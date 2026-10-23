@@ -20,6 +20,7 @@ import { Requested } from "./template-details.js";
 
 type DetailValue = ReadonlyArray<string | symbol>;
 type DetailsMap = Record<string, DetailValue>;
+type DetailsHash = Record<string, DetailValue | ":any">;
 type DefaultProc = () => DetailValue;
 
 const REGISTERED_DETAILS: string[] = [];
@@ -39,11 +40,10 @@ type Accessors = {
   set handlers(value: DetailWriter);
   get locale(): unknown;
   set locale(value: DetailWriter);
-  defaultLocale(): DetailValue;
-  defaultFormats(): DetailValue;
-  defaultVariants(): DetailValue;
-  defaultHandlers(): DetailValue;
 };
+
+/** @noRailsEquivalent CONVERGEABLE lookup-context-register-detail-accessors-typed-on-merge */
+type DefaultAccessors = Record<"defaultLocale" | "defaultFormats", () => DetailValue>;
 
 type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
 
@@ -57,21 +57,21 @@ export class DetailsKey {
   /** @internal */
   static _digestCache = new Map<Requested, DigestCache>();
 
-  static detailsCacheKey(details: DetailsMap): Requested {
-    let formats = details.formats;
+  static detailsCacheKey(details: DetailsHash): Requested {
+    let formats = details.formats as DetailValue | undefined;
     if (formats && !Template.Types.isValidSymbols(formats)) {
       formats = formats.filter(
         (f) => typeof f === "string" && Template.Types.symbols().includes(f),
       ) as DetailValue;
     }
-    const normalized: DetailsMap = { ...details, formats: formats ?? [] };
+    const normalized: DetailsHash = { ...details, formats: formats ?? [] };
     const key = DetailsKey._stableKey(normalized);
     let req = DetailsKey._detailsKeys.get(key);
     if (req) return req;
     req = new Requested({
-      locale: normalized.locale ?? [],
-      handlers: normalized.handlers ?? [],
-      formats: normalized.formats ?? [],
+      locale: (normalized.locale ?? []) as DetailValue,
+      handlers: (normalized.handlers ?? []) as DetailValue,
+      formats: (normalized.formats ?? []) as DetailValue,
       variants: normalized.variants ?? [],
     });
     DetailsKey._detailsKeys.set(key, req);
@@ -123,17 +123,26 @@ export class DetailsKey {
   }
 
   /** @internal */
-  private static _stableKey(details: DetailsMap): string {
+  private static _stableKey(details: DetailsHash): string {
     return JSON.stringify(
-      REGISTERED_DETAILS.map((k) => [
-        k,
-        (details[k] ?? []).map((v) => (typeof v === "symbol" ? DetailsKey._tagSymbol(v) : v)),
-      ]),
+      REGISTERED_DETAILS.map((k) => {
+        const value = details[k] ?? [];
+        return [
+          k,
+          value === ":any"
+            ? value
+            : value.map((v) => (typeof v === "symbol" ? DetailsKey._tagSymbol(v) : v)),
+        ];
+      }),
     );
   }
 }
 
-export class LookupContext extends (Object as unknown as new () => Accessors) {
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Accessors` (`actionview/lib/action_view/lookup_context.rb:228`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface LookupContext extends Accessors {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class LookupContext {
   static DetailsKey: typeof DetailsKey;
   static Accessors: typeof Accessors;
 
@@ -170,14 +179,13 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
   private _detailsCache = true;
   private _htmlFallbackForJs = false;
   private _viewPaths: PathSet;
-  private _detailArgsForAny: [DetailsMap, Requested | null] | null = null;
+  private _detailArgsForAny: [DetailsHash, Requested | null] | null = null;
 
   constructor(
-    viewPaths: PathSet | ReadonlyArray<PathSetResolver> | null = null,
+    viewPaths: PathSet | ReadonlyArray<PathSetResolver | string> | null = null,
     details: DetailsMap = {},
     prefixes: string[] = [],
   ) {
-    super();
     this._prefixes = prefixes;
     this._details = this.initializeDetails({}, details);
     this._viewPaths = this.buildViewPaths(viewPaths);
@@ -198,10 +206,10 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
     this._prefixes = value;
   }
 
-  override get locale(): string | null {
+  get locale(): string | null {
     return (this._details.locale[0] as string | undefined) ?? null;
   }
-  override set locale(value: string | null) {
+  set locale(value: string | null) {
     if (value != null) {
       const config = rbObjRespondTo(I18n.config(), "originalConfig")
         ? (I18n.config() as unknown as { originalConfig: ReturnType<typeof I18n.config> })
@@ -210,16 +218,23 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
       config.locale = isSymbol(value) ? symbolToS(value) : value;
     }
 
-    super.locale = this.defaultLocale();
+    const defaultLocale = (this as unknown as DefaultAccessors).defaultLocale();
+    const detail: DetailValue = isPresent(defaultLocale)
+      ? kernelArray(defaultLocale as (string | symbol)[])
+      : (this as unknown as DefaultAccessors).defaultLocale();
+    if (!rbEqual(detail, this._details.locale)) this._setDetail("locale", detail);
   }
 
-  override get formats(): DetailValue {
-    return super.formats;
+  get formats(): DetailValue {
+    return this._details.formats ?? [];
   }
-  override set formats(values: DetailValue | null | undefined) {
+  set formats(values: DetailValue | null | undefined) {
     if (values) {
       let arr = [...values];
-      if (arr.includes("*/*")) arr = arr.filter((v) => v !== "*/*").concat(this.defaultFormats());
+      if (arr.includes("*/*"))
+        arr = arr
+          .filter((v) => v !== "*/*")
+          .concat((this as unknown as DefaultAccessors).defaultFormats());
       arr = Array.from(new Set(arr));
 
       if (!Template.Types.isValidSymbols(arr)) {
@@ -235,7 +250,10 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
       }
       values = arr;
     }
-    super.formats = values;
+    const detail: DetailValue = isPresent(values)
+      ? kernelArray(values as (string | symbol)[])
+      : (this as unknown as DefaultAccessors).defaultFormats();
+    if (!rbEqual(detail, this._details.formats)) this._setDetail("formats", detail);
   }
   get htmlFallbackForJs(): boolean {
     return this._htmlFallbackForJs;
@@ -284,7 +302,7 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
   }
 
   /** @internal */
-  buildViewPaths(paths: PathSet | ReadonlyArray<PathSetResolver> | null): PathSet {
+  buildViewPaths(paths: PathSet | ReadonlyArray<PathSetResolver | string> | null): PathSet {
     if (paths instanceof PathSet) return paths;
     return new PathSet(paths ?? []);
   }
@@ -343,11 +361,15 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
     return this._viewPaths.exists(base, pfxs, partial, details, key, keys);
   }
 
+  declare isTemplateExists: LookupContext["isExists"];
+
   isAny(name: string, prefixes: ReadonlyArray<string> = [], partial = false): boolean {
     const [base, pfxs] = this.normalizeName(name, prefixes);
     const [details, key] = this.detailArgsForAny();
     return this._viewPaths.exists(base, pfxs, partial, details, key, []);
   }
+
+  declare isAnyTemplates: LookupContext["isAny"];
 
   /** @internal */
   detailArgsFor(options: Record<string, DetailValue>): [DetailsMap, Requested | null] {
@@ -358,21 +380,23 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
   }
 
   /** @internal */
-  detailArgsForAny(): [DetailsMap, Requested | null] {
+  detailArgsForAny(): [DetailsHash, Requested | null] {
     if (this._detailArgsForAny) return this._detailArgsForAny;
-    const details: DetailsMap = {};
+    const details: DetailsHash = {};
+
     for (const k of REGISTERED_DETAILS) {
-      details[k] = Accessors.DEFAULT_PROCS[k]();
+      if (k === "variants") {
+        details[k] = ":any";
+      } else {
+        details[k] = Accessors.DEFAULT_PROCS[k].call(undefined);
+      }
     }
-    const key = this._detailsCache
-      ? new Requested({
-          locale: details.locale,
-          handlers: details.handlers,
-          formats: details.formats,
-          variants: "any",
-        })
-      : null;
-    this._detailArgsForAny = [details, key];
+
+    if (this._detailsCache) {
+      this._detailArgsForAny = [details, DetailsKey.detailsCacheKey(details)];
+    } else {
+      this._detailArgsForAny = [details, null];
+    }
     return this._detailArgsForAny;
   }
 
@@ -391,6 +415,8 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
     return new (DetailsKey.viewContextClass())(this, {}, null);
   }
 }
+LookupContext.prototype.isTemplateExists = LookupContext.prototype.isExists;
+LookupContext.prototype.isAnyTemplates = LookupContext.prototype.isAny;
 
 (LookupContext as { DetailsKey: typeof DetailsKey }).DetailsKey = DetailsKey;
 LookupContext.Accessors = Accessors;

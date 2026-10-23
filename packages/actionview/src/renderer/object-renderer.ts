@@ -17,13 +17,14 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
   partialPath = partialPath;
 
   /** @internal */
-  contextPrefix: string;
+  contextPrefix: string | undefined;
   private object: unknown = null;
   private localName: string | null = null;
 
+  /** @inlinedFrom ActionView::AbstractRenderer::ObjectRendering#initialize rails/v8.0.2/actionview/lib/action_view/renderer/abstract_renderer.rb:37-40 */
   constructor(lookupContext: LookupContext, options: RenderOptions = {}) {
     super(lookupContext, options);
-    this.contextPrefix = lookupContext.prefixes[0] ?? "";
+    this.contextPrefix = lookupContext.prefixes[0];
   }
 
   renderObjectWithPartial(
@@ -31,7 +32,7 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
     partial: string,
     context: ViewContext,
     block: ((...args: unknown[]) => unknown) | null | undefined,
-  ): RenderedTemplate {
+  ): Promise<RenderedTemplate> {
     this.object = object;
     this.localName = this.localVariable(partial);
     return this.render(partial, context, block);
@@ -41,7 +42,7 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
     object: unknown,
     context: ViewContext,
     block: ((...args: unknown[]) => unknown) | null | undefined,
-  ): RenderedTemplate {
+  ): Promise<RenderedTemplate> {
     const path = this.partialPath(object, context);
     return this.renderObjectWithPartial(object, path, context, block);
   }
@@ -58,7 +59,7 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
     template: RenderableTemplate,
     layout: RenderableTemplate | null,
     block: ((...args: unknown[]) => unknown) | null | undefined,
-  ): RenderedTemplate {
+  ): Promise<RenderedTemplate> {
     locals[this.localName ?? template.variable!] = this.object;
     return super.renderPartialTemplate(view, locals, template, layout, block);
   }

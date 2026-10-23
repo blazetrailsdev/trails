@@ -28,12 +28,13 @@ import {
   Hash,
   isEmpty,
   isModuleIncluded,
-  rbFPublicSend,
+  rbFSend,
   rbObjRespondTo,
   rtest,
   toD,
   toI,
   uniq,
+  eachWithObject,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
@@ -111,6 +112,8 @@ interface CalculationConnection {
 }
 
 interface CalculationRelation {
+  /** @internal */
+  skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R>;
   model: CalculationRelation["_model"];
   primaryKey: string | string[];
   _model: {
@@ -122,6 +125,7 @@ interface CalculationRelation {
     _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
     withConnection<R>(fn: (conn: CalculationConnection) => R | Promise<R>): Promise<R>;
     ensureSchemaLoaded(): Promise<void>;
+    _reflectOnAssociation?(name: string): any;
     disallowRawSqlBang(args: (string | symbol | ArelNode)[], options?: { permit?: RegExp }): void;
     attributeNames(): string[];
     attributeAliases: Record<string, string>;
@@ -428,7 +432,7 @@ export async function pluck(
 ): Promise<unknown[]> {
   if (this.isNullRelation()) return [];
 
-  if (this.loaded && isAllAttributes.call(this, columnNames as unknown as string[])) {
+  if (this.loaded && isAllAttributes.call(this, columnNames)) {
     const records = await this.records();
     return records.map((record) =>
       columnNames.length > 1
@@ -480,7 +484,7 @@ export async function pick(
     | Record<string, string | string[]>
   >
 ): Promise<unknown> {
-  if (this.loaded && isAllAttributes.call(this, columnNames as unknown as string[])) {
+  if (this.loaded && isAllAttributes.call(this, columnNames)) {
     return enumerablePick(await this.records(), ...(columnNames as never[])) ?? null;
   }
 
@@ -711,7 +715,10 @@ export function aggregateColumn(
 }
 
 /** @internal */
-export function isAllAttributes(this: CalculationRelation, columnNames: string[]): boolean {
+export function isAllAttributes(
+  this: CalculationRelation,
+  columnNames: readonly unknown[],
+): boolean {
   const attributeNames: string[] = this.model.attributeNames();
   const attributeAliases = Object.keys(this.model.attributeAliases);
   return isEmpty(
@@ -784,7 +791,7 @@ export function operationOverAggregateColumn(
   operation: string,
   distinct: boolean,
 ): unknown {
-  return operation === "count" ? column.count(distinct) : rbFPublicSend(column, operation);
+  return operation === "count" ? column.count(distinct) : rbFSend(column, operation);
 }
 
 /** @internal */
@@ -857,9 +864,7 @@ export async function executeSimpleCalculation(
     ? this._async
       ? FutureResult.wrap(Result.empty())
       : Result.empty()
-    : (
-        this as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
-      ).skipQueryCacheIfNecessary(() =>
+    : this.skipQueryCacheIfNecessary(() =>
         this.model.withConnection((c) =>
           c.selectAll(
             queryBuilder,
@@ -898,7 +903,7 @@ export async function executeGroupedCalculation(
   let association: any = null;
   let associated = false;
   if (groupFields.length === 1 && typeof groupFields[0] === "string") {
-    association = (this.model as any)._reflectOnAssociation?.(groupFields[0]) ?? null;
+    association = this.model._reflectOnAssociation?.(groupFields[0]) ?? null;
     associated = association != null && association.belongsTo?.() === true;
     if (associated) groupFields = kernelArray(association.foreignKey());
   }
@@ -946,9 +951,7 @@ export async function executeGroupedCalculation(
     relation.selectValues = selectValues as (string | ArelNode)[];
 
     const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-    const calculatedData = await (
-      this as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
-    ).skipQueryCacheIfNecessary(() =>
+    const calculatedData = await this.skipQueryCacheIfNecessary(() =>
       connection.selectAll(relation.arel(), `${this.model.name} ${opName}`),
     );
 
@@ -960,13 +963,12 @@ export async function executeGroupedCalculation(
         .indexBy((record) => record.id as string | number);
     }
 
-    const keyTypes: ColumnTypes = {};
-    for (const [aliaz, colName] of groupColumns) {
-      keyTypes[aliaz] = (typeCasterFor(colName) ??
+    const keyTypes = eachWithObject(groupColumns, {} as ColumnTypes, ([aliaz, colName], types) => {
+      types[aliaz] = (typeCasterFor(colName) ??
         typeFor.call(this, colName, () =>
           fetch(calculatedData.columnTypes, aliaz, defaultValue()),
         )) as ColumnType;
-    }
+    });
 
     const hashRows = (calculatedData.castValues(keyTypes) as unknown[][]).map((row) => {
       const hash: Record<string, unknown> = {};
@@ -985,15 +987,13 @@ export async function executeGroupedCalculation(
       if (type instanceof EnumType) type = type.subtype;
     }
 
-    const result = new Map<unknown, unknown>();
-    for (const row of hashRows) {
+    return eachWithObject(hashRows, new Map<unknown, unknown>(), (row, result) => {
       let key: unknown = groupAliases.map((aliaz) => row[aliaz]);
       if ((key as unknown[]).length === 1) key = (key as unknown[])[0];
       if (associated) key = hashAref(keyRecords!, key);
 
       result.set(key, typeCastCalculatedValue.call(this, row[columnAlias], fn, type));
-    }
-    return result;
+    });
   });
 }
 

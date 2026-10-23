@@ -1,6 +1,7 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
-  Module,
   classAttribute,
   extend,
   include,
@@ -57,25 +58,25 @@ export function lookupAndDigestTemplate(
   return Digestor.digest({ name: template, format: null, finder: this.lookupContext });
 }
 
-export const EtagWithTemplateDigest = new Module((mod) => {
-  extend(mod, Concern);
+export const EtagWithTemplateDigest = {};
+extend(EtagWithTemplateDigest, Concern);
+include(EtagWithTemplateDigest, ConditionalGet);
+(
+  EtagWithTemplateDigest as unknown as {
+    included(base: null, block: (this: object) => void): void;
+  }
+).included(null, function (this: object) {
+  classAttribute.call(this, "etagWithTemplateDigest", { default: true });
 
-  include(mod, ConditionalGet);
-
-  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
-    null,
-    function (this: object) {
-      classAttribute.call(this, "etagWithTemplateDigest", { default: true });
-
-      (this as typeof ConditionalGet.ClassMethods & { etaggers: Etagger[] }).etag(function (
-        this: unknown,
-        options,
-      ) {
-        const controller = this as EtagWithTemplateDigestHost & { etagWithTemplateDigest: boolean };
-        if (controller.etagWithTemplateDigest) {
-          return determineTemplateEtag.call(controller, options);
-        }
-      });
-    },
-  );
+  (this as typeof ConditionalGet.ClassMethods & { etaggers: Etagger[] }).etag(function (
+    this: unknown,
+    options,
+  ) {
+    const controller = this as EtagWithTemplateDigestHost & { etagWithTemplateDigest: boolean };
+    if (controller.etagWithTemplateDigest) {
+      return determineTemplateEtag.call(controller, options);
+    }
+  });
 });
+
+rbModConstSet(ActionController, "EtagWithTemplateDigest", EtagWithTemplateDigest);

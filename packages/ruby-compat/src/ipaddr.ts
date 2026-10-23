@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { Range } from "./range.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NoMethodError } from "./no-method-error.js";
 
@@ -64,6 +65,11 @@ export class IPAddr {
     return this.beginAddr() <= coerced.beginAddr() && this.endAddr() >= coerced.endAddr();
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:181` */
+  caseEquals(other: unknown): boolean {
+    return this.includes(other);
+  }
+
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:184` */
   toI(): bigint {
     return this._addr!;
@@ -127,6 +133,15 @@ export class IPAddr {
       this._zoneId === other._zoneId &&
       this.isIpv4() === other.isIpv4() &&
       this.equals(other)
+    );
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:406` */
+  toRange(): Range<IPAddr> {
+    const klass = this.constructor as new (addr: bigint, family: number) => IPAddr;
+    return new Range(
+      new klass(this.beginAddr(), this.family!),
+      new klass(this.endAddr(), this.family!),
     );
   }
 

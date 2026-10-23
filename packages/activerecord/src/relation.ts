@@ -5,7 +5,6 @@ import {
   except,
   hashDelete,
   isModuleIncluded,
-  type Module,
   Range,
   rbEnsure,
   rtest,
@@ -23,12 +22,13 @@ import {
 import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
 import { ARRAY_METHOD_TABLE, fetch, first } from "@blazetrails/ruby-compat";
-import { YAML } from "@blazetrails/ruby-compat/yaml";
+import { toYaml } from "@blazetrails/ruby-compat/yaml";
+import type { Psych } from "@blazetrails/ruby-compat/psych";
 import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotUnique } from "./errors.js";
-import { compact, max, min, take } from "@blazetrails/ruby-compat";
+import { compact, groupBy, max, min, take } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { PermittedAttributes, SerializeOptions } from "@blazetrails/activemodel";
 
@@ -39,7 +39,6 @@ import {
   any,
   compactBlank,
   extractOptionsBang,
-  groupBy,
   indexBy,
   many,
 } from "@blazetrails/activesupport";
@@ -140,8 +139,7 @@ function valuesEqual(a: unknown, b: unknown): boolean {
   const keys = Object.keys(a);
   if (keys.length !== Object.keys(b).length) return false;
   return keys.every(
-    (key) =>
-      Object.prototype.hasOwnProperty.call(b, key) && valuesEqual((a as any)[key], (b as any)[key]),
+    (key) => Object.hasOwn(b, key) && valuesEqual((a as any)[key], (b as any)[key]),
   );
 }
 
@@ -195,9 +193,7 @@ export class ExplainProxy<T extends Base> {
   }
 
   inspect(): Promise<string> {
-    return this.execExplain(() =>
-      (this._relation as unknown as { execQueries(): Promise<T[]> }).execQueries(),
-    );
+    return this.execExplain(() => this._relation.execQueries());
   }
 
   average(columnName: string | ArelNode): Promise<string> {
@@ -285,7 +281,7 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
     if (prop === Symbol.iterator && !target._isRecordsSynchronous) return false;
     if (Reflect.has(target, prop)) return true;
     if (typeof prop === "symbol") return false;
-    if (Object.prototype.hasOwnProperty.call(ENUMERABLE_METHODS, prop)) return true;
+    if (Object.hasOwn(ENUMERABLE_METHODS, prop)) return true;
     return target.respondToMissing(prop, false);
   },
 };
@@ -334,11 +330,12 @@ export class Relation<T extends Base, G extends boolean = false> {
     ...Relation.CLAUSE_METHODS,
   ];
 
-  private _model: typeof Base;
+  private _model: typeof Base & (new (attributes?: any, block?: any) => T);
   /** @internal */
   _values: ValuesHash = {};
   _withIsRecursive = false;
-  private _isNone = false;
+  /** @internal */
+  _isNone = false;
   skipPreloadingValue = false;
   private _loaded = false;
   private _delegateToModel = false;
@@ -350,7 +347,8 @@ export class Relation<T extends Base, G extends boolean = false> {
   protected set _records(records: T[]) {
     this._recordsStore = records;
   }
-  protected _offsets?: Record<number, T | null>;
+  /** @internal */
+  _offsets?: Record<number, T | null>;
   private _futureResult?: FutureResult | Complete | Promise<Result>;
   /** @internal */
   _loadResult?: Promise<T[]>;
@@ -364,7 +362,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   /** @inventedArm if — PERMANENT */
   constructor(
-    model: typeof Base,
+    model: typeof Base & (new (attributes?: any, block?: any) => T),
     {
       table = null,
       predicateBuilder = null,
@@ -513,9 +511,9 @@ export class Relation<T extends Base, G extends boolean = false> {
       return attributes.map((a) => this.build(a, block));
     }
     const restoring = block ? this.currentScopeRestoringBlock(block) : undefined;
-    const modelClass = this._model as any;
+    const modelClass = this._model;
     const prev = ScopeRegistry.currentScope(modelClass);
-    modelClass.setCurrentScope(this as any);
+    modelClass.setCurrentScope(this);
     try {
       return this._new(attributes, restoring);
     } finally {
@@ -563,13 +561,13 @@ export class Relation<T extends Base, G extends boolean = false> {
     return await this.scoping(() => this._createBang(attributes, restoring));
   }
 
-  /** @noRailsEquivalent CONVERGEABLE relation-to-yaml-is-an-awaited-member-not-object-to-yaml */
+  /** @noRailsEquivalent PERMANENT */
   async toYaml(): Promise<string> {
     await this.load();
-    return YAML.toYaml(this);
+    return toYaml(this);
   }
 
-  encodeWith(coder: { representSeq(tag: string | null, list: unknown[]): void }): void {
+  encodeWith(coder: Psych.Coder): void {
     coder.representSeq(null, this._records);
   }
 
@@ -676,11 +674,10 @@ export class Relation<T extends Base, G extends boolean = false> {
     return [...(await this.records())];
   }
 
-  protected async execQueries(block?: (record: T) => void): Promise<T[]> {
+  /** @internal */
+  async execQueries(block?: (record: T) => void): Promise<T[]> {
     return this.skipQueryCacheIfNecessary(async () => {
-      await (
-        this._model as unknown as { ensureSchemaLoaded(): Promise<void> }
-      ).ensureSchemaLoaded();
+      await this._model.ensureSchemaLoaded();
 
       await this._materializeDeferredDistinctPkPredicates();
 
@@ -704,12 +701,12 @@ export class Relation<T extends Base, G extends boolean = false> {
 
       if (this.readonlyValue) {
         for (const record of records) {
-          (record as any)._readonly = true;
+          record._readonly = true;
         }
       }
       if (this.strictLoadingValue != null) {
         for (const record of records) {
-          (record as any)._strictLoading = this.strictLoadingValue;
+          record._strictLoading = this.strictLoadingValue;
         }
       }
 
@@ -797,10 +794,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
     let values: [Nodes.Node, unknown][] | Nodes.SqlLiteral;
     if (typeof updates !== "string" && !Array.isArray(updates)) {
-      if (
-        this.model.lockingEnabled &&
-        !Object.prototype.hasOwnProperty.call(updates, this.model.lockingColumn)
-      ) {
+      if (this.model.lockingEnabled && !Object.hasOwn(updates, this.model.lockingColumn)) {
         const attr = this.table.get(this.model.lockingColumn);
         updates[String(attr.name)] = this._incrementAttribute(attr);
       }
@@ -1005,8 +999,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     if (!this.hasLimitOrOffset) return false;
     return !this._eagerJoinDependencyIsLimitable(
       QueryMethods.constructJoinDependency.call(
-        this as any,
-        [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
+        this,
+        [...new Set([...this.eagerLoadValues, ...this.includesValues])],
         Nodes.OuterJoin,
       ),
     );
@@ -1014,10 +1008,10 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   /** @internal */
   _buildDeferredDistinctPkInlineSubquery(): SelectManager {
-    const basePk = (this._model as any).primaryKey ?? "id";
+    const basePk = this._model.primaryKey ?? "id";
     const jd = QueryMethods.constructJoinDependency.call(
-      this as any,
-      [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
+      this,
+      [...new Set([...this.eagerLoadValues, ...this.includesValues])],
       Nodes.OuterJoin,
     );
     return this._limitedDistinctRelation(jd, basePk).arel();
@@ -1025,10 +1019,10 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   /** @internal */
   async _materializeDistinctPkIds(): Promise<unknown[]> {
-    const basePk = (this._model as any).primaryKey ?? "id";
+    const basePk = this._model.primaryKey ?? "id";
     const jd = QueryMethods.constructJoinDependency.call(
-      this as any,
-      [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
+      this,
+      [...new Set([...this.eagerLoadValues, ...this.includesValues])],
       Nodes.OuterJoin,
     );
     if (jd.reflections.length === 0) return [];
@@ -1105,7 +1099,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       return joinDependency.instantiate(rows, this.strictLoadingValue, block) as T[];
     }
 
-    return this._model._loadFromSql(rows, block as never) as T[];
+    return this._model._loadFromSql(rows, block);
   }
 
   /** @internal */
@@ -1126,12 +1120,12 @@ export class Relation<T extends Base, G extends boolean = false> {
     block?: (relation: Relation<T, G>, joinDependency: JoinDependency) => R,
   ): R | Relation<T, G> {
     const jd = QueryMethods.constructJoinDependency.call(
-      this as any,
-      [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
+      this,
+      [...new Set([...this.eagerLoadValues, ...this.includesValues])],
       Nodes.OuterJoin,
     );
     let rel = this.except("includes", "eagerLoad", "preload");
-    QueryMethods.joinsBang.call(rel as any, jd as any);
+    QueryMethods.joinsBang.call(rel, jd);
     if (
       eagerLoading &&
       this.hasLimitOrOffset &&
@@ -1139,18 +1133,18 @@ export class Relation<T extends Base, G extends boolean = false> {
         this.usingLimitableReflections(jd.reflections as never) &&
         this.usingLimitableReflections(
           QueryMethods.constructJoinDependency.call(
-            this as any,
+            this,
             _qm.selectAssociationList
-              .call(this as any, this.joinsValues, null)
+              .call(this, this.joinsValues, null)
               .concat(
-                _qm.selectAssociationList.call(this as any, this.leftOuterJoinsValues, null),
+                _qm.selectAssociationList.call(this, this.leftOuterJoinsValues, null),
               ) as AssociationSpec[],
             null,
           ).reflections as never,
         )
       )
     ) {
-      const basePk: string | string[] = (this._model as any).primaryKey ?? "id";
+      const basePk: string | string[] = this._model.primaryKey ?? "id";
       if (Array.isArray(basePk)) {
         const tuples = limitedIds as unknown[][] | undefined;
         basePk.forEach((column, i) => {
@@ -1179,11 +1173,11 @@ export class Relation<T extends Base, G extends boolean = false> {
       this.usingLimitableReflections(jd.reflections as never) &&
       this.usingLimitableReflections(
         QueryMethods.constructJoinDependency.call(
-          this as any,
+          this,
           _qm.selectAssociationList
-            .call(this as any, this.joinsValues, null)
+            .call(this, this.joinsValues, null)
             .concat(
-              _qm.selectAssociationList.call(this as any, this.leftOuterJoinsValues, null),
+              _qm.selectAssociationList.call(this, this.leftOuterJoinsValues, null),
             ) as AssociationSpec[],
           null,
         ).reflections as never,
@@ -1197,13 +1191,13 @@ export class Relation<T extends Base, G extends boolean = false> {
     distinctSelectSql?: string,
   ): Relation<T, G> {
     const relation = this.except("includes", "eagerLoad", "preload");
-    QueryMethods.joinsBang.call(relation as any, jd as any);
+    QueryMethods.joinsBang.call(relation, jd);
     const values =
       distinctSelectSql !== undefined
         ? [new Nodes.SqlLiteral(distinctSelectSql)]
         : (Array.isArray(basePk) ? basePk : [basePk]).map((column) => this.table.get(column));
     const limited = relation.reselect(...values);
-    QueryMethods.distinctBang.call(limited as any);
+    QueryMethods.distinctBang.call(limited);
     return limited;
   }
 
@@ -1274,7 +1268,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     const scope = this.strictLoadingValue ? Relation.StrictLoadingScope : undefined;
     for (const associations of preload) {
       await Preloader.new({
-        records: records as unknown as import("./base.js").Base[],
+        records,
         associations: [associations],
         scope,
       }).call();
@@ -1306,7 +1300,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       }
       return records;
     } else {
-      return (await this.model.update(id, attributes)) as T;
+      return await this.model.update(id, attributes);
     }
   }
 
@@ -1325,7 +1319,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       }
       return records;
     } else {
-      return (await this.model.updateBang(id, attributes)) as T;
+      return await this.model.updateBang(id, attributes);
     }
   }
 
@@ -1384,7 +1378,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         ...(names as string[]),
         options.time,
       );
-      if (!isEmpty(touchUpdates)) Object.assign(updates, touchUpdates);
+      if (Object.keys(touchUpdates).length !== 0) Object.assign(updates, touchUpdates);
     }
 
     return this.updateAll(updates);
@@ -1444,11 +1438,11 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this._table;
   }
 
-  get model(): typeof Base {
+  get model(): typeof Base & (new (attributes?: any, block?: any) => T) {
     return this._model;
   }
 
-  get klass(): typeof Base {
+  get klass(): typeof Base & (new (attributes?: any, block?: any) => T) {
     return this._model;
   }
 
@@ -1499,7 +1493,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   get isEmptyScope(): boolean {
-    return valuesEqual(this.values(), (this.model as any).unscoped().values());
+    return valuesEqual(this.values(), this.model.unscoped().values());
   }
 
   get hasLimitOrOffset(): boolean {
@@ -1552,7 +1546,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     } else if (this.isAlreadyInScope(registry)) {
       return block!();
     } else {
-      return this._scoping(this as any, registry, allQueries, block!);
+      return this._scoping(this, registry, allQueries, block!);
     }
   }
 
@@ -1600,13 +1594,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       const records = await this.records();
       size = records.length;
       if ((size as number) > 0) {
-        timestamp = max(
-          records.map((record) =>
-            (record as unknown as { readAttribute(name: string): unknown }).readAttribute(
-              timestampColumn,
-            ),
-          ),
-        );
+        timestamp = max(records.map((record) => record.readAttribute(timestampColumn)));
       }
     } else {
       const collection = this.isEagerLoading ? await this.applyJoinDependency() : this;
@@ -1637,9 +1625,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
         if (size != null) {
           const columnType = this.model.typeForAttribute(timestampColumn);
-          timestamp = (
-            columnType as unknown as { deserialize(value: unknown): unknown }
-          ).deserialize(timestamp);
+          timestamp = columnType!.deserialize(timestamp);
         } else {
           size = 0;
         }
@@ -1698,9 +1684,9 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   private currentScopeRestoringBlock(block?: (record: T) => void): (record: T) => void {
     const modelClass = this.model;
-    const currentScope = (modelClass as any).currentScope(true);
+    const currentScope = modelClass.currentScope(true);
     return (record: T) => {
-      (modelClass as any).setCurrentScope(currentScope ?? null);
+      modelClass.setCurrentScope(currentScope ?? null);
       if (block) return block(record);
     };
   }
@@ -1709,21 +1695,21 @@ export class Relation<T extends Base, G extends boolean = false> {
     attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): T {
-    return new (this.model as any)(attributes, block) as T;
+    return new this.model(attributes, block);
   }
 
   protected _create(
     attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): Promise<T> {
-    return (this.model as any).create(attributes, block);
+    return this.model.create(attributes, block);
   }
 
   protected _createBang(
     attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): Promise<T> {
-    return (this.model as any).createBang(attributes, block);
+    return this.model.createBang(attributes, block);
   }
 
   private _scoping<R>(
@@ -1778,7 +1764,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     return value < 0 ? new Nodes.Subtraction(expr, bind) : new Nodes.Addition(expr, bind);
   }
 
-  private skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R> {
+  /** @internal */
+  skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R> {
     if (this.skipQueryCacheValue) {
       return this.model.uncached(block);
     }
@@ -1905,8 +1892,8 @@ export interface Relation<T extends Base, G extends boolean = false>
   extending<M extends Record<string, (...args: any[]) => any>>(
     mod: M | undefined,
   ): Relation<T, G> & Partial<M>;
-  extending(...modules: Module[]): Relation<T, G>;
-  extending(block: (mod: Module) => void): Relation<T, G>;
+  extending(...modules: object[]): Relation<T, G>;
+  extending(block: (mod: Record<string, unknown>) => void): Relation<T, G>;
   extending(): Relation<T, G>;
   optimizerHints(...args: string[]): Relation<T, G>;
   annotate(...args: string[]): Relation<T, G>;

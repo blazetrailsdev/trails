@@ -5,6 +5,7 @@ import {
   registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
+  rbFSend,
 } from "@blazetrails/ruby-compat";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { RouteSet } from "@blazetrails/actionpack";
@@ -219,8 +220,8 @@ describe("Engine", () => {
       class Upcaser {
         constructor(private app: (env: never) => Promise<[number, object, string[]]>) {}
         async call(env: never): Promise<[number, object, string[]]> {
-          const response = await this.app(env);
-          response[2] = response[2].map((part) => part.toUpperCase());
+          const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+          response[2] = response[2].map((part: string) => part.toUpperCase());
           return response;
         }
       }

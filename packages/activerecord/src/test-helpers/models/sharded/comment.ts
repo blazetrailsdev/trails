@@ -1,16 +1,11 @@
-import {
-  Module,
-  rbModConstSet,
-  registerConstant,
-  registeredConstant,
-} from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant, registeredConstant } from "@blazetrails/ruby-compat";
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedBlog } from "./blog.js";
 import type { ShardedBlogPost } from "./blog-post.js";
 
-const Sharded = (registeredConstant("Sharded") as Module | undefined) ?? new Module();
+const Sharded = (registeredConstant("Sharded") as object | undefined) ?? {};
 registerConstant("Sharded", Sharded);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

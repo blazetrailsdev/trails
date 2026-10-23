@@ -27,7 +27,7 @@ const TestFileUtils = {
     return new URL(import.meta.url).pathname;
   },
   fileData(this: { _data?: string; filePath(): string }): string {
-    return (this._data ||= File.binread(this.filePath()));
+    return (this._data ||= Buffer.from(File.binread(this.filePath())).toString("latin1"));
   },
 };
 
@@ -144,9 +144,9 @@ describe("SendFileTest", () => {
       response = await tc.process("file");
     });
     assertNotNil(response);
-    const body = response!.body;
-    assertKindOf(String, body);
-    assertEqual(tc.fileData(), body);
+    const body = response!.body as unknown as Uint8Array;
+    assertKindOf(Uint8Array, body);
+    assertEqual(tc.fileData(), Buffer.from(body).toString("latin1"));
   });
 
   it("file stream", async () => {
@@ -160,8 +160,11 @@ describe("SendFileTest", () => {
 
     const output = new StringIO();
     output.binmode();
-    for (const part of response!.bodyParts()) output.write(String(part));
-    assertEqual(tc.fileData(), output.string());
+    for (const part of response!.bodyParts()) output.write(part as Uint8Array);
+    assertEqual(
+      tc.fileData(),
+      Buffer.from(output.string() as unknown as Uint8Array).toString("latin1"),
+    );
   });
 
   it("file url based filename", async () => {
@@ -269,8 +272,11 @@ describe("SendFileTest", () => {
     });
     assertNotNil(response);
 
-    assertKindOf(String, response!.body);
-    assertEqual(tc.fileData(), response!.body);
+    assertKindOf(Uint8Array, response!.body as unknown as Uint8Array);
+    assertEqual(
+      tc.fileData(),
+      Buffer.from(response!.body as unknown as Uint8Array).toString("latin1"),
+    );
   });
 
   it("send file instrumentation", async () => {

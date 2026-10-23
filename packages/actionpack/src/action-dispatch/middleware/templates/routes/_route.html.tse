@@ -1,0 +1,19 @@
+<tr class='route_row' data-helper='path'>
+  <td data-route-name='<%= route.name %>'>
+    <% if (route.name) { %>
+      <%= route.name %><span class='helper'>_path</span>
+    <% } %>
+  </td>
+  <td>
+    <%= route.verb %>
+  </td>
+  <td data-route-path='<%= route.path %>'>
+    <%= route.path %>
+  </td>
+  <td>
+    <%= simpleFormat(route.reqs) %>
+  </td>
+  <td>
+    <%= simpleFormat(route.sourceLocation) %>
+  </td>
+</tr>

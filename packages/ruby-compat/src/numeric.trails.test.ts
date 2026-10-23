@@ -11,8 +11,8 @@ import {
   fixMod,
   isFinite,
   isNan,
+  numStep,
   numericMinus,
-  numericUminus,
   numericModulo,
   numericMul,
   numericPow,
@@ -91,18 +91,6 @@ describe("Numeric#*", () => {
     expect(numericMul(2n ** 60n, 4)).toBe(2n ** 62n);
     expect(toI(numericMul(0.5, 1_000_000))).toBe(500000);
     expect(() => numericMul(1, "a")).toThrow("String can't be coerced into Integer");
-  });
-});
-
-describe("Numeric#-@", () => {
-  it("negates within the Integer, Float and Rational seats", () => {
-    expect(numericUminus(3)).toBe(-3);
-    expect(Object.is(numericUminus(0), 0)).toBe(true);
-    expect(numericUminus(1.5)).toBe(-1.5);
-    expect(numericUminus(new Number(2))).toEqual(new Number(-2));
-    expect(Object.is((numericUminus(new Number(0)) as number).valueOf(), -0)).toBe(true);
-    expect(numericUminus(2n ** 60n)).toBe(-(2n ** 60n));
-    expect(numericUminus(new Rational(1, 2))).toEqual(new Rational(-1, 2));
   });
 });
 
@@ -308,5 +296,48 @@ describe("intXor", () => {
       new TypeError("Operand can't be coerced into Integer"),
     );
     expect(() => intXor(3, new Operand(5))).toThrow(new TypeError("coerce must return [x, y]"));
+  });
+});
+
+describe("numStep", () => {
+  function steps(from: number, to: number, step: number): number[] {
+    const r: number[] = [];
+    const stop = new Error("break");
+    try {
+      numStep(from, to, step, (v) => {
+        r.push(v);
+        if (r.length > 5) throw stop;
+      });
+    } catch (e) {
+      if (e !== stop) throw e;
+    }
+    return r;
+  }
+
+  it("steps an Integer range up and down, inclusive", () => {
+    expect(steps(1, 5, 2)).toEqual([1, 3, 5]);
+    expect(steps(5, 1, -2)).toEqual([5, 3, 1]);
+  });
+
+  it("loops forever toward an infinite bound in the step's direction", () => {
+    expect(steps(1, Infinity, 1)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(steps(1, -Infinity, -1)).toEqual([1, 0, -1, -2, -3, -4]);
+    expect(steps(1, Infinity, -1)).toEqual([]);
+  });
+
+  it("takes ruby_float_step for a Float bound or step", () => {
+    expect(steps(1.5, 2.5, 0.5)).toEqual([1.5, 2, 2.5]);
+    expect(steps(1, 2, 0.3)).toEqual([1, 1.3, 1.6, 1 + 3 * 0.3]);
+    expect(steps(0.1, 0.3, 0.1)).toEqual([0.1, 0.2, 0.3]);
+    expect(steps(1, 3, Infinity)).toEqual([1]);
+  });
+
+  it("yields nothing for an infinite or NaN span", () => {
+    expect(steps(-Infinity, -Infinity, -1)).toEqual([]);
+    expect(steps(NaN, 3, 1)).toEqual([]);
+  });
+
+  it("raises for a zero step", () => {
+    expect(() => numStep(1, 3, 0, () => {})).toThrow("step can't be 0");
   });
 });

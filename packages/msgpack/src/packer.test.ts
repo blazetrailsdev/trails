@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { ArgumentError, StringIO, rbCString, rbFSend, rbObjClass } from "@blazetrails/ruby-compat";
-import { Array as ArrayExt, Hash } from "./core-ext.js";
+import {
+  ArgumentError,
+  defineModule,
+  StringIO,
+  extend,
+  include,
+  rbCString,
+  rbFSend,
+  rbObjClass,
+} from "@blazetrails/ruby-compat";
 import { ExtensionValue, MessagePack, Packer } from "./index.js";
 
 class ValueOne {
@@ -17,6 +25,14 @@ describe("MessagePack::Packer", () => {
   let packer: Packer;
   beforeEach(() => {
     packer = new Packer();
+  });
+
+  it("initialize", () => {
+    new Packer();
+    new Packer(null);
+    new Packer(new StringIO());
+    new Packer({});
+    new Packer(new StringIO(), {});
   });
 
   it("write", () => {
@@ -99,7 +115,7 @@ describe("MessagePack::Packer", () => {
     pk.writeNil();
     pk.flush();
     expect(pk.toS()).toEqual(new Uint8Array(0));
-    expect(io.string()).toEqual("\xc0");
+    expect(io.string()).toEqual("\udcc0");
   });
 
   it("to_msgpack returns String", () => {
@@ -109,8 +125,8 @@ describe("MessagePack::Packer", () => {
     expect(rbObjClass(rbFSend(1, "toMsgpack"))).toBe(rbCString);
     expect(rbObjClass(rbFSend(new Number(1.0), "toMsgpack"))).toBe(rbCString);
     expect(rbObjClass(rbFSend("", "toMsgpack"))).toBe(rbCString);
-    expect(rbObjClass(Hash.toMsgpack({}))).toBe(rbCString);
-    expect(rbObjClass(ArrayExt.toMsgpack([]))).toBe(rbCString);
+    expect(rbObjClass(rbFSend({}, "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend([], "toMsgpack"))).toBe(rbCString);
   });
 
   it("to_msgpack with packer equals to_msgpack", () => {
@@ -123,8 +139,8 @@ describe("MessagePack::Packer", () => {
       rbFSend(new Number(1.0), "toMsgpack"),
     );
     expect(toStr(rbFSend("", "toMsgpack", new Packer()))).toEqual(rbFSend("", "toMsgpack"));
-    expect(toStr(Hash.toMsgpack({}, new Packer()))).toEqual(Hash.toMsgpack({}));
-    expect(toStr(ArrayExt.toMsgpack([], new Packer()))).toEqual(ArrayExt.toMsgpack([]));
+    expect(toStr(rbFSend({}, "toMsgpack", new Packer()))).toEqual(rbFSend({}, "toMsgpack"));
+    expect(toStr(rbFSend([], "toMsgpack", new Packer()))).toEqual(rbFSend([], "toMsgpack"));
   });
 
   class CustomPack01 {
@@ -139,15 +155,15 @@ describe("MessagePack::Packer", () => {
 
   class CustomPack02 {
     toMsgpack(pk: unknown = null): unknown {
-      return ArrayExt.toMsgpack([1, 2], pk);
+      return rbFSend([1, 2], "toMsgpack", pk);
     }
   }
 
   it("calls custom to_msgpack method", () => {
-    expect(MessagePack.pack(new CustomPack01())).toEqual(ArrayExt.toMsgpack([1, 2]));
-    expect(MessagePack.pack(new CustomPack02())).toEqual(ArrayExt.toMsgpack([1, 2]));
-    expect(new CustomPack01().toMsgpack()).toEqual(ArrayExt.toMsgpack([1, 2]));
-    expect(new CustomPack02().toMsgpack()).toEqual(ArrayExt.toMsgpack([1, 2]));
+    expect(MessagePack.pack(new CustomPack01())).toEqual(rbFSend([1, 2], "toMsgpack"));
+    expect(MessagePack.pack(new CustomPack02())).toEqual(rbFSend([1, 2], "toMsgpack"));
+    expect(new CustomPack01().toMsgpack()).toEqual(rbFSend([1, 2], "toMsgpack"));
+    expect(new CustomPack02().toMsgpack()).toEqual(rbFSend([1, 2], "toMsgpack"));
   });
 
   describe("#type_registered?", () => {
@@ -192,16 +208,145 @@ describe("MessagePack::Packer", () => {
       expect(two.class).toEqual(ValueTwo);
       expect(two.packer).toBeInstanceOf(Function);
     });
+    const valueMsgpacked = Uint8Array.of(
+      0xc7,
+      0x0f,
+      0x01,
+      ...new TextEncoder().encode("value_msgpacked"),
+    );
+
+    describe("when it has no ext type but a super class has", () => {
+      class Value {
+        toMsgpackExt(): string {
+          return "value_msgpacked";
+        }
+      }
+      beforeEach(() => {
+        packer.registerType(0x01, Value, "toMsgpackExt");
+      });
+
+      describe("when it is a child class", () => {
+        class InheritedValue extends Value {}
+
+        it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
+          expect(packer.pack(new InheritedValue()).toS()).toEqual(valueMsgpacked);
+        });
+
+        describe("when it is a grandchild class", () => {
+          class InheritedTwiceValue extends InheritedValue {}
+
+          it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
+            expect(packer.pack(new InheritedTwiceValue()).toS()).toEqual(valueMsgpacked);
+          });
+        });
+      });
+    });
+
+    describe("when it and its super class has an ext type", () => {
+      class Value {
+        toMsgpackExt(): string {
+          return "value_msgpacked";
+        }
+      }
+      class InheritedValue extends Value {
+        override toMsgpackExt(): string {
+          return "inherited_value_msgpacked";
+        }
+      }
+      beforeEach(() => {
+        packer.registerType(0x01, Value, "toMsgpackExt");
+        packer.registerType(0x02, InheritedValue, "toMsgpackExt");
+      });
+
+      describe("when it is a child class", () => {
+        it('is expected to eq "\\xC7\\x19\\x02inherited_value_msgpacked"', () => {
+          expect(packer.pack(new InheritedValue()).toS()).toEqual(
+            Uint8Array.of(
+              0xc7,
+              0x19,
+              0x02,
+              ...new TextEncoder().encode("inherited_value_msgpacked"),
+            ),
+          );
+        });
+      });
+
+      describe("even when it is a child class", () => {
+        it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
+          expect(packer.pack(new Value()).toS()).toEqual(valueMsgpacked);
+        });
+      });
+    });
+
+    describe("when it has no ext type but an included module has", () => {
+      it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
+        const Mod = defineModule({
+          toMsgpackExt(): string {
+            return "value_msgpacked";
+          },
+        });
+        packer.registerType(0x01, Mod, "toMsgpackExt");
+        class Value {}
+        include(Value, Mod);
+        expect(packer.pack(new Value()).toS()).toEqual(valueMsgpacked);
+      });
+    });
+
+    describe("when it has no ext type but it was extended by a module which has one", () => {
+      it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
+        const Mod = defineModule({
+          toMsgpackExt(): string {
+            return "value_msgpacked";
+          },
+        });
+        const object = extend({}, Mod);
+        packer.registerType(0x01, Mod, "toMsgpackExt");
+        expect(packer.pack(object).toS()).toEqual(valueMsgpacked);
+      });
+    });
   });
 
   describe("ext formats", () => {
-    [1, 2, 4, 8, 16].forEach((n, i) => {
-      const b = [0xd4, 0xd5, 0xd6, 0xd7, 0xd8][i];
+    for (const [n, b] of [
+      [1, 0xd4],
+      [2, 0xd5],
+      [4, 0xd6],
+      [8, 0xd7],
+      [16, 0xd8],
+    ] as const) {
       it(`msgpack fixext ${n} format`, () => {
         expect(new ExtensionValue(1, "a".repeat(n)).toMsgpack()).toEqual(
           Uint8Array.of(b, 1, ...new TextEncoder().encode("a".repeat(n))),
         );
       });
+    }
+
+    const ext = (header: number[], type: number, n: number): Uint8Array =>
+      Uint8Array.of(...header, type & 0xff, ...new Uint8Array(n).fill(0x61));
+
+    it("msgpack ext 8 format", () => {
+      expect(new ExtensionValue(1, "").toMsgpack()).toEqual(ext([0xc7, 0], 1, 0));
+      expect(new ExtensionValue(-1, "a".repeat(255)).toMsgpack()).toEqual(
+        ext([0xc7, 255], -1, 255),
+      );
+    });
+
+    it("msgpack ext 16 format", () => {
+      expect(new ExtensionValue(1, "a".repeat(256)).toMsgpack()).toEqual(
+        ext([0xc8, 0x01, 0x00], 1, 256),
+      );
+      expect(new ExtensionValue(-1, "a".repeat(65535)).toMsgpack()).toEqual(
+        ext([0xc8, 0xff, 0xff], -1, 65535),
+      );
+    });
+
+    it("msgpack ext 32 format", () => {
+      expect(new ExtensionValue(1, "a".repeat(65536)).toMsgpack()).toEqual(
+        ext([0xc9, 0, 0x01, 0x00, 0x00], 1, 65536),
+      );
+      expect(new ExtensionValue(-1, "a".repeat(65538)).toMsgpack()).toEqual(
+        ext([0xc9, 0, 0x01, 0x00, 0x02], -1, 65538),
+      );
     });
   });
 });

@@ -1,4 +1,11 @@
-import { Encoding, File, FileUtils, StringIO, Tempfile } from "@blazetrails/ruby-compat";
+import {
+  Encoding,
+  File,
+  FileUtils,
+  StringIO,
+  Tempfile,
+  methodMissingProxy,
+} from "@blazetrails/ruby-compat";
 
 export interface UploadedFileOptions {
   path?: string | null;
@@ -8,6 +15,13 @@ export interface UploadedFileOptions {
   io?: StringIO;
 }
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the merge is how the delegated surface reaches the class type. */
+export interface UploadedFile {
+  /** @noRailsEquivalent PERMANENT */
+  read(): string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class UploadedFile {
   readonly originalFilename: string;
   contentType: string;
@@ -48,6 +62,8 @@ export class UploadedFile {
       this._tempfile = tempfile;
     }
     this.contentType = contentType;
+
+    return methodMissingProxy(this, { delegate: (uploadedFile) => uploadedFile._tempfile });
   }
 
   get path(): string | undefined {
@@ -58,15 +74,9 @@ export class UploadedFile {
     return this.path;
   }
 
-  read(): string {
-    return this._tempfile.read();
-  }
-
   /**
-   * @internal Direct access to the underlying tempfile for delegating consumers.
-   * @noRailsEquivalent CONVERGEABLE Rack reaches the tempfile through
-   * `method_missing` delegation (uploaded_file.rb:39), which forwards to
-   * `@tempfile` rather than exposing a reader.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE rack-uploaded-file-publishes-tempfile-and-filename-readers
    */
   get tempfile(): Tempfile | StringIO {
     return this._tempfile;
@@ -86,10 +96,8 @@ export class UploadedFile {
   }
 
   /**
-   * @internal Compat shim for callers that read `filename` directly
-   * (e.g. the existing Rack tests). Rails uses {@link originalFilename}.
-   * @noRailsEquivalent CONVERGEABLE `Rack::Multipart::UploadedFile` exposes only
-   * `original_filename` (uploaded_file.rb:10); the callers should read that.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE rack-uploaded-file-publishes-tempfile-and-filename-readers
    */
   get filename(): string {
     return this.originalFilename;

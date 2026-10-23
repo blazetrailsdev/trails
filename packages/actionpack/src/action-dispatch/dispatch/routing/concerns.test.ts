@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertEqual, assertRaises } from "@blazetrails/activesupport";
 import { controllerConstants } from "../../http/request.js";
 import type { Mapper } from "../../routing/mapper.js";
 import { RouteSet } from "../../routing/route-set.js";
@@ -116,16 +117,13 @@ describe("RoutingConcernsTest", () => {
     expect(String(session.response.status)).toBe("404");
   });
 
-  it("with an invalid concern name", () => {
-    let e: unknown;
-    try {
+  it("with an invalid concern name", async () => {
+    const e = await assertRaises([ArgumentError], {}, () => {
       new RouteSet().draw(function () {
         this.resources("posts", { concerns: "foo" });
       });
-    } catch (error) {
-      e = error;
-    }
-    expect(e).toBeInstanceOf(ArgumentError);
-    expect((e as Error).message).toBe("No concern named foo was found!");
+    });
+
+    assertEqual("No concern named foo was found!", e.message);
   });
 });

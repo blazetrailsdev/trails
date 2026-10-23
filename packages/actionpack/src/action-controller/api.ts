@@ -5,8 +5,10 @@ import {
   type ClassMethods as RateLimitingClassMethods,
 } from "./metal/rate-limiting.js";
 import { Logging, type logAt } from "./metal/logging.js";
-import { include, type Included } from "@blazetrails/activesupport";
-import { Caching } from "../abstract-controller/caching.js";
+import { include, runLoadHooks, TopLevel, type Included } from "@blazetrails/activesupport";
+import { isModuleIncluded, rbModConstGet } from "@blazetrails/ruby-compat";
+import { ActionController } from "../namespaces.js";
+import { Caching } from "./caching.js";
 import { ConditionalGet } from "./metal/conditional-get.js";
 import { BasicImplicitRender } from "./metal/basic-implicit-render.js";
 import { DataStreaming } from "./metal/data-streaming.js";
@@ -35,6 +37,7 @@ import {
 } from "../abstract-controller/rendering.js";
 import type { Renderer } from "./renderer.js";
 import { UrlFor } from "./metal/url-for.js";
+import type { Head } from "./metal/head.js";
 import { Rescue } from "./metal/rescue.js";
 import { Instrumentation } from "./metal/instrumentation.js";
 import {
@@ -51,6 +54,7 @@ export interface API
     Included<typeof UrlFor>,
     Included<typeof Redirecting>,
     Included<typeof ConditionalGet>,
+    Included<typeof Head>,
     Included<typeof DataStreaming> {
   render: OmitThisParameter<typeof render>;
   get params(): Params;
@@ -64,8 +68,13 @@ export class API extends Metal {
   }
 
   declare static render: Renderer["render"];
-  static withoutModules<T extends typeof API>(this: T, ..._modules: unknown[]): T {
-    return this;
+  static withoutModules(
+    ...modules: Array<string | Parameters<typeof include>[1]>
+  ): Array<Parameters<typeof include>[1]> {
+    const mods = modules.map((m) =>
+      typeof m === "string" ? rbModConstGet(ActionController, m) : m,
+    );
+    return API.MODULES.filter((m) => !mods.includes(m));
   }
 
   static MODULES: Array<Parameters<typeof include>[1]> = [
@@ -119,6 +128,8 @@ export class API extends Metal {
 
   declare static _wrapperOptions: ParamsWrapperOptions;
   declare _wrapperOptions: ParamsWrapperOptions;
+  declare static _isWrapperOptions: boolean;
+  declare _isWrapperOptions: boolean;
   /** @internal */
   declare static _setWrapperOptions: OmitThisParameter<typeof _setWrapperOptions>;
   declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;
@@ -140,9 +151,15 @@ export class API extends Metal {
     if ("_routes" in this) this._routes = null;
     this._urlOptions = null;
     this.viewRuntime = null;
+    if (isModuleIncluded(new.target, TopLevel.ActiveRecord?.Railties.ControllerRuntime as never)) {
+      (this as unknown as { dbRuntime: number | null }).dbRuntime = null;
+    }
   }
 }
 
 for (const mod of API.MODULES) {
   include(API, mod);
 }
+
+runLoadHooks("action_controller_api", API);
+runLoadHooks("action_controller", API);

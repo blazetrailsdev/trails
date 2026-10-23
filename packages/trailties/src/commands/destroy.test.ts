@@ -4,6 +4,9 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { createProgram } from "../cli.js";
 import { destroyCommand } from "./destroy.js";
+import { lookupBang } from "../command/behavior.js";
+
+await lookupBang();
 
 let tmpDir: string;
 let originalCwd: string;

@@ -3,10 +3,10 @@ import {
   type Extended,
   include,
   type CodeGenerator,
-  type Included,
   included,
+  type Included,
 } from "@blazetrails/activesupport";
-import { type Hash, Module, keys, rbDeclareIvar, rbObjClone } from "@blazetrails/ruby-compat";
+import { type Hash, keys, rbCallSuper, rbDeclareIvar, rbObjClone } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -25,17 +25,9 @@ import {
   type AttributeRegistrationHost,
 } from "./attribute-registration.js";
 
-export function constructor(
-  this: AttributeInstanceHost & { constructor: { _defaultAttributes(): AttributeSet } },
-  ...args: unknown[]
-): void {
-  this._attributes = this.constructor._defaultAttributes().deepDup();
-  SuperMethods.superMethod(this, "initialize")!(...args);
-}
-
 export function initializeDup(this: AttributeInstanceHost, other: unknown): void {
   this._attributes = this._attributes.deepDup();
-  SuperMethods.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
 }
 
 export type AttributeInstanceHost = { _attributes: AttributeSet };
@@ -65,14 +57,10 @@ export function freeze<T extends AttributeInstanceHost>(this: T): T {
   if (!Object.isFrozen(this)) {
     this._attributes = rbObjClone(this._attributes).freeze();
   }
-  return SuperMethods.superMethod(this, "freeze")!() as T;
+  return rbCallSuper(this, freeze) as T;
 }
 
-const SuperMethods = new Module((mod) => {
-  mod.defineMethod("initialize", constructor);
-  mod.defineMethod("initializeDup", initializeDup);
-  mod.defineMethod("freeze", freeze);
-});
+const SuperMethods = { initializeDup, freeze };
 
 /** @internal */
 export function _writeAttribute(
@@ -135,8 +123,20 @@ export function setDefineMethodAttribute(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.
-export interface Attributes extends Included<typeof AttributeMethods> {
+export interface Attributes extends Pick<
+  Included<typeof AttributeMethods>,
+  "isAttributeMethod" | "matchedAttributeMethod" | "missingAttribute" | "_readAttribute"
+> {
+  methodMissing(
+    ...args: Parameters<(typeof AttributeMethods)["methodMissing"]>
+  ): ReturnType<(typeof AttributeMethods)["methodMissing"]>;
   attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
+  isRespondToWithoutAttributes(
+    ...args: Parameters<(typeof AttributeMethods)["isRespondToWithoutAttributes"]>
+  ): ReturnType<(typeof AttributeMethods)["isRespondToWithoutAttributes"]>;
+  isRespondTo(
+    ...args: Parameters<(typeof AttributeMethods)["isRespondTo"]>
+  ): ReturnType<(typeof AttributeMethods)["isRespondTo"]>;
 
   /** @internal */
   _writeAttribute(name: string, value: unknown): void;

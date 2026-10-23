@@ -52,23 +52,25 @@
 export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Comparable#<=>", "cmp"],
   ["Comparable#between?", "isBetween"],
-  ["Hash#delete_if", "deleteIf"],
-  ["Hash#each_key", "eachKey"],
   ["Hash#each_pair", "eachPair"],
   ["Hash#has_key?", "hasKey"],
   ["Hash#key?", "hasKey"],
-  ["Hash#transform_values", "transformValues"],
+  ["Kernel#Array", "rbFArray"],
   ["Kernel#Float", "kernelFloat"],
   ["Kernel#Integer", "kernelInteger"],
   ["Kernel#catch", "kernelCatch"],
+  ["Kernel#dup", "rbObjDup"],
   ["Kernel#inspect", "rbInspect"],
+  ["Kernel#method", "rbObjMethod"],
   ["Kernel#object_id", "rbObjId"],
   ["Kernel#send", "rbFSend"],
   ["Kernel#throw", "kernelThrow"],
   ["Kernel#Rational", "rational"],
   ["Module#define_method", "rbModDefineMethod"],
+  ["Object#to_yaml", "toYaml"],
   ["Range#cover?", "cover"],
   ["Regexp.escape", "regexpEscape"],
+  ["Regexp.quote", "regexpEscape"],
   ["Regexp.union", "rbRegSUnion"],
   ["Regexp#match?", "rbRegMatchP"],
 ]);
@@ -77,7 +79,8 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
  *  spelling the artifact carries them. `hash`, `string`, `symbol`, `array` and
  *  `numeric` name the receiver's CLASS, and only where Ripper proved it; the
  *  rest name a shape whose class is unknown, so a receiver-keyed row can never
- *  match one. */
+ *  match one. `formless` is a proven site on an arm no native form ports
+ *  (extract-ruby-api.rb#FORM_ARMS). */
 export type ReceiverKind =
   | "hash"
   | "string"
@@ -89,7 +92,8 @@ export type ReceiverKind =
   | "local"
   | "ivar"
   | "const"
-  | "expr";
+  | "expr"
+  | "formless";
 
 /**
  * MRI spelling → its ruby-compat export AND the receiver kinds that prove the
@@ -114,8 +118,11 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   ["Array#include?", { tsExport: "aryIncludes", receiver: "array" }],
   ["Array#join", { tsExport: "aryJoin", receiver: "array" }],
   ["Array#reduce", { tsExport: "reduce", receiver: "array" }],
+  ["Array#delete_if", { tsExport: "aryDeleteIf", receiver: "array" }],
   ["Array#sort", { tsExport: "sort", receiver: "array" }],
   ["Hash#delete", { tsExport: "hashDelete", receiver: "hash" }],
+  ["Hash#delete_if", { tsExport: "deleteIf", receiver: "hash" }],
+  ["Hash#each_key", { tsExport: "eachKey", receiver: "hash" }],
   ["Hash#except", { tsExport: "except", receiver: "hash" }],
   ["Hash#fetch", { tsExport: "fetch", receiver: "hash" }],
   // MRI defines `include?` onto `rb_hash_has_key` (`vendor/ruby/v3.3.11/hash.c:7255`),
@@ -126,13 +133,33 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   ["Hash#reject", { tsExport: "reject", receiver: "hash" }],
   ["Hash#replace", { tsExport: "hashReplace", receiver: "hash" }],
   ["Hash#slice", { tsExport: "slice", receiver: "hash" }],
+  ["Hash#transform_values", { tsExport: "transformValues", receiver: "hash" }],
   ["Hash#update", { tsExport: "update", receiver: "hash" }],
   ["String#delete", { tsExport: "stringDelete", receiver: "string" }],
   ["String#dump", { tsExport: "rbStrDump", receiver: "string" }],
-  ["String.new", { tsExport: "rbStrSNew", receiver: "string" }],
   ["String#split", { tsExport: "stringSplit", receiver: "string" }],
   ["String#succ", { tsExport: "succ", receiver: "string" }],
   ["Symbol#to_s", { tsExport: "symbolToS", receiver: "symbol" }],
+]);
+
+/**
+ * `Enumerable#<m>` → the ruby-compat free function that ports it with the Ruby
+ * receiver as argument 1 and the block as a trailing callback: `xs.partition { }`
+ * is `partition(xs, fn)`. Read by the argument gate like a
+ * {@link RECEIVER_KEYED_RUBY_COMPAT_EXPORTS} row whose receiver can be any
+ * kind, because `Enumerable` is mixed into every receiver that has an `each`
+ * (`vendor/ruby/v3.3.11/enum.c:5084`). The call-set gate credits these through
+ * the naming convention already, so this table is the argument gate's alone.
+ */
+export const ENUMERABLE_FREE_FUNCTIONS = new Map<string, string>([
+  ["Enumerable#drop", "drop"],
+  ["Enumerable#each_slice", "eachSlice"],
+  ["Enumerable#first", "first"],
+  ["Enumerable#group_by", "groupBy"],
+  ["Enumerable#partition", "partition"],
+  ["Enumerable#take", "take"],
+  ["Enumerable#uniq", "uniq"],
+  ["Enumerable#zip", "zip"],
 ]);
 
 /** ruby-compat exports deliberately NOT in the table, each with the homonym
@@ -170,7 +197,7 @@ type Claim = { tsExport: string; receiver?: ReceiverKind };
 
 const BY_BARE_NAME = byBareName();
 
-/** `string-new` is `core_new_kind`'s record of a `String.new(x)` site
+/** `string-new` is `core_new_kind`'s record of a `String.new` site
  *  (extract-ruby-api.rb), whose receiver is proven to be the String class. */
 function provenClass(kind: string): string {
   return kind === "string-new" ? "string" : kind;

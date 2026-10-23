@@ -72,7 +72,7 @@ describe("contentSecurityPolicy class DSL", () => {
   it("treats a first-positional options object as enabled=true and accepts a block in arg 2 (Rails kwargs shape)", async () => {
     const controller = makeController({ contentSecurityPolicy: null });
     let blockRan = false;
-    host.contentSecurityPolicy({ only: ["show"] }, function (policy) {
+    host.contentSecurityPolicy(undefined, { only: ["show"] }, function (policy) {
       blockRan = true;
       policy.defaultSrc(":self");
     });
@@ -84,7 +84,7 @@ describe("contentSecurityPolicy class DSL", () => {
 
   it("accepts a block-only form (no enabled, no options)", async () => {
     const controller = makeController({ contentSecurityPolicy: null });
-    host.contentSecurityPolicy(function (policy) {
+    host.contentSecurityPolicy(undefined, undefined, function (policy) {
       policy.defaultSrc(":self");
     });
     await registered[0].callback(controller);
@@ -117,7 +117,7 @@ describe("contentSecurityPolicyReportOnly class DSL", () => {
 
   it("treats a first-positional options object as reportOnly=true", async () => {
     const controller = makeController({});
-    host.contentSecurityPolicyReportOnly({ except: ["index"] });
+    host.contentSecurityPolicyReportOnly(undefined, { except: ["index"] });
     expect(registered[0].options).toEqual({ except: ["index"] });
     await registered[0].callback(controller);
     expect(controller.request.contentSecurityPolicyReportOnly).toBe(true);

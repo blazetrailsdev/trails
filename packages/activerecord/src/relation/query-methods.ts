@@ -9,10 +9,8 @@ import {
   isModuleIncluded,
   isSymbol,
   merge,
-  Module,
   rbBlockGivenP,
   partition,
-  rbFPublicSend,
   rbFSend,
   rbInspect,
   rbObjAsString,
@@ -27,6 +25,7 @@ import {
   union,
   uniq,
   TypeError,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import {
@@ -61,7 +60,6 @@ import {
   actsLike,
   compactBlank,
   defineModule,
-  filterMap,
   foreignKey,
   included,
   indexWith,
@@ -100,8 +98,9 @@ export class WhereChain<R = any> {
         joinsBang.call(scope, association);
       }
 
-      const associationConditions = Object.fromEntries(
-        indexWith(kernelArray(reflection.associationPrimaryKey()), null),
+      const associationConditions = indexWith(
+        kernelArray(reflection.associationPrimaryKey()),
+        null,
       );
       if (reflection.options.className) {
         this.not({ [association]: associationConditions });
@@ -118,8 +117,9 @@ export class WhereChain<R = any> {
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
       leftOuterJoinsBang.call(scope, association);
-      const associationConditions = Object.fromEntries(
-        indexWith(kernelArray(reflection.associationPrimaryKey()), null),
+      const associationConditions = indexWith(
+        kernelArray(reflection.associationPrimaryKey()),
+        null,
       );
       if (reflection.options.className) {
         whereBang.call(scope, { [association]: associationConditions });
@@ -217,6 +217,9 @@ interface QueryMethodsHost {
   createWithValue: Record<string, unknown>;
   skipQueryCacheValue: boolean | null;
   _isNone: boolean;
+  _async?: boolean;
+  readonly isLoaded: boolean;
+  records(): Promise<import("../base.js").Base[]>;
   aliasTracker(joins?: Nodes.Node[], aliases?: Hash<string, number>): AliasTracker;
   clone(): any;
   spawn(): any;
@@ -224,8 +227,7 @@ interface QueryMethodsHost {
   /** @internal */
   buildArel(connection: unknown, aliases?: AliasTracker): any;
   skipPreloadingValue: boolean;
-  _model: typeof import("../base.js").Base;
-  model: QueryMethodsHost["_model"];
+  model: typeof import("../base.js").Base;
   table: ArelTable;
   predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
 }
@@ -338,7 +340,7 @@ function select(this: QueryMethodsHost, ...fields: any[]): any {
     if (fields.length > 1) {
       throw new ArgumentError("`select' with block doesn't take arguments.");
     }
-    return (this as any).records().then((records: any[]) => records.filter(fields[0]));
+    return this.records().then((records) => records.filter(fields[0]));
   }
   checkIfMethodHasArgumentsBang.call(
     this,
@@ -411,7 +413,7 @@ function inOrderOf(
   values: unknown[],
   filter = true,
 ): any {
-  (this.model as any).disallowRawSqlBang([column], {
+  this.model.disallowRawSqlBang([column], {
     permit: this.model.adapterClass().columnNameWithOrderMatcher(),
   });
   if (values.length === 0) return noneBang.call(this.spawn());
@@ -430,7 +432,7 @@ function inOrderOf(
 
   let scope = orderBang.call(
     this.spawn(),
-    buildCaseForValuePosition.call(this, arelColumn, values, { filter }) as any,
+    buildCaseForValuePosition.call(this, arelColumn, values, { filter }),
   );
 
   if (filter) {
@@ -606,7 +608,7 @@ export function buildWhereClause(
   let parts: (Nodes.Node | Nodes.SqlLiteral | string)[];
   if (typeof opts === "string" || opts instanceof Nodes.SqlLiteral) {
     opts = opts.toString();
-    if (isEmpty(rest)) {
+    if (rest.length === 0) {
       parts = [Arel.sql(opts as string)];
     } else if (isPlainObject(rest[0]) && /:\w+/.test(opts as string)) {
       parts = [buildNamedBoundSqlLiteral.call(this, opts as string, rest[0])];
@@ -614,7 +616,7 @@ export function buildWhereClause(
       parts = [buildBoundSqlLiteral.call(this, opts as string, rest)];
     } else {
       parts = [
-        this.model.sanitizeSql(isEmpty(rest) ? (opts as string) : [opts as string, ...rest])!,
+        this.model.sanitizeSql(rest.length === 0 ? (opts as string) : [opts as string, ...rest])!,
       ];
     }
   } else if (isHash(opts)) {
@@ -627,7 +629,7 @@ export function buildWhereClause(
       }
     });
     const references = PredicateBuilder.references(opts as Record<string, unknown>);
-    if (!isEmpty(references)) {
+    if (references.length !== 0) {
       this.referencesValues = unionReferences(this.referencesValues, references);
     }
 
@@ -991,7 +993,7 @@ function distinctBang(this: QueryMethodsHost, value = true): any {
   return this;
 }
 
-function extending(this: QueryMethodsHost, block: (mod: Module) => void): any;
+function extending(this: QueryMethodsHost, block: (mod: Record<string, unknown>) => void): any;
 function extending(this: QueryMethodsHost, ...modules: object[]): any;
 function extending(this: QueryMethodsHost, ...modules: object[]): any {
   const block = rbBlockGivenP(modules[modules.length - 1]) ? modules.pop() : undefined;
@@ -1002,11 +1004,15 @@ function extending(this: QueryMethodsHost, ...modules: object[]): any {
   }
 }
 
-function extendingBang(this: QueryMethodsHost, block: (mod: Module) => void): any;
+function extendingBang(this: QueryMethodsHost, block: (mod: Record<string, unknown>) => void): any;
 function extendingBang(this: QueryMethodsHost, ...modules: object[]): any;
 function extendingBang(this: QueryMethodsHost, ...modules: object[]): any {
   const block = rbBlockGivenP(modules[modules.length - 1]) ? modules.pop() : undefined;
-  if (block) modules.push(new Module(block as (mod: Module) => void));
+  if (block) {
+    const mod: Record<string, unknown> = {};
+    (block as (mod: Record<string, unknown>) => void)(mod);
+    modules.push(mod);
+  }
   modules.splice(0, modules.length, ...(flatten(modules) as object[]));
 
   this.extendingValues = [...this.extendingValues, ...modules];
@@ -1066,7 +1072,7 @@ function uniqBang(this: QueryMethodsHost, name?: string): any {
 
 function excludingWithCallee(callee: "excluding" | "without") {
   return function (this: QueryMethodsHost, ...records: unknown[]): any {
-    const relations = records.filter((r) => r instanceof ActiveRecord.Relation) as any[];
+    const relations = records.filter((r) => r instanceof ActiveRecord.Relation);
     records = records
       .filter((r) => !(r instanceof ActiveRecord.Relation))
       .flat(1)
@@ -1074,7 +1080,7 @@ function excludingWithCallee(callee: "excluding" | "without") {
 
     const model = this.model;
     if (
-      !records.every((r) => r instanceof (model as any)) ||
+      !records.every((r) => r instanceof model) ||
       !relations.every((relation) => relation.model === model)
     ) {
       throw new ArgumentError(
@@ -1118,9 +1124,7 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   }
 
   const attribute = this.predicateBuilder.table.arelTable.get(pk as string);
-  const literalIds = literalRecords.map((r) =>
-    r instanceof ActiveRecord.Base ? (r as any).id : r,
-  );
+  const literalIds = literalRecords.map((r) => (r instanceof ActiveRecord.Base ? r.id : r));
   const inlineSubquery = (
     this.predicateBuilder.build(
       attribute,
@@ -1162,18 +1166,18 @@ export function constructJoinDependency(
 
 /** @internal */
 function asyncBang(this: QueryMethodsHost): QueryMethodsHost {
-  (this as any)._async = true;
+  this._async = true;
   return this;
 }
 
 /** @internal */
 export function async(this: QueryMethodsHost): QueryMethodsHost {
-  return asyncBang.call((this as any).spawn());
+  return asyncBang.call(this.spawn());
 }
 
 /** @internal */
 export function assertModifiableBang(this: QueryMethodsHost): void {
-  if ((this as any)._loaded || this._arel) {
+  if (this.isLoaded || this._arel) {
     throw new UnmodifiableRelation();
   }
 }
@@ -1321,7 +1325,7 @@ export function buildSubquery(
 ): SelectManager {
   const subquery = this.except("optimizerHints").arel().as(subqueryAlias);
 
-  const arel = new SelectManager(subquery).project(selectValue as any);
+  const arel = new SelectManager(subquery).project(selectValue as ArelNode);
   if (!isEmpty(this.optimizerHintsValues)) arel.optimizerHints(...this.optimizerHintsValues);
   return arel;
 }
@@ -1434,7 +1438,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   validateOrderArgs.call(this, orderArgs);
 
   const references = columnReferences(orderArgs);
-  if (!isEmpty(references)) {
+  if (references.length !== 0) {
     this.referencesValues = unionReferences(this.referencesValues, references);
   }
 
@@ -1449,7 +1453,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
           return (toA(arg) as [unknown, unknown][]).map(([key, value]) => {
             if (isHash(value)) {
               return (toA(value) as [unknown, unknown][]).map(([field, dir]) =>
-                rbFPublicSend(
+                rbFSend(
                   orderColumn.call(this, [toS(key), toS(field)].join(".")),
                   rbFSend(dir, "downcase"),
                 ),
@@ -1460,9 +1464,9 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
                 key instanceof Nodes.Node ||
                 key instanceof Arel.Attribute
               ) {
-                return rbFPublicSend(key, rbFSend(value, "downcase"));
+                return rbFSend(key, rbFSend(value, "downcase"));
               } else {
-                return rbFPublicSend(orderColumn.call(this, toS(key)), rbFSend(value, "downcase"));
+                return rbFSend(orderColumn.call(this, toS(key)), rbFSend(value, "downcase"));
               }
             }
           });
@@ -1476,7 +1480,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
 
 /** @internal */
 export function buildOrder(this: QueryMethodsHost, arel: any): unknown {
-  const orders = compactBlank(((this as any).orderValues ?? []) as unknown[]);
+  const orders = compactBlank((this.orderValues ?? []) as unknown[]);
   if (orders.length > 0) return arel.order?.(...orders);
 }
 
@@ -1486,13 +1490,13 @@ export function buildCaseForValuePosition(
   column: unknown,
   values: unknown[],
   options: { filter?: boolean } = {},
-): unknown {
+): Nodes.Ascending {
   const filter = options.filter !== false;
   const node = new Nodes.Case();
   values.forEach((value, i) => {
-    node.when((column as any).eq(value)).then(i + 1);
+    node.when((column as Arel.Attribute).eq(value)).then(i + 1);
   });
-  if (!filter) (node as any).else(values.length + 1);
+  if (!filter) node.else(values.length + 1);
   return new Nodes.Ascending(node);
 }
 
@@ -1730,7 +1734,7 @@ export function arelColumn(
 
   field = (modelClass.attributeAliases[field as string] as string | undefined) || toS(field);
 
-  const fromClause = (this as any).fromClause;
+  const fromClause = this.fromClause;
   const from = fromClause?.name || fromClause?.value;
 
   if (
@@ -1771,7 +1775,7 @@ export function arelColumnWithTable(
   tableName: string,
   columnName: string,
 ): Arel.Attribute | Nodes.SqlLiteral {
-  (this as any).referencesValues = unionReferences((this as any).referencesValues ?? [], [
+  this.referencesValues = unionReferences(this.referencesValues ?? [], [
     Arel.sql(tableName, { retryable: true }),
   ]);
   if (isRubySymbol(columnName) || !/\W/.test(columnName)) {
@@ -1848,7 +1852,7 @@ export function arelColumnAliasesFromHash(
 }
 
 /** @internal */
-export function buildFrom(this: QueryMethodsHost): unknown {
+export function buildFrom(this: QueryMethodsHost): ArelNode | string {
   let opts: FromClause["value"] = this.fromClause.value;
   let name = this.fromClause.name;
   if (opts instanceof ActiveRecord.Relation) {
@@ -1881,7 +1885,7 @@ export function buildWithExpressionFromValue(
   value: unknown,
   nested = false,
 ): unknown {
-  if (value instanceof Nodes.SqlLiteral) return new Nodes.Grouping(value as any);
+  if (value instanceof Nodes.SqlLiteral) return new Nodes.Grouping(value);
   if (value !== null && typeof value === "object" && "arel" in value) {
     if (nested) {
       return (value as any).arel().ast;
@@ -1897,7 +1901,8 @@ export function buildWithExpressionFromValue(
     return parts
       .slice(1)
       .reduce(
-        (result: unknown, value: unknown) => new Nodes.UnionAll(result as any, value as any),
+        (result: unknown, value: unknown) =>
+          new Nodes.UnionAll(result as Nodes.Node, value as Nodes.Node),
         parts[0],
       );
   }
@@ -1913,7 +1918,7 @@ export function buildWithValueFromHash(
 ): Nodes.TableAlias[] {
   return Object.entries(hash).map(
     ([name, value]) =>
-      new Nodes.TableAlias(buildWithExpressionFromValue.call(this, value) as any, name),
+      new Nodes.TableAlias(buildWithExpressionFromValue.call(this, value) as Nodes.Node, name),
   );
 }
 
@@ -1985,7 +1990,7 @@ export function buildArel(
   if (this.optimizerHintsValues.length > 0) arel.optimizerHints?.(...this.optimizerHintsValues);
   arel.distinct(this.distinctValue);
 
-  if (!this.fromClause.isEmpty()) arel.from(buildFrom.call(this) as any);
+  if (!this.fromClause.isEmpty()) arel.from(buildFrom.call(this));
 
   if (this.lockValue != null && this.lockValue !== false) arel.lock(this.lockValue);
 
@@ -2091,7 +2096,7 @@ export function buildJoinBuckets(
 
   for (const [i, join] of joins.entries()) {
     if (typeof join === "string" && !join.startsWith(":")) {
-      joins[i] = new Nodes.StringJoin(Arel.sql(join.trim()) as any) as Nodes.Join;
+      joins[i] = new Nodes.StringJoin(Arel.sql(join.trim())) as Nodes.Join;
     }
   }
 

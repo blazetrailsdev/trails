@@ -70,6 +70,26 @@ describe("Ruby extractor gate detection", () => {
   }
 
   // Fixtures are minimal — the extractor needs no class wrapper or assertion body.
+  it("decides a ::Rack::RELEASE gate against trails' Rack 3", () => {
+    const g = rubyGates({
+      "dispatch/param_builder_test.rb": `
+        if ::Rack::RELEASE.start_with?("2.")
+          test "(rack 2) defaults to ignoring leading bracket" do; end
+        else
+          test "rack 3 arm" do; end
+        end
+        unless ::Rack::RELEASE.start_with?("3.")
+          test "not rack 3" do; end
+        end
+        if ::Rack::RELEASE.start_with?(prefix)
+          test "non-literal prefix" do; end
+        end
+      `,
+    });
+    expect(Object.keys(g)).toEqual(["rack 3 arm", "non-literal prefix"]);
+    expect(g["rack 3 arm"]).toBeNull();
+  });
+
   it("derives gates from dir, class wrapping, and in-body skips", () => {
     const g = rubyGates({
       "cases/adapters/postgresql/foo_test.rb": `test "pg dir" do; end`,

@@ -1,5 +1,4 @@
 import {
-  Module,
   compact,
   hashDelete,
   include,
@@ -145,7 +144,12 @@ export class CommandRecorder {
     }
   }
 
-  private static StraightReversions = new Module((mod) => {
+  private static StraightReversions: Record<
+    string,
+    (args: unknown[], block?: MigrationBlock) => MigrationCommand
+  > = {};
+
+  static {
     for (const [cmd, inv] of Object.entries({
       executeBlock: "executeBlock",
       createTable: "dropTable",
@@ -167,15 +171,12 @@ export class CommandRecorder {
         [inv, cmd],
         [cmd, inv],
       ])) {
-        mod.defineMethod(
-          `invert${method.charAt(0).toUpperCase()}${method.slice(1)}`,
-          (args: unknown[], block?: MigrationBlock): MigrationCommand => [inverse, args, block],
-        );
+        this.StraightReversions[`invert${method.charAt(0).toUpperCase()}${method.slice(1)}`] = (
+          args: unknown[],
+          block?: MigrationBlock,
+        ): MigrationCommand => [inverse, args, block];
       }
     }
-  });
-
-  static {
     include(this, this.StraightReversions);
   }
 
@@ -184,11 +185,7 @@ export class CommandRecorder {
     if (isPlainObject(last(args))) {
       delete (last(args) as Record<string, unknown>).ifNotExists;
     }
-    return CommandRecorder.StraightReversions.instanceMethod("invertCreateTable")!.value.call(
-      this,
-      args,
-      block,
-    );
+    return ["dropTable", args, block];
   }
 
   /** @internal */
@@ -210,11 +207,7 @@ export class CommandRecorder {
 
     if (!isEmpty(options)) args.push(options);
 
-    return CommandRecorder.StraightReversions.instanceMethod("invertDropTable")!.value.call(
-      this,
-      args,
-      block,
-    );
+    return ["createTable", args, block];
   }
 
   /** @internal */
@@ -224,11 +217,7 @@ export class CommandRecorder {
         "remove_column is only reversible if given a type.",
       );
     }
-    return CommandRecorder.StraightReversions.instanceMethod("invertRemoveColumn")!.value.call(
-      this,
-      args,
-      block,
-    );
+    return ["addColumn", args, block];
   }
 
   /** @internal */
@@ -255,30 +244,18 @@ export class CommandRecorder {
 
   /** @internal */
   invertAddBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return CommandRecorder.StraightReversions.instanceMethod("invertAddReference")!.value.call(
-      this,
-      args,
-      block,
-    );
+    return CommandRecorder.StraightReversions.invertAddReference(args, block);
   }
 
   /** @internal */
   invertRemoveBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return CommandRecorder.StraightReversions.instanceMethod("invertRemoveReference")!.value.call(
-      this,
-      args,
-      block,
-    );
+    return CommandRecorder.StraightReversions.invertRemoveReference(args, block);
   }
 
   /** @internal */
   invertAddForeignKey(args: unknown[], block?: MigrationBlock): MigrationCommand {
     if (isPlainObject(last(args))) delete (last(args) as Record<string, unknown>).validate;
-    return CommandRecorder.StraightReversions.instanceMethod("invertAddForeignKey")!.value.call(
-      this,
-      args,
-      block,
-    );
+    return ["removeForeignKey", args, block];
   }
 
   /** @internal */
@@ -307,9 +284,7 @@ export class CommandRecorder {
       delete options.validate;
       if ("ifNotExists" in options) options["ifExists"] = hashDelete(options, "ifNotExists");
     }
-    return CommandRecorder.StraightReversions.instanceMethod(
-      "invertAddCheckConstraint",
-    )!.value.call(this, args, block);
+    return ["removeCheckConstraint", args, block];
   }
 
   /** @internal */
@@ -324,9 +299,7 @@ export class CommandRecorder {
     if (isPlainObject(options)) {
       if ("ifExists" in options) options["ifNotExists"] = hashDelete(options, "ifExists");
     }
-    return CommandRecorder.StraightReversions.instanceMethod(
-      "invertRemoveCheckConstraint",
-    )!.value.call(this, args, block);
+    return ["addCheckConstraint", args, block];
   }
 
   /** @internal */
@@ -336,9 +309,7 @@ export class CommandRecorder {
         "remove_exclusion_constraint is only reversible if given an expression.",
       );
     }
-    return CommandRecorder.StraightReversions.instanceMethod(
-      "invertRemoveExclusionConstraint",
-    )!.value.call(this, args, block);
+    return ["addExclusionConstraint", args, block];
   }
 
   /** @internal */
@@ -350,9 +321,7 @@ export class CommandRecorder {
         "add_unique_constraint is not reversible if given an using_index.",
       );
     }
-    return CommandRecorder.StraightReversions.instanceMethod(
-      "invertAddUniqueConstraint",
-    )!.value.call(this, args, block);
+    return ["removeUniqueConstraint", args, block];
   }
 
   /** @internal */
@@ -365,9 +334,7 @@ export class CommandRecorder {
         "remove_unique_constraint is only reversible if given an column_name.",
       );
     }
-    return CommandRecorder.StraightReversions.instanceMethod(
-      "invertRemoveUniqueConstraint",
-    )!.value.call(this, args, block);
+    return ["addUniqueConstraint", args, block];
   }
 
   /** @internal */
@@ -417,21 +384,25 @@ export class CommandRecorder {
 
   /** @internal */
   invertChangeColumnDefault(args: unknown[]): [string, unknown[]] {
-    const [table, column, options] = args;
+    const [table, column, options] = args as [unknown, unknown, Record<string, unknown> | null];
     if (
-      !(
-        typeof options === "object" &&
-        options !== null &&
-        "from" in (options as Record<string, unknown>) &&
-        "to" in (options as Record<string, unknown>)
-      )
+      !(typeof options === "object" && options !== null && "from" in options && "to" in options)
     ) {
       throw new ActiveRecord.IrreversibleMigration(
         "change_column_default is only reversible if given a :from and :to option.",
       );
     }
-    const opts = options as Record<string, unknown>;
-    return ["changeColumnDefault", [table, column, { from: opts["to"], to: opts["from"] }]];
+    return [
+      "changeColumnDefault",
+      [
+        table,
+        column,
+        {
+          from: options["to"],
+          to: options["from"],
+        },
+      ],
+    ];
   }
 
   /** @internal */
@@ -442,40 +413,47 @@ export class CommandRecorder {
 
   /** @internal */
   invertChangeColumnComment(args: unknown[]): [string, unknown[]] {
-    const [table, column, options] = args;
+    const [table, column, options] = args as [unknown, unknown, Record<string, unknown> | null];
     if (
-      !(
-        typeof options === "object" &&
-        options !== null &&
-        "from" in (options as Record<string, unknown>) &&
-        "to" in (options as Record<string, unknown>)
-      )
+      !(typeof options === "object" && options !== null && "from" in options && "to" in options)
     ) {
       throw new ActiveRecord.IrreversibleMigration(
         "change_column_comment is only reversible if given a :from and :to option.",
       );
     }
-    const opts = options as Record<string, unknown>;
-    return ["changeColumnComment", [table, column, { from: opts["to"], to: opts["from"] }]];
+    return [
+      "changeColumnComment",
+      [
+        table,
+        column,
+        {
+          from: options["to"],
+          to: options["from"],
+        },
+      ],
+    ];
   }
 
   /** @internal */
   invertChangeTableComment(args: unknown[]): [string, unknown[]] {
-    const [table, options] = args;
+    const [table, options] = args as [unknown, Record<string, unknown> | null];
     if (
-      !(
-        typeof options === "object" &&
-        options !== null &&
-        "from" in (options as Record<string, unknown>) &&
-        "to" in (options as Record<string, unknown>)
-      )
+      !(typeof options === "object" && options !== null && "from" in options && "to" in options)
     ) {
       throw new ActiveRecord.IrreversibleMigration(
         "change_table_comment is only reversible if given a :from and :to option.",
       );
     }
-    const opts = options as Record<string, unknown>;
-    return ["changeTableComment", [table, { from: opts["to"], to: opts["from"] }]];
+    return [
+      "changeTableComment",
+      [
+        table,
+        {
+          from: options["to"],
+          to: options["from"],
+        },
+      ],
+    ];
   }
 
   /** @internal */
@@ -488,11 +466,7 @@ export class CommandRecorder {
         "drop_enum is only reversible if given a list of enum values.",
       );
     }
-    return CommandRecorder.StraightReversions.instanceMethod("invertDropEnum")!.value.call(
-      this,
-      args,
-      block,
-    );
+    return ["createEnum", args, block];
   }
 
   /** @internal */
@@ -530,11 +504,7 @@ export class CommandRecorder {
         "drop_virtual_table is only reversible if given options.",
       );
     }
-    return CommandRecorder.StraightReversions.instanceMethod("invertDropVirtualTable")!.value.call(
-      this,
-      args,
-      block,
-    );
+    return ["createVirtualTable", args, block];
   }
 
   /** @internal */
@@ -598,7 +568,7 @@ for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
   if (method in CommandRecorder.prototype) continue;
   (CommandRecorder.prototype as unknown as Record<string, unknown>)[method] = function (
     this: CommandRecorder,
-    ...args: unknown[]
+    ...args: [...args: unknown[], block: MigrationBlock] | unknown[]
   ): Promise<MigrationCommand[]> {
     while (args.length > 0 && args[args.length - 1] === undefined) args.pop();
     const block =

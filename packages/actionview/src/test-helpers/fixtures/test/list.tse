@@ -1,0 +1,1 @@
+<%= this.testUnchanged = 'goodbye' %><%= await render({ partial: 'customer', collection: this.customers }) %><%= this.testUnchanged %>

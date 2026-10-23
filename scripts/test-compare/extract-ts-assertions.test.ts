@@ -36,6 +36,26 @@ describe("TS extractor assertion-count collection", () => {
     expect(info.testCases[0].assertionKinds).toEqual(["expect", "expect", "assertEqual", "toBe"]);
   });
 
+  it("reads a two-argument mustBe / wontBe as assertPredicate / refutePredicate", () => {
+    const src = `
+      it("spec forms", () => {
+        mustBe(x, "isEmpty");
+        wontBe(x, "isEmpty");
+        mustBe(x, "<", 3);
+        mustBe(x, "isNil");
+        wontBe(x, "isNil");
+      });
+    `;
+    const info = extractTestsFromSource(src, "packages/rack-test/src/x.test.ts");
+    expect(info.testCases[0].assertionKinds).toEqual([
+      "assertPredicate",
+      "refutePredicate",
+      "mustBe",
+      "assertNil",
+      "refuteNil",
+    ]);
+  });
+
   it("counts a helper declared inside the test body once, not per call site", () => {
     const src = `
       it("inline lambda", () => {
@@ -139,6 +159,41 @@ describe("TS extractor assertion-count collection", () => {
       });
     `;
     expect(tsAssertionCounts(src)["on the test object"]).toBe(2);
+  });
+
+  it("counts an assert helper called on the suite's tc instance, folding a same-file helper", () => {
+    const src = `
+      function withRouting(block: () => void) {
+        assertNothingRaised(block);
+      }
+      it("on tc", () => {
+        tc.assertRecognizes({ controller: "messages" }, "/messages");
+        tc.withRouting(() => {});
+        tc.setup();
+      });
+    `;
+    expect(tsAssertionCounts(src)["on tc"]).toBe(2);
+  });
+
+  it("counts an assert helper called on the suite's t instance", () => {
+    const src = `
+      it("on t", async () => {
+        await t.get("/parse");
+        t.assertResponse(":ok");
+      });
+    `;
+    expect(tsAssertionCounts(src)["on t"]).toBe(1);
+  });
+
+  it("counts an assert helper invoked with .call on a non-test-case host", () => {
+    const src = `
+      it("on c", async () => {
+        await c.dispatch("action", makeRequest(), makeResponse());
+        assertResponse.call(c, "forbidden");
+        helper.call(c);
+      });
+    `;
+    expect(tsAssertionCounts(src)["on c"]).toBe(1);
   });
 
   it("counts trails expect* assertion helpers (twins of Rails assert_* helpers)", () => {

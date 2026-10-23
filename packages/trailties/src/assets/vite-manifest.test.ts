@@ -34,19 +34,20 @@ async function generateApp(): Promise<string> {
   return path.join(tmpDir, "my-app");
 }
 
-function renderLayout(root: string): string {
+async function renderLayout(root: string): Promise<string> {
   const source = fs.readFileSync(
     path.join(root, "app", "views", "layouts", "application.html.tse"),
     "utf-8",
   );
   const view = new (Base.withEmptyTemplateCache())(null, {}, null);
   (view as unknown as Record<string, unknown>)["computeAssetPath"] = computeAssetPath;
-  return new Template(source, "application.html.tse", new TseHandler(), {
-    locals: [],
-    format: ":html",
-  })
-    .render(view, {}, null, undefined, (...name) => view._layoutFor(...(name as [string])))
-    .toString();
+  (view as unknown as Record<string, unknown>)["isContentSecurityPolicy"] = () => false;
+  return String(
+    await new Template(source, "application.html.tse", new TseHandler(), {
+      locals: [],
+      format: ":html",
+    }).render(view, {}, null, undefined, (...name) => view._layoutFor(...(name as [string]))),
+  );
 }
 
 describe("the generated layout's stylesheet", () => {
@@ -64,7 +65,7 @@ describe("the generated layout's stylesheet", () => {
 
     setViteManifest(await loadViteManifest(root));
 
-    expect(renderLayout(root)).toContain(`href="/assets/${emitted}"`);
+    expect(await renderLayout(root)).toContain(`href="/assets/${emitted}"`);
   }, 60_000);
 
   it("renders the path Vite's dev server serves when no build has run", async () => {
@@ -72,6 +73,6 @@ describe("the generated layout's stylesheet", () => {
 
     setViteManifest(await loadViteManifest(root));
 
-    expect(renderLayout(root)).toContain('href="/assets/stylesheets/application.css"');
+    expect(await renderLayout(root)).toContain('href="/assets/stylesheets/application.css"');
   }, 30_000);
 });

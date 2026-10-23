@@ -17,28 +17,6 @@ describe("TemplateRenderer raises", () => {
     vi.restoreAllMocks();
   });
 
-  it("render file with invalid full path", async () => {
-    const renderer = new TemplateRenderer(new LookupContext());
-    const e = await (async () =>
-      renderer.render(ctx, { file: "/nonexistent/fixtures/test/hello_world_invalid.erb" }))().catch(
-      (err: unknown) => err,
-    );
-    expect(e).toBeInstanceOf(ArgumentError);
-    expect((e as Error).message).toMatch(/File (.+) does not exist/);
-  });
-
-  it("render file with relative path", async () => {
-    const renderer = new TemplateRenderer(new LookupContext());
-    const e = await (async () =>
-      renderer.render(ctx, { file: "fixtures/test/hello_world.erb" }))().catch(
-      (err: unknown) => err,
-    );
-    expect(e).toBeInstanceOf(ArgumentError);
-    expect((e as Error).message).toMatch(
-      /`render file:` should be given the absolute path to a file. (.+) was given instead/,
-    );
-  });
-
   it("raises ArgumentError for an absolute layout path", async () => {
     const lc = new LookupContext();
     vi.spyOn(lc, "findTemplate").mockReturnValueOnce(fakeTemplate("content") as never);

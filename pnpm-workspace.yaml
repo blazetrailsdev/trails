@@ -13,3 +13,5 @@ allowBuilds:
   libsql: true
 
 pmOnFail: ignore
+
+engineStrict: true

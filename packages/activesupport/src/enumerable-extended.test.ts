@@ -2,20 +2,16 @@ import { describe, it, expect } from "vitest";
 import {
   sum,
   indexBy,
-  groupBy,
   minimum,
   maximum,
   compactBlank,
   any,
   many,
-  tally,
-  filterMap,
   excluding,
   including,
   minBy,
   maxBy,
   eachCons,
-  eachSlice,
   inOrderOf,
   exclude,
   without,
@@ -120,28 +116,6 @@ describe("EnumerableTests", () => {
     expect(including([1, 2, 3], 4, 5)).toEqual([1, 2, 3, 4, 5]);
   });
 
-  it("tally — counts occurrences", () => {
-    expect(tally(["a", "b", "a", "c", "b", "a"])).toEqual({ a: 3, b: 2, c: 1 });
-  });
-
-  it("tally — empty array", () => {
-    expect(tally([])).toEqual({});
-  });
-
-  it("filterMap — maps and removes nullish results", () => {
-    const result = filterMap([1, 2, 3, 4], (x) => (x % 2 === 0 ? x * 10 : null));
-    expect(result).toEqual([20, 40]);
-  });
-
-  it("filterMap — removes false as well as nil, and keeps other falsy values", () => {
-    const result = filterMap([0, 1, 2, 3], (x) => (x === 1 ? false : x === 2 ? null : x));
-    expect(result).toEqual([0, 3]);
-  });
-
-  it("filterMap — empty array", () => {
-    expect(filterMap([], (x: number) => x)).toEqual([]);
-  });
-
   it("minBy — finds element with minimum mapped value", () => {
     const payments = [pay(5), pay(15), pay(10)];
     expect(minBy(payments, (p) => p.price)).toEqual(pay(5));
@@ -158,17 +132,6 @@ describe("EnumerableTests", () => {
 
   it("maxBy — undefined for empty", () => {
     expect(maxBy([], (p: Payment) => p.price)).toBeUndefined();
-  });
-
-  it("groupBy — groups by key function", () => {
-    const items = [
-      { type: "a", v: 1 },
-      { type: "b", v: 2 },
-      { type: "a", v: 3 },
-    ];
-    const grouped = groupBy(items, (x) => x.type);
-    expect(grouped.get("a")).toHaveLength(2);
-    expect(grouped.get("b")).toHaveLength(1);
   });
 
   it("compact_blank — removes blank values", () => {
@@ -192,15 +155,6 @@ describe("EnumerableTests", () => {
 
   it("eachCons — window larger than array returns empty", () => {
     expect(eachCons([1, 2], 3)).toEqual([]);
-  });
-
-  it("eachSlice — chunks array", () => {
-    expect(eachSlice([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
-    expect(eachSlice([1, 2, 3], 3)).toEqual([[1, 2, 3]]);
-  });
-
-  it("eachSlice — empty array", () => {
-    expect(eachSlice([], 2)).toEqual([]);
   });
 
   it("in_order_of — reorders by series", () => {

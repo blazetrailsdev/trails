@@ -1,7 +1,14 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { ModelName } from "@blazetrails/activemodel";
 import { camelize } from "@blazetrails/activesupport";
-import { block as rbBlock, fetch, hashDelete, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  block as rbBlock,
+  fetch,
+  hashDelete,
+  isSymbol,
+  rbFSend,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 
 import { Routing } from "../../namespaces.js";
 import * as PolymorphicRoutes from "./polymorphic-routes.js";
@@ -237,14 +244,14 @@ export class HelperMethodBuilder {
     let args: unknown[];
     let target: PolymorphicHost = recipient;
     if (Array.isArray(recordOrHashOrArray)) {
-      const compact = recordOrHashOrArray.filter((x) => x != null);
-      if (compact.length === 0) {
+      recordOrHashOrArray = recordOrHashOrArray.filter((x) => x != null);
+      if (recordOrHashOrArray.length === 0) {
         throw new ArgumentError("Nil location provided. Can't build URI.");
       }
-      if (compact[0] instanceof Routing.RoutesProxy) {
-        target = compact.shift() as unknown as PolymorphicHost;
+      if (recordOrHashOrArray[0] instanceof Routing.RoutesProxy) {
+        target = (recordOrHashOrArray as unknown[]).shift() as PolymorphicHost;
       }
-      [method, args] = builder.handleList(compact);
+      [method, args] = builder.handleList(recordOrHashOrArray);
     } else if (typeof recordOrHashOrArray === "string") {
       [method, args] = builder.handleString(recordOrHashOrArray);
     } else if (isModelClass(recordOrHashOrArray)) {
@@ -255,13 +262,11 @@ export class HelperMethodBuilder {
       [method, args] = builder.handleModel(recordOrHashOrArray as ToModel);
     }
 
-    const helper = (target as unknown as Record<string, unknown>)[method];
-    if (typeof helper !== "function") {
-      throw new ArgumentError(`undefined route helper ${method}`);
+    if (Object.keys(options).length === 0) {
+      return rbFSend(target, method, ...args) as string;
+    } else {
+      return rbFSend(target, method, ...args, options) as string;
     }
-    return Object.keys(options).length === 0
-      ? (helper as (...a: unknown[]) => string).call(target, ...args)
-      : (helper as (...a: unknown[]) => string).call(target, ...args, options);
   }
 
   readonly suffix: string;
@@ -351,7 +356,8 @@ export class HelperMethodBuilder {
   }
 
   private getMethodForClass(klass: ModelClass): string {
-    return this.getMethodForString(this.keyStrategy(klass.modelName));
+    const name = this.keyStrategy(klass.modelName);
+    return this.getMethodForString(name);
   }
 
   private getMethodForString(str: string): string {

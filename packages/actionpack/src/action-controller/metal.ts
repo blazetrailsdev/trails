@@ -1,20 +1,25 @@
 import type { MimeType } from "../action-dispatch/http/mime-type.js";
-import { AbstractController } from "../abstract-controller/base.js";
+import { Base as AbstractControllerBase } from "../abstract-controller/base.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import type { Session } from "../action-dispatch/request/session.js";
 import { Parameters } from "./metal/strong-parameters.js";
-import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import type { RackResponse, Response as RackResponseObject } from "@blazetrails/rack";
 import {
   classAttribute,
   demodulize,
-  initializeIncludedModules,
+  extractOptionsBang,
   isAnonymous,
   SafeBuffer,
   underscore,
 } from "@blazetrails/activesupport";
-import { rbCheckArrayType, rbModSingletonP, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  rbCheckArrayType,
+  rbFSend,
+  rbModSingletonP,
+  rbObjDup,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
   Middleware as AbstractMiddleware,
@@ -27,19 +32,19 @@ import type { RackEnv } from "@blazetrails/rack";
 import type { EncodingTemplate } from "../action-dispatch/http/param-builder.js";
 
 export class MiddlewareStack extends AbstractMiddlewareStack {
-  override build(app: RackApp | RackAppObject): RackApp;
-  override build(action: string, app?: RackApp | RackAppObject): RackApp;
-  override build(action: string | RackApp | RackAppObject, app?: RackApp | RackAppObject): RackApp {
+  override build(app: RackApp | RackAppObject): RackApp | RackAppObject;
+  override build(action: string, app?: RackApp | RackAppObject): RackApp | RackAppObject;
+  override build(
+    action: string | RackApp | RackAppObject,
+    app?: RackApp | RackAppObject,
+  ): RackApp | RackAppObject {
     action = String(action);
 
-    let current: RackApp =
-      typeof app === "function" ? app : (env: RackEnv) => (app as RackAppObject).call(env);
-    const middlewares = this.middlewares as Middleware[];
-    for (let i = middlewares.length - 1; i >= 0; i--) {
-      const middleware = middlewares[i];
-      current = middleware.valid(action) ? middleware.build(current) : current;
-    }
-    return current;
+    return [...(this.middlewares as Middleware[])]
+      .reverse()
+      .reduce<
+        RackApp | RackAppObject
+      >((a, middleware) => (middleware.valid(action) ? middleware.build(a) : a), app as RackApp | RackAppObject);
   }
 
   /** @internal */
@@ -48,17 +53,12 @@ export class MiddlewareStack extends AbstractMiddlewareStack {
     args: unknown[],
     block?: MiddlewareBlock,
   ): Middleware {
-    const next = [...args];
-    const last = next[next.length - 1];
-    const options: Record<string, unknown> =
-      last && typeof last === "object" && !Array.isArray(last)
-        ? { ...(next.pop() as Record<string, unknown>) }
-        : {};
+    const options: Record<string, unknown> = extractOptionsBang(args);
     const only = ([] as string[]).concat((options.only as string | string[]) ?? []).map(String);
     const except = ([] as string[]).concat((options.except as string | string[]) ?? []).map(String);
     delete options.only;
     delete options.except;
-    if (Object.keys(options).length > 0) next.push(options);
+    if (Object.keys(options).length > 0) args.push(options);
 
     let strategy: Strategy = NULL;
     let list: string[] | null = null;
@@ -69,7 +69,7 @@ export class MiddlewareStack extends AbstractMiddlewareStack {
       strategy = EXCLUDE;
       list = except;
     }
-    return new Middleware(klass, next, list, strategy, block);
+    return new Middleware(klass, args, list, strategy, block);
   }
 }
 
@@ -101,10 +101,10 @@ const EXCLUDE: Strategy = (list, action) => !(list ?? []).includes(action);
 const NULL: Strategy = () => true;
 
 function inherited(this: typeof Metal, subclass: typeof Metal): void {
-  subclass.middlewareStack = this.middlewareStack.dup();
+  subclass.middlewareStack = rbObjDup(this.middlewareStack);
 }
 
-export class Metal extends AbstractController {
+export class Metal extends AbstractControllerBase {
   static {
     this.abstractBang();
   }
@@ -120,10 +120,7 @@ export class Metal extends AbstractController {
     Object.defineProperty(this, "middlewareStack", {
       ...reader,
       get(this: typeof Metal) {
-        if (
-          !Object.prototype.hasOwnProperty.call(this, "__class_attr_middlewareStack") &&
-          !rbModSingletonP(this)
-        ) {
+        if (!Object.hasOwn(this, "__class_attr_middlewareStack") && !rbModSingletonP(this)) {
           inherited.call(Object.getPrototypeOf(this), this);
         }
         return reader.get!.call(this);
@@ -137,11 +134,7 @@ export class Metal extends AbstractController {
 
   constructor() {
     super();
-    fireInherited(
-      new.target as unknown as HelpersPathControllerClass,
-      Metal as unknown as HelpersPathControllerClass,
-    );
-    initializeIncludedModules(this);
+    fireInherited(new.target, Metal);
   }
 
   get params(): Parameters | Record<string, unknown> {
@@ -200,7 +193,7 @@ export class Metal extends AbstractController {
     this.middlewareStack.use(args[0] as MiddlewareFactory, ...(args.slice(1) as any));
   }
 
-  static action(this: typeof Metal, name: string): RackApp {
+  static action(this: typeof Metal, name: string): RackApp | RackAppObject {
     const app: RackApp = async (env: RackEnv) => {
       const req = new Request(env);
       const res = this.makeResponseBang(req);
@@ -223,11 +216,15 @@ export class Metal extends AbstractController {
     res: Response,
   ): Promise<RackResponse> {
     if (this.middlewareStack.isAny()) {
-      return await this.middlewareStack.build(name, async () => {
-        const controller = new this();
-        await controller.dispatch(name, req, res);
-        return controller.toA();
-      })(req.env);
+      return await (rbFSend(
+        this.middlewareStack.build(name, async () => {
+          const controller = new this();
+          await controller.dispatch(name, req, res);
+          return controller.toA();
+        }),
+        "call",
+        req.env,
+      ) as Promise<RackResponse>);
     } else {
       const controller = new this();
       await controller.dispatch(name, req, res);
@@ -265,9 +262,9 @@ export class Metal extends AbstractController {
     this._response = response as Response;
   }
 
-  resetSession(): void {
+  async resetSession(): Promise<void> {
     if (this.request && typeof (this.request as any).resetSession === "function") {
-      (this.request as any).resetSession();
+      await (this.request as any).resetSession();
     }
   }
 
@@ -303,7 +300,7 @@ export class Metal extends AbstractController {
     return this.response.contentType ?? null;
   }
 
-  get mediaType(): string | undefined {
+  get mediaType(): string | null {
     return this.response.mediaType;
   }
 
@@ -330,6 +327,28 @@ export class Metal extends AbstractController {
   }
 
   toA(): RackResponse {
-    return this.response.toRack() as RackResponse;
+    return this.response.toA() as RackResponse;
+  }
+}
+
+const fired = new WeakSet<object>();
+
+/** @noRailsEquivalent CONVERGEABLE layouts-inherited-writes-layout-method-at-first-construction */
+function fireInherited(klass: object, metal: object): void {
+  const chain: object[] = [];
+  for (
+    let k: object | null = klass;
+    k && k !== metal && Object.getPrototypeOf(k) !== metal;
+    k = Object.getPrototypeOf(k) as object | null
+  ) {
+    chain.unshift(k);
+  }
+
+  for (const k of chain) {
+    if (fired.has(k)) continue;
+    fired.add(k);
+    if (rbObjRespondTo(k, "_writeLayoutMethod")) {
+      (k as { _writeLayoutMethod(): void })._writeLayoutMethod();
+    }
   }
 }

@@ -52,7 +52,7 @@ describe("AttributeMethodsTest (trails)", () => {
       Leaf as unknown as { isInstanceMethodAlreadyImplemented(name: string): boolean }
     ).isInstanceMethodAlreadyImplemented("title");
 
-    expect(Object.prototype.hasOwnProperty.call(Leaf, "_generatedAttributeMethods")).toBe(true);
+    expect(Object.hasOwn(Leaf, "_generatedAttributeMethods")).toBe(true);
     expect(Leaf._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
     expect(Leaf._generatedAttributeMethods!.inspect()).toBe("Leaf::GeneratedAttributeMethods");
   });
@@ -69,7 +69,7 @@ describe("AttributeMethodsTest (trails)", () => {
       }
     }
     generatable(Dog).defineAttributeMethods();
-    expect(Object.prototype.hasOwnProperty.call(Animal, "_attributeMethodsGenerated")).toBe(true);
+    expect(Object.hasOwn(Animal, "_attributeMethodsGenerated")).toBe(true);
     expect(generatable(Animal)._attributeMethodsGenerated).toBe(true);
     expect(generatable(Dog)._attributeMethodsGenerated).toBe(true);
   });
@@ -404,7 +404,7 @@ describe("AttributeMethodsTest (trails)", () => {
       link;
       link = Object.getPrototypeOf(link) as object | null
     ) {
-      if (Object.prototype.hasOwnProperty.call(link, "nameChanged")) carriers += 1;
+      if (Object.hasOwn(link, "nameChanged")) carriers += 1;
     }
     expect(carriers).toBe(1);
   });
@@ -453,8 +453,8 @@ describe("AttributeMethods#respond_to_missing? (trails)", () => {
 
     await Topic.loadSchema();
     expect(rbObjRespondTo(topic, "title")).toBe(true);
-    expect(basicObjRespondTo(topic, "title", true)).toBe(true);
-    expect(basicObjRespondTo(topic, "mumbo", true)).toBe(false);
+    expect(basicObjRespondTo(topic, "title")).toBe(true);
+    expect(basicObjRespondTo(topic, "mumbo")).toBe(false);
     expect(rbObjRespondTo(new Topic(), "title")).toBe(true);
   });
 

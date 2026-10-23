@@ -3,7 +3,7 @@ import {
   ArgumentError,
   EOFError,
   Hash,
-  Module,
+  defineModule,
   NoMethodError,
   include,
   rbCInteger,
@@ -134,7 +134,7 @@ describe("oversized_integer_extension", () => {
 });
 
 describe("ext registry lookup", () => {
-  const Mod = new Module((mod) => mod.defineMethod("toMsgpackExt", () => "value_msgpacked"));
+  const Mod = defineModule({ toMsgpackExt: () => "value_msgpacked" });
   const packed = Uint8Array.of(0xc7, 0x0f, 0x01, ...new TextEncoder().encode("value_msgpacked"));
 
   it("finds a Module a base class includes", () => {

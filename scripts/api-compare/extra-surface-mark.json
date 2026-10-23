@@ -1,10 +1,37 @@
 {
+  "actioncontroller": {
+    "novel": 0,
+    "total": 10,
+    "noCounterpartFiles": 0,
+    "allowed": 4
+  },
+  "actiondispatch": {
+    "novel": 0,
+    "total": 7,
+    "noCounterpartFiles": 0,
+    "allowed": 40
+  },
+  "actionview": {
+    "novel": 0,
+    "total": 23,
+    "noCounterpartFiles": 3,
+    "allowed": 24
+  },
+  "i18n": {
+    "novel": 0,
+    "total": 0,
+    "noCounterpartFiles": 0,
+    "allowed": 14
+  },
   "ruby-compat": {
     "novel": 0,
-    "total": 52
+    "total": 51,
+    "noCounterpartFiles": 14
   },
   "thor": {
     "novel": 0,
-    "total": 1
+    "total": 0,
+    "noCounterpartFiles": 0,
+    "allowed": 1
   }
 }

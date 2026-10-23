@@ -1,5 +1,3 @@
-export const VERSION = "8.0.2";
-
 export { Deprecator, deprecator } from "./deprecator.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export * as Constants from "./constants.js";
@@ -23,10 +21,6 @@ export {
   Dispatcher,
   StaticDispatcher,
   type DispatchableControllerClass,
-  escapePath,
-  escapeSegment,
-  escapeFragment,
-  unescapeUri,
   HelperMethodBuilder,
   UrlFor,
 } from "./routing/index.js";
@@ -78,7 +72,6 @@ export {
   type CspRequestHost,
 } from "./http/content-security-policy.js";
 export { Middleware as PermissionsPolicyMiddleware } from "./http/permissions-policy.js";
-export { redirectTo, redirectBack, type RedirectResult } from "./redirect.js";
 export { Flash, FlashHash } from "./middleware/flash.js";
 export { Static, type StaticOptions } from "./middleware/static.js";
 export * as Session from "./middleware/session/index.js";
@@ -109,19 +102,14 @@ export {
   ParamsTooDeepError,
 } from "./http/param-error.js";
 export { RequestId, type RequestIdOptions } from "./middleware/request-id.js";
-export { ExceptionWrapper } from "./middleware/exception-wrapper.js";
+export { ExceptionWrapper, SourceMapLocation } from "./middleware/exception-wrapper.js";
 export { ShowExceptions } from "./middleware/show-exceptions.js";
 export { DebugExceptions } from "./middleware/debug-exceptions.js";
 export { AssumeSSL } from "./middleware/assume-ssl.js";
 export { ActionableExceptions } from "./middleware/actionable-exceptions.js";
 export { Callbacks } from "./middleware/callbacks.js";
 export { ServerTiming } from "./middleware/server-timing.js";
-export {
-  DebugLocks,
-  type InterlockLike,
-  type ThreadLike,
-  type ThreadInfo,
-} from "./middleware/debug-locks.js";
+export { DebugLocks } from "./middleware/debug-locks.js";
 export {
   Executor,
   type ExecutorLike,
@@ -146,19 +134,6 @@ export {
   type DrivenByOptions,
   type ServedByOptions,
 } from "./system-test-case.js";
-export {
-  Driver,
-  type BrowserName,
-  type DriverOptions,
-  type PlaywrightBrowser,
-  type PlaywrightBrowserContext,
-  type PlaywrightPage,
-} from "./system-testing/driver.js";
-export {
-  Server,
-  type ServerApp,
-  type ServerHandle,
-  type ServerAddress,
-} from "./system-testing/server.js";
-export { RequestUtils } from "./request/utils.js";
-export { CacheConfig } from "./http/cache.js";
+export { Driver, type BrowserName, type DriverOptions } from "./system-testing/driver.js";
+export { Server } from "./system-testing/server.js";
+export { Request as CacheRequest } from "./http/cache.js";

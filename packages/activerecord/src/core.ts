@@ -18,8 +18,10 @@ import {
   rbModToS,
   rbObjHash,
   basicObjRespondTo,
-  rbFPublicSend,
+  rbFSend,
   rbObjSingletonClass,
+  rbCallSuper,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import {
   NameError,
@@ -36,7 +38,6 @@ import {
   isPlainObject,
   constantize,
   delegate,
-  filterMap,
 } from "@blazetrails/activesupport";
 import { AsynchronousQueriesTracker, type Session } from "./asynchronous-queries-tracker.js";
 import { _reflectOnAssociation, reflectOnAggregation } from "./reflection.js";
@@ -137,6 +138,8 @@ export const Core = {
 };
 
 import { ActiveRecord } from "./namespaces.js";
+import type { Base } from "./base.js";
+import type { Relation } from "./relation.js";
 import {
   actionOnStrictLoadingViolation,
   applicationRecordClass,
@@ -148,10 +151,7 @@ type FilterAttributes = (string | RegExp | ((key: string, value: unknown) => unk
 export class ClassMethods {
   static get filterAttributes(): FilterAttributes {
     const host = this as unknown as CoreHost;
-    if (
-      !Object.prototype.hasOwnProperty.call(host, "_filterAttributes") ||
-      host._filterAttributes == null
-    ) {
+    if (!Object.hasOwn(host, "_filterAttributes") || host._filterAttributes == null) {
       return parentClass(host)!.filterAttributes;
     } else {
       return host._filterAttributes;
@@ -185,7 +185,7 @@ export class ClassMethods {
   /** @missingRailsCall table_exists? — PERMANENT */
   static inspect(
     this: (abstract new (...args: never) => unknown) & {
-      abstractClass: boolean;
+      isAbstractClass(): boolean;
       isConnected(): boolean;
       attributeTypes():
         | Record<string, { type(): string | null | undefined } | null>
@@ -195,7 +195,7 @@ export class ClassMethods {
     const name = rbModToS(this);
     if (this === ActiveRecord.Base || rbModSingletonP(this)) {
       return name;
-    } else if (this.abstractClass) {
+    } else if (this.isAbstractClass()) {
       return `${name}(abstract)`;
     } else if (!isSchemaLoaded.call(this as never) && !this.isConnected()) {
       return `${name} (call '${name}.load_schema' to load schema informations)`;
@@ -217,7 +217,7 @@ export class ClassMethods {
     const host = this as unknown as CoreHost;
     return (
       (Object.hasOwn(host, "_arelTable") ? host._arelTable : undefined) ||
-      (host._arelTable = new Table((this as any).tableName, { klass: this as any }))
+      (host._arelTable = new Table(host.tableName!, { klass: this as unknown as typeof Base }))
     );
   }
 
@@ -226,26 +226,18 @@ export class ClassMethods {
     return (
       (Object.hasOwn(host, "_predicateBuilder") ? host._predicateBuilder : undefined) ||
       (host._predicateBuilder = new PredicateBuilder(
-        new TableMetadata(this as any, (this as any).arelTable),
+        new TableMetadata(this as unknown as typeof Base, host.arelTable),
       ))
     );
   }
 }
 
-interface CoreRecord {
-  id: unknown;
-  _attributes: AttributeSet;
-  _newRecord: boolean;
-  readAttribute(name: string): unknown;
-  isPersisted(): boolean;
-}
-
-export function inspect(this: CoreRecord): string {
-  return inspectWithAttributes.call(this as any, attributesForInspect.call(this));
+export function inspect(this: Base): string {
+  return inspectWithAttributes.call(this, attributesForInspect.call(this));
 }
 
 export async function prettyPrint(
-  this: CoreRecord & {
+  this: Base & {
     _attributes: any;
     _hasAttribute(attrName: string): boolean;
     constructor: { prototype: object };
@@ -253,7 +245,7 @@ export async function prettyPrint(
   pp: PP,
 ): Promise<void> {
   if (isCustomInspectMethodDefined.call(this)) {
-    pp.text((this as unknown as { inspect(): string }).inspect());
+    pp.text(this.inspect());
     return;
   }
   await pp.objectAddressGroup(this as object, async () => {
@@ -272,9 +264,7 @@ export async function prettyPrint(
           pp.text(attrName);
           pp.text(":");
           pp.breakable();
-          const value = (
-            this as unknown as { attributeForInspect(attr: string): string | InspectionMask }
-          ).attributeForInspect(attrName);
+          const value = this.attributeForInspect(attrName);
           pp.text(String(value));
         });
       },
@@ -282,21 +272,21 @@ export async function prettyPrint(
   });
 }
 
-export function equals(this: CoreRecord, comparisonObject: unknown): boolean {
+export function equals(this: Base, comparisonObject: unknown): boolean {
   return (
     this === comparisonObject ||
     (rbObjClass(comparisonObject) === rbObjClass(this) &&
-      (this as unknown as { isPrimaryKeyValuesPresent(): boolean }).isPrimaryKeyValuesPresent() &&
-      rbEqual((comparisonObject as CoreRecord).id, this.id))
+      this.isPrimaryKeyValuesPresent() &&
+      rbEqual((comparisonObject as Base).id, this.id))
   );
 }
 
 export const eql = equals;
 
-export function hash(this: CoreRecord): number {
+export function hash(this: Base): number {
   const id = this.id;
 
-  if ((this as unknown as { isPrimaryKeyValuesPresent(): boolean }).isPrimaryKeyValuesPresent()) {
+  if (this.isPrimaryKeyValuesPresent()) {
     return rbHash(this.constructor) ^ rbHash(id);
   } else {
     return rbObjHash(this);
@@ -313,12 +303,9 @@ export function isFrozen(this: FrozenRecord): boolean {
   return Object.isFrozen(this._attributes);
 }
 
-export function compare(this: CoreRecord, otherObject: unknown): number | null {
+export function compare(this: Base, otherObject: unknown): number | null {
   if (rbObjIsKindOf(otherObject, this.constructor)) {
-    return cmp(
-      (this as unknown as ComparableRecord).toKey(),
-      (otherObject as ComparableRecord).toKey(),
-    );
+    return cmp(this.toKey(), (otherObject as ComparableRecord).toKey());
   } else {
     return cmp(this, otherObject);
   }
@@ -328,11 +315,11 @@ interface ComparableRecord {
   toKey(): unknown[] | null;
 }
 
-export function isPresent(this: CoreRecord): boolean {
+export function isPresent(this: Base): boolean {
   return true;
 }
 
-export function isBlank(this: CoreRecord): boolean {
+export function isBlank(this: Base): boolean {
   return false;
 }
 
@@ -391,16 +378,16 @@ type YamlHost = { yamlEncoder(): YAMLEncoder };
  * @inventedArm defineAttributeMethod — PERMANENT
  */
 export function initWith(
-  this: CoreRecord & {
+  this: Base & {
     initWithAttributes(attributes: unknown, newRecord: boolean, block?: unknown): unknown;
   },
   coder: Record<string, unknown>,
-  block?: (record: CoreRecord) => void,
+  block?: (record: Base) => void,
 ): void {
   coder = LegacyYamlAdapter.convert(coder);
-  const attributes = (this.constructor as unknown as YamlHost).yamlEncoder().decode(coder);
+  const attributes = this.constructor.yamlEncoder().decode(coder);
   for (const name of attributes.keys()) {
-    if (!basicObjRespondTo(this, name, false)) {
+    if (!basicObjRespondTo(this, name)) {
       (
         rbObjSingletonClass(this) as unknown as { defineAttributeMethod(name: string): void }
       ).defineAttributeMethod(name);
@@ -409,7 +396,7 @@ export function initWith(
   this.initWithAttributes(attributes, coder["new_record"] as boolean, block);
 }
 
-export function initWithAttributes<T extends CoreRecord>(
+export function initWithAttributes<T extends Base>(
   this: T & {
     _attributes: any;
     _newRecord: boolean;
@@ -434,7 +421,7 @@ export function initWithAttributes<T extends CoreRecord>(
 }
 
 export function initAttributes(
-  this: CoreRecord & {
+  this: Base & {
     _attributes: any;
     _primaryKey?: string | string[] | null;
     constructor: { isCompositePrimaryKey(): boolean };
@@ -452,14 +439,14 @@ export function initAttributes(
   return attrs;
 }
 
-type StrictLoadingModeHost = CoreRecord & { _strictLoadingMode?: StrictLoadingMode };
+type StrictLoadingModeHost = Base & { _strictLoadingMode?: StrictLoadingMode };
 
 /** @missingRailsName attributes — PERMANENT */
 export function encodeWith(
-  this: CoreRecord & { _attributes: AttributeSet; isNewRecord(): boolean },
+  this: Base & { _attributes: AttributeSet; isNewRecord(): boolean },
   coder: Record<string, unknown>,
 ): void {
-  (this.constructor as unknown as YamlHost).yamlEncoder().encode(this._attributes, coder);
+  this.constructor.yamlEncoder().encode(this._attributes, coder);
   coder["new_record"] = this.isNewRecord();
   coder["active_record_yaml_version"] = 2;
 }
@@ -476,8 +463,8 @@ export function isStrictLoadingAll(this: StrictLoadingModeHost): boolean {
   return strictLoadingMode.call(this) === "all";
 }
 
-export function fullInspect(this: CoreRecord): string {
-  return inspectWithAttributes.call(this as any, allAttributesForInspect.call(this));
+export function fullInspect(this: Base): string {
+  return inspectWithAttributes.call(this, allAttributesForInspect.call(this));
 }
 
 interface CoreHost {
@@ -491,7 +478,7 @@ interface CoreHost {
   inspectionFilter(): ParameterFilter;
   _connectionClass?: boolean;
   _destroyAssociationAsyncJob?: any;
-  destroyAssociationAsyncJob?: any;
+  destroyAssociationAsyncJob?: string | (abstract new (...args: never[]) => unknown) | null;
   _findByStatementCache?: FindByStatementCache;
   initializeFindByCache(): FindByStatementCache;
   _generatedAssociationMethods?: Module;
@@ -503,6 +490,9 @@ interface CoreHost {
   isScopeAttributes(): boolean;
   typeForAttribute(name: string): { cast(value: unknown): unknown } | null;
   ensureSchemaLoaded(): Promise<void>;
+  generatedAttributeMethods(): Module;
+  attributeAliases?: Record<string, string>;
+  where(...args: unknown[]): Relation<Base>;
 }
 
 function parentClass(klass: CoreHost): CoreHost | null {
@@ -510,12 +500,14 @@ function parentClass(klass: CoreHost): CoreHost | null {
   return typeof proto === "function" ? (proto as CoreHost) : null;
 }
 
-export function destroyAssociationAsyncJob(this: CoreHost): any {
+export function destroyAssociationAsyncJob(
+  this: typeof Base,
+): (abstract new (...args: never[]) => unknown) | null {
   try {
     if (typeof this._destroyAssociationAsyncJob === "string") {
       this._destroyAssociationAsyncJob = constantize(this._destroyAssociationAsyncJob);
     }
-    return this._destroyAssociationAsyncJob;
+    return this._destroyAssociationAsyncJob as (abstract new (...args: never[]) => unknown) | null;
   } catch (error) {
     if (!(error instanceof NameError)) throw error;
     throw new NameError(`Unable to load destroy_association_async_job: ${error.message}`);
@@ -533,7 +525,7 @@ export function configurations(
   return _configurations;
 }
 
-export function isApplicationRecordClass(this: CoreHost): boolean | undefined {
+export function isApplicationRecordClass(this: typeof Base): boolean | undefined {
   if (applicationRecordClass() != null) {
     return (this as unknown) === applicationRecordClass();
   } else {
@@ -564,7 +556,7 @@ export function connectedToStack(): ConnectedToEntry[] {
   }
 }
 
-export function currentRole(this: CoreHost): string {
+export function currentRole(this: typeof Base): string {
   const stack = connectedToStack();
   for (let i = stack.length - 1; i >= 0; i--) {
     const hash = stack[i];
@@ -575,7 +567,7 @@ export function currentRole(this: CoreHost): string {
   return (this as CoreHost & { defaultRole: string }).defaultRole;
 }
 
-export function currentShard(this: CoreHost): string {
+export function currentShard(this: typeof Base): string {
   const stack = connectedToStack();
   for (let i = stack.length - 1; i >= 0; i--) {
     const hash = stack[i];
@@ -586,7 +578,7 @@ export function currentShard(this: CoreHost): string {
   return (this as CoreHost & { defaultShard: string }).defaultShard;
 }
 
-export function currentPreventingWrites(this: CoreHost): boolean {
+export function currentPreventingWrites(this: typeof Base): boolean {
   const stack = connectedToStack();
   for (let i = stack.length - 1; i >= 0; i--) {
     const hash = stack[i];
@@ -674,20 +666,20 @@ export function strictLoadingViolationBang({
   }
 }
 
-export function initializeFindByCache(this: CoreHost): FindByStatementCache {
+export function initializeFindByCache(this: typeof Base): FindByStatementCache {
   return (this._findByStatementCache = new Map([
     [true, new Concurrent.Map()],
     [false, new Concurrent.Map()],
   ]));
 }
 
-export function initializeGeneratedModules(this: CoreHost): void {
+export function initializeGeneratedModules(this: typeof Base): void {
   generatedAssociationMethods.call(this);
 }
 
 /** @inventedArm generatedAttributeMethods — PERMANENT */
 export function generatedAssociationMethods(this: CoreHost): Module {
-  (this as unknown as { generatedAttributeMethods(): Module }).generatedAttributeMethods();
+  this.generatedAttributeMethods();
   return (
     (Object.hasOwn(this, "_generatedAssociationMethods")
       ? this._generatedAssociationMethods
@@ -705,7 +697,7 @@ export function generatedAssociationMethods(this: CoreHost): Module {
   );
 }
 
-export function typeCaster(this: CoreHost): TypeCasterMap {
+export function typeCaster(this: typeof Base): TypeCasterMap {
   return new TypeCasterMap(this);
 }
 
@@ -727,14 +719,14 @@ export function inspectionFilter(this: { constructor: CoreHost }): ParameterFilt
   return this.constructor.inspectionFilter();
 }
 
-export function connectionHandler(this: CoreHost): ConnectionHandler {
+export function connectionHandler(this: typeof Base): ConnectionHandler {
   return (
     IsolatedExecutionState.get<ConnectionHandler>(ACTIVE_RECORD_CONNECTION_HANDLER_KEY) ??
     (this as CoreHost & { defaultConnectionHandler: ConnectionHandler }).defaultConnectionHandler
   );
 }
 
-export function setConnectionHandler(this: CoreHost, handler: ConnectionHandler): void {
+export function setConnectionHandler(this: typeof Base, handler: ConnectionHandler): void {
   IsolatedExecutionState.set(ACTIVE_RECORD_CONNECTION_HANDLER_KEY, handler);
 }
 
@@ -743,7 +735,11 @@ const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
 /** @internal */
 export const _allocation: { klass: unknown } = { klass: null };
 
-function completeAttributesOnSchemaLoad(record: object, attributes: AttributeSet): void {
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE save-chain-schema-warm-and-cold-built-records
+ */
+export function completeAttributesOnSchemaLoad(record: object, attributes: AttributeSet): void {
   Object.defineProperty(record, "_attributes", {
     get(this: object) {
       const klass = record.constructor as unknown as {
@@ -769,47 +765,9 @@ function completeAttributesOnSchemaLoad(record: object, attributes: AttributeSet
   });
 }
 
-/**
- * @inventedArm if — PERMANENT
- * @inventedArm completeAttributesOnSchemaLoad — CONVERGEABLE save-chain-schema-warm-and-cold-built-records
- */
-export function constructor(
-  this: CoreRecord & {
-    _attributes: AttributeSet;
-    _newRecord: boolean;
-    initInternals(): void;
-    initializeInternalsCallback(): void;
-  },
-  attributes: unknown = null,
-  block?: (record: CoreRecord) => void,
-): void {
-  const allocating = _allocation.klass === this.constructor;
-  if (allocating) _allocation.klass = null;
-  if (!allocating) {
-    this._newRecord = true;
-    this._attributes = (
-      this.constructor as unknown as {
-        _defaultAttributes(): AttributeSet;
-      }
-    )
-      ._defaultAttributes()
-      .deepDup();
-    if (!isSchemaLoaded.call(this.constructor as never)) {
-      completeAttributesOnSchemaLoad(this, this._attributes);
-    }
-  }
-
-  this.initInternals();
-  if (!allocating) this.initializeInternalsCallback();
-
-  SuperMethods.superMethod(this, "initialize")!(attributes);
-
-  if (block) block(this);
-}
-
 /** @internal */
 export function initInternals(
-  this: CoreRecord & {
+  this: Base & {
     _attributes: import("@blazetrails/activemodel").AttributeSet;
     _newRecord: boolean;
     _readonly: boolean;
@@ -829,7 +787,7 @@ export function initInternals(
   this._markedForDestruction = false;
   this._destroyedByAssociation = null;
   this._startTransactionState = null;
-  const klass = this.constructor as any;
+  const klass = this.constructor;
   this._primaryKey = klass.primaryKey;
   this._strictLoading = klass.strictLoadingByDefault ?? false;
   this._strictLoadingMode = klass.strictLoadingMode;
@@ -837,27 +795,25 @@ export function initInternals(
   klass.defineAttributeMethods();
 }
 
-const SuperMethods = new Module((mod) => {
-  mod.defineMethod("initialize", constructor);
-  mod.defineMethod("initInternals", initInternals);
-  mod.defineMethod("initializeDup", initializeDup);
-  mod.defineMethod("initializeInternalsCallback", initializeInternalsCallback);
-});
+const SuperMethods = {
+  initInternals,
+  initializeDup,
+  initializeInternalsCallback,
+};
 
 export function initializeDup(
-  this: CoreRecord & {
+  this: Base & {
     _attributes: any;
     _newRecord: boolean;
     _previouslyNewRecord: boolean;
     _destroyed: boolean;
     _startTransactionState: unknown;
     _runInitializeCallbacks(): unknown;
+    initAttributes(other: unknown): unknown;
   },
   other: unknown,
 ): void {
-  this._attributes = (
-    this as unknown as { initAttributes(other: unknown): unknown }
-  ).initAttributes(other);
+  this._attributes = this.initAttributes(other);
 
   this._runInitializeCallbacks();
 
@@ -866,7 +822,7 @@ export function initializeDup(
   this._destroyed = false;
   this._startTransactionState = null;
 
-  SuperMethods.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
 }
 
 interface CloneRecord {
@@ -879,8 +835,8 @@ interface CloneRecord {
 export function clone<T extends CloneRecord>(this: T): T {
   const copy = Object.create(Object.getPrototypeOf(this)) as T;
   Object.assign(copy, this);
-  (copy as unknown as CloneRecord)._attributes = this._attributes;
-  (copy as unknown as CloneRecord)._previouslyNewRecord = false;
+  copy._attributes = this._attributes;
+  copy._previouslyNewRecord = false;
   (copy as unknown as { _errors: unknown })._errors = new this.errors.constructor(copy);
   return copy;
 }
@@ -892,19 +848,16 @@ export function initializeInternalsCallback(this: unknown): void {}
 export function isCustomInspectMethodDefined(this: {
   constructor: { prototype: object };
 }): boolean {
-  return Object.prototype.hasOwnProperty.call(this.constructor.prototype, "inspect");
+  return Object.hasOwn(this.constructor.prototype, "inspect");
 }
 
 /** @internal */
-export function inspectWithAttributes(
-  this: CoreRecord & { _attributes: any; _hasAttribute(attrName: string): boolean },
-  attributesToList: string[],
-): string {
+export function inspectWithAttributes(this: Base, attributesToList: string[]): string {
   const inspection = this._attributes
     ? filterMap(attributesToList, (name) => {
         name = String(name);
         if (this._hasAttribute(name)) {
-          return `${name}: ${(this as unknown as { attributeForInspect(attr: string): string | InspectionMask }).attributeForInspect(name)}`;
+          return `${name}: ${this.attributeForInspect(name)}`;
         }
       }).join(", ")
     : "not initialized";
@@ -912,27 +865,27 @@ export function inspectWithAttributes(
   return `#<${rbModToS(this.constructor as new (...args: never) => unknown)} ${inspection}>`;
 }
 
-export function attributesForInspect(this: CoreRecord): string[] {
-  const klass = this.constructor as unknown as { attributesForInspect: ":all" | string[] };
+export function attributesForInspect(this: Base): string[] {
+  const klass = this.constructor;
   return klass.attributesForInspect === ":all"
     ? allAttributesForInspect.call(this)
     : klass.attributesForInspect;
 }
 
 /** @internal */
-export function allAttributesForInspect(this: CoreRecord): string[] {
+export function allAttributesForInspect(this: Base): string[] {
   if (!this._attributes) return [];
-  return (this as unknown as { attributeNames(): string[] }).attributeNames();
+  return this.attributeNames();
 }
 
 /** @internal */
-function relation(this: CoreHost): any {
-  return (this as any).all();
+function relation(this: typeof Base): any {
+  return this.all();
 }
 
-export function find(this: CoreHost, block: (record: any) => unknown): Promise<any>;
-export function find(this: CoreHost, ...ids: unknown[]): Promise<any>;
-export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
+export function find(this: typeof Base, block: (record: any) => unknown): Promise<any>;
+export function find(this: typeof Base, ...ids: unknown[]): Promise<any>;
+export async function find(this: typeof Base, ...ids: unknown[]): Promise<any> {
   await this.ensureSchemaLoaded();
   if (ids.length !== 1) return this.all().find(...ids);
   if (
@@ -968,7 +921,7 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
   }
   const keys = Object.keys(conditions);
   await this.ensureSchemaLoaded();
-  const aliases: Record<string, string> = (this as any).attributeAliases ?? {};
+  const aliases: Record<string, string> = this.attributeAliases ?? {};
   const resolvedKeys: (string | string[])[] = [];
   const values: unknown[] = [];
 
@@ -993,13 +946,13 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
             if (attribute === "id") {
               return (value as any).id_value;
             } else {
-              return rbFPublicSend(value, attribute);
+              return rbFSend(value, attribute);
             }
           });
           compositePrimaryKey = true;
         }
       } else {
-        if (respondsTo(value, pkey)) value = rbFPublicSend(value, pkey);
+        if (respondsTo(value, pkey)) value = rbFSend(value, pkey);
       }
     }
 
@@ -1041,7 +994,7 @@ async function cachedFindBy(
           wheres.set(key, params.bind());
         }
       }
-      return (this as any).where(wheres).limit(1);
+      return this.where(wheres).limit(1);
     });
     try {
       const records = await statement.execute(values.flat(), connection, { allowRetry: true });

@@ -29,6 +29,13 @@ const FIXTURES: Record<string, { input: string; recited: string }> = {
   },
 };
 
+const libyaml = activeVersion(SOURCES.find((s) => s.name === "libyaml")!);
+
+FIXTURES["packages/ruby-compat/src/bare-ref.ts"] = {
+  input: `// vendor/libyaml/${libyaml}/src/emitter.c:281 and vendor/libyaml/0.2.4/src/emitter.c\n`,
+  recited: `// vendor/libyaml/${libyaml}/src/emitter.c:281 and vendor/libyaml/${libyaml}/src/emitter.c\n`,
+};
+
 const TAG = "@inlinedFrom ActiveModel::API#initialize";
 
 FIXTURES["packages/activerecord/src/tagged.ts"] = {
@@ -68,6 +75,7 @@ describe("vendor:recite", () => {
       expect(changed.sort()).toEqual([
         "docs/stale.md",
         "packages/activerecord/src/tagged.ts",
+        "packages/ruby-compat/src/bare-ref.ts",
         "packages/ruby-compat/src/unversioned.ts",
       ]);
       for (const [path, { recited }] of Object.entries(FIXTURES)) {
@@ -91,7 +99,7 @@ describe("vendor:recite", () => {
   it("--check reports without writing", async () => {
     const root = await fixtureTree();
     try {
-      expect((await recite(root, PATHS, { check: true })).length).toBe(3);
+      expect((await recite(root, PATHS, { check: true })).length).toBe(4);
       for (const [path, { input }] of Object.entries(FIXTURES)) {
         expect(await readFile(join(root, path), "utf8")).toBe(input);
       }

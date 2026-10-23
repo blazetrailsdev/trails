@@ -1,6 +1,6 @@
 import { Fiber } from "./fiber.js";
 import { rbBlockGivenP } from "./hash.js";
-import { rtest } from "./object.js";
+import { rbFSend, rtest } from "./object.js";
 import { StopIteration } from "./stop-iteration.js";
 
 /**
@@ -106,8 +106,7 @@ export class Enumerator<T = unknown> {
    */
   each(block?: (...args: never[]) => unknown): unknown {
     if (!block) return this;
-    const meth = (this.obj as Record<string, (...args: unknown[]) => unknown>)[this.meth];
-    return meth.call(this.obj, ...this.args, block);
+    return rbFSend(this.obj, this.meth, ...this.args, block);
   }
 
   /**
@@ -130,14 +129,24 @@ export class Enumerator<T = unknown> {
   }
 
   /**
+   * `Enumerable#to_a` (`vendor/ruby/v3.3.11/enum.c:711` `enum_to_a`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toA(): T[] {
+    return [...this];
+  }
+
+  /**
    * `enumerator_each` (`vendor/ruby/v3.3.11/enumerator.c:613`) run to completion
-   * into a snapshot, which a `for…of` then walks.
+   * into a snapshot, which a `for…of` then walks. A multi-value yield is packed
+   * into one Array (`vendor/ruby/v3.3.11/enum.c:53` `rb_enum_values_pack`).
    *
    * @noRailsEquivalent PERMANENT
    */
   *[Symbol.iterator](): globalThis.Generator<T> {
     const buffer: T[] = [];
-    this.each((value: T) => buffer.push(value));
+    this.each((...values: T[]) => buffer.push(values.length <= 1 ? values[0] : (values as T)));
     yield* buffer;
   }
 }

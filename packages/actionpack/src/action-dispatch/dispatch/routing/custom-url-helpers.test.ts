@@ -1,7 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
 import { Conversion, ModelName, Naming } from "@blazetrails/activemodel";
 import { assertEqual, assertRaises, Concern, extend, underscore } from "@blazetrails/activesupport";
-import { include, merge, Module, NameError, rbFSend, RuntimeError } from "@blazetrails/ruby-compat";
+import { include, merge, NameError, rbFSend, RuntimeError } from "@blazetrails/ruby-compat";
 import {
   Parameters,
   UnfilteredParameters,
@@ -416,10 +416,9 @@ describe("TestCustomUrlHelpers", () => {
   });
 
   it("url helpers module can be included directly in an active support concern", () => {
-    const concern = new Module((mod) => {
-      extend(mod, Concern);
-      mod.include(Routes.urlHelpers());
-    });
+    const concern = {};
+    extend(concern, Concern);
+    include(concern, Routes.urlHelpers());
 
     const klass = class {};
     include(klass, concern);

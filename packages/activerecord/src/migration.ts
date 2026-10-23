@@ -1,8 +1,8 @@
+import { rbModConstSet, groupBy, filterMap, sortBy } from "@blazetrails/ruby-compat";
 import {
   getEnv,
   camelize,
   constantize,
-  groupBy,
   underscore,
   humanize,
   isPlainObject,
@@ -16,7 +16,6 @@ import {
   extend,
   type Extended,
   wrap,
-  filterMap,
 } from "@blazetrails/activesupport";
 import {
   format,
@@ -25,7 +24,7 @@ import {
   puts,
   excToS,
   rbFLoad,
-  rbFPublicSend,
+  rbFSend,
   rbInspect,
   rbModRemoveConst,
   rbObjRespondTo,
@@ -45,7 +44,7 @@ import {
   StandardError,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NoMethodError, rbFSend, rbObjClassname, Struct, Zlib } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjClassname, Struct, Zlib } from "@blazetrails/ruby-compat";
 import { Temporal, Time } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -1134,7 +1133,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         .migrations;
 
       for (const migration of sourceMigrations) {
-        let source = File.binread(migration.filename);
+        let source = Buffer.from(File.binread(migration.filename)).toString("latin1");
         const insertedComment = `// This migration comes from ${scope} (originally ${migration.version})\n`;
         let magicComments = "";
         let substituted: unknown;
@@ -1369,7 +1368,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 export declare namespace Migration {
   let CommandRecorder:
     | typeof import("./migration/command-recorder.js").CommandRecorder
-    | import("@blazetrails/ruby-compat").Module;
+    | Record<string, (...args: never[]) => unknown>;
   let Compatibility: typeof CompatibilityModule;
   let JoinTable: typeof JoinTableModule;
   let ExecutionStrategy: typeof import("./migration/execution-strategy.js").ExecutionStrategy;
@@ -1460,10 +1459,6 @@ function toInteger(value: string): number {
   const match = value.match(/^\s*(-?\d+)/);
   if (!match) return 0;
   return Number(match[1]);
-}
-
-function byVersion(a: MigrationProxy, b: MigrationProxy): number {
-  return a.version - b.version;
 }
 
 /** @internal */
@@ -1583,8 +1578,8 @@ export class MigrationContext<
 
     dbList = dbList.map((version) => ["up", version as string, "********** NO FILE **********"]);
 
-    return ([...dbList, ...fileList] as Array<[string, string, string]>).sort(
-      ([, a], [, b]) => Number(toI(a)) - Number(toI(b)),
+    return sortBy([...dbList, ...fileList] as Array<[string, string, string]>, ([, version]) =>
+      toI(version),
     );
   }
 
@@ -1652,7 +1647,7 @@ export class MigrationContext<
       return new MigrationProxy(name, version, file, scope);
     });
 
-    return migrations.sort(byVersion);
+    return sortBy(migrations, (migration) => migration.version);
   }
 
   /** @internal */
@@ -1709,7 +1704,7 @@ export class MigrationContext<
 
     const finish = migrator.migrations[startIndex + steps];
     const version = finish ? finish.version : 0;
-    return rbFPublicSend(this, direction, version) as Promise<MigrationProxy[]>;
+    return rbFSend(this, direction, version) as Promise<MigrationProxy[]>;
   }
 }
 
@@ -1916,7 +1911,7 @@ export class Migrator {
   }
 
   private _sortMigrations(migrations: MigrationProxy[]): MigrationProxy[] {
-    return [...migrations].sort(byVersion);
+    return sortBy(migrations, (migration) => migration.version);
   }
 
   /** @internal */
@@ -2128,7 +2123,7 @@ export class CheckPending {
       }
     });
 
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {
@@ -2158,3 +2153,17 @@ Migration.CheckPending = CheckPending;
 Migration.delegate = new Migration();
 ActiveRecord.Migration = Migration;
 ActiveRecord.IrreversibleMigration = IrreversibleMigration;
+
+rbModConstSet(ActiveRecord, "MigrationError", MigrationError);
+rbModConstSet(ActiveRecord, "IrreversibleMigration", IrreversibleMigration);
+rbModConstSet(ActiveRecord, "DuplicateMigrationVersionError", DuplicateMigrationVersionError);
+rbModConstSet(ActiveRecord, "DuplicateMigrationNameError", DuplicateMigrationNameError);
+rbModConstSet(ActiveRecord, "UnknownMigrationVersionError", UnknownMigrationVersionError);
+rbModConstSet(ActiveRecord, "IllegalMigrationNameError", IllegalMigrationNameError);
+rbModConstSet(ActiveRecord, "InvalidMigrationTimestampError", InvalidMigrationTimestampError);
+rbModConstSet(ActiveRecord, "PendingMigrationError", PendingMigrationError);
+rbModConstSet(ActiveRecord, "ConcurrentMigrationError", ConcurrentMigrationError);
+rbModConstSet(ActiveRecord, "NoEnvironmentInSchemaError", NoEnvironmentInSchemaError);
+rbModConstSet(ActiveRecord, "ProtectedEnvironmentError", ProtectedEnvironmentError);
+rbModConstSet(ActiveRecord, "EnvironmentMismatchError", EnvironmentMismatchError);
+rbModConstSet(ActiveRecord, "EnvironmentStorageError", EnvironmentStorageError);

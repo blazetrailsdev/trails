@@ -1,6 +1,6 @@
 import { Time } from "@blazetrails/date";
 import { Utils } from "@blazetrails/rack";
-import { type Generic, URI, merge, regexpEscape } from "@blazetrails/ruby-compat";
+import { type Generic, URI, rbObjDup, regexpEscape } from "@blazetrails/ruby-compat";
 import { DEFAULT_HOST } from "./test.js";
 
 /** @internal */
@@ -12,7 +12,7 @@ export class Cookie {
   readonly raw: string;
 
   /** @internal */
-  private readonly _defaultHost: string;
+  private readonly defaultHost: string;
 
   /** @internal */
   private readonly _options: Record<string, string | string[] | undefined>;
@@ -21,7 +21,7 @@ export class Cookie {
   private readonly _exactDomainMatch: boolean;
 
   constructor(raw: string, uri: Generic | null = null, defaultHost: string = DEFAULT_HOST) {
-    this._defaultHost = defaultHost;
+    this.defaultHost = defaultHost;
     uri ??= this.defaultUri();
 
     this.raw = raw.split(/[;,] */, 2)[0];
@@ -93,7 +93,7 @@ export class Cookie {
   isValid(uri: Generic | null): boolean {
     uri ??= this.defaultUri();
 
-    if (uri.host == null) uri.host = this._defaultHost;
+    if (uri.host == null) uri.host = this.defaultHost;
 
     const pattern = new RegExp(
       `${this._exactDomainMatch ? "^" : ""}${regexpEscape(this.domain() as string)}$`,
@@ -117,11 +117,12 @@ export class Cookie {
   }
 
   toH(): Record<string, string | string[] | boolean | undefined> {
-    const hash: Record<string, string | string[] | boolean | undefined> = merge(this._options, {
+    const hash: Record<string, string | string[] | boolean | undefined> = {
+      ...this._options,
       value: this.value,
       HttpOnly: this.isHttpOnly(),
       secure: this.isSecure(),
-    });
+    };
     delete hash.httponly;
     return hash;
   }
@@ -132,7 +133,7 @@ export class Cookie {
 
   /** @internal */
   private defaultUri(): Generic {
-    return URI.parse(`//${this._defaultHost}/`);
+    return URI.parse(`//${this.defaultHost}/`);
   }
 }
 
@@ -141,20 +142,18 @@ export class CookieJar {
   static readonly DELIMITER = "; ";
 
   /** @internal */
-  private _defaultHost: string;
+  private defaultHost: string;
 
   /** @internal */
   private _cookies: Cookie[];
 
   constructor(cookies: Cookie[] = [], defaultHost: string = DEFAULT_HOST) {
-    this._defaultHost = defaultHost;
+    this.defaultHost = defaultHost;
     this._cookies = cookies.sort((a, b) => a.spaceship(b));
   }
 
-  initializeCopy(other: CookieJar): this {
-    this._defaultHost = other._defaultHost;
-    this._cookies = other._cookies.slice();
-    return this;
+  initializeCopy(_other: CookieJar): void {
+    this._cookies = rbObjDup(this._cookies);
   }
 
   get(name: string | { toString(): string }): string | undefined {
@@ -187,7 +186,7 @@ export class CookieJar {
 
     for (const rawCookie of cookies) {
       if (rawCookie === "") continue;
-      const cookie = new Cookie(rawCookie, uri, this._defaultHost);
+      const cookie = new Cookie(rawCookie, uri, this.defaultHost);
       if (cookie.isValid(uri)) this.push(cookie);
     }
   }

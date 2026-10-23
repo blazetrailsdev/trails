@@ -6,7 +6,7 @@ import {
   rbCDateTime,
   rbCNumeric,
   rbCTime,
-  rbFPublicSend,
+  rbFSend,
   rbObjIsKindOf,
   rbObjRespondTo,
   rtest,
@@ -56,9 +56,9 @@ export function isInclude(this: ClusivityHost, record: unknown, value: unknown):
   const members = this.resolveValue(record, this.delimiter());
 
   if (Array.isArray(value)) {
-    return value.every((v) => rtest(rbFPublicSend(members, this.inclusionMethod(members), v)));
+    return value.every((v) => rtest(rbFSend(members, this.inclusionMethod(members), v)));
   } else {
-    return rtest(rbFPublicSend(members, this.inclusionMethod(members), value));
+    return rtest(rbFSend(members, this.inclusionMethod(members), value));
   }
 }
 

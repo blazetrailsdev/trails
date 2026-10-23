@@ -21,7 +21,13 @@ import {
   rbModAncestors,
   rbObjClass,
   rbObjIsKindOf,
+  rbEqual,
+  rbEql,
+  cmp,
+  rbFSend,
 } from "@blazetrails/ruby-compat";
+
+const dumpStr = (value: unknown): string => String.fromCharCode(...Marshal.dump(value));
 
 const gemDate = (str: string, comp?: boolean) => dNewByFrags(RubyDate._parse(str, comp));
 const gemDateTime = (str: string, comp?: boolean) => dtNewByFrags(RubyDate._parse(str, comp));
@@ -1066,14 +1072,14 @@ describe("Date", () => {
 
   it("answers eql? only for a Date, where == admits a Numeric", () => {
     const d = new RubyDate(2002, 3, 19);
-    expect(d.isEql(new RubyDate(2002, 3, 19))).toBe(true);
-    expect(d.isEql(new RubyDate(2002, 3, 20))).toBe(false);
-    expect(d.isEql(new RubyDateTime(2002, 3, 19, 0, 0, 0))).toBe(true);
-    expect(d.isEql(new RubyDateTime(2002, 3, 19, 0, 0, 1))).toBe(false);
+    expect(d.eql(new RubyDate(2002, 3, 19))).toBe(true);
+    expect(d.eql(new RubyDate(2002, 3, 20))).toBe(false);
+    expect(d.eql(new RubyDateTime(2002, 3, 19, 0, 0, 0))).toBe(true);
+    expect(d.eql(new RubyDateTime(2002, 3, 19, 0, 0, 1))).toBe(false);
 
     expect(d.equals(d.ajd)).toBe(true);
-    expect(d.isEql(d.ajd)).toBe(false);
-    expect(d.isEql("2002-03-19")).toBe(false);
+    expect(d.eql(d.ajd)).toBe(false);
+    expect(d.eql("2002-03-19")).toBe(false);
   });
 
   it("raises on a Bignum year to_time cannot narrow, where MRI's NUM2LONG raises", () => {
@@ -1894,19 +1900,19 @@ describe("Date#marshalLoad legacy dumps", () => {
 
 describe("Marshal over Date", () => {
   it("dumps a Date and a DateTime as ruby does", () => {
-    expect(Marshal.dump(new RubyDate(2016, 1, 1))).toBe(
+    expect(dumpStr(new RubyDate(2016, 1, 1))).toBe(
       "\x04\bU:\tDate[\x0bi\x00i\x03-\x7f%i\x00i\x00i\x00f\f2299161",
     );
-    expect(Marshal.dump(new RubyDate(2016, 1, 1, RubyDate.JULIAN))).toBe(
+    expect(dumpStr(new RubyDate(2016, 1, 1, RubyDate.JULIAN))).toBe(
       "\x04\bU:\tDate[\x0bi\x00i\x03:\x7f%i\x00i\x00i\x00f\binf",
     );
-    expect(Marshal.dump(new RubyDate(-4712, 1, 1))).toBe(
+    expect(dumpStr(new RubyDate(-4712, 1, 1))).toBe(
       "\x04\bU:\tDate[\x0bi\x00i\x00i\x00i\x00i\x00f\f2299161",
     );
-    expect(Marshal.dump(new RubyDateTime(2016, 1, 1, 12, 30, new Rational(1, 2), "+09:00"))).toBe(
+    expect(dumpStr(new RubyDateTime(2016, 1, 1, 12, 30, new Rational(1, 2), "+09:00"))).toBe(
       "\x04\bU:\rDateTime[\x0bi\x00i\x03-\x7f%i\x0281i\x04\x00e\xcd\x1di\x02\x90~f\f2299161",
     );
-    expect(Marshal.dump(new RubyDateTime(2016, 1, 1, 0, 0, new Rational(1, 3)))).toBe(
+    expect(dumpStr(new RubyDateTime(2016, 1, 1, 0, 0, new Rational(1, 3)))).toBe(
       "\x04\bU:\rDateTime[\x0bi\x00i\x03-\x7f%i\x00U:\rRational[\x07i\x04\x00\xca\x9a;i\x08i\x00f\f2299161",
     );
   });
@@ -1929,7 +1935,7 @@ describe("Marshal over Date", () => {
 
   it("dumps a Temporal.PlainDate as the Date it seats, and loads it back equal", () => {
     const date = Temporal.PlainDate.from("2016-01-01");
-    expect(Marshal.dump(date)).toBe(Marshal.dump(new RubyDate(2016, 1, 1)));
+    expect(Marshal.dump(date)).toEqual(Marshal.dump(new RubyDate(2016, 1, 1)));
 
     const loaded = Marshal.load(Marshal.dump([date, date])) as RubyDate[];
     expect(loaded[0]).toBeInstanceOf(RubyDate);
@@ -1966,5 +1972,70 @@ describe("Marshal over Date", () => {
       expect(rbObjIsKindOf(seat, rbCTime)).toBe(false);
     }
     expect(Object.keys(zoned)).toEqual([]);
+  });
+});
+
+describe("a Ruby date against its Temporal seat", () => {
+  it("rbEqual and cmp match a Date against a Temporal.PlainDate, as MRI does", () => {
+    const d = new RubyDate(2001, 2, 3);
+    const same = RubyDate.iso8601("2001-02-03");
+    const next = RubyDate.iso8601("2001-02-04");
+    expect([rbEqual(d, same), rbEqual(same, d)]).toEqual([true, true]);
+    expect([rbEqual(d, next), rbEqual(next, d)]).toEqual([false, false]);
+    expect([cmp(d, same), cmp(same, d), cmp(d, next), cmp(next, d)]).toEqual([0, 0, -1, 1]);
+  });
+
+  it("rbEqual and cmp match a DateTime against a Temporal.ZonedDateTime / PlainDateTime", () => {
+    const dt = new RubyDateTime(2001, 2, 3, 4, 5, 6, "+03:00");
+    const zoned = RubyDateTime.iso8601("2001-02-03T04:05:06+03:00");
+    const later = RubyDateTime.iso8601("2001-02-03T04:05:07+03:00");
+    expect([rbEqual(dt, zoned), rbEqual(zoned, dt)]).toEqual([true, true]);
+    expect([rbEqual(dt, later), rbEqual(later, dt)]).toEqual([false, false]);
+    expect([cmp(dt, zoned), cmp(zoned, dt), cmp(dt, later), cmp(later, dt)]).toEqual([0, 0, -1, 1]);
+    const utc = new RubyDateTime(2001, 2, 3, 4, 5, 6);
+    const plain = Temporal.PlainDateTime.from("2001-02-03T04:05:06");
+    expect([rbEqual(utc, plain), rbEqual(plain, utc), cmp(utc, plain), cmp(plain, utc)]).toEqual([
+      true,
+      true,
+      0,
+      0,
+    ]);
+  });
+
+  it("rbEql matches a Date against its seat, and a Time seat is not a DateTime, as MRI does", () => {
+    const d = new RubyDate(2001, 2, 3);
+    expect([
+      rbEql(d, RubyDate.iso8601("2001-02-03")),
+      rbEql(RubyDate.iso8601("2001-02-03"), d),
+    ]).toEqual([true, true]);
+    expect(rbEql(RubyDate.iso8601("2001-02-04"), d)).toBe(false);
+    const dt = new RubyDateTime(2001, 2, 3, 4, 5, 6);
+    const time = Temporal.ZonedDateTime.from("2001-02-03T04:05:06+00:00[UTC]");
+    expect([rbEqual(time, dt), cmp(time, dt)]).toEqual([false, null]);
+    expect([rbEqual(dt, time), cmp(dt, time), dt.cmp(time)]).toEqual([false, null, null]);
+  });
+});
+
+describe("Date#hour, #min, #sec (d_lite_zero, private)", () => {
+  it("answer 0 through send on a Date instance, and are not JS members", () => {
+    const d = new RubyDate(2013, 2, 20);
+    for (const m of ["hour", "min", "minute", "sec", "second"]) {
+      expect(rbFSend(d, m)).toBe(0);
+      expect(m in d).toBe(false);
+    }
+  });
+
+  it("leave DateTime's public readers in place", () => {
+    const dt = new RubyDateTime(2013, 2, 20, 7, 8, 9);
+    expect(["hour", "min", "minute", "sec", "second"].map((m) => rbFSend(dt, m))).toEqual([
+      7, 8, 8, 9, 9,
+    ]);
+  });
+
+  it("raise ArgumentError on an argument, as the arity-0 private readers do", () => {
+    expect(() => rbFSend(new RubyDate(2013, 2, 20), "hour", 1)).toThrow(ArgumentError);
+    expect(() => rbFSend(new RubyDateTime(2013, 2, 20, 7, 8, 9), "minute", 1)).toThrow(
+      ArgumentError,
+    );
   });
 });

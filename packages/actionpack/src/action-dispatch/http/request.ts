@@ -1,5 +1,24 @@
-import { camelize, NameError, presence, toSentence, underscore } from "@blazetrails/activesupport";
-import { rbRegMatchP, rbStrDump, toI } from "@blazetrails/ruby-compat";
+import {
+  camelize,
+  constantize,
+  NameError,
+  toSentence,
+  underscore,
+  type Logger,
+} from "@blazetrails/activesupport";
+import {
+  EOFError,
+  b,
+  Encoding,
+  StringIO,
+  forceEncoding,
+  rbModConstSet,
+  rbRegMatchP,
+  rbStrDump,
+  toI,
+  excSetupMessage,
+  rbObjDup,
+} from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   parseNestedQuery,
@@ -15,14 +34,13 @@ import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Session } from "../request/session.js";
 import {
   commitFlash,
-  flash,
-  flashHash,
+  RequestMethods as FlashRequestMethods,
   resetSession as resetFlashSession,
-  type FlashHash,
 } from "../middleware/flash.js";
 import {
   etagMatches as _etagMatches,
   fresh as _fresh,
+  Request as CacheRequest,
   ifModifiedSince as _ifModifiedSince,
   ifNoneMatch as _ifNoneMatch,
   ifNoneMatchEtags as _ifNoneMatchEtags,
@@ -33,19 +51,22 @@ import {
   accepts as _accepts,
   contentMimeType as _contentMimeType,
   format as _format,
-  formats as _formats,
   formatFromPathExtension as _formatFromPathExtension,
   hasContentType as _hasContentType,
   MimeNegotiation as _MimeNegotiation,
   negotiateMime as _negotiateMime,
-  paramsReadable as _paramsReadable,
+  isParamsReadable as _isParamsReadable,
+  setFormat as _setFormat,
   shouldApplyVaryHeader as _shouldApplyVaryHeader,
   useAcceptHeader as _useAcceptHeader,
   validAcceptHeader as _validAcceptHeader,
-  variant as _variant,
-  type MimeNegotiationHost,
 } from "./mime-negotiation.js";
-import { include, type ArrayInquirer } from "@blazetrails/activesupport";
+import {
+  include,
+  runLoadHooks,
+  type ArrayInquirer,
+  type Included,
+} from "@blazetrails/activesupport";
 import type { MimeType, NullType } from "./mime-type.js";
 import { URL as HttpURL } from "./url.js";
 import {
@@ -54,43 +75,26 @@ import {
   filteredParameters as _filteredParameters,
   filteredPath as _filteredPath,
   filteredQueryString as _filteredQueryString,
+  type FilterParameters,
   parameterFilter as _parameterFilter,
   parameterFilterFor as _parameterFilterFor,
 } from "./filter-parameters.js";
 import { Request as CspRequest } from "./content-security-policy.js";
 import { QueryParser } from "./query-parser.js";
 import { X_CASCADE } from "../constants.js";
-import type { PermissionsPolicy } from "../permissions-policy.js";
+import { Request as PermissionsPolicyRequest } from "./permissions-policy.js";
 import type { ParameterFilter } from "@blazetrails/activesupport";
-import { CustomParamEncoder, type ParamHash } from "../request/utils.js";
+import { Utils, type ParamHash } from "../request/utils.js";
+import "../middleware/cookies.js";
+import type { RequestCookieMethods } from "../middleware/cookies.js";
 import {
-  authenticatedEncryptedCookieSalt as _authenticatedEncryptedCookieSalt,
-  cookieJar as _cookieJar,
-  cookiesDigest as _cookiesDigest,
-  cookiesRotations as _cookiesRotations,
-  cookiesSameSiteProtection as _cookiesSameSiteProtection,
-  cookiesSerializer as _cookiesSerializer,
-  encryptedCookieCipher as _encryptedCookieCipher,
-  encryptedCookieSalt as _encryptedCookieSalt,
-  encryptedSignedCookieSalt as _encryptedSignedCookieSalt,
-  isHaveCookieJar as _isHaveCookieJar,
-  secretKeyBase as _secretKeyBase,
-  signedCookieDigest as _signedCookieDigest,
-  signedCookieSalt as _signedCookieSalt,
-  useAuthenticatedCookieEncryption as _useAuthenticatedCookieEncryption,
-  useCookiesWithMetadata as _useCookiesWithMetadata,
-  type CookieJar,
-} from "../middleware/cookies.js";
-import {
-  parameters as _parameters,
   Parameters as _Parameters,
   paramsParsers as _paramsParsers,
   parseFormattedParameters as _parseFormattedParameters,
-  pathParameters as _pathParameters,
+  parameters as _parameters,
   logParseErrorOnce as _logParseErrorOnce,
   type ParameterParser,
   type ParameterParsers,
-  type ParametersHost,
 } from "./parameters.js";
 import { Headers as HttpHeaders } from "./headers.js";
 import type { GetIp } from "../middleware/remote-ip.js";
@@ -138,37 +142,7 @@ const HTTP_METHOD_LOOKUP: Record<string, string> = Object.assign(
   Object.fromEntries(HTTP_METHODS.map((m) => [m, m.toLowerCase().replace(/-/g, "_")])),
 );
 
-const HTTP_HEADER_NAME = /^[A-Za-z0-9-]+$/;
-const CGI_VARIABLES: ReadonlySet<string> = new Set([
-  "AUTH_TYPE",
-  "CONTENT_LENGTH",
-  "CONTENT_TYPE",
-  "GATEWAY_INTERFACE",
-  "HTTPS",
-  "PATH_INFO",
-  "PATH_TRANSLATED",
-  "QUERY_STRING",
-  "REMOTE_ADDR",
-  "REMOTE_HOST",
-  "REMOTE_IDENT",
-  "REMOTE_USER",
-  "REQUEST_METHOD",
-  "SCRIPT_NAME",
-  "SERVER_NAME",
-  "SERVER_PORT",
-  "SERVER_PROTOCOL",
-  "SERVER_SOFTWARE",
-]);
-
 const TRANSFER_ENCODING = "HTTP_TRANSFER_ENCODING";
-
-function envName(key: string): string {
-  if (HTTP_HEADER_NAME.test(key)) {
-    const upper = key.toUpperCase().replace(/-/g, "_");
-    return CGI_VARIABLES.has(upper) ? upper : `HTTP_${upper}`;
-  }
-  return key;
-}
 
 export const ENV_METHODS: readonly string[] = Object.freeze([
   "AUTH_TYPE",
@@ -201,6 +175,11 @@ export const ENV_METHODS: readonly string[] = Object.freeze([
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Request {
+  declare static Utils: typeof Utils;
+  static HTTP_METHODS = HTTP_METHODS;
+  static HTTP_METHOD_LOOKUP = HTTP_METHOD_LOOKUP;
+  static ENV_METHODS = ENV_METHODS;
+
   static {
     for (const env of ENV_METHODS) {
       Object.defineProperty(
@@ -217,19 +196,14 @@ export class Request {
   }
 
   readonly env: RackEnv;
+  declare readonly ssl: boolean;
 
   #method?: string;
   #requestMethod?: string;
-  #protocol: string | null;
-  #port: number | null;
   /** @internal */
-  declare _filteredParameters: Record<string, unknown> | null;
+  declare _protocol: string | null;
   /** @internal */
-  declare _filteredEnv: Record<string, unknown> | null;
-  /** @internal */
-  declare _filteredPath: string | null;
-  /** @internal */
-  declare _parameterFilter: ParameterFilter | null;
+  declare _port: number | null;
 
   /**
    * @inlinedFrom Rack::Request::Env#initialize rack/v3.1.14/lib/rack/request.rb:86-91
@@ -242,8 +216,8 @@ export class Request {
     this._filteredEnv = null;
     this._filteredPath = null;
     this._parameterFilter = null;
-    this.#protocol = null;
-    this.#port = null;
+    this._protocol = null;
+    this._port = null;
   }
 
   get method(): string {
@@ -269,66 +243,6 @@ export class Request {
     return this.getHeader("REQUEST_METHOD") as string;
   }
 
-  get host(): string {
-    return this.rawHostWithPort.replace(/:\d+$/, "");
-  }
-
-  get rawHost(): string {
-    return this.rawHostWithPort;
-  }
-
-  get protocol(): string {
-    return (this.#protocol ??= this.ssl ? "https://" : "http://");
-  }
-
-  get rawHostWithPort(): string {
-    const forwarded = presence(this.xForwardedHost);
-    if (forwarded != null) {
-      const parts = forwarded.split(/,\s?/);
-      return parts[parts.length - 1];
-    }
-    return (
-      (this.getHeader("HTTP_HOST") as string) ||
-      `${this.serverName ?? ""}:${this.getHeader("SERVER_PORT") ?? ""}`
-    );
-  }
-
-  get port(): number {
-    if (this.#port == null) {
-      const match = this.rawHostWithPort.match(/:(\d+)$/);
-      this.#port = match ? parseInt(match[1], 10) : this.standardPort;
-    }
-    return this.#port;
-  }
-
-  get standardPort(): number {
-    if ("https://" === this.protocol) {
-      return 443;
-    } else {
-      return 80;
-    }
-  }
-
-  get isStandardPort(): boolean {
-    return this.port === this.standardPort;
-  }
-
-  get optionalPort(): number | null {
-    return this.isStandardPort ? null : this.port;
-  }
-
-  get portString(): string {
-    return this.isStandardPort ? "" : `:${this.port}`;
-  }
-
-  hostWithPort(): string {
-    return `${this.host}${this.portString}`;
-  }
-
-  get serverPort(): number {
-    return parseInt((this.getHeader("SERVER_PORT") as string) || "80", 10);
-  }
-
   get fullpath(): string {
     const qs = this.queryString;
     return qs ? `${this.path}?${qs}` : this.path;
@@ -342,28 +256,12 @@ export class Request {
     return `${this.scheme}://${this.hostWithPort()}${this.originalFullpath}`;
   }
 
-  get url(): string {
-    return `${this.scheme}://${this.hostWithPort()}${this.fullpath}`;
-  }
-
-  domain(tldLength: number = HttpURL.tldLength): string | null {
-    return HttpURL.extractDomain(this.host, tldLength);
-  }
-
-  subdomains(tldLength: number = HttpURL.tldLength): string[] {
-    return HttpURL.extractSubdomains(this.host, tldLength);
-  }
-
-  subdomain(tldLength: number = HttpURL.tldLength): string {
-    return HttpURL.extractSubdomain(this.host, tldLength);
-  }
-
   get mediaType(): string | undefined {
     return this.contentMimeType?.toString();
   }
 
   get contentLength(): number {
-    if (this.hasHeader(TRANSFER_ENCODING)) return new TextEncoder().encode(this.rawPost).length;
+    if (this.hasHeader(TRANSFER_ENCODING)) return b(this.rawPost).length;
     return Number(toI(this.rackRequest.contentLength));
   }
 
@@ -371,8 +269,8 @@ export class Request {
   declare readonly ifNoneMatch: string | undefined;
   declare readonly ifNoneMatchEtags: string[];
   declare notModified: (modifiedAt: Date | undefined) => boolean;
-  declare etagMatches: (etag: string | undefined) => boolean;
-  declare fresh: (response: CacheResponseLike) => boolean;
+  declare etagMatches: (etag: string | null | undefined) => boolean | null;
+  declare fresh: (response: CacheResponseLike) => boolean | null;
 
   declare readonly contentMimeType: MimeType | null;
   declare readonly accepts: MimeType[];
@@ -380,23 +278,9 @@ export class Request {
   declare negotiateMime: (order: MimeType[]) => MimeType | NullType | null;
   declare shouldApplyVaryHeader: () => boolean;
   get format(): MimeType | NullType {
-    return _format.call(mimeHost(this));
+    return _format.call(this);
   }
-  setFormat(extension: unknown): void {
-    mimeHost(this).format = extension;
-  }
-  get formats(): MimeType[] {
-    return _formats.call(mimeHost(this));
-  }
-  set formats(extensions: unknown[]) {
-    mimeHost(this).formats = extensions;
-  }
-  get variant(): ArrayInquirer<string> & Record<string, () => boolean> {
-    return _variant.call(mimeHost(this));
-  }
-  set variant(value: string | string[] | null | undefined) {
-    mimeHost(this).variant = value;
-  }
+  declare setFormat: (extension: unknown) => void;
 
   declare static ignoreAcceptHeader: boolean;
   declare ignoreAcceptHeader: boolean;
@@ -412,16 +296,6 @@ export class Request {
   /** @internal */
   declare parameterFilterFor: (filters: Array<string | RegExp>) => ParameterFilter;
 
-  get permissionsPolicy(): PermissionsPolicy | null | undefined {
-    return this.getHeader("action_dispatch.permissions_policy") as
-      | PermissionsPolicy
-      | null
-      | undefined;
-  }
-  set permissionsPolicy(policy: PermissionsPolicy | null) {
-    this.setHeader("action_dispatch.permissions_policy", policy);
-  }
-
   get isXmlHttpRequest(): boolean {
     return rbRegMatchP(
       /XMLHttpRequest/i,
@@ -436,9 +310,7 @@ export class Request {
   get remoteIp(): string | null {
     const v = this.getHeader("action_dispatch.remote_ip");
     if (v != null) {
-      if (typeof v === "object" && typeof (v as { calculate?: unknown }).calculate === "function") {
-        return (v as { calculate(): string | null }).calculate();
-      }
+      if (typeof v === "object") return (v as { toString(): string | null }).toString();
       return typeof v === "string" ? v : String(v);
     }
     return (this.getHeader("REMOTE_ADDR") as string) || "127.0.0.1";
@@ -452,22 +324,25 @@ export class Request {
     return this.remoteIp;
   }
 
-  get body(): string {
-    const rawPost = this.getHeader("RAW_POST_DATA");
-    if (rawPost != null) return String(rawPost);
-    return this.readBodyStream();
+  /** @missingRailsArgs force_encoding — PERMANENT */
+  get body(): StringIO {
+    let rawPost = this.getHeader("RAW_POST_DATA") as string | null | undefined;
+    if (rawPost != null) {
+      rawPost = forceEncoding(rawPost, Encoding.BINARY);
+      return new StringIO(rawPost);
+    } else {
+      return this.bodyStream;
+    }
   }
 
-  get rawPost(): string {
+  get rawPost(): string | Uint8Array {
     if (!this.hasHeader("RAW_POST_DATA")) {
       this.setHeader("RAW_POST_DATA", this.readBodyStream());
     }
-    return this.getHeader("RAW_POST_DATA") as string;
+    return this.getHeader("RAW_POST_DATA") as string | Uint8Array;
   }
 
-  get params(): Record<string, unknown> {
-    return _parameters.call(this._paramsHost);
-  }
+  declare readonly params: Record<string, unknown>;
 
   get queryParameters(): Record<string, unknown> {
     return this.GET();
@@ -475,14 +350,6 @@ export class Request {
 
   get requestParameters(): Record<string, unknown> {
     return this.POST();
-  }
-
-  get pathParameters(): Record<string, unknown> {
-    return _pathParameters.call(this._paramsHost);
-  }
-
-  set pathParameters(params: Record<string, unknown>) {
-    this._paramsHost.pathParameters = params;
   }
 
   static get parameterParsers(): ParameterParsers {
@@ -496,39 +363,8 @@ export class Request {
   }
 
   /** @internal */
-  private get _paramsHost(): ParametersHost & _Parameters {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const req = this;
-    const host: ParametersHost = {
-      getHeader: (k) => req.env[k],
-      setHeader: (k, v) => ((req.env[k] = v), v),
-      deleteHeader: (k) => void delete req.env[k],
-      get queryParameters() {
-        return req.queryParameters;
-      },
-      get requestParameters() {
-        return req.requestParameters;
-      },
-      get contentLength() {
-        return req.contentLength;
-      },
-      get contentMimeType() {
-        return req.contentMimeType;
-      },
-      get rawPost() {
-        return req.rawPost;
-      },
-      get logger() {
-        const l = req.env["action_dispatch.logger"] ?? req.env["rack.logger"];
-        return (l as { debug(m: string): void } | null | undefined) ?? null;
-      },
-    };
-    return Object.setPrototypeOf(host, _Parameters.prototype) as ParametersHost & _Parameters;
-  }
-
-  /** @internal */
   private _fallbackRequestParameters(): Record<string, unknown> {
-    const input = this.rawPost;
+    const input = forceEncoding(this.rawPost, Encoding.UTF_8) as string;
     if (!input) return {};
     const ct = ((this.env["CONTENT_TYPE"] as string) || "").toLowerCase();
     if (ct.includes("application/x-www-form-urlencoded")) {
@@ -537,16 +373,20 @@ export class Request {
     return {};
   }
 
-  get serverSoftware(): string {
-    return ((this.getHeader("SERVER_SOFTWARE") as string) || "").split("/")[0] || "";
+  get serverSoftware(): string | null {
+    const m =
+      this.getHeader("SERVER_SOFTWARE") != null
+        ? /^([a-zA-Z]+)/.exec(this.getHeader("SERVER_SOFTWARE") as string)
+        : null;
+    return m != null ? m[1].toLowerCase() : null;
   }
 
   getHeader(name: string): any {
-    return this.env[envName(name)];
+    return this.env[name];
   }
 
   hasHeader(key: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.env, key);
+    return Object.hasOwn(this.env, key);
   }
 
   setHeader(key: string, value: unknown): unknown {
@@ -585,7 +425,7 @@ export class Request {
   fetchHeader(key: string): unknown;
   fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   fetchHeader<T>(key: string, fallback?: (key: string) => T): unknown | T {
-    if (Object.prototype.hasOwnProperty.call(this.env, key)) return this.env[key];
+    if (Object.hasOwn(this.env, key)) return this.env[key];
     if (fallback) return fallback(key);
     throw new Error(`key not found: ${key}`);
   }
@@ -598,19 +438,6 @@ export class Request {
     return this.fetchHeader(RACK_SESSION, (k) =>
       this.setHeader(k, this.defaultSession()),
     ) as Session;
-  }
-
-  get flash(): FlashHash | null {
-    return flash.call(this as never);
-  }
-
-  set flash(value: FlashHash | null) {
-    flash.call(this as never, value);
-  }
-
-  /** @internal */
-  flashHash(): FlashHash | null {
-    return flashHash.call(this as never);
   }
 
   get headers(): HttpHeaders {
@@ -659,15 +486,12 @@ export class Request {
     return this.getHeader(routes.envKey);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName dup — PERMANENT
+   */
   setEngineScriptName(name: string): void {
-    this.setHeader((this.routes as { envKey: string }).envKey, name);
-  }
-
-  get keyGenerator(): { generateKey(salt: string, keySize?: number): Buffer | string } | undefined {
-    return this.env["action_dispatch.key_generator"] as
-      | { generateKey(salt: string, keySize?: number): Buffer | string }
-      | undefined;
+    this.setHeader((this.routes as { envKey: string }).envKey, rbObjDup(name));
   }
 
   get httpAuthSalt(): unknown {
@@ -685,8 +509,8 @@ export class Request {
     return this.requestId;
   }
 
-  get logger(): unknown {
-    return this.getHeader("action_dispatch.logger");
+  get logger(): Logger | undefined {
+    return this.getHeader("action_dispatch.logger") as Logger | undefined;
   }
 
   isKey(key: string): boolean {
@@ -711,19 +535,21 @@ export class Request {
       this.getHeader("REDIRECT_X_HTTP_AUTHORIZATION")) as string | undefined;
   }
 
-  get bodyStream(): unknown {
-    return this.getHeader("rack.input");
+  get bodyStream(): StringIO {
+    return this.getHeader("rack.input") as StringIO;
   }
 
   /** @internal */
-  protected readBodyStream(): string {
-    const input = this.bodyStream;
-    if (typeof input === "string") return input;
-    const stream = input as { read?: (n?: number) => string; rewind?: () => void } | undefined;
-    if (!stream || typeof stream.read !== "function") return "";
-    return this.resetStream(stream, () =>
-      this.hasHeader(TRANSFER_ENCODING) ? stream.read!() : stream.read!(this.contentLength),
-    );
+  protected readBodyStream(): string | Uint8Array | null | undefined {
+    if (this.bodyStream != null) {
+      return this.resetStream(this.bodyStream, () => {
+        if (this.hasHeader(TRANSFER_ENCODING)) {
+          return this.bodyStream.read();
+        } else {
+          return this.bodyStream.read(this.contentLength);
+        }
+      });
+    }
   }
 
   /** @internal */
@@ -742,8 +568,8 @@ export class Request {
     return this._fallbackRequestParameters();
   }
 
-  resetSession(): void {
-    this.session.destroy();
+  async resetSession(): Promise<void> {
+    await this.session.destroy();
     this.resetCsrfToken();
     resetFlashSession.call(this as never);
   }
@@ -789,7 +615,7 @@ export class Request {
   GET(): Record<string, unknown> {
     try {
       return this.fetchHeader("action_dispatch.request.query_parameters", (k) => {
-        const encodingTemplate = CustomParamEncoder.actionEncodingTemplate(
+        const encodingTemplate = Request.Utils.CustomParamEncoder.actionEncodingTemplate(
           this,
           this.pathParameters["controller"] as string | undefined,
           this.pathParameters["action"] as string | undefined,
@@ -802,7 +628,7 @@ export class Request {
       }) as Record<string, unknown>;
     } catch (e) {
       if (e instanceof ParamError) {
-        throw new BadRequest(`Invalid query parameters: ${e.message}`);
+        throw excSetupMessage(new BadRequest(`Invalid query parameters: ${e.message}`, e), e);
       }
       throw e;
     }
@@ -811,15 +637,14 @@ export class Request {
   POST(): Record<string, unknown> {
     try {
       return this.fetchHeader("action_dispatch.request.request_parameters", (k) => {
-        const encodingTemplate = CustomParamEncoder.actionEncodingTemplate(
+        const encodingTemplate = Request.Utils.CustomParamEncoder.actionEncodingTemplate(
           this,
           this.pathParameters["controller"] as string | undefined,
           this.pathParameters["action"] as string | undefined,
         );
 
         let paramList: Array<[string, unknown]> | null = null;
-        const host = this._paramsHost;
-        let pr = _parseFormattedParameters.call(host, this.paramsParsers(), () => {
+        let pr = this.parseFormattedParameters(this.paramsParsers(), () => {
           if ((paramList = this.requestParametersList()) != null) {
             return ParamBuilder.fromPairs(paramList, { encodingTemplate: encodingTemplate });
           } else {
@@ -834,25 +659,22 @@ export class Request {
         return this.setHeader(k, pr);
       }) as Record<string, unknown>;
     } catch (e) {
-      if (e instanceof ParamError) {
-        throw new BadRequest(`Invalid request parameters: ${e.message}`);
+      if (e instanceof ParamError || e instanceof EOFError) {
+        throw excSetupMessage(new BadRequest(`Invalid request parameters: ${e.message}`, e), e);
       }
       throw e;
     }
   }
 
   get parameters(): Record<string, unknown> {
-    const override = this.env["action_dispatch.request.parameters_override"];
-    if (override) return override as Record<string, unknown>;
-    return this.params;
-  }
-  set parameters(value: Record<string, unknown>) {
-    this.env["action_dispatch.request.parameters_override"] = value;
+    return _parameters.call(this);
   }
 
   sendEarlyHints(links: Record<string, string>): void {
-    const cb = this.env["rack.early_hints"] as ((l: Record<string, string>) => void) | undefined;
-    if (typeof cb === "function") cb(links);
+    (this.env["rack.early_hints"] as ((links: Record<string, string>) => void) | undefined)?.call(
+      null,
+      links,
+    );
   }
 
   get rackRequest(): RackRequest {
@@ -872,30 +694,41 @@ export class Request {
   /** @internal */
   declare isParamsReadable: () => boolean;
 
-  controllerClass(): DispatchableControllerClass | typeof PassNotFound | null {
+  controllerClass(): DispatchableControllerClass | typeof PASS_NOT_FOUND | null {
     const params = this.pathParameters;
     if (params["action"] == null) params["action"] = "index";
     return this.controllerClassFor(params["controller"] as string | undefined);
   }
 
+  /** @inventedArm get — CONVERGEABLE controller-constant-resolution-throws-instead-of-constantize */
   controllerClassFor(
     name: string | undefined | null,
-  ): DispatchableControllerClass | typeof PassNotFound {
+  ): DispatchableControllerClass | typeof PASS_NOT_FOUND {
     if (name != null) {
       const controllerParam = underscore(name);
       const constName = `${camelize(controllerParam)}Controller`;
-      const klass = controllerConstants.get(controllerParam);
-      if (!klass) throw new MissingController(`uninitialized constant ${constName}`, constName);
-      return klass;
+      try {
+        return (
+          controllerConstants.get(controllerParam) ??
+          (constantize(constName) as DispatchableControllerClass)
+        );
+      } catch (error) {
+        if (!(error instanceof NameError)) throw error;
+        if (error.missingName() === constName || constName.startsWith(`${error.missingName()}::`)) {
+          throw new MissingController(error.message, error.constantName);
+        } else {
+          throw error;
+        }
+      }
     }
-    return PassNotFound;
+    return PASS_NOT_FOUND;
   }
 
   requestParametersList(): Array<[string, unknown]> | null {
     const rackPost = this.rackRequest.POST;
-    const formPairs = this.env["rack.request.form_pairs"];
+    const formPairs = this.getHeader("rack.request.form_pairs");
     if (formPairs != null) return formPairs as Array<[string, unknown]>;
-    const formVars = this.env["rack.request.form_vars"];
+    const formVars = this.getHeader("rack.request.form_vars");
     if (formVars != null) return Array.from(QueryParser.eachPair(formVars as string));
     if (rackPost && typeof rackPost === "object" && Object.keys(rackPost as object).length > 0) {
       return null;
@@ -905,18 +738,18 @@ export class Request {
 
   /** @internal */
   paramsParsers(): ParameterParsers {
-    return _paramsParsers.call(this._paramsHost);
+    return _paramsParsers.call(this);
   }
   /** @internal */
   parseFormattedParameters(
     parsers: ParameterParsers,
-    fallback: () => Record<string, unknown>,
-  ): Record<string, unknown> {
-    return _parseFormattedParameters.call(this._paramsHost, parsers, fallback);
+    fn: () => Record<string, unknown>,
+  ): ReturnType<ParameterParser> {
+    return _parseFormattedParameters.call(this, parsers, fn);
   }
   /** @internal */
   logParseErrorOnce(): void {
-    _logParseErrorOnce.call(this._paramsHost);
+    _logParseErrorOnce.call(this);
   }
 
   static create(env: RackEnv = {}): Request {
@@ -952,6 +785,7 @@ Request.prototype.fresh = _fresh;
 
 include(Request, RequestHelpers);
 include(Request, _MimeNegotiation);
+include(Request, _Parameters);
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Request extends Omit<
   RequestHelpers,
@@ -962,6 +796,8 @@ export interface Request extends Omit<
   | "body"
   | "requestMethod"
   | "host"
+  | "hostWithPort"
+  | "ssl"
   | "port"
   | "serverPort"
   | "url"
@@ -1012,96 +848,57 @@ export interface Request {
   get xForwardedHost(): string | undefined;
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging */
-export interface Request extends CspRequest {}
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
+export interface Request
+  extends
+    CspRequest,
+    CacheRequest,
+    HttpURL,
+    PermissionsPolicyRequest,
+    FlashRequestMethods,
+    FilterParameters {}
 include(Request, CspRequest);
+include(Request, PermissionsPolicyRequest);
+include(Request, CacheRequest);
+include(Request, HttpURL);
+include(Request, FlashRequestMethods);
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request {
   dup(): Request;
+  get formats(): MimeType[];
+  set formats(extensions: unknown[]);
+  get variant(): ArrayInquirer<string> & Record<string, () => boolean>;
+  set variant(value: string | string[] | null | undefined);
+  get pathParameters(): Record<string, unknown>;
+  set pathParameters(parameters: Record<string, unknown>);
 }
 Request.prototype.dup = RackRequest.prototype.dup as unknown as () => Request;
 
-type MimeHost = MimeNegotiationHost & _MimeNegotiation;
-const MIME_HOSTS = new WeakMap<Request, MimeHost>();
-function mimeHost(req: Request): MimeHost {
-  let h = MIME_HOSTS.get(req);
-  if (!h) {
-    h = Object.create(_MimeNegotiation.prototype, {
-      constructor: { get: () => req.constructor },
-      getHeader: { value: (k: string) => req.env[k] },
-      setHeader: {
-        value: (k: string, v: unknown) => {
-          req.env[k] = v;
-          return v;
-        },
-      },
-      fetchHeader: {
-        value: <T>(k: string, fallback: (key: string) => T) => req.fetchHeader(k, fallback),
-      },
-      parameters: { get: () => req.parameters },
-      accept: { get: () => req.accept },
-      xhr: { get: () => req.xhr },
-    }) as MimeHost;
-    MIME_HOSTS.set(req, h);
-  }
-  return h;
-}
 Object.defineProperty(Request.prototype, "contentMimeType", {
   get(this: Request) {
-    return _contentMimeType.call(mimeHost(this));
+    return _contentMimeType.call(this);
   },
   configurable: true,
 });
 Object.defineProperty(Request.prototype, "accepts", {
   get(this: Request) {
-    return _accepts.call(mimeHost(this));
+    return _accepts.call(this);
   },
   configurable: true,
 });
 Request.prototype.hasContentType = function (this: Request) {
-  return _hasContentType.call(mimeHost(this));
+  return _hasContentType.call(this);
 };
 Request.prototype.negotiateMime = function (this: Request, order: MimeType[]) {
-  return _negotiateMime.call(mimeHost(this), order);
+  return _negotiateMime.call(this, order);
 };
 Request.prototype.shouldApplyVaryHeader = function (this: Request) {
-  return _shouldApplyVaryHeader.call(mimeHost(this));
+  return _shouldApplyVaryHeader.call(this);
 };
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include RequestCookieMethods`; the class/interface merge is how a mixin surfaces on the type side. */
-export interface Request {
-  cookieJar(jar?: CookieJar): CookieJar;
-  isHaveCookieJar(): boolean;
-  signedCookieSalt(): string | undefined;
-  encryptedCookieSalt(): string | undefined;
-  encryptedSignedCookieSalt(): string | undefined;
-  authenticatedEncryptedCookieSalt(): string | undefined;
-  useAuthenticatedCookieEncryption(): boolean | undefined;
-  encryptedCookieCipher(): string | undefined;
-  signedCookieDigest(): string | undefined;
-  secretKeyBase(): string | undefined;
-  cookiesSerializer(): unknown;
-  cookiesSameSiteProtection(): unknown;
-  cookiesDigest(): string | undefined;
-  cookiesRotations(): unknown;
-  useCookiesWithMetadata(): boolean | undefined;
-}
-Request.prototype.cookieJar = _cookieJar;
-Request.prototype.isHaveCookieJar = _isHaveCookieJar;
-Request.prototype.signedCookieSalt = _signedCookieSalt;
-Request.prototype.encryptedCookieSalt = _encryptedCookieSalt;
-Request.prototype.encryptedSignedCookieSalt = _encryptedSignedCookieSalt;
-Request.prototype.authenticatedEncryptedCookieSalt = _authenticatedEncryptedCookieSalt;
-Request.prototype.useAuthenticatedCookieEncryption = _useAuthenticatedCookieEncryption;
-Request.prototype.encryptedCookieCipher = _encryptedCookieCipher;
-Request.prototype.signedCookieDigest = _signedCookieDigest;
-Request.prototype.secretKeyBase = _secretKeyBase;
-Request.prototype.cookiesSerializer = _cookiesSerializer;
-Request.prototype.cookiesSameSiteProtection = _cookiesSameSiteProtection;
-Request.prototype.cookiesDigest = _cookiesDigest;
-Request.prototype.cookiesRotations = _cookiesRotations;
-Request.prototype.useCookiesWithMetadata = _useCookiesWithMetadata;
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `ActiveSupport.on_load(:action_dispatch_request) { include RequestCookieMethods }` (`action_dispatch/middleware/cookies.rb:93-95`). */
+export interface Request extends Included<typeof RequestCookieMethods> {}
 
 Request.prototype.filteredParameters = _filteredParameters;
 Request.prototype.filteredEnv = _filteredEnv;
@@ -1128,10 +925,10 @@ export class MissingController extends NameError {
 /** @noRailsEquivalent CONVERGEABLE controller-constant-resolution-throws-instead-of-constantize */
 export const controllerConstants = new Map<string, DispatchableControllerClass>();
 
-export class PassNotFound {
+export class PASS_NOT_FOUND {
   /** @internal */
-  static action(_: unknown): typeof PassNotFound {
-    return PassNotFound;
+  static action(_: unknown): typeof PASS_NOT_FOUND {
+    return PASS_NOT_FOUND;
   }
   /** @internal */
   static call(_: RackEnv): RackResponse {
@@ -1143,16 +940,20 @@ export class PassNotFound {
   }
 }
 Request.prototype.validAcceptHeader = function (this: Request) {
-  return _validAcceptHeader.call(mimeHost(this));
+  return _validAcceptHeader.call(this);
 };
 Request.prototype.useAcceptHeader = function (this: Request) {
-  return _useAcceptHeader.call(mimeHost(this));
+  return _useAcceptHeader.call(this);
 };
 Request.prototype.formatFromPathExtension = function (this: Request) {
-  return _formatFromPathExtension.call(mimeHost(this));
+  return _formatFromPathExtension.call(this);
 };
-Request.prototype.isParamsReadable = function (this: Request) {
-  return _paramsReadable.call(mimeHost(this));
-};
+Request.prototype.setFormat = _setFormat;
+Request.prototype.isParamsReadable = _isParamsReadable;
 
-ActionDispatch.Request = Request;
+rbModConstSet(ActionDispatch, "Request", Request);
+rbModConstSet(Request, "Utils", Utils);
+rbModConstSet(Request, "Session", Session);
+rbModConstSet(ActionDispatch, "MissingController", MissingController);
+
+runLoadHooks("action_dispatch_request", Request);

@@ -1,39 +1,26 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  Concern,
-  Module,
-  extend,
-  include,
-  initializeIncludedModules,
-} from "@blazetrails/activesupport";
+import { Concern, extend, include, initializeIncludedModules } from "@blazetrails/activesupport";
 import { ControllerRuntime, logProcessAction } from "./controller-runtime.js";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
-const FakeInstrumentation = new Module((mod) => {
-  extend(mod, Concern);
-
-  mod.defineMethod(
-    "processAction",
-    function (this: FakeController, action: string, ...args: unknown[]): unknown {
-      this.processedWith = [action, ...args];
-      return undefined;
-    },
-  );
-  mod.defineMethod("cleanupViewRuntime", function <T>(block: () => T): T {
+const FakeInstrumentation = {
+  processAction(this: FakeController, action: string, ...args: unknown[]): unknown {
+    this.processedWith = [action, ...args];
+    return undefined;
+  },
+  cleanupViewRuntime<T>(block: () => T): T {
     return block();
-  });
-  mod.defineMethod(
-    "appendInfoToPayload",
-    function (this: FakeController, payload: Record<string, unknown>): void {
-      payload.view_runtime = this.viewRuntime;
-    },
-  );
-}) as Module & { ClassMethods: Module };
-FakeInstrumentation.ClassMethods = new Module((mod) => {
-  mod.defineMethod("logProcessAction", function (payload: Record<string, unknown>): string[] {
+  },
+  appendInfoToPayload(this: FakeController, payload: Record<string, unknown>): void {
+    payload.view_runtime = this.viewRuntime;
+  },
+} as unknown as Record<string, unknown> & { ClassMethods: object };
+extend(FakeInstrumentation, Concern);
+FakeInstrumentation.ClassMethods = {
+  logProcessAction(payload: Record<string, unknown>): string[] {
     return payload.view_runtime == null ? [] : [`Views: ${payload.view_runtime}ms`];
-  });
-});
+  },
+};
 
 class FakeController {
   dbRuntime: number | null = null;
@@ -257,35 +244,6 @@ describe("ControllerRuntimeTest", () => {
           db_runtime: 2.0,
         }),
       ).toEqual(["Views: 1ms", "ActiveRecord: 2.0ms (0 queries, 0 cached)"]);
-    });
-  });
-
-  describe("initialize", () => {
-    it("seats dbRuntime to null on a fresh controller", () => {
-      class SeatController {
-        logger: { "info?": boolean } | null = null;
-        constructor() {
-          initializeIncludedModules(this);
-        }
-      }
-      include(SeatController as never, FakeInstrumentation);
-      include(SeatController as never, ControllerRuntime);
-
-      const controller = new SeatController() as SeatController & { dbRuntime: number | null };
-      expect(
-        typeof Object.getOwnPropertyDescriptor(
-          Object.getPrototypeOf(SeatController.prototype),
-          "dbRuntime",
-        )?.get,
-      ).toBe("function");
-      expect(controller.dbRuntime).toBe(null);
-      expect(Object.hasOwn(controller, "_dbRuntime")).toBe(true);
-
-      controller.dbRuntime = 1.5;
-      expect(Object.hasOwn(controller, "_dbRuntime")).toBe(true);
-      expect(new SeatController() as unknown as { dbRuntime: unknown }).toMatchObject({
-        dbRuntime: null,
-      });
     });
   });
 });

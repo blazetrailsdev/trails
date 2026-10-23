@@ -3,11 +3,12 @@ import {
   fetch,
   first,
   include,
-  isEmpty,
   kernelThrow,
   rbEqual,
+  rbFSend,
   toI,
   rbModConstSet,
+  eachSlice,
 } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
@@ -17,7 +18,7 @@ import { DeleteRestrictionError } from "./errors.js";
 import { CollectionAssociation, isThenable } from "./collection-association.js";
 import { ForeignAssociation } from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
-import { eachSlice, min, selectBang } from "@blazetrails/activesupport";
+import { min, selectBang } from "@blazetrails/activesupport";
 
 export class HasManyAssociation extends CollectionAssociation {
   /** @internal */
@@ -73,7 +74,7 @@ export class HasManyAssociation extends CollectionAssociation {
       case "destroy": {
         const records = await this.loadTarget();
         for (const record of records) {
-          (record as any).destroyedByAssociation = this.reflection;
+          record.destroyedByAssociation = this.reflection;
         }
         await this.destroyAll();
         break;
@@ -82,30 +83,30 @@ export class HasManyAssociation extends CollectionAssociation {
       case "destroyAsync": {
         const records = await this.loadTarget();
         for (const t of records) {
-          (t as any).destroyedByAssociation = this.reflection;
+          t.destroyedByAssociation = this.reflection;
         }
 
-        if (!isEmpty(this.target)) {
-          const associationClass = first(this.target)!.constructor as typeof Base;
+        if (this.target.length !== 0) {
+          const associationClass = first(this.target)!.constructor;
           let primaryKeyColumn: string | string[];
           let ids: unknown[];
-          if (queryConstraintsList.call(associationClass as any)) {
-            primaryKeyColumn = queryConstraintsList.call(associationClass as any)!;
+          if (queryConstraintsList.call(associationClass)) {
+            primaryKeyColumn = queryConstraintsList.call(associationClass)!;
             ids = this.target.map((assoc) =>
-              (primaryKeyColumn as string[]).map((col) => (assoc as any)[col]),
+              (primaryKeyColumn as string[]).map((col) => rbFSend(assoc, col)),
             );
           } else {
             primaryKeyColumn = associationClass.primaryKey as string;
-            ids = this.target.map((assoc) => (assoc as any)[primaryKeyColumn as string]);
+            ids = this.target.map((assoc) => rbFSend(assoc, primaryKeyColumn));
           }
 
           for (const idsBatch of eachSlice(
             ids,
-            (this.owner.constructor as typeof Base).destroyAssociationAsyncBatchSize ?? ids.length,
+            this.owner.constructor.destroyAssociationAsyncBatchSize ?? ids.length,
           )) {
             this.enqueueDestroyAssociation({
               ownerModelName: this.owner.constructor.name,
-              ownerId: (this.owner as any).id,
+              ownerId: this.owner.id,
               associationClass: String(this.reflection.klass.name),
               associationIds: idsBatch,
               associationPrimaryKeyColumn: primaryKeyColumn,
@@ -133,7 +134,7 @@ export class HasManyAssociation extends CollectionAssociation {
 
   /** @internal */
   protected override async deleteOrNullifyAllRecords(method?: string): Promise<number> {
-    const count = await this.deleteCount(method ?? "", (this as any).scope());
+    const count = await this.deleteCount(method ?? "", this.scope());
     await this.updateCounter(-count);
     return count;
   }
@@ -146,7 +147,7 @@ export class HasManyAssociation extends CollectionAssociation {
         return this.updateCounter(-records.length);
       }
     } else {
-      const queryConstraints = compositeQueryConstraintsList.call(this.reflection.klass as any);
+      const queryConstraints = compositeQueryConstraintsList.call(this.reflection.klass);
       const values = records.map((r) => queryConstraints.map((col) => r._readAttribute(col)));
       const scope = this.scope().where(new Map([[queryConstraints, values]]));
       return this.updateCounter(-(await this.deleteCount(method, scope)));
@@ -182,30 +183,25 @@ export class HasManyAssociation extends CollectionAssociation {
 
   /** @internal */
   async countRecords(): Promise<number> {
-    const reflection = this.reflection as unknown as {
-      hasActiveCachedCounter(): boolean;
-      counterCacheColumn(): string | null;
-    };
+    const reflection = this.reflection;
     let count: number;
     if (reflection.hasActiveCachedCounter()) {
       const counterCacheColumn = reflection.counterCacheColumn();
       count =
         counterCacheColumn == null
           ? 0
-          : (toI((this.owner as any).readAttribute(counterCacheColumn)) as number);
+          : (toI(this.owner.readAttribute(counterCacheColumn)) as number);
     } else {
-      count = await (this as unknown as CollectionAssociation).scope().count(":all");
+      count = await this.scope().count(":all");
     }
 
     if (count === 0) {
-      selectBang((this as unknown as CollectionAssociation).target, (record) =>
-        record.isNewRecord(),
-      );
-      (this as unknown as CollectionAssociation).loadedBang();
+      selectBang(this.target, (record) => record.isNewRecord());
+      this.loadedBang();
     }
 
     const limitValue = (
-      (this as unknown as CollectionAssociation).associationScope() as {
+      this.associationScope() as {
         limitValue?: number | null;
       } | null
     )?.limitValue;
@@ -221,14 +217,7 @@ async function updateCounter(
 ): Promise<void> {
   if (!reflection.hasCachedCounter?.()) return;
   const counterCacheColumn = reflection.counterCacheColumn?.() as string;
-  const owner = this.owner as any;
-  if (typeof owner.incrementBang === "function") {
-    await owner.incrementBang(counterCacheColumn, difference);
-  } else if (typeof owner.updateCounters === "function") {
-    await owner.updateCounters({ [counterCacheColumn]: difference });
-  } else if (typeof owner.increment === "function") {
-    owner.increment(counterCacheColumn, difference);
-  }
+  await this.owner.incrementBang(counterCacheColumn, difference);
 }
 
 /** @internal */
@@ -236,7 +225,7 @@ function updateCounterInMemory(this: HasManyAssociation, difference: number): vo
   const reflection = this.reflection;
   if (!reflection.isCounterMustBeUpdatedByHasMany?.()) return;
   const counter = reflection.counterCacheColumn?.() as string;
-  const owner = this.owner as any;
+  const owner = this.owner;
   const current = Number(owner.readAttribute?.(counter) ?? 0);
   owner.writeAttribute?.(counter, current + difference);
   owner.clearAttributeChange?.(counter);

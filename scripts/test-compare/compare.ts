@@ -126,6 +126,11 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
 const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
   "core/kernel/catch_spec.rb": "kernel-catch.test.ts",
   "core/kernel/throw_spec.rb": "kernel-catch.test.ts",
+  "library/yaml/dump_spec.rb": "psych-dump.test.ts",
+  "library/yaml/load_file_spec.rb": "psych-load-file.test.ts",
+  "library/yaml/load_spec.rb": "psych-load.test.ts",
+  "library/yaml/to_yaml_spec.rb": "psych-to-yaml.test.ts",
+  "library/yaml/unsafe_load_spec.rb": "psych-unsafe-load.test.ts",
 };
 
 /**
@@ -141,6 +146,7 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
  */
 export const CROSS_PACKAGE_TEST_FILES: Record<string, { package: string; tsFile: string }> = {
   "activemodel:railtie_test.rb": { package: "trailties", tsFile: "trailties/active-model.test.ts" },
+  "globalid:railtie_test.rb": { package: "trailties", tsFile: "trailties/global-id.test.ts" },
 };
 
 /**
@@ -267,7 +273,8 @@ export function aliasKey(key: string): string | undefined {
 function normalizeErb(s: string): string {
   return normalize(s)
     .replace(/erb/g, "tse")
-    .replace(/rubocop/g, "eslint");
+    .replace(/rubocop/g, "eslint")
+    .replace(/capybara/g, "vitest");
 }
 
 /**
@@ -312,6 +319,17 @@ export function rejectsSiblingClassCandidate(
 ): boolean {
   if (rubyClass === undefined || classCount <= 1) return false;
   return !tsParts.slice(0, -1).some((n) => describedClass(n) === rubyClass);
+}
+
+/**
+ * The compared packages whose TS test files `pkg`'s TS population also holds:
+ * a test there may be the port of one of their Rails files.
+ */
+export function sharingPackages(pkg: string, ts: TestManifest): string[] {
+  const own = new Set((ts.packages[pkg]?.files ?? []).map((f) => f.file));
+  return Object.entries(ts.packages)
+    .filter(([p, info]) => p !== pkg && info.files.some((f) => own.has(f.file)))
+    .map(([p]) => p);
 }
 
 /**
@@ -812,8 +830,11 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
     // Ruby-side: which test paths/names appear in multiple Ruby files?
     const rubyPathToFileCount = new Map<string, number>();
     const rubyDescToFileCount = new Map<string, number>();
-    for (const file of pkgInfo.files) {
-      if (isTestFileUnported(file.file, pkg)) continue;
+    const countedFiles = [pkg, ...sharingPackages(pkg, ts)].flatMap((p) =>
+      (ruby.packages[p]?.files ?? []).map((file) => ({ p, file })),
+    );
+    for (const { p, file } of countedFiles) {
+      if (isTestFileUnported(file.file, p)) continue;
       const seenPaths = new Set<string>();
       const seenDescs = new Set<string>();
       for (const tc of file.testCases) {
@@ -1636,10 +1657,12 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   "rack-test": "packages/rack-test/src/",
   bcrypt: "packages/bcrypt/src/",
   msgpack: "packages/msgpack/src/",
+  marcel: "packages/marcel/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
   actionview: "packages/actionview/src/",
+  actioncable: "packages/actioncable/src/",
   activejob: "packages/activejob/src/",
   trailties: "packages/trailties/src/",
   globalid: "packages/globalid/src/",

@@ -60,7 +60,7 @@ export interface FsAdapter {
   rmSync(path: string, options?: { recursive?: boolean; force?: boolean }): void;
   rmdirSync(path: string): void;
   renameSync(src: string, dest: string): void;
-  flockSync?(fd: number, operation: "ex" | "un"): void;
+  flockSync?(fd: number, operation: "ex" | "exnb" | "un"): boolean | void;
   statSync(path: string): FsStatResult;
   fstatSync?(fd: number): FsStatResult;
   lstatSync(path: string): FsStatResult;
@@ -167,7 +167,7 @@ const flockPaths = new Map<number, string>();
 const flockHeld = new Map<number, string>();
 
 function withFlock<T extends FlockableFs>(nodeFs: T): Partial<FsAdapter> {
-  const flockSync = (fd: number, operation: "ex" | "un"): void => {
+  const flockSync = (fd: number, operation: "ex" | "exnb" | "un"): boolean | void => {
     if (operation === "un") {
       const lockPath = flockHeld.get(fd);
       if (lockPath == null) return;
@@ -187,9 +187,10 @@ function withFlock<T extends FlockableFs>(nodeFs: T): Partial<FsAdapter> {
       try {
         nodeFs.closeSync(nodeFs.openSync(lockPath, "wx"));
         flockHeld.set(fd, lockPath);
-        return;
+        return true;
       } catch (error) {
         if ((error as { code?: string }).code !== "EEXIST") throw error;
+        if (operation === "exnb") return false;
         sleepSync(LOCK_RETRY_MS);
       }
     }

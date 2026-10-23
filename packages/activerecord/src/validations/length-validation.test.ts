@@ -66,7 +66,7 @@ describe("LengthValidationTest", () => {
     expect(await o.save()).toBeTruthy();
 
     const petCount = await Pet.count();
-    expect(await o.update({ petsAttributes: [{ _destroy: 1, id: pet.id }] })).toBeFalsy();
+    expect(await o.update({ pets_attributes: [{ _destroy: 1, id: pet.id }] })).toBeFalsy();
     expect(await o.isValid()).toBeFalsy();
     expect(o.errors.messagesFor("pets").length > 0).toBeTruthy();
     expect(await Pet.count()).toBe(petCount);

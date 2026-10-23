@@ -1,5 +1,7 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, Module, extend } from "@blazetrails/activesupport";
-import { ArgumentError, File, merge, slice } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, slice, stringDelete } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Base, RenderOptions } from "../base.js";
@@ -62,9 +64,10 @@ export function sendData(
   options: SendDataOptions = {},
 ): unknown {
   this.sendFileHeadersBang(options);
-  return this.render(
-    merge(slice(options as Record<string, unknown>, "status", "contentType"), { body: data }),
-  );
+  return this.render({
+    ...slice(options as Record<string, unknown>, "status", "contentType"),
+    body: data,
+  });
 }
 
 /** @internal */
@@ -90,7 +93,7 @@ export function sendFileHeadersBang(
     if (!typeProvided && options.filename != null) {
       contentType =
         MimeType.lookupByExtension(
-          File.extname(options.filename).toLowerCase().replaceAll(".", ""),
+          stringDelete(File.extname(options.filename).toLowerCase(), "."),
         ) || contentType;
     }
     this.contentType = contentType;
@@ -124,3 +127,5 @@ export const DataStreaming: Module<{
   mod.defineMethod("sendData", sendData);
   mod.defineMethod("sendFileHeadersBang", sendFileHeadersBang);
 });
+
+rbModConstSet(ActionController, "DataStreaming", DataStreaming);

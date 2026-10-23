@@ -8,7 +8,7 @@ import {
   isPlainObject,
   unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
-import { Hash, Module } from "@blazetrails/ruby-compat";
+import { Hash, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { OutputBuffer } from "../buffers.js";
 
 export function raw(stringish: unknown): SafeBuffer {
@@ -66,14 +66,13 @@ export function toSentence(array: unknown[], options: ToSentenceOptions = {}): S
   const i18nConnectors = I18n.translate("support.array", {
     locale: options.locale ?? null,
     default: {},
-  }) as Record<string, string>;
-  for (const [k, v] of Object.entries(i18nConnectors)) {
-    defaultConnectors[camelize(k, "lower")] = v;
+  }) as Record<string, string> | Map<unknown, string>;
+  for (const [k, v] of i18nConnectors instanceof Map
+    ? i18nConnectors
+    : Object.entries(i18nConnectors)) {
+    defaultConnectors[camelize(isSymbol(k) ? symbolToS(k) : String(k), "lower")] = v;
   }
-  for (const [k, v] of Object.entries(options)) {
-    if (v !== undefined) defaultConnectors[k] = v as string | SafeBuffer | null;
-  }
-  const { wordsConnector, twoWordsConnector, lastWordConnector } = defaultConnectors;
+  options = Object.assign(defaultConnectors, options);
 
   switch (array.length) {
     case 0:
@@ -81,18 +80,21 @@ export function toSentence(array: unknown[], options: ToSentenceOptions = {}): S
     case 1:
       return htmlEscape(array[0]);
     case 2:
-      return safeJoin([array[0], array[1]], twoWordsConnector as string | SafeBuffer);
-    default: {
-      const allButLast = array.slice(0, -1);
-      const last = array[array.length - 1];
-      const joinedHead = safeJoin(allButLast, wordsConnector as string | SafeBuffer);
-      return safeJoin([joinedHead, lastWordConnector, last], null);
-    }
+      return safeJoin([array[0], array[1]], options.twoWordsConnector);
+    default:
+      return safeJoin(
+        [
+          safeJoin(array.slice(0, -1), options.wordsConnector),
+          options.lastWordConnector,
+          array.at(-1),
+        ],
+        null,
+      );
   }
 }
 
-export const OutputSafetyHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { raw, safeJoin, toSentence });
-  });
-});
+export const OutputSafetyHelper = {
+  raw,
+  safeJoin,
+  toSentence,
+};

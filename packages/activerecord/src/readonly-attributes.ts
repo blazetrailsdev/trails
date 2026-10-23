@@ -1,3 +1,5 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActiveRecord } from "./namespaces.js";
 import type { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
 import { classAttribute, include, included } from "@blazetrails/activesupport";
@@ -31,7 +33,7 @@ export function isReadonlyAttribute(this: typeof Base, name: string): boolean {
 }
 
 export function writeAttribute(this: Base, attrName: string, value: unknown): void {
-  const ctor = this.constructor as typeof Base;
+  const ctor = this.constructor;
   if (this._newRecord === false && ctor.isReadonlyAttribute(String(attrName))) {
     throw new ReadonlyAttributeError(String(attrName));
   }
@@ -40,7 +42,7 @@ export function writeAttribute(this: Base, attrName: string, value: unknown): vo
 }
 
 export function _writeAttribute(this: Base, attrName: string, value: unknown): void {
-  const ctor = this.constructor as typeof Base;
+  const ctor = this.constructor;
   if (this._newRecord === false && ctor.isReadonlyAttribute(String(attrName))) {
     throw new ReadonlyAttributeError(String(attrName));
   }
@@ -56,3 +58,5 @@ export const ClassMethods = {
   attrReadonly,
   isReadonlyAttribute,
 };
+
+rbModConstSet(ActiveRecord, "ReadonlyAttributeError", ReadonlyAttributeError);

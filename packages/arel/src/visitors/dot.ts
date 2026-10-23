@@ -289,7 +289,6 @@ export class Dot extends Visitor {
     this.visitEdge(o, "default");
   }
 
-  /** @missingRailsName send — PERMANENT */
   protected visitEdge(o: object, method: string): void {
     this.edge(method, () => this.visit(rbFSend(o, camelize(method, false))));
   }

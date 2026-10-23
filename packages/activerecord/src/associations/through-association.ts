@@ -10,12 +10,13 @@ import {
   drop,
   first,
   isNil,
-  Module,
+  rbCallSuper,
   rbEqual,
   transformValues,
   zip,
+  filterMap,
 } from "@blazetrails/ruby-compat";
-import { delegate, filterMap, kernelArray as Array, presence } from "@blazetrails/activesupport";
+import { delegate, kernelArray as Array, presence } from "@blazetrails/activesupport";
 
 /** @internal */
 export interface ThroughAssociationHost {
@@ -65,7 +66,7 @@ export function throughAssociation(this: ThroughAssociationHost): any {
 
 /** @internal */
 export function targetScope(this: ThroughAssociationHost): any {
-  const scope = ThroughAssociation.superMethod(this, "targetScope")!() as any;
+  const scope = rbCallSuper(this, targetScope) as any;
   for (const reflection of drop<any>(this.reflection.chain, 1)) {
     const relation = reflection.klass.scopeForAssociation();
     scope.mergeBang(
@@ -193,22 +194,19 @@ export function buildRecord(
     }
   }
 
-  return ThroughAssociation.superMethod(this, "buildRecord")!(attributes, block) as Base | null;
+  return rbCallSuper(this, buildRecord, attributes, block) as Base | null;
 }
 
-export const ThroughAssociation: Module = new Module((mod) => {
-  delegate.call(mod, "sourceReflection", { to: "reflection" });
-
-  mod.include({
-    transaction,
-    throughReflection,
-    throughAssociation,
-    targetScope,
-    constructJoinAttributes,
-    staleState,
-    foreignKeyPresent,
-    ensureMutable,
-    ensureNotNested,
-    buildRecord,
-  });
-});
+export const ThroughAssociation = {
+  transaction,
+  throughReflection,
+  throughAssociation,
+  targetScope,
+  constructJoinAttributes,
+  staleState,
+  foreignKeyPresent,
+  ensureMutable,
+  ensureNotNested,
+  buildRecord,
+};
+delegate.call(ThroughAssociation, "sourceReflection", { to: "reflection" });

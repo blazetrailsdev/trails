@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Type-checks TypeScript code blocks in the website guides.",
   "dependencies": {
+    "@blazetrails/actioncable": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
@@ -12,10 +13,12 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/bcrypt": "workspace:*",
+    "@blazetrails/builder": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/rack-session": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
+    "@blazetrails/solid-queue": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
@@ -23,10 +26,13 @@
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/i18n": "workspace:*",
+    "@blazetrails/marcel": "workspace:*",
+    "@blazetrails/mini-magick": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
-    "@blazetrails/ruby-compat": "workspace:*"
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*"
   }
 }

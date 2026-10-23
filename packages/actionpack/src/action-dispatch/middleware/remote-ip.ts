@@ -1,7 +1,6 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { rbInspect } from "@blazetrails/ruby-compat";
-import { ActionDispatch } from "../../namespaces.js";
-import type { Request } from "../http/request.js";
+import { ArgumentError, IPAddr, rbInspect, rbFSend } from "@blazetrails/ruby-compat";
+import { Request } from "../http/request.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse> | RackResponse;
 
@@ -89,7 +88,8 @@ function cidrContains(cidr: ParsedCidr, ip: ParsedIp): boolean {
   return cidr.value >> shift === ip.value >> shift;
 }
 
-function proxyMatches(proxy: Proxy, ipStr: string): boolean {
+function proxyMatches(proxy: Proxy | null, ipStr: string | undefined): boolean {
+  if (proxy == null || ipStr == null) return false;
   if (proxy instanceof RegExp) return proxy.test(ipStr);
   const cidr = parseCidr(proxy);
   const ip = parseIp(ipStr);
@@ -100,7 +100,7 @@ export class GetIp {
   private readonly req: Request;
   private readonly checkIp: boolean;
   private readonly proxies: readonly Proxy[];
-  private memoized: string | null | undefined;
+  private ip: string | null | undefined;
 
   constructor(req: Request, checkIp: boolean, proxies: readonly Proxy[]) {
     this.req = req;
@@ -108,14 +108,8 @@ export class GetIp {
     this.proxies = proxies;
   }
 
-  toString(): string {
-    return this.calculate() ?? "";
-  }
-
-  calculate(): string | null {
-    if (this.memoized !== undefined) return this.memoized;
-    this.memoized = this.calculateIp();
-    return this.memoized;
+  toString(): string | null {
+    return (this.ip ??= this.calculateIp());
   }
 
   private calculateIp(): string | null {
@@ -135,17 +129,27 @@ export class GetIp {
     }
 
     const ips = [...forwardedIps, ...clientIps];
-    const withRemote = remoteAddr ? [...ips, remoteAddr] : ips;
-    const filtered = withRemote.filter((ip) => !this.proxies.some((p) => proxyMatches(p, ip)));
-    return filtered[0] ?? ips[ips.length - 1] ?? remoteAddr ?? null;
+    return this.filterProxies([...ips, remoteAddr])[0] ?? ips[ips.length - 1] ?? remoteAddr ?? null;
   }
 
   private ipsFrom(header: string | undefined): string[] {
     if (!header) return [];
-    return header
-      .trim()
-      .split(/[,\s]+/)
-      .filter((ip) => !!ip && parseIp(ip) !== null);
+    let ips = header.trim().split(/[,\s]+/);
+    ips = ips.filter((ip) => {
+      try {
+        const range = new IPAddr(ip).toRange();
+        return range.begin!.equals(range.end);
+      } catch (e) {
+        if (e instanceof ArgumentError) return false;
+        throw e;
+      }
+    });
+    return ips;
+  }
+
+  /** @internal */
+  private filterProxies(ips: Array<string | undefined>): Array<string | undefined> {
+    return ips.filter((ip) => !this.proxies.some((proxy) => proxyMatches(proxy, ip)));
   }
 }
 
@@ -184,8 +188,8 @@ export class RemoteIp {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const req = new ActionDispatch.Request(env);
+    const req = new Request(env);
     req.remoteIp = new GetIp(req, this.checkIp, this.proxies);
-    return await this.app(req.env);
+    return await (rbFSend(this.app, "call", req.env) as ReturnType<typeof this.app>);
   }
 }

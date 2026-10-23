@@ -28,9 +28,7 @@
  * The advisory arity check compares the positional-arg ranges of name-matched
  * methods (it never affects the parity %). A one-line summary always prints and
  * output/arity-mismatches.json is always written; `--arity` adds the
- * per-method breakdown. A justified deviation can be suppressed with a
- * reasoned arity-exclude.json entry (arity-exclude.ts); lint-arity-excludes.ts
- * then fails that entry once it goes stale.
+ * per-method breakdown.
  *
  * The advisory parameter-NAME check (RFC 0126, param-names.ts) runs beside it on
  * the same pairs: where arity asks how many args a method takes, this asks what
@@ -109,6 +107,7 @@ import {
   COPY_HOOKS,
   OPERATORS,
   TS_CLASS_RENAMES,
+  applyTokenRenames,
   isArityOverridden,
   isRubyOnlyClass,
   isScopedSkip,
@@ -131,19 +130,7 @@ import {
   type ArityRange,
 } from "./arity.js";
 import { isNestedConstructorHomonym, matchParamNamesAgainst } from "./param-names.js";
-import { dropsBlock } from "./block-params.js";
-import {
-  ARITY_EXCLUDE_PATH,
-  arityExcludeKeyOf,
-  arityExcludeKeys,
-  parseArityExcludes,
-} from "./arity-exclude.js";
-import {
-  INHERITANCE_EXCLUDE_PATH,
-  inheritanceExcludeKeyOf,
-  inheritanceExcludeKeys,
-  parseInheritanceExcludes,
-} from "./inheritance-exclude.js";
+import { GENERATOR_BLOCK, dropsBlock, isInternalGenerator } from "./block-params.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
 // call-args.ts imports NO_JS_CALL_FORM back from this module and reads it at
 // CALL time for exactly that reason (see its isSkippedCallName): the pair is a
@@ -194,11 +181,16 @@ import {
   inlinedRubyCallArgs,
   inlinedRubySkeleton,
   inlinedSegments,
+  inlinedMethodSegments,
+  portsSiblingClass,
   isInitializeLessTaggedClass,
+  inheritedModules,
   moduleAncestors,
   sameFileInitializeModules,
   taggedBodies,
   uncomparedInlinedTags,
+  INLINED_FROM_PAIRS_FILE,
+  type InlinedFromPair,
 } from "./inlined-bodies.js";
 import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
 
@@ -776,7 +768,17 @@ export const SIGNIFICANT_CALLS: { has(value: string): boolean } = {
  * the 2026-09-18 addendum below `NO_JS_CALL_FORM` for the population this
  * closes.
  */
-const POSITIONAL_ARRAY_ANALOGUES = new Set(["first", "last", "any?", "size", "empty?"]);
+const POSITIONAL_ARRAY_ANALOGUES = new Set(["first", "last", "any?", "size", "empty?", "length"]);
+
+/**
+ * The {@link POSITIONAL_ARRAY_ANALOGUES} a proven `string` or `hash` receiver
+ * answers through `.length` too (`isEmpty(s)` is otherwise written only to
+ * earn the credit). The Relation homonym the comment above guards against
+ * only reaches the `local` / `ivar` / `expr` kinds, never a proven literal.
+ */
+const SIZE_ANALOGUES = new Set(["size", "empty?", "length"]);
+const SIZED_RECEIVER_KINDS = new Set(["array", "string", "hash"]);
+const ARRAY_RECEIVER_KIND = new Set(["array"]);
 
 /**
  * {@link SIGNIFICANT_CALLS}, narrowed for ONE Ruby body's own receiver-kind
@@ -801,9 +803,11 @@ export function significantCallsForReceivers(
       if (value === "new" && isCoreNewWithNoNewExpression(receivers?.new, tsNativeForms)) {
         return false;
       }
+      if (value === "with_indifferent_access" && tsNativeForms.has("object")) return false;
       if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
       const kinds = receivers?.[value];
-      return !(kinds && kinds.length > 0 && kinds.every((k) => k === "array"));
+      const proven = SIZE_ANALOGUES.has(value) ? SIZED_RECEIVER_KINDS : ARRAY_RECEIVER_KIND;
+      return !(kinds && kinds.length > 0 && kinds.every((k) => proven.has(k)));
     },
   };
 }
@@ -841,10 +845,18 @@ export function invokeForms(calls: Iterable<string>): string[] {
  * expression (extract-ruby-api.rb#core_new_kind):
  *
  * - `literal-new`: an argument-less, block-less `Hash.new` / `Array.new` /
- *   `Concurrent::Array.new`, the literal `{}` / `[]`
+ *   `Concurrent::Array.new` / `String.new`, the literal `{}` / `[]` / `""`
  *   (`associations/foreign_association.rb:14`, `core.rb:220`).
- * - `string-new`: `String.new(x)`, credited only against a TS body that makes
- *   the `String(x)` conversion call (`relation/query_methods.rb:2047`).
+ * - `string-new`: `String.new(x)`, whose faithful port is the JS string `x`
+ *   itself, a Ruby String being a JS string primitive (CLAUDE.md, "Ruby
+ *   Strings are JS string primitives"), so no native form is required
+ *   (`relation/query_methods.rb:2047`). An argument-less `String.new` is a
+ *   `literal-new`, the literal `""`.
+ * - `hwia-new`: `HashWithIndifferentAccess.new` with at most one argument,
+ *   credited against a TS body that builds a plain object (the `object` native
+ *   form: `{}` or `Object.create(null)`), the shape RFC 0190 settles for a hash
+ *   whose consumer reads literal string keys
+ *   (`action_dispatch/http/param_builder.rb:162-164`).
  *
  * One `Foo.new` in the body leaves `new` significant, the all-sites discipline
  * {@link POSITIONAL_ARRAY_ANALOGUES} has.
@@ -855,7 +867,10 @@ function isCoreNewWithNoNewExpression(
 ): boolean {
   if (kinds === undefined || kinds.length === 0) return false;
   return kinds.every(
-    (k) => k === "literal-new" || (k === "string-new" && tsNativeForms.has("String")),
+    (k) =>
+      k === "literal-new" ||
+      k === "string-new" ||
+      (k === "hwia-new" && tsNativeForms.has("object")),
   );
 }
 
@@ -1833,8 +1848,13 @@ interface CallResult {
 export interface CallSkeleton {
   rubyFile: string;
   rubyName: string;
+  /** The Ruby class/module the `def` sits in, and the seat it is defined on. */
+  rubyOwner?: string;
+  rubySeat?: OwnerSeat;
   tsFile: string;
   tsName: string;
+  /** The TS class the pair resolved to; `""` is a top-level function. */
+  tsOwner?: string;
   ruby: string[];
   ts: string[];
   /** The SAME-FILE methods this pair's own `ref:` reaches resolve to, folded
@@ -2960,8 +2980,6 @@ interface ArityResult {
    *  silently absorbing the skip. */
   forwardingSkipped: number;
   mismatched: number;
-  /** Mismatching pairs suppressed by a reasoned arity-exclude.json entry. */
-  excluded: number;
   mismatches: ArityMismatch[];
 }
 
@@ -3086,10 +3104,6 @@ interface InheritanceMismatch {
 interface InheritanceResult {
   checked: number;
   matched: number;
-  /** Mismatches suppressed by a reasoned inheritance-exclude.json entry, and
-   *  dropped from `checked` — reported so the shrunken denominator is
-   *  auditable rather than silently absorbing the deviation. */
-  excluded: number;
   mismatches: InheritanceMismatch[];
 }
 
@@ -3244,6 +3258,10 @@ export function resolveTsClassForRuby(
   if (!resolved) {
     const rename = TS_CLASS_RENAMES[short];
     if (rename) resolved = tsByFileName.get(`${expectedFile}::${rename}`);
+  }
+  if (!resolved) {
+    const renamed = applyTokenRenames(short);
+    if (renamed !== short) resolved = tsByFileName.get(`${expectedFile}::${renamed}`);
   }
   return resolved;
 }
@@ -3518,6 +3536,17 @@ export function flattenIncludedMethodInfos(
   for (const inc of entity.includes ?? []) walk(inc, false, entityFqn);
   for (const ext of entity.extends ?? []) walk(ext, true, entityFqn);
   return { instance, klass };
+}
+
+/**
+ * Whether a (flattened) Ruby method makes its host a separate owner of the
+ * name. A same-file module's body flattened onto its includer is one body,
+ * not a second owner: `TestCase::Behavior#controller_class_name` copied onto
+ * `TestCase` (actionpack/lib/action_controller/test_case.rb:552) made the one
+ * TS member read as ambiguous, and both call gates skipped it.
+ */
+export function countsAsRubyOwner(rm: { mixinFile?: string }, hostRubyFile: string): boolean {
+  return rm.mixinFile !== hostRubyFile;
 }
 
 /**
@@ -3971,12 +4000,14 @@ export function dedupeRubyMethodInto(
   klass = false,
   pkg?: string,
 ): void {
-  const tsMirrorNames = rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile);
+  const tsMirrorNames =
+    rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile, pkg);
   if (tsMirrorNames === null && rubyMethodToTsForFqn(itemFqn, rm.name, undefined, pkg) === null) {
     return;
   }
   if (isRubyOnlyClass(itemFqn)) return;
-  if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile)) return;
+  if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile, pkg))
+    return;
   const level = rubyOwnerSeat(itemFqn, klass);
   const key = rubyLevelKey(level, rm.name);
   if (!seen.has(key)) {
@@ -4076,12 +4107,12 @@ function rubyDefinitionBucket(
   seen: Set<string>,
   pkg: string,
 ): DenominatorBucket {
-  const tsMirrorNames = scopedSkipMirrorName(name, file);
+  const tsMirrorNames = scopedSkipMirrorName(name, file, pkg);
   if (tsMirrorNames === null && rubyMethodToTsForFqn(fqn, name, undefined, pkg) === null) {
     return OPERATORS.has(name) ? "operator" : "globalSkip";
   }
   if (isRubyOnlyClass(fqn)) return "rowlessFile";
-  if (tsMirrorNames === null && isScopedSkip(name, file)) return "scopedSkip";
+  if (tsMirrorNames === null && isScopedSkip(name, file, pkg)) return "scopedSkip";
   const key = rubyLevelKey(rubyOwnerSeat(fqn, klass), name);
   if (seen.has(key)) return "sameNameCollapse";
   seen.add(key);
@@ -4243,20 +4274,8 @@ function isPackageBarrel(file: string): boolean {
  * bucket has no port at all and must read as missing rather than partly ported.
  * Keyed `<package>:<ruby file>`. Only-shrink: a row leaves when the file is
  * ported, never when a better justification is found for keeping it.
- *
- * `dependency_tracker/ruby_tracker.rb` is the sibling-interface shape: every one
- * of its nine members shares a name with a member of `ERBTracker`, whose port
- * IS `dependency-tracker/tse-tracker.ts`, so the vote lands the whole bucket
- * there and reads it 9/9 ported. Nothing in that file ports RubyTracker —
- * `render_dependencies` needs `RenderParser::Default` (`ruby_tracker.rb:29-33`),
- * which is unported — so the credit is a coincidence of names and the bucket
- * must read as missing. It leaves when
- * `actionview-dependency-tracker-ruby-tracker-and-render-parser-are-unported`
- * lands `dependency-tracker/ruby-tracker.ts`.
  */
-export const NAME_COLLISION_CLUSTERS: ReadonlySet<string> = new Set([
-  "actionview:dependency_tracker/ruby_tracker.rb",
-]);
+export const NAME_COLLISION_CLUSTERS: ReadonlySet<string> = new Set<string>();
 
 /**
  * Whether a Ruby file has SOME real TS counterpart the compare can point at:
@@ -4569,21 +4588,8 @@ export function main() {
   const ruby: ApiManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: ApiManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
-  // Reasoned arity suppressions (RFC 0072). Read sync to match this module's
-  // other manifest reads; arity-exclude.ts's async loader serves the gate.
-  const arityExcludes = arityExcludeKeys(
-    parseArityExcludes(fs.readFileSync(ARITY_EXCLUDE_PATH, "utf-8")),
-  );
-  const appliedArityExcludes = new Set<string>();
-
-  // Reasoned inheritance suppressions (RFC 0072) — a ported class whose TS
-  // superclass deliberately differs, each with its justification.
-  const inheritanceExcludes = inheritanceExcludeKeys(
-    parseInheritanceExcludes(fs.readFileSync(INHERITANCE_EXCLUDE_PATH, "utf-8")),
-  );
-  const appliedInheritanceExcludes = new Set<string>();
-
   const results: PackageResult[] = [];
+  const inlinedFromPairs: InlinedFromPair[] = [];
   const tsInlinedHookTags = inlinedHookTags(ts, ruby);
 
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
@@ -4656,6 +4662,7 @@ export function main() {
       Map<string, Map<string, Map<string, string>>>
     >();
     const tsInlinedFromByFileOwner = new Map<string, Map<string, InlinedFrom[]>>();
+    const tsInlinedMethodTagsByFile = new Map<string, Map<string, InlinedFrom[]>>();
     const inlinedTagsCompared = new Set<string>();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
@@ -4785,6 +4792,7 @@ export function main() {
         const blockSigs = byName.get(m.name) ?? [];
         blockSigs.push(m.params);
         if (m.aliasParams) blockSigs.push(m.aliasParams);
+        if (isInternalGenerator(m)) blockSigs.push(GENERATOR_BLOCK);
         byName.set(m.name, blockSigs);
         tsBlockSigsByFileName.set(file, byName);
         const byOwner = tsBlockSigsByFileOwnerName.get(file) ?? new Map<string, ParamInfo[][]>();
@@ -4793,6 +4801,7 @@ export function main() {
           ...(byOwner.get(ownerKey) ?? []),
           m.params,
           ...(m.aliasParams ? [m.aliasParams] : []),
+          ...(isInternalGenerator(m) ? [GENERATOR_BLOCK] : []),
         ]);
         tsBlockSigsByFileOwnerName.set(file, byOwner);
       }
@@ -4850,6 +4859,10 @@ export function main() {
         const byOwner = tsInlinedFromByFileOwner.get(file) ?? new Map<string, InlinedFrom[]>();
         byOwner.set(owner, m.inlinedFrom);
         tsInlinedFromByFileOwner.set(file, byOwner);
+      } else if (m.inlinedFrom !== undefined && scope === "package" && declaredHere) {
+        const byKey = tsInlinedMethodTagsByFile.get(file) ?? new Map<string, InlinedFrom[]>();
+        byKey.set(`${owner}#${m.name}`, m.inlinedFrom);
+        tsInlinedMethodTagsByFile.set(file, byKey);
       }
       // A relative path is not unique across packages — activemodel and
       // activerecord both port attribute_methods.rb to attribute-methods.ts —
@@ -5178,7 +5191,6 @@ export function main() {
     const blockParamMismatches: BlockParamMismatch[] = [];
     let arityCompared = 0;
     let arityForwardingSkipped = 0;
-    let arityExcluded = 0;
     const arityMismatches: ArityMismatch[] = [];
     let optionKeysCompared = 0;
     const optionKeyMismatches: OptionKeyMismatch[] = [];
@@ -5371,10 +5383,12 @@ export function main() {
               params: [...(owned?.params ?? []), ...rm.params],
             });
           }
-          rubyOwnersByName.set(
-            rm.name,
-            (rubyOwnersByName.get(rm.name) ?? new Set<string>()).add(item.fqn),
-          );
+          if (countsAsRubyOwner(rm, rubyFile)) {
+            rubyOwnersByName.set(
+              rm.name,
+              (rubyOwnersByName.get(rm.name) ?? new Set<string>()).add(item.fqn),
+            );
+          }
           if (klassNames.has(rm.name)) rubyKlassOwnerNames.add(ownerKey(item.fqn, rm.name));
           if (rm.calls && !rubyCallsByName.has(rm.name)) {
             rubyCallsByName.set(rm.name, rm.calls);
@@ -5573,26 +5587,73 @@ export function main() {
         rubyModule: string,
         level: OwnerSeat,
       ): MethodInfo[] => {
-        if (rubyName !== "initialize" || tsName !== "constructor") return [];
+        if (tsName !== "constructor") {
+          const byKey = tsInlinedMethodTagsByFile.get(tsFile);
+          if (byKey === undefined) return [];
+          const tsClass = resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass;
+          const key = `${tsClass}#${tsName}`;
+          const tags = byKey.get(key);
+          const includer = (rubyPkg.classes[rubyModule] ??
+            rubyPkg.modules[rubyModule]) as unknown as ClassInfo | undefined;
+          if (tags === undefined || includer === undefined) return [];
+          inlinedTagsCompared.add(`${tsFile} ${key}`);
+          const ancestors = moduleAncestors(includer, rubyModule, rubyPkg.modules, (incName, ctx) =>
+            resolveModuleName(incName, ctx, moduleFqnByShort),
+          );
+          return inlinedMethodSegments(
+            includer.instanceMethods.find((m) => m.name === rubyName),
+            taggedBodies(
+              ruby,
+              tags,
+              sameFileInitializeModules(includer, ancestors, rubyPkg.modules, rubyName),
+              `${pkg}/${tsFile} ${key}`,
+            ),
+          );
+        }
+        if (rubyName !== "initialize") return [];
         const klass = rubyPkg.classes[rubyModule] as unknown as ClassInfo | undefined;
         if (!klass) return [];
         const initializeOf = (fqn: string) =>
           (rubyPkg.modules[fqn] as unknown as ClassInfo | undefined)?.instanceMethods.find(
             (m) => m.name === "initialize",
           );
+        const resolve = (incName: string, contextFqn: string) =>
+          resolveModuleName(incName, contextFqn, moduleFqnByShort);
+        const classFqnByShort = new Map<string, string[]>();
+        for (const fqn of Object.keys(rubyPkg.classes)) {
+          const short = fqn.split("::").pop()!;
+          classFqnByShort.set(short, [...(classFqnByShort.get(short) ?? []), fqn]);
+        }
         const ancestors = moduleAncestors(
           klass,
           rubyModule,
           rubyPkg.modules,
-          (incName, contextFqn) => resolveModuleName(incName, contextFqn, moduleFqnByShort),
+          resolve,
+          inheritedModules(
+            klass,
+            rubyModule,
+            rubyPkg.classes,
+            rubyPkg.modules,
+            resolve,
+            (name, ctx) => resolveModuleName(name, ctx, classFqnByShort),
+          ),
         );
         const sameFile = sameFileInitializeModules(klass, ancestors, rubyPkg.modules);
         const byOwner = tsInlinedFromByFileOwner.get(tsFile);
-        const tsClass =
+        const resolved =
           byOwner === undefined
             ? undefined
             : resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass;
-        if (byOwner?.has(tsClass ?? "")) inlinedTagsCompared.add(`${tsFile} ${tsClass}`);
+        const tsClass =
+          resolved !== undefined && portsSiblingClass(resolved, rubyModule, rubyPkg.classes)
+            ? undefined
+            : resolved;
+        if (tsClass !== undefined && byOwner?.has(tsClass)) {
+          inlinedTagsCompared.add(`${tsFile} ${tsClass}`);
+          const pair = { package: pkg, tsFile, owner: tsClass, rubyModule };
+          if (!inlinedFromPairs.some((p) => JSON.stringify(p) === JSON.stringify(pair)))
+            inlinedFromPairs.push(pair);
+        }
         return inlinedSegments(
           klass.instanceMethods.find((m) => m.name === "initialize"),
           ancestors,
@@ -5787,8 +5848,11 @@ export function main() {
           callSkeletons.push({
             rubyFile,
             rubyName,
+            rubyOwner: rubyModule,
+            rubySeat: level,
             tsFile: skeletonFile,
             tsName,
+            ...(tsClass !== undefined ? { tsOwner: tsClass } : {}),
             ruby: foldSkeletonTokens(rubySkeleton, "ruby", tsFolded),
             ts: tsFolded,
             rubyHelpers: sameFileHelperSkeletons(
@@ -5957,6 +6021,9 @@ export function main() {
             resolveCalleeSigs(
               portedWithArgsSigs(tsFile, ts.name),
               tsParamsByNameInDeps.get(ts.name),
+              ts.recv === undefined && tsClass !== undefined
+                ? (tsParamsByFileOwnerNameInPkg.get(tsFile)?.get(`${tsClass}#${ts.name}`) ?? [])
+                : [],
             ),
             rubyParamsByName.get(ruby.name),
           );
@@ -6166,18 +6233,6 @@ export function main() {
         }
         if (candidates.every((c) => shouldSkipArity(rubyParams, c))) return;
         const verdict = matchArityAgainst(rubyParams, candidates);
-        // Excluding also drops the pair from the compared denominator, so a
-        // justified deviation neither inflates nor deflates the arity %. Only a
-        // pair that really mismatches consumes its exclude — one on a
-        // now-matching pair stays unapplied and the gate reports it stale.
-        if (!verdict.matched) {
-          const excludeKey = arityExcludeKeyOf({ package: pkg, rubyFile, rubyName });
-          if (arityExcludes.has(excludeKey)) {
-            appliedArityExcludes.add(excludeKey);
-            arityExcluded++;
-            return;
-          }
-        }
         arityCompared++;
         if (verdict.matched) return;
         arityMismatches.push({
@@ -6394,17 +6449,17 @@ export function main() {
         }
 
         const creditedBy =
-          ownerIsModule && mixinFile === undefined && (rubyName === "initialize" || classMethodsNew)
+          ownerIsModule && mixinFile === undefined && (level === "instance" || classMethodsNew)
             ? inlinedHookCreditedBy(
                 classMethodsNew ? `${rubyModule}::ClassMethods` : rubyModule,
-                classMethodsNew ? "new" : "initialize",
+                classMethodsNew ? "new" : rubyName,
                 pkg,
                 moduleIncluderFiles.get(rubyModule) ?? new Set(),
                 tsInlinedHookTags,
               )
             : undefined;
         if (creditedBy !== undefined) {
-          checkBody(rubyName, "constructor", creditedBy.tsFile);
+          checkBody(rubyName, creditedBy.tsName, creditedBy.tsFile);
           fileMatched++;
           continue;
         }
@@ -6591,6 +6646,18 @@ export function main() {
         checkCalls("initialize", "constructor", expectedTs, fqn, "instance");
         checkCallArgs("initialize", "constructor", expectedTs, fqn, "instance");
       }
+      for (const [key, tags] of tsInlinedMethodTagsByFile.get(expectedTs) ?? []) {
+        if (inlinedTagsCompared.has(`${expectedTs} ${key}`)) continue;
+        const [owner, tsName] = key.split("#");
+        const rubyName = tags[0].hook;
+        const fqn = items.find(
+          (item) =>
+            resolveOwner(rubyName, tsName, expectedTs, item.fqn, "instance").tsClass === owner,
+        )?.fqn;
+        if (fqn === undefined) continue;
+        checkCalls(rubyName, tsName, expectedTs, fqn, "instance");
+        checkCallArgs(rubyName, tsName, expectedTs, fqn, "instance");
+      }
 
       const total = fileMatched + fileMissing;
       if (total === 0) continue;
@@ -6658,7 +6725,6 @@ export function main() {
     const inheritance: InheritanceResult = {
       checked: 0,
       matched: 0,
-      excluded: 0,
       mismatches: [],
     };
     if (tsPkg) {
@@ -6735,18 +6801,6 @@ export function main() {
         // actually declares (e.g. "ValueType", not Ruby's "Value").
         if (superclassesMatch(rubySuper, chain, tsCls.name)) {
           inheritance.matched++;
-        } else if (
-          inheritanceExcludes.has(
-            inheritanceExcludeKeyOf({ package: pkg, rubyFile: info.file, rubyFqn: fqn }),
-          )
-        ) {
-          // Reviewed deviation: drop it from the denominator rather than score
-          // it as a match, the way the arity check reports its excludes.
-          appliedInheritanceExcludes.add(
-            inheritanceExcludeKeyOf({ package: pkg, rubyFile: info.file, rubyFqn: fqn }),
-          );
-          inheritance.checked--;
-          inheritance.excluded++;
         } else {
           inheritance.mismatches.push({
             rubyFqn: fqn,
@@ -6763,6 +6817,11 @@ export function main() {
     }
 
     const uncomparedInlined = uncomparedInlinedTags(tsInlinedFromByFileOwner, inlinedTagsCompared);
+    const uncomparedMethods = uncomparedInlinedTags(tsInlinedMethodTagsByFile, inlinedTagsCompared);
+    if (callsGate && uncomparedMethods.length > 0) {
+      const where = uncomparedMethods.map((key) => `${pkg}/${key}`).join(", ");
+      throw new Error(`@inlinedFrom was never compared, no Rails method paired: ${where}`);
+    }
     if (callsGate && uncomparedInlined.length > 0) {
       const where = uncomparedInlined.map((key) => `${pkg}/${key}#constructor`).join(", ");
       throw new Error(`@inlinedFrom was never compared, no Rails \`initialize\` paired: ${where}`);
@@ -6784,7 +6843,6 @@ export function main() {
         compared: arityCompared,
         forwardingSkipped: arityForwardingSkipped,
         mismatched: arityMismatches.length,
-        excluded: arityExcluded,
         mismatches: arityMismatches,
       },
       paramNames: {
@@ -6868,9 +6926,6 @@ export function main() {
     JSON.stringify(
       {
         generatedAt: new Date().toISOString(),
-        // The inheritance gate treats every committed exclude absent from this
-        // list as stale, the same only-shrink contract arity-exclude has.
-        appliedInheritanceExcludes: [...appliedInheritanceExcludes].sort(),
         results: results.map(({ bodyHashes: _bodyHashes, ...rest }) => rest),
       },
       null,
@@ -6893,9 +6948,6 @@ export function main() {
         compared: results.reduce((n, r) => n + r.arity.compared, 0),
         forwardingSkipped: results.reduce((n, r) => n + r.arity.forwardingSkipped, 0),
         mismatched: arityFlat.length,
-        excluded: results.reduce((n, r) => n + r.arity.excluded, 0),
-        // The gate treats every committed exclude absent from this list as stale.
-        appliedExcludes: [...appliedArityExcludes].sort(),
         mismatches: arityFlat,
       },
       null,
@@ -7005,6 +7057,10 @@ export function main() {
   );
 
   if (callsGate) {
+    fs.writeFileSync(
+      path.join(OUTPUT_DIR, INLINED_FROM_PAIRS_FILE),
+      JSON.stringify(inlinedFromPairs, null, 2) + "\n",
+    );
     // Advisory calls-parity artifact (RFC 0047), flat across packages. Written
     // only under `--calls`, the mode that computes the call sets at all —
     // a plain run would otherwise overwrite it with an empty result.
@@ -7246,7 +7302,6 @@ function printReport(
   let grandInhMatched = 0;
   let grandArityCompared = 0;
   let grandArityMismatched = 0;
-  let grandArityExcluded = 0;
   let grandOptKeysCompared = 0;
   let grandOptKeysMismatched = 0;
   let grandOptKeysMissing = 0;
@@ -7273,7 +7328,6 @@ function printReport(
     grandInhMatched += pkg.inheritance.matched;
     grandArityCompared += pkg.arity.compared;
     grandArityMismatched += pkg.arity.mismatched;
-    grandArityExcluded += pkg.arity.excluded;
     grandOptKeysCompared += pkg.optionKeys.compared;
     grandOptKeysMismatched += pkg.optionKeys.mismatched;
     grandOptKeysMissing += pkg.optionKeys.mismatches.filter((m) => m.missingInTs.length > 0).length;
@@ -7291,18 +7345,13 @@ function printReport(
       pkg.excludedFiles.length > 0 ? "  (some intentionally excluded, see unported-files/)" : "";
     const inh = pkg.inheritance;
     const inhPct = inh.checked > 0 ? Math.round((inh.matched / inh.checked) * 1000) / 10 : 0;
-    const inhExcludedNote = inh.excluded > 0 ? `, ${inh.excluded} excluded` : "";
     const inhNote =
-      inh.checked > 0
-        ? `  |  inheritance: ${inh.matched}/${inh.checked} (${inhPct}%${inhExcludedNote})`
-        : "";
+      inh.checked > 0 ? `  |  inheritance: ${inh.matched}/${inh.checked} (${inhPct}%)` : "";
     const misplacedNote = pkg.misplacedFiles > 0 ? `  |  ${pkg.misplacedFiles} misplaced` : "";
     const ar = pkg.arity;
     const arOk = ar.compared - ar.mismatched;
     const arPct = ar.compared > 0 ? Math.round((arOk / ar.compared) * 1000) / 10 : 0;
-    const arExcludedNote = ar.excluded > 0 ? `, ${ar.excluded} excluded` : "";
-    const arityNote =
-      ar.compared > 0 ? `  |  arity: ${arOk}/${ar.compared} (${arPct}%${arExcludedNote})` : "";
+    const arityNote = ar.compared > 0 ? `  |  arity: ${arOk}/${ar.compared} (${arPct}%)` : "";
     const pn = pkg.paramNames;
     const pnOk = pn.compared - pn.mismatchedPairs;
     const pnPct = pn.compared > 0 ? Math.round((pnOk / pn.compared) * 1000) / 10 : 0;
@@ -7471,11 +7520,8 @@ function printReport(
   const grandArOk = grandArityCompared - grandArityMismatched;
   const arPct =
     grandArityCompared > 0 ? Math.round((grandArOk / grandArityCompared) * 1000) / 10 : 0;
-  const grandArityExcludedNote = grandArityExcluded > 0 ? `, ${grandArityExcluded} excluded` : "";
   const aritySummary =
-    grandArityCompared > 0
-      ? `  |  arity: ${grandArOk}/${grandArityCompared} (${arPct}%${grandArityExcludedNote})`
-      : "";
+    grandArityCompared > 0 ? `  |  arity: ${grandArOk}/${grandArityCompared} (${arPct}%)` : "";
   console.log(
     `  Overall: ${grandMatched}/${grandTotal} methods (${grandPct}%)  |  files: ${grandFilesExist}/${grandFiles}${inhSummary}${aritySummary}`,
   );

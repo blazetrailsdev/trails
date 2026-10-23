@@ -4,7 +4,7 @@ import "@blazetrails/activesupport/testing/autorun";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import { TestFixtures, type ClassMethods } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
-import { Module, abort } from "@blazetrails/ruby-compat";
+import { abort, rbCallSuper, rbModDefineMethod } from "@blazetrails/ruby-compat";
 import { Trails } from "./rails.js";
 
 declare module "@blazetrails/activesupport/test-case" {
@@ -45,20 +45,18 @@ onLoad("action_dispatch_integration_test", function (this: FixtureHost) {
 });
 
 onLoad("action_controller_test_case", function (this: typeof TestCase) {
-  const reopening = new Module();
-  reopening.defineMethod("beforeSetup", function (this: { routes?: unknown }) {
+  function beforeSetup(this: { routes?: unknown }) {
     this.routes = Trails.application!.routes();
-    return reopening.superMethod(this, "beforeSetup")!();
-  });
-  include(this, reopening);
+    return rbCallSuper(this, beforeSetup);
+  }
+  rbModDefineMethod(this, "beforeSetup", beforeSetup);
 });
 
 onLoad("action_dispatch_integration_test", function (this: typeof TestCase) {
-  const reopening = new Module();
-  reopening.defineMethod("beforeSetup", async function (this: { routes?: unknown }) {
+  async function beforeSetup(this: { routes?: unknown }) {
     this.routes = Trails.application!.routes();
     await Trails.application!.reloadRoutesUnlessLoaded();
-    return reopening.superMethod(this, "beforeSetup")!();
-  });
-  include(this, reopening);
+    return rbCallSuper(this, beforeSetup);
+  }
+  rbModDefineMethod(this, "beforeSetup", beforeSetup);
 });

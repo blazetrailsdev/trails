@@ -2,6 +2,9 @@ import { beforeAll, describe, it, expect } from "vitest";
 import { createProgram } from "./cli.js";
 import { VERSION } from "./version.js";
 import { Generators } from "./generators.js";
+import { lookupBang } from "./command/behavior.js";
+
+await lookupBang();
 
 beforeAll(async () => {
   await Generators.lookupBang();

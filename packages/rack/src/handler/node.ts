@@ -1,4 +1,12 @@
-import { getHttpAsync, stderr, StringIO, Thread } from "@blazetrails/ruby-compat";
+import {
+  EOFError,
+  getHttpAsync,
+  stderr,
+  StringIO,
+  TCPSocket,
+  Thread,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import type { HttpRequest, HttpResponse, HttpServer, HttpSocket } from "@blazetrails/ruby-compat";
 import {
   HTTPS,
@@ -19,26 +27,34 @@ import {
 } from "../constants.js";
 import { HTTP_STATUS_CODES } from "../utils.js";
 import { RELEASE } from "../version.js";
-import type { RackApp, RackEnv, RackResponse } from "../index.js";
+import type { RackApp, RackEnv, RackMiddleware, RackResponse } from "../index.js";
 
+/** @noRailsEquivalent PERMANENT */
 export interface Options {
+  /** @noRailsEquivalent PERMANENT */
   Port?: number;
+  /** @noRailsEquivalent PERMANENT */
   Host?: string;
 }
 
 /** @noRailsEquivalent PERMANENT */
 const unhijacked = new Set<HttpSocket>();
 
+/** @noRailsEquivalent PERMANENT */
 export class Node {
+  /** @noRailsEquivalent PERMANENT */
   static server: HttpServer | null = null;
 
-  readonly app: RackApp;
+  /** @noRailsEquivalent PERMANENT */
+  readonly app: RackApp | RackMiddleware;
 
-  constructor(app: RackApp) {
+  /** @noRailsEquivalent PERMANENT */
+  constructor(app: RackApp | RackMiddleware) {
     this.app = app;
   }
 
-  static async run(app: RackApp, options: Options = {}): Promise<HttpServer> {
+  /** @noRailsEquivalent PERMANENT */
+  static async run(app: RackApp | RackMiddleware, options: Options = {}): Promise<HttpServer> {
     const handler = new Node(app);
     const http = await getHttpAsync();
     const server = http.createServer((req, res) => {
@@ -53,6 +69,7 @@ export class Node {
     });
   }
 
+  /** @noRailsEquivalent PERMANENT */
   static async shutdown(): Promise<void> {
     const server = Node.server;
     if (!server) return;
@@ -68,17 +85,45 @@ export class Node {
   service(req: HttpRequest, res: HttpResponse): Promise<void> {
     return new Thread(async (): Promise<void> => {
       const env = await this.requestEnv(req, new StringIO(await readBody(req)));
-      env[RACK_IS_HIJACK] = false;
+      const socket = res.socket;
+      let hijacked = false;
+      let io: TCPSocket | undefined;
+      const release = (): TCPSocket => {
+        hijacked = true;
+        return (io ??= new TCPSocket(socket!));
+      };
+      env[RACK_IS_HIJACK] = socket != null;
+      if (env[RACK_IS_HIJACK]) env[RACK_HIJACK] = release;
 
-      const [status, headers, body] = await this.app(env);
       try {
-        res.writeHead(status, sentHeaders(headers));
-        for await (const chunk of body) {
-          res.write(chunk);
+        const [status, headers, body] = await (rbFSend(
+          this.app,
+          "call",
+          env,
+        ) as Promise<RackResponse>);
+        try {
+          if (hijacked) return;
+          const partial = headers[RACK_HIJACK];
+          if (env[RACK_IS_HIJACK] && typeof partial === "function") {
+            const stream = release();
+            stream.write(responseHead(status, sentHeaders(headers)));
+            await partial(stream);
+            return;
+          }
+          res.writeHead(status, sentHeaders(headers));
+          for await (const chunk of body) {
+            if (hijacked) return;
+            res.write(chunk);
+          }
+          res.end();
+        } finally {
+          await closeBody(body);
         }
-        res.end();
-      } finally {
-        await closeBody(body);
+      } catch (error) {
+        if (!hijacked) throw error;
+        stderr.write(
+          `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+        );
       }
     }).value();
   }
@@ -88,6 +133,7 @@ export class Node {
     return new Thread(async (): Promise<void> => {
       let hijacked = false;
       let started = false;
+      let io: TCPSocket | undefined;
       const discard = (): void => {
         socket.destroy();
       };
@@ -95,23 +141,65 @@ export class Node {
         hijacked = true;
         unhijacked.delete(socket);
         socket.removeListener("error", discard);
+        io ??= new TCPSocket(socket);
       };
       socket.on("error", discard);
       unhijacked.add(socket);
       socket.on("close", () => {
         unhijacked.delete(socket);
       });
-      if (head.length > 0) socket.unshift(head);
 
       try {
-        const env = await this.requestEnv(req, new StringIO(""));
+        const length = Number(header(req, "content-length") ?? 0);
+        let input: string | Uint8Array = "";
+        if (!(length > 0)) {
+          if (head.length > 0) socket.unshift(head);
+        } else {
+          if (length > MAX_BODY_SIZE) throw new Error("Request body too large");
+          const bodyBytes = new Uint8Array(length);
+          let n = Math.min(length, head.length);
+          bodyBytes.set(head.subarray(0, n));
+          if (head.length > n) socket.unshift(head.subarray(n));
+          if (n < length) {
+            await new Promise<void>((resolve, reject) => {
+              const onEnd = (): void => {
+                socket.removeListener("data", onData);
+                socket.removeListener("end", onEnd);
+                socket.removeListener("close", onEnd);
+                reject(new EOFError("end of file reached"));
+              };
+              const onData = (chunk: Uint8Array): void => {
+                const take = Math.min(length - n, chunk.length);
+                bodyBytes.set(chunk.subarray(0, take), n);
+                n += take;
+                if (n < length) return;
+                socket.pause();
+                socket.removeListener("data", onData);
+                socket.removeListener("end", onEnd);
+                socket.removeListener("close", onEnd);
+                if (take < chunk.length) socket.unshift(chunk.subarray(take));
+                resolve();
+              };
+              socket.on("data", onData);
+              socket.on("end", onEnd);
+              socket.on("close", onEnd);
+              socket.resume();
+            });
+          }
+          input = bodyBytes;
+        }
+        const env = await this.requestEnv(req, new StringIO(input));
         env[RACK_IS_HIJACK] = true;
-        env[RACK_HIJACK] = (): HttpSocket => {
+        env[RACK_HIJACK] = (): TCPSocket => {
           release();
-          return socket;
+          return io!;
         };
 
-        const [status, headers, body] = await this.app(env);
+        const [status, headers, body] = await (rbFSend(
+          this.app,
+          "call",
+          env,
+        ) as Promise<RackResponse>);
         try {
           if (hijacked) return;
           const partial = headers[RACK_HIJACK] as unknown;
@@ -119,7 +207,7 @@ export class Node {
             started = true;
             socket.write(responseHead(status, sentHeaders(headers)));
             release();
-            await (partial as (stream: HttpSocket) => unknown)(socket);
+            await (partial as (stream: TCPSocket) => unknown)(io!);
             return;
           }
           started = true;
@@ -144,7 +232,10 @@ export class Node {
   }
 
   /** @internal */
-  private async requestEnv(req: HttpRequest, input: StringIO): Promise<RackEnv> {
+  private async requestEnv(
+    req: HttpRequest,
+    input: StringIO<string | Uint8Array>,
+  ): Promise<RackEnv> {
     const env = await this.metaVars(req);
     for (const key of Object.keys(env)) {
       if (env[key] == null) delete env[key];
@@ -164,6 +255,7 @@ export class Node {
     return env;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   async metaVars(req: HttpRequest): Promise<RackEnv> {
     const scheme = req.socket.encrypted === true ? "https" : "http";
     const url = parseUri(req.url ?? "/", scheme, header(req, "host") ?? "localhost");
@@ -204,13 +296,14 @@ export class Node {
 function sentHeaders(headers: RackResponse[1]): Record<string, string | string[]> {
   const sent: Record<string, string | string[]> = {};
   const setCookie = headers[SET_COOKIE];
-  if (setCookie) {
+  if (setCookie && typeof setCookie !== "function") {
     sent[SET_COOKIE] = Array.isArray(setCookie) ? setCookie : [setCookie];
   }
 
   for (const [key, value] of Object.entries(headers)) {
     if (key.startsWith("rack.")) continue;
     if (key === SET_COOKIE) continue;
+    if (typeof value === "function") continue;
     sent[key] = Array.isArray(value) ? value.join(", ") : value;
   }
   return sent;
@@ -251,9 +344,9 @@ function header(req: HttpRequest, name: string): string | undefined {
 /** @noRailsEquivalent PERMANENT */
 const MAX_BODY_SIZE = 10 * 1024 * 1024;
 
-function readBody(req: HttpRequest): Promise<string> {
+function readBody(req: HttpRequest): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    const chunks: string[] = [];
+    const chunks: Uint8Array[] = [];
     let totalLength = 0;
     req.on("data", (chunk) => {
       totalLength += chunk.length;
@@ -262,18 +355,17 @@ function readBody(req: HttpRequest): Promise<string> {
         reject(new Error("Request body too large"));
         return;
       }
-      chunks.push(binaryString(chunk));
+      chunks.push(chunk);
     });
-    req.on("end", () => resolve(chunks.join("")));
+    req.on("end", () => {
+      const body = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        body.set(chunk, offset);
+        offset += chunk.length;
+      }
+      resolve(body);
+    });
     req.on("error", reject);
   });
-}
-
-/** @noRailsEquivalent PERMANENT */
-function binaryString(bytes: Uint8Array): string {
-  let out = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  return out;
 }

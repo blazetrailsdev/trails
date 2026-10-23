@@ -1,3 +1,4 @@
+import { publicInstanceMethods, rbFSend, rbModAncestors, rbModToS } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   include,
@@ -102,11 +103,11 @@ class HelpersTypoController extends Base {
 }
 await ActionPackTestSuiteUtils.requireHelpers(HelpersTypoController.helpersPath);
 
-const LocalAbcHelper = new Module().include({
+const LocalAbcHelper = {
   a(): void {},
   b(): void {},
   c(): void {},
-});
+};
 
 function body(response: RackResponse): string {
   return (response.at(-1) as unknown as Response).body;
@@ -114,7 +115,11 @@ function body(response: RackResponse): string {
 
 describe("HelperPathsTest", () => {
   it("helpers paths priority", async () => {
-    const responses = await HelpersPathsController.action("index")(TestRequest.defaultEnv());
+    const responses = await (rbFSend(
+      HelpersPathsController.action("index"),
+      "call",
+      TestRequest.defaultEnv(),
+    ) as Promise<RackResponse>);
 
     expect(body(responses)).toBe("pack1");
   });
@@ -224,7 +229,7 @@ describe("HelperTest", () => {
   });
 
   function callController(klass: typeof Base, action: string): Promise<RackResponse> {
-    return klass.action(action)(TestRequest.defaultEnv());
+    return rbFSend(klass.action(action), "call", TestRequest.defaultEnv()) as Promise<RackResponse>;
   }
 
   it("helper for nested controller", async () => {
@@ -239,14 +244,14 @@ describe("HelperTest", () => {
 
   it("default helpers only", () => {
     expect(
-      (JustMeController._helpers.ancestors() as Module[])
+      (rbModAncestors(JustMeController._helpers) as Module[])
         .filter((mod) => !isAnonymous(mod as { name: string }))
-        .map((mod) => mod.toS()),
+        .map((mod) => rbModToS(mod as never)),
     ).toEqual(["JustMeHelper"]);
     expect(
-      (MeTooController._helpers.ancestors() as Module[])
+      (rbModAncestors(MeTooController._helpers) as Module[])
         .filter((mod) => !isAnonymous(mod as { name: string }))
-        .map((mod) => mod.toS()),
+        .map((mod) => rbModToS(mod as never)),
     ).toEqual(["MeTooController::HelperMethods", "MeTooHelper", "JustMeHelper"]);
   });
 
@@ -259,7 +264,7 @@ describe("HelperTest", () => {
   });
 
   it("all helpers", () => {
-    const methods = AllHelpersController._helpers.instanceMethods();
+    const methods = publicInstanceMethods(AllHelpersController._helpers);
 
     expect(methods).toContain("bareA");
 
@@ -272,7 +277,7 @@ describe("HelperTest", () => {
     controllerClass.helpersPath = File.expandPath("alternate-helpers", fixtures);
     await ActionPackTestSuiteUtils.requireHelpers(controllerClass.helpersPath);
 
-    controllerClass._helpers = new Module();
+    controllerClass._helpers = {};
     controllerClass.helper(":all");
 
     expect(masterHelperMethods()).not.toContain("bareA");
@@ -318,11 +323,11 @@ describe("HelperTest", () => {
   }
 
   function expectedHelperMethods(): string[] {
-    return constants.TestHelper!.instanceMethods();
+    return publicInstanceMethods(constants.TestHelper!);
   }
 
   function masterHelperMethods(): string[] {
-    return controllerClass._helpers.instanceMethods();
+    return publicInstanceMethods(controllerClass._helpers);
   }
 
   function missingMethods(): string[] {
@@ -367,7 +372,7 @@ describe("IsolatedHelpersTest", () => {
 
   class IsolatedHelpersTest extends TestCase {
     callController(klass: typeof Base, action: string): Promise<RackResponse> {
-      return klass.action(action)(this.request.env);
+      return rbFSend(klass.action(action), "call", this.request.env) as Promise<RackResponse>;
     }
 
     override setup(): void {

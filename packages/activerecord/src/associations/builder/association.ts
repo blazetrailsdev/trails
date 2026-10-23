@@ -1,3 +1,4 @@
+import type { MacroType } from "../../reflection.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   NotImplementedError,
@@ -52,20 +53,10 @@ export class Association {
   static build(
     model: any,
     name: string,
-    scope: ((...args: any[]) => any) | null | Record<string, unknown>,
+    scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown> = {},
-    block?: (mod: Module) => void,
+    block?: (mod: Record<string, unknown>) => void,
   ): any {
-    if (
-      typeof scope === "object" &&
-      scope !== null &&
-      !Array.isArray(scope) &&
-      !(scope instanceof Function)
-    ) {
-      options = scope;
-      scope = null;
-    }
-
     if (model.isDangerousAttributeMethod(name)) {
       throw new ArgumentError(
         `You tried to define an association named ${name} on the model ${model.name}, but ` +
@@ -74,7 +65,7 @@ export class Association {
       );
     }
 
-    const reflection = this.createReflection(model, name, scope as any, options, block);
+    const reflection = this.createReflection(model, name, scope, options, block);
     this.defineAccessors(model, reflection);
     this.defineCallbacks(model, reflection);
     this.defineValidations(model, reflection);
@@ -87,7 +78,7 @@ export class Association {
     name: string,
     scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown>,
-    block?: (mod: Module) => void,
+    block?: (mod: Record<string, unknown>) => void,
   ): any {
     if (typeof name !== "string") {
       throw new ArgumentError("association names must be a Symbol");
@@ -101,7 +92,7 @@ export class Association {
     scope = this.buildScope(scope);
 
     const macro = this.macro();
-    return ActiveRecord.Reflection.create(macro as any, name, scope, options, model);
+    return ActiveRecord.Reflection.create(macro, name, scope, options, model);
   }
 
   static buildScope(scope: ((...args: any[]) => any) | null): ((...args: any[]) => any) | null {
@@ -114,7 +105,7 @@ export class Association {
     return scope;
   }
 
-  static macro(): string {
+  static macro(): Exclude<MacroType, "composedOf"> {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/builder/association.rb:62
     throw new NotImplementedError();
   }
@@ -127,7 +118,11 @@ export class Association {
     assertValidKeys(options, this.validOptions(options));
   }
 
-  static defineExtensions(_model: any, _name: string, _block?: (mod: Module) => void): any {
+  static defineExtensions(
+    _model: any,
+    _name: string,
+    _block?: (mod: Record<string, unknown>) => void,
+  ): any {
     return undefined;
   }
 

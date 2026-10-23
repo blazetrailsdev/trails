@@ -1,7 +1,7 @@
 import { CollectionAssociation } from "./collection-association.js";
 
 export class HasMany extends CollectionAssociation {
-  static override macro(): string {
+  static override macro(): "hasMany" {
     return "hasMany";
   }
 

@@ -8,6 +8,6 @@ describe("DatabaseNotSupported", () => {
 
     expect(error).toBeInstanceOf(StandardError);
     expect(error.name).toBe("ActiveRecord::Tasks::DatabaseNotSupported");
-    expect(Object.prototype.hasOwnProperty.call(error, "name")).toBe(false);
+    expect(Object.hasOwn(error, "name")).toBe(false);
   });
 });

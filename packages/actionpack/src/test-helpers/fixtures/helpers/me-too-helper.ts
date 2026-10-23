@@ -1,8 +1,8 @@
-import { Module, registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 
-export const MeTooHelper = new Module().include({
+export const MeTooHelper = {
   me(): string {
     return "me too!";
   },
-});
+};
 registerConstant("MeTooHelper", MeTooHelper);

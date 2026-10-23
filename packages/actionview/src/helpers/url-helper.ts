@@ -1,6 +1,8 @@
 import {
+  Concern,
   SafeBuffer,
   dasherize,
+  extend,
   htmlEscape,
   htmlSafe,
   isBlank,
@@ -39,7 +41,7 @@ export interface UrlHelperHost {
   _filteredReferrer(): string | null;
   isProtectAgainstForgery?(): boolean;
   formAuthenticityToken?(options: { formOptions: Record<string, unknown> }): string;
-  requestForgeryProtectionToken?: unknown;
+  requestForgeryProtectionToken?(): unknown;
 }
 
 interface UrlHelperController {
@@ -62,11 +64,11 @@ type Block = (...args: unknown[]) => unknown;
 
 export const BUTTON_TAG_METHOD_VERBS = ["patch", "put", "delete"];
 
-export class ClassMethods {
-  static _urlForModules(): typeof RoutingUrlFor {
+export const ClassMethods = {
+  _urlForModules(): typeof RoutingUrlFor {
     return RoutingUrlFor;
-  }
-}
+  },
+};
 
 export let buttonToGeneratesButtonTag: boolean = false;
 
@@ -447,7 +449,7 @@ export function tokenTag(
 ): SafeBuffer | string {
   if (
     token !== false &&
-    rbObjRespondTo(this, "isProtectAgainstForgery", true) &&
+    rbObjRespondTo(this, "isProtectAgainstForgery") &&
     this.isProtectAgainstForgery!()
   ) {
     token =
@@ -456,7 +458,7 @@ export function tokenTag(
         : token;
     return tag.call(this, "input", {
       type: "hidden",
-      name: String(this.requestForgeryProtectionToken),
+      name: String(this.requestForgeryProtectionToken!()),
       value: token,
       autocomplete: "off",
     }) as SafeBuffer;
@@ -499,7 +501,9 @@ export function toFormParams(
     params.push({ name: namespace ?? "", value: toParam(attribute) });
   }
 
-  return params.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  return params.sort((pair, other) =>
+    pair.name < other.name ? -1 : pair.name > other.name ? 1 : 0,
+  );
 }
 
 /** @internal */
@@ -512,6 +516,8 @@ export function removeTrailingSlashBang(urlString: string): string {
 }
 
 export const UrlHelper = new Module((mod) => {
+  extend(mod, Concern);
+
   mod.include(TagHelper);
   mod.include(ContentExfiltrationPreventionHelper);
 
@@ -523,4 +529,6 @@ export const UrlHelper = new Module((mod) => {
     Object.assign(m, { addMethodToAttributesBang, methodForOptions, isMethodNotGetMethod });
     Object.assign(m, { tokenTag, methodTag, toFormParams, removeTrailingSlashBang });
   });
+
+  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
 });

@@ -60,8 +60,7 @@ describe("AggregationsTest (trails)", () => {
 });
 
 describe("lazy composed_of inclusion", () => {
-  const own = (klass: typeof Base, key: string): boolean =>
-    Object.prototype.hasOwnProperty.call(klass.prototype, key);
+  const own = (klass: typeof Base, key: string): boolean => Object.hasOwn(klass.prototype, key);
 
   it("does not mix Aggregations onto models without composed_of", () => {
     class Plain extends Base {}
@@ -97,7 +96,7 @@ describe("lazy composed_of inclusion", () => {
     expect(own(SubPriced, "initializeDup")).toBe(false);
     expect(SubPriced.prototype.reload).toBe(Priced.prototype.reload);
     expect(SubPriced.prototype.reload).not.toBe(persistenceReload);
-    expect(Object.getPrototypeOf(Priced.prototype)).not.toBe(Base.prototype);
+    expect(own(Priced, "reload")).toBe(true);
     expect(Object.getPrototypeOf(SubPriced.prototype)).toBe(Priced.prototype);
   });
 });

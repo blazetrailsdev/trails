@@ -20,7 +20,9 @@ describe("RoutingInstrumentationTest", () => {
       this.get("redirect", { to: this.redirect("/login") });
     });
 
-    const event = await subscribed("redirect.action_dispatch", () => t.get("/redirect"));
+    const event = await subscribed("redirect.action_dispatch", async () => {
+      await t.get("/redirect");
+    });
 
     expect(event!.payload.status).toBe(301);
     expect(event!.payload.location).toBe("http://www.example.com/login");

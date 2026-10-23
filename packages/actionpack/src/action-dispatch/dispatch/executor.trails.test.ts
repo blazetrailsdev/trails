@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Handler, bodyFromString } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rack";
 import type { RackResponse } from "@blazetrails/rack";
 import { Thread } from "@blazetrails/ruby-compat";
 import { Executor, type ExecutorLike } from "../middleware/executor.js";
@@ -15,7 +15,7 @@ describe("Executor execution context", () => {
     };
     const mw = new Executor(async () => {
       requestThread = Thread.current();
-      return [200, {}, bodyFromString("")] as unknown as RackResponse;
+      return [200, {}, [""]] as unknown as RackResponse;
     }, executor);
 
     const server = await Handler.Node.run((env) => mw.call(env), { Port: 0, Host: "127.0.0.1" });

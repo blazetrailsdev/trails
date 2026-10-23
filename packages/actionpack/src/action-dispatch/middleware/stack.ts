@@ -1,4 +1,11 @@
-import { rbBlockGivenP } from "@blazetrails/ruby-compat";
+import {
+  RuntimeError,
+  deleteAt,
+  rbInspect,
+  insert,
+  rbBlockGivenP,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import { Notifications } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
@@ -9,9 +16,10 @@ export interface RackAppObject {
   call(env: RackEnv): Promise<RackResponse>;
 }
 export type MiddlewareBlock = (...args: any[]) => unknown;
+type MiddlewareArgs = unknown[] | [...unknown[], MiddlewareBlock];
 
 export type MiddlewareFactory = new (
-  app: RackApp,
+  app: any,
   ...args: any[]
 ) => { call(env: RackEnv): Promise<RackResponse> };
 
@@ -38,28 +46,22 @@ export class Middleware {
       : (this.klass as object).constructor.name;
   }
 
-  build(app: RackApp): RackApp {
-    const mw: RackApp | RackAppObject = new this.klass(
-      app,
-      ...this.args,
-      ...(this.block ? [this.block] : []),
-    );
-    return typeof mw === "function" ? mw : (env: RackEnv) => mw.call(env);
+  build(app: RackApp | RackAppObject): RackApp | RackAppObject {
+    return new this.klass(app, ...this.args, ...(this.block ? [this.block] : []));
   }
 
-  buildInstrumented(app: RackApp): RackApp {
-    const proxy = new InstrumentationProxy(this.build(app), this.inspect());
-    return (env: RackEnv) => proxy.call(env);
+  buildInstrumented(app: RackApp | RackAppObject): InstrumentationProxy {
+    return new InstrumentationProxy(this.build(app), this.inspect());
   }
 }
 
 export class InstrumentationProxy {
   static readonly EVENT_NAME = "process_middleware.action_dispatch";
 
-  private _middleware: RackApp;
+  private _middleware: RackApp | RackAppObject;
   private _payload: { middleware: string };
 
-  constructor(middleware: RackApp, className: string) {
+  constructor(middleware: RackApp | RackAppObject, className: string) {
     this._middleware = middleware;
 
     this._payload = {
@@ -67,9 +69,12 @@ export class InstrumentationProxy {
     };
   }
 
+  /** @missingRailsName payload — PERMANENT */
   call(env: RackEnv): Promise<RackResponse> {
-    return Notifications.instrument(InstrumentationProxy.EVENT_NAME, this._payload, () =>
-      this._middleware(env),
+    return Notifications.instrument(
+      InstrumentationProxy.EVENT_NAME,
+      this._payload,
+      () => rbFSend(this._middleware, "call", env) as Promise<RackResponse>,
     );
   }
 }
@@ -89,18 +94,12 @@ export class MiddlewareStack implements Iterable<Middleware> {
     this.entries = value;
   }
 
-  get length(): number {
-    return this.entries.length;
-  }
-
   get size(): number {
     return this.entries.length;
   }
 
-  dup(): this {
-    const copy = new (this.constructor as new () => this)();
-    copy.middlewares = [...this.entries];
-    return copy;
+  initializeCopy(other: MiddlewareStack): void {
+    this.middlewares = [...other.middlewares];
   }
 
   isAny(): boolean {
@@ -115,14 +114,18 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return this.entries[this.entries.length - 1];
   }
 
-  unshift(klass: MiddlewareFactory, ...args: unknown[]): void {
+  unshift(klass: MiddlewareFactory, ...args: MiddlewareArgs): void {
     const block = rbBlockGivenP(args[args.length - 1])
       ? (args.pop() as MiddlewareBlock)
       : undefined;
     this.middlewares.unshift(this.buildMiddleware(klass, args, block));
   }
 
-  insert(index: MiddlewareFactory | number, klass: MiddlewareFactory, ...args: unknown[]): void {
+  insert(
+    index: MiddlewareFactory | number,
+    klass: MiddlewareFactory,
+    ...args: MiddlewareArgs
+  ): void {
     const block = rbBlockGivenP(args[args.length - 1])
       ? (args.pop() as MiddlewareBlock)
       : undefined;
@@ -138,12 +141,12 @@ export class MiddlewareStack implements Iterable<Middleware> {
     this.insert(index, klass, ...args);
   }
 
-  insertAfter(index: MiddlewareFactory | number, ...args: unknown[]): void {
+  insertAfter(index: MiddlewareFactory | number, ...args: MiddlewareArgs): void {
     index = this.assertIndex(index, "after");
     this.insert(index + 1, ...(args as [MiddlewareFactory, ...unknown[]]));
   }
 
-  swap(target: MiddlewareFactory | number, ...args: unknown[]): void {
+  swap(target: MiddlewareFactory | number, ...args: MiddlewareArgs): void {
     const index = this.assertIndex(target, "before");
     this.insert(index, ...(args as [MiddlewareFactory, ...unknown[]]));
     this.middlewares.splice(index + 1, 1);
@@ -163,17 +166,17 @@ export class MiddlewareStack implements Iterable<Middleware> {
   deleteBang(target: MiddlewareFactory): Middleware[] {
     const rejected = this.delete(target);
     if (rejected === null) {
-      throw new Error(`No such middleware to remove: ${target.name}`);
+      throw new RuntimeError(`No such middleware to remove: ${rbInspect(target)}`);
     }
     return rejected;
   }
 
   move(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {
     const sourceIndex = this.assertIndex(source, "before");
-    const [sourceMiddleware] = this.entries.splice(sourceIndex, 1);
+    const sourceMiddleware = deleteAt(this.middlewares, sourceIndex)!;
 
     const targetIndex = this.assertIndex(target, "before");
-    this.entries.splice(targetIndex, 0, sourceMiddleware);
+    insert(this.middlewares, targetIndex, sourceMiddleware);
   }
 
   moveBefore(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {
@@ -182,25 +185,25 @@ export class MiddlewareStack implements Iterable<Middleware> {
 
   moveAfter(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {
     const sourceIndex = this.assertIndex(source, "after");
-    const [sourceMiddleware] = this.entries.splice(sourceIndex, 1);
+    const sourceMiddleware = deleteAt(this.middlewares, sourceIndex)!;
 
     const targetIndex = this.assertIndex(target, "after");
-    this.entries.splice(targetIndex + 1, 0, sourceMiddleware);
+    insert(this.middlewares, targetIndex + 1, sourceMiddleware);
   }
 
-  use(klass: MiddlewareFactory, ...args: unknown[]): void {
+  use(klass: MiddlewareFactory, ...args: MiddlewareArgs): void {
     const block = rbBlockGivenP(args[args.length - 1])
       ? (args.pop() as MiddlewareBlock)
       : undefined;
     this.middlewares.push(this.buildMiddleware(klass, args, block));
   }
 
-  includes(klass: MiddlewareFactory): boolean {
-    return this.indexOf(klass) !== -1;
+  includes(obj: unknown): boolean {
+    return this.middlewares.some((m) => m.equals(obj) === true);
   }
 
-  get(index: number): Middleware | undefined {
-    return this.entries[index];
+  get(i: number): Middleware | undefined {
+    return this.entries[i];
   }
 
   toArray(): Middleware[] {
@@ -212,27 +215,25 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return this.entries[Symbol.iterator]();
   }
 
-  build(app: RackApp | RackAppObject): RackApp {
+  build(app: RackApp | RackAppObject): RackApp | RackAppObject {
     const instrumenting = Notifications.notifier.listening(InstrumentationProxy.EVENT_NAME);
     const middlewares = Object.freeze(this.middlewares);
-    let current: RackApp = typeof app === "function" ? app : (env: RackEnv) => app.call(env);
+    let a: RackApp | RackAppObject = app;
     for (let i = middlewares.length - 1; i >= 0; i--) {
       if (instrumenting) {
-        current = middlewares[i].buildInstrumented(current);
+        a = middlewares[i].buildInstrumented(a);
       } else {
-        current = middlewares[i].build(current);
+        a = middlewares[i].build(a);
       }
     }
-    return current;
+    return a;
   }
 
   /** @internal */
   assertIndex(index: number | MiddlewareFactory, where: "before" | "after"): number {
     const i = typeof index === "number" ? index : this.indexOf(index);
     if (i === -1) {
-      throw new Error(
-        `No such middleware to insert ${where}: ${typeof index === "number" ? index : index.name}`,
-      );
+      throw new RuntimeError(`No such middleware to insert ${where}: ${rbInspect(index)}`);
     }
     return i;
   }

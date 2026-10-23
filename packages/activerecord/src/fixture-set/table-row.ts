@@ -3,30 +3,21 @@ import type { Base } from "../base.js";
 import { FixtureSet, type Fixture } from "../fixtures.js";
 import type { TableRows } from "./table-rows.js";
 import type { ModelMetadata } from "./model-metadata.js";
-
-interface FixtureReflection {
-  name: string;
-  macro: string;
-  options: { through?: unknown };
-  joinTable?: string;
-  foreignKey(): string | string[];
-  joinForeignKey: string | string[];
-  joinForeignType: string | null;
-  joinPrimaryKey(): string | string[];
-  isPolymorphic(): boolean;
-  klass: typeof Base;
-  throughReflection: FixtureReflection & { tableName: string };
-}
+import type {
+  AssociationReflection,
+  BelongsToReflection,
+  ThroughReflection,
+} from "../reflection.js";
 
 export class ReflectionProxy {
-  protected _association: FixtureReflection;
+  protected _association: AssociationReflection | ThroughReflection;
 
-  constructor(association: FixtureReflection) {
+  constructor(association: AssociationReflection | ThroughReflection) {
     this._association = association;
   }
 
   get joinTable(): string {
-    return this._association.joinTable!;
+    return this._association.joinTable;
   }
 
   get name(): string {
@@ -45,20 +36,20 @@ export class HasManyThroughProxy extends ReflectionProxy {
   }
 
   get lhsKey(): string | string[] {
-    return this._association.throughReflection.foreignKey();
+    return this._association.throughReflection!.foreignKey();
   }
 
   override get joinTable(): string {
-    return this._association.throughReflection.tableName;
+    return this._association.throughReflection!.tableName!;
   }
 
   get timestampColumnNames(): readonly string[] {
-    return this._association.throughReflection.klass.allTimestampAttributesInModel();
+    return this._association.throughReflection!.klass.allTimestampAttributesInModel();
   }
 }
 
 export class PrimaryKeyError extends Error {
-  constructor(label: string, association: FixtureReflection, value: unknown) {
+  constructor(label: string, association: AssociationReflection, value: unknown) {
     super(
       `Unable to set ${association.name} to ${String(value)} because the association has a\n` +
         `custom primary key (${String(association.joinPrimaryKey())}) that does not match the\n` +
@@ -181,9 +172,7 @@ export class TableRow {
   }
 
   private resolveStiReflections(): void {
-    for (const association of Object.values(
-      this.reflectionClass._reflections,
-    ) as unknown as FixtureReflection[]) {
+    for (const association of Object.values(this.reflectionClass._reflections)) {
       switch (association.macro) {
         case "belongsTo": {
           const fkName = association.joinForeignKey;
@@ -197,7 +186,7 @@ export class TableRow {
               const match = (value as string).match(/\s*\(([^)]*)\)\s*$/);
               if (match) {
                 value = (value as string).slice(0, match.index);
-                this._row[association.joinForeignType!] = match[1];
+                this._row[(association as BelongsToReflection).joinForeignType!] = match[1];
               }
             } else if (
               JSON.stringify(association.joinPrimaryKey()) !==

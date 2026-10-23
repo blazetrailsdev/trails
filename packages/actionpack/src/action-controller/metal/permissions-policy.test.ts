@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../base.js";
 import { PermissionsPolicy } from "../../action-dispatch/http/permissions-policy.js";
-import { Request } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
+import { Request } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 
 const POLICY = new PermissionsPolicy((p) => {
   p.gyroscope(":self");

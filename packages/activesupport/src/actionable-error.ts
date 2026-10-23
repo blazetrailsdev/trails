@@ -2,6 +2,10 @@ import { KeyError, fetch } from "@blazetrails/ruby-compat";
 import { classAttribute } from "./class-attribute.js";
 
 export class NonActionable extends Error {
+  static toString(): string {
+    return "ActiveSupport::ActionableError::NonActionable";
+  }
+
   constructor(message: string) {
     super(message);
     this.name = "NonActionable";
@@ -10,7 +14,7 @@ export class NonActionable extends Error {
 
 export class ActionableError extends Error {
   declare static _actions: Record<string, () => void>;
-  declare static is_actions: boolean;
+  declare static _isActions: boolean;
 
   static {
     classAttribute.call(this, "_actions", { default: {} });
@@ -64,7 +68,7 @@ export class ActionableError extends Error {
   }
 
   static action(name: string, block: () => void): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_actions")) {
+    if (!Object.hasOwn(this, "_actions")) {
       const parentActions = this._actions || {};
       Object.defineProperty(this, "_actions", {
         value: { ...parentActions },

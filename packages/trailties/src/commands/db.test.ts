@@ -48,6 +48,9 @@ function migrationContextFor(
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { lookupBang } from "../command/behavior.js";
+
+await lookupBang();
 
 let migrationAdapters = 0;
 async function establishMigrationConnection(

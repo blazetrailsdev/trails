@@ -31,6 +31,320 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "actionview:template/render_test.rb › render location conditional append 2": [
+    {
+      kind: "assert_instance_of",
+      value: null,
+      as: "assert_equal",
+      reason:
+        "template/render_test.rb:254 `assert_instance_of Integer` — a Ruby Integer is a JS number primitive, which is not `instanceof` any class, so the port asserts `rbObjClass` answers `rbCInteger`",
+    },
+  ],
+  "actionview:template/tag_helper_test.rb › TagHelperTest › content tag": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (CLAUDE.md § "A Ruby Symbol is a JS string, never a JS `Symbol`"; template/tag_helper_test.rb:220)',
+    },
+  ],
+  "actionview:template/tag_helper_test.rb › TagHelperTest › tag builder with content": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (CLAUDE.md § "A Ruby Symbol is a JS string, never a JS `Symbol`"; template/tag_helper_test.rb:233)',
+    },
+  ],
+  "activejob:cases/argument_serialization_test.rb › ArgumentSerializationTest › should maintain a functional duration":
+    [
+      {
+        kind: "assert_kind_of",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'argument_serialization_test.rb:215 `assert_kind_of Hash, duration.parts` — a Ruby Hash is a plain JS object (CLAUDE.md, "A Ruby Hash is a plain object unless it needs a `Hash` feature"), which no JS `instanceof` can test; the port asserts `rbObjIsKindOf(duration.parts, Hash)` equals true',
+      },
+    ],
+  "actionview:template/output_safety_helper_test.rb › OutputSafetyHelperTest › safe_join should return the safe string separated by $, when second argument is not passed":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:a|b",
+        as: null,
+        reason:
+          "Ruby's `$,` output field separator is a process global that `safe_join` reads as its default `sep` (`output_safety_helper.rb:33`); JS has no output field separator to set, so there is no `|` default to join with (template/output_safety_helper_test.rb:50)",
+      },
+    ],
+  "actionview:template/form_helper_test.rb › FormHelperTest › explicit name": [
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1413)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1417)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1421)",
+    },
+  ],
+  "actionview:template/form_helper_test.rb › FormHelperTest › explicit id": [
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1440)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1444)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1448)",
+    },
+  ],
+  "actionview:template/form_helper_test.rb › FormHelperTest › nil id": [
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1475)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1479)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1483)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1487)",
+    },
+  ],
+  "actionview:template/form_helper_test.rb › FormHelperTest › index with nil id": [
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1533)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1537)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1541)",
+    },
+  ],
+  "actionview:template/form_collections_helper_test.rb › FormCollectionsHelperTest › collection radio correctly builds unique DOM IDs for float values":
+    [
+      {
+        kind: "assert_select",
+        value: "s:label[for=user_name_1_0]",
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:57)',
+      },
+      {
+        kind: "assert_select",
+        value: 's:input#user_name_1_0[type=radio][value="1.0"]',
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:59)',
+      },
+    ],
+  "actionview:template/form_collections_helper_test.rb › FormCollectionsHelperTest › collection check boxes correctly builds unique DOM IDs for float values":
+    [
+      {
+        kind: "assert_select",
+        value: "s:label[for=user_name_1_0]",
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:326)',
+      },
+      {
+        kind: "assert_select",
+        value: 's:input#user_name_1_0[type=checkbox][value="1.0"]',
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:328)',
+      },
+    ],
+  "actionview:template/date_helper_test.rb › DateHelperTest › object select html safety": [
+    {
+      kind: "assert_predicate",
+      value: null,
+      as: null,
+      reason:
+        'template/date_helper_test.rb:3670 `time_select` over a Date reaches `Date#min` through `send`, a private method (`date_core.c:9774`); a JS method entry carries no visibility, so porting it would make every Date `respond_to?(:min)` (CLAUDE.md, "Method visibility is compile-time only")',
+    },
+  ],
+  "actionview:template/template_test.rb › TestERBTemplate › no magic comment word with utf 8": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'template/template_test.rb:150 `render.encoding` is Encoding::UTF_8 — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+    },
+  ],
+  "actiondispatch:dispatch/test_response_test.rb › TestResponseTest › JSON response Hash pattern matching":
+    [
+      {
+        kind: "assert_pattern",
+        value: null,
+        as: "assert_match",
+        reason:
+          "dispatch/test_response_test.rb:45 `assert_pattern { x => pattern }` is Ruby rightward pattern matching, which has no JS syntax; the port matches the same pattern with `toMatchObject`",
+      },
+    ],
+  "actiondispatch:dispatch/test_response_test.rb › TestResponseTest › JSON response Array pattern matching":
+    [
+      {
+        kind: "assert_pattern",
+        value: null,
+        as: "assert_match",
+        reason:
+          "dispatch/test_response_test.rb:50 `assert_pattern { x => pattern }` is Ruby rightward pattern matching, which has no JS syntax; the port matches the same pattern with `toMatchObject`",
+      },
+    ],
+  "actiondispatch:dispatch/param_builder_test.rb › ParamBuilderTest › simple query string": [
+    {
+      kind: "assert_instance_of",
+      value: null,
+      as: "assert_nil",
+      reason:
+        'dispatch/param_builder_test.rb:15 `result` is a HashWithIndifferentAccess; trails params are a null-prototype plain object, so the port asserts the prototype is null (packages/actionpack/CLAUDE.md, "Request params are a null-prototype plain object")',
+    },
+  ],
+  "actiondispatch:dispatch/param_builder_test.rb › ParamBuilderTest › nested parameters": [
+    {
+      kind: "assert_instance_of",
+      value: null,
+      as: "assert_nil",
+      reason:
+        'dispatch/param_builder_test.rb:21 `result[:foo]` is a HashWithIndifferentAccess; trails params are a null-prototype plain object, so the port asserts the prototype is null (packages/actionpack/CLAUDE.md, "Request params are a null-prototype plain object")',
+    },
+  ],
+  "actiondispatch:dispatch/system_testing/driver_test.rb › DriverTest › initializing the driver with a browser":
+    [
+      {
+        kind: "assert_instance_of",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'dispatch/system_testing/driver_test.rb:17 `@browser.options` is a Playwright `LaunchOptions` plain object with no browser-specific options class, so its `args` are asserted (packages/actionpack/CLAUDE.md, "System testing runs on Vitest")',
+      },
+    ],
+  "actiondispatch:dispatch/system_testing/driver_test.rb › DriverTest › initializing the driver with a headless chrome":
+    [
+      {
+        kind: "assert_instance_of",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'dispatch/system_testing/driver_test.rb:26 `@browser.options` is a Playwright `LaunchOptions` plain object with no browser-specific options class, so its `args` are asserted (packages/actionpack/CLAUDE.md, "System testing runs on Vitest")',
+      },
+    ],
+  "actiondispatch:dispatch/system_testing/driver_test.rb › DriverTest › initializing the driver with a headless firefox":
+    [
+      {
+        kind: "assert_instance_of",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'dispatch/system_testing/driver_test.rb:45 `@browser.options` is a Playwright `LaunchOptions` plain object with no browser-specific options class, so its `args` are asserted (packages/actionpack/CLAUDE.md, "System testing runs on Vitest")',
+      },
+    ],
+  "actiondispatch:dispatch/request/session_test.rb › Request › SessionTest › dig": [
+    {
+      kind: "assert_nil",
+      value: null,
+      as: null,
+      reason:
+        'dispatch/request/session_test.rb:135 `assert_nil session.dig("one", :two)` — misses because `:two` is a Symbol and the stored key a String; a Ruby Symbol is a JS string (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`")',
+    },
+  ],
+  "actiondispatch:dispatch/uploaded_file_test.rb › UploadedFileTest › filename is different object":
+    [
+      {
+        kind: "assert_not_equal",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'dispatch/uploaded_file_test.rb:23 `assert_not_equal file_str.object_id, uf.original_filename.object_id` — a JS string has no identity, so the port asserts the copied value (CLAUDE.md, "Ruby Strings are JS string primitives")',
+      },
+    ],
+  "actiondispatch:dispatch/request/multipart_params_parsing_test.rb › MultipartParamsParsingTest › parses utf8 filename with percent character":
+    [
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/request/multipart_params_parsing_test.rb:86 `file.original_filename` is a binary String decoded only by UploadedFile#initialize\'s encode! rescue arm — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+    ],
+  "actiondispatch:dispatch/request/multipart_params_parsing_test.rb › MultipartParamsParsingTest › parses mixed files":
+    [
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/request/multipart_params_parsing_test.rb:139 `files.bytesize` — rack.input stays one byte per character, but tag_multipart_encoding `body.force_encoding(UTF_8)` (rack parser.rb:483) only re-tags in Ruby; with no tag to set, forceEncoding must decode, and invalid UTF-8 cannot survive as a JS string — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+    ],
+  "actiondispatch:dispatch/response_test.rb › ResponseTest › respond_to? accepts include_private": [
+    {
+      kind: "assert",
+      value: null,
+      as: null,
+      reason:
+        'dispatch/response_test.rb:381 `assert @response.respond_to?(:method_missing, true)` — a JS method entry carries no visibility, so no private `method_missing` exists to answer only at `include_private` (CLAUDE.md, "Method visibility is compile-time only")',
+    },
+  ],
   "activerecord:connection_pool_test.rb › pin connection synchronize the connection": [
     {
       kind: "assert_equal",
@@ -135,6 +449,16 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'base_test.rb:991 `assert_equal("c", duped_topic.title)` — reads the `duped_topic.title.replace "c"` of :979 back after save; a JS string cannot be mutated in place (CLAUDE.md, "Ruby Strings are JS string primitives")',
     },
   ],
+  "activerecord:fixtures_test.rb › FixturesWithoutInstantiationTest › visibility of accessor method":
+    [
+      {
+        kind: "assert_equal",
+        value: "b:false",
+        as: null,
+        reason:
+          'fixtures_test.rb:771 `assert_equal false, respond_to?(:topics, false)` — a JS method entry carries no visibility, so a fixture accessor answers `respond_to?` at both `include_private` values (CLAUDE.md, "Method visibility is compile-time only")',
+      },
+    ],
   "activerecord:connection_adapters/standalone_connection_test.rb › StandaloneConnectionTest › async fallback":
     [
       {
@@ -296,6 +620,30 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
           "safe_buffer_test.rb:195 `assert_kind_of NilClass` — JS `null` is not an instance of any class, and nil is NilClass's only instance, so the check is `assert_nil`",
       },
     ],
+  "actiondispatch:dispatch/routing_test.rb › TestUrlGenerationErrors › URL helpers raise message with mixed parameters when generation fails":
+    [
+      {
+        kind: "assert_raises",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/routing_test.rb:4966-4977 `{ id: nil, "id" => "url-tested" }`, in the call and in the expected message — a Ruby Symbol is a JS string, so a JS object cannot hold both `:id` and `"id"` (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`"; packages/actionpack/CLAUDE.md, "A `null` positional keeps its url-helper slot")',
+      },
+      {
+        kind: "assert_match",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/routing_test.rb:4966-4977 `{ id: nil, "id" => "url-tested" }`, in the call and in the expected message — a Ruby Symbol is a JS string, so a JS object cannot hold both `:id` and `"id"` (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`"; packages/actionpack/CLAUDE.md, "A `null` positional keeps its url-helper slot")',
+      },
+      {
+        kind: "assert_match",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/routing_test.rb:4966-4977 `{ id: nil, "id" => "url-tested" }`, in the call and in the expected message — a Ruby Symbol is a JS string, so a JS object cannot hold both `:id` and `"id"` (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`"; packages/actionpack/CLAUDE.md, "A `null` positional keeps its url-helper slot")',
+      },
+    ],
   "actioncontroller:controller/routing_test.rb › LegacyRouteSetTests › id encoding": [
     {
       kind: "assert_equal",
@@ -369,6 +717,104 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
       as: "assert_equal",
       reason:
         "cruby/buffer_spec.rb:595 `expect(subject).to_not respond_to :clone` — vitest has no respond_to matcher, and ActiveSupport's `assertNotRespondTo` is out of reach because activesupport depends on msgpack; the port asserts `rbObjRespondTo(...)` equals false",
+    },
+  ],
+  "ruby-compat:library/yaml/to_yaml_spec.rb › Object#to_yaml › returns the YAML representation of a FalseClass":
+    [
+      {
+        kind: "should_be_kind_of",
+        value: null,
+        as: "should_==",
+        reason:
+          "library/yaml/to_yaml_spec.rb:35 `should be_kind_of(FalseClass)` — a JS boolean has no FalseClass/TrueClass; the port asserts its typeof",
+      },
+    ],
+  "ruby-compat:library/yaml/to_yaml_spec.rb › Object#to_yaml › returns the YAML representation of a Float object":
+    [
+      {
+        kind: "should_be_kind_of",
+        value: null,
+        as: "should_==",
+        reason:
+          "library/yaml/to_yaml_spec.rb:41 `should be_kind_of(Float)` — a JS number has no Float class; the port asserts its typeof",
+      },
+    ],
+  "ruby-compat:library/yaml/to_yaml_spec.rb › Object#to_yaml › returns the YAML representation of an Integer object":
+    [
+      {
+        kind: "should_be_kind_of",
+        value: null,
+        as: "should_==",
+        reason:
+          "library/yaml/to_yaml_spec.rb:47 `should be_kind_of(Integer)` — a JS number has no Integer class; the port asserts Number.isInteger",
+      },
+    ],
+  "ruby-compat:library/yaml/to_yaml_spec.rb › Object#to_yaml › returns the YAML representation of a NilClass object":
+    [
+      {
+        kind: "should_be_kind_of",
+        value: null,
+        as: "should_be_nil",
+        reason:
+          "library/yaml/to_yaml_spec.rb:53 `should be_kind_of(NilClass)` — JS null has no NilClass; the port asserts toBeNull",
+      },
+    ],
+  "ruby-compat:library/yaml/to_yaml_spec.rb › Object#to_yaml › returns the YAML representation of a TrueClass":
+    [
+      {
+        kind: "should_be_kind_of",
+        value: null,
+        as: "should_==",
+        reason:
+          "library/yaml/to_yaml_spec.rb:85 `should be_kind_of(TrueClass)` — a JS boolean has no FalseClass/TrueClass; the port asserts its typeof",
+      },
+    ],
+  "ruby-compat:library/yaml/to_yaml_spec.rb › Object#to_yaml › returns the YAML representation of numeric constants":
+    [
+      {
+        kind: "should_match_yaml",
+        value: null,
+        as: null,
+        reason:
+          "library/yaml/to_yaml_spec.rb:105 `(0.0).to_yaml` is `--- 0.0` — `0.0` and `0` are one JS number, so no Float exists to dump with a fraction",
+      },
+    ],
+  "rack:spec_request.rb › RackRequestTest › return values for the keys in the order given from values_at":
+    [
+      {
+        kind: "assert_output",
+        value: "x:nil",
+        as: "assert_match",
+        reason:
+          "spec_request.rb:802 `assert_output(nil, /deprecated/)` swaps `$stderr` for a StringIO; Node's stderr is a stream with no reassignable global, so the port captures the `Kernel#warn` call that writes it and matches its message",
+      },
+    ],
+  "rack:spec_request.rb › RackRequestTest › TestProxyRequest › return values for the keys in the order given from values_at":
+    [
+      {
+        kind: "assert_output",
+        value: "x:nil",
+        as: "assert_match",
+        reason:
+          "spec_request.rb:802 `assert_output(nil, /deprecated/)` swaps `$stderr` for a StringIO; Node's stderr is a stream with no reassignable global, so the port captures the `Kernel#warn` call that writes it and matches its message",
+      },
+    ],
+  "rack:spec_multipart.rb › parses multipart/mixed": [
+    {
+      kind: "must_be_instance_of",
+      value: null,
+      as: "must_equal",
+      reason:
+        'spec_multipart.rb:517 `must_be_instance_of String` — a Ruby String is a JS string primitive, which is not `instanceof String`, so its `typeof` is asserted (CLAUDE.md, "Ruby Strings are JS string primitives")',
+    },
+  ],
+  "rack:spec_multipart.rb › falls back to content-type for the name": [
+    {
+      kind: "must_equal",
+      value: "n:26473",
+      as: null,
+      reason:
+        'spec_multipart.rb:1030 `f.length` is the byte size of an image/png part that tag_multipart_encoding re-tags UTF-8 (parser.rb:483); with no tag to set, forceEncoding must decode, and invalid UTF-8 cannot survive as a JS string (CLAUDE.md, "A String has no encoding tag either")',
     },
   ],
 };

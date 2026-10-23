@@ -9,13 +9,7 @@ import {
   assertRaise,
   assertRaises,
 } from "@blazetrails/activesupport";
-import {
-  Module,
-  include,
-  rbModConstSet,
-  regexpEscape,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { include, rbModConstSet, regexpEscape, registerConstant } from "@blazetrails/ruby-compat";
 import { Nodes } from "@blazetrails/arel";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
@@ -115,7 +109,7 @@ describe("InheritanceTest", () => {
       Company.computeType("NonexistentModel");
     });
     expect(e.message).toMatch("uninitialized constant Company::NonexistentModel");
-    expect((e as NameError).constantName).toBe("Company::NonexistentModel");
+    expect(e.constantName).toBe("Company::NonexistentModel");
   });
 
   it.skip("compute type no method error", () => {
@@ -598,7 +592,7 @@ describe("InheritanceComputeTypeTest", () => {
 });
 
 describe("InheritanceAttributeTest", () => {
-  const InheritanceAttributeTest = new Module();
+  const InheritanceAttributeTest = {};
   registerConstant("InheritanceAttributeTest", InheritanceAttributeTest);
   fixtures(["companies"]);
 
@@ -638,7 +632,7 @@ describe("InheritanceAttributeTest", () => {
 });
 
 describe("InheritanceAttributeMappingTest", () => {
-  const InheritanceAttributeMappingTest = new Module();
+  const InheritanceAttributeMappingTest = {};
   registerConstant("InheritanceAttributeMappingTest", InheritanceAttributeMappingTest);
   fixtures(["companies", "sponsors"]);
 

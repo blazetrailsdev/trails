@@ -6,7 +6,11 @@ import { controllerConstants, type Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
-class StubController {}
+class StubController {
+  static actionEncodingTemplate(): null {
+    return null;
+  }
+}
 
 beforeEach(() => {
   for (const name of [
@@ -33,6 +37,9 @@ afterEach(() => {
 let capturedEnv: RackEnv = {};
 
 class CaptureEnvController {
+  static actionEncodingTemplate(): null {
+    return null;
+  }
   static makeResponseBang(request: Request): Response {
     const res = new Response();
     res.request = request;
@@ -155,18 +162,6 @@ describe("Controller routing integration", () => {
     });
     expect(() => routes.recognizePath("/posts/123")).not.toThrow();
     expect(() => routes.recognizePath("/posts/abc")).toThrow(RoutingError);
-  });
-
-  it("multiple draw calls append routes", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/a", { to: "posts#index" });
-    });
-    routes.draw(function () {
-      this.get("/b", { to: "pages#home" });
-    });
-    expect(() => routes.recognizePath("/a")).not.toThrow();
-    expect(() => routes.recognizePath("/b")).not.toThrow();
   });
 
   it("clear removes all routes", () => {

@@ -157,7 +157,7 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
     });
 
     await pirate.update({
-      shipAttributes: { name: "Black Pearl" },
+      ship_attributes: { name: "Black Pearl" },
       catchphrase: "Aye",
     });
 
@@ -195,9 +195,9 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
 
   it("assigns constructor nested attributes without the property setter", async () => {
     Pirate.acceptsNestedAttributesFor("ship");
-    expect(Object.getOwnPropertyDescriptor(Pirate.prototype, "shipAttributes")).toBeUndefined();
+    expect(Object.getOwnPropertyDescriptor(Pirate.prototype, "ship_attributes")).toBeUndefined();
 
-    const pirate = new Pirate({ catchphrase: "Arr", shipAttributes: { name: "Black Pearl" } });
+    const pirate = new Pirate({ catchphrase: "Arr", ship_attributes: { name: "Black Pearl" } });
     await pirate.saveBang();
     expect(
       cols((await Ship.where({ pirate_id: readAttr(pirate, "id") }).first()) as Base).name,
@@ -205,7 +205,7 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
 
     const created = await Pirate.createBang({
       catchphrase: "Aye",
-      shipAttributes: { name: "Flying Dutchman" },
+      ship_attributes: { name: "Flying Dutchman" },
     });
     expect(
       cols((await Ship.where({ pirate_id: readAttr(created, "id") }).first()) as Base).name,
@@ -242,7 +242,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
 
     try {
       await pirate.assignAttributes({
-        shipAttributes: { name: "The Black Rock" },
+        ship_attributes: { name: "The Black Rock" },
         catchphrase: "Aye",
       });
     } finally {
@@ -261,7 +261,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     await (pirate as unknown as { ship: Promise<Base | null> }).ship;
 
     expect(
-      await pirate.setAttributes({ shipAttributes: { name: "Davy Jones Gold Dagger" } }),
+      await pirate.setAttributes({ ship_attributes: { name: "Davy Jones Gold Dagger" } }),
     ).toBeUndefined();
     await pirate.save();
 
@@ -343,8 +343,8 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     };
 
     await pirate.setAttributes({
-      shipAttributes: { name: "Davy Jones Gold Dagger" },
-      parrotsAttributes: { foo: { name: "Posideons Killer" } },
+      ship_attributes: { name: "Davy Jones Gold Dagger" },
+      parrots_attributes: { foo: { name: "Posideons Killer" } },
     });
 
     expect(events).toEqual(["remove_target!:start", "remove_target!:end", "parrots"]);
@@ -377,8 +377,8 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     };
 
     await (pirate as unknown as { update(a: Record<string, unknown>): Promise<unknown> }).update({
-      shipAttributes: { name: "Davy Jones Gold Dagger" },
-      parrotsAttributes: { foo: { name: "Posideons Killer" } },
+      ship_attributes: { name: "Davy Jones Gold Dagger" },
+      parrots_attributes: { foo: { name: "Posideons Killer" } },
     });
 
     expect(events.slice(0, 3)).toEqual(["remove_target!:start", "remove_target!:end", "parrots"]);
@@ -407,7 +407,7 @@ describe("nested attributes destroy dispatch (trails-only)", () => {
     };
     try {
       await (pirate as unknown as { update(a: Record<string, unknown>): Promise<unknown> }).update({
-        shipAttributes: { id: ship.id, _destroy: "1" },
+        ship_attributes: { id: ship.id, _destroy: "1" },
       });
     } finally {
       Ship.prototype.markForDestruction = original;
@@ -508,7 +508,7 @@ describe("nested attributes existing record lookup (trails-only)", () => {
   it("builds a blank-string id's attributes on a record under construction", async () => {
     const pirate = new Pirate({
       catchphrase: "Arr",
-      birdsAttributes: [{ id: "", name: "Blank" }],
+      birds_attributes: [{ id: "", name: "Blank" }],
     });
     await pirate.save();
 

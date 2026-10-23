@@ -31,7 +31,48 @@ Every route around it was tried and each one loses more fidelity than it buys:
   module function, or as a class property) does not help: the check follows any
   inheritance path, `override` keyword or not.
 
-## Call-time constant resolution (Ruby autoload → the zero-import slot)
+## Call-time constant resolution (Ruby autoload → ES imports)
+
+**The "ESM has no equivalent" premise was corrected on 2026-10-22** (RFC 0205,
+ruled by the repo owner). The section had read "Every `import` is eager and
+evaluated before the importing module's body, so naming a constant in a method
+body still costs a module-eval edge", and the second half does not follow from
+the first: an ESM import binding is live and is read when the expression runs,
+so a binding named inside a method body is resolved at call time — what
+Zeitwerk's autoload buys Rails — and stays correct inside a cycle, because the
+method runs after both module bodies finish. Only a read evaluated _while the
+module body runs_ (an `extends` clause, a top-level call, a top-level `new`)
+can TDZ.
+
+On that premise the namespace read had become the house style for every
+cross-module reference, and `rbModConstSet` the seat spelling: **790 seat call
+sites in 407 files, up from 15 four weeks earlier**, against **18 `const_set`
+sites in the whole vendored Rails tree**. Nothing caught the growth, because an
+added call is invisible to both call gates — they flag what Rails does and the
+port omits, never the reverse (§ "Before you open the PR"). Measured at the
+time of the ruling: **631 of 686 namespace reads were inside a function or
+method body**, and of the 55 at module-eval time, 8 were erased TypeScript type
+positions and ~35 were `extends Migration.Current` migration fixtures, leaving
+fewer than ten genuine framework sites. arel is the proof case: direct imports
+put 65 of its 92 modules in one cycle cluster, and 278 of its 287 reads are
+still plain imports, `nodes/node.ts`'s `new Nodes.Not(this)` among them.
+
+Two shapes were rejected on the way. Converging the seat onto a plain
+`Owner.Name = Klass` assignment and keeping every read going through the
+namespace was the repo owner's first reading of the problem and was rejected as
+a relabeling: the 790 calls become 790 assignments, the import graph still says
+nothing about where a class comes from, and the reader still cannot tell
+("I only want the namespace seating when necessary, I want to lean on ES
+imports / exports"). Deriving a class's Ruby path at run time by walking the
+namespace objects looked attractive because **all 39 namespace objects across
+the 13 `packages/*/src/namespaces.ts` files already carry their own
+fully-qualified path in `name`** (`{ name: "Arel::Nodes" }`), so 39 facts would
+have replaced 790 registration calls. It was rejected once the reads became
+imports: a class reached by a plain import is not seated on a namespace at all,
+so there is nothing left to walk. The path comes instead from a table generated
+out of `rails-api.json`, which already holds every class's `fqn` and defining
+file and is already matched to its TS counterpart by `parity:api` — verified by
+CI rather than by hand.
 
 Deferring the subclass edges instead (a slot per `extends` site) looks smaller
 and does not work: nothing then loads the subclass modules at all, so their
@@ -47,6 +88,19 @@ and `query-cache.ts -> connection-pool.ts -> abstract-adapter.ts`. The
 `queryTransformers()`, `disablePreparedStatements()`, `lazilyLoadSchemaCache()`
 and `asyncQueryExecutor()` seats left their slot for the `ActiveRecord` module
 in `active-record.ts`, which holds the Rails default itself.
+
+## A Ruby module is a JS object or a JS class
+
+The `Module` fallback was removed from the rule on 2026-10-22 by the repo
+owner: "A ruby module should be a js class, or a js object. no ruby-compat
+modules." The section had closed by saying a module whose methods are defined
+after it is included "is ported so that its definitions exist before the
+include, or is left on a `Module` until its own story settles it" — and the
+second clause was doing the work, with 61 `new Module` sites outstanding across
+six packages when the clause was struck. ruby-compat's `Module` is a carrier
+trails invented, not a shape Ruby has; the remedy for an awkward definition
+order is to fix the order. `pnpm parity:modules` holds the line, only-shrink
+with every mark's destination 0, and the mark file is deleted with the class.
 
 ## Method visibility is compile-time only
 
@@ -313,3 +367,70 @@ why a computed key is `Object.hasOwn`. By the same count, 76 of the 94
 `hashDelete` call lines use the removed value and 18 are a bare statement, so
 the helper stays there, and the RFC reports that residual instead of promising
 zero helper calls.
+
+## A translation lookup is synchronous; the load is an awaited step
+
+Ratified by the repo owner on 2026-10-21, after `i18n-backend-cache`
+(RFC 0193) was filed to port `I18n::Backend::Cache` and twice failed to find a
+shape.
+
+The blocker is that `I18n.translate` is synchronous in Ruby while every
+`ActiveSupport::Cache` store's `read` / `write` is async
+(`packages/activesupport/src/cache/store.ts:250`, `:352`), so `Cache#_fetch`
+(`vendor/i18n/v1.14.8/lib/i18n/backend/cache.rb:93-99`) has no port that keeps
+both halves.
+
+**Prewarm and peek was ruled out on 2026-10-20.** The design seated an
+in-process copy of the store's `i18n/<namespace>/` entries behind an awaited
+warm, answered `_fetch`'s `read` from the copy, and started the store `write`
+without awaiting it. Two differences from Rails were accepted in the story and
+rejected by the owner: an entry another process wrote after the warm is not
+seen, and a failed store write cannot reach the `translate` caller. It is also
+the invented lazy machinery the owner has pushed back on elsewhere.
+
+**An async `translate` was measured and rejected on 2026-10-21.** The call
+sites are what this command lists, run from the repo root:
+
+```bash
+grep -rnE 'I18n\.(translate|localize|t|l)\(' packages/*/src --include='*.ts' \
+  | grep -v '\.test\.ts:' | grep -v '^packages/i18n/'
+```
+
+30 sites in 17 files across actionpack (1), actionview (12), activemodel (6),
+activerecord (1) and activesupport (10). The reviewer of trails#9180 got 30
+from an independent pattern; an earlier hand-built count said 31 because
+`html-safe-translation.ts:28` carries `Parameters<typeof I18n.translate>[1]`,
+a type reference and not a call. The trailing `\(` is what excludes it.
+
+Every member those sites sit in is synchronous. Two are constructors
+(`activemodel/validations.ts:339`, `activerecord/validations.ts:29`), which
+cannot await at all; two more are getters (`Error#message`, `#full_message`).
+So the change would not make i18n async; it would make ActiveModel's error
+messages and ActiveSupport's string helpers async, where Rails returns a
+String. CLAUDE.md § "Serialization's dual sync/async hash" had already refused
+that trade in the same direction for `as_json`.
+
+The member count is deliberately not stated as a number in the ratified
+section: resolving a call's enclosing member by text is a heuristic — it reads
+a nested call such as `assertValidKeys(...)` as a declaration unless the
+pattern excludes it — so a hardcoded count is a figure a reader cannot check
+from the section. The command above is checkable, and the claim that carries
+the ruling is that every one of those members is synchronous.
+
+**A dual-shape return was rejected as impossible, not merely costly.**
+`thenableHash` works because a Hash can be a Proxy; a Proxy cannot be a string
+primitive, so a thenable translation breaks `` `Name ${error.message}` `` and
+`error.message.length`.
+
+What made the sync answer cheap is that trails had already put the asynchrony
+at the load: `setLoadPath`, `reloadBang` and `eagerLoadBang` are async
+(`packages/i18n/src/i18n.ts:127`, `:139`, `:144`), converged there by
+`i18n-async-reload-chain` and `i18n-backend-async-read-path` under RFC 0074,
+against Ruby's lazy `init_translations unless initialized?` inside
+`Backend::Simple#lookup`
+(`vendor/i18n/v1.14.8/lib/i18n/backend/simple.rb:93-94`). i18n reports 100% on
+methods, files, inheritance, arity and params and 307/307 tests on that split.
+
+Settled by trails#9180, which also records why the parked
+`translate caching backend` test keeps an empty body: the Rails body names
+`I18n::Backend::Cache`, so a kept body would not type-check.

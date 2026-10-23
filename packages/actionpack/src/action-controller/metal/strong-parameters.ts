@@ -9,9 +9,7 @@ import {
   Rational,
   StringIO,
   KeyError,
-  aryFetch,
   aryIncludes,
-  block as blockOf,
   type ConflictBlock,
   eachKey,
   eachPair,
@@ -24,6 +22,7 @@ import {
   isModuleIncluded,
   rbBlockGivenP,
   rbEql,
+  rbEqq,
   rbEqual,
   rbFSend,
   rbHash,
@@ -37,6 +36,7 @@ import {
   toEnum,
   toH,
   transformValues,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import { coderTag, type Psych } from "@blazetrails/ruby-compat/psych";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
@@ -51,7 +51,6 @@ import {
   deepDup,
   deepTransformKeys,
   deepTransformKeysBang,
-  filterMap,
   include,
   isBlank,
   toQuery,
@@ -147,11 +146,6 @@ type ExpectedHashFilter = readonly [
   ...(string | Record<string, unknown>)[],
 ];
 type ExpectedHash<K extends string> = true extends IsUnion<K> ? Parameters[] : Parameters;
-
-/** @internal */
-function isPermittedScalar(value: unknown): boolean {
-  return PERMITTED_SCALAR_TYPES.some((type) => type(value));
-}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface Parameters {
@@ -311,13 +305,13 @@ export class Parameters {
   }
 
   except(...keys: string[]): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.except(...keys));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.except(...keys));
   }
 
   declare without: Parameters["except"];
 
   slice(...keys: string[]): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.slice(...keys));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.slice(...keys));
   }
 
   sliceBang(...keys: string[]): this {
@@ -326,11 +320,13 @@ export class Parameters {
   }
 
   extractBang(...keys: string[]): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.extractBang(...keys));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.extractBang(...keys));
   }
 
   merge(otherHash: Parameters | Record<string, unknown>): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.merge(toH<OtherHash>(otherHash)));
+    return this.newInstanceWithInheritedPermittedStatus(
+      this.parameters.merge(toH<OtherHash>(otherHash)),
+    );
   }
 
   mergeBang(otherHash: Parameters | Record<string, unknown>, block?: ConflictBlock<unknown>): this {
@@ -349,7 +345,9 @@ export class Parameters {
   }
 
   reverseMerge(otherHash: Parameters | Record<string, unknown>): Parameters {
-    return this._newWithInheritedPermitted(merge(toH<OtherHash>(otherHash), this.parameters));
+    return this.newInstanceWithInheritedPermittedStatus(
+      merge(toH<OtherHash>(otherHash), this.parameters),
+    );
   }
 
   declare withDefaults: Parameters["reverseMerge"];
@@ -368,7 +366,7 @@ export class Parameters {
   transformKeys(fn: (key: string) => string): Parameters;
   transformKeys(fn?: (key: string) => string): Parameters | Enumerator<string> {
     if (!fn) return toEnum(this, "transformKeys");
-    return this._newWithInheritedPermitted(this.parameters.transformKeys(fn));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.transformKeys(fn));
   }
 
   transformKeysBang(): Enumerator<string>;
@@ -380,7 +378,7 @@ export class Parameters {
   }
 
   deepTransformKeys(fn: (key: string) => string): Parameters {
-    return this._newWithInheritedPermitted(
+    return this.newInstanceWithInheritedPermittedStatus(
       (this._deepTransformKeysInObject(this.parameters, fn) as Parameters).toUnsafeH(),
     );
   }
@@ -396,7 +394,7 @@ export class Parameters {
   transformValues(fn: (value: unknown) => unknown): Parameters;
   transformValues(fn?: (value: unknown) => unknown): Parameters | Enumerator<unknown> {
     if (!fn) return toEnum(this, "transformValues");
-    return this._newWithInheritedPermitted(
+    return this.newInstanceWithInheritedPermittedStatus(
       this.parameters.transformValues((v) => fn(this.convertValueToParameters(v))),
     );
   }
@@ -410,7 +408,7 @@ export class Parameters {
   }
 
   select(fn: (key: string, value: unknown) => boolean): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.select(fn));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.select(fn));
   }
 
   selectBang(fn: (key: string, value: unknown) => boolean): this {
@@ -421,7 +419,7 @@ export class Parameters {
   declare keepIf: Parameters["selectBang"];
 
   reject(fn: (key: string, value: unknown) => boolean): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.reject(fn));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.reject(fn));
   }
 
   rejectBang(fn: (key: string, value: unknown) => boolean): this {
@@ -432,7 +430,7 @@ export class Parameters {
   declare deleteIf: Parameters["rejectBang"];
 
   compact(): Parameters {
-    return this._newWithInheritedPermitted(
+    return this.newInstanceWithInheritedPermittedStatus(
       this.parameters.compact() as HashWithIndifferentAccess<unknown>,
     );
   }
@@ -494,13 +492,8 @@ export class Parameters {
         if (blockGiven) {
           return blockGiven();
         } else {
-          return aryFetch(
-            args,
-            0,
-            blockOf(() => {
-              throw new ParameterMissing(key, [...this.parameters.keys()]);
-            }),
-          );
+          if (args.length > 0) return args[0];
+          throw new ParameterMissing(key, [...this.parameters.keys()]);
         }
       }),
     );
@@ -527,7 +520,7 @@ export class Parameters {
     }
   }
 
-  toHash(): Hash<string, unknown> {
+  toHash(): Hash<string, unknown> | Record<string, unknown> {
     return this.toH().toHash();
   }
 
@@ -597,8 +590,8 @@ export class Parameters {
         this._permitted = false;
         break;
       case "!ruby/hash-with-ivars:ActionController::Parameters":
-        this.parameters = withIndifferentAccess(coder["elements"] as Record<string, unknown>);
-        this._permitted = (coder["ivars"] as Record<string, boolean>)[":@permitted"];
+        this.parameters = withIndifferentAccess(coder["elements"] as Hash<unknown, unknown>);
+        this._permitted = (coder["ivars"] as Map<string, boolean>).get(":@permitted")!;
         break;
       case "!ruby/object:ActionController::Parameters":
         this.parameters = coder["parameters"] as HashWithIndifferentAccess<unknown>;
@@ -645,14 +638,6 @@ export class Parameters {
     });
   }
 
-  private _newWithInheritedPermitted(
-    data: Record<string, unknown> | Hash<string, unknown>,
-  ): Parameters {
-    const p = new Parameters(data, this.loggingContext);
-    p._permitted = this._permitted;
-    return p;
-  }
-
   private _convertParametersToHashes(
     value: unknown,
     using: "toH" | "toUnsafeH",
@@ -678,6 +663,11 @@ export class Parameters {
       this.parameters.set(key, converted);
     }
     return converted;
+  }
+
+  /** @internal */
+  protected set permitted(value: boolean) {
+    this._permitted = value;
   }
 
   /** @internal */
@@ -718,8 +708,12 @@ export class Parameters {
   }
 
   /** @internal */
-  newInstanceWithInheritedPermittedStatus(hash: Record<string, unknown>): Parameters {
-    return this._newWithInheritedPermitted(hash);
+  newInstanceWithInheritedPermittedStatus(
+    hash: Record<string, unknown> | Hash<string, unknown>,
+  ): Parameters {
+    const newInstance = new (this.constructor as typeof Parameters)(hash, this.loggingContext);
+    newInstance.permitted = this._permitted;
+    return newInstance;
   }
 
   /** @internal */
@@ -832,8 +826,13 @@ export class Parameters {
   }
 
   /** @internal */
+  isPermittedScalar(value: unknown): boolean {
+    return PERMITTED_SCALAR_TYPES.some((type) => type(value));
+  }
+
+  /** @internal */
   permittedScalarFilter(params: Parameters, permittedKey: string): void {
-    if (this.hasKey(permittedKey) && isPermittedScalar(this.get(permittedKey))) {
+    if (this.hasKey(permittedKey) && this.isPermittedScalar(this.get(permittedKey))) {
       params.set(permittedKey, this.get(permittedKey));
     }
 
@@ -842,7 +841,7 @@ export class Parameters {
       if (!match) return;
       if (key.slice(0, match.index) !== permittedKey) return;
 
-      if (isPermittedScalar(this.get(key))) params.set(key, this.get(key));
+      if (this.isPermittedScalar(this.get(key))) params.set(key, this.get(key));
     });
   }
 
@@ -900,7 +899,8 @@ export class Parameters {
 
   /** @internal */
   permitArrayOfScalars(value: unknown): unknown {
-    if (Array.isArray(value) && value.every((el) => isPermittedScalar(el))) return value;
+    if (Array.isArray(value) && value.every((element) => this.isPermittedScalar(element)))
+      return value;
     return undefined;
   }
 
@@ -953,13 +953,13 @@ export class Parameters {
   /** @internal */
   permitAnyInParameters(params: Parameters): Parameters {
     const sanitized = new Parameters();
-    params.each(([k, v]) => {
-      if (isPermittedScalar(v)) {
-        sanitized.set(k, v);
-      } else if (Array.isArray(v)) {
-        sanitized.set(k, this.permitAnyInArray(v));
-      } else if (v instanceof Parameters) {
-        sanitized.set(k, this.permitAnyInParameters(v));
+    params.each(([key, value]) => {
+      if (rbEqq((v: unknown) => this.isPermittedScalar(v), value)) {
+        sanitized.set(key, value);
+      } else if (Array.isArray(value)) {
+        sanitized.set(key, this.permitAnyInArray(value));
+      } else if (value instanceof Parameters) {
+        sanitized.set(key, this.permitAnyInParameters(value));
       }
     });
     return sanitized;
@@ -968,10 +968,10 @@ export class Parameters {
   /** @internal */
   permitAnyInArray(array: unknown[]): unknown[] {
     const sanitized: unknown[] = [];
-    for (const el of array) {
-      if (isPermittedScalar(el)) sanitized.push(el);
-      else if (Array.isArray(el)) sanitized.push(this.permitAnyInArray(el));
-      else if (el instanceof Parameters) sanitized.push(this.permitAnyInParameters(el));
+    for (const element of array) {
+      if (rbEqq((e: unknown) => this.isPermittedScalar(e), element)) sanitized.push(element);
+      else if (Array.isArray(element)) sanitized.push(this.permitAnyInArray(element));
+      else if (element instanceof Parameters) sanitized.push(this.permitAnyInParameters(element));
     }
     return sanitized;
   }
@@ -1056,5 +1056,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 rbModConstSet(ActionController, "ParameterMissing", ParameterMissing);
+rbModConstSet(ActionController, "ExpectedParameterMissing", ExpectedParameterMissing);
+rbModConstSet(ActionController, "UnpermittedParameters", UnpermittedParameters);
+rbModConstSet(ActionController, "UnfilteredParameters", UnfilteredParameters);
+rbModConstSet(ActionController, "InvalidParameterKey", InvalidParameterKey);
 rbModConstSet(ActionController, "Parameters", Parameters);
 Parameters.hookIntoYamlLoading();
+
+rbModConstSet(ActionController, "StrongParameters", StrongParameters);

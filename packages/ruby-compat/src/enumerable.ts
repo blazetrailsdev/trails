@@ -9,7 +9,6 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
-import { each } from "./array.js";
 import { Hash } from "./hash.js";
 import {
   numericPlus,
@@ -19,9 +18,10 @@ import {
   rbIntegerTypeP,
   rbPlus,
 } from "./numeric.js";
-import { rbFPublicSend, rbFSend } from "./object.js";
+import { rbFSend } from "./object.js";
 import { Rational } from "./rational.js";
 import { checkArity } from "./string/support.js";
+import { cmp, rbCmpint } from "./comparable.js";
 import { rbEqq, rbEqual } from "./rb-equal.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
 
@@ -31,12 +31,18 @@ export interface Each<T, E = unknown> {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export type Enumerated<E, R> = E extends Promise<unknown> ? Promise<R> : R;
+export type Enumerated<E, R> = 0 extends 1 & E ? R : E extends Promise<unknown> ? Promise<R> : R;
 
 const iterBreak = Symbol("rb_iter_break");
 
+/**
+ * `rb_block_call(obj, id_each, …)`: an `each` member where the receiver has
+ * one, else its JS iterator, which is how an Array (`rb_ary_each`,
+ * `vendor/ruby/v3.3.11/array.c:2532`), a Set or a generator yields, and a Map
+ * yields `[key, value]` as `rb_hash_each_pair` does (`vendor/ruby/v3.3.11/hash.c:3149`).
+ */
 function rbBlockCall<T, E, R>(
-  obj: Each<T, E>,
+  obj: Iterable<T> | Each<T, E>,
   block: (i: T) => void,
   result: () => R,
 ): Enumerated<E, R> {
@@ -46,7 +52,11 @@ function rbBlockCall<T, E, R>(
   };
   let each: unknown;
   try {
-    each = obj.each(block);
+    if (typeof (obj as Partial<Each<T, E>>).each === "function") {
+      each = (obj as Each<T, E>).each(block);
+    } else {
+      for (const i of obj as Iterable<T>) block(i);
+    }
   } catch (e) {
     return rescue(e) as Enumerated<E, R>;
   }
@@ -58,7 +68,7 @@ function rbBlockCall<T, E, R>(
  * `enum_to_a` (`vendor/ruby/v3.3.11/enum.c:711`): the elements `each` yields,
  * which is what a block-less member's enumerator (`RETURN_ENUMERATOR`) holds.
  */
-function enumToA<T, E>(obj: Each<T, E>): Enumerated<E, T[]> {
+function enumToA<T, E>(obj: Iterable<T> | Each<T, E>): Enumerated<E, T[]> {
   const ary: T[] = [];
   return rbBlockCall(
     obj,
@@ -70,18 +80,57 @@ function enumToA<T, E>(obj: Each<T, E>): Enumerated<E, T[]> {
 }
 
 /**
+ * Mirrors: Ruby's Enumerable#partition — `vendor/ruby/v3.3.11/enum.c:1102` `enum_partition`:
+ * the elements whose block result `RTEST`s, then the others (`partition_i`, `:1057`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function partition<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T) => unknown,
+): Enumerated<E, [T[], T[]]>;
+/** @noRailsEquivalent PERMANENT */
+export function partition<T, E = unknown>(obj: Iterable<T> | Each<T, E>): Enumerated<E, T[]>;
+/** @noRailsEquivalent PERMANENT */
+export function partition<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block?: (i: T) => unknown,
+): Enumerated<E, [T[], T[]] | T[]> {
+  if (!block) return enumToA(obj);
+  const memo = { v1: [] as T[], v2: [] as T[] };
+  return rbBlockCall(
+    obj,
+    (i) => {
+      const result = block(i);
+      if (result != null && result !== false) memo.v1.push(i);
+      else memo.v2.push(i);
+    },
+    () => [memo.v1, memo.v2] as [T[], T[]],
+  );
+}
+
+/**
  * Mirrors: Ruby's Enumerable#group_by — `vendor/ruby/v3.3.11/enum.c:1157` `enum_group_by`,
  * pushing each element onto the Array under its block result (`group_by_i`, `:1115`).
  * @noRailsEquivalent PERMANENT
  */
-function groupBy<T, K, E = unknown>(
-  this: Each<T, E>,
+export function groupBy<T, K, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T) => K,
+): Enumerated<E, Hash<K, T[]>>;
+/** @noRailsEquivalent PERMANENT */
+export function groupBy<T, K, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block?: (i: T) => K,
+): Enumerated<E, Hash<K, T[]> | T[]>;
+/** @noRailsEquivalent PERMANENT */
+export function groupBy<T, K, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
   block?: (i: T) => K,
 ): Enumerated<E, Hash<K, T[]> | T[]> {
-  if (!block) return enumToA(this);
+  if (!block) return enumToA(obj);
   const hash = new Hash<K, T[]>();
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       const group = block(i);
       const values = hash.get(group);
@@ -93,18 +142,71 @@ function groupBy<T, K, E = unknown>(
 }
 
 /**
+ * Mirrors: Ruby's Enumerable#tally — `vendor/ruby/v3.3.11/enum.c:1229` `enum_tally`: a
+ * Hash counting each element (`tally_up`, `:1165`). The `hash` argument arm is
+ * not ported: nothing passes one.
+ * @noRailsEquivalent PERMANENT
+ */
+export function tally<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+): Enumerated<E, Hash<T, number>> {
+  const hash = new Hash<T, number>();
+  return rbBlockCall(
+    obj,
+    (i) => {
+      const tally = hash.get(i);
+      hash.set(i, tally === undefined ? 1 : tally + 1);
+    },
+    () => hash,
+  );
+}
+
+/**
  * Mirrors: Ruby's Enumerable#find_all — `vendor/ruby/v3.3.11/enum.c:509` `enum_find_all`,
  * pushing each element whose block result `RTEST`s (`find_all_i`, `:456`).
  * @noRailsEquivalent PERMANENT
  */
-function findAll<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown): Enumerated<E, T[]> {
-  if (!block) return enumToA(this);
+function enumFindAll<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block?: (i: T) => unknown,
+): Enumerated<E, T[]> {
+  if (!block) return enumToA(obj);
   const ary: T[] = [];
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       const result = block(i);
       if (result != null && result !== false) ary.push(i);
+    },
+    () => ary,
+  );
+}
+export { enumFindAll as findAll };
+
+/**
+ * The mixin member over `self`, bound as `find_all` and `select`
+ * (`vendor/ruby/v3.3.11/enum.c:5075-5076`).
+ * @noRailsEquivalent PERMANENT
+ */
+function findAll<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown): Enumerated<E, T[]> {
+  return enumFindAll(this, block);
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#filter_map — `vendor/ruby/v3.3.11/enum.c:550` `enum_filter_map`,
+ * pushing each block result that `RTEST`s (`filter_map_i`, `:522`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function filterMap<T, R, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T) => R | false | null | undefined,
+): Enumerated<E, R[]> {
+  const ary: R[] = [];
+  return rbBlockCall(
+    obj,
+    (i) => {
+      const result = block(i);
+      if (result != null && result !== false) ary.push(result);
     },
     () => ary,
   );
@@ -116,13 +218,16 @@ function findAll<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown): E
  * (`find_i`, `:324`). The block is the last argument.
  * @noRailsEquivalent PERMANENT
  */
-function find<T, E = unknown>(this: Each<T, E>, ...argv: unknown[]): Enumerated<E, unknown> {
+export function find<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  ...argv: unknown[]
+): Enumerated<E, unknown> {
   const block = argv.pop() as (i: T) => unknown;
   checkArity(argv.length, 0, 1);
   const ifNone = argv.length > 0 ? argv[0] : null;
   const memo = { v1: null as unknown, cnt: 0 };
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       const result = block(i);
       if (result != null && result !== false) {
@@ -160,15 +265,20 @@ function map<T, R, E = unknown>(this: Each<T, E>, block?: (i: T) => R): Enumerat
  * whose `n` arm is `enum_take` (`:3514`).
  * @noRailsEquivalent PERMANENT
  */
-function first<T, E = unknown>(this: Each<T, E>): Enumerated<E, T | null>;
-function first<T, E = unknown>(this: Each<T, E>, n: number): Enumerated<E, T[]>;
-function first<T, E = unknown>(this: Each<T, E>, n?: number): Enumerated<E, T | null | T[]> {
+export function first<T, E = unknown>(obj: Iterable<T> | Each<T, E>): Enumerated<E, T | null>;
+/** @noRailsEquivalent PERMANENT */
+export function first<T, E = unknown>(obj: Iterable<T> | Each<T, E>, n: number): Enumerated<E, T[]>;
+/** @noRailsEquivalent PERMANENT */
+export function first<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  n?: number,
+): Enumerated<E, T | null | T[]> {
   if (n !== undefined) {
     if (n < 0) throw new ArgumentError("attempt to take negative size");
     const result: T[] = [];
     if (n === 0) return result as Enumerated<E, T[]>;
     return rbBlockCall(
-      this,
+      obj,
       (i) => {
         result.push(i);
         if (result.length >= n) throw iterBreak;
@@ -178,7 +288,7 @@ function first<T, E = unknown>(this: Each<T, E>, n?: number): Enumerated<E, T | 
   }
   let memo: T | null = null;
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       memo = i;
       throw iterBreak;
@@ -192,7 +302,7 @@ function first<T, E = unknown>(this: Each<T, E>, n?: number): Enumerated<E, T | 
  * `drop_i` (`:3571`) counts `n` elements down before it pushes.
  * @noRailsEquivalent PERMANENT
  */
-function drop<T, E = unknown>(this: Each<T, E>, n: number): Enumerated<E, T[]> {
+export function drop<T, E = unknown>(obj: Iterable<T> | Each<T, E>, n: number): Enumerated<E, T[]> {
   let len = n;
 
   if (len < 0) {
@@ -201,7 +311,7 @@ function drop<T, E = unknown>(this: Each<T, E>, n: number): Enumerated<E, T[]> {
 
   const result: T[] = [];
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       if (len === 0) {
         result.push(i);
@@ -210,6 +320,91 @@ function drop<T, E = unknown>(this: Each<T, E>, n: number): Enumerated<E, T[]> {
       }
     },
     () => result,
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#each_with_object — `vendor/ruby/v3.3.11/enum.c:3285`
+ * `enum_each_with_object`, yielding each element with the memo
+ * (`each_with_object_i`) and answering the memo.
+ * @noRailsEquivalent PERMANENT
+ */
+export function eachWithObject<T, M, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  memo: M,
+  block: (i: T, memo: M) => unknown,
+): Enumerated<E, M> {
+  return rbBlockCall(
+    obj,
+    (i) => {
+      block(i, memo);
+    },
+    () => memo,
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#sort_by — `vendor/ruby/v3.3.11/enum.c:1651` `enum_sort_by`,
+ * which pairs each element with its block value (`sort_by_i`) and sorts the
+ * pairs by `<=>` on the values (`sort_by_cmp`, `:1379`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function sortBy<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T) => unknown,
+): Enumerated<E, T[]> {
+  const buf: [unknown, T][] = [];
+  return rbBlockCall(
+    obj,
+    (i) => {
+      buf.push([block(i), i]);
+    },
+    () => buf.sort(([a], [b]) => rbCmpint(cmp(a, b), a, b)).map(([, i]) => i),
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#each_slice — `vendor/ruby/v3.3.11/enum.c:3166` `enum_each_slice`,
+ * yielding each full slice as it fills (`each_slice_i`, `:3102`) and the
+ * remainder last, then answering the receiver. With no block it answers the
+ * slices, the elements of its `RETURN_SIZED_ENUMERATOR`.
+ * @noRailsEquivalent PERMANENT
+ */
+export function eachSlice<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  n: number,
+): Enumerated<E, T[][]>;
+/** @noRailsEquivalent PERMANENT */
+export function eachSlice<T, O extends Iterable<T> | Each<T, unknown>>(
+  obj: O,
+  n: number,
+  block: (slice: T[]) => unknown,
+): Enumerated<O extends Each<T, infer E> ? E : unknown, O>;
+/** @noRailsEquivalent PERMANENT */
+export function eachSlice<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  n: number,
+  block?: (slice: T[]) => unknown,
+): unknown {
+  const size = Math.trunc(n);
+
+  if (size <= 0) throw new ArgumentError("invalid slice size");
+  const slices: T[][] = [];
+  const yieldSlice = block ?? ((slice: T[]) => slices.push(slice));
+  let ary: T[] = [];
+  return rbBlockCall(
+    obj,
+    (i) => {
+      ary.push(i);
+      if (ary.length === size) {
+        yieldSlice(ary);
+        ary = [];
+      }
+    },
+    () => {
+      if (ary.length > 0) yieldSlice(ary);
+      return block ? obj : slices;
+    },
   );
 }
 
@@ -462,10 +657,10 @@ function enumSumValue(memo: EnumSumMemo): unknown {
  * includer is a Hash.
  * @noRailsEquivalent PERMANENT
  */
-function sum<T, E = unknown>(this: Each<T, E>, ...args: unknown[]): unknown {
+export function sum<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...args: unknown[]): unknown {
   const [memo, block] = enumSumMemo<T>(args);
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       sumIter(memo.blockGiven ? block!(i) : i, memo);
     },
@@ -496,7 +691,7 @@ function injectOpI<T>(i: T, memo: InjectMemo<T>): void {
   if (memo.v1 === undef) {
     memo.v1 = i;
   } else if (isSymbol(name)) {
-    memo.v1 = rbFPublicSend(memo.v1, name, i);
+    memo.v1 = rbFSend(memo.v1, name, i);
   } else {
     memo.v1 = rbFSend(memo.v1, name, i);
   }
@@ -528,25 +723,23 @@ function aryInjectOp(ary: readonly unknown[], init: unknown, op: string): unknow
     }
   }
   for (; i < ary.length; i++) {
-    v = rbFPublicSend(v, op, ary[i]);
+    v = rbFSend(v, op, ary[i]);
   }
   return v;
 }
 
 /**
  * Mirrors: Ruby's Enumerable#reduce — `vendor/ruby/v3.3.11/enum.c:1005` `enum_inject`,
- * bound as `reduce` at `:5085`. The receiver is the first argument, an Array
- * as readily as an `each` includer, and the block is the trailing function
- * argument. `rb_check_id` turns a String naming a method into its Symbol,
+ * bound as `reduce` at `:5085`. The receiver is the first argument, and the
+ * block is the trailing function argument. `rb_check_id` turns a String naming a method into its Symbol,
  * which every String here does; `rb_warning("given block not used")` prints
- * only under `$VERBOSE`. An Array's `each` is `rb_ary_each`
- * (`vendor/ruby/v3.3.11/array.c:2532`), which has no `each` member to call.
+ * only under `$VERBOSE`.
  * Unported: the `rb_method_basic_definition_p` checks on `each` (`:1044`) and
  * on `Integer#+` (`:836`), which ask whether a core method was redefined.
  * @noRailsEquivalent PERMANENT
  */
 export function reduce<T, E = unknown>(
-  obj: Each<T, E> | readonly T[],
+  obj: Iterable<T> | Each<T, E>,
   ...argv: unknown[]
 ): Enumerated<E, unknown> {
   const block =
@@ -587,12 +780,11 @@ export function reduce<T, E = unknown>(
   }
 
   const memo: InjectMemo<T> = { v1: init, block, op };
-  const result = () => (memo.v1 === undef ? null : memo.v1);
-  if (Array.isArray(obj)) {
-    each(obj as T[], (i) => iter(i, memo));
-    return result() as Enumerated<E, unknown>;
-  }
-  return rbBlockCall(obj as Each<T, E>, (i) => iter(i, memo), result);
+  return rbBlockCall(
+    obj,
+    (i) => iter(i, memo),
+    () => (memo.v1 === undef ? null : memo.v1),
+  );
 }
 
 /**
@@ -600,18 +792,28 @@ export function reduce<T, E = unknown>(
  * @noRailsEquivalent PERMANENT
  */
 export const Enumerable = {
-  find,
+  find<T, E = unknown>(this: Each<T, E>, ...argv: unknown[]) {
+    return find(this, ...argv);
+  },
   findAll,
   select: findAll,
   map,
-  groupBy,
-  first,
-  drop,
+  groupBy<T, K, E = unknown>(this: Each<T, E>, block?: (i: T) => K) {
+    return groupBy(this, block);
+  },
+  first<T, E = unknown>(this: Each<T, E>, n?: number): Enumerated<E, T | null | T[]> {
+    return n === undefined ? first(this) : first(this, n);
+  },
+  drop<T, E = unknown>(this: Each<T, E>, n: number) {
+    return drop(this, n);
+  },
   isAny,
   isOne,
   isNone,
   isInclude,
-  sum,
+  sum<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
+    return sum(this, ...args);
+  },
   [Symbol.iterator]: iterator,
 };
 
@@ -660,7 +862,7 @@ export const AsyncEnumerable = {
     return enumSumValue(memo);
   },
 
-  first,
+  first: Enumerable.first,
 
   /**
    * Mirrors: Ruby's Enumerable#reverse_each — `vendor/ruby/v3.3.11/enum.c:3006`

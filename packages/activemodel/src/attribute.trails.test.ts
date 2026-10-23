@@ -356,12 +356,12 @@ describe("Attribute — trails-only coverage", () => {
 
     it("Marshal.dump writes Rails' ivar names", () => {
       const attr = Attribute.fromUser("age", "42", new ValueType());
-      const unread = Marshal.dump(attr);
+      const unread = String.fromCharCode(...Marshal.dump(attr));
       expect(unread).toContain("@value_before_type_cast");
       expect(unread).not.toMatch(/@_value|@_has_value|@value[^_]/);
 
       attr.value();
-      const read = Marshal.dump(attr);
+      const read = String.fromCharCode(...Marshal.dump(attr));
       expect(read).toMatch(/@value[^_]/);
       expect(read).not.toMatch(/@_value|@_has_value/);
 

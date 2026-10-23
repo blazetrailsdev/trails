@@ -54,7 +54,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
     const guitar = await NestedOrderGuitar.createBang({});
     await guitar.tuningPegs.createBang({ pitch: 1 });
     const peg2 = await guitar.tuningPegs.createBang({ pitch: 2 });
-    await guitar.update({ tuningPegsAttributes: [{ id: peg2.id, pitch: null }] });
+    await guitar.update({ tuningPegs_attributes: [{ id: peg2.id, pitch: null }] });
 
     const error = guitar.errors.objects[0] as NestedError;
 
@@ -70,7 +70,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
     const guitar = await NestedOrderGuitar.createBang({});
 
     await guitar.update({
-      tuningPegsAttributes: [{ pitch: 1 }, { pitch: null }],
+      tuningPegs_attributes: [{ pitch: 1 }, { pitch: null }],
     });
 
     const error = guitar.errors.objects[0] as NestedError;
@@ -115,7 +115,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
       const oldAttributeConfig = indexNestedAttributeErrors();
       setIndexNestedAttributeErrors(true);
       try {
-        const owner = new PetOwner({ petAttributes: { name: null } });
+        const owner = new PetOwner({ pet_attributes: { name: null } });
         await owner.isValid();
 
         const error = owner.errors.objects[0] as NestedError;

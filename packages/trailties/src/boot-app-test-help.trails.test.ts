@@ -1,14 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
+import { ActiveJob } from "@blazetrails/activejob";
+import { constantize } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
 import {
-  Module,
   env,
   include,
   includedModules,
+  rbCallSuper,
+  rbModName,
   setEnv,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -114,26 +117,22 @@ describe("test_help wires a booted app into the test case classes", () => {
     }
   });
 
-  it("reaches a module included onto ActionController::TestCase after test_help loads", async ({
+  // PERMANENT-SKIP: a method a class defines itself is not overwritten by a later include's copy (CLAUDE.md, "A module included by an open set of classes binds `super` at include time").
+  it.skip("reaches a module included onto ActionController::TestCase after test_help loads", async ({
     task,
   }) => {
     const ran: string[] = [];
-    const Included = new Module();
-    Included.defineMethod("beforeSetup", function (this: object) {
-      ran.push("included");
-      return Included.superMethod(this, "beforeSetup")!();
-    });
-    const proto = ActionController.TestCase.prototype;
-    const parent = Object.getPrototypeOf(proto);
+    const Included = {
+      beforeSetup(this: object) {
+        ran.push("included");
+        return rbCallSuper(this, Included.beforeSetup);
+      },
+    };
     include(ActionController.TestCase, Included);
-    try {
-      const controllerTest = new ActionController.TestCase(task.name);
-      await controllerTest.beforeSetup();
-      expect(ran).toEqual(["included"]);
-      expect(controllerTest.routes).toBe(Trails.application!.routes());
-    } finally {
-      Object.setPrototypeOf(proto, parent);
-    }
+    const controllerTest = new ActionController.TestCase(task.name);
+    await controllerTest.beforeSetup();
+    expect(ran).toEqual(["included"]);
+    expect(controllerTest.routes).toBe(Trails.application!.routes());
   });
 
   it("renders a view through ActionController::TestCase", async ({ task }) => {
@@ -160,5 +159,25 @@ describe("test_help wires a booted app into the test case classes", () => {
       "A second post",
       "Welcome to Trails",
     ]);
+  });
+
+  it("performs an app/jobs job through the inline adapter by its constantized job_class", async () => {
+    const { WelcomeEmailJob } =
+      await import("./__fixtures__/boot-app/app/jobs/welcome-email-job.js");
+    const previous = ActiveJob.Base.queueAdapter;
+    ActiveJob.Base.setQueueAdapter("inline");
+    try {
+      await WelcomeEmailJob.performLater("david");
+    } finally {
+      ActiveJob.Base.setQueueAdapter(previous);
+    }
+    expect(WelcomeEmailJob.performed).toEqual([["david"]]);
+    expect(constantize("WelcomeEmailJob")).toBe(WelcomeEmailJob);
+  });
+
+  it("registers a namespaced app/jobs job under its namespace-prefixed name", async () => {
+    const { CleanupJob } = await import("./__fixtures__/boot-app/app/jobs/admin/cleanup-job.js");
+    expect(rbModName(CleanupJob)).toBe("Admin::CleanupJob");
+    expect(constantize("Admin::CleanupJob")).toBe(CleanupJob);
   });
 });

@@ -1,7 +1,6 @@
 import { pluralize, singularize, underscore } from "@blazetrails/activesupport";
-import { format, included, initialize } from "@blazetrails/ruby-compat";
+import { included } from "@blazetrails/ruby-compat";
 import type { GeneratorBase } from "./base.js";
-import { GeneratorError } from "./generated-attribute.js";
 import type { NamedBase } from "./named-base.js";
 
 // prettier-ignore
@@ -15,7 +14,7 @@ export interface ModelHelpersOptions {
   forcePlural?: boolean;
 }
 
-interface ModelHelpersHost extends NamedBase {
+export interface ModelHelpersHost extends NamedBase {
   options: NamedBase["options"] & ModelHelpersOptions;
   isPluralModelName(name: string): boolean;
   isIrregularModelName(name: string): boolean;
@@ -56,27 +55,5 @@ export const ModelHelpers = {
       default: false,
       desc: "Do not singularize the model name, even if it appears plural",
     });
-  },
-
-  [initialize](this: ModelHelpersHost, args: unknown, ..._options: unknown[]): void {
-    if (this.isPluralModelName(this.name) && !this.options.forcePlural) {
-      const singular = singularize(this.name);
-      if (!ModelHelpers.skipWarn) {
-        this.say(format(PLURAL_MODEL_NAME_WARN_MESSAGE, this.name, singular));
-      }
-      this.name = (this.options as { name?: string }).name = singular;
-      this.assignNamesBang(this.name);
-    }
-    if (this.isInflectionImpossible(this.name)) {
-      const option1 = underscore(singularize(this.name));
-      const option2 = singularize(underscore(pluralize(this.name)));
-      throw new GeneratorError(
-        format(INFLECTION_IMPOSSIBLE_ERROR_MESSAGE, this.name, option1, option2),
-      );
-    }
-    if (this.isIrregularModelName(this.name) && !ModelHelpers.skipWarn) {
-      this.say(format(IRREGULAR_MODEL_NAME_WARN_MESSAGE, pluralize(this.name)));
-    }
-    ModelHelpers.skipWarn = true;
   },
 };

@@ -13,8 +13,7 @@ import {
   typeCast,
   castBoundValue,
   sanitizeAsSqlComment,
-  columnNameMatcher,
-  columnNameWithOrderMatcher,
+  ClassMethods,
 } from "./connection-adapters/abstract/quoting.js";
 import { NotImplementedError } from "./errors.js";
 
@@ -61,14 +60,14 @@ describe("QuotingTest (trails)", () => {
   });
 
   it("column name matcher matches simple columns", () => {
-    const matcher = columnNameMatcher();
+    const matcher = ClassMethods.columnNameMatcher();
     expect(matcher.test("name")).toBe(true);
     expect(matcher.test("users.name")).toBe(true);
     expect(matcher.test("name, email")).toBe(true);
   });
 
   it("column name with order matcher matches columns with order", () => {
-    const matcher = columnNameWithOrderMatcher();
+    const matcher = ClassMethods.columnNameWithOrderMatcher();
     expect(matcher.test("name ASC")).toBe(true);
     expect(matcher.test("name DESC NULLS LAST")).toBe(true);
     expect(matcher.test("users.name ASC, email DESC")).toBe(true);

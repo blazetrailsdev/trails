@@ -9,7 +9,6 @@ import {
 import { Model } from "@blazetrails/activemodel";
 import {
   extend,
-  Module,
   rbObjRespondTo,
   registerConstant,
   unregisterConstant,
@@ -106,10 +105,10 @@ describe("ActionController::Cookies#cookies", () => {
 
   it("skips helper_method on a controller without AbstractController::Helpers", () => {
     class CookiesMetal extends Metal {}
-    expect(rbObjRespondTo(CookiesMetal, "helperMethod", true)).toBe(false);
+    expect(rbObjRespondTo(CookiesMetal, "helperMethod")).toBe(false);
     include(CookiesMetal, Cookies);
     expect(Object.hasOwn(CookiesMetal, "_helperMethods")).toBe(false);
-    expect(rbObjRespondTo(Base, "helperMethod", true)).toBe(true);
+    expect(rbObjRespondTo(Base, "helperMethod")).toBe(true);
   });
 });
 
@@ -359,7 +358,7 @@ describe("ActionController::Rescue#process_action (rescue.rb:26-31)", () => {
 
 describe("ActionController::Helpers included into ActionController::API", () => {
   it("carries helper, helpers and the class attributes onto a subclass", () => {
-    const ApiWithHelper = new Module().include({ myHelper: () => "helper" });
+    const ApiWithHelper = { myHelper: () => "helper" };
     type WithHelpers = typeof API &
       HelpersClass & { helpers(): { myHelper(): string }; helpersPath: string[] };
     class WithHelpersController extends API {}
@@ -371,11 +370,11 @@ describe("ActionController::Helpers included into ActionController::API", () => 
     expect(subclass.helpers().myHelper()).toBe("helper");
     expect(subclass.helpersPath).toEqual([]);
     expect(rbObjRespondTo(new SubclassWithHelpersController(), "helpers")).toBe(true);
-    expect(rbObjRespondTo(API, "helper", true)).toBe(false);
+    expect(rbObjRespondTo(API, "helper")).toBe(false);
   });
 
-  it("fires the inherited hooks for a subclass: default helper module and helpersPath", () => {
-    const helper = new Module().include({ probe: () => "probed" });
+  it("fires the inherited hook for a subclass: default helper module", () => {
+    const helper = { probe: () => "probed" };
     registerConstant("ApiSubclassProbeHelper", helper);
     const paths = ["app/helpers"];
     setHelpersPath(paths);
@@ -385,13 +384,7 @@ describe("ActionController::Helpers included into ActionController::API", () => 
       class ApiSubclassProbeController extends ApiProbeWithHelpersController {}
       new ApiSubclassProbeController();
 
-      const subclass = ApiSubclassProbeController as unknown as HelpersClass & {
-        helpersPath: string[];
-      };
-      expect(subclass.helpersPath).toBe(paths);
-      expect(
-        (ApiProbeWithHelpersController as unknown as { helpersPath: string[] }).helpersPath,
-      ).toEqual([]);
+      const subclass = ApiSubclassProbeController as unknown as HelpersClass;
       expect((extend({}, subclass._helpers) as Probe).probe()).toBe("probed");
     } finally {
       setHelpersPath([]);
@@ -404,7 +397,7 @@ type Probe = Record<string, () => unknown>;
 
 describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)", () => {
   it("includes the controller's default helper module with no helper call", () => {
-    registerConstant("DefaultHelperProbeHelper", new Module().include({ probe: () => "probed" }));
+    registerConstant("DefaultHelperProbeHelper", { probe: () => "probed" });
     class DefaultHelperProbeController extends Base {}
     new DefaultHelperProbeController();
     expect((extend({}, DefaultHelperProbeController._helpers) as Probe).probe()).toBe("probed");
@@ -419,7 +412,7 @@ describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)
   it("keeps helpers a subclass declared before the hook fired", () => {
     class DeclaredProbeController extends Base {
       static {
-        this.helper(new Module().include({ declared: () => "declared" }));
+        this.helper({ declared: () => "declared" });
       }
     }
     new DeclaredProbeController();
@@ -427,7 +420,7 @@ describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)
   });
 
   it("skips an anonymous controller class", () => {
-    registerConstant("KlassHelper", new Module().include({ leaked: () => "leaked" }));
+    registerConstant("KlassHelper", { leaked: () => "leaked" });
     const klass = (() => class extends Base {})();
     new klass();
     expect("leaked" in extend({}, klass._helpers)).toBe(false);

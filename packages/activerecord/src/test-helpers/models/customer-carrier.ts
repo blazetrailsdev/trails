@@ -14,7 +14,7 @@ export class CustomerCarrier extends Base {
     this.belongsTo("customer");
     this.belongsTo("carrier");
 
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       if (CustomerCarrier.currentCustomer) {
         return this.where({ customer: CustomerCarrier.currentCustomer });
       }

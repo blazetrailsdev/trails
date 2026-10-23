@@ -9,7 +9,7 @@ export class Liquid extends Base {
   static _tableName = "liquid";
 
   static {
-    this.hasMany("molecules", function (this: any) {
+    this.hasMany("molecules", function () {
       return this.distinct();
     });
   }

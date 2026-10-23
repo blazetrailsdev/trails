@@ -10,12 +10,12 @@ import {
   Hash,
   hashDelete,
   included,
-  initialize,
   last,
-  merge,
   mergeBang,
-  Module,
   Open3,
+  rbCallSuper,
+  rbModAttrReader,
+  rbModAttrWriter,
   type Process,
   rbFSystem,
   rbInspect,
@@ -99,7 +99,7 @@ export const ClassMethods = {
 
   async sourceRoot(this: ActionsClassHost, path: string | null = null): Promise<string | null> {
     if (path != null) this._sourceRoot = path;
-    if (!Object.prototype.hasOwnProperty.call(this, "_sourceRoot")) this._sourceRoot = null;
+    if (!Object.hasOwn(this, "_sourceRoot")) this._sourceRoot = null;
     return this._sourceRoot ?? null;
   },
 
@@ -343,7 +343,7 @@ export async function runRubyScript(
   config: RunConfig = {},
 ): Promise<string | boolean | null | undefined> {
   if (this.behavior !== "invoke") return;
-  return this.run(command, merge(config, { with: rubyCommand() }));
+  return this.run(command, { ...config, with: rubyCommand() });
 }
 
 export async function thor(
@@ -365,10 +365,9 @@ export async function thor(
 
 /** @internal */
 function _sharedConfiguration(this: ActionsHost): Record<string, unknown> {
-  return Object.assign(
-    Actions.superMethod(this, "_sharedConfiguration")!() as Record<string, unknown>,
-    { destinationRoot: this.destinationRoot },
-  );
+  return Object.assign(rbCallSuper(this, _sharedConfiguration) as Record<string, unknown>, {
+    destinationRoot: this.destinationRoot,
+  });
 }
 
 /** @internal */
@@ -386,74 +385,47 @@ function _cleanupOptionsAndSet(
   }
 }
 
-export const Actions = new Module((mod) => {
-  (mod as unknown as Record<symbol, unknown>)[included] = function (base: object): void {
+export const Actions = {
+  [included](base: object): void {
     extend(base, ClassMethods);
-  };
-
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function* (
-    this: ActionsHost,
-    args: unknown[] = [],
-    options: unknown[] | Record<string, unknown> = {},
-    config: { behavior?: string | null; destinationRoot?: string | null } = {},
-  ): Generator<void, void, void> {
-    this.behavior = (() => {
-      switch (toS(config.behavior)) {
-        case "force":
-        case "skip":
-          this._cleanupOptionsAndSet(options, config.behavior!);
-          return "invoke";
-        case "revoke":
-          return "revoke";
-        default:
-          return "invoke";
-      }
-    })();
-
-    yield;
-    this.destinationRoot = config.destinationRoot as string;
-  };
-
-  mod.attrReader("behavior");
-  mod.attrWriter("behavior");
-  mod.moduleEval((m) => {
-    Object.defineProperty(m, "destinationRoot", {
-      get: destinationRoot,
-      set: setDestinationRoot,
-      configurable: true,
-    });
-    Object.assign(m, {
-      action,
-      relativeToOriginalDestinationRoot,
-      sourcePaths,
-      findInSourcePaths,
-      inside,
-      inRoot,
-      apply,
-      run,
-      runRubyScript,
-      thor,
-      emptyDirectory,
-      createFile,
-      addFile,
-      createLink,
-      addLink,
-      chmod,
-      prependToFile,
-      prependFile,
-      appendToFile,
-      appendFile,
-      injectIntoClass,
-      injectIntoModule,
-      gsubFile,
-      uncommentLines,
-      commentLines,
-      removeFile,
-      removeDir,
-      insertIntoFile,
-      injectIntoFile,
-      _sharedConfiguration,
-      _cleanupOptionsAndSet,
-    });
-  });
+  },
+  action,
+  relativeToOriginalDestinationRoot,
+  sourcePaths,
+  findInSourcePaths,
+  inside,
+  inRoot,
+  apply,
+  run,
+  runRubyScript,
+  thor,
+  emptyDirectory,
+  createFile,
+  addFile,
+  createLink,
+  addLink,
+  chmod,
+  prependToFile,
+  prependFile,
+  appendToFile,
+  appendFile,
+  injectIntoClass,
+  injectIntoModule,
+  gsubFile,
+  uncommentLines,
+  commentLines,
+  removeFile,
+  removeDir,
+  insertIntoFile,
+  injectIntoFile,
+  _sharedConfiguration,
+  _cleanupOptionsAndSet,
+};
+rbModAttrReader({ prototype: Actions }, "behavior");
+rbModAttrWriter({ prototype: Actions }, "behavior");
+Object.defineProperty(Actions, "destinationRoot", {
+  get: destinationRoot,
+  set: setDestinationRoot,
+  enumerable: true,
+  configurable: true,
 });

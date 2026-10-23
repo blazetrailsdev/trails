@@ -55,6 +55,7 @@ export const GATED_TOKEN = "throw";
  */
 export const GATED_PACKAGES = [
   "abstractcontroller",
+  "actioncable",
   "actioncontroller",
   "actiondispatch",
   "actionpackversion",

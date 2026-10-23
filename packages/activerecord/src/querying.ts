@@ -1,5 +1,5 @@
 import { Nodes } from "@blazetrails/arel";
-import { hasKey, toI, type Module } from "@blazetrails/ruby-compat";
+import { hasKey, toI } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "./timestamp.js";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
@@ -789,15 +789,15 @@ export function extending<T extends typeof Base, M extends Record<string, (...ar
   this: T,
   mod: M,
 ): Relation<InstanceType<T>> & M;
-export function extending<T extends typeof Base>(this: T, mod: Module): Relation<InstanceType<T>>;
+export function extending<T extends typeof Base>(this: T, mod: object): Relation<InstanceType<T>>;
 export function extending<T extends typeof Base>(
   this: T,
-  block: (mod: Module) => void,
+  block: (mod: Record<string, unknown>) => void,
 ): Relation<InstanceType<T>>;
 export function extending<T extends typeof Base>(this: T): Relation<InstanceType<T>>;
 export function extending<T extends typeof Base>(
   this: T,
-  mod?: Record<string, (...args: any[]) => any> | Module | ((mod: Module) => void),
+  mod?: Record<string, (...args: any[]) => any> | object | ((mod: Record<string, unknown>) => void),
 ): Relation<InstanceType<T>> {
   return mod
     ? this.all().extending(mod as Record<string, (...args: any[]) => any>)

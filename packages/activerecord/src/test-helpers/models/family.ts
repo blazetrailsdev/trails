@@ -9,7 +9,7 @@ export class Family extends Base {
   declare members: AssociationProxy<Member>;
 
   static {
-    this.hasMany("familyTrees", function (this: any) {
+    this.hasMany("familyTrees", function () {
       return this.where({ token: null });
     });
     this.hasMany("members", { through: "familyTrees" });

@@ -16,7 +16,7 @@ import { registerConstant } from "@blazetrails/ruby-compat";
 import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
 import "${root}test-helper.js";
 
-class ${testClassName} extends IntegrationTest {
+export class ${testClassName} extends IntegrationTest {
   declare "@${singular}": ${modelClassName};
   declare ${fixtureName}: FixtureSetAccessor<${modelClassName}>;
 

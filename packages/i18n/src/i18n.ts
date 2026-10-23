@@ -1,4 +1,4 @@
-import { kernelCatch, kernelThrow, rbEnsure } from "@blazetrails/ruby-compat";
+import { kernelCatch, kernelThrow, rbEnsure, Thread } from "@blazetrails/ruby-compat";
 import * as I18n from "./i18n.js";
 import type { ExceptionHandlerLike } from "./config.js";
 import type { Base } from "./backend/base.js";
@@ -52,27 +52,23 @@ export function reservedKeysPattern(): RegExp {
   return reservedKeysPatternCache;
 }
 
-let currentConfig: Config | undefined;
-
 export function config(): Config {
-  currentConfig ??= new Config();
-  return currentConfig;
+  return (
+    (Thread.current().threadVariableGet(":i18n_config") as Config | null) ||
+    (Thread.current().threadVariableSet(":i18n_config", new Config()) as Config)
+  );
 }
 
 export function setConfig(value: Config): void {
-  currentConfig = value;
+  Thread.current().threadVariableSet(":i18n_config", value);
 }
 
 /**
- * Test seam — drops the process-wide config so a case starts clean.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE — Ruby's suite resets by assigning a fresh
- * `I18n.config`; this also clears the trails-only normalized-key cache, so it
- * folds into `setConfig` once that cache hangs off the Config instance.
+ * @noRailsEquivalent CONVERGEABLE i18n-reset-seams-fold-into-config-assignment
  */
 export function resetConfig(): void {
-  currentConfig = undefined;
+  Thread.current().threadVariableSet(":i18n_config", null);
   normalizedKeyCache.clear();
 }
 
@@ -151,11 +147,10 @@ export async function eagerLoadBang(): Promise<void> {
 
 export type TranslateKey = TranslationKey | null;
 
-/** @missingRailsName throw — PERMANENT */
 export function translate(
   key: TranslateKey | TranslateKey[] = null,
   {
-    throw: throwOption = false,
+    throw: throw_ = false,
     raise = false,
     locale = null,
     ...options
@@ -168,9 +163,9 @@ export function translate(
   const backend = config().backend;
 
   if (Array.isArray(key)) {
-    return key.map((k) => translateKey(k, throwOption, raise, locale as Locale, backend, options));
+    return key.map((k) => translateKey(k, throw_, raise, locale as Locale, backend, options));
   } else {
-    return translateKey(key, throwOption, raise, locale as Locale, backend, options);
+    return translateKey(key, throw_, raise, locale as Locale, backend, options);
   }
 }
 
@@ -212,7 +207,7 @@ export function exists(
 export function transliterate(
   key: string,
   {
-    throw: throwOption = false,
+    throw: throw_ = false,
     raise = false,
     locale = null,
     replacement = null,
@@ -228,7 +223,7 @@ export function transliterate(
   } catch (exception) {
     if (!(exception instanceof ArgumentError)) throw exception;
     return handleException(
-      truthy(throwOption) ? "throw" : truthy(raise) ? "raise" : false,
+      truthy(throw_) ? "throw" : truthy(raise) ? "raise" : false,
       exception,
       locale as Locale,
       key,
@@ -294,7 +289,7 @@ function normalizeKey(key: unknown, separator: string): TranslationKey[] {
   return normalized;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE i18n-core-string-helpers-move-to-ruby-compat */
 export function toSym(value: unknown): string {
   return typeof value === "string" && value.startsWith(":") ? value : `:${String(value)}`;
 }
@@ -334,7 +329,7 @@ function truthy(value: unknown): boolean {
 /** @internal */
 function translateKey(
   key: TranslateKey,
-  throwOption: unknown,
+  throw_: unknown,
   raise: unknown,
   locale: Locale,
   backend: Base,
@@ -344,7 +339,7 @@ function translateKey(
 
   if (result instanceof MissingTranslation) {
     return handleException(
-      truthy(throwOption) ? "throw" : truthy(raise) ? "raise" : false,
+      truthy(throw_) ? "throw" : truthy(raise) ? "raise" : false,
       result,
       locale,
       key,

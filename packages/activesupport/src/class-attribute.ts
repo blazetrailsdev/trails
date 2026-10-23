@@ -1,4 +1,11 @@
-import { CLASS_METHOD_TABLE, TypeError, rbModSingletonP } from "@blazetrails/ruby-compat";
+import {
+  CLASS_METHOD_TABLE,
+  Module,
+  TypeError,
+  rbClassAttachedObject,
+  rbObjIsKindOf,
+  rbModSingletonP,
+} from "@blazetrails/ruby-compat";
 
 export interface ClassAttributeOptions {
   instanceAccessor?: boolean;
@@ -16,7 +23,12 @@ function inspect(value: unknown): string {
 export namespace ClassAttribute {
   export function redefine(owner: any, name: string, namespacedName: string, value: unknown): void {
     if (rbModSingletonP(owner)) {
-      redefineMethod(owner.prototype, name, false, () => value);
+      const attachedObject = rbClassAttachedObject(owner);
+      if (rbObjIsKindOf(attachedObject, Module)) {
+        redefineMethod(owner.prototype, namespacedName, true, () => value);
+      } else {
+        redefineMethod(owner.prototype, name, false, () => value);
+      }
     }
 
     redefineMethod(owner, namespacedName, true, () => value);
@@ -58,7 +70,7 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     instanceReader = instanceAccessor,
     instanceWriter = instanceAccessor,
     instancePredicate = true,
-    default: defaultValue,
+    default: defaultValue = null,
   } = options;
 
   for (const name of attrs as string[]) {
@@ -86,7 +98,7 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
       Object.assign(methods, delegators);
     } else if (instanceReader) {
       methods.get = function (this: any) {
-        if (Object.prototype.hasOwnProperty.call(this, `@${name}`)) {
+        if (Object.hasOwn(this, `@${name}`)) {
           return this[`@${name}`];
         } else {
           return this.constructor[name];
@@ -102,7 +114,9 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     if (methods.get || methods.set) Object.defineProperty(this.prototype, name, methods);
 
     if (instancePredicate) {
-      const predicateName = `is${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+      const lead = /^_*/.exec(name)![0];
+      const bare = name.slice(lead.length);
+      const predicateName = `${lead}is${bare.charAt(0).toUpperCase()}${bare.slice(1)}`;
       ClassAttribute.redefineMethod(this, predicateName, false, function (this: any) {
         return this[name] != null && this[name] !== false;
       });

@@ -49,6 +49,10 @@ export async function _require(): Promise<void> {
 }
 
 export class HashBuilder {
+  static toString(): string {
+    return "ActiveSupport::XmlMini_NokogiriSAX::HashBuilder";
+  }
+
   static readonly CONTENT_KEY = "__content__";
   static readonly HASH_SIZE_KEY = "__hash_size__";
 

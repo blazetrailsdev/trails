@@ -14,9 +14,9 @@ import {
 } from "./parser.js";
 import { QueryParser } from "../query-parser.js";
 import {
-  getMultipartFileLimit,
+  multipartFileLimit,
   setMultipartFileLimit,
-  getMultipartTotalPartLimit,
+  multipartTotalPartLimit,
   setMultipartTotalPartLimit,
 } from "../utils.js";
 
@@ -137,7 +137,7 @@ describe("Rack::Multipart::Parser", () => {
   });
 
   it("reaches a multipart file limit", () => {
-    const prev = getMultipartFileLimit();
+    const prev = multipartFileLimit();
     try {
       setMultipartFileLimit(1);
       expect(() => fix("text")).toThrow(MultipartPartLimitError);
@@ -161,7 +161,7 @@ describe("Rack::Multipart::Parser", () => {
   });
 
   it("reaches a multipart total limit", () => {
-    const prev = getMultipartTotalPartLimit();
+    const prev = multipartTotalPartLimit();
     try {
       setMultipartTotalPartLimit(1);
       expect(() => fix("none")).toThrow(MultipartTotalPartLimitError);

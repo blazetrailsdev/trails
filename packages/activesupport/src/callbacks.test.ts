@@ -666,40 +666,20 @@ describe("CallStackTest", () => {
       .map((line) => /^\s*at (\S+) \(/.exec(line)?.[1] ?? "<anonymous>");
     callStack.splice(callStack.length - (new Error().stack!.split("\n").length - 1));
 
-    // eslint-disable-next-line vitest/no-conditional-in-test
-    if (callStack[callStack.length - 1].includes(".")) {
-      // eslint-disable-next-line vitest/no-conditional-expect
-      expect(callStack.join("\n")).toBe(
-        [
-          "<anonymous>",
-          "invokeSequence",
-          "AroundPerson.tweedleDeedle",
-          "invokeSequence",
-          "AroundPerson.w0tyes",
-          "invokeSequence",
-          "AroundPerson.tweedleDum",
-          "invokeSequence",
-          "AroundPerson.runCallbacks",
-          "AroundPerson.save",
-        ].join("\n"),
-      );
-    } else {
-      // eslint-disable-next-line vitest/no-conditional-expect
-      expect(callStack.join("\n")).toBe(
-        [
-          "<anonymous>",
-          "invokeSequence",
-          "tweedleDeedle",
-          "invokeSequence",
-          "w0tyes",
-          "invokeSequence",
-          "tweedleDum",
-          "invokeSequence",
-          "runCallbacks",
-          "save",
-        ].join("\n"),
-      );
-    }
+    expect(callStack.join("\n")).toBe(
+      [
+        "<anonymous>",
+        "invokeSequence",
+        "AroundPerson.tweedleDeedle",
+        "invokeSequence",
+        "AroundPerson.w0tyes",
+        "invokeSequence",
+        "AroundPerson.tweedleDum",
+        "invokeSequence",
+        "AroundPerson.runCallbacks",
+        "AroundPerson.save",
+      ].join("\n"),
+    );
   });
 
   it("short call stack", () => {
@@ -721,16 +701,9 @@ describe("CallStackTest", () => {
       .map((line) => /^\s*at (\S+) \(/.exec(line)?.[1] ?? "<anonymous>");
     callStack.splice(callStack.length - (new Error().stack!.split("\n").length - 1));
 
-    // eslint-disable-next-line vitest/no-conditional-in-test
-    if (callStack[callStack.length - 1].includes(".")) {
-      // eslint-disable-next-line vitest/no-conditional-expect
-      expect(callStack.join("\n")).toBe(
-        ["<anonymous>", "Person.runCallbacks", "Person.save"].join("\n"),
-      );
-    } else {
-      // eslint-disable-next-line vitest/no-conditional-expect
-      expect(callStack.join("\n")).toBe(["<anonymous>", "runCallbacks", "save"].join("\n"));
-    }
+    expect(callStack.join("\n")).toBe(
+      ["<anonymous>", "Person.runCallbacks", "Person.save"].join("\n"),
+    );
   });
 });
 

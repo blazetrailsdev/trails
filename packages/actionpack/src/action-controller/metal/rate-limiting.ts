@@ -1,6 +1,7 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
-  Module,
   Notifications,
   extend,
   type CacheStore,
@@ -64,12 +65,8 @@ export const ClassMethods = {
   },
 };
 
-export const RateLimiting = new Module((mod) => {
-  extend(mod, Concern);
-
-  mod.defineMethod("rateLimiting", rateLimiting);
-}) as Module<{ rateLimiting: typeof rateLimiting }> & { ClassMethods: typeof ClassMethods };
-RateLimiting.ClassMethods = ClassMethods;
+export const RateLimiting = { ClassMethods, rateLimiting };
+extend(RateLimiting, Concern);
 
 /** @internal */
 export async function rateLimiting(
@@ -98,3 +95,5 @@ export async function rateLimiting(
     );
   }
 }
+
+rbModConstSet(ActionController, "RateLimiting", RateLimiting);

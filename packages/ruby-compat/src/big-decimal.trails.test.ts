@@ -527,3 +527,10 @@ describe("BigDecimal#round", () => {
     }
   });
 });
+
+describe("Kernel#BigDecimal", () => {
+  it("raises ArgumentError for an unparseable String", () => {
+    expect(() => new BigDecimal("abc")).toThrow(ArgumentError);
+    expect(() => new BigDecimal("abc")).toThrow('invalid value for BigDecimal(): "abc"');
+  });
+});

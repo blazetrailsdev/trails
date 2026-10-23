@@ -24,7 +24,7 @@ export interface RenderableTemplate {
     buffer?: null,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
-  ): string | SafeBuffer | Uint8Array | Promise<string | SafeBuffer>;
+  ): string | SafeBuffer | Uint8Array | Promise<string | SafeBuffer | null>;
   render(
     view: ViewContext,
     locals: Record<string, unknown>,
@@ -44,7 +44,7 @@ export interface ViewContext {
 
 export interface RenderOptions {
   template?: string | RenderableTemplate;
-  partial?: string | object;
+  partial?: string | object | null;
   inline?: string;
   body?: string;
   plain?: string;
@@ -62,7 +62,7 @@ export interface RenderOptions {
         keys: readonly string[],
       ) => RenderOptions["layout"]);
   locals?: Record<string, unknown>;
-  collection?: readonly unknown[];
+  collection?: Iterable<unknown> | null;
   as?: string | false | null;
   spacerTemplate?: string;
   object?: unknown;
@@ -116,7 +116,7 @@ export class EmptyCollection {
 
 /** @internal */
 export interface ObjectRenderingHost {
-  contextPrefix: string;
+  contextPrefix: string | undefined;
   readonly options: RenderOptions;
 }
 
@@ -192,11 +192,11 @@ export function partialPath(this: ObjectRenderingHost, object: unknown, view: Vi
     );
   }
 
-  if (view.prefixPartialPathWithControllerNamespace && contextPrefix) {
-    const cached = getPrefixedName(contextPrefix, path);
+  if (view.prefixPartialPathWithControllerNamespace) {
+    const cached = getPrefixedName(contextPrefix!, path);
     if (cached !== undefined) return cached;
-    const merged = mergePrefixIntoObjectPath(contextPrefix, path);
-    setPrefixedName(contextPrefix, path, merged);
+    const merged = mergePrefixIntoObjectPath(contextPrefix!, path);
+    setPrefixedName(contextPrefix!, path, merged);
     return merged;
   }
   return path;

@@ -1,6 +1,10 @@
 import { deepMerge, isPlainObject } from "./hash-utils.js";
 
 export class OptionMerger {
+  static toString(): string {
+    return "ActiveSupport::OptionMerger";
+  }
+
   private context: any;
   private options: Record<string, unknown>;
 

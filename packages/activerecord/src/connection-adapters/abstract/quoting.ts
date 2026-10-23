@@ -9,7 +9,7 @@
  *   Rails' `when Date, Time then "'#{quoted_date(value)}'"` (quoting.rb:85)
  *   accepts Ruby's native time objects; trails' analogues are the Temporal
  *   types, `Time`, `TimeWithZone`, and a JS `Date`, which ruby-compat classes
- *   as `Time` (`rbClassOf`).
+ *   as `Time` (`rbObjClass`).
  *
  *   Rails' `when nil, Numeric, String then value` (quoting.rb:102) hands a
  *   Float to the driver unchanged. trails' whole-valued Float is a boxed
@@ -35,6 +35,7 @@ import { Value as TimeValue } from "../../type/time.js";
 
 export interface QuotingClassMethods {
   quoteColumnName(columnName: unknown): string;
+  quoteTableName(tableName: unknown): string;
 }
 
 export interface QuotingDispatchHost {
@@ -53,9 +54,21 @@ export interface QuotingDispatchHost {
 }
 
 export const ClassMethods = {
+  columnNameMatcher(): RegExp {
+    return /^((?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:(?:\s+AS)?\s+\w+)?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:(?:\s+AS)?\s+\w+)?)*$/i;
+  },
+
+  columnNameWithOrderMatcher(): RegExp {
+    return /^((?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*$/i;
+  },
+
   quoteColumnName(_columnName: unknown): string {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:61
     throw new NotImplementedError();
+  },
+
+  quoteTableName(this: QuotingClassMethods, tableName: unknown): string {
+    return this.quoteColumnName(tableName);
   },
 };
 
@@ -160,10 +173,6 @@ export function quoteColumnName(this: object, columnName: unknown): string {
   return (this.constructor as unknown as QuotingClassMethods).quoteColumnName(columnName);
 }
 
-export function quoteTableName(this: QuotingClassMethods, tableName: unknown): string {
-  return this.quoteColumnName(tableName);
-}
-
 export function quoteTableNameForAssignment(
   this: QuotingDispatchHost,
   table: string,
@@ -253,14 +262,6 @@ export function lookupCastType(
   sqlType: string | number | null,
 ): ValueType {
   return this.typeMap.lookup(sqlType as string | null);
-}
-
-export function columnNameMatcher(): RegExp {
-  return /^((?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:(?:\s+AS)?\s+\w+)?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:(?:\s+AS)?\s+\w+)?)*$/i;
-}
-
-export function columnNameWithOrderMatcher(): RegExp {
-  return /^((?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*$/i;
 }
 
 /** @internal */

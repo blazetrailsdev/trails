@@ -1,6 +1,10 @@
 export type RotationKind = "signed" | "encrypted";
 
 export class RotationConfiguration {
+  static toString(): string {
+    return "ActiveSupport::Messages::RotationConfiguration";
+  }
+
   readonly signed: unknown[][];
   readonly encrypted: unknown[][];
 

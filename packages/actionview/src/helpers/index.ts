@@ -2,6 +2,7 @@ export * from "./form-helper.js";
 export * from "./form-tag-helper.js";
 export * from "./content-exfiltration-prevention-helper.js";
 export * from "./csrf-helper.js";
+export * from "./csp-helper.js";
 
 export { raw, safeJoin, toSentence } from "./output-safety-helper.js";
 export type { ToSentenceOptions } from "./output-safety-helper.js";
@@ -43,16 +44,6 @@ export {
   sanitizeCss,
   stripTags,
   stripLinks,
-  getSanitizerVendor,
-  setSanitizerVendor,
-  getFullSanitizer,
-  setFullSanitizer,
-  getLinkSanitizer,
-  setLinkSanitizer,
-  getSafeListSanitizer,
-  setSafeListSanitizer,
-  sanitizedAllowedTags,
-  sanitizedAllowedAttributes,
   SanitizeHelper,
   ClassMethods as SanitizeHelperClassMethods,
 } from "./sanitize-helper.js";
@@ -94,8 +85,6 @@ export {
   assignController,
   logger,
   isRespondTo,
-  installControllerDelegates,
-  installControllerInternals,
   CONTROLLER_DELEGATES,
 } from "./controller-helper.js";
 export type { ControllerHelperHost } from "./controller-helper.js";

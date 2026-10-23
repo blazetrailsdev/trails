@@ -1,6 +1,7 @@
 import { Configurable, include, underscore } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
-import { rbFSend, rbModName, rbObjId, sprintf } from "@blazetrails/ruby-compat";
+import { AbstractController } from "../namespaces.js";
+import { rbFSend, rbModConstSet, rbModName, rbObjId, sprintf } from "@blazetrails/ruby-compat";
 
 function ownPublicMethodNames(proto: object | null | undefined): string[] {
   if (!proto) return [];
@@ -31,12 +32,12 @@ export type {
 } from "./callbacks.js";
 
 export class ActionNotFound extends Error {
-  readonly controller: AbstractController | null;
+  readonly controller: Base | null;
   readonly action: string | null;
 
   constructor(
     message: string | null = null,
-    controller: AbstractController | null = null,
+    controller: Base | null = null,
     action: string | null = null,
   ) {
     super(message ?? "AbstractController::ActionNotFound");
@@ -53,7 +54,7 @@ export class ActionNotFound extends Error {
       this.#cachedCorrections = [];
       return this.#cachedCorrections;
     }
-    const ctor = this.controller.constructor as typeof AbstractController;
+    const ctor = this.controller.constructor as typeof Base;
     this.#cachedCorrections = new SpellChecker({
       dictionary: ctor.actionMethods(),
     }).correct(this.action);
@@ -61,7 +62,7 @@ export class ActionNotFound extends Error {
   }
 }
 
-export class AbstractController {
+export class Base {
   _actionName: string = "";
 
   get actionName(): string {
@@ -78,6 +79,15 @@ export class AbstractController {
   }
   set responseBody(value: string | Buffer | null) {
     this._responseBody = value;
+  }
+
+  protected _formats: unknown = null;
+
+  get formats(): unknown {
+    return this._formats;
+  }
+  set formats(value: unknown) {
+    this._formats = value;
   }
 
   private static readonly _internalMethods: ReadonlySet<string> = new Set([
@@ -117,7 +127,7 @@ export class AbstractController {
 
   /** @internal */
   static get abstract(): boolean {
-    return Object.prototype.hasOwnProperty.call(this, "_abstract")
+    return Object.hasOwn(this, "_abstract")
       ? (this as unknown as { _abstract: boolean })._abstract
       : false;
   }
@@ -140,7 +150,7 @@ export class AbstractController {
   protected static _controllerPath?: string;
 
   static controllerPath(): string {
-    if (Object.prototype.hasOwnProperty.call(this, "_controllerPath")) {
+    if (Object.hasOwn(this, "_controllerPath")) {
       return (this as unknown as { _controllerPath: string })._controllerPath;
     }
     const name = rbModName(this);
@@ -155,17 +165,17 @@ export class AbstractController {
   static internalMethods(): string[] {
     const collected = new Set<string>();
     // eslint-disable-next-line @typescript-eslint/no-this-alias
-    let cursor: typeof AbstractController = this;
+    let cursor: typeof Base = this;
     while (cursor && !cursor.isAbstract()) {
       for (const name of ownPublicMethodNames(cursor.prototype)) collected.add(name);
       const next = Object.getPrototypeOf(cursor);
       if (!next || next === Function.prototype) break;
-      cursor = next as typeof AbstractController;
+      cursor = next as typeof Base;
     }
-    const abstractProto = cursor?.prototype ?? AbstractController.prototype;
+    const abstractProto = cursor?.prototype ?? Base.prototype;
     const all = new Set<string>(allPublicMethodNames(abstractProto));
     for (const name of collected) all.delete(name);
-    for (const name of AbstractController._internalMethods) all.add(name);
+    for (const name of Base._internalMethods) all.add(name);
     return [...all];
   }
 
@@ -185,10 +195,7 @@ export class AbstractController {
   }
 
   static actionMethods(): string[] {
-    if (
-      !Object.prototype.hasOwnProperty.call(this, "_actionMethodCache") ||
-      !this._actionMethodCache
-    ) {
+    if (!Object.hasOwn(this, "_actionMethodCache") || !this._actionMethodCache) {
       const internalMethods = new Set(this.internalMethods());
       const methods = allPublicMethodNames(this.prototype).filter(
         (name) => !internalMethods.has(name),
@@ -200,8 +207,8 @@ export class AbstractController {
   }
 
   /** @internal */
-  async processAction(action: string, ...args: unknown[]): Promise<void> {
-    await this.sendAction(action, ...args);
+  async processAction(action: string, ...args: unknown[]): Promise<unknown> {
+    return this.sendAction(action, ...args);
   }
 
   /** @internal */
@@ -209,7 +216,7 @@ export class AbstractController {
     return rbFSend(this, method, ...args);
   }
 
-  async process(action: string, ...args: unknown[]): Promise<void> {
+  async process(action: string, ...args: unknown[]): Promise<unknown> {
     this._actionName = String(action);
 
     const actionName = this._findActionName(this._actionName);
@@ -223,15 +230,15 @@ export class AbstractController {
 
     this._responseBody = null;
 
-    await this.processAction(actionName, ...args);
+    return this.processAction(actionName, ...args);
   }
 
   controllerPath(): string {
-    return (this.constructor as typeof AbstractController).controllerPath();
+    return (this.constructor as typeof Base).controllerPath();
   }
 
   actionMethods(): string[] {
-    return (this.constructor as typeof AbstractController).actionMethods();
+    return (this.constructor as typeof Base).actionMethods();
   }
 
   isAvailableAction(actionName: string): boolean {
@@ -244,7 +251,7 @@ export class AbstractController {
 
   /** @internal */
   isActionMethod(name: string): boolean {
-    return (this.constructor as typeof AbstractController).actionMethods().includes(name);
+    return (this.constructor as typeof Base).actionMethods().includes(name);
   }
 
   /** @internal */
@@ -278,4 +285,7 @@ export class AbstractController {
   }
 }
 
-include(AbstractController, Configurable);
+include(Base, Configurable);
+
+rbModConstSet(AbstractController, "Base", Base);
+rbModConstSet(AbstractController, "ActionNotFound", ActionNotFound);

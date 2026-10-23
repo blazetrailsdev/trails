@@ -8,6 +8,7 @@
  *   custom types and rejects them with a clear error (per PR 6).
  */
 
+import type { AbstractAdapter } from "../abstract-adapter.js";
 import {
   sql as arelSql,
   arelNode,
@@ -17,17 +18,17 @@ import {
   Table,
   InsertManager,
 } from "@blazetrails/arel";
-import { stringify as yamlStringify } from "@blazetrails/ruby-compat/psych-adapter";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import {
   rbGetKwargs,
   aryReject,
   kernelInteger,
-  Module,
   rbInspect,
   rtest,
   RuntimeError,
   rbObjRespondTo,
+  Hash,
 } from "@blazetrails/ruby-compat";
 import {
   TransactionIsolationError,
@@ -91,8 +92,8 @@ export function toSqlAndBinds(
       );
     }
 
-    const host = this as unknown as DatabaseStatementsHost | undefined;
-    const visitor = (host as any)?.visitor as Visitors.ToSql;
+    const host = this as DatabaseStatementsHost | undefined;
+    const visitor = host?.visitor as Visitors.ToSql;
 
     const collector = host!.collector!() as unknown as Collectors.Composite;
     collector.retryable = true;
@@ -102,7 +103,7 @@ export function toSqlAndBinds(
       collector.preparable = true;
       [sql, binds] = visitor.compile(arelOrSqlString, collector) as unknown as [string, unknown[]];
 
-      if (binds.length > (host as unknown as { bindParamsLength(): number }).bindParamsLength()) {
+      if (binds.length > host!.bindParamsLength!()) {
         return host!.unpreparedStatement!(() => toSqlAndBinds.call(host, arelOrSqlString)) as [
           string,
           unknown[],
@@ -128,6 +129,11 @@ export function toSqlAndBinds(
 export type ExplainOption = string;
 
 export interface DatabaseStatementsHost {
+  visitor?: AbstractAdapter["visitor"];
+  bindParamsLength?: AbstractAdapter["bindParamsLength"];
+  withRawConnection?: AbstractAdapter["withRawConnection"];
+  /** @internal */
+  performQuery?: typeof performQuery;
   _transactionManager?: TransactionManager;
   readonly transactionManager?: TransactionManager;
   preparedStatements?: boolean;
@@ -251,8 +257,8 @@ export function cacheableQuery(
   },
   arel: unknown,
 ): [unknown, unknown[]] {
-  const host = this as unknown as DatabaseStatementsHost;
-  const visitor = (host as any).visitor as Visitors.ToSql;
+  const host = this as DatabaseStatementsHost;
+  const visitor = host.visitor as Visitors.ToSql;
 
   const ast = (arel as { ast: Nodes.Node }).ast;
 
@@ -338,7 +344,7 @@ export function explain(
 }
 
 export async function insert(
-  this: any,
+  this: DatabaseStatementsHost & AbstractAdapter,
   arel: unknown,
   name: string | null = null,
   pk?: string | null,
@@ -350,9 +356,9 @@ export async function insert(
   let sql: string;
   [sql, binds] = toSqlAndBinds.call(this, arel, binds);
   const value = await this.execInsert(sql, name, binds, pk, sequenceName, opts?.returning ?? null);
-  if (opts?.returning != null) return this.returningColumnValues(value);
+  if (opts?.returning != null) return this.returningColumnValues!(value);
 
-  return rtest(idValue) ? idValue : this.lastInsertedId(value);
+  return rtest(idValue) ? idValue : this.lastInsertedId!(value);
 }
 
 /** @missingRailsName buildTruncateStatement — PERMANENT */
@@ -486,19 +492,20 @@ export function resetTransaction(
   options?: { restore?: boolean },
   callback?: () => Promise<unknown>,
 ): void | Promise<unknown> {
-  const self = this as any;
   const oldState =
-    options?.restore && self._transactionManager?.isRestorable() ? self._transactionManager : null;
+    options?.restore && this._transactionManager?.isRestorable() ? this._transactionManager : null;
 
-  self._transactionManager = new TransactionManager(self);
+  this._transactionManager = new TransactionManager(
+    this as unknown as ConstructorParameters<typeof TransactionManager>[0],
+  );
 
   if (callback) {
     return (async () => {
       const result = await callback();
 
       if (oldState) {
-        self._transactionManager = oldState;
-        await self._transactionManager.restoreTransactions();
+        this._transactionManager = oldState;
+        await this._transactionManager.restoreTransactions();
       }
 
       return result;
@@ -623,8 +630,8 @@ export function sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral {
 }
 
 export function withYamlFallback(value: unknown): unknown {
-  if (isPlainObject(value) || Array.isArray(value)) {
-    return yamlStringify(value, { directives: true });
+  if (isPlainObject(value) || value instanceof Hash || Array.isArray(value)) {
+    return YAML.dump(value);
   } else {
     return value;
   }
@@ -691,8 +698,8 @@ export async function rawExecute(
 ): Promise<unknown> {
   const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
   return this.log!(sql, name, binds ?? [], typeCastedBinds, async, (notificationPayload) =>
-    (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
-      (this as any).performQuery(conn, sql, binds ?? [], typeCastedBinds, {
+    this.withRawConnection!({ allowRetry, materializeTransactions }, (conn: unknown) =>
+      this.performQuery!(conn, sql, binds ?? [], typeCastedBinds, {
         prepare,
         notificationPayload,
         batch,
@@ -789,7 +796,7 @@ export function castResult(rawResult: any): never {
 
 export const create = insert;
 
-export const DatabaseStatements = new Module().include({
+export const DatabaseStatements = {
   resetTransaction,
   selectAll(
     this: DatabaseStatementsDefaultsHost,
@@ -935,7 +942,7 @@ export const DatabaseStatements = new Module().include({
   create,
 
   async update(
-    this: any,
+    this: DatabaseStatementsHost & AbstractAdapter,
     arel: unknown,
     name: string | null = null,
     binds: unknown[] = [],
@@ -946,7 +953,7 @@ export const DatabaseStatements = new Module().include({
   },
 
   async delete(
-    this: any,
+    this: DatabaseStatementsHost & AbstractAdapter,
     arel: unknown,
     name: string | null = null,
     binds: unknown[] = [],
@@ -1023,7 +1030,7 @@ export const DatabaseStatements = new Module().include({
   singleValueFromRows,
   arelFromRelation,
   extractTableRefFromInsertSql,
-});
+};
 
 /** @internal */
 export function affectedRows(rawResult: any): never {
@@ -1062,8 +1069,8 @@ export function internalExecute(
   block?: (result: unknown) => unknown,
 ): Promise<unknown> {
   const processed = preprocessQuery.call(this, sql);
-  return (this as any).rawExecute(
-    processed,
+  return this.rawExecute(
+    processed!,
     name,
     binds,
     prepare,
@@ -1084,15 +1091,7 @@ export async function executeBatch(
   }: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
 ): Promise<void> {
   for (const statement of statements) {
-    await (this as any).rawExecute(
-      statement,
-      name,
-      [],
-      false,
-      false,
-      allowRetry,
-      materializeTransactions,
-    );
+    await this.rawExecute(statement, name, [], false, false, allowRetry, materializeTransactions);
   }
 }
 

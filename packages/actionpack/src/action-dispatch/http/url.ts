@@ -1,7 +1,7 @@
-import { isBlank, toParam, toQuery } from "@blazetrails/activesupport";
-import { escapeFragment } from "../journey/router/utils.js";
+import { isBlank, mattrAccessor, presence, toParam, toQuery } from "@blazetrails/activesupport";
+import { Utils } from "../journey/router/utils.js";
 import { Utils as RackUtils } from "@blazetrails/rack";
-import { fetch, rbInspect, toI } from "@blazetrails/ruby-compat";
+import { ArgumentError, fetch, rbInspect, toI } from "@blazetrails/ruby-compat";
 
 const IP_HOST_REGEXP = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const HOST_REGEXP = /(^[^:]+:\/\/)?(\[[^\]]+\]|[^:]+)(?::(\d+$))?/;
@@ -61,7 +61,7 @@ function addParams(path: string[], params: unknown): void {
 function addAnchor(path: string[], anchor: unknown): void {
   if (anchor !== null && anchor !== undefined && anchor !== false) {
     const p = toParam(anchor);
-    path.push(`#${escapeFragment(String(p ?? ""))}`);
+    path.push(`#${Utils.escapeFragment(String(p ?? ""))}`);
   }
 }
 
@@ -139,52 +139,59 @@ function buildHostUrl(
     if (!("port" in options)) port = match[3] ?? null;
   }
 
-  const protocolStr = normalizeProtocol(protocol);
+  protocol = normalizeProtocol(protocol);
   host = normalizeHost(host, options);
 
-  let result = protocolStr;
+  let result = protocol;
   if (options.user && options.password) {
     result += `${RackUtils.escape(options.user)}:${RackUtils.escape(options.password)}@`;
   }
   result += host;
-  normalizePort(port, protocolStr, (normalizedPort) => {
+  normalizePort(port, protocol, (normalizedPort) => {
     result += `:${normalizedPort}`;
   });
   result += path;
   return result;
 }
 
-export const URL = {
-  secureProtocol: false as boolean,
-  tldLength: 1 as number,
+export class URL {
+  declare static secureProtocol: boolean;
+  declare static tldLength: number;
+  declare secureProtocol: boolean;
+  declare tldLength: number;
 
-  extractDomain(host: string, tldLength: number): string | null {
+  static {
+    mattrAccessor.call(this, "secureProtocol", { default: false });
+    mattrAccessor.call(this, "tldLength", { default: 1 });
+  }
+
+  static extractDomain(host: string, tldLength: number): string | null {
     return namedHost(host) ? extractDomainFrom(host, tldLength) : null;
-  },
+  }
 
-  extractSubdomains(host: string, tldLength: number): string[] {
+  static extractSubdomains(host: string, tldLength: number): string[] {
     return namedHost(host) ? extractSubdomainsFrom(host, tldLength) : [];
-  },
+  }
 
-  extractSubdomain(host: string, tldLength: number): string {
+  static extractSubdomain(host: string, tldLength: number): string {
     return URL.extractSubdomains(host, tldLength).join(".");
-  },
+  }
 
-  urlFor(options: UrlOptions): string {
+  static urlFor(options: UrlOptions): string {
     return options.onlyPath ? URL.pathFor(options) : URL.fullUrlFor(options);
-  },
+  }
 
-  fullUrlFor(options: UrlOptions): string {
+  static fullUrlFor(options: UrlOptions): string {
     const { host, protocol, port } = options;
     if (!host) {
-      throw new Error(
+      throw new ArgumentError(
         "Missing host to link to! Please provide the :host parameter, set default_url_options[:host], or set :only_path to true",
       );
     }
     return buildHostUrl(host, port, protocol, options, URL.pathFor(options));
-  },
+  }
 
-  pathFor(options: UrlOptions): string {
+  static pathFor(options: UrlOptions): string {
     let path = (options.scriptName ?? "").replace(/\/$/, "");
     if ("path" in options && options.path !== undefined) path += options.path;
     if (options.trailingSlash && isBlank(path)) path = "/";
@@ -193,5 +200,87 @@ export const URL = {
     if ("params" in options) addParams(parts, options.params);
     if ("anchor" in options) addAnchor(parts, options.anchor);
     return parts.join("");
-  },
-};
+  }
+
+  declare protected getHeader: (name: string) => unknown;
+  declare protected ssl: boolean;
+  declare protected xForwardedHost: string | undefined;
+  declare protected serverName: string | undefined;
+  declare protected fullpath: string;
+  /** @internal */
+  declare protected _protocol: string | null;
+  /** @internal */
+  declare protected _port: number | null;
+
+  get url(): string {
+    return this.protocol + this.hostWithPort() + this.fullpath;
+  }
+
+  get protocol(): string {
+    return (this._protocol ??= this.ssl ? "https://" : "http://");
+  }
+
+  get rawHostWithPort(): string {
+    const forwarded = presence(this.xForwardedHost);
+    if (forwarded != null) {
+      return forwarded.split(/,\s?/).at(-1)!;
+    } else {
+      return (
+        (this.getHeader("HTTP_HOST") as string | undefined) ??
+        `${this.serverName ?? ""}:${this.getHeader("SERVER_PORT") ?? ""}`
+      );
+    }
+  }
+
+  get host(): string {
+    return this.rawHostWithPort.replace(/:\d+$/, "");
+  }
+
+  hostWithPort(): string {
+    return `${this.host}${this.portString}`;
+  }
+
+  get port(): number {
+    if (this._port == null) {
+      const match = this.rawHostWithPort.match(/:(\d+)$/);
+      this._port = match ? Number(toI(match[1])) : this.standardPort;
+    }
+    return this._port;
+  }
+
+  get standardPort(): number {
+    if ("https://" === this.protocol) {
+      return 443;
+    } else {
+      return 80;
+    }
+  }
+
+  get isStandardPort(): boolean {
+    return this.port === this.standardPort;
+  }
+
+  get optionalPort(): number | null {
+    return this.isStandardPort ? null : this.port;
+  }
+
+  get portString(): string {
+    return this.isStandardPort ? "" : `:${this.port}`;
+  }
+
+  get serverPort(): number {
+    return Number(toI(this.getHeader("SERVER_PORT")));
+  }
+
+  domain(tldLength: number = URL.tldLength): string | null {
+    return URL.extractDomain(this.host, tldLength);
+  }
+
+  subdomains(tldLength: number = URL.tldLength): string[] {
+    return URL.extractSubdomains(this.host, tldLength);
+  }
+
+  subdomain(tldLength: number = URL.tldLength): string {
+    return URL.extractSubdomain(this.host, tldLength);
+  }
+}

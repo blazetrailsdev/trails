@@ -105,9 +105,9 @@ describe("Tempfile", () => {
     const tempfile = Tempfile.new("bin");
     tempfile.binmode();
     tempfile.write(Uint8Array.from(bytes));
-    expect(tempfile.read()).toBe("");
+    expect(tempfile.read()).toEqual(new Uint8Array(0));
     tempfile.rewind();
-    expect([...tempfile.read()].map((c) => c.charCodeAt(0))).toEqual(bytes);
+    expect([...tempfile.read()]).toEqual(bytes);
     tempfile.close();
     tempfile.unlink();
   });
@@ -129,7 +129,7 @@ describe("Tempfile", () => {
     tempfile.setEncoding(Encoding.BINARY);
     tempfile.write(Uint8Array.from(bytes));
     tempfile.rewind();
-    expect([...tempfile.read()].map((c) => c.charCodeAt(0))).toEqual(bytes);
+    expect([...tempfile.read()]).toEqual(bytes);
     tempfile.close();
     tempfile.unlink();
   });
@@ -193,9 +193,9 @@ describe("Tempfile", () => {
     tempfile.write("thunderhorse");
     tempfile.rewind();
 
-    expect(tempfile.read(7)).toBe("thunder");
+    expect(tempfile.read(7)).toEqual(new TextEncoder().encode("thunder"));
     const buffer = new Uint8Array(5);
-    expect(tempfile.read(5, buffer)).toBe("horse");
+    expect(tempfile.read(5, buffer)).toEqual(new TextEncoder().encode("horse"));
     expect(String.fromCharCode(...buffer)).toBe("horse");
     expect(tempfile.read(1)).toBeNull();
 

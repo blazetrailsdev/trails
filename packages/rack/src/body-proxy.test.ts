@@ -1,4 +1,5 @@
 import { it, expect } from "vitest";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { BodyProxy } from "./body-proxy.js";
 
 it("call each on the wrapped body", () => {
@@ -12,15 +13,10 @@ it("call each on the wrapped body", () => {
 });
 
 it("call close on the wrapped body", () => {
-  let closed = false;
-  const body = {
-    close() {
-      closed = true;
-    },
-  };
+  const body = new StringIO();
   const proxy = new BodyProxy(body, () => {});
   proxy.close();
-  expect(closed).toBe(true);
+  expect(body.isClosed()).toBeTruthy();
 });
 
 it("only call close on the wrapped body if it responds to close", () => {
@@ -49,14 +45,21 @@ it("call the passed block on close even if there is an exception", () => {
   const proxy = new BodyProxy(body, () => {
     called = true;
   });
-  expect(called).toBe(false);
-  let caught: Error | undefined;
-  try {
-    proxy.close();
-  } catch (e: any) {
-    caught = e;
-  }
-  expect(caught).toBeDefined();
+  const e = (() => {
+    try {
+      expect(called).toBe(false);
+      proxy.close();
+    } catch (error: any) {
+      return error;
+    }
+  })();
+
+  void (
+    e ??
+    (() => {
+      throw new Error("Expected exception to have been raised");
+    })()
+  );
   expect(called).toBe(true);
 });
 
@@ -72,7 +75,7 @@ it("allows #method to work with delegated methods", () => {
     },
   };
   const proxy = new BodyProxy(body, () => {});
-  expect(proxy.delegate("banana")).toBe("pear");
+  expect(proxy.methodMissing("banana")).toBe("pear");
 });
 
 it("allows calling delegated methods with keywords", () => {
@@ -82,7 +85,7 @@ it("allows calling delegated methods with keywords", () => {
     },
   };
   const proxy = new BodyProxy(body, () => {});
-  expect(proxy.delegate("banana", { foo: 1 })).toBe(1);
+  expect(proxy.methodMissing("banana", { foo: 1 })).toBe(1);
 });
 
 it("respond to :to_ary if body does responds to it, and have to_ary call close", () => {
@@ -104,19 +107,19 @@ it("not respond to :to_ary if body does not respond to it", () => {
   };
   const proxy = new BodyProxy(body, () => {});
   expect(proxy.respondToMissing("to_ary")).toBe(false);
-  expect(() => proxy.delegate("to_ary")).not.toThrow();
+  expect(() => proxy.methodMissing("to_ary")).toThrow(TypeError);
 });
 
 it("not respond to :to_str", () => {
   const proxy = new BodyProxy("string body", () => {});
   expect(proxy.respondToMissing("to_str")).toBe(false);
-  expect(() => proxy.delegate("to_str")).toThrow();
+  expect(() => proxy.methodMissing("to_str")).toThrow();
 });
 
 it("not respond to :to_path if body does not respond to it", () => {
   const proxy = new BodyProxy("string body", () => {});
   expect(proxy.respondToMissing("to_path")).toBe(false);
-  expect(() => proxy.delegate("to_path")).toThrow();
+  expect(() => proxy.methodMissing("to_path")).toThrow();
 });
 
 it("not close more than one time", () => {

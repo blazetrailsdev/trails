@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../activejob" },
+    { "path": "../activemodel" },
+    { "path": "../activerecord" },
+    { "path": "../activesupport" },
+    { "path": "../arel" },
+    { "path": "../date" },
+    { "path": "../globalid" },
+    { "path": "../ruby-compat" }
+  ]
+}

@@ -1,14 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
+import { stderr } from "@blazetrails/ruby-compat";
 import * as Utils from "./utils.js";
 
 describe("Utils.statusCode", () => {
   it("takes the Symbol arm for a ':name' Symbol value", () => {
     expect(Utils.statusCode(":ok")).toBe(200);
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(stderr, "write").mockImplementation(() => true);
     try {
       expect(Utils.statusCode(":not_extended")).toBe(510);
-      expect(warn).toHaveBeenLastCalledWith(
-        "Status code :not_extended is deprecated and will be removed in a future version of Rack.",
+      expect(warn.mock.lastCall![0]).toContain(
+        "warning: Status code :not_extended is deprecated and will be removed in a future version of Rack.\n",
       );
     } finally {
       warn.mockRestore();
@@ -34,5 +35,33 @@ describe("Utils.setCookieHeader", () => {
     expect(Utils.setCookieHeader("foo", { value: "bar", sameSite: ":Lax" })).toBe(
       "foo=bar; samesite=lax",
     );
+  });
+});
+
+describe("Utils.unescapePath", () => {
+  it("decodes every %XX escape and leaves a malformed one as is", () => {
+    expect(Utils.unescapePath("/foo%24bar%2Bbaz%3A")).toBe("/foo$bar+baz:");
+    expect(Utils.unescapePath("/%zz")).toBe("/%zz");
+    expect(Utils.unescapePath("/100%")).toBe("/100%");
+  });
+});
+
+describe("Utils.multipartPartLimit", () => {
+  it("is the same accessor as multipartFileLimit", () => {
+    const old = Utils.multipartFileLimit();
+    try {
+      Utils.setMultipartPartLimit(7);
+      expect(Utils.multipartFileLimit()).toBe(7);
+      Utils.setMultipartFileLimit(9);
+      expect(Utils.multipartPartLimit()).toBe(9);
+    } finally {
+      Utils.setMultipartFileLimit(old);
+    }
+  });
+});
+
+describe("Rack::Utils.parse_cookies_header", () => {
+  it("reads a key-only cookie as nil", () => {
+    expect(Utils.parseCookiesHeader("foo; bar=baz")).toEqual({ foo: null, bar: "baz" });
   });
 });

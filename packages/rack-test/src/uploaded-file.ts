@@ -22,9 +22,9 @@ export interface UploadedFile {
   /** @noRailsEquivalent PERMANENT */
   rewind(): number;
   /** @noRailsEquivalent PERMANENT */
-  setEncoding(extEnc: Encoding | string): File | StringIO;
+  setEncoding(extEnc: Encoding | string): File | StringIO<string | Uint8Array>;
   /** @noRailsEquivalent PERMANENT */
-  binmode(): File | StringIO;
+  binmode(): File | StringIO<string | Uint8Array>;
   /** @noRailsEquivalent PERMANENT */
   isEof(): boolean;
   /** @noRailsEquivalent PERMANENT */
@@ -37,12 +37,12 @@ export interface UploadedFile {
 export class UploadedFile {
   originalFilename: string | null;
 
-  tempfile!: Tempfile | StringIO;
+  tempfile!: Tempfile | StringIO<string | Uint8Array>;
 
   contentType: string | null;
 
   constructor(
-    content: StringIO | string,
+    content: StringIO<string | Uint8Array> | string,
     contentType: string | null = "text/plain",
     binary: boolean = false,
     { originalFilename = null }: { originalFilename?: string | null } = {},
@@ -84,10 +84,8 @@ export class UploadedFile {
    * Ruby's `buf` is a mutable String `readpartial` refills in place
    * (`vendor/ruby/v3.3.11/io.c:3590`); JS strings are immutable, so the reusable buffer
    * is the `Uint8Array` `IO#read`'s `str` argument already takes.
-   *
-   * @missingRailsArgs new — PERMANENT: a JS string is immutable, so Ruby's reusable `String.new` buffer is a sized `Uint8Array`
    */
-  appendTo(buffer: StringIO): null {
+  appendTo(buffer: StringIO<string | Uint8Array>): null {
     this.tempfile.rewind();
 
     const buf = new Uint8Array(65_536);
@@ -98,7 +96,7 @@ export class UploadedFile {
     return null;
   }
 
-  private initializeFromStringio(stringio: StringIO): void {
+  private initializeFromStringio(stringio: StringIO<string | Uint8Array>): void {
     if (this.originalFilename == null)
       throw new ArgumentError("Missing `original_filename` for StringIO object");
 

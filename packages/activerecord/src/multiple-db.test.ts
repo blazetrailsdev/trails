@@ -121,9 +121,9 @@ describe("MultipleDbTest", () => {
   });
 
   it("exception contains connection pool", async () => {
-    const error = (await assertRaises([StatementInvalid], {}, () =>
+    const error = await assertRaises([StatementInvalid], {}, () =>
       Course.where({ wrong_column: "wrong" }).firstBang(),
-    )) as StatementInvalid;
+    );
 
     expect(error.connectionPool).toBe(((await Course.leaseConnection()) as { pool: unknown }).pool);
   });
@@ -140,15 +140,15 @@ describe("MultipleDbTest", () => {
 
     expect(courseConn).not.toBe(entrantConn);
 
-    const courseError = (await assertRaises([StatementInvalid], {}, () =>
+    const courseError = await assertRaises([StatementInvalid], {}, () =>
       courseConn.execute("SELECT * FROM entrants"),
-    )) as StatementInvalid;
+    );
 
     expect(courseError.connectionPool).toBe(courseConn.pool);
 
-    const entrantError = (await assertRaises([StatementInvalid], {}, () =>
+    const entrantError = await assertRaises([StatementInvalid], {}, () =>
       entrantConn.execute("SELECT * FROM courses"),
-    )) as StatementInvalid;
+    );
 
     expect(entrantError.connectionPool).toBe(entrantConn.pool);
   });

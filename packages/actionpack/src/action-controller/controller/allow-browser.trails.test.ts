@@ -3,8 +3,8 @@ import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Metal } from "../metal.js";
-import { Request } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
+import { Request } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 
 const CHROME_118 =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118 Safari/537.36";

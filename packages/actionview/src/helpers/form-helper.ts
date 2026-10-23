@@ -2,6 +2,7 @@ import {
   CodeGenerator,
   I18n,
   SafeBuffer,
+  attrInternal,
   classAttribute,
   constantize,
   cattrAccessor,
@@ -11,42 +12,52 @@ import {
   isBlank,
   isExtractableOptions,
   isPlainObject,
+  isPresent,
   onLoad,
   presence,
   reverseMergeBang,
   underscore,
+  Concern,
+  extend,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   block as rbBlock,
   compact,
   Hash,
-  except,
   fetch,
   hashDelete,
-  merge,
-  rbFPublicSend,
+  rbFSend,
   rbInspect,
   rbObjRespondTo,
   slice,
+  classModule,
+  include,
 } from "@blazetrails/ruby-compat";
 
-import { convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
+import { ModelNaming, convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
 export { convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
-import { domClass, domId } from "../record-identifier.js";
+import { RecordIdentifier, domClass, domId } from "../record-identifier.js";
 export { domClass, domId } from "../record-identifier.js";
 import { ActionView } from "../namespaces.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
 import {
+  buttonTag,
+  convertDirectUploadOptionToUrl,
   embedAuthenticityTokenInRemoteForms,
   formTagHtml,
   formTagWithBody,
   htmlOptionsForForm,
   type FormTagHelperHost,
+  FormTagHelper,
 } from "./form-tag-helper.js";
+import { CheckBox } from "./tags/check-box.js";
+import { FileField } from "./tags/file-field.js";
 import { Label, type LabelBuilder } from "./tags/label.js";
+import { RadioButton } from "./tags/radio-button.js";
 import { PasswordField } from "./tags/password-field.js";
 import { HiddenField } from "./tags/hidden-field.js";
+import type { select } from "./form-options-helper.js";
 import { TextArea } from "./tags/text-area.js";
 import { ColorField } from "./tags/color-field.js";
 import { TelField } from "./tags/tel-field.js";
@@ -61,6 +72,7 @@ import { NumberField } from "./tags/number-field.js";
 import { RangeField } from "./tags/range-field.js";
 import { SearchField } from "./tags/search-field.js";
 import { TextField } from "./tags/text-field.js";
+import { UrlHelper } from "./url-helper.js";
 
 const __FILE__ = import.meta.url;
 const __LINE__ = 0;
@@ -68,6 +80,11 @@ const __LINE__ = 0;
 export interface FormHelperHost extends FormTagHelperHost, CaptureHelperHost {
   fieldsFor: typeof fieldsFor;
   hiddenField: typeof hiddenField;
+  fileField: typeof fileField;
+  select?: typeof select;
+  checkbox: typeof checkbox;
+  radioButton: typeof radioButton;
+  buttonTag: typeof buttonTag;
   label: typeof label;
   _objectForFormBuilder: typeof _objectForFormBuilder;
   defaultFormBuilder: unknown;
@@ -105,7 +122,7 @@ export function formFor(
   record: unknown,
   options: Record<string, unknown> = {},
   block?: (builder: FormBuilder) => unknown,
-): SafeBuffer {
+): SafeBuffer | Promise<SafeBuffer> {
   if (block === undefined) throw new ArgumentError("Missing block");
 
   let model: unknown;
@@ -174,9 +191,23 @@ export function applyFormForOptionsBang(
 
 export function formWith(
   this: FormHelperHost,
+  options: FormWithOptions,
+  block: (builder: FormBuilder) => PromiseLike<unknown>,
+): Promise<SafeBuffer>;
+export function formWith(
+  this: FormHelperHost,
+  options?: FormWithOptions,
+  block?: (builder: FormBuilder) => unknown,
+): SafeBuffer;
+/**
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+ */
+export function formWith(
+  this: FormHelperHost,
   { scope = null, url = null, format = null, ...rest }: FormWithOptions = {},
   block?: (builder: FormBuilder) => unknown,
-): SafeBuffer {
+): SafeBuffer | Promise<SafeBuffer> {
   let model = "model" in rest ? rest.model : false;
   delete rest.model;
   if (model == null) {
@@ -205,6 +236,18 @@ export function formWith(
   if (block !== undefined) {
     const builder = instantiateBuilder.call(this, scope, model, options);
     const output = capture.call(this, block as (...args: unknown[]) => unknown, builder);
+    if (output instanceof Promise) {
+      return output.then((output) => {
+        if (options["multipart"] == null || options["multipart"] === false) {
+          options["multipart"] = builder.isMultipart();
+        }
+        return formTagWithBody.call(
+          this,
+          htmlOptionsForFormWith.call(this, url, model, options),
+          output,
+        );
+      });
+    }
     if (options["multipart"] == null || options["multipart"] === false) {
       options["multipart"] = builder.isMultipart();
     }
@@ -235,13 +278,22 @@ export function fieldsFor(
 export function fields(
   this: FormHelperHost,
   scope: unknown = null,
-  { model = null, ...rest }: { model?: unknown; [key: string]: unknown } = {},
+  options: { model?: unknown; [key: string]: unknown } | ((builder: FormBuilder) => unknown) = {},
   block?: (builder: FormBuilder) => unknown,
 ): SafeBuffer | null {
-  const options: Record<string, unknown> = Object.assign(
+  if (isPlainObject(scope))
+    [scope, options, block] = [
+      null,
+      scope as Record<string, unknown>,
+      (typeof options === "function" ? options : block) as never,
+    ];
+  if (typeof options === "function") [options, block] = [{}, options];
+  let model: unknown = options["model"] ?? null;
+  options = Object.assign(
     { allowMethodNamesOutsideObject: true, skipDefaultIds: !formWithGeneratesIds },
-    rest,
+    options,
   );
+  delete options["model"];
 
   if (model != null && model !== false) {
     model = _objectForFormBuilder(model);
@@ -290,6 +342,22 @@ export function hiddenField(
   return new HiddenField(objectName, method, this, options).render();
 }
 
+export function fileField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  options = Object.assign({ includeHidden: multipleFileFieldIncludeHidden }, options);
+
+  return new FileField(
+    objectName,
+    method,
+    this,
+    convertDirectUploadOptionToUrl.call(this, { ...options }),
+  ).render();
+}
+
 export function textarea(
   this: FormHelperHost,
   objectName: unknown,
@@ -299,6 +367,28 @@ export function textarea(
   return new TextArea(objectName, method, this, options).render();
 }
 export const textArea = textarea;
+
+export function checkbox(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+  checkedValue: unknown = "1",
+  uncheckedValue: unknown = "0",
+): unknown {
+  return new CheckBox(objectName, method, this, checkedValue, uncheckedValue, options).render();
+}
+export const checkBox = checkbox;
+
+export function radioButton(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  tagValue: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new RadioButton(objectName, method, this, tagValue, options).render();
+}
 
 export function colorField(
   this: FormHelperHost,
@@ -578,7 +668,7 @@ export class FormBuilder {
   }
 
   static _toPartialPath(): string | null {
-    if (!Object.prototype.hasOwnProperty.call(this, "__toPartialPath")) {
+    if (!Object.hasOwn(this, "__toPartialPath")) {
       const name = underscore(demodulize(this.name));
       const partialPath = name.replace(/_builder$/, "");
       this.__toPartialPath = partialPath === name ? null : partialPath;
@@ -608,11 +698,9 @@ export class FormBuilder {
     this._defaultOptions = this.options
       ? slice(this.options, "index", "namespace", "skipDefaultIds", "allowMethodNamesOutsideObject")
       : {};
-    this._defaultHtmlOptions = except(
-      this._defaultOptions,
-      "skipDefaultIds",
-      "allowMethodNamesOutsideObject",
-    );
+    const { skipDefaultIds, allowMethodNamesOutsideObject, ...defaultHtmlOptions } =
+      this._defaultOptions;
+    this._defaultHtmlOptions = defaultHtmlOptions;
 
     this.convertToLegacyOptions(this.options);
 
@@ -763,9 +851,18 @@ export class FormBuilder {
 
   fields(
     scope: unknown = null,
-    { model = null, ...options }: { model?: unknown; [key: string]: unknown } = {},
+    options: { model?: unknown; [key: string]: unknown } | ((builder: FormBuilder) => unknown) = {},
     block?: (builder: FormBuilder) => unknown,
   ): unknown {
+    if (isPlainObject(scope))
+      [scope, options, block] = [
+        null,
+        scope as Record<string, unknown>,
+        (typeof options === "function" ? options : block) as never,
+      ];
+    if (typeof options === "function") [options, block] = [{}, options];
+    const { model = null, ...rest }: { model?: unknown; [key: string]: unknown } = options;
+    options = rest;
     options["allowMethodNamesOutsideObject"] = true;
     options["skipDefaultIds"] = !formWithGeneratesIds;
 
@@ -789,9 +886,43 @@ export class FormBuilder {
     );
   }
 
+  checkbox(
+    method: unknown,
+    options: Record<string, unknown> = {},
+    checkedValue: unknown = "1",
+    uncheckedValue: unknown = "0",
+  ): unknown {
+    return this._template.checkbox(
+      this.objectName,
+      method,
+      this.objectifyOptions(options),
+      checkedValue,
+      uncheckedValue,
+    );
+  }
+
+  declare checkBox: FormBuilder["checkbox"];
+  static {
+    this.prototype.checkBox = this.prototype.checkbox;
+  }
+
+  radioButton(method: unknown, tagValue: unknown, options: Record<string, unknown> = {}): unknown {
+    return this._template.radioButton(
+      this.objectName,
+      method,
+      tagValue,
+      this.objectifyOptions(options),
+    );
+  }
+
   hiddenField(method: unknown, options: Record<string, unknown> = {}): unknown {
     if (method === "id") this._emittedHiddenId = true;
     return this._template.hiddenField(this.objectName, method, this.objectifyOptions(options));
+  }
+
+  fileField(method: unknown, options: Record<string, unknown> = {}): unknown {
+    this.multipart = true;
+    return this._template.fileField(this.objectName, method, this.objectifyOptions(options));
   }
 
   isEmittedHiddenId(): unknown {
@@ -809,8 +940,61 @@ export class FormBuilder {
     return this._template.submitTag(value, options);
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+   */
+  button(
+    value: unknown = null,
+    options: Record<string, unknown> = {},
+    block?: (value: unknown) => unknown,
+  ): SafeBuffer | Promise<SafeBuffer> {
+    if (isPlainObject(value) || value instanceof Hash) {
+      [value, options] = [null, value as Record<string, unknown>];
+    } else if (typeof value === "string" && value.startsWith(":")) {
+      [value, options] = [
+        null,
+        Object.assign(
+          { name: this.fieldName(value.slice(1)), id: this.fieldId(value.slice(1)) },
+          options,
+        ),
+      ];
+    }
+    if (value == null || value === false) value = this.submitDefaultValue();
+
+    if (block !== undefined) {
+      value = this._template.capture(() => block(value));
+      if (value instanceof Promise) {
+        return value.then((value) => {
+          const formmethod = options["formmethod"];
+          if (
+            isPresent(formmethod) &&
+            !/post|get/i.test(String(formmethod)) &&
+            !Object.hasOwn(options, "name") &&
+            !Object.hasOwn(options, "value")
+          ) {
+            Object.assign(options, { formmethod: "post", name: "_method", value: formmethod });
+          }
+          return this._template.buttonTag(value, options);
+        });
+      }
+    }
+
+    const formmethod = options["formmethod"];
+    if (
+      isPresent(formmethod) &&
+      !/post|get/i.test(String(formmethod)) &&
+      !Object.hasOwn(options, "name") &&
+      !Object.hasOwn(options, "value")
+    ) {
+      Object.assign(options, { formmethod: "post", name: "_method", value: formmethod });
+    }
+
+    return this._template.buttonTag(value, options);
+  }
+
   private objectifyOptions(options: Record<string, unknown>): Record<string, unknown> {
-    const result = merge(this._defaultOptions, options);
+    const result = { ...this._defaultOptions, ...options };
     result["object"] = this.object;
     return result;
   }
@@ -840,6 +1024,10 @@ export class FormBuilder {
     return rbObjRespondTo(this.object, `${associationName}_attributes=`);
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+   */
   private fieldsForWithNestedAttributes(
     associationName: string,
     association: unknown,
@@ -850,16 +1038,17 @@ export class FormBuilder {
     association = convertToModel(association);
 
     if (rbObjRespondTo(association, "isPersisted")) {
-      if (rbObjRespondTo(rbFPublicSend(this.object, associationName), "toAry")) {
+      if (rbObjRespondTo(rbFSend(this.object, associationName), "toAry")) {
         association = [association];
       }
     } else if (!rbObjRespondTo(association, "toAry")) {
-      association = rbFPublicSend(this.object, associationName);
+      association = rbFSend(this.object, associationName);
     }
 
     if (rbObjRespondTo(association, "toAry")) {
       const explicitChildIndex = options["childIndex"];
       const output = new SafeBuffer();
+      const contents: unknown[] = [];
       for (const child of association as Iterable<unknown>) {
         if (explicitChildIndex != null && explicitChildIndex !== false) {
           if (rbObjRespondTo(explicitChildIndex, "call")) {
@@ -874,15 +1063,26 @@ export class FormBuilder {
           options,
           block,
         );
-        if (content != null) output.concat(content);
+        contents.push(content);
       }
-      return output;
+      const concatAll = (settled: unknown[]) => {
+        for (const content of settled) if (content != null) output.concat(content as SafeBuffer);
+        return output;
+      };
+      if (contents.some((content) => content instanceof Promise)) {
+        return Promise.all(contents).then(concatAll);
+      }
+      return concatAll(contents);
     } else if (association != null && association !== false) {
       return this.fieldsForNestedModel(name, association, options, block);
     }
     return null;
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+   */
   private fieldsForNestedModel(
     name: string,
     object: unknown,
@@ -902,6 +1102,17 @@ export class FormBuilder {
 
     return this._template.fieldsFor(name, object, fieldsOptions, (f) => {
       const output = this._template.capture(block as (...args: unknown[]) => unknown, f);
+      if (output instanceof Promise) {
+        return output.then((output) => {
+          if (output != null && emitHiddenId != null && emitHiddenId !== false) {
+            const emittedHiddenId = f.isEmittedHiddenId();
+            if (emittedHiddenId == null || emittedHiddenId === false) {
+              output.concat(f.hiddenField("id"));
+            }
+          }
+          return output;
+        });
+      }
       if (output != null && emitHiddenId != null && emitHiddenId !== false) {
         const emittedHiddenId = f.isEmittedHiddenId();
         if (emittedHiddenId == null || emittedHiddenId === false) {
@@ -930,4 +1141,30 @@ onLoad("action_view", (base: unknown) => {
     instanceReader: false,
     default: () => FormBuilder,
   });
+});
+
+export class FormHelper {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+}
+
+extend(FormHelper, Concern);
+
+include(FormHelper, FormTagHelper);
+include(FormHelper, UrlHelper);
+include(FormHelper, ModelNaming);
+include(FormHelper, RecordIdentifier);
+
+attrInternal.call(FormHelper.prototype, "defaultFormBuilder");
+Object.assign(FormHelper.prototype, { formFor, applyFormForOptionsBang, formWith, fieldsFor });
+Object.assign(FormHelper.prototype, { fields, label, textField, passwordField, hiddenField });
+Object.assign(FormHelper.prototype, { fileField, textarea, textArea, checkbox, checkBox });
+Object.assign(FormHelper.prototype, { radioButton, colorField, searchField, telephoneField });
+Object.assign(FormHelper.prototype, { phoneField, dateField, timeField, datetimeField });
+Object.assign(FormHelper.prototype, { datetimeLocalField, monthField, weekField, urlField });
+Object.assign(FormHelper.prototype, { emailField, numberField, rangeField, _objectForFormBuilder });
+Object.assign(FormHelper.prototype, {
+  htmlOptionsForFormWith,
+  instantiateBuilder,
+  defaultFormBuilderClass,
 });

@@ -1,19 +1,24 @@
-import { ArgumentError, File } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  File,
+  RuntimeError,
+  rbBlockGivenP,
+  rbFBinding,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
 
-type RackApp = (env: Record<string, any>) => any;
-type MiddlewareFactory = new (app: RackApp, ...args: any[]) => { call: RackApp };
+type RackApp = { call(env: Record<string, any>): any } | ((env: Record<string, any>) => any);
+type MiddlewareFactory = new (app: RackApp, ...args: any[]) => RackApp;
+
+export const BUILDER_TOPLEVEL_BINDING = (builder: Builder): Builder => rbFBinding(builder);
 
 export class Builder {
-  private _middlewares: Array<{
-    klass: MiddlewareFactory | ((app: RackApp) => { call: RackApp });
-    args: any[];
-    block?: any;
-  }> = [];
-  private _map: Record<string, RackApp> = {};
+  private _use: Array<(app: RackApp) => RackApp> = [];
+  private _map: Record<string, (builder: Builder) => void> | null = null;
   private _run: RackApp | null = null;
   private _warmupBlock: ((app: RackApp) => void) | null = null;
-  private _frozen = false;
+  private _freezeApp = false;
   readonly options: Record<string, unknown>;
 
   constructor(
@@ -37,7 +42,7 @@ export class Builder {
     if (config.charCodeAt(0) === 0xfeff) config = config.slice(1);
 
     if (/^#\\(.*)/m.test(config)) {
-      throw new Error(
+      throw new RuntimeError(
         `Parsing options from the first comment line is no longer supported: ${path}`,
       );
     }
@@ -58,6 +63,7 @@ export class Builder {
     options: Record<string, unknown> = {},
   ): RackApp {
     const builder = new this(null, options);
+    const binding = rbFSend(BUILDER_TOPLEVEL_BINDING, "call", builder) as Builder;
     const source =
       `"use strict";\n${builderScript}` +
       `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
@@ -70,7 +76,7 @@ export class Builder {
       });
     }
     try {
-      configFn(builder);
+      configFn(binding);
     } catch (err) {
       throw new Error(`Error evaluating config from ${path}: ${(err as Error).message}`, {
         cause: err,
@@ -80,7 +86,21 @@ export class Builder {
   }
 
   use(middleware: any, ...args: any[]): this {
-    this._middlewares.push({ klass: middleware, args });
+    const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+    if (this._map) {
+      const mapping = this._map;
+      this._map = null;
+      this._use.push((app) => this.generateMap(app, mapping));
+    }
+    this._use.push((app) =>
+      typeof middleware === "function" && middleware.prototype && middleware.prototype.call
+        ? new (middleware as MiddlewareFactory)(app, ...args, ...(block ? [block] : []))
+        : (middleware as (app: RackApp, ...args: any[]) => RackApp)(
+            app,
+            ...args,
+            ...(block ? [block] : []),
+          ),
+    );
     return this;
   }
 
@@ -90,14 +110,13 @@ export class Builder {
     if (app && block) {
       throw new ArgumentError("Both app and block given!");
     }
-    this._run = block || app;
+    this._run = app || block!;
     return this;
   }
 
   map(path: string, block: (builder: Builder) => void): this {
-    const inner = new Builder();
-    block(inner);
-    this._map[path] = inner.toApp();
+    this._map ??= {};
+    this._map[path] = block;
     return this;
   }
 
@@ -107,7 +126,7 @@ export class Builder {
   }
 
   freezeApp(): this {
-    this._frozen = true;
+    this._freezeApp = true;
     return this;
   }
 
@@ -116,34 +135,34 @@ export class Builder {
   }
 
   async call(env: Record<string, any>): Promise<any> {
-    return this.toApp()(env);
+    return rbFSend(this.toApp(), "call", env);
   }
 
+  /**
+   * @missingRailsName run — PERMANENT
+   * @missingRailsName map — PERMANENT
+   */
   toApp(): RackApp {
-    const app =
-      Object.keys(this._map).length > 0 ? this.generateMap(this._run, this._map) : this._run;
-    if (!app) throw new Error("missing run or map statement");
-    let result = app;
-    for (let i = this._middlewares.length - 1; i >= 0; i--) {
-      const { klass, args } = this._middlewares[i];
-      const inner = result;
-      if (typeof klass === "function" && klass.prototype && klass.prototype.call) {
-        const mw = new (klass as MiddlewareFactory)(inner, ...args);
-        result = (e) => mw.call(e);
-      } else {
-        const mw = (klass as any)(inner, ...args);
-        result = (e) => mw.call(e);
-      }
-    }
-    if (this._warmupBlock) this._warmupBlock(result);
-    return result;
+    let app = this._map ? this.generateMap(this._run, this._map) : this._run;
+    if (!app) throw new RuntimeError("missing run or map statement");
+    if (this._freezeApp) Object.freeze(app);
+    app = this._use.reduceRight((a, e) => {
+      const x = e(a);
+      if (this._freezeApp) Object.freeze(x);
+      return x;
+    }, app);
+    if (this._warmupBlock) rbFSend(this._warmupBlock, "call", app);
+    return app;
   }
 
-  private generateMap(defaultApp: RackApp | null, mapping: Record<string, RackApp>): RackApp {
+  private generateMap(
+    defaultApp: RackApp | null,
+    mapping: Record<string, (builder: Builder) => void>,
+  ): RackApp {
     const mapped: Record<string, RackApp> = defaultApp ? { "/": defaultApp } : {};
     for (const [r, b] of Object.entries(mapping)) {
-      mapped[r] = b;
+      mapped[r] = new (this.constructor as typeof Builder)(defaultApp, {}, b).toApp();
     }
-    return (env) => new URLMap(mapped).call(env);
+    return new URLMap(mapped);
   }
 }

@@ -1,6 +1,4 @@
-import type { TranslationData } from "@blazetrails/i18n";
-
-export const en: TranslationData = {
+export const en: Record<string, unknown> = {
   errors: {
     format: "%{attribute} %{message}",
 

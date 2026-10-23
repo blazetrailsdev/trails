@@ -6,7 +6,7 @@ import type { UniqueReply } from "./reply.js";
 import type { WebReply } from "./reply.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { TimeWithZone } from "@blazetrails/activesupport";
-import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
@@ -58,42 +58,42 @@ export class Topic extends Base {
   declare written_on: RubyTime | Temporal.PlainDateTime;
 
   static {
-    this.scope("base", function (this: any) {
+    this.scope("base", function () {
       return this.all();
     });
-    this.scope("writtenBefore", function (this: any, time: any) {
+    this.scope("writtenBefore", function (time: any) {
       if (time) {
         return this.where("written_on < ?", time);
       }
     });
-    this.scope("approved", function (this: any) {
+    this.scope("approved", function () {
       return this.where({ approved: true });
     });
-    this.scope("rejected", function (this: any) {
+    this.scope("rejected", function () {
       return this.where({ approved: false });
     });
-    this.scope("children", function (this: any) {
+    this.scope("children", function () {
       return this.where().not({ parent_id: null });
     });
     this.scope("hasChildren", function (this: any) {
       return this.where({ id: this.model.children().select("parent_id") });
     });
-    this.scope("byLifo", function (this: any) {
+    this.scope("byLifo", function () {
       return this.where({ author_name: "lifo" });
     });
-    this.scope("replied", function (this: any) {
+    this.scope("replied", function () {
       return this.where("replies_count > 0");
     });
-    this.scope("true", function (this: any) {
+    this.scope("true", function () {
       return this.where({ approved: true });
     });
-    this.scope("false", function (this: any) {
+    this.scope("false", function () {
       return this.where({ approved: false });
     });
-    this.scope("scopeWithLambda", function (this: any) {
+    this.scope("scopeWithLambda", function () {
       return this.all();
     });
-    this.scope("approvedAsString", function (this: any) {
+    this.scope("approvedAsString", function () {
       return this.where({ approved: true });
     });
     this.scope(
@@ -115,14 +115,14 @@ export class Topic extends Base {
         return klass.where({ approved: true });
       },
     });
-    this.scope("withKwargs", function (this: any, approved = false) {
+    this.scope("withKwargs", function (approved = false) {
       return this.where({ approved });
     });
 
     this.hasMany("replies", { dependent: "destroy", autosave: true, inverseOf: "topic" });
     this.hasMany(
       "approvedReplies",
-      function (this: any) {
+      function () {
         return this.approved();
       },
       {
@@ -133,7 +133,7 @@ export class Topic extends Base {
     );
     this.hasMany(
       "openReplies",
-      function (this: any) {
+      function () {
         return this.open();
       },
       {
@@ -149,25 +149,25 @@ export class Topic extends Base {
     this.aliasAttribute("heading", "title");
 
     this.beforeCreate(async (record: Topic) => {
-      await (record as any).defaultWrittenOn();
+      await record.defaultWrittenOn();
     });
     this.beforeDestroy(async (record: Topic) => {
-      await (record as any).destroyChildren();
+      await record.destroyChildren();
     });
-    this.beforeValidation((record: Topic) => (record as any).beforeValidationForTransaction());
-    this.beforeSave((record: Topic) => (record as any).beforeSaveForTransaction());
-    this.beforeDestroy((record: Topic) => (record as any).beforeDestroyForTransaction());
-    this.afterSave((record: Topic) => (record as any).afterSaveForTransaction());
-    this.afterCreate((record: Topic) => (record as any).afterCreateForTransaction());
+    this.beforeValidation((record: Topic) => record.beforeValidationForTransaction());
+    this.beforeSave((record: Topic) => record.beforeSaveForTransaction());
+    this.beforeDestroy((record: Topic) => record.beforeDestroyForTransaction());
+    this.afterSave((record: Topic) => record.afterSaveForTransaction());
+    this.afterCreate((record: Topic) => record.afterCreateForTransaction());
     this.afterInitialize((record: Topic) => {
-      (record as any).setEmailAddress();
+      record.setEmailAddress();
     });
   }
 
   changeApprovedBeforeSave: boolean | null | undefined;
 
   static {
-    this.beforeSave((record: Topic) => (record as any).changeApprovedCallback());
+    this.beforeSave((record: Topic) => record.changeApprovedCallback());
   }
 
   static afterInitializeCalled: boolean | null = null;
@@ -213,19 +213,19 @@ export class Topic extends Base {
   }
 
   topicId() {
-    return (this as any).id;
+    return this.id;
   }
 
   /** @internal */
   private async defaultWrittenOn() {
-    if (!(this as any).attributePresent("written_on")) {
+    if (!this.attributePresent("written_on")) {
       this.writeAttribute("written_on", RubyTime.now());
     }
   }
 
   /** @internal */
   private async destroyChildren() {
-    await Topic.deleteBy({ parent_id: (this as any).id });
+    await Topic.deleteBy({ parent_id: this.id });
   }
 
   /** @internal */
@@ -257,7 +257,7 @@ registerModel(Topic);
 
 export class DefaultRejectedTopic extends Topic {
   static {
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ approved: false });
     });
   }
@@ -279,7 +279,7 @@ export class TitlePrimaryKeyTopic extends Topic {
 }
 registerModel(TitlePrimaryKeyTopic);
 
-export const Web = new Module();
+export const Web = {};
 registerConstant("Web", Web);
 
 export class WebTopic extends Base {

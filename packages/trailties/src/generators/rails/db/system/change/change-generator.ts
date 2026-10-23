@@ -1,4 +1,14 @@
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { any } from "@blazetrails/activesupport";
+import {
+  aryDelete,
+  compact,
+  File,
+  FileUtils,
+  flatten,
+  Hash,
+  hashDelete,
+} from "@blazetrails/ruby-compat";
+import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
 import { TEMPLATES } from "../../../app/templates.js";
@@ -8,29 +18,37 @@ const BUILD_PACKAGES = ["build-essential", "git"];
 
 export interface ChangeGeneratorOptions extends GeneratorOptions {
   to: string;
+  database?: string;
   appName?: string;
 }
 
 export class ChangeGenerator extends GeneratorBase {
-  readonly to: DatabaseName;
   /** @internal */
   readonly appName: string;
   private _database?: Database;
 
   constructor(options: ChangeGeneratorOptions) {
     super(options);
-    if (!(DATABASES as readonly string[]).includes(options.to)) {
+
+    if (!(DATABASES as readonly string[]).includes((this.options as ChangeGeneratorOptions).to)) {
       throw new Error(
         `Invalid value for --to option. Supported preconfigurations are: ${DATABASES.join(", ")}.`,
       );
     }
-    this.to = options.to as DatabaseName;
+
+    const opt = { ...this.options } as ChangeGeneratorOptions;
+    opt.database ||= opt.to;
+    this.options = Object.freeze(opt);
     this.appName = options.appName ?? File.basename(this.cwd);
   }
 
   /** @internal */
   get database(): Database {
-    if (!this._database) this._database = Database.build(this.to);
+    if (!this._database) {
+      this._database = Database.build(
+        (this.options as ChangeGeneratorOptions).database as DatabaseName,
+      );
+    }
     return this._database;
   }
 
@@ -170,55 +188,49 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   private editComposeYaml(): void {
-    const rel = ".devcontainer/compose.yaml";
-    if (!this.fileExists(rel)) return;
-    const full = File.join(this.cwd, rel);
-    let compose: {
-      services: Record<string, Record<string, unknown>>;
-      volumes?: Record<string, unknown>;
-      [k: string]: unknown;
-    };
-    try {
-      compose = JSON.parse(File.read(full));
-    } catch (e) {
-      throw new Error(
-        `Could not parse ${full}: ${(e as Error).message}. Fix the file and re-run.`,
-        {
-          cause: e,
-        },
-      );
-    }
-    const { services } = compose;
-    const volumes = compose.volumes ?? {};
-    const railsApp = services["rails-app"] as
-      | { depends_on?: string[]; [k: string]: unknown }
-      | undefined;
+    const composeYamlPath = File.expandPath(".devcontainer/compose.yaml", this.cwd);
+    if (!File.isExist(composeYamlPath)) return;
 
-    for (const d of Database.all()) {
-      delete services[d.name];
-      if (d.volume) delete volumes[d.volume];
-      if (railsApp?.depends_on) {
-        railsApp.depends_on = railsApp.depends_on.filter((dep) => dep !== d.name);
-      }
+    const composeConfig = YAML.loadFile(composeYamlPath) as Hash<string, any>;
+
+    for (const database of Database.all()) {
+      hashDelete(composeConfig.get("services"), database.name);
+      const volumes = composeConfig.get("volumes");
+      if (volumes != null) hashDelete(volumes, database.volume!);
+      const dependsOn = composeConfig.get("services").get("rails-app").get("depends_on");
+      if (dependsOn != null) aryDelete(dependsOn, database.name);
     }
 
     if (this.database.service) {
-      services[this.database.name] = this.database.service as unknown as Record<string, unknown>;
-      if (this.database.volume) volumes[this.database.volume] = null;
-      if (railsApp) {
-        railsApp.depends_on = [this.database.name, ...(railsApp.depends_on ?? [])];
-      }
+      composeConfig.get("services").set(this.database.name, this.database.service);
+      composeConfig.set(
+        "volumes",
+        new Hash<string, unknown>()
+          .set(this.database.volume!, null)
+          .merge(composeConfig.get("volumes") ?? new Hash()),
+      );
+      composeConfig
+        .get("services")
+        .get("rails-app")
+        .set(
+          "depends_on",
+          compact(
+            flatten([
+              this.database.name,
+              composeConfig.get("services").get("rails-app").get("depends_on"),
+            ]),
+          ),
+        );
     }
 
-    if (Object.keys(volumes).length > 0) {
-      compose.volumes = volumes;
-    } else {
-      delete compose.volumes;
+    const volumes = composeConfig.get("volumes");
+    if (!(volumes != null && any([...volumes]))) hashDelete(composeConfig, "volumes");
+    const dependsOn = composeConfig.get("services").get("rails-app").get("depends_on");
+    if (!(dependsOn != null && any(dependsOn))) {
+      hashDelete(composeConfig.get("services").get("rails-app"), "depends_on");
     }
 
-    if (railsApp?.depends_on?.length === 0) delete railsApp.depends_on;
-
-    this.writeOrUpdate(rel, JSON.stringify(compose, null, 2) + "\n");
+    File.write(composeYamlPath, toYaml(composeConfig));
   }
 }
 

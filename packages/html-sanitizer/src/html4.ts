@@ -1,4 +1,5 @@
 import { extend } from "@blazetrails/ruby-compat";
+import "./html5.js";
 import { FullSanitizer } from "./full-sanitizer.js";
 import { LinkSanitizer } from "./link-sanitizer.js";
 import { SafeListSanitizer } from "./safe-list-sanitizer.js";

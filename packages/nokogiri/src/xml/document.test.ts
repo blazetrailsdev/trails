@@ -22,7 +22,7 @@ describe("Nokogiri::XML::Document", () => {
   });
 
   it("root node has children", () => {
-    doc = XmlDocument.parse("<root><a/><b/></root>");
+    const doc = XmlDocument.parse("<root><a/><b/></root>");
     const children = doc.root.children;
     expect(children).toHaveLength(2);
     expect(children[0].name).toBe("a");
@@ -59,5 +59,69 @@ describe("Nokogiri::XML::Document", () => {
   it("dispose does not throw", () => {
     const d = XmlDocument.parse("<root/>");
     expect(() => d.dispose()).not.toThrow();
+  });
+});
+
+describe("Nokogiri::XML::Searchable", () => {
+  const xml = `<root><a id="x" class="one two" lang="en-US">1</a><b href="http://e.com/p.xml">2</b><c>3</c><d><e/></d></root>`;
+
+  it("css on document searches from the root and on a node searches descendants", () => {
+    const doc = XmlDocument.parse(xml);
+    expect(doc.css("root").size).toBe(1);
+    expect(doc.root.css("root").size).toBe(0);
+    expect(doc.root.css("e").size).toBe(1);
+    expect(doc.atCss("c")?.content).toBe("3");
+  });
+
+  it("css combinators and groups", () => {
+    const doc = XmlDocument.parse(xml);
+    expect(doc.css("root > a").size).toBe(1);
+    expect(doc.css("root > e").size).toBe(0);
+    expect(doc.css("a + b").size).toBe(1);
+    expect(doc.css("a ~ c").size).toBe(1);
+    expect(doc.css("a, c, e").size).toBe(3);
+  });
+
+  it("css attribute operators", () => {
+    const doc = XmlDocument.parse(xml);
+    expect(doc.css("#x.two").size).toBe(1);
+    expect(doc.css("[href^=http]").size).toBe(1);
+    expect(doc.css("[href$='.xml']").size).toBe(1);
+    expect(doc.css("[href*='e.com']").size).toBe(1);
+    expect(doc.css("[class~=one]").size).toBe(1);
+    expect(doc.css("[lang|=en]").size).toBe(1);
+    expect(doc.css("root > [id!=x]").size).toBe(0);
+    expect(XmlDocument.parse(`<r><a k="1"/><a k="2"/><a/></r>`).css("[k!='1']").size).toBe(1);
+    expect(XmlDocument.parse(`<r><a k='x"y&apos;z'/></r>`).css(`[k='x"y\\'z']`).size).toBe(1);
+  });
+
+  it("css pseudo classes", () => {
+    const doc = XmlDocument.parse(xml);
+    expect(doc.css("root > :first-child").first()?.name).toBe("a");
+    expect(doc.css("root > :nth-child(2)").first()?.name).toBe("b");
+    expect(doc.css("root > :not(a)").size).toBe(3);
+    expect(doc.css("e:empty").size).toBe(1);
+  });
+
+  it("blank? answers true only for whitespace text", () => {
+    const doc = XmlDocument.parse("<root> <a/>x</root>");
+    const [space, a, text] = doc.root.children;
+    expect(space.isBlank()).toBe(true);
+    expect(a.isBlank()).toBe(false);
+    expect(text.isBlank()).toBe(false);
+  });
+  it("union dedups the same libxml node by pointer_id", () => {
+    const doc = XmlDocument.parse("<root><a/><b/></root>");
+    const union = doc.css("a, root > a");
+    expect(union.length).toBe(1);
+    expect(doc.css("a").plus(doc.css("a")).length).toBe(1);
+  });
+
+  it("css defaults its namespaces to the root's", () => {
+    const doc = XmlDocument.parse('<root xmlns="urn:x" xmlns:y="urn:y"><a/><y:b/></root>');
+    expect(doc.root.namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
+    expect(doc.css("a").length).toBe(1);
+    expect(doc.css("y|b").length).toBe(1);
+    expect(doc.root.children[0].namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
   });
 });

@@ -139,7 +139,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
     ]);
 
     const content = read("test/controllers/users-controller.test.ts");
-    assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
+    assertMatch(/^export class UsersControllerTest extends IntegrationTest/m, content);
     assertMatch(/it\("should get index"/, content);
     assertMatch(
       /t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \} \}\)/,
@@ -155,7 +155,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
     await runGenerator("User");
 
     const content = read("test/controllers/users-controller.test.ts");
-    assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
+    assertMatch(/^export class UsersControllerTest extends IntegrationTest/m, content);
     assertMatch(/it\("should get index"/, content);
     assertMatch(/t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{\} \} \}\)/, content);
     assertMatch(/t\.patch\(t\.userUrl\(t\["@user"\]\), \{ params: \{ user: \{\} \} \}\)/, content);
@@ -199,7 +199,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
     );
 
     const content = read("test/controllers/users-controller.test.ts");
-    assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
+    assertMatch(/^export class UsersControllerTest extends IntegrationTest/m, content);
     assertMatch(/it\("should get index"/, content);
     assertMatch(
       /t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \}, as: "json" \}\)/,

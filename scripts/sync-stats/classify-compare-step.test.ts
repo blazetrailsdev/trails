@@ -30,6 +30,7 @@ describe("classifyCompareStep", () => {
       "pnpm exec tsx scripts/test-compare/compare.ts --gates",
       "pnpm exec tsx scripts/test-compare/test-compare.ts --gates",
       "pnpm exec tsx scripts/test-compare/convention-compare.ts",
+      "node scripts/ci/bg-gates.mjs wait test-compare",
     ]) {
       expect(classifyCompareStep(cmd)).toBe("test_compare");
     }
@@ -41,6 +42,8 @@ describe("classifyCompareStep", () => {
       "pnpm exec tsx scripts/schema-compare/compare.ts",
       "pnpm exec tsx scripts/fixtures-compare/compare.ts --models",
       "pnpm exec tsx scripts/api-compare/lint-call-mismatches.ts",
+      "node scripts/ci/bg-gates.mjs wait test-names-manifest test-names",
+      "node scripts/ci/bg-gates.mjs wait assertions",
     ]) {
       expect(classifyCompareStep(cmd)).toBeNull();
     }

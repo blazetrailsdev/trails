@@ -1,0 +1,21 @@
+{
+  "abstractcontroller": 33,
+  "actioncable": 81,
+  "actioncontroller": 182,
+  "actiondispatch": 777,
+  "actionpackversion": 0,
+  "actionview": 424,
+  "activemodel": 239,
+  "activerecord": 2189,
+  "arel": 288,
+  "bcrypt": 2,
+  "did-you-mean": 8,
+  "globalid": 35,
+  "i18n": 99,
+  "marcel": 0,
+  "rack": 214,
+  "rack-session": 60,
+  "rack-test": 45,
+  "ruby-compat": 926,
+  "thor": 175
+}

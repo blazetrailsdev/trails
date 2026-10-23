@@ -1,18 +1,20 @@
 import {
   ArgumentError,
-  FrozenError,
   Hash,
   dup,
   hashAset,
   hashDelete,
+  hashReplace,
   isSymbol,
+  merge,
   rbFSend,
-  rbInspect,
   rbObjDup,
+  rbModDefineMethod,
   rbObjRespondTo,
   symbolToS,
   valuesAt,
 } from "@blazetrails/ruby-compat";
+import { Module, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
 import { isBlank } from "./core-ext/object/blank.js";
 import { isDuplicable } from "./core-ext/object/duplicable.js";
 import * as XmlMini from "./xml-mini.js";
@@ -42,7 +44,7 @@ export function deepMergeBang<T extends AnyObject>(
       ? ([...(other as unknown as Hash<string, unknown>)] as [string, unknown][])
       : Object.entries(other);
   for (const [key, otherVal] of entries) {
-    if (!Object.prototype.hasOwnProperty.call(target, key)) {
+    if (!Object.hasOwn(target, key)) {
       (target as AnyObject)[key] = otherVal;
       continue;
     }
@@ -138,7 +140,7 @@ export function isExtractableOptions(self: unknown): boolean {
 export function extractOptionsBang<T>(args: T[]): AnyObject {
   const last = args[args.length - 1];
   const isHash =
-    isPlainObject(last) ||
+    (isPlainObject(last) && !rbObjIsKindOf(last, Module)) ||
     (last !== null && typeof last === "object" && "isExtractableOptions" in last);
   if (args.length > 0 && isHash && isExtractableOptions(last)) {
     return args.pop() as unknown as AnyObject;
@@ -285,6 +287,14 @@ export function transformKeys<T extends AnyObject>(
   hash: T,
   block: (key: string) => string,
 ): Record<string, unknown>;
+export function transformKeys<T extends AnyObject, U extends object>(
+  hash: T,
+  block: (key: string) => U,
+): Hash<U, unknown>;
+export function transformKeys<U extends object>(
+  hash: AnyObject | Map<string, unknown>,
+  block: (key: string) => U,
+): Map<U, unknown>;
 export function transformKeys<V>(
   hash: AnyObject | Map<string, V>,
   block: (key: string) => string,
@@ -294,13 +304,21 @@ export function transformKeys(
   block: ((key: string) => string) | ((key: unknown) => unknown),
 ): Record<string, unknown> | Map<unknown, unknown> {
   if (hash instanceof Map) {
-    const result = new Map<unknown, unknown>();
+    const result =
+      hash instanceof Hash ? new Hash<unknown, unknown>() : new Map<unknown, unknown>();
     for (const [key, value] of hash) result.set((block as (key: unknown) => unknown)(key), value);
     return result;
   }
-  const result: Record<string, unknown> = {};
+  let result: Record<string, unknown> | Hash<unknown, unknown> = {};
   for (const key of Object.keys(hash)) {
-    result[(block as (key: string) => string)(key)] = hash[key];
+    const newKey = (block as (key: string) => unknown)(key);
+    if (!(result instanceof Hash) && typeof newKey === "object" && newKey !== null) {
+      const objectKeyed = new Hash<unknown, unknown>();
+      for (const [k, v] of Object.entries(result)) objectKeyed.set(k, v);
+      result = objectKeyed;
+    }
+    if (result instanceof Hash) result.set(newKey, hash[key]);
+    else hashAset(result, newKey as string, hash[key]);
   }
   return result;
 }
@@ -334,7 +352,7 @@ export function reverseMerge<T extends object>(obj: T, otherHash: object): T {
   if (!(otherHash instanceof Map) && !isPlainObject(otherHash)) {
     return rbFSend(otherHash, "merge", obj) as T;
   }
-  return { ...(otherHash instanceof Map ? Object.fromEntries(otherHash) : otherHash), ...obj };
+  return merge(otherHash as Record<string, unknown>, obj as Record<string, unknown>) as T;
 }
 
 export const withDefaults = reverseMerge;
@@ -346,13 +364,7 @@ export function reverseMergeBang<T extends object>(hash: T, otherHash: object): 
   ) {
     return rbFSend(hash, "reverseMergeBang", otherHash) as T;
   }
-  const merged = reverseMerge(hash, otherHash);
-  if (Object.isFrozen(hash)) {
-    throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
-  }
-  for (const key of Object.keys(hash)) hashDelete(hash, key);
-  for (const [key, value] of Object.entries(merged)) hashAset(hash, key, value);
-  return hash;
+  return hashReplace(hash, reverseMerge(hash, otherHash));
 }
 
 export const reverseUpdate = reverseMergeBang;
@@ -546,8 +558,20 @@ export function toXml(
   return builder.target();
 }
 
+rbModDefineMethod(
+  Hash,
+  "toXml",
+  function (
+    this: AnyObject,
+    options?: XmlMini.ToXmlOptions,
+    block?: (builder: XmlMini.XmlBuilder) => void,
+  ) {
+    return toXml(this, options, block);
+  },
+);
+
 export function fromXml(
-  xml: string | StringIO | null | undefined,
+  xml: string | Uint8Array | StringIO | null | undefined,
   disallowedTypes?: string[] | null,
 ): unknown {
   return new XMLConverter(xml, disallowedTypes).toH();

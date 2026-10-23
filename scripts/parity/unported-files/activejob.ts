@@ -54,4 +54,10 @@ export const ACTIVEJOB_UNPORTED_FILES: UnportedFile[] = [
     tests: ["sucker_punch adapter should be deprecated", "sucker_punch check_adapter should warn"],
     reason: GEM_ADAPTER,
   },
+  {
+    testFile: "cases/test_helper_test.rb",
+    tests: ["queue adapter is is inline adapter because it is set on the job class"],
+    reason:
+      'drives Zeitwerk.with_loader to autoload QueueAdapterJob from test/jobs (CLAUDE.md § "Trails has no autoloader").',
+  },
 ];

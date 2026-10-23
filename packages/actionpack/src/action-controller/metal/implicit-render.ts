@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { dasherize, underscore } from "@blazetrails/activesupport";
 import { Module, rbInspect as inspect } from "@blazetrails/ruby-compat";
 
@@ -103,3 +105,5 @@ export const ImplicitRender = new Module((mod) => {
     Object.assign(m, { defaultRender, methodForAction, isInteractiveBrowserRequest });
   });
 });
+
+rbModConstSet(ActionController, "ImplicitRender", ImplicitRender);

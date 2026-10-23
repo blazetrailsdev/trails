@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { I18n } from "@blazetrails/activesupport";
-import { bodyToString } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
 import { PublicExceptions } from "../middleware/public-exceptions.js";
 import { Response } from "../http/response.js";
@@ -36,7 +35,7 @@ describe("PublicExceptions", () => {
     });
     expect(status).toBe(500);
     expect(headers["content-type"]).toBe("text/html; charset=utf-8");
-    expect(await bodyToString(body)).toBe("<h1>500</h1>");
+    expect([...(body as Iterable<string>)].join("")).toBe("<h1>500</h1>");
   });
 
   it("prefers the localized html when present", async () => {
@@ -45,7 +44,7 @@ describe("PublicExceptions", () => {
       HTTP_ACCEPT: "text/html",
     });
     expect(status).toBe(404);
-    expect(await bodyToString(body)).toBe("<h1>404 en</h1>");
+    expect([...(body as Iterable<string>)].join("")).toBe("<h1>404 en</h1>");
   });
 
   it("returns x-cascade pass when no template exists", async () => {
@@ -55,7 +54,7 @@ describe("PublicExceptions", () => {
     });
     expect(status).toBe(404);
     expect(headers[X_CASCADE]).toBe("pass");
-    expect(await bodyToString(body)).toBe("");
+    expect([...(body as Iterable<string>)].join("")).toBe("");
   });
 
   it("renders json when requested", async () => {
@@ -65,7 +64,7 @@ describe("PublicExceptions", () => {
     });
     expect(status).toBe(500);
     expect(headers["content-type"]).toBe("application/json; charset=utf-8");
-    expect(JSON.parse(await bodyToString(body))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       status: 500,
       error: "Internal Server Error",
     });
@@ -78,7 +77,7 @@ describe("PublicExceptions", () => {
     });
     expect(status).toBe(500);
     expect(headers["content-type"]).toBe("application/xml; charset=utf-8");
-    const xml = await bodyToString(body);
+    const xml = [...(body as Iterable<string>)].join("");
     expect(xml).toContain('<status type="integer">500</status>');
     expect(xml).toContain("<error>Internal Server Error</error>");
   });

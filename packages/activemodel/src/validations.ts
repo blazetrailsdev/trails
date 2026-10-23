@@ -12,9 +12,8 @@ import {
   dup as hashDup,
   flatten,
   Hash,
-  Module,
+  rbCallSuper,
   rbBlockGivenP,
-  rbFPublicSend,
   rbFSend,
   rbModConstSet,
   rbModMethodDefined,
@@ -110,10 +109,7 @@ export class Validations {
     Object.defineProperty(base, "_validators", {
       ...reader,
       get(this: ValidationsClassHost) {
-        if (
-          !Object.prototype.hasOwnProperty.call(this, "__class_attr__validators") &&
-          !rbModSingletonP(this)
-        ) {
+        if (!Object.hasOwn(this, "__class_attr__validators") && !rbModSingletonP(this)) {
           inherited.call(Object.getPrototypeOf(this), this);
         }
         return reader.get!.call(this);
@@ -342,7 +338,7 @@ export class ValidationError<TModel extends ModelWithErrors = ModelWithErrors>
   constructor(model: TModel) {
     const errors = model.errors.fullMessages.join(", ");
     const message = I18n.t(
-      `${rbFPublicSend(model.constructor, "i18nScope")}.errors.messages.model_invalid`,
+      `${rbFSend(model.constructor, "i18nScope")}.errors.messages.model_invalid`,
       {
         errors,
         default: ":errors.messages.model_invalid",
@@ -367,14 +363,14 @@ export function initializeDup<TBase extends object>(
   other: unknown,
 ): void {
   this._errors = undefined;
-  SuperMethods.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
 }
 
 export function freeze<T extends Validations>(this: T): T {
   void this.errors;
   void this.contextForValidation();
 
-  return SuperMethods.superMethod(this, "freeze")!() as T;
+  return rbCallSuper(this, freeze) as T;
 }
 
 export const VALID_OPTIONS_FOR_VALIDATE = ["on", "if", "unless", "prepend", "exceptOn"] as const;
@@ -389,7 +385,7 @@ export interface ReadAttributeForValidationHost {
 
 /** @internal */
 export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
-  SuperMethods.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._errors = undefined;
   this._contextForValidation = undefined;
 }
@@ -400,11 +396,7 @@ function inherited(this: ValidationsClassHost, base: ValidationsClassHost): void
   base._validators = dup;
 }
 
-const SuperMethods = new Module((mod) => {
-  mod.defineMethod("freeze", freeze);
-  mod.defineMethod("initializeDup", initializeDup);
-  mod.defineMethod("initInternals", initInternals);
-});
+const SuperMethods = { freeze, initializeDup, initInternals };
 
 export type ConditionFn = ((record: ValidatableRecord) => boolean) | string;
 

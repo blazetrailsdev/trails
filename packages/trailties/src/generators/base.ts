@@ -102,7 +102,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   static async sourceRoot(path: string | null = null): Promise<string | null | undefined> {
     if (path != null) this._sourceRoot = path;
-    if (!Object.prototype.hasOwnProperty.call(this, "_sourceRoot") || this._sourceRoot == null) {
+    if (!Object.hasOwn(this, "_sourceRoot") || this._sourceRoot == null) {
       this._sourceRoot = await this.defaultSourceRoot();
     }
     return this._sourceRoot;
@@ -285,7 +285,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   /** @noRailsEquivalent PERMANENT */
   static classOptions(): Record<string, ClassOptionConfig> {
-    if (!Object.prototype.hasOwnProperty.call(this, "_classOptions")) {
+    if (!Object.hasOwn(this, "_classOptions")) {
       const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
       this._classOptions = { ...(superclass.classOptions?.() ?? {}) };
     }
@@ -442,7 +442,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   protected static commands(): string[] {
-    if (!Object.prototype.hasOwnProperty.call(this, "_commands")) this._commands = [];
+    if (!Object.hasOwn(this, "_commands")) this._commands = [];
     return this._commands;
   }
 
@@ -464,7 +464,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   private static invocations(): Record<string, boolean> {
-    if (!Object.prototype.hasOwnProperty.call(this, "_invocations")) {
+    if (!Object.hasOwn(this, "_invocations")) {
       const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
       this._invocations = { ...(superclass.invocations?.() ?? {}) };
     }
@@ -472,7 +472,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   private static invocationBlocks(): Record<string, HookBlock> {
-    if (!Object.prototype.hasOwnProperty.call(this, "_invocationBlocks")) {
+    if (!Object.hasOwn(this, "_invocationBlocks")) {
       const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
       this._invocationBlocks = { ...(superclass.invocationBlocks?.() ?? {}) };
     }
@@ -782,7 +782,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   /** @internal */
   static hooks(): Record<string, [string | undefined, string | undefined]> {
-    if (!Object.prototype.hasOwnProperty.call(this, "_hooks")) {
+    if (!Object.hasOwn(this, "_hooks")) {
       const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
       this._hooks = { ...(superclass.hooks?.() ?? {}) };
     }

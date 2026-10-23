@@ -163,15 +163,19 @@ export function rbRegEqual(re1: RegExp, re2: unknown): boolean {
  * `re` matches `str`, keeping no state. A JS pattern carrying `g` or `y`
  * searches from its `lastIndex` and advances it on a match, which MRI has no
  * counterpart for, so the search starts at 0 and `lastIndex` is put back.
+ * An ASCII-8BIT String, a `Uint8Array`, is searched a byte per character, as
+ * `rb_reg_prepare_enc` (`re.c:1548`) searches a binary String.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbRegMatchP(re: RegExp, str: string | null | undefined): boolean {
+export function rbRegMatchP(re: RegExp, str: string | Uint8Array | null | undefined): boolean {
   if (str == null) return false;
+  let chars = "";
+  if (str instanceof Uint8Array) for (const byte of str) chars += String.fromCharCode(byte);
   const { lastIndex } = re;
   try {
     re.lastIndex = 0;
-    return re.test(str);
+    return re.test(typeof str === "string" ? str : chars);
   } finally {
     re.lastIndex = lastIndex;
   }

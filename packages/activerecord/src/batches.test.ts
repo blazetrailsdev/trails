@@ -19,6 +19,7 @@ import { Developer } from "./test-helpers/models/developer.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 import { Tag } from "./test-helpers/models/tag.js";
+import "./test-helpers/models/category.js";
 import { registerModel } from "./associations.js";
 import { errorOnIgnoredOrder, setErrorOnIgnoredOrder } from "./active-record.js";
 

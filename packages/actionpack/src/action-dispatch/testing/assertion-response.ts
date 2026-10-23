@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { HTTP_STATUS_CODES, statusCode as rackStatusCode } from "@blazetrails/rack";
 
 const GENERIC_RESPONSE_CODES: Record<string, string> = {
@@ -8,27 +9,20 @@ const GENERIC_RESPONSE_CODES: Record<string, string> = {
 };
 
 export class AssertionResponse {
-  readonly code: string;
-  readonly name: string;
+  readonly code: number | string | null;
+  readonly name: string | null;
 
   constructor(codeOrName: number | string) {
-    const isNumeric = typeof codeOrName === "number" || /^\d+$/.test(codeOrName);
-    if (isNumeric) {
-      const code = typeof codeOrName === "number" ? codeOrName : parseInt(codeOrName, 10);
-      const n = nameFromCode(code);
-      if (n === undefined) {
-        throw new Error(`Invalid response code: ${codeOrName}`);
-      }
-      this.name = n;
-      this.code = String(codeOrName);
-    } else {
+    if (typeof codeOrName === "string" && !/^\d/.test(codeOrName)) {
       this.name = codeOrName;
-      const c = codeFromName(codeOrName);
-      if (c === undefined) {
-        throw new Error(`Invalid response name: ${codeOrName}`);
-      }
-      this.code = c;
+      this.code = codeFromName(codeOrName);
+    } else {
+      this.name = nameFromCode(codeOrName);
+      this.code = codeOrName;
     }
+
+    if (this.code == null) throw new ArgumentError(`Invalid response name: ${this.name}`);
+    if (this.name == null) throw new ArgumentError(`Invalid response code: ${this.code}`);
   }
 
   codeAndName(): string {
@@ -37,16 +31,20 @@ export class AssertionResponse {
 }
 
 /** @internal */
-function codeFromName(name: string): string | undefined {
+function codeFromName(name: string): number | string | null {
   if (Object.hasOwn(GENERIC_RESPONSE_CODES, name)) return GENERIC_RESPONSE_CODES[name];
   try {
-    return String(rackStatusCode(name));
+    return rackStatusCode(name);
   } catch {
-    return undefined;
+    return null;
   }
 }
 
 /** @internal */
-function nameFromCode(code: number): string | undefined {
-  return HTTP_STATUS_CODES[code];
+function nameFromCode(code: number | string): string | null {
+  return (
+    Object.keys(GENERIC_RESPONSE_CODES).find((name) => GENERIC_RESPONSE_CODES[name] === code) ??
+    (typeof code === "number" ? HTTP_STATUS_CODES[code] : undefined) ??
+    null
+  );
 }

@@ -312,7 +312,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   affectedRows(rawResult: Mysql2Result | null): number | null {
-    return mysql2AffectedRows.call(this as any, rawResult);
+    return mysql2AffectedRows.call(this, rawResult);
   }
 }
 

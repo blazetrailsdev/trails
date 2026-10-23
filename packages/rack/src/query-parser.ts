@@ -1,5 +1,14 @@
-import { ArgumentError, include, rbObjClassname } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  bytes,
+  include,
+  rbModConstSet,
+  rbObjClassname,
+  strNew,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
 import { BadRequest } from "./bad-request.js";
+import { Rack } from "./namespaces.js";
 export class ParameterTypeError extends TypeError {
   constructor(message: string) {
     super(message);
@@ -42,6 +51,7 @@ export class Params {
     return params as Params;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   static [Symbol.hasInstance](value: unknown): boolean {
     return (
       typeof value === "object" &&
@@ -67,6 +77,8 @@ const BYTESIZE_LIMIT = 4194304;
 const PARAMS_LIMIT = 4096;
 
 export class QueryParser {
+  static readonly DEFAULT_SEP = DEFAULT_SEP;
+
   readonly paramDepthLimit: number;
   private readonly bytesizeLimit: number;
   private readonly paramsLimit: number;
@@ -106,16 +118,8 @@ export class QueryParser {
     const result: Record<string, string | string[] | null> = Object.create(null);
 
     for (const p of str.split(sep)) {
-      if (!p) continue;
-      const eqIdx = p.indexOf("=");
-      let k: string, v: string | null;
-      if (eqIdx === -1) {
-        k = unescape(p);
-        v = null;
-      } else {
-        k = unescape(p.substring(0, eqIdx));
-        v = unescape(p.substring(eqIdx + 1));
-      }
+      if (p.length === 0) continue;
+      const [k, v = null] = stringSplit(p, "=", 2).map((s) => unescape(s));
       if (Object.hasOwn(result, k)) {
         const cur = result[k];
         if (Array.isArray(cur)) {
@@ -139,20 +143,11 @@ export class QueryParser {
       const sep = separator ? (COMMON_SEP[separator] ?? escapedSepRe(separator)) : DEFAULT_SEP;
 
       for (const p of str.split(sep)) {
-        if (!p) continue;
-        const eqIdx = p.indexOf("=");
-        let k: string, v: string | null;
-        if (eqIdx === -1) {
-          k = unescape(p);
-          v = null;
-        } else {
-          k = unescape(p.substring(0, eqIdx));
-          v = unescape(p.substring(eqIdx + 1));
-        }
+        const [k = null, v = null] = stringSplit(p, "=", 2).map((s) => unescape(s));
         this._normalizeParams(params, k, v, 0);
       }
     } catch (e) {
-      if (e instanceof URIError) {
+      if (e instanceof ArgumentError) {
         throw new InvalidParameterError((e as Error).message);
       }
       throw e;
@@ -170,7 +165,7 @@ export class QueryParser {
   }
 
   newDepthLimit(paramDepthLimit: number): QueryParser {
-    return new QueryParser(this.paramsClass, paramDepthLimit, this.bytesizeLimit, this.paramsLimit);
+    return new (this.constructor as typeof QueryParser)(this.paramsClass, paramDepthLimit);
   }
 
   private checkQueryString(qs: string, sep: string | null | undefined): string {
@@ -293,7 +288,28 @@ export class QueryParser {
   }
 }
 
-/** @internal */
-function unescape(s: string): string {
-  return decodeURIComponent(s.replace(/\+/g, " "));
+/**
+ * `URI.decode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:370-372`, `:399-402`).
+ *
+ * @internal
+ */
+function unescape(string: string): string {
+  if (/%(?![0-9a-fA-F]{2})/.test(string)) throw new ArgumentError(`invalid %-encoding (${string})`);
+  const b = bytes(string.replace(/\+/g, " "));
+  const decoded: number[] = [];
+  for (let i = 0; i < b.length; i++) {
+    if (b[i] === 0x25) {
+      decoded.push(parseInt(String.fromCharCode(b[i + 1], b[i + 2]), 16));
+      i += 2;
+    } else {
+      decoded.push(b[i]);
+    }
+  }
+  return strNew(decoded);
 }
+
+rbModConstSet(Rack, "QueryParser", QueryParser);
+rbModConstSet(QueryParser, "ParameterTypeError", ParameterTypeError);
+rbModConstSet(QueryParser, "InvalidParameterError", InvalidParameterError);
+rbModConstSet(QueryParser, "QueryLimitError", QueryLimitError);
+rbModConstSet(QueryParser, "Params", Params);

@@ -27,7 +27,7 @@ const BYTES = pack(
   "C*",
 );
 const VALUES: unknown[] = [null, true, 1, "", "ümlaut", BYTES, ...COMPRESSIBLE_VALUES];
-const VERSIONS: (string | null)[] = [null, "", "ümlaut", BYTES, "x".repeat(256)];
+const VERSIONS: (string | Uint8Array | null)[] = [null, "", "ümlaut", BYTES, "x".repeat(256)];
 const EXPIRIES: (number | null)[] = [null, 0, 100 * 365 * 24 * 3600];
 
 const ENTRIES = VALUES.flatMap((value) =>
@@ -73,7 +73,7 @@ describe("CacheCoderTest", () => {
     for (const entry of COMPRESSIBLE_ENTRIES) {
       const dumped = c.dump(entry);
       const notCompressed = c.dumpCompressed(entry, 1_000_000);
-      expect(notCompressed).toBe(dumped);
+      expect(notCompressed).toEqual(dumped);
     }
   });
 
@@ -81,7 +81,7 @@ describe("CacheCoderTest", () => {
     for (const entry of ENTRIES.filter((e) => !COMPRESSIBLE_VALUES.includes(e.value))) {
       const dumped = c.dump(entry);
       const notCompressed = c.dumpCompressed(entry, 1);
-      expect(notCompressed).toBe(dumped);
+      expect(notCompressed).toEqual(dumped);
     }
   });
 
@@ -94,7 +94,7 @@ describe("CacheCoderTest", () => {
   it("matches output of original serializer when legacy_serializer: true", () => {
     const legacy = new Coder(Serializer, Compressor, { legacySerializer: true });
     for (const entry of ENTRIES) {
-      expect(legacy.dump(entry)).toBe(Serializer.dump(entry));
+      expect(legacy.dump(entry)).toEqual(Serializer.dump(entry));
       expect(legacy.dumpCompressed(entry, 1)).toBe(Serializer.dumpCompressed());
     }
   });

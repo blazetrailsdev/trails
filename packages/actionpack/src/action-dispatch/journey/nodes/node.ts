@@ -230,7 +230,7 @@ export class Ast {
   private readonly symbols: Symbol[] = [];
   private readonly stars: Star[] = [];
 
-  constructor(tree: Node, formatted: boolean | null | undefined) {
+  constructor(tree: Node, formatted: boolean | string | RegExp | null | undefined) {
     this.tree = tree;
     this.visitTree(formatted);
   }
@@ -255,7 +255,7 @@ export class Ast {
   }
 
   /** @internal */
-  private visitTree(formatted: boolean | null | undefined): void {
+  private visitTree(formatted: boolean | string | RegExp | null | undefined): void {
     for (const node of this.tree) {
       if (node.isSymbol()) {
         const sym = node as Symbol;

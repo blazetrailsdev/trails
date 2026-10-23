@@ -9,7 +9,6 @@ import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
 import {
-  type Hash,
   isEmpty,
   isSymbol,
   rbEqual,
@@ -19,9 +18,9 @@ import {
   sort,
   symbolToS,
   toSym,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import {
-  filterMap,
   indexWith,
   isPresent,
   many,
@@ -114,8 +113,9 @@ export class InsertAll {
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
   ): Promise<Result> {
-    const model = (relation as any)._model as ModelClass;
-    return withConnection.call(model as any, async (c: any) =>
+    const model = relation.model as ModelClass;
+    await model.loadSchema();
+    return withConnection.call(model, async (c: any) =>
       new InsertAll(
         relation,
         c,
@@ -134,7 +134,7 @@ export class InsertAll {
     facts: ResolvedConnectionFacts,
   ) {
     this._facts = facts;
-    this.model = (relation as any)._model as ModelClass;
+    this.model = relation.model as ModelClass;
     this.connection = connection;
     this.inserts = inserts.map((r) => ({ ...r }));
     this.updateOnly = options.updateOnly;
@@ -163,7 +163,7 @@ export class InsertAll {
     }
 
     this.scopeAttributes = except(
-      (relation as any).scopeForCreate() as Record<string, unknown>,
+      relation.scopeForCreate(),
       this.model.inheritanceColumn as string,
     );
     for (const key of Object.keys(this.scopeAttributes)) {
@@ -182,7 +182,7 @@ export class InsertAll {
   }
 
   async execute(): Promise<Result> {
-    if (isEmpty(this.inserts)) return Result.empty();
+    if (this.inserts.length === 0) return Result.empty();
     let message = `${this.model.name} `;
     if (many(this.inserts)) message += "Bulk ";
     message += this.onDuplicate === ":update" ? "Upsert" : "Insert";
@@ -284,27 +284,21 @@ export class InsertAll {
   /** @internal */
   private ensureValidOptionsForConnectionBang(): void {
     if (this.returning && !this._facts.supportsInsertReturning) {
-      throw new ArgumentError(
-        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support :returning`,
-      );
+      throw new ArgumentError(`${this.connection.constructor.name} does not support :returning`);
     }
 
     if (this.skipDuplicates() && !this._facts.supportsInsertOnDuplicateSkip) {
       throw new ArgumentError(
-        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support skipping duplicates`,
+        `${this.connection.constructor.name} does not support skipping duplicates`,
       );
     }
 
     if (this.updateDuplicates() && !this._facts.supportsInsertOnDuplicateUpdate) {
-      throw new ArgumentError(
-        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support upsert`,
-      );
+      throw new ArgumentError(`${this.connection.constructor.name} does not support upsert`);
     }
 
     if (this.uniqueBy && !this._facts.supportsInsertConflictTarget) {
-      throw new ArgumentError(
-        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support :unique_by`,
-      );
+      throw new ArgumentError(`${this.connection.constructor.name} does not support :unique_by`);
     }
   }
 
@@ -352,9 +346,7 @@ export class InsertAll {
     if (!this._facts.supportsInsertConflictTarget) {
       if (uniqueBy == null) return undefined;
 
-      throw new ArgumentError(
-        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support :unique_by`,
-      );
+      throw new ArgumentError(`${this.connection.constructor.name} does not support :unique_by`);
     }
 
     const nameOrColumns = rtest(uniqueBy) ? uniqueBy : this.model.primaryKey;
@@ -407,7 +399,7 @@ export class InsertAll {
   }
 
   /** @internal */
-  private timestampsForCreate(): Hash<string, unknown> {
+  private timestampsForCreate(): Record<string, unknown> {
     return indexWith(
       this.model.allTimestampAttributesInModel(),
       this.connection.highPrecisionCurrentTimestamp(),
@@ -449,12 +441,12 @@ export class Builder implements InsertBuilder {
   private async extractTypesFromColumnsOn(
     tableName: string,
     keys: string[],
-  ): Promise<Hash<string, ValueType | null>> {
+  ): Promise<Record<string, ValueType | null>> {
     const columns = await this.model.schemaCache().columnsHash(tableName);
 
     const columnsKeys = Object.keys(columns);
     const unknownColumn = first(keys.filter((key) => !columnsKeys.includes(key)));
-    if (unknownColumn !== undefined) {
+    if (unknownColumn != null) {
       throw new UnknownAttributeError(new this.model(), unknownColumn);
     }
 
@@ -525,7 +517,7 @@ export class Builder implements InsertBuilder {
 
     const valuesList = this._insertAll.mapKeyWithValue<unknown>((key, value) => {
       if (value instanceof Nodes.SqlLiteral) return value;
-      const type = types.get(key);
+      const type = types[key];
       value = SerializeCastValue.serialize(type!, type!.cast(value));
       return value;
     });

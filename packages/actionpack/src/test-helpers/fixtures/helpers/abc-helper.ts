@@ -1,6 +1,6 @@
-import { Module, registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 
-export const AbcHelper = new Module().include({
+export const AbcHelper = {
   bareA(): void {},
-});
+};
 registerConstant("AbcHelper", AbcHelper);

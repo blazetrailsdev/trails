@@ -11,3 +11,8 @@ export function convertToModel(object: unknown): unknown {
 export function modelNameFromRecordOrClass(recordOrClass: unknown): ModelName {
   return (convertToModel(recordOrClass) as { modelName: ModelName }).modelName;
 }
+
+export const ModelNaming = {
+  convertToModel,
+  modelNameFromRecordOrClass,
+};

@@ -53,17 +53,17 @@ export class LogSubscriber extends BaseLogSubscriber {
   declare backtraceCleaner: BacktraceCleaner;
 
   strictLoadingViolation(event: Event): void {
-    this.debug(null, () => {
+    this.debug(undefined, () => {
       const owner = event.payload.owner;
       const reflection = event.payload.reflection as any;
       return this.color(reflection.strictLoadingViolationMessage(owner), BaseLogSubscriber.RED);
     });
   }
 
-  sql(event: Event): undefined {
+  sql(event: Event): boolean | null {
     const payload = event.payload as Event["payload"] & { binds?: any[] | null };
 
-    if (LogSubscriber.IGNORE_PAYLOAD_NAMES.includes(payload.name as string)) return;
+    if (LogSubscriber.IGNORE_PAYLOAD_NAMES.includes(payload.name as string)) return null;
 
     let name: string;
     if (payload.async) {
@@ -116,19 +116,15 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   /** @internal */
-  protected debug(progname: string | null = null, block?: () => string): undefined {
-    if (!super._debug(block ?? progname ?? undefined)) return;
+  protected override debug(progname: string | null = null, block?: () => string): boolean | null {
+    if (!super.debug(progname, block)) return null;
 
-    if (verboseQueryLogs()) {
-      this.logQuerySource();
-    }
+    return verboseQueryLogs() ? this.logQuerySource() : null;
   }
 
-  private logQuerySource(): void {
+  private logQuerySource(): boolean | null {
     const source = this.querySourceLocation();
-    if (source) {
-      this.logger!.debug(`  ↳ ${source}`);
-    }
+    return source ? this.logger!.debug(`  ↳ ${source}`) : null;
   }
 
   private querySourceLocation(): string | null {

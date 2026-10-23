@@ -3,21 +3,25 @@ import {
   StandardError,
   max,
   rbBigNorm,
-  rbFPublicSend,
+  rbFSend,
   rbIntegerTypeP,
   rbPlus,
 } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { exclude, sum as enumerableSum } from "../enumerable-utils.js";
 
-export class SoleItemExpectedError extends StandardError {}
+export class SoleItemExpectedError extends StandardError {
+  static toString(): string {
+    return "Enumerable::SoleItemExpectedError";
+  }
+}
 
 export function maximum(
   this: Iterable<unknown> | Record<string, unknown>,
   key: string | null = null,
 ): unknown {
   const entries = Symbol.iterator in this ? [...this] : Object.entries(this);
-  return max(key === null ? entries : entries.map((element) => rbFPublicSend(element, key)));
+  return max(key === null ? entries : entries.map((element) => rbFSend(element, key)));
 }
 
 ENUMERABLE_METHOD_TABLE.maximum = (self: Iterable<unknown>, key?: string | null) =>

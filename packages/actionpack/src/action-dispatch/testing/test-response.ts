@@ -1,3 +1,5 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActionDispatch } from "../../namespaces.js";
 import { Response } from "../http/response.js";
 import { Headers } from "@blazetrails/rack";
 import { RequestEncoder, type ResponseParser } from "./request-encoder.js";
@@ -13,7 +15,7 @@ export class TestResponse extends Response {
   }): TestResponse {
     const headers =
       response.headers instanceof Headers
-        ? response.headers.toHash()
+        ? (response.headers.toH() as Record<string, string>)
         : (response.headers as Record<string, string>);
     const body = Array.isArray(response.body)
       ? (response.body as string[])
@@ -23,13 +25,14 @@ export class TestResponse extends Response {
 
   get parsedBody(): unknown {
     if (this._parsedBody === undefined) {
-      this._parsedBody = this.responseParser(this.body);
+      this._parsedBody = this.responseParser.call(undefined, this.body);
     }
     return this._parsedBody;
   }
 
   get responseParser(): ResponseParser {
-    this._responseParser ??= RequestEncoder.parser(this.contentType);
+    this._responseParser ??= RequestEncoder.parser(this.mediaType);
     return this._responseParser;
   }
 }
+rbModConstSet(ActionDispatch, "TestResponse", TestResponse);

@@ -1,0 +1,9 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/test-unit/scaffold/scaffold-generator.ts",
+    "rubyName": "create_test_files",
+    "call": "template",
+    "reason": "Surfaced when scaffold_generator.rb left UNPORTED_FILES; the port writes the test through TEMPLATES rather than Thor's template, pending scaffold-controller-hooks-test-framework-and-engine-arms."
+  }
+]

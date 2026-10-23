@@ -1,5 +1,16 @@
 import { isPresent, wrap } from "@blazetrails/activesupport";
-import { first, Hash, rbEqual, rbHash, Set, toS, zip } from "@blazetrails/ruby-compat";
+import {
+  first,
+  Hash,
+  rbEqual,
+  rbHash,
+  rbObjId,
+  Set,
+  toS,
+  uniq,
+  zip,
+  eachWithObject,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 
@@ -33,12 +44,12 @@ export class Association {
     associateByDefault: boolean = true,
   ) {
     this.klass = klass;
-    this.owners = this._uniqueOwners(owners);
+    this.owners = uniq(owners, (o) => rbObjId(o));
     this.reflection = reflection;
     this.preloadScope = preloadScope ?? null;
     this._reflectionScope = reflectionScope ?? null;
     this._associate = associateByDefault || preloadScope == null || preloadScope.isEmptyScope;
-    this._model = owners.length > 0 ? (owners[0].constructor as typeof Base) : null;
+    this._model = owners.length > 0 ? owners[0].constructor : null;
     this._run = false;
   }
 
@@ -89,7 +100,7 @@ export class Association {
   }
 
   get associationKeyName(): string | string[] {
-    return (this.reflection as any).joinPrimaryKey(this.klass);
+    return this.reflection.joinPrimaryKey(this.klass);
   }
 
   loaderQuery(): LoaderQuery {
@@ -97,23 +108,23 @@ export class Association {
   }
 
   get ownersByKey(): Hash<unknown, Base[]> {
-    this._ownersByKey ??= (() => {
-      const result = new Hash<unknown, Base[]>();
-      for (const owner of this.owners) {
+    this._ownersByKey ??= eachWithObject(
+      this.owners,
+      new Hash<unknown, Base[]>(),
+      (owner, result) => {
         const key = this.deriveKey(owner, this.ownerKeyName);
         if (key != null) (result.get(key) ?? result.set(key, []).get(key)!).push(owner);
-      }
-      return result;
-    })();
+      },
+    );
     return this._ownersByKey;
   }
 
   isLoaded(owner: Base): boolean {
-    return (owner as any).association(this.reflection.name).isLoaded();
+    return owner.association(this.reflection.name).isLoaded();
   }
 
   targetFor(owner: Base): Base[] {
-    return wrap((owner as any).association(this.reflection.name).target);
+    return wrap(owner.association(this.reflection.name).target);
   }
 
   get scope(): any {
@@ -124,7 +135,7 @@ export class Association {
   setInverse(record: Base): void {
     const owners = this.ownersByKey.get(this.deriveKey(record, this.associationKeyName));
     if (owners != null) {
-      const association = (first(owners) as any).association(this.reflection.name);
+      const association = first(owners)!.association(this.reflection.name);
       association.setInverseInstance(record);
     }
   }
@@ -147,7 +158,7 @@ export class Association {
             this._recordsByOwner!.set(owner, entries);
           }
 
-          if ((this.reflection as any).isCollection?.() || entries.length === 0) {
+          if (this.reflection.isCollection() || entries.length === 0) {
             entries.push(record);
             assignments = true;
           }
@@ -161,15 +172,15 @@ export class Association {
     if (!unscopedRecords || unscopedRecords.length === 0) return;
     if (!this.reflectionScope.isEmptyScope) return;
     if (this.preloadScope && !this.preloadScope.isEmptyScope) return;
-    if ((this.reflection as any).isCollection?.()) return;
+    if (this.reflection.isCollection()) return;
 
     const associationKeyName = this.associationKeyName as string;
     for (const record of unscopedRecords.filter((r) =>
-      isPresent((r as any).readAttribute(associationKeyName)),
+      isPresent(r.readAttribute(associationKeyName)),
     )) {
       const owners = this.ownersByKey.get(this.deriveKey(record, this.associationKeyName));
       owners?.forEach((owner, i) => {
-        const association = (owner as any).association(this.reflection.name);
+        const association = owner.association(this.reflection.name);
         association.target = record;
 
         if (i === 0) {
@@ -184,13 +195,13 @@ export class Association {
   }
 
   private get ownerKeyName(): string | string[] {
-    return (this.reflection as any).joinForeignKey;
+    return this.reflection.joinForeignKey;
   }
 
   private associateRecordsToOwner(owner: Base, records: Base[]): void {
     if (this.isLoaded(owner)) return;
 
-    const association = (owner as any).association(this.reflection.name);
+    const association = owner.association(this.reflection.name);
     if (this.reflection.isCollection()) {
       const notPersistedRecords = (association.target as Base[]).filter((r) => !r.isPersisted());
       association.target = records.concat(notPersistedRecords);
@@ -201,9 +212,9 @@ export class Association {
 
   private deriveKey(owner: Base, key: string | string[]): unknown {
     if (Array.isArray(key)) {
-      return key.map((k) => this.convertKey((owner as any)._readAttribute(k)));
+      return key.map((k) => this.convertKey(owner._readAttribute(k)));
     } else {
-      return this.convertKey((owner as any)._readAttribute(key));
+      return this.convertKey(owner._readAttribute(key));
     }
   }
 
@@ -233,19 +244,19 @@ export class Association {
 
   /** @internal */
   protected get reflectionScope(): any {
-    this._reflectionScope ??= (this.reflection as any)
-      .joinScopes((this.klass as any).arelTable, (this.klass as any).predicateBuilder, this.klass)
-      .reduce((acc: any, s: any) => acc.merge(s), (this.klass as any).unscoped());
+    this._reflectionScope ??= this.reflection
+      .joinScopes(this.klass.arelTable, this.klass.predicateBuilder, this.klass)
+      .reduce((acc: any, s: any) => acc.merge(s), this.klass.unscoped());
     return this._reflectionScope;
   }
 
   private buildScope(): any {
-    let scope = (this.klass as any).scopeForAssociation();
+    let scope = this.klass.scopeForAssociation();
 
-    const type = (this.reflection as any).type;
-    if (type && !(this.reflection as any).isThroughReflection?.()) {
+    const type = this.reflection.type;
+    if (type && !this.reflection.isThroughReflection()) {
       scope = scope.where({
-        [type]: (this.model as any)?.polymorphicName?.() ?? this.model?.name,
+        [type]: this.model!.polymorphicName(),
       });
     }
 
@@ -263,15 +274,6 @@ export class Association {
   /** @internal */
   protected cascadeStrictLoading(scope: any): any {
     return this.preloadScope?.strictLoadingValue ? (scope.strictLoading?.() ?? scope) : scope;
-  }
-
-  private _uniqueOwners(owners: Base[]): Base[] {
-    const seen = new globalThis.Set<Base>();
-    return owners.filter((o) => {
-      if (seen.has(o)) return false;
-      seen.add(o);
-      return true;
-    });
   }
 }
 

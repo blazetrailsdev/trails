@@ -1,3 +1,5 @@
+import { AbstractController } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 /** @internal */
 
 import { included } from "@blazetrails/activesupport";
@@ -27,3 +29,5 @@ export class AssetPaths {
     );
   }
 }
+
+rbModConstSet(AbstractController, "AssetPaths", AssetPaths);

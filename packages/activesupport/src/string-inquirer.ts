@@ -1,6 +1,19 @@
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  KERNEL_METHODS,
+  NoMethodError,
+  PROTOCOL_PROBES,
+  rbMethodName,
+} from "@blazetrails/ruby-compat";
+
+function isPredicateSpelling(prop: string): boolean {
+  return /^is[A-Z]/.test(prop) && !KERNEL_METHODS.has(prop) && !PROTOCOL_PROBES.has(prop);
+}
 
 export class StringInquirer extends String {
+  static toString(): string {
+    return "ActiveSupport::StringInquirer";
+  }
+
   constructor(value: string) {
     super(value);
     return new Proxy(this, {
@@ -13,8 +26,8 @@ export class StringInquirer extends String {
             : value;
         }
         if (typeof prop === "symbol") return Reflect.get(target, prop, receiver);
-        if (prop.endsWith("?")) {
-          const methodName = prop;
+        const methodName = isPredicateSpelling(prop) ? rbMethodName(prop) : prop;
+        if (methodName.endsWith("?")) {
           return () => target.valueOf() === methodName.slice(0, -1);
         }
         return () => {
@@ -24,7 +37,8 @@ export class StringInquirer extends String {
         };
       },
       has(target, prop) {
-        if (typeof prop === "string" && prop.endsWith("?")) return true;
+        if (typeof prop === "string" && (prop.endsWith("?") || isPredicateSpelling(prop)))
+          return true;
         return Reflect.has(target, prop);
       },
     });

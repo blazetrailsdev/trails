@@ -78,7 +78,7 @@ export function mergeTsconfig(existingText: string): TsconfigMergeResult {
   const conflicts: TsconfigConflict[] = [];
 
   for (const [key, required] of AR_REQUIRED_OPTIONS) {
-    if (!Object.prototype.hasOwnProperty.call(cfg.compilerOptions, key)) {
+    if (!Object.hasOwn(cfg.compilerOptions, key)) {
       cfg.compilerOptions[key] = required;
       added.push(key);
     } else if (cfg.compilerOptions[key] !== required) {

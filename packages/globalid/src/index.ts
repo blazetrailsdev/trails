@@ -1,6 +1,3 @@
-export { getApp, setApp } from "./config.js";
-/** @internal */
-export { _resetApp } from "./config.js";
 export { GlobalID } from "./global-id.js";
 export type { GlobalIDModel, GlobalIDOptions } from "./global-id.js";
 export { SignedGlobalID, ExpiredMessage } from "./signed-global-id.js";
@@ -9,7 +6,7 @@ export { FixtureSet, type FixtureSetHost } from "./fixture-set.js";
 /** @internal */
 export { _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
 export type { SignedGlobalIDOptions, ParseOptions } from "./signed-global-id.js";
-export { validateApp, GID, MissingModelIdError, InvalidModelIdError } from "./uri/gid.js";
+export { GID, MissingModelIdError, InvalidModelIdError } from "./uri/gid.js";
 export type { GidComponents } from "./uri/gid.js";
 export { Locator, BaseLocator, UnscopedLocator, BlockLocator } from "./locator.js";
 /** @internal */

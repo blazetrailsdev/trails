@@ -268,7 +268,7 @@ describe("BasicsTest", async () => {
     await assertRaises([RuntimeError], {}, () => (Topic as any).columnsHash());
     vi.restoreAllMocks();
 
-    expect(((await Topic.first()) as any).content).toEqual(payload);
+    expect(((await Topic.first()) as any).content).toEqual(new Hash().set("foo", payload.foo));
   });
 
   it("column names are escaped", async () => {
@@ -343,7 +343,7 @@ describe("BasicsTest", async () => {
   it("previously changed", async () => {
     const topic = (await Topic.first()) as any;
     topic.title = "<3<3<3";
-    expect(topic.previousChanges).toEqual(new Hash());
+    expect(topic.previousChanges).toEqual({});
 
     await topic.saveBang();
     const expected = ["The First Topic", "<3<3<3"];
@@ -473,14 +473,14 @@ describe("BasicsTest", async () => {
   });
 
   it("initialize with invalid attribute", async () => {
-    const ex = (await assertRaises([MultiparameterAssignmentErrors], {}, () => {
+    const ex = await assertRaises([MultiparameterAssignmentErrors], {}, () => {
       new Topic({
         title: "test",
         "written_on(4i)": "16",
         "written_on(5i)": "24",
         "written_on(6i)": "00",
       } as never);
-    })) as MultiparameterAssignmentErrors;
+    });
 
     expect(ex.errors.length).toEqual(1);
     expect((ex.errors[0] as AttributeAssignmentError).attribute).toEqual("written_on");
@@ -1468,11 +1468,11 @@ describe("BasicsTest", async () => {
 
     klass.tableName = "foo";
     expect(klass.tableName).toEqual("foo");
-    expect(klass.quotedTableName()).toEqual((klass.adapterClass() as any).quoteTableName("foo"));
+    expect(klass.quotedTableName()).toEqual(klass.adapterClass().quoteTableName("foo"));
 
     klass.tableName = "bar";
     expect(klass.tableName).toEqual("bar");
-    expect(klass.quotedTableName()).toEqual((klass.adapterClass() as any).quoteTableName("bar"));
+    expect(klass.quotedTableName()).toEqual(klass.adapterClass().quoteTableName("bar"));
   });
 
   it("set table name with inheritance", () => {

@@ -1,14 +1,9 @@
-import {
-  REQUEST_METHOD,
-  SCRIPT_NAME,
-  PATH_INFO,
-  QUERY_STRING,
-  SERVER_PROTOCOL,
-  CONTENT_LENGTH,
-} from "./constants.js";
-import { Process, sprintf } from "@blazetrails/ruby-compat";
+import type { RackHeaders } from "./index.js";
+import { SERVER_PROTOCOL, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
+import { Process, sprintf, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Time } from "@blazetrails/date";
 import type { RackApp } from "./mock-request.js";
-import { forwardedValues } from "./utils.js";
+import { Request } from "./request.js";
 import { BodyProxy } from "./body-proxy.js";
 
 function clockTime(): number {
@@ -18,17 +13,17 @@ function clockTime(): number {
 export class CommonLogger {
   static readonly FORMAT = `%s - %s [%s] "%s %s%s%s %s" %d %s %0.4f `;
 
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private logger: any;
 
-  constructor(app: RackApp, logger?: any) {
+  constructor(app: RackApp | { call: RackApp }, logger?: any) {
     this.app = app;
     this.logger = logger || null;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const beganAt = clockTime();
-    const response = await this.app(env);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
     const [status, headers, body] = response;
 
     response[2] = new BodyProxy(body, () => {
@@ -41,54 +36,22 @@ export class CommonLogger {
   private log(
     env: Record<string, any>,
     status: number,
-    responseHeaders: Record<string, string | string[]>,
+    responseHeaders: RackHeaders,
     beganAt: number,
   ): void {
-    let addr: string;
-    if (env["HTTP_X_FORWARDED_FOR"]) {
-      addr = env["HTTP_X_FORWARDED_FOR"].split(",")[0].trim();
-    } else if (env["HTTP_FORWARDED"]) {
-      const forwarded = forwardedValues(env["HTTP_FORWARDED"]);
-      addr = forwarded?.for?.[0] || "-";
-    } else {
-      addr = env["REMOTE_ADDR"] || "-";
-    }
-
+    const request = new Request(env);
     const length = this.extractContentLength(responseHeaders);
-
-    // boundary: Common Log Format timestamp (`[10/Oct/2000:13:55:36 -0700]`)
-    const now = new Date();
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const tz = now.getTimezoneOffset();
-    const tzSign = tz <= 0 ? "+" : "-";
-    const tzH = pad(Math.floor(Math.abs(tz) / 60));
-    const tzM = pad(Math.abs(tz) % 60);
-    const timestamp = `${pad(now.getDate())}/${months[now.getMonth()]}/${now.getFullYear()}:${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} ${tzSign}${tzH}${tzM}`;
 
     let msg = sprintf(
       CommonLogger.FORMAT,
-      addr,
-      env["REMOTE_USER"] || "-",
-      timestamp,
-      env[REQUEST_METHOD],
-      env[SCRIPT_NAME] || "",
-      env[PATH_INFO] || "",
-      env[QUERY_STRING] && env[QUERY_STRING].length > 0 ? `?${env[QUERY_STRING]}` : "",
-      env[SERVER_PROTOCOL],
+      request.ip || "-",
+      request.getHeader("REMOTE_USER") || "-",
+      Time.now().strftime("%d/%b/%Y:%H:%M:%S %z"),
+      request.requestMethod,
+      request.scriptName,
+      request.pathInfo,
+      request.queryString.length === 0 ? "" : `?${request.queryString}`,
+      request.getHeader(SERVER_PROTOCOL),
       String(status).slice(0, 4),
       length,
       clockTime() - beganAt,
@@ -99,16 +62,16 @@ export class CommonLogger {
     );
     msg = msg.slice(0, -1) + "\n";
 
-    const logger = this.logger || env["rack.errors"];
+    const logger = this.logger || request.getHeader(RACK_ERRORS);
 
-    if (logger && typeof logger.write === "function") {
+    if (rbObjRespondTo(logger, "write")) {
       logger.write(msg);
-    } else if (logger && typeof logger.info === "function") {
-      logger.info(msg.trimEnd());
+    } else {
+      logger.append(msg);
     }
   }
 
-  private extractContentLength(headers: Record<string, string | string[]>): string {
+  private extractContentLength(headers: RackHeaders): string {
     const value = headers[CONTENT_LENGTH];
     return !value || value === "0" ? "-" : String(value);
   }

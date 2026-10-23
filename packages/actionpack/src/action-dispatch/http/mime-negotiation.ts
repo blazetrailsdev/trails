@@ -2,35 +2,36 @@ import { ArrayInquirer, included, mattrAccessor } from "@blazetrails/activesuppo
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { MimeType, NullType } from "./mime-type.js";
 import { ParseError } from "./parameters.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActionDispatch } from "../../namespaces.js";
 
 /** @internal */
 const RESCUABLE_MIME_FORMAT_ERRORS = [BadRequest, ParseError] as const;
 
-export class InvalidType extends Error {
-  constructor(message?: string) {
-    super(message);
-    this.name = "ActionDispatch::Http::MimeNegotiation::InvalidType";
-  }
-}
+export class InvalidType extends MimeType.InvalidMimeType {}
+InvalidType.prototype.name = "ActionDispatch::Http::MimeNegotiation::InvalidType";
 
 export interface MimeNegotiationHost {
   getHeader(key: string): unknown;
   setHeader(key: string, value: unknown): unknown;
   fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   parameters: Record<string, unknown>;
-  accept: string;
+  accept: string | undefined;
   xhr: boolean;
 }
 
 export class MimeNegotiation {
-  declare setHeader: MimeNegotiationHost["setHeader"];
-  declare parameters: MimeNegotiationHost["parameters"];
+  declare protected setHeader: MimeNegotiationHost["setHeader"];
+  declare protected parameters: MimeNegotiationHost["parameters"];
   /** @internal */
   declare _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
 
   static [included](base: object): void {
     mattrAccessor.call(base, "ignoreAcceptHeader", { default: false });
+  }
+
+  get variant(): ArrayInquirer<string> & Record<string, () => boolean> {
+    return variant.call(this as unknown as MimeNegotiationHost);
   }
 
   set variant(value: string | string[] | null | undefined) {
@@ -42,11 +43,8 @@ export class MimeNegotiation {
       Record<string, () => boolean>;
   }
 
-  set format(extension: unknown) {
-    this.parameters["format"] = extension == null ? "" : String(extension);
-    this.setHeader("action_dispatch.request.formats", [
-      MimeType.lookupByExtension(this.parameters["format"] as string),
-    ]);
+  get formats(): MimeType[] {
+    return formats.call(this as unknown as MimeNegotiationHost);
   }
 
   set formats(extensions: unknown[]) {
@@ -60,6 +58,7 @@ export class MimeNegotiation {
 
 const BROWSER_LIKE_ACCEPTS = /,\s*\*\/\*|\*\/\*\s*,/;
 
+/** @missingRailsName downcase — PERMANENT */
 export function contentMimeType(this: MimeNegotiationHost): MimeType | null {
   return this.fetchHeader("action_dispatch.request.content_type", (k) => {
     try {
@@ -67,7 +66,8 @@ export function contentMimeType(this: MimeNegotiationHost): MimeType | null {
       const v = match ? MimeType.lookup(match[1].trim().toLowerCase()) : null;
       return this.setHeader(k, v);
     } catch (e) {
-      throw new InvalidType((e as Error).message);
+      if (!(e instanceof MimeType.InvalidMimeType)) throw e;
+      throw new InvalidType(e.message);
     }
   }) as MimeType | null;
 }
@@ -85,9 +85,17 @@ export function accepts(this: MimeNegotiationHost): MimeType[] {
         header === "" ? ([contentMimeType.call(this)] as MimeType[]) : MimeType.parse(header);
       return this.setHeader(k, v);
     } catch (e) {
-      throw new InvalidType((e as Error).message);
+      if (!(e instanceof MimeType.InvalidMimeType)) throw e;
+      throw new InvalidType(e.message);
     }
   }) as MimeType[];
+}
+
+export function setFormat(this: MimeNegotiationHost, extension: unknown): void {
+  this.parameters["format"] = extension == null ? "" : String(extension);
+  this.setHeader("action_dispatch.request.formats", [
+    MimeType.lookupByExtension(this.parameters["format"] as string),
+  ]);
 }
 
 export function format(this: MimeNegotiationHost, _viewPath?: unknown): MimeType | NullType {
@@ -98,7 +106,7 @@ export function formats(this: MimeNegotiationHost): MimeType[] {
   return this.fetchHeader("action_dispatch.request.formats", (k) => {
     let v: MimeType[];
     let extType: MimeType | undefined;
-    if (paramsReadable.call(this)) {
+    if (isParamsReadable.call(this)) {
       const f = this.parameters["format"];
       const found = f != null ? MimeType.lookupByExtension(String(f)) : undefined;
       v = found ? [found] : [];
@@ -145,11 +153,11 @@ export function negotiateMime(
 
 /** @internal */
 export function shouldApplyVaryHeader(this: MimeNegotiationHost): boolean {
-  return !paramsReadable.call(this) && useAcceptHeader.call(this) && validAcceptHeader.call(this);
+  return !isParamsReadable.call(this) && useAcceptHeader.call(this) && validAcceptHeader.call(this);
 }
 
 /** @internal */
-export function paramsReadable(this: MimeNegotiationHost): boolean {
+export function isParamsReadable(this: MimeNegotiationHost): boolean {
   try {
     return this.parameters["format"] != null;
   } catch (err) {
@@ -185,3 +193,6 @@ export function formatFromPathExtension(this: MimeNegotiationHost): MimeType | u
   if (match) return MimeType.lookupByExtension(match[1]);
   return undefined;
 }
+
+rbModConstSet(ActionDispatch.Http, "MimeNegotiation", MimeNegotiation);
+rbModConstSet(MimeNegotiation, "InvalidType", InvalidType);

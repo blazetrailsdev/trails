@@ -13,7 +13,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { aryJoin, b, fetch, first, isEmpty } from "@blazetrails/ruby-compat";
+import { aryJoin, b, fetch, first, rbRegMatchP } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -95,7 +95,7 @@ export function isWriteQuery(sql: string | null): boolean {
     return !READ_QUERY.test(sql as string);
   } catch (error) {
     if (!(error instanceof ArgumentError)) throw error;
-    return !READ_QUERY.test(b(sql as string));
+    return !rbRegMatchP(READ_QUERY, b(sql as string));
   }
 }
 
@@ -146,7 +146,7 @@ export async function execInsert(
   returning?: string[] | null,
 ): Promise<Result> {
   if (this.isUseInsertReturning() || pk === false) {
-    return DatabaseStatements.instanceMethod("execInsert")!.value.call(
+    return DatabaseStatements.execInsert.call(
       this as never,
       sql,
       name,
@@ -348,7 +348,7 @@ export async function performQuery(
 
 /** @internal */
 export async function castResult(this: CastResultHost, result: PG.Result): Promise<Result> {
-  if (isEmpty(result.fields())) {
+  if (result.fields().length === 0) {
     result.clear();
     return Result.empty();
   }
@@ -443,7 +443,7 @@ export async function lastInsertIdResult(
 }
 
 /** @internal */
-export function returningColumnValues(result: Result): unknown[] | undefined {
+export function returningColumnValues(result: Result): unknown[] | null {
   return first(result.rows);
 }
 

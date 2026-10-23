@@ -7,9 +7,6 @@ import {
   eachPair,
   first,
   include,
-  initializeIncludedModules,
-  isEmpty,
-  merge,
   mergeBang,
   puts,
   Range,
@@ -30,8 +27,14 @@ import {
   uniq,
   rbGvGet,
   rbGvSet,
+  Hash,
+  hashDelete,
+  isModuleIncluded,
 } from "@blazetrails/ruby-compat";
-import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS } from "./base.js";
+import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, type Relations } from "./base.js";
+import type { Invocation } from "./invocation.js";
+import type { Shell } from "./shell.js";
+import { Actions, type ActionsHost } from "./actions.js";
 import { Command, DynamicCommand, HiddenCommand } from "./command.js";
 import { AmbiguousTaskError } from "./error.js";
 import { Group, type GroupClass } from "./group.js";
@@ -59,6 +62,8 @@ type Instance = Base & {
 };
 
 export type ThorClass = typeof Thor & Omit<BaseClass, keyof typeof Thor>;
+
+type Host = Base & Invocation & Shell & ActionsHost;
 
 export class Thor {
   static {
@@ -178,7 +183,7 @@ export class Thor {
       this._map = this.fromSuperclass("map", {}) as Record<string, string>;
     }
 
-    if (rtest(mappings) && !isEmpty(kw)) {
+    if (rtest(mappings) && Object.keys(kw).length !== 0) {
       mappings = mergeBang(new Map(Object.entries(kw)), mappings as Map<string, string>);
     } else {
       mappings ||= kw;
@@ -338,9 +343,9 @@ export class Thor {
       configurable: true,
     });
     this.methodAdded(subcommand);
-    eachPair(subcommandClass.commands(), (_meth, command) => {
+    for (const [, command] of Object.entries(subcommandClass.commands())) {
       command.ancestorName = subcommand;
-    });
+    }
   }
   declare static subtask: typeof Thor.subcommand;
 
@@ -348,13 +353,13 @@ export class Thor {
     if (!Object.hasOwn(this, "_checkUnknownOptions") || !rtest(this._checkUnknownOptions)) {
       this._checkUnknownOptions = {};
     }
-    eachPair(options, (key, value) => {
+    for (const [key, value] of Object.entries(options)) {
       if (rtest(value)) {
         (this._checkUnknownOptions as CheckUnknownOptions)[key] = rbFArray(value);
       } else {
         delete (this._checkUnknownOptions as CheckUnknownOptions)[key];
       }
-    });
+    }
     return this._checkUnknownOptions;
   }
 
@@ -445,7 +450,7 @@ export class Thor {
     let opts: string[][] = [];
     if (!(command == null)) opts = command.methodExclusiveOptionNames();
     opts = opts.concat(this.classExclusiveOptionNames());
-    if (!isEmpty(opts)) {
+    if (opts.length !== 0) {
       shell.say("Exclusive Options:");
       shell.printTable(
         opts.map((ex) => ex.map((e) => `--${e}`)),
@@ -464,7 +469,7 @@ export class Thor {
     let opts: string[][] = [];
     if (!(command == null)) opts = command.methodAtLeastOneOptionNames();
     opts = opts.concat(this.classAtLeastOneOptionNames());
-    if (!isEmpty(opts)) {
+    if (opts.length !== 0) {
       shell.say("Required At Least One:");
       shell.printTable(
         opts.map((ex) => ex.map((e) => `--${e}`)),
@@ -495,7 +500,7 @@ export class Thor {
     let opts: unknown[] | Record<string, unknown> | null;
     if (rtest(command)) {
       [args, opts] = Options.split(givenArgs);
-      if (rtest(this.isStopOnUnknownOption(command)) && !isEmpty(args)) {
+      if (rtest(this.isStopOnUnknownOption(command)) && args.length !== 0) {
         opts.forEach((opt) => args.push(opt));
         opts.length = 0;
       }
@@ -590,7 +595,7 @@ export class Thor {
 
   /** @internal */
   static retrieveCommandName(this: ThorClass, args: unknown[]): string | null | undefined {
-    const meth = !isEmpty(args) ? toS(first(args)) : null;
+    const meth = args.length !== 0 ? toS(first(args)) : null;
     if (rtest(meth) && (rtest(this.map()[meth]) || !/^-/m.test(meth))) {
       return args.shift() as string | null | undefined;
     }
@@ -610,7 +615,7 @@ export class Thor {
       );
     }
 
-    if (isEmpty(possibilities)) {
+    if (possibilities.length === 0) {
       meth ??= this.defaultCommand();
     } else if (rtest(this.map()[meth])) {
       meth = this.map()[meth];
@@ -627,7 +632,7 @@ export class Thor {
   static findCommandPossibilities(this: ThorClass, meth: string): string[] {
     const len = toS(meth).length;
     const possibilities = sort(
-      Object.keys(merge(this.allCommands(), this.map())).filter((n) => meth === n.slice(0, len)),
+      Object.keys({ ...this.allCommands(), ...this.map() }).filter((n) => meth === n.slice(0, len)),
     );
     const uniquePossibilities = uniq(
       possibilities.map((k) => (rtest(this.map()[k]) ? this.map()[k] : k)),
@@ -669,8 +674,107 @@ export class Thor {
     return list.sort((a, b) => rbCmpint(cmp(a[0], b[0]), a[0], b[0]));
   }
 
-  constructor(...args: unknown[]) {
-    initializeIncludedModules(this, ...args);
+  /**
+   * @inlinedFrom Thor::Shell#initialize thor/v1.3.2/lib/thor/shell.rb:44-48
+   * @inlinedFrom Thor::Invocation#initialize thor/v1.3.2/lib/thor/invocation.rb:23-27
+   * @inlinedFrom Thor::Base#initialize thor/v1.3.2/lib/thor/base.rb:53-113
+   * @inventedArm if — PERMANENT
+   */
+  constructor(
+    args: unknown[] = [],
+    localOptions: unknown = {},
+    config: BaseConfig & {
+      behavior?: string | null;
+      destinationRoot?: string | null;
+      shell?: Basic | null;
+    } = {},
+  ) {
+    if (isModuleIncluded(new.target, Actions)) {
+      (this as unknown as Host).behavior = (() => {
+        switch (toS(config.behavior)) {
+          case "force":
+          case "skip":
+            (this as unknown as Host)._cleanupOptionsAndSet(
+              localOptions as Record<string, unknown>,
+              config.behavior!,
+            );
+            return "invoke";
+          case "revoke":
+            return "revoke";
+          default:
+            return "invoke";
+        }
+      })();
+    }
+
+    (this as unknown as Host)._invocations =
+      (config.invocations as Host["_invocations"] | undefined) ||
+      new Hash<unknown, string[]>((h, k) => {
+        const v: string[] = [];
+        h.set(k, v);
+        return v;
+      });
+    (this as unknown as Host)._initializer = [args, localOptions, config];
+
+    const klass = this.constructor as unknown as BaseClass;
+    let parseOptions = klass.classOptions();
+
+    const commandOptions = hashDelete(config, "commandOptions") as Record<string, Option> | null;
+    if (rtest(commandOptions)) parseOptions = { ...parseOptions, ...commandOptions };
+
+    let arrayOptions: unknown[];
+    let hashOptions: Record<string, unknown>;
+    if (Array.isArray(localOptions)) {
+      arrayOptions = localOptions;
+      hashOptions = {};
+    } else {
+      arrayOptions = [];
+      hashOptions = localOptions as Record<string, unknown>;
+    }
+
+    const currentCommand = config.currentCommand ?? null;
+    const stopOnUnknown = klass.isStopOnUnknownOption(currentCommand);
+
+    const relations: Relations =
+      currentCommand == null
+        ? { exclusiveOptionNames: [], atLeastOneOptionNames: [] }
+        : currentCommand.optionsRelation;
+
+    klass.classExclusiveOptionNames().map((n) => relations.exclusiveOptionNames!.push(n));
+    klass.classAtLeastOneOptionNames().map((n) => relations.atLeastOneOptionNames!.push(n));
+
+    const disableRequiredCheck = klass.isDisableRequiredCheck(currentCommand);
+
+    const opts = new Options(
+      parseOptions,
+      hashOptions,
+      stopOnUnknown,
+      disableRequiredCheck,
+      relations,
+    );
+
+    (this as unknown as Host).options = opts.parse(arrayOptions);
+    if (rtest(config.classOptions)) {
+      (this as unknown as Host).options = config.classOptions.merge(
+        (this as unknown as Host).options,
+      ) as Host["options"];
+    }
+
+    if (klass.isCheckUnknownOptions(config)) opts.checkUnknownBang();
+
+    let toParse = args;
+    if (!klass["strictArgsPosition?"](config)) toParse = toParse.concat(opts.remaining());
+
+    const thorArgs = new Arguments(klass.arguments());
+    for (const [k, v] of Object.entries(thorArgs.parse(toParse))) rbFSend(this, `${k}=`, v);
+    (this as unknown as Host).args = thorArgs.remaining();
+
+    (this as unknown as Host).shell = config.shell as Basic;
+    if (rbObjRespondTo((this as unknown as Host).shell, "base"))
+      (this as unknown as Host).shell.base ||= this as never;
+
+    if (isModuleIncluded(new.target, Actions))
+      (this as unknown as Host).destinationRoot = config.destinationRoot as string;
   }
 
   help(command: string | null = null, subcommand: unknown = false): void {

@@ -241,22 +241,17 @@ export {
   sum,
   indexBy,
   indexWith,
-  groupBy,
   pluck,
   maximum,
   minimum,
-  inBatchesOf,
   compactBlank,
   any,
   many,
-  tally,
-  filterMap,
   excluding,
   including,
   minBy,
   maxBy,
   eachCons,
-  eachSlice,
   inOrderOf,
   exclude,
   without,
@@ -372,6 +367,7 @@ export {
 } from "./testing/deprecation.js";
 
 export * from "./time-ext.js";
+import "./core-ext/date/calculations.js";
 import "./core-ext/time/calculations.js";
 import "./core-ext/date-time/calculations.js";
 import "./core-ext/date/zones.js";
@@ -448,9 +444,11 @@ export {
   jsonEscape,
   xmlNameEscape,
   tokenize,
+  Util as TseUtil,
 } from "./core-ext/tse/util.js";
 export { HtmlSafeTranslation } from "./html-safe-translation.js";
 export { BacktraceCleaner } from "./backtrace-cleaner.js";
+export { SyntaxErrorProxy } from "./syntax-error-proxy.js";
 export { OrderedHash } from "./ordered-hash.js";
 export { ErrorReporter } from "./error-reporter.js";
 export { TopLevel } from "./namespaces.js";
@@ -545,6 +543,10 @@ export {
 export type { ClassMethods } from "./callbacks.js";
 export { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "./concern.js";
 export * as Autoload from "./dependencies/autoload.js";
+export { Dependencies } from "./dependencies.js";
+export { Interlock } from "./dependencies/interlock.js";
+export { ShareLock } from "./concurrency/share-lock.js";
+export type { ShareLockThreadInfo } from "./concurrency/share-lock.js";
 export {
   include,
   extend,
@@ -613,6 +615,8 @@ export {
   assertNoMatch,
   assertSame,
   assertNotSame,
+  assertOperator,
+  diff,
   assertRaises,
   assertRaise,
   assertNothingRaised,
@@ -627,6 +631,7 @@ export {
   BacktraceFilter,
   Minitest,
 } from "./testing/assertions.js";
+export { assertErrorReported, assertNoErrorReported } from "./testing/error-reporter-assertions.js";
 export { ConstantLookup } from "./testing/constant-lookup.js";
 export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { Stream, silenceStream, quietly, capture } from "./testing/stream.js";

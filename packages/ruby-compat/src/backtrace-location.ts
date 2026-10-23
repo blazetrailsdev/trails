@@ -1,3 +1,5 @@
+import { TypeError } from "./type-error.js";
+
 /**
  * Ruby's `Thread::Backtrace::Location` (`vendor/ruby/v3.3.11/vm_backtrace.c:1345`),
  * one frame of `Exception#backtrace_locations`.
@@ -19,11 +21,13 @@
 export class Location {
   /**
    * `Thread::Backtrace::Location#path` (`vendor/ruby/v3.3.11/vm_backtrace.c:314`),
-   * nil for a V8 frame whose position is not a plain file (an `eval` frame).
+   * always a String. An `eval` frame answers `(eval at <caller>)`, MRI 3.3's
+   * eval path (`vendor/ruby/v3.3.11/vm_eval.c:1628-1636`), and a frame with no
+   * position answers its location text (`<anonymous>`, `native`).
    *
    * @noRailsEquivalent PERMANENT
    */
-  readonly path: string | null;
+  readonly path: string;
   /** @noRailsEquivalent PERMANENT */
   readonly lineno: number;
   /** @noRailsEquivalent PERMANENT */
@@ -42,8 +46,12 @@ export class Location {
     const body = this._frame.replace(/^at\s+(?:async\s+)?/, "");
     const location =
       body.endsWith(")") && body.includes(" (") ? body.slice(body.indexOf(" (") + 2, -1) : body;
-    const path = location.startsWith("eval at ") ? null : /^(.+):\d+:\d+$/.exec(location);
-    this.path = path ? path[1] : null;
+    const path = /^(.+):\d+:\d+$/.exec(location);
+    if (location.startsWith("eval at ")) {
+      this.path = `(${location.slice(0, location.lastIndexOf(", "))})`;
+    } else {
+      this.path = path ? path[1] : location;
+    }
 
     const position = /:(\d+):(\d+)\)?$/.exec(this._frame);
     this.lineno = position ? Number(position[1]) : 0;
@@ -60,13 +68,19 @@ export class Location {
   }
 }
 
+const setBacktraces = new WeakMap<Error, string[] | null>();
+
 /**
  * `Exception#backtrace_locations` (`vendor/ruby/v3.3.11/error.c:1789`): nil for an
- * exception that was never raised, else one `Location` per frame.
+ * exception that was never raised, else one `Location` per frame. Dispatches
+ * to the receiver's own `backtraceLocations` override, as a Ruby call would.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function excBacktraceLocations(exc: Error): Location[] | null {
+  const override = (exc as Error & { backtraceLocations?: () => Location[] | null })
+    .backtraceLocations;
+  if (typeof override === "function") return override.call(exc);
   const stack = exc.stack;
   if (stack == null) return null;
   return stack
@@ -77,14 +91,41 @@ export function excBacktraceLocations(exc: Error): Location[] | null {
 
 /**
  * `Exception#backtrace` (`vendor/ruby/v3.3.11/error.c:1741` `exc_backtrace`): nil for
- * an exception that was never raised, else one String per frame.
+ * an exception that was never raised, else one String per frame. Dispatches to
+ * the receiver's own `backtrace` override, as a Ruby call would.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function excBacktrace(exc: Error): string[] | null {
+  const override = (exc as Error & { backtrace?: () => string[] | null }).backtrace;
+  if (typeof override === "function") return override.call(exc);
+  const bt = setBacktraces.get(exc);
+  if (bt !== undefined) return bt;
   const locations = excBacktraceLocations(exc);
   if (locations === null) return null;
   return locations.map((location) => location.toString());
+}
+
+/**
+ * `rb_check_backtrace` (`vendor/ruby/v3.3.11/error.c:1800-1820`): nil stays nil, a
+ * String is wrapped as a one-element Array, and anything but an Array of
+ * Strings raises `TypeError`.
+ */
+function rbCheckBacktrace(bt: unknown): string[] | null {
+  const err = "backtrace must be Array of String";
+
+  if (bt != null) {
+    if (typeof bt === "string") return [bt];
+    if (!Array.isArray(bt)) {
+      throw new TypeError(err);
+    }
+    for (const e of bt) {
+      if (typeof e !== "string") {
+        throw new TypeError(err);
+      }
+    }
+  }
+  return (bt ?? null) as string[] | null;
 }
 
 /**
@@ -94,9 +135,15 @@ export function excBacktrace(exc: Error): string[] | null {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function excSetBacktrace(exc: Error, bt: string[]): string[] {
-  exc.stack = [`${exc.name}: ${exc.message}`, ...bt.map((frame) => `    ${frame}`)].join("\n");
-  return bt;
+export function excSetBacktrace(exc: Error, bt: string | string[] | null): string[] | null {
+  const checked = rbCheckBacktrace(bt);
+  setBacktraces.set(exc, checked);
+  if (checked !== null) {
+    exc.stack = [`${exc.name}: ${exc.message}`, ...checked.map((frame) => `    ${frame}`)].join(
+      "\n",
+    );
+  }
+  return checked;
 }
 
 /**

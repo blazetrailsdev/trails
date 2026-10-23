@@ -1,4 +1,18 @@
-export type BrowserName = "chromium" | "firefox" | "webkit";
+import type { LaunchOptions } from "playwright";
+import { compact } from "@blazetrails/activesupport";
+import type { RackMiddleware } from "@blazetrails/rack";
+import { Session } from "@blazetrails/rack-test";
+import { hashDelete, NotImplementedError } from "@blazetrails/ruby-compat";
+import { Browser } from "./browser.js";
+import { vite } from "./server.js";
+
+export type BrowserName =
+  | "chromium"
+  | "firefox"
+  | "webkit"
+  | "chrome"
+  | "headless_chrome"
+  | "headless_firefox";
 
 export interface DriverOptions {
   using?: BrowserName;
@@ -6,25 +20,12 @@ export interface DriverOptions {
   options?: Record<string, unknown>;
 }
 
-export interface PlaywrightBrowserContext {
-  newPage(): Promise<PlaywrightPage>;
-  close(): Promise<void>;
-}
-
-export interface PlaywrightPage {
-  goto(url: string, options?: Record<string, unknown>): Promise<unknown>;
-}
-
-export interface PlaywrightBrowser {
-  newContext(options?: Record<string, unknown>): Promise<PlaywrightBrowserContext>;
-  close(): Promise<void>;
-}
-
 /** @internal */
 let playwrightModule: Record<string, unknown> | undefined;
 const PLAYWRIGHT_MODULE = "playwright";
 
-async function requirePlaywright(): Promise<Record<string, unknown>> {
+/** @noRailsEquivalent PERMANENT */
+export async function requirePlaywright(): Promise<Record<string, unknown>> {
   if (playwrightModule) return playwrightModule;
   try {
     playwrightModule = (await import(PLAYWRIGHT_MODULE)) as Record<string, unknown>;
@@ -36,102 +37,123 @@ async function requirePlaywright(): Promise<Record<string, unknown>> {
   }
 }
 
+interface BrowserType {
+  launch(options: Record<string, unknown>): Promise<unknown>;
+}
+
 export class Driver {
   readonly name: string;
-  private _driverType: string;
-  private _screenSize: [number, number];
-  private _options: Record<string, unknown>;
-  private _using: BrowserName;
-  private _browser: PlaywrightBrowser | undefined;
+  private driverType: string;
+  private screenSize: [number, number] | undefined;
+  private options: Record<string, unknown>;
+  private capabilities: ((options: LaunchOptions | undefined) => void) | undefined;
+  private browser: Browser | null;
+  private _preload: Promise<void> | undefined;
 
-  constructor(driverType: string, options: DriverOptions = {}) {
-    this._driverType = driverType;
-    this._using = options.using ?? "chromium";
-    this._screenSize = options.screenSize ?? [1400, 1400];
-    const opts = { ...(options.options ?? {}) };
-    this.name = (opts.name as string) ?? driverType;
-    delete opts.name;
-    this._options = opts;
+  constructor(
+    driverType: string,
+    options: DriverOptions = {},
+    capabilities?: (options: LaunchOptions | undefined) => void,
+  ) {
+    this.driverType = driverType;
+    this.screenSize = options.screenSize;
+    this.options = options.options ?? {};
+    this.name = (hashDelete(this.options, "name") as string | null) ?? driverType;
+    this.capabilities = capabilities;
+
+    if (driverType === "selenium") {
+      this.browser = new Browser(options.using);
+      if (this.options.browser !== "remote") {
+        this._preload = this.browser.preload();
+        this._preload.catch(() => {});
+      }
+    } else {
+      this.browser = null;
+    }
   }
 
-  async use(): Promise<void> {
-    if (this._browser) return;
-    if (this.registerable()) await this.register();
+  use(): void {
+    if (this.registerable()) this.register();
+
     this.setup();
   }
 
   /** @internal */
   private registerable(): boolean {
-    return (["selenium", "cuprite", "rack_test", "playwright"] as string[]).includes(
-      this._driverType,
-    );
+    return ["selenium", "cuprite", "rack_test", "playwright"].includes(this.driverType);
   }
 
   /** @internal */
-  private async register(): Promise<void> {
-    switch (this._driverType) {
-      case "selenium":
-        this.registerSelenium();
-        break;
-      case "cuprite":
-        this.registerCuprite();
-        break;
-      case "rack_test":
-        this.registerRackTest();
-        break;
-      case "playwright":
-        await this.registerPlaywright();
-        break;
-    }
+  private register(): void {
+    this.browser?.configure(this.capabilities);
+
+    vite.drivers[this.name] = async (app) => {
+      switch (this.driverType) {
+        case "selenium":
+          return this.registerSelenium(app);
+        case "cuprite":
+          return this.registerCuprite(app);
+        case "rack_test":
+          return this.registerRackTest(app);
+        case "playwright":
+          return this.registerPlaywright(app);
+      }
+    };
   }
 
   /** @internal */
   private browserOptions(): Record<string, unknown> {
-    return { ...this._options };
+    return compact({ ...this.options, options: this.browser!.options });
   }
 
   /** @internal */
-  private registerSelenium(): void {
-    throw new Error("Selenium is not supported. Use playwright.");
+  private async registerSelenium(app: RackMiddleware | undefined): Promise<unknown> {
+    await this._preload;
+    this.browserOptions();
+    // @nie disposition=port-real rails=actionpack/lib/action_dispatch/system_testing/driver.rb:55
+    throw new NotImplementedError(
+      "selenium is not implemented; see converge-driver-selenium-arm-onto-webdriverio",
+    );
   }
-  /** @internal */
-  private registerCuprite(): void {
-    throw new Error("Cuprite is not supported. Use playwright.");
-  }
-  /** @internal */
-  private registerRackTest(): void {
-    throw new Error("RackTest is not supported. Use playwright.");
+
+  /**
+   * @internal
+   * @inventedArm launch — PERMANENT
+   */
+  private async registerCuprite(app: RackMiddleware | undefined): Promise<unknown> {
+    const options = { ...this.options, windowSize: this.screenSize };
+    const { chromium } = (await requirePlaywright()) as { chromium: BrowserType };
+    return { app, options, browser: await chromium.launch(this.options) };
   }
 
   /** @internal */
-  private async registerPlaywright(): Promise<void> {
-    const pw = await requirePlaywright();
-    const browserType = pw[this._using] as {
-      launch(opts: Record<string, unknown>): Promise<PlaywrightBrowser>;
+  private async registerRackTest(app: RackMiddleware | undefined): Promise<unknown> {
+    return {
+      app,
+      options: { respectDataMethod: true, ...this.options },
+      session: new Session(app!),
     };
-    this._browser = await browserType.launch(this.browserOptions());
   }
 
-  /** @internal */
-  private setup(): void {}
-
-  /** @internal */
-  async newContext(): Promise<PlaywrightBrowserContext> {
-    if (!this._browser) throw new Error("Driver not started. Call use() first.");
-    return this._browser.newContext({
-      viewport: { width: this._screenSize[0], height: this._screenSize[1] },
+  /**
+   * @internal
+   * @inventedArm launch — PERMANENT
+   */
+  private async registerPlaywright(app: RackMiddleware | undefined): Promise<unknown> {
+    let screen: { width: number; height: number } | undefined;
+    if (this.screenSize) screen = { width: this.screenSize[0], height: this.screenSize[1] };
+    const options = compact({
+      screen: screen,
+      viewport: screen,
+      ...this.options,
     });
+
+    const { chromium } = (await requirePlaywright()) as { chromium: BrowserType };
+    return { app, options, browser: await chromium.launch(this.options) };
   }
 
   /** @internal */
-  async newPage(): Promise<PlaywrightPage> {
-    const context = await this.newContext();
-    return context.newPage();
-  }
-
-  /** @internal */
-  async close(): Promise<void> {
-    await this._browser?.close();
-    this._browser = undefined;
+  private setup(): void {
+    vite.currentDriver = this.name;
   }
 }

@@ -8,7 +8,7 @@ describe("TemplatePathTest", () => {
     expect(path.virtual).toBe("foo/_bar");
     expect(path.prefix).toBe("foo");
     expect(path.name).toBe("bar");
-    expect(path.partial).toBe(true);
+    expect(path.partial).toBeTruthy();
   });
 
   test("virtual", () => {
@@ -23,55 +23,55 @@ describe("TemplatePathTest", () => {
     const path = TemplatePath.parse("foo");
     expect(path.prefix).toBe("");
     expect(path.name).toBe("foo");
-    expect(path.partial).toBe(false);
+    expect(path.partial).toBeFalsy();
   });
 
   test("parse root template with slash", () => {
     const path = TemplatePath.parse("/foo");
     expect(path.prefix).toBe("");
     expect(path.name).toBe("foo");
-    expect(path.partial).toBe(false);
+    expect(path.partial).toBeFalsy();
   });
 
   test("parse root partial", () => {
     const path = TemplatePath.parse("_foo");
     expect(path.prefix).toBe("");
     expect(path.name).toBe("foo");
-    expect(path.partial).toBe(true);
+    expect(path.partial).toBeTruthy();
   });
 
   test("parse root partial with slash", () => {
     const path = TemplatePath.parse("/_foo");
     expect(path.prefix).toBe("");
     expect(path.name).toBe("foo");
-    expect(path.partial).toBe(true);
+    expect(path.partial).toBeTruthy();
   });
 
   test("parse template", () => {
     const path = TemplatePath.parse("foo/bar");
     expect(path.prefix).toBe("foo");
     expect(path.name).toBe("bar");
-    expect(path.partial).toBe(false);
+    expect(path.partial).toBeFalsy();
   });
 
   test("parse partial", () => {
     const path = TemplatePath.parse("foo/_bar");
     expect(path.prefix).toBe("foo");
     expect(path.name).toBe("bar");
-    expect(path.partial).toBe(true);
+    expect(path.partial).toBeTruthy();
   });
 
   test("parse deep partial", () => {
     const path = TemplatePath.parse("foo/bar/_baz");
     expect(path.prefix).toBe("foo/bar");
     expect(path.name).toBe("baz");
-    expect(path.partial).toBe(true);
+    expect(path.partial).toBeTruthy();
   });
 
   test("parse deep partial with slash", () => {
     const path = TemplatePath.parse("/foo/bar/_baz");
     expect(path.prefix).toBe("foo/bar");
     expect(path.name).toBe("baz");
-    expect(path.partial).toBe(true);
+    expect(path.partial).toBeTruthy();
   });
 });

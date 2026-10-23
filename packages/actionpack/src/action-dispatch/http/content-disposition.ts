@@ -19,13 +19,12 @@ export class ContentDisposition {
     this.filename = filename;
   }
 
-  static format(options: ContentDispositionOptions): string {
-    return new ContentDisposition(options).toString();
+  static format({ disposition, filename }: ContentDispositionOptions): string {
+    return new ContentDisposition({ disposition: disposition, filename: filename }).toString();
   }
 
   asciiFilename(): string {
-    const translit = transliterate(this.filename ?? "");
-    return `filename="${percentEscape(translit, TRADITIONAL_ESCAPED_CHAR)}"`;
+    return `filename="${percentEscape(transliterate(this.filename ?? ""), TRADITIONAL_ESCAPED_CHAR)}"`;
   }
 
   utf8Filename(): string {

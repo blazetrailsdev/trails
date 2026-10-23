@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bodyFromString, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import { type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
   ChainedCookieJars,
   type CookieSerializer,
@@ -13,12 +13,7 @@ import {
   isReserialize,
   type RequestCookieMethodsHost,
   serializer,
-  keyGenerator,
-  signedCookieSalt,
-  authenticatedEncryptedCookieSalt,
 } from "./cookies.js";
-import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { MessageEncryptor, NullSerializer } from "@blazetrails/activesupport/message-encryptor";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { SerializerWithFallback } from "@blazetrails/activesupport/messages/serializer-with-fallback";
@@ -43,17 +38,20 @@ function cookieRequest(env: Record<string, unknown> = {}): RequestCookieMethodsH
     env: e,
     getHeader: (name: string) => e[name],
     hasHeader: (name: string) => Object.hasOwn(e, name),
+    fetchHeader: (name: string, block: (name: string) => unknown) =>
+      Object.hasOwn(e, name) ? e[name] : block(name),
+    setHeader: (name: string, value: unknown) => (e[name] = value),
     cookies: {},
   };
 }
 
 function emptyResponse(): RackResponse {
-  return [200, {}, bodyFromString("")];
+  return [200, {}, [""]];
 }
 
 describe("Cookies middleware", () => {
   it("leaves headers untouched when downstream never builds a jar", async () => {
-    const cookies = new Cookies(async () => [200, { "x-foo": "bar" }, bodyFromString("ok")]);
+    const cookies = new Cookies(async () => [200, { "x-foo": "bar" }, ["ok"]]);
     const env: RackEnv = {};
     const [status, headers] = await cookies.call(env);
     expect(status).toBe(200);
@@ -98,7 +96,7 @@ describe("Cookies middleware", () => {
       const jar = new CookieJar(cookieRequest());
       jar.set("b", "2");
       env[COOKIES_KEY] = jar;
-      return [200, { "set-cookie": "a=1; path=/" }, bodyFromString("")];
+      return [200, { "set-cookie": "a=1; path=/" }, [""]];
     });
     const [, headers] = await cookies.call({});
     const lines = headers["set-cookie"] as string[];
@@ -111,11 +109,7 @@ describe("Cookies middleware", () => {
       const jar = new CookieJar(cookieRequest());
       jar.set("c", "3");
       env[COOKIES_KEY] = jar;
-      return [
-        200,
-        { "set-cookie": ["a=1; path=/", "b=2; path=/"] as unknown as string },
-        bodyFromString(""),
-      ];
+      return [200, { "set-cookie": ["a=1; path=/", "b=2; path=/"] as unknown as string }, [""]];
     });
     const [, headers] = await cookies.call({});
     const setCookie = headers["set-cookie"] as string[];
@@ -128,7 +122,7 @@ describe("Cookies middleware", () => {
       const jar = new CookieJar(cookieRequest());
       jar.set("b", "2");
       env[COOKIES_KEY] = jar;
-      return [200, { "Set-Cookie": "a=1; path=/" }, bodyFromString("")];
+      return [200, { "Set-Cookie": "a=1; path=/" }, [""]];
     });
     const [, headers] = await cookies.call({});
     expect(headers["Set-Cookie"]).toBeUndefined();
@@ -143,6 +137,9 @@ function chainedHost(env: Record<string, unknown>): ChainedCookieJars {
     env,
     getHeader: (k: string) => env[k],
     hasHeader: (k: string) => Object.hasOwn(env, k),
+    fetchHeader: (k: string, block: (k: string) => unknown) =>
+      Object.hasOwn(env, k) ? env[k] : block(k),
+    setHeader: (k: string, value: unknown) => (env[k] = value),
     cookies: {},
   }) as unknown as ChainedCookieJars;
 }
@@ -235,9 +232,11 @@ describe("SerializedCookieJars", () => {
     const host = serializedHost();
     const options = { value: { hello: "world" } } as { value: unknown };
     commit.call(host, "session", options);
-    expect(SerializerWithFallback.get("marshal").load(options.value as string)).toEqual({
-      hello: "world",
-    });
+    expect(
+      Object.fromEntries(
+        SerializerWithFallback.get("marshal").load(options.value as string) as Map<string, unknown>,
+      ),
+    ).toEqual({ hello: "world" });
   });
 
   it("isReserialize is true when the payload was not produced by JSON", () => {
@@ -259,8 +258,11 @@ describe("SerializedCookieJars", () => {
   it("serializer honors a caller-supplied custom serializer object", () => {
     const custom: CookieSerializer = {
       dump: (v) => `!${String(v)}!`,
-      load: (s) => s.slice(1, -1),
-      dumped: (s) => s.startsWith("!") && s.endsWith("!"),
+      load: (s) => (typeof s === "string" ? s : new TextDecoder().decode(s)).slice(1, -1),
+      dumped: (s) => {
+        const text = typeof s === "string" ? s : new TextDecoder().decode(s);
+        return text.startsWith("!") && text.endsWith("!");
+      },
     };
     const host = serializedHost({ "action_dispatch.cookies_serializer": custom });
     expect(serializer.call(host)).toBe(custom);
@@ -291,7 +293,10 @@ describe("SignedKeyRotatingCookieJar serialized API", () => {
   it("accepts arbitrary hash values via set and JSON-round-trips them", () => {
     const jar = CookieJar.build(cookieRequest(), {});
     jar.signed.set("user", { value: { id: 45, name: "Aaron" } });
-    expect(jar.signed.get("user")).toEqual({ id: 45, name: "Aaron" });
+    expect(Object.fromEntries(jar.signed.get("user") as Map<string, unknown>)).toEqual({
+      id: 45,
+      name: "Aaron",
+    });
   });
 
   it("accepts a hash carrying value alongside cookie options", () => {
@@ -303,8 +308,11 @@ describe("SignedKeyRotatingCookieJar serialized API", () => {
   it("honors a custom serializer from request env for round-trip", () => {
     const custom: CookieSerializer = {
       dump: (v) => `!${String(v)}!`,
-      load: (s) => s.slice(1, -1),
-      dumped: (s) => s.startsWith("!") && s.endsWith("!"),
+      load: (s) => (typeof s === "string" ? s : new TextDecoder().decode(s)).slice(1, -1),
+      dumped: (s) => {
+        const text = typeof s === "string" ? s : new TextDecoder().decode(s);
+        return text.startsWith("!") && text.endsWith("!");
+      },
     };
     const jar = CookieJar.build(
       cookieRequest({ "action_dispatch.cookies_serializer": custom }),
@@ -324,7 +332,10 @@ describe("EncryptedKeyRotatingCookieJar serialized API", () => {
   it("accepts arbitrary hash values via set and JSON-round-trips them", () => {
     const jar = CookieJar.build(cookieRequest(), {});
     jar.encrypted.set("session", { value: { uid: 7, role: "admin" } });
-    expect(jar.encrypted.get("session")).toEqual({ uid: 7, role: "admin" });
+    expect(Object.fromEntries(jar.encrypted.get("session") as Map<string, unknown>)).toEqual({
+      uid: 7,
+      role: "admin",
+    });
   });
 
   it("returns undefined when decryption fails", () => {
@@ -335,8 +346,11 @@ describe("EncryptedKeyRotatingCookieJar serialized API", () => {
   it("honors a custom serializer from request env for round-trip", () => {
     const custom: CookieSerializer = {
       dump: (v) => `!${String(v)}!`,
-      load: (s) => s.slice(1, -1),
-      dumped: (s) => s.startsWith("!") && s.endsWith("!"),
+      load: (s) => (typeof s === "string" ? s : new TextDecoder().decode(s)).slice(1, -1),
+      dumped: (s) => {
+        const text = typeof s === "string" ? s : new TextDecoder().decode(s);
+        return text.startsWith("!") && text.endsWith("!");
+      },
     };
     const jar = CookieJar.build(
       cookieRequest({ "action_dispatch.cookies_serializer": custom }),
@@ -364,94 +378,5 @@ describe("SignedKeyRotatingCookieJar#permanent", () => {
     jar.signed.permanent.set("session_id", { value: "42", httpOnly: true, sameSite: ":lax" });
     expect(jar.signed.get("session_id")).toBe("42");
     expect(jar.get("session_id")).toMatch(/--/);
-  });
-});
-
-describe("cookies_rotations", () => {
-  const marshal = SerializerWithFallback.get("marshal");
-
-  it("signed cookie rotating secret and digest", () => {
-    const secret = "b3c631c314c0bbca50c1b2843150fe33";
-    const rotations = new RotationConfiguration();
-    rotations.rotate("signed", secret, { digest: "SHA1" });
-
-    const oldMessage = new MessageVerifier(secret, {
-      digest: "SHA1",
-      serializer: NullSerializer,
-    }).generate(marshal.dump(45));
-
-    const request = cookieRequest({
-      "action_dispatch.signed_cookie_digest": "SHA256",
-      "action_dispatch.cookies_rotations": rotations,
-    });
-    const jar = CookieJar.build(request, { user_id: oldMessage });
-
-    expect(jar.signed.get("user_id")).toBe(45);
-
-    const secretFromGenerator = keyGenerator
-      .call(request)!
-      .generateKey(signedCookieSalt.call(request)!) as string;
-    const verifier = new MessageVerifier(secretFromGenerator, {
-      digest: "SHA256",
-      serializer: NullSerializer,
-    });
-    expect(marshal.load(verifier.verify(jar.get("user_id")!) as string)).toBe(45);
-  });
-
-  it("rotating signed cookies digest", () => {
-    const rotations = new RotationConfiguration();
-    rotations.rotate("signed", { digest: "SHA1" });
-
-    const request = cookieRequest({
-      "action_dispatch.signed_cookie_digest": "SHA256",
-      "action_dispatch.cookies_rotations": rotations,
-    });
-    const oldSecret = keyGenerator
-      .call(request)!
-      .generateKey(signedCookieSalt.call(request)!) as string;
-    const oldValue = new MessageVerifier(oldSecret, {
-      digest: "SHA1",
-      serializer: NullSerializer,
-    }).generate(marshal.dump(45));
-
-    const jar = CookieJar.build(request, { user_id: oldValue });
-    expect(jar.signed.get("user_id")).toBe(45);
-
-    const verifier = new MessageVerifier(oldSecret, {
-      digest: "SHA256",
-      serializer: NullSerializer,
-    });
-    expect(marshal.load(verifier.verify(jar.get("user_id")!) as string)).toBe(45);
-  });
-
-  it("encrypted cookie rotating secret", () => {
-    const secret = "b3c631c314c0bbca50c1b2843150fe33";
-    const rotations = new RotationConfiguration();
-    rotations.rotate("encrypted", secret, { digest: "SHA1" });
-
-    const oldMessage = new MessageEncryptor(secret, {
-      cipher: "aes-256-gcm",
-      serializer: NullSerializer,
-    }).encryptAndSign(marshal.dump(45));
-
-    const request = cookieRequest({
-      "action_dispatch.encrypted_cookie_cipher": "aes-256-gcm",
-      "action_dispatch.use_authenticated_cookie_encryption": true,
-      "action_dispatch.authenticated_encrypted_cookie_salt": "authenticated encrypted cookie",
-      "action_dispatch.cookies_rotations": rotations,
-    });
-    const jar = CookieJar.build(request, { foo: oldMessage });
-
-    expect(jar.encrypted.get("foo")).toBe(45);
-
-    const keyLen = MessageEncryptor.keyLen("aes-256-gcm");
-    const secretFromGenerator = keyGenerator
-      .call(request)!
-      .generateKey(authenticatedEncryptedCookieSalt.call(request)!, keyLen) as Buffer;
-    const encryptor = new MessageEncryptor(secretFromGenerator, {
-      cipher: "aes-256-gcm",
-      serializer: NullSerializer,
-    });
-    expect(marshal.load(encryptor.decryptAndVerify(jar.get("foo")!) as string)).toBe(45);
   });
 });

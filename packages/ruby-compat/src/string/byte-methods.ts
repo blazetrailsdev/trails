@@ -53,13 +53,13 @@ export function rbStrSetbyte(
   return value;
 }
 
-function strByteSubstr(
+function strByteSubstr<T>(
   b: ArrayLike<unknown>,
   beg: number,
   len: number,
   empty: boolean,
-  newStr: (beg: number, end: number) => string,
-): string | null {
+  newStr: (beg: number, end: number) => T,
+): T | null {
   const n = b.length;
   if (beg > n || len < 0) return null;
   if (beg < 0) {
@@ -86,22 +86,20 @@ export function rbStrByteslice(str: string, ...args: unknown[]): string | null {
 
 /**
  * `String#byteslice` (`vendor/ruby/v3.3.11/string.c:6330` `rb_str_byteslice`) over an
- * ASCII-8BIT String, spelled as {@link b} spells one: a byte per code unit.
- * {@link rbStrByteslice} reads its receiver's UTF-8 bytes, which would count
- * each code unit from `0x80` up as two.
+ * ASCII-8BIT String, a `Uint8Array`, whose slice is a `Uint8Array`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#byteslice`
  * (`vendor/ruby/v3.3.11/string.c:6330`).
  */
-export function byteslice(str: string, ...args: unknown[]): string | null {
+export function byteslice(str: Uint8Array, ...args: unknown[]): Uint8Array | null {
   return strByteslice(str, args, (beg, end) => str.slice(beg, end));
 }
 
-function strByteslice(
+function strByteslice<T>(
   b: ArrayLike<unknown>,
   args: unknown[],
-  newStr: (beg: number, end: number) => string,
-): string | null {
+  newStr: (beg: number, end: number) => T,
+): T | null {
   if (args.length === 2) {
     return strByteSubstr(b, num2long(args[0]), num2long(args[1]), true, newStr);
   }

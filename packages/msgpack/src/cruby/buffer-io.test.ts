@@ -37,12 +37,12 @@ function bytes(n: number): string {
 
 describe("MessagePack::Buffer", () => {
   let source: string;
-  let io: StringIO;
+  let io: StringIO<Uint8Array>;
   let buffer: Buffer;
 
   const setSource = (s: string) => {
     source = s;
-    io = new StringIO(source);
+    io = new StringIO(bin(source));
     buffer = new Buffer(io);
   };
 
@@ -106,22 +106,22 @@ describe("MessagePack::Buffer", () => {
   it("write short once and flush", () => {
     buffer.write("aa");
     buffer.flush();
-    expect(io.string()).toEqual("aa");
+    expect(str(io.string())!).toEqual("aa");
   });
 
   it("write short twice and flush", () => {
     buffer.write("a");
     buffer.write("a");
     buffer.flush();
-    expect(io.string()).toEqual("aa");
+    expect(str(io.string())!).toEqual("aa");
   });
 
   it("write long once and flush", () => {
     const s = " ".repeat(1024 * 1024);
     buffer.write(s);
     buffer.flush();
-    expect(io.string().length).toEqual(s.length);
-    expect(io.string()).toEqual(s);
+    expect(str(io.string())!.length).toEqual(s.length);
+    expect(str(io.string())!).toEqual(s);
   });
 
   it("write short multi and flush", () => {
@@ -130,8 +130,8 @@ describe("MessagePack::Buffer", () => {
       buffer.write(" ".repeat(1024));
     }
     buffer.flush();
-    expect(io.string().length).toEqual(s.length);
-    expect(io.string()).toEqual(s);
+    expect(str(io.string())!.length).toEqual(s.length);
+    expect(str(io.string())!).toEqual(s);
   });
 
   it("random read", () => {
@@ -144,7 +144,7 @@ describe("MessagePack::Buffer", () => {
         fragments.push(s);
       }
 
-      const io = new StringIO(fragments.join(""));
+      const io = new StringIO(bin(fragments.join("")));
       const b = new Buffer(io);
 
       for (const s of fragments) {
@@ -168,7 +168,7 @@ describe("MessagePack::Buffer", () => {
         fragments.push(s);
       }
 
-      const io = new StringIO(fragments.join(""));
+      const io = new StringIO(bin(fragments.join("")));
       const b = new Buffer(io);
 
       for (const s of fragments) {
@@ -193,7 +193,7 @@ describe("MessagePack::Buffer", () => {
         fragments.push(s);
       }
 
-      const io = new StringIO(fragments.join(""));
+      const io = new StringIO(bin(fragments.join("")));
       const b = new Buffer(io);
 
       for (const s of fragments) {
@@ -214,7 +214,7 @@ describe("MessagePack::Buffer", () => {
         fragments.push(s);
       }
 
-      const io = new StringIO(fragments.join(""));
+      const io = new StringIO(bin(fragments.join("")));
       const b = new Buffer(io);
 
       for (const s of fragments) {
@@ -232,7 +232,7 @@ describe("MessagePack::Buffer", () => {
   it("random write and flush", () => {
     for (let i = 0; i < 50; i++) {
       let s = bytes(0);
-      const io = new StringIO();
+      const io = new StringIO(new Uint8Array(0));
       const b = new Buffer(io);
 
       for (let j = rand(4); j > 0; j--) {
@@ -242,12 +242,12 @@ describe("MessagePack::Buffer", () => {
         b.write(bin(x));
       }
 
-      expect(io.string().length + b.size()).toEqual(s.length);
+      expect(str(io.string())!.length + b.size()).toEqual(s.length);
 
       b.flush();
 
-      expect(io.string().length).toEqual(s.length);
-      expect(io.string()).toEqual(s);
+      expect(str(io.string())!.length).toEqual(s.length);
+      expect(str(io.string())!).toEqual(s);
     }
   }, 30_000);
 

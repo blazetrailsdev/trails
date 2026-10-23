@@ -57,7 +57,7 @@ export interface Categorization {
 export class SpecialCategorization extends Base {
   static {
     this._tableName = "categorizations";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ special: true });
     });
     this.belongsTo("author");

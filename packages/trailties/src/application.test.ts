@@ -1,3 +1,10 @@
+import type { RackResponse } from "@blazetrails/rack";
+import {
+  publicInstanceMethods,
+  rbFSend,
+  rbModConstSet,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished } from "vitest";
 import {
   NullLogger,
@@ -36,6 +43,7 @@ import {
   SSL,
   Static,
   Session,
+  ActionDispatch,
   ActionController,
 } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
@@ -43,7 +51,6 @@ import { Collection } from "./initializable.js";
 import { Root } from "./paths.js";
 import { Trails } from "./rails.js";
 import { HelloWorldApp, buildRoutes } from "./__fixtures__/hello-world/app.js";
-import { bodyToString } from "@blazetrails/rack";
 
 const posixPath: PathAdapter = {
   join: (...p) => p.join("/").replace(/\/+/g, "/"),
@@ -378,7 +385,7 @@ describe("Trails.application integration (PR 2.6 hello-world fixture)", () => {
       PATH_INFO: "/hello",
     });
     expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("hello world");
+    expect([...(body as Iterable<string>)].join("")).toBe("hello world");
   });
 });
 
@@ -397,20 +404,22 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
     expect(app).toBeInstanceOf(BootApp);
     expect(app.routesReloader().loaded).toBe(false);
-    const [status, , body] = await app.app()({
+    const [status, , body] = await (rbFSend(app.app(), "call", {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts",
-    });
+    }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(await bodyToString(body))).toEqual({ posts: [] });
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({ posts: [] });
     expect(app.routesReloader().loaded).toBe(true);
 
-    const [nestedStatus, , nestedBody] = await app.app()({
+    const [nestedStatus, , nestedBody] = await (rbFSend(app.app(), "call", {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/admin/sessions",
-    });
+    }) as Promise<RackResponse>);
     expect(nestedStatus).toBe(200);
-    expect(JSON.parse(await bodyToString(nestedBody))).toEqual({ scope: "admin" });
+    expect(JSON.parse([...(nestedBody as Iterable<string>)].join(""))).toEqual({
+      scope: "admin",
+    });
   });
 
   it("assigns the drawn route set to the controller's _routes", async () => {
@@ -424,13 +433,13 @@ describe("Trails.application integration (boot-app fixture)", () => {
     await Trails.initialize();
 
     expect(ActionController.Base._routes).toBe(app.routes());
-    const [status, , body] = await app.app()({
+    const [status, , body] = await (rbFSend(app.app(), "call", {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/show",
       HTTP_ACCEPT: "*/*",
-    });
+    }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(await bodyToString(body)).toContain('<a href="/posts">All posts</a>');
+    expect([...(body as Iterable<string>)].join("")).toContain('<a href="/posts">All posts</a>');
   });
 
   it("calls a named route helper from a controller action with lazily drawn routes", async () => {
@@ -443,12 +452,12 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
     await Trails.initialize();
 
-    const [status, , body] = await app.app()({
+    const [status, , body] = await (rbFSend(app.app(), "call", {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/link",
-    });
+    }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(await bodyToString(body))).toEqual({ href: "/posts" });
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({ href: "/posts" });
   });
 
   it("calls a named *_url helper from a controller action against the request host", async () => {
@@ -461,14 +470,14 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
     await Trails.initialize();
 
-    const [status, , body] = await app.app()({
+    const [status, , body] = await (rbFSend(app.app(), "call", {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/url",
       HTTP_HOST: "blog.example.com:8080",
       "rack.url_scheme": "https",
-    });
+    }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(await bodyToString(body))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       href: "https://blog.example.com:8080/posts",
     });
   });
@@ -483,14 +492,14 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
     await Trails.initialize();
 
-    const [status, , body] = await app.app()({
+    const [status, , body] = await (rbFSend(app.app(), "call", {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/canonical",
       HTTP_HOST: "blog.example.com:8080",
       "rack.url_scheme": "https",
-    });
+    }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(await bodyToString(body))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       href: "https://blog.example.com:8080/posts",
     });
     expect(
@@ -507,8 +516,23 @@ describe("Trails.application integration (boot-app fixture)", () => {
     app.config.considerAllRequestsLocal = true;
     await Trails.initialize();
 
-    const [status] = await app.app()({ REQUEST_METHOD: "GET", PATH_INFO: "/boom" });
+    const [status] = await app.call({ REQUEST_METHOD: "GET", PATH_INFO: "/boom" });
     expect(status).toBe(500);
+  });
+
+  it("includes every application helper into ApplicationController at boot, before any request", async () => {
+    const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
+    class BootAppHelpersAtBoot extends BootApp {}
+    Application.register(BootAppHelpersAtBoot);
+    runLoadHooks("action_controller", ActionController.Base);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    await Trails.initialize();
+
+    const { ApplicationController } =
+      await import("./__fixtures__/boot-app/app/controllers/application-controller.js");
+    const helpers = (ApplicationController as unknown as { _helpers: object })._helpers;
+    expect(publicInstanceMethods(helpers)).toContain("statusBadge");
   });
 });
 
@@ -533,13 +557,13 @@ describe("Application::Configuration", () => {
 
   it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", () => {
     class MyCustomStore extends Session.CookieStore {}
-    Session.sessionStoreConstants.set("MyCustomStore", MyCustomStore);
+    rbModConstSet(ActionDispatch.Session, "MyCustomStore", MyCustomStore);
     try {
       const c = new Configuration();
       c.sessionStore(":my_custom_store");
       expect(c.sessionStore()).toBe(MyCustomStore);
     } finally {
-      Session.sessionStoreConstants.delete("MyCustomStore");
+      rbModRemoveConst(ActionDispatch.Session, "MyCustomStore");
     }
   });
 
@@ -616,7 +640,7 @@ describe("Application::Configuration", () => {
     expect(c.yjit).toBe(true);
     expect(c.addAutoloadPathsToLoadPath).toBe(false);
     expect(c.precompileFilterParameters).toBe(true);
-    expect(c.domTestingDefaultHtmlVersion).toBe(":html4");
+    expect(c.domTestingDefaultHtmlVersion).toBe(":html5");
     expect(c.sslOptions).toEqual({ hsts: { subdomains: true } });
     expect((c.get("activeRecord") as Record<string, unknown>).belongsToRequiredByDefault).toBe(
       true,
@@ -739,7 +763,7 @@ describe("Application::DefaultMiddlewareStack", () => {
     const mw = new DefaultMiddlewareStack(app, app.config, paths)
       .buildStack()
       .middlewares.find((m) => m.klass === DebugExceptions)!;
-    expect(mw.args).toEqual([{ responseFormat: "api" }]);
+    expect(mw.args).toEqual([app, "api"]);
   });
 
   it("default stack always includes RequestId, ShowExceptions, DebugExceptions, Callbacks, Static", () => {

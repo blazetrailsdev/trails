@@ -5,7 +5,7 @@ import { InvalidPluralizationData, MissingTranslationData } from "../exceptions.
 import { config, resetConfig, t, type TranslateKey } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import type { TranslateOptions } from "./base.js";
-import type { TranslationData } from "../utils.js";
+import { deepSymbolizeKeys, type TranslationData } from "../utils.js";
 
 class FallbacksBackend extends Fallbacks(KeyValue) {}
 
@@ -24,8 +24,8 @@ describe("I18nBackendKeyValueTest", () => {
     storeTranslations("en", { foo: { bar: "bar", baz: "baz" } });
   }
 
-  function storeTranslations(locale: string, data: TranslationData): unknown {
-    return config().backend.storeTranslations(locale, data);
+  function storeTranslations(locale: string, data: Record<string, unknown>): unknown {
+    return config().backend.storeTranslations(locale, deepSymbolizeKeys(data));
   }
 
   function translations(): TranslationData | undefined {
@@ -37,8 +37,8 @@ describe("I18nBackendKeyValueTest", () => {
   }
 
   function assertFlattens(
-    expected: TranslationData,
-    nested: TranslationData,
+    expected: Record<string, unknown>,
+    nested: Record<string, unknown>,
     escape = true,
     subtree = true,
   ): void {
@@ -74,14 +74,14 @@ describe("I18nBackendKeyValueTest", () => {
 
   it("store_translations handle subtrees by default", () => {
     setupBackend();
-    expect(t("foo")).toEqual({ bar: "bar", baz: "baz" });
+    expect(t("foo")).toEqual(deepSymbolizeKeys({ bar: "bar", baz: "baz" }));
   });
 
   it("store_translations merge subtrees accordingly", () => {
     setupBackend();
     storeTranslations("en", { foo: { baz: "BAZ" } });
     expect(t("foo.baz")).toBe("BAZ");
-    expect(t("foo")).toEqual({ bar: "bar", baz: "BAZ" });
+    expect(t("foo")).toEqual(deepSymbolizeKeys({ bar: "bar", baz: "BAZ" }));
   });
 
   it("store_translations does not handle subtrees if desired", () => {
@@ -98,7 +98,7 @@ describe("I18nBackendKeyValueTest", () => {
   it("translations gets the translations from the store", () => {
     setupBackend();
     send(backend, "translations");
-    const expected = { en: { foo: { bar: "bar", baz: "baz" } } };
+    const expected = deepSymbolizeKeys({ en: { foo: { bar: "bar", baz: "baz" } } });
     expect(translations()).toEqual(expected);
   });
 

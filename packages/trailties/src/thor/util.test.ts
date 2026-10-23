@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assertEmpty } from "@blazetrails/activesupport";
-import { Module, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "./core-ext/hash-with-indifferent-access.js";
 import { Thor, type ThorClass } from "./thor.js";
 import * as Util from "./util.js";
@@ -116,9 +116,9 @@ describe("Thor::Util", () => {
       expect(Util.namespaceFromThorClass(HashWithIndifferentAccess)).toEqual(
         "thor:core_ext:hash_with_indifferent_access",
       );
-      expect(
-        Util.namespaceFromThorClass(rbModConstSet({ name: "Thor" }, "Util", new Module())),
-      ).toEqual("thor:util");
+      expect(Util.namespaceFromThorClass(rbModConstSet({ name: "Thor" }, "Util", {}))).toEqual(
+        "thor:util",
+      );
     });
 
     it("removes Thor::Sandbox namespace", () => {

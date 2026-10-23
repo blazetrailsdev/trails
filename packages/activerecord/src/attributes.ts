@@ -70,7 +70,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
       );
 
       const attributeSet = new AttributeSet(attributesHash);
-      const cold = !isSchemaLoaded.call(this) && !this.abstractClass && !!this.tableName;
+      const cold = !isSchemaLoaded.call(this) && !this.isAbstractClass() && !!this.tableName;
       const wasCold = replayingOverColdSchema;
       replayingOverColdSchema = cold;
       try {

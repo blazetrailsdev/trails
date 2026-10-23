@@ -1,11 +1,8 @@
 import {
   aryDelete,
   compact,
-  eachPair,
-  isEmpty,
   keys,
   matchOperator,
-  mergeBang,
   rbFSend,
   rbInspect,
   rbModName,
@@ -88,14 +85,16 @@ export class Options extends Arguments {
     const options = Object.values(hashOptions);
     super(options);
     this.stopOnUnknown = stopOnUnknown;
-    this.exclusives = (relations.exclusiveOptionNames ?? []).filter((array) => !isEmpty(array));
-    this.atLeastOnes = (relations.atLeastOneOptionNames ?? []).filter((array) => !isEmpty(array));
+    this.exclusives = (relations.exclusiveOptionNames ?? []).filter((array) => array.length !== 0);
+    this.atLeastOnes = (relations.atLeastOneOptionNames ?? []).filter(
+      (array) => array.length !== 0,
+    );
     this.disableRequiredCheck = disableRequiredCheck;
 
-    eachPair(defaults, (key, value) => {
+    for (const [key, value] of Object.entries(defaults)) {
       this.assigns[rbObjAsString(key)] = value;
       aryDelete(this.nonAssignedRequired, hashOptions[key]);
-    });
+    }
 
     this.shorts = Object.create(null) as Record<string, string>;
     this.switches = Object.create(null) as Record<string, Option>;
@@ -244,7 +243,8 @@ export class Options extends Arguments {
     const unknown = toCheck.filter((str) =>
       rtest(matchOperator(str, /(?<![^\n])--?(?:(?!--)[^\n])*(?![^\n])/)),
     );
-    if (!isEmpty(unknown)) throw new UnknownArgumentError(keys(this.switches), unknown as string[]);
+    if (unknown.length !== 0)
+      throw new UnknownArgumentError(keys(this.switches), unknown as string[]);
   }
 
   /** @internal */
@@ -265,7 +265,7 @@ export class Options extends Arguments {
   /** @internal */
   protected assignResultBang(option: Option, result: unknown): void {
     if (rtest(option.repeatable) && option.type === "hash") {
-      mergeBang(
+      Object.assign(
         (this.assigns[option.humanName] ??= Object.create(null)) as Record<string, unknown>,
         result as Record<string, unknown>,
       );

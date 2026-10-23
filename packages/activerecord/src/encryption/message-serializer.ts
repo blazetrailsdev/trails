@@ -102,7 +102,7 @@ export class MessageSerializer implements MessageSerializerLike {
   private encodeIfNeeded(value: unknown): unknown {
     if (typeof value === "string" || value instanceof Uint8Array) {
       value = b(value);
-      return Base64.strictEncode64(value as string);
+      return Base64.strictEncode64(value as Uint8Array);
     } else {
       return value;
     }

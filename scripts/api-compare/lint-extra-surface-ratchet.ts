@@ -2,8 +2,9 @@
 /**
  * CI gate for the extra-surface ratchet (RFC 0117). Fails on:
  *
- *   - GROWTH — a gated package's `novel` or `total` extra-surface count rose
- *     above its committed mark in extra-surface-mark.json. The fix is to
+ *   - GROWTH — a gated package's `novel`, `total`, `noCounterpartFiles` or
+ *     `allowed` extra-surface count rose above its committed mark in
+ *     extra-surface-mark.json. The fix is to
  *     remove the invented surface (delete it, fold it into the ported method,
  *     or — for a genuine TypeScript shortcoming — tag it `@noRailsEquivalent
  *     <reason>`), never to raise the mark;
@@ -14,6 +15,9 @@
  *     only remedies are a `@noRailsEquivalent` receipt at the declaration or
  *     deleting the name. A rowless package is pinned the same way in `total`
  *     too;
+ *   - INTERNAL — a gated package's `@internal` count rose above its mark in
+ *     extra-surface-internal-mark.json (RFC 0120), which would be surface
+ *     relabelled `@internal` to leave the measured population;
  *   - STRANDED — a mark row for a rowless package, which carries none by
  *     construction;
  *   - STALE — a mark left ABOVE the current measurement. The mark only
@@ -49,6 +53,7 @@ import {
   ROWLESS_PACKAGES,
   TAGGED_ONLY_PACKAGES,
   exceedances,
+  incompleteMarks,
   loadMarks,
   measure,
   staleMarks,
@@ -58,6 +63,12 @@ import {
   unmarkedPackages,
   unmeasuredPackages,
   writeMarks,
+  INTERNAL_MARK_PATH,
+  internalViolations,
+  loadInternalMarks,
+  measureInternal,
+  tightenedInternal,
+  writeInternalMarks,
 } from "./extra-surface-mark.js";
 
 async function readManifest(name: string): Promise<ApiManifest> {
@@ -113,6 +124,16 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
 
+  const incomplete = incompleteMarks(marks).filter((d) => inScope(d.split(" ")[0]));
+  if (incomplete.length > 0) {
+    console.error(
+      `\nextra-surface gate: ${incomplete.length} gated dimension(s) missing from a committed row: ${incomplete.join(", ")}.\n` +
+        "A dimension a row lacks is skipped by every comparison, so the gate would\n" +
+        "pass on it silently. Seed it from a clean measurement.\n",
+    );
+    return 1;
+  }
+
   const stranded = strandedMarks(marks);
   if (stranded.length > 0) {
     console.error(
@@ -124,9 +145,24 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
 
-  const grew = exceedances(marks, current);
+  const internalMarks = await loadInternalMarks();
+  const currentInternal = measureInternal(report.packages);
+  const internal = internalViolations(internalMarks, currentInternal);
+  if (internal.unmarked.length > 0) {
+    console.error(
+      `\nextra-surface gate: ${internal.unmarked.length} gated package(s) carry no ` +
+        `internal mark in ${path.relative(ROOT_DIR, INTERNAL_MARK_PATH)}: ` +
+        `${internal.unmarked.join(", ")}.\n`,
+    );
+    return 1;
+  }
+
+  const grew = [...exceedances(marks, current), ...internal.grew.filter((v) => inScope(v.package))];
   const unreceipted = taggedOnlyViolations(current);
-  const stale = staleMarks(marks, current);
+  const stale = [
+    ...staleMarks(marks, current),
+    ...internal.stale.filter((v) => inScope(v.package)),
+  ];
 
   if (tighten) {
     if (grew.length > 0 || unreceipted.length > 0) {
@@ -142,6 +178,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
       return 1;
     }
     await writeMarks(tightened(marks, current));
+    await writeInternalMarks(tightenedInternal(internalMarks, currentInternal));
     console.log(
       `Wrote ${path.relative(ROOT_DIR, MARK_PATH)}: narrowed ${stale.length} dimension(s).`,
     );
@@ -179,6 +216,9 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
       "Extra surface is public TS with no Ruby counterpart. Delete it, fold it into\n" +
         "the ported method, or — only for a genuine TypeScript shortcoming — tag it\n" +
         "`@noRailsEquivalent <PERMANENT|CONVERGEABLE> <reason>`. Do NOT raise the mark.\n" +
+        "`noCounterpartFiles` grew: a new TS file maps onto no Rails file — move its\n" +
+        "members to the file mirroring their `.rb`. `allowed` grew: a new receipt —\n" +
+        "delete the name rather than tag it.\n" +
         "See the offending names with:\n" +
         "  pnpm parity:api:extra --package <pkg> --novel-only\n",
     );
@@ -196,16 +236,20 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   const taggedOnly = new Set<string>(TAGGED_ONLY_PACKAGES);
   const rowless = new Set<string>(ROWLESS_PACKAGES);
   const summary = Object.entries(current)
-    .map(([name, m]) =>
-      rowless.has(name)
-        ? `${name} novel ${m.novel}/0, total ${m.total}/0` +
-          (m.inlinedFrom === undefined ? "" : `, inlined-from ${m.inlinedFrom}/0`) +
-          " (rowless)"
-        : `${name} novel ${m.novel}/${taggedOnly.has(name) ? "0 (pinned)" : marks[name].novel}` +
-          `, total ${m.total}/${marks[name].total}` +
-          (m.inlinedFrom === undefined
-            ? ""
-            : `, inlined-from ${m.inlinedFrom}/${marks[name].inlinedFrom}`),
+    .map(
+      ([name, m]) =>
+        (rowless.has(name)
+          ? `${name} novel ${m.novel}/0, total ${m.total}/0` +
+            (m.inlinedFrom === undefined ? "" : `, inlined-from ${m.inlinedFrom}/0`) +
+            " (rowless)"
+          : `${name} novel ${m.novel}/${taggedOnly.has(name) ? "0 (pinned)" : marks[name].novel}` +
+            `, total ${m.total}/${marks[name].total}` +
+            `, no-counterpart files ${m.noCounterpartFiles}/${marks[name].noCounterpartFiles}` +
+            (m.allowed === undefined ? "" : `, allowed ${m.allowed}/${marks[name].allowed}`) +
+            (m.inlinedFrom === undefined
+              ? ""
+              : `, inlined-from ${m.inlinedFrom}/${marks[name].inlinedFrom}`)) +
+        `, internal ${currentInternal[name]}/${internalMarks[name]}`,
     )
     .join("; ");
   console.log(`extra-surface gate: OK (${summary})`);

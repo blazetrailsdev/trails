@@ -1,3 +1,5 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActionDispatch } from "../../namespaces.js";
 import {
   ParameterTypeError as RackParameterTypeError,
   InvalidParameterError as RackInvalidParameterError,
@@ -12,6 +14,7 @@ export class ParamError extends ParseError {
     this.name = "ActionDispatch::ParamError";
   }
 
+  /** @noRailsEquivalent PERMANENT */
   static [Symbol.hasInstance](other: unknown): boolean {
     if (this === ParamError) {
       if (
@@ -51,3 +54,8 @@ export class ParamsTooDeepError extends ParamError {
     this.name = "ActionDispatch::ParamsTooDeepError";
   }
 }
+
+rbModConstSet(ActionDispatch, "ParamError", ParamError);
+rbModConstSet(ActionDispatch, "ParameterTypeError", ParameterTypeError);
+rbModConstSet(ActionDispatch, "InvalidParameterError", InvalidParameterError);
+rbModConstSet(ActionDispatch, "ParamsTooDeepError", ParamsTooDeepError);

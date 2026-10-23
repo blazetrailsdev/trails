@@ -62,7 +62,7 @@ function nodeToHash(node: XmlNode): XmlHash {
     if (child.isElement()) {
       const childHash = nodeToHash(child);
       const key = child.name;
-      if (Object.prototype.hasOwnProperty.call(hash, key)) {
+      if (Object.hasOwn(hash, key)) {
         const existing = hash[key];
         if (Array.isArray(existing)) {
           existing.push(childHash);
@@ -79,7 +79,7 @@ function nodeToHash(node: XmlNode): XmlHash {
   }
 
   if (
-    Object.prototype.hasOwnProperty.call(hash, CONTENT_ROOT) &&
+    Object.hasOwn(hash, CONTENT_ROOT) &&
     Object.keys(hash).length > 1 &&
     (hash[CONTENT_ROOT] as string).trim() === ""
   ) {

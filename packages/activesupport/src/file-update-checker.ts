@@ -1,6 +1,10 @@
 import { ArgumentError, Dir, File } from "@blazetrails/ruby-compat";
 
 export class FileUpdateChecker {
+  static toString(): string {
+    return "ActiveSupport::FileUpdateChecker";
+  }
+
   private files: string[];
   private glob?: string;
   private block: () => Promise<void> | void;

@@ -4,14 +4,15 @@ import type { JsdocOrigin } from "./missing-rails-call-tags.js";
 /**
  * The `@inlinedFrom <Ruby::Module>#<hook> <source>/<version>/<file>:<first>-<last>`
  * JSDoc tag (RFC 0188): names the Ruby body a segment of a constructor came
- * from when that body lives in another Ruby file. The citation is the span of
+ * from when that body lives in another Ruby file. On a method it names a
+ * module method whose `super` the includer's method inlines (RFC 0197). The citation is the span of
  * the `def`, relative to `vendor/` and not spelling it, and the tag carries
  * nothing else.
  */
 export const TAG = "@inlinedFrom";
 
 const TAG_LINE = /^@inlinedFrom(?:\s+(.*))?$/;
-const RUBY_NAME = /^([A-Z]\w*(?:::[A-Z]\w*)*)#(initialize|new)$/;
+const RUBY_NAME = /^([A-Z]\w*(?:::[A-Z]\w*)*)#([a-z_]\w*[?!=]?)$/;
 const CITATION = /^([\w.-]+)\/([\w.-]+)\/(\S+\.rb):(\d+)-(\d+)$/;
 
 /**
@@ -34,12 +35,11 @@ export function inlinedFromIn(comment: string, origin?: JsdocOrigin): InlinedFro
     const malformed = (why: string): Error =>
       new Error(
         `${TAG} is malformed:${at} — ${why}. Write it as ` +
-          `\`${TAG} Ruby::Module#initialize <source>/<version>/<file>:<first>-<last>\`.`,
+          `\`${TAG} Ruby::Module#method <source>/<version>/<file>:<first>-<last>\`.`,
       );
     const [name, citation, ...extra] = (m[1] ?? "").split(/\s+/).filter(Boolean);
     const ruby = name?.match(RUBY_NAME);
-    if (!ruby)
-      throw malformed("it must name a Ruby `Module#initialize` or `Mod::ClassMethods#new`");
+    if (!ruby) throw malformed("it must name a Ruby `Module#method`");
     if (ruby[2] === "new" && !ruby[1].endsWith("::ClassMethods")) {
       throw malformed("`new` is cited on a `ClassMethods` module only");
     }
@@ -53,7 +53,7 @@ export function inlinedFromIn(comment: string, origin?: JsdocOrigin): InlinedFro
     if (firstLine < 1 || lastLine < firstLine) throw malformed("its line span is empty");
     tags.push({
       module: ruby[1],
-      hook: ruby[2] as InlinedFrom["hook"],
+      hook: ruby[2],
       source: cite[1],
       version: cite[2],
       file: cite[3],

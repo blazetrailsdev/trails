@@ -64,7 +64,7 @@ export class AliasTracker {
             ),
         ).length;
       } else if (join instanceof Nodes.Join) {
-        return (join.left as any).name === name ? 1 : 0;
+        return (join.left as { name?: string }).name === name ? 1 : 0;
       } else {
         throw new ArgumentError("joins list should be initialized by list of Arel::Nodes::Join");
       }

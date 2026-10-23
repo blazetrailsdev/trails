@@ -65,18 +65,22 @@ export function sequenceLength(b: number[], i: number): number {
  * @noRailsEquivalent PERMANENT
  */
 export function strNew(b: number[]): string {
+  const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
   let str = "";
   let i = 0;
+  let run = 0;
   while (i < b.length) {
     const len = sequenceLength(b, i);
     if (len > 0) {
-      str += new TextDecoder().decode(Uint8Array.from(b.slice(i, i + len)));
       i += len;
     } else {
+      if (run < i) str += decoder.decode(Uint8Array.from(b.slice(run, i)));
       str += String.fromCharCode(0xdc00 + b[i]);
       i += 1;
+      run = i;
     }
   }
+  if (run < i) str += decoder.decode(Uint8Array.from(b.slice(run, i)));
   return str;
 }
 

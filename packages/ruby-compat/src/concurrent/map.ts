@@ -1,7 +1,17 @@
 import { Hash, rbBlockGivenP, type Block } from "../hash.js";
 import { rbModConstSet } from "../include.js";
 import type { CountDownLatch } from "./count-down-latch.js";
+import type { CyclicBarrier } from "./cyclic-barrier.js";
 import type { Event } from "./event.js";
+import type { AtomicBoolean } from "./atomic-boolean.js";
+import type { ReadWriteLock } from "./read-write-lock.js";
+import type { AtomicFixnum } from "./atomic-fixnum.js";
+import type { TimerTask } from "./timer-task.js";
+import type {
+  CachedThreadPool,
+  RejectedExecutionError,
+  ThreadPoolExecutor,
+} from "../thread-pool-executor.js";
 
 /**
  * concurrent-ruby's `Concurrent` module (`vendor/ruby/v3.3.11/class.c:1087` `rb_define_module`).
@@ -12,7 +22,15 @@ export const Concurrent = { name: "Concurrent" } as {
   readonly name: string;
   Map: typeof Map;
   CountDownLatch: typeof CountDownLatch;
+  CyclicBarrier: typeof CyclicBarrier;
   Event: typeof Event;
+  AtomicBoolean: typeof AtomicBoolean;
+  ReadWriteLock: typeof ReadWriteLock;
+  AtomicFixnum: typeof AtomicFixnum;
+  TimerTask: typeof TimerTask;
+  ThreadPoolExecutor: typeof ThreadPoolExecutor;
+  RejectedExecutionError: typeof RejectedExecutionError;
+  globalIoExecutor: () => CachedThreadPool;
 };
 
 /**

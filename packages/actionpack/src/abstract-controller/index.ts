@@ -1,11 +1,11 @@
 export {
-  AbstractController,
+  Base,
   ActionNotFound,
   type ActionCallback,
   type AroundCallback,
   type CallbackOptions,
 } from "./base.js";
-export { AbstractControllerError } from "./error.js";
+export { Error } from "./error.js";
 export {
   translate,
   t,
@@ -78,8 +78,8 @@ export {
   type HelpersClassMethods,
   type HelpersHost,
 } from "./helpers.js";
+export { Trailties } from "./trailties/routes-helpers.js";
 export {
-  withRoutesHelpers,
   type RoutesHelpersClassMethods,
   type RoutesHelpersControllerClass,
   type UrlHelpersRouteSet,

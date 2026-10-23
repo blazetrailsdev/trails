@@ -45,7 +45,11 @@ const SHARED_EXCLUDE = [
   // packages/website: `pnpm exec svelte-kit sync && pnpm exec vitest run`.
   "packages/website/**",
   "packages/*/dx-tests/**",
+  // System tests launch real browsers; only the `system` project runs them.
+  "**/*.system.test.ts",
 ];
+
+const SYSTEM_SCREENSHOT_DIRECTORY = "tmp/screenshots";
 
 // Rails model: ARCONN selects one backend; that backend's adapter dirs
 // run as part of the shared `pnpm vitest run packages/activerecord/` invocation;
@@ -248,6 +252,10 @@ const alias = {
     __dirname,
     "packages/activerecord/src/fixtures.ts",
   ),
+  "@blazetrails/activerecord/active-record": path.resolve(
+    __dirname,
+    "packages/activerecord/src/active-record.ts",
+  ),
   "@blazetrails/activerecord/test-databases": path.resolve(
     __dirname,
     "packages/activerecord/src/test-databases.ts",
@@ -294,6 +302,7 @@ const alias = {
   "@blazetrails/rack-test/": path.resolve(__dirname, "packages/rack-test/src") + "/",
   "@blazetrails/rack-test": path.resolve(__dirname, "packages/rack-test/src/index.ts"),
   "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
+  "@blazetrails/actionview/": path.resolve(__dirname, "packages/actionview/src") + "/",
   "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),
   "@blazetrails/tse-compiler": path.resolve(__dirname, "packages/tse-compiler/src/index.ts"),
   "@blazetrails/actionpack": path.resolve(__dirname, "packages/actionpack/src/index.ts"),
@@ -305,16 +314,27 @@ const alias = {
   "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
   "@blazetrails/activejob/": path.resolve(__dirname, "packages/activejob/src") + "/",
   "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/src/index.ts"),
+  "@blazetrails/actioncable/": path.resolve(__dirname, "packages/actioncable/src") + "/",
+  "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/src/index.ts"),
+  "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/src") + "/",
+  "@blazetrails/solid-queue": path.resolve(__dirname, "packages/solid-queue/src/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/src/index.ts"),
   "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/src/engine.ts"),
   "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/src/trailtie.ts"),
   "@blazetrails/ruby-compat/": path.resolve(__dirname, "packages/ruby-compat/src") + "/",
   "@blazetrails/ruby-compat": path.resolve(__dirname, "packages/ruby-compat/src/index.ts"),
   "@blazetrails/bcrypt": path.resolve(__dirname, "packages/bcrypt/src/index.ts"),
+  "@blazetrails/vitest-matchers/setup": path.resolve(
+    __dirname,
+    "packages/vitest-matchers/src/setup.ts",
+  ),
+  "@blazetrails/vitest-matchers": path.resolve(__dirname, "packages/vitest-matchers/src/index.ts"),
   "@blazetrails/date": path.resolve(__dirname, "packages/date/src/index.ts"),
   "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/src/index.ts"),
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
+  "@blazetrails/builder": path.resolve(__dirname, "packages/builder/src/builder.ts"),
+  "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/src/marcel.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
   "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/src/index.ts"),
 };
@@ -396,9 +416,11 @@ const otherResolve = {
 // Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
 // (it runs under activerecord, where the engine is ActiveRecord::Base).
 const otherSetupFiles = [
+  "./packages/vitest-matchers/src/setup.ts",
   "./packages/activesupport/src/testing/autorun.ts",
   "./packages/activesupport/src/test-setup-abstract-unit.ts",
   "./packages/arel/src/test-setup-engine.ts",
+  "./packages/actionview/src/test-helpers/setup-compile-template.ts",
 ];
 
 export default defineConfig({
@@ -456,6 +478,7 @@ export default defineConfig({
           include: [
             "packages/activerecord/src/**/*.test.ts",
             "packages/activerecord/scripts/**/*.test.ts",
+            "packages/solid-queue/src/**/*.test.ts",
           ],
           exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE, ...SQLITE_DRIVER_TESTS],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
@@ -464,11 +487,13 @@ export default defineConfig({
           globalSetup: ["./packages/activerecord/src/support/template-global-setup.ts"],
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
+            "./packages/vitest-matchers/src/setup.ts",
             // `ActiveSupport::TestCase`'s include list (test_case.rb:144-153),
             // which helper.rb picks up by requiring active_support/test_case.
             "./packages/activesupport/src/testing/autorun.ts",
             "./packages/activerecord/src/cases/helper.ts",
             "./packages/bcrypt/src/index.ts",
+            "./packages/actionview/src/test-helpers/setup-compile-template.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
@@ -532,8 +557,30 @@ export default defineConfig({
             "eslint/*.test.mjs",
             "vendor/*.test.ts",
           ],
-          exclude: ["packages/activerecord/**", "packages/trailties/**", ...SHARED_EXCLUDE],
+          exclude: [
+            "packages/activerecord/**",
+            "packages/solid-queue/**",
+            "packages/trailties/**",
+            ...SHARED_EXCLUDE,
+          ],
+          globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],
           setupFiles: otherSetupFiles,
+        },
+      },
+      {
+        // System tests (RFC 0166): Node workers that each launch one real
+        // browser. `screenshotDirectory` reaches the worker through `inject`,
+        // since Vitest does not serialize `browser.screenshotDirectory`.
+        resolve: otherResolve,
+        test: {
+          name: "system",
+          globals: true,
+          include: ["packages/*/src/**/*.system.test.ts"],
+          exclude: SHARED_EXCLUDE.filter((glob) => glob !== "**/*.system.test.ts"),
+          setupFiles: otherSetupFiles,
+          pool: "forks",
+          browser: { enabled: false, screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },
+          provide: { screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },
         },
       },
       {

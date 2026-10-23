@@ -1,4 +1,13 @@
-import { ArgumentError, hasKey, toS } from "@blazetrails/ruby-compat";
+import type { RackHeaders } from "./index.js";
+import {
+  ArgumentError,
+  hasKey,
+  hashDelete,
+  rbFSend,
+  rbObjRespondTo,
+  toI,
+  toS,
+} from "@blazetrails/ruby-compat";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -9,7 +18,7 @@ import {
   ETAG,
 } from "./constants.js";
 import { STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
-import * as MediaTypeModule from "./media-type.js";
+import { MediaType } from "./media-type.js";
 import { setCookieHeader, deleteSetCookieHeaderBang } from "./utils.js";
 import { include } from "@blazetrails/ruby-compat";
 
@@ -23,7 +32,7 @@ export abstract class Helpers {
   declare _body: any;
   declare length: number | null;
   declare _buffered: boolean | null;
-  declare _writer: (chunk: string) => string;
+  declare _writer: (chunk: string | Uint8Array) => string | Uint8Array;
 
   abstract hasHeader(key: any): boolean;
   abstract getHeader(key: any): any;
@@ -101,8 +110,8 @@ export abstract class Helpers {
     return this.hasHeader(header);
   }
 
-  addHeader(key: string | null, value: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+  addHeader(key: string, value: string | null): any {
+    if (typeof key !== "string") throw new ArgumentError();
     if (value === null || value === undefined) return this.getHeader(key) ?? null;
     const existing = this.getHeader(key);
     if (existing != null) {
@@ -129,11 +138,11 @@ export abstract class Helpers {
   }
 
   get mediaType(): string | null {
-    return MediaTypeModule.type(this.contentType ?? null);
+    return MediaType.type(this.contentType ?? null);
   }
 
   get mediaTypeParams(): Record<string, string> {
-    return MediaTypeModule.params(this.contentType ?? null);
+    return MediaType.params(this.contentType ?? null);
   }
 
   get contentLength(): number | null {
@@ -204,17 +213,15 @@ export abstract class Helpers {
         );
         this._buffered = true;
       } else if (this._body && typeof this._body.each === "function") {
-        const oldBody = this._body;
+        const body = this._body;
         this._body = [];
         this._buffered = true;
-        this.length = 0;
-        oldBody.each((part: string | Uint8Array) => this.append(toS(part)));
-      } else if (this._body && typeof this._body[Symbol.iterator] === "function") {
-        const oldBody = this._body;
-        this._body = [];
-        this._buffered = true;
-        this.length = 0;
-        for (const part of oldBody as Iterable<string | Uint8Array>) this.append(toS(part));
+
+        body.each((part: string | Uint8Array) => {
+          this._writer(toS(part));
+        });
+
+        if (rbObjRespondTo(body, "close")) body.close();
       } else {
         this._buffered = false;
       }
@@ -236,20 +243,20 @@ export abstract class Helpers {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:373`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
+  static get(status: number, headers: RackHeaders, body: any): Response {
+    return new this(body, status, headers);
+  }
+
   status: number;
-  headers: Record<string, string | string[]>;
+  headers: Record<string, RackHeaders[string]>;
   protected _body: any;
   length: number | null;
   private _buffered: boolean | null;
   private _block: ((self: Response) => void) | null;
   private _writer: (chunk: string | Uint8Array) => string | Uint8Array;
 
-  constructor(
-    body: any = null,
-    status: number = 200,
-    headers: Record<string, string | string[]> = {},
-  ) {
-    this.status = typeof status === "number" ? status : parseInt(String(status));
+  constructor(body: any = null, status: number | string = 200, headers: RackHeaders = {}) {
+    this.status = Number(toI(status));
 
     if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {
       throw new ArgumentError("Headers must be a Hash!");
@@ -289,21 +296,6 @@ export class Response {
     this._body = value;
   }
 
-  static create(status: number, headers: Record<string, string | string[]>, body: any): Response {
-    return new Response(body, status, headers);
-  }
-
-  get(key: string): any {
-    return this.headers[key];
-  }
-  set(key: string, value: any): void {
-    this.headers[key] = value;
-  }
-
-  [Symbol.for("[]")](key: string): any {
-    return this.headers[key];
-  }
-
   includes(key: string): boolean {
     return key in this.headers;
   }
@@ -334,24 +326,18 @@ export class Response {
       return [this.status, this.headers, this];
     }
 
-    if (this.length !== null && !this.isChunked() && !this.headers[CONTENT_LENGTH]) {
+    if (this.length != null && !this.isChunked()) {
       this.headers[CONTENT_LENGTH] = String(this.length);
     }
     return [this.status, this.headers, this._body];
   }
 
-  toArray(): [number, Record<string, any>, any] {
-    return this.finish();
+  toA(block?: (self: Response) => void): [number, Record<string, any>, any] {
+    return this.finish(block);
   }
 
   each(callback: (chunk: string) => void): void {
-    if (Array.isArray(this._body)) {
-      for (const chunk of this._body) callback(chunk);
-    } else if (this._body && typeof this._body.each === "function") {
-      this._body.each(callback);
-    } else if (this._body && typeof this._body.forEach === "function") {
-      this._body.forEach(callback);
-    }
+    rbFSend(this._body, "each", callback);
     this._buffered = true;
     if (this._block) {
       this._writer = callback as any;
@@ -377,29 +363,30 @@ export class Response {
     return this._block === null && Array.isArray(this._body) && this._body.length === 0;
   }
 
-  hasHeader(key: string | null): boolean {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+  hasHeader(key: string): boolean {
+    if (typeof key !== "string") throw new ArgumentError();
     return Object.hasOwn(this.headers, downcaseKey(key));
   }
-  getHeader(key: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+  getHeader(key: string): any {
+    if (typeof key !== "string") throw new ArgumentError();
     return this.headers[downcaseKey(key)];
   }
-  setHeader(key: string | null, value: any): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+  get(key: string): any {
+    return this.getHeader(key);
+  }
+  setHeader(key: string, value: any): any {
+    if (typeof key !== "string") throw new ArgumentError();
     this.headers[downcaseKey(key)] = value;
     return value;
   }
-  deleteHeader(key: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
-    const val = this.headers[downcaseKey(key)];
-    delete this.headers[downcaseKey(key)];
-    return val ?? null;
+  deleteHeader(key: string): any {
+    if (typeof key !== "string") throw new ArgumentError();
+    return hashDelete(this.headers, downcaseKey(key));
   }
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:376`); the class/interface merge is how a mixin surfaces on the type side. */
-export class ResponseRaw {
+export class Raw {
   status: number;
   headers: Record<string, any>;
 
@@ -419,10 +406,7 @@ export class ResponseRaw {
     return value;
   }
   deleteHeader(key: any): any {
-    const k = String(key);
-    const val = this.headers[k];
-    delete this.headers[k];
-    return val ?? null;
+    return hashDelete(this.headers, key);
   }
 }
 
@@ -442,9 +426,9 @@ export interface Response extends Omit<
   | "deleteHeader"
 > {}
 
-include(ResponseRaw, Helpers);
+include(Raw, Helpers);
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:376`); the class/interface merge is how a mixin surfaces on the type side. */
-export interface ResponseRaw extends Omit<
+export interface Raw extends Omit<
   Helpers,
   | "status"
   | "headers"

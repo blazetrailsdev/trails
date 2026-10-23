@@ -24,17 +24,13 @@ export class OutputBuffer {
     return htmlSafe(this._raw);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   toStr(): string {
     return this._raw;
   }
 
   get htmlSafe(): true {
     return true;
-  }
-
-  /** @deprecated */
-  htmlSafeBuffer(): SafeBuffer {
-    return this.toString();
   }
 
   append(value: unknown): this {
@@ -86,15 +82,31 @@ export class OutputBuffer {
     return copy.initializeCopy(this);
   }
 
-  capture<TArgs extends unknown[]>(...args: [...TArgs, (...args: TArgs) => void]): SafeBuffer {
-    const block = args.pop() as (...args: unknown[]) => void;
+  capture<TArgs extends unknown[]>(
+    ...args: [...TArgs, (...args: TArgs) => PromiseLike<unknown>]
+  ): Promise<SafeBuffer>;
+  capture<TArgs extends unknown[]>(...args: [...TArgs, (...args: TArgs) => unknown]): SafeBuffer;
+  capture(...args: unknown[]): SafeBuffer | Promise<SafeBuffer> {
+    const block = args.pop() as (...args: unknown[]) => unknown;
     const saved = this._raw;
     this._raw = "";
+    let pending = false;
     try {
-      block(...args);
+      const result = block(...args);
+      if (result != null && typeof (result as PromiseLike<unknown>).then === "function") {
+        pending = true;
+        return (async () => {
+          try {
+            await result;
+            return htmlSafe(this._raw);
+          } finally {
+            this._raw = saved;
+          }
+        })();
+      }
       return htmlSafe(this._raw);
     } finally {
-      this._raw = saved;
+      if (!pending) this._raw = saved;
     }
   }
 
@@ -170,17 +182,31 @@ export class StreamingBuffer {
     return this.safeAppend(value);
   }
 
-  capture(fn: () => void): SafeBuffer {
+  capture(fn: () => PromiseLike<unknown>): Promise<SafeBuffer>;
+  capture(fn: () => unknown): SafeBuffer;
+  capture(fn: () => unknown): SafeBuffer | Promise<SafeBuffer> {
     let buffer = "";
     const previous = this._block;
     this._block = (value: string) => {
       buffer += value;
     };
+    let pending = false;
     try {
-      fn();
+      const result = fn();
+      if (result != null && typeof (result as PromiseLike<unknown>).then === "function") {
+        pending = true;
+        return (async () => {
+          try {
+            await result;
+            return htmlSafe(buffer);
+          } finally {
+            this._block = previous;
+          }
+        })();
+      }
       return htmlSafe(buffer);
     } finally {
-      this._block = previous;
+      if (!pending) this._block = previous;
     }
   }
 

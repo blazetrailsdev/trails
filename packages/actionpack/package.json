@@ -6,17 +6,25 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc && cp -R src/action-dispatch/journey/visualizer dist/action-dispatch/journey/"
+    "build": "tsc && cp -R src/action-dispatch/journey/visualizer dist/action-dispatch/journey/ && cp -R src/action-dispatch/middleware/templates dist/action-dispatch/middleware/ && trails-tsc-views build --views dist/action-dispatch/middleware/templates --in-place && trails-tsc-views build --views dist/action-dispatch/journey/visualizer --in-place"
   },
   "files": [
     "dist"
   ],
   "license": "MIT",
   "peerDependencies": {
-    "playwright": ">=1.40.0"
+    "playwright": ">=1.40.0",
+    "vite": ">=7.0.0",
+    "vitest": ">=3.0.0"
   },
   "peerDependenciesMeta": {
     "playwright": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    },
+    "vitest": {
       "optional": true
     }
   },
@@ -33,5 +41,12 @@
     "@blazetrails/rack-session": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
     "ua-parser-js": "^2.0.9"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@blazetrails/trails-tsc": "workspace:*",
+    "vite": "^7.0.0"
   }
 }

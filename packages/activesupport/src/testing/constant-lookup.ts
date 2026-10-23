@@ -1,4 +1,4 @@
-import { extend, Module } from "@blazetrails/ruby-compat";
+import { extend } from "@blazetrails/ruby-compat";
 import { Concern } from "../concern.js";
 import { safeConstantize } from "../inflector.js";
 
@@ -19,8 +19,5 @@ export const ClassMethods = {
   },
 };
 
-export const ConstantLookup = new Module((mod) => {
-  extend(mod, Concern);
-
-  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
-});
+export const ConstantLookup = { ClassMethods };
+extend(ConstantLookup, Concern);

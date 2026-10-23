@@ -1,3 +1,5 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActiveRecord } from "../namespaces.js";
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 import { max, rbObjDup, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
@@ -209,3 +211,5 @@ export class AdapterSpecificRegistry {
     return max(this.registrations.filter((registration) => registration.matches(symbol, ...args)));
   }
 }
+
+rbModConstSet(ActiveRecord, "TypeConflictError", TypeConflictError);

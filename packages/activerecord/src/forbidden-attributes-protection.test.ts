@@ -116,7 +116,7 @@ describe("ForbiddenAttributesProtectionTest", () => {
   it("strong params style objects work with singular associations", () => {
     const params = new ProtectedParams({
       name: "Stern",
-      shipAttributes: new ProtectedParams({ name: "The Black Rock" }).permitBang(),
+      ship_attributes: new ProtectedParams({ name: "The Black Rock" }).permitBang(),
     }).permitBang();
     const part = new ShipPart(params);
 
@@ -126,7 +126,7 @@ describe("ForbiddenAttributesProtectionTest", () => {
 
   it("strong params style objects work with collection associations", () => {
     const params = new ProtectedParams({
-      trinketsAttributes: new ProtectedParams({
+      trinkets_attributes: new ProtectedParams({
         "0": new ProtectedParams({ name: "Necklace" }).permitBang(),
         "1": new ProtectedParams({ name: "Spoon" }).permitBang(),
       }).permitBang(),

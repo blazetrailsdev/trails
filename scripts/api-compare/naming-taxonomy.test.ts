@@ -4,9 +4,9 @@ import {
   differingRefPairs,
   classifyRow,
   refName,
-  JS_RESERVED_WORDS,
   NAMING_CLASSES,
 } from "./naming-taxonomy.js";
+import { JS_RESERVED_WORDS } from "@blazetrails/parity/conventions";
 
 describe("classifyPair", () => {
   // postgresql_adapter.rb:781's second parameter is `default`.
@@ -136,6 +136,18 @@ describe("classifyPair", () => {
     expect(classifyPair("inspect", "toString")).toBe("no-js-equivalent");
   });
 
+  // static.rb:145 `File.join(@root, path.b)` vs static.ts `File.join(this.root, path)`.
+  it("names String#b dropped for the receiver as an encoding tag", () => {
+    expect(classifyPair("b", "path")).toBe("encoding-tag");
+    expect(classifyPair("b", "data")).toBe("burndown");
+  });
+
+  // deflater.rb:105-106 `gzip.write(part)` vs deflater.ts `gzip.write(Buffer.from(part, "binary"))`.
+  it("names an ASCII-8BIT read handed to a byte sink as an encoding tag", () => {
+    expect(classifyPair("part", "from")).toBe("encoding-tag");
+    expect(classifyPair("part", "data")).toBe("burndown");
+  });
+
   // Ruby builtins whose TS spelling is the free function or method doing the
   // same work: locator.rb:107 `compact`, base.rb:282 `File.read`,
   // flatten.rb:100 `gsub`, base.rb:269 `inspect`.
@@ -187,6 +199,7 @@ describe("the taxonomy itself", () => {
       "block-idiom",
       "ivar-reflection",
       "implicit-to-s",
+      "encoding-tag",
     ]);
   });
 

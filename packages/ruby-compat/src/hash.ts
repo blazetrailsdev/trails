@@ -6,6 +6,7 @@ import { isPlainHash, rbBuiltinClassName, rbInspect, rbObjClass } from "./object
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { RuntimeError } from "./runtime-error.js";
+import { isSymbol, symbolToS } from "./symbol.js";
 
 const BLOCK = Symbol.for("@blazetrails/ruby-compat:block");
 const UNDEF = Symbol("Qundef");
@@ -153,13 +154,17 @@ export function fetch(
     const own = ownMethod(receiver, "fetch");
     if (own) return own.call(receiver, key, ...rest);
   }
+  const blockGiven = rbBlockGivenP(rest[rest.length - 1]);
+  const argc = 1 + rest.length - (blockGiven ? 1 : 0);
+  if (argc > 2) {
+    throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1..2)`);
+  }
   const hash = receiver as Record<string, unknown> | Map<unknown, unknown>;
-  const blockGiven = rbBlockGivenP(rest[0]);
   const isMap = !plain && hash instanceof Map;
   if (!(isMap ? hash.has(key) : hasKey(hash, key as string))) {
     if (blockGiven) {
-      return (rest[0] as (key: unknown) => unknown)(key);
-    } else if (rest.length === 0) {
+      return (rest[rest.length - 1] as (key: unknown) => unknown)(key);
+    } else if (argc === 1) {
       throw new KeyError(`key not found: ${strEllipsize(rbInspect(key), 65)}`, {
         receiver: hash,
         key,
@@ -337,7 +342,11 @@ export function update<T>(
           block !== undefined && hash.has(key) ? block(key, hash.get(key)!, value) : value,
         );
       } else {
-        hash[key] = block !== undefined && hasKey(hash, key) ? block(key, hash[key], value) : value;
+        hashAset(
+          hash,
+          key,
+          block !== undefined && hasKey(hash, key) ? block(key, hash[key], value) : value,
+        );
       }
     }
   }
@@ -361,8 +370,18 @@ export function hashReplace<H extends object>(hash: H, hash2: object): H {
     throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
   }
   if (hash === hash2) return hash;
-  for (const key of Object.keys(hash)) delete (hash as Record<string, unknown>)[key];
-  Object.assign(hash, hash2);
+  if (hash instanceof Map) {
+    hash.clear();
+  } else {
+    for (const key of Object.keys(hash)) delete (hash as Record<string, unknown>)[key];
+  }
+  if (hash2 instanceof Map || hash instanceof Map) {
+    for (const [key, value] of hash2 instanceof Map ? hash2 : Object.entries(hash2)) {
+      hashAset(hash, key, value);
+    }
+  } else {
+    Object.assign(hash, hash2);
+  }
   return hash;
 }
 
@@ -516,7 +535,9 @@ export function reject<T>(hash: Record<string, T>, block: PairBlock<T>): Record<
  * `Hash#each` is also defined onto (`hash.c:7219`): yields each key and value
  * and returns the receiver. A `Hash` (a `Map`) is walked as readily as a plain object.
  * A receiver that is not a Hash is sent its own `each`, as {@link hashAref}
- * sends one its own `[]`.
+ * sends one its own `[]`; a lone Array that `each` yields is splatted over the
+ * two-parameter block (`vendor/ruby/v3.3.11/vm_insnhelper.c:4807`
+ * `vm_callee_setup_block_arg_arg0_splat`).
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`).
  */
 export function eachPair<T>(hash: Record<string, T>, block: PairBlock<T>): Record<string, T>;
@@ -543,7 +564,11 @@ export function eachPair<T>(
 ): Record<string, T> | Map<string, T> {
   const own = ownMethod(hash, "each");
   if (own) {
-    own.call(hash, block);
+    own.call(hash, (...args: unknown[]) =>
+      args.length === 1 && Array.isArray(args[0])
+        ? block(args[0][0] as string, args[0][1] as T)
+        : block(...(args as [string, T])),
+    );
     return hash;
   }
   if (hash instanceof Map) {
@@ -691,6 +716,29 @@ export function eachKey<T>(
 }
 
 /**
+ * Ruby `Hash#transform_values!` (`vendor/ruby/v3.3.11/hash.c:3398`
+ * `rb_hash_transform_values_bang`): each value replaced in place by the
+ * block's result, answering the receiver.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values!` (`vendor/ruby/v3.3.11/hash.c:3398`).
+ */
+export function transformValuesBang<H extends Record<string, unknown> | Map<unknown, unknown>>(
+  hash: H,
+  block: (value: unknown) => unknown,
+): H {
+  if (hash instanceof Map) {
+    const set = hash instanceof Hash ? Hash.prototype.set : Map.prototype.set;
+    for (const [key, value] of [...hash]) {
+      set.call(hash, key, block(value));
+    }
+    return hash;
+  }
+  for (const key of Object.keys(hash)) {
+    hash[key] = block(hash[key]);
+  }
+  return hash;
+}
+
+/**
  * Ruby `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`
  * `rb_hash_transform_values`) — a NEW hash with the same keys in the same
  * order and each value replaced by the block's result.
@@ -725,6 +773,10 @@ export function transformValues(
   const own = ownMethod(hash, "transformValues");
   if (own) return own.call(hash, block) as Record<string, unknown>;
   if (hash instanceof Map) {
+    const override = (hash as { transformValues?: unknown }).transformValues;
+    if (typeof override === "function") {
+      return override.call(hash, block) as Hash<unknown, unknown>;
+    }
     const result = new Hash<unknown, unknown>();
     for (const [key, value] of hash) {
       result.set(key, block(value));
@@ -824,12 +876,15 @@ export function except(
  * the hash does not hold.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#values_at` (`vendor/ruby/v3.3.11/hash.c:2713`).
  */
-export function valuesAt<T>(hash: Record<string, T>, ...keys: string[]): (T | undefined)[];
+export function valuesAt<T>(
+  hash: Record<string, T> | Map<string, T>,
+  ...keys: string[]
+): (T | null)[];
 /**
  * The Map arm: `rb_hash_aref` is the same lookup whichever hash it is given.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#values_at` (`vendor/ruby/v3.3.11/hash.c:2713`).
  */
-export function valuesAt<K, T>(hash: Map<K, T>, ...keys: K[]): (T | undefined)[];
+export function valuesAt<K, T>(hash: Map<K, T>, ...keys: K[]): (T | null)[];
 /**
  * Ruby `Array#values_at` with Integer indexes (`vendor/ruby/v3.3.11/array.c:3769`
  * `rb_ary_values_at`): the element at each index, a negative one counting from
@@ -837,7 +892,7 @@ export function valuesAt<K, T>(hash: Map<K, T>, ...keys: K[]): (T | undefined)[]
  * arm of `rb_get_values_at` (`array.c:3672`) is not ported: nothing calls it.
  * @noRailsEquivalent PERMANENT — Ruby core `Array#values_at` (`vendor/ruby/v3.3.11/array.c:3769`).
  */
-export function valuesAt<T>(ary: readonly T[], ...indexes: number[]): (T | undefined)[];
+export function valuesAt<T>(ary: readonly T[], ...indexes: number[]): (T | null)[];
 /**
  * `rb_hash_values_at` pushes `rb_hash_aref(hash, argv[i])` for each key, so the
  * arms share one body over the rest parameter.
@@ -847,9 +902,16 @@ export function valuesAt(
   hash: Record<string, unknown> | Map<unknown, unknown> | readonly unknown[],
   ...keys: unknown[]
 ) {
-  if (hash instanceof Map) return keys.map((key) => hash.get(key));
-  if (Array.isArray(hash)) return keys.map((index) => hash.at(index as number));
-  return keys.map((key) => (hash as Record<string, unknown>)[key as string]);
+  if (hash instanceof Map) return keys.map((key) => (hash.has(key) ? hash.get(key) : null));
+  if (Array.isArray(hash)) {
+    return keys.map((index) => {
+      const offset = (index as number) < 0 ? (index as number) + hash.length : (index as number);
+      return offset >= 0 && offset < hash.length ? hash[offset] : null;
+    });
+  }
+  return keys.map((key) =>
+    Object.hasOwn(hash, key as string) ? (hash as Record<string, unknown>)[key as string] : null,
+  );
 }
 
 /**
@@ -1022,13 +1084,16 @@ export class Hash<K, V> extends Map<K, V> {
   /**
    * `Hash.new` (`vendor/ruby/v3.3.11/hash.c:1782` `rb_hash_initialize`): a block is
    * the default_proc, an argument the default value, neither is `nil`. A block
-   * is a single trailing function argument, the spelling `fetch` uses.
+   * is a single trailing function argument, the spelling `fetch` uses, and a
+   * block beside a default is `rb_check_arity(argc, 0, 0)`'s ArgumentError.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Hash.new` (`vendor/ruby/v3.3.11/hash.c:1782`).
    */
-  constructor(ifnone?: DefaultProc<K, V> | V) {
+  constructor(ifnone?: DefaultProc<K, V> | V, block?: DefaultProc<K, V>) {
     super();
-    if (typeof ifnone === "function") {
+    if (block !== undefined) {
+      throw new ArgumentError("wrong number of arguments (given 1, expected 0)");
+    } else if (typeof ifnone === "function") {
       this.setDefaultProc(ifnone as DefaultProc<K, V>);
     } else if (ifnone !== undefined) {
       this.setDefault(ifnone);
@@ -1208,14 +1273,14 @@ export class Hash<K, V> extends Map<K, V> {
    * The `JSON.stringify` protocol: a `Map`'s entries are not properties, so
    * without it a Hash stringifies as `{}` where `Hash#to_json`
    * (`vendor/ruby/v3.3.11/ext/json/generator/generator.c:430` `mHash_to_json`)
-   * writes each pair under its key's `to_s`.
+   * writes each pair under its key's `to_s`, a Symbol's being its name.
    *
    * @noRailsEquivalent PERMANENT
    */
   toJSON(): Record<string, V> {
     const result = Object.create(null) as Record<string, V>;
     for (const [key, value] of this) {
-      result[String(key)] = value;
+      result[isSymbol(key) ? symbolToS(key) : String(key)] = value;
     }
     return result;
   }
@@ -1225,13 +1290,17 @@ export class Hash<K, V> extends Map<K, V> {
    * `rb_hash_to_h_block` (`hash.c:3528`): a new bare Hash of the pairs the block
    * returns, each checked by `rb_hash_set_pair` (`hash.c:3503`). With none, the receiver itself when it IS a Hash (`hash.c:3560`),
    * otherwise a `hash_dup` (`hash.c:3562`) into a bare Hash that carries the
-   * same entries and the same `default` / `default_proc`.
+   * same entries and the same `default` / `default_proc`. That bare Hash is a
+   * plain object when it needs no `Hash` feature (README, § "When a Ruby Hash
+   * is a `Hash` and when it is an object").
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#to_h` (`vendor/ruby/v3.3.11/hash.c:3555`).
    */
-  toH(): Hash<K, V>;
+  toH(): Hash<K, V> | Record<string, V>;
   toH<K2, V2>(block: (key: K, value: V) => [K2, V2]): Hash<K2, V2>;
-  toH(block?: (key: K, value: V) => [unknown, unknown]): Hash<unknown, unknown> {
+  toH(
+    block?: (key: K, value: V) => [unknown, unknown],
+  ): Hash<unknown, unknown> | Record<string, unknown> {
     if (block !== undefined) {
       const h = new Hash<unknown, unknown>();
       for (const [key, value] of this) {
@@ -1249,6 +1318,14 @@ export class Hash<K, V> extends Map<K, V> {
       return h;
     }
     if (this.constructor === Hash) return this;
+    if (
+      this.default() == null &&
+      !this.defaultProc() &&
+      !this.isCompareByIdentity() &&
+      [...this.keys()].every((key) => typeof key === "string")
+    ) {
+      return Object.fromEntries(this) as Record<string, V>;
+    }
     return hashDup(this, Hash<K, V>);
   }
 
@@ -1436,6 +1513,17 @@ export class Hash<K, V> extends Map<K, V> {
   }
 
   /**
+   * `Hash#initialize_copy`, which MRI binds to `rb_hash_replace`
+   * (`vendor/ruby/v3.3.11/hash.c:7190`): the hook `rbObjDup` / `rbObjClone`
+   * dispatch, so a dup holds a copy of the receiver's table.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#initialize_copy` (`vendor/ruby/v3.3.11/hash.c:7190`).
+   */
+  initializeCopy(hash: Hash<K, V>): this {
+    return this.replace(hash);
+  }
+
+  /**
    * `Hash#replace` (`vendor/ruby/v3.3.11/hash.c:2967` `rb_hash_replace`): the
    * receiver takes `hash2`'s `default` / `default_proc` (`COPY_DEFAULT`) and a
    * `hash_copy` of its table, which is not written through a subclass's `[]=`.
@@ -1521,6 +1609,232 @@ export class Hash<K, V> extends Map<K, V> {
    */
   override values(): MapBoundaryReturn {
     return [...super.values()];
+  }
+
+  /**
+   * `Hash#length` (`vendor/ruby/v3.3.11/hash.c:3002` `rb_hash_size`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  length(): number {
+    return this.size;
+  }
+
+  /**
+   * `Hash#empty?` (`vendor/ruby/v3.3.11/hash.c:3023` `rb_hash_empty_p`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  isEmpty(): boolean {
+    return this.size === 0;
+  }
+
+  /**
+   * `Hash#delete_if` (`vendor/ruby/v3.3.11/hash.c:2564` `rb_hash_delete_if`):
+   * drops every pair the block answers truthily for, and returns the receiver.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  deleteIf(block: (key: K, value: V) => unknown): this {
+    this.modifyCheck();
+    for (const [key, value] of this) {
+      const ret = block(key, value);
+      if (ret != null && ret !== false) this.deleteEntry(key);
+    }
+    return this;
+  }
+
+  /**
+   * `Hash#reject!` (`vendor/ruby/v3.3.11/hash.c:2594` `rb_hash_reject_bang`):
+   * `delete_if`, answering `nil` when nothing was deleted.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  rejectBang(block: (key: K, value: V) => unknown): this | null {
+    this.modifyCheck();
+    const n = this.size;
+    if (!n) return null;
+    this.deleteIf(block);
+    if (n === this.size) return null;
+    return this;
+  }
+
+  /**
+   * `Hash#keep_if` (`vendor/ruby/v3.3.11/hash.c:2844` `rb_hash_keep_if`): drops
+   * every pair the block answers falsily for (`keep_if_i`, `:2757`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  keepIf(block: (key: K, value: V) => unknown): this {
+    this.modifyCheck();
+    for (const [key, value] of this) {
+      const ret = block(key, value);
+      if (ret == null || ret === false) this.deleteEntry(key);
+    }
+    return this;
+  }
+
+  /**
+   * `Hash#select!` (`vendor/ruby/v3.3.11/hash.c:2813` `rb_hash_select_bang`):
+   * `keep_if`, answering `nil` when nothing was deleted.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  selectBang(block: (key: K, value: V) => unknown): this | null {
+    this.modifyCheck();
+    const n = this.size;
+    if (!n) return null;
+    this.keepIf(block);
+    if (n === this.size) return null;
+    return this;
+  }
+
+  /**
+   * `Hash#transform_values!` (`vendor/ruby/v3.3.11/hash.c:3398`
+   * `rb_hash_transform_values_bang`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  transformValuesBang(block: (value: V) => V): this {
+    this.modifyCheck();
+    for (const [key, value] of [...super.entries()]) {
+      super.set(key, block(value));
+    }
+    return this;
+  }
+
+  /**
+   * `Hash#to_a` (`vendor/ruby/v3.3.11/hash.c:3428` `rb_hash_to_a`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toA(): [K, V][] {
+    return [...this];
+  }
+
+  /**
+   * `Hash#to_hash` (`vendor/ruby/v3.3.11/hash.c:3497` `rb_hash_to_hash`): the
+   * receiver itself.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toHash(): object {
+    return this;
+  }
+
+  /**
+   * `Hash#assoc` (`vendor/ruby/v3.3.11/hash.c:4193` `rb_hash_assoc`): the stored
+   * key and its value for `key`, else `nil`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  assoc(key: K): [K, V] | null {
+    const stored = this.hashStlikeLookup(key);
+    if (!super.has(stored)) return null;
+    return [stored, super.get(stored)!];
+  }
+
+  /**
+   * `Hash#dig` (`vendor/ruby/v3.3.11/hash.c:4627` `rb_hash_dig`): `self[key]`,
+   * then `rb_obj_dig` (`vendor/ruby/v3.3.11/object.c:3906`) over the rest, which
+   * answers `nil` through a `nil` and sends `dig` to anything else.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  dig(key: K, ...rest: unknown[]): unknown {
+    const obj: unknown = this.get(key);
+    if (rest.length === 0) return obj;
+    if (obj == null) return null;
+    const dig = (obj as { dig?: unknown }).dig;
+    if (typeof dig !== "function") {
+      throw new TypeError(`${rbBuiltinClassName(obj)} does not have #dig method`);
+    }
+    return dig.call(obj, ...rest);
+  }
+
+  /**
+   * `Hash#fetch_values` (`vendor/ruby/v3.3.11/hash.c:2745`
+   * `rb_hash_fetch_values`): `rb_hash_fetch` for each key.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  fetchValues(...argv: K[]): V[] {
+    return argv.map((key) => fetch(this as Map<K, V>, key) as V);
+  }
+
+  /**
+   * `Hash#rassoc` (`vendor/ruby/v3.3.11/hash.c:4254` `rb_hash_rassoc`): the
+   * first pair whose value is `==` to `obj` (`rassoc_i`), else `nil`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  rassoc(obj: unknown): [K, V] | null {
+    for (const [key, value] of this) {
+      if (rbEqual(value, obj)) return [key, value];
+    }
+    return null;
+  }
+
+  /**
+   * `Hash#flatten` (`vendor/ruby/v3.3.11/hash.c:4308` `rb_hash_flatten`): the
+   * pairs spliced into one Array, then `flatten!(level - 1)` over it, or a
+   * recursive `flatten!` for a negative level.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  flatten(...argv: [] | [number]): unknown[] {
+    if (argv.length) {
+      const level = argv[0];
+      if (level === 0) return this.toA();
+      const ary: unknown[] = [];
+      for (const [key, value] of this) ary.push(key, value);
+      const rest = level - 1;
+      if (rest > 0) return ary.flat(rest);
+      else if (rest < 0) return ary.flat(Infinity);
+      return ary;
+    }
+    const ary: unknown[] = [];
+    for (const [key, value] of this) ary.push(key, value);
+    return ary;
+  }
+
+  /**
+   * `Hash#compact` (`vendor/ruby/v3.3.11/hash.c:4360` `rb_hash_compact`): a dup
+   * with every `nil` value dropped (`delete_if_nil`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  compact(): Hash<K, NonNullable<V>> {
+    const result = hashDup(this, this.constructor as new () => Hash<K, V>);
+    if (this.size) {
+      result.deleteIf((_key, value) => value == null);
+    }
+    return result as Hash<K, NonNullable<V>>;
+  }
+
+  /**
+   * `Hash#compact!` (`vendor/ruby/v3.3.11/hash.c:4385` `rb_hash_compact_bang`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  compactBang(): this | null {
+    this.modifyCheck();
+    const n = this.size;
+    if (n) {
+      this.deleteIf((_key, value) => value == null);
+      if (n !== this.size) return this;
+    }
+    return null;
+  }
+
+  /**
+   * `Hash#deconstruct_keys` (`vendor/ruby/v3.3.11/hash.c:4759`
+   * `rb_hash_deconstruct_keys`): the receiver itself.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  deconstructKeys(_keys: unknown): this {
+    return this;
   }
 }
 

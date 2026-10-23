@@ -19,5 +19,3 @@ export {
 export { CacheStore, type CacheStoreSessionOptions } from "./cache-store.js";
 
 export { MemCacheStore, type MemCacheStoreSessionOptions } from "./mem-cache-store.js";
-
-export { resolveStore, sessionStoreConstants } from "./resolve-store.js";

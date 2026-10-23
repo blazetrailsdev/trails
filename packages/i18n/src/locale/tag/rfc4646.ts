@@ -1,5 +1,5 @@
 import type { Locale } from "../../i18n.js";
-import { parent, parents, selfAndParents, type Parents } from "./parents.js";
+import { parent, parents, selfAndParents } from "./parents.js";
 
 export const RFC4646_SUBTAGS = [
   "language",
@@ -25,7 +25,7 @@ const STRING_FORMATS: Record<string, (value: string) => string> = {
   upcase: (value) => value.toUpperCase(),
 };
 
-export class Rfc4646 implements Parents {
+export class Rfc4646 {
   static tag(tag: string): Rfc4646 | null {
     const matches = Rfc4646.parser().match(tag);
     return matches ? new Rfc4646(...matches) : null;

@@ -13,6 +13,10 @@ import { Tempfile } from "./tempfile.js";
 const CIPHER = "aes-128-gcm";
 
 export class MissingContentError extends Error {
+  static toString(): string {
+    return "ActiveSupport::EncryptedFile::MissingContentError";
+  }
+
   constructor(contentPath: string) {
     super(`Missing encrypted content file in ${contentPath}.`);
     this.name = "MissingContentError";
@@ -20,6 +24,10 @@ export class MissingContentError extends Error {
 }
 
 export class MissingKeyError extends Error {
+  static toString(): string {
+    return "ActiveSupport::EncryptedFile::MissingKeyError";
+  }
+
   constructor(opts: { keyPath: string; envKey: string }) {
     super(
       `Missing encryption key to decrypt file with. ` +
@@ -31,6 +39,10 @@ export class MissingKeyError extends Error {
 }
 
 export class InvalidKeyLengthError extends Error {
+  static toString(): string {
+    return "ActiveSupport::EncryptedFile::InvalidKeyLengthError";
+  }
+
   constructor() {
     super(`Encryption key must be exactly ${EncryptedFile.expectedKeyLength()} characters.`);
     this.name = "InvalidKeyLengthError";
@@ -45,6 +57,10 @@ export interface EncryptedFileOptions {
 }
 
 export class EncryptedFile {
+  static toString(): string {
+    return "ActiveSupport::EncryptedFile";
+  }
+
   private static memoExpectedKeyLength?: number;
 
   readonly contentPath: string;

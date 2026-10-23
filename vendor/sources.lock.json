@@ -4,6 +4,14 @@
       "ref": "v3.1.20",
       "sha": "58f8afd33d8813e84706b938815bb1aa08d0b470"
     },
+    "builder": {
+      "ref": "v3.3.0",
+      "sha": "789896b306e36a5fe166388413b16e9323260601"
+    },
+    "crass": {
+      "ref": "v1.0.6",
+      "sha": "87f642e80670dc1093eddf4d3a93cbd40a9551c6"
+    },
     "date": {
       "ref": "v3.4.1",
       "sha": "a3295ad262773a80ad61526beb500b29e770b817"
@@ -20,6 +28,22 @@
       "ref": "v1.14.8",
       "sha": "f2fb6a5766dee835082eb74ee83f52e0a6479573"
     },
+    "libyaml": {
+      "ref": "0.2.5",
+      "sha": "2c891fc7a770e8ba2fec34fc6b545c672beb37e6"
+    },
+    "loofah": {
+      "ref": "v2.24.0",
+      "sha": "85990602c6fdb40489138e80080ca508200c7137"
+    },
+    "marcel": {
+      "ref": "v1.0.4",
+      "sha": "cdf0e659c87f81e5d2b393cff3569f870bd71c47"
+    },
+    "mini_magick": {
+      "ref": "v5.2.0",
+      "sha": "34433dc21cd4df544b33e67c111ff0ea36312d34"
+    },
     "minitest": {
       "ref": "v5.27.0",
       "sha": "819e9b5f873d7ab6d4edfeaed48542279367ff93"
@@ -32,9 +56,17 @@
       "ref": "0.5.6",
       "sha": "43ea8af635f5e23f054294ef7759320d47f30e5f"
     },
+    "nokogiri": {
+      "ref": "v1.18.3",
+      "sha": "fd3ca2e22df67fd25fd5c25c466f6896b6547cb8"
+    },
     "pg": {
       "ref": "v1.5.9",
       "sha": "afe2f208f7d5eacea1260ce1def10e1fb30b8241"
+    },
+    "racc": {
+      "ref": "v1.8.0",
+      "sha": "8eeca623c95c77724d3b0856806d2f9fc82684b1"
     },
     "rack": {
       "ref": "v3.1.14",
@@ -56,9 +88,25 @@
       "ref": "v2.2.0",
       "sha": "a14001a41d514ece1a7c4d03a1d9bc69edf677d1"
     },
+    "rails-html-sanitizer": {
+      "ref": "v1.6.2",
+      "sha": "9160d49020b57828ea536ffedc9cac8fef98ee59"
+    },
     "ruby": {
       "ref": "v3_3_11",
       "sha": "1f2d15125a2dc701e1822ed2900eb17899500ec7"
+    },
+    "solid_cable": {
+      "ref": "v3.0.7",
+      "sha": "f383a5816271dda411aa36099df5d236110e5600"
+    },
+    "solid_cache": {
+      "ref": "v1.0.7",
+      "sha": "411771527afdc7b8f91b79b15ff12680d1a628a4"
+    },
+    "solid_queue": {
+      "ref": "v1.1.3",
+      "sha": "c46b6de4bf6d7d76eedc5c20274fa9eb0ba0d7ea"
     },
     "sqlite3": {
       "ref": "v2.6.0",

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IndexError } from "./index-error.js";
-import { Hash, block } from "./hash.js";
+import { Hash } from "./hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
 import {
@@ -11,10 +10,8 @@ import {
   zip,
   aryDelete,
   aryDeleteIf,
-  aryFetch,
   aryIncludes,
   aryJoin,
-  aryPop,
   deleteAt,
   arySlice,
   compact,
@@ -24,8 +21,6 @@ import {
   last,
   pack,
   each,
-  groupBy,
-  partition,
   sort,
   toA,
   union,
@@ -35,8 +30,10 @@ import {
   unpack1,
 } from "./array.js";
 import { Range } from "./range.js";
-import { rbFSend, rbObjRespondTo } from "./object.js";
+import { rbFSend, rbObjId, rbObjRespondTo } from "./object.js";
 import { byteslice } from "./string/byte-methods.js";
+
+const bin = (str: string): Uint8Array => Uint8Array.from(str, (c) => c.charCodeAt(0));
 
 describe("Array#pack", () => {
   const long = "a".repeat(100);
@@ -118,41 +115,43 @@ describe("Array#pack", () => {
 
 describe("Array#pack integer, float and position directives", () => {
   it("packs the CEl< header Cache::Coder writes", () => {
-    expect(pack([0x81, 1.5, 15], "CEl<")).toBe("\x81\x00\x00\x00\x00\x00\x00\xF8?\x0F\x00\x00\x00");
+    expect(pack([0x81, 1.5, 15], "CEl<")).toEqual(
+      bin("\x81\x00\x00\x00\x00\x00\x00\xF8?\x0F\x00\x00\x00"),
+    );
   });
 
   it("C truncates to the low byte and converts with to_int", () => {
-    expect(pack([300], "C")).toBe(",");
-    expect(pack([1.5], "C")).toBe("\x01");
+    expect(pack([300], "C")).toEqual(bin(","));
+    expect(pack([1.5], "C")).toEqual(bin("\x01"));
     expect(() => pack(["x"], "C")).toThrow(
       new TypeError("no implicit conversion of String into Integer"),
     );
   });
 
   it("l packs two's complement, little-endian with < and big-endian with >", () => {
-    expect(pack([-1], "l<")).toBe("\xFF\xFF\xFF\xFF");
-    expect(pack([-2], "l>")).toBe("\xFF\xFF\xFF\xFE");
-    expect(pack([2 ** 32 + 5], "l<")).toBe("\x05\x00\x00\x00");
+    expect(pack([-1], "l<")).toEqual(bin("\xFF\xFF\xFF\xFF"));
+    expect(pack([-2], "l>")).toEqual(bin("\xFF\xFF\xFF\xFE"));
+    expect(pack([2 ** 32 + 5], "l<")).toEqual(bin("\x05\x00\x00\x00"));
   });
 
   it("l with no modifier packs in the host byte order", () => {
     const host = String.fromCharCode(...new Uint8Array(new Uint32Array([1]).buffer));
-    expect(pack([1], "l")).toBe(host);
+    expect(pack([1], "l")).toEqual(bin(host));
     expect(unpack1(host, "l")).toBe(1);
   });
 
   it("E packs a little-endian double", () => {
-    expect(pack([1], "E")).toBe("\x00\x00\x00\x00\x00\x00\xF0?");
-    expect(pack([-1.0], "E")).toBe("\x00\x00\x00\x00\x00\x00\xF0\xBF");
+    expect(pack([1], "E")).toEqual(bin("\x00\x00\x00\x00\x00\x00\xF0?"));
+    expect(pack([-1.0], "E")).toEqual(bin("\x00\x00\x00\x00\x00\x00\xF0\xBF"));
     expect(() => pack(["x"], "E")).toThrow(new TypeError("can't convert String into Float"));
     expect(() => pack([null as never], "E")).toThrow(new TypeError("can't convert nil into Float"));
   });
 
   it("@ null-fills to, or truncates back to, an absolute position", () => {
-    expect(pack([0], "@2C")).toBe("\x00\x00\x00");
-    expect(pack([1, 2], "@0C@5C")).toBe("\x01\x00\x00\x00\x00\x02");
-    expect(pack([1, 2], "CC@1")).toBe("\x01");
-    expect(pack([1, 2], "C@4")).toBe("\x01\x00\x00\x00");
+    expect(pack([0], "@2C")).toEqual(bin("\x00\x00\x00"));
+    expect(pack([1, 2], "@0C@5C")).toEqual(bin("\x01\x00\x00\x00\x00\x02"));
+    expect(pack([1, 2], "CC@1")).toEqual(bin("\x01"));
+    expect(pack([1, 2], "C@4")).toEqual(bin("\x01\x00\x00\x00"));
   });
 
   it("< is allowed only after the endstr types", () => {
@@ -165,7 +164,7 @@ describe("Array#pack integer, float and position directives", () => {
 describe("String#unpack", () => {
   it("answers every item the format pushes, and packs L as it unpacks it", () => {
     const packed = pack([1, 0xffffffff, 2n], "CL>*");
-    expect(packed).toBe("\x01\xff\xff\xff\xff\x00\x00\x00\x02");
+    expect(packed).toEqual(bin("\x01\xff\xff\xff\xff\x00\x00\x00\x02"));
     expect(unpack(packed, "CL>*")).toEqual([1, 0xffffffff, 2]);
     expect(unpack(Uint8Array.of(7, 0, 0), "CL>*")).toEqual([7]);
     expect(unpack1(packed, "L>", { offset: 1 })).toBe(0xffffffff);
@@ -173,7 +172,7 @@ describe("String#unpack", () => {
 
   it("packs q and Q as 64-bit integers, and unpacks one past 2**53 as a bigint", () => {
     const packed = pack([-1, 2n ** 63n], "q>Q>");
-    expect(packed).toBe("\xff".repeat(8) + "\x80" + "\x00".repeat(7));
+    expect(packed).toEqual(bin("\xff".repeat(8) + "\x80" + "\x00".repeat(7)));
     expect(unpack(packed, "q>Q>")).toEqual([-1, 2n ** 63n]);
     expect(unpack(pack([1], "q<"), "q<")).toEqual([1]);
     const max: number | bigint | null = unpack1(pack([2n ** 63n - 1n], "q>"), "q>");
@@ -182,7 +181,7 @@ describe("String#unpack", () => {
 });
 
 describe("String#unpack1", () => {
-  const packed = "\x00\x11" + pack([0x81, 1.5, -1], "CEl<") + "ab";
+  const packed = Uint8Array.of(0x00, 0x11, ...pack([0x81, 1.5, -1], "CEl<"), ...bin("ab"));
 
   it("reads the Cache::Coder header back at its fixed offsets", () => {
     expect(unpack1(packed, "@2C")).toBe(129);
@@ -224,12 +223,12 @@ describe("String#unpack1", () => {
 });
 
 describe("String#byteslice over an ASCII-8BIT string", () => {
-  const packed = "\x00\x11" + pack([0x81, 1.5, 2], "CEl<") + "ab";
+  const packed = Uint8Array.of(0x00, 0x11, ...pack([0x81, 1.5, 2], "CEl<"), ...bin("ab"));
 
   it("counts one byte per code unit", () => {
-    expect(byteslice(packed, 15, 2)).toBe("ab");
-    expect(byteslice(packed, new Range(15, null))).toBe("ab");
-    expect(byteslice("\xFF", 0, 1)).toBe("\xFF");
+    expect(byteslice(packed, 15, 2)).toEqual(bin("ab"));
+    expect(byteslice(packed, new Range(15, null))).toEqual(bin("ab"));
+    expect(byteslice(Uint8Array.of(0xff), 0, 1)).toEqual(Uint8Array.of(0xff));
   });
 });
 
@@ -285,8 +284,8 @@ describe("Array#zip", () => {
   it("is as long as the receiver, nil past an argument's end", () => {
     expect(zip([1, 2, 3], ["a"])).toEqual([
       [1, "a"],
-      [2, undefined],
-      [3, undefined],
+      [2, null],
+      [3, null],
     ]);
     expect(zip([1], ["a", "b"])).toEqual([[1, "a"]]);
   });
@@ -354,32 +353,6 @@ describe("Array#each", () => {
   });
 });
 
-describe("Enumerable#group_by", () => {
-  it("groups the elements under the block's result, keeping order", () => {
-    const hash = groupBy(["apple", "avocado", "banana"], (i) => i[0]);
-    expect([...hash]).toEqual([
-      ["a", ["apple", "avocado"]],
-      ["b", ["banana"]],
-    ]);
-  });
-});
-
-describe("Enumerable#partition", () => {
-  it("splits on the block's truthiness, keeping order", () => {
-    expect(partition([1, 2, 3, 4], (i) => i % 2 === 0)).toEqual([
-      [2, 4],
-      [1, 3],
-    ]);
-  });
-
-  it("counts 0 and the empty string as truthy, nil and false as not", () => {
-    expect(partition([0, "", null, false, undefined], (i) => i)).toEqual([
-      [0, ""],
-      [null, false, undefined],
-    ]);
-  });
-});
-
 describe("Array#compact and Array#uniq", () => {
   it("drops every nil element and keeps the rest in order", () => {
     expect(compact([1, null, 2, undefined, 3])).toEqual([1, 2, 3]);
@@ -419,6 +392,14 @@ describe("Array#compact and Array#uniq", () => {
         [1, 3],
       ]),
     ).toEqual([[1n, 3]]);
+  });
+
+  it("keys on a block's result and keeps the first element per key", () => {
+    expect(uniq(["a", "bb", "c", "dd"], (s) => s.length)).toEqual(["a", "bb"]);
+    const x = { a: 1 };
+    const y = { a: 1 };
+    expect(uniq([x, y, x], (o) => rbObjId(o))).toEqual([x, y]);
+    expect(uniq([x, y, x], (o) => rbObjId(o))[1]).toBe(y);
   });
 });
 
@@ -520,30 +501,6 @@ describe("aryIncludes", () => {
   });
 });
 
-describe("aryFetch", () => {
-  it("answers the element, the block's value, the default, or raises IndexError", () => {
-    const ary = ["foo", "bar", 2];
-    expect([aryFetch(ary, 1), aryFetch(ary, -1), aryFetch(ary, 1, null)]).toEqual([
-      "bar",
-      2,
-      "bar",
-    ]);
-    expect(
-      aryFetch(
-        ary,
-        50,
-        block((index: number) => `Value for ${index}`),
-      ),
-    ).toBe("Value for 50");
-    expect(aryFetch(ary, 50, null)).toBeNull();
-    expect(() => aryFetch(ary, 50)).toThrow(
-      new IndexError("index 50 outside of array bounds: -3...3"),
-    );
-    expect(() => aryFetch(ary, -4)).toThrow("index -4 outside of array bounds: -3...3");
-    expect(() => aryFetch(ary, 1, 2, 3)).toThrow(/\(given 3, expected 1\.\.2\)/);
-  });
-});
-
 describe("aryDelete", () => {
   it("removes every == element in place and returns the last one removed", () => {
     const a = { equals: (o: unknown) => o === a || o === b };
@@ -570,12 +527,12 @@ describe("aryDelete", () => {
 describe("first", () => {
   it("answers the first element, or nil for an empty array", () => {
     expect(first([1, 2, 3])).toBe(1);
-    expect(first([])).toBeUndefined();
+    expect(first([])).toBeNull();
   });
 
   it("reads only the first element of a Set", () => {
     expect(first(new Set(["a", "b"]))).toBe("a");
-    expect(first(new Set())).toBeUndefined();
+    expect(first(new Set())).toBeNull();
     let yielded = 0;
     function* each(): Generator<number> {
       for (const i of [1, 2, 3]) {
@@ -591,7 +548,7 @@ describe("first", () => {
 describe("last", () => {
   it("answers the last element, or nil for an empty array", () => {
     expect(last([1, 2, 3])).toBe(3);
-    expect(last([])).toBeUndefined();
+    expect(last([])).toBeNull();
   });
 
   it("answers the last n elements in order", () => {
@@ -603,21 +560,6 @@ describe("last", () => {
   it("raises on a negative n", () => {
     expect(() => last([1], -1)).toThrow(ArgumentError);
     expect(() => last([1], -1)).toThrow("negative array size");
-  });
-});
-
-describe("aryPop", () => {
-  it("pops the last n elements in place, all of them past the length", () => {
-    const ary = [1, 2, 3];
-    expect(aryPop(ary, 2)).toEqual([2, 3]);
-    expect(ary).toEqual([1]);
-    expect(aryPop(ary, 0)).toEqual([]);
-    expect(aryPop(ary, 5)).toEqual([1]);
-    expect(ary).toEqual([]);
-  });
-
-  it("raises for a negative count", () => {
-    expect(() => aryPop([1], -1)).toThrow("negative array size");
   });
 });
 

@@ -1,39 +1,11 @@
-import { bodyFromString, CONTENT_TYPE, CONTENT_LENGTH } from "@blazetrails/rack";
+import { Dependencies, type ShareLockThreadInfo } from "@blazetrails/activesupport";
+import { rbFSend, rbInspect } from "@blazetrails/ruby-compat";
+import { CONTENT_TYPE, CONTENT_LENGTH } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 
-export interface ThreadLike {
-  status: string | false | null;
-  backtrace(): string[] | null;
-  id: number;
-}
-
-export interface ThreadInfo {
-  exclusive?: boolean;
-  sharing?: number;
-  waiting?: boolean;
-  sleeper?: string | null;
-  purpose?: unknown;
-  compatible?: Array<unknown> | null;
-  index?: number;
-  backtrace?: string[] | null;
-}
-
-export interface InterlockLike {
-  rawState<T>(block: (threads: Map<ThreadLike, ThreadInfo>) => T): T;
-}
-
 export class DebugLocks {
-  static interlock: InterlockLike | null = null;
-
-  static get defaultCharset(): string | null {
-    return Response.defaultCharset;
-  }
-  static set defaultCharset(value: string | null) {
-    Response.defaultCharset = value;
-  }
-
   private app: RackApp;
   private path: string;
 
@@ -48,22 +20,16 @@ export class DebugLocks {
     if (req.isGet()) {
       const path = req.pathInfo.replace(/\/$/, "");
       if (path === this.path) {
-        return this.renderDetails();
+        return this.renderDetails(req);
       }
     }
 
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 
   /** @internal */
-  private renderDetails(): RackResponse {
-    const interlock = DebugLocks.interlock;
-    if (!interlock) {
-      throw new Error(
-        "ActionDispatch::DebugLocks.interlock is not configured (no autoload interlock port available)",
-      );
-    }
-    const threads = interlock.rawState<Map<ThreadLike, ThreadInfo>>((rawThreads) => {
+  private async renderDetails(req: Request): Promise<RackResponse> {
+    const threads = await Dependencies.interlock.rawState((rawThreads) => {
       let idx = 0;
       for (const [thread, info] of rawThreads) {
         info.index = idx++;
@@ -72,16 +38,15 @@ export class DebugLocks {
       return rawThreads;
     });
 
-    const allInfos = Array.from(threads.values());
     const parts: string[] = [];
 
     for (const [thread, info] of threads) {
       let lockState: string;
       if (info.exclusive) {
         lockState = "Exclusive";
-      } else if ((info.sharing ?? 0) > 0) {
+      } else if (info.sharing > 0) {
         lockState = "Sharing";
-        if ((info.sharing ?? 0) > 1) lockState += ` x${info.sharing}`;
+        if (info.sharing > 1) lockState += ` x${info.sharing}`;
       } else {
         lockState = "No lock";
       }
@@ -95,23 +60,25 @@ export class DebugLocks {
 
       if (info.sleeper) {
         msg += `  Waiting in ${String(info.sleeper)}`;
-        if (info.purpose != null) msg += ` to ${JSON.stringify(String(info.purpose))}`;
+        if (info.purpose != null) msg += ` to ${rbInspect(String(info.purpose))}`;
         msg += "\n";
 
         if (info.compatible) {
-          const compat = info.compatible.map((c) =>
-            c === false ? "share" : JSON.stringify(String(c)),
-          );
+          const compat = info.compatible.map((c) => (c === false ? "share" : rbInspect(String(c))));
           msg += `  may be pre-empted for: ${compat.join(", ")}\n`;
         }
 
-        const blockers = allInfos.filter((binfo) => this.blockedBy(info, binfo, allInfos));
+        const blockers = Array.from(threads.values()).filter((binfo) =>
+          this.blockedBy(info, binfo, threads.values()),
+        );
         if (blockers.length) {
           msg += `  blocked by: ${blockers.map((i) => i.index).join(", ")}\n`;
         }
       }
 
-      const blockees = allInfos.filter((binfo) => this.blockedBy(binfo, info, allInfos));
+      const blockees = Array.from(threads.values()).filter((binfo) =>
+        this.blockedBy(binfo, info, threads.values()),
+      );
       if (blockees.length) {
         msg += `  blocking: ${blockees.map((i) => i.index).join(", ")}\n`;
       }
@@ -128,15 +95,19 @@ export class DebugLocks {
     return [
       200,
       {
-        [CONTENT_TYPE]: `text/plain; charset=${DebugLocks.defaultCharset}`,
+        [CONTENT_TYPE]: `text/plain; charset=${Response.defaultCharset}`,
         [CONTENT_LENGTH]: Buffer.byteLength(str, "utf-8").toString(),
       },
-      bodyFromString(str),
+      [str],
     ];
   }
 
   /** @internal */
-  private blockedBy(victim: ThreadInfo, blocker: ThreadInfo, allThreads: ThreadInfo[]): boolean {
+  private blockedBy(
+    victim: ShareLockThreadInfo,
+    blocker: ShareLockThreadInfo,
+    allThreads: Iterable<ShareLockThreadInfo>,
+  ): boolean {
     if (victim === blocker) return false;
 
     switch (victim.sleeper) {
@@ -147,7 +118,7 @@ export class DebugLocks {
         );
       case "start_exclusive":
         return (
-          (blocker.sharing ?? 0) > 0 ||
+          blocker.sharing > 0 ||
           !!blocker.exclusive ||
           (!!blocker.compatible && !blocker.compatible.includes(victim.purpose))
         );
@@ -158,7 +129,7 @@ export class DebugLocks {
           !!blocker.exclusive ||
           (!!victim.compatible &&
             victim.compatible.includes(blocker.purpose) &&
-            allThreads.every(
+            Array.from(allThreads).every(
               (other) =>
                 !other.compatible ||
                 other === blocker ||

@@ -11,17 +11,20 @@
 
 import type { UnportedFile } from "./types.js";
 
-const FORM_HELPER_REASON =
-  "Form-builder HTML generation (tag/label/input rendering, `FormBuilder` object binding). " +
-  "Pre-1.0 scope: trails ports no view layer and the AR/AM closure never reaches it.";
-
 export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
   {
-    pattern: "/helpers.rb",
+    pattern: "template/handlers/erb/erubi.rb",
     package: "actionview",
     reason:
-      "The `ActionView::Helpers` umbrella that includes every helper module; " +
-      "nothing under it is ported, so the barrel has no trails counterpart.",
+      "`Handlers::ERB::Erubi` (erubi.rb:9-83) is the Erubi step, and root CLAUDE.md " +
+      '§ "Templates are precompiled" rules that `compileJs` in `@blazetrails/tse-compiler` ' +
+      "is that step. Its members answer them in `tse-compiler/src/emit-js.ts`: `initialize`'s " +
+      "`bufvar` / `preamble` / `postamble` / `escapefunc` are `EmitJsOptions` read by `emit`; " +
+      "`add_text` is `emitNode`'s `text` arm (`safeAppend`); `add_expression` is its `expr` / " +
+      "`rawExpr` arms and `emit`'s `blockExpr` arm (`BLOCK_EXPR`); `add_code` is the `code` " +
+      "arm; `add_postamble` is `emit`'s `options.postamble`. `flush_newline_if_pending` has no " +
+      "member: `emit`'s `push` pads to each node's source line, which is what Rails' pending " +
+      "newlines keep, so the backtrace line matches the template's.",
   },
   {
     pattern: "template/handlers/builder.rb",
@@ -34,55 +37,42 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
       "(handlers.rb:12-18) registers the other four handlers and not `:builder`.",
   },
   {
-    pattern: "/test_case.rb",
+    pattern: "helpers/atom_feed_helper.rb",
+    testFile: "template/atom_feed_helper_test.rb",
     package: "actionview",
     reason:
-      "Minitest harness for rendering views (`ActionView::TestCase`) — a Rails test-suite " +
-      "support class for a layer trails does not port.",
-  },
-  { pattern: "helpers/form_options_helper.rb", package: "actionview", reason: FORM_HELPER_REASON },
-  {
-    pattern: "helpers/tags/collection_check_boxes.rb",
-    package: "actionview",
-    reason: FORM_HELPER_REASON,
+      "`AtomFeedHelper#atom_feed` (atom_feed_helper.rb:96-125) reads `xml` from the block's " +
+      "binding, where only a `.builder` template's compiled code sets it, and every " +
+      "`AtomBuilder` / `AtomFeedBuilder` method forwards to `::Builder::XmlMarkup`. The " +
+      "`:builder` handler is unported above for want of XmlMarkup, and every test in " +
+      "atom_feed_helper_test.rb renders a `.builder` template, so neither half has a caller.",
   },
   {
-    pattern: "helpers/tags/collection_radio_buttons.rb",
-    package: "actionview",
-    reason: FORM_HELPER_REASON,
-  },
-  {
-    pattern: "helpers/tags/collection_select.rb",
-    package: "actionview",
-    reason: FORM_HELPER_REASON,
-  },
-  {
-    pattern: "helpers/tags/grouped_collection_select.rb",
-    package: "actionview",
-    reason: FORM_HELPER_REASON,
-  },
-  { pattern: "helpers/tags/select.rb", package: "actionview", reason: FORM_HELPER_REASON },
-  {
-    pattern: "helpers/tags/time_zone_select.rb",
-    package: "actionview",
-    reason: FORM_HELPER_REASON,
-  },
-  { pattern: "helpers/tags/weekday_select.rb", package: "actionview", reason: FORM_HELPER_REASON },
-  {
-    pattern: "helpers/asset_tag_helper.rb",
-    package: "actionview",
-    reason: "Emits asset `<script>`/`<img>` tags off the asset pipeline; no trails view layer.",
-  },
-  {
-    pattern: "helpers/translation_helper.rb",
+    pattern: "dependency_tracker/ruby_tracker.rb",
     package: "actionview",
     reason:
-      "View-side `translate`/`localize` wrappers that add HTML-safety and lazy `.key` lookup " +
-      "on top of I18n; trails ports the I18n gem itself, not the view wrappers.",
+      "`DependencyTracker::RubyTracker` (ruby_tracker.rb) reads a template's compiled Ruby. " +
+      'No trails handler compiles to Ruby, so there is no `RubyTracker` and nothing for a `RenderParser` to parse: by repo-owner ruling (2026-10-18), recorded in packages/actionview/CLAUDE.md § "`TSETracker` answers what `RubyTracker` answers", `TSETracker` answers the three `RubyTrackerTests` (dependency_tracker_test.rb:274-302) instead. PERMANENT.',
   },
   {
-    pattern: "/layouts.rb",
+    pattern: "/render_parser.rb",
     package: "actionview",
-    reason: "Layout resolution for rendered templates; no trails template renderer.",
+    reason:
+      "`RenderParser` (render_parser.rb) reads a template's compiled Ruby. " +
+      'No trails handler compiles to Ruby, so there is no `RubyTracker` and nothing for a `RenderParser` to parse: by repo-owner ruling (2026-10-18), recorded in packages/actionview/CLAUDE.md § "`TSETracker` answers what `RubyTracker` answers", `TSETracker` answers the three `RubyTrackerTests` (dependency_tracker_test.rb:274-302) instead. PERMANENT.',
+  },
+  {
+    pattern: "render_parser/prism_render_parser.rb",
+    package: "actionview",
+    reason:
+      "`RenderParser::PrismRenderParser` (prism_render_parser.rb) reads a template's compiled Ruby. " +
+      'No trails handler compiles to Ruby, so there is no `RubyTracker` and nothing for a `RenderParser` to parse: by repo-owner ruling (2026-10-18), recorded in packages/actionview/CLAUDE.md § "`TSETracker` answers what `RubyTracker` answers", `TSETracker` answers the three `RubyTrackerTests` (dependency_tracker_test.rb:274-302) instead. PERMANENT.',
+  },
+  {
+    pattern: "render_parser/ripper_render_parser.rb",
+    package: "actionview",
+    reason:
+      "`RenderParser::RipperRenderParser` (ripper_render_parser.rb) reads a template's compiled Ruby. " +
+      'No trails handler compiles to Ruby, so there is no `RubyTracker` and nothing for a `RenderParser` to parse: by repo-owner ruling (2026-10-18), recorded in packages/actionview/CLAUDE.md § "`TSETracker` answers what `RubyTracker` answers", `TSETracker` answers the three `RubyTrackerTests` (dependency_tracker_test.rb:274-302) instead. PERMANENT.',
   },
 ];

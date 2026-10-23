@@ -11,6 +11,7 @@ import { ActiveRecord, AttributeMethods } from "../namespaces.js";
 
 /** @internal */
 export interface PrimaryKeyRecord {
+  _attributes?: { getAttribute?(name: string): object | null };
   id: unknown;
   _primaryKey: string | string[];
   readAttribute(name: string): unknown;
@@ -27,7 +28,7 @@ export function toKey(this: PrimaryKeyRecord): unknown[] | null {
 }
 
 function columnForDatabase(record: PrimaryKeyRecord, key: string): unknown {
-  const attrs = (record as any)._attributes;
+  const attrs = record._attributes;
   if (attrs?.getAttribute) {
     const attr = attrs.getAttribute(key);
     if (attr != null && "valueForDatabase" in attr) return attr.valueForDatabase;
@@ -120,48 +121,25 @@ function cachedSchemaCacheFor(host: PrimaryKeyHost): CachedSchemaSource | undefi
 }
 
 /**
- * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key
- *
- * Rails' `inherited` (primary_key.rb:143-150) resets a subclass's
- * `@primary_key`, so a configured key is answered only when it is an own
- * property; any other class takes `reset_primary_key`, whose base-class arm
- * consults the schema cache so a key-less data source
- * (e.g. a view) resolves to `null` rather than the "id" convention. The lookup
- * is query-free — it reads only what `loadSchema` already warmed — so a cold
- * cache falls back to "id". The `null` it can return matches Rails'
- * dynamically-nil `primary_key` for a key-less data source (a view); this is
- * the one accessor that surfaces that case honestly. The public boundaries
- * (`Base.primaryKey`, the `primaryKey()` class method) and the model-typed
- * `PrimaryKeyHost` deliberately narrow to the non-null `string | string[]`
- * contract — never null for a persistable model — so hot paths that read
- * `primary_key` are not forced to null-guard. That narrowing is the accepted
- * deviation; this function is where the truth lives.
- * Rails' `primary_key` runs `reset_primary_key` on first read
- * (primary_key.rb:80-81) and latches the answer into `@primary_key`. trails
- * latches too, but only once the answer is reflected: `table_exists?` is async
- * here, so a read taken before the schema cache is warm answers the "id"
- * convention without latching it.
  * @internal
- * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key (attribute_methods/primary_key.rb:80-81) as a this-typed function; a cold-cache read does not latch because table_exists? is async.
+ * @noRailsEquivalent CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts
  */
-export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
-  if (Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+export function getPrimaryKeyAttr(this: PrimaryKeyHost & typeof Base): string | string[] | null {
+  if (Object.hasOwn(this, "_primaryKey")) {
     return this._primaryKey as string | string[] | null;
   }
   if (isPrimaryKeyReflected(this)) {
     resetPrimaryKey.call(this);
     return this._primaryKey as string | string[] | null;
   }
-  if (isBaseClass(this as unknown as typeof Base)) {
-    return getPrimaryKey.call(this, baseClass.call(this as unknown as typeof Base).name);
+  if (isBaseClass(this)) {
+    return getPrimaryKey.call(this, baseClass.call(this).name);
   }
-  return baseClass.call(this as unknown as typeof Base).primaryKey;
+  return baseClass.call(this).primaryKey;
 }
 
-function isPrimaryKeyReflected(host: PrimaryKeyHost): boolean {
-  const base = baseClass.call(host as unknown as typeof Base) as unknown as PrimaryKeyHost & {
-    primaryKeyPrefixType?: string | null;
-  };
+function isPrimaryKeyReflected(host: PrimaryKeyHost & typeof Base): boolean {
+  const base = baseClass.call(host);
   if (base.primaryKeyPrefixType != null) return true;
   try {
     const tableName = base.tableName;
@@ -175,11 +153,8 @@ function isPrimaryKeyReflected(host: PrimaryKeyHost): boolean {
 }
 
 /**
- * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key=
- * (attribute_methods/primary_key.rb:130-140), as a this-typed function behind
- * the Rails-named `static set primaryKey` accessor on `Base`.
  * @internal
- * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key= (attribute_methods/primary_key.rb:130) as a this-typed function behind the Rails-named Base accessor.
+ * @noRailsEquivalent CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts
  */
 export function setPrimaryKeyAttr(this: PrimaryKeyHost, value: string | string[] | null): void {
   if (Array.isArray(value)) {
@@ -196,18 +171,21 @@ export function setPrimaryKeyAttr(this: PrimaryKeyHost, value: string | string[]
 }
 
 /**
- * @inventedArm isPrimaryKeyReflected — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo
- * @inventedArm isArray — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo
+ * @inventedArm isPrimaryKeyReflected — PERMANENT
+ * @inventedArm isArray — PERMANENT
  */
-export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
-  if (!Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+export function isCompositePrimaryKey(this: PrimaryKeyHost & typeof Base): boolean {
+  if (!Object.hasOwn(this, "_primaryKey")) {
     if (!isPrimaryKeyReflected(this)) return Array.isArray(getPrimaryKeyAttr.call(this));
     resetPrimaryKey.call(this);
   }
   return this._compositePrimaryKey;
 }
 
-export function primaryKey(this: PrimaryKeyHost, value?: string | string[]): string | string[] {
+export function primaryKey(
+  this: PrimaryKeyHost & typeof Base,
+  value?: string | string[],
+): string | string[] {
   if (value !== undefined) {
     setPrimaryKeyAttr.call(this, value);
     return value;
@@ -234,11 +212,13 @@ const ID_ATTRIBUTE_METHODS = new Set([
 ]);
 
 export function isInstanceMethodAlreadyImplemented(
-  this: PrimaryKeyHost & { prototype: any },
+  this: PrimaryKeyHost &
+    typeof Base &
+    ThisParameterType<typeof attributeMethodsIsInstanceMethodAlreadyImplemented>,
   methodName: string,
 ): boolean {
   return (
-    attributeMethodsIsInstanceMethodAlreadyImplemented.call(this as any, methodName) ||
+    attributeMethodsIsInstanceMethodAlreadyImplemented.call(this, methodName) ||
     (primaryKey.call(this) != null && ID_ATTRIBUTE_METHODS.has(methodName))
   );
 }
@@ -253,16 +233,14 @@ export function quotedPrimaryKey(
   return this.adapterClass().quoteColumnName(this.primaryKey);
 }
 
-export function resetPrimaryKey(this: PrimaryKeyHost): void {
-  if (isBaseClass(this as unknown as typeof Base)) {
+export function resetPrimaryKey(this: PrimaryKeyHost & typeof Base): void {
+  if (isBaseClass(this)) {
     setPrimaryKeyAttr.call(
       this,
-      getPrimaryKey.call(this, baseClass.call(this as unknown as typeof Base).name) as
-        | string
-        | string[],
+      getPrimaryKey.call(this, baseClass.call(this).name) as string | string[],
     );
   } else {
-    setPrimaryKeyAttr.call(this, baseClass.call(this as unknown as typeof Base).primaryKey);
+    setPrimaryKeyAttr.call(this, baseClass.call(this).primaryKey);
   }
 }
 
@@ -299,7 +277,7 @@ export function getPrimaryKey(
   } else if (baseName != null && this.primaryKeyPrefixType === "table_name_with_underscore") {
     return foreignKey(baseName);
   } else if (
-    ActiveRecord.Base !== (this as unknown) &&
+    ActiveRecord.Base !== this &&
     cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(this.tableName) !== undefined
   ) {
     return cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(this.tableName) as
@@ -312,7 +290,10 @@ export function getPrimaryKey(
 }
 
 /** @internal */
-function attributeMethod(this: any, attrName: string): boolean {
+function attributeMethod(
+  this: { primaryKey: string | string[] | null },
+  attrName: string,
+): boolean {
   const pk = this.primaryKey;
   return Array.isArray(pk) ? pk.includes(attrName) : attrName === pk;
 }

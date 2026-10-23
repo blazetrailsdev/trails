@@ -17,6 +17,7 @@ import {
   symbolToS,
   toS,
   toSym,
+  eachWithObject,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { Result } from "../result.js";
@@ -42,14 +43,17 @@ export class Aliases {
 
   constructor(tables: Aliases.Table[]) {
     this._tables = tables;
-    this._aliasCache = new Map();
-    for (const table of tables) {
-      const i = new Map<string, string>();
-      for (const column of table.columns) i.set(column.name, column.alias);
-      this._aliasCache.set(table.node, i);
-    }
-    this._columnsCache = new Map();
-    for (const table of tables) this._columnsCache.set(table.node, table.columns);
+    this._aliasCache = eachWithObject(tables, new Map(), (table, h) => {
+      h.set(
+        table.node,
+        eachWithObject(table.columns, new Map<string, string>(), (column, i) => {
+          i.set(column.name, column.alias);
+        }),
+      );
+    });
+    this._columnsCache = eachWithObject(tables, new Map(), (table, h) => {
+      h.set(table.node, table.columns);
+    });
   }
 
   columns(): Nodes.As[] {
@@ -157,7 +161,7 @@ export class JoinDependency {
     this._joinedTables = new Hash();
     this._references = new Map();
 
-    if (!isEmpty(references)) {
+    if (references.length !== 0) {
       for (const tableName of references) {
         if (tableName instanceof Nodes.SqlLiteral) {
           this._references.set(tableName.toString(), tableName.toString());
@@ -230,13 +234,13 @@ export class JoinDependency {
           return [table, true];
         }
 
-        const tableName = this._references.get((reflection as any).name);
+        const tableName = this._references.get((reflection as AssociationReflection).name);
 
         table = this.aliasTracker.aliasedTableFor(
-          (reflection.klass as any).arelTable,
+          reflection.klass.arelTable,
           tableName ?? null,
           () => {
-            const name = (reflection as any).aliasCandidate(parent.tableName);
+            const name = reflection.aliasCandidate(parent.tableName!);
             return root ? name : `${name}_join`;
           },
         );
@@ -418,10 +422,10 @@ export class JoinDependency {
 
   /** @internal */
   private findReflection(klass: typeof Base, name: string): any {
-    const reflection = _reflectOnAssociation(klass as any, name);
+    const reflection = _reflectOnAssociation(klass, name);
     if (!rtest(reflection)) {
       throw new ConfigurationError(
-        `Can't join '${(klass as any).name}' to association named '${name}'; perhaps you misspelled it?`,
+        `Can't join '${klass.name}' to association named '${name}'; perhaps you misspelled it?`,
       );
     }
     return reflection;

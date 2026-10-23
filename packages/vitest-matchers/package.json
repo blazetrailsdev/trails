@@ -1,0 +1,34 @@
+{
+  "name": "@blazetrails/vitest-matchers",
+  "version": "0.1.0",
+  "description": "Vitest matchers for the Minitest assertions whose meaning turns on Ruby semantics",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./setup": {
+      "types": "./dist/setup.d.ts",
+      "default": "./dist/setup.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "vitest": ">=3.0.0"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

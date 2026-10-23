@@ -13,13 +13,13 @@ export class Lesson extends Base {
 
   static {
     this.hasAndBelongsToMany("students");
-    this.beforeDestroy(async function (this: any) {
+    this.beforeDestroy(async function (this: Lesson) {
       return this.ensureNoStudents();
     });
   }
 
   async ensureNoStudents() {
-    if (!(await (this as any).students.isEmpty())) throw new LessonError();
+    if (!(await this.students.isEmpty())) throw new LessonError();
   }
 }
 registerModel(Lesson);

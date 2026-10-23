@@ -1,4 +1,7 @@
+import type { RackHeaders } from "./index.js";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
+import { BodyProxy } from "./body-proxy.js";
 
 interface Mutex {
   lock(): void;
@@ -16,49 +19,25 @@ class DefaultMutex implements Mutex {
 }
 
 export class Lock {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private mutex: Mutex;
 
-  constructor(app: RackApp, mutex?: Mutex) {
+  constructor(app: RackApp | { call: RackApp }, mutex?: Mutex) {
     this.app = app;
     this.mutex = mutex || new DefaultMutex();
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     this.mutex.lock();
-    let response: [number, Record<string, string | string[]>, any];
+    let returned: [number, RackHeaders, any] | undefined;
     try {
-      response = await this.app(env);
-    } catch (e) {
-      this.mutex.unlock();
-      throw e;
+      const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
+      response.push(new BodyProxy(response.pop(), () => this.unlock()));
+      returned = response;
+      return returned;
+    } finally {
+      if (!returned) this.unlock();
     }
-
-    const [status, headers, body] = response;
-    const mutex = this.mutex;
-
-    const proxy: any = {
-      close() {
-        if (body && typeof body.close === "function") body.close();
-        mutex.unlock();
-      },
-    };
-
-    if (body && typeof body.each === "function") {
-      proxy.each = (fn: (x: string) => void) => body.each(fn);
-    }
-    if (Array.isArray(body)) {
-      proxy[Symbol.iterator] = () => body[Symbol.iterator]();
-      proxy.forEach = body.forEach.bind(body);
-      proxy.length = body.length;
-      for (let i = 0; i < body.length; i++) proxy[i] = body[i];
-    }
-
-    if (body && typeof body.toPath === "function") {
-      proxy.toPath = () => body.toPath();
-    }
-
-    return [status, headers, proxy];
   }
 
   /** @internal */

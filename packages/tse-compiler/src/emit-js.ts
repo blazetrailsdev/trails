@@ -9,6 +9,7 @@ export interface EmitJsOptions {
   async?: boolean;
   fileName?: string;
   sourceFileName?: string;
+  bufvar?: string;
 }
 
 export interface EmitResult {
@@ -33,11 +34,11 @@ export function compileJs(source: string, options: EmitJsOptions = {}): EmitResu
   };
 }
 
-const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
+export const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
 
-const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
+export const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
 
-const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
+export const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
 
 const REGEX_PRECEDING_KEYWORD_RE =
   /(?:^|[^\w$])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/;
@@ -117,7 +118,7 @@ function isRegexStart(code: string, i: number, prev: string): boolean {
   return REGEX_PRECEDING_KEYWORD_RE.test(code.slice(0, i).trimEnd());
 }
 
-function netBraceDepth(code: string): number {
+export function netBraceDepth(code: string): number {
   const mask = codeMask(code);
   let depth = 0;
   for (let i = 0; i < code.length; i++) {
@@ -131,7 +132,7 @@ function netBraceDepth(code: string): number {
 const FLOW_READ_RE =
   /(?<![\w$.])(?:(_layoutFor|contentFor|isContentFor|_|yield)\s*\(|yield(?![\w$]))/y;
 
-function awaitFlowReads(
+export function awaitFlowReads(
   code: string,
   mask: boolean[] = codeMask(code),
   start = 0,
@@ -188,7 +189,7 @@ function awaitFlowReads(
   return out;
 }
 
-function netUnclosedParens(code: string): number {
+export function netUnclosedParens(code: string): number {
   let depth = 0;
   for (const ch of code) {
     if (ch === "(") depth++;
@@ -197,8 +198,72 @@ function netUnclosedParens(code: string): number {
   return Math.max(0, depth);
 }
 
+export interface EmitStep {
+  node: TseNode;
+  bufRef: string;
+  awaits: boolean;
+  suffix?: string;
+}
+
+export function* emitSteps(
+  nodes: TseNode[],
+  bufvar: string,
+  async: boolean | undefined,
+): Generator<EmitStep> {
+  const innerDepths: number[] = [];
+  const innerCallExprParens: number[] = [];
+  let braceDepth = 0;
+  const functionDepths: number[] = [];
+  for (const node of nodes) {
+    const insideBlock = innerDepths.length > 0;
+    const bufRef = insideBlock ? bufvar : "_ob";
+    const awaits = async === true && !insideBlock && functionDepths.length === 0;
+    if (node.kind === "blockExpr") {
+      const trimmed = node.value.trim();
+      if (!ARROW_BLOCK_RE.test(trimmed)) {
+        throw new Error(
+          `TSE: block-expr tag must use arrow syntax (e.g. \`(x) => {\`); function/do forms are not supported. Got: \`${trimmed}\``,
+        );
+      }
+      innerDepths.push(0);
+      innerCallExprParens.push(netUnclosedParens(node.value) + (awaits ? 1 : 0));
+      yield { node, bufRef, awaits };
+    } else if (node.kind === "code" && insideBlock) {
+      const innerDepth = innerDepths[innerDepths.length - 1];
+      if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
+        innerDepths.pop();
+        const callExprParens = innerCallExprParens.pop()!;
+        const closingParens = (node.value.match(/\)/g) ?? []).length;
+        const suffix = ")".repeat(Math.max(0, 1 + callExprParens - closingParens)) + ";";
+        yield { node, bufRef, awaits: false, suffix };
+      } else {
+        innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
+        yield { node, bufRef: bufvar, awaits: false };
+      }
+    } else {
+      if (node.kind === "code" && async === true) {
+        braceDepth += netBraceDepth(node.value);
+        while (
+          functionDepths.length > 0 &&
+          braceDepth < functionDepths[functionDepths.length - 1]
+        ) {
+          functionDepths.pop();
+        }
+        if (FUNCTION_BLOCK_RE.test(node.value.trimEnd())) functionDepths.push(braceDepth);
+      }
+      yield { node, bufRef, awaits };
+    }
+  }
+  if (innerDepths.length > 0) {
+    throw new Error(
+      `TSE: ${innerDepths.length} block-expr tag(s) were never closed — missing <% } %> or <% }) %>`,
+    );
+  }
+}
+
 function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: LineMapping[] } {
   const exprAppend = options.escapeIgnore === true ? "safeExprAppend" : "append";
+  const bufvar = options.bufvar ?? "context.outputBuffer";
   let code = "";
   const lineMappings: LineMapping[] = [];
   let genLine = 0;
@@ -223,57 +288,16 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
   };
 
   push(`export default ${options.async ? "async " : ""}function render(context, locals) {`);
-  push("const _ob = context.outputBuffer;");
+  push(`const _ob = ${bufvar};`);
   if (options.preamble) push(options.preamble);
-  const innerDepths: number[] = [];
-  const innerCallExprParens: number[] = [];
-  let braceDepth = 0;
-  const functionDepths: number[] = [];
-  for (const node of ast.nodes) {
-    const insideBlock = innerDepths.length > 0;
-    const bufRef = insideBlock ? "context.outputBuffer" : "_ob";
-    const awaits = options.async === true && !insideBlock && functionDepths.length === 0;
+  for (const { node, bufRef, awaits, suffix } of emitSteps(ast.nodes, bufvar, options.async)) {
     if (node.kind === "blockExpr") {
-      const trimmed = node.value.trim();
-      if (!ARROW_BLOCK_RE.test(trimmed)) {
-        throw new Error(
-          `TSE: block-expr tag must use arrow syntax (e.g. \`(x) => {\`); function/do forms are not supported. Got: \`${trimmed}\``,
-        );
-      }
-      innerDepths.push(0);
-      innerCallExprParens.push(netUnclosedParens(node.value));
-      push(`${bufRef}.${exprAppend}(${node.value}`, node.srcLine);
-    } else if (node.kind === "code" && insideBlock) {
-      const innerDepth = innerDepths[innerDepths.length - 1];
-      if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
-        innerDepths.pop();
-        const callExprParens = innerCallExprParens.pop()!;
-        const closer = node.value.replace(/;\s*$/, "");
-        const closingParens = (closer.match(/\)/g) ?? []).length;
-        const suffix = ")".repeat(Math.max(0, 1 + callExprParens - closingParens)) + ";";
-        push(`${closer}${suffix}`, node.srcLine);
-      } else {
-        innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
-        push(emitNode(node, exprAppend, "context.outputBuffer"), node.srcLine);
-      }
+      push(`${bufRef}.${exprAppend}(${awaits ? "await (" : ""}${node.value}`, node.srcLine);
+    } else if (suffix !== undefined) {
+      push(`${node.value.replace(/;\s*$/, "")}${suffix}`, node.srcLine);
     } else {
-      if (node.kind === "code" && options.async === true) {
-        braceDepth += netBraceDepth(node.value);
-        while (
-          functionDepths.length > 0 &&
-          braceDepth < functionDepths[functionDepths.length - 1]
-        ) {
-          functionDepths.pop();
-        }
-        if (FUNCTION_BLOCK_RE.test(node.value.trimEnd())) functionDepths.push(braceDepth);
-      }
       push(emitNode(node, exprAppend, bufRef, awaits), node.srcLine);
     }
-  }
-  if (innerDepths.length > 0) {
-    throw new Error(
-      `TSE: ${innerDepths.length} block-expr tag(s) were never closed — missing <% } %> or <% }) %>`,
-    );
   }
   code += "\n";
   if (options.postamble) code += options.postamble + " ";

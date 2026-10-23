@@ -28,6 +28,15 @@ export class StringScanner {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:423` `strscan_get_pos`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  get pos(): number {
+    return this.#curr;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:681` `strscan_scan`. The match
    * runs over the rest of the string (`strscan_do_scan`, `:605`), so `^` and
    * `\A` anchor at the scan pointer.
@@ -56,6 +65,15 @@ export class StringScanner {
   skip(pattern: RegExp): number | null {
     const matched = this.scan(pattern);
     return matched === null ? null : matched.length;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:962` `strscan_peek`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  peek(len: number): string {
+    return this.#str.slice(this.#curr, this.#curr + len);
   }
 
   /**

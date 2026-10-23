@@ -41,13 +41,13 @@ class RubyHash {
   set(key: RubyDate, value: number): void {
     const bucket = this.#buckets.get(key.hash()) ?? [];
     this.#buckets.set(key.hash(), bucket);
-    const found = bucket.find(([k]) => k.isEql(key));
+    const found = bucket.find(([k]) => k.eql(key));
     if (found) found[1] = value;
     else bucket.push([key, value]);
   }
 
   get(key: RubyDate): number | undefined {
-    return this.#buckets.get(key.hash())?.find(([k]) => k.isEql(key))?.[1];
+    return this.#buckets.get(key.hash())?.find(([k]) => k.eql(key))?.[1];
   }
 
   get size(): number {

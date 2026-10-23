@@ -5,6 +5,13 @@ import {
   XmlText as LibXmlText,
   XmlTreeNode,
 } from "libxml2-wasm";
+import { include, rbModConstSet } from "@blazetrails/ruby-compat";
+
+import { XML } from "../namespaces.js";
+
+import type { NodeSet } from "./node-set.js";
+import "./node-set.js";
+import { Searchable } from "./searchable.js";
 
 export interface AttrNode {
   nodeName: string;
@@ -12,7 +19,33 @@ export interface AttrNode {
 }
 
 export class XmlNode {
-  constructor(protected readonly _node: XmlTreeNode) {}
+  declare css: (...args: unknown[]) => NodeSet;
+  declare atCss: (...args: unknown[]) => XmlNode | undefined;
+
+  static readonly IMPLIED_XPATH_CONTEXTS = [".//"] as const;
+
+  constructor(
+    /**
+     * @internal
+     * @noRailsEquivalent PERMANENT
+     */
+    readonly _node: XmlTreeNode,
+    readonly document: unknown,
+  ) {}
+
+  get pointerId(): number {
+    return (this._node as unknown as { _nodePtr: number })._nodePtr;
+  }
+
+  get namespaces(): Record<string, string> {
+    if (!(this._node instanceof LibXmlElement)) return {};
+    const hash: Record<string, string> = {};
+    for (const [prefix, href] of Object.entries(this._node.namespaces)) {
+      const key = prefix ? `xmlns:${prefix}` : "xmlns";
+      hash[key] = href;
+    }
+    return hash;
+  }
 
   get name(): string {
     if (this._node instanceof LibXmlElement) return this._node.name;
@@ -33,6 +66,11 @@ export class XmlNode {
     return this._node instanceof LibXmlCData;
   }
 
+  isBlank(): boolean {
+    if (!(this._node instanceof LibXmlText || this._node instanceof LibXmlCData)) return false;
+    return /^[ \t\n\r]*$/.test(this.content);
+  }
+
   get content(): string {
     return this._node.content ?? "";
   }
@@ -42,7 +80,7 @@ export class XmlNode {
     const result: XmlNode[] = [];
     let child = this._node.firstChild;
     while (child !== null) {
-      result.push(new XmlNode(child));
+      result.push(new XmlNode(child, this.document));
       child = child.next;
     }
     return result;
@@ -56,3 +94,6 @@ export class XmlNode {
     }));
   }
 }
+
+include(XmlNode, Searchable);
+rbModConstSet(XML, "Node", XmlNode);

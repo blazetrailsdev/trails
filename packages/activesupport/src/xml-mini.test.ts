@@ -1,4 +1,4 @@
-import { Thread } from "@blazetrails/ruby-compat";
+import { Hash, Thread } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import {
   backend,
@@ -118,13 +118,13 @@ describe("ParsingTest", () => {
       "    description : Basketball",
       "",
     ].join("\n");
-    const expected = {
-      product: [{ sku: "BL394D", quantity: 4, description: "Basketball" }],
-    };
+    const product = new Hash<string, unknown>();
+    product.set("sku", "BL394D").set("quantity", 4).set("description", "Basketball");
+    const expected = new Hash<string, unknown>().set("product", [product]);
     const parser = parsing["yaml"];
-    expect(await parser(yaml)).toEqual(expected);
-    expect(await parser({ 1: "test" })).toEqual({ 1: "test" });
-    expect(await parser("{1 => 'test'}")).toEqual({ "1 => 'test'": null });
+    expect(parser(yaml)).toEqual(expected);
+    expect(parser({ 1: "test" })).toEqual({ 1: "test" });
+    expect(parser("{1 => 'test'}")).toEqual(new Hash().set("1 => 'test'", null));
   });
 
   it("hexBinary", () => {

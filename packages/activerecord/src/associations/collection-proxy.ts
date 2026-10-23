@@ -151,7 +151,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     association: CollectionAssociation,
   ): AssociationProxy<T> {
     const Ctor = relationClassFor.call(CollectionProxy, model);
-    return new Ctor(model, association) as unknown as AssociationProxy<T>;
+    return new Ctor(model, association) as AssociationProxy<T>;
   }
 
   /** @internal */
@@ -162,11 +162,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   ): CollectionProxy<T> {
     const targetModel = this._targetModelFor(record, assocName, assocDef);
     const Ctor = relationClassFor.call(CollectionProxy, targetModel);
-    const association = record.association(assocName) as unknown as CollectionAssociation;
+    const association = record.association(assocName) as CollectionAssociation;
     return new Ctor(targetModel, association) as CollectionProxy<T>;
   }
 
-  constructor(klass: typeof Base, association: CollectionAssociation) {
+  constructor(klass: Relation<T>["model"], association: CollectionAssociation) {
     super(klass);
     this._association = association;
     this._assocName = association.reflection.name;
@@ -229,15 +229,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     return this._association.isEmpty();
   }
 
-  async push(...records: T[]): Promise<Omit<this, "then"> | false> {
+  push(...records: T[]): Promise<Omit<this, "then"> | false> {
     if (this.reflection.options.through) {
-      await this._pushThrough(records);
-      return stripThenable(this);
+      return this._pushThrough(records).then(() => stripThenable(this));
     }
 
-    const concatResult = await this._association.concat(...(records as unknown as Base[]));
-    if (!concatResult) return false;
-    return stripThenable(this);
+    return Promise.resolve(this._association.concat(...records)).then((concatResult) =>
+      concatResult ? stripThenable(this) : false,
+    );
   }
 
   private async _pushThrough(records: T[], throughScope?: unknown): Promise<void> {
@@ -287,7 +286,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   override last(limit: number): Promise<T[]>;
   override async last(limit?: number): Promise<T | T[] | null> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    return FinderMethods.last.call(this as any, limit);
+    return FinderMethods.last.call(this, limit);
   }
 
   override take(): Promise<T | null>;
@@ -298,15 +297,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   }
 
   /** @internal */
-  protected override async findNthWithLimit(index: number, limit: number): Promise<T[]> {
+  override async findNthWithLimit(index: number, limit: number): Promise<T[]> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    return baseFindNthWithLimit.call(this as any, index, limit);
+    return baseFindNthWithLimit.call(this, index, limit);
   }
 
   /** @internal */
-  protected override async findNthFromLast(index: number): Promise<T | null> {
+  override async findNthFromLast(index: number): Promise<T | null> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    return baseFindNthFromLast.call(this as any, index);
+    return baseFindNthFromLast.call(this, index);
   }
 
   async replace(otherArray: T[]): Promise<T[] | undefined> {

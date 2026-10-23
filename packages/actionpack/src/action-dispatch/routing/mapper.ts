@@ -10,15 +10,18 @@ import { Pattern } from "../journey/path/pattern.js";
 import { Route as JourneyRoute, type VerbMatcher } from "../journey/route.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import {
+  BacktraceCleaner as ActiveSupportBacktraceCleaner,
   camelize,
+  callerLocations,
+  cattrAccessor,
   extractOptionsBang,
   isBlank,
   isPlainObject,
   isPresent,
-  kernelArray,
   pluralize,
   reverseMergeBang,
   singularize,
+  squish,
   TopLevel,
   transformKeys,
   underscore,
@@ -33,20 +36,25 @@ import {
   include,
   Module,
   RFC2396_PARSER,
+  rbFArray,
   rbInspect,
   RuntimeError,
-  rbFPublicSend,
   rbFSend,
   slice,
-  rbModPublicMethodDefined,
+  rbModMethodDefined,
   rbObjRespondTo,
   rtest,
   stringSplit,
+  Thread,
+  rbIterBreakValue,
+  rbBlockGivenP,
+  type Block,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   dup,
   fetch,
+  File,
   groupBy,
   hashDelete,
   isSymbol,
@@ -75,7 +83,7 @@ export interface RouteOptions {
   name?: string | null | false;
   constraints?: RouteConstraints | CallableConstraint;
   defaults?: Record<string, string | null>;
-  format?: boolean;
+  format?: boolean | string | RegExp;
   as?: string | null | false;
   to?: string | MountableApp | Redirect;
   controller?: string | RegExp;
@@ -84,7 +92,7 @@ export interface RouteOptions {
   except?: ResourceAction | ResourceAction[];
   ip?: string | RegExp;
   redirect?: string | RedirectOptions | RedirectFunction;
-  pathNames?: { new?: string; edit?: string };
+  pathNames?: Record<string, string>;
   anchor?: boolean;
   shallow?: boolean;
   internal?: boolean;
@@ -111,7 +119,8 @@ type ConcernCallback = (mapper: Mapper, options: Record<string, unknown>) => voi
 type ConcernCallable =
   | ConcernCallback
   | { call(mapper: Mapper, options: Record<string, unknown>): void };
-type MapMethodArgs = (string | RouteOptions | Record<string, unknown>)[];
+type MapMethodArg = string | RouteOptions | Record<string, unknown>;
+type MapMethodArgs = MapMethodArg[] | [...MapMethodArg[], Block<unknown>];
 
 const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
   "as",
@@ -125,7 +134,7 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
 
 /** @internal */
 export class Resource {
-  static defaultActions(apiOnly: boolean): ResourceAction[] {
+  static defaultActions(apiOnly: boolean | null): ResourceAction[] {
     if (apiOnly) {
       return ["index", "create", "show", "update", "destroy"];
     } else {
@@ -140,13 +149,18 @@ export class Resource {
   protected _as: string | null | false | undefined;
   protected _options: RouteOptions;
   protected _shallow: boolean;
-  protected _apiOnly: boolean;
+  protected _apiOnly: boolean | null;
   protected _only: ResourceAction | ResourceAction[] | null;
   protected _except: ResourceAction | ResourceAction[] | null;
   protected _plural: string | undefined;
   protected _singular: string | undefined;
 
-  constructor(entities: string, apiOnly: boolean, shallow: boolean, options: RouteOptions = {}) {
+  constructor(
+    entities: string,
+    apiOnly: boolean | null,
+    shallow: boolean,
+    options: RouteOptions = {},
+  ) {
     if (String(options.param ?? "").includes(":")) {
       throw new ArgumentError(":param option can't contain colons");
     }
@@ -172,13 +186,14 @@ export class Resource {
     this._except = hashDelete(options as Record<string, never>, "except");
   }
 
+  /** @missingRailsName apiOnly — PERMANENT */
   defaultActions(): ResourceAction[] {
     return (this.constructor as typeof Resource).defaultActions(this._apiOnly);
   }
 
   actions(): ResourceAction[] {
     if (this._except != null) {
-      const except = kernelArray(this._except);
+      const except = rbFArray(this._except) as ResourceAction[];
       return this.availableActions().filter((a) => !except.includes(a));
     } else {
       return this.availableActions();
@@ -187,7 +202,7 @@ export class Resource {
 
   availableActions(): ResourceAction[] {
     if (this._only != null) {
-      return kernelArray(this._only);
+      return rbFArray(this._only) as ResourceAction[];
     } else {
       return this.defaultActions();
     }
@@ -260,7 +275,7 @@ export class Resource {
 
 /** @internal */
 export class SingletonResource extends Resource {
-  static override defaultActions(apiOnly: boolean): ResourceAction[] {
+  static override defaultActions(apiOnly: boolean | null): ResourceAction[] {
     if (apiOnly) {
       return ["show", "create", "update", "destroy"];
     } else {
@@ -268,7 +283,7 @@ export class SingletonResource extends Resource {
     }
   }
 
-  constructor(entities: string, apiOnly: boolean, shallow: boolean, options: RouteOptions) {
+  constructor(entities: string, apiOnly: boolean | null, shallow: boolean, options: RouteOptions) {
     super(entities, apiOnly, shallow, options);
     this._as = null;
     this.controller = String(rtest(options.controller) ? options.controller : this.plural());
@@ -310,7 +325,7 @@ export class SingletonResource extends Resource {
 
 /** @internal */
 interface RouteSetLike {
-  namedRoutes: { get(name: string): unknown };
+  namedRoutes: { get(name: string): unknown; isKey(name: string): boolean };
   urlHelpers(): object;
   addRoute(mapping: Mapping, name?: string | null | false): unknown;
   resourcesPathNames: Record<string, string>;
@@ -319,6 +334,7 @@ interface RouteSetLike {
   requestClass(): { prototype: object };
   addUrlHelper: RouteSet["addUrlHelper"];
   addPolymorphicMapping: RouteSet["addPolymorphicMapping"];
+  isApiOnly(): boolean | null;
 }
 
 /** @internal */
@@ -353,14 +369,16 @@ export class Constraints extends Endpoint {
   }
 
   override matches(req: Request): boolean {
-    return this.constraints.every((constraint) => {
-      const c = constraint as ConstraintLike;
-      if (rbObjRespondTo(c, "matches")) {
-        const matched = c.matches!(req);
+    return (this.constraints as ConstraintLike[]).every((constraint) => {
+      if (rbObjRespondTo(constraint, "matches")) {
+        const matched = constraint.matches!(req);
         if (matched != null && matched !== false) return true;
       }
-      if (rbObjRespondTo(c, "call")) {
-        const called = callableOf(c).apply(c, this.constraintArgs(c, req));
+      if (rbObjRespondTo(constraint, "call")) {
+        const called = callableOf(constraint).apply(
+          constraint,
+          this.constraintArgs(constraint, req),
+        );
         if (called != null && called !== false) return true;
       }
       return false;
@@ -443,7 +461,7 @@ export class Mapping {
   private readonly _blocks: readonly unknown[];
   private readonly _anchor: boolean;
   private readonly _via: readonly string[];
-  private readonly _formatted: boolean | undefined;
+  private readonly _formatted: boolean | string | RegExp | undefined;
   private readonly _internal: boolean | undefined;
   private readonly _conditions: Record<string, unknown>;
 
@@ -455,7 +473,7 @@ export class Mapping {
     defaultAction: string | undefined,
     to: unknown,
     via: readonly string[],
-    formatted: boolean | undefined,
+    formatted: boolean | string | RegExp | undefined,
     optionsConstraints: unknown,
     anchor: boolean,
     options: Record<string, unknown>,
@@ -479,7 +497,7 @@ export class Mapping {
       optionsConstraints,
       anchor,
       scopeParams,
-      options: merge(scopeParams.options, options),
+      options: { ...scopeParams.options, ...options },
     });
   }
 
@@ -496,7 +514,7 @@ export class Mapping {
     return via;
   }
 
-  static normalizePath(path: string, format: boolean | undefined): string {
+  static normalizePath(path: string, format: boolean | string | RegExp | undefined): string {
     path = Mapper.normalizePath(path);
 
     if (format === true) {
@@ -508,7 +526,7 @@ export class Mapping {
     }
   }
 
-  static optionalFormat(path: string, format: boolean | undefined): boolean {
+  static optionalFormat(path: string, format: boolean | string | RegExp | undefined): boolean {
     return format !== false && !Mapping.OPTIONAL_FORMAT_REGEX.test(path);
   }
 
@@ -530,7 +548,7 @@ export class Mapping {
     controller: string | RegExp | undefined;
     defaultAction: string | undefined;
     to: unknown;
-    formatted: boolean | undefined;
+    formatted: boolean | string | RegExp | undefined;
     via: readonly string[];
     optionsConstraints: unknown;
     anchor: boolean;
@@ -556,10 +574,10 @@ export class Mapping {
 
     const splitOptions = this.constraints(options, this.ast.pathParams);
 
-    const constraints: Record<string, unknown> = merge(
-      scopeParams.constraints,
-      Object.fromEntries(splitOptions.constraints ?? []),
-    );
+    const constraints: Record<string, unknown> = {
+      ...scopeParams.constraints,
+      ...Object.fromEntries(splitOptions.constraints ?? []),
+    };
 
     if (isPlainObject(optionsConstraints)) {
       defaults = {
@@ -606,7 +624,7 @@ export class Mapping {
 
   static readonly JOINED_SEPARATORS = SEPARATORS.join("");
 
-  /** @missingRailsArgs new — CONVERGEABLE mapping-make-route-source-location */
+  /** @missingRailsName internal — PERMANENT */
   makeRoute(name: string | null, precedence: number): JourneyRoute {
     return new JourneyRoute({
       name,
@@ -619,13 +637,16 @@ export class Mapping {
       precedence,
       scopeOptions: this.scopeOptions,
       internal: this._internal,
+      sourceLocation: this.routeSourceLocation(),
     });
   }
 
+  /** @missingRailsName blocks — PERMANENT */
   application(): Endpoint {
     return this.app(this._blocks);
   }
 
+  /** @missingRailsName conditions — PERMANENT */
   conditions(): Record<string, unknown> {
     return this.buildConditions(this._conditions, this._set!.requestClass());
   }
@@ -637,7 +658,7 @@ export class Mapping {
   ): Record<string, unknown> {
     const conditions = dup(currentConditions);
 
-    return keepIf(conditions, (k) => rbModPublicMethodDefined(requestClass, k));
+    return keepIf(conditions, (k) => rbModMethodDefined(requestClass, k));
   }
 
   /** @internal */
@@ -674,7 +695,7 @@ export class Mapping {
       if (this.to == null) {
         controller = this.defaultController;
         action = this.defaultAction;
-      } else if (typeof this.to === "string") {
+      } else if (typeof this.to === "string" && !SYMBOL.test(this.to)) {
         if (this.to.includes("#")) {
           const toEndpoint = stringSplit(this.to, "#");
           controller = toEndpoint[0];
@@ -878,6 +899,21 @@ export class Mapping {
   private dispatcher(raiseOnNameError: boolean): Dispatcher {
     return new Dispatcher(raiseOnNameError);
   }
+
+  /** @internal */
+  private routeSourceLocation(): string | null | undefined {
+    if (Mapper.routeSourceLocations) {
+      const actionDispatchDir = File.dirname(File.dirname(callerLocations(0, 1)[0].path));
+      return Thread.eachCallerLocation<string>((location) => {
+        if (location.path.startsWith(actionDispatchDir)) return;
+
+        const cleanedPath = Mapper.backtraceCleaner.cleanFrame(location.path);
+        if (cleanedPath == null) return;
+
+        rbIterBreakValue(`${cleanedPath}:${location.lineno}`);
+      });
+    }
+  }
 }
 
 export type ScopeLevel =
@@ -1012,6 +1048,15 @@ export class Scope {
 include(Scope, Enumerable);
 
 export class Mapper {
+  static BacktraceCleaner: typeof ActiveSupportBacktraceCleaner = class BacktraceCleaner extends ActiveSupportBacktraceCleaner {
+    constructor() {
+      super();
+      this.removeSilencers();
+      this.addCoreSilencer();
+      this.addStdlibSilencer();
+    }
+  };
+
   static readonly URL_OPTIONS: readonly string[] = [
     "protocol",
     "subdomain",
@@ -1019,6 +1064,17 @@ export class Mapper {
     "host",
     "port",
   ];
+
+  declare static routeSourceLocations: boolean;
+  declare static backtraceCleaner: ActiveSupportBacktraceCleaner;
+
+  static {
+    cattrAccessor.call(this, "routeSourceLocations", { instanceAccessor: false, default: false });
+    cattrAccessor.call(this, "backtraceCleaner", {
+      instanceAccessor: false,
+      default: new this.BacktraceCleaner(),
+    });
+  }
 
   static Scope = Scope;
 
@@ -1030,8 +1086,6 @@ export class Mapper {
   _drawPaths: string[];
   /** @internal */
   _scope: Scope;
-  /** @internal */
-  _apiOnly = false;
 
   constructor(set: RouteSetLike) {
     this._set = set;
@@ -1087,201 +1141,96 @@ export class Mapper {
     }
   }
 
-  resources(...resources: Array<string | RouteOptions | MapperCallback>): void {
-    const cb = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
+  resources(...resources: Array<string | RouteOptions | MapperCallback>): this {
+    const block = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
       | MapperCallback
       | undefined;
     let options: RouteOptions = dup(extractOptionsBang(resources));
 
-    if (this.applyCommonBehaviorFor("resources", resources as string[], options, cb)) return;
-    options = this.applyActionOptions("resources", options);
-    const name = resources.pop() as string;
+    if (this.applyCommonBehaviorFor("resources", resources as string[], options, block)) {
+      return this;
+    }
 
-    const resource = new Resource(
-      name,
-      this.isApiOnly(),
-      this._scope.get("shallow") === true,
-      options,
-    );
-    const shallow = resource.isShallow();
-    const path = resource.path;
-    const controller = resource.controller;
-    const param = resource.param;
-    const prefix = (this._scope.get("path") as string | undefined) ?? "";
-    const basePath = `${prefix}/${path}`;
+    this.withScopeLevel("resources", () => {
+      options = this.applyActionOptions("resources", options);
+      this.resourceScope(
+        new Resource(
+          resources.pop() as string,
+          this.isApiOnly(),
+          this._scope.get("shallow") as boolean,
+          options,
+        ),
+        () => {
+          if (block) block.call(this);
 
-    const shallowPath = shallow
-      ? `${(this._scope.get("shallowPath") as string | undefined) ?? ""}/${path}`
-      : basePath;
-    const names: Record<string, string | undefined> = {};
+          if (options.concerns) this.concerns(options.concerns);
 
-    const allowed = new Set(resource.actions());
-    const merged = {
-      ...((this._scope.get("constraints") as RouteConstraints | undefined) ?? {}),
-      ...((options.constraints as RouteConstraints | undefined) ?? {}),
-    };
-    const constraints = Object.keys(merged).length > 0 ? merged : undefined;
-    const newPath = this.actionPath("new");
-    const editPath = this.actionPath("edit");
-
-    this.withScopeLevel("resources", () =>
-      this.resourceScope(resource, () => {
-        if (cb) cb.call(this);
-
-        if (options.concerns) this.concerns(options.concerns);
-
-        this.collection(() => {
-          if (allowed.has("index")) names.index = this.nameForAction(undefined, "index");
-        });
-
-        if (allowed.has("new")) {
-          this.new(() => {
-            names.new = this.nameForAction(undefined, "new");
+          this.collection(() => {
+            if (this.parentResource()!.actions().includes("index")) this.get(":index");
+            if (this.parentResource()!.actions().includes("create")) this.post(":create");
           });
-        }
 
-        this.member(() => {
-          if (allowed.has("edit")) names.edit = this.nameForAction(undefined, "edit");
-          if (allowed.has("show")) names.show = this.nameForAction(undefined, "show");
-        });
-      }),
-    );
+          if (this.parentResource()!.actions().includes("new")) {
+            this.new(() => {
+              this.get(":new");
+            });
+          }
 
-    if (allowed.has("index")) {
-      const as = names.index;
-      this.addRouteToSet("GET", basePath, controller, "index", as, constraints);
-    }
-
-    if (allowed.has("create")) {
-      this.addRouteToSet("POST", basePath, controller, "create", undefined, constraints);
-    }
-
-    if (allowed.has("new")) {
-      const as = names.new;
-      this.addRouteToSet("GET", `${basePath}/${newPath}`, controller, "new", as, constraints);
-    }
-
-    if (allowed.has("edit")) {
-      const as = names.edit;
-      this.addRouteToSet(
-        "GET",
-        `${shallowPath}/:${param}/${editPath}`,
-        controller,
-        "edit",
-        as,
-        constraints,
+          this.setMemberMappingsForResource();
+        },
       );
-    }
+    });
 
-    if (allowed.has("show")) {
-      const as = names.show;
-      this.addRouteToSet("GET", `${shallowPath}/:${param}`, controller, "show", as, constraints);
-    }
-
-    if (allowed.has("update")) {
-      this.addRouteToSet(
-        "PATCH",
-        `${shallowPath}/:${param}`,
-        controller,
-        "update",
-        undefined,
-        constraints,
-      );
-      this.addRouteToSet(
-        "PUT",
-        `${shallowPath}/:${param}`,
-        controller,
-        "update",
-        undefined,
-        constraints,
-      );
-    }
-
-    if (allowed.has("destroy")) {
-      this.addRouteToSet(
-        "DELETE",
-        `${shallowPath}/:${param}`,
-        controller,
-        "destroy",
-        undefined,
-        constraints,
-      );
-    }
+    return this;
   }
 
-  resource(...resources: Array<string | RouteOptions | MapperCallback>): void {
-    const cb = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
+  resource(...resources: Array<string | RouteOptions | MapperCallback>): this {
+    const block = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
       | MapperCallback
       | undefined;
     let options: RouteOptions = dup(extractOptionsBang(resources));
 
-    if (this.applyCommonBehaviorFor("resource", resources as string[], options, cb)) return;
-    options = this.applyActionOptions("resource", options);
-    const name = resources.pop() as string;
-
-    const resource = new SingletonResource(
-      name,
-      this.isApiOnly(),
-      this._scope.get("shallow") === true,
-      options,
-    );
-    const controller = resource.controller;
-    const prefix = (this._scope.get("path") as string | undefined) ?? "";
-    const basePath = `${prefix}/${resource.path}`;
-    const names: Record<string, string | undefined> = {};
-
-    const allowed = new Set(resource.actions());
-    const newPath = this.actionPath("new");
-    const editPath = this.actionPath("edit");
-
-    this.withScopeLevel("resource", () =>
-      this.resourceScope(resource, () => {
-        if (cb) cb.call(this);
-
-        if (options.concerns) this.concerns(options.concerns);
-
-        if (allowed.has("new")) {
-          this.new(() => {
-            names.new = this.nameForAction(undefined, "new");
-          });
-        }
-
-        this.member(() => {
-          if (allowed.has("edit")) names.edit = this.nameForAction(undefined, "edit");
-          if (allowed.has("show")) names.show = this.nameForAction(undefined, "show");
-        });
-      }),
-    );
-
-    if (allowed.has("new")) {
-      this.addRouteToSet("GET", `${basePath}/${newPath}`, controller, "new", names.new);
+    if (this.applyCommonBehaviorFor("resource", resources as string[], options, block)) {
+      return this;
     }
 
-    if (allowed.has("create")) {
-      this.addRouteToSet("POST", basePath, controller, "create");
-    }
+    this.withScopeLevel("resource", () => {
+      options = this.applyActionOptions("resource", options);
+      this.resourceScope(
+        new SingletonResource(
+          resources.pop() as string,
+          this.isApiOnly(),
+          this._scope.get("shallow") as boolean,
+          options,
+        ),
+        () => {
+          if (block) block.call(this);
 
-    if (allowed.has("show")) {
-      this.addRouteToSet("GET", basePath, controller, "show", names.show);
-    }
+          if (options.concerns) this.concerns(options.concerns);
 
-    if (allowed.has("edit")) {
-      this.addRouteToSet("GET", `${basePath}/${editPath}`, controller, "edit", names.edit);
-    }
+          if (this.parentResource()!.actions().includes("new")) {
+            this.new(() => {
+              this.get(":new");
+            });
+          }
 
-    if (allowed.has("update")) {
-      this.addRouteToSet("PATCH", basePath, controller, "update");
-      this.addRouteToSet("PUT", basePath, controller, "update");
-    }
+          this.setMemberMappingsForResource();
 
-    if (allowed.has("destroy")) {
-      this.addRouteToSet("DELETE", basePath, controller, "destroy");
-    }
+          if (this.parentResource()!.actions().includes("create")) {
+            this.collection(() => {
+              this.post(":create");
+            });
+          }
+        },
+      );
+    });
+
+    return this;
   }
 
   namespace(
     path: string,
-    options: (ScopeOptions & { path?: string }) | MapperCallback = {},
+    options: (ScopeOptions & { path?: string | null }) | MapperCallback = {},
     block?: MapperCallback,
   ): void {
     const opts: ScopeOptions & Record<string, unknown> =
@@ -1306,32 +1255,12 @@ export class Mapper {
     });
   }
 
-  scope(
-    pathOrOptions: string | ScopeOptions,
-    callbackOrOptions?: MapperCallback | ScopeOptions,
-    callback?: MapperCallback,
-  ): void {
-    let path: string | undefined;
-    let options: ScopeOptions = {};
-    let cb: MapperCallback;
-
-    if (typeof pathOrOptions === "string") {
-      path = pathOrOptions;
-      if (typeof callbackOrOptions === "function") {
-        cb = callbackOrOptions;
-      } else {
-        options = callbackOrOptions ?? {};
-        cb = callback!;
-      }
-    } else {
-      options = pathOrOptions;
-      cb = callbackOrOptions as MapperCallback;
-    }
-
-    options = { ...options };
+  scope(...args: Array<string | string[] | ScopeOptions | MapperCallback>): void {
+    const cb = args.pop() as MapperCallback;
+    const options: ScopeOptions = dup(extractOptionsBang(args)) as ScopeOptions;
     const scope: ScopeFrameHash = {};
 
-    if (path !== undefined) options.path = path;
+    if (args.length > 0) options.path = (args as Array<string | string[]>).flat(Infinity).join("/");
     options.constraints ??= {};
 
     if (!this.isNestedScope()) {
@@ -1459,6 +1388,10 @@ export class Mapper {
     }
   }
 
+  /**
+   * @missingRailsCall find — PERMANENT
+   * @missingRailsCall read — PERMANENT
+   */
   async draw(name: string): Promise<void> {
     const fs = getFs();
     const p = getPath();
@@ -1487,26 +1420,14 @@ export class Mapper {
 
   /** @internal */
   setMemberMappingsForResource(): void {
-    const parent = this.parentResource();
-    if (!parent) return;
-    const actions = parent.actions();
     this.member(() => {
-      const memberPath = this._scope.get("path") as string;
-      const controller = parent.resourceScope();
-      const editPath = this.actionPath("edit");
-      if (actions.includes("edit")) {
-        this.addRouteToSet("GET", `${memberPath}/${editPath}`, controller, "edit");
+      if (this.parentResource()!.actions().includes("edit")) this.get(":edit");
+      if (this.parentResource()!.actions().includes("show")) this.get(":show");
+      if (this.parentResource()!.actions().includes("update")) {
+        this.patch(":update");
+        this.put(":update");
       }
-      if (actions.includes("show")) {
-        this.addRouteToSet("GET", memberPath, controller, "show");
-      }
-      if (actions.includes("update")) {
-        this.addRouteToSet("PATCH", memberPath, controller, "update");
-        this.addRouteToSet("PUT", memberPath, controller, "update");
-      }
-      if (actions.includes("destroy")) {
-        this.addRouteToSet("DELETE", memberPath, controller, "destroy");
-      }
+      if (this.parentResource()!.actions().includes("destroy")) this.delete(":destroy");
     });
   }
 
@@ -1542,8 +1463,11 @@ export class Mapper {
 
   match(
     path: string | Record<string, unknown>,
-    ...rest: (string | (RouteOptions & { via?: string | string[] }))[]
+    ...rest:
+      | (string | (RouteOptions & { via?: string | string[] }))[]
+      | [...(string | (RouteOptions & { via?: string | string[] }))[], Block<unknown>]
   ): void {
+    if (rest.length > 0 && (rest.at(-1) === undefined || rbBlockGivenP(rest.at(-1)))) rest.pop();
     let options: Record<string, unknown>;
     let paths: string[];
     if (rest.length === 0 && isPlainObject(path)) {
@@ -1596,10 +1520,16 @@ export class Mapper {
   }
 
   /** @internal */
-  mapMethod(method: string | string[], args: MapMethodArgs): this {
-    const options = extractOptionsBang(args);
+  mapMethod(
+    method: string | string[],
+    args: MapMethodArgs,
+    block: Block<unknown> | undefined = rbBlockGivenP(args.at(-1))
+      ? (args.pop() as Block<unknown>)
+      : undefined,
+  ): this {
+    const options = extractOptionsBang(args as MapMethodArg[]);
     options[args.length === 0 ? ":via" : "via"] = method;
-    this.match(...(args as [string]), options as RouteOptions);
+    this.match(...(args as [string]), options as RouteOptions, block!);
     return this;
   }
 
@@ -1613,7 +1543,7 @@ export class Mapper {
     }
   }
 
-  defaults(defaults: Record<string, string>, callback: MapperCallback): void {
+  defaults(defaults: Record<string, unknown>, callback: MapperCallback): void {
     const previous = this._scope;
     const merged = this.mergeDefaultsScope(
       this._scope.get("defaults") as Record<string, string> | undefined,
@@ -1642,7 +1572,7 @@ export class Mapper {
         MountableApp,
         string,
       ];
-      if (app) options.delete(app);
+      if (app) hashDelete(options, app);
     }
 
     if (!rbObjRespondTo(app, "call")) {
@@ -1715,7 +1645,7 @@ export class Mapper {
       }
 
       _route.segmentKeys.forEach((k) => delete options[k]);
-      return rbFPublicSend(_urlHelpers, camelize(`${name}_path`, "lower"), prefixOptions) as string;
+      return rbFSend(_urlHelpers, camelize(`${name}_path`, "lower"), prefixOptions) as string;
     };
 
     app.routes().defineMountedHelper(name, scriptNamer);
@@ -1739,24 +1669,31 @@ export class Mapper {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName array — PERMANENT
+   */
   mapMatch(
     paths: string[],
     options: RouteOptions & {
       via?: string | string[];
       on?: string;
-      format?: boolean;
+      format?: boolean | string | RegExp;
       anchor?: boolean;
       path?: string;
     },
   ): void {
     if (paths.length > 1) {
       deprecator().warn(
-        "Mapping a route with multiple paths is deprecated and will be removed in Rails 8.1. Please use multiple method calls instead.",
+        squish(`Mapping a route with multiple paths is deprecated and
+          will be removed in Rails 8.1. Please use multiple method calls instead.`),
       );
     }
 
-    if (options.on !== undefined) assertValidOnOption(options.on);
+    let on;
+    if ((on = options.on) != null && (on as unknown) !== false && !VALID_ON_OPTIONS.has(on)) {
+      throw new ArgumentError(`Unknown scope :${on} given to :on`);
+    }
 
     const scopeTo = this._scope.get("to") as string | undefined;
     if (scopeTo) options.to ??= scopeTo;
@@ -1773,12 +1710,13 @@ export class Mapper {
     let to = options.to;
     delete options.to;
     const via = Mapping.checkVia(
-      kernelArray(
+      rbFArray(
         "via" in options ? options.via : (this._scope.get("via") as string | string[] | undefined),
-      ),
+      ) as string[],
     );
     delete options.via;
-    const formatted = options.format ?? (this._scope.get("format") as boolean | undefined);
+    const formatted =
+      options.format ?? (this._scope.get("format") as boolean | string | RegExp | undefined);
     delete options.format;
     const anchor = options.anchor ?? true;
     delete options.anchor;
@@ -1830,9 +1768,9 @@ export class Mapper {
     action: string | undefined,
   ): T | string | undefined {
     if (to || action) return to;
-    const stripped = path.replace(/\(\.:format\)$/, "");
-    if (this.isUsingMatchShorthand(stripped)) {
-      return stripped
+    const pathWithoutFormat = path.replace(/\(\.:format\)$/, "");
+    if (this.isUsingMatchShorthand(pathWithoutFormat)) {
+      return pathWithoutFormat
         .replace(/^\//, "")
         .replace(/\/([^/]*)$/, "#$1")
         .replace(/-/g, "_");
@@ -1852,8 +1790,8 @@ export class Mapper {
     options: RouteOptions & { on?: string },
     _path: string | undefined,
     to: string | MountableApp | Redirect | undefined,
-    via: string | string[],
-    formatted: boolean | undefined,
+    via: string[],
+    formatted: boolean | string | RegExp | undefined,
     anchor: boolean,
     optionsConstraints: RouteOptions["constraints"],
   ): void {
@@ -1913,7 +1851,9 @@ export class Mapper {
     this._set.addUrlHelper(name, options, block);
   }
 
-  resolve(...args: unknown[]): void {
+  resolve(
+    ...args: unknown[] | [...unknown[], Parameters<RouteSet["addPolymorphicMapping"]>[2]]
+  ): void {
     if (!this._scope.isRoot()) {
       throw new RuntimeError("The resolve method can't be used inside a routes scope block");
     }
@@ -1929,14 +1869,19 @@ export class Mapper {
     }
   }
 
+  /**
+   * @missingRailsName delete — PERMANENT
+   * @missingRailsName scope — PERMANENT
+   * @missingRailsName set — PERMANENT
+   */
   private addRoute(
     action: string | undefined,
     controller: string | RegExp | undefined,
     options: RouteOptions,
     _path: string | undefined,
     to: string | MountableApp | Redirect | undefined,
-    via: string | string[],
-    formatted: boolean | undefined,
+    via: string[],
+    formatted: boolean | string | RegExp | undefined,
     anchor: boolean,
     optionsConstraints: RouteOptions["constraints"],
   ): void {
@@ -1983,40 +1928,13 @@ export class Mapper {
       controller,
       defaultAction,
       to,
-      kernelArray(via),
+      via,
       formatted,
       optionsConstraints,
       anchor,
       options as Record<string, unknown>,
     );
     this._set.addRoute(mapping, as);
-  }
-
-  /** @internal */
-  private addRouteToSet(
-    via: string,
-    path: string,
-    controller: string,
-    action: string,
-    name?: string | null,
-    constraints?: RouteConstraints,
-  ): void {
-    const formatted = this._scope.get("format") as boolean | undefined;
-    const mapping = Mapping.build(
-      this._scope,
-      this._set,
-      Parser.parse(Mapping.normalizePath(RFC2396_PARSER.escape(path), formatted))!,
-      controller,
-      action,
-      undefined,
-      [via],
-      formatted,
-      constraints ?? {},
-      true,
-      {},
-    );
-    if (name != null && (!/^[_a-z]/i.test(name) || this.hasNamedRoute(name))) name = undefined;
-    this._set.addRoute(mapping, name);
   }
 
   private isShallow(): boolean {
@@ -2039,23 +1957,23 @@ export class Mapper {
   }
 
   /** @internal */
-  mergePathScope(parent: string | undefined, child: string): string {
-    return Mapper.normalizePath(`${parent ?? ""}/${child}`);
+  mergePathScope(parent: string | undefined, child: string | null): string {
+    return Mapper.normalizePath(`${parent ?? ""}/${child ?? ""}`);
   }
 
   /** @internal */
-  mergeShallowPathScope(parent: string | undefined, child: string): string {
-    return Mapper.normalizePath(`${parent ?? ""}/${child}`);
+  mergeShallowPathScope(parent: string | undefined, child: string | null): string {
+    return Mapper.normalizePath(`${parent ?? ""}/${child ?? ""}`);
   }
 
   /** @internal */
-  mergeAsScope(parent: string | undefined, child: string): string {
-    return parent ? `${parent}_${child}` : child;
+  mergeAsScope(parent: string | undefined, child: string | null): string | null {
+    return parent ? `${parent}_${child ?? ""}` : child;
   }
 
   /** @internal */
-  mergeShallowPrefixScope(parent: string | undefined, child: string): string {
-    return parent ? `${parent}_${child}` : child;
+  mergeShallowPrefixScope(parent: string | undefined, child: string | null): string | null {
+    return parent ? `${parent}_${child ?? ""}` : child;
   }
 
   /** @internal */
@@ -2113,7 +2031,7 @@ export class Mapper {
 
   /** @internal */
   mergeOptionsScope<T extends Record<string, unknown>>(parent: T | undefined, child: T): T {
-    return { ...(parent ?? ({} as T)), ...child };
+    return { ...(parent || {}), ...child } as T;
   }
 
   /** @internal */
@@ -2187,7 +2105,10 @@ export class Mapper {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName tr — PERMANENT
+   */
   prefixNameForAction(
     as: string | null | undefined,
     action: string | undefined,
@@ -2226,7 +2147,7 @@ export class Mapper {
 
   /** @internal */
   hasNamedRoute(name: string): boolean {
-    return this._set.namedRoutes.get(name) !== undefined;
+    return this._set.namedRoutes.isKey(name);
   }
 
   /** @internal */
@@ -2241,7 +2162,7 @@ export class Mapper {
   }
 
   /** @internal */
-  pathScope<T>(path: string, fn: () => T): T {
+  pathScope<T>(path: string | null, fn: () => T): T {
     const previous = this._scope;
     const merged = this.mergePathScope(this._scope.get("path") as string | undefined, path);
     this._scope = this._scope.new({ path: merged });
@@ -2301,15 +2222,13 @@ export class Mapper {
   }
 
   /** @internal */
-  isApiOnly(): boolean {
-    return this._apiOnly;
+  isApiOnly(): boolean | null {
+    return this._set.isApiOnly();
   }
 
   /** @internal */
   resourcesPathNames(options: Record<string, string>): Record<string, string> {
-    const current = (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
-    Object.assign(current, options);
-    return current;
+    return Object.assign(this._scope.get("pathNames") as Record<string, string>, options);
   }
 
   /** @internal */
@@ -2349,7 +2268,7 @@ export class Mapper {
 
   /** @internal */
   applyActionOptions(method: "resource" | "resources", options: RouteOptions): RouteOptions {
-    if (options.only || options.except) return options;
+    if (this.isActionOptions(options)) return options;
     return { ...options, ...this.scopeActionOptions(method) };
   }
 
@@ -2415,11 +2334,6 @@ const SYMBOL = /^:\w+[?!=]?$/;
 
 const VALID_ON_OPTIONS: ReadonlySet<string> = new Set(["new", "collection", "member"]);
 
-/** @internal */
-function assertValidOnOption(on: string): void {
-  if (!VALID_ON_OPTIONS.has(on)) throw new Error(`Unknown scope :${on} given to :on`);
-}
-
 include(Mapper, Redirection);
 
 /** @noRailsEquivalent PERMANENT */
@@ -2431,10 +2345,10 @@ function deleteWithDefault<T>(hash: Record<string, unknown>, key: string, defaul
 }
 
 interface ScopeOptions {
-  as?: string;
+  as?: string | null;
   module?: string;
-  shallowPath?: string;
-  shallowPrefix?: string;
+  shallowPath?: string | null;
+  shallowPrefix?: string | null;
   [key: string]: unknown;
 }
 

@@ -3,9 +3,8 @@ import { Context } from "./context.js";
 import { KeyGenerator } from "./key-generator.js";
 import { Encryption } from "../encryption.js";
 import { NullEncryptor } from "./null-encryptor.js";
-import { encrypts } from "./encryptable-record.js";
-import { AttributeRegistration, Model } from "@blazetrails/activemodel";
-import { include } from "@blazetrails/activesupport";
+import { Book } from "../test-helpers/models/book.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { AutoFilteredParameters } from "./auto-filtered-parameters.js";
 
 describe("ActiveRecord::Encryption::Configurable (trails)", () => {
@@ -102,6 +101,7 @@ describe("ActiveRecord::Encryption::Configurable (trails)", () => {
 });
 
 describe("ActiveRecord::Encryption::ConfigurableTest (trails)", () => {
+  fixtures({});
   let savedConfig: ReturnType<typeof snapshotConfig>;
 
   function snapshotConfig() {
@@ -145,7 +145,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest (trails)", () => {
   });
 
   it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {
-    Encryption.config.excludedFromFilterParameters = ["secret_token"];
+    Encryption.config.excludedFromFilterParameters = ["isbn"];
 
     const filterParameters: string[] = [];
     const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
@@ -156,14 +156,12 @@ describe("ActiveRecord::Encryption::ConfigurableTest (trails)", () => {
     });
 
     try {
-      class PaymentModel extends Model {}
-      const modelClass = PaymentModel;
-      include(modelClass, AttributeRegistration);
-      encrypts.call(modelClass, "card_number");
-      encrypts.call(modelClass, "secret_token");
+      class NamedBook extends Book {}
+      NamedBook.encrypts("name");
+      NamedBook.encrypts("isbn");
 
-      expect(filterParameters).toContain("payment_model.card_number");
-      expect(filterParameters).not.toContain("payment_model.secret_token");
+      expect(filterParameters).toContain("named_book.name");
+      expect(filterParameters).not.toContain("named_book.isbn");
     } finally {
       listeners.pop();
     }

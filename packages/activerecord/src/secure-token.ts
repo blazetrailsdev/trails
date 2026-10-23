@@ -28,7 +28,7 @@ export function hasSecureToken(
     camelize(`regenerate_${attribute}`, false),
     function (this: Base): Promise<true | undefined> {
       return this.updateBang({
-        [attribute]: (this.constructor as typeof Base).generateUniqueSecureToken({ length }),
+        [attribute]: this.constructor.generateUniqueSecureToken({ length }),
       });
     },
   );

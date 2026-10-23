@@ -42,11 +42,6 @@ import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { MigrationContext, Migrator } from "../../migration.js";
 
-interface PoolManagedConnection {
-  lease?(): void;
-  expire?(): void;
-}
-
 export interface AbstractPool {
   get schemaCache(): unknown;
 }
@@ -184,6 +179,11 @@ export class Lease {
   }
 }
 
+const pendingCheckouts = new WeakMap<
+  Lease,
+  { connection: Promise<DatabaseAdapter>; holders: number }
+>();
+
 export class LeaseRegistry {
   private _map = new WeakMap<object, Lease>();
 
@@ -209,8 +209,7 @@ export class ExecutorHooks {
       const connection = pool.isActiveConnection();
       if (connection) {
         const txn =
-          (connection as any).currentTransaction?.() ??
-          (connection as any).transactionManager?.currentTransaction;
+          connection.currentTransaction?.() ?? connection.transactionManager?.currentTransaction;
         if (txn && (txn.closed || !txn.joinable)) {
           pool.releaseConnection();
         }
@@ -399,6 +398,7 @@ export class ConnectionPool implements ReapablePool {
     return false;
   }
 
+  /** @inventedArm if — CONVERGEABLE with-connection-pending-checkout-join-needs-ruling */
   async withConnection<T>(
     fn: (conn: DatabaseAdapter) => T | Promise<T>,
     options: { preventPermanentCheckout?: boolean } = {},
@@ -408,18 +408,30 @@ export class ConnectionPool implements ReapablePool {
     const stickyWas = lease.sticky;
     if (preventPermanentCheckout) lease.sticky = false;
 
-    if (lease.connection) {
+    const pending = pendingCheckouts.get(lease);
+    if (lease.connection && !pending) {
       try {
         return await fn(lease.connection);
       } finally {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
       }
     } else {
+      const checkout = pending ?? { connection: this.checkout(), holders: 0 };
+      if (!pending) {
+        pendingCheckouts.set(lease, checkout);
+        checkout.connection.catch(() => {
+          if (pendingCheckouts.get(lease) === checkout) pendingCheckouts.delete(lease);
+        });
+      }
+      checkout.holders++;
       try {
-        return await fn((lease.connection = await this.checkout()));
+        return await fn((lease.connection = await checkout.connection));
       } finally {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
-        if (!lease.sticky) this.releaseConnection(lease);
+        if (--checkout.holders === 0) {
+          if (pendingCheckouts.get(lease) === checkout) pendingCheckouts.delete(lease);
+          if (!lease.sticky) this.releaseConnection(lease);
+        }
       }
     }
   }
@@ -457,7 +469,7 @@ export class ConnectionPool implements ReapablePool {
     await synchronize.call(this, async () => {
       if (this.isDiscarded()) return;
       for (const conn of this._connections ?? []) {
-        (conn as unknown as { discardBang?: () => void }).discardBang?.();
+        conn.discardBang?.();
       }
       this._connections = null;
       this._available?.clear();
@@ -498,9 +510,7 @@ export class ConnectionPool implements ReapablePool {
     return this._pinnedConnection.lock.synchronize(() =>
       (synchronize<DatabaseAdapter>).call(this, async () => {
         if (this._pinnedConnection) {
-          await (
-            this._pinnedConnection as unknown as { verifyBang(): void | Promise<void> }
-          ).verifyBang();
+          await this._pinnedConnection.verifyBang();
           if (this._connections && !this._connections.includes(this._pinnedConnection)) {
             this._connections.push(this._pinnedConnection);
           }
@@ -830,8 +840,7 @@ async function attemptToCheckoutAllExistingConnections(
       await this.reap();
 
       return (this._connections as DatabaseAdapter[]).filter(
-        (conn) =>
-          (conn as unknown as { owner: unknown }).owner === IsolatedExecutionState.context(),
+        (conn) => conn.owner === IsolatedExecutionState.context(),
       );
     });
 
@@ -884,7 +893,7 @@ async function checkoutForExclusiveAccess(
 
       const threadReport: string[] = [];
       for (const conn of pool._connections as DatabaseAdapter[]) {
-        const owner = (conn as unknown as { owner: unknown }).owner;
+        const owner = conn.owner;
         if (owner !== IsolatedExecutionState.context()) {
           threadReport.push(`${String(conn)} is owned by ${String(owner)}`);
         }
@@ -995,7 +1004,7 @@ async function tryToCheckoutNewConnection(this: Pool): Promise<DatabaseAdapter |
     await synchronize.call(this, async () => {
       if (conn) {
         await this.adoptConnection(conn);
-        (conn as unknown as PoolManagedConnection).lease?.();
+        conn.lease?.();
       }
       this._nowConnecting -= 1;
     });

@@ -40,7 +40,8 @@ the constructor against `new` then `initialize`, with `new`'s `super` spent
 on `initialize`. A `ClassMethods#new` in the class's own Ruby file pairs the
 same way. A module's `initialize`, or a `ClassMethods#new`, defined in another
 Ruby file is matched through the `@inlinedFrom` tag on the constructor it is
-inlined into (RFC 0188).
+inlined into (RFC 0188), and a module method whose body calls `super` through
+the tag on the includer's method of the same name (RFC 0197).
 
 Any other `new`, an instance method or a module's own `self.new`, maps to
 `constructor` only when its Ruby file does NOT also define `initialize`.
@@ -116,6 +117,16 @@ ported operator sorts into its Rails slot and does not read as extra surface.
 The pin is per-class on purpose: `<<` is `bitwiseShiftLeft` on `Arel::Math` and
 means _append_ on the collectors, so a global entry would mis-credit them.
 
+## Reserved-word locals
+
+A Ruby local, parameter, or kwarg binding whose name is a JS reserved word
+(`throw`, `default`, `class`, …; `JS_RESERVED_WORDS`) cannot be a TS
+binding name. It is ported with a trailing underscore: `translate(key = nil,
+throw: false, …)` (`i18n.rb:212`) destructures `{ throw: throw_ = false }`
+and passes `throw_` on. `parity:api:calls:args` reads `throw_` as Ruby
+`throw`. Any other spelling (`throwOption`) is a
+rename the gate reports.
+
 ## Token renames
 
 Applied to every identifier before camelization (and the equivalent applies to
@@ -134,6 +145,8 @@ trails:
 | `rubocop`  | `eslint`     |
 | `RuboCop`  | `ESLint`     |
 | `Rubocop`  | `Eslint`     |
+| `capybara` | `vitest`     |
+| `Capybara` | `Vitest`     |
 
 Test names are not an exception. Rails'
 `test "ERB::Util.html_escape should escape unsafe characters"`
@@ -168,8 +181,10 @@ anything else takes the plain kebab-case rule.
 
 parity:api never expects a TS counterpart for these Ruby methods:
 
-- Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity (`object_id`, `equal?`, `class`), reflection (`instance_of?`, `instance_variable_get` / `instance_variable_set` / `instance_variables`), dispatch (`send`, `public_send`, `tap`, `yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), and `clone`.
-  - `clone`, `object_id`, `class`, `send`, `public_send`, `tap`, `yield_self`, `instance_of?`, `equal?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `to_i`, `to_f`, `to_r`, `to_c`
+- Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity (`object_id`, `equal?`, `class`), reflection (`instance_of?`, `instance_variable_get` / `instance_variable_set` / `instance_variables`), dispatch (`tap`, `yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), and `clone`.
+  - `clone`, `object_id`, `class`, `tap`, `yield_self`, `instance_of?`, `equal?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `to_i`, `to_f`, `to_r`, `to_c`
+- PERMANENT — dispatch by name and visibility reflection. trails has no runtime visibility, so `send` / `public_send` dispatch alike and the `*_methods` / `*_method_defined?` readers have no fact to report (CLAUDE.md § "Method visibility is compile-time only"). A dispatch with a literal name is spelled as the direct member call (CLAUDE.md § "A dispatch by name is spelled directly").
+  - `send`, `public_send`, `public_method_defined?`, `private_method_defined?`, `protected_method_defined?`, `public_methods`, `private_methods`, `protected_methods`, `public_instance_methods`, `public_instance_method`
 - Scored per definition in `PROTOCOL_DEFINITION_ENROLLED_PACKAGES`, and skipped elsewhere only until that package's burndown story enrolls it (RFC 0156): these translate directly, so a Ruby file defining one expects it in the mirroring TS file.
   - `inspect`, `pretty_print`, `dup`, `initialize_copy`, `initialize_dup`, `encode_with`, `init_with`, `to_a`, `to_h`, `to_hash`
 - PERMANENT for scoring by name — JS spells `is_a?` as `instanceof`, customised by `static [Symbol.hasInstance]` on the class tested AGAINST, so `TimeWithZone#is_a?(Time)` ports as a hook on `Time`. A same-named `isA` is judged against its Rails body per class (CLAUDE.md § "Ruby protocol methods with a different JS mechanism").
@@ -191,6 +206,8 @@ parity:api skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
+- Node's event loop stands in for Action Cable's `NIO::Selector` and its thread (CLAUDE.md, "Node's event loop stands in for Action Cable's nio4r selector"). `spawn`, `run` and `wakeup` own and interrupt the selector thread (stream_event_loop.rb:62-133); `writes_pending` (:47-54) and `Stream#flush_write_buffer` (stream.rb:72-92) carry a partial `write_nonblock`, which a `net.Socket` never leaves.
+  - `spawn`, `run`, `wakeup`, `writes_pending`, `flush_write_buffer` (only in: `connection/stream_event_loop.rb`, `connection/stream.rb`)
 - `Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs Thorfiles) is not ported, and these `Thor::Util` members exist only for it: `namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside `Thor::Sandbox` (util.rb:58-70, :153-166), and `user_home`, `thor_root`, `thor_root_glob` and `globs_for` (util.rb:168-216) locate the Thorfiles installed under `~/.thor`. railties never reaches them. Scoped to thor's util.rb.
   - `namespaces_in_content`, `load_thorfile`, `user_home`, `thor_root`, `thor_root_glob`, `globs_for` (only in: `util.rb`)
 - `Thor::Util.escape_html` (util.rb:280-282) is `CGI.escapeHTML`, called only by `Thor::Shell::HTML`, which is not ported: there is no terminal rendering HTML. Scoped to thor's util.rb.
@@ -221,11 +238,9 @@ a genuine gap:
   - `config`, `config_file`, `read_config` (only in: `config.rb`)
 - `ActiveModel::API#initialize` (api.rb:78-81) is an `initialize` on a Concern, so in Ruby it joins the _host's_ constructor chain via `super` when a class does `include ActiveModel::API`. TypeScript has no expression for that: `include()` (packages/ruby-compat/src/include.ts) copies prototype members and cannot install a constructor, so the port keeps the Rails name as an exported `initialize` function that each including class calls from its own constructor (model.ts). There is no TS `constructor` at the mapped site for the comparison to find — the same shape `ActiveSupport::Messages::Rotator#initialize` above already carries. Scoped to api.rb so a real class's `initialize` is still expected to map to a `constructor`.
   - `initialize` (only in: `api.rb`; ported in TS as `initialize`)
-- `ActiveRecord::Fixture#initialize` (fixtures.rb:817-820) is the method `ActiveRecord::Encryption::EncryptedFixtures` prepends onto (encrypted_fixtures.rb:6-11), so in Ruby the module's `initialize` runs first and reaches the class's own through `super`. TypeScript has no expression for that: `prepend()` (packages/ruby-compat/src/prepend.ts) wraps methods on the prototype and cannot wrap a constructor, so the port keeps the Rails name as an `initialize` method the constructor delegates to — the same shape `ActiveSupport::Messages::Rotator#initialize` above already carries. Scoped to fixtures.rb so a real class's `initialize` is still expected to map to a `constructor`.
-  - `initialize` (only in: `fixtures.rb`, `encryption/encrypted_fixtures.rb`; ported in TS as `initialize`)
 - `Thor::Option#initialize` (parser/option.rb:7-16) assigns `@check_default_type` and `@repeatable` and only then calls `super`, and `Thor::Argument#initialize` (parser/argument.rb:8-26) ends in `validate!`, whose `Option` override reads both ivars (option.rb:126-158). A JS constructor cannot touch `this` before `super()` returns, so the port keeps the Ruby name as an `initialize` method `Argument`'s constructor delegates to and `Option` overrides, calling `super.initialize` where Ruby calls `super` — the same shape `ActiveRecord::Fixture#initialize` above already carries. Scoped to thor's parser/argument.rb and parser/option.rb so a real class's `initialize` is still expected to map to a `constructor`.
   - `initialize` (only in: `parser/argument.rb`, `parser/option.rb`; ported in TS as `initialize`)
-- ActiveSupport::Dependencies (dependencies.rb), ActiveSupport::Autoload (dependencies/autoload.rb) and the ShareLock wrapper Dependencies.interlock returns (dependencies/interlock.rb) are Zeitwerk autoload/reload machinery: an interlock guarding concurrent constant loads, the autoload/eager-load path registries it walks, and the `autoload :Const` / `eager_autoload` DSL that defers a constant to a file. ESM has neither half — every `import` is eager and resolved before the importing module's body, and there is no reloading — so trails has no constant table to guard and nothing to reload. Where Ruby leans on call-time constant resolution to break a load-order cycle, the port uses the zero-import slot module instead (CLAUDE.md, "Call-time constant resolution"); the two require_dependency suites in trails (dependencies.test.ts, autoload.test.ts) are permanent skips for the same reason. That includes every `eager_load!` a module inherits from `extend ActiveSupport::Autoload` with no `def` of its own — the `super` and the Locking / Scoping / AttributeMethods / ConnectionAdapters calls in `ActiveRecord.eager_load!` (active_record.rb:499-507) — so `eagerLoadBang` makes only the calls that reach a Rails `def`: Associations (associations.rb:44) then Encryption (encryption.rb:50). Scoped to these three files so `clear`, `autoload`, `autoloader`, `initialize`, `running` and the `*_paths` readers stay expected everywhere else.
+- ActiveSupport::Dependencies (dependencies.rb), ActiveSupport::Autoload (dependencies/autoload.rb) and the ShareLock wrapper Dependencies.interlock returns (dependencies/interlock.rb) are Zeitwerk autoload/reload machinery: an interlock guarding concurrent constant loads, the autoload/eager-load path registries it walks, and the `autoload :Const` / `eager_autoload` DSL that defers a constant to a file. ESM has neither half — a module graph is resolved and evaluated eagerly at import, and there is no reloading — so trails has no constant table to guard and nothing to reload. Where Ruby leans on call-time constant resolution to break a load-order cycle, the port uses a plain ES import, whose binding is live and is read when the expression runs (CLAUDE.md, "Call-time constant resolution"); the two require_dependency suites in trails (dependencies.test.ts, autoload.test.ts) are permanent skips for the same reason. That includes every `eager_load!` a module inherits from `extend ActiveSupport::Autoload` with no `def` of its own — the `super` and the Locking / Scoping / AttributeMethods / ConnectionAdapters calls in `ActiveRecord.eager_load!` (active_record.rb:499-507) — so `eagerLoadBang` makes only the calls that reach a Rails `def`: Associations (associations.rb:44) then Encryption (encryption.rb:50). Scoped to these three files so `clear`, `autoload`, `autoloader`, `initialize`, `running` and the `*_paths` readers stay expected everywhere else.
   - `interlock`, `interlock=`, `run_interlock`, `load_interlock`, `unload_interlock`, `autoload_paths`, `autoload_paths=`, `autoload_once_paths`, `autoload_once_paths=`, `_eager_load_paths`, `_eager_load_paths=`, `_autoloaded_tracked_classes`, `_autoloaded_tracked_classes=`, `autoloader`, `autoloader=`, `clear`, `search_for_file`, `eager_load?`, `autoload`, `autoload_under`, `autoload_at`, `eager_autoload`, `eager_load!`, `initialize`, `loading`, `unloading`, `start_unloading`, `done_unloading`, `start_running`, `done_running`, `running`, `permit_concurrent_loads`, `raw_state` (only in: `dependencies.rb`, `dependencies/autoload.rb`, `dependencies/interlock.rb`)
 - `Date#acts_like_date?` (core_ext/date/acts_like.rb:7), DateTime's `acts_like_date?` / `acts_like_time?` (core_ext/date_time/acts_like.rb:8-14) and `Time#acts_like_time?` (core_ext/time/acts_like.rb:6-8) are marker methods: Ruby reopens the class to hang an empty predicate on it so `Object#acts_like?` can find it with `respond_to?`. Two things follow, and they differ by receiver. (1) `Time#acts_like_time?` IS ported, as a real marker method: trails' `::Time` is a class the port owns (packages/date/src/time.ts), so the reopening ports literally and `Object.actsLike` answers its `:time` arm through `respond_to?` exactly as Ruby does. It is skipped HERE only because activesupport cannot reopen another package's class, so the member lands at that class rather than at this Rails path. (2) The remaining receivers — `Temporal.PlainDate` / `PlainDateTime` / `ZonedDateTime` / `Instant` and a JS `Date` — are built-ins the port does not monkey-patch, so there is no reopening to define a marker in at all, and RFC 0098 (`time-with-zone-residue-structural-blockers`) landed the decision that `@blazetrails/date` answers for them with the `actsLikeDate` / `actsLikeTime` predicates (packages/date/src/acts-like.ts) that `Object.actsLike` calls (core-ext/object/acts-like.ts:20-30). Installing markers on the `Temporal` polyfill prototypes at import time was rejected as a global side effect on a third-party package; the cost recorded there is the Rails file path for these members. Scoped to the three acts_like.rb files: `TimeWithZone#acts_like_time?` is a real method on a trails-owned class and IS ported (time-with-zone.ts:858).
   - `acts_like_date?`, `acts_like_time?` (only in: `core_ext/date/acts_like.rb`, `core_ext/date_time/acts_like.rb`, `core_ext/time/acts_like.rb`)
@@ -249,6 +264,10 @@ a genuine gap:
   - `to_ary` (only in: `core.rb`, `base.rb`)
 - `ActiveRecord::Relation#then` (relation.rb:1157-1165) chains a block onto the relation's `@future_result`, else falls to `Kernel#then`. A trails relation is evaluated by an async query, so `Relation.prototype` carries the `then` / `catch` / `finally` that `await rel` calls, installed by `applyThenable` and declared on the class without a body (packages/activerecord/CLAUDE.md § "`Relation` is evaluated by an async query"). Scoped to relation.rb so `FutureResult#then` and any other definition stay scored.
   - `then` (only in: `relation.rb`)
+- `OutputBuffer` delegates `encoding`, `encode!` and `force_encoding` to its raw String (buffers.rb:27). Each reads or rewrites a String's encoding tag, which a JS string does not have (CLAUDE.md § "A String has no encoding tag either"). PERMANENT.
+  - `encoding`, `encode!`, `force_encoding` (only in: `buffers.rb`)
+- `Template#offset` and `#locals_code` (template.rb:541-576) build the `module_eval` line offset and the Ruby locals binding of `compiled_source`, which `virtualizeTse` writes as TypeScript at build time; `#find_node_by_id` (template.rb:405-415) walks the Prism tree `spot` parses, and `spot` is line-based (CLAUDE.md § "Templates are precompiled"). PERMANENT.
+  - `offset`, `locals_code`, `find_node_by_id` (only in: `template.rb`)
 
 ## Ruby-only classes
 

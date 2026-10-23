@@ -1,10 +1,11 @@
 /** @internal */
 
-import { Module, NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   Concern,
   extend,
+  htmlSafe,
   mattrWriter,
   Notifications,
 } from "@blazetrails/activesupport";
@@ -36,49 +37,38 @@ export function fragmentCacheKey(
   this.fragmentCacheKeys = [...this.fragmentCacheKeys!, key || (() => value)];
 }
 
-export const ClassMethods = new Module((mod) => {
-  mod.defineMethod("fragmentCacheKey", fragmentCacheKey);
+export const ClassMethods = { fragmentCacheKey };
+
+export const Fragments = {
+  ClassMethods,
+  combinedFragmentCacheKey,
+  writeFragment,
+  readFragment,
+  fragmentExist,
+  expireFragment,
+  instrumentFragmentCache,
+};
+extend(Fragments, Concern);
+(
+  Fragments as unknown as {
+    included(
+      base: null,
+      block: (this: FragmentsClassMethods & { helperMethod(...methods: string[]): void }) => void,
+    ): void;
+  }
+).included(null, function () {
+  if (rbObjRespondTo(this, "classAttribute")) {
+    classAttribute.call(this, "fragmentCacheKeys");
+  } else {
+    mattrWriter.call(this, "fragmentCacheKeys");
+  }
+
+  this.fragmentCacheKeys = [];
+
+  if (rbObjRespondTo(this, "helperMethod")) {
+    this.helperMethod("combinedFragmentCacheKey");
+  }
 });
-
-export const Fragments = new Module((mod) => {
-  extend(mod, Concern);
-
-  (
-    mod as unknown as {
-      included(
-        base: null,
-        block: (this: FragmentsClassMethods & { helperMethod(...methods: string[]): void }) => void,
-      ): void;
-    }
-  ).included(null, function () {
-    if (rbObjRespondTo(this, "classAttribute")) {
-      classAttribute.call(this, "fragmentCacheKeys");
-    } else {
-      mattrWriter.call(this, "fragmentCacheKeys");
-    }
-
-    this.fragmentCacheKeys = [];
-
-    if (rbObjRespondTo(this, "helperMethod")) {
-      this.helperMethod("combinedFragmentCacheKey");
-    }
-  });
-
-  mod.defineMethod("combinedFragmentCacheKey", combinedFragmentCacheKey);
-  mod.defineMethod("writeFragment", writeFragment);
-  mod.defineMethod("readFragment", readFragment);
-  mod.defineMethod("fragmentExist", fragmentExist);
-  mod.defineMethod("expireFragment", expireFragment);
-  mod.defineMethod("instrumentFragmentCache", instrumentFragmentCache);
-}) as Module<{
-  combinedFragmentCacheKey: typeof combinedFragmentCacheKey;
-  writeFragment: typeof writeFragment;
-  readFragment: typeof readFragment;
-  fragmentExist: typeof fragmentExist;
-  expireFragment: typeof expireFragment;
-  instrumentFragmentCache: typeof instrumentFragmentCache;
-}> & { ClassMethods: typeof ClassMethods };
-Fragments.ClassMethods = ClassMethods;
 
 export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unknown[] {
   const heads = this.constructor.fragmentCacheKeys!.map((k) => k.call(this));
@@ -127,50 +117,59 @@ function toStr(content: unknown): string {
   throw new NoMethodError(`undefined method 'to_str' for ${String(content)}`);
 }
 
-export function writeFragment(
+export async function writeFragment(
   this: FragmentsHost,
   key: unknown,
   content: unknown,
   options?: CacheOptions,
-): unknown {
+): Promise<unknown> {
   if (!this.isCacheConfigured()) return content;
-  key = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  instrumentFragmentCache.call(this, "write_fragment", key, () => {
+  key = combinedFragmentCacheKey.call(this, key);
+  await instrumentFragmentCache.call(this, "write_fragment", key, async () => {
     content = toStr(content);
-    this.cacheStore!.write(key as string, content, options);
+    await this.cacheStore!.write(key, content, options);
   });
   return content;
 }
 
-export function readFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
-  if (!this.isCacheConfigured()) return undefined;
-  key = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return instrumentFragmentCache.call(this, "read_fragment", key, () =>
-    this.cacheStore!.read(key as string, options),
-  );
-}
-
-export function fragmentExist(
+export async function readFragment(
   this: FragmentsHost,
   key: unknown,
   options?: CacheOptions,
-): boolean | undefined {
+): Promise<unknown> {
   if (!this.isCacheConfigured()) return undefined;
-  key = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return instrumentFragmentCache.call(this, "exist_fragment?", key, () =>
-    this.cacheStore!.exist(key as string, options),
-  ) as boolean | undefined;
+  key = combinedFragmentCacheKey.call(this, key);
+  return await instrumentFragmentCache.call(this, "read_fragment", key, async () => {
+    const result = await this.cacheStore!.read(key, options);
+    return typeof result === "string" ? htmlSafe(result) : result;
+  });
 }
 
-export function expireFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
+export async function fragmentExist(
+  this: FragmentsHost,
+  key: unknown,
+  options?: CacheOptions,
+): Promise<boolean | undefined> {
   if (!this.isCacheConfigured()) return undefined;
-  if (!(key instanceof RegExp)) key = stringifyKey(combinedFragmentCacheKey.call(this, key));
+  key = combinedFragmentCacheKey.call(this, key);
+  return (await instrumentFragmentCache.call(this, "exist_fragment?", key, () =>
+    this.cacheStore!.exist(key, options),
+  )) as boolean | undefined;
+}
 
-  return instrumentFragmentCache.call(this, "expire_fragment", key, () => {
+export async function expireFragment(
+  this: FragmentsHost,
+  key: unknown,
+  options?: CacheOptions,
+): Promise<unknown> {
+  if (!this.isCacheConfigured()) return undefined;
+  if (!(key instanceof RegExp)) key = combinedFragmentCacheKey.call(this, key);
+
+  return await instrumentFragmentCache.call(this, "expire_fragment", key, () => {
     if (key instanceof RegExp) {
       return this.cacheStore!.deleteMatched(key, options);
     } else {
-      return this.cacheStore!.delete(key as string, options);
+      return this.cacheStore!.delete(key, options);
     }
   });
 }
@@ -186,23 +185,4 @@ export function instrumentFragmentCache<T>(
     this.instrumentPayload(key),
     block,
   ) as T;
-}
-
-function stringifyKey(parts: unknown[]): string {
-  return parts.map(stringifyPart).join("/");
-}
-
-function stringifyPart(part: unknown): string {
-  if (part == null) return "";
-  if (typeof part === "string") return part;
-  if (typeof part === "number" || typeof part === "boolean" || typeof part === "bigint") {
-    return String(part);
-  }
-  const maybe = (part as { cacheKey?: () => string }).cacheKey;
-  if (typeof maybe === "function") return maybe.call(part);
-  try {
-    return JSON.stringify(part) ?? "";
-  } catch {
-    return String(part);
-  }
 }

@@ -1,4 +1,5 @@
-import { kernelThrow, Module, registerConstant } from "@blazetrails/ruby-compat";
+import type { ScopeOn } from "../../scoping/named.js";
+import { kernelThrow, rbCallSuper, registerConstant } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
 import type { AuthorAddress } from "./author.js";
@@ -30,6 +31,12 @@ import { registerModel } from "../../associations.js";
 import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    orderedByPostId: ScopeOn<T, Comment | Post>;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CategoryPost extends Base {
@@ -153,20 +160,23 @@ export class Post extends Base {
   declare taggingsWithDeleteAll: AssociationProxy<Tagging>;
   declare taggingsWithDestroy: AssociationProxy<Tagging>;
 
-  static namedExtension = new Module();
+  static namedExtension = {
+    author(): string {
+      return "lifo";
+    },
 
-  declare static CommentsWithExtendAssociationExtension: Module;
+    greeting(this: object): string {
+      return `${rbCallSuper(this, Post.namedExtension.greeting) as string} :)`;
+    },
+  };
 
-  static namedExtension2 = new Module();
+  declare static CommentsWithExtendAssociationExtension: Record<string, unknown>;
 
-  static {
-    this.namedExtension.defineMethod("author", () => "lifo");
-    this.namedExtension.defineMethod("greeting", function (this: object) {
-      return `${Post.namedExtension.superMethod(this, "greeting")!()} :)`;
-    });
-
-    this.namedExtension2.defineMethod("greeting", () => "hullo");
-  }
+  static namedExtension2 = {
+    greeting(): string {
+      return "hullo";
+    },
+  };
 
   static _log: Array<[any, any, any]> = [];
 
@@ -174,67 +184,67 @@ export class Post extends Base {
     this.aliasAttribute("text", "body");
     this.aliasAttribute("comments_count", "legacy_comments_count");
 
-    this.scope("containingTheLetterA", function (this: any) {
+    this.scope("containingTheLetterA", function () {
       return this.where("body LIKE '%a%'");
     });
-    this.scope("titledWithAnApostrophe", function (this: any) {
+    this.scope("titledWithAnApostrophe", function () {
       return this.where("title LIKE '%''%'");
     });
-    this.scope("rankedByComments", function (this: any) {
+    this.scope("rankedByComments", function () {
       return this.order(this.model.arelTable.get("comments_count").desc());
     });
-    this.scope("orderedByPostId", function (this: any) {
+    this.scope("orderedByPostId", function () {
       return this.order("posts.post_id ASC");
     });
-    this.scope("limitBy", function (this: any, l: number) {
+    this.scope("limitBy", function (l: number) {
       return this.limit(l);
     });
-    this.scope("locked", function (this: any) {
+    this.scope("locked", function () {
       return this.lock();
     });
-    this.scope("mostCommented", function (this: any, commentsCount: number) {
+    this.scope("mostCommented", function (commentsCount: number) {
       return this.joins(":comments")
         .group("posts.id")
         .having("count(comments.id) >= ?", commentsCount);
     });
 
-    this.scope("noComments", function (this: any) {
+    this.scope("noComments", function () {
       return this.leftJoins(":comments").where({ comments: { id: null } });
     });
-    this.scope("withSpecialComments", function (this: any) {
+    this.scope("withSpecialComments", function () {
       return this.joins(":comments").where({ comments: { type: "SpecialComment" } });
     });
-    this.scope("withVerySpecialComments", function (this: any) {
+    this.scope("withVerySpecialComments", function () {
       return this.joins(":comments").where({ comments: { type: "VerySpecialComment" } });
     });
-    this.scope("withPost", function (this: any, postId: number) {
+    this.scope("withPost", function (postId: number) {
       return this.joins(":comments").where({ comments: { post_id: postId } });
     });
-    this.scope("withComments", function (this: any) {
+    this.scope("withComments", function () {
       return this.preload(":comments");
     });
-    this.scope("withTags", function (this: any) {
+    this.scope("withTags", function () {
       return this.preload(":taggings");
     });
-    this.scope("withTagsCte", function (this: any) {
+    this.scope("withTagsCte", function () {
       return this.with({ posts_with_tags: this.model.where("tags_count > 0") }).from(
         "posts_with_tags AS posts",
       );
     });
-    this.scope("taggedWith", function (this: any, id: number) {
+    this.scope("taggedWith", function (id: number) {
       return this.joins(":taggings").where({ taggings: { tag_id: id } });
     });
-    this.scope("taggedWithComment", function (this: any, comment: string) {
+    this.scope("taggedWithComment", function (comment: string) {
       return this.joins(":taggings").where({ taggings: { comment } });
     });
-    this.scope("typographicallyInteresting", function (this: any) {
+    this.scope("typographicallyInteresting", function () {
       return this.where("body LIKE '%a%'").or(this.where("title LIKE '%''%'"));
     });
 
     this.belongsTo("author");
     this.belongsTo(
       "readonlyAuthor",
-      function (this: any) {
+      function () {
         return this.readonly();
       },
       {
@@ -244,7 +254,7 @@ export class Post extends Base {
     );
     this.belongsTo(
       "authorWithPosts",
-      function (this: any) {
+      function () {
         return this.includes(":posts");
       },
       {
@@ -254,7 +264,7 @@ export class Post extends Base {
     );
     this.belongsTo(
       "authorWithAddress",
-      function (this: any) {
+      function () {
         return this.includes(":authorAddress");
       },
       {
@@ -264,7 +274,7 @@ export class Post extends Base {
     );
     this.belongsTo(
       "authorWithSelect",
-      function (this: any) {
+      function () {
         return this.select("id");
       },
       {
@@ -274,7 +284,7 @@ export class Post extends Base {
     );
     this.belongsTo(
       "authorWithTheLetterA",
-      function (this: any) {
+      function () {
         return this.where("name LIKE '%a%'");
       },
       {
@@ -285,14 +295,14 @@ export class Post extends Base {
 
     this.hasOne(
       "firstComment",
-      function (this: any) {
+      function () {
         return this.order("id ASC");
       },
       { className: "Comment" },
     );
     this.hasOne(
       "lastComment",
-      function (this: any) {
+      function () {
         return this.order("id desc");
       },
       { className: "Comment" },
@@ -321,12 +331,12 @@ export class Post extends Base {
       null,
       { extend: Post.namedExtension, className: "Comment", foreignKey: "post_id" },
       (mod) => {
-        mod.defineMethod("greeting", () => "hello");
+        mod.greeting = () => "hello";
       },
     );
     this.hasMany(
       "commentsWithExtending",
-      function (this: any) {
+      function () {
         return this.extending(Post.namedExtension);
       },
       {
@@ -356,7 +366,7 @@ export class Post extends Base {
     this.hasOne("verySpecialComment");
     this.hasOne(
       "verySpecialCommentWithPost",
-      function (this: any) {
+      function () {
         return this.includes(":post");
       },
       {
@@ -365,14 +375,14 @@ export class Post extends Base {
     );
     this.hasOne(
       "verySpecialCommentWithPostWithJoins",
-      function (this: any) {
+      function () {
         return this.joins(":post").order("posts.id");
       },
       { className: "VerySpecialComment" },
     );
     this.hasOne(
       "verySpecialCommentWithStringJoins",
-      function (this: any) {
+      function () {
         return this.joins("JOIN posts AS p1 ON comments.post_id = p1.id")
           .where()
           .not({ p1: { id: 999999 } });
@@ -381,7 +391,7 @@ export class Post extends Base {
     );
     this.hasMany(
       "commentsWithStringJoins",
-      function (this: any) {
+      function () {
         return this.joins("JOIN posts AS p2 ON comments.post_id = p2.id")
           .where()
           .not({ p2: { id: 999999 } });
@@ -395,7 +405,7 @@ export class Post extends Base {
     this.hasMany("specialComments");
     this.hasMany(
       "nonexistentComments",
-      function (this: any) {
+      function () {
         return this.where("comments.id < 0");
       },
       {
@@ -413,7 +423,7 @@ export class Post extends Base {
     this.hasMany("scategories", { through: "categoryPosts", source: "category" });
     this.hasMany(
       "hmtSpecialCategories",
-      function (this: any) {
+      function () {
         return this.where().not({ name: null });
       },
       {
@@ -431,7 +441,7 @@ export class Post extends Base {
     this.hasMany("essays", { through: "categories" });
     this.hasMany(
       "authorsOfEssaysNamedBob",
-      function (this: any) {
+      function () {
         return this.where({ name: "Bob" });
       },
       {
@@ -489,7 +499,7 @@ export class Post extends Base {
 
     this.hasMany(
       "miscTags",
-      function (this: any) {
+      function () {
         return this.where({ tags: { name: "Misc" } });
       },
       {
@@ -505,7 +515,7 @@ export class Post extends Base {
 
     this.hasMany(
       "firstTaggings",
-      function (this: any) {
+      function () {
         return this.where({ taggings: { comment: "first" } });
       },
       {
@@ -515,7 +525,7 @@ export class Post extends Base {
     );
     this.hasMany(
       "firstBlueTags",
-      function (this: any) {
+      function () {
         return this.where({ tags: { name: "Blue" } });
       },
       {
@@ -525,7 +535,7 @@ export class Post extends Base {
     );
     this.hasMany(
       "firstBlueTags_2",
-      function (this: any) {
+      function () {
         return this.where({ taggings: { comment: "first" } });
       },
       {
@@ -536,7 +546,7 @@ export class Post extends Base {
 
     this.hasMany(
       "invalidTaggings",
-      function (this: any) {
+      function () {
         return this.where("taggings.id < 0");
       },
       {
@@ -590,7 +600,7 @@ export class Post extends Base {
     this.hasMany("secureReaders");
     this.hasMany(
       "readersWithPerson",
-      function (this: any) {
+      function () {
         return this.includes(":person");
       },
       { className: "Reader" },
@@ -615,7 +625,7 @@ export class Post extends Base {
     });
     this.hasMany(
       "skimmers",
-      function (this: any) {
+      function () {
         return this.where({ skimmer: true });
       },
       { className: "Reader" },
@@ -625,7 +635,7 @@ export class Post extends Base {
     this.hasMany("lazyReaders");
     this.hasMany(
       "lazyReadersSkimmersOrNot",
-      function (this: any) {
+      function () {
         return this.where({ skimmer: [true, false] });
       },
       {
@@ -635,7 +645,7 @@ export class Post extends Base {
     this.hasMany("lazyPeople", { through: "lazyReaders", source: "person" });
     this.hasMany(
       "lazyReadersUnscopeSkimmers",
-      function (this: any) {
+      function () {
         return this.skimmersOrNot();
       },
       {
@@ -751,7 +761,7 @@ registerModel(SubAbstractStiPost);
 
 export class NullPost extends Post {
   static {
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.none();
     });
   }
@@ -765,7 +775,7 @@ export class FirstPost extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ id: 1 });
     });
 
@@ -789,7 +799,7 @@ export interface FirstPost {
 export class PostWithDefaultSelect extends Base {
   static {
     this._tableName = "posts";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.select("author_id");
     });
   }
@@ -803,7 +813,7 @@ export class TaggedPost extends Post {
   static {
     this.hasMany(
       "taggings",
-      function (this: any) {
+      function () {
         return this.rewhere({ taggable_type: "TaggedPost" });
       },
       {
@@ -821,7 +831,7 @@ export class PostWithDefaultInclude extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.includes(":comments");
     });
     this.hasMany("comments", { foreignKey: "post_id" });
@@ -834,7 +844,7 @@ export class PostWithSpecialCategorization extends Post {
 
   static {
     this.hasMany("categorizations", { foreignKey: "post_id" });
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ type: "PostWithSpecialCategorization" })
         .joins(":categorizations")
         .where({ categorizations: { special: true } });
@@ -847,7 +857,7 @@ export class PostWithDefaultScope extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.order("title");
     });
   }
@@ -860,7 +870,7 @@ export class PostWithPreloadDefaultScope extends Base {
   static {
     this._tableName = "posts";
     this.hasMany("readers", { foreignKey: "post_id" });
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.preload(":readers");
     });
   }
@@ -873,7 +883,7 @@ export class PostWithIncludesDefaultScope extends Base {
   static {
     this._tableName = "posts";
     this.hasMany("readers", { foreignKey: "post_id" });
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.includes(":readers");
     });
   }
@@ -887,10 +897,10 @@ export class SpecialPostWithDefaultScope extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ id: [1, 5, 6] });
     });
-    this.scope("unscopedAll", function (this: any) {
+    this.scope("unscopedAll", function () {
       return this.model.unscoped(() => this.model.all());
     });
     this.scope("authorless", function (this: any) {
@@ -910,7 +920,7 @@ export class PostThatLoadsCommentsInAnAfterSaveHook extends Base {
       className: "CommentThatAutomaticallyAltersPostBody",
       foreignKey: "post_id",
     });
-    this.afterSave(async function (this: any) {
+    this.afterSave(async function (this: PostThatLoadsCommentsInAnAfterSaveHook) {
       await this.comments.load();
     });
   }
@@ -926,7 +936,7 @@ export class PostWithAfterCreateCallback extends Base {
     this._tableName = "posts";
     this.hasMany("comments", { foreignKey: "post_id" });
     this.hasAndBelongsToMany("categories", { foreignKey: "post_id" });
-    this.afterCreate(async function (this: any) {
+    this.afterCreate(async function (this: PostWithAfterCreateCallback) {
       const firstComment = await this.comments.first();
       await this.updateAttribute("author_id", firstComment?.id);
     });
@@ -970,7 +980,7 @@ registerModel(SerializedPost);
 
 export class ConditionalStiPost extends Post {
   static {
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ title: "Untitled" });
     });
   }
@@ -984,7 +994,7 @@ export class PostWithDestroyCallback extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.beforeDestroy(function (this: any) {
+    this.beforeDestroy(function (this: PostWithDestroyCallback) {
       if (Number(this.id) === 1) kernelThrow(":abort");
     });
   }

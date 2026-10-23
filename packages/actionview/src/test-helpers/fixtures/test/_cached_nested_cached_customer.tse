@@ -1,0 +1,3 @@
+<% await context.cache(cached_customer, {}, async () => { %>
+  <%= await render({ partial: "test/cached_customer", locals: { cached_customer: cached_customer } }) %>
+<% }) %>

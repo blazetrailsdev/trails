@@ -3,7 +3,7 @@ import * as ts from "typescript/unstable/ast";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { virtualize, remapLine } from "./virtualize.js";
+import { virtualize, remapLine, missingTables, type ModelTable } from "./virtualize.js";
 import { tsApi } from "./ts-api.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -916,5 +916,155 @@ describe("virtualize — idempotence", () => {
     const once = virtualize(src, "post.ts").text;
     const twice = virtualize(once, "post.ts").text;
     expect(twice).toBe(once);
+  });
+});
+
+describe("virtualize — missingTables", () => {
+  const schema = { posts: { title: "string" } };
+  const missing = (...files: string[]): string[] => {
+    const models: ModelTable[] = [];
+    files.forEach((src, i) =>
+      virtualize(src, i === 0 ? "m.ts" : `m${i}.ts`, {
+        baseNames: ["Base", "ApplicationRecord", "Article", "Post"],
+        schemaColumnsByTable: schema,
+        onModel: (m) => models.push(m),
+      }),
+    );
+    return missingTables(models, schema).map((m) => `${m.className}:${m.tableName}:${m.fileName}`);
+  };
+
+  test("warns for a model whose table is in no schema", () => {
+    expect(missing("export class PullRequest extends Base {}\n")).toEqual([
+      "PullRequest:pull_requests:m.ts",
+    ]);
+  });
+
+  test("does not warn for a model marked no-schema or skip", () => {
+    expect(
+      missing("/** @trails-typegen no-schema */\nexport class PullRequest extends Base {}\n"),
+    ).toEqual([]);
+    expect(
+      missing("/** @trails-typegen skip */\nexport class PullRequest extends Base {}\n"),
+    ).toEqual([]);
+  });
+
+  test("does not warn for an abstract class", () => {
+    expect(
+      missing(
+        "export class Hub extends Base {\n  static {\n    this.abstractClass = true;\n  }\n}\n",
+      ),
+    ).toEqual([]);
+  });
+
+  test("reads tableName assigned in a static block", () => {
+    const src =
+      "export class Article extends Base {\n" +
+      '  static {\n    this.tableName = "posts";\n  }\n' +
+      "}\n";
+    expect(missing(src)).toEqual([]);
+    const { text } = virtualize(src, "m.ts", { schemaColumnsByTable: schema });
+    expect(text).toMatch(/get title\(\): string;/);
+  });
+
+  test("does not warn for a model whose tableName is not a literal", () => {
+    expect(
+      missing(
+        'export class Stat extends Base {\n  static {\n    this.tableName = prefix + "stats";\n  }\n}\n',
+      ),
+    ).toEqual([]);
+  });
+
+  test("ignores Object.prototype keys when looking up a table", () => {
+    expect(
+      missing('export class Constructor extends Base {\n  static tableName = "constructor";\n}\n'),
+    ).toEqual(["Constructor:constructor:m.ts"]);
+  });
+
+  test("does not warn for an STI subclass of a model whose table is known", () => {
+    expect(
+      missing("export class Post extends Base {}\nexport class Draft extends Post {}\n"),
+    ).toEqual([]);
+  });
+
+  test("resolves an STI subclass's table through a base class in another file", () => {
+    const base = 'export class Article extends Base {\n  static tableName = "posts";\n}\n';
+    const sub = "export class Draft extends Article {}\n";
+    expect(missing(sub, base)).toEqual([]);
+  });
+
+  test("does not warn when the base class is in no processed file", () => {
+    expect(missing("export class Draft extends Article {}\n")).toEqual([]);
+  });
+
+  test("resolves the table below an abstract class in another file", () => {
+    const abstract =
+      "export class ApplicationRecord extends Base {\n  static {\n    this.abstractClass = true;\n  }\n}\n";
+    expect(missing("export class Post extends ApplicationRecord {}\n", abstract)).toEqual([]);
+    expect(missing("export class Comment extends ApplicationRecord {}\n", abstract)).toEqual([
+      "Comment:comments:m.ts",
+    ]);
+  });
+
+  test("a no-schema model keeps its synthesized associations", () => {
+    const src =
+      "/** @trails-typegen no-schema */\n" +
+      'export class PullRequest extends Base {\n  static { this.hasMany("posts"); }\n}\n';
+    expect(virtualize(src, "m.ts").text).toContain("declare posts:");
+  });
+});
+
+describe("virtualize — aliasAttribute", () => {
+  const run = (body: string, extra = ""): string =>
+    virtualize(
+      `export class Story extends Base {\n${extra}  static {\n${body}  }\n}\n`,
+      "story.ts",
+      { schemaColumnsByTable: { stories: { pr_number: "integer" } } },
+    ).text;
+
+  test("aliases a schema column", () => {
+    const text = run('    this.aliasAttribute("prNumber", "pr_number");\n');
+    expect(text).toMatch(/get prNumber\(\): number;/);
+    expect(text).toMatch(/set prNumber\(value: unknown\);/);
+  });
+
+  test("aliases an attribute() call", () => {
+    const text = run(
+      '    this.attribute("title", "string");\n    this.aliasAttribute("heading", "title");\n',
+    );
+    expect(text).toMatch(/get heading\(\): string;/);
+  });
+
+  test("aliases a hand-declared member", () => {
+    const text = run('    this.aliasAttribute("label", "name");\n', "  declare name: string;\n");
+    expect(text).toMatch(/get label\(\): string;/);
+  });
+
+  test("an enum-narrowed attribute keeps its narrowed type under the alias", () => {
+    const text = run(
+      '    this.attribute("status", "string");\n' +
+        '    this.enum("status", { open: 0, closed: 1 });\n' +
+        '    this.aliasAttribute("state", "status");\n',
+    );
+    expect(text).toMatch(/get state\(\): "open" \| "closed";/);
+  });
+
+  test("an alias of an unknown attribute synthesizes nothing", () => {
+    expect(run('    this.aliasAttribute("ghost", "missing");\n')).not.toMatch(/get ghost/);
+  });
+
+  test("an alias of an alias resolves regardless of source order", () => {
+    const text = run(
+      '    this.aliasAttribute("prNo", "prNumber");\n' +
+        '    this.aliasAttribute("prNumber", "pr_number");\n',
+    );
+    expect(text).toMatch(/get prNo\(\): number;/);
+  });
+
+  test("an existing member wins over the alias", () => {
+    const text = run(
+      '    this.aliasAttribute("prNumber", "pr_number");\n',
+      "  declare prNumber: string;\n",
+    );
+    expect(text).not.toMatch(/get prNumber/);
   });
 });

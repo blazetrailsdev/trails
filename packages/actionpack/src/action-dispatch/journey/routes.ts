@@ -3,16 +3,7 @@ import { Builder } from "./gtg/builder.js";
 import { Simulator } from "./gtg/simulator.js";
 import type { Route } from "./route.js";
 
-/**
- * Journey::Mapping shape — Rails calls `mapping.make_route(name, index)`
- * to construct a Route. Trails consumers can implement this interface
- * directly or hand `Routes.addRoute` a factory.
- *
- * @noRailsEquivalent CONVERGEABLE (story:
- * converge-journey-mapping-onto-ported-mapper-mapping). Rails passes a real
- * `ActionDispatch::Routing::Mapper::Mapping` (`routing/mapper.rb:83`); this
- * shape stands in until that class is ported.
- */
+/** @noRailsEquivalent CONVERGEABLE converge-journey-mapping-onto-ported-mapper-mapping */
 export interface Mapping {
   makeRoute(name: string | null, index: number): Route;
 }

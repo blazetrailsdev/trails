@@ -4,38 +4,42 @@ import { Entry } from "./entry.js";
 
 class TestStore extends Store {
   private _data = new Map<string, Entry>();
-  protected readEntry(key: string, _o: Record<string, unknown>): Entry | null {
+  protected async readEntry(key: string, _o: Record<string, unknown>): Promise<Entry | null> {
     return this._data.get(key) ?? null;
   }
-  protected writeEntry(key: string, entry: Entry, _o: Record<string, unknown>): boolean {
+  protected async writeEntry(
+    key: string,
+    entry: Entry,
+    _o: Record<string, unknown>,
+  ): Promise<boolean> {
     this._data.set(key, entry);
     return true;
   }
-  protected deleteEntry(key: string, _o: Record<string, unknown>): boolean {
+  protected async deleteEntry(key: string, _o: Record<string, unknown>): Promise<boolean> {
     return this._data.delete(key);
   }
-  override clear(): void {
+  override async clear(): Promise<void> {
     this._data.clear();
   }
-  override cleanup(): void {
+  override async cleanup(): Promise<void> {
     for (const [k, e] of this._data) {
       if (e.isExpired()) this._data.delete(k);
     }
   }
-  override increment(name: string, amount = 1): number | null {
+  override async increment(name: string, amount = 1): Promise<number | null> {
     const key = this.normalizeKey(name, {});
-    const entry = this.readEntry(key, {});
+    const entry = await this.readEntry(key, {});
     if (!entry) return null;
     const n = Number(entry.value);
     if (isNaN(n)) return null;
     const next = n + amount;
-    this.writeEntry(key, new Entry(next), {});
+    await this.writeEntry(key, new Entry(next), {});
     return next;
   }
-  override decrement(name: string, amount = 1): number | null {
-    return this.increment(name, -amount);
+  override async decrement(name: string, amount = 1): Promise<number | null> {
+    return await this.increment(name, -amount);
   }
-  override deleteMatched(matcher: string | RegExp): void {
+  override async deleteMatched(matcher: string | RegExp): Promise<void> {
     const re = typeof matcher === "string" ? new RegExp(matcher) : matcher;
     for (const k of this._data.keys()) {
       if (re.test(k)) this._data.delete(k);

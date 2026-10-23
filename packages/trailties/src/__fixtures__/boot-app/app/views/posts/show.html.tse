@@ -2,3 +2,4 @@
 <p><%= title %></p>
 <a href="<%= postsPath() %>">All posts</a>
 <%= statusBadge("ready") %>
+<%= renderMarkdown("rendered") %>

@@ -13,16 +13,15 @@
  *      Missing/wrong-parent reports on line 1.
  *   2. Everywhere in scope: `throw new Error(` (and TypeError/globalThis.Error/
  *      …) is flagged — keyed on the constructor only, so ported subclasses pass.
- *   3. Everywhere in scope, the exclude list included: `throw new X(message)`
+ *   3. Everywhere in scope: `throw new X(message)`
  *      where the Rails file this one mirrors raises `X` with no message
  *      (`raise X` / `raise X unless …`) is flagged. The manifest's
  *      `bareRaises` lists, per TS file and per owning class (`*` for a
  *      function with no class around it, or a class Rails does not name), the
  *      classes each Rails method raises bare and never with a message.
- *      This arm has no baseline: it starts from zero.
  *
- * Pre-existing violators are grandfathered via the ratchet baseline
- * `eslint/rails-error-parity-exclude.json` (it only shrinks). Manifest:
+ * Pre-existing violations are counted per file against origin/main by
+ * `pnpm parity:lint:counts` (scripts/parity/eslint-count.ts). Manifest:
  *   pnpm tsx scripts/build-rails-error-manifest.ts
  *
  * Blind spot: this check is file-driven, so a manifest class whose mapped home
@@ -40,9 +39,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // env vars without import-time ordering games.
 const manifestPath = () =>
   process.env.RAILS_ERROR_CLASSES_PATH ?? path.join(__dirname, "rails-error-classes.json");
-const excludePath = () =>
-  process.env.RAILS_ERROR_PARITY_EXCLUDE_PATH ??
-  path.join(__dirname, "rails-error-parity-exclude.json");
 
 // Global error constructors. `throw new <one of these>(…)` is the bare-throw
 // the rule bans; ported subclasses (RecordNotFound, …) are not in this set.
@@ -86,10 +82,6 @@ function loadJson(p, fallback) {
 
 function loadManifest() {
   return loadJson(manifestPath(), { packages: {} });
-}
-
-function loadExclude() {
-  return new Set(loadJson(excludePath(), []));
 }
 
 /** Repo-relative path (POSIX) for the in-scope packages; null if out of scope. */
@@ -262,7 +254,7 @@ const rule = {
         context.report({ node: arg, messageId: "inventedMessage", data: { name } });
       },
     };
-    if (!PKG_NS[scope.pkg] || loadExclude().has(scope.rel)) return inventedMessage;
+    if (!PKG_NS[scope.pkg]) return inventedMessage;
 
     const exportedClasses = new Map();
     // A name bound by an `import` shadows the global of the same spelling, so

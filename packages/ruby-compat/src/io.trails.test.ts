@@ -7,6 +7,7 @@ import { File } from "./file.js";
 import { IO, STDOUT, printf, puts } from "./io.js";
 import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 import { stderr, stdout } from "./process-adapter.js";
+import { b } from "./string/b.js";
 
 describe("IO", () => {
   it("binwrite writes the string and answers its byte count", () => {
@@ -24,7 +25,7 @@ describe("IO", () => {
 
     const copy = join(mkdtempSync(join(tmpdir(), "trails-io-")), "copy.bin");
     expect(IO.binwrite(copy, bytes)).toBe(bytes.length);
-    expect(IO.binread(copy)).toBe(bytes);
+    expect(IO.binread(copy)).toEqual(bytes);
     expect(readFileSync(copy, "utf-8")).toBe("héllo 日本");
   });
 
@@ -40,8 +41,8 @@ describe("IO", () => {
     writeFileSync(path, "abcdef");
     File.open(path, "rb", (file) => {
       expect(file.seek(2)).toBe(0);
-      expect(file.read(3)).toBe("cde");
-      expect(file.read(3)).toBe("f");
+      expect(file.read(3)).toEqual(b("cde"));
+      expect(file.read(3)).toEqual(b("f"));
       expect(file.read(3)).toBe(null);
     });
   });
@@ -52,9 +53,9 @@ describe("IO", () => {
     writeFileSync(path, "abcdef");
     const str = new Uint8Array(3);
     File.open(path, "rb", (file) => {
-      expect(file.read(3, str)).toBe("abc");
+      expect(file.read(3, str)).toEqual(b("abc"));
       expect([...str]).toEqual([0x61, 0x62, 0x63]);
-      expect(file.read(null, str)).toBe("def");
+      expect(file.read(null, str)).toEqual(b("def"));
       expect([...str]).toEqual([0x64, 0x65, 0x66]);
       expect(file.read(3, str)).toBe(null);
       expect([...str]).toEqual([0, 0, 0]);
@@ -75,7 +76,7 @@ describe("IO", () => {
     file.rewind();
     expect(file.read()).toBe("héllo");
     file.rewind();
-    expect(file.read(3)).toBe("h\u00c3\u00a9");
+    expect(file.read(3)).toEqual(b("hé"));
     file.close();
   });
 
@@ -85,9 +86,9 @@ describe("IO", () => {
     file.binmode();
     expect(file.write("héllo")).toBe(6);
     file.rewind();
-    expect(file.read()).toBe("h\u00c3\u00a9llo");
+    expect(file.read()).toEqual(b("héllo"));
     file.close();
-    expect(File.binread(path)).toBe("h\u00c3\u00a9llo");
+    expect(File.binread(path)).toEqual(b("héllo"));
   });
 
   it("write sends a Uint8Array's bytes unchanged, whatever the stream's encoding", () => {
@@ -95,7 +96,7 @@ describe("IO", () => {
     const file = File.open(path, "w:UTF-8");
     expect(file.write(new Uint8Array([0x68, 0xc3, 0xa9, 0xff]))).toBe(4);
     file.close();
-    expect(File.binread(path)).toBe("h\u00c3\u00a9\u00ff");
+    expect(File.binread(path)).toEqual(Uint8Array.of(0x68, 0xc3, 0xa9, 0xff));
   });
 
   it("read answers the mode string's external encoding, and write transcodes to it", () => {
@@ -107,7 +108,7 @@ describe("IO", () => {
       expect(file.read()).toBe("hél");
     });
     const binary = File.open(path, "r", { externalEncoding: "ASCII-8BIT" });
-    expect(binary.read()).toBe("h\u00e9l");
+    expect(binary.read()).toEqual(Uint8Array.of(0x68, 0xe9, 0x6c));
     binary.close();
   });
 

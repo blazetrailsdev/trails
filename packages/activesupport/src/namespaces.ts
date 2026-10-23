@@ -3,8 +3,10 @@ import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
 import type { CacheStore } from "./cache/index.js";
+import type { Duration } from "./duration.js";
 import type { EnvironmentInquirer } from "./environment-inquirer.js";
 import type { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
+import type * as Inflector from "./inflector.js";
 import type { Logger } from "./logger.js";
 import type { MessagePack } from "./message-pack.js";
 
@@ -33,7 +35,9 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 
 export const ActiveSupport = { name: "ActiveSupport", loadPath } as AutoloadModule & {
   BroadcastLogger: typeof BroadcastLogger;
+  Duration: typeof Duration;
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;
+  Inflector: typeof Inflector;
   MessagePack?: typeof MessagePack;
 };
 extend(ActiveSupport, Autoload);
@@ -65,7 +69,9 @@ export const TopLevel: {
         paths(): { get(path: string): { firstSync(): string | undefined } | undefined };
       };
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
+      envConfig(): Record<string, unknown>;
       executor: { wrap<T>(block: () => T): T };
+      call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
     } | null;
     Application: abstract new (...args: never[]) => unknown;
     Engine: abstract new (...args: never[]) => unknown;
@@ -82,10 +88,16 @@ export const TopLevel: {
       PolymorphicRoutes: {
         HelperMethodBuilder: { path(): PolymorphicBuilder; url(): PolymorphicBuilder };
       };
+      UrlFor?: object;
     };
   };
   ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
-  ActionCable?: { Engine?: unknown };
+  ActiveRecord?: {
+    Railties: { ControllerRuntime?: object };
+    Base?: { logger: unknown };
+    afterAllTransactionsCommit(block: () => unknown): unknown;
+  };
+  ActionCable?: { name?: string; Engine?: unknown; server?(): unknown };
   BCrypt?: {
     Engine: { readonly MIN_COST: number; readonly cost: number };
     Password: {

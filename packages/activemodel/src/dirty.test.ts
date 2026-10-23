@@ -1,4 +1,4 @@
-import { Hash, rbEqual } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, rbEqual } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
@@ -235,8 +235,8 @@ describe("DirtyTest", () => {
     model.name = "Jericho Cane";
     model.status = "waiting";
     model.save();
-    expect(model.previousChanges.get("name")).toEqual([null, "Jericho Cane"]);
-    expect(model.previousChanges.get("status")).toEqual(["initialized", "waiting"]);
+    expect(hashAref(model.previousChanges, "name")).toEqual([null, "Jericho Cane"]);
+    expect(hashAref(model.previousChanges, "status")).toEqual(["initialized", "waiting"]);
   });
 
   it("setting new attributes should not affect previous changes", () => {
@@ -246,7 +246,7 @@ describe("DirtyTest", () => {
     model.name = "DudeFella ManGuy";
     model.status = "finished";
     expect(model.namePreviousChange).toEqual([null, "Jericho Cane"]);
-    expect(model.previousChanges.get("status")).toEqual(["initialized", "waiting"]);
+    expect(hashAref(model.previousChanges, "status")).toEqual(["initialized", "waiting"]);
   });
 
   it("saving should preserve model's previous changed status", () => {
@@ -307,12 +307,12 @@ describe("DirtyTest", () => {
     model.save();
     model.name = "Bob";
 
-    expect(model.previousChanges.get("name")).toEqual([null, "Dmitry"]);
+    expect(hashAref(model.previousChanges, "name")).toEqual([null, "Dmitry"]);
     expect(model.changedAttributes.get("name")).toBe("Dmitry");
 
     model.clearChangesInformation();
 
-    expect(model.previousChanges).toEqual(new HashWithIndifferentAccess());
+    expect(model.previousChanges).toEqual({});
     expect(model.changedAttributes).toEqual(new HashWithIndifferentAccess());
   });
 

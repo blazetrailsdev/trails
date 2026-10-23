@@ -847,7 +847,7 @@ describe("ValidationsTest (trails)", () => {
       class Child extends Base {}
       Base.validates("name", { presence: true });
       expect(Child.validatorsOn("name")).toHaveLength(1);
-      expect(Object.prototype.hasOwnProperty.call(Child, "__class_attr__validators")).toBe(true);
+      expect(Object.hasOwn(Child, "__class_attr__validators")).toBe(true);
       const copy = Child._validators;
       expect(Child._validators).toBe(copy);
       expect(copy).not.toBe(Base._validators);

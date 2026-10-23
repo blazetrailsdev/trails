@@ -294,3 +294,102 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
     );
   });
 });
+
+describe("compare.ts --calls over a method carrying @inlinedFrom", () => {
+  const argv = process.argv;
+  const HELPER_RB = "rails/v8.0.2/activemodel/lib/active_model/helper.rb";
+  const helperTag = (overrides: Partial<InlinedFrom> = {}): InlinedFrom =>
+    tag({
+      module: "ActiveModel::Helper",
+      hook: "render",
+      file: HELPER_RB.slice(13),
+      firstLine: 3,
+      lastLine: 5,
+      ...overrides,
+    });
+
+  beforeEach(() => {
+    output.dir = fs.mkdtempSync(path.join(os.tmpdir(), "compare-inlined-method-"));
+    process.argv = ["node", "compare-under-test", "--calls", "--package", PKG];
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.argv = argv;
+    vi.restoreAllMocks();
+    fs.rmSync(output.dir, { recursive: true, force: true });
+  });
+
+  function compareMethod({
+    tsCalls = ["buildReflection", "assignAttributes"],
+    inlinedFrom = [helperTag()],
+    ownRender = true,
+  }: { tsCalls?: string[]; inlinedFrom?: InlinedFrom[]; ownRender?: boolean } = {}) {
+    const write = (name: string, packages: unknown) =>
+      fs.writeFileSync(path.join(output.dir, name), JSON.stringify({ packages }));
+    const helpers = (names: string[]) => names.map((name) => method(name, [], { params: PARAMS }));
+    write("rails-api.json", {
+      [PKG]: {
+        classes: {
+          "ActiveModel::Thing": entity(
+            "ActiveModel::Thing",
+            "thing.rb",
+            [
+              ...(ownRender ? [method("render", ["build_reflection", "super"])] : []),
+              ...helpers(["assign_attributes", "build_reflection"]),
+            ],
+            ["ActiveModel::Helper"],
+          ),
+        },
+        modules: {
+          "ActiveModel::Helper": entity("ActiveModel::Helper", "helper.rb", [
+            method("render", ["assign_attributes", "super"], {
+              vendorFile: HELPER_RB,
+              line: 3,
+              endLine: 5,
+            }),
+          ]),
+        },
+      },
+    });
+    const tsMethods = [
+      method("render", tsCalls, { inlinedFrom }),
+      ...helpers(["assignAttributes", "buildReflection"]),
+    ].map((m, index) => ({ ...m, file: "thing.ts", line: 3 + index * 5 }));
+    write("ts-api.json", {
+      [PKG]: { classes: { Thing: entity("Thing", "thing.ts", tsMethods) }, modules: {} },
+    });
+    main();
+    const read = (name: string) =>
+      JSON.parse(fs.readFileSync(path.join(output.dir, name), "utf-8"));
+    const calls = JSON.stringify(read("call-mismatches.json"), null, 1)
+      .split("\n")
+      .filter((line) => line.includes("→"));
+    const helperRow = read("api-comparison.json").results[0].files.find(
+      (file: { rubyFile: string }) => file.rubyFile === "helper.rb",
+    );
+    return { calls, helperRow };
+  }
+
+  it("flags a call only the tagged module method makes when the includer's method omits it", () => {
+    const { calls } = compareMethod({ tsCalls: ["buildReflection"] });
+    expect(calls.join("\n")).toContain("assign_attributes → assignAttributes");
+    expect(compareMethod().calls).toEqual([]);
+  });
+
+  it("compares an includer with no def of its own against the tagged bodies alone", () => {
+    const { calls } = compareMethod({ ownRender: false, tsCalls: [] });
+    expect(calls.join("\n")).toContain("assign_attributes → assignAttributes");
+    expect(compareMethod({ ownRender: false, tsCalls: ["assignAttributes"] }).calls).toEqual([]);
+  });
+
+  it("scores the module method as matched through the tag", () => {
+    expect(compareMethod({ ownRender: false }).helperRow).toMatchObject({ matched: 1, missing: 0 });
+  });
+
+  it("throws on a stale citation", () => {
+    expect(() => compareMethod({ inlinedFrom: [helperTag({ firstLine: 4 })] })).toThrow(
+      /^@inlinedFrom citation is stale/,
+    );
+  });
+});

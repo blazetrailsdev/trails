@@ -211,7 +211,7 @@ export class MyChildScript extends MyScript {
     klass.removeCommand("boom", { undefine: true });
   }
 
-  constructor(...args: unknown[]) {
+  constructor(...args: ConstructorParameters<typeof Thor>) {
     super(...args);
   }
 

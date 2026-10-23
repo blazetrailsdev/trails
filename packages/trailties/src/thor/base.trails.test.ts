@@ -3,7 +3,6 @@ import {
   ArgumentError,
   extend,
   include,
-  initializeIncludedModules,
   NoMethodError,
   rbFSend,
   rbObjRespondTo,
@@ -22,6 +21,7 @@ import {
   UndefinedCommandError,
   UnknownArgumentError,
 } from "./error.js";
+import { Group } from "./group.js";
 import { Option } from "./parser/option.js";
 
 type Instance = Base & Record<string, unknown>;
@@ -38,12 +38,22 @@ function baseclass(): Klass {
       this.commands()[meth] = new Command(meth, null, null, null, meth, {});
       return true;
     }
-    constructor(...args: unknown[]) {
-      initializeIncludedModules(this, ...args);
-    }
   }
   include(Root, Base);
   extend(Root, ClassMethods);
+  return Root as unknown as Klass;
+}
+
+function groupclass(): Klass {
+  class Root extends Group {
+    static baseclass(): typeof Group {
+      return Root;
+    }
+    static createCommand(meth: string): boolean {
+      (this as unknown as Klass).commands()[meth] = new Command(meth, null, null, null, meth, {});
+      return true;
+    }
+  }
   return Root as unknown as Klass;
 }
 
@@ -54,7 +64,7 @@ function subclass(parent: Klass): Klass {
 describe("Thor::Base", () => {
   describe("attr_accessor :options, :parent_options, :args", () => {
     it("gives an including class the three accessors, each over its ivar", () => {
-      const klass = baseclass();
+      const klass = groupclass();
       for (const name of ["options", "parentOptions", "args"]) {
         let accessor: PropertyDescriptor | undefined;
         for (let o: object | null = klass.prototype; o && !accessor; o = Object.getPrototypeOf(o)) {
@@ -76,7 +86,7 @@ describe("Thor::Base", () => {
 
   describe("#initialize", () => {
     it("assigns each declared argument through its writer and keeps the rest in args", () => {
-      const klass = baseclass();
+      const klass = groupclass();
       klass.argument("name");
       klass.argument("count", { type: "numeric", optional: true });
       const instance = new klass(["app", "3", "extra"]);
@@ -87,7 +97,7 @@ describe("Thor::Base", () => {
     });
 
     it("parses an Array of local options and appends what is left to the arguments", () => {
-      const klass = baseclass();
+      const klass = groupclass();
       klass.argument("name", { optional: true });
       klass.classOption("force", { type: "boolean" });
       const instance = new klass([], ["--force", "app", "other"]);
@@ -97,7 +107,7 @@ describe("Thor::Base", () => {
     });
 
     it("takes a Hash of local options as pre-parsed defaults", () => {
-      const klass = baseclass();
+      const klass = groupclass();
       klass.classOption("force", { type: "boolean" });
       const instance = new klass([], { force: true });
       expect(instance.options.get("force")).toBe(true);
@@ -105,7 +115,7 @@ describe("Thor::Base", () => {
     });
 
     it("merges config's command options and deletes them from the config", () => {
-      const klass = baseclass();
+      const klass = groupclass();
       const config = { commandOptions: { quiet: new Option("quiet", { type: "boolean" }) } };
       const instance = new klass([], ["--quiet"], config);
       expect(instance.options.get("quiet")).toBe(true);
@@ -114,7 +124,7 @@ describe("Thor::Base", () => {
     });
 
     it("merges the parsed options over config's class options", () => {
-      const klass = baseclass();
+      const klass = groupclass();
       klass.classOption("force", { type: "boolean" });
       const classOptions = new HashWithIndifferentAccess({ force: false, pretend: true });
       const instance = new klass([], ["--force"], { classOptions });
@@ -123,7 +133,7 @@ describe("Thor::Base", () => {
     });
 
     it("raises on an unknown switch only after check_unknown_options!", () => {
-      const klass = baseclass();
+      const klass = groupclass();
       expect(new klass([], ["--nope"]).args).toEqual(["--nope"]);
       klass.checkUnknownOptionsBang();
       expect(() => new klass([], ["--nope"])).toThrow(UnknownArgumentError);
@@ -131,7 +141,7 @@ describe("Thor::Base", () => {
     });
 
     it("leaves the parser's remaining arguments out under strict_args_position!", () => {
-      const klass = baseclass();
+      const klass = groupclass();
       klass.argument("name", { optional: true });
       klass.strictArgsPositionBang();
       const instance = new klass([], ["app"]);
@@ -140,7 +150,7 @@ describe("Thor::Base", () => {
     });
 
     it("hands the class's option relations to the parser", () => {
-      const klass = baseclass();
+      const klass = groupclass();
       klass.classExclusive(function (this: BaseClass) {
         this.classOption("one");
         this.classOption("two");
@@ -229,7 +239,7 @@ describe("Thor::Base", () => {
 
   describe(".remove_argument", () => {
     it("undefines the accessor only with :undefine", () => {
-      const klass = baseclass();
+      const klass = groupclass();
       klass.argument("name");
       klass.argument("other");
       klass.removeArgument("name");

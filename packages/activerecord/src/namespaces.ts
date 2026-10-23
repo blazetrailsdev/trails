@@ -1,5 +1,5 @@
-import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
-import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { Autoload, extend, type Extended, TopLevel } from "@blazetrails/activesupport";
+import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
 import type { AssociationScope } from "./associations/association-scope.js";
@@ -212,8 +212,11 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Tasks: typeof Tasks;
   Point: new (x: number, y: number) => { x: number; y: number };
   TestCase: typeof TestCase;
+  Railties: typeof Railties;
+  afterAllTransactionsCommit: typeof import("./active-record.js").afterAllTransactionsCommit;
 };
 registerConstant("ActiveRecord", ActiveRecord);
+TopLevel.ActiveRecord = ActiveRecord;
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");
 ActiveRecord.autoload("ConnectionHandling");
@@ -234,21 +237,20 @@ ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("Result");
 });
 
-export const Associations = Object.assign(new Module(), { loadPath }) as Module &
-  AutoloadModule & {
-    CollectionProxy: typeof CollectionProxy;
-    BelongsToAssociation: typeof BelongsToAssociation;
-    BelongsToPolymorphicAssociation: typeof BelongsToPolymorphicAssociation;
-    HasManyAssociation: typeof HasManyAssociation;
-    HasManyThroughAssociation: typeof HasManyThroughAssociation;
-    HasOneAssociation: typeof HasOneAssociation;
-    HasOneThroughAssociation: typeof HasOneThroughAssociation;
-    Preloader: typeof Preloader;
-    JoinDependency: typeof JoinDependency;
-    AssociationScope: typeof AssociationScope;
-    DisableJoinsAssociationScope: typeof DisableJoinsAssociationScope;
-    AliasTracker: typeof AliasTracker;
-  };
+export const Associations = { name: "ActiveRecord::Associations", loadPath } as AutoloadModule & {
+  CollectionProxy: typeof CollectionProxy;
+  BelongsToAssociation: typeof BelongsToAssociation;
+  BelongsToPolymorphicAssociation: typeof BelongsToPolymorphicAssociation;
+  HasManyAssociation: typeof HasManyAssociation;
+  HasManyThroughAssociation: typeof HasManyThroughAssociation;
+  HasOneAssociation: typeof HasOneAssociation;
+  HasOneThroughAssociation: typeof HasOneThroughAssociation;
+  Preloader: typeof Preloader;
+  JoinDependency: typeof JoinDependency;
+  AssociationScope: typeof AssociationScope;
+  DisableJoinsAssociationScope: typeof DisableJoinsAssociationScope;
+  AliasTracker: typeof AliasTracker;
+};
 rbModConstSet(ActiveRecord, "Associations", Associations);
 extend(Associations, Autoload);
 Associations.autoload("CollectionProxy");
@@ -305,11 +307,10 @@ Locking.eagerAutoload(() => {
 });
 ActiveRecord.Locking = Locking;
 
-export const Scoping = Object.assign(new Module(), { loadPath }) as Module &
-  AutoloadModule & {
-    Default: typeof Default;
-    Named: typeof Named;
-  };
+export const Scoping = { name: "ActiveRecord::Scoping", loadPath } as AutoloadModule & {
+  Default: typeof Default;
+  Named: typeof Named;
+};
 extend(Scoping, Autoload);
 Scoping.eagerAutoload(() => {
   Scoping.autoload("Default");
@@ -409,3 +410,9 @@ Encryption.eagerAutoload(() => {
   Encryption.autoload("ReadOnlyNullEncryptor");
   Encryption.autoload("Scheme");
 });
+
+export const Railties = { name: "ActiveRecord::Railties" } as {
+  name: string;
+  ControllerRuntime?: object;
+};
+rbModConstSet(ActiveRecord, "Railties", Railties);

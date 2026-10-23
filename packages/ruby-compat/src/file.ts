@@ -185,6 +185,14 @@ export class File extends IO {
   static readonly LOCK_UN = 8;
 
   /**
+   * `vendor/ruby/v3.3.11/file.c:7845` — `File::LOCK_NB`, which makes `File#flock`
+   * answer `false` rather than wait (`file.c:5201`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::LOCK_NB`.
+   */
+  static readonly LOCK_NB = 4;
+
+  /**
    * `vendor/ruby/v3.3.11/dir.c:3678` — a backslash is an ordinary character, not an escape.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_NOESCAPE`.
@@ -280,6 +288,22 @@ export class File extends IO {
   static isDirectory(fileName: string): boolean {
     try {
       return getFs().statSync(fileName).isDirectory();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/file.c:1966` `rb_file_executable_p`, which is
+   * `rb_eaccess(fname, X_OK) >= 0`: the backend's `File::Stat#executable?`
+   * (`file.c:2244`), and `false` where the stat fails.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.executable?`
+   * (`vendor/ruby/v3.3.11/file.c:1966`).
+   */
+  static isExecutable(fileName: string): boolean {
+    try {
+      return getFs().statSync(fileName).isExecutable();
     } catch {
       return false;
     }
@@ -427,6 +451,8 @@ export class File extends IO {
    * `Tempfile#initialize` sets to `0600` (`vendor/ruby/v3.3.11/lib/tempfile.rb:158`)
    * and `external_encoding:` the stream's external encoding
    * (`rb_io_extract_encoding_option`, `io.c:6725,6750`).
+   * `mode` defaults to `"r"` (`rb_open_file`, `vendor/ruby/v3.3.11/io.c:8102`); a caller that
+   * skips it passes `undefined`.
    * Ruby's block is a block and its `opt` a trailing argument; TypeScript has
    * only the one trailing position for both, so the third parameter is either,
    * discriminated by `typeof`, and a block that follows an `opt` is the fourth.
@@ -445,19 +471,19 @@ export class File extends IO {
    */
   static open(
     fileName: string,
-    mode: string,
+    mode?: string,
     opt?: { perm?: number; externalEncoding?: Encoding | string },
   ): File;
-  static open<T>(fileName: string, mode: string, block: (file: File) => T): T;
+  static open<T>(fileName: string, mode: string | undefined, block: (file: File) => T): T;
   static open<T>(
     fileName: string,
-    mode: string,
+    mode: string | undefined,
     opt: { perm?: number; externalEncoding?: Encoding | string },
     block: (file: File) => T,
   ): T;
   static open<T>(
     fileName: string,
-    mode: string,
+    mode: string = "r",
     blockOrOpt?: ((file: File) => T) | { perm?: number; externalEncoding?: Encoding | string },
     optBlock?: (file: File) => T,
   ): T | File {
@@ -501,7 +527,11 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.read` (`IO.read`,
    * `vendor/ruby/v3.3.11/io.c:12200`).
    */
-  static read(name: string, opt?: { encoding?: Encoding | string }): string {
+  static read(name: string): string;
+  /** @noRailsEquivalent PERMANENT — Ruby core `File.read` (`vendor/ruby/v3.3.11/io.c:12200`). */
+  static read(name: string, opt: { encoding?: Encoding | string }): string | Uint8Array;
+  /** @noRailsEquivalent PERMANENT — Ruby core `File.read` (`vendor/ruby/v3.3.11/io.c:12200`). */
+  static read(name: string, opt?: { encoding?: Encoding | string }): string | Uint8Array {
     const file = File.open(name, "r", { externalEncoding: opt?.encoding });
     try {
       return file.read();
@@ -774,13 +804,14 @@ export class File extends IO {
   /**
    * `vendor/ruby/v3.3.11/file.c:4705` `rb_file_s_basename`. The optional `suffix` is
    * stripped, and the literal `".*"` strips whatever extension is there
-   * (`file.c:4664-4680`).
+   * (`file.c:4664-4680`). A path of separators only answers `"/"`
+   * (`vendor/ruby/v3.3.11/file.c:4625` `ruby_enc_find_basename`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.basename`
    * (`vendor/ruby/v3.3.11/file.c:4705`).
    */
   static basename(fileName: string, suffix?: string): string {
-    const base = getPath().basename(fileName);
+    const base = /^\/+$/.test(fileName) ? "/" : getPath().basename(fileName);
     if (suffix === undefined) return base;
     if (suffix === ".*") {
       const extname = File.extname(base);
@@ -848,8 +879,12 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File#flock`
    * (`vendor/ruby/v3.3.11/file.c:5301`).
    */
-  flock(operation: number): number {
-    getFs().flockSync?.(this.fd, operation === File.LOCK_UN ? "un" : "ex");
+  flock(operation: number): number | false {
+    const locked = getFs().flockSync?.(
+      this.fd,
+      operation === File.LOCK_UN ? "un" : operation & File.LOCK_NB ? "exnb" : "ex",
+    );
+    if (locked === false) return false;
     return 0;
   }
 
@@ -863,6 +898,19 @@ export class File extends IO {
    */
   size(): number {
     return this.stat().size;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/file.c:2599` `rb_file_chmod`, which answers `0`. MRI
+   * calls `fchmod(2)` on the descriptor; the `FsAdapter` contract has no
+   * `fchmodSync`, so the open file's path takes the mode instead.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File#chmod`
+   * (`vendor/ruby/v3.3.11/file.c:2599`).
+   */
+  chmod(mode: number): number {
+    getFs().chmodSync?.(this.path()!, mode);
+    return 0;
   }
 }
 

@@ -5,54 +5,38 @@
  *   from `Date.now()`.
  */
 
+import { Time } from "@blazetrails/date";
+import { CGI, fetch, rbFArray, rbObjRespondTo, rbStrToI } from "@blazetrails/ruby-compat";
 import { Response } from "./response.js";
 import { SET_COOKIE } from "./constants.js";
 
-export class MockCookie {
-  name: string;
-  value: string[];
-  path?: string;
-  domain?: string;
-  expires?: Date;
-  secure: boolean;
-
-  constructor(args: Record<string, any>) {
-    this.name = args.name;
-    this.value = args.value;
-    this.path = args.path;
-    this.domain = args.domain;
-    this.expires = args.expires;
-    this.secure = args.secure || false;
-  }
-
-  toString(): string {
-    return this.value.join("&");
-  }
-}
+type Cookie = InstanceType<typeof CGI.Cookie>;
 
 export class MockResponse extends Response {
   originalHeaders: Record<string, any>;
-  cookies: Record<string, MockCookie>;
+  cookies: Record<string, Cookie>;
   private _errors: any;
   private _bufferedBody: string | undefined;
 
-  constructor(status: number, headers: Record<string, any>, body: any, errors?: any) {
+  constructor(status: number, headers: Record<string, any>, body: any, errors: any = null) {
     super(body, status, headers);
-    this.originalHeaders = { ...headers };
-    this._errors = errors;
+    this.originalHeaders = headers;
+
+    if (errors != null && errors !== false) {
+      this._errors = rbObjRespondTo(errors, "string") ? errors : null;
+    } else {
+      this._errors = "";
+    }
+
     this.cookies = this.parseCookiesFromHeader();
     this.bufferedBodyBang();
   }
 
-  get errors(): string {
-    if (this._errors) {
-      if (typeof this._errors.string === "function") return this._errors.string();
-      if (typeof this._errors === "string") return this._errors;
-    }
-    return "";
+  get errors(): string | null {
+    return rbObjRespondTo(this._errors, "string") ? this._errors.string() : this._errors;
   }
 
-  set errors(value: string) {
+  set errors(value: string | null) {
     this._errors = value;
   }
 
@@ -60,7 +44,7 @@ export class MockResponse extends Response {
   override get body(): string {
     if (this._bufferedBody !== undefined) return this._bufferedBody;
 
-    let buffer = "";
+    let buffer = (this._bufferedBody = "");
 
     for (const chunk of this._body) {
       buffer +=
@@ -81,8 +65,8 @@ export class MockResponse extends Response {
     return [201, 204, 304].includes(this.status);
   }
 
-  cookie(name: string): MockCookie | undefined {
-    return this.cookies[name];
+  cookie(name: string): Cookie | null {
+    return fetch(this.cookies, name, null);
   }
 
   match(other: RegExp): RegExpMatchArray | null {
@@ -90,53 +74,52 @@ export class MockResponse extends Response {
   }
 
   /** @internal */
-  private parseCookiesFromHeader(): Record<string, MockCookie> {
-    const cookies: Record<string, MockCookie> = {};
-    const setCookie = this.headers[SET_COOKIE];
-    if (!setCookie) return cookies;
-    const cookieHeaders = Array.isArray(setCookie) ? setCookie : [setCookie];
-
-    for (const cookie of cookieHeaders) {
-      const eqIdx = cookie.indexOf("=");
-      if (eqIdx === -1) continue;
-      const name = cookie.substring(0, eqIdx);
-      const filling = cookie.substring(eqIdx + 1);
-      const attrs = this.identifyCookieAttributes(filling);
-
-      cookies[name.trim()] = new MockCookie({
-        name: name.trim(),
-        value: attrs.value,
-        path: attrs.path,
-        domain: attrs.domain,
-        expires: attrs.expires,
-        secure: attrs.secure || false,
-      });
+  private parseCookiesFromHeader(): Record<string, Cookie> {
+    const cookies: Record<string, Cookie> = {};
+    const setCookieHeader = this.headers[SET_COOKIE];
+    if (setCookieHeader && setCookieHeader.length !== 0) {
+      for (const cookie of rbFArray(setCookieHeader) as string[]) {
+        const i = cookie.indexOf("=");
+        const [cookieName, cookieFilling] =
+          i === -1 ? [cookie, undefined] : [cookie.slice(0, i), cookie.slice(i + 1)];
+        const cookieAttributes = this.identifyCookieAttributes(cookieFilling!);
+        const parsedCookie = new CGI.Cookie({
+          name: cookieName.trim(),
+          value: fetch(cookieAttributes, "value"),
+          path: fetch(cookieAttributes, "path", null),
+          domain: fetch(cookieAttributes, "domain", null),
+          expires: fetch(cookieAttributes, "expires", null),
+          secure: fetch(cookieAttributes, "secure", false),
+        });
+        cookies[cookieName] = parsedCookie;
+      }
     }
     return cookies;
   }
 
   /** @internal */
   private identifyCookieAttributes(cookieFilling: string): Record<string, any> {
-    const bits = cookieFilling.split(";");
-    const attrs: Record<string, any> = { value: [bits[0].trim()] };
-
-    for (let i = 1; i < bits.length; i++) {
-      const bit = bits[i].trim();
+    const cookieBits = cookieFilling.split(";");
+    const cookieAttributes: Record<string, any> = {};
+    cookieAttributes["value"] = cookieBits[0].trim();
+    for (const bit of cookieBits.slice(1)) {
       if (bit.includes("=")) {
-        const [k, v] = bit.split("=", 2);
-        attrs[k.trim().toLowerCase()] = v.trim();
+        const index = bit.indexOf("=");
+        const cookieAttribute = bit.slice(0, index);
+        const attributeValue = bit.slice(index + 1);
+        cookieAttributes[cookieAttribute.trim().toLowerCase()] = attributeValue.trim();
       }
-      if (bit.toLowerCase().includes("secure")) {
-        attrs.secure = true;
+      if (bit.includes("secure")) {
+        cookieAttributes["secure"] = true;
       }
     }
 
-    if (attrs["max-age"]) {
-      attrs.expires = new Date(Date.now() + parseInt(attrs["max-age"], 10) * 1000);
-    } else if (attrs.expires) {
-      attrs.expires = new Date(attrs.expires);
+    if (Object.hasOwn(cookieAttributes, "max-age")) {
+      cookieAttributes["expires"] = Time.now().plus(rbStrToI(cookieAttributes["max-age"]));
+    } else if (Object.hasOwn(cookieAttributes, "expires")) {
+      cookieAttributes["expires"] = Time.httpdate(cookieAttributes["expires"]);
     }
 
-    return attrs;
+    return cookieAttributes;
   }
 }

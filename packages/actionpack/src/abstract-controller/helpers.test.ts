@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { extend, include, Module, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  include,
+  isModuleIncluded,
+  NoMethodError,
+  publicInstanceMethods,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 
 import { helperMethod, Helpers, type HelpersClass } from "./helpers.js";
 
@@ -66,7 +73,7 @@ describe("helperMethod", () => {
     expect(view.name).toBe("david");
     view.name = "jamis";
     expect(controller.name).toBe("jamis");
-    expect(Object.hasOwn(view, "name")).toBe(false);
+    expect("value" in Object.getOwnPropertyDescriptor(view, "name")!).toBe(false);
   });
 
   it("a lone name= entry defines the attribute with both halves", () => {
@@ -108,7 +115,7 @@ describe("helperMethod", () => {
 
     const controller = { equals: (other: unknown) => other === 1 };
     expect(view(cls, controller)["=="](1)).toBe(true);
-    expect(cls._helpers.instanceMethods()).toEqual(["=="]);
+    expect(publicInstanceMethods(cls._helpers)).toEqual(["=="]);
   });
 
   it("a name= entry survives clearHelpers' replay", () => {
@@ -127,7 +134,7 @@ describe("helperMethod", () => {
     const cls = makeBase();
     helperMethod.call(cls, "a", ["b", "c"]);
     expect(cls._helperMethods).toEqual(["a", "b", "c"]);
-    expect(cls._helpers.instanceMethods().sort()).toEqual(["a", "b", "c"]);
+    expect(publicInstanceMethods(cls._helpers).sort()).toEqual(["a", "b", "c"]);
   });
 
   it("throws when controller does not respond to the named method", () => {
@@ -143,9 +150,9 @@ describe("helperMethod", () => {
     const child = Object.create(parent) as HelpersClass;
     helperMethod.call(child, "fromChild");
 
-    expect(child._helpers.instanceMethods(false)).toEqual(["fromChild"]);
+    expect(publicInstanceMethods(child._helpers, false)).toEqual(["fromChild"]);
     expect("fromParent" in view(child)).toBe(true);
-    expect(parent._helpers.instanceMethods()).toEqual(["fromParent"]);
+    expect(publicInstanceMethods(parent._helpers)).toEqual(["fromParent"]);
     expect(parent._helperMethods).toEqual(["fromParent"]);
     expect(child._helperMethods).toEqual(["fromParent", "fromChild"]);
   });
@@ -167,14 +174,14 @@ describe("helperMethod", () => {
 describe("helper", () => {
   it("includes a module's methods into _helpers", () => {
     const cls = makeBase();
-    const FooHelper = new Module().include({ foo: () => "FOO" });
+    const FooHelper = { foo: () => "FOO" };
     cls.helper(FooHelper);
     expect(view(cls).foo()).toBe("FOO");
   });
 
   it("is idempotent when the same module is included twice", () => {
     const cls = makeBase();
-    const FooHelper = new Module().include({ foo: () => "FOO" });
+    const FooHelper = { foo: () => "FOO" };
     cls.helper(FooHelper);
     const helpersBefore = cls._helpers;
     cls.helper(FooHelper);
@@ -184,20 +191,20 @@ describe("helper", () => {
 
   it("a duplicate-include no-op does NOT fork the subclass helpers module", () => {
     const parent = makeBase();
-    const FooHelper = new Module().include({ foo: () => "FOO" });
+    const FooHelper = { foo: () => "FOO" };
     parent.helper(FooHelper);
     const child = Object.create(parent) as HelpersClass;
 
     child.helper(FooHelper);
 
-    expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(false);
+    expect(Object.hasOwn(child, "_helpers")).toBe(false);
     expect(child._helpers).toBe(parent._helpers);
   });
 
   it("re-including a module after a later module overrode its method is a no-op (identity-based)", () => {
     const cls = makeBase();
-    const A = new Module().include({ foo: () => "A.foo" });
-    const B = new Module().include({ foo: () => "B.foo" });
+    const A = { foo: () => "A.foo" };
+    const B = { foo: () => "B.foo" };
     cls.helper(A);
     cls.helper(B);
     expect(view(cls).foo()).toBe("B.foo");
@@ -216,24 +223,15 @@ describe("helper", () => {
   it("direct-method precedence: helperMethod beats a later helper(Mod) with the same name", () => {
     const cls = makeBase();
     helperMethod.call(cls, "x");
-    const Override = new Module().include({ x: () => "from-module" });
+    const Override = { x: () => "from-module" };
     cls.helper(Override);
     expect(() => view(cls).x()).toThrow(NoMethodError);
   });
 
-  it("included modules stay live — methods added after include are visible", () => {
-    const cls = makeBase();
-    const Live = new Module().include({ early: () => "early" });
-    cls.helper(Live);
-    Live.defineMethod("late", () => "late");
-    expect(view(cls).early()).toBe("early");
-    expect(view(cls).late()).toBe("late");
-  });
-
   it("multiple includes layer in the ancestor chain (both reachable)", () => {
     const cls = makeBase();
-    const A = new Module().include({ fromA: () => "A" });
-    const B = new Module().include({ fromB: () => "B" });
+    const A = { fromA: () => "A" };
+    const B = { fromB: () => "B" };
     cls.helper(A);
     cls.helper(B);
     expect(view(cls).fromA()).toBe("A");
@@ -242,7 +240,7 @@ describe("helper", () => {
 
   it("an included module is enumerable, so including _helpers elsewhere carries it", () => {
     const cls = makeBase();
-    const FooHelper = new Module().include({ foo: () => "FOO" });
+    const FooHelper = { foo: () => "FOO" };
     cls.helper(FooHelper);
 
     class ViewContext {}
@@ -254,8 +252,8 @@ describe("helper", () => {
 
   it("carries every layered module, and helper_method proxies with them", () => {
     const cls = makeBase();
-    cls.helper(new Module().include({ fromA: () => "A" }));
-    cls.helper(new Module().include({ fromB: () => "B" }));
+    cls.helper({ fromA: () => "A" });
+    cls.helper({ fromB: () => "B" });
     helperMethod.call(cls, "currentUser");
 
     class ViewContext {}
@@ -269,7 +267,7 @@ describe("helper", () => {
 
   it("accepts modules and a block mixed together", () => {
     const cls = makeBase();
-    const FooHelper = new Module().include({ foo: () => "FOO" });
+    const FooHelper = { foo: () => "FOO" };
     cls.helper(FooHelper, (mod) => {
       mod.bar = () => "BAR";
     });
@@ -281,12 +279,12 @@ describe("helper", () => {
 describe("identity tracking lives on the helpers module chain, not the class", () => {
   it("after clearHelpers, the same module can be re-included on the cleared child", () => {
     const parent = makeBase();
-    const Shared = new Module().include({ shared: () => "S" });
+    const Shared = { shared: () => "S" };
     parent.helper(Shared);
     const child = Object.create(parent) as HelpersClass;
 
     child.helper(Shared);
-    expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(false);
+    expect(Object.hasOwn(child, "_helpers")).toBe(false);
 
     child.clearHelpers();
     child.helper(Shared);
@@ -297,7 +295,7 @@ describe("identity tracking lives on the helpers module chain, not the class", (
 describe("clearHelpers", () => {
   it("wipes _helpers + _helperMethods, then re-adds the previous helper_method proxies", () => {
     const cls = makeBase();
-    const ExtraHelper = new Module().include({ extra: () => "EXTRA" });
+    const ExtraHelper = { extra: () => "EXTRA" };
     helperMethod.call(cls, "keep");
     cls.helper(ExtraHelper);
     expect("keep" in view(cls)).toBe(true);
@@ -306,7 +304,7 @@ describe("clearHelpers", () => {
     cls.clearHelpers();
 
     expect(cls._helperMethods).toEqual(["keep"]);
-    expect(cls._helpers.instanceMethods()).toEqual(["keep"]);
+    expect(publicInstanceMethods(cls._helpers)).toEqual(["keep"]);
     expect("keep" in view(cls)).toBe(true);
     expect(view(cls).extra).toBeUndefined();
   });
@@ -319,9 +317,9 @@ describe("_helpersForModification", () => {
     const child = Object.create(parent) as HelpersClass;
 
     const mod = child._helpersForModification();
-    expect(mod).not.toBe(parent._helpers);
-    expect(mod.isInclude(parent._helpers)).toBe(true);
-    expect(mod.instanceMethods(false)).toEqual([]);
+    expect(mod === parent._helpers).toBe(false);
+    expect(isModuleIncluded(mod, parent._helpers)).toBe(true);
+    expect(publicInstanceMethods(mod, false)).toEqual([]);
     expect("fromParent" in view(child)).toBe(true);
 
     expect(child._helpersForModification()).toBe(mod);
@@ -337,7 +335,7 @@ describe("_helpersForModification", () => {
 describe("_helpers", () => {
   it("the instance reader is self.class._helpers", () => {
     const cls = makeBase();
-    const host = new (cls as unknown as new () => { _helpers: Module })();
+    const host = new (cls as unknown as new () => { _helpers: object })();
     expect(host._helpers).toBe(cls._helpers);
   });
 
@@ -347,12 +345,12 @@ describe("_helpers", () => {
       class extends (parent as unknown as new () => object) {})() as unknown as HelpersClass;
     expect(child._helpers).toBe(parent._helpers);
 
-    const mod = new Module();
+    const mod = {};
     child._helpers = mod;
     expect(child._helpers).toBe(mod);
     expect(parent._helpers).not.toBe(mod);
 
-    (child as { _helpers: Module | null })._helpers = null;
+    (child as { _helpers: object | null })._helpers = null;
     expect(child._helpers).toBe(parent._helpers);
   });
 });
@@ -361,13 +359,13 @@ describe("defineHelpersModule", () => {
   it("is idempotent per class — same class returns the same module", () => {
     const cls = makeBase();
     expect(cls.defineHelpersModule(cls)).toBe(cls._helpers);
-    expect((cls as unknown as { HelperMethods: Module }).HelperMethods).toBe(cls._helpers);
+    expect((cls as unknown as { HelperMethods: object }).HelperMethods).toBe(cls._helpers);
   });
 
   it("names the module after the class it is seated on", () => {
     class WidgetsController {}
     include(WidgetsController, Helpers);
-    expect((WidgetsController as unknown as HelpersClass)._helpers.name).toBe(
+    expect(rbModName((WidgetsController as unknown as HelpersClass)._helpers)).toBe(
       "WidgetsController::HelperMethods",
     );
   });

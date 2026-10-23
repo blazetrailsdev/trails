@@ -11,13 +11,24 @@ Rules that bind only inside `packages/arel`. The repo-wide rules are in the root
 `Collectors` are extended with `ActiveSupport::Autoload` (RFC 0151): Rails
 `require`s the collectors (`arel.rb:19`, `collectors/sql_string.rb:3`) and
 nothing reads one through the namespace at call time, so it carries no
-`autoload`. Each autoloaded constant is seated by its defining module and read
-as a property at call time (`new Nodes.Not(this)`). The seat is the constant
-binding, `rbModConstSet(Nodes, "Not", Not)`: as Ruby's `const_set` does
-(`vendor/ruby/v3.3.11/variable.c:3648-3668`), binding a class under a named
-owner is what paths it (`Arel::Nodes::Not`), so a seat carries no separate path
-call. `Collectors`, `Nodes` and `Visitors` are also the public
-`Arel.Collectors` / `Arel.Nodes` / `Arel.Visitors` exports: every class seats
-itself on them in its defining module, and a type-only `declare namespace` of
-the same name carries the type side. This is the shape every package's plain
-`Owner.Name = klass` assignment and any remaining slot converge onto.
+`autoload`. `Collectors`, `Nodes` and `Visitors` are also the public
+`Arel.Collectors` / `Arel.Nodes` / `Arel.Visitors` exports, and a type-only
+`declare namespace` of the same name carries the type side.
+
+**arel's cycle is real, and almost none of its reads need the namespace.**
+Converting arel's reads to direct imports puts 65 of its 92 modules in one
+cycle cluster — `nodes/node.ts` reads `Nodes.Not` while `nodes/unary.ts`
+imports `node.ts` for `class Unary extends Node`. It is still a plain
+`import { Not } from "./unary.js"`, because `Node#not` runs long after both
+module bodies finish (root CLAUDE.md § "Call-time constant resolution"). 278 of
+arel's 287 namespace reads are deferred that way; the 9 module-eval reads are 8
+erased `T extends Nodes.X` type positions, which are `import type`, and one
+alias seat.
+
+A seat is a plain `Nodes.Not = Not` assignment, type-checked against the
+namespace's declared property. The generated node classes in `nodes/binary.ts`,
+`nodes/unary.ts` and `nodes/function.ts` keep `rbModConstSet`, because Rails
+builds them with `const_set name, Class.new(Binary)`
+(`activerecord/lib/arel/nodes/binary.rb:122`, `unary.rb:41`, `function.rb:42`)
+— a computed name with no declaration to assign at. A class's qualified Ruby
+path comes from the table generated out of `rails-api.json`, not from the seat.

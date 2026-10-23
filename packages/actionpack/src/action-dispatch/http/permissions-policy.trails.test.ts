@@ -9,3 +9,12 @@ describe("PermissionsPolicy#apply_mapping", () => {
     );
   });
 });
+
+describe("PermissionsPolicy constructor block", () => {
+  it("accepts a block", () => {
+    const policy = new PermissionsPolicy((p) => {
+      p.gyroscope(":self");
+    });
+    expect(policy.build()).toBe("gyroscope 'self'");
+  });
+});

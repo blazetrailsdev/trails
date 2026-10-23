@@ -1,9 +1,10 @@
+import { FLOAT_DIG } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   isInclude,
   isSymbol,
   kernelFloat,
-  rbFPublicSend,
+  rbFSend,
   rtest,
   Range,
   toI,
@@ -67,8 +68,7 @@ export class NumericalityValidator extends EachValidator {
     record: ValidatableRecord,
     attrName: string,
     value: unknown,
-    precision = 15,
-    scale?: number,
+    { precision = FLOAT_DIG, scale = null }: { precision?: number; scale?: number | null } = {},
   ): void {
     if (!this.isNumber(value, precision, scale)) {
       record.errors.add(attrName, ":not_a_number", this.filteredOptions(value));
@@ -87,16 +87,12 @@ export class NumericalityValidator extends EachValidator {
     )) {
       let optionValue = rawOptionValue as NumericValue | undefined;
       if (isInclude(NUMBER_CHECKS, option)) {
-        if (
-          !rtest(rbFPublicSend(toI(value), NUMBER_CHECKS[option as keyof typeof NUMBER_CHECKS]))
-        ) {
+        if (!rtest(rbFSend(toI(value), NUMBER_CHECKS[option as keyof typeof NUMBER_CHECKS]))) {
           record.errors.add(attrName, `:${option}`, this.filteredOptions(value));
         }
       } else if (isInclude(RANGE_CHECKS, option)) {
         const range = optionValue as unknown as Range<unknown>;
-        if (
-          !rtest(rbFPublicSend(value, RANGE_CHECKS[option as keyof typeof RANGE_CHECKS], range))
-        ) {
+        if (!rtest(rbFSend(value, RANGE_CHECKS[option as keyof typeof RANGE_CHECKS], range))) {
           record.errors.add(
             attrName,
             `:${option}`,
@@ -105,7 +101,7 @@ export class NumericalityValidator extends EachValidator {
         }
       } else if (isInclude(COMPARE_CHECKS, option)) {
         optionValue = this.optionAsNumber(record, optionValue, precision, scale);
-        if (!rtest(rbFPublicSend(value, COMPARE_CHECKS[option as CompareKey], optionValue))) {
+        if (!rtest(rbFSend(value, COMPARE_CHECKS[option as CompareKey], optionValue))) {
           record.errors.add(
             attrName,
             `:${underscore(option)}`,
@@ -139,7 +135,7 @@ export function optionAsNumber(
   record: ValidatableRecord,
   optionValue: unknown,
   precision: number,
-  scale?: number,
+  scale?: number | null,
 ): number | bigint | undefined {
   return parseAsNumber(this.resolveValue(record, optionValue), precision, scale);
 }
@@ -151,7 +147,7 @@ export function optionAsNumber(
 export function parseAsNumber(
   rawValue: unknown,
   precision: number,
-  scale?: number,
+  scale?: number | null,
 ): number | bigint | undefined {
   if (typeof rawValue === "number" && rawValue % 1 !== 0) {
     return parseFloat(rawValue, precision, scale);
@@ -172,7 +168,7 @@ function isNumeric(value: unknown): boolean {
 }
 
 /** @internal */
-export function round(rawValue: number, scale?: number): number {
+export function round(rawValue: number, scale?: number | null): number {
   if (scale === undefined || scale === null) return rawValue;
   if (!Number.isFinite(rawValue)) return rawValue;
   return Number(new BigDecimal(String(rawValue)).round(scale).toString("F"));
@@ -183,7 +179,7 @@ export function isNumber(
   this: { options: Record<string, unknown> },
   rawValue: unknown,
   precision: number,
-  scale?: number,
+  scale?: number | null,
 ): boolean {
   if (this.options.onlyNumeric && !isNumeric(rawValue)) return false;
 
@@ -278,7 +274,7 @@ export function isRecordAttributeChangedInPlace(
 }
 
 /** @internal */
-function parseFloat(num: number, precision: number, scale?: number): number {
+function parseFloat(num: number, precision: number, scale?: number | null): number {
   if (!Number.isFinite(num)) return num;
   return Number(new BigDecimal(round(num, scale), precision).toString("F"));
 }

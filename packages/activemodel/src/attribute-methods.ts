@@ -14,13 +14,13 @@ import {
   rbModConstSet,
   regexpEscape,
   unpack1,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import {
   camelize,
   classAttribute,
   CodeGenerator,
   extend,
-  filterMap,
   include,
   included,
   type Extended,
@@ -307,7 +307,7 @@ export const ClassMethods = {
 
     const generateMethod = camelize(`define_method_${pattern.proxyTarget}`, false);
 
-    if (rbObjRespondTo(this, generateMethod, true)) {
+    if (rbObjRespondTo(this, generateMethod)) {
       rbFSend(this, generateMethod, String(attrName), { owner, as });
     } else {
       this.defineProxyCall(
@@ -332,7 +332,7 @@ export const ClassMethods = {
 
   /** @inventedArm if — PERMANENT */
   aliasesByAttributeName(this: ClassMethodsHost): Hash<string, string[]> {
-    if (!Object.prototype.hasOwnProperty.call(this, "_aliasesByAttributeName")) {
+    if (!Object.hasOwn(this, "_aliasesByAttributeName")) {
       this._aliasesByAttributeName = new Hash<string, string[]>((h, k) => {
         const v: string[] = [];
         h.set(k, v);
@@ -381,7 +381,7 @@ export const ClassMethods = {
         typeof Concurrent.Map<string, Array<AttributeMethod>>
       >;
     };
-    if (!Object.prototype.hasOwnProperty.call(h, "_attributeMethodPatternsCache")) {
+    if (!Object.hasOwn(h, "_attributeMethodPatternsCache")) {
       h._attributeMethodPatternsCache = new Concurrent.Map({ initialCapacity: 4 });
     }
     return h._attributeMethodPatternsCache!;
@@ -443,8 +443,7 @@ export const ClassMethods = {
     { namespace, as }: { namespace: string; as: string },
   ): void {
     const reader =
-      this.attributeAliases[name] === targetName &&
-      rbObjRespondTo(this, "defineMethodAttribute", true);
+      this.attributeAliases[name] === targetName && rbObjRespondTo(this, "defineMethodAttribute");
     type Body = (self: ReadWriteHost, args: unknown[]) => unknown;
     let descriptor: (body: Body) => PropertyDescriptor;
     let cachedName = mangledName;
@@ -534,7 +533,7 @@ export const AttributeMethods = {
     method: string,
     includePrivateMethods: boolean = false,
   ): boolean {
-    return basicObjRespondTo(this, method, !includePrivateMethods);
+    return basicObjRespondTo(this, method);
   },
 
   isRespondTo(
@@ -542,10 +541,8 @@ export const AttributeMethods = {
     method: string,
     includePrivateMethods: boolean = false,
   ): boolean {
-    if (basicObjRespondTo(this, method, !includePrivateMethods)) {
+    if (basicObjRespondTo(this, method)) {
       return true;
-    } else if (!includePrivateMethods && basicObjRespondTo(this, method, false)) {
-      return false;
     } else {
       return this.matchedAttributeMethod(String(method)) !== null;
     }
@@ -598,8 +595,8 @@ function isDefinedByAClassBody(klass: unknown, name: string): boolean {
     link;
     link = Object.getPrototypeOf(link) as object | null
   ) {
-    if (!Object.prototype.hasOwnProperty.call(link, name)) continue;
-    return Object.prototype.hasOwnProperty.call(link, "constructor");
+    if (!Object.hasOwn(link, name)) continue;
+    return Object.hasOwn(link, "constructor");
   }
   return false;
 }

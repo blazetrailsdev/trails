@@ -3,6 +3,14 @@ import { DelegateClass } from "./delegate.js";
 import { include, initialize, initializeIncludedModules, rbGetAllocFunc } from "./include.js";
 
 describe("DelegateClass (trails)", () => {
+  it("builds a subclass with no constructor of its own from the object to delegate to", () => {
+    class Wrapper extends DelegateClass(Array) {}
+    const target = [1, 2];
+    const wrapper = new Wrapper(target);
+    expect(wrapper.__getobj__()).toBe(target);
+    expect(wrapper.at(1)).toBe(2);
+  });
+
   it("allocates an instance that still forwards a delegate's data properties", () => {
     class Point {
       x = 1;

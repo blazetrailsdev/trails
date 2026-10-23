@@ -1,6 +1,6 @@
 import { MemoryStore, SafeBuffer, indexWith } from "@blazetrails/activesupport";
 import type { CacheStore } from "@blazetrails/activesupport";
-import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { OutputBuffer } from "../../buffers.js";
 import type { SameCollectionIterator } from "../collection-renderer.js";
@@ -69,7 +69,7 @@ export function cacheCollectionRender(
       collection,
     );
 
-    const cachedPartials = collectionCache().readMulti(...keyedCollection.keys());
+    const cachedPartials = await collectionCache().readMulti(...keyedCollection.keys());
     instrumentationPayload["cache_hits"] = cachedPartials.size;
 
     const filtered = [...keyedCollection]
@@ -80,7 +80,7 @@ export function cacheCollectionRender(
       filtered.length === 0 ? [] : await block(collectionIterator.fromCollection(filtered));
 
     let index = 0;
-    const keyedPartials = fetchOrCachePartial.call(
+    const keyedPartials = await fetchOrCachePartial.call(
       this,
       cachedPartials,
       template,
@@ -88,7 +88,7 @@ export function cacheCollectionRender(
       () => renderedPartials[index++],
     );
 
-    return orderedKeys.map((key) => keyedPartials.get(key) as RenderedTemplate);
+    return orderedKeys.map((key) => hashAref(keyedPartials, key) as RenderedTemplate);
   })();
 }
 
@@ -134,13 +134,13 @@ export function expandedCacheKey(
 }
 
 /** @internal */
-export function fetchOrCachePartial(
+export async function fetchOrCachePartial(
   this: CollectionCachingHost,
   cachedPartials: Map<unknown, unknown>,
   template: RenderableTemplate,
   { orderBy }: { orderBy: unknown[][] },
   block: () => RenderedTemplate,
-): Map<unknown[], RenderedTemplate> {
+): Promise<Hash<unknown[], RenderedTemplate> | Record<string, RenderedTemplate>> {
   const entriesToWrite = new Hash<unknown[], unknown>();
 
   const keyedPartials = indexWith(orderBy, (cacheKey): RenderedTemplate => {
@@ -161,7 +161,7 @@ export function fetchOrCachePartial(
   });
 
   if (entriesToWrite.size !== 0) {
-    collectionCache().writeMulti(entriesToWrite);
+    await collectionCache().writeMulti(entriesToWrite);
   }
 
   return keyedPartials;

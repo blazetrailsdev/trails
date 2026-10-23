@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Parser } from "../parser.js";
-import { Ast } from "../ast.js";
+import { Ast } from "../nodes/node.js";
 import { Symbol as SymbolNode } from "../nodes/node.js";
 import { Pattern } from "./pattern.js";
 
@@ -157,5 +157,12 @@ describe("ActionDispatch::Journey::Path::Pattern — leading-optional normalizat
   it("doesn't rewrite when the second top-level Group's body is just a SLASH", () => {
     const p = buildPath("/(/)/foo");
     expect(p.toRegexp()).toBeInstanceOf(RegExp);
+  });
+});
+
+describe("ActionDispatch::Journey::Path::Pattern — flags of unused requirements", () => {
+  it("does not take flags from a requirement the path does not name", () => {
+    const pattern = buildPath("/:id", { other: /x/u });
+    expect(pattern.toRegexp().flags).toBe("");
   });
 });

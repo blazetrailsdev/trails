@@ -16,7 +16,10 @@ const artifact: Artifact = {
   packages: [],
   mismatches: [
     row("activesupport", "inflector/inflections.ts", "to_regex", "escape → escape|_escape"),
-    row("i18n", "backend/base.ts", "translate", "each_key → each_key|_each_key"),
+    {
+      ...row("i18n", "backend/base.ts", "translate", "each_key → each_key|_each_key"),
+      receivers: { each_key: ["hash"] },
+    },
     row("actiondispatch", "routing/inspector.ts", "normalize_filter", "escape → escape|_escape"),
   ],
 };
@@ -60,7 +63,10 @@ describe("ruby-compat call ratchet", () => {
         },
         { ...row("rack", "utils.ts", "merge", "delete → delete"), receivers: { delete: ["hash"] } },
         row("rack", "utils.ts", "each", "each_pair → eachPair"),
-        row("rack", "utils.ts", "prune", "delete_if → deleteIf"),
+        {
+          ...row("rack", "utils.ts", "prune", "delete_if → deleteIf"),
+          receivers: { delete_if: ["hash"] },
+        },
       ],
     };
     expect(reverseRows(hash).map(renderKey)).toEqual([

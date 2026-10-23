@@ -7,6 +7,10 @@ const RECORDERS = "active_support_error_reporter_assertions";
 
 /** @internal */
 export class Report {
+  static toString(): string {
+    return "ActiveSupport::Testing::ErrorReporterAssertions::ErrorCollector::Report";
+  }
+
   error: Error;
   handled: boolean;
   severity: ErrorSeverity;
@@ -87,7 +91,7 @@ function deleteIf<T>(array: T[], predicate: (element: T) => boolean): void {
   }
 }
 
-/** @missingRailsArgs assert_predicate — CONVERGEABLE assert-predicate-takes-the-predicate-name-and-builds-minitests-message */
+/** @missingRailsArgs assert_predicate — CONVERGEABLE ported-rails-assertion-bodies-call-expect */
 export async function assertNoErrorReported(block: () => unknown): Promise<void> {
   const reports = await ErrorCollector.record(() =>
     _assertNothingRaisedOrWarn("assert_no_error_reported", block),

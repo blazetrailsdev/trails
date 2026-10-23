@@ -1,4 +1,5 @@
 import { File } from "@blazetrails/ruby-compat";
+import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../database.js";
 import { Generators } from "../../../generators.js";
@@ -67,6 +68,8 @@ export class DevcontainerGenerator extends GeneratorBase {
   }
 
   readonly opts: ResolvedOptions;
+  private _dependencies?: string[];
+  private _volumes?: string[];
   /** @internal */
   readonly database: Database;
 
@@ -137,7 +140,7 @@ export class DevcontainerGenerator extends GeneratorBase {
 
     const env: Record<string, string> = {};
     if (systemTest)
-      Object.assign(env, { CAPYBARA_SERVER_PORT: "45678", SELENIUM_HOST: "selenium" });
+      Object.assign(env, { TRAILS_SYSTEM_TESTING_SERVER_PORT: "45678", SELENIUM_HOST: "selenium" });
     if (redis) env.REDIS_URL = "redis://redis:6379/1";
     if (kamal) env.KAMAL_REGISTRY_PASSWORD = "$KAMAL_REGISTRY_PASSWORD";
     if (this.database.service) env.DB_HOST = this.database.name;
@@ -162,39 +165,94 @@ export class DevcontainerGenerator extends GeneratorBase {
   }
 
   private composeYaml(): string {
-    const { systemTest, redis, appName } = this.opts;
-    const { name: dbName, service: dbService, volume: dbVolume } = this.database;
-    const deps: string[] = [];
-    if (systemTest) deps.push("selenium");
-    if (redis) deps.push("redis");
-    if (dbService) deps.push(dbName);
-    const railsApp: JsonObject = {
-      build: { context: "..", dockerfile: ".devcontainer/Dockerfile" },
-      volumes: ["../..:/workspaces:cached"],
-      command: "sleep infinity",
-    };
-    if (deps.length > 0) railsApp.depends_on = deps;
-    const services: JsonObject = { "rails-app": railsApp };
-    if (systemTest)
-      services.selenium = { image: "selenium/standalone-chromium", restart: "unless-stopped" };
-    if (redis)
-      services.redis = {
-        image: "redis:7.2",
-        restart: "unless-stopped",
-        volumes: ["redis-data:/data"],
-      };
-    if (dbService) services[dbName] = dbService as unknown as JsonObject;
-    const yaml: JsonObject = { name: appName, services };
-    const volumes: JsonObject = {};
-    if (redis) volumes["redis-data"] = null;
-    if (dbVolume) volumes[dbVolume] = null;
-    if (Object.keys(volumes).length > 0) yaml.volumes = volumes;
-    return JSON.stringify(yaml, null, 2) + "\n";
+    const { appName, systemTest, redis } = this.opts;
+    const dependencies = this.dependencies();
+    const volumes = this.volumes();
+    let out = `name: "${appName}"
+
+services:
+  rails-app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+
+    volumes:
+    - ../..:/workspaces:cached
+
+    # Overrides default command so things don't shut down after the process ends.
+    command: sleep infinity
+
+    # Uncomment the next line to use a non-root user for all processes.
+    # user: vscode
+
+    # Use "forwardPorts" in **devcontainer.json** to forward an app port locally.
+    # (Adding the "ports" property to this file will not forward from a Codespace.)
+`;
+    if (dependencies.length > 0) {
+      out += "    depends_on:\n";
+      for (const dependency of dependencies) out += `    - ${dependency}\n`;
+    }
+    if (systemTest) {
+      out += `
+  selenium:
+    image: selenium/standalone-chromium
+    restart: unless-stopped
+`;
+    }
+    out += "\n";
+    if (redis) {
+      out += `  redis:
+    image: redis:7.2
+    restart: unless-stopped
+    volumes:
+    - redis-data:/data
+
+`;
+    }
+    out += `  ${this.devcontainerDbServiceYaml({ indentation: 4 }) ?? ""}\n`;
+    if (volumes.length > 0) {
+      out += "volumes:\n";
+      for (const volume of volumes) out += `  ${volume}:\n`;
+    }
+    return out;
+  }
+
+  private dependencies(): string[] {
+    if (this._dependencies) return this._dependencies;
+
+    this._dependencies = [];
+
+    const options = this.options as DevcontainerGeneratorOptions;
+    if (options.systemTest) this._dependencies.push("selenium");
+    if (options.redis) this._dependencies.push("redis");
+    if (this.database.service) this._dependencies.push(this.database.name);
+    return this._dependencies;
+  }
+
+  private volumes(): string[] {
+    if (this._volumes) return this._volumes;
+
+    this._volumes = [];
+
+    const options = this.options as DevcontainerGeneratorOptions;
+    if (options.redis) this._volumes.push("redis-data");
+    if (this.database.volume) this._volumes.push(this.database.volume);
+
+    return this._volumes;
+  }
+
+  private devcontainerDbServiceYaml(
+    options: Parameters<typeof toYaml>[1] = {},
+  ): string | undefined {
+    const service = this.database.service;
+    if (!service) return;
+
+    return toYaml({ [this.database.name]: service }, options).slice(4);
   }
 
   private systemTestConfiguration(): string {
-    return `  if (process.env.CAPYBARA_SERVER_PORT) {
-    servedBy({ host: "rails-app", port: process.env.CAPYBARA_SERVER_PORT });
+    return `  if (process.env.TRAILS_SYSTEM_TESTING_SERVER_PORT) {
+    servedBy({ host: "rails-app", port: process.env.TRAILS_SYSTEM_TESTING_SERVER_PORT });
     drivenBy(":selenium", { using: ":headless_chrome", screenSize: [1400, 1400], options: { browser: ":remote", url: \`http://\${process.env.SELENIUM_HOST}:4444\` } });
   } else {
     drivenBy(":selenium", { using: ":headless_chrome", screenSize: [1400, 1400] });

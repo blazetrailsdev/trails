@@ -21,7 +21,7 @@ export function scope<T extends typeof Base>(
   body: ((this: Relation<InstanceType<T>>, ...args: any[]) => any) | { call(...args: any[]): any },
   block?: Record<string, (...args: any[]) => any>,
 ): void {
-  const modelClass = this as any;
+  const modelClass = this;
 
   if (!rbObjRespondTo(body, "call")) {
     throw new ArgumentError("The scope body needs to be callable.");

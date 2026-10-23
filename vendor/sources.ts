@@ -143,6 +143,12 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "actionview/test",
       },
       {
+        name: "actioncable",
+        libPath: "actioncable/lib/action_cable",
+        libEntryFile: "actioncable/lib/action_cable.rb",
+        testPath: "actioncable/test",
+      },
+      {
         name: "activejob",
         libPath: "activejob/lib/active_job",
         libEntryFile: "activejob/lib/active_job.rb",
@@ -230,6 +236,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         // derives that from the package name, so use the kebab form.
         name: "did-you-mean",
         libPath: "lib/did_you_mean",
+        libEntryFile: "lib/did_you_mean.rb",
         testPath: "test",
       },
     ],
@@ -249,6 +256,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         // global_id/*.rb together; pointing at `lib/global_id` matches the
         // pattern used for activerecord (lib/active_record/).
         libPath: "lib/global_id",
+        libEntryFile: "lib/global_id.rb",
         // Globalid puts *_test.rb under test/cases/ (not test/ directly).
         testPath: "test/cases",
       },
@@ -335,6 +343,66 @@ export const SOURCES: readonly UpstreamSource[] = [
         // ports live in `packages/activerecord/src/sqlite/`.
         name: "sqlite3",
         libPath: "lib/sqlite3",
+      },
+    ],
+  },
+  {
+    name: "marcel",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/marcel.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:344 resolves marcel (1.0.4), which
+      // Active Storage depends on.
+      ref: "v1.0.4",
+    },
+    packages: [
+      {
+        name: "marcel",
+        libPath: "lib/marcel",
+        libEntryFile: "lib/marcel.rb",
+        testPath: "test",
+        compareApi: true,
+        compareTests: true,
+      },
+    ],
+  },
+  {
+    name: "builder",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/builder.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:156 resolves builder (3.3.0), which
+      // ActionView's `Template::Handlers::Builder` requires.
+      ref: "v3.3.0",
+    },
+    packages: [
+      {
+        name: "builder",
+        libPath: "lib/builder",
+        libEntryFile: "lib/builder.rb",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "mini_magick",
+    origin: {
+      type: "git",
+      url: "https://github.com/minimagick/minimagick.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:352 resolves mini_magick (5.2.0), which
+      // image_processing (Active Storage's variant processor) depends on.
+      ref: "v5.2.0",
+    },
+    packages: [
+      {
+        name: "mini-magick",
+        libPath: "lib/mini_magick",
+        libEntryFile: "lib/mini_magick.rb",
+        testPath: "spec",
+        compareApi: false,
+        compareTests: false,
       },
     ],
   },
@@ -443,6 +511,91 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "nokogiri",
+    origin: {
+      type: "git",
+      url: "https://github.com/sparklemotion/nokogiri.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:398; a read-anchor for
+      // packages/nokogiri, like rails-dom-testing.
+      ref: "v1.18.3",
+    },
+    packages: [
+      {
+        name: "nokogiri",
+        libPath: "lib/nokogiri",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "racc",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby/racc.git",
+      // The runtime nokogiri's generated CSS parser runs on
+      // (vendor/nokogiri/v1.18.3/lib/nokogiri/css/parser.rb:4 names Racc 1.8.0);
+      // a read-anchor for packages/nokogiri/src/racc.
+      ref: "v1.8.0",
+    },
+    packages: [
+      {
+        name: "racc",
+        libPath: "lib/racc",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "rails-html-sanitizer",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/rails-html-sanitizer.git",
+      ref: "v1.6.2",
+    },
+    packages: [
+      {
+        name: "rails-html-sanitizer",
+        libPath: "lib/rails/html",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "loofah",
+    origin: {
+      type: "git",
+      url: "https://github.com/flavorjones/loofah.git",
+      ref: "v2.24.0",
+    },
+    packages: [
+      {
+        name: "loofah",
+        libPath: "lib/loofah",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "crass",
+    origin: {
+      type: "git",
+      url: "https://github.com/rgrove/crass.git",
+      ref: "v1.0.6",
+    },
+    packages: [
+      {
+        name: "crass",
+        libPath: "lib/crass",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "ruby",
     origin: {
       type: "git",
@@ -531,6 +684,15 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "libyaml",
+    origin: {
+      type: "git",
+      url: "https://github.com/yaml/libyaml.git",
+      ref: "0.2.5",
+    },
+    packages: [],
+  },
+  {
     name: "i18n",
     origin: {
       type: "git",
@@ -545,6 +707,58 @@ export const SOURCES: readonly UpstreamSource[] = [
         // aliases — is defined here, not under `lib/i18n/`.
         libEntryFile: "lib/i18n.rb",
         testPath: "test",
+      },
+    ],
+  },
+  {
+    name: "solid_cache",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/solid_cache.git",
+      ref: "v1.0.7",
+    },
+    packages: [
+      {
+        name: "solid-cache",
+        libPath: "lib/solid_cache",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "solid_queue",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/solid_queue.git",
+      ref: "v1.1.3",
+    },
+    packages: [
+      {
+        name: "solid-queue",
+        libPath: "lib/solid_queue",
+        libEntryFile: "lib/solid_queue.rb",
+        testPath: "test",
+        compareApi: true,
+        compareTests: true,
+      },
+    ],
+  },
+  {
+    name: "solid_cable",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/solid_cable.git",
+      ref: "v3.0.7",
+    },
+    packages: [
+      {
+        name: "solid-cable",
+        libPath: "lib/solid_cable",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
       },
     ],
   },

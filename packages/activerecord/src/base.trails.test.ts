@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base, SubclassNotFound, UnknownPrimaryKey, registerModel } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
-import { include, initialize } from "@blazetrails/activesupport";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { loadSchema } from "./model-schema.js";
 import { Firm } from "./test-helpers/models/company.js";
@@ -191,7 +190,7 @@ describe("instantiate override types for absent keys (trails)", () => {
   }
   const seedAttrs = async (): Promise<Record<string, unknown>> => {
     class Topic extends Base {}
-    const seed = await Topic.create({ title: "The First Topic" } as Partial<Topic>);
+    const seed = await Topic.create({ title: "The First Topic" });
     const attrs = {
       ...(seed as unknown as AttrProbe & { attributes: Record<string, unknown> }).attributes,
     };
@@ -392,7 +391,7 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     const first = Firm.columnsHash();
     expect(Firm.columnsHash()).toBe(first);
 
-    expect(Object.prototype.hasOwnProperty.call(Company, "_schemaLoaded")).toBe(true);
+    expect(Object.hasOwn(Company, "_schemaLoaded")).toBe(true);
 
     await Company.resetColumnInformation();
     await Company.loadSchema();
@@ -422,25 +421,5 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     await dev.updateColumn("name", "name");
     await dev.reload();
     expect("name" in dev).toBe(true);
-  });
-});
-
-describe("ActiveRecord::Base#initialize seats included modules", () => {
-  it("runs an included module's initialize at the core.rb:477 super", () => {
-    class Topic extends Base {
-      static {
-        this._tableName = "topics";
-        this.attribute("id", "integer");
-      }
-    }
-    include(Topic, {
-      [initialize](this: Record<string, unknown>) {
-        this.dbRuntime = null;
-      },
-    });
-
-    const topic = new Topic();
-    expect(Object.hasOwn(topic, "dbRuntime")).toBe(true);
-    expect((topic as unknown as Record<string, unknown>).dbRuntime).toBe(null);
   });
 });

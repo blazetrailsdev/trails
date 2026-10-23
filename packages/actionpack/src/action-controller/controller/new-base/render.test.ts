@@ -20,7 +20,7 @@ class BlankRenderController extends Base {
         "render/blank-render/index.html.tse": "Hello world!",
         "render/blank-render/access-request.html.tse":
           "The request: <%= request.method.toString().toUpperCase() %>",
-        "render/blank-render/access-action-name.html.tse": "Action Name: <%= actionName %>",
+        "render/blank-render/access-action-name.html.tse": "Action Name: <%= actionName() %>",
         "render/blank-render/access-controller-name.html.tse":
           "Controller Name: <%= controllerName() %>",
         "render/blank-render/overridden-with-own-view-paths-appended.html.tse": "parent content",
@@ -114,8 +114,7 @@ describe("RenderTest", () => {
     });
   });
 
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
-  it.skip("rendering more than once raises an exception", async () => {
+  it("rendering more than once raises an exception", async () => {
     await t.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         deprecator().silence(() => {
@@ -141,8 +140,7 @@ describe("TestOnlyRenderPublicActions", () => {
     t = new TestOnlyRenderPublicActions(task.name);
   });
 
-  // BLOCKED: debug-exceptions-gates-on-wrapper-show-and-request-headers
-  it.skip("raises an exception when a method of Object is called", async () => {
+  it("raises an exception when a method of Object is called", async () => {
     await assertRaises([ActionNotFound], {}, async () => {
       await t.get("/render/blank_render/clone", {
         headers: { "action_dispatch.show_exceptions": "none" },

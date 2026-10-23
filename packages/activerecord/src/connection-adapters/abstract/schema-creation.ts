@@ -16,7 +16,6 @@ import {
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { wrap } from "@blazetrails/activesupport";
-import { merge } from "@blazetrails/ruby-compat";
 
 export interface SchemaCreationConn extends SchemaQuoter {
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
@@ -189,7 +188,7 @@ export class SchemaCreation {
     if (this.supportsIndexesInCreate()) {
       for (const [columnName, options] of o.indexes) {
         statements.push(
-          await (this as unknown as IndexVisitor).indexInCreate(o.name, columnName, options),
+          await (this as Partial<IndexVisitor>).indexInCreate!(o.name, columnName, options),
         );
       }
     }
@@ -281,10 +280,10 @@ export class SchemaCreation {
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
     parts.push(`(${await this.quotedColumns(index)})`);
     if ((await this.supportsIndexInclude()) && index.include != null) {
-      const pg = this as unknown as {
-        quotedIncludeColumns(o: string | string[]): Promise<string>;
+      const pg = this as {
+        quotedIncludeColumns?(o: string | string[]): Promise<string>;
       };
-      parts.push(`INCLUDE (${await pg.quotedIncludeColumns(index.include)})`);
+      parts.push(`INCLUDE (${await pg.quotedIncludeColumns!(index.include)})`);
     }
     if ((await this.supportsNullsNotDistinct()) && index.nullsNotDistinct)
       parts.push("NULLS NOT DISTINCT");
@@ -320,7 +319,7 @@ export class SchemaCreation {
 
   /** @internal */
   protected columnOptions(o: ColumnDefinition): Record<string, unknown> {
-    return merge(o.options, { column: o });
+    return { ...o.options, column: o };
   }
 
   /** @internal */
@@ -345,7 +344,8 @@ export class SchemaCreation {
 
   /** @internal */
   protected toSql(sql: unknown): string {
-    if (sql && typeof (sql as any).toSql === "function") return (sql as any).toSql();
+    if (sql && typeof (sql as { toSql?: unknown }).toSql === "function")
+      return (sql as { toSql(): string }).toSql();
     return String(sql);
   }
 

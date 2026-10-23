@@ -1,11 +1,5 @@
-import {
-  NameError,
-  camelize,
-  constantize,
-  pluralize,
-  underscore,
-} from "@blazetrails/activesupport";
-import { include, included, initialize } from "@blazetrails/ruby-compat";
+import { NameError, camelize, constantize, underscore } from "@blazetrails/activesupport";
+import { include, included } from "@blazetrails/ruby-compat";
 import { ActiveModel } from "./active-model.js";
 import { ModelHelpers } from "./model-helpers.js";
 import type { GeneratorBase } from "./base.js";
@@ -103,15 +97,5 @@ export const ResourceHelpers = {
     const klass = base as typeof GeneratorBase & (new (...args: never[]) => GeneratorBase);
     include(klass, ModelHelpers);
     klass.classOption("modelName", { type: "string", desc: "ModelName to be used" });
-  },
-
-  [initialize](this: ResourceHelpersHost): void {
-    const controllerName = this.name;
-    if (this.options.modelName != null) {
-      this.name = this.options.modelName;
-      this.assignNamesBang(this.name);
-    }
-
-    this.assignControllerNamesBang(pluralize(controllerName));
   },
 };

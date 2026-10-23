@@ -32,6 +32,7 @@ const PACKAGE_DIRS: Record<string, string> = {
   arel: "packages/arel/src",
   date: "packages/date/src",
   "did-you-mean": "packages/did-you-mean/src",
+  globalid: "packages/globalid/src",
   i18n: "packages/i18n/src",
 };
 

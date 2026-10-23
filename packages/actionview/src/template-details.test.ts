@@ -46,7 +46,7 @@ describe("TemplateDetails variants", () => {
   });
 
   test('variants "any" matches anything', () => {
-    const r = req({ variants: "any" });
+    const r = req({ variants: ":any" });
     expect(new TemplateDetails("en", "tse", "html", "phone").matches(r)).toBe(true);
     expect(new TemplateDetails("en", "tse", "html", null).matches(r)).toBe(true);
   });

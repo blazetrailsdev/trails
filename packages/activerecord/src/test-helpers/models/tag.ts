@@ -22,7 +22,7 @@ export class Tag extends Base {
 
     this.hasMany(
       "nullTaggings",
-      function (this: any) {
+      function () {
         return this.none();
       },
       { className: "Tagging" },
@@ -49,7 +49,7 @@ export class OrderedTag extends Tag {
     this._tableName = "tags";
     this.hasMany(
       "orderedTaggings",
-      function (this: any) {
+      function () {
         return this.order("taggings.id DESC");
       },
       {

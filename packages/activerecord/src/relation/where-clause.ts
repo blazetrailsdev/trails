@@ -1,6 +1,7 @@
 import { extractBang, rbEqual } from "@blazetrails/activesupport";
 import {
   Hash,
+  eachWithObject,
   first,
   isEmpty,
   isModuleIncluded,
@@ -130,17 +131,19 @@ export class WhereClause {
   }
 
   toH(tableName?: string | null, opts: { equalityOnly?: boolean } = {}): Record<string, unknown> {
-    const hash: Record<string, unknown> = {};
-    for (const node of equalities(this.predicates, opts.equalityOnly ?? false) as (Nodes.Node & {
-      left: Arel.Attribute;
-      right: unknown;
-    })[]) {
-      if (tableName != null && !rbEqual(tableName, node.left.relation.name)) continue;
-      const name = String(node.left.name);
-      const value = extractNodeValue(node.right);
-      hash[name] = value;
-    }
-    return hash;
+    return eachWithObject(
+      equalities(this.predicates, opts.equalityOnly ?? false) as (Nodes.Node & {
+        left: Arel.Attribute;
+        right: unknown;
+      })[],
+      {} as Record<string, unknown>,
+      (node, hash) => {
+        if (tableName != null && !rbEqual(tableName, node.left.relation.name)) return;
+        const name = String(node.left.name);
+        const value = extractNodeValue(node.right);
+        hash[name] = value;
+      },
+    );
   }
 
   /** @internal */

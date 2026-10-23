@@ -98,9 +98,13 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@blazetrails/activejob": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

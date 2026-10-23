@@ -85,4 +85,19 @@ describe("start / wait / summary", () => {
     expect(run(["start"], "a: true\n").stderr).toContain("already holds a run");
     expect(run(["wait", "nope"]).stderr).toContain("no task nope");
   });
+
+  it("prints a task log larger than a pipe buffer in full to a slow reader", () => {
+    const { dir } = runner();
+    const env = { ...process.env, CI_BG_DIR: dir };
+    spawnSync(process.execPath, [SCRIPT, "start"], {
+      env,
+      input: "big: head -c 1000000 /dev/zero | tr '\\0' x\n",
+    });
+    const piped = spawnSync(
+      "bash",
+      ["-c", `"${process.execPath}" "${SCRIPT}" wait big | { sleep 0.5; wc -c; }`],
+      { env, encoding: "utf8" },
+    );
+    expect(Number(piped.stdout.trim())).toBeGreaterThan(1000000);
+  });
 });

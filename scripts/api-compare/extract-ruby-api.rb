@@ -910,7 +910,8 @@ class ApiExtractor
       line: @current_line,
     }
     record_body_facts(method_info, node[3], find_params(node), fqn)
-    if INLINED_HOOKS.include?(name)
+    record_included_hook_mixins(target, node[3], find_params(node)) if @in_sclass && name == "included"
+    if INLINED_HOOKS.include?(name) || (@modules[fqn] && !@in_sclass)
       @def_end_lines ||= DefEndLines.new(@source).tap(&:parse).ends
       end_line = @def_end_lines[method_info[:line]]
       method_info[:endLine] = end_line if end_line
@@ -968,6 +969,57 @@ class ApiExtractor
     maybe_update_module_file(fqn, target)
 
     each_base_class_attribute(node[5]) { |call| process_method_add_arg(call) } if %w[extended included].include?(name)
+    record_included_hook_mixins(target, node[5], find_params_defs(node)) if name == "included"
+  end
+
+  def record_boot_mixin(receiver, name, args)
+    return false unless @in_on_load.positive? && %w[include prepend].include?(name)
+    return false unless receiver.is_a?(Array) && %i[var_ref const_path_ref top_const_ref].include?(receiver[0])
+    target = const_name(receiver)
+    return false unless target && target.match?(/\A[A-Z]/)
+    names = extract_const_args(args, keep_absolute: true)
+    return true if names.empty?
+    (@boot_mixins ||= []) << { target: target, context: current_fqn, statement: { kind: name, names: names } }
+    true
+  end
+
+  public def resolve_boot_mixins!
+    (@boot_mixins || []).each do |mixin|
+      scopes = mixin[:context].to_s.split("::")
+      candidates = scopes.length.downto(0).map { |n| (scopes.first(n) + [mixin[:target]]).join("::") }
+      fqn = candidates.find { |c| @classes[c] || @modules[c] }
+      next unless fqn
+      ((@classes[fqn] || @modules[fqn])[:bootMixins] ||= []) << mixin[:statement]
+    end
+  end
+
+  def record_included_hook_mixins(target, body, params)
+    base = params.is_a?(Array) && params[1].is_a?(Array) && params[1][0].is_a?(Array) ? ident_name(params[1][0]) : nil
+    return unless base
+    on_base = ->(n) { n.is_a?(Array) && %i[var_ref vcall].include?(n[0]) && ident_name(n[1]) == base }
+    scan = lambda do |n|
+      return unless n.is_a?(Array)
+      statement =
+        if n[0] == :command_call && on_base.(n[1])
+          name = ident_name(n[3])
+          args = n[4].is_a?(Array) && n[4][0] == :args_add_block ? n[4][1] : nil
+          if name == "send" && args.is_a?(Array) && args[0].is_a?(Array) && args[0][0] == :symbol_literal
+            kind = ident_name(args[0][1][1])
+            { kind: kind, names: extract_const_args(args[1..], keep_absolute: true) } if %w[include prepend].include?(kind)
+          elsif %w[include prepend].include?(name)
+            { kind: name, names: extract_const_args(n[4], keep_absolute: true) }
+          end
+        elsif n[0] == :method_add_arg && n[1].is_a?(Array) && n[1][0] == :call && on_base.(n[1][1]) &&
+              %w[include prepend].include?(ident_name(n[1][3]))
+          { kind: ident_name(n[1][3]), names: extract_const_args_from_paren(n[2], keep_absolute: true) }
+        end
+      if statement
+        (target[:includedHookMixins] ||= []) << statement if statement[:names].any?
+      else
+        n.each { |c| scan.(c) }
+      end
+    end
+    scan.(body)
   end
 
   def each_base_class_attribute(node, &block)
@@ -989,6 +1041,14 @@ class ApiExtractor
   # faithfully-placed TS member scores as a `moved` extra.
   def maybe_update_module_file(fqn, target)
     return unless @modules[fqn] || @classes[fqn]
+    return if target[:named_file]
+    if File.basename(@current_file.to_s, ".rb") == fqn.to_s.gsub("::", "/").gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase &&
+       !fqn.to_s.include?("::")
+      target[:named_file] = true
+      target[:first_method_file] = @current_file
+      target[:file] = @current_file
+      return
+    end
     return if target[:first_method_file]
     target[:first_method_file] = @current_file
     target[:file] = @current_file
@@ -1013,6 +1073,8 @@ class ApiExtractor
     # Umbrella scans harvest no methods; ignore every command in the umbrella file.
     return if @scanning_umbrella
 
+    return if node[0] == :command_call && record_boot_mixin(node[1], cmd_name, args)
+
     case cmd_name
     when "private", "protected", "public"
       # No-args form (`private`) flips the default visibility for the scope.
@@ -1031,11 +1093,17 @@ class ApiExtractor
       process_prepend(extract_const_args(args, keep_absolute: true))
     when "extend"
       process_extend(args)
-    when "attr_reader"
+    when "attr_reader", "attr"
       process_attr(args, :reader, force_class: on_singleton)
     when "attr_writer"
       process_attr(args, :writer, force_class: on_singleton)
     when "attr_accessor"
+      process_attr(args, :accessor, force_class: on_singleton)
+    when "attr_internal_reader"
+      process_attr(args, :reader, force_class: on_singleton)
+    when "attr_internal_writer"
+      process_attr(args, :writer, force_class: on_singleton)
+    when "attr_internal", "attr_internal_accessor"
       process_attr(args, :accessor, force_class: on_singleton)
     when "alias_method"
       process_alias_method(args)
@@ -1049,7 +1117,7 @@ class ApiExtractor
       process_define_method(args, nil)
     when "class_attribute"
       process_mattr(args, reader: true, writer: true, predicate: true, class_attr: true)
-    when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor"
+    when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor", "config_accessor"
       process_mattr(args, reader: true, writer: true, predicate: false, class_attr: false)
     when "cattr_reader", "mattr_reader", "thread_cattr_reader", "thread_mattr_reader"
       process_mattr(args, reader: true, writer: false, predicate: false, class_attr: false)
@@ -1091,6 +1159,11 @@ class ApiExtractor
   end
 
   def process_method_add_arg(node)
+    if node[1].is_a?(Array) && node[1][0] == :call &&
+       record_boot_mixin(node[1][1], ident_name(node[1][3]), node[2])
+      return
+    end
+
     # `base.class_attribute(:foo, …)` inside `def self.extended(base)` /
     # `def self.included(base)` (activerecord/lib/active_record/enum.rb:166-168)
     # declares the attribute on whatever extends the module, as the bare
@@ -1120,7 +1193,8 @@ class ApiExtractor
         else
           apply_visibility_to_named(names, cmd_name.to_sym)
         end
-      when "attr_reader", "attr_writer", "attr_accessor"
+      when "attr_reader", "attr_writer", "attr_accessor", "attr_internal", "attr_internal_reader",
+           "attr_internal_writer", "attr_internal_accessor"
         process_attr_from_arg_paren(node[2], cmd_name)
       when "include"
         process_include_from_arg_paren(node[2])
@@ -1134,7 +1208,7 @@ class ApiExtractor
         process_define_model_callbacks(node[2])
       when "class_attribute"
         process_mattr(node[2], reader: true, writer: true, predicate: true, class_attr: true)
-      when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor"
+      when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor", "config_accessor"
         process_mattr(node[2], reader: true, writer: true, predicate: false, class_attr: false)
       when "cattr_reader", "mattr_reader", "thread_cattr_reader", "thread_mattr_reader"
         process_mattr(node[2], reader: true, writer: false, predicate: false, class_attr: false)
@@ -1168,7 +1242,11 @@ class ApiExtractor
       @module_function_stack[-1] = true
       return
     end
-    names = extract_symbol_args(args)
+    # `module_function def server` (actioncable/lib/action_cable.rb:77): the
+    # def is the argument, so it is walked first and then moved by its name.
+    defs = args.is_a?(Array) ? args.flatten(1).select { |n| n.is_a?(Array) && n[0] == :def } : []
+    defs.each { |d| walk(d) }
+    names = extract_symbol_args(args) + defs.map { |d| ident_name(d[1]) }.compact
     return if names.empty?
     fqn = current_fqn
     target = @modules[fqn]
@@ -1379,9 +1457,9 @@ class ApiExtractor
 
   def process_attr_from_arg_paren(args, cmd_name)
     kind = case cmd_name
-    when "attr_reader" then :reader
-    when "attr_writer" then :writer
-    when "attr_accessor" then :accessor
+    when "attr_reader", "attr_internal_reader" then :reader
+    when "attr_writer", "attr_internal_writer" then :writer
+    when "attr_accessor", "attr_internal", "attr_internal_accessor" then :accessor
     end
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
@@ -2237,6 +2315,70 @@ class ApiExtractor
     target[on_class ? :classMethods : :instanceMethods] << entry
   end
 
+  # VISIBILITY_ARMS_RATIONALE: an `elsif` arm whose condition reads only a
+  # visibility parameter, such as `elsif !include_private_methods && super(method, true)`
+  # (`activemodel/lib/active_model/attribute_methods.rb:528-533`), cannot answer
+  # differently from its sibling arm in trails, which has no runtime visibility
+  # (CLAUDE.md § "Method visibility is compile-time only"). The arm, and the
+  # calls inside it, are dropped from the calls, call-argument and skeleton
+  # facts every gate compares, and the entry is marked `visibilityArms`.
+  VISIBILITY_PARAM_NAMES = %w[include_private include_private_methods include_all include_priv priv].freeze
+
+  def visibility_params(_entry)
+    VISIBILITY_PARAM_NAMES
+  end
+
+  # The body with every visibility-only `elsif` arm spliced out of its chain,
+  # or `body` itself (the same object) when there is none.
+  def drop_visibility_arms(node, params)
+    return node unless node.is_a?(Array)
+
+    if %i[if elsif].include?(node[0]) && visibility_arm?(node[3], params)
+      rest = drop_visibility_arms(node[3][3], params)
+      return drop_visibility_arms([node[0], node[1], node[2], rest], params)
+    end
+    mapped = node.map { |child| drop_visibility_arms(child, params) }
+    mapped.each_with_index.all? { |child, i| child.equal?(node[i]) } ? node : mapped
+  end
+
+  def visibility_arm?(node, params)
+    node.is_a?(Array) && node[0] == :elsif && visibility_condition?(node[1], params)
+  end
+
+  # A condition built only of `!`, `&&` / `and`, references to a visibility
+  # parameter, and calls whose last argument is the literal `true`, reading at
+  # least one visibility parameter.
+  def visibility_condition?(cond, params)
+    seen = [false]
+    visibility_operand?(cond, params, seen) && seen[0]
+  end
+
+  def visibility_operand?(cond, params, seen)
+    return false unless cond.is_a?(Array)
+
+    case cond[0]
+    when :unary then %i[! not].include?(cond[1]) && visibility_operand?(cond[2], params, seen)
+    when :binary
+      %i[&& and].include?(cond[2]) && visibility_operand?(cond[1], params, seen) &&
+        visibility_operand?(cond[3], params, seen)
+    when :var_ref
+      return false unless cond[1][0] == :@ident && params.include?(cond[1][1])
+
+      seen[0] = true
+    when :paren then cond[1].is_a?(Array) && cond[1].length == 1 && visibility_operand?(cond[1][0], params, seen)
+    else trailing_true_call?(cond)
+    end
+  end
+
+  def trailing_true_call?(node)
+    args = { super: 1, method_add_arg: 2, command: 2, command_call: 4 }[node[0]]&.then { |i| node[i] }
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    return false unless args.is_a?(Array) && args[0] == :args_add_block && args[1].is_a?(Array)
+
+    last = args[1].last
+    last.is_a?(Array) && last[0] == :var_ref && last[1] == [:@kw, "true", last[1][2]]
+  end
+
   # The body-derived half of a method entry: every fact the manifest carries
   # about a method body, so a `define_method`-generated entry is
   # indistinguishable from a `def`-written one rather than reading as a
@@ -2247,8 +2389,10 @@ class ApiExtractor
     mark_symbol_discriminated(entry[:params], body)
     entry[:takesBlock] = true if entry[:params].any? { |p| p[:kind] == "block" } || body_takes_block?(body)
     dep_info = detect_deps(body)
+    compared = drop_visibility_arms(body, visibility_params(entry))
+    entry[:visibilityArms] = true unless compared.equal?(body)
     calls, weak_calls, call_receivers, call_receiver_names, string_eval_calls =
-      collect_method_calls(body, params_node)
+      collect_method_calls(compared, params_node)
     entry[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     entry[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     entry[:calls] = calls unless calls.empty?
@@ -2256,9 +2400,9 @@ class ApiExtractor
     entry[:callReceivers] = call_receivers unless call_receivers.empty?
     entry[:callReceiverNames] = call_receiver_names unless call_receiver_names.empty?
     entry[:stringEvalCalls] = string_eval_calls unless string_eval_calls.empty?
-    call_args = collect_call_args(body)
+    call_args = collect_call_args(compared)
     entry[:callArgs] = call_args unless call_args.empty?
-    skeleton = collect_method_skeleton(body)
+    skeleton = collect_method_skeleton(compared)
     entry[:skeleton] = skeleton unless skeleton.empty?
     opt_keys = collect_option_keys(body, entry[:params], fqn)
     entry[:option_keys] = opt_keys unless opt_keys.empty?
@@ -2490,15 +2634,21 @@ class ApiExtractor
         forms.each do |suffix_in_def, form|
           name = "#{base}#{suffix_in_def}"
           method_name = form == :writer ? "#{name}=" : name
+          generated = defs[method_name]
+          params =
+            if generated
+              extract_params(generated[:params])
+            else
+              form == :writer ? [{ name: "value", kind: "required" }] : []
+            end
           entry = {
             name: method_name,
             visibility: "public",
-            params: form == :writer ? [{ name: "value", kind: "required" }] : [],
+            params: params,
             file: @current_file,
             line: @current_line,
             notes: "class_eval",
           }
-          generated = defs[method_name]
           record_body_facts(entry, generated[:body], generated[:params], fqn) if generated
           target[:instanceMethods] << entry
         end
@@ -2734,8 +2884,15 @@ class ApiExtractor
     parts = name.split("::")
     const = parts.last
     container = parts[0...-1].join("::")
-    own = store.dig(current_fqn, const)
-    return own if own && !absolute && container.empty?
+    if !absolute && container.empty?
+      scope = current_fqn.to_s.split("::")
+      loop do
+        found = store.dig(scope.join("::"), const)
+        return found if found
+        break if scope.empty?
+        scope.pop
+      end
+    end
     store.each do |fqn, consts|
       next unless consts.key?(const)
       if absolute
@@ -2957,6 +3114,19 @@ class ApiExtractor
   # `delete` answers a boolean.
   BLOCK_ARM_HASH_CALLS = %w[delete merge merge! update].freeze
 
+  FORM_ARMS = {
+    "uniq" => ->(has_block, _args) { !has_block },
+    "count" => ->(has_block, _args) { has_block },
+    "round" => ->(_has_block, args) { args.all? { |arg| arg.nil? || arg == [:arg_paren, nil] } }
+  }.freeze
+
+  def form_arm?(name, has_block, args)
+    return string_literal_arg?(args) if name == "chomp"
+
+    arm = FORM_ARMS[name]
+    arm.nil? || arm.call(has_block, args)
+  end
+
   def block_pass?(args)
     args.any? do |arg|
       arg = arg[1] if arg.is_a?(Array) && arg[0] == :arg_paren
@@ -3061,6 +3231,9 @@ class ApiExtractor
     when :const_path_ref then const_name(recv[2])
     when :top_const_ref then const_name(recv[1])
     when :aref then symbol_key_name(recv[2])
+    when :opassign
+      target = recv[1]
+      target.is_a?(Array) && target[0] == :aref_field && recv[2] == [:@op, "||=", recv[2][2]] ? receiver_tail_name(target[1]) : nil
     when :paren
       stmts = recv[1]
       stmts.is_a?(Array) && stmts.length == 1 ? or_operand_names(stmts[0]) : nil
@@ -3078,9 +3251,35 @@ class ApiExtractor
 
   def or_operand_names(node)
     return receiver_tail_name(node) unless node.is_a?(Array) && node[0] == :binary && node[2] == :"||"
+    return or_operand_names(node[1]) if empty_hash_literal?(node[3])
 
     names = [or_operand_names(node[1]), or_operand_names(node[3])]
     names.all? ? names.join("|") : nil
+  end
+
+  def empty_hash_literal?(node)
+    node.is_a?(Array) && node[0] == :hash && node[1].nil?
+  end
+
+  # The receiver name a `merge` spread credits against: `receiver_tail_name`,
+  # plus `super` (`super.merge(...)`, `locking/optimistic.rb:151`) and the
+  # leftmost receiver of a chained `merge`, which a port flattens into one
+  # literal (`as_options(polymorphic).merge(conditional_options).merge(...)`,
+  # `connection_adapters/abstract/schema_definitions.rb:259`, is
+  # `{ ...this.asOptions(this.polymorphic), ...this.conditionalOptions(), ... }`).
+  # A `(x || {})` operand names `x` alone (`persistence.rb:746`), and
+  # `Hash[pairs]` (`rb_hash_s_create`, `vendor/ruby/v3.3.11/hash.c:1843`) names
+  # `from_entries`, its `Object.fromEntries(pairs)` port (`routing/mapper.rb:153-155`).
+  def merge_receiver_name(recv)
+    return "super" if recv.is_a?(Array) && %i[zsuper super].include?(recv[0])
+    return "from_entries" if recv.is_a?(Array) && recv[0] == :aref && const_name(recv[1]) == "Hash"
+
+    if recv.is_a?(Array) && recv[0] == :method_add_arg && recv[1].is_a?(Array) &&
+       recv[1][0] == :call && ident_name(recv[1][3]) == "merge"
+      return merge_receiver_name(recv[1][1])
+    end
+
+    receiver_tail_name(recv)
   end
 
   def symbol_key_name(args)
@@ -3738,12 +3937,20 @@ class ApiExtractor
         lhs[1]
       elsif lhs.is_a?(Array) && lhs[0] == :const_path_field && self_ref?(lhs[1])
         lhs[2]
+      elsif lhs.is_a?(Array) && lhs[0] == :const_path_field
+        lhs[2]
       end
     return unless const.is_a?(Array) && const[0] == :@const
     rhs = unwrap_freeze(rhs)
     maybe_record_collection_constant(const[1], rhs)
     maybe_record_symbol_hash_keys(const[1], rhs)
     record_file_hash_keys(literal_hash_keys(rhs))
+    if rhs.is_a?(Array) && %i[var_ref const_path_ref top_const_ref].include?(rhs[0]) &&
+       (target = qualified_const_name(rhs))
+      (@file_constants[@current_file] ||= {})[const[1]] =
+        { kind: "alias", target: target, namespace: current_fqn }
+      return
+    end
     lit = literal_value(rhs, method(:string_opener_at))
     return if lit.nil?
     (@file_constants[@current_file] ||= {})[const[1]] = lit
@@ -4126,6 +4333,15 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@const && inner[1] == "Proc"
   end
 
+  INDEXED_ITERATORS = %w[map each select reject flat_map each_with_object].freeze
+
+  def indexed_iterator_receiver?(recv, args)
+    return false unless args.all? { |a| a.is_a?(Array) && a[0] == :arg_paren && a[1].nil? }
+    return false unless recv.is_a?(Array) && recv[0] == :call && recv[3]
+
+    INDEXED_ITERATORS.include?(ident_name(recv[3]))
+  end
+
   # `Promise.new(...)`, `Promise::Complete.new(...)` and `Promise.wrap(...)` port
   # to the value itself: the native JS promise is the port of
   # `ActiveRecord::Promise` (CLAUDE.md § "`ActiveRecord::Promise` is the native
@@ -4141,10 +4357,10 @@ class ApiExtractor
     NATIVE_PROMISE_CALLS.include?(name) && NATIVE_PROMISE_CONSTANTS.include?(const_name(recv))
   end
 
-  LITERAL_NEW_CONSTANTS = %w[Hash Array Concurrent::Array].freeze
+  LITERAL_NEW_CONSTANTS = %w[Hash Array Concurrent::Array String].freeze
 
   def core_new_kind(recv, args, has_block)
-    return nil unless recv.is_a?(Array) && %i[var_ref const_path_ref].include?(recv[0])
+    return nil unless recv.is_a?(Array) && %i[var_ref const_path_ref top_const_ref].include?(recv[0])
     return nil if has_block
 
     const = const_name(recv)
@@ -4153,7 +4369,16 @@ class ApiExtractor
     no_args = args.all? { |arg| arg.nil? || arg == [:arg_paren, nil] }
     return "literal-new" if no_args && LITERAL_NEW_CONSTANTS.include?(const)
 
-    "string-new" if !no_args && const == "String"
+    return "string-new" if !no_args && const == "String"
+
+    "hwia-new" if const.split("::").last == "HashWithIndifferentAccess" && positional_arg_count(args) <= 1
+  end
+
+  def positional_arg_count(args)
+    args.sum do |arg|
+      arg = arg[1] if arg.is_a?(Array) && arg[0] == :arg_paren
+      arg.is_a?(Array) && arg[0] == :args_add_block && arg[1].is_a?(Array) ? arg[1].length : 0
+    end
   end
 
   # `weak` collects the occurrences whose receiver was inert; a name only
@@ -4227,6 +4452,7 @@ class ApiExtractor
       # Unqualified method call: foo() or foo
       name = ident_name(callee[1])
       name = nil if callee[0] == :vcall && capture_local?(name)
+      name = "raise" if name == "fail" && !@defines_fail
     when :call, :command_call
       # Qualified method call: obj.foo
       recv = callee[1]
@@ -4249,14 +4475,17 @@ class ApiExtractor
 
     if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
        !(name == "new" && recv && proc_new_receiver?(recv)) &&
-       !(recv && native_promise_call?(name, recv))
-      calls << name
+       !(recv && native_promise_call?(name, recv)) &&
+       !(name == "with_index" && has_block && indexed_iterator_receiver?(recv, args))
       kind = (name == "new" && core_new_kind(recv, args, has_block)) || receiver_kind(recv)
+      kind = "formless" unless form_arm?(name, has_block || block_pass?(args), args)
+      calls << name unless kind == "literal-new"
       (@call_receivers[name] ||= Set.new) << kind
       if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
         formless = ((has_block || block_pass?(args)) && BLOCK_ARM_HASH_CALLS.include?(name)) ||
                    (value_used && name == "delete")
-        (@call_receiver_names[name] ||= Set.new) << ((!formless && receiver_tail_name(recv)) || "?")
+        recv_name = name == "merge" ? merge_receiver_name(recv) : receiver_tail_name(recv)
+        (@call_receiver_names[name] ||= Set.new) << ((!formless && recv_name) || "?")
       end
       weak << name if (recv && inert_receiver?(recv)) || core_receiver_call?(name, recv)
       if STRING_EVAL_CALLS.include?(name) && string_literal_arg?(args)
@@ -4993,6 +5222,7 @@ def run
     # package has been seen (a reopened class may define the target elsewhere).
     extractor.resolve_aliases!
     extractor.resolve_method_missing_forwards!
+    extractor.resolve_boot_mixins!
 
     # Normalize into the JSON shape. Non-public methods are kept (tagged
     # `internal: true`) so consumers can opt into private-API coverage.
@@ -5056,6 +5286,8 @@ def normalize_class_info(info)
     out[:forwardedMethods] = info[:forwardedMethods] if info[:forwardedMethods]
     out[:prepends] = info[:prepends].uniq if info[:prepends]&.any?
     out[:mixinOrder] = info[:mixinOrder] if info[:mixinOrder]&.any?
+    out[:includedHookMixins] = info[:includedHookMixins] if info[:includedHookMixins]&.any?
+    out[:bootMixins] = info[:bootMixins] if info[:bootMixins]&.any?
   end
 end
 

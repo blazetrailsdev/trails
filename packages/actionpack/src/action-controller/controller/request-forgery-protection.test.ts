@@ -1,16 +1,19 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { Cookies } from "../../action-dispatch/middleware/cookies.js";
 import {
   ActiveSupportJSON,
-  Duration,
+  assert,
+  assertNil,
+  assertNot,
   assertNothingRaised,
   assertRaises,
+  Duration,
   include,
-  isBlank,
   type Included,
+  isBlank,
 } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
-  RoutingUrlFor,
   embedAuthenticityTokenInRemoteForms,
   setEmbedAuthenticityTokenInRemoteForms,
 } from "@blazetrails/actionview";
@@ -24,10 +27,7 @@ import {
   RequestForgeryProtection,
   decodeCsrfToken,
 } from "../metal/request-forgery-protection.js";
-import { UrlFor } from "../../action-dispatch/routing/url-for.js";
 import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
-
-include(RoutingUrlFor, UrlFor);
 
 interface ActionsHost {
   sameOriginJs(): Promise<void>;
@@ -225,14 +225,14 @@ class PerFormTokensController extends Base {
   async index(): Promise<void> {
     await this.render({
       inline:
-        "<%= context.formTag(context.params.get('form_path') ?? '/per_form_tokens/post_one', { method: context.params.get('form_method') }) %>",
+        "<%= context.formTag(context.params().get('form_path') ?? '/per_form_tokens/post_one', { method: context.params().get('form_method') }) %>",
     });
   }
 
   async buttonTo(): Promise<void> {
     await this.render({
       inline:
-        "<%= context.buttonTo('Button', context.params.get('form_path') ?? '/per_form_tokens/post_one', { method: context.params.get('form_method') }) %>",
+        "<%= context.buttonTo('Button', context.params().get('form_path') ?? '/per_form_tokens/post_one', { method: context.params().get('form_method') }) %>",
     });
   }
 
@@ -361,10 +361,10 @@ function RequestForgeryProtectionTests(
     Base.requestForgeryProtectionToken = oldRequestForgeryProtectionToken;
   });
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should render form with token tag", () => {});
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should render button to with token tag", () => {});
 
   it("should render form without token tag if remote", async () => {
@@ -383,16 +383,16 @@ function RequestForgeryProtectionTests(
     }
   });
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should render form with token tag if remote and external authenticity token requested and embedding is on", () => {});
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should render form with token tag if remote and external authenticity token requested", () => {});
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should render form with token tag if remote and authenticity token requested", () => {});
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should render form with token tag with authenticity token requested", () => {});
 
   it("should render form with with token tag if remote", async () => {
@@ -411,19 +411,19 @@ function RequestForgeryProtectionTests(
     }
   });
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should render form with with token tag if remote and external authenticity token requested and embedding is on", () => {});
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should render form with with token tag if remote and external authenticity token requested", () => {});
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should render form with with token tag if remote and authenticity token requested", () => {});
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should render form with with token tag with authenticity token requested", () => {});
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should render form with with token tag if remote and embedding token is on", () => {});
 
   it("should allow get", async () => {
@@ -812,7 +812,7 @@ function RequestForgeryProtectionTests(
 describe("RequestForgeryProtectionControllerUsingResetSessionTest", () => {
   RequestForgeryProtectionTests(RequestForgeryProtectionControllerUsingResetSession);
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should emit a csrf-param meta tag and a csrf-token meta tag", () => {});
 });
 
@@ -829,8 +829,8 @@ describe("RequestForgeryProtectionControllerUsingNullSessionTest", () => {
     tc = new TestCase(task.name);
     tc.controller = new RequestForgeryProtectionControllerUsingNullSession();
     await tc.beforeSetup();
-    tc.request.env["action_dispatch.key_generator"] = new NullSessionDummyKeyGenerator();
-    tc.request.env["action_dispatch.cookies_rotations"] = new RotationConfiguration();
+    tc.request.env[Cookies.GENERATOR_KEY] = new NullSessionDummyKeyGenerator();
+    tc.request.env[Cookies.COOKIES_ROTATIONS] = new RotationConfiguration();
   });
 
   it("should allow to set signed cookies", async () => {
@@ -925,9 +925,9 @@ describe("PrependProtectForgeryBaseControllerTest", () => {
 });
 
 describe("FreeCookieControllerTest", () => {
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should not render form with token tag", () => {});
-  // BLOCKED: action-controller-test-case-has-no-assert-select
+  // BLOCKED: port-request-forgery-form-token-tag-tests
   it.skip("should not render button to with token tag", () => {});
 
   let tc: TestCase;
@@ -955,7 +955,7 @@ describe("FreeCookieControllerTest", () => {
     const stub = vi.spyOn(SecureRandom, "urlsafeBase64").mockReturnValue(token);
     try {
       await tc.get("meta");
-      expect(isBlank(tc.response.body)).toBe(true);
+      assert(isBlank(tc.response.body));
     } finally {
       stub.mockRestore();
     }
@@ -1418,8 +1418,8 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
     {
       testCase: CookieCsrfTokenStorageStrategyControllerTest,
       setup(tc) {
-        tc.request.env["action_dispatch.key_generator"] = new NullSessionDummyKeyGenerator();
-        tc.request.env["action_dispatch.cookies_rotations"] = new RotationConfiguration();
+        tc.request.env[Cookies.GENERATOR_KEY] = new NullSessionDummyKeyGenerator();
+        tc.request.env[Cookies.COOKIES_ROTATIONS] = new RotationConfiguration();
       },
       initializeCsrfToken: (_tc, token) => initializeCsrfToken(token),
       assertNotBlocked: (_tc, block) => assertNotBlocked(block),
@@ -1441,8 +1441,8 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
 
   it("csrf token is stored in cookie", async () => {
     await tc().get("cookie");
-    expect(tc().session().isKey("_csrf_token")).toBe(false);
-    expect(tc().cookies().isKey("csrf_token")).toBe(true);
+    assertNot(tc().session().isKey("_csrf_token"));
+    assert(tc().cookies().isKey("csrf_token"));
   });
 
   it("csrf token is stored in custom cookie", async () => {
@@ -1450,8 +1450,8 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
       controller() as unknown as { csrfTokenStorageStrategy: CookieStore }
     ).csrfTokenStorageStrategy = new CookieStore("custom_cookie");
     await tc().get("cookie");
-    expect(tc().cookies().isKey("csrf_token")).toBe(false);
-    expect(tc().cookies().isKey("custom_cookie")).toBe(true);
+    assertNot(tc().cookies().isKey("csrf_token"));
+    assert(tc().cookies().isKey("custom_cookie"));
   });
 
   it("csrf token cookie has same site lax", async () => {
@@ -1463,7 +1463,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
     await tc().get("cookie");
 
     const cookies = tc().parseSetCookiesHeaders(tc().response.headers.get("Set-Cookie"));
-    const csrfTokenCookie = cookies.get("csrf_token")!;
+    const csrfTokenCookie = cookies["csrf_token"];
     expect(csrfTokenCookie["httponly"]).toBeTruthy();
   });
 
@@ -1477,7 +1477,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
   it("reset csrf token deletes cookie", async () => {
     await tc().get("cookie");
     await tc().get("reset");
-    expect(tc().cookies().get("csrf_token")).toBeUndefined();
+    assertNil(tc().cookies().get("csrf_token"));
   });
 
   it("should allow when session id in cookie matches session id", async () => {
@@ -1575,7 +1575,7 @@ describe("CustomCsrfTokenStorageStrategyControllerTest", () => {
   it("csrf token is stored in custom location", async () => {
     await t().post("index");
     (t().controller as Base).commitCsrfToken(t().request);
-    expect(t().session().isKey("_csrf_token")).toBe(false);
+    assertNot(t().session().isKey("_csrf_token"));
     expect(t().request.env["custom_storage"]).not.toBeNull();
   });
 

@@ -37,9 +37,10 @@ class Column {
 class Shape {
   constructor(public kind: string) {}
 }
-const Geo = { name: "Geo", Shape };
+const Geo = { name: "Geo", Shape } as { name: string; Shape: typeof Shape; Mark?: object };
 rbSetClassPathString(Shape, Geo, "Shape");
-const Kind = rbModConstSet(Geo, "Kind", new Module());
+const Kind = rbModConstSet(Geo, "Kind", {});
+rbModConstSet(Geo, "Mark", {});
 class Pair extends Struct.new("a", "b") {}
 rbModConstSet(Geo, "Pair", Pair);
 class Shadow extends Struct.new("a") {
@@ -108,8 +109,8 @@ function bytes(name: string): string {
   return fixtures[name].replace(/../g, (byte) => String.fromCharCode(Number.parseInt(byte, 16)));
 }
 
-function hex(str: string): string {
-  return Array.from(str, (c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+function hex(str: Uint8Array): string {
+  return Array.from(str, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 const shared = new Column("a", ":string");
@@ -172,7 +173,7 @@ const VALUES: Record<string, unknown> = {
 
 const LOADED: Record<string, unknown> = {
   floats: [...(VALUES.floats as unknown[]).slice(0, 8), 1.5],
-  "string binary": "Ã©ÿ",
+  "string binary": Uint8Array.of(0xc3, 0xa9, 0xff),
   "string us-ascii": "abc",
   "string shift_jis": "あ",
   array: [1, "a", null, [], new Hash()],
@@ -249,6 +250,13 @@ describe("Marshal.dump", () => {
       "0408653a0e47656f3a3a4b696e646f3a0f47656f3a3a5368617065063a0a406b696e643a0b636972636c65",
     );
 
+    const twice = new Shape(":circle");
+    extend(twice, Kind);
+    extend(twice, Geo.Mark!);
+    expect(hex(Marshal.dump(twice))).toBe(
+      "0408653a0e47656f3a3a4d61726b653a0e47656f3a3a4b696e646f3a0f47656f3a3a5368617065063a0a406b696e643a0b636972636c65",
+    );
+
     const anonymous = new Shape(":circle");
     extend(anonymous, new Module());
     expect(() => Marshal.dump(anonymous)).toThrow(TypeError);
@@ -273,7 +281,9 @@ describe("Marshal.dump", () => {
   });
 
   it("dumps an object of a class with a compat entry as its dumper's, under its own class", () => {
-    expect(Marshal.dump(new Point(3))).toBe("\x04\bo:\nPoint\x06:\x07@vi\x08");
+    expect(hex(Marshal.dump(new Point(3)))).toBe(
+      hex(Uint8Array.from("\x04\bo:\nPoint\x06:\x07@vi\x08", (c) => c.charCodeAt(0))),
+    );
   });
 
   it("raises RuntimeError for a marshal_dump that returns an instance of the same class", () => {
@@ -316,7 +326,7 @@ describe("Marshal.dump", () => {
   });
 
   it("raises ArgumentError past the depth limit", () => {
-    expect(Marshal.dump([[1]], 3)).toBe(Marshal.dump([[1]]));
+    expect(Marshal.dump([[1]], 3)).toEqual(Marshal.dump([[1]]));
     expect(() => Marshal.dump([[1]], 2)).toThrow(new ArgumentError("exceed depth limit"));
   });
 

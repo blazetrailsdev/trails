@@ -86,13 +86,6 @@ export function numberToDelimited(
   return NumberToDelimitedConverter.convert(number, options);
 }
 
-export function numberWithDelimiter(
-  number: unknown,
-  options: NumberWithDelimiterOptions = {},
-): unknown {
-  return numberToDelimited(number, options);
-}
-
 export function numberToRounded(number: unknown, options: NumberToRoundedOptions = {}): unknown {
   return NumberToRoundedConverter.convert(number, options);
 }
@@ -124,7 +117,6 @@ const _helpers = {
   numberToCurrency,
   numberToPercentage,
   numberToDelimited,
-  numberWithDelimiter,
   numberToRounded,
   numberToHumanSize,
   numberToHuman,
@@ -135,7 +127,6 @@ export namespace NumberHelper {
   export const numberToCurrency = _helpers.numberToCurrency;
   export const numberToPercentage = _helpers.numberToPercentage;
   export const numberToDelimited = _helpers.numberToDelimited;
-  export const numberWithDelimiter = _helpers.numberWithDelimiter;
   export const numberToRounded = _helpers.numberToRounded;
   export const numberToHumanSize = _helpers.numberToHumanSize;
   export const numberToHuman = _helpers.numberToHuman;

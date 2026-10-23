@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { TypeError } from "./type-error.js";
+import { Thread, rbIterBreakValue } from "./thread.js";
 import {
   Location,
   excBacktrace,
@@ -14,7 +16,7 @@ describe("Thread::Backtrace::Location", () => {
     expect(loc.label).toBe("_app_views_posts_show");
     expect(loc.lineno).toBe(3);
     expect(loc.column).toBe(11);
-    expect(loc.path).toBeNull();
+    expect(loc.path).toBe("(eval at compile (x.js:1:2))");
     expect(loc.toString()).toBe(
       "at Base._app_views_posts_show (eval at compile (x.js:1:2), <anonymous>:3:11)",
     );
@@ -34,10 +36,11 @@ describe("Thread::Backtrace::Location", () => {
       "webpack-internal:///(app-pages)/x.js",
     );
     expect(new Location("    at new Foo (/app/d.js:9:1)").path).toBe("/app/d.js");
-    expect(
-      new Location("    at eval (eval at compile (x.js:1:2), <anonymous>:3:11)").path,
-    ).toBeNull();
-    expect(new Location("    at <anonymous>").path).toBeNull();
+    expect(new Location("    at eval (eval at compile (x.js:1:2), <anonymous>:3:11)").path).toBe(
+      "(eval at compile (x.js:1:2))",
+    );
+    expect(new Location("    at <anonymous>").path).toBe("<anonymous>");
+    expect(new Location("    at new Promise (<anonymous>)").path).toBe("<anonymous>");
   });
 });
 
@@ -75,5 +78,65 @@ describe("Exception#set_backtrace", () => {
     excSetBacktrace(exc, ["at foo (a.js:1:2)", "at bar (b.js:3:4)"]);
     expect(exc.stack).toBe("Error: boom\n    at foo (a.js:1:2)\n    at bar (b.js:3:4)");
     expect(excBacktraceLocations(exc)!.map((loc) => loc.label)).toEqual(["foo", "bar"]);
+  });
+
+  it("dispatches to an exception's own backtrace and backtraceLocations", () => {
+    const locations = [new Location("    at foo (a.js:1:2)")];
+    class Proxy extends Error {
+      backtrace(): string[] {
+        return ["proxied"];
+      }
+      backtraceLocations(): Location[] {
+        return locations;
+      }
+    }
+    const exc = new Proxy("boom");
+    expect(excBacktrace(exc)).toEqual(["proxied"]);
+    expect(excBacktraceLocations(exc)).toBe(locations);
+  });
+
+  it("stores nil, wraps a String and keeps an Array of Strings", () => {
+    const exc = new Error("x");
+    expect(excSetBacktrace(exc, null)).toBeNull();
+    expect(excBacktrace(exc)).toBeNull();
+    expect(excSetBacktrace(exc, "a:1")).toEqual(["a:1"]);
+    expect(excBacktrace(exc)).toEqual(["a:1"]);
+    expect(excSetBacktrace(exc, ["a", "b"])).toEqual(["a", "b"]);
+    expect(excBacktrace(exc)).toEqual(["a", "b"]);
+  });
+
+  it("raises TypeError for anything but an Array of Strings", () => {
+    const exc = new Error("x");
+    expect(() => excSetBacktrace(exc, 1 as never)).toThrow(TypeError);
+    expect(() => excSetBacktrace(exc, ["a", 1] as never)).toThrow(
+      "backtrace must be Array of String",
+    );
+  });
+});
+
+describe("Thread.each_caller_location", () => {
+  function inner(): string[] {
+    const labels: string[] = [];
+    Thread.eachCallerLocation((location) => {
+      labels.push(String(location.label));
+    });
+    return labels;
+  }
+  function outer(): string[] {
+    return inner();
+  }
+
+  it("yields from the caller of the calling method", () => {
+    expect(outer()[0]).toBe("outer");
+  });
+
+  it("stops the walk at rbIterBreakValue and answers its value", () => {
+    let seen = 0;
+    const result = Thread.eachCallerLocation<number>(() => {
+      seen += 1;
+      rbIterBreakValue(5);
+    });
+    expect(result).toBe(5);
+    expect(seen).toBe(1);
   });
 });

@@ -1,6 +1,6 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Files, Mime, Request, Utils } from "@blazetrails/rack";
-import { File } from "@blazetrails/ruby-compat";
+import { chomp, File, rbFSend } from "@blazetrails/ruby-compat";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
@@ -30,7 +30,10 @@ export class Static {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    return (await this.fileHandler.attempt(env)) ?? this.app(env);
+    return (
+      (await this.fileHandler.attempt(env)) ??
+      (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>)
+    );
   }
 }
 
@@ -61,7 +64,7 @@ export class FileHandler {
       compressibleContentTypes = /^(?:text\/|application\/javascript|image\/svg\+xml)/,
     }: FileHandlerOptions = {},
   ) {
-    this.root = root.replace(/\/$/, "");
+    this.root = chomp(root, "/");
     this.index = index;
 
     this.precompressed = [...new Set([...precompressed, "identity"])];
@@ -166,7 +169,10 @@ export class FileHandler {
     return result;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName b — PERMANENT
+   */
   private isFileReadable(path: string): boolean {
     const filePath = File.join(this.root, path);
     return File.isFile(filePath) && File.isReadable(filePath);
@@ -215,7 +221,7 @@ export class FileHandler {
   private cleanPath(pathInfo: string): string | null {
     let path: string;
     try {
-      path = Utils.unescapePath(pathInfo.replace(/\/$/, ""));
+      path = Utils.unescapePath(chomp(pathInfo, "/"));
     } catch {
       return null;
     }

@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { bodyFromString } from "@blazetrails/rack";
 import { Mapper, Mapping, type MountableApp } from "../routing/mapper.js";
 import { Parser } from "../journey/parser.js";
 import { Dispatcher, RouteSet } from "../routing/route-set.js";
 import { Request } from "../http/request.js";
 import type { Pattern } from "../journey/path/pattern.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertEqual, assertRaises } from "@blazetrails/activesupport";
 
 class FakeSet extends RouteSet {
   override resourcesPathNames: Record<string, string> = {};
@@ -176,7 +176,7 @@ describe("MapperTest", () => {
     expect(fakeset.asts()[0].toString()).toBe("/*path.:format");
   });
 
-  const app = (_env: Record<string, unknown>) => [200, {}, bodyFromString("")] as const;
+  const app = (_env: Record<string, unknown>) => [200, {}, [""]] as const;
 
   it("can pass anchor to mount", () => {
     const fakeset = new FakeSet();
@@ -208,17 +208,14 @@ describe("MapperTest", () => {
     );
   });
 
-  it("raising error when invalid on option is given", () => {
+  it("raising error when invalid on option is given", async () => {
     const fakeset = new FakeSet();
-    const m = new Mapper(fakeset);
-    let error: Error | undefined;
-    try {
-      m.get("/foo", { on: "invalid_option" });
-    } catch (e) {
-      error = e as Error;
-    }
-    expect(error).toBeDefined();
-    expect(error!.message).toBe("Unknown scope :invalid_option given to :on");
+    const mapper = new Mapper(fakeset);
+    const error = await assertRaises([ArgumentError], {}, () => {
+      mapper.get("/foo", { on: "invalid_option" });
+    });
+
+    assertEqual("Unknown scope :invalid_option given to :on", error.message);
   });
 
   it("scope does not destructively mutate default options", () => {
@@ -236,7 +233,7 @@ describe("Mapper#mount dispatch", () => {
     const seen: Array<Record<string, unknown>> = [];
     const engine = (env: Record<string, unknown>) => {
       seen.push({ SCRIPT_NAME: env["SCRIPT_NAME"], PATH_INFO: env["PATH_INFO"] });
-      return [200, { "content-type": "text/plain" }, bodyFromString("engine-ok")];
+      return [200, { "content-type": "text/plain" }, ["engine-ok"]];
     };
     const routes = new RouteSet();
     routes.draw(function () {
@@ -256,7 +253,7 @@ describe("Mapper#mount dispatch", () => {
         PATH_INFO: env["PATH_INFO"],
         path_parameters: env["action_dispatch.request.path_parameters"],
       });
-      return [200, {}, bodyFromString("")];
+      return [200, {}, [""]];
     };
     const routes = new RouteSet();
     routes.draw(function () {

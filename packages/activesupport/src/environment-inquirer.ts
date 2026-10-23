@@ -15,6 +15,10 @@ export interface EnvironmentInquirer {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class EnvironmentInquirer extends StringInquirer {
+  static toString(): string {
+    return "ActiveSupport::EnvironmentInquirer";
+  }
+
   #local: boolean;
 
   constructor(env: string) {

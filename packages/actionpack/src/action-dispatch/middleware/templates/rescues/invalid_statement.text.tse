@@ -1,0 +1,16 @@
+<%= this.exception.constructor.name %><%
+  if (this.request.parameters["controller"]) {
+%> in <%= ActiveSupport.Inflector.camelize(this.request.parameters["controller"]) %>Controller<% if (this.request.parameters["action"]) { %>#<%= this.request.parameters["action"] %><% } %>
+<% } %>
+
+<%= this.exception.message %>
+<% if (TopLevel.ActiveStorage != null && new RegExp(`${TopLevel.ActiveStorage.Blob.tableName}|${TopLevel.ActiveStorage.Attachment.tableName}`).test(this.exception.message)) { %>
+To resolve this issue run: bin/rails active_storage:install
+<% } %>
+<% if (TopLevel.ActionMailbox != null && new RegExp(`${TopLevel.ActionMailbox.InboundEmail.tableName}`).test(this.exception.message)) { %>
+To resolve this issue run: bin/rails action_mailbox:install
+<% } %>
+
+<%= render({ template: "rescues/_source" }) %>
+<%= render({ template: "rescues/_trace" }) %>
+<%= render({ template: "rescues/_request_and_response" }) %>

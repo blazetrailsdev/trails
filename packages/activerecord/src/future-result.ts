@@ -31,8 +31,8 @@ export interface FutureResultConnection {
 
 /** @internal */
 export interface FutureResultSession {
-  active(): boolean;
-  synchronize<T>(block: () => T): T;
+  isActive(): boolean;
+  synchronize<T>(block: () => T): T | Promise<Awaited<T>>;
 }
 
 /** @internal */
@@ -216,11 +216,11 @@ export class FutureResult {
   }
 
   pending(): boolean {
-    return this.#pending && (!this.#session || this.#session.active());
+    return this.#pending && (!this.#session || this.#session.isActive());
   }
 
   canceled(): boolean {
-    return !!this.#session && !this.#session.active();
+    return !!this.#session && !this.#session.isActive();
   }
 
   private async executeOrWait(): Promise<void> {

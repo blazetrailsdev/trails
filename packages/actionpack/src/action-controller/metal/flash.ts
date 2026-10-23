@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { classAttribute, Concern, extend, Module } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
@@ -65,10 +67,7 @@ export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
 
 export function actionMethods(this: FlashClassHost): string[] {
   const host = this as FlashClassHost & { _actionMethodCache?: Set<string> };
-  if (
-    !Object.prototype.hasOwnProperty.call(host, "_actionMethodCache") ||
-    !host._actionMethodCache
-  ) {
+  if (!Object.hasOwn(host, "_actionMethodCache") || !host._actionMethodCache) {
     const flashTypes = new Set(host._flashTypes.map(String));
     const methods = ClassMethods.superMethod(this, "actionMethods")!() as string[];
     host._actionMethodCache = new Set(methods.filter((name) => !flashTypes.has(name)));
@@ -97,3 +96,5 @@ export const Flash = new Module((mod) => {
   mod.defineMethod("redirectTo", redirectTo);
 }) as Module<{ redirectTo: typeof redirectTo }> & { ClassMethods: typeof ClassMethods };
 Flash.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "Flash", Flash);

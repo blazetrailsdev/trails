@@ -140,5 +140,8 @@
     "@blazetrails/nokogiri": {
       "optional": true
     }
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

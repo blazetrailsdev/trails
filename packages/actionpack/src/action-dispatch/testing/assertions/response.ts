@@ -5,7 +5,7 @@ import {
   isPresent,
   UnexpectedError,
 } from "@blazetrails/activesupport";
-import { Module, rbEqq } from "@blazetrails/ruby-compat";
+import { rbEqq } from "@blazetrails/ruby-compat";
 import { AssertionResponse } from "../assertion-response.js";
 import { Redirecting, type RedirectingHost } from "../../../action-controller/metal/redirecting.js";
 
@@ -17,6 +17,7 @@ export interface AssertionResponseHost {
 
 export interface AssertionResponseLike {
   status: number;
+  responseCode: number;
   body?: string;
   location?: string;
   isRedirection?: boolean;
@@ -40,7 +41,7 @@ export function assertResponse(
   if (Object.hasOwn(RESPONSE_PREDICATES, type)) {
     assert(RESPONSE_PREDICATES[type](this.response.status), message);
   } else {
-    assertEqual(parseInt(new AssertionResponse(type).code, 10), this.response.status, message);
+    assertEqual(new AssertionResponse(type).code, this.response.responseCode, message);
   }
 }
 
@@ -142,18 +143,14 @@ export type ResponseAssertions = {
   codeWithName: typeof codeWithName;
 };
 
-export const ResponseAssertions = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      assertResponse,
-      assertRedirectedTo,
-      parameterize,
-      normalizeArgumentToRedirection,
-      generateResponseMessage,
-      responseBodyIfShort,
-      exceptionIfPresent,
-      locationIfRedirected,
-      codeWithName,
-    });
-  });
-});
+export const ResponseAssertions = {
+  assertResponse,
+  assertRedirectedTo,
+  parameterize,
+  normalizeArgumentToRedirection,
+  generateResponseMessage,
+  responseBodyIfShort,
+  exceptionIfPresent,
+  locationIfRedirected,
+  codeWithName,
+};

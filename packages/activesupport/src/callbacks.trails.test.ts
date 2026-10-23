@@ -1,4 +1,10 @@
-import { block, include, kernelThrow, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import {
+  block,
+  defineModule,
+  include,
+  kernelThrow,
+  rbObjSingletonClass,
+} from "@blazetrails/ruby-compat";
 import type { Extended, Included } from "@blazetrails/ruby-compat/include";
 import { classAttribute } from "./class-attribute.js";
 import { describe, it, expect } from "vitest";
@@ -128,7 +134,7 @@ describe("include ActiveSupport::Callbacks (trails)", () => {
 
     expect(Child.__callbacks).toBe(inherited);
     expect(Object.keys(Child.__callbacks)).toEqual(["save"]);
-    expect(Object.prototype.hasOwnProperty.call(Child, "__class_attr___callbacks")).toBe(false);
+    expect(Object.hasOwn(Child, "__class_attr___callbacks")).toBe(false);
   });
 });
 
@@ -1316,5 +1322,22 @@ describe("setCallback with a block (trails)", () => {
     // @ts-expect-error run_callbacks is an instance method (callbacks.rb:97)
     expect(Callbacks.runCallbacks).toBeUndefined();
     expect(Callbacks.instanceMethods()).toContain("runCallbacks");
+  });
+});
+
+describe("module singleton-class callbacks (trails)", () => {
+  it("runs an :execute chain defined on a plain-object module's singleton class", async () => {
+    const mod: any = defineModule({});
+    const singleton: any = rbObjSingletonClass(mod);
+    include(singleton, Callbacks);
+    singleton.defineCallbacks("execute");
+    const log: string[] = [];
+    singleton.setCallback("execute", "before", () => {
+      log.push("before");
+    });
+
+    await mod.runCallbacks("execute", () => log.push("block"));
+
+    expect(log).toEqual(["before", "block"]);
   });
 });

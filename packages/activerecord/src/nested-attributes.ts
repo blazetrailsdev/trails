@@ -60,7 +60,7 @@ export function acceptsNestedAttributesFor(
   if (options.rejectIf === "all_blank") options.rejectIf = REJECT_ALL_BLANK_PROC;
 
   for (const associationName of attrNames as string[]) {
-    const reflection = (this as any)._reflectOnAssociation?.(associationName);
+    const reflection = this._reflectOnAssociation(associationName);
     if (reflection) {
       reflection.autosave = true;
       defineAutosaveValidationCallbacks.call(this, reflection);
@@ -91,7 +91,7 @@ export function hasDestroyFlag(hash: Record<string, unknown> | Map<string, unkno
 
 /** @internal */
 export function isAllowDestroy(this: Base, associationName: string): boolean {
-  const ctor = this.constructor as typeof Base;
+  const ctor = this.constructor;
   return ctor.nestedAttributesOptions[associationName]?.allowDestroy ?? false;
 }
 
@@ -112,8 +112,7 @@ export function callRejectIf(
 ): boolean | undefined {
   if (isWillBeDestroyed.call(this, associationName, attributes)) return false;
 
-  const callback = (this.constructor as typeof Base).nestedAttributesOptions[associationName]
-    .rejectIf;
+  const callback = this.constructor.nestedAttributesOptions[associationName].rejectIf;
   if (typeof callback === "string") {
     return (
       rbObjMethod(this, callback).arity() === 0
@@ -171,8 +170,7 @@ export function raiseNestedAttributesRecordNotFoundBang(
   associationName: string,
   recordId: unknown,
 ): never {
-  const model = (this.constructor as typeof Base)._reflectOnAssociation(associationName)!.klass
-    .name;
+  const model = this.constructor._reflectOnAssociation(associationName)!.klass.name;
   throw new RecordNotFound(
     `Couldn't find ${model} with ID=${recordId} for ${this.constructor.name} with ID=${this.id}`,
     model,
@@ -211,7 +209,7 @@ export function generateAssociationWriter(
   associationName: string,
   type: "collection" | "one_to_one",
 ): void {
-  const attrName = `${associationName}Attributes`;
+  const attrName = `${associationName}_attributes`;
 
   this.generatedAssociationMethods().moduleEval((m) => {
     for (const methodName of [`set${camelize(attrName, true)}`, `${attrName}=`]) {
@@ -278,7 +276,7 @@ export function assignNestedAttributesForOneToOneAssociation(
     );
   }
 
-  const options = (this.constructor as typeof Base).nestedAttributesOptions[associationName];
+  const options = this.constructor.nestedAttributesOptions[associationName];
 
   const assoc = this.association(associationName) as unknown as OneToOneAssociation;
   if (
@@ -341,7 +339,7 @@ export function assignNestedAttributesForCollectionAssociation(
     | Record<string, Record<string, unknown> | Map<string, unknown>>
     | Map<string, Record<string, unknown> | Map<string, unknown>>,
 ): Promise<void> | void {
-  const options = (this.constructor as typeof Base).nestedAttributesOptions[associationName];
+  const options = this.constructor.nestedAttributesOptions[associationName];
   if (rbObjRespondTo(attributesCollection, "isPermitted")) {
     attributesCollection = (
       attributesCollection as unknown as {
@@ -400,15 +398,16 @@ export function assignNestedAttributesForCollectionAssociation(
             if (targetRecord) {
               existingRecord = targetRecord;
             } else {
-              (association as any).addToTarget(existingRecord, { skipCallbacks: true });
+              association.addToTarget(existingRecord, { skipCallbacks: true });
             }
 
-            const allowDestroy = isAllowDestroy.call(this, associationName);
             nestedTarget.push(existingRecord);
             pending = (
               pending
-                ? pending.then(() => assignToOrMarkForDestruction(existingRecord!, a, allowDestroy))
-                : assignToOrMarkForDestruction(existingRecord, a, allowDestroy)
+                ? pending.then(() =>
+                    assignToOrMarkForDestruction(existingRecord!, a, options.allowDestroy!),
+                  )
+                : assignToOrMarkForDestruction(existingRecord, a, options.allowDestroy!)
             ) as Promise<void> | undefined;
           } else {
             nestedTarget.push(null);

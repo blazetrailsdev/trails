@@ -62,14 +62,6 @@ export const DID_YOU_MEAN_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     package: "did-you-mean",
-    pattern: "spell_checkers/null_checker.rb",
-    testFile: "spell_checking/test_uncorrectable_name_check.rb",
-    reason:
-      "Null-object fallback in Ruby's checker registry. Not needed in our " +
-      "error-subclass approach.",
-  },
-  {
-    package: "did-you-mean",
     pattern: "spell_checkers/pattern_key_name_checker.rb",
     testFile: "spell_checking/test_pattern_key_name_check.rb",
     reason:

@@ -4,7 +4,8 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { AdapterNotFound } from "../errors.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";
-import { assertNotDeprecated, getEnv } from "@blazetrails/activesupport";
+import { assertNotDeprecated, assertNothingRaised, getEnv } from "@blazetrails/activesupport";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { deprecator } from "../deprecator.js";
 import { restoreWorkerConnection } from "../support/connection.js";
@@ -25,6 +26,7 @@ function setupSharedConnectionPool(handlerArg: ConnectionHandler): void {
 }
 
 describe("ConnectionHandlerTest", () => {
+  const { self } = fixtures([]);
   let handler: ConnectionHandler;
   let pool: any;
   const connectionName = "ActiveRecord::Base";
@@ -147,27 +149,19 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("setting writing role while using another named role does not raise", async () => {
+    const connectionHandler = Base.connectionHandler;
+    Base.connectionHandler = new ConnectionHandler();
     const oldRole = writingRole();
     setWritingRole("also_writing");
     try {
-      const localHandler = new ConnectionHandler();
-      const config = new HashConfig("development", "primary", {
-        adapter: "sqlite3",
-        database: "test/db/primary.sqlite3",
+      await Base.connectsTo({
+        shards: { default: { also_writing: ":arunit" }, one: { also_writing: ":arunit" } },
       });
-      await localHandler.establishConnection(config, {
-        ownerName: "ActiveRecord::Base",
-        role: "also_writing",
-        shard: "default",
-      });
-      await localHandler.establishConnection(config, {
-        ownerName: "ActiveRecord::Base",
-        role: "also_writing",
-        shard: "one",
-      });
-      expect(() => setupSharedConnectionPool(localHandler)).not.toThrow();
+
+      await assertNothingRaised(() => self().setupSharedConnectionPool());
     } finally {
       setWritingRole(oldRole);
+      Base.connectionHandler = connectionHandler;
     }
   });
 

@@ -6,13 +6,15 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers"],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers", "src/test-case.ts"],
   "references": [
+    { "path": "../builder" },
     { "path": "../ruby-compat" },
     { "path": "../activesupport" },
     { "path": "../date" },
     { "path": "../did-you-mean" },
     { "path": "../tse-compiler" },
-    { "path": "../html-sanitizer" }
+    { "path": "../html-sanitizer" },
+    { "path": "../nokogiri" }
   ]
 }

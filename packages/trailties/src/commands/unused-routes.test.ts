@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { createProgram } from "../cli.js";
+import { lookupBang } from "../command/behavior.js";
+
+await lookupBang();
 
 describe("UnusedRoutesCommand", () => {
   it("is registered on the program", () => {

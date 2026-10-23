@@ -28,7 +28,7 @@ function objectId(obj: object): number {
 
 function threadMattrKey(klass: Module, sym: string): string {
   const ivar = `@__thread_mattr_${sym}`;
-  if (!Object.prototype.hasOwnProperty.call(klass, ivar)) {
+  if (!Object.hasOwn(klass, ivar)) {
     Object.defineProperty(klass, ivar, {
       value: `attr_${sym}_${objectId(klass)}`,
       configurable: true,

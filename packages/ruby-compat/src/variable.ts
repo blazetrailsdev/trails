@@ -1,15 +1,42 @@
 import { ArgumentError } from "./argument-error.js";
 import { Exception } from "./exception.js";
+import { EncodingError } from "./encoding-error.js";
+import { EOFError } from "./eof-error.js";
+import { FiberError } from "./fiber-error.js";
+import { FloatDomainError } from "./float-domain-error.js";
+import { IOError } from "./io-error.js";
+import { LocalJumpError } from "./local-jump-error.js";
+import { StopIteration } from "./stop-iteration.js";
+import { ThreadError } from "./thread-error.js";
+import { SystemCallError } from "./errno.js";
+import { FrozenError } from "./frozen-error.js";
+import { IndexError } from "./index-error.js";
+import { KeyError } from "./key-error.js";
+import { LoadError } from "./load-error.js";
+import { NoMethodError } from "./no-method-error.js";
+import { NotImplementedError } from "./not-implemented-error.js";
+import { RangeError } from "./range-error.js";
+import { RuntimeError } from "./runtime-error.js";
+import { Interrupt, SignalException } from "./signal-exception.js";
+import { StandardError } from "./standard-error.js";
 import { Hash } from "./hash.js";
+import { warn } from "./kernel-warn.js";
+import { verbose } from "./verbose.js";
 import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
-import { classpaths, rbCBasicObject, rbCSymbol, rbModName } from "./object.js";
+import {
+  RCLASS_CONST_TBL,
+  classpaths,
+  rbCBasicObject,
+  rbCSymbol,
+  rbModName,
+  rbModToS,
+} from "./object.js";
 import { Range } from "./range.js";
-import { Rational } from "./rational.js";
+import { Rational, ZeroDivisionError } from "./rational.js";
 import { Struct } from "./struct.js";
 import { TypeError } from "./type-error.js";
 
-const _constants = new Map<string, unknown>();
 const _globals = new Map<string, unknown>();
 
 /**
@@ -44,7 +71,7 @@ export function rbGvSet<T>(name: string, val: T): T {
  * @noRailsEquivalent PERMANENT
  */
 export function registerConstant(name: string, value: unknown): void {
-  _constants.set(name, value);
+  RCLASS_CONST_TBL.set(name, value);
   if (
     (typeof value === "object" && value !== null) ||
     (typeof value === "function" &&
@@ -63,8 +90,8 @@ export function registerConstant(name: string, value: unknown): void {
  * @noRailsEquivalent PERMANENT
  */
 export function unregisterConstant(name: string, expected: unknown): void {
-  if (_constants.get(name) !== expected) return;
-  _constants.delete(name);
+  if (RCLASS_CONST_TBL.get(name) !== expected) return;
+  RCLASS_CONST_TBL.delete(name);
 }
 
 /**
@@ -78,11 +105,11 @@ export function unregisterConstant(name: string, expected: unknown): void {
  */
 export function rbModRemoveConst(mod: object, name: string): unknown {
   const tbl = mod as Record<string, unknown>;
-  if (mod === Object ? !_constants.has(name) : !Object.prototype.hasOwnProperty.call(mod, name)) {
+  if (mod === Object ? !RCLASS_CONST_TBL.has(name) : !Object.hasOwn(mod, name)) {
     throw new NameError(`constant ${rbModName(mod)}::${name} not defined`, name);
   }
-  const val = mod === Object ? _constants.get(name) : tbl[name];
-  if (mod === Object) _constants.delete(name);
+  const val = mod === Object ? RCLASS_CONST_TBL.get(name) : tbl[name];
+  if (mod === Object) RCLASS_CONST_TBL.delete(name);
   else delete tbl[name];
   return val;
 }
@@ -93,7 +120,7 @@ export function rbModRemoveConst(mod: object, name: string): unknown {
  * @noRailsEquivalent PERMANENT
  */
 export function isRegisteredConstant(name: string): boolean {
-  return _constants.has(name);
+  return RCLASS_CONST_TBL.has(name);
 }
 
 /**
@@ -103,7 +130,7 @@ export function isRegisteredConstant(name: string): boolean {
  * @noRailsEquivalent PERMANENT
  */
 export function registeredConstant(name: string): unknown {
-  return _constants.get(name);
+  return RCLASS_CONST_TBL.get(name);
 }
 
 /**
@@ -116,11 +143,11 @@ export function registeredConstant(name: string): unknown {
  */
 export function rbFBinding<T extends object>(self: T): T {
   return new Proxy(self, {
-    has: (target, key) => key in target || (typeof key === "string" && _constants.has(key)),
+    has: (target, key) => key in target || (typeof key === "string" && RCLASS_CONST_TBL.has(key)),
     get: (target, key, receiver) =>
       key in target || typeof key !== "string"
         ? Reflect.get(target, key, receiver)
-        : _constants.get(key),
+        : RCLASS_CONST_TBL.get(key),
   });
 }
 
@@ -131,7 +158,7 @@ export function rbFBinding<T extends object>(self: T): T {
  * @noRailsEquivalent PERMANENT
  */
 export function resetConstants(): void {
-  _constants.clear();
+  RCLASS_CONST_TBL.clear();
 }
 
 /**
@@ -158,7 +185,7 @@ export function rbPathToClass(pathname: string): unknown {
     throw new ArgumentError(`can't retrieve anonymous class ${pathname}`);
   }
   while (p < pend) {
-    if (_constants.has(pathname)) p = pend;
+    if (RCLASS_CONST_TBL.has(pathname)) p = pend;
     while (p < pend && pathname[p] !== ":") p++;
     const id = pathname.slice(pbeg, p);
     const path = pathname.slice(0, p);
@@ -172,9 +199,9 @@ export function rbPathToClass(pathname: string): unknown {
     if (id === "") {
       throw new ArgumentError(`undefined class/module ${pathname.slice(0, p)}`);
     }
-    c = _constants.has(path)
-      ? _constants.get(path)
-      : c !== Object && /^[A-Z]/.test(id) && Object.prototype.hasOwnProperty.call(c, id)
+    c = RCLASS_CONST_TBL.has(path)
+      ? RCLASS_CONST_TBL.get(path)
+      : c !== Object && /^[A-Z]/.test(id) && Object.hasOwn(c as object, id)
         ? (c as Record<string, unknown>)[id]
         : undefined;
     if (c === undefined) {
@@ -241,18 +268,71 @@ export function rbModConstMissing(klass: { name?: string } | null, name: string)
  * @noRailsEquivalent PERMANENT
  */
 export function rbConstGet(klass: object, id: string): unknown {
-  if (id in klass) return (klass as Record<string, unknown>)[id];
+  if (id in klass) {
+    let tmp: object | null = klass;
+    while (tmp !== null && !Object.hasOwn(tmp, id)) tmp = Object.getPrototypeOf(tmp) as object;
+    if (tmp !== null) rbConstWarnIfDeprecated(tmp, id);
+    return (klass as Record<string, unknown>)[id];
+  }
   if (typeof klass === "function") {
     for (const tmp of rbModAncestors(klass as unknown as { prototype: object })) {
-      if (Object.prototype.hasOwnProperty.call(tmp, id)) {
+      if (Object.hasOwn(tmp, id)) {
+        rbConstWarnIfDeprecated(tmp, id);
         return (tmp as Record<string, unknown>)[id];
       }
     }
   }
-  if (_constants.has(id)) return _constants.get(id);
+  if (RCLASS_CONST_TBL.has(id)) return RCLASS_CONST_TBL.get(id);
   const { constMissing } = klass as { constMissing?: (name: string) => unknown };
   if (constMissing !== undefined) return constMissing.call(klass, id);
   return rbModConstMissing(klass, id);
+}
+
+const CONST_DEPRECATED = new WeakMap<object, Set<string>>();
+
+/**
+ * `rb_mod_deprecate_constant` (`vendor/ruby/v3.3.11/variable.c:3892-3896`),
+ * `Module#deprecate_constant`, through `set_const_visibility`
+ * (`variable.c:3786-3825`): each name must be a constant `mod` holds itself,
+ * else `undefined_constant` (`variable.c:3235-3239`) raises `NameError`, and
+ * is flagged `CONST_DEPRECATED` so a later read warns. Answers `mod`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModDeprecateConstant<T extends object>(obj: T, ...argv: string[]): T {
+  if (argv.length === 0) {
+    if (verbose() === true) warn("deprecate_constant with no argument is just ignored");
+    return obj;
+  }
+  for (const id of argv) {
+    if (Object.hasOwn(obj, id)) {
+      let flags = CONST_DEPRECATED.get(obj);
+      if (flags === undefined) CONST_DEPRECATED.set(obj, (flags = new Set()));
+      flags.add(id);
+    } else {
+      throw new NameError(`constant ${rbModName(obj)}::${id} not defined`, id);
+    }
+  }
+  return obj;
+}
+
+/**
+ * `rb_const_warn_if_deprecated` (`vendor/ruby/v3.3.11/variable.c:3104-3117`):
+ * a `:deprecated`-category warning for a read of a constant
+ * {@link rbModDeprecateConstant} flagged.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbConstWarnIfDeprecated(klass: object, id: string): void {
+  if (CONST_DEPRECATED.get(klass)?.has(id)) {
+    if (klass === Object) {
+      warn(`constant ::${id} is deprecated`, { category: ":deprecated" });
+    } else {
+      warn(`constant ${rbModToS(klass as never)}::${id} is deprecated`, {
+        category: ":deprecated",
+      });
+    }
+  }
 }
 
 /**
@@ -291,20 +371,21 @@ export function rbModConstants(mod: object, inherit: unknown = true): string[] {
  * @noRailsEquivalent PERMANENT
  */
 export function rbModConstGet(mod: object, name: string): unknown {
-  if (_constants.has(name)) return _constants.get(name);
+  if (RCLASS_CONST_TBL.has(name)) return RCLASS_CONST_TBL.get(name);
   let path = "";
   let c: unknown = mod;
   for (const [i, part] of name.split("::").entries()) {
     path = i === 0 ? part : `${path}::${part}`;
     if (i === 0) {
       c = rbConstGet(mod, part);
-    } else if (_constants.has(path)) {
-      c = _constants.get(path);
+    } else if (RCLASS_CONST_TBL.has(path)) {
+      c = RCLASS_CONST_TBL.get(path);
     } else if (
       c !== null &&
       (typeof c === "object" || typeof c === "function") &&
-      Object.prototype.hasOwnProperty.call(c, part)
+      Object.hasOwn(c, part)
     ) {
+      rbConstWarnIfDeprecated(c, part);
       c = (c as Record<string, unknown>)[part];
     } else {
       return rbModConstMissing(c as { name?: string } | null, part);
@@ -318,6 +399,30 @@ registerConstant("Object", Object);
 registerConstant("Array", Array);
 registerConstant("Hash", Hash);
 registerConstant("Exception", Exception);
+registerConstant("SignalException", SignalException);
+registerConstant("Interrupt", Interrupt);
+registerConstant("StandardError", StandardError);
+registerConstant("TypeError", TypeError);
+registerConstant("ArgumentError", ArgumentError);
+registerConstant("IndexError", IndexError);
+registerConstant("KeyError", KeyError);
+registerConstant("RangeError", RangeError);
+registerConstant("LoadError", LoadError);
+registerConstant("NotImplementedError", NotImplementedError);
+registerConstant("NameError", NameError);
+registerConstant("NoMethodError", NoMethodError);
+registerConstant("RuntimeError", RuntimeError);
+registerConstant("FrozenError", FrozenError);
+registerConstant("EncodingError", EncodingError);
+registerConstant("SystemCallError", SystemCallError);
+registerConstant("ZeroDivisionError", ZeroDivisionError);
+registerConstant("FloatDomainError", FloatDomainError);
+registerConstant("IOError", IOError);
+registerConstant("EOFError", EOFError);
+registerConstant("StopIteration", StopIteration);
+registerConstant("LocalJumpError", LocalJumpError);
+registerConstant("ThreadError", ThreadError);
+registerConstant("FiberError", FiberError);
 registerConstant("Range", Range);
 registerConstant("Regexp", RegExp);
 registerConstant("Struct", Struct);

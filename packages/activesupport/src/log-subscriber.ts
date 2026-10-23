@@ -7,6 +7,10 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 
 export class LogSubscriber extends Subscriber {
+  static toString(): string {
+    return "ActiveSupport::LogSubscriber";
+  }
+
   static readonly MODES: Record<string, number> = {
     clear: 0,
     bold: 1,
@@ -175,40 +179,28 @@ export class LogSubscriber extends Subscriber {
     }
   }
 
-  protected _info(message?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.info(message);
+  protected info(progname: string | null = null, block?: () => string): boolean | null {
+    return this.logger ? this.logger.info(progname, block) : null;
   }
 
-  protected _debug(message?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.debug(message);
+  protected debug(progname: string | null = null, block?: () => string): boolean | null {
+    return this.logger ? this.logger.debug(progname, block) : null;
   }
 
-  protected _warn(message?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.warn(message);
+  protected warn(progname: string | null = null, block?: () => string): boolean | null {
+    return this.logger ? this.logger.warn(progname, block) : null;
   }
 
-  protected _error(message?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.error(message);
+  protected error(progname: string | null = null, block?: () => string): boolean | null {
+    return this.logger ? this.logger.error(progname, block) : null;
   }
 
-  protected _fatal(message?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.fatal(message);
+  protected fatal(progname: string | null = null, block?: () => string): boolean | null {
+    return this.logger ? this.logger.fatal(progname, block) : null;
   }
 
-  protected _unknown(message?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.unknown(message);
+  protected unknown(progname: string | null = null, block?: () => string): boolean | null {
+    return this.logger ? this.logger.unknown(progname, block) : null;
   }
 
   protected color(

@@ -1,5 +1,4 @@
 import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
 
 export let prependContentExfiltrationPrevention: boolean = false;
 
@@ -27,8 +26,6 @@ export function preventContentExfiltration(html: SafeBuffer): SafeBuffer {
   }
 }
 
-export const ContentExfiltrationPreventionHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { preventContentExfiltration });
-  });
-});
+export const ContentExfiltrationPreventionHelper = {
+  preventContentExfiltration,
+};

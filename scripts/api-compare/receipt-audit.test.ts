@@ -82,6 +82,19 @@ describe("receiptsCoveringNothing", () => {
     };
     expect(receiptsCoveringNothing(ruby, ts, null).map((e) => e.name)).toEqual([]);
   });
+
+  it("reports nothing from another package under a package filter", () => {
+    const { ruby, ts } = manifests();
+    ruby.packages.activerecord = {
+      classes: { "ActiveRecord::Baz": entity("Baz", "baz.rb", [method("quux")]) },
+      modules: {},
+    };
+    ts.packages.activerecord = {
+      classes: { Baz: entity("Baz", "baz.ts", [method("quux")]) },
+      modules: {},
+    };
+    expect(receiptsCoveringNothing(ruby, ts, "activerecord")).toEqual([]);
+  });
 });
 
 describe("unverifiableReceipts", () => {

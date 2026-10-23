@@ -125,6 +125,7 @@ describe("ActionController::Railtie action_controller.test_case", () => {
 
   async function runsInExecutor(name: string): Promise<number> {
     const application = new TestApplication();
+    application.config.secretKeyBase = "secret_key_base".repeat(4);
     let runs = 0;
     application.executor.toRun(() => {
       runs += 1;

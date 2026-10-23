@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { assert } from "@blazetrails/activesupport";
 import { Parameters } from "../../metal/strong-parameters.js";
 
 describe("MultiParameterAttributesTest", () => {
@@ -20,7 +21,7 @@ describe("MultiParameterAttributesTest", () => {
 
     const permitted = params.permit({ book: ["shipped_at", "price"] });
 
-    expect(permitted.isPermitted()).toBe(true);
+    assert(permitted.isPermitted());
 
     const book = permitted.get("book") as Parameters;
     expect(book.get("shipped_at(1i)")).toBe("2012");

@@ -15,3 +15,9 @@ describe("ParamBuilder#storeNestedParam", () => {
     expect((err as Error).message).toBe("Invalid encoding for parameter: �E");
   });
 });
+
+describe("ParamBuilder#newDepthLimit", () => {
+  it("builds a builder with the given depth limit", () => {
+    expect(ParamBuilder.default.newDepthLimit(5).paramDepthLimit).toBe(5);
+  });
+});

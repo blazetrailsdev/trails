@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  validateApp,
-  GID,
-  MissingModelIdError,
-  InvalidComponentError,
-  BadURIError,
-} from "./uri/gid.js";
+import { URI } from "@blazetrails/ruby-compat";
+import { GID, MissingModelIdError, InvalidComponentError, BadURIError } from "./uri/gid.js";
 
 function assertRaise(klass: new (...args: never[]) => Error, block: () => unknown): Error {
   try {
@@ -26,7 +21,7 @@ function assertBadUri(uri: string): void {
 }
 
 function assertInvalidApp(value: string | null): void {
-  expect(() => validateApp(value)).toThrow();
+  expect(() => GID.validateApp(value)).toThrow();
 }
 
 describe("URI::GIDTest", () => {
@@ -108,13 +103,7 @@ describe("URI::GIDTest", () => {
   });
 
   it("new returns invalid gid when not checking", () => {
-    const synthetic = new GID("gid:///", {
-      app: "",
-      modelName: "",
-      modelId: "",
-      params: {},
-    });
-    expect(synthetic).toBeTruthy();
+    expect(new GID(...URI.split("gid:///"))).toBeTruthy();
   });
 });
 
@@ -205,7 +194,7 @@ describe("URI::GIDAppValidationTest", () => {
   });
 
   it("app with hyphen is allowed", () => {
-    expect(validateApp("foo-bar")).toBe("foo-bar");
+    expect(GID.validateApp("foo-bar")).toBe("foo-bar");
   });
 });
 
@@ -218,8 +207,8 @@ describe("URI::GIDParamsTest", () => {
       params: { hello: "world" },
     }).toString();
     const gid = GID.parse(uri);
-    expect(gid.params["hello"]).toBe("world");
-    expect(gid.params["hello"]).toBe("world");
+    expect(gid.params!.get("hello")).toBe("world");
+    expect(gid.params!.get("hello")).toBe("world");
   });
 
   it("integer option", () => {
@@ -230,12 +219,12 @@ describe("URI::GIDParamsTest", () => {
       params: { integer: "20" },
     }).toString();
     const gid = GID.parse(uri);
-    expect(gid.params["integer"]).toBe("20");
+    expect(gid.params!.get("integer")).toBe("20");
   });
 
   it("multi value params returns last value", () => {
     const gid = GID.parse("gid://bcx/Person/5?multi=one&multi=two");
-    expect(gid.params["multi"]).toBe("two");
+    expect(gid.params!.get("multi")).toBe("two");
   });
 
   it("as String", () => {
@@ -250,58 +239,7 @@ describe("URI::GIDParamsTest", () => {
 
   it("immutable params", () => {
     const gid = GID.parse("gid://bcx/Person/5?hello=world");
-    gid.params["param"] = "value";
+    gid.params!.set("param", "value");
     expect(gid.toString()).not.toBe("gid://bcx/Person/5?hello=world&param=value");
-  });
-});
-
-describe("URI::GID class wrapper", () => {
-  it("GID.parse exposes app / modelName / modelId / params", () => {
-    const gid = GID.parse("gid://bcx/Person/5?hello=world");
-    expect(gid.app).toBe("bcx");
-    expect(gid.modelName).toBe("Person");
-    expect(gid.modelId).toBe("5");
-    expect(gid.params).toEqual({ hello: "world" });
-    expect(gid.toString()).toBe("gid://bcx/Person/5?hello=world");
-  });
-
-  it("GID.create builds from app + model instance", () => {
-    const gid = GID.create("bcx", { id: 5, constructor: { name: "Person" } });
-    expect(gid.toString()).toBe("gid://bcx/Person/5");
-  });
-
-  it("GID.build accepts a components-hash with composite primary key", () => {
-    const gid = GID.build({
-      app: "bcx",
-      modelName: "CompositePrimaryKeyModel",
-      modelId: ["tenant", "id"],
-      params: { db: "primary" },
-    });
-    expect(gid.toString()).toBe("gid://bcx/CompositePrimaryKeyModel/tenant/id?db=primary");
-    expect(gid.modelId).toEqual(["tenant", "id"]);
-  });
-
-  it("GID.validateApp rejects invalid app names", () => {
-    expect(() => GID.validateApp(null)).toThrow();
-    expect(() => GID.validateApp("foo_bar")).toThrow();
-    expect(GID.validateApp("foo-bar")).toBe("foo-bar");
-  });
-
-  it("GID#deconstructKeys returns a deep-enough copy of the component hash", () => {
-    const gid = GID.parse("gid://bcx/Person/5?k=v");
-    const a = gid.deconstructKeys();
-    expect(a).toEqual({ app: "bcx", modelName: "Person", modelId: "5", params: { k: "v" } });
-    (a as { app: string }).app = "evil";
-    a.params["k"] = "evil";
-    expect(gid.app).toBe("bcx");
-    expect(gid.params).toEqual({ k: "v" });
-  });
-
-  it("GID#deconstructKeys also copies composite modelId arrays", () => {
-    const gid = GID.parse("gid://bcx/CompositePrimaryKeyModel/tenant/id");
-    const a = gid.deconstructKeys();
-    expect(a.modelId).toEqual(["tenant", "id"]);
-    (a.modelId as string[]).push("evil");
-    expect(gid.modelId).toEqual(["tenant", "id"]);
   });
 });

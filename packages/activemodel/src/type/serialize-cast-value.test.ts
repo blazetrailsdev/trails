@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { include, Module } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { SerializeCastValue } from "./serialize-cast-value.js";
 
@@ -46,7 +47,7 @@ describe("SerializeCastValueTest", () => {
     static {
       include(this, SerializeCastValue);
 
-      const zuper = Object.getPrototypeOf(this.prototype) as { serializeCastValue: Serializer };
+      const zuper = { serializeCastValue: this.prototype.serializeCastValue as Serializer };
       this.prototype.serializeCastValue = function (value) {
         return `serialize_cast_value(${zuper.serializeCastValue.call(this, value)})`;
       };
@@ -96,10 +97,11 @@ describe("SerializeCastValueTest", () => {
   });
 
   it("uses #serialize when a subclass defines a newer #serialize implementation via a module", () => {
-    const mod = new Module();
-    mod.defineMethod("serialize", function (this: object, value: unknown) {
-      return mod.superMethod(this, "serialize")!(value);
-    });
+    const mod = {
+      serialize(this: object, value: unknown): unknown {
+        return rbCallSuper(this, mod.serialize, value);
+      },
+    };
     class subclass extends IncludesModule {
       static {
         include(this, mod);
@@ -109,10 +111,11 @@ describe("SerializeCastValueTest", () => {
   });
 
   it("uses #serialize_cast_value when a subclass defines a newer #serialize_cast_value implementation via a module", () => {
-    const mod = new Module();
-    mod.defineMethod("serializeCastValue", function (this: object, value: unknown) {
-      return mod.superMethod(this, "serializeCastValue")!(value);
-    });
+    const mod = {
+      serializeCastValue(this: object, value: unknown): unknown {
+        return rbCallSuper(this, mod.serializeCastValue, value);
+      },
+    };
     class subclass extends IncludesModule {
       static {
         include(this, mod);

@@ -1,6 +1,7 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
+import type { ScopeOn } from "../../scoping/named.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Author } from "./author.js";
 import type { Company } from "./company.js";
@@ -11,6 +12,13 @@ import type { Rating } from "./rating.js";
 import type { SpecialPostWithDefaultScope } from "./post.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    orderedByPostId: ScopeOn<T, Comment | Post>;
+    forFirstAuthor: ScopeOn<T, Comment>;
+  }
+}
 
 export class OopsError extends Error {}
 registerConstant("OopsError", OopsError);
@@ -62,38 +70,38 @@ export class Comment extends Base {
   declare author_type: string | null;
 
   static {
-    this.scope("limitBy", function (this: any, l: number) {
+    this.scope("limitBy", function (l: number) {
       return this.limit(l);
     });
-    this.scope("containingTheLetterE", function (this: any) {
+    this.scope("containingTheLetterE", function () {
       return this.where("comments.body LIKE '%e%'");
     });
-    this.scope("notAgain", function (this: any) {
+    this.scope("notAgain", function () {
       return this.where("comments.body NOT LIKE '%again%'");
     });
-    this.scope("forFirstPost", function (this: any) {
+    this.scope("forFirstPost", function () {
       return this.where({ post_id: 1 });
     });
-    this.scope("forFirstAuthor", function (this: any) {
+    this.scope("forFirstAuthor", function () {
       return this.joins(":post").where({ "posts.author_id": 1 });
     });
-    this.scope("created", function (this: any) {
+    this.scope("created", function () {
       return this.all();
     });
-    this.scope("orderedByPostId", function (this: any) {
+    this.scope("orderedByPostId", function () {
       return this.order("comments.post_id DESC");
     });
-    this.scope("allAsScope", function (this: any) {
+    this.scope("allAsScope", function () {
       return this.all();
     });
     this.scope(
       "oopsComments",
-      function (this: any) {
+      function () {
         return this.all();
       },
       OopsExtension,
     );
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.extending(OopsExtension);
     });
 
@@ -108,7 +116,7 @@ export class Comment extends Base {
 
     this.hasOne(
       "postWithInverse",
-      function (this: any, comment: any) {
+      function (comment: any) {
         return this.where({ id: comment.post_id });
       },
       {
@@ -175,7 +183,7 @@ export class SpecialComment extends Comment {
   static {
     this.belongsTo("ordinaryPost", { foreignKey: "post_id", className: "Post" });
     this.hasOne("author", { through: "post" });
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ deleted_at: null });
     });
   }
@@ -205,7 +213,7 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
       className: "PostThatLoadsCommentsInAnAfterSaveHook",
       foreignKey: "post_id",
     });
-    this.afterSave(async function (this: any) {
+    this.afterSave(async function (this: CommentThatAutomaticallyAltersPostBody) {
       const post = await this.post;
       if (post) await post.update({ body: "Automatically altered" });
     });
@@ -216,7 +224,7 @@ registerModel(CommentThatAutomaticallyAltersPostBody);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
   static {
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.includes(":developer").order("developers.name").references(":developer");
     });
     this.belongsTo("developer");
@@ -231,7 +239,7 @@ export interface CommentWithDefaultScopeReferencesAssociation {
 
 export class CommentWithAfterCreateUpdate extends Comment {
   static {
-    this.afterCreate(async function (this: any) {
+    this.afterCreate(async function (this: CommentWithAfterCreateUpdate) {
       await this.update({ body: "bar" });
     });
   }

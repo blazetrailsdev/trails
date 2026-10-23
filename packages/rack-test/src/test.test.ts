@@ -1,8 +1,15 @@
 import { assertEmpty } from "@blazetrails/activesupport";
+import { b } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { MockResponse, Request } from "@blazetrails/rack";
+import {
+  Response,
+  type MockResponse,
+  type RackApp,
+  type RackEnv,
+  type Request,
+} from "@blazetrails/rack";
 import { FAKE_APP } from "./fixtures/fake-app.js";
-import { Error as RackTestError, Session } from "./index.js";
+import { Error as RackTestError, MockSession, Session } from "./index.js";
 import { mustBe, wontBe } from "./test-helpers/assertions.js";
 
 const app = FAKE_APP;
@@ -22,6 +29,10 @@ const lastRequest = (): Request => session.lastRequest();
 const lastResponse = (): MockResponse => session.lastResponse();
 
 describe("Rack::Test::Session", () => {
+  it("has alias of Rack::MockSession for backwards compatibility", () => {
+    expect(MockSession).toBe(Session);
+  });
+
   it("supports being initialized with a Rack::MockSession app", async () => {
     mustBe(await new Session(new Session(app)).request("/"), "isOk");
   });
@@ -119,14 +130,14 @@ describe("Rack::Test::Session#request", () => {
     await request("/", { ":method": "post", ":params": { foo: "bar" } });
     expect(lastRequest().POST["foo"]).toBe("bar");
     lastRequest().env["rack.input"].rewind();
-    expect(lastRequest().env["rack.input"].read()).toBe("foo=bar");
+    expect(lastRequest().env["rack.input"].read()).toEqual(b("foo=bar"));
   });
 
   it("supports :multipart when using :params for POST to force multipart input", async () => {
     await request("/", { ":method": "post", ":params": { foo: "bar" }, ":multipart": true });
     expect(lastRequest().POST["foo"]).toBe("bar");
     lastRequest().env["rack.input"].rewind();
-    expect(lastRequest().env["rack.input"].read()).toContain(
+    expect(new TextDecoder().decode(lastRequest().env["rack.input"].read())).toContain(
       'content-disposition: form-data; name="foo"',
     );
   });
@@ -139,7 +150,7 @@ describe("Rack::Test::Session#request", () => {
     });
     expect(lastRequest().POST["foo"]).toBe("bar");
     lastRequest().env["rack.input"].rewind();
-    expect(lastRequest().env["rack.input"].read()).toContain(
+    expect(new TextDecoder().decode(lastRequest().env["rack.input"].read())).toContain(
       'content-disposition: form-data; name="foo"',
     );
   });
@@ -178,7 +189,7 @@ describe("Rack::Test::Session#request", () => {
 
   it("allows passing :input in for POSTs", async () => {
     await request("/", { ":method": "post", ":input": "foo" });
-    expect(lastRequest().env["rack.input"].read()).toBe("foo");
+    expect(lastRequest().env["rack.input"].read()).toEqual(b("foo"));
   });
 
   it("converts method names to a uppercase strings", async () => {
@@ -223,17 +234,70 @@ describe("Rack::Test::Session#request", () => {
 
   it("accepts params and builds url encoded params for POST requests", async () => {
     await request("/foo", { ":method": "post", ":params": { foo: { bar: "1" } } });
-    expect(lastRequest().env["rack.input"].read()).toBe("foo[bar]=1");
+    expect(lastRequest().env["rack.input"].read()).toEqual(b("foo[bar]=1"));
   });
 
   it("accepts raw input in params for POST requests", async () => {
     await request("/foo", { ":method": "post", ":params": "foo[bar]=1" });
-    expect(lastRequest().env["rack.input"].read()).toBe("foo[bar]=1");
+    expect(lastRequest().env["rack.input"].read()).toEqual(b("foo[bar]=1"));
+  });
+
+  it("supports a Rack::Response", async () => {
+    const app = (_env: RackEnv) => new Response("", 200, {});
+
+    const session = new Session(new MockSession(app as unknown as RackApp));
+    mustBe(await session.request("/"), "isOk");
+  });
+
+  class CloseableBody {
+    private closed = false;
+
+    each(block: (chunk: string) => void): void {
+      if (this.closed) return;
+      block("Hello, World!");
+    }
+
+    close(): void {
+      this.closed = true;
+    }
+
+    isClosed(): boolean {
+      return this.closed;
+    }
+  }
+
+  it("closes response's body when body responds_to?(:close)", async () => {
+    const body = new CloseableBody();
+
+    const app = (_env: RackEnv) => [
+      200,
+      { "content-type": "text/html", "content-length": "13" },
+      body,
+    ];
+
+    const session = new Session(new MockSession(app as unknown as RackApp));
+    expect(body.isClosed()).toBe(false);
+    await session.request("/");
+    expect(body.isClosed()).toBe(true);
+  });
+
+  it("closes response's body after iteration when body responds_to?(:close)", async () => {
+    let body: CloseableBody | null = null;
+    const app = (_env: RackEnv) => [
+      200,
+      { "content-type": "text/html", "content-length": "13" },
+      (body = new CloseableBody()),
+    ];
+
+    const session = new Session(new MockSession(app as unknown as RackApp));
+    await session.request("/");
+    expect(session.lastResponse().body).toBe("Hello, World!");
+    expect(body!.isClosed()).toBe(true);
   });
 
   it("sends the input when input is given", async () => {
     await request("/", { ":method": "POST", ":input": "foo" });
-    expect(lastRequest().env["rack.input"].read()).toBe("foo");
+    expect(lastRequest().env["rack.input"].read()).toEqual(b("foo"));
   });
 
   it("does not send a multipart request when input is given", async () => {
@@ -655,7 +719,7 @@ describe("Rack::Test::Session#post", () => {
 
   it("accepts a body", async () => {
     await session.post("/", "Lobsterlicious!");
-    expect(lastRequest().body.read()).toBe("Lobsterlicious!");
+    expect(lastRequest().body.read()).toEqual(b("Lobsterlicious!"));
   });
 
   it("does not overwrite the CONTENT_TYPE when CONTENT_TYPE is specified in the env", async () => {
@@ -670,7 +734,7 @@ describe("Rack::Test::Session#put", () => {
 
   it("accepts a body", async () => {
     await session.put("/", "Lobsterlicious!");
-    expect(lastRequest().body.read()).toBe("Lobsterlicious!");
+    expect(lastRequest().body.read()).toEqual(b("Lobsterlicious!"));
   });
 });
 
@@ -680,7 +744,7 @@ describe("Rack::Test::Session#patch", () => {
 
   it("accepts a body", async () => {
     await session.patch("/", "Lobsterlicious!");
-    expect(lastRequest().body.read()).toBe("Lobsterlicious!");
+    expect(lastRequest().body.read()).toEqual(b("Lobsterlicious!"));
   });
 });
 
@@ -690,7 +754,7 @@ describe("Rack::Test::Session#delete", () => {
 
   it("accepts a body", async () => {
     await session.patch("/", "Lobsterlicious!");
-    expect(lastRequest().body.read()).toBe("Lobsterlicious!");
+    expect(lastRequest().body.read()).toEqual(b("Lobsterlicious!"));
   });
 
   it("uses the provided params hash", async () => {
@@ -698,20 +762,20 @@ describe("Rack::Test::Session#delete", () => {
     expect(lastRequest().GET).toEqual({});
     expect(lastRequest().POST).toEqual({ foo: "bar" });
     lastRequest().body.rewind();
-    expect(lastRequest().body.read()).toBe("foo=bar");
+    expect(lastRequest().body.read()).toEqual(b("foo=bar"));
   });
 
   it("accepts params in the path", async () => {
     await session.delete("/?foo=bar");
     expect(lastRequest().GET).toEqual({ foo: "bar" });
     expect(lastRequest().POST).toEqual({});
-    expect(lastRequest().body.read()).toBe("");
+    expect(lastRequest().body.read()).toEqual(b(""));
   });
 
   it("accepts a body", async () => {
     await session.delete("/", "Lobsterlicious!");
     expect(lastRequest().GET).toEqual({});
-    expect(lastRequest().body.read()).toBe("Lobsterlicious!");
+    expect(lastRequest().body.read()).toEqual(b("Lobsterlicious!"));
   });
 });
 

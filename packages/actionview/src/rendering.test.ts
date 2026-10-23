@@ -3,7 +3,7 @@ import { Base } from "./base.js";
 import { DetailsKey } from "./lookup-context.js";
 import { Template } from "./template.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import { Tse } from "./template/handlers/tse.js";
+import { TSE } from "./template/handlers/tse.js";
 import {
   buildViewContextClass,
   isInheritViewContextClass,
@@ -28,9 +28,16 @@ const routesWith = (helpers: object): ViewContextRoutes => ({
   mountedHelpers: () => ({}),
 });
 
-const renderTse = (source: string, locals: Record<string, unknown>, view: Base): string =>
+const renderTse = async (
+  source: string,
+  locals: Record<string, unknown>,
+  view: Base,
+): Promise<string> =>
   String(
-    new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(view, locals),
+    await new Template(source, "t", new TSE(), { locals: [], format: ":html" }).render(
+      view,
+      locals,
+    ),
   );
 
 describe("ActionView::Rendering::ClassMethods", () => {
@@ -107,21 +114,21 @@ describe("ActionView::Rendering::ClassMethods", () => {
     expect(Base.prototype.capture).not.toBe(view.capture);
   });
 
-  it("includes routes.url_helpers so a route helper is a bare identifier in a template", () => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+  it("includes routes.url_helpers so a route helper is a bare identifier in a template", async () => {
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     try {
       class C extends Controller {
         static override _routes = routesWith({ postsPath: () => "/posts" });
       }
       const view = new (C.viewContextClass())(null, {}, null);
-      expect(renderTse("<%= postsPath() %>", {}, view)).toBe("/posts");
+      expect(await renderTse("<%= postsPath() %>", {}, view)).toBe("/posts");
     } finally {
       TemplateHandlers.clear();
     }
   });
 
-  it("makes a helper_method-style helper resolvable as a bare identifier in a template", () => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+  it("makes a helper_method-style helper resolvable as a bare identifier in a template", async () => {
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     try {
       class C extends Controller {
         static override _helpers = {
@@ -131,7 +138,7 @@ describe("ActionView::Rendering::ClassMethods", () => {
         };
       }
       const view = new (C.viewContextClass())(null, {}, { user: "Ada" });
-      expect(renderTse("<%= currentUser() %>", {}, view)).toBe("Ada");
+      expect(await renderTse("<%= currentUser() %>", {}, view)).toBe("Ada");
     } finally {
       TemplateHandlers.clear();
     }

@@ -1,13 +1,16 @@
 import { ArgumentError } from "./argument-error.js";
+import { classpaths } from "./classpath.js";
 import { Encoding } from "./encoding.js";
 import { Hash } from "./hash.js";
-import { Module, prepend, rbGetAllocFunc } from "./include.js";
+import { Module, extend, prepend, rbGetAllocFunc } from "./include.js";
+
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
 import { Rational, nuratDumper, nuratLoader } from "./rational.js";
 import {
   FL_SINGLETON,
   T_ICLASS,
+  isPlainHash,
   rbFSend,
   rbInspect,
   rbModName,
@@ -35,6 +38,9 @@ import { TypeError } from "./type-error.js";
 import { rbPathToClass, registeredConstant } from "./variable.js";
 import { verbose } from "./verbose.js";
 
+const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
+const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
+
 const MARSHAL_MAJOR = 4;
 const MARSHAL_MINOR = 8;
 
@@ -47,6 +53,7 @@ const TYPE_UCLASS = 0x43;
 const TYPE_STRUCT = 0x53;
 const TYPE_OBJECT = 0x6f;
 const TYPE_EXTENDED = 0x65;
+const TYPE_USERDEF = 0x75;
 const TYPE_USRMARSHAL = 0x55;
 const TYPE_FLOAT = 0x66;
 const TYPE_BIGNUM = 0x6c;
@@ -113,6 +120,7 @@ interface DumpArg {
   data: Map<unknown, number>;
   numEntries: number;
   compatTbl: Map<object, object> | null;
+  userdefs: Set<object> | null;
 }
 
 /** `struct load_arg` (`vendor/ruby/v3.3.11/marshal.c:1267`). */
@@ -328,8 +336,8 @@ function hashEach(key: unknown, value: unknown, arg: DumpArg, limit: number): vo
  * `dump_funcall` (`marshal.c:210`). `check_dump_arg` (`marshal.c:188`) guards
  * a `dump_arg` a re-entered `Marshal.dump` freed, which a JS object never is.
  */
-function dumpFuncall(obj: object, sym: string, name: string): unknown {
-  const ret = rbFSend(obj, sym);
+function dumpFuncall(obj: object, sym: string, name: string, ...args: unknown[]): unknown {
+  const ret = rbFSend(obj, sym, ...args);
   const klass = Object.getPrototypeOf(obj) as object | null;
   if (ret !== null && typeof ret === "object" && Object.getPrototypeOf(ret) === klass) {
     throw new RuntimeError(`${rbModToS(rbObjClass(obj))}#${name} returned same class instance`);
@@ -339,12 +347,13 @@ function dumpFuncall(obj: object, sym: string, name: string): unknown {
 
 /**
  * `SINGLETON_DUMP_UNABLE_P` (`vendor/ruby/v3.3.11/marshal.c:545`): `klass` is
- * the singleton class's method table, its prototype, whose `constructor` and
- * `FL_SINGLETON` seats `rbObjSingletonClass` writes are not methods.
+ * the singleton class's method table, its prototype, whose `constructor` seat
+ * `rbObjSingletonClass` writes is not a method, nor is any Symbol-keyed seat
+ * (`FL_SINGLETON`, the modules an `extend` tracks there).
  */
 function singletonDumpUnableP(klass: object): boolean {
   return (
-    Reflect.ownKeys(klass).some((mid) => mid !== "constructor" && mid !== FL_SINGLETON) ||
+    Object.getOwnPropertyNames(klass).some((mid) => mid !== "constructor") ||
     Object.keys((klass as Record<symbol, object>)[FL_SINGLETON]).length > 0
   );
 }
@@ -356,13 +365,22 @@ function singletonDumpUnableP(klass: object): boolean {
  * singleton check and the `RICLASS_IS_ORIGIN` guard (`marshal.c:561-562`) have
  * no iclass to meet. `rb_class_name` answers an anonymous module's temporary
  * path, which `w_unique` refuses (`must_not_be_anonymous`, `marshal.c:530`).
+ * A plain-object module `extend` copied onto `obj` is recorded on `obj`
+ * itself, and stands for the iclass `extend` puts beneath the singleton class.
  */
-function wExtended(klass: object | null, arg: DumpArg, check: boolean): void {
+function wExtended(obj: object, arg: DumpArg, check: boolean): void {
+  let klass = Object.getPrototypeOf(obj) as object | null;
   if (check && klass !== null && Object.hasOwn(klass, FL_SINGLETON)) {
     if (singletonDumpUnableP(klass)) {
       throw new TypeError("singleton can't be dumped");
     }
     klass = Object.getPrototypeOf(klass) as object | null;
+  }
+  if (Object.hasOwn(obj, extendedKeys) && Object.hasOwn(obj, includedModulesKey)) {
+    for (const m of [...(obj as Record<symbol, Set<object>>)[includedModulesKey]].reverse()) {
+      wByte(TYPE_EXTENDED, arg);
+      wUnique(rbModName(m) ?? rbModToS(m as AnyClass), arg);
+    }
   }
   while (klass !== null && Object.hasOwn(klass, T_ICLASS)) {
     const m = (klass as Record<symbol, AnyClass | Module>)[T_ICLASS];
@@ -391,7 +409,7 @@ function wClass(type: number, obj: object, arg: DumpArg, check: boolean): void {
   if (temporalTag(obj) !== null) {
     klass = registeredConstant(rbModToS(rbObjClass(obj))) as AnyClass;
   }
-  wExtended(Object.getPrototypeOf(obj) as object | null, arg, check);
+  wExtended(obj, arg, check);
   wByte(type, arg);
   const path = class2path(klass);
   wUnique(path, arg);
@@ -401,7 +419,7 @@ function wClass(type: number, obj: object, arg: DumpArg, check: boolean): void {
 function wUclass(obj: object, sup: AnyClass, arg: DumpArg): void {
   const klass = obj.constructor as AnyClass | undefined;
 
-  wExtended(Object.getPrototypeOf(obj) as object | null, arg, true);
+  wExtended(obj, arg, true);
   if (klass !== undefined && klass !== sup) {
     wByte(TYPE_UCLASS, arg);
     wUnique(class2path(klass), arg);
@@ -434,14 +452,32 @@ function wEncoding(encname: Encname, arg: DumpArg, limit: number): number {
   return 1;
 }
 
-/** `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`). */
-function hasIvars(encname: Encname): number {
-  return encname !== null ? 1 : 0;
+/**
+ * `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`). Only a boxed `String` (the
+ * ASCII-8BIT String a `_dump` answers) holds ivars, as its own non-index properties.
+ *
+ * @inventedArm if — PERMANENT
+ */
+function hasIvars(obj: unknown, encname: Encname): number {
+  let num = encname !== null ? 1 : 0;
+  if (obj instanceof String) num += Object.keys(obj).length - obj.length;
+  return num;
 }
 
-/** `w_ivar_each` (`vendor/ruby/v3.3.11/marshal.c:736`) over `w_obj_each` (`marshal.c:629`). */
+/**
+ * `w_ivar_each` (`vendor/ruby/v3.3.11/marshal.c:736`) over `w_obj_each` (`marshal.c:629`).
+ *
+ * @inventedArm if — PERMANENT
+ */
 function wIvarEach(obj: object, num: number, arg: DumpArg, limit: number): void {
   if (!num) return;
+  if (obj instanceof String) {
+    for (const id of Object.keys(obj).slice(obj.length)) {
+      wSymbol(`:${id}`, arg);
+      wObject((obj as unknown as Record<string, unknown>)[id], arg, limit);
+    }
+    return;
+  }
   for (const id of rbObjInstanceVariables(obj)) {
     wSymbol(`:${id}`, arg);
     wObject(rbObjIvarGet(obj, id), arg, limit);
@@ -449,9 +485,18 @@ function wIvarEach(obj: object, num: number, arg: DumpArg, limit: number): void 
 }
 
 /** `w_ivar` (`vendor/ruby/v3.3.11/marshal.c:763`). */
-function wIvar(num: number, encname: Encname, arg: DumpArg, limit: number): void {
+function wIvar(
+  num: number,
+  ivobj: object | undefined,
+  encname: Encname,
+  arg: DumpArg,
+  limit: number,
+): void {
   wLong(num, arg);
-  wEncoding(encname, arg, limit);
+  num -= wEncoding(encname, arg, limit);
+  if (ivobj !== undefined && num) {
+    wIvarEach(ivobj, num, arg, limit);
+  }
 }
 
 /** `w_objivar` (`vendor/ruby/v3.3.11/marshal.c:780`). */
@@ -542,7 +587,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
       return;
     }
 
-    if (rbObjRespondTo(obj, "marshalDump", true)) {
+    if (rbObjRespondTo(obj, "marshalDump")) {
       wRemember(obj, arg);
 
       const v = dumpFuncall(obj as object, "marshalDump", "marshal_dump");
@@ -550,10 +595,44 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
       wObject(v, arg, limit);
       return;
     }
+    if (rbObjRespondTo(obj, "_dump")) {
+      let ivobj: object | undefined;
+
+      if (arg.userdefs && arg.userdefs.has(obj as object)) {
+        throw new RuntimeError("can't dump recursive object using _dump()");
+      }
+      const v = dumpFuncall(obj as object, "_dump", "_dump", limit);
+      if (!(typeof v === "string" || v instanceof String)) {
+        throw new TypeError("_dump() must return string");
+      }
+      hasiv = hasIvars(obj, (encname = encodingName(obj)));
+      const encname2 = encodingName(v);
+      const hasiv2 = hasIvars(v, encname2);
+      if (hasiv2) {
+        hasiv = hasiv2;
+        ivobj = v as object;
+        encname = encname2;
+      }
+      if (hasiv) wByte(TYPE_IVAR, arg);
+      wClass(TYPE_USERDEF, obj as object, arg, false);
+      if (typeof v === "string") {
+        wCstr(v, arg);
+      } else {
+        const bytes = Array.from({ length: v.length }, (_, i) => v.charCodeAt(i));
+        wBytes(bytes, bytes.length, arg);
+      }
+      if (hasiv) {
+        (arg.userdefs ??= new Set()).add(obj as object);
+        wIvar(hasiv, ivobj, encname, arg, limit);
+        arg.userdefs.delete(obj as object);
+      }
+      wRemember(obj, arg);
+      return;
+    }
 
     wRemember(key, arg);
 
-    hasiv = hasIvars((encname = encodingName(obj)));
+    hasiv = hasIvars(obj, (encname = encodingName(obj)));
     {
       const allocator = rbGetAllocFunc(rbObjClass(obj));
       const compat = allocator === undefined ? undefined : compatAllocatorTbl.get(allocator);
@@ -580,8 +659,8 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
         wCstr(path, arg);
         wEncname(encname, arg);
       }
-    } else if (obj instanceof Module) {
-      const path = class2path(obj);
+    } else if (obj instanceof Module || (isPlainHash(obj) && classpaths.has(obj))) {
+      const path = class2path(obj as Module);
       const encname = wEncivar(path, arg);
       wByte(TYPE_MODULE, arg);
       wCstr(path, arg);
@@ -605,6 +684,9 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
     } else if (typeof obj === "string") {
       wByte(TYPE_STRING, arg);
       wCstr(obj, arg);
+    } else if (obj instanceof Uint8Array) {
+      wByte(TYPE_STRING, arg);
+      wBytes(obj, obj.length, arg);
     } else if (Array.isArray(obj)) {
       wUclass(obj, Array, arg);
       wByte(TYPE_ARRAY, arg);
@@ -659,18 +741,19 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
     }
   }
   if (hasiv) {
-    wIvar(hasiv, encname, arg, limit);
+    wIvar(hasiv, undefined, encname, arg, limit);
   }
 }
 
 /** `rb_marshal_dump_limited` (`vendor/ruby/v3.3.11/marshal.c:1228`). */
-function rbMarshalDumpLimited(obj: unknown, limit: number): string {
+function rbMarshalDumpLimited(obj: unknown, limit: number): Uint8Array {
   const arg: DumpArg = {
     str: [],
     symbols: new Map(),
     data: new Map(),
     numEntries: 0,
     compatTbl: null,
+    userdefs: null,
   };
 
   wByte(MARSHAL_MAJOR, arg);
@@ -678,11 +761,7 @@ function rbMarshalDumpLimited(obj: unknown, limit: number): string {
 
   wObject(obj, arg, limit);
 
-  let port = "";
-  for (let i = 0; i < arg.str.length; i += 0x8000) {
-    port += String.fromCharCode(...arg.str.slice(i, i + 0x8000));
-  }
-  return port;
+  return Uint8Array.from(arg.str);
 }
 
 /** `too_short` (`vendor/ruby/v3.3.11/marshal.c:1337`). */
@@ -909,10 +988,19 @@ function rEntry<T>(v: T, arg: LoadArg): T {
  * retags a Ruby String in place; a JS string is immutable, so the re-read
  * string is answered, and `undefined` is the C `FALSE`.
  */
-function rIvarEncoding(obj: unknown, arg: LoadArg, sym: string, val: unknown): string | undefined {
+function rIvarEncoding(
+  obj: unknown,
+  arg: LoadArg,
+  sym: string,
+  val: unknown,
+): string | Uint8Array | undefined {
   const idx = sym2encidx(sym, val);
   if (idx !== null) {
-    if (typeof obj === "string") {
+    if (obj instanceof Uint8Array) {
+      let str = "";
+      for (const byte of obj) str += String.fromCharCode(byte);
+      return forceEncoding(str, idx);
+    } else if (typeof obj === "string") {
       return forceEncoding(obj, idx);
     } else {
       throw new ArgumentError(`${rbObjAsString(obj)} is not enc_capable`);
@@ -925,7 +1013,7 @@ function rIvarEncoding(obj: unknown, arg: LoadArg, sym: string, val: unknown): s
  * `r_encname` (`vendor/ruby/v3.3.11/marshal.c:1750`). `obj` holds the String
  * `rb_enc_associate_index` retags in place, and is left holding the re-read one.
  */
-function rEncname(obj: { value: string }, arg: LoadArg): number {
+function rEncname(obj: { value: string | Uint8Array }, arg: LoadArg): number {
   let len = rLong(arg);
   if (len > 0) {
     const sym = rSymbol(arg);
@@ -941,6 +1029,8 @@ function rEncname(obj: { value: string }, arg: LoadArg): number {
  * `r_ivar` (`vendor/ruby/v3.3.11/marshal.c:1762`), answering `obj` as
  * {@link rIvarEncoding} left it. `rb_hash_ruby2_keywords` flags a Hash as
  * keyword arguments, which a JS call has no slot for.
+ *
+ * @inventedArm if — PERMANENT
  */
 function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadArg): unknown {
   let len = rLong(arg);
@@ -958,6 +1048,8 @@ function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadAr
             `ruby2_keywords flag is given but ${rbObjAsString(obj)} is not a Hash`,
           );
         }
+      } else if (obj instanceof String) {
+        (obj as unknown as Record<string, unknown>)[sym] = val;
       } else {
         rbObjIvarSet(obj as object, sym, val);
       }
@@ -994,10 +1086,10 @@ function path2class(path: string): AnyClass {
 
 /** `must_be_module` (`vendor/ruby/v3.3.11/marshal.c:1803`), under `path2module` (`marshal.c:1800`). */
 function mustBeModule(v: unknown, path: string): Module {
-  if (!(v instanceof Module)) {
+  if (!(v instanceof Module || isPlainHash(v))) {
     throw new ArgumentError(`${path} does not refer to module`);
   }
-  return v;
+  return v as Module;
 }
 
 /**
@@ -1132,7 +1224,7 @@ function rObjectFor(
           v = rObject0(arg, null, extmod);
           while (extmod.length > 0) {
             m = extmod.pop();
-            (m as Module).extendObject(v as object);
+            extend(v as object, m as Module);
           }
         }
         v = rLeave(v, arg);
@@ -1237,7 +1329,10 @@ function rObjectFor(
       }
 
       case TYPE_STRING:
-        v = rEntry(rString(arg), arg);
+        v = rEntry(
+          Uint8Array.from(rString(arg), (c) => c.charCodeAt(0)),
+          arg,
+        );
         v = rLeave(v, arg);
         break;
 
@@ -1301,6 +1396,28 @@ function rObjectFor(
         break;
       }
 
+      case TYPE_USERDEF: {
+        const name = rUnique(arg);
+        const klass = path2class(name);
+
+        if (!rbObjRespondTo(klass, "_load")) {
+          throw new TypeError(`class ${name} needs to have method \`_load'`);
+        }
+        let data: string | typeof String.prototype = rString(arg);
+        if (ivp) {
+          data = rIvar(new String(data), null, arg) as typeof String.prototype;
+          ivp.value = false;
+        }
+        v = rbFSend(klass, "_load", data);
+        v = rEntry(v, arg);
+        const allocator = rbGetAllocFunc(klass);
+        const compat = allocator === undefined ? undefined : compatAllocatorTbl.get(allocator);
+        if (compat !== undefined) {
+          v = compat.loader(klass as never, v as never);
+        }
+        break;
+      }
+
       case TYPE_USRMARSHAL: {
         const name = rUnique(arg);
         const klass = path2class(name);
@@ -1311,7 +1428,7 @@ function rObjectFor(
         if (extmod !== null) {
           appendExtmod(v as object, extmod);
         }
-        if (!rbObjRespondTo(v, "marshalLoad", true)) {
+        if (!rbObjRespondTo(v, "marshalLoad")) {
           throw new TypeError(`instance of ${name} needs to have method \`marshal_load'`);
         }
         v = rEntry(v, arg);
@@ -1396,7 +1513,13 @@ function rObject(arg: LoadArg): unknown {
 
 /** `rb_marshal_load_with_proc` (`vendor/ruby/v3.3.11/marshal.c:2378`), for a String `port`. */
 function rbMarshalLoadWithProc(port: unknown): unknown {
-  const v = rbCheckStringType(port);
+  let v: string | null;
+  if (port instanceof Uint8Array) {
+    v = "";
+    for (const byte of port) v += String.fromCharCode(byte);
+  } else {
+    v = rbCheckStringType(port);
+  }
   if (v === null) {
     throw new TypeError("instance of IO needed");
   }
@@ -1456,12 +1579,14 @@ export const Marshal = {
    *  internal slots, a Temporal value, or an instance of a class carrying
    *  `Symbol.toStringTag` is `T_DATA` and takes its `TypeError`.
    *
-   * Not ported: the `anIO` argument; and the `_dump` and Regexp arms, which
-   * nothing calls.
+   * `_dump` (`TYPE_USERDEF`, `marshal.c:918`) answers a String, or a boxed `String`
+   * for an ASCII-8BIT one carrying ivars, as `Time#_dump` does.
+   *
+   * Not ported: the `anIO` argument; and the Regexp arm, which nothing calls.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.dump` (`vendor/ruby/v3.3.11/marshal.c:1207`).
    */
-  dump(obj: unknown, limit: number = -1): string {
+  dump(obj: unknown, limit: number = -1): Uint8Array {
     return rbMarshalDumpLimited(obj, limit);
   },
 
@@ -1484,7 +1609,8 @@ export const Marshal = {
    *  own raises `FrozenError`. A class path resolves through `rbPathToClass`.
    *
    * Not ported: the `proc` and `freeze:` arguments and an IO source; and
-   * `TYPE_USERDEF`, `TYPE_DATA` and Regexp, which nothing calls. A Struct has
+   * `TYPE_DATA` and Regexp, which nothing calls. `TYPE_USERDEF` hands `_load` a boxed
+   * `String` holding the String's ivars, which carries no encoding ivar. A Struct has
    * no `keyword_init`, so `TYPE_STRUCT` reads positional values only.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.load` (`vendor/ruby/v3.3.11/marshal.c:2434`).

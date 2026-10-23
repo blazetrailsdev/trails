@@ -1,3 +1,4 @@
+import { QUERY_STRING } from "@blazetrails/rack";
 import {
   ActiveSupportJSON,
   camelize,
@@ -24,8 +25,9 @@ import {
   b,
   KeyError,
   merge,
-  Module,
   rbModConstSet,
+  rbModAttrReader,
+  rbObjIvarSet,
   RuntimeError,
   SecureRandom,
   StringIO,
@@ -47,7 +49,8 @@ import {
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { TestResponse } from "../action-dispatch/testing/test-response.js";
 import { Assertions } from "../action-dispatch/testing/assertions.js";
-import type { XmlDocument } from "@blazetrails/nokogiri";
+import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/testing/assertions";
+import type { Html5Document, XmlDocument } from "@blazetrails/nokogiri";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import type { CookieJar, CookieResponse } from "../action-dispatch/middleware/cookies.js";
@@ -153,15 +156,15 @@ export const ClassMethods: BehaviorClassMethods & ThisType<BehaviorClass> = {
 export interface Behavior extends Included<typeof TestProcess> {
   routes?: RouteSet;
   controller: Metal;
-  request: TestRequest;
-  response: TestResponse | LiveTestResponse;
+  readonly request: TestRequest;
+  readonly response: TestResponse | LiveTestResponse;
   /** @internal */
   _cookieJar?: CookieJar;
   /** @internal */
   _responseKlass: typeof TestResponse | typeof LiveTestResponse;
   /** @internal */
-  _htmlDocument?: XmlDocument;
-  readonly htmlDocument: XmlDocument;
+  _htmlDocument?: XmlDocument | Html5Document | null;
+  readonly htmlDocument: XmlDocument | Html5Document;
   get: OmitThisParameter<typeof get>;
   post: OmitThisParameter<typeof post>;
   patch: OmitThisParameter<typeof patch>;
@@ -186,7 +189,7 @@ export interface Behavior extends Included<typeof TestProcess> {
   /** @internal */
   scrubEnvBang: OmitThisParameter<typeof scrubEnvBang>;
   /** @internal */
-  readonly documentRootElement: ReturnType<typeof documentRootElement>;
+  documentRootElement: OmitThisParameter<typeof documentRootElement>;
   /** @internal */
   checkRequiredIvars: OmitThisParameter<typeof checkRequiredIvars>;
 }
@@ -241,6 +244,11 @@ async function head(
   return this.process(action, { method: "HEAD", ...options });
 }
 
+/**
+ * @missingRailsName scrub_env! — PERMANENT
+ * @missingRailsName class — PERMANENT
+ * @missingRailsName responseKlass — PERMANENT
+ */
 async function process(
   this: Behavior,
   action: string,
@@ -254,19 +262,23 @@ async function process(
 
   const httpMethod = String(method).toUpperCase();
 
-  this._htmlDocument = undefined;
+  this._htmlDocument = null;
 
   this.cookies().update(this.request.cookies);
   this.cookies().updateCookiesFromJar();
   this.request.setHeader("HTTP_COOKIE", this.cookies().toHeader());
   this.request.deleteHeader("action_dispatch.cookies");
 
-  this.request = new TestRequest(
-    this.scrubEnvBang(this.request.env),
-    this.request.session as unknown as TestSession,
-    this.controller.constructor as typeof Metal,
+  rbObjIvarSet(
+    this,
+    "@request",
+    new TestRequest(
+      this.scrubEnvBang(this.request.env),
+      this.request.session as unknown as TestSession,
+      this.controller.constructor as typeof Metal,
+    ),
   );
-  this.response = this.buildResponse(this._responseKlass);
+  rbObjIvarSet(this, "@response", this.buildResponse(this._responseKlass));
   this.response.request = this.request;
   this.controller.recycleBang();
 
@@ -306,6 +318,7 @@ function queryParameterNames(this: Behavior, generatedExtras: [string, string[]]
   return [...generatedExtras[1], "controller", "action"];
 }
 
+/** @missingRailsName responseKlass — PERMANENT */
 function setupControllerRequestAndResponse(this: Behavior): void {
   if (this.controller === undefined) this.controller = null!;
 
@@ -326,8 +339,12 @@ function setupControllerRequestAndResponse(this: Behavior): void {
     }
   }
 
-  this.request = TestRequest.create(this.controller == null ? null : this.controller.constructor);
-  this.response = this.buildResponse(this._responseKlass);
+  rbObjIvarSet(
+    this,
+    "@request",
+    TestRequest.create(this.controller == null ? null : this.controller.constructor),
+  );
+  rbObjIvarSet(this, "@response", this.buildResponse(this._responseKlass));
   this.response.request = this.request;
 
   if (this.controller) {
@@ -413,8 +430,8 @@ async function processControllerResponse(
 
     await this.wrapExecution(() => this.controller.dispatch(action, this.request, this.response));
   } finally {
-    this.request = this.controller.request as TestRequest;
-    this.response = this.controller.response as Behavior["response"];
+    rbObjIvarSet(this, "@request", this.controller.request);
+    rbObjIvarSet(this, "@response", this.controller.response);
 
     if (this.request.isHaveCookieJar()) {
       if (!this.request.cookieJar().isCommitted()) {
@@ -423,7 +440,7 @@ async function processControllerResponse(
         cookies.update(this.response.cookies as Record<string, string>);
       }
     }
-    this.response.toRack();
+    this.response.toA();
 
     const flashValue = this.request.flash!.toSessionValue();
     if (flashValue) {
@@ -476,53 +493,48 @@ function checkRequiredIvars(this: Behavior): void {
   }
 }
 
-export const Behavior = new Module((mod) => {
-  extend(mod, Concern);
-  mod.include(TestProcess);
-  mod.include(ConstantLookup);
+export const Behavior = { ClassMethods } as Record<string, unknown> & {
+  ClassMethods: typeof ClassMethods;
+};
+extend(Behavior, Concern);
+include(Behavior, TestProcess);
+include(Behavior, ConstantLookup);
+include(Behavior, DomTestingAssertions);
 
-  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
+rbModAttrReader({ prototype: Behavior }, "response", "request");
 
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      get,
-      post,
-      patch,
-      put,
-      delete: deleteRequest,
-      head,
-      process,
-      controllerClassName,
-      generatedPath,
-      queryParameterNames,
-      setupControllerRequestAndResponse,
-      buildResponse,
-    });
-  });
+Object.assign(Behavior, {
+  get,
+  post,
+  patch,
+  put,
+  delete: deleteRequest,
+  head,
+  process,
+  controllerClassName,
+  generatedPath,
+  queryParameterNames,
+  setupControllerRequestAndResponse,
+  buildResponse,
+});
 
-  (
-    mod as unknown as { included(base: null, block: (this: typeof TestCase) => void): void }
-  ).included(null, function (this: typeof TestCase) {
-    include(this, TemplateAssertions);
-    include(this, Assertions);
-    classAttribute.call(this, "_controllerClass");
-    this.setup(":setupControllerRequestAndResponse");
-    runLoadHooks("action_controller_test_case", this);
-  });
+(
+  Behavior as unknown as { included(base: null, block: (this: typeof TestCase) => void): void }
+).included(null, function (this: typeof TestCase) {
+  include(this, TemplateAssertions);
+  include(this, Assertions);
+  classAttribute.call(this, "_controllerClass");
+  this.setup(":setupControllerRequestAndResponse");
+  runLoadHooks("action_controller_test_case", this);
+});
 
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      setupRequest,
-      wrapExecution,
-      processControllerResponse,
-      scrubEnvBang,
-      checkRequiredIvars,
-    });
-    Object.defineProperty(m, "documentRootElement", {
-      get: documentRootElement,
-      configurable: true,
-    });
-  });
+Object.assign(Behavior, {
+  setupRequest,
+  wrapExecution,
+  processControllerResponse,
+  scrubEnvBang,
+  checkRequiredIvars,
+  documentRootElement,
 });
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Behavior` (`actionpack/lib/action_controller/test_case.rb:696`) and the two `include`s of its `included do` block (`:597-598`); the class/interface merge is how a mixin surfaces on the type side. */
@@ -531,16 +543,13 @@ export interface TestCase extends Behavior, TemplateAssertions, Assertions {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class TestCase extends ActiveSupportTestCase {
   static executorAroundEachRequest: boolean | null | undefined = null;
-
-  declare response: TestResponse | LiveTestResponse;
-  declare request: TestRequest;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace -- `Behavior::ClassMethods`, `class_attribute :_controller_class` and `RoutingAssertions::ClassMethods` reach `TestCase` through `include Behavior` (`actionpack/lib/action_controller/test_case.rb:379-414,599,696`); a namespace merged onto the class is how the added statics surface on the type side.
 export declare namespace TestCase {
   /** @internal */
   let _controllerClass: ControllerClass | null | undefined;
-  let is_controllerClass: boolean;
+  let _isControllerClass: boolean;
   const tests: BehaviorClassMethods["tests"];
   let controllerClass: ControllerClass | null;
   const determineDefaultControllerClass: BehaviorClassMethods["determineDefaultControllerClass"];
@@ -570,10 +579,13 @@ export class TestRequest extends AbstractTestRequest {
   }
 
   static create(controllerClass: unknown): TestRequest {
-    const env: Record<string, unknown> = {};
+    let env: Record<string, unknown> = {};
+    if (TopLevel.Trails !== undefined && TopLevel.Trails.application) {
+      env = { ...TopLevel.Trails.application.envConfig(), ...env };
+    }
     env["rack.request.cookie_hash"] = {};
     return new TestRequest(
-      merge(TestRequest.defaultEnv(), env),
+      { ...TestRequest.defaultEnv(), ...env },
       TestRequest.newSession(),
       controllerClass as DispatchableControllerClass | null,
     );
@@ -604,7 +616,7 @@ export class TestRequest extends AbstractTestRequest {
   }
 
   set queryString(string: string) {
-    this.setHeader("QUERY_STRING", string);
+    this.setHeader(QUERY_STRING, string);
   }
 
   get contentType(): string | null {
@@ -643,7 +655,7 @@ export class TestRequest extends AbstractTestRequest {
         this.queryString = toQuery(nonPathParameters);
       }
     } else {
-      let data: string;
+      let data: string | Uint8Array;
       if (TestRequest.ENCODER.shouldMultipart(nonPathParameters)) {
         this.contentType = TestRequest.ENCODER.contentType;
         data = TestRequest.ENCODER.buildMultipart(nonPathParameters)!;
@@ -669,10 +681,9 @@ export class TestRequest extends AbstractTestRequest {
             this._customParamParsers[contentMimeType!.symbol!] = () => nonPathParameters;
             data = toQuery(nonPathParameters);
         }
-        data = b(data);
       }
 
-      const dataStream = new StringIO(data);
+      const dataStream = new StringIO(b(data));
       this.setHeader("CONTENT_LENGTH", String(dataStream.size()));
       this.setHeader("rack.input", dataStream);
     }
@@ -716,7 +727,10 @@ export class TestRequest extends AbstractTestRequest {
     }
   })();
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName customParamParsers — PERMANENT
+   */
   override paramsParsers(): ParameterParsers {
     const base = super.paramsParsers();
     return merge<unknown>(base, this._customParamParsers) as ParameterParsers;
@@ -768,7 +782,7 @@ export class TestSession extends SecureSessionHash {
     return Object.values(this.data);
   }
 
-  override destroy(): void {
+  override async destroy(): Promise<void> {
     this.clear();
   }
 

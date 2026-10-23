@@ -123,7 +123,10 @@ export class Column {
     return false;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable#deduplicated rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:24-26
+   */
   deduplicated(): this {
     this.name = strUminus(this.name);
     if (this.sqlTypeMetadata) this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
@@ -131,7 +134,7 @@ export class Column {
     if (this.defaultFunction != null) this.defaultFunction = strUminus(this.defaultFunction);
     if (this.collation != null) this.collation = strUminus(this.collation);
     if (this.comment != null) this.comment = strUminus(this.comment);
-    return Deduplicable.instanceMethod("deduplicated")!.value.call(this);
+    return Object.freeze(this);
   }
 
   initWith(coder: ColumnCoder): void {

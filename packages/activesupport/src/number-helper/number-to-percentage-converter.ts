@@ -3,6 +3,10 @@ import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import type { NumberToPercentageOptions } from "../number-helper.js";
 
 export class NumberToPercentageConverter extends NumberConverter<NumberToPercentageOptions> {
+  static toString(): string {
+    return "ActiveSupport::NumberHelper::NumberToPercentageConverter";
+  }
+
   static {
     this.namespace = "percentage";
   }

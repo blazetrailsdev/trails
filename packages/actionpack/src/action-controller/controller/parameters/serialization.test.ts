@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { assertNot } from "@blazetrails/activesupport";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Parameters } from "../../metal/strong-parameters.js";
 
@@ -14,8 +15,7 @@ describe("ParametersSerializationTest", () => {
     Parameters.permitAllParameters = oldPermittedParameters;
   });
 
-  // BLOCKED: psych-dump-puts-root-tag-on-its-own-line
-  it.skip("YAML serialization", () => {
+  it("YAML serialization", () => {
     const params = new Parameters({ key: ":value" });
     const yamlDump = YAML.dump(params);
     expect(yamlDump).toMatch("--- !ruby/object:ActionController::Parameters");
@@ -31,7 +31,7 @@ describe("ParametersSerializationTest", () => {
     const roundtripped = YAML.unsafeLoad(payload) as Parameters;
 
     expect(roundtripped.equals(params)).toBe(true);
-    expect(roundtripped.isPermitted()).toBe(false);
+    assertNot(roundtripped.isPermitted());
   });
 
   it("YAML backwardscompatible with psych 2.0.8 format", () => {
@@ -41,7 +41,7 @@ key: :value
     const params = YAML.unsafeLoad(payload) as Parameters;
 
     expect(params.get("key")).toEqual(":value");
-    expect(params.isPermitted()).toBe(false);
+    assertNot(params.isPermitted());
   });
 
   it("YAML backwardscompatible with psych 2.0.9+ format", () => {
@@ -54,6 +54,6 @@ ivars:
     const params = YAML.unsafeLoad(payload) as Parameters;
 
     expect(params.get("key")).toEqual(":value");
-    expect(params.isPermitted()).toBe(false);
+    assertNot(params.isPermitted());
   });
 });

@@ -1,4 +1,4 @@
-import { Module, isPlainObject, underscore } from "@blazetrails/activesupport";
+import { isPlainObject, underscore } from "@blazetrails/activesupport";
 import { ArgumentError, hashDelete, rbInspect, rbObjAsString } from "@blazetrails/ruby-compat";
 import { Mime, type MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Metal } from "../metal.js";
@@ -73,7 +73,4 @@ function includeContent(status: number): boolean {
   }
 }
 
-export const Head: Module<{ head: typeof head }> = new Module((mod) => {
-  mod.defineMethod("head", head);
-  mod.defineMethod("includeContent", includeContent);
-});
+export const Head = { head, includeContent };

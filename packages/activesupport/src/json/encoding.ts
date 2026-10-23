@@ -1,6 +1,5 @@
-import { fetch, toS } from "@blazetrails/ruby-compat";
+import { fetch, rbObjDup, toS } from "@blazetrails/ruby-compat";
 import { asJson, Float, isPlainObject } from "../core-ext/object/json.js";
-import { isEmpty } from "@blazetrails/ruby-compat";
 
 export interface EncodeOptions {
   only?: string | number | Array<string | number>;
@@ -10,6 +9,10 @@ export interface EncodeOptions {
 }
 
 export class JSONGemEncoder {
+  static toString(): string {
+    return "ActiveSupport::JSON::Encoding::JSONGemEncoder";
+  }
+
   readonly options: EncodeOptions;
 
   constructor(options?: EncodeOptions | null) {
@@ -17,8 +20,8 @@ export class JSONGemEncoder {
   }
 
   encode(value: unknown): string {
-    if (!isEmpty(this.options)) {
-      value = asJson(value, this.options);
+    if (Object.keys(this.options).length !== 0) {
+      value = asJson(value, Object.freeze(rbObjDup(this.options)));
     }
     let json = this.stringify(this.jsonify(value));
 

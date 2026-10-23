@@ -1,17 +1,18 @@
+import type { Duration } from "../duration.js";
 import { coder } from "../cache/coder.js";
 import { ActiveSupportJSON } from "../json.js";
 import { Encoding } from "../json/encoding.js";
 import { onLoad } from "../lazy-load-hooks.js";
 import { ActiveSupport } from "../namespaces.js";
 import { Temporal, Time } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, fetch, hasKey, hashAref, rbStrStartWith } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
 
 export interface MetadataOptions {
   expiresAt?: Temporal.Instant | null;
-  expiresIn?: number | null;
+  expiresIn?: number | Duration | null;
   purpose?: unknown;
 }
 
@@ -30,18 +31,18 @@ function isPresent(value: unknown): boolean {
 export abstract class Metadata {
   static useMessageSerializerForMetadata = false;
 
-  static readonly ENVELOPE_SERIALIZERS: unknown[] = [...Object.values(SERIALIZERS), coder];
+  static readonly ENVELOPE_SERIALIZERS: unknown[] = [...SERIALIZERS.values(), coder];
 
   static readonly TIMESTAMP_SERIALIZERS: unknown[] = [
-    SERIALIZERS.message_pack,
-    SERIALIZERS.message_pack_allow_marshal,
+    fetch(SERIALIZERS, "message_pack"),
+    fetch(SERIALIZERS, "message_pack_allow_marshal"),
   ];
 
   protected abstract readonly serializer: MessageSerializer;
-  protected abstract encode(data: string | Buffer, options?: { urlSafe?: boolean }): string;
-  protected abstract decode(encoded: string, options?: { urlSafe?: boolean }): Buffer;
+  protected abstract encode(data: string | Uint8Array, options?: { urlSafe?: boolean }): string;
+  protected abstract decode(encoded: string | Uint8Array, options?: { urlSafe?: boolean }): Buffer;
   protected abstract serialize(data: unknown): unknown;
-  protected abstract deserialize(serialized: string): unknown;
+  protected abstract deserialize(serialized: string | Uint8Array): unknown;
 
   protected serializeWithMetadata(data: unknown, metadata: MetadataOptions = {}): unknown {
     const hasMetadata = Object.values(metadata).some(isPresent);
@@ -57,17 +58,17 @@ export abstract class Metadata {
   }
 
   protected deserializeWithMetadata(
-    message: string,
+    message: string | Uint8Array,
     expectedMetadata: ExpectedMetadataOptions = {},
   ): unknown {
     if (this.dualSerializedMetadataEnvelopeJson(message)) {
       const envelope = this.deserializeFromJson(message);
       const extracted = this.extractFromMetadataEnvelope(envelope, expectedMetadata);
-      return this.deserializeFromJsonSafeString(extracted.message as string);
+      return this.deserializeFromJsonSafeString(hashAref(extracted, "message") as string);
     } else {
       const deserialized = this.deserialize(message);
       if (this.metadataEnvelope(deserialized)) {
-        return this.extractFromMetadataEnvelope(deserialized, expectedMetadata).data;
+        return hashAref(this.extractFromMetadataEnvelope(deserialized, expectedMetadata), "data");
       } else if (!Object.values(expectedMetadata).some(isPresent)) {
         return deserialized;
       } else {
@@ -106,20 +107,20 @@ export abstract class Metadata {
   protected extractFromMetadataEnvelope(
     envelope: unknown,
     { purpose = null }: ExpectedMetadataOptions = {},
-  ): Record<string, unknown> {
-    const hash = (envelope as Record<string, unknown>)._rails as Record<string, unknown>;
+  ): object {
+    const hash = hashAref(envelope as object, "_rails") as object;
 
-    if (isPresent(hash.exp)) {
+    if (isPresent(hashAref(hash, "exp"))) {
       if (
         Time.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n))
           .utc()
-          .compare(this.parseExpiry(hash.exp as string | Time))! >= 0
+          .compare(this.parseExpiry(hashAref(hash, "exp") as string | Time))! >= 0
       ) {
         throw new Thrown("invalid_message_content", "expired");
       }
     }
 
-    if (toS(hash.pur) !== toS(purpose)) {
+    if (toS(hashAref(hash, "pur")) !== toS(purpose)) {
       throw new Thrown("invalid_message_content", "mismatched purpose");
     }
 
@@ -127,16 +128,16 @@ export abstract class Metadata {
   }
 
   protected metadataEnvelope(object: unknown): boolean {
-    return typeof object === "object" && object !== null && "_rails" in object;
+    return typeof object === "object" && object !== null && hasKey(object, "_rails");
   }
 
-  protected dualSerializedMetadataEnvelopeJson(string: string): boolean {
-    return string.startsWith('{"_rails":{"message":');
+  protected dualSerializedMetadataEnvelopeJson(string: string | Uint8Array): boolean {
+    return rbStrStartWith(string, '{"_rails":{"message":');
   }
 
   protected pickExpiry(
     expiresAt: Temporal.Instant | null | undefined,
-    expiresIn: number | null | undefined,
+    expiresIn: number | Duration | null | undefined,
   ): Time | string | undefined {
     let expiry: Time | undefined;
     if (isPresent(expiresAt)) {
@@ -168,7 +169,7 @@ export abstract class Metadata {
     return ActiveSupportJSON.encode(data);
   }
 
-  protected deserializeFromJson(serialized: string): unknown {
+  protected deserializeFromJson(serialized: string | Uint8Array): unknown {
     try {
       return ActiveSupportJSON.decode(serialized);
     } catch (error) {
@@ -177,12 +178,11 @@ export abstract class Metadata {
   }
 
   protected serializeToJsonSafeString(data: unknown): string {
-    return this.encode(this.serialize(data) as string, { urlSafe: false });
+    return this.encode(this.serialize(data) as string | Uint8Array, { urlSafe: false });
   }
 
-  /** @missingRailsName decode — PERMANENT */
   protected deserializeFromJsonSafeString(string: string): unknown {
-    return this.deserialize(this.decode(string, { urlSafe: false }).toString("latin1"));
+    return this.deserialize(this.decode(string, { urlSafe: false }));
   }
 }
 

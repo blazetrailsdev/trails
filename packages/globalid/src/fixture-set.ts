@@ -1,4 +1,3 @@
-import { getApp } from "./config.js";
 import { GlobalID, type GlobalIDOptions } from "./global-id.js";
 import { SignedGlobalID, type SignedGlobalIDOptions } from "./signed-global-id.js";
 import { GID } from "./uri/gid.js";
@@ -50,7 +49,12 @@ function createGlobalId(
 ): GlobalID {
   const identifier = this.identify(label, columnType);
   const modelName = this.defaultFixtureModelName(fixtureSetName);
-  const uri = GID.build({ app: getApp() as string, modelName, modelId: identifier, params: {} });
+  const uri = GID.build({
+    app: GlobalID.app as string,
+    modelName,
+    modelId: identifier,
+    params: {},
+  });
   return new klass(uri, options);
 }
 

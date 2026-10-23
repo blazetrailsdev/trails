@@ -1,4 +1,4 @@
-import { rbCString, rbObjIsProc, rbObjRespondTo, rtest } from "./object.js";
+import { rbCDate, rbCString, rbObjClass, rbObjIsProc, rbObjRespondTo, rtest } from "./object.js";
 import { rbRegEqual } from "./regexp.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
@@ -113,7 +113,10 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
      before the `equals` arm below, mirroring `cmp`'s Temporal arm. */
   const tag = temporalTag(a);
   if (tag !== null) {
-    if (temporalTag(b) === null) return false;
+    if (temporalTag(b) === null) {
+      if (kDateP(a) && kDateP(b)) return (b as { cmp(other: unknown): number | null }).cmp(a) === 0;
+      return false;
+    }
     const x = widenPlainDate(a);
     const y = widenPlainDate(b);
     if (temporalTag(x) !== temporalTag(y)) return false;
@@ -191,15 +194,20 @@ export function hashEntries(value: unknown): [unknown, unknown][] | null {
 
 /* `RB_TYPE_P(hash2, T_HASH)` (`vendor/ruby/v3.3.11/hash.c:3751`), which
    `hash_equal` asks of the other operand before it reads either table. Its
-   `to_hash` arm for a non-Hash operand (`hash.c:3752-3764`) is not ported. */
+   `to_hash` arm for a non-Hash operand (`hash.c:3752-3764`) is not ported.
+   A plain object recording the modules it includes is a Module, whose `==`
+   is `rb_obj_equal` (`vendor/ruby/v3.3.11/object.c:4374`), not a Hash. */
 function isHash(value: unknown): boolean {
   return (
     value instanceof Map ||
     (typeof value === "object" &&
       value !== null &&
-      [Object.prototype, null].includes(Object.getPrototypeOf(value)))
+      [Object.prototype, null].includes(Object.getPrototypeOf(value)) &&
+      !Object.hasOwn(value, MODULE_INCLUDES))
   );
 }
+
+const MODULE_INCLUDES = Symbol.for("@blazetrails/ruby-compat:moduleIncludes");
 
 /**
  * The `===` send (`rb_funcall(pattern, idEqq, 1, target)`, what
@@ -231,4 +239,17 @@ export function rbEqq(pattern: unknown, target: unknown): boolean {
     return rtest(pattern(target));
   }
   return rbEqual(pattern, target);
+}
+
+/**
+ * `k_date_p` (`vendor/ruby/v3.3.11/ext/date/date_core.c:1992`), `f_kind_of_p(x, cDate)`.
+ * Read off `rbObjClass` rather than `rbObjIsKindOf`, whose module would close an
+ * import cycle through include.ts.
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function kDateP(x: unknown): boolean {
+  const klass = rbObjClass(x);
+  return klass === rbCDate || klass.prototype instanceof rbCDate;
 }

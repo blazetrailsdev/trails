@@ -1,21 +1,27 @@
 export { type TemplateHandler, type RenderContext, TemplateHandlers } from "./template/handlers.js";
 export { Raw as RawHandler } from "./template/handlers/raw.js";
 export {
-  Tse as TseHandler,
+  TSE as TseHandler,
   type TseTemplate,
   type TseImplementation,
 } from "./template/handlers/tse.js";
 
 export { Template } from "./template.js";
-export type { BacktraceLocation, Spot } from "./template/handlers/tse-translate-location.js";
+export { TopLevel } from "@blazetrails/activesupport";
+export type { BacktraceLocation, Spot } from "./template/handlers/tse.js";
 
-export { FileSystemResolver, Resolver } from "./template/resolver.js";
+export { FileSystemResolver, PathParser, Resolver } from "./template/resolver.js";
+export { UnboundTemplate } from "./unbound-template.js";
 export { FixtureResolver, NullResolver } from "./testing/resolvers.js";
 
 export { LookupContext, DetailsKey } from "./lookup-context.js";
 
-export { MissingTemplate, StrictLocalsError, TemplateError } from "./template/error.js";
-export type { TemplateErrorOptions } from "./template/error.js";
+export {
+  MissingTemplate,
+  StrictLocalsError,
+  TemplateError,
+  WrongEncodingError,
+} from "./template/error.js";
 
 export { PathRegistry } from "./path-registry.js";
 export { ViewReloader } from "./cache-expiry.js";
@@ -62,6 +68,8 @@ export * from "./layouts.js";
 export { Renderer, RenderedTemplate } from "./renderer.js";
 export type { ViewContext, RenderOptions as RendererOptions } from "./renderer.js";
 export { PartialIteration } from "./renderer/collection-renderer.js";
+export { PartialRenderer } from "./renderer/partial-renderer.js";
+export { CacheHelper } from "./helpers/cache-helper.js";
 
 export { OutputBuffer, RawOutputBuffer, StreamingBuffer, RawStreamingBuffer } from "./buffers.js";
 
@@ -91,10 +99,8 @@ export { FormBuilder } from "./helpers/form-helper.js";
 export { deprecator, Deprecator } from "./deprecator.js";
 export type { TemplateRegistry, TemplateLocals } from "./template-registry.js";
 
-export {
-  TseRenderContextImpl,
-  type TseRenderContext,
-  type RenderOptions,
-} from "./render-context.js";
+export type { TseRenderContext, RenderOptions } from "./render-context.js";
 export type NoExtraKeys<T> = T & { [K in Exclude<string, keyof T>]?: never };
 export { RoutingUrlFor, type RoutingUrlForHost } from "./routing-url-for.js";
+export { VERSION, gemVersion } from "./gem-version.js";
+export { version } from "./version.js";

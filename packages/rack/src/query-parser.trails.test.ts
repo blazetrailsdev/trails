@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { QueryParser, Params, ParamsTooDeepError, QueryLimitError } from "./query-parser.js";
 
+describe("Rack::QueryParser#new_depth_limit", () => {
+  it("answers a parser with the default bytesize and params limits", () => {
+    const parser = new QueryParser(Params, 10, 1, 1).newDepthLimit(5);
+    expect(parser.paramDepthLimit).toBe(5);
+    expect(parser.parseNestedQuery("a=1&b=2")).toEqual({ a: "1", b: "2" });
+  });
+});
+
 describe("Rack::QueryParser::Params", () => {
   it("does not write through Object.prototype for a __proto__ key", () => {
     const parsed = QueryParser.makeDefault(100).parseNestedQuery("__proto__[x]=1");

@@ -3,6 +3,10 @@ import { Logger, type LogLevel } from "./logger.js";
 import { ActiveSupport } from "./namespaces.js";
 
 export class BroadcastLogger extends Logger {
+  static toString(): string {
+    return "ActiveSupport::BroadcastLogger";
+  }
+
   public broadcasts: Logger[] = [];
 
   static silencer: boolean = true;
@@ -201,7 +205,7 @@ export class BroadcastLogger extends Logger {
   }
 
   private respondToMissing(method: string, includeAll: boolean): boolean {
-    return this.broadcasts.some((logger) => rbObjRespondTo(logger, method, includeAll));
+    return this.broadcasts.some((logger) => rbObjRespondTo(logger, method));
   }
 }
 

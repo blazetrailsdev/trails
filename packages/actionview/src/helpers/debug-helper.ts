@@ -1,14 +1,15 @@
 import { SafeBuffer, htmlEscape } from "@blazetrails/activesupport";
-import { Marshal } from "@blazetrails/ruby-compat";
-import { stringify } from "@blazetrails/ruby-compat/psych-adapter";
-import { contentTag, type TagHelperHost } from "./tag-helper.js";
+import { Exception, Marshal, StandardError, include } from "@blazetrails/ruby-compat";
+import { toYaml } from "@blazetrails/ruby-compat/yaml";
+import { contentTag, type TagHelperHost, TagHelper } from "./tag-helper.js";
 
 export function debug(this: TagHelperHost, object: unknown): SafeBuffer {
   try {
     Marshal.dump(object);
-    const yaml = stringify(object);
-    return contentTag.call(this, "pre", htmlEscape(yaml), { class: "debug_dump" });
-  } catch {
+    object = htmlEscape(toYaml(object));
+    return contentTag.call(this, "pre", object, { class: "debug_dump" });
+  } catch (error) {
+    if (error instanceof Exception && !(error instanceof StandardError)) throw error;
     return contentTag.call(this, "code", inspect(object), { class: "debug_dump" });
   }
 }
@@ -39,3 +40,9 @@ function inspect(value: unknown, seen: WeakSet<object> = new WeakSet()): string 
     seen.delete(value);
   }
 }
+
+export const DebugHelper = {
+  debug,
+};
+
+include(DebugHelper, TagHelper);

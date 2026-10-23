@@ -15,7 +15,7 @@ export class Cat extends Base {
   static {
     this.abstractClass = true;
     this.enum("gender", ["female", "male"]);
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ is_vegetarian: false });
     });
   }

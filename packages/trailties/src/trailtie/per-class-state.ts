@@ -4,7 +4,7 @@
  */
 export function ownState<T>(klass: object, key: string, factory: () => T): T {
   const bag = klass as Record<string, unknown>;
-  if (!Object.prototype.hasOwnProperty.call(bag, key)) bag[key] = factory();
+  if (!Object.hasOwn(bag, key)) bag[key] = factory();
   return bag[key] as T;
 }
 
@@ -14,7 +14,7 @@ export function ownState<T>(klass: object, key: string, factory: () => T): T {
  */
 export function readOwnState<T>(klass: object, key: string): T | undefined {
   const bag = klass as Record<string, unknown>;
-  return Object.prototype.hasOwnProperty.call(bag, key) ? (bag[key] as T) : undefined;
+  return Object.hasOwn(bag, key) ? (bag[key] as T) : undefined;
 }
 
 /**

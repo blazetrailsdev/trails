@@ -139,15 +139,15 @@ describe("EventedTest", () => {
     notifier.start("hello", 1, {});
     notifier.start("world", 1, {});
 
-    let error = (await assertRaises([InstrumentationSubscriberError], {}, () =>
+    let error = await assertRaises([InstrumentationSubscriberError], {}, () =>
       notifier.finish("world", 1, {}),
-    )) as InstrumentationSubscriberError;
+    );
     expect(error.exceptions.length).toEqual(5);
     expect(error.cause).toBeInstanceOf(BadListenerException);
 
-    error = (await assertRaises([InstrumentationSubscriberError], {}, () =>
+    error = await assertRaises([InstrumentationSubscriberError], {}, () =>
       notifier.finish("hello", 1, {}),
-    )) as InstrumentationSubscriberError;
+    );
     expect(error.exceptions.length).toEqual(5);
     expect(error.cause).toBeInstanceOf(BadListenerException);
 

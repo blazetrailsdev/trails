@@ -14,7 +14,7 @@ import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
 /** @internal */
-export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRenderer {
+export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends AbstractRenderer {
   /** @internal */
   protected details: Record<string, readonly (string | symbol)[]> = {};
 
@@ -33,16 +33,16 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
   private determineTemplate(options: RenderOptions): RenderableTemplate {
     const keys = options.locals ? Object.keys(options.locals) : [];
 
-    if (Object.prototype.hasOwnProperty.call(options, "body")) {
+    if (Object.hasOwn(options, "body")) {
       return new Text(options.body);
     }
-    if (Object.prototype.hasOwnProperty.call(options, "plain")) {
+    if (Object.hasOwn(options, "plain")) {
       return new Text(options.plain);
     }
-    if (Object.prototype.hasOwnProperty.call(options, "html")) {
+    if (Object.hasOwn(options, "html")) {
       return new HTML(options.html, this.formats[0]);
     }
-    if (Object.prototype.hasOwnProperty.call(options, "file")) {
+    if (Object.hasOwn(options, "file")) {
       if (File.isExist(options.file!)) {
         return new RawFile(options.file);
       } else {
@@ -55,7 +55,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
         }
       }
     }
-    if (Object.prototype.hasOwnProperty.call(options, "inline")) {
+    if (Object.hasOwn(options, "inline")) {
       const handler = TemplateHandlers.handlerForExtension(options.type ?? "tse");
       const format = rbObjRespondTo(handler, "defaultFormat")
         ? (handler as TemplateHandler & { defaultFormat: string }).defaultFormat
@@ -65,23 +65,22 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
         format,
       });
     }
-    if (Object.prototype.hasOwnProperty.call(options, "renderable") && options.renderable) {
+    if (Object.hasOwn(options, "renderable")) {
       return new Renderable(options.renderable);
     }
-    if (Object.prototype.hasOwnProperty.call(options, "template") && options.template != null) {
-      const tmpl = options.template;
-      if (typeof tmpl === "object" && typeof tmpl.render === "function") {
-        return tmpl;
+    if (Object.hasOwn(options, "template")) {
+      if (rbObjRespondTo(options.template, "render")) {
+        return options.template as RenderableTemplate;
       }
       return this.lookupContext.findTemplate(
-        tmpl as string,
+        options.template as string,
         options.prefixes,
         false,
         keys,
         this.details,
       ) as RenderableTemplate;
     }
-    throw new Error(
+    throw new ArgumentError(
       "You invoked render but did not give any of :body, :file, :html, :inline, :partial, :plain, :renderable, or :template option.",
     );
   }
@@ -94,7 +93,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
     locals: Record<string, unknown>,
   ): Rendered {
     return this.renderWithLayout(view, template, layoutName, locals, (layout) =>
-      Notifications.instrument<string | SafeBuffer>(
+      Notifications.instrument<Promise<string | SafeBuffer>>(
         "render_template.action_view",
         {
           identifier: template.identifier,
@@ -102,21 +101,21 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
           locals,
         },
         () =>
-          template.render(view, locals, null, {}, (...name) => view._layoutFor!(...name)) as
-            | string
-            | SafeBuffer,
+          template.render(view, locals, null, {}, (...name) =>
+            view._layoutFor!(...name),
+          ) as Promise<string | SafeBuffer>,
       ),
     ) as unknown as Rendered;
   }
 
   /** @internal */
-  private renderWithLayout(
+  private async renderWithLayout(
     view: ViewContext,
     template: RenderableTemplate,
     path: RenderOptions["layout"],
     locals: Record<string, unknown>,
-    block: (layout: RenderableTemplate | null) => string | SafeBuffer,
-  ): RenderedTemplate {
+    block: (layout: RenderableTemplate | null) => Promise<string | SafeBuffer>,
+  ): Promise<RenderedTemplate> {
     const layout =
       path != null && path !== false
         ? this.findLayout(path, Object.keys(locals), [this.formats[0] as string])
@@ -124,18 +123,18 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
 
     let body: string | SafeBuffer;
     if (layout) {
-      body = Notifications.instrument<string | SafeBuffer>(
+      body = await Notifications.instrument<Promise<string | SafeBuffer>>(
         "render_layout.action_view",
         { identifier: layout.identifier },
-        () => {
-          view.viewFlow?.set("layout", block(layout));
-          return layout.render(view, locals, null, {}, (...name) => view._layoutFor!(...name)) as
-            | string
-            | SafeBuffer;
+        async () => {
+          view.viewFlow?.set("layout", await block(layout));
+          return (await layout.render(view, locals, null, {}, (...name) =>
+            view._layoutFor!(...name),
+          )) as string | SafeBuffer;
         },
       );
     } else {
-      body = block(null);
+      body = await block(null);
     }
     return this.buildRenderedTemplate(body, template);
   }
@@ -174,7 +173,9 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
         if (!(e instanceof MissingTemplate)) throw e;
         const allDetails = {
           ...this.details,
-          formats: this.lookupContext.defaultFormats() as readonly string[],
+          formats: (
+            this.lookupContext as unknown as { defaultFormats(): readonly string[] }
+          ).defaultFormats(),
         };
         if (!this.templateExists(layout, [], false, keys, allDetails)) throw e;
         return null;

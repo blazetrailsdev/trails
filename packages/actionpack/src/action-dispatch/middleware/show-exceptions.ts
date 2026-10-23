@@ -1,104 +1,98 @@
+import { excBacktrace, rbFSend, stderr } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
+import { CONTENT_LENGTH, CONTENT_TYPE } from "@blazetrails/rack";
+import type { BacktraceCleaner } from "@blazetrails/activesupport";
 import { ExceptionWrapper } from "./exception-wrapper.js";
+import { Request } from "../http/request.js";
+import { InvalidType } from "../http/mime-negotiation.js";
+import { X_CASCADE } from "../constants.js";
 import type { RackAppObject } from "./stack.js";
 
-export type ShowExceptionsMode = "all" | "rescuable" | "none";
-
 export class ShowExceptions {
-  private app: RackApp;
+  private app: RackApp | RackAppObject;
   private exceptionsApp: RackApp | RackAppObject;
 
-  constructor(app: RackApp, exceptionsApp: RackApp | RackAppObject) {
+  constructor(app: RackApp | RackAppObject, exceptionsApp: RackApp | RackAppObject) {
     this.app = app;
     this.exceptionsApp = exceptionsApp;
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const rawMode = env["action_dispatch.show_exceptions"];
-    const mode: ShowExceptionsMode =
-      rawMode === "all" || rawMode === "rescuable" || rawMode === "none" ? rawMode : "none";
-
     try {
-      return await this.app(env);
+      return await (rbFSend(this.app, "call", env) as Promise<RackResponse>);
     } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
+      const exception = error instanceof Error ? error : new Error(String(error));
+      const request = new Request(env);
+      const backtraceCleaner =
+        (request.getHeader("action_dispatch.backtrace_cleaner") as BacktraceCleaner | undefined) ??
+        null;
+      const wrapper = new ExceptionWrapper(backtraceCleaner, exception);
+      request.setHeader("action_dispatch.exception", wrapper.unwrappedException);
+      request.setHeader("action_dispatch.report_exception", !wrapper.rescueResponse());
 
-      if (mode === "none") {
-        throw err;
+      if (wrapper.isShow(request)) {
+        return this.renderException(request.dup(), wrapper);
+      } else {
+        throw exception;
       }
-
-      const wrapper = new ExceptionWrapper(err);
-
-      if (mode === "rescuable" && !wrapper.rescueResponse()) {
-        throw err;
-      }
-
-      env["action_dispatch.exception"] = err;
-      return this.renderException(env, wrapper);
     }
   }
 
   /** @internal */
   private async renderException(
-    request: RackEnv,
+    request: Request,
     wrapper: ExceptionWrapper,
   ): Promise<RackResponse> {
-    const status = wrapper.statusCode;
-    const originalPath = request["PATH_INFO"];
-    const originalMethod = request["REQUEST_METHOD"];
-    request["action_dispatch.original_path"] = originalPath;
-    request["action_dispatch.original_request_method"] = originalMethod;
-    this.fallbackToHtmlFormatIfInvalidMimeType(request);
-    request["PATH_INFO"] = `/${status}`;
-    request["REQUEST_METHOD"] = "GET";
     try {
-      try {
-        const response = await (typeof this.exceptionsApp === "function"
-          ? this.exceptionsApp(request)
-          : this.exceptionsApp.call(request));
-        const cascade = response[1]["x-cascade"] ?? response[1]["X-Cascade"];
-        return cascade === "pass" ? this.passResponse(status) : response;
-      } catch {
-        return this.failsafeResponse(wrapper);
-      }
-    } finally {
-      request["PATH_INFO"] = originalPath;
-      request["REQUEST_METHOD"] = originalMethod;
+      const status = wrapper.statusCode;
+      request.setHeader("action_dispatch.original_path", request.pathInfo);
+      request.setHeader("action_dispatch.original_request_method", request.rawRequestMethod);
+      this.fallbackToHtmlFormatIfInvalidMimeType(request);
+      request.pathInfo = `/${status}`;
+      request.requestMethod = "GET";
+      const response = await (rbFSend(
+        this.exceptionsApp,
+        "call",
+        request.env,
+      ) as Promise<RackResponse>);
+      return response[1][X_CASCADE] === "pass" ? this.passResponse(status) : response;
+    } catch (failsafeError) {
+      stderr.write(
+        `Error during failsafe response: ${(failsafeError as Error).message}\n  ${excBacktrace(failsafeError as Error)!.join("\n  ")}\n`,
+      );
+
+      return [
+        500,
+        { [CONTENT_TYPE]: "text/plain; charset=utf-8" },
+        [
+          "500 Internal Server Error\n" +
+            "If you are the administrator of this website, then please read this web " +
+            "application's log file and/or the web server's log file to find out what " +
+            "went wrong.",
+        ],
+      ];
     }
   }
 
   /** @internal */
-  private fallbackToHtmlFormatIfInvalidMimeType(request: RackEnv): void {
-    const ct = request["CONTENT_TYPE"];
-    if (typeof ct === "string" && !isValidMimeLike(ct)) {
-      request["CONTENT_TYPE"] = "text/html";
+  private fallbackToHtmlFormatIfInvalidMimeType(request: Request): void {
+    try {
+      void request.contentMimeType;
+    } catch (e) {
+      if (!(e instanceof InvalidType)) throw e;
+      request.setHeader("CONTENT_TYPE", "text/html");
     }
-    const accept = request["HTTP_ACCEPT"];
-    if (typeof accept === "string" && !isValidMimeLike(accept)) {
-      request["HTTP_ACCEPT"] = "text/html";
+
+    try {
+      void request.formats;
+    } catch (e) {
+      if (!(e instanceof InvalidType)) throw e;
+      request.setHeader("HTTP_ACCEPT", "text/html");
     }
   }
 
   /** @internal */
   private passResponse(status: number): RackResponse {
-    return [
-      status,
-      { "content-type": "text/html; charset=utf-8", "content-length": "0" },
-      bodyFromString(""),
-    ];
+    return [status, { [CONTENT_TYPE]: "text/html; charset=utf-8", [CONTENT_LENGTH]: "0" }, [""]];
   }
-
-  private failsafeResponse(_wrapper: ExceptionWrapper): RackResponse {
-    return [
-      500,
-      { "content-type": "text/plain; charset=utf-8" },
-      bodyFromString("500 Internal Server Error\n"),
-    ];
-  }
-}
-
-function isValidMimeLike(value: string): boolean {
-  const first = value.split(",")[0]?.trim().split(";")[0]?.trim() ?? "";
-  return /^[\w!#$&^_.+*-]+\/[\w!#$&^_.+*-]+$/.test(first);
 }

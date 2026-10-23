@@ -1,4 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
+import { assert, assertNot, assertNotEqual } from "@blazetrails/activesupport";
 import { rbObjDup } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../metal/strong-parameters.js";
 
@@ -23,7 +24,7 @@ describe("ParametersDupTest", () => {
   it("a duplicate maintains the original's permitted status", () => {
     params.permitBang();
     const duppedParams = rbObjDup(params);
-    expect(duppedParams.isPermitted()).toBe(true);
+    assert(duppedParams.isPermitted());
   });
 
   it("a duplicate maintains the original's parameters", () => {
@@ -35,13 +36,13 @@ describe("ParametersDupTest", () => {
   it("changes to a duplicate's parameters do not affect the original", () => {
     const duppedParams = rbObjDup(params);
     duppedParams.delete("person");
-    expect(duppedParams.equals(params)).toBe(false);
+    assertNotEqual(params, duppedParams);
   });
 
   it("changes to a duplicate's permitted status do not affect the original", () => {
     const duppedParams = rbObjDup(params);
     duppedParams.permitBang();
-    expect(duppedParams.equals(params)).toBe(false);
+    assertNotEqual(params, duppedParams);
   });
 
   it("deep_dup content", () => {
@@ -61,11 +62,11 @@ describe("ParametersDupTest", () => {
     const duppedParams = params.deepDup();
     duppedParams.permitBang();
 
-    expect(params.isPermitted()).toBe(false);
+    assertNot(params.isPermitted());
   });
 
   it("deep_dup @permitted is being copied", () => {
     params.permitBang();
-    expect(params.deepDup().isPermitted()).toBe(true);
+    assert(params.deepDup().isPermitted());
   });
 });

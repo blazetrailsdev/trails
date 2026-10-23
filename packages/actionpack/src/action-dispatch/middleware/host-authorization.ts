@@ -1,9 +1,9 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
 import { isBlank, type Logger } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import { Request } from "../http/request.js";
-import { IPAddr, regexpEscape } from "@blazetrails/ruby-compat";
+import { IPAddr, regexpEscape, rbEqq, rbFSend, rtest } from "@blazetrails/ruby-compat";
+import { DebugView } from "./debug-view.js";
 
 /** @internal */
 export const PORT_REGEX = "(?::\\d+)";
@@ -30,11 +30,16 @@ export const ALLOWED_HOSTS_IN_DEVELOPMENT: (string | RegExp | IPAddr)[] = [
   new IPAddr("::/0"),
 ];
 
-export type HostPermission = string | RegExp | IPAddr;
+export type HostPermission =
+  | string
+  | RegExp
+  | IPAddr
+  | ((host: string) => unknown)
+  | { caseEquals(host: string): unknown };
 
 /** @internal */
 export class Permissions {
-  private readonly hosts: (RegExp | IPAddr)[];
+  private readonly hosts: Exclude<HostPermission, string>[];
 
   constructor(hosts: HostPermission[] | HostPermission | undefined | null) {
     this.hosts = sanitizeHosts(hosts);
@@ -45,30 +50,29 @@ export class Permissions {
   }
 
   allows(host: string): boolean {
-    for (const allowed of this.hosts) {
+    return this.hosts.some((allowed) => {
       if (allowed instanceof IPAddr) {
         try {
-          if (allowed.includes(extractHostname(host))) return true;
+          return rbEqq(allowed, extractHostname(host));
         } catch {
-          continue;
+          return false;
         }
-      } else if (allowed.test(host)) {
-        return true;
+      } else {
+        return rbEqq(allowed, host);
       }
-    }
-    return false;
+    });
   }
 }
 
 /** @internal */
 function sanitizeHosts(
   hosts: HostPermission[] | HostPermission | undefined | null,
-): (RegExp | IPAddr)[] {
+): Exclude<HostPermission, string>[] {
   const arr = hosts == null ? [] : Array.isArray(hosts) ? hosts : [hosts];
-  return arr.map((h) => {
-    if (h instanceof IPAddr) return h;
-    if (h instanceof RegExp) return sanitizeRegexp(h);
-    return sanitizeString(h);
+  return arr.map((host) => {
+    if (host instanceof RegExp) return sanitizeRegexp(host);
+    if (typeof host === "string") return sanitizeString(host);
+    return host;
   });
 }
 
@@ -95,40 +99,45 @@ export function extractHostname(host: string): string {
 }
 
 export interface HostAuthorizationOptions {
-  hosts: HostPermission[];
   exclude?: (request: Request) => boolean;
   responseApp?: (env: RackEnv) => Promise<RackResponse>;
 }
 
-type RackApp = (env: RackEnv) => Promise<RackResponse>;
+type RackApp =
+  | ((env: RackEnv) => Promise<RackResponse>)
+  | { call(env: RackEnv): Promise<RackResponse> };
 
 export class HostAuthorization {
   private app: RackApp;
   private permissions: Permissions;
   private exclude?: (request: Request) => boolean;
-  private responseApp: (env: RackEnv) => Promise<RackResponse>;
+  private responseApp: RackApp;
 
-  constructor(app: RackApp, options: HostAuthorizationOptions) {
+  constructor(
+    app: RackApp,
+    hosts: HostPermission[] | HostPermission | null | undefined,
+    { exclude, responseApp }: HostAuthorizationOptions = {},
+  ) {
     this.app = app;
-    this.permissions = new Permissions(options.hosts);
-    this.exclude = options.exclude;
-    const defaultApp = new DefaultResponseApp();
-    this.responseApp = options.responseApp ?? ((env) => defaultApp.call(env));
+    this.permissions = new Permissions(hosts);
+    this.exclude = exclude;
+
+    this.responseApp = responseApp ?? new DefaultResponseApp();
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    if (this.permissions.empty()) return this.app(env);
+    if (this.permissions.empty()) return rbFSend(this.app, "call", env) as Promise<RackResponse>;
 
     const request = new Request(env);
     const blocked = this.blockedHosts(request);
 
     if (blocked.length === 0 || this.isExcluded(request)) {
       this.markAsAuthorized(request);
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as Promise<RackResponse>;
     }
 
     env["action_dispatch.blocked_hosts"] = blocked;
-    return this.responseApp(env);
+    return rbFSend(this.responseApp, "call", env) as Promise<RackResponse>;
   }
 
   /** @internal */
@@ -165,16 +174,15 @@ export class DefaultResponseApp {
     const request = new Request(env);
     const format = request.xhr ? "text/plain" : "text/html";
     this.logError(request);
-    return this.response(format, this.responseBody(request, format));
+    return this.response(format, String(await this.responseBody(request)));
   }
 
   /** @internal */
-  private responseBody(request: Request, format: string): string {
-    if (!request.env["action_dispatch.show_detailed_exceptions"]) return "";
-    const blocked = (request.env["action_dispatch.blocked_hosts"] as string[]) ?? [];
-    return format === "text/plain"
-      ? renderBlockedHostText(blocked)
-      : renderBlockedHostHtml(blocked);
+  private responseBody(request: Request): ReturnType<DebugView["render"]> {
+    if (!rtest(request.getHeader("action_dispatch.show_detailed_exceptions"))) return "";
+
+    const template = new DebugView({ hosts: request.env["action_dispatch.blocked_hosts"] });
+    return template.render({ template: "rescues/blocked_host", layout: "rescues/layout" });
   }
 
   /** @internal */
@@ -186,7 +194,7 @@ export class DefaultResponseApp {
         "content-type": `${format}; charset=utf-8`,
         "content-length": String(bytes),
       },
-      bodyFromString(body),
+      [body],
     ];
   }
 
@@ -204,46 +212,4 @@ export class DefaultResponseApp {
   private availableLogger(request: Request): Logger | null {
     return (request.logger as Logger | null | undefined) ?? (Base.logger as Logger | null);
   }
-}
-
-/** @internal */
-function renderBlockedHostHtml(hosts: string[]): string {
-  const joined = escapeHtml(hosts.join(", "));
-  const lines = hosts.map((host) => `    config.hosts << "${escapeHtml(host)}"`).join("\n");
-  return [
-    "<header>",
-    `  <h1>Blocked hosts: ${joined}</h1>`,
-    "</header>",
-    '<main role="main" id="container">',
-    "  <h2>To allow requests to these hosts, make sure they are valid hostnames (containing only numbers, letters, dashes and dots), then add the following to your environment configuration:</h2>",
-    "  <pre>",
-    lines,
-    "  </pre>",
-    '  <p>For more details view: <a href="https://guides.rubyonrails.org/configuring.html#actiondispatch-hostauthorization">the Host Authorization guide</a></p>',
-    "</main>",
-  ].join("\n");
-}
-
-/** @internal */
-function renderBlockedHostText(hosts: string[]): string {
-  const lines = hosts.map((host) => `  config.hosts << "${host}"`).join("\n");
-  return [
-    `Blocked hosts: ${hosts.join(", ")}`,
-    "",
-    "To allow requests to these hosts, make sure they are valid hostnames (containing only numbers, letters, dashes and dots), then add the following to your environment configuration:",
-    "",
-    lines,
-    "",
-    "For more details on host authorization view: https://guides.rubyonrails.org/configuring.html#actiondispatch-hostauthorization",
-  ].join("\n");
-}
-
-/** @internal */
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }

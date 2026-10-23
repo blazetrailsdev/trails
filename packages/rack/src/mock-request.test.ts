@@ -4,7 +4,7 @@ import { MockRequest, type RackApp } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
 import { UploadedFile } from "./multipart/uploaded-file.js";
 import { Request } from "./request.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { Encoding, File, StringIO, Tempfile, b } from "@blazetrails/ruby-compat";
 import * as path from "path";
 
 const fixtureDir = path.join(__dirname, "..", "test", "multipart");
@@ -33,20 +33,25 @@ it("return a MockResponse", async () => {
 
 it("be able to only return the environment", () => {
   const env = MockRequest.envFor("");
-  expect(typeof env).toBe("object");
+  expect(env).toBeInstanceOf(Object);
 });
 
 it("should handle a non-GET request with :input String and :params", () => {
   const env = MockRequest.envFor("/", { ":method": "post", ":input": "", ":params": {} });
   expect(env["PATH_INFO"]).toBe("/");
-  expect(typeof env).toBe("object");
-  expect(env["rack.input"].read()).toBe("");
+  expect(env).toBeInstanceOf(Object);
+  expect(env["rack.input"].read()).toEqual(b(""));
 });
 
 it("should convert :input IO object to binary encoding", () => {
-  const f = new StringIO("binary data \xff");
-  const env = MockRequest.envFor("/", { ":method": "post", ":input": f });
-  expect(env["rack.input"].read()).toBe("binary data \xff");
+  const f = File.open(__filename, "r", { externalEncoding: "UTF-8" });
+  try {
+    const env = MockRequest.envFor("/", { ":method": "post", ":input": f });
+    expect(f.externalEncoding()).toBe(Encoding.BINARY);
+    expect(env["rack.input"].read()).toEqual(File.binread(__filename));
+  } finally {
+    f?.close();
+  }
 });
 
 it("should handle :input object that does not respond to set_encoding", () => {
@@ -68,7 +73,7 @@ it("return an environment with a path", () => {
   );
   expect(env["QUERY_STRING"]).toBe("location[]=1&location[]=2&age_group[]=2");
   expect(env["PATH_INFO"]).toBe("/parse");
-  expect(typeof env).toBe("object");
+  expect(env).toBeInstanceOf(Object);
 });
 
 it("provide sensible defaults", async () => {
@@ -114,16 +119,21 @@ it("set content length", () => {
   env = MockRequest.envFor("/", { ":input": new StringIO("foo") });
   expect(env["CONTENT_LENGTH"]).toBe("3");
 
+  const t = Tempfile.new("name");
+  t.write("foo");
+  env = MockRequest.envFor("/", { ":input": t });
+  expect(env["CONTENT_LENGTH"]).toBe("3");
+
   env = MockRequest.envFor("/", { ":input": { read: () => "foo" } });
   expect(env["CONTENT_LENGTH"]).toBeUndefined();
 });
 
 it("allow posting", async () => {
   await new MockRequest(app).get("", { ":input": "foo" });
-  expect(lastEnv["mock.postdata"]).toBe("foo");
+  expect(lastEnv["mock.postdata"]).toEqual(b("foo"));
 
   await new MockRequest(app).post("", { ":input": new StringIO("foo") });
-  expect(lastEnv["mock.postdata"]).toBe("foo");
+  expect(lastEnv["mock.postdata"]).toEqual(b("foo"));
 });
 
 it("use all parts of an URL", async () => {
@@ -211,7 +221,7 @@ it("accept params and build url encoded params for POST requests", async () => {
   expect(env["QUERY_STRING"]).toBe("");
   expect(env["PATH_INFO"]).toBe("/foo");
   expect(env["CONTENT_TYPE"]).toBe("application/x-www-form-urlencoded");
-  expect(env["mock.postdata"]).toBe("foo%5Bbar%5D=1");
+  expect(env["mock.postdata"]).toEqual(b("foo%5Bbar%5D=1"));
 });
 
 it("accept raw input in params for POST requests", async () => {
@@ -222,7 +232,7 @@ it("accept raw input in params for POST requests", async () => {
   expect(env["QUERY_STRING"]).toBe("");
   expect(env["PATH_INFO"]).toBe("/foo");
   expect(env["CONTENT_TYPE"]).toBe("application/x-www-form-urlencoded");
-  expect(env["mock.postdata"]).toBe("foo%5Bbar%5D=1");
+  expect(env["mock.postdata"]).toEqual(b("foo%5Bbar%5D=1"));
 });
 
 it("accept params and build multipart encoded params for POST requests", async () => {
@@ -236,7 +246,7 @@ it("accept params and build multipart encoded params for POST requests", async (
   expect(env["QUERY_STRING"]).toBe("");
   expect(env["PATH_INFO"]).toBe("/foo");
   expect(env["CONTENT_TYPE"]).toBe("multipart/form-data; boundary=AaB03x");
-  expect(env["mock.postdata"].replace(/\r/g, "").length).toBe(206);
+  expect(Array.from(env["mock.postdata"] as Uint8Array).filter((c) => c !== 0x0d).length).toBe(206);
 });
 
 it("behave valid according to the Rack spec", async () => {

@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import type { Request } from "../../action-dispatch/http/request.js";
 import { Concern, Module, extend } from "@blazetrails/activesupport";
 import {
@@ -52,3 +54,5 @@ export const UrlFor: Module<{ urlOptions: typeof urlOptions }> = new Module((mod
 
   mod.defineMethod("urlOptions", urlOptions);
 });
+
+rbModConstSet(ActionController, "UrlFor", UrlFor);

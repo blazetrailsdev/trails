@@ -117,12 +117,24 @@ describe("File", () => {
     const path = join(root, "sub", "w.txt");
     expect(File.write(path, "héllo")).toBe(6);
     expect(File.read(path)).toBe("héllo");
-    expect(File.binread(path)).toBe("h\xC3\xA9llo");
+    expect(File.binread(path)).toEqual(Uint8Array.of(0x68, 0xc3, 0xa9, 0x6c, 0x6c, 0x6f));
     expect(File.binread(path).length).toBe(File.stat(path).size);
     expect(File.isFile(path)).toBe(true);
     expect(File.isDirectory(join(root, "sub"))).toBe(true);
     expect(File.delete(path)).toBe(1);
     expect(File.isExist(path)).toBe(false);
+  });
+
+  it("executable? answers the stat's execute bit, and false on a missing path", () => {
+    // vendor/ruby/v3.3.11/file.c:1966.
+    const root = fixture();
+    const path = join(root, "x.sh");
+    writeFileSync(path, "");
+    chmodSync(path, 0o644);
+    expect(File.isExecutable(path)).toBe(false);
+    chmodSync(path, 0o755);
+    expect(File.isExecutable(path)).toBe(true);
+    expect(File.isExecutable("/nope/nope")).toBe(false);
   });
 
   it("directory? and file? answer false rather than raising on a missing path", () => {
@@ -354,7 +366,7 @@ describe("File.fnmatch", () => {
     const path = File.join(mkdtempSync(join(tmpdir(), "trails-file-")), "latin1.txt");
     File.binwrite(path, "h\u00e9l");
     expect(File.read(path, { encoding: "ISO-8859-1" })).toBe("hél");
-    expect(File.read(path, { encoding: "ASCII-8BIT" })).toBe("h\u00e9l");
+    expect(File.read(path, { encoding: "ASCII-8BIT" })).toEqual(Uint8Array.of(0x68, 0xe9, 0x6c));
   });
 });
 

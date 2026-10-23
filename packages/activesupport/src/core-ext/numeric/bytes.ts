@@ -1,4 +1,8 @@
 export class Numeric {
+  static toString(): string {
+    return "Numeric";
+  }
+
   static readonly KILOBYTE = 1024;
   static readonly MEGABYTE = Numeric.KILOBYTE * 1024;
   static readonly GIGABYTE = Numeric.MEGABYTE * 1024;

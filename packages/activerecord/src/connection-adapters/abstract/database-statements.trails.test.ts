@@ -3,7 +3,7 @@ import { sql as arelSql, Visitors } from "@blazetrails/arel";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { Hash, NotImplementedError, hashAset } from "@blazetrails/ruby-compat";
 import { Rollback, StatementInvalid } from "../../errors.js";
 import { FixtureError } from "../../fixtures.js";
 import { defaultInsertValue as sqliteDefaultInsertValue } from "../sqlite3/database-statements.js";
@@ -101,7 +101,7 @@ const hostDefaults: Pick<
   dirtyCurrentTransaction: () => {},
   castResult,
   affectedRows,
-  isWriteQuery: DatabaseStatements.instanceMethod("isWriteQuery")!.value,
+  isWriteQuery: DatabaseStatements.isWriteQuery,
   execute: async () => undefined,
   buildTruncateStatements,
   executeBatch: async () => undefined,
@@ -604,6 +604,9 @@ describe("DatabaseStatements", () => {
     it("with yaml fallback converts objects to YAML", () => {
       expect(withYamlFallback({ a: 1 })).toBe("---\na: 1\n");
       expect(withYamlFallback([1, 2])).toBe("---\n- 1\n- 2\n");
+      const hash = new Hash();
+      hashAset(hash, "a", 1);
+      expect(withYamlFallback(hash)).toBe("---\na: 1\n");
     });
 
     it("with yaml fallback passes Temporal values through unchanged (not serialized to '{}')", () => {
@@ -798,10 +801,7 @@ describe("internal_exec_query is a virtual call", () => {
 
   it("execQuery reaches the adapter override", async () => {
     const { host, seen } = makeOverrideHost();
-    const result = await DatabaseStatements.instanceMethod("execQuery")!.value.call(
-      host as never,
-      "SELECT 1",
-    );
+    const result = await DatabaseStatements.execQuery.call(host as never, "SELECT 1");
     expect(result.columns).toEqual(["overridden"]);
     expect(seen).toEqual(["SELECT 1"]);
   });

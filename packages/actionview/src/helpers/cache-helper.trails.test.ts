@@ -28,8 +28,8 @@ function makeView(performCaching = true): CacheHelperHost & { store: Map<string,
     controller: {
       performCaching,
       urlFor: (options: unknown) => `http://test.host/${String((options as { id?: unknown }).id)}`,
-      readFragment: (key: unknown) => store.get(String(key)),
-      writeFragment: (key: unknown, content: unknown) => {
+      readFragment: async (key: unknown) => store.get(String(key)),
+      writeFragment: async (key: unknown, content: unknown) => {
         store.set(String(key), content);
         return content;
       },
@@ -40,17 +40,17 @@ function makeView(performCaching = true): CacheHelperHost & { store: Map<string,
 }
 
 describe("CacheHelper", () => {
-  it("writes the fragment on a miss and reads it back on a hit", () => {
+  it("writes the fragment on a miss and reads it back on a hit", async () => {
     const view = makeView();
     let calls = 0;
-    cache.call(view, "foo", {}, () => {
+    await cache.call(view, "foo", {}, () => {
       calls += 1;
       view.outputBuffer.append("bar");
     });
     expect(String(view.store.get("foo"))).toBe("bar");
     expect(view.outputBuffer.toStr()).toBe("bar");
 
-    cache.call(view, "foo", {}, () => {
+    await cache.call(view, "foo", {}, () => {
       calls += 1;
       view.outputBuffer.append("baz");
     });
@@ -58,51 +58,51 @@ describe("CacheHelper", () => {
     expect(view.outputBuffer.toStr()).toBe("barbar");
   });
 
-  it("yields without caching when the controller does not perform caching", () => {
+  it("yields without caching when the controller does not perform caching", async () => {
     const view = makeView(false);
-    cache.call(view, "foo", {}, () => view.outputBuffer.append("bar"));
+    await cache.call(view, "foo", {}, () => view.outputBuffer.append("bar"));
     expect(view.store.size).toBe(0);
     expect(view.outputBuffer.toStr()).toBe("bar");
   });
 
-  it("caching? is true only inside a cache block", () => {
+  it("caching? is true only inside a cache block", async () => {
     const view = makeView();
     expect(isCaching.call(view)).toBe(false);
     let inside: boolean | null = null;
-    cache.call(view, "foo", {}, () => {
+    await cache.call(view, "foo", {}, () => {
       inside = isCaching.call(view);
     });
     expect(inside).toBe(true);
     expect(isCaching.call(view)).toBe(false);
   });
 
-  it("uncacheable! raises inside a cache block", () => {
+  it("uncacheable! raises inside a cache block", async () => {
     const view = makeView();
     expect(() => uncacheableBang.call(view)).not.toThrow();
-    expect(() =>
+    await expect(
       cache.call(view, "foo", {}, () => {
         uncacheableBang.call(view);
       }),
-    ).toThrow(UncacheableFragmentError);
+    ).rejects.toThrow(UncacheableFragmentError);
   });
 
-  it("cache_if caches only when the condition is true", () => {
+  it("cache_if caches only when the condition is true", async () => {
     const view = makeView();
-    cacheIf.call(view, false, "foo", {}, () => view.outputBuffer.append("bar"));
+    await cacheIf.call(view, false, "foo", {}, () => view.outputBuffer.append("bar"));
     expect(view.store.size).toBe(0);
-    cacheIf.call(view, true, "foo", {}, () => view.outputBuffer.append("bar"));
+    await cacheIf.call(view, true, "foo", {}, () => view.outputBuffer.append("bar"));
     expect(view.store.size).toBe(1);
   });
 
-  it("cache_unless caches only when the condition is false", () => {
+  it("cache_unless caches only when the condition is false", async () => {
     const view = makeView();
-    cacheUnless.call(view, true, "foo", {}, () => view.outputBuffer.append("bar"));
+    await cacheUnless.call(view, true, "foo", {}, () => view.outputBuffer.append("bar"));
     expect(view.store.size).toBe(0);
-    cacheUnless.call(view, false, "foo", {}, () => view.outputBuffer.append("bar"));
+    await cacheUnless.call(view, false, "foo", {}, () => view.outputBuffer.append("bar"));
     expect(view.store.size).toBe(1);
   });
 
-  it("cache_fragment_name returns the bare name when skip_digest is passed", () => {
+  it("cache_fragment_name returns the bare name when skip_digest is passed", async () => {
     const view = makeView();
     expect(cacheFragmentName.call(view, "foo", { skipDigest: true })).toBe("foo");
   });

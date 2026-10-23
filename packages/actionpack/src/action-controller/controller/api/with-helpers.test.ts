@@ -1,4 +1,3 @@
-import { Module } from "@blazetrails/ruby-compat";
 import { assertEqual, include } from "@blazetrails/activesupport";
 import type { Base as ActionViewBase } from "@blazetrails/actionview";
 import { beforeEach, describe, it } from "vitest";
@@ -8,11 +7,11 @@ import { API } from "../../api.js";
 import { Helpers } from "../../metal/helpers.js";
 import { TestCase } from "../../test-case.js";
 
-const ApiWithHelper = new Module().include({
+const ApiWithHelper = {
   myHelper(): string {
     return "helper";
   },
-});
+};
 
 type WithHelpers = typeof API &
   HelpersClass & { helpers(): ActionViewBase & { myHelper(): string } };

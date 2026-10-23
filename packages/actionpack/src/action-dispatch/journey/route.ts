@@ -5,7 +5,6 @@ import {
   dup,
   fetch,
   isSymbol,
-  merge,
   rbEqq,
   rbFSend,
   symbolToS,
@@ -202,6 +201,7 @@ export class Route {
   /** @internal */
   private _requiredDefaultsCache: Record<string, unknown> | null = null;
 
+  /** @missingRailsName upcase — PERMANENT */
   static verbMatcher(verb: string): VerbMatcher {
     return fetch<VerbMatcher>(
       VerbMatchers.VERB_TO_CLASS as unknown as Record<string, unknown>,
@@ -245,7 +245,7 @@ export class Route {
   /** @missingRailsArgs delete_if — PERMANENT */
   get requirements(): Record<string, unknown> {
     return deleteIf(
-      merge(this.defaults, this.path.requirements),
+      { ...this.defaults, ...this.path.requirements },
       (_, v) => v instanceof RegExp && v.source === ".+?" && v.flags.includes("s"),
     );
   }
@@ -288,7 +288,6 @@ export class Route {
     return this._requiredDefaults.includes(key);
   }
 
-  /** @missingRailsArgs delete_if — PERMANENT */
   get requiredDefaults(): Record<string, unknown> {
     if (this._requiredDefaultsCache) return this._requiredDefaultsCache;
     this._requiredDefaultsCache = deleteIf(

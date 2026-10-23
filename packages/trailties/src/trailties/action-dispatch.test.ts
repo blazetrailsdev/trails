@@ -6,8 +6,8 @@ import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie, type ActionDispatchConfig } from "./action-dispatch.js";
 import { URL as HttpURL } from "@blazetrails/actionpack";
 import { QueryParser } from "@blazetrails/actionpack";
-import { RequestUtils } from "@blazetrails/actionpack";
-import { CacheConfig } from "@blazetrails/actionpack";
+import { Request } from "@blazetrails/actionpack";
+import { CacheRequest } from "@blazetrails/actionpack";
 import { Response } from "@blazetrails/actionpack";
 import { X_REQUEST_ID } from "@blazetrails/actionpack";
 
@@ -28,8 +28,8 @@ describe("ActionDispatch::Trailtie", () => {
     savedConfig = { ...cfg() };
     savedTldLength = HttpURL.tldLength;
     savedStrictQuery = QueryParser.strictQueryStringSeparator;
-    savedPerformDeepMunge = RequestUtils.performDeepMunge;
-    savedStrictFreshness = CacheConfig.strictFreshness;
+    savedPerformDeepMunge = Request.Utils.performDeepMunge;
+    savedStrictFreshness = CacheRequest.strictFreshness;
     savedDefaultCharset = Response.defaultCharset;
     app = { deprecators: new Deprecators() };
   });
@@ -38,8 +38,8 @@ describe("ActionDispatch::Trailtie", () => {
     Trailtie.config.set("actionDispatch", savedConfig);
     HttpURL.tldLength = savedTldLength;
     QueryParser.strictQueryStringSeparator = savedStrictQuery;
-    RequestUtils.performDeepMunge = savedPerformDeepMunge;
-    CacheConfig.strictFreshness = savedStrictFreshness;
+    Request.Utils.performDeepMunge = savedPerformDeepMunge;
+    CacheRequest.strictFreshness = savedStrictFreshness;
     Response.defaultCharset = savedDefaultCharset;
   });
 
@@ -71,8 +71,8 @@ describe("ActionDispatch::Trailtie", () => {
 
     expect(HttpURL.tldLength).toBe(2);
     expect(QueryParser.strictQueryStringSeparator).toBe(true);
-    expect(RequestUtils.performDeepMunge).toBe(false);
-    expect(CacheConfig.strictFreshness).toBe(true);
+    expect(Request.Utils.performDeepMunge).toBe(false);
+    expect(CacheRequest.strictFreshness).toBe(true);
     expect(app.deprecators.get("actionDispatch")).toBeDefined();
   });
 

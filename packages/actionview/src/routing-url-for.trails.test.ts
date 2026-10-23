@@ -2,12 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { RoutingUrlFor, type RoutingUrlForHost } from "./routing-url-for.js";
 import { _backUrl, type UrlHelperHost } from "./helpers/url-helper.js";
 import { TopLevel, include } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
 
 class Parameters {
   constructor(private readonly data: Record<string, unknown>) {}
   hasKey(key: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.data, key);
+    return Object.hasOwn(this.data, key);
   }
   get(key: string): unknown {
     return this.data[key];
@@ -33,23 +32,31 @@ interface Host extends RoutingUrlFor, RoutingUrlForHost, UrlHelperHost {
 
 let host: Host;
 
-include(
-  RoutingUrlFor as unknown as new (...args: never[]) => unknown,
-  new Module((mod) =>
-    mod.include({
-      urlFor(this: Host, options?: unknown) {
-        this.seen.push(options);
-        return "/super";
-      },
-      urlOptions: () => ({ host: "example.com" }),
-      optimizeRoutesGeneration: () => true,
-      polymorphicPath: (record: unknown, options: unknown) =>
-        `path:${JSON.stringify([record, options])}`,
-      polymorphicUrl: (record: unknown, options: unknown) =>
-        `url:${JSON.stringify([record, options])}`,
-    }),
-  ),
-);
+class UrlForSuper {
+  urlFor(this: Host, options?: unknown) {
+    this.seen.push(options);
+    return "/super";
+  }
+
+  urlOptions() {
+    return { host: "example.com" };
+  }
+
+  optimizeRoutesGeneration() {
+    return true;
+  }
+
+  polymorphicPath(record: unknown, options: unknown) {
+    return `path:${JSON.stringify([record, options])}`;
+  }
+
+  polymorphicUrl(record: unknown, options: unknown) {
+    return `url:${JSON.stringify([record, options])}`;
+  }
+}
+
+class View extends UrlForSuper {}
+include(View, RoutingUrlFor);
 
 beforeEach(() => {
   TopLevel.ActionController = { Parameters } as never;
@@ -58,7 +65,7 @@ beforeEach(() => {
       PolymorphicRoutes: { HelperMethodBuilder: { path: () => builder, url: () => builder } },
     },
   } as never;
-  host = Object.assign(Object.create(RoutingUrlFor.prototype) as RoutingUrlFor, {
+  host = Object.assign(Object.create(View.prototype) as RoutingUrlFor, {
     controller: null as unknown,
     seen: [] as unknown[],
     _backUrl,
@@ -113,15 +120,15 @@ describe("ActionView::RoutingUrlFor#url_for", () => {
   it("defaults :only_path through the Parameters writer, not a bare property", () => {
     const params = new Parameters({ action: "index" });
     host.urlFor(params);
-    expect(params.hasKey("only_path")).toBe(true);
-    expect(params.get("only_path")).toBe(true);
-    expect(params.toH()).toEqual({ action: "index", only_path: true });
+    expect(params.hasKey("onlyPath")).toBe(true);
+    expect(params.get("onlyPath")).toBe(true);
+    expect(params.toH()).toEqual({ action: "index", onlyPath: true });
   });
 
   it("leaves :only_path alone on Parameters carrying a :host", () => {
     const params = new Parameters({ action: "index", host: "example.com" });
     host.urlFor(params);
-    expect(params.hasKey("only_path")).toBe(false);
+    expect(params.hasKey("onlyPath")).toBe(false);
   });
 
   it("routes a Symbol through handle_string_call", () => {

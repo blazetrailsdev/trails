@@ -22,12 +22,8 @@ import {
   decryptAttributes,
   deterministicEncryptedAttributes,
   encryptAttributes,
-  encrypts,
   validateEncryptionAllowed,
 } from "./encryptable-record.js";
-import { generatedAttributeMethods } from "../attribute-methods.js";
-import { AttributeRegistration, Model as ActiveModel } from "@blazetrails/activemodel";
-import { include } from "@blazetrails/activesupport";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Serialized } from "../type/serialized.js";
 import { Base } from "../base.js";
@@ -314,6 +310,7 @@ describe("ActiveRecord::Encryption::EncryptableRecord.encrypted_attributes? (tra
 });
 
 describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring", () => {
+  fixtures({});
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
 
   beforeEach(() => {
@@ -325,53 +322,52 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
     restoreEncryptionConfig(configSnapshot);
   });
 
-  function makeMockModel(columns: string[]) {
-    class MockModel extends ActiveModel {
-      static {
-        include(this, AttributeRegistration);
-      }
-    }
-    const model = Object.assign(MockModel, {
-      columnNames: () => columns,
-      generatedAttributeMethods,
-    });
-    return model as typeof model & { encryptedAttributes: Set<string> };
+  async function makeModel(tableName: string) {
+    const model = class extends Base {
+      static _tableName = tableName;
+    };
+    await model.loadSchema();
+    return model;
   }
 
-  it("wires the case-preserving original_<name> column when ignoreCase is set", () => {
-    const modelClass = makeMockModel(["name", "original_name"]);
-    encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true });
-    const encrypted = modelClass.encryptedAttributes;
+  it("wires the case-preserving original_<name> column when ignoreCase is set", async () => {
+    const modelClass = await makeModel("encrypted_books");
+    modelClass.encrypts("name", { deterministic: true, ignoreCase: true });
+    const encrypted = modelClass.encryptedAttributes!;
     expect(encrypted.has("name")).toBe(true);
     expect(encrypted.has("original_name")).toBe(true);
   });
 
-  it("does not wire original_<name> when ignoreCase is absent", () => {
-    const modelClass = makeMockModel(["name"]);
-    encrypts.call(modelClass, "name", { deterministic: true });
-    expect(modelClass.encryptedAttributes.has("original_name")).toBe(false);
+  it("does not wire original_<name> when ignoreCase is absent", async () => {
+    const modelClass = await makeModel("authors");
+    modelClass.encrypts("name", { deterministic: true });
+    expect(modelClass.encryptedAttributes!.has("original_name")).toBe(false);
   });
 
-  it("raises when the original_<name> column is missing and supportUnencryptedData is false", () => {
+  it("raises when the original_<name> column is missing and supportUnencryptedData is false", async () => {
     Encryption.config.supportUnencryptedData = false;
-    const modelClass = makeMockModel(["name"]);
-    expect(() =>
-      encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
-    ).toThrow(/must create an additional column named 'original_name'/);
+    const modelClass = await makeModel("authors");
+    expect(() => modelClass.encrypts("name", { deterministic: true, ignoreCase: true })).toThrow(
+      /must create an additional column named 'original_name'/,
+    );
   });
 
-  it("does not raise while no columns are known (schema not loaded yet)", () => {
-    const modelClass = makeMockModel([]);
+  it("does not raise while no columns are known (schema not loaded yet)", async () => {
+    const modelClass = class extends Base {
+      static _tableName = "authors";
+    };
+    const conn = await modelClass.leaseConnection();
+    await conn.schemaCache.clearDataSourceCacheBang("authors");
     expect(() =>
-      encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
+      modelClass.encrypts("name", { deterministic: true, ignoreCase: true }),
     ).not.toThrow();
   });
 
-  it("does not raise when supportUnencryptedData is true even if the column is missing", () => {
+  it("does not raise when supportUnencryptedData is true even if the column is missing", async () => {
     Encryption.config.supportUnencryptedData = true;
-    const modelClass = makeMockModel(["id", "name"]);
+    const modelClass = await makeModel("authors");
     expect(() =>
-      encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
+      modelClass.encrypts("name", { deterministic: true, ignoreCase: true }),
     ).not.toThrow();
   });
 });

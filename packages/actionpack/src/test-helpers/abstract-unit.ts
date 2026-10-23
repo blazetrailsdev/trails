@@ -16,21 +16,16 @@ import {
   Dir,
   Module,
   type Generic,
-  Hash,
+  hashAref,
+  hashAset,
+  rbFSend,
   rbInspect,
   rbStrSend,
   stringSplit,
   URI,
 } from "@blazetrails/ruby-compat";
-import {
-  bodyFromString,
-  bodyToString,
-  Head,
-  MethodOverride,
-  type RackEnv,
-  type RackResponse,
-} from "@blazetrails/rack";
-import { withRoutesHelpers } from "../abstract-controller/trailties/routes-helpers.js";
+import { Head, MethodOverride, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import { RoutesHelpers } from "../abstract-controller/trailties/routes-helpers.js";
 import { ActionDispatch } from "../namespaces.js";
 import { API } from "../action-controller/api.js";
 import { Base } from "../action-controller/base.js";
@@ -51,6 +46,7 @@ import {
   MiddlewareStack,
   type MiddlewareFactory,
   type RackApp,
+  type RackAppObject,
 } from "../action-dispatch/middleware/stack.js";
 import {
   RouteSet,
@@ -63,6 +59,7 @@ import {
   type IntegrationRequestOptions,
 } from "../action-dispatch/testing/integration.js";
 import { TestProcess } from "../action-dispatch/testing/test-process.js";
+import { SystemTestCase } from "../action-dispatch/system-test-case.js";
 
 export const ActionPackTestSuiteUtils = {
   async requireHelpers(helpersDirs: string | string[]): Promise<void> {
@@ -120,7 +117,7 @@ export class RoutedRackApp {
 
   readonly routes: RouteSet;
   private _stack: MiddlewareStack;
-  private _app: RackApp;
+  private _app: RackApp | RackAppObject;
 
   constructor(routes: RouteSet, blk?: (stack: MiddlewareStack) => void) {
     this.routes = routes;
@@ -129,7 +126,7 @@ export class RoutedRackApp {
   }
 
   call(env: RackEnv): Promise<RackResponse> {
-    return this._app(env);
+    return rbFSend(this._app, "call", env) as Promise<RackResponse>;
   }
 
   config(): Config {
@@ -173,11 +170,7 @@ class NullController extends Metal {
     req: Request,
     res: Response,
   ): Promise<RackResponse> {
-    return [
-      200,
-      { "Content-Type": "text/html" },
-      bodyFromString(`${req.params["controller"]}#${action}`),
-    ];
+    return [200, { "Content-Type": "text/html" }, [`${req.params["controller"]}#${action}`]];
   }
 }
 
@@ -233,7 +226,7 @@ class TestCase extends IntegrationTest {
     }
   }
 
-  override get(thing: string, options: IntegrationRequestOptions = {}): Promise<void> {
+  override get(thing: string, options: IntegrationRequestOptions = {}): Promise<number> {
     if (thing.startsWith(":")) {
       return super.get(
         `${(this.constructor as typeof TestCase).testing() ?? ""}/${thing.slice(1)}`,
@@ -283,9 +276,9 @@ TestCase.prototype.assertResponse = function (
 
 export const Rack = { TestCase };
 
-withRoutesHelpers(SharedTestRoutes)(API);
+RoutesHelpers.with(SharedTestRoutes)(API);
 
-withRoutesHelpers(SharedTestRoutes)(Base);
+RoutesHelpers.with(SharedTestRoutes)(Base);
 include(Base, SharedTestRoutes.mountedHelpers());
 
 Base.viewPaths(FIXTURE_LOAD_PATH);
@@ -364,7 +357,7 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return bodyToString((await this.sendRequest(uriOrHost, "GET", path))[2]);
+    return [...((await this.sendRequest(uriOrHost, "GET", path))[2] as Iterable<string>)].join("");
   },
 
   async post(
@@ -372,7 +365,7 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return bodyToString((await this.sendRequest(uriOrHost, "POST", path))[2]);
+    return [...((await this.sendRequest(uriOrHost, "POST", path))[2] as Iterable<string>)].join("");
   },
 
   async put(
@@ -380,7 +373,7 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return bodyToString((await this.sendRequest(uriOrHost, "PUT", path))[2]);
+    return [...((await this.sendRequest(uriOrHost, "PUT", path))[2] as Iterable<string>)].join("");
   },
 
   async delete(
@@ -388,7 +381,9 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return bodyToString((await this.sendRequest(uriOrHost, "DELETE", path))[2]);
+    return [...((await this.sendRequest(uriOrHost, "DELETE", path))[2] as Iterable<string>)].join(
+      "",
+    );
   },
 
   async patch(
@@ -396,7 +391,9 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return bodyToString((await this.sendRequest(uriOrHost, "PATCH", path))[2]);
+    return [...((await this.sendRequest(uriOrHost, "PATCH", path))[2] as Iterable<string>)].join(
+      "",
+    );
   },
 };
 
@@ -500,7 +497,7 @@ type CookieAssertionsHost = {
   ): SetCookieAttributes;
   parseSetCookiesHeaders(
     setCookies: string | string[] | null | undefined,
-  ): Hash<string, SetCookieAttributes>;
+  ): Record<string, SetCookieAttributes>;
 };
 
 export const CookieAssertions = {
@@ -531,12 +528,12 @@ export const CookieAssertions = {
   parseSetCookiesHeaders(
     this: Pick<CookieAssertionsHost, "parseSetCookieAttributes">,
     setCookies: string | string[] | null | undefined,
-  ): Hash<string, SetCookieAttributes> {
+  ): Record<string, SetCookieAttributes> {
     if (typeof setCookies === "string") {
       setCookies = stringSplit(setCookies, "\n");
     }
 
-    const cookies = new Hash<string, SetCookieAttributes>();
+    const cookies: Record<string, SetCookieAttributes> = {};
 
     setCookies?.forEach((cookieString) => {
       const attributes: SetCookieAttributes = {};
@@ -547,7 +544,7 @@ export const CookieAssertions = {
 
       attributes["value"] = value;
 
-      cookies.set(name, this.parseSetCookieAttributes(fields, attributes));
+      hashAset(cookies, name, this.parseSetCookieAttributes(fields, attributes));
     });
 
     return cookies;
@@ -563,10 +560,10 @@ export const CookieAssertions = {
     if (typeof attributes === "string") attributes = this.parseSetCookieAttributes(attributes);
 
     assert(
-      cookies.has(name),
-      `No cookie found with the name '${name}', found cookies: ${[...cookies.keys()].join(", ")}`,
+      Object.hasOwn(cookies, name),
+      `No cookie found with the name '${name}', found cookies: ${Object.keys(cookies).join(", ")}`,
     );
-    const cookie = cookies.get(name)!;
+    const cookie = cookies[name];
 
     for (const [key, value] of Object.entries(attributes)) {
       assert(Object.hasOwn(cookie, key), `No attribute '${key}' found for cookie '${name}'`);
@@ -583,8 +580,8 @@ export const CookieAssertions = {
     const cookies = this.parseSetCookiesHeaders(header);
     if (typeof attributes === "string") attributes = this.parseSetCookieAttributes(attributes);
 
-    assert(cookies.has(name), `No cookie found with the name '${name}'`);
-    const cookie = cookies.get(name)!;
+    assert(Object.hasOwn(cookies, name), `No cookie found with the name '${name}'`);
+    const cookie = cookies[name];
 
     for (const [key, value] of Object.entries(attributes)) {
       if (value === true) {
@@ -597,12 +594,12 @@ export const CookieAssertions = {
 
   assertSetCookieHeader(
     this: CookieAssertionsHost,
-    expected: string | string[] | Hash<string, SetCookieAttributes>,
+    expected: string | string[] | Record<string, SetCookieAttributes>,
     header:
       | string
       | string[]
       | undefined
-      | Hash<string, SetCookieAttributes> = this.response.headers.get("Set-Cookie"),
+      | Record<string, SetCookieAttributes> = this.response.headers.get("Set-Cookie"),
   ): void {
     if (typeof header === "string") {
       header = stringSplit(header, "\n").sort();
@@ -615,8 +612,8 @@ export const CookieAssertions = {
     header = this.parseSetCookiesHeaders(header as string[] | undefined);
     expected = this.parseSetCookiesHeaders(expected as string[]);
 
-    for (const [key, value] of expected) {
-      assertEqual(value, header.get(key));
+    for (const [key, value] of Object.entries(expected)) {
+      assertEqual(value, header[key]);
     }
   },
 
@@ -627,7 +624,7 @@ export const CookieAssertions = {
       | string
       | string[]
       | undefined
-      | Hash<string, SetCookieAttributes> = this.response.headers.get("Set-Cookie"),
+      | Record<string, SetCookieAttributes> = this.response.headers.get("Set-Cookie"),
   ): void {
     if (typeof header === "string") {
       header = stringSplit(header, "\n").sort();
@@ -645,25 +642,27 @@ export const CookieAssertions = {
   },
 };
 
+type HeadersHash = Map<string, unknown> | Record<string, unknown>;
+
 type HeadersAssertionsHost = {
-  response: { headers: Map<string, unknown> };
-  normalizeHeaders(headers: Map<string, unknown>): Map<string, unknown>;
+  response: { headers: HeadersHash };
+  normalizeHeaders(headers: HeadersHash): HeadersHash;
   normalizedJoinHeader(header: unknown): unknown;
 };
 
 export const HeadersAssertions = {
-  normalizeHeaders(headers: Map<string, unknown>): Map<string, unknown> {
+  normalizeHeaders(headers: HeadersHash): HeadersHash {
     return transformKeys(headers, (key) => key.toLowerCase());
   },
 
   assertHeaders(
     this: HeadersAssertionsHost,
     expected: Record<string, unknown>,
-    actual: Map<string, unknown> = this.response.headers,
+    actual: HeadersHash = this.response.headers,
   ): void {
     actual = this.normalizeHeaders(actual);
     for (const [key, value] of Object.entries(expected)) {
-      assertEqual(value, actual.get(key));
+      assertEqual(value, hashAref(actual, key));
     }
   },
 
@@ -671,16 +670,16 @@ export const HeadersAssertions = {
     this: HeadersAssertionsHost,
     key: string,
     value: unknown,
-    actual: Map<string, unknown> = this.response.headers,
+    actual: HeadersHash = this.response.headers,
   ): void {
     actual = this.normalizeHeaders(actual);
-    assertEqual(value, actual.get(key));
+    assertEqual(value, hashAref(actual, key));
   },
 
   assertNotHeader(
     this: HeadersAssertionsHost,
     key: string,
-    actual: Map<string, unknown> = this.response.headers,
+    actual: HeadersHash = this.response.headers,
   ): void {
     actual = this.normalizeHeaders(actual);
     assertNotIncludes(actual, key);
@@ -699,3 +698,27 @@ export const HeadersAssertions = {
     assertEqual(header, expected);
   },
 };
+
+export class DrivenByRackTest extends SystemTestCase {
+  static {
+    this.drivenBy("rack_test");
+  }
+}
+
+export class DrivenBySeleniumWithChrome extends SystemTestCase {
+  static {
+    this.drivenBy("selenium", { using: "chrome" });
+  }
+}
+
+export class DrivenBySeleniumWithHeadlessChrome extends SystemTestCase {
+  static {
+    this.drivenBy("selenium", { using: "headless_chrome" });
+  }
+}
+
+export class DrivenBySeleniumWithHeadlessFirefox extends SystemTestCase {
+  static {
+    this.drivenBy("selenium", { using: "headless_firefox" });
+  }
+}

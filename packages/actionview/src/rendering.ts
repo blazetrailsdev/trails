@@ -3,22 +3,50 @@
 import {
   Concern,
   extend,
+  I18n,
   isPlainObject,
   type SafeBuffer,
   dasherize,
   underscore,
 } from "@blazetrails/activesupport";
-import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { include, Module } from "@blazetrails/ruby-compat/include";
+import { Hash, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { include, Module, rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { Base } from "./base.js";
 import { DetailsKey, type LookupContext } from "./lookup-context.js";
 import { Renderer } from "./renderer.js";
 import { Template } from "./template.js";
+import { ActionView } from "./namespaces.js";
 import { ViewPaths } from "./view-paths.js";
+
+type I18nConfig = InstanceType<typeof I18n.Config>;
+
+/** @internal */
+export class I18nProxy extends I18n.Config {
+  readonly originalConfig: I18nConfig;
+  readonly lookupContext: LookupContext;
+
+  constructor(originalConfig: I18nConfig, lookupContext: LookupContext) {
+    super();
+    if (rbObjRespondTo(originalConfig, "originalConfig")) {
+      originalConfig = (originalConfig as I18nProxy).originalConfig;
+    }
+    this.originalConfig = originalConfig;
+    this.lookupContext = lookupContext;
+  }
+
+  override get locale(): I18nConfig["locale"] {
+    return this.originalConfig.locale;
+  }
+
+  override set locale(value: I18nConfig["locale"]) {
+    this.lookupContext.locale = value as string | null;
+  }
+}
+rbModConstSet(ActionView, "I18nProxy", I18nProxy);
 
 export interface RenderOptions {
   template?: string;
-  partial?: string;
+  partial?: string | true | object;
   action?: string;
   layout?: string | false;
   formats?: string[];
@@ -52,6 +80,19 @@ export interface ViewContextClassMethods {
 export interface ViewContextRoutes {
   urlHelpers(supportsPath?: boolean): object;
   mountedHelpers(): object;
+}
+
+async function process(
+  this: { lookupContext: LookupContext },
+  ...args: unknown[]
+): Promise<unknown> {
+  const oldConfig = I18n.config();
+  I18n.setConfig(new I18nProxy(I18n.config(), this.lookupContext));
+  try {
+    return await Rendering.superMethod(this, "process")!(...args);
+  } finally {
+    I18n.setConfig(oldConfig);
+  }
 }
 
 /** @internal */
@@ -91,6 +132,12 @@ export function buildViewContextClass(
     include(subclass, helpers);
   }
   return subclass;
+}
+
+export function eagerLoadBang(this: ViewContextClassMethods): null {
+  rbCallSuper(this, eagerLoadBang);
+  this.viewContextClass();
+  return null;
 }
 
 export function viewContextClass(this: ViewContextClassMethods): typeof Base {
@@ -257,8 +304,15 @@ export function _processRenderTemplateOptions(
 }
 
 export const ClassMethods = {
+  get _routes(): ViewContextRoutes | null {
+    return null;
+  },
+  get _helpers(): object | null {
+    return null;
+  },
   isInheritViewContextClass,
   buildViewContextClass,
+  eagerLoadBang,
   viewContextClass,
 };
 
@@ -266,6 +320,7 @@ export const Rendering = new Module((mod) => {
   extend(mod, Concern);
   mod.include(ViewPaths);
 
+  mod.defineMethod("process", process);
   mod.defineMethod("viewContextClass", function (this: { constructor: ViewContextClassMethods }) {
     return this.constructor.viewContextClass();
   });

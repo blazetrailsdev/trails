@@ -1,4 +1,5 @@
 import { Executor } from "@blazetrails/activesupport";
+import { Concurrent } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 
@@ -35,8 +36,10 @@ export class AsynchronousQueriesTracker {
     return tracker;
   }
 
-  static complete(asynchronousQueriesTracker: AsynchronousQueriesTracker): void {
-    asynchronousQueriesTracker.finalizeSession();
+  static complete(
+    asynchronousQueriesTracker: AsynchronousQueriesTracker,
+  ): Promise<AsynchronousQueriesTracker> {
+    return asynchronousQueriesTracker.finalizeSession();
   }
 
   get currentSession(): Session {
@@ -52,27 +55,36 @@ export class AsynchronousQueriesTracker {
     return this.#stack;
   }
 
-  finalizeSession(wait = false): this {
+  async finalizeSession(wait = false): Promise<this> {
     const session = this.#stack.pop();
-    session?.finalize(wait);
+    await session?.finalize(wait);
     return this;
   }
 }
 
 /** @internal */
 export class Session {
-  #active = true;
+  #active: InstanceType<typeof Concurrent.AtomicBoolean>;
+  #lock: InstanceType<typeof Concurrent.ReadWriteLock>;
 
-  active(): boolean {
-    return this.#active;
+  constructor() {
+    this.#active = new Concurrent.AtomicBoolean(true);
+    this.#lock = new Concurrent.ReadWriteLock();
   }
 
-  synchronize<T>(block: () => T): T {
-    return block();
+  isActive(): boolean {
+    return this.#active.isTrue();
   }
 
-  finalize(_wait = false): void {
-    this.#active = false;
+  synchronize<T>(block: () => T): T | Promise<Awaited<T>> {
+    return this.#lock.withReadLock(block);
+  }
+
+  async finalize(wait = false): Promise<void> {
+    this.#active.makeFalse();
+    if (wait) {
+      await this.#lock.withWriteLock(() => {});
+    }
   }
 }
 

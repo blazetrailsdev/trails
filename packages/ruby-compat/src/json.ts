@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-namespace -- Ruby's `JSON` module is a
    namespace of module functions; ESM syntax cannot spell `JSON.dump`. */
 import { ArgumentError } from "./argument-error.js";
+import { Hash } from "./hash.js";
 import { rbObjClassname } from "./object.js";
 
 const globalJSON = globalThis.JSON;
@@ -73,13 +74,24 @@ export namespace JSON {
    * takes the source through `StringValue` and `convert_encoding`
    * (`vendor/ruby/v3.3.11/ext/json/parser/parser.rl:673-687,805`), which reads an
    * `ASCII-8BIT` source as UTF-8, so a source held as its bytes is decoded here.
-   * A malformed source raises `SyntaxError`, JS's `JSON::ParserError`.
+   * A malformed source raises `SyntaxError`, JS's `JSON::ParserError`. With an
+   * options hash an object is parsed into a `Hash`, its names Symbols under
+   * `symbolizeNames` and every value frozen under `freeze` (`parser.rl:742-752`),
+   * or into a new `objectClass` instance filled through its `[]=`
+   * (`parser.rl:139-143,179`).
    *
    * @inventedArm try — CONVERGEABLE json-parse-skips-comments-in-one-pass-and-takes-options
    * @noRailsEquivalent PERMANENT — Ruby stdlib `JSON.parse`
    * (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:219`).
    */
-  export function parse(source: string | Uint8Array): unknown {
+  export function parse(
+    source: string | Uint8Array,
+    opts?: {
+      symbolizeNames?: boolean;
+      freeze?: boolean;
+      objectClass?: new () => Hash<string, unknown>;
+    },
+  ): unknown {
     if (source instanceof Uint8Array) {
       try {
         source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(source);
@@ -90,11 +102,23 @@ export namespace JSON {
     if (typeof source !== "string") {
       throw new TypeError(`no implicit conversion of ${rbObjClassname(source)} into String`);
     }
+    const reviver =
+      opts === undefined
+        ? undefined
+        : (_key: string, value: unknown): unknown => {
+            if (Array.isArray(value)) return opts.freeze ? Object.freeze(value) : value;
+            if (typeof value !== "object" || value === null) return value;
+            const hash = opts.objectClass ? new opts.objectClass() : new Hash<string, unknown>();
+            for (const [name, v] of Object.entries(value)) {
+              hash.set(opts.symbolizeNames ? `:${name}` : name, v);
+            }
+            return opts.freeze ? hash.freeze() : hash;
+          };
     try {
-      return globalJSON.parse(source);
+      return globalJSON.parse(source, reviver);
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
-      return globalJSON.parse(stripJsonComments(source));
+      return globalJSON.parse(stripJsonComments(source), reviver);
     }
   }
 
@@ -102,8 +126,9 @@ export namespace JSON {
     return globalJSON.stringify(value) ?? "null";
   }
 
-  export function load(dumped: string): unknown {
-    return globalJSON.parse(dumped, (_key, value) => {
+  export function load(dumped: string | Uint8Array): unknown {
+    const source = typeof dumped === "string" ? dumped : new TextDecoder().decode(dumped);
+    return globalJSON.parse(source, (_key, value) => {
       if (value !== null && typeof value === "object" && typeof value.json_class === "string") {
         const klass = deepConstGet(value.json_class) as { jsonCreate?: (hash: object) => unknown };
         if (typeof klass?.jsonCreate === "function") return klass.jsonCreate(value);

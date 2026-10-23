@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { publicInstanceMethods, rbModName } from "@blazetrails/ruby-compat";
 import { ActionController } from "../../namespaces.js";
 import { Metal } from "../metal.js";
 import "../test-case.js";
@@ -8,16 +9,16 @@ describe("ActionController::Testing", () => {
   it("is seated on ActionController with Functional nested on it", () => {
     expect(ActionController.Testing).toBe(Testing);
     expect(Testing.Functional).toBe(Functional);
-    expect(Testing.name).toBe("ActionController::Testing");
-    expect(Functional.name).toBe("ActionController::Testing::Functional");
+    expect(rbModName(Testing)).toBe("ActionController::Testing");
+    expect(rbModName(Functional)).toBe("ActionController::Testing::Functional");
   });
 
   it("Functional defines the functional-test methods and Testing defines none", () => {
-    expect(Functional.instanceMethods(false)).toEqual([
+    expect(publicInstanceMethods(Functional, false)).toEqual([
       "clearInstanceVariablesBetweenRequests",
       "recycleBang",
     ]);
-    expect(Testing.instanceMethods(false)).toEqual([]);
+    expect(publicInstanceMethods(Testing, false)).toEqual([]);
   });
 
   it("Metal includes Functional once test_case is loaded", () => {

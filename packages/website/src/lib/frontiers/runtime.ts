@@ -1,8 +1,12 @@
 import type { SqlJsStatic } from "sql.js";
 import { SqlJsAdapter } from "./sql-js-adapter.js";
+import * as yaml from "yaml";
+import { registerPsychAdapter } from "@blazetrails/ruby-compat/psych-adapter";
 import { VirtualFS } from "./virtual-fs.js";
 import { createTrailsCLI, dropUserTables, type CliResult } from "./trails-cli.js";
 import type { MigrationProxy } from "@blazetrails/activerecord/migration";
+
+registerPsychAdapter("yaml", yaml);
 
 export type { VirtualFS, VfsFile } from "./virtual-fs.js";
 export type { CliResult } from "./trails-cli.js";

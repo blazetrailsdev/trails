@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { bodyToString } from "@blazetrails/rack";
 import { OptionRedirect, PathRedirect, Redirect, redirect } from "./redirection.js";
 import { RouteSet } from "./route-set.js";
 import { Request } from "../http/request.js";
@@ -144,7 +143,7 @@ describe("RouteSet#call through a Redirect endpoint", () => {
 
     expect(status).toBe(301);
     expect(headers["location"]).toBe("http://example.com/dashboard");
-    expect(await bodyToString(body)).toBe("");
+    expect([...(body as Iterable<string>)].join("")).toBe("");
   });
 
   it("hands the redirect block the path parameters Journey matched", async () => {

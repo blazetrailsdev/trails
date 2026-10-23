@@ -19,12 +19,12 @@ export class Bird extends Base {
     this.acceptsNestedAttributesFor("pirate");
 
     this.beforeSave(async function (this: Bird) {
-      const conn = await (this.constructor as typeof Base).leaseConnection();
-      await (conn as any).materializeTransactions?.();
+      const conn = await this.constructor.leaseConnection();
+      await conn.materializeTransactions?.();
     });
 
     this.beforeSave(
-      function (this: any) {
+      function (this: Bird) {
         this.cancelSaveCallbackMethod();
       },
       { if: (r: any) => r.cancelSaveFromCallback },

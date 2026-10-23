@@ -1,12 +1,28 @@
-const APP_NAME_RE = /^[a-zA-Z0-9-]+$/;
-const GID_RE = /^gid:\/\/([^/?#]+)(\/[^?#]*)(\?[^#]*)?$/;
+import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  BadURIError,
+  CGI,
+  Error as URIError,
+  Generic,
+  InvalidComponentError,
+  RFC2396Parser,
+  stringSplit,
+  URI,
+  Util,
+} from "@blazetrails/ruby-compat";
+
+export { BadURIError, InvalidComponentError };
 
 export interface GidComponents {
   app: string;
   modelName: string;
   modelId: string | string[];
-  params: Record<string, string>;
+  params: HashWithIndifferentAccess<string> | null;
 }
+
+export class MissingModelIdError extends InvalidComponentError {}
+export class InvalidModelIdError extends InvalidComponentError {}
 
 /** @internal */
 const COMPOSITE_MODEL_ID_MAX_SIZE = 20;
@@ -14,206 +30,48 @@ const COMPOSITE_MODEL_ID_MAX_SIZE = 20;
 const COMPOSITE_MODEL_ID_DELIMITER = "/";
 
 /** @internal */
-function parseGid(uri: string): GidComponents {
-  if (!uri.startsWith("gid://")) {
-    throw new BadURIError(`Not a gid:// URI scheme: ${uri}`);
-  }
+const URI_PARSER = new RFC2396Parser();
 
-  const m = GID_RE.exec(uri);
-  if (!m) {
-    throw new InvalidComponentError(`Expected a URI like gid://app/Person/1234: ${uri}`);
-  }
+export class GID extends Generic {
+  static override readonly COMPONENT: readonly string[] = Object.freeze([
+    "scheme",
+    "app",
+    "modelName",
+    "modelId",
+    "params",
+  ]);
 
-  const [, rawApp, pathStr, queryStr] = m;
-  const app = rawApp ?? "";
-
-  if (!APP_NAME_RE.test(app)) {
-    throw new InvalidComponentError(`Expected a URI like gid://app/Person/1234: ${uri}`);
-  }
-
-  const path = pathStr ?? "";
-  const pathParts = path.split("/");
-  const modelName = pathParts[1];
-  const rawModelId = pathParts.slice(2).join("/");
-
-  if (!modelName) {
-    throw new InvalidComponentError(`Expected a URI like gid://app/Person/1234: ${uri}`);
-  }
-
-  if (!rawModelId) {
-    throw new MissingModelIdError(
-      `Unable to create a Global ID for ${modelName} without a model id.`,
-    );
-  }
-
-  const modelId = parseModelId(rawModelId, modelName);
-  const params = parseQueryParams(queryStr?.slice(1));
-
-  return { app, modelName, modelId, params };
-}
-
-/** @internal */
-function buildGid(
-  app: string,
-  modelName: string,
-  modelId: unknown,
-  params?: Record<string, string> | null,
-): string {
-  validateApp(app);
-  if (!modelName) throw new InvalidComponentError("model_name is required");
-
-  const ids = Array.isArray(modelId) ? modelId : [modelId];
-  const idSegment = ids.map((p) => cgiEscape(String(p ?? ""))).join(COMPOSITE_MODEL_ID_DELIMITER);
-
-  if (!idSegment) {
-    throw new MissingModelIdError(
-      `Unable to create a Global ID for ${modelName} without a model id.`,
-    );
-  }
-
-  let uri = `gid://${app}/${modelName}/${idSegment}`;
-
-  if (params && Object.keys(params).length > 0) {
-    const qs = Object.entries(params)
-      .map(([k, v]) => `${cgiEscape(k)}=${cgiEscape(v)}`)
-      .join("&");
-    uri += `?${qs}`;
-  }
-
-  return uri;
-}
-
-export function validateApp(app: string | null | undefined): string {
-  if (!app || !APP_NAME_RE.test(app)) {
-    throw new Error(
-      "Invalid app name. App names must be valid URI hostnames: alphanumeric and hyphen characters only.",
-    );
-  }
-  return app;
-}
-
-export class MissingModelIdError extends Error {}
-export class InvalidModelIdError extends Error {}
-/** @internal */
-export class InvalidComponentError extends Error {}
-/** @internal */
-export class BadURIError extends Error {}
-
-function parseModelId(raw: string, modelName: string): string | string[] {
-  const parts = raw
-    .split(COMPOSITE_MODEL_ID_DELIMITER, COMPOSITE_MODEL_ID_MAX_SIZE)
-    .filter((p) => p.length > 0)
-    .map((p) => cgiUnescape(p));
-
-  if (parts.length === 0) {
-    throw new MissingModelIdError(
-      `Unable to create a Global ID for ${modelName} without a model id.`,
-    );
-  }
-
-  return parts.length === 1 ? parts[0] : parts;
-}
-
-/** @internal */
-function normalizeModelId(raw: unknown, modelName: string): string | string[] {
-  const parts = (Array.isArray(raw) ? raw : [raw])
-    .slice(0, COMPOSITE_MODEL_ID_MAX_SIZE)
-    .map((p) => String(p ?? ""))
-    .filter((p) => p.length > 0);
-  if (parts.length === 0) {
-    throw new MissingModelIdError(
-      `Unable to create a Global ID for ${modelName} without a model id.`,
-    );
-  }
-  return parts.length === 1 ? parts[0] : parts;
-}
-
-/** @internal */
-function parseQueryParams(qs: string | undefined): Record<string, string> {
-  if (!qs) return {};
-  const result: Record<string, string> = {};
-  for (const [k, v] of new URLSearchParams(qs)) {
-    result[k] = v;
-  }
-  return result;
-}
-
-/** @internal */
-function cgiEscape(s: string): string {
-  return encodeURIComponent(s)
-    .replace(/%20/g, "+")
-    .replace(/[~!*'()]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
-}
-
-function modelIdEquals(a: string | string[], b: string | string[]): boolean {
-  if (Array.isArray(a) || Array.isArray(b)) {
-    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-    return a.every((segment, i) => segment === b[i]);
-  }
-  return a === b;
-}
-
-/** @internal */
-function paramsEquals(a: Record<string, string>, b: Record<string, string>): boolean {
-  const keys = Object.keys(a);
-  if (keys.length !== Object.keys(b).length) return false;
-  return keys.every((key) => Object.prototype.hasOwnProperty.call(b, key) && a[key] === b[key]);
-}
-
-/** @internal */
-function cgiUnescape(s: string): string {
-  return decodeURIComponent(s.replace(/\+/g, "%20"));
-}
-
-export class GID {
-  private readonly _uri: string;
-  private readonly _components: GidComponents;
-
-  /** @noRailsEquivalent PERMANENT */
-  constructor(uri: string, components?: GidComponents) {
-    this._uri = uri;
-    this._components = components ?? parseGid(uri);
-  }
+  declare private _modelName: string;
+  declare private _modelId: string | string[];
+  declare private _params: HashWithIndifferentAccess<string> | null;
 
   get app(): string {
-    return this._components.app;
+    return this.host!;
   }
   get modelName(): string {
-    return this._components.modelName;
+    return this._modelName;
   }
   get modelId(): string | string[] {
-    return this._components.modelId;
+    return this._modelId;
   }
-  get params(): Record<string, string> {
-    return this._components.params;
-  }
-
-  toString(): string {
-    return this._uri;
+  get params(): HashWithIndifferentAccess<string> | null {
+    return this._params;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  equals(oth: GID): boolean {
-    if (oth == null) return false;
-    return (
-      this.app.toLowerCase() === oth.app.toLowerCase() &&
-      this.modelName === oth.modelName &&
-      modelIdEquals(this.modelId, oth.modelId) &&
-      paramsEquals(this.params, oth.params)
-    );
-  }
-
-  deconstructKeys(_keys: readonly string[] | null = null): GidComponents {
-    const { modelId } = this._components;
-    return {
-      ...this._components,
-      modelId: Array.isArray(modelId) ? [...modelId] : modelId,
-      params: { ...this._components.params },
-    };
+  static validateApp(app: string | null | undefined): string {
+    try {
+      return this.parse(`gid://${app ?? ""}/Model/1`).app;
+    } catch (error) {
+      if (!(error instanceof URIError)) throw error;
+      throw new ArgumentError(
+        "Invalid app name. App names must be valid URI hostnames: alphanumeric and hyphen characters only.",
+      );
+    }
   }
 
   static parse(uri: string): GID {
-    return new GID(uri);
+    const genericComponents = [...URI.split(uri), URI_PARSER, true] as const;
+    return new GID(...genericComponents);
   }
 
   static create(
@@ -224,95 +82,142 @@ export class GID {
     return GID.build({ app, modelName: model.constructor.name, modelId: model.id, params });
   }
 
-  static build(args: {
+  static override build(args: {
     app: string;
     modelName: string;
     modelId: unknown;
     params?: Record<string, string> | null;
   }): GID {
-    const uri = buildGid(args.app, args.modelName, args.modelId, args.params);
-    return new GID(uri, {
-      app: args.app,
-      modelName: args.modelName,
-      modelId: normalizeModelId(args.modelId, args.modelName),
-      params: args.params ?? {},
-    });
+    const parts = Util.makeComponentsHash(this, args);
+    parts["host"] = parts["app"];
+    const modelIdSegment = (Array.isArray(parts["modelId"]) ? parts["modelId"] : [parts["modelId"]])
+      .map((p) => CGI.escape(String(p ?? "")))
+      .join(COMPOSITE_MODEL_ID_DELIMITER);
+    parts["path"] = `/${parts["modelName"] as string}/${modelIdSegment}`;
+
+    const params = parts["params"] as Record<string, string> | null | undefined;
+    if (params != null && Object.keys(params).length > 0) {
+      parts["query"] = URI.encodeWwwForm(params);
+    }
+
+    return super.build(parts) as GID;
   }
 
-  static validateApp(app: string | null | undefined): string {
-    return validateApp(app);
+  override toString(): string {
+    return `gid://${this.app ?? ""}${this.path ?? ""}${this.query != null ? "?" + this.query : ""}`;
+  }
+
+  deconstructKeys(_keys: readonly string[] | null): GidComponents {
+    return { app: this.app, modelName: this.modelName, modelId: this.modelId, params: this.params };
   }
 
   /** @internal */
-  protected setPath(path: string): void {
-    if (!("modelName" in this._components) || !this.modelId) this.setModelComponents(path);
+  protected override setPath(path: string | null): void {
+    if (!(this._modelName !== undefined && this._modelId != null)) this.setModelComponents(path!);
+    super.setPath(path);
   }
+
   /** @internal */
-  protected set query(query: string | undefined) {
+  override set query(query: string | null) {
+    this.setParams(this.parseQueryParams(query));
+    super.query = query;
+  }
+
+  /** @internal */
+  override get query(): string | null {
+    return super.query;
+  }
+
+  /** @internal */
+  protected setQuery(query: string | null): void {
     this.setParams(this.parseQueryParams(query));
   }
+
   /** @internal */
-  protected setQuery(query: string | undefined): void {
-    this.query = query;
+  protected setParams(params: HashWithIndifferentAccess<string> | null): void {
+    this._params = params;
   }
+
   /** @internal */
-  protected setParams(params: Record<string, string>): void {
-    (this._components as { params: Record<string, string> }).params = params;
-  }
-  /** @internal */
-  protected checkHost(host: string): true {
+  protected override checkHost(host: string | null): boolean | null {
     this.validateComponent(host);
-    return true;
+    return super.checkHost(host);
   }
+
   /** @internal */
-  protected checkPath(path: string): true {
+  protected override checkPath(path: string | null): unknown {
     this.validateComponent(path);
-    this.setModelComponents(path, true);
-    return true;
+    return this.setModelComponents(path!, true);
   }
+
   /** @internal */
-  protected checkScheme(scheme: string): true {
-    if (scheme !== "gid") {
-      throw new BadURIError(`Not a gid:// URI scheme: ${scheme}`);
+  protected override checkScheme(scheme: string | null): boolean {
+    if (scheme === "gid") {
+      return true;
+    } else {
+      throw new BadURIError(`Not a gid:// URI scheme: ${this.inspect()}`);
     }
-    return true;
   }
+
   /** @internal */
-  protected setModelComponents(path: string, validate = false): void {
-    const parts = path.split("/");
-    const modelName = parts[1];
-    const modelId = parts.slice(2).join("/");
-    if (validate) {
-      this.validateComponent(modelName);
+  private setModelComponents(path: string, validate = false): string | string[] | null {
+    const [, modelName, modelId] = stringSplit(path, "/", 3);
+
+    if (validate && this.validateComponent(modelName)) {
       this.validateModelIdSection(modelId, modelName);
     }
-  }
-  /** @internal */
-  protected validateComponent(component: string | null | undefined): string {
-    if (!component) {
-      throw new InvalidComponentError(`Expected a URI like gid://app/Person/1234`);
+    this._modelName = modelName!;
+
+    if (modelId != null) {
+      const modelIdParts = stringSplit(
+        modelId,
+        COMPOSITE_MODEL_ID_DELIMITER,
+        COMPOSITE_MODEL_ID_MAX_SIZE,
+      )
+        .filter((part) => !isBlank(part))
+        .map((id) => {
+          this.validateModelId(id);
+          return CGI.unescape(id);
+        });
+
+      return (this._modelId = modelIdParts.length === 1 ? modelIdParts[0] : modelIdParts);
     }
-    return component;
+    return null;
   }
+
   /** @internal */
-  protected validateModelIdSection(modelId: string, modelName: string): string {
-    if (!modelId) {
-      throw new MissingModelIdError(
-        `Unable to create a Global ID for ${modelName} without a model id.`,
-      );
-    }
-    return modelId;
+  private validateComponent(component: string | null | undefined): string | null | undefined {
+    if (!isBlank(component)) return component;
+
+    throw new InvalidComponentError(`Expected a URI like gid://app/Person/1234: ${this.inspect()}`);
   }
+
   /** @internal */
-  protected validateModelId(modelIdPart: string): void {
-    if (modelIdPart.includes("/")) {
-      throw new InvalidModelIdError(
-        `Unable to create a Global ID for ${this.modelName} with a malformed model id.`,
-      );
-    }
+  private validateModelIdSection(
+    modelId: string | undefined,
+    modelName: string | undefined,
+  ): string | undefined {
+    if (!isBlank(modelId)) return modelId;
+
+    throw new MissingModelIdError(
+      `Unable to create a Global ID for ${modelName ?? ""} without a model id.`,
+    );
   }
+
   /** @internal */
-  protected parseQueryParams(query: string | undefined): Record<string, string> {
-    return parseQueryParams(query);
+  private validateModelId(modelIdPart: string): void {
+    if (!modelIdPart.includes("/")) return;
+
+    throw new InvalidModelIdError(
+      `Unable to create a Global ID for ${this.modelName} with a malformed model id.`,
+    );
+  }
+
+  /** @internal */
+  private parseQueryParams(query: string | null): HashWithIndifferentAccess<string> | null {
+    if (query == null) return null;
+    return new HashWithIndifferentAccess(Object.fromEntries(URI.decodeWwwForm(query)));
   }
 }
+
+URI.registerScheme("GID", GID as never);

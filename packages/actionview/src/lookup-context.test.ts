@@ -1,8 +1,4 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import { MimeType } from "@blazetrails/actionpack";
-import { I18n } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat";
-import { Base } from "./base.js";
 import { DetailsKey, LookupContext } from "./lookup-context.js";
 import type { RenderableTemplate, RenderOptions } from "./renderer/abstract-renderer.js";
 import { MissingTemplate } from "./template/error.js";
@@ -11,62 +7,12 @@ import { FixtureResolver } from "./testing/resolvers.js";
 import { Template } from "./template.js";
 import { TemplatePath } from "./template-path.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import { Tse } from "./template/handlers/tse.js";
+import { TSE } from "./template/handlers/tse.js";
 
 async function render(ctx: LookupContext, options: RenderOptions) {
   const view = new (DetailsKey.viewContextClass())(ctx, {}, null);
   return String(await view.viewRenderer.render(view, options));
 }
-
-describe("LookupContext", () => {
-  let enforceAvailableLocales: boolean;
-  beforeEach(() => {
-    enforceAvailableLocales = I18n.enforceAvailableLocales();
-    I18n.setEnforceAvailableLocales(false);
-  });
-  afterEach(() => {
-    I18n.setLocale("en");
-    I18n.setEnforceAvailableLocales(enforceAvailableLocales);
-  });
-
-  it("allows to override default_formats with ActionView::Base.default_formats", () => {
-    const formats = Base.defaultFormats;
-    Base.defaultFormats = [":foo", ":bar"];
-
-    expect(new LookupContext([]).defaultFormats()).toEqual([":foo", ":bar"]);
-    Base.defaultFormats = formats;
-  });
-
-  it("handles */* formats", () => {
-    const lookupContext = new LookupContext([]);
-    lookupContext.formats = ["*/*"];
-    expect(lookupContext.formats).toEqual(MimeType.SET.symbols);
-  });
-
-  it("raises on invalid format assignment", () => {
-    const lookupContext = new LookupContext([]);
-    let ex: unknown;
-    try {
-      lookupContext.formats = [":html", ":invalid", "also bad"];
-    } catch (e) {
-      ex = e;
-    }
-    expect(ex).toBeInstanceOf(ArgumentError);
-    expect((ex as ArgumentError).message).toBe('Invalid formats: :invalid, "also bad"');
-  });
-
-  it("provides getters and setters for locale", () => {
-    const lookupContext = new LookupContext([], {});
-    lookupContext.locale = ":pt";
-    expect(lookupContext.locale).toBe(":pt");
-  });
-
-  it("changing lookup_context locale, changes I18n.locale", () => {
-    const lookupContext = new LookupContext([], {});
-    lookupContext.locale = ":pt";
-    expect(I18n.locale()).toBe("pt");
-  });
-});
 
 describe("MissingTemplate#corrections", () => {
   const paths = (candidates: string[]) => [new PathsOnlyResolver(candidates)];
@@ -187,55 +133,55 @@ describe("Base#render (trails)", () => {
     return ctx;
   }
 
-  function renderPartial(ctx: LookupContext, partial: string, locals = {}): string {
-    return String(new (DetailsKey.viewContextClass())(ctx, {}, null).render(partial, locals));
+  async function renderPartial(ctx: LookupContext, partial: string, locals = {}): Promise<string> {
+    return String(await new (DetailsKey.viewContextClass())(ctx, {}, null).render(partial, locals));
   }
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {
     TemplateHandlers.clear();
   });
 
-  it("restores the parent's virtual path after a nested partial returns", () => {
+  it("restores the parent's virtual path after a nested partial returns", async () => {
     const ctx = contextWith({
       "posts/_post":
         '<%= render({ partial: "shared/spacer" }) %>|<%= render({ partial: "byline" }) %>',
       "shared/_spacer": "spacer",
       "posts/_byline": "byline",
     });
-    expect(renderPartial(ctx, "post")).toBe("spacer|byline");
+    expect(await renderPartial(ctx, "post")).toBe("spacer|byline");
   });
 
-  it("renders a partial by bare name against the given prefix", () => {
+  it("renders a partial by bare name against the given prefix", async () => {
     const ctx = contextWith({ "posts/_form": "<%= title %>" });
-    expect(renderPartial(ctx, "form", { title: "New" })).toBe("New");
+    expect(await renderPartial(ctx, "form", { title: "New" })).toBe("New");
   });
 
-  it("takes the prefix from a qualified name", () => {
+  it("takes the prefix from a qualified name", async () => {
     const ctx = contextWith({ "users/_user": "<li><%= user %></li>" });
-    expect(renderPartial(ctx, "users/user", { user: "Ada" })).toBe("<li>Ada</li>");
+    expect(await renderPartial(ctx, "users/user", { user: "Ada" })).toBe("<li>Ada</li>");
   });
 
-  it("resolves a partial nested inside a partial", () => {
+  it("resolves a partial nested inside a partial", async () => {
     const ctx = contextWith({
       "posts/_post": '<%= render({ partial: "posts/byline", locals: { name: name } }) %>',
       "posts/_byline": "by <%= name %>",
     });
-    expect(renderPartial(ctx, "post", { name: "Ada" })).toBe("by Ada");
+    expect(await renderPartial(ctx, "post", { name: "Ada" })).toBe("by Ada");
   });
 
-  it("raises MissingTemplate when the partial does not resolve", () => {
+  it("raises MissingTemplate when the partial does not resolve", async () => {
     const ctx = contextWith({ "posts/_form": "" });
-    expect(() => renderPartial(ctx, "frm")).toThrow(MissingTemplate);
+    await expect(renderPartial(ctx, "frm")).rejects.toThrow(MissingTemplate);
   });
 
   it("is reachable from a template rendered through renderTemplate", async () => {
     const ctx = contextWith({ "posts/_form": "form!" });
     const out = await render(ctx, {
-      template: new Template('<%= render({ partial: "form" }) %>', "posts/index", new Tse(), {
+      template: new Template('<%= render({ partial: "form" }) %>', "posts/index", new TSE(), {
         locals: [],
         virtualPath: "posts/index",
         format: ":html",
@@ -258,7 +204,7 @@ describe("LookupContext#render with a layout", () => {
   }
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {

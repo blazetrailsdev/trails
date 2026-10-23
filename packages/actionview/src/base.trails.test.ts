@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect } from "vitest";
-import { include, initialize } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
 
 import { isModuleIncluded } from "@blazetrails/ruby-compat";
 
@@ -16,25 +16,8 @@ import { UrlHelper } from "./helpers/url-helper.js";
 import { LookupContext } from "./lookup-context.js";
 import { Template } from "./template.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import { Tse } from "./template/handlers/tse.js";
+import { TSE } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
-
-type DynProps = Record<string, unknown>;
-
-describe("ActionView::Base#initialize seats included modules", () => {
-  it("runs an included module's initialize at the base.rb:255 super", () => {
-    const View = Base.withEmptyTemplateCache();
-    include(View, {
-      [initialize](this: DynProps) {
-        this.dbRuntime = null;
-      },
-    });
-
-    const view = new View(null, {}, null);
-    expect(Object.hasOwn(view, "dbRuntime")).toBe(true);
-    expect((view as unknown as DynProps).dbRuntime).toBe(null);
-  });
-});
 
 describe("ActionView::Base include Helpers, Context (base.rb:158)", () => {
   it("includes the helper modules as live modules, with their own includes", () => {
@@ -89,32 +72,32 @@ describe("ActionView::Base#in_rendering_context", () => {
 });
 
 describe("ActionView::Base#render returns the renderer body unwrapped", () => {
-  afterEach(() => {
+  afterEach(async () => {
     TemplateHandlers.clear();
   });
 
-  const renderTse = (source: string): string => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+  const renderTse = async (source: string): Promise<string> => {
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     const lookupContext = new LookupContext(null, {}, []);
     lookupContext.appendViewPaths([new FixtureResolver({ "test/_bold.html.tse": "<b>bold</b>" })]);
     const view = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
     return String(
-      new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(view, {}),
+      await new Template(source, "t", new TSE(), { locals: [], format: ":html" }).render(view, {}),
     );
   };
 
-  it("escapes a render plain: body appended by <%= %> (template/text.rb:23-25)", () => {
-    expect(renderTse('<%= render({ plain: "<b>" }) %>')).toBe("&lt;b&gt;");
+  it("escapes a render plain: body appended by <%= %> (template/text.rb:23-25)", async () => {
+    expect(await renderTse('<%= render({ plain: "<b>" }) %>')).toBe("&lt;b&gt;");
   });
 
-  it("does not escape a render partial: body, an OutputBuffer#to_s (template.rb:272)", () => {
-    expect(renderTse('<%= render({ partial: "test/bold" }) %>')).toBe("<b>bold</b>");
+  it("does not escape a render partial: body, an OutputBuffer#to_s (template.rb:272)", async () => {
+    expect(await renderTse('<%= render({ partial: "test/bold" }) %>')).toBe("<b>bold</b>");
   });
 });
 
 describe("ActionView::Base class-hosted accessors", () => {
   afterEach(() => {
-    Tse.tseTrimMode = "-";
+    TSE.tseTrimMode = "-";
   });
 
   it("stores the field_error_proc default as the proc itself", () => {
@@ -126,6 +109,12 @@ describe("ActionView::Base class-hosted accessors", () => {
 
   it("delegates erb_trim_mode= to the handler", () => {
     Base.tseTrimMode = ">";
-    expect(Tse.tseTrimMode).toBe(">");
+    expect(TSE.tseTrimMode).toBe(">");
+  });
+});
+
+describe("ActionView::Base#initialize Routing::UrlFor segment", () => {
+  it("a bare view sets no own _routes", () => {
+    expect(Object.hasOwn(Base.empty(), "_routes")).toBe(false);
   });
 });

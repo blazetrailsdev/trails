@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { EOFError, StringIO, rbObjIsKindOf } from "@blazetrails/ruby-compat";
+import { EOFError, StringIO, rbFSend, rbObjIsKindOf } from "@blazetrails/ruby-compat";
 import {
   ExtensionValue,
   MalformedFormatError,
@@ -133,8 +133,13 @@ describe("MessagePack::Unpacker", () => {
   });
 
   describe("ext formats", () => {
-    [1, 2, 4, 8, 16].forEach((n, i) => {
-      const b = [0xd4, 0xd5, 0xd6, 0xd7, 0xd8][i];
+    for (const [n, b] of [
+      [1, 0xd4],
+      [2, 0xd5],
+      [4, 0xd6],
+      [8, 0xd7],
+      [16, 0xd8],
+    ] as const) {
       it(`msgpack fixext ${n} format`, () => {
         const unpacker = new Unpacker({ allowUnknownExt: true });
         const a = new TextEncoder().encode("a".repeat(n));
@@ -143,6 +148,39 @@ describe("MessagePack::Unpacker", () => {
           new ExtensionValue(-1, a),
         );
       });
+    }
+
+    const ext = (header: number[], type: number, n: number) =>
+      Uint8Array.of(...header, type & 0xff, ...new TextEncoder().encode("a".repeat(n)));
+    const a = (n: number) => new TextEncoder().encode("a".repeat(n));
+
+    it("msgpack ext 8 format", () => {
+      const unpacker = new Unpacker({ allowUnknownExt: true });
+      expect(unpacker.feed(ext([0xc7, 0], 1, 0)).unpack()).toEqual(new ExtensionValue(1, a(0)));
+      expect(unpacker.feed(ext([0xc7, 255], -1, 255)).unpack()).toEqual(
+        new ExtensionValue(-1, a(255)),
+      );
+    });
+
+    it("msgpack ext 16 format", () => {
+      const unpacker = new Unpacker({ allowUnknownExt: true });
+      expect(unpacker.feed(ext([0xc8, 0, 0], 1, 0)).unpack()).toEqual(new ExtensionValue(1, a(0)));
+      expect(unpacker.feed(ext([0xc8, 1, 0], -1, 256)).unpack()).toEqual(
+        new ExtensionValue(-1, a(256)),
+      );
+    });
+
+    it("msgpack ext 32 format", () => {
+      const unpacker = new Unpacker({ allowUnknownExt: true });
+      expect(unpacker.feed(ext([0xc9, 0, 0, 0, 0], 1, 0)).unpack()).toEqual(
+        new ExtensionValue(1, a(0)),
+      );
+      expect(unpacker.feed(ext([0xc9, 0, 0, 1, 0], -1, 256)).unpack()).toEqual(
+        new ExtensionValue(-1, a(256)),
+      );
+      expect(unpacker.feed(ext([0xc9, 0, 1, 0, 0], -1, 65536)).unpack()).toEqual(
+        new ExtensionValue(-1, a(65536)),
+      );
     });
   });
 
@@ -151,8 +189,42 @@ describe("MessagePack::Unpacker", () => {
   const buffer3 = MessagePack.pack({ x: "y" });
   const expected = [{ foo: "bar" }, { hello: { world: [1, 2, 3] } }, { x: "y" }];
 
+  describe("#read", () => {
+    describe("with a buffer", () => {
+      it("reads objects", () => {
+        const objects: unknown[] = [];
+        unpacker.feed(buffer1);
+        unpacker.feed(buffer2);
+        unpacker.feed(buffer3);
+        objects.push(unpacker.read());
+        objects.push(unpacker.read());
+        objects.push(unpacker.read());
+        expect(objects).toEqual(expected);
+      });
+
+      it("reads map header", () => {
+        unpacker.feed(rbFSend({}, "toMsgpack") as Uint8Array);
+        expect(unpacker.readMapHeader()).toEqual(0);
+      });
+
+      it("reads array header", () => {
+        unpacker.feed(rbFSend([], "toMsgpack") as Uint8Array);
+        expect(unpacker.readArrayHeader()).toEqual(0);
+      });
+    });
+  });
+
   describe("#each", () => {
     describe("with a buffer", () => {
+      it("yields each object in the buffer", () => {
+        const objects: unknown[] = [];
+        unpacker.feed(buffer1);
+        unpacker.feed(buffer2);
+        unpacker.feed(buffer3);
+        unpacker.each((obj) => objects.push(obj));
+        expect(objects).toEqual(expected);
+      });
+
       it("returns an enumerator when no block is given", () => {
         for (const buffer of [buffer1, buffer2, buffer3]) unpacker.feed(buffer);
         const enumerator = unpacker.each();

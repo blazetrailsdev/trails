@@ -21,7 +21,7 @@ export class Base64 {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Base64.encode64`
    * (`vendor/ruby/v3.3.11/lib/base64.rb:219`).
    */
-  static encode64(bin: string): string {
+  static encode64(bin: string | Uint8Array): string {
     return pack([bin], "m");
   }
 
@@ -37,7 +37,7 @@ export class Base64 {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Base64.strict_encode64`
    * (`vendor/ruby/v3.3.11/lib/base64.rb:273`).
    */
-  static strictEncode64(bin: string): string {
+  static strictEncode64(bin: string | Uint8Array): string {
     return pack([bin], "m0");
   }
 
@@ -131,7 +131,10 @@ export class Base64 {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Base64.urlsafe_encode64`
    * (`vendor/ruby/v3.3.11/lib/base64.rb:328`).
    */
-  static urlsafeEncode64(bin: string, { padding = true }: { padding?: boolean } = {}): string {
+  static urlsafeEncode64(
+    bin: string | Uint8Array,
+    { padding = true }: { padding?: boolean } = {},
+  ): string {
     let str = Base64.strictEncode64(bin);
     if (!padding) {
       const chomped = chomp(str, "==");

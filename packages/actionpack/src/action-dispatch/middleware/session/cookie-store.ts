@@ -2,6 +2,9 @@ import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
 import { SessionId as RackSessionId } from "@blazetrails/rack-session";
 import { AbstractSecureStore } from "./abstract-store.js";
+import { hashAref, hashAset, rbModConstSet } from "@blazetrails/ruby-compat";
+import { stringifyKeysBang } from "@blazetrails/activesupport";
+import { Session } from "../../../namespaces.js";
 
 /** @internal */
 export interface CookieStoreRequest {
@@ -64,17 +67,17 @@ export interface CookieStoreSessionOptions {
 export class CookieStore extends AbstractSecureStore {
   constructor(app?: RackApp, options: CookieStoreSessionOptions = {}) {
     options.cookieOnly = true;
-    if (!Object.prototype.hasOwnProperty.call(options, "sameSite")) {
+    if (!Object.hasOwn(options, "sameSite")) {
       options.sameSite = DEFAULT_SAME_SITE;
     }
     super(app, options);
   }
 
-  deleteSession(
+  async deleteSession(
     req: any,
     _sessionId: unknown,
     options: Record<string, unknown>,
-  ): RackSessionId | null {
+  ): Promise<RackSessionId | null> {
     const newSid = options["drop"] ? null : this.generateSid();
     req.setHeader(
       "action_dispatch.request.unsigned_session_cookie",
@@ -87,14 +90,14 @@ export class CookieStore extends AbstractSecureStore {
     return this.staleSessionCheckBang(() => {
       let data = this.unpackedCookieData(req);
       data = this.persistentSessionIdBang(data);
-      return [new RackSessionId(String(data["session_id"])), data];
+      return [new RackSessionId(String(hashAref(data, "session_id"))), data];
     });
   }
 
   /** @internal */
   extractSessionId(req: any): RackSessionId | null {
     return this.staleSessionCheckBang(() => {
-      const sid = this.unpackedCookieData(req)["session_id"];
+      const sid = hashAref(this.unpackedCookieData(req), "session_id");
       return sid ? new RackSessionId(String(sid)) : null;
     });
   }
@@ -103,8 +106,11 @@ export class CookieStore extends AbstractSecureStore {
   unpackedCookieData(req: CookieStoreRequest): Record<string, unknown> {
     return req.fetchHeader("action_dispatch.request.unsigned_session_cookie", (k: string) => {
       const v = this.staleSessionCheckBang(() => {
-        const data = this.getCookie(req);
-        return (data as Record<string, unknown> | undefined) ?? {};
+        const data = this.getCookie(req) as Record<string, unknown> | null | undefined;
+        if (data != null) {
+          stringifyKeysBang(data);
+        }
+        return data ?? {};
       });
       req.setHeader(k, v);
       return v;
@@ -117,19 +123,19 @@ export class CookieStore extends AbstractSecureStore {
     sid: RackSessionId | null = null,
   ): Record<string, unknown> {
     const out = data ?? {};
-    if (out["session_id"] == null) {
-      out["session_id"] = sid ? sid.publicId : this.generateSid().publicId;
+    if (hashAref(out, "session_id") == null) {
+      hashAset(out, "session_id", sid ? sid.publicId : this.generateSid().publicId);
     }
     return out;
   }
 
   /** @internal */
-  writeSession(
+  async writeSession(
     _req: CookieStoreRequest | PersistedRequest,
     sid: RackSessionId,
     sessionData: Record<string, unknown>,
     _options?: Record<string, unknown>,
-  ): SessionId {
+  ): Promise<SessionId> {
     sessionData["session_id"] = sid.publicId;
     return new SessionId(sid, sessionData);
   }
@@ -152,3 +158,5 @@ export class CookieStore extends AbstractSecureStore {
   /** @internal */
   declare staleSessionCheckBang: <T>(block: () => T) => T;
 }
+
+rbModConstSet(Session, "CookieStore", CookieStore);

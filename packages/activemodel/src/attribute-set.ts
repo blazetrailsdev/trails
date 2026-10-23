@@ -148,7 +148,7 @@ export class AttributeSet {
   }
 
   toHash(): Record<string, unknown> {
-    return Object.fromEntries(indexWith(this.keys(), (name) => this.getAttribute(name).value()));
+    return indexWith(this.keys(), (name) => this.getAttribute(name).value());
   }
 
   toH(): Record<string, unknown> {

@@ -1,18 +1,30 @@
-import { Logger } from "@blazetrails/activesupport";
-import { Exception, StandardError, stderr } from "@blazetrails/ruby-compat";
+import { ActiveSupportJSON, Logger } from "@blazetrails/activesupport";
+import {
+  EOFError,
+  Exception,
+  StandardError,
+  excSetupMessage,
+  stderr,
+} from "@blazetrails/ruby-compat";
 
-import { merge } from "@blazetrails/ruby-compat";
-import { MimeType } from "./mime-type.js";
+import { block, fetch, merge, rbModConstSet, type Hash } from "@blazetrails/ruby-compat";
+import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
+import { Mime, MimeType } from "./mime-type.js";
+import type { ParamHash } from "../request/utils.js";
+import { ActionDispatch } from "../../namespaces.js";
+import { BadRequest } from "../../action-controller/metal/exceptions.js";
 
 export const PARAMETERS_KEY = "action_dispatch.request.path_parameters";
 
-export type ParameterParser = (rawPost: string) => Record<string, unknown>;
+export type ParameterParser = (
+  rawPost: string | Uint8Array,
+) => Record<string, unknown> | Hash<string, unknown>;
 
 export type ParameterParsers = Record<string, ParameterParser>;
 
 export const DEFAULT_PARSERS: ParameterParsers = {
-  [MimeType.JSON.symbol!]: (rawPost: string) => {
-    const data = JSON.parse(rawPost);
+  [Mime.get(":json")!.symbol!]: (rawPost: string | Uint8Array) => {
+    const data = ActiveSupportJSON.decode(rawPost);
     if (data !== null && typeof data === "object" && !Array.isArray(data)) {
       return data as Record<string, unknown>;
     }
@@ -28,6 +40,7 @@ export class ParseError extends Error {
 }
 
 export interface ParametersHost {
+  controllerClassFor(name: string): unknown;
   getHeader(key: string): unknown;
   setHeader(key: string, value: unknown): unknown;
   deleteHeader(key: string): void;
@@ -35,13 +48,14 @@ export interface ParametersHost {
   requestParameters: Record<string, unknown>;
   contentLength: number;
   contentMimeType: MimeType | null;
-  rawPost: string;
+  rawPost: string | Uint8Array;
   logger?: { debug(message: string): void } | null;
 }
 
 export class Parameters {
-  declare setHeader: ParametersHost["setHeader"];
-  declare deleteHeader: ParametersHost["deleteHeader"];
+  declare controllerClassFor: ParametersHost["controllerClassFor"];
+  declare protected setHeader: ParametersHost["setHeader"];
+  declare protected deleteHeader: ParametersHost["deleteHeader"];
 
   /** @internal */
   private static _parameterParsers: ParameterParsers = DEFAULT_PARSERS;
@@ -72,9 +86,33 @@ export class Parameters {
     Parameters._parameterParsers = normalized;
   }
 
+  get params(): Record<string, unknown> {
+    return parameters.call(this as unknown as ParametersHost);
+  }
+
+  get pathParameters(): Record<string, unknown> {
+    return pathParameters.call(this as unknown as ParametersHost);
+  }
+
   set pathParameters(parameters: Record<string, unknown>) {
-    this.deleteHeader("action_dispatch.request.parameters");
-    this.setHeader(PARAMETERS_KEY, parameters);
+    try {
+      this.deleteHeader("action_dispatch.request.parameters");
+
+      parameters = ActionDispatch.Request.Utils.setBinaryEncoding(
+        this,
+        parameters as ParamHash,
+        parameters["controller"] as string | undefined,
+        parameters["action"] as string | undefined,
+      );
+      ActionDispatch.Request.Utils.checkParamEncoding(parameters as ParamHash);
+
+      this.setHeader(PARAMETERS_KEY, parameters);
+    } catch (e) {
+      if (e instanceof ParameterTypeError || e instanceof InvalidParameterError) {
+        throw excSetupMessage(new BadRequest(`Invalid path parameters: ${e.message}`, e), e);
+      }
+      throw e;
+    }
   }
 }
 
@@ -82,7 +120,13 @@ export function parameters(this: ParametersHost): Record<string, unknown> {
   const cached = this.getHeader("action_dispatch.request.parameters");
   if (cached) return cached as Record<string, unknown>;
 
-  const params: Record<string, unknown> = merge(this.requestParameters, this.queryParameters);
+  let params: Record<string, unknown>;
+  try {
+    params = merge(this.requestParameters, this.queryParameters);
+  } catch (e) {
+    if (!(e instanceof EOFError)) throw e;
+    params = { ...this.queryParameters };
+  }
   Object.assign(params, pathParameters.call(this));
   this.setHeader("action_dispatch.request.parameters", params);
   return params;
@@ -96,24 +140,35 @@ export function pathParameters(this: ParametersHost): Record<string, unknown> {
   return empty;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
 export function parseFormattedParameters(
   this: ParametersHost,
   parsers: ParameterParsers,
-  fallback: () => Record<string, unknown>,
-): Record<string, unknown> {
-  if (this.contentLength === 0 || this.contentMimeType === null || !this.rawPost) {
-    return fallback();
+  fn: () => Record<string, unknown>,
+): Record<string, unknown> | Hash<string, unknown> {
+  if (this.contentLength === 0 || this.contentMimeType === null) {
+    return fn();
   }
-  const strategy = parsers[this.contentMimeType.symbol!];
-  if (!strategy) return fallback();
+  let yielded = false;
+  const strategy = fetch<ParameterParser>(
+    parsers,
+    this.contentMimeType.symbol!,
+    block(() => {
+      yielded = true;
+      return null as unknown as ParameterParser;
+    }),
+  );
+  if (yielded) return fn();
 
   try {
     return strategy(this.rawPost);
   } catch (e) {
     if (e instanceof Exception && !(e instanceof StandardError)) throw e;
     logParseErrorOnce.call(this);
-    throw new ParseError("Error occurred while parsing request parameters");
+    throw excSetupMessage(new ParseError("Error occurred while parsing request parameters"), e);
   }
 }
 
@@ -139,3 +194,6 @@ const PARSE_ERROR_LOGGED_KEY = "action_dispatch.request.parse_error_logged";
 export function paramsParsers(this: ParametersHost): ParameterParsers {
   return Parameters.parameterParsers;
 }
+
+rbModConstSet(ActionDispatch.Http, "Parameters", Parameters);
+rbModConstSet(Parameters, "ParseError", ParseError);

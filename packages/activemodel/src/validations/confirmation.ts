@@ -1,16 +1,16 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { filterMap } from "@blazetrails/activesupport";
 import {
   casecmp,
   except,
   isNil,
   rbEqual,
-  rbFPublicSend,
+  rbFSend,
   rbModAttrReader,
   rbModAttrWriter,
   rbModMethodDefined,
   rtest,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
@@ -26,7 +26,7 @@ export class ConfirmationValidator extends EachValidator {
   }
 
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
-    const confirmed = rbFPublicSend(record, `${attribute}Confirmation`);
+    const confirmed = rbFSend(record, `${attribute}Confirmation`);
     if (!isNil(confirmed)) {
       if (!this.isConfirmationValueEqual(record, attribute, value, confirmed)) {
         const humanAttributeName = (

@@ -1,10 +1,25 @@
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
+import { psychAdapterConfig } from "@blazetrails/ruby-compat/psych-adapter";
+import { Hash } from "@blazetrails/ruby-compat";
 import { Simple } from "./simple.js";
 import { config, eagerLoadBang, reloadBang, resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { InvalidLocaleData, UnknownFileType } from "../exceptions.js";
 import { preloadTranslationFiles, registerFileReader, registerLocaleModule } from "./base.js";
+
+function hashOf(literal: Record<string, unknown>): Hash<unknown, unknown> {
+  const hash = new Hash<unknown, unknown>();
+  for (const [k, v] of Object.entries(literal)) {
+    hash.set(
+      `:${k}`,
+      v !== null && typeof v === "object" && !Array.isArray(v)
+        ? hashOf(v as Record<string, unknown>)
+        : v,
+    );
+  }
+  return hash;
+}
 
 function localesDir(): string {
   return new URL("../test-data/locales", import.meta.url).pathname;
@@ -37,7 +52,7 @@ describe("I18n::Backend::Base file loading", () => {
     const overriding = new Overriding() as unknown as {
       loadYaml(f: string): [unknown, boolean];
     };
-    expect(overriding.loadYaml(filename)).toEqual([{ en: { foo: { bar: "baz" } } }, true]);
+    expect(overriding.loadYaml(filename)).toEqual([hashOf({ en: { foo: { bar: "baz" } } }), true]);
   });
 
   it("load_yml freezes the parsed data deeply", () => {
@@ -45,8 +60,24 @@ describe("I18n::Backend::Base file loading", () => {
     const loading = backend as unknown as { loadYml(f: string): [unknown, boolean] };
     const [data, keysSymbolized] = loading.loadYml(filename);
     expect(keysSymbolized).toBe(true);
-    expect(Object.isFrozen(data)).toBe(true);
-    expect(Object.isFrozen((data as { en: { foo: unknown } }).en.foo)).toBe(true);
+    expect((data as Hash<string, Hash<string, Hash<string, unknown>>>).isFrozen()).toBe(true);
+    expect(
+      (data as Hash<string, Hash<string, Hash<string, unknown>>>)
+        .get(":en")!
+        .get(":foo")!
+        .isFrozen(),
+    ).toBe(true);
+  });
+
+  it("raises InvalidLocaleData when no YAML backend loads", () => {
+    psychAdapterConfig.adapter = "missing-yaml-backend";
+    try {
+      expect(() => backend.loadTranslations(`${localesDir()}/en.yml`)).toThrow(
+        /can not load translations from .*en\.yml: #<LoadError: cannot load such file -- missing-yaml-backend>/,
+      );
+    } finally {
+      psychAdapterConfig.adapter = null;
+    }
   });
 
   it("raises InvalidLocaleData given a YAML file that is empty", () => {
@@ -66,7 +97,7 @@ describe("I18n::Backend::Base file loading", () => {
     const yielded: unknown[] = [];
     const fr = `${localesDir()}/fr.yml`;
     backend.loadTranslations(fr, (...args: unknown[]) => yielded.push(args));
-    expect(yielded).toEqual([[fr, { fr: { animal: { dog: "chien" } } }]]);
+    expect(yielded).toEqual([[fr, hashOf({ fr: { animal: { dog: "chien" } } })]]);
   });
 
   it("refuses a lazy lookup while I18n.load_path is unread", () => {
@@ -178,7 +209,9 @@ describe("I18n::Backend::Base file loading", () => {
     expect(backend.translate("en", "greeting")).toBe("Hello");
     expect(backend.translate("en", "aliased")).toBe("Hello");
     expect(backend.translate("en", "farewell")).toBe("Bye\nnow");
-    expect(backend.translate("en", "entries")).toEqual([{ key: "value" }]);
+    expect(backend.translate("en", "entries")).toEqual([
+      new Hash<unknown, unknown>().set(":key", "value"),
+    ]);
     expect(backend.translate("en", "tagged")).toBe("42");
   });
 });

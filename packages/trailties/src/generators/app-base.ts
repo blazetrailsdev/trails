@@ -1,4 +1,4 @@
-import { Dir, File, include, rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Dir, File, include, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
 import { Generators } from "../generators.js";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
@@ -33,7 +33,6 @@ export type AppBaseOptions = GeneratorOptions & {
 const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
   skipActionCable: true,
   skipActionMailer: true,
-  skipActiveJob: true,
   skipActiveStorage: true,
 };
 
@@ -141,7 +140,7 @@ export abstract class AppBase extends GeneratorBase {
 
   /** @internal */
   protected build(meth: string, ...args: unknown[]): unknown {
-    if (rbObjRespondTo(this.builder(), meth)) return rbFPublicSend(this.builder(), meth, ...args);
+    if (rbObjRespondTo(this.builder(), meth)) return rbFSend(this.builder(), meth, ...args);
     return undefined;
   }
 
@@ -161,7 +160,7 @@ export abstract class AppBase extends GeneratorBase {
     return this.skip("ActiveStorage") && !this.sqlite3();
   }
   keeps(): boolean {
-    return !this.skip("Keeps");
+    return !this.options.skipKeeps;
   }
   /** @internal */
   devcontainer(): boolean {
@@ -173,7 +172,7 @@ export abstract class AppBase extends GeneratorBase {
   }
   /** @internal */
   dependsOnSystemTest(): boolean {
-    return !(this.skip("SystemTest") || this.skip("Test") || this.options.api);
+    return !(this.options.skipSystemTest || this.options.skipTest || this.options.api);
   }
 
   /** @internal */

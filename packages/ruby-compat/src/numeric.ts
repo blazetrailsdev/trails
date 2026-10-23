@@ -1,3 +1,4 @@
+import { ArgumentError } from "./argument-error.js";
 import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NameError } from "./name-error.js";
@@ -254,20 +255,6 @@ export function rbBigNorm(x: bigint): number | bigint {
 }
 
 /**
- * `rb_absint_size` (`vendor/ruby/v3.3.11/bignum.c:3283`): the bytes the
- * absolute value takes, with `nlz_bits_ret`, the leading zero bits of its
- * most significant byte.
- * @noRailsEquivalent PERMANENT
- */
-export function rbAbsintSize(val: number | bigint): [number, number] {
-  let v = BigInt(val);
-  if (v < 0n) v = -v;
-  const bits = v === 0n ? 0 : v.toString(2).length;
-  const size = Math.ceil(bits / 8);
-  return [size, size * 8 - bits];
-}
-
-/**
  * `fix_mul` (`vendor/ruby/v3.3.11/numeric.c:4045`), `rb_float_mul` (`numeric.c:1237`),
  * `rb_rational_mul` (`vendor/ruby/v3.3.11/rational.c:861`).
  * @noRailsEquivalent PERMANENT
@@ -290,19 +277,6 @@ export function numericMul(x: unknown, y: unknown): unknown {
     if (y instanceof Rational) return y.mul(x);
   }
   throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
-}
-
-/**
- * `rb_float_uminus` (`vendor/ruby/v3.3.11/numeric.c:1156`), `rb_int_uminus` (`numeric.c:3833`),
- * `rb_rational_uminus` (`vendor/ruby/v3.3.11/rational.c:611`).
- * @noRailsEquivalent PERMANENT
- */
-export function numericUminus(x: unknown): unknown {
-  if (rbFloatTypeP(x)) return rbDbl2num(-x.valueOf());
-  if (x instanceof Rational) return new Rational(-x.numerator, x.denominator);
-  if (typeof x === "bigint") return rbBigNorm(-x);
-  if (typeof x === "number") return 0 - x;
-  throw new NoMethodError(`undefined method '-@' for ${rbInspect(x)}`);
 }
 
 /**
@@ -614,4 +588,111 @@ export function rbPlus(v: unknown, i: unknown): unknown {
   throw new NoMethodError(
     `undefined method '+' for ${v == null ? "nil" : `an instance of ${rbObjClassname(v)}`}`,
   );
+}
+
+/**
+ * `Float::DIG` (`vendor/ruby/v3.3.11/numeric.c:6283`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const FLOAT_DIG = 15;
+
+/**
+ * Ruby `Numeric#step(to, step) { |i| }` over the `number` seat, with a block
+ * (`num_step`, `vendor/ruby/v3.3.11/numeric.c:3034`). An integral `number` is a
+ * Fixnum and takes the `long` loop; any other takes `ruby_float_step`
+ * (`numeric.c:2767`), so an infinite or NaN bound yields nothing where a naive
+ * `for` loop would never end.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function numStep(
+  from: number,
+  to: number,
+  step: number,
+  block: (i: number) => void,
+): number {
+  if (step === 0) {
+    throw new ArgumentError("step can't be 0");
+  }
+  const desc = step < 0;
+  let inf: boolean;
+  if (step === 0) {
+    inf = true;
+  } else if (!Number.isInteger(to)) {
+    inf = !Number.isFinite(to) && !Number.isNaN(to) && (to < 0 ? desc : !desc);
+  } else inf = false;
+
+  if (Number.isInteger(from) && (inf || Number.isInteger(to)) && Number.isInteger(step)) {
+    let i = from;
+    if (inf) {
+      for (; ; i += step) block(i);
+    } else if (desc) {
+      for (; i >= to; i += step) block(i);
+    } else {
+      for (; i <= to; i += step) block(i);
+    }
+  } else {
+    rubyFloatStep(from, to, step, false, block);
+  }
+  return from;
+}
+
+function rubyFloatStepSize(beg: number, end: number, unit: number, excl: boolean): number {
+  const epsilon = Number.EPSILON;
+  let d: number;
+  let n: number;
+  let err: number;
+
+  if (unit === 0) {
+    return Infinity;
+  }
+  if (!Number.isFinite(unit)) {
+    return Number(unit > 0 ? beg <= end : beg >= end);
+  }
+  n = (end - beg) / unit;
+  err = ((Math.abs(beg) + Math.abs(end) + Math.abs(end - beg)) / Math.abs(unit)) * epsilon;
+  if (err > 0.5) err = 0.5;
+  if (excl) {
+    if (n <= 0) return 0;
+    if (n < 1) n = 0;
+    else n = Math.floor(n - err);
+    d = (n + 1) * unit + beg;
+    if (beg < end) {
+      if (d < end) n++;
+    } else if (beg > end) {
+      if (d > end) n++;
+    }
+  } else {
+    if (n < 0) return 0;
+    n = Math.floor(n + err);
+    d = (n + 1) * unit + beg;
+    if (beg < end) {
+      if (d <= end) n++;
+    } else if (beg > end) {
+      if (d >= end) n++;
+    }
+  }
+  return n + 1;
+}
+
+function rubyFloatStep(
+  beg: number,
+  end: number,
+  unit: number,
+  excl: boolean,
+  block: (i: number) => void,
+): void {
+  const n = rubyFloatStepSize(beg, end, unit, excl);
+  if (!Number.isFinite(unit)) {
+    if (n) block(beg);
+  } else if (unit === 0) {
+    for (;;) block(beg);
+  } else {
+    for (let i = 0; i < n; i++) {
+      let d = i * unit + beg;
+      if (unit >= 0 ? end < d : d < end) d = end;
+      block(d);
+    }
+  }
 }

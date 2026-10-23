@@ -16,7 +16,7 @@ import {
   type RenderOptions,
   type RenderingHost,
 } from "./rendering.js";
-import { AbstractControllerError } from "./error.js";
+import { Error as AbstractControllerError } from "./error.js";
 
 function makeHost(opts: Partial<RenderingHost> = {}): RenderingHost {
   return {

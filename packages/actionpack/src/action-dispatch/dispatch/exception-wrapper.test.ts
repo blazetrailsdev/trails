@@ -2,48 +2,119 @@ import { describe, it, expect } from "vitest";
 import { ParameterTypeError } from "@blazetrails/rack";
 import { ActionNotFound } from "../../abstract-controller/base.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
-import { ExceptionWrapper } from "../exception-wrapper.js";
+import { BacktraceCleaner, assertCalledWith, assertEmpty } from "@blazetrails/activesupport";
+import { excBacktrace, excBacktraceLocations, type Location } from "@blazetrails/ruby-compat";
+import { ExceptionWrapper } from "../middleware/exception-wrapper.js";
+
+const BACKTRACE =
+  "TestError\n    at index (lib/file.ts:42:1)\n    at run (node_modules/vitest/index.js:7:3)";
+
+function makeCleaner(): BacktraceCleaner {
+  const cleaner = new BacktraceCleaner();
+  cleaner.removeFilters();
+  cleaner.addSilencer((line) => !line.includes("lib/"));
+  return cleaner;
+}
+
+class TopErrorProxy extends Error {
+  constructor(
+    private ex: Error,
+    private n: number,
+  ) {
+    super();
+  }
+
+  backtrace(): string[] {
+    return excBacktrace(this.ex)!.slice(0, this.n);
+  }
+
+  backtraceLocations(): Location[] {
+    return excBacktraceLocations(this.ex)!.slice(0, this.n);
+  }
+}
+
+function raised(klass: ErrorConstructor, ...frames: string[]): Error {
+  const ex = new klass();
+  ex.stack = [klass.name, ...frames.map((frame) => `    at ${frame}`)].join("\n");
+  return ex;
+}
+
+function badlyDefinedError(): Error {
+  const ex = new Error();
+  ex.stack = undefined;
+  return ex;
+}
 
 describe("ExceptionWrapperTest", () => {
-  it("#source_extracts fetches source fragments for every backtrace entry", () => {
-    const err = new Error("test");
-    const wrapper = new ExceptionWrapper(err);
-    const extracts = wrapper.sourceExtracts;
-    expect(extracts.length).toBeGreaterThan(0);
-    for (const extract of extracts) {
-      expect(extract).toHaveProperty("file");
-      expect(extract).toHaveProperty("line");
-    }
+  it("#source_extracts fetches source fragments for every backtrace entry", async () => {
+    const exception = raised(Error, "index (lib/file.rb:42:1)");
+    const wrapper = new ExceptionWrapper(null, exception);
+
+    await assertCalledWith(
+      wrapper,
+      "sourceFragment",
+      ["lib/file.rb", 42],
+      { returns: "foo" },
+      () => {
+        expect(wrapper.sourceExtracts).toEqual([{ code: "foo", lineNumber: 42 }]);
+      },
+    );
   });
 
-  it("#source_extracts works with Windows paths", () => {
-    const err = new Error("test");
-    err.stack = "Error: test\n    at Object.<anonymous> (C:\\Users\\test\\file.ts:10:5)";
-    const wrapper = new ExceptionWrapper(err);
-    const extracts = wrapper.sourceExtracts;
-    expect(extracts.length).toBe(1);
+  it("#source_extracts works with Windows paths", async () => {
+    const exc = raised(Error, "ms_index (c:/path/to/rails/app/controller.rb:27:1)");
+
+    const wrapper = new ExceptionWrapper(null, exc);
+
+    await assertCalledWith(
+      wrapper,
+      "sourceFragment",
+      ["c:/path/to/rails/app/controller.rb", 27],
+      { returns: "nothing" },
+      () => {
+        expect(wrapper.sourceExtracts).toEqual([{ code: "nothing", lineNumber: 27 }]);
+      },
+    );
   });
 
-  it("#source_extracts works with non standard backtrace", () => {
-    const err = new Error("test");
-    err.stack = "Error: test\n    at some_function (weird/path:42:1)";
-    const wrapper = new ExceptionWrapper(err);
-    const extracts = wrapper.sourceExtracts;
-    expect(extracts.length).toBe(1);
+  it("#source_extracts works with non standard backtrace", async () => {
+    const exc = raised(Error, "invalid_ex (invalid:0:1)");
+
+    const wrapper = new ExceptionWrapper(null, exc);
+
+    await assertCalledWith(
+      wrapper,
+      "sourceFragment",
+      ["invalid", 0],
+      { returns: "nothing" },
+      () => {
+        expect(wrapper.sourceExtracts).toEqual([{ code: "nothing", lineNumber: 0 }]);
+      },
+    );
   });
 
-  it("#source_extracts works with eval syntax error", () => {
-    const err = new SyntaxError("Unexpected token");
-    const wrapper = new ExceptionWrapper(err);
-    const extracts = wrapper.sourceExtracts;
-    expect(Array.isArray(extracts)).toBe(true);
+  it("#source_extracts works with eval syntax error", async () => {
+    const exception = raised(SyntaxError, "throw_syntax_error (lib/file.rb:42:1)");
+
+    const wrapper = new ExceptionWrapper(null, new TopErrorProxy(exception, 1));
+
+    await assertCalledWith(
+      wrapper,
+      "sourceFragment",
+      ["lib/file.rb", 42],
+      { returns: "foo" },
+      () => {
+        expect(wrapper.sourceExtracts).toEqual([{ code: "foo", lineNumber: 42 }]);
+      },
+    );
   });
 
   it("#source_extracts works with nil backtrace_locations", () => {
-    const err = new Error("no stack");
-    err.stack = undefined;
-    const wrapper = new ExceptionWrapper(err);
-    expect(wrapper.sourceExtracts).toEqual([]);
+    const exception = badlyDefinedError();
+
+    const wrapper = new ExceptionWrapper(null, exception);
+
+    assertEmpty(wrapper.sourceExtracts);
   });
 
   it("#source_extracts works with error_highlight", () => {
@@ -54,10 +125,10 @@ describe("ExceptionWrapperTest", () => {
   });
 
   it("#application_trace returns traces only from the application", () => {
-    const wrapper = new ExceptionWrapper(new Error("test"));
-    for (const line of wrapper.applicationTrace.map(String)) {
-      expect(line).not.toContain("node_modules");
-    }
+    const exception = new Error("test");
+    exception.stack = BACKTRACE;
+    const wrapper = new ExceptionWrapper(makeCleaner(), exception);
+    expect(wrapper.applicationTrace.map(String)).toEqual(["at index (lib/file.ts:42:1)"]);
   });
 
   it("#status_code returns 400 for Rack::Utils::ParameterTypeError", () => {
@@ -77,59 +148,58 @@ describe("ExceptionWrapperTest", () => {
   });
 
   it("#application_trace cannot be nil", () => {
-    const err = new Error("no stack");
-    err.stack = undefined;
-    const wrapper = new ExceptionWrapper(err);
-    expect(wrapper.applicationTrace).toEqual([]);
+    const nilBacktraceWrapper = new ExceptionWrapper(makeCleaner(), badlyDefinedError());
+    const nilCleanerWrapper = new ExceptionWrapper(null, badlyDefinedError());
+
+    expect(nilBacktraceWrapper.applicationTrace).toEqual([]);
+    expect(nilCleanerWrapper.applicationTrace).toEqual([]);
   });
 
   it("#framework_trace returns traces outside the application", () => {
-    const wrapper = new ExceptionWrapper(new Error("test"));
-    for (const line of wrapper.frameworkTrace.map(String)) {
-      expect(line).toContain("node_modules");
-    }
+    const exception = new Error("test");
+    exception.stack = BACKTRACE;
+    const wrapper = new ExceptionWrapper(makeCleaner(), exception);
+    expect(wrapper.frameworkTrace.map(String)).toEqual([
+      "at run (node_modules/vitest/index.js:7:3)",
+    ]);
   });
 
   it("#framework_trace cannot be nil", () => {
-    const err = new Error("no stack");
-    err.stack = undefined;
-    const wrapper = new ExceptionWrapper(err);
-    expect(wrapper.frameworkTrace).toEqual([]);
+    const nilBacktraceWrapper = new ExceptionWrapper(makeCleaner(), badlyDefinedError());
+    const nilCleanerWrapper = new ExceptionWrapper(null, badlyDefinedError());
+
+    expect(nilBacktraceWrapper.frameworkTrace).toEqual([]);
+    expect(nilCleanerWrapper.frameworkTrace).toEqual([]);
   });
 
   it("#full_trace returns application and framework traces", () => {
-    const wrapper = new ExceptionWrapper(new Error("test"));
-    const total = wrapper.applicationTrace.length + wrapper.frameworkTrace.length;
-    expect(wrapper.fullTrace.length).toBe(total);
+    const exception = new Error("test");
+    exception.stack = BACKTRACE;
+    const wrapper = new ExceptionWrapper(makeCleaner(), exception);
+    expect(wrapper.fullTrace.map(String)).toEqual(wrapper.backtrace.map(String));
   });
 
   it("#full_trace cannot be nil", () => {
-    const err = new Error("no stack");
-    err.stack = undefined;
-    const wrapper = new ExceptionWrapper(err);
-    expect(wrapper.fullTrace).toEqual([]);
+    const nilBacktraceWrapper = new ExceptionWrapper(makeCleaner(), badlyDefinedError());
+    const nilCleanerWrapper = new ExceptionWrapper(null, badlyDefinedError());
+
+    expect(nilBacktraceWrapper.fullTrace).toEqual([]);
+    expect(nilCleanerWrapper.fullTrace).toEqual([]);
   });
 
   it("#traces returns every trace by category enumerated with an index", () => {
-    const exception = new Error("test");
-    const wrapper = new ExceptionWrapper(exception);
-    const traces = wrapper.traces;
+    const exception = raised(Error, "index (lib/file.rb:42:1)", "in_rack (/gems/rack.rb:43:1)");
+    const wrapper = new ExceptionWrapper(makeCleaner(), exception);
+    const exceptionObjectId = wrapper.exceptionId();
 
-    expect(Object.keys(traces)).toEqual(["Application Trace", "Framework Trace", "Full Trace"]);
-    expect(traces["Full Trace"].length).toBe(wrapper.fullTrace.length);
-    expect(traces["Application Trace"].length + traces["Framework Trace"].length).toBe(
-      traces["Full Trace"].length,
-    );
-    expect(traces["Full Trace"].map((frame) => frame.id)).toEqual(
-      wrapper.fullTrace.map((_trace, idx) => idx),
-    );
-    expect(traces["Full Trace"].map((frame) => frame.trace)).toEqual(wrapper.fullTrace.map(String));
-    for (const frame of traces["Full Trace"]) {
-      expect(frame.exceptionObjectId).toBe(wrapper.exceptionId());
-    }
-    for (const frame of traces["Application Trace"]) {
-      expect(wrapper.applicationTrace.map(String)).toContain(frame.trace);
-    }
+    expect(wrapper.traces).toEqual({
+      "Application Trace": [{ exceptionObjectId, id: 0, trace: "at index (lib/file.rb:42:1)" }],
+      "Framework Trace": [{ exceptionObjectId, id: 1, trace: "at in_rack (/gems/rack.rb:43:1)" }],
+      "Full Trace": [
+        { exceptionObjectId, id: 0, trace: "at index (lib/file.rb:42:1)" },
+        { exceptionObjectId, id: 1, trace: "at in_rack (/gems/rack.rb:43:1)" },
+      ],
+    });
   });
 
   const requestWith = (mode: "all" | "rescuable" | "none") => ({
@@ -138,21 +208,21 @@ describe("ExceptionWrapperTest", () => {
 
   it("#show? returns false when using :rescuable and the exceptions is not rescuable", () => {
     const wrapper = new ExceptionWrapper(null, new Error("generic"));
-    expect(wrapper.show(requestWith("rescuable"))).toBe(false);
+    expect(wrapper.isShow(requestWith("rescuable"))).toBe(false);
   });
 
   it("#show? returns true when using :rescuable and the exceptions is rescuable", () => {
     const wrapper = new ExceptionWrapper(null, new ActionNotFound(""));
-    expect(wrapper.show(requestWith("rescuable"))).toBe(true);
+    expect(wrapper.isShow(requestWith("rescuable"))).toBe(true);
   });
 
   it("#show? returns false when using :none and the exceptions is rescuable", () => {
     const wrapper = new ExceptionWrapper(null, new ActionNotFound(""));
-    expect(wrapper.show(requestWith("none"))).toBe(false);
+    expect(wrapper.isShow(requestWith("none"))).toBe(false);
   });
 
   it("#show? returns true when using :all and the exceptions is not rescuable", () => {
     const wrapper = new ExceptionWrapper(null, new Error("generic"));
-    expect(wrapper.show(requestWith("all"))).toBe(true);
+    expect(wrapper.isShow(requestWith("all"))).toBe(true);
   });
 });

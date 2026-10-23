@@ -17,6 +17,7 @@ import {
   declaringFile,
   extractClass,
   extractFileConstants,
+  extractFileConstantReceipts,
   extractInternalFileConstants,
   extractFileLocalHelpers,
   extractFromProgram,
@@ -28,7 +29,7 @@ import {
   staticClassExpressions,
   tsLiteralValue,
 } from "./extract-ts-api.js";
-import { collectTsFileNames } from "./extra-surface.js";
+import { collectTsFileNames, countTsInternalNames } from "./extra-surface.js";
 import { partitionNegatedCalls, significantCallsForReceivers } from "./compare.js";
 import { CALL_ARG_DESCRIPTOR_VOCABULARY } from "./extractor-skew.js";
 import { overlappingSubDirs, packageSrcDir } from "./config.js";
@@ -84,6 +85,20 @@ describe("extractClass — a `declare` member typed `typeof fn`", () => {
     );
     const member = cls.instanceMethods.find((m) => m.name === "addIncludes")!;
     expect(member.aliasParams?.find((p) => p.name === "block")?.admitsFunction).toBe(true);
+  });
+});
+
+describe("extractClass — a splat whose last element is a block", () => {
+  it("credits a rest typed as a tuple ending in a function, and not a bare rest", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        call(...args: unknown[] | [...unknown[], () => void]): void {}
+        each(...args: unknown[]): void {}
+      }`,
+    );
+    const params = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.params;
+    expect(params("call")[0].admitsFunction).toBe(true);
+    expect(params("each")[0].admitsFunction).toBeUndefined();
   });
 });
 
@@ -185,6 +200,21 @@ describe("harvestObjectLiteralMethods", () => {
       ["strictArgsPosition", 0],
       ["strictArgsPosition?", 1],
     ]);
+  });
+
+  it("reads an unset slot beside a method as an attr_accessor", () => {
+    const methods = objectLiteralMethods(
+      `export const Behavior = {
+        controller: undefined as object | undefined,
+        rendered: null as string | null,
+        render(): void {},
+      };`,
+    );
+    expect(methods.map((m) => m.name)).toEqual(["controller", "rendered", "render"]);
+  });
+
+  it("reads a holder of unset slots alone as no module", () => {
+    expect(objectLiteralMethods(`export const _allocation = { klass: null };`)).toEqual([]);
   });
 
   it("records a plain-object module's [initialize] hook", () => {
@@ -437,6 +467,26 @@ describe("body call capture", () => {
     const writer = cls.instanceMethods.find((m) => m.name === "queryCache" && m.writer)!;
     expect(writer.calls).toEqual(["@invoked:store", "store"]);
     expect(writer.callSeq).toEqual(["store"]);
+  });
+
+  it("leaves an index read off another object out of the order stream only", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        resource() {
+          this.build(this._scope.get("shallow"));
+          this.get(":new");
+        }
+        show() {
+          this.build(this.headers.get("x"));
+          this.get(":new");
+        }
+      }`,
+    );
+    const resource = cls.instanceMethods.find((m) => m.name === "resource")!;
+    expect(resource.calls).toContain("get");
+    expect(resource.callSeq).toEqual(["_scope", "build", "get"]);
+    const show = cls.instanceMethods.find((m) => m.name === "show")!;
+    expect(show.callSeq).toEqual(["headers", "get", "build"]);
   });
 
   it("also records the same calls in source order, for the order-only comparison", () => {
@@ -1797,6 +1847,29 @@ describe("body call capture", () => {
     expect(skeleton("poll")).toEqual(["loop", "if", "ref:done"]);
   });
 
+  it("keeps the `if` and `throw` of a negated instanceof guard that throws something other than the catch binding", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        run(cause: Error) {
+          try {
+            this.work();
+          } catch (error) {
+            if (!(error instanceof Busy)) throw cause;
+            this.retry();
+          }
+        }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "run")!.skeleton).toEqual([
+      "try",
+      "ref:work",
+      "rescue",
+      "if",
+      "throw",
+      "ref:retry",
+    ]);
+  });
+
   it("reads a loop that only pushes an awaited element as the `map` an awaiting `collect` block lowers to", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -2108,6 +2181,21 @@ describe("body call capture", () => {
     );
   });
 
+  it("names a memoized element receiver by the collection it indexes", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        assigns: Record<string, object> = {};
+        assign(k: string, r: object) {
+          Object.assign((this.assigns[k] ??= {}), r);
+          Object.assign((this.other[k] ||= {}), r);
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "assign")!;
+    expect(m.calls).toContain("@assign:assigns");
+    expect(m.calls).not.toContain("@assign:other");
+  });
+
   it("marks the native hash forms with the receiver each one ends in", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -2143,6 +2231,57 @@ describe("body call capture", () => {
     expect(marks("update")).toEqual(["@assign", "@assign:options"]);
     expect(marks("merge")).toEqual(["@spread", "@spread:options"]);
     expect(marks("eachPair")).toEqual(["@entries", "@entries:options"]);
+  });
+
+  it("names a leading spread through super, superFn, `x || {}`, a string-keyed index and a conditional", () => {
+    const cls = extractFromSource(
+      `class Foo extends Bar {
+        sup() {
+          return { ...super.toH(), a: 1 };
+        }
+        fn(superFn: () => object) {
+          return { ...superFn(), a: 1 };
+        }
+        ored(options: object | null) {
+          return { ...(options || {}), allQueries: true };
+        }
+        keyed(result: Record<string, object>) {
+          return { ...((result["path_params"] as object) ?? {}), ...result };
+        }
+        cond(parent: Foo | object) {
+          return { ...(parent instanceof Foo ? parent.toH() : parent), ...this };
+        }
+      }`,
+    );
+    const marks = (name: string): string[] =>
+      cls.instanceMethods
+        .find((m) => m.name === name)!
+        .calls!.filter((c) => /^@spread\b/.test(c))
+        .sort();
+    expect(marks("sup")).toEqual(["@spread", "@spread:super"]);
+    expect(marks("fn")).toEqual(["@spread", "@spread:super"]);
+    expect(marks("ored")).toEqual(["@spread", "@spread:options"]);
+    expect(marks("keyed")).toEqual(["@spread", "@spread:pathParams"]);
+    expect(marks("cond")).toEqual(["@spread", "@spread:parent", "@spread:toH"]);
+  });
+
+  it("marks a plain-object construction for HashWithIndifferentAccess.new, and nothing for new Foo()", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        empty() { return {}; }
+        nullProto() { return Object.create(null); }
+        hwia() { return new HashWithIndifferentAccess(); }
+        other() { return new Foo(); }
+        filled() { return { a: 1 }; }
+      }`,
+    );
+    const object = (name: string): boolean =>
+      cls.instanceMethods.find((m) => m.name === name)!.calls?.includes("@object") ?? false;
+    expect(object("empty")).toBe(true);
+    expect(object("nullProto")).toBe(true);
+    expect(object("hwia")).toBe(true);
+    expect(object("other")).toBe(false);
+    expect(object("filled")).toBe(false);
   });
 
   it("names no receiver for a native hash form over an element access", () => {
@@ -2221,6 +2360,91 @@ describe("body call capture", () => {
     expect(m.callSeq!.some((c) => c.startsWith("@"))).toBe(false);
   });
 
+  it("marks the native value forms an Array, Hash, Numeric or String call ports as", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        ported(xs: unknown[], ys: unknown[], h: Record<string, number>, n: number, s: string) {
+          xs.filter((x) => x != null);
+          [...new Set(xs)];
+          Array.from(new Set([...xs, ...ys]));
+          xs.slice(0, 2);
+          xs.slice(2);
+          xs.filter((x) => x === 1).length;
+          Object.fromEntries(xs as [string, number][]);
+          xs.map((x, i) => [x, ys[i]]);
+          Object.keys(h);
+          Object.fromEntries(Object.entries(h).map(([k, v]) => [k, v + 1]));
+          for (const v of Object.values(h)) use(v);
+          ["a"].map((k) => h[k]);
+          const copy = { ...h };
+          const { a, "b": b, ...rest } = h;
+          Number.parseInt(s, 10);
+          Number.parseFloat(s);
+          Math.sign(n) * Math.round(Math.abs(n));
+          Number.isNaN(n);
+          s.trim();
+          s.trimEnd();
+          s.endsWith("x") ? s.slice(0, -1) : s;
+        }
+        unported(xs: unknown[], h: Record<string, number>, n: number, s: string, k: string) {
+          xs.filter((x) => x !== 1);
+          xs.slice(1, 2);
+          xs.sort((a, b) => 0);
+          Number.parseInt(s);
+          Math.round(n);
+          Math.trunc(n);
+          xs.toSorted();
+          new Map(xs as [string, number][]);
+          s.endsWith("x") ? k.slice(1) : s;
+          s.endsWith("xy") ? s.slice(1) : s;
+          const { [k]: picked, ...others } = h;
+          const { only } = h;
+          return { a: h.a };
+        }
+      }`,
+    );
+    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls ?? [];
+    for (const form of [
+      "compact",
+      "uniq",
+      "union",
+      "take",
+      "drop",
+      "count",
+      "toH",
+      "zip",
+      "keys",
+      "values",
+      "transformValues",
+      "eachValue",
+      "valuesAt",
+      "dup",
+      "except",
+      "toI",
+      "toF",
+      "round",
+      "isNaN",
+      "trim",
+      "trimEnd",
+      "chomp",
+    ]) {
+      expect(calls("ported")).toContain(`@${form}`);
+    }
+    for (const form of [
+      "compact",
+      "take",
+      "sort",
+      "toI",
+      "toH",
+      "round",
+      "except",
+      "dup",
+      "chomp",
+    ]) {
+      expect(calls("unported")).not.toContain(`@${form}`);
+    }
+  });
+
   it("marks an unshift() call as a native form", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -2280,14 +2504,14 @@ describe("body call capture", () => {
     expect(calls("schedule")).not.toContain("@timer");
   });
 
-  it("records rbFSend / rbFPublicSend of a string-literal name as a call to that name", () => {
+  it("records rbFSend of a string-literal name as a call to that name", () => {
     const cls = extractFromSource(
       `class Foo {
         first(records: unknown[], limit: number) {
           return rbFSend(records, "limit", limit);
         }
         assign(record: object, k: string, v: unknown) {
-          return rbFPublicSend(record, "write", v);
+          return rbFSend(record, "write", v);
         }
         dispatch(record: object, name: string) {
           return rbFSend(record, name);
@@ -2296,24 +2520,8 @@ describe("body call capture", () => {
     );
     const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
     expect(calls("first")).toEqual(expect.arrayContaining(["rbFSend", "limit"]));
-    expect(calls("assign")).toEqual(expect.arrayContaining(["rbFPublicSend", "write"]));
+    expect(calls("assign")).toEqual(expect.arrayContaining(["rbFSend", "write"]));
     expect(calls("dispatch")).toEqual(["@invoked:rbFSend", "rbFSend"]);
-  });
-
-  it("marks the String(x) conversion call as a native form", () => {
-    const cls = extractFromSource(
-      `class Foo {
-        plain(order: unknown) {
-          return String(order);
-        }
-        boxed(order: unknown) {
-          return new String(order);
-        }
-      }`,
-    );
-    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
-    expect(calls("plain")).toContain("@String");
-    expect(calls("boxed") ?? []).not.toContain("@String");
   });
 
   it("marks a call INVOKED on another object with the foreign-read prefix", () => {
@@ -2988,6 +3196,15 @@ describe("extractInternalFileConstants", () => {
   });
 });
 
+describe("extractFileConstantReceipts", () => {
+  it("maps each receipted exported literal const to its reason", () => {
+    const src = `/** @noRailsEquivalent PERMANENT */ export const TAGGED = 1;
+      export const BARE = 2;
+      /** @noRailsEquivalent PERMANENT */ export const NOT_A_LITERAL = compute();`;
+    expect(extractFileConstantReceipts(compile(src).sourceFile)).toEqual({ TAGGED: "PERMANENT" });
+  });
+});
+
 describe("resolveRelModule", () => {
   it("resolves a sibling .js import", () => {
     expect(resolveRelModule("migration.ts", "./migration-errors.js")).toBe("migration-errors.ts");
@@ -3280,6 +3497,60 @@ export function classAttribute(this: any, ...attrs: any[]): void {}`,
 }
 
 describe("extractFromProgram — include() detection", () => {
+  it("counts a plain module's members in the module's file, not the includer's", () => {
+    const info = extractFromFiles("/p", {
+      "autosave.ts": `
+        export const Autosave = {
+          /** @internal */
+          saveBelongsTo(): void {},
+        };
+      `,
+      "persistence.ts": `
+        /** @internal */
+        export function createOrUpdate(): void {}
+        export const Persistence = { createOrUpdate };
+      `,
+      "base.ts": `
+        import { include } from "@blazetrails/activesupport";
+        import { Autosave } from "./autosave.js";
+        import { Persistence } from "./persistence.js";
+        export class Base {}
+        include(Base, Autosave);
+        include(Base, Persistence);
+      `,
+    });
+    const classes = Object.values(info.classes);
+    const modules = Object.values(info.modules);
+    const internal = (file: string): number =>
+      countTsInternalNames(file, classes, modules, info.fileFunctions?.[file], []);
+    expect(classOf(info, "Base").instanceMethods.map((m) => [m.name, m.declaredIn])).toEqual([
+      ["saveBelongsTo", "autosave.ts"],
+      ["createOrUpdate", "persistence.ts"],
+    ]);
+    expect([internal("base.ts"), internal("autosave.ts"), internal("persistence.ts")]).toEqual([
+      0, 1, 1,
+    ]);
+  });
+
+  it("credits an `included do` hook's attribute macro and `helper do` defs to the module", () => {
+    const info = extractFromFiles("/p", {
+      "translation-helper.ts": `
+        import { classAttribute } from "@blazetrails/activesupport";
+        export const TranslationHelper = { translate() {} } as { translate(): void };
+        (TranslationHelper as any).included(null, function (this: any) {
+          classAttribute.call(this, "debugMissingTranslation");
+          this.helper((helper: object) => {
+            Object.assign(helper, { isProtectAgainstForgery(): boolean { return false; } });
+          });
+        });
+      `,
+    });
+    const mod = info.modules["translation-helper.ts:TranslationHelper"];
+    expect(mod.instanceMethods.map((m) => m.name)).toEqual(
+      expect.arrayContaining(["debugMissingTranslation", "isProtectAgainstForgery"]),
+    );
+  });
+
   it("records `export const X = { ... }` as a module with method names", () => {
     const info = extractFromFiles("/p", {
       "predications.ts": `
@@ -3871,6 +4142,29 @@ describe("extractFromProgram — Object.defineProperty wiring", () => {
     expect(m.params).toEqual([{ name: "attribute", kind: "required", type: "string" }]);
   });
 
+  it("carries a @noRailsEquivalent receipt on a get/set defineProperty statement", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `
+        export class Base {}
+        /**
+         * @noRailsEquivalent PERMANENT
+         */
+        Object.defineProperty(Base.prototype, "message", {
+          configurable: true,
+          get() {
+            return "";
+          },
+          set(value: unknown) {},
+        });
+      `,
+    });
+    const members = info.classes["base.ts:Base"].instanceMethods.filter(
+      (x) => x.name === "message",
+    );
+    expect(members.length).toBe(2);
+    for (const m of members) expect(m.noRailsEquivalent).toBe("PERMANENT");
+  });
+
   it("credits for-of loop over [name, fn][] array to host class (Pattern B)", () => {
     const info = extractFromFiles("/p", {
       "base.ts": `export class Base {}`,
@@ -3978,6 +4272,25 @@ describe("extractFromProgram — name-list prototype generator", () => {
       { name: "this", kind: "required", type: "CommandRecorder" },
       { name: "args", kind: "rest", type: "unknown[]" },
     ]);
+  });
+
+  it("credits a for-of over an inline array defining a non-enumerable value on the prototype", () => {
+    const info = extractFromFiles("/p", {
+      "selector.ts": `
+        export class DateTimeSelector {}
+        for (const method of ["sec", "min"]) {
+          Object.defineProperty(DateTimeSelector.prototype, method, {
+            value: function (this: DateTimeSelector): unknown {
+              return method;
+            },
+            writable: true,
+            configurable: true,
+          });
+        }
+      `,
+    });
+    const names = info.classes["selector.ts:DateTimeSelector"].instanceMethods.map((m) => m.name);
+    expect(names).toEqual(expect.arrayContaining(["sec", "min"]));
   });
 
   it("credits nothing when the name list is imported rather than same-file", () => {
@@ -4665,10 +4978,31 @@ describe("extractFromProgram — re-export attribution", () => {
     expect(info.classes["adapters.ts:AbstractAdapter"].reExportedFrom).toBe(
       "adapters/abstract-adapter.ts:AbstractAdapter",
     );
-    expect(info.modules["adapters.ts:ConnectionPool"].reExportedFrom).toBe(
-      "adapters/pool.ts:ConnectionPool",
-    );
+    expect(info.modules["adapters.ts:ConnectionPool"]).toBeUndefined();
     expect(info.classes["adapters.ts:LocalHelper"].reExportedFrom).toBeUndefined();
+  });
+
+  it("records a re-exported plain module once, at its declaring file", () => {
+    const info = extractFromFiles("/p", {
+      "connection-adapters/deduplicable.ts": `
+        export const Deduplicable = {
+          /** @internal */
+          deduplicated() {},
+        };
+      `,
+      "connection-adapters.ts": `export { Deduplicable } from "./connection-adapters/deduplicable.js";`,
+    });
+    const classes = Object.values(info.classes);
+    const modules = Object.values(info.modules);
+
+    expect(info.modules["connection-adapters.ts:Deduplicable"]).toBeUndefined();
+    expect(
+      countTsInternalNames("connection-adapters/deduplicable.ts", classes, modules, undefined, []),
+    ).toBe(1);
+    expect(countTsInternalNames("connection-adapters.ts", classes, modules, undefined, [])).toBe(0);
+    expect(
+      collectTsFileNames("connection-adapters.ts", classes, modules, undefined).has("Deduplicable"),
+    ).toBe(false);
   });
 
   it("re-syncs a clone's extendsFiles, which the include pass writes after cloning", () => {
@@ -5504,6 +5838,31 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toBeUndefined();
   });
 
+  it("marks an interface's own @internal members internal unless a receipt yields", () => {
+    const info = extractFromFiles("/p", {
+      "behavior.ts": `
+        export interface Behavior {
+          /** @internal */
+          buildResponse(klass: unknown): unknown;
+          /** @internal */
+          _htmlDocument?: unknown;
+          /**
+           * @internal
+           * @noRailsEquivalent PERMANENT
+           */
+          wrapExecution(block: () => unknown): unknown;
+          process(action: string): unknown;
+        }
+      `,
+    });
+    const iface = info.classes["behavior.ts:Behavior"] ?? info.modules["behavior.ts:Behavior"];
+    const internal = (name: string) => iface.instanceMethods.find((m) => m.name === name)!.internal;
+    expect(internal("buildResponse")).toBe(true);
+    expect(internal("_htmlDocument")).toBe(true);
+    expect(internal("wrapExecution")).toBeUndefined();
+    expect(internal("process")).toBeUndefined();
+  });
+
   it("records interface property signatures alongside method signatures", () => {
     const info = extractFromFiles("/p", {
       "locator.ts": `
@@ -5657,6 +6016,29 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
         `,
       }),
     ).toThrow(/@noRailsEquivalent needs a reason/);
+  });
+
+  it("throws with file:line when a CONVERGEABLE tag names no story id", () => {
+    for (const reason of ["CONVERGEABLE", "CONVERGEABLE — prose", "CONVERGEABLE (story: x-y)"]) {
+      expect(() =>
+        extractFromFiles("/p", {
+          "seams.ts": `\n/** @noRailsEquivalent ${reason} */\nexport class Seam {}\n`,
+        }),
+      ).toThrow(/CONVERGEABLE needs a story id: .*seams\.ts:2/);
+    }
+  });
+
+  it("accepts a CONVERGEABLE tag whose first token is a story id, and a bare PERMANENT", () => {
+    const info = extractFromFiles("/p", {
+      "seams.ts": `
+        /** @noRailsEquivalent CONVERGEABLE port-the-seam — the reason */
+        export class Seam {}
+        /** @noRailsEquivalent PERMANENT */
+        export class Fact {}
+      `,
+    });
+    const reasons = Object.values(info.classes).map((c) => c.noRailsEquivalent);
+    expect(reasons).toEqual(["CONVERGEABLE port-the-seam — the reason", "PERMANENT"]);
   });
 
   it("throws when the tag carries no reason", () => {
@@ -7033,6 +7415,16 @@ describe("declaringFile (RFC 0126)", () => {
     );
   });
 
+  it("qualifies a package extracted from inside this one's src by that package", () => {
+    const trailties = packageSrcDir("trailties");
+    expect(declaringFile(symbolAt(`${packageSrcDir("thor")}/error.ts`), trailties)).toBe(
+      "pkg:thor:error.ts",
+    );
+    expect(declaringFile(symbolAt(`${trailties}/generators/base.ts`), trailties)).toBe(
+      "generators/base.ts",
+    );
+  });
+
   it("marks a TypeScript lib global external", () => {
     // `class Cleaner extends Error` — no package entity is `Error`, and the
     // walk must follow nothing rather than proximity-guess between same-named
@@ -7163,6 +7555,13 @@ describe("extractFromProgram — defineModule section visibility", () => {
     }
     return out;
   }
+
+  it("records an empty defineModule so an include of it resolves", () => {
+    const info = extractFromFiles("/p", {
+      "mod.ts": `export const Mod = defineModule({}) as { run(): void };`,
+    });
+    expect(info.modules["mod.ts:Mod"]).toBeDefined();
+  });
 
   it("stamps protected and private sections onto their top-level functions", () => {
     expect(
@@ -7394,6 +7793,51 @@ describe("extractFromProgram — a Module on a static property", () => {
   });
 });
 
+describe("extractFromProgram — aliasMethod on another file's module", () => {
+  it("credits the alias of a file function the file seats on that module", () => {
+    const info = extractFromFiles("/p", {
+      "live.ts": `export const Live = new Module();`,
+      "test-case.ts": `import { Live } from "./live.js";
+        Live.aliasMethod("originalNewControllerThread", "newControllerThread");
+        export function newControllerThread(block: () => void): void {}
+        Live.defineMethod("newControllerThread", newControllerThread);`,
+    });
+    expect(info.fileFunctions!["test-case.ts"].map((f) => [f.name, f.aliasOf])).toEqual([
+      ["newControllerThread", undefined],
+      ["originalNewControllerThread", "newControllerThread"],
+    ]);
+  });
+
+  it("does not credit an aliasMethod whose receiver is not an imported Module", () => {
+    const info = extractFromFiles("/p", {
+      "live.ts": `export const Live = { aliasMethod(a: string, b: string) {} };`,
+      "test-case.ts": `import { Live } from "./live.js";
+        Live.aliasMethod("originalNewControllerThread", "newControllerThread");
+        export function newControllerThread(block: () => void): void {}`,
+    });
+    expect(info.fileFunctions!["test-case.ts"].map((f) => f.name)).toEqual(["newControllerThread"]);
+  });
+});
+
+describe("extractFromProgram — configAccessor() generated accessors", () => {
+  it("credits the class and instance accessors on the module whose included hook calls it", () => {
+    const info = extractFromFiles("/p", {
+      "request-forgery-protection.ts": `
+        export const RequestForgeryProtection = {
+          included(base: any): void {
+            base.configAccessor("perFormCsrfTokens");
+          },
+        };
+      `,
+    });
+    const mod = info.modules["request-forgery-protection.ts:RequestForgeryProtection"];
+    const seat = (members: MethodInfo[]) =>
+      members.filter((m) => m.name === "perFormCsrfTokens").map((m) => m.writer === true);
+    expect(seat(mod.classMethods)).toEqual([false, true]);
+    expect(seat(mod.instanceMethods)).toEqual([false, true]);
+  });
+});
+
 describe("extractFromProgram — classAttribute() generated accessors", () => {
   const TZ = `
     import { classAttribute } from "@blazetrails/activesupport";
@@ -7499,7 +7943,22 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
         };
         Deduplicable.defineMethod("deduplicate", function () {});
       `,
+      "logging.ts": `
+        import { cattrAccessor, Concern, extend, Module } from "@blazetrails/activesupport";
+        export const Logging = new Module();
+        extend(Logging, Concern);
+        Concern.included.call(Logging as never, null, function (this: object) {
+          cattrAccessor.call(this, "logger", { default: null });
+        });
+        Logging.defineMethod("tagLogger", function () {});
+      `,
     });
+    expect(
+      [
+        ...info.modules["logging.ts:Logging"].classMethods,
+        ...info.modules["logging.ts:Logging"].instanceMethods,
+      ].some((m) => m.name === "logger"),
+    ).toBe(true);
     const seats = (c: ClassInfo, name: string) =>
       [...c.classMethods, ...c.instanceMethods]
         .filter((m) => m.name === name)
@@ -7537,6 +7996,85 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(seats("config")).toEqual(["static", "instance"]);
     expect(seats("listeners")).toEqual(["static", "static writer", "instance", "instance writer"]);
     expect(seats("isConfig")).toEqual([]);
+  });
+
+  it("credits attrInternal on a moduleEval carrier as the module's instance reader and writer", () => {
+    const info = extractFromFiles("/p", {
+      "form-helper.ts": `
+        import { attrInternal, attrInternalReader } from "@blazetrails/activesupport";
+        import { Module } from "@blazetrails/ruby-compat";
+        export const FormHelper = new Module((mod) => {
+          mod.moduleEval((m) => {
+            attrInternal.call(m, "defaultFormBuilder");
+            attrInternalReader.call(m, "builder");
+          });
+          /** @internal */
+          mod.moduleEval((m) => attrInternal.call(m, "secret"));
+        });
+      `,
+    });
+    const mod = info.modules["form-helper.ts:FormHelper"];
+    const seats = (name: string) =>
+      [...mod.classMethods, ...mod.instanceMethods]
+        .filter((m) => m.name === name)
+        .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
+    expect(seats("defaultFormBuilder")).toEqual(["instance", "instance writer"]);
+    expect(seats("builder")).toEqual(["instance"]);
+    expect(mod.instanceMethods.filter((m) => m.name === "secret").map((m) => m.internal)).toEqual([
+      true,
+      true,
+    ]);
+  });
+
+  it("credits top-level attrInternal and delegate on a class's prototype", () => {
+    const info = extractFromFiles("/p", {
+      "controller-helper.ts": `
+        import { attrInternal, delegate } from "@blazetrails/activesupport";
+        const DELEGATES = ["params", "session"] as const;
+        export class ControllerHelper {}
+        attrInternal.call(ControllerHelper.prototype, "controller");
+        delegate.call(ControllerHelper.prototype, ...DELEGATES, { to: "controller" });
+        delegate.call(ControllerHelper.prototype, "flash", { to: "controller", prefix: true });
+      `,
+    });
+    const klass = info.classes["controller-helper.ts:ControllerHelper"];
+    const seats = (name: string) =>
+      [...klass.classMethods, ...klass.instanceMethods]
+        .filter((m) => m.name === name)
+        .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
+    expect(seats("controller")).toEqual(["instance", "instance writer"]);
+    expect(seats("params")).toEqual(["instance"]);
+    expect(seats("session")).toEqual(["instance"]);
+    expect(seats("flash")).toEqual([]);
+  });
+
+  it("seats a cattrAccessor inside an onLoad block on the hook's module", () => {
+    const info = extractFromFiles("/p", {
+      "form-helper.ts": `
+        import { cattrAccessor, onLoad } from "@blazetrails/activesupport";
+        onLoad("action_view", (base) => {
+          cattrAccessor.call(base, "defaultFormBuilder", { instanceReader: false, instanceWriter: false });
+        });
+      `,
+    });
+    const mod = info.modules["form-helper.ts:ActionView"];
+    expect(mod.classMethods.map((m) => `${m.name}${m.writer ? "=" : ""}`)).toEqual([
+      "defaultFormBuilder",
+      "defaultFormBuilder=",
+    ]);
+    expect(mod.instanceMethods).toEqual([]);
+  });
+
+  it("does not seat a cattrAccessor inside a lifecycle onLoad block on a module", () => {
+    const info = extractFromFiles("/p", {
+      "railtie.ts": `
+        import { cattrAccessor, onLoad } from "@blazetrails/activesupport";
+        onLoad("after_initialize", (base) => {
+          cattrAccessor.call(base, "logger");
+        });
+      `,
+    });
+    expect(Object.keys(info.modules).filter((k) => k.startsWith("railtie.ts:"))).toEqual([]);
   });
 
   it("credits a Module's attrReader / attrWriter with the instance half each installs", () => {
@@ -7866,10 +8404,60 @@ describe("extractClass — @inlinedFrom on a constructor", () => {
     ]);
   });
 
-  it("records nothing on an untagged constructor or a tagged method", () => {
+  it("records nothing on an untagged constructor, and a tagged method's tags", () => {
     const got = extractFromSource(
       `class Foo {\n  constructor() {}\n  /** @inlinedFrom ${api} */\n  save() {}\n}`,
     ).instanceMethods;
-    expect(got.map((m) => m.inlinedFrom)).toEqual([undefined, undefined]);
+    expect(got.map((m) => m.inlinedFrom?.map((t) => t.module))).toEqual([
+      undefined,
+      ["ActiveModel::API"],
+    ]);
+  });
+});
+
+describe("a top-level rbModDefineMethod seat", () => {
+  it("is recorded as a method of the file, with params and call set", () => {
+    const info = extractFromFiles("/p", {
+      "core-ext.ts": `
+        rbModDefineMethod(rbCNilClass, "toMsgpackWithPacker", function (this: null, packer: Packer) {
+          packer.writeNil();
+          return packer;
+        });
+      `,
+    });
+    const [seat] = fileFunctionsOf(info, "core-ext.ts");
+    expect(seat.name).toBe("toMsgpackWithPacker");
+    expect(seat.params.map((p) => p.name)).toEqual(["this", "packer"]);
+    expect(seat.callSeq).toEqual(["writeNil"]);
+    expect(seat.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("carries the @noRailsEquivalent receipt written above the call", () => {
+    const info = extractFromFiles("/p", {
+      "object.ts": `
+        /**
+         * Integer#integer?
+         * @noRailsEquivalent PERMANENT
+         */
+        rbModDefineMethod(rbCInteger, "isInteger", () => true);
+      `,
+    });
+    const [seat] = fileFunctionsOf(info, "object.ts");
+    expect(seat.noRailsEquivalent).toMatch(/^PERMANENT/);
+  });
+
+  it("records one seat per name a for-of literal list defines", () => {
+    const info = extractFromFiles("/p", {
+      "proxy.ts": `
+        for (const severity of ["debug", "info"] as const) {
+          rbModDefineMethod(Proxy, severity, function (message: unknown = null) {
+            return this.log(severity, message);
+          });
+        }
+      `,
+    });
+    const seats = fileFunctionsOf(info, "proxy.ts");
+    expect(seats.map((s) => s.name)).toEqual(["debug", "info"]);
+    expect(seats[0].callSeq).toEqual(["log"]);
   });
 });

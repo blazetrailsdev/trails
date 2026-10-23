@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Collector as AbstractCollector } from "../../abstract-controller/collector.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { NullType } from "../../action-dispatch/http/mime-type.js";
@@ -38,6 +40,7 @@ export class Collector {
     return this.any(...args);
   }
 
+  /** @missingRailsName variant — PERMANENT */
   custom(mimeType: MimeType | string, block?: FormatHandler | VariantBlock): Response {
     if (!(mimeType instanceof MimeType)) mimeType = MimeType.lookup(String(mimeType));
     let response = this._responses.get(mimeType);
@@ -48,11 +51,13 @@ export class Collector {
     return response;
   }
 
+  /** @missingRailsName responses — PERMANENT */
   isAnyResponse(): boolean {
     const own = fetch(this._responses, this.format, false);
     return !(own != null && own !== false) && this._responses.get(MimeType.ALL) != null;
   }
 
+  /** @missingRailsName variant — PERMANENT */
   get response(): FormatHandler | null | undefined {
     const response = fetch(this._responses, this.format, this._responses.get(MimeType.ALL));
     if (response instanceof VariantCollector) {
@@ -113,6 +118,8 @@ export function respondTo(
   }
 }
 
+export const MimeResponds = { respondTo };
+
 export class VariantCollector {
   private _variant: readonly string[] | null;
   private _variants = new Map<string, FormatHandler>();
@@ -165,3 +172,5 @@ const VARIANT_COLLECTOR_HANDLER: ProxyHandler<VariantCollector> = {
     return (block?: FormatHandler): void => target.methodMissing(prop, block);
   },
 };
+
+rbModConstSet(ActionController, "MimeResponds", MimeResponds);

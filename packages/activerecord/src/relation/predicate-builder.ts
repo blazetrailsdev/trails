@@ -2,7 +2,7 @@ import {
   ArgumentError,
   last,
   rbCBasicObject as BasicObject,
-  rbFPublicSend,
+  rbFSend,
   rbModConstSet,
   rbObjAsString as toS,
   rbObjIsKindOf,
@@ -12,6 +12,7 @@ import {
   Set,
   toH,
   zip,
+  eachWithObject,
 } from "@blazetrails/ruby-compat";
 import type * as Arel from "@blazetrails/arel";
 import { Nodes, sql } from "@blazetrails/arel";
@@ -120,7 +121,7 @@ export class PredicateBuilder {
         if (mapping.length === 1 || values.length === 0) {
           const [columnName, aggrAttr] = mapping[0];
           values = values.map((object) =>
-            rbObjRespondTo(object, aggrAttr) ? rbFPublicSend(object, aggrAttr) : object,
+            rbObjRespondTo(object, aggrAttr) ? rbFSend(object, aggrAttr) : object,
           );
           return this.get(columnName, values);
         } else {
@@ -148,7 +149,7 @@ export class PredicateBuilder {
     queries = queries as (Nodes.Node | Nodes.SqlLiteral)[][];
     if (queries.length === 1) return queries[0];
     queries = queries.map((query) =>
-      query.reduce((left, right) => rbFPublicSend(left, "and", right) as Nodes.Node),
+      query.reduce((left, right) => (left as Nodes.Node).and(right as Nodes.Node)),
     );
     queries = new Nodes.Or(queries);
     return [new Nodes.Grouping(queries)];
@@ -168,7 +169,7 @@ export class PredicateBuilder {
       )
     ) {
       const bind = this.buildBindAttribute(toS(attribute.name), value);
-      return rbFPublicSend(attribute, operator, bind) as Nodes.Node;
+      return rbFSend(attribute, operator, bind) as Nodes.Node;
     } else {
       return this.handlerFor(value).call(attribute, value);
     }
@@ -202,16 +203,18 @@ export class PredicateBuilder {
   }
 
   static references(attributes: string[] | Attributes): Nodes.SqlLiteral[] {
-    const result: Nodes.SqlLiteral[] = [];
     let idx: number;
-    for (const [key, value] of entriesOf(attributes)) {
-      if (isPlainObject(value)) {
-        result.push(sql(key as string, { retryable: true }));
-      } else if ((idx = key.lastIndexOf(".")) !== -1) {
-        result.push(sql((key as string).slice(0, idx), { retryable: true }));
-      }
-    }
-    return result;
+    return eachWithObject(
+      entriesOf(attributes),
+      [] as Nodes.SqlLiteral[],
+      ([key, value], result) => {
+        if (isPlainObject(value)) {
+          result.push(sql(key as string, { retryable: true }));
+        } else if ((idx = key.lastIndexOf(".")) !== -1) {
+          result.push(sql((key as string).slice(0, idx), { retryable: true }));
+        }
+      },
+    );
   }
 
   references(): string[] {
@@ -219,32 +222,34 @@ export class PredicateBuilder {
   }
 
   private convertDotNotationToHash(attributes: Attributes): Attributes {
-    const converted = new Map<string | string[], unknown>();
     let existing: Record<string, unknown> | undefined;
     let idx: number;
-    for (const [key, value] of entriesOf(attributes)) {
-      if (isPlainObject(value)) {
-        if ((existing = converted.get(key) as Record<string, unknown> | undefined)) {
-          Object.assign(existing, value);
-        } else {
-          converted.set(key, { ...value });
-        }
-      } else if ((idx = key.lastIndexOf(".")) !== -1) {
-        const [tableName, columnName] = [
-          (key as string).slice(0, idx),
-          (key as string).slice(idx + 1),
-        ];
+    return eachWithObject(
+      entriesOf(attributes),
+      new Map<string | string[], unknown>(),
+      ([key, value], converted) => {
+        if (isPlainObject(value)) {
+          if ((existing = converted.get(key) as Record<string, unknown> | undefined)) {
+            Object.assign(existing, value);
+          } else {
+            converted.set(key, { ...value });
+          }
+        } else if ((idx = key.lastIndexOf(".")) !== -1) {
+          const [tableName, columnName] = [
+            (key as string).slice(0, idx),
+            (key as string).slice(idx + 1),
+          ];
 
-        if ((existing = converted.get(tableName) as Record<string, unknown> | undefined)) {
-          existing[columnName] = value;
+          if ((existing = converted.get(tableName) as Record<string, unknown> | undefined)) {
+            existing[columnName] = value;
+          } else {
+            converted.set(tableName, { [columnName]: value });
+          }
         } else {
-          converted.set(tableName, { [columnName]: value });
+          converted.set(key, value);
         }
-      } else {
-        converted.set(key, value);
-      }
-    }
-    return converted as Map<unknown, unknown>;
+      },
+    ) as Map<unknown, unknown>;
   }
 
   private handlerFor(object: unknown): { call(attr: Arel.Attribute, value: any): Nodes.Node } {

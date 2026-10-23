@@ -1,12 +1,17 @@
-import { DescendantsTracker, runLoadHooks, underscore } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { camelize, DescendantsTracker, runLoadHooks, underscore } from "@blazetrails/activesupport";
+import { Base as JobBase } from "@blazetrails/activejob";
+import { getFs, getPath, registerConstant } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { Root } from "../paths.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { DrawCallback } from "@blazetrails/actionpack";
-import { controllerConstants, type DispatchableControllerClass } from "@blazetrails/actionpack";
+import {
+  ActionController,
+  controllerConstants,
+  type DispatchableControllerClass,
+} from "@blazetrails/actionpack";
 import { Base, registerModel } from "@blazetrails/activerecord";
 
 export interface FinisherRoutes {
@@ -70,7 +75,9 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   for (const [name, klass] of await loadControllers(this.paths())) {
     controllerConstants.set(name, klass);
   }
+  for (const klass of controllerConstants.values()) await defineController(klass);
   registerModel(await loadModels(this.paths()));
+  await loadJobs(this.paths());
 });
 
 Finisher.initializer(
@@ -242,6 +249,55 @@ async function collectControllers(
         const name = `${prefix}${underscore(match[1].replace(/-/g, "_"))}`;
         out.set(name, value as DispatchableControllerClass);
       }
+    }
+  }
+}
+
+const definedControllers = new WeakSet<object>();
+
+/** @noRailsEquivalent PERMANENT */
+async function defineController(klass: object): Promise<void> {
+  const base = ActionController.Base;
+  if (!((klass as { prototype: unknown }).prototype instanceof base)) return;
+
+  const superclass = Object.getPrototypeOf(klass) as object;
+  if (superclass !== base) await defineController(superclass);
+
+  if (definedControllers.has(klass)) return;
+  definedControllers.add(klass);
+  await ActionController.Railties.Helpers.inherited(
+    klass as ActionController.HelpersPathControllerClass,
+  );
+}
+
+/** @noRailsEquivalent PERMANENT */
+async function loadJobs(paths: Root): Promise<void> {
+  const node = paths.get("app");
+  if (!node) return;
+
+  const p = getPath();
+  for (const dir of await node.existentDirectories()) {
+    if (p.basename(dir) === "jobs") await collectJobs(dir, "");
+  }
+}
+
+/** @internal */
+async function collectJobs(dir: string, prefix: string): Promise<void> {
+  const fs = getFs();
+  const p = getPath();
+  for (const entry of await fs.readdir!(dir)) {
+    const full = p.join(dir, entry);
+    if ((await fs.stat!(full)).isDirectory()) {
+      await collectJobs(full, `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}::`);
+      continue;
+    }
+    const match = entry.match(/^(.+)\.(?:ts|js)$/);
+    if (!match || /\.d\.ts$/.test(entry)) continue;
+    const mod = (await import(p.pathToFileURL!(full).href)) as Record<string, unknown>;
+    const cname = camelize(underscore(match[1].replace(/-/g, "_")));
+    const value = mod[cname];
+    if (typeof value === "function" && value.prototype instanceof JobBase) {
+      registerConstant(`${prefix}${cname}`, value);
     }
   }
 }

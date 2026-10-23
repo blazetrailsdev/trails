@@ -1,5 +1,6 @@
 import type { SafeBuffer } from "@blazetrails/activesupport";
-import { Module, isSymbol } from "@blazetrails/ruby-compat";
+import { isSymbol } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
 
@@ -16,14 +17,8 @@ export function _layoutFor(
   if (block && !isSymbol(name)) {
     return capture.call(this, block, ...args);
   } else {
-    return RenderingHelper.superMethod(this, "_layoutFor")!(...args) as
-      | SafeBuffer
-      | Promise<SafeBuffer>;
+    return rbCallSuper(this, _layoutFor, ...args) as SafeBuffer | Promise<SafeBuffer>;
   }
 }
 
-export const RenderingHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { _layoutFor });
-  });
-});
+export const RenderingHelper = { _layoutFor };

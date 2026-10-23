@@ -11,11 +11,11 @@ export class Statement {
   ) {}
 
   execute(...args: unknown[]): Promise<Mysql2Result | null> {
-    return this._execute(...args);
+    return this._execute(args);
   }
 
   /** @internal */
-  async _execute(...argv: unknown[]): Promise<Mysql2Result | null> {
+  async _execute(argv: unknown[]): Promise<Mysql2Result | null> {
     const [args, kwargs] = rbScanArgs<QueryOptions>(argv);
     const currentQueryOptions = { ...this.client.queryOptions, ...kwargs, cast: true };
     const result = storeResult(

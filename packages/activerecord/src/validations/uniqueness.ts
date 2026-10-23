@@ -94,7 +94,7 @@ export class UniquenessValidator extends EachValidator {
     let currentClass = record.constructor;
     let foundClass = null;
     for (;;) {
-      if (!currentClass.abstractClass) foundClass = currentClass;
+      if (!currentClass.isAbstractClass()) foundClass = currentClass;
       if (currentClass === this._klass) break;
       currentClass = rbClassSuperclass(currentClass);
     }
@@ -146,7 +146,7 @@ async function isValidationNeeded(
   attribute: string,
 ): Promise<boolean> {
   const options = validator.options;
-  if (options.conditions || Object.prototype.hasOwnProperty.call(options, "caseSensitive")) {
+  if (options.conditions || Object.hasOwn(options, "caseSensitive")) {
     return true;
   }
   const scope = Array.isArray(options.scope)

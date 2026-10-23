@@ -126,8 +126,7 @@ describe("WebServiceTest", () => {
     });
   });
 
-  // BLOCKED: request-params-pipeline-drops-a-hash-with-indifferent-access
-  it.skip("register and use json simple", async () => {
+  it("register and use json simple", async () => {
     await t.withTestRouteSet(async () => {
       await t.withParamsParsers(
         new Map([

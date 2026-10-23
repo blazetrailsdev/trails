@@ -128,6 +128,26 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     }
   }
 
+  it("files a module_function def as one module method, as module_function :name does", () => {
+    const fixtures = {
+      "action_cable.rb": `
+        module ActionCable
+          module_function def server
+            @server ||= 1
+          end
+          def ping; end
+          module_function :ping
+        end
+      `,
+    };
+    const names = (edge: string) =>
+      (rubyIncludes(fixtures, edge)["ActionCable"] as unknown as { name: string }[]).map(
+        (m) => m.name,
+      );
+    expect(names("classMethods")).toEqual(["server", "ping"]);
+    expect(names("instanceMethods")).toEqual([]);
+  });
+
   it("does not attribute an on_load block's include to the enclosing class", () => {
     // railtie.rb:271-273 — the module is included into ActiveJob::Base when
     // active_job loads, NOT into ActiveRecord::Railtie. Attributing it to the
@@ -267,6 +287,60 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
   function rubySkeletons(fixtures: Record<string, string>): Record<string, string[] | undefined> {
     return rubyField(fixtures, "skeleton");
   }
+
+  it("drops an elsif arm only include_private distinguishes, and nothing else", () => {
+    const fixtures = {
+      "foo.rb": `
+        class Foo
+          def respond_to?(method, include_private_methods = false)
+            if super
+              true
+            elsif !include_private_methods && super(method, true)
+              false
+            else
+              !matched_attribute_method(method.to_s).nil?
+            end
+          end
+
+          def other?(method, include_private = false)
+            if super
+              true
+            elsif ready?(method)
+              false
+            end
+          end
+
+          def probe(method)
+            super(method, true)
+          end
+
+          def bare?(method, include_all = false)
+            if super
+              true
+            elsif !include_all and respond_to? method, true
+              false
+            end
+          end
+        end
+      `,
+    };
+    const s = rubySkeletons(fixtures);
+    expect(s["Foo#respond_to?"]).toEqual([
+      "if",
+      "ref:super",
+      "ref:matched_attribute_method",
+      "ref:to_s",
+      "ref:nil?",
+    ]);
+    expect(s["Foo#other?"]).toEqual(["if", "ref:super", "if", "ref:ready?"]);
+    const marks = rubyField(fixtures, "visibilityArms");
+    expect(marks["Foo#respond_to?"]).toBe(true);
+    expect(marks["Foo#bare?"]).toBe(true);
+    expect(marks["Foo#other?"]).toBeNull();
+    expect(rubyField(fixtures, "callArgs")["Foo#probe"]).toEqual([
+      expect.objectContaining({ name: "super", args: ["id:method", "bool:true"] }),
+    ]);
+  });
 
   it("marks a send to a dynamically named setter", () => {
     const s = rubySkeletons({
@@ -634,6 +708,42 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(calls["Foo#script"]).toEqual(["nil?", "send"]);
   });
 
+  it("resolves a bare constant through the reading scope and its enclosing namespaces", () => {
+    const calls = rubyCalls({
+      "a.rb": `
+        module Http
+          class Csp
+            DIRECTIVES = { base_uri: "base-uri" }
+          end
+          class Other
+            FORMATS = { script: :capitalize }
+          end
+        end
+      `,
+      "b.rb": `
+        module Http
+          class Policy
+            DIRECTIVES = { camera: "camera" }
+            DIRECTIVES.each { |name, d| define_method(name) { d.to_s } }
+          end
+
+          FORMATS = { language: :downcase }
+          class Csp
+            class Inner
+              FORMATS.each { |name, f| define_method(name) { f.to_s } }
+            end
+          end
+        end
+      `,
+    });
+    expect(Object.keys(calls).filter((k) => k.startsWith("Http::Policy#"))).toEqual([
+      "Http::Policy#camera",
+    ]);
+    expect(Object.keys(calls).filter((k) => k.startsWith("Http::Csp::Inner#"))).toEqual([
+      "Http::Csp::Inner#language",
+    ]);
+  });
+
   it("reads a named capture bound by `=~` as a local, not a call", () => {
     const fixtures = {
       "foo.rb": `
@@ -723,6 +833,39 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
       `,
     });
     expect(s["Foo#check"]).toEqual(["ref:size"]);
+  });
+
+  it("records Kernel#fail as raise in a file with no fail of its own", () => {
+    const c = rubyCalls({
+      "foo.rb": `
+        class Foo
+          def a; fail "missing" unless ok?; end
+        end
+      `,
+      "bar.rb": `
+        class Bar
+          def get; fail(405, "no"); end
+          def fail(status, body); [status, body]; end
+        end
+      `,
+    });
+    expect(c["Foo#a"]).toEqual(["ok?", "raise"]);
+    expect(c["Bar#get"]).toEqual(["fail"]);
+  });
+
+  it("leaves a literal-new out of the call sequence", () => {
+    const c = rubyCalls({
+      "foo.rb": `
+        class Foo
+          def a
+            h = Hash.new
+            h[:x] = build
+            Cookie.new(h)
+          end
+        end
+      `,
+    });
+    expect(c["Foo#a"]).toEqual(["build", "new"]);
   });
 
   it("still reads a bare name as a call when the regexp is on the right of `=~`", () => {
@@ -1103,6 +1246,24 @@ describe(
       expect(c["Qux#d"].calls).toContain("new");
       expect(c["Qux#d"].calls?.filter((n) => n === "new")).toEqual(["new"]);
       expect(c["Qux#d"].calls).toContain("run");
+    });
+
+    it("drops a with_index chained after a block-less iterator, keeping an offset one", () => {
+      const c = rubyWeakCalls({
+        "indexed.rb": `
+        class Indexed
+          def f
+            columns.map.with_index { |c, i| c[i] }
+          end
+
+          def g
+            columns.map.with_index(1) { |c, i| c[i] }
+          end
+        end
+      `,
+      });
+      expect(c["Indexed#f"].calls).toEqual(["columns", "map"]);
+      expect(c["Indexed#g"].calls).toEqual(["columns", "map", "with_index"]);
     });
 
     it("drops the new a raise builds its error with, keeping any other new", () => {
@@ -2264,6 +2425,29 @@ describe("Ruby extractor file constants", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS 
     `);
     expect(c["OPTION_NAMES"]).toEqual({ kind: "expr" });
   });
+
+  it("records a bare constant reference as an alias with its target and namespace", () => {
+    const c = rubyFileConstants(`
+      module ActiveRecord
+        module Type
+          Value = ActiveModel::Type::Value
+          Root = ::Object
+          Registry = AdapterSpecificRegistry.new
+        end
+      end
+    `);
+    expect(c["Value"]).toEqual({
+      kind: "alias",
+      target: "ActiveModel::Type::Value",
+      namespace: "ActiveRecord::Type",
+    });
+    expect(c["Root"]).toEqual({
+      kind: "alias",
+      target: "::Object",
+      namespace: "ActiveRecord::Type",
+    });
+    expect(c["Registry"]).toEqual({ kind: "expr" });
+  });
 });
 
 describe(
@@ -2504,6 +2688,45 @@ describe(
       end
     `);
       expect(m["ActiveSupport::TimeWithZone"].map((x) => x.name)).toEqual(["year", "mon", "wday"]);
+    });
+
+    it("records the parameters of a class_eval heredoc def with an interpolated name", () => {
+      const m = metaMethods(`
+      module ActionController
+        class LogSubscriber
+          %w(write_fragment exist_fragment?).each do |method|
+            class_eval <<-METHOD, __FILE__, __LINE__ + 1
+              def #{method}(event)
+                return unless ActionController::Base.enable_fragment_cache_logging
+              end
+            METHOD
+          end
+        end
+      end
+    `);
+      expect(m["ActionController::LogSubscriber"].map((x) => [x.name, x.params])).toEqual([
+        ["write_fragment", [{ name: "event", kind: "required" }]],
+        ["exist_fragment?", [{ name: "event", kind: "required" }]],
+      ]);
+    });
+
+    it("records the parameter name of a class_eval heredoc writer def", () => {
+      const m = metaMethods(`
+      module ActiveSupport
+        class Options
+          %w(level).each do |name|
+            class_eval <<-EOV, __FILE__, __LINE__ + 1
+              def #{name}=(new_level)
+                @#{name} = new_level
+              end
+            EOV
+          end
+        end
+      end
+    `);
+      expect(m["ActiveSupport::Options"].map((x) => [x.name, x.params])).toEqual([
+        ["level=", [{ name: "new_level", kind: "required" }]],
+      ]);
     });
 
     it("keeps the literal suffix a class_eval def name carries after the loop variable", () => {
@@ -3278,6 +3501,25 @@ describe("Ruby extractor attr_reader flag", { timeout: RUBY_SUBPROCESS_TIMEOUT_M
     }
   }
 
+  it("records the reader and writer each attr_internal macro defines", () => {
+    const m = attrMethods(`
+      class Metal
+        attr_internal :view_runtime
+        attr_internal_reader :response
+        attr_internal_writer(:action_has_layout)
+        attr_internal_accessor :formats
+      end
+    `);
+    expect(m["Metal"].map((x) => x.name)).toEqual([
+      "view_runtime",
+      "view_runtime=",
+      "response",
+      "action_has_layout=",
+      "formats",
+      "formats=",
+    ]);
+  });
+
   // The flag is what tells compare.ts's checkCallArgs that `if foreign_key`
   // (schema_definitions.rb:241) is a FIELD read in the port, so it must not be
   // paired against the body's real `table.foreign_key(...)` call at :242.
@@ -3549,7 +3791,96 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
   });
 
-  it("names an argument-less Hash.new / Array.new a literal and String.new(x) a conversion", () => {
+  it("records a site on an arm no native form ports as formless", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/core.rb": `
+        class Core
+          def ported
+            [1].uniq
+            [3].count { |x| x }
+            1.5.round
+            "a\\n".chomp("\\n")
+          end
+
+          def formless
+            [1].uniq { |x| x }
+            [3].count
+            1.5.round(1)
+            2.5.round(0)
+            "a".chomp
+          end
+        end
+      `,
+    });
+    expect(c["Core#ported"]).toEqual({
+      uniq: ["array"],
+      count: ["array"],
+      round: ["numeric"],
+      chomp: ["string"],
+    });
+    expect(c["Core#formless"]).toEqual({
+      uniq: ["formless"],
+      count: ["formless"],
+      round: ["formless"],
+      chomp: ["formless"],
+    });
+  });
+
+  it("names HashWithIndifferentAccess.new with at most one argument an hwia-new", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/core.rb": `
+        class Core
+          def bare
+            ActiveSupport::HashWithIndifferentAccess.new
+          end
+
+          def wrapped(h)
+            HashWithIndifferentAccess.new(h)
+          end
+
+          def blocked
+            HashWithIndifferentAccess.new { |h, k| h[k] = 1 }
+          end
+        end
+      `,
+    });
+    expect(c["Core#bare"]).toEqual({ new: ["hwia-new"] });
+    expect(c["Core#wrapped"]).toEqual({ new: ["hwia-new"] });
+    expect(c["Core#blocked"]).toEqual({ new: ["const"] });
+  });
+
+  it("names a merge receiver through super, a chained merge, (x || {}) and Hash[pairs]", () => {
+    const names = rubyCallReceivers(
+      {
+        "lib/active_support/core.rb": `
+          class Core
+            def sup
+              super.merge(a: 1)
+            end
+
+            def chained
+              as_options(x).merge(conditional_options).merge(slice)
+            end
+
+            def ored(options)
+              (options || {}).merge(all_queries: true)
+            end
+
+            def pairs(list)
+              Hash[list].merge(@defaults)
+            end
+          end
+        `,
+      },
+      "callReceiverNames",
+    );
+    expect(names["Core#sup"]).toEqual({ merge: ["super"] });
+    expect(names["Core#chained"]).toEqual({ merge: ["as_options"] });
+    expect(names["Core#ored"]).toEqual({ merge: ["options"] });
+    expect(names["Core#pairs"]).toEqual({ merge: ["from_entries"] });
+  });
+
+  it("names an argument-less Hash.new / Array.new / String.new a literal and String.new(x) a conversion", () => {
     const c = rubyCallReceivers({
       "lib/active_support/core.rb": `
         class Core
@@ -3589,18 +3920,23 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
           def empty_string
             String.new
           end
+
+          def top_level(order)
+            ::String.new(order)
+          end
         end
       `,
     });
-    expect(c["Core#literal"]).toEqual({ new: ["literal-new"], tap: ["expr"] });
-    expect(c["Core#concurrent"]).toEqual({ new: ["literal-new"] });
+    expect(c["Core#literal"]).toEqual({ tap: ["expr"] });
+    expect(c["Core#concurrent"]).toBeNull();
     expect(c["Core#concurrent_map"]).toEqual({ new: ["const"] });
     expect(c["Core#concurrent_sized"]).toEqual({ new: ["const"] });
     expect(c["Core#defaulted"]).toEqual({ new: ["const"] });
     expect(c["Core#blocked"]).toEqual({ new: ["const"] });
     expect(c["Core#other"]).toEqual({ new: ["const"] });
     expect(c["Core#conversion"]).toEqual({ new: ["string-new"] });
-    expect(c["Core#empty_string"]).toEqual({ new: ["const"] });
+    expect(c["Core#empty_string"]).toBeNull();
+    expect(c["Core#top_level"]).toEqual({ new: ["string-new"] });
   });
 
   it("proves a Hash local from a hash-literal default, a `**` param and an assignment", () => {
@@ -3953,6 +4289,11 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
           def each(options)
             each { |name| options.delete(name) }
           end
+
+          def memoized(option, result)
+            (@assigns[option.human_name] ||= {}).merge!(result)
+            (@assigns[option.human_name] &&= {}).merge!(result)
+          end
         end
       `,
     };
@@ -3984,6 +4325,9 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#branched_last"]).toEqual({
       delete: ["?"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#memoized"]).toEqual({
+      "merge!": ["?", "@assigns"],
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#class_variable"]).toEqual({
       "key?": ["@@responses"],
@@ -4787,6 +5131,51 @@ describe("Ruby extractor Concern included-block class methods", () => {
       expect(out.current_role).toBe(true);
       expect(out.after_save).toBe(true);
       expect(out.outside).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Ruby extractor config_accessor", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  it("credits the class and instance accessors config_accessor defines", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "config-accessor-rb-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "rfp.rb"),
+        `
+          module ActionController
+            module RequestForgeryProtection
+              extend ActiveSupport::Concern
+              included do
+                config_accessor :per_form_csrf_tokens
+                config_accessor(:hidden, instance_reader: false)
+              end
+            end
+          end
+        `,
+      );
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "rfp.rb"), ${JSON.stringify(dir)})
+        mod = ex.modules["ActionController::RequestForgeryProtection"]
+        puts JSON.generate({
+          klass: mod[:classMethods].map { |m| m[:name] }.sort,
+          inst: mod[:instanceMethods].map { |m| m[:name] }.sort,
+        })
+      `;
+      const out = JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      expect(out.klass).toEqual([
+        "hidden",
+        "hidden=",
+        "per_form_csrf_tokens",
+        "per_form_csrf_tokens=",
+      ]);
+      expect(out.inst).toEqual(["hidden=", "per_form_csrf_tokens", "per_form_csrf_tokens="]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

@@ -5,6 +5,8 @@ import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import { rbClassSuperclass, rbObjClone } from "@blazetrails/ruby-compat";
 import { Author } from "./test-helpers/models/author.js";
+import { Base } from "./base.js";
+import { NotImplementedError } from "./errors.js";
 
 describe("_instantiate STI dispatch", () => {
   fixtures([]);
@@ -24,7 +26,7 @@ describe("compute_type candidates cache", () => {
 
     const cache = (Client as unknown as { _typeCandidatesCache: Map<string, string> })
       ._typeCandidatesCache;
-    expect(Object.prototype.hasOwnProperty.call(Client, "_typeCandidatesCache")).toBe(true);
+    expect(Object.hasOwn(Client, "_typeCandidatesCache")).toBe(true);
     expect(cache.get("Author")).toBe("Author");
     expect(Client.computeType("Author")).toBe(Author);
   });
@@ -112,7 +114,7 @@ describe("Inheritance::ClassMethods#initialize_clone", () => {
     const copy = rbObjClone(Company);
 
     expect(copy).not.toBe(Company);
-    expect(Object.prototype.hasOwnProperty.call(copy, "_computedBaseClass")).toBe(true);
+    expect(Object.hasOwn(copy, "_computedBaseClass")).toBe(true);
     expect(copy.baseClass).toBe(copy);
     expect(rbObjClone(Client).baseClass).toBe(Company);
   });
@@ -157,4 +159,44 @@ describe("subclass_from_attributes with permitted parameters", () => {
   it("reads the inheritance column from a Map", () => {
     expect(Company.subclassFromAttributes(new Map([["type", "Client"]]) as never)).toBe(Client);
   });
+});
+
+describe("abstract_class as a static field", () => {
+  fixtures(["authors"]);
+
+  function buildHierarchy(field: boolean) {
+    class FieldHub extends Base {
+      static abstractClass = true;
+    }
+    class BlockHub extends Base {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    const Hub = field ? FieldHub : BlockHub;
+    class Owner extends Hub {
+      static {
+        this.tableName = "authors";
+      }
+    }
+    return { Hub, Owner };
+  }
+
+  for (const field of [true, false]) {
+    it(`belongs only to the class that set it (${field ? "field" : "static block"})`, async () => {
+      const { Hub, Owner } = buildHierarchy(field);
+
+      const owner = await Owner.create({ name: "Hub owner" });
+      expect(owner.isPersisted()).toBe(true);
+      expect(Owner.isAbstractClass()).toBe(false);
+      expect(Hub.isAbstractClass()).toBe(true);
+
+      expect(Owner.isDescendsFromActiveRecord()).toBe(true);
+      expect(Owner.baseClass).toBe(Owner);
+      await expect(Owner.connectsTo({ database: { writing: "primary" } })).rejects.toThrow(
+        NotImplementedError,
+      );
+      expect(() => Owner.connectedTo({ role: "reading" }, () => null)).toThrow(NotImplementedError);
+    });
+  }
 });

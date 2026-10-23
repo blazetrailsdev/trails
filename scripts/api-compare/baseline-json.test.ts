@@ -132,7 +132,6 @@ describe("committed api-compare baselines", () => {
     const files = [
       ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-exclude"))),
       path.join(HERE, "body-pins.json"),
-      path.join(HERE, "arity-exclude.json"),
       ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-unreviewed"))),
     ];
     expect(await findNonCanonicalBaselines(files)).toEqual([]);

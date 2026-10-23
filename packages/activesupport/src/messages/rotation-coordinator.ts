@@ -1,3 +1,4 @@
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { extractBang } from "../core-ext/hash/slice.js";
 import { isPlainObject } from "../hash-utils.js";
 import type { OnRotation } from "./rotator.js";
@@ -27,6 +28,10 @@ export interface FallsBack<C> {
 }
 
 export abstract class RotationCoordinator<C extends FallsBack<C>> {
+  static toString(): string {
+    return "ActiveSupport::Messages::RotationCoordinator";
+  }
+
   transitional: boolean | null = null;
 
   readonly #secretGenerator: SecretGenerator;
@@ -96,21 +101,18 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall filter_map — PERMANENT
-   */
-  private normalizeOptions(options: RotateOptions): BuildOptions {
-    const normalized = { ...options } as Record<string, unknown>;
+  /** @internal */
+  private normalizeOptions(options: RotateOptions & Record<string, unknown>): BuildOptions {
+    options = rbObjDup(options);
 
-    normalized.secretGenerator ??= this.#secretGenerator;
+    options.secretGenerator ??= this.#secretGenerator;
 
-    const secretGeneratorKwargs = (normalized.secretGenerator as SecretGenerator).parameters ?? [];
-    normalized.secretGeneratorOptions = extractBang(normalized, ...secretGeneratorKwargs);
+    const secretGeneratorKwargs = options.secretGenerator.parameters ?? [];
+    options.secretGeneratorOptions = extractBang(options, ...secretGeneratorKwargs);
 
-    normalized.onRotation = this.#onRotation;
+    options.onRotation = this.#onRotation;
 
-    return normalized as BuildOptions;
+    return options as BuildOptions;
   }
 
   /** @internal */

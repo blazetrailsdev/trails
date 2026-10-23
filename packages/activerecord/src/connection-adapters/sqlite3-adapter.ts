@@ -3,9 +3,7 @@ import {
   anybits,
   fetch,
   last,
-  merge,
   rbRegMatchP,
-  rbStrPartition,
   registerConstant,
   rbObjAsString,
 } from "@blazetrails/ruby-compat";
@@ -70,7 +68,7 @@ import {
   runLoadHooks,
   trailsRoot,
 } from "@blazetrails/activesupport";
-import { File, FileUtils, rbRegSUnion } from "@blazetrails/ruby-compat";
+import { File, FileUtils, eachWithObject, rbRegSUnion, sortBy } from "@blazetrails/ruby-compat";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -178,7 +176,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     classAttribute.call(this, "strictStringsByDefault", { default: false });
   }
 
-  /** @missingRailsName config — PERMANENT */
   constructor(config: SQLite3Config) {
     super(config);
 
@@ -207,11 +204,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (!("strict" in this._config)) {
       this._config.strict = SQLite3Adapter.strictStringsByDefault;
     }
-    this._connectionParameters = merge(this._config as SQLite3Config, {
+    this._connectionParameters = {
+      ...(this._config as SQLite3Config),
       database: rbObjAsString(this._config.database),
       resultsAsHash: true,
       defaultTransactionMode: "immediate",
-    });
+    };
   }
 
   override async databaseExists(): Promise<boolean> {
@@ -417,7 +415,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async primaryKeys(tableName: string): Promise<string[]> {
     const pks = (await this.tableStructure(tableName)).filter((f) => Number(f["pk"]) > 0);
-    return pks.sort((a, b) => Number(a["pk"]) - Number(b["pk"])).map((f) => String(f["name"]));
+    return sortBy(pks, (f) => f["pk"]).map((f) => String(f["name"]));
   }
 
   async removeIndex(
@@ -443,14 +441,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async virtualTables(): Promise<Array<[string, [string, string]]>> {
     const query = "SELECT name, sql FROM sqlite_master WHERE sql LIKE 'CREATE VIRTUAL %';";
 
-    const rows = (await this.execQuery(query, "SCHEMA")).castValues() as unknown[][];
-    const memo = new Map<string, [string, string]>();
-    for (const row of rows) {
-      const [tableName, sql] = row as [string, string];
-      const [, moduleName, args] = SQLite3Adapter.VIRTUAL_TABLE_REGEX.exec(sql) ?? [];
-      memo.set(tableName, [moduleName, args]);
-    }
-    return [...memo];
+    return [
+      ...eachWithObject(
+        (await this.execQuery(query, "SCHEMA")).castValues() as unknown[][],
+        new Map<string, [string, string]>(),
+        (row, memo) => {
+          const [tableName, sql] = row as [string, string];
+          const [, moduleName, args] = SQLite3Adapter.VIRTUAL_TABLE_REGEX.exec(sql) ?? [];
+          memo.set(tableName, [moduleName, args]);
+        },
+      ),
+    ];
   }
 
   override async createVirtualTable(
@@ -571,13 +572,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async addTimestamps(tableName: string, options?: Record<string, unknown>): Promise<void> {
-    const opts: Record<string, unknown> = { ...options };
-    if (opts.null == null) opts.null = false;
-    if (!("precision" in opts)) opts.precision = 6;
+    options = { ...options };
+    if (options["null"] == null) options["null"] = false;
+
+    if (!("precision" in options)) {
+      options["precision"] = 6;
+    }
 
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
-      definition.column("created_at", "datetime", opts);
-      definition.column("updated_at", "datetime", opts);
+      definition.column("created_at", "datetime", options);
+      definition.column("updated_at", "datetime", options);
     });
   }
 
@@ -984,7 +988,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
     if (!result) return [];
 
-    return last(rbStrPartition(result, SQLite3Adapter.UNQUOTED_OPEN_PARENS_REGEX))!
+    const match = SQLite3Adapter.UNQUOTED_OPEN_PARENS_REGEX.exec(result);
+    const partition = match
+      ? [result.slice(0, match.index), match[0], result.slice(match.index + match[0].length)]
+      : [result, "", ""];
+    return last(partition)!
       .replace(SQLite3Adapter.FINAL_CLOSE_PARENS_REGEX, "")
       .split(new RegExp(`,(?=\\s(?:CONSTRAINT|"(?:${rbRegSUnion(columnNames).source})"))`, "i"))
       .map((columnString) => columnString.trim());
@@ -1038,27 +1046,22 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /** @internal */
   override async configureConnection(): Promise<void> {
-    const cfg = this._config as SQLite3Config;
-    if (rtest(cfg.timeout) && rtest(cfg.retries)) {
+    if (rtest(this._config["timeout"]) && rtest(this._config["retries"])) {
       throw new ArgumentError("Cannot specify both timeout and retries arguments");
-    } else if (rtest(cfg.timeout)) {
-      const timeout = SQLite3Adapter.typeCastConfigToInteger(cfg.timeout);
+    } else if (rtest(this._config["timeout"])) {
+      const timeout = SQLite3Adapter.typeCastConfigToInteger(this._config["timeout"]);
       if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
         throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
       }
       await Pragmas.setBusyTimeout.call(this._rawConnection!, timeout);
-    } else if (rtest(cfg.retries)) {
+    } else if (rtest(this._config["retries"])) {
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
     }
     await super.configureConnection();
 
-    const pragmas = fetch<Record<string, string | number | boolean>>(
-      cfg as unknown as Record<string, unknown>,
-      "pragmas",
-      {},
-    );
+    const pragmas = fetch<Record<string, string | number | boolean>>(this._config, "pragmas", {});
     for (const [pragma, value] of Object.entries({
       ...SQLite3Adapter.DEFAULT_PRAGMAS,
       ...pragmas,

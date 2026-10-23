@@ -1,12 +1,6 @@
-import {
-  attrInternal,
-  Concern,
-  extend,
-  initialize,
-  Module,
-  pluralize,
-  toF,
-} from "@blazetrails/activesupport";
+import { attrInternal, Concern, extend, pluralize, toF } from "@blazetrails/activesupport";
+import { classModule, rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
+import { Railties } from "../namespaces.js";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
 interface ControllerRuntimeHost {
@@ -22,7 +16,7 @@ export function logProcessAction(
   this: ControllerClass,
   payload: Record<string, unknown>,
 ): string[] {
-  const messages = ClassMethods.superMethod(this, "logProcessAction")!(payload) as string[];
+  const messages = rbCallSuper(this, logProcessAction, payload) as string[];
   const dbRuntime = payload["db_runtime"];
 
   if (dbRuntime != null && dbRuntime !== false) {
@@ -37,9 +31,7 @@ export function logProcessAction(
   return messages;
 }
 
-export const ClassMethods: Module = new Module((mod) => {
-  mod.defineMethod("logProcessAction", logProcessAction);
-});
+export const ClassMethods = { logProcessAction };
 
 /** @internal */
 export function processAction(
@@ -48,7 +40,7 @@ export function processAction(
   ...args: unknown[]
 ): unknown {
   RuntimeRegistry.reset();
-  return ControllerRuntime.superMethod(this, "processAction")!(action, ...args);
+  return rbCallSuper(this, processAction, action, ...args);
 }
 
 /** @internal */
@@ -56,7 +48,7 @@ export function cleanupViewRuntime<T>(this: ControllerRuntimeHost, block: () => 
   if (this.logger?.["info?"]) {
     const dbRtBeforeRender = RuntimeRegistry.resetRuntimes();
     this.dbRuntime = (this.dbRuntime ?? 0) + dbRtBeforeRender;
-    const runtime = ControllerRuntime.superMethod(this, "cleanupViewRuntime")!(block);
+    const runtime = rbCallSuper(this, cleanupViewRuntime, block);
     const subtractQueries = (elapsed: number): number => {
       const queriesRt = RuntimeRegistry.sqlRuntime() - RuntimeRegistry.asyncSqlRuntime();
       const dbRtAfterRender = RuntimeRegistry.resetRuntimes();
@@ -68,7 +60,7 @@ export function cleanupViewRuntime<T>(this: ControllerRuntimeHost, block: () => 
     }
     return subtractQueries(runtime as number) as T;
   } else {
-    return ControllerRuntime.superMethod(this, "cleanupViewRuntime")!(block) as T;
+    return rbCallSuper(this, cleanupViewRuntime, block) as T;
   }
 }
 
@@ -77,26 +69,23 @@ export function appendInfoToPayload(
   this: ControllerRuntimeHost,
   payload: Record<string, unknown>,
 ): void {
-  ControllerRuntime.superMethod(this, "appendInfoToPayload")!(payload);
+  rbCallSuper(this, appendInfoToPayload, payload);
 
   payload["db_runtime"] = (this.dbRuntime ?? 0) + RuntimeRegistry.resetRuntimes();
   payload["queries_count"] = RuntimeRegistry.resetQueriesCount();
   payload["cached_queries_count"] = RuntimeRegistry.resetCachedQueriesCount();
 }
 
-export const ControllerRuntime = new Module((mod) => {
-  extend(mod, Concern);
-
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function (
-    this: ControllerRuntimeHost,
-  ): void {
-    this.dbRuntime = null;
-  };
-
-  mod.moduleEval((carrier) => attrInternal.call(carrier, "dbRuntime"));
-
-  mod.defineMethod("processAction", processAction);
-  mod.defineMethod("cleanupViewRuntime", cleanupViewRuntime);
-  mod.defineMethod("appendInfoToPayload", appendInfoToPayload);
-}) as Module & { ClassMethods: Module };
-ControllerRuntime.ClassMethods = ClassMethods;
+export class ControllerRuntime {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+  static ClassMethods = ClassMethods;
+}
+extend(ControllerRuntime, Concern);
+attrInternal.call(ControllerRuntime.prototype, "dbRuntime");
+Object.assign(ControllerRuntime.prototype, {
+  processAction,
+  cleanupViewRuntime,
+  appendInfoToPayload,
+});
+rbModConstSet(Railties, "ControllerRuntime", ControllerRuntime);

@@ -19,8 +19,10 @@ import {
   OPTIONS,
 } from "./constants.js";
 import {
+  Encoding,
   type Generic,
   isSymbol,
+  rbFSend,
   rbObjRespondTo,
   RFC2396Parser,
   StringIO,
@@ -58,9 +60,9 @@ export type RackApp = (
 export class MockRequest {
   private static parser: RFC2396Parser | undefined;
 
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
@@ -89,10 +91,9 @@ export class MockRequest {
   async request(method = GET, uri = "", opts: Record<string, any> = {}): Promise<MockResponse> {
     const env = MockRequest.envFor(uri, { ...opts, ":method": method });
 
-    let app: RackApp;
+    let app: RackApp | { call: RackApp } | Lint;
     if (opts[":lint"]) {
-      const lint = new Lint(this.app);
-      app = lint.call.bind(lint);
+      app = new Lint(this.app);
     } else {
       app = this.app;
     }
@@ -100,7 +101,7 @@ export class MockRequest {
     const errors = env[RACK_ERRORS];
     let body: any;
     try {
-      const result = await app(env);
+      const result = await (rbFSend(app, "call", env) as ReturnType<RackApp>);
       const [status, headers, b] = result;
       body = b;
       return new MockResponse(status, headers, body, errors);
@@ -161,11 +162,12 @@ export class MockRequest {
     }
 
     let rackInput = opts[":input"];
-    if (typeof rackInput === "string") {
+    if (typeof rackInput === "string" || rackInput instanceof Uint8Array) {
       rackInput = new StringIO(rackInput);
     }
 
     if (rackInput != null && rackInput !== false) {
+      if (rbObjRespondTo(rackInput, "setEncoding")) rackInput.setEncoding(Encoding.BINARY);
       env[RACK_INPUT] = rackInput;
 
       if (rbObjRespondTo(env[RACK_INPUT], "size"))

@@ -14,7 +14,9 @@ import {
   numericModulo,
   numericMul,
   numericPlus,
-  numericUminus,
+  NoMethodError,
+  Rational,
+  rbBigNorm,
   rbDbl2num,
   rbFloatTypeP,
   rbCNumeric,
@@ -31,14 +33,23 @@ import {
   since as datetimeSince,
 } from "./core-ext/date-time/calculations.js";
 import { current as timeCurrent } from "./core-ext/time/calculations.js";
-import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { rbInspect as inspect, rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActiveSupport } from "./namespaces.js";
 import { ArgumentError } from "./hash-utils.js";
 import { toSentence } from "./array-utils.js";
-import { isEmpty, rbHash } from "@blazetrails/ruby-compat";
+import { rbHash } from "@blazetrails/ruby-compat";
 import type { TimeWithZone } from "./time-with-zone.js";
 import { actsLike } from "./core-ext/object/acts-like.js";
 import { ISO8601Parser } from "./duration/iso8601-parser.js";
 import { ISO8601Serializer } from "./duration/iso8601-serializer.js";
+
+function numericUminus(x: unknown): unknown {
+  if (rbFloatTypeP(x)) return rbDbl2num(-x.valueOf());
+  if (x instanceof Rational) return new Rational(-x.numerator, x.denominator);
+  if (typeof x === "bigint") return rbBigNorm(-x);
+  if (typeof x === "number") return 0 - x;
+  throw new NoMethodError(`undefined method '-@' for ${inspect(x)}`);
+}
 
 export type DurationParts = {
   years: number;
@@ -97,6 +108,10 @@ function mergeParts(
 }
 
 export class Duration {
+  static toString(): string {
+    return "ActiveSupport::Duration";
+  }
+
   static ISO8601Parser = ISO8601Parser;
 
   static readonly PARTS = PARTS;
@@ -385,7 +400,7 @@ export class Duration {
   }
 
   inspect(): string {
-    if (isEmpty(this._parts())) return `${this.value} seconds`;
+    if (Object.keys(this._parts()).length === 0) return `${this.value} seconds`;
 
     return toSentence(
       (Object.entries(this._parts()) as [keyof DurationParts, number][])
@@ -449,7 +464,7 @@ export class Duration {
       throw new ArgumentError(`expected a time or date, got ${inspect(time)}`);
     }
 
-    if (isEmpty(this._parts())) {
+    if (Object.keys(this._parts()).length === 0) {
       if (time instanceof Temporal.PlainDate) return dateSince(time, sign * this.inSeconds());
       if (isDateTime(time)) return datetimeSince(time, sign * this.inSeconds());
       if (!(time instanceof Date || time instanceof Temporal.Instant))
@@ -689,6 +704,10 @@ function applyDuration(date: Date, parts: DurationParts, direction: 1 | -1): Dat
 }
 
 export class Scalar {
+  static toString(): string {
+    return "ActiveSupport::Duration::Scalar";
+  }
+
   readonly value: number;
 
   constructor(value: number) {
@@ -838,3 +857,5 @@ export class Scalar {
     );
   }
 }
+
+rbModConstSet(ActiveSupport, "Duration", Duration);

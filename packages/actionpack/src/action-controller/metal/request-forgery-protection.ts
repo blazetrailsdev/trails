@@ -1,12 +1,11 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet, TypeError } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   Base64,
-  intXor,
   chomp,
   OpenSSL,
   rbObjRespondTo,
-  rbStrGetbyte,
-  rbStrSetbyte,
   rtest,
   SecureRandom,
   URI,
@@ -22,7 +21,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   CookieJar,
-  cookieJar,
+  setCookieJar,
   type RequestCookieMethodsHost,
 } from "../../action-dispatch/middleware/cookies.js";
 import { SessionHash } from "@blazetrails/rack-session";
@@ -53,7 +52,7 @@ export class InvalidCrossOriginRequest extends ActionControllerError {
 }
 
 export interface ProtectionMethods {
-  handleUnverifiedRequest(): void;
+  handleUnverifiedRequest(): void | Promise<void>;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -72,7 +71,7 @@ export class NullSessionHash extends SessionHash {
     this.loaded = true;
   }
 
-  override destroy(): void {}
+  override async destroy(): Promise<void> {}
 
   override isExists(): boolean {
     return true;
@@ -99,7 +98,7 @@ export class NullSession implements ProtectionMethods {
     request.session = new NullSessionHash(request);
     request.flash = null;
     request.sessionOptions = { skip: true };
-    cookieJar.call(request, NullCookieJar.build(request, {}));
+    setCookieJar.call(request, NullCookieJar.build(request, {}));
   }
 }
 
@@ -108,8 +107,8 @@ export class ResetSession implements ProtectionMethods {
   constructor(controller: Controller) {
     this._controller = controller;
   }
-  handleUnverifiedRequest(): void {
-    (this._controller as { resetSession(): void }).resetSession();
+  async handleUnverifiedRequest(): Promise<void> {
+    await (this._controller as { resetSession(): Promise<void> }).resetSession();
   }
 }
 
@@ -461,26 +460,26 @@ export function verifySameOriginRequest(this: CsrfController): void {
 }
 
 /** @internal */
-export function verifyAuthenticityToken(this: CsrfController): void {
+export async function verifyAuthenticityToken(this: CsrfController): Promise<void> {
   this.markForSameOriginVerificationBang();
 
   if (!this.isVerifiedRequest()) {
     if (this.logger && this.logWarningOnCsrfFailure)
       this.logger.warn(this.unverifiedRequestWarningMessage());
 
-    this.handleUnverifiedRequest();
+    await this.handleUnverifiedRequest();
   }
 }
 
 /** @internal */
-export function handleUnverifiedRequest(this: CsrfController): void {
+export async function handleUnverifiedRequest(this: CsrfController): Promise<void> {
   const protectionStrategy = new this.forgeryProtectionStrategy!(this);
 
   if ("warningMessage" in protectionStrategy) {
     (protectionStrategy as Exception).warningMessage = this.unverifiedRequestWarningMessage();
   }
 
-  protectionStrategy.handleUnverifiedRequest();
+  await protectionStrategy.handleUnverifiedRequest();
 }
 
 /** @internal */
@@ -509,7 +508,10 @@ export function generateCsrfToken(): string {
   return SecureRandom.urlsafeBase64(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsName csrfToken — PERMANENT
+ */
 export function encodeCsrfToken(csrfToken: Bytes): string {
   return Base64.urlsafeEncode64(csrfToken.toString("latin1"), { padding: false });
 }
@@ -525,7 +527,8 @@ export function xorByteStrings(s1: Bytes, s2: Bytes): Bytes {
   const size = s1.length;
   let i = 0;
   while (i < size) {
-    rbStrSetbyte(s2, i, intXor(rbStrGetbyte(s1, i), rbStrGetbyte(s2, i)));
+    if (s2[i] === undefined) throw new TypeError("nil can't be coerced into Integer");
+    s2[i] = s1[i] ^ s2[i];
     i += 1;
   }
   return s2;
@@ -564,16 +567,19 @@ export function perFormCsrfToken(
 
 /** @internal */
 export function maskToken(this: CsrfController, rawToken: Bytes): string {
-  const otp = SecureRandom.randomBytes(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
-  return this.encodeCsrfToken(Buffer.concat([otp, this.xorByteStrings(otp, rawToken)]));
+  const oneTimePad = SecureRandom.randomBytes(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
+  const encryptedCsrfToken = this.xorByteStrings(oneTimePad, rawToken);
+  const maskedToken = Buffer.concat([oneTimePad, encryptedCsrfToken]);
+  return this.encodeCsrfToken(maskedToken);
 }
 
 /** @internal */
 export function unmaskToken(this: CsrfController, maskedToken: Bytes): Bytes {
-  return this.xorByteStrings(
-    maskedToken.subarray(0, RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH),
-    maskedToken.subarray(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH),
+  const oneTimePad = maskedToken.subarray(0, RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
+  const encryptedCsrfToken = maskedToken.subarray(
+    RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH,
   );
+  return this.xorByteStrings(oneTimePad, encryptedCsrfToken);
 }
 
 /** @internal */
@@ -657,17 +663,17 @@ export function isValidAuthenticityToken(
   encodedMaskedToken: unknown,
 ): boolean {
   if (typeof encodedMaskedToken !== "string" || encodedMaskedToken.length === 0) return false;
-  let masked: Bytes;
+  let maskedToken: Bytes;
   try {
-    masked = this.decodeCsrfToken(encodedMaskedToken);
+    maskedToken = this.decodeCsrfToken(encodedMaskedToken);
   } catch (e) {
     if (e instanceof ArgumentError) return false;
     throw e;
   }
-  if (masked.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH)
-    return this.compareWithRealToken(masked);
-  if (masked.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH * 2) {
-    const csrfToken = this.unmaskToken(masked);
+  if (maskedToken.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH)
+    return this.compareWithRealToken(maskedToken);
+  if (maskedToken.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH * 2) {
+    const csrfToken = this.unmaskToken(maskedToken);
     return (
       this.compareWithGlobalToken(csrfToken) ||
       this.compareWithRealToken(csrfToken) ||
@@ -763,3 +769,7 @@ Object.defineProperty(NullSessionHash, "name", {
   value:
     "ActionController::RequestForgeryProtection::ProtectionMethods::NullSession::NullSessionHash",
 });
+
+rbModConstSet(ActionController, "InvalidAuthenticityToken", InvalidAuthenticityToken);
+rbModConstSet(ActionController, "InvalidCrossOriginRequest", InvalidCrossOriginRequest);
+rbModConstSet(ActionController, "RequestForgeryProtection", RequestForgeryProtection);

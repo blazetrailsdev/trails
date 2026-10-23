@@ -1,3 +1,5 @@
+import { classpaths } from "./classpath.js";
+
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
  * Ruby's core `Exception` (`vendor/ruby/v3.3.11/error.c:3294` `rb_eException`) — the
@@ -16,10 +18,52 @@ export class Exception extends Error {}
 export interface Exception {
   /** @noRailsEquivalent PERMANENT */
   detailedMessage(opt?: { highlight?: boolean | null } | null): string;
+  /** @noRailsEquivalent PERMANENT */
+  toS(): string;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 Exception.prototype.name = "Exception";
+
+/**
+ * `exc_to_s` (`vendor/ruby/v3.3.11/error.c:1463`): the message, or the class
+ * name when there is none. Ruby's `mesg` ivar is the own `message` property
+ * `Error`'s constructor seats only when given a message. `rb_String` is
+ * `String`, not ruby-compat's `rbObjAsString`: `object.ts` reaches classes that
+ * extend `Exception`, so importing it here leaves `Exception` uninitialized
+ * when this module is loaded first.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+Exception.prototype.toS = function (this: Exception): string {
+  const mesg: unknown = Object.hasOwn(this, "message") ? Reflect.get(this, "message", this) : null;
+
+  if (mesg == null) {
+    const klass = this.constructor;
+    return classpaths.get(klass)?.path ?? (klass.name || "");
+  }
+  return String(mesg);
+};
+
+/**
+ * `exc_message` (`vendor/ruby/v3.3.11/error.c:3303`) is `rb_funcallv(exc, idTo_s, 0, 0)`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+Object.defineProperty(Exception.prototype, "message", {
+  configurable: true,
+  get(this: Exception) {
+    return this.toS();
+  },
+  set(this: Exception, value: unknown) {
+    Object.defineProperty(this, "message", {
+      value,
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    });
+  },
+});
 
 /**
  * `exc_setup_message` and `exc_setup_cause`

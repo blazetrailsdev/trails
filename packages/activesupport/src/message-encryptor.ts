@@ -1,4 +1,4 @@
-import { Cipher, prepend, type Bytes } from "@blazetrails/ruby-compat";
+import { Cipher, b, prepend, rbEqual, byteslice, type Bytes } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "./message-verifier.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
@@ -14,7 +14,7 @@ import {
 import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export namespace NullSerializer {
-  export function load(value: string): string {
+  export function load(value: string | Uint8Array): string | Uint8Array {
     return value;
   }
 
@@ -24,6 +24,10 @@ export namespace NullSerializer {
 }
 
 export class InvalidMessage extends Error {
+  static toString(): string {
+    return "ActiveSupport::MessageEncryptor::InvalidMessage";
+  }
+
   constructor(message = "Invalid message") {
     super(message);
     this.name = "InvalidMessage";
@@ -42,6 +46,10 @@ const AUTH_TAG_LENGTH = 16;
 const SEPARATOR = "--";
 
 export class MessageEncryptor extends Codec {
+  static toString(): string {
+    return "ActiveSupport::MessageEncryptor";
+  }
+
   static override defaultSerializer: Format | MessageSerializer = "json";
 
   static useAuthenticatedMessageEncryption = false;
@@ -130,7 +138,9 @@ export class MessageEncryptor extends Codec {
   }
 
   createMessage(value: unknown, options: MetadataOptions = {}): string {
-    return this.sign(this.encrypt(this.serializeWithMetadata(value, options) as string));
+    return this.sign(
+      this.encrypt(this.serializeWithMetadata(value, options) as string | Uint8Array),
+    );
   }
 
   readMessage(message: string, options: ExpectedMetadataOptions = {}): unknown {
@@ -141,11 +151,11 @@ export class MessageEncryptor extends Codec {
     return this.verifier ? this.verifier.createMessage(data) : data;
   }
 
-  private verify(data: string): string {
-    return this.verifier ? (this.verifier.readMessage(data) as string) : data;
+  private verify(data: string): string | Uint8Array {
+    return this.verifier ? (this.verifier.readMessage(data) as string | Uint8Array) : data;
   }
 
-  private encrypt(data: string): string {
+  private encrypt(data: string | Uint8Array): string {
     const cipher = this.newCipher();
     cipher.encrypt();
     cipher.key = this.secret;
@@ -153,7 +163,7 @@ export class MessageEncryptor extends Codec {
     const iv = cipher.randomIv();
     if (this.aeadMode) cipher.authData = "";
 
-    let encryptedData = cipher.update(Buffer.from(data, "latin1"));
+    let encryptedData = cipher.update(typeof data === "string" ? b(data) : data);
     encryptedData = Buffer.concat([encryptedData, cipher.final()]);
 
     const parts: Bytes[] = [encryptedData, iv];
@@ -162,7 +172,7 @@ export class MessageEncryptor extends Codec {
     return this.joinParts(parts);
   }
 
-  private decrypt(encryptedMessage: string): string {
+  private decrypt(encryptedMessage: string | Uint8Array): Uint8Array {
     const cipher = this.newCipher();
     const [encryptedData, iv, authTag] = this.extractParts(encryptedMessage);
 
@@ -180,7 +190,7 @@ export class MessageEncryptor extends Codec {
       }
 
       const decryptedData = Buffer.concat([cipher.update(encryptedData), cipher.final()]);
-      return Buffer.from(decryptedData).toString("latin1");
+      return decryptedData;
     } catch (error) {
       throw new Thrown("invalid_message_format", error);
     }
@@ -208,18 +218,21 @@ export class MessageEncryptor extends Codec {
     return parts.map((part) => this.encode(part)).join(SEPARATOR);
   }
 
-  private extractPart(encryptedMessage: string, rindex: number, length: number): string {
+  private extractPart(encryptedMessage: Uint8Array, rindex: number, length: number): Uint8Array {
     const index = rindex - length;
 
-    if (encryptedMessage.slice(index - SEPARATOR.length, index) === SEPARATOR) {
-      return encryptedMessage.slice(index, index + length);
+    if (
+      rbEqual(byteslice(encryptedMessage, index - SEPARATOR.length, SEPARATOR.length), SEPARATOR)
+    ) {
+      return byteslice(encryptedMessage, index, length)!;
     } else {
       throw new Thrown("invalid_message_format", "missing separator");
     }
   }
 
-  private extractParts(encryptedMessage: string): Bytes[] {
-    const parts: string[] = [];
+  private extractParts(encryptedMessage: string | Uint8Array): Bytes[] {
+    encryptedMessage = b(encryptedMessage);
+    const parts: Uint8Array[] = [];
     let rindex = encryptedMessage.length;
 
     if (this.aeadMode) {
@@ -230,7 +243,7 @@ export class MessageEncryptor extends Codec {
     parts.push(this.extractPart(encryptedMessage, rindex, this.lengthOfEncodedIv()));
     rindex -= SEPARATOR.length + this.lengthOfEncodedIv();
 
-    parts.push(encryptedMessage.slice(0, rindex));
+    parts.push(byteslice(encryptedMessage, 0, rindex)!);
 
     return parts.reverse().map((part) => this.decode(part));
   }

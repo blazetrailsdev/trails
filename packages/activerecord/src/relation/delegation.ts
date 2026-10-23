@@ -1,5 +1,5 @@
 import type { Base } from "../base.js";
-import type { RelationName } from "../relation.js";
+import type { Relation, RelationName } from "../relation.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
@@ -27,7 +27,7 @@ import {
   extend,
   fetch,
   include,
-  rbFPublicSend,
+  rbFSend,
   rbModConstSet,
   rbClassSuperclass,
   rbModName,
@@ -35,6 +35,7 @@ import {
   rbObjIvarSet,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
+import type { Psych } from "@blazetrails/ruby-compat/psych";
 import { ActiveRecord, Associations } from "../namespaces.js";
 
 type FamilyCtor = new (...args: any[]) => any;
@@ -133,27 +134,21 @@ export class GeneratedRelationMethods extends Module {
         });
       } else {
         this.defineMethod(method, function (this: any, ...args: any[]) {
-          return this.scoping(() => rbFPublicSend(this._model, method, ...args));
+          return this.scoping(() => rbFSend(this._model, method, ...args));
         });
       }
     });
   }
 }
 
-export const ClassSpecificRelation = new Module() as Module<{
-  methodMissing(method: string, ...args: any[]): unknown;
-}> & { ClassMethods: typeof ClassMethods };
-extend(ClassSpecificRelation, Concern);
-
 export const ClassMethods = {
   get name(): string | null {
     return rbModName(rbClassSuperclass(this as object)!);
   },
 };
-ClassSpecificRelation.ClassMethods = ClassMethods;
 
-export function methodMissing(this: any, method: string, ...args: any[]): unknown {
-  const model = this._model as typeof Base;
+export function methodMissing(this: Relation<Base>, method: string, ...args: any[]): unknown {
+  const model: typeof Base = this.model;
   if (rbObjRespondTo(model, method)) {
     if (!DelegateCache.delegateBaseMethods && rbObjRespondTo(ActiveRecord.Base, method)) {
       // @nie disposition=TODO
@@ -175,7 +170,12 @@ export function methodMissing(this: any, method: string, ...args: any[]): unknow
     );
   }
 }
-ClassSpecificRelation.defineMethod("methodMissing", methodMissing);
+
+export const ClassSpecificRelation = {
+  ClassMethods,
+  methodMissing,
+};
+extend(ClassSpecificRelation, Concern);
 
 export function create(this: FamilyCtor, model: typeof Base, ...args: any[]): any {
   return new (relationClassFor.call(this, model))(model, ...args);
@@ -252,6 +252,7 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   toFs: (records, format?: string) => toFsArray(records, format),
   toXml: (records, options?: ToXmlOptions, block?: (builder: XmlBuilder) => void) =>
     toXmlArray(records, options, block),
+  encodeWith: (records, coder: Psych.Coder) => rbFSend(records, "encodeWith", coder),
 };
 RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
 
@@ -402,6 +403,12 @@ export class Delegation {
       this,
       (records) => RECORD_DELEGATES.toXml(records, options, block) as string,
     );
+  }
+
+  encodeWith(this: DelegationHost, coder: Psych.Coder): void | Promise<void> {
+    return withRecords(this, (records) => {
+      RECORD_DELEGATES.encodeWith(records, coder);
+    });
   }
 
   get connection(): Promise<DatabaseAdapter | null> {

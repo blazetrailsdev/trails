@@ -1,23 +1,27 @@
+import type { RackHeaders } from "./index.js";
+import { rbCheckArrayType, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { CONTENT_LENGTH, TRANSFER_ENCODING, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
 export class ContentLength {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    const response = await this.app(env);
-    const [status, headers, body] = response;
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
+    const [status, headers] = response;
+    let [, , body] = response;
 
     if (
       !Object.hasOwn(STATUS_WITH_NO_ENTITY_BODY, status) &&
       !headers[CONTENT_LENGTH] &&
       !headers[TRANSFER_ENCODING] &&
-      Array.isArray(body)
+      rbObjRespondTo(body, "toAry")
     ) {
+      response[2] = body = rbCheckArrayType(body) as Array<string | Uint8Array>;
       const totalSize = body.reduce(
         (sum: number, chunk: string | Uint8Array) => sum + Buffer.byteLength(chunk),
         0,

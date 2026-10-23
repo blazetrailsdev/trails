@@ -1,4 +1,4 @@
-import { rbFPublicSend, rbObjDup, regexpEscape } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjDup, regexpEscape } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
@@ -13,6 +13,10 @@ export interface HumanRule {
 }
 
 export class Uncountables extends Array<string> {
+  static toString(): string {
+    return "ActiveSupport::Inflector::Inflections::Uncountables";
+  }
+
   private _regexArray: RegExp[] = [];
 
   delete(entry: string): void {
@@ -41,6 +45,10 @@ export class Uncountables extends Array<string> {
 }
 
 export class Inflections {
+  static toString(): string {
+    return "ActiveSupport::Inflector::Inflections";
+  }
+
   plurals!: InflectionRule[];
   singulars!: InflectionRule[];
   uncountables!: Uncountables;
@@ -77,7 +85,7 @@ export class Inflections {
 
   initializeDup(orig: Inflections): void {
     for (const scope of ["plurals", "singulars", "uncountables", "humans", "acronyms"]) {
-      Object.assign(this, { [scope]: rbObjDup(rbFPublicSend(orig, scope)) });
+      Object.assign(this, { [scope]: rbObjDup(rbFSend(orig, scope)) });
     }
     this.defineAcronymRegexPatterns();
   }

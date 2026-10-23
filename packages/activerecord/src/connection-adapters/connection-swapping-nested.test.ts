@@ -3,8 +3,10 @@ import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { currentRole, currentPreventingWrites } from "../core.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("ConnectionSwappingNestedTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   class PrimaryBase extends Base {
     static override abstractClass = true;
   }
@@ -60,9 +62,11 @@ describe("ConnectionSwappingNestedTest", () => {
   });
 
   let baselinePools: Set<unknown>;
+  let baseConfig: Record<string, unknown>;
 
   beforeEach(async () => {
     baselinePools = new Set(Base.connectionHandler.connectionPoolList("all"));
+    baseConfig = Base.connectionPool().dbConfig.configurationHash;
     const fs = await asyncFs();
     const path = getPath();
     const os = await getOsAsync();
@@ -88,6 +92,9 @@ describe("ConnectionSwappingNestedTest", () => {
       });
     }
     Base.configurations(prevConfigs);
+    if (!Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base")) {
+      await Base.establishConnection(baseConfig);
+    }
     (PrimaryBase as any).connectionClass = false;
     (SecondaryBase as any).connectionClass = false;
     (TertiaryBase as any).connectionClass = false;

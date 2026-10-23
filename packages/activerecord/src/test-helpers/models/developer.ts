@@ -15,7 +15,7 @@ import { StringType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import * as Type from "../../type.js";
 import type { Relation } from "../../relation.js";
-import { Module, Range, RuntimeError, registerConstant } from "@blazetrails/ruby-compat";
+import { Range, RuntimeError, registerConstant } from "@blazetrails/ruby-compat";
 import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -54,13 +54,13 @@ export class Developer extends Base {
 
   static instanceCount: number | undefined;
 
-  declare static ProjectsAssociationExtension: Module;
+  declare static ProjectsAssociationExtension: Record<string, unknown>;
 
-  static ProjectsAssociationExtension2 = new Module((mod) => {
-    mod.defineMethod("findLeastRecent", async function (this: Relation<Base>) {
+  static ProjectsAssociationExtension2 = {
+    async findLeastRecent(this: Relation<Base>) {
       return this.order("id ASC").first();
-    });
-  });
+    },
+  };
 
   static {
     this.ignoredColumns = ["first_name", "last_name"];
@@ -75,9 +75,9 @@ export class Developer extends Base {
       null,
       { joinTable: "developers_projects", associationForeignKey: "project_id" },
       (mod) => {
-        mod.defineMethod("findMostRecent", async function (this: Relation<Base>) {
+        mod.findMostRecent = async function (this: Relation<Base>) {
           return this.order("id DESC").first();
-        });
+        };
       },
     );
 
@@ -99,7 +99,7 @@ export class Developer extends Base {
 
     this.hasAndBelongsToMany(
       "projectsExtendedByName",
-      function (this: any) {
+      function () {
         return this.extending(Developer.ProjectsAssociationExtension);
       },
       {
@@ -126,7 +126,7 @@ export class Developer extends Base {
 
     this.hasAndBelongsToMany(
       "projectsExtendedByNameAndBlock",
-      function (this: any) {
+      function () {
         return this.extending(Developer.ProjectsAssociationExtension);
       },
       {
@@ -135,9 +135,9 @@ export class Developer extends Base {
         associationForeignKey: "project_id",
       },
       (mod) => {
-        mod.defineMethod("findLeastRecent", async function (this: Relation<Base>) {
+        mod.findLeastRecent = async function (this: Relation<Base>) {
           return this.order("id ASC").first();
-        });
+        };
       },
     );
 
@@ -162,7 +162,7 @@ export class Developer extends Base {
     this.hasMany("requiredAuditLogs", { className: "AuditLogRequired" });
     this.hasMany(
       "strictLoadingAuditLogs",
-      function (this: any) {
+      function () {
         return this.strictLoading();
       },
       { className: "AuditLog" },
@@ -170,7 +170,7 @@ export class Developer extends Base {
     this.hasMany("strictLoadingOptAuditLogs", { strictLoading: true, className: "AuditLog" });
     this.hasMany("contracts");
     this.hasMany("firms", { through: "contracts", source: "firm" });
-    this.hasMany("comments", function (this: any, developer: any) {
+    this.hasMany("comments", function (developer: any) {
       return this.where({ body: `I'm ${developer.name}` });
     });
     this.hasMany("ratings", { through: "comments" });
@@ -181,7 +181,7 @@ export class Developer extends Base {
     this.belongsTo("firm");
     this.hasMany("contractedProjects", { className: "Project" });
 
-    this.scope("jamises", function (this: any) {
+    this.scope("jamises", function () {
       return this.where({ name: "Jamis" });
     });
 
@@ -189,7 +189,7 @@ export class Developer extends Base {
     this.validates("name", { length: { in: new Range(3, 20) } });
 
     this.beforeCreate(async function (developer: Developer) {
-      (developer as any).auditLogs.build({ message: "Computer created" });
+      developer.auditLogs.build({ message: "Computer created" });
     });
 
     this.attribute("last_name");
@@ -204,7 +204,7 @@ export class Developer extends Base {
   }
 
   set log(message: string) {
-    (this as any).auditLogs.build({ message });
+    this.auditLogs.build({ message });
   }
 }
 registerModel(Developer);
@@ -292,7 +292,7 @@ export class DeveloperWithBeforeDestroyRaise extends Base {
       foreignKey: "developer_id",
     });
     this.beforeDestroy(async function (developer: DeveloperWithBeforeDestroyRaise) {
-      const projects = await (developer as any).projects;
+      const projects = await developer.projects;
       if (projects.length === 0) throw new RuntimeError("unhandled exception");
     });
   }
@@ -302,7 +302,7 @@ registerModel(DeveloperWithBeforeDestroyRaise);
 export class DeveloperWithSelect extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.select("name");
     });
   }
@@ -312,7 +312,7 @@ registerModel(DeveloperWithSelect);
 export class DeveloperwithDefaultMentorScopeNot extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ mentor_id: 1 });
     });
   }
@@ -323,7 +323,7 @@ export class DeveloperWithDefaultMentorScopeAllQueries extends Base {
   static {
     this.tableName = "developers";
     this.defaultScope(
-      function (this: any) {
+      function () {
         return this.where({ mentor_id: 1 });
       },
       { allQueries: true },
@@ -337,7 +337,7 @@ export class DeveloperWithDefaultNilableFirmScopeAllQueries extends Base {
     this.tableName = "developers";
     const firmId: number | null = null;
     this.defaultScope(
-      function (this: any) {
+      function () {
         return firmId != null ? this.where({ firm_id: firmId }) : this;
       },
       { allQueries: true },
@@ -349,12 +349,12 @@ registerModel(DeveloperWithDefaultNilableFirmScopeAllQueries);
 export class DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ mentor_id: 1 });
     });
     const firmId = 10;
     this.defaultScope(
-      function (this: any) {
+      function () {
         return firmId != null ? this.where({ firm_id: firmId }) : this;
       },
       { allQueries: true },
@@ -371,7 +371,7 @@ export class DeveloperWithIncludes extends Base {
   static {
     this.tableName = "developers";
     this.hasMany("auditLogs", { foreignKey: "developer_id" });
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.includes(":auditLogs");
     });
   }
@@ -385,7 +385,7 @@ export class DeveloperFilteredOnJoins extends Base {
     this.tableName = "developers";
     this.hasAndBelongsToMany(
       "projects",
-      function (this: any) {
+      function () {
         return this.order("projects.id");
       },
       {
@@ -393,7 +393,7 @@ export class DeveloperFilteredOnJoins extends Base {
         joinTable: "developers_projects",
       },
     );
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.joins(":projects").where({ projects: { name: "Active Controller" } });
     });
   }
@@ -409,10 +409,10 @@ export class DeveloperOrderedBySalary extends Base {
     this.aliasAttribute("updated_at", "legacy_updated_at");
     this.aliasAttribute("created_on", "legacy_created_on");
     this.aliasAttribute("updated_on", "legacy_updated_on");
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.order("salary DESC");
     });
-    this.scope("byName", function (this: any) {
+    this.scope("byName", function () {
       return this.order("name DESC");
     });
   }
@@ -422,7 +422,7 @@ registerModel(DeveloperOrderedBySalary);
 export class DeveloperCalledDavid extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where("name = 'David'");
     });
   }
@@ -432,7 +432,7 @@ registerModel(DeveloperCalledDavid);
 export class LazyLambdaDeveloperCalledDavid extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ name: "David" });
     });
   }
@@ -442,7 +442,7 @@ registerModel(LazyLambdaDeveloperCalledDavid);
 export class LazyBlockDeveloperCalledDavid extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ name: "David" });
     });
   }
@@ -474,7 +474,7 @@ export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
 
   static {
     this.tableName = "developers";
-    this.scope("david", function (this: any) {
+    this.scope("david", function () {
       return this.where({ name: "David" });
     });
   }
@@ -490,11 +490,11 @@ export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
 
   static {
     this.tableName = "developers";
-    this.scope("david", function (this: any) {
+    this.scope("david", function () {
       return this.where({ name: "David" });
     });
-    this.defaultScope(function (this: any) {
-      return (LazyBlockReferencingScopeDeveloperCalledDavid as any).david();
+    this.defaultScope(function () {
+      return LazyBlockReferencingScopeDeveloperCalledDavid.david();
     });
   }
 }
@@ -512,16 +512,16 @@ export class DeveloperCalledJamis extends Base {
     this.aliasAttribute("updated_at", "legacy_updated_at");
     this.aliasAttribute("created_on", "legacy_created_on");
     this.aliasAttribute("updated_on", "legacy_updated_on");
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ name: "Jamis" });
     });
-    this.scope("poor", function (this: any) {
+    this.scope("poor", function () {
       return this.where("salary < 150000");
     });
-    this.scope("david", function (this: any) {
+    this.scope("david", function () {
       return this.where({ name: "David" });
     });
-    this.scope("david2", function (this: any) {
+    this.scope("david2", function () {
       return this.unscoped().where({ name: "David" });
     });
   }
@@ -531,7 +531,7 @@ registerModel(DeveloperCalledJamis);
 export class PoorDeveloperCalledJamis extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ name: "Jamis", salary: 50000 });
     });
   }
@@ -541,7 +541,7 @@ registerModel(PoorDeveloperCalledJamis);
 export class InheritedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
   static {
     this.tableName = "developers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ salary: 50000 });
     });
   }
@@ -551,13 +551,13 @@ registerModel(InheritedPoorDeveloperCalledJamis);
 export class MultiplePoorDeveloperCalledJamis extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this;
     });
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ name: "Jamis" });
     });
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ salary: 50000 });
     });
   }
@@ -567,7 +567,7 @@ registerModel(MultiplePoorDeveloperCalledJamis);
 export class ModuleIncludedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
   static {
     this.tableName = "developers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ salary: 50000 });
     });
   }
@@ -581,7 +581,7 @@ export class EagerDeveloperWithDefaultScope extends Base {
     this.tableName = "developers";
     this.hasAndBelongsToMany(
       "projects",
-      function (this: any) {
+      function () {
         return this.order("projects.id");
       },
       {
@@ -589,7 +589,7 @@ export class EagerDeveloperWithDefaultScope extends Base {
         joinTable: "developers_projects",
       },
     );
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.includes(":projects");
     });
   }
@@ -603,7 +603,7 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
     this.tableName = "developers";
     this.hasAndBelongsToMany(
       "projects",
-      function (this: any) {
+      function () {
         return this.order("projects.id");
       },
       {
@@ -626,7 +626,7 @@ export class EagerDeveloperWithLambdaDefaultScope extends Base {
     this.tableName = "developers";
     this.hasAndBelongsToMany(
       "projects",
-      function (this: any) {
+      function () {
         return this.order("projects.id");
       },
       {
@@ -634,7 +634,7 @@ export class EagerDeveloperWithLambdaDefaultScope extends Base {
         joinTable: "developers_projects",
       },
     );
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.includes(":projects");
     });
   }
@@ -648,7 +648,7 @@ export class EagerDeveloperWithBlockDefaultScope extends Base {
     this.tableName = "developers";
     this.hasAndBelongsToMany(
       "projects",
-      function (this: any) {
+      function () {
         return this.order("projects.id");
       },
       {
@@ -656,7 +656,7 @@ export class EagerDeveloperWithBlockDefaultScope extends Base {
         joinTable: "developers_projects",
       },
     );
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.includes(":projects");
     });
   }
@@ -670,7 +670,7 @@ export class EagerDeveloperWithCallableDefaultScope extends Base {
     this.tableName = "developers";
     this.hasAndBelongsToMany(
       "projects",
-      function (this: any) {
+      function () {
         return this.order("projects.id");
       },
       {
@@ -687,7 +687,7 @@ registerModel(EagerDeveloperWithCallableDefaultScope);
 export class ThreadsafeDeveloper extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.limit(1);
     });
   }

@@ -25,7 +25,11 @@ function buildHost(): RoutingAssertionsHost {
   return { routes };
 }
 
-class StubController {}
+class StubController {
+  static actionEncodingTemplate(): null {
+    return null;
+  }
+}
 
 beforeAll(() => {
   for (const name of ["items", "tmp", "x"]) {

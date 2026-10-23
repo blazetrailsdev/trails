@@ -1,9 +1,10 @@
 import { expandCacheKey } from "@blazetrails/activesupport/cache";
 import { Digest } from "@blazetrails/activesupport/digest";
+import { mattrAccessor } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 
-const HTTP_IF_MODIFIED_SINCE = "If-Modified-Since";
-const HTTP_IF_NONE_MATCH = "If-None-Match";
+const HTTP_IF_MODIFIED_SINCE = "HTTP_IF_MODIFIED_SINCE";
+const HTTP_IF_NONE_MATCH = "HTTP_IF_NONE_MATCH";
 const DATE = "Date";
 const LAST_MODIFIED = "Last-Modified";
 const ETAG = "ETag";
@@ -18,10 +19,18 @@ const NO_STORE = "no-store",
 const MUST_REVALIDATE = "must-revalidate",
   IMMUTABLE = "immutable";
 
-export const CacheConfig = { strictFreshness: false };
+export class Request {
+  declare static strictFreshness: boolean;
+  declare strictFreshness: boolean;
+
+  static {
+    mattrAccessor.call(this, "strictFreshness", { default: false });
+  }
+}
 
 export interface RequestCacheHost {
   getHeader(name: string): string | undefined;
+  strictFreshness: boolean;
 }
 
 export interface CacheResponseLike {
@@ -47,14 +56,17 @@ export function notModified(this: RequestCacheHost, modifiedAt: Date | undefined
   return !!(since && modifiedAt && since.getTime() >= modifiedAt.getTime());
 }
 
-export function etagMatches(this: RequestCacheHost, etag: string | undefined): boolean {
-  if (!etag) return false;
+export function etagMatches(
+  this: RequestCacheHost,
+  etag: string | null | undefined,
+): boolean | null {
+  if (etag == null) return null;
   const v = ifNoneMatchEtags.call(this);
   return v.includes(etag) || v.includes("*");
 }
 
-export function fresh(this: RequestCacheHost, response: CacheResponseLike): boolean {
-  if (CacheConfig.strictFreshness) {
+export function fresh(this: RequestCacheHost, response: CacheResponseLike): boolean | null {
+  if (this.strictFreshness) {
     if (ifNoneMatch.call(this)) return etagMatches.call(this, response.etag);
     if (ifModifiedSince.call(this)) return notModified.call(this, response.lastModified);
     return false;
@@ -62,7 +74,7 @@ export function fresh(this: RequestCacheHost, response: CacheResponseLike): bool
   const lm = ifModifiedSince.call(this);
   const et = ifNoneMatch.call(this);
   if (!lm && !et) return false;
-  let ok = true;
+  let ok: boolean | null = true;
   if (lm) ok &&= notModified.call(this, response.lastModified);
   if (et) ok &&= etagMatches.call(this, response.etag);
   return ok;
@@ -155,9 +167,9 @@ export function parseHttpDate(s: string | undefined): Date | undefined {
 type R = ResponseCacheHost;
 
 export class Response {
-  declare getHeader: ResponseCacheHost["getHeader"];
-  declare setHeader: ResponseCacheHost["setHeader"];
-  declare hasHeader: ResponseCacheHost["hasHeader"];
+  declare protected getHeader: ResponseCacheHost["getHeader"];
+  declare protected setHeader: ResponseCacheHost["setHeader"];
+  declare protected hasHeader: ResponseCacheHost["hasHeader"];
   /** @internal */
   declare _cacheControlHash: CacheControlHash;
 
@@ -192,7 +204,7 @@ export class Response {
   }
 
   set etag(v: unknown) {
-    weakEtag.call(this, v);
+    weakEtag.call(this as unknown as R, v);
   }
 }
 
@@ -202,11 +214,11 @@ export function isLastModified(this: R) {
 export function isDate(this: R) {
   return this.hasHeader(DATE);
 }
-export function weakEtag(this: R, v: unknown) {
-  this.setHeader(ETAG, generateWeakEtag(v));
+export function weakEtag(this: R, weakValidators: unknown) {
+  this.setHeader("ETag", generateWeakEtag(weakValidators));
 }
-export function strongEtag(this: R, v: unknown) {
-  this.setHeader(ETAG, generateStrongEtag(v));
+export function strongEtag(this: R, strongValidators: unknown) {
+  this.setHeader("ETag", generateStrongEtag(strongValidators));
 }
 export function isEtag(this: R): string | undefined {
   return this.getHeader(ETAG);
@@ -238,20 +250,21 @@ export type CacheControlHash = Record<string, unknown> & { extras?: string[] };
 
 /** @internal */
 export function cacheControlHeaders(this: ResponseCacheHost): CacheControlHash {
-  const result: CacheControlHash = {};
+  const cacheControl: CacheControlHash = {};
   const segments = cacheControlSegments.call(this);
-  if (!segments) return result;
+  if (!segments) return cacheControl;
   for (const segment of segments) {
     const eq = segment.indexOf("=");
     const directive = eq === -1 ? segment : segment.slice(0, eq);
     const argument = eq === -1 ? undefined : segment.slice(eq + 1);
     if (SPECIAL_KEYS.has(directive)) {
-      result[directive.replace(/-(.)/g, (_, c: string) => c.toUpperCase())] = argument ?? true;
+      cacheControl[directive.replace(/-(.)/g, (_, c: string) => c.toUpperCase())] =
+        argument ?? true;
     } else {
-      (result.extras ??= []).push(segment);
+      (cacheControl.extras ??= []).push(segment);
     }
   }
-  return result;
+  return cacheControl;
 }
 
 /** @internal */

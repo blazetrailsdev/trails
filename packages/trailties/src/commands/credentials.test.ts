@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { createProgram } from "../cli.js";
 import { buildFile } from "./credentials.js";
+import { lookupBang } from "../command/behavior.js";
+
+await lookupBang();
 
 describe("CredentialsCommand", () => {
   it("registers edit/show subcommands", () => {

@@ -1,24 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { Events, EventResponse, type EventHandler } from "./events.js";
+import { Events, BufferedResponse, type EventHandler } from "./events.js";
 import { Request } from "./request.js";
 import type { RackApp, RackBody } from "./index.js";
 
 function makeHandler(events: [any, string][]): EventHandler & { self: object } {
   const handler = {
     self: {} as object,
-    onStart(_req: Request, _res: EventResponse) {
+    onStart(_req: Request, _res: BufferedResponse) {
       events.push([handler, "on_start"]);
     },
-    onCommit(_req: Request, _res: EventResponse) {
+    onCommit(_req: Request, _res: BufferedResponse) {
       events.push([handler, "on_commit"]);
     },
-    onSend(_req: Request, _res: EventResponse) {
+    onSend(_req: Request, _res: BufferedResponse) {
       events.push([handler, "on_send"]);
     },
-    onFinish(_req: Request, _res: EventResponse) {
+    onFinish(_req: Request, _res: BufferedResponse) {
       events.push([handler, "on_finish"]);
     },
-    onError(_req: Request, _res: EventResponse, _e: Error) {
+    onError(_req: Request, _res: BufferedResponse, _e: Error) {
       events.push([handler, "on_error"]);
     },
   };

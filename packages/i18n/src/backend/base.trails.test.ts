@@ -1,4 +1,4 @@
-import { kernelCatch, UncaughtThrowError } from "@blazetrails/ruby-compat";
+import { Hash, kernelCatch, UncaughtThrowError } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Simple } from "./simple.js";
@@ -105,10 +105,9 @@ describe("I18n::Backend::Base", () => {
 
   it("deep interpolates when deepInterpolation is set", () => {
     backend.storeTranslations("en", { people: { ann: "Ann is %{ann}", john: "John is %{john}" } });
-    expect(translate("people", { deepInterpolation: true, ann: "good", john: "big" })).toEqual({
-      ann: "Ann is good",
-      john: "John is big",
-    });
+    expect(translate("people", { deepInterpolation: true, ann: "good", john: "big" })).toEqual(
+      new Hash().set(":ann", "Ann is good").set(":john", "John is big"),
+    );
   });
 
   it("raises ReservedInterpolationKey when an entry uses a reserved key", () => {

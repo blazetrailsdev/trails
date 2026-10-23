@@ -16,7 +16,6 @@
     "lint": "NODE_OPTIONS=--max-old-space-size=10240 eslint .",
     "prelint:files": "pnpm prelint",
     "lint:files": "NODE_OPTIONS=--max-old-space-size=10240 eslint --no-error-on-unmatched-pattern",
-    "lint:no-explicit-any:allowlist": "pnpm tsx scripts/generate-no-explicit-any-allowlist.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:types": "vitest run --config vitest.dx-tests.config.ts",
@@ -54,13 +53,17 @@
     "parity:api:params": "pnpm tsx scripts/api-compare/lint-param-names.ts",
     "parity:api:parents": "pnpm tsx scripts/api-compare/lint-ambiguous-parents.ts",
     "parity:api:parents:tighten": "pnpm tsx scripts/api-compare/lint-ambiguous-parents.ts --tighten",
+    "parity:lint:counts": "tsx -e \"import('./scripts/parity/eslint-count.ts').then((m) => m.main()).then(console.log)\"",
+    "parity:lint:counts:ci": "tsx -e \"import('./scripts/parity/eslint-count.ts').then((m) => m.main('HEAD^1')).then(console.log)\"",
     "parity:api:predicates": "pnpm tsx scripts/api-compare/lint-predicate-kinds.ts",
     "parity:api:predicates:tighten": "pnpm tsx scripts/api-compare/lint-predicate-kinds.ts --tighten",
     "parity:api:params:tighten": "pnpm tsx scripts/api-compare/lint-param-names.ts --tighten",
+    "parity:types:casts": "tsx -e \"import('./scripts/parity/cast-count.ts').then((m) => m.main()).then(console.log)\"",
+    "parity:modules": "tsx -e \"import('./scripts/parity/module-count.ts').then((m) => m.main()).then(console.log)\"",
+    "parity:modules:tighten": "tsx -e \"import('./scripts/parity/module-count.ts').then((m) => m.main(['--tighten'])).then(console.log)\"",
+    "parity:api:sends": "tsx -e \"import('./scripts/parity/send-count.ts').then((m) => m.main()).then(console.log)\"",
     "parity:api:blocks": "pnpm tsx scripts/api-compare/lint-block-params.ts",
     "parity:api:blocks:tighten": "pnpm tsx scripts/api-compare/lint-block-params.ts --tighten",
-    "parity:api:arity": "pnpm tsx scripts/api-compare/lint-arity-excludes.ts",
-    "parity:api:inheritance": "pnpm tsx scripts/api-compare/lint-inheritance-excludes.ts",
     "parity:api:inlined": "pnpm tsx scripts/api-compare/lint-inlined-from.ts",
     "parity:api:inlined:fix": "pnpm tsx scripts/api-compare/lint-inlined-from.ts --fix",
     "parity:api:pins": "pnpm tsx scripts/api-compare/lint-body-pins.ts",
@@ -72,7 +75,6 @@
     "parity:api:deps": "pnpm vendor:fetch && LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths) LOCKFILE_PATH=$PWD/vendor/sources.lock.json ruby scripts/api-compare/extract-ruby-api.rb && pnpm tsx scripts/api-compare/lint-deps.ts",
     "parity:test": "bash scripts/test-compare/run.sh",
     "parity:test:assertions": "pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts",
-    "parity:test:assertions:reseed": "pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts --write",
     "parity:test:names:tighten": "pnpm tsx scripts/tighten-rails-test-name-parity.ts",
     "parity:test:closure": "pnpm tsx scripts/test-compare/closure-cli.ts",
     "parity:test:stubs": "pnpm parity:test -- --missing --json && pnpm tsx scripts/test-compare/generate-stubs.ts",
@@ -108,8 +110,6 @@
     "api:calls:args:reseed": "pnpm parity:api:calls:args:reseed",
     "api:calls:unreviewed": "pnpm parity:api:calls:unreviewed",
     "api:calls:reseed": "pnpm parity:api:calls:reseed",
-    "api:arity": "pnpm parity:api:arity",
-    "api:inheritance": "pnpm parity:api:inheritance",
     "api:pins": "pnpm parity:api:pins",
     "api:pins:all": "pnpm parity:api:pins:all",
     "fixtures:compare": "pnpm parity:fixtures",
@@ -120,7 +120,6 @@
     "lint:deps": "pnpm parity:api:deps",
     "test:compare": "pnpm parity:test",
     "test:assertions:ratchet": "pnpm parity:test:assertions",
-    "test:assertions:ratchet:reseed": "pnpm parity:test:assertions:reseed",
     "test:stubs": "pnpm parity:test:stubs",
     "vendor:fetch": "pnpm tsx vendor/fetch.ts",
     "vendor:recite": "pnpm tsx scripts/vendor-recite.ts"
@@ -162,5 +161,8 @@
     "mysql2": "^3.18.2",
     "pg": "^8.19.0",
     "yaml": "^2.8.3"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

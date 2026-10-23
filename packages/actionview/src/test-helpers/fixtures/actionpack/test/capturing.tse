@@ -1,0 +1,4 @@
+<% const days = capture(() => { %>
+  Dreamy days
+<% }) %>
+<%= days %>

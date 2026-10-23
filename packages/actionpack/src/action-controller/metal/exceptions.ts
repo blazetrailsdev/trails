@@ -1,9 +1,17 @@
-import { SpellChecker } from "@blazetrails/did-you-mean";
+import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import { toSentence } from "@blazetrails/activesupport";
+import {
+  StandardError,
+  excBacktrace,
+  excSetBacktrace,
+  include,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 
+import { ActionController } from "../../namespaces.js";
 import type { RouteSetLike } from "../../abstract-controller/url-for.js";
 
-export class ActionControllerError extends Error {
+export class ActionControllerError extends StandardError {
   constructor(msg?: string) {
     super(msg ?? "");
     this.name = "ActionControllerError";
@@ -11,9 +19,10 @@ export class ActionControllerError extends Error {
 }
 
 export class BadRequest extends ActionControllerError {
-  constructor(msg?: string) {
+  constructor(msg?: string, errinfo?: Error | null) {
     super(msg);
     this.name = "ActionController::BadRequest";
+    if (errinfo) excSetBacktrace(this, excBacktrace(errinfo));
   }
 }
 
@@ -47,7 +56,7 @@ export class UrlGenerationError extends ActionControllerError {
     methodName: string | null = null,
   ) {
     super(message);
-    this.name = "UrlGenerationError";
+    this.name = "ActionController::UrlGenerationError";
     this.routes = routes;
     this.routeName = routeName;
     this.methodName = methodName;
@@ -67,6 +76,7 @@ export class UrlGenerationError extends ActionControllerError {
     return this.#cachedCorrections;
   }
 }
+include(UrlGenerationError, Correctable);
 
 export class MethodNotAllowed extends ActionControllerError {
   constructor(...allowedMethods: string[]) {
@@ -134,3 +144,17 @@ export class MissingExactTemplate extends UnknownFormat {
     this.actionName = actionName;
   }
 }
+
+rbModConstSet(ActionController, "ActionControllerError", ActionControllerError);
+rbModConstSet(ActionController, "BadRequest", BadRequest);
+rbModConstSet(ActionController, "RenderError", RenderError);
+rbModConstSet(ActionController, "RoutingError", RoutingError);
+rbModConstSet(ActionController, "UrlGenerationError", UrlGenerationError);
+rbModConstSet(ActionController, "MethodNotAllowed", MethodNotAllowed);
+rbModConstSet(ActionController, "NotImplemented", NotImplemented);
+rbModConstSet(ActionController, "MissingFile", MissingFile);
+rbModConstSet(ActionController, "SessionOverflowError", SessionOverflowError);
+rbModConstSet(ActionController, "UnknownHttpMethod", UnknownHttpMethod);
+rbModConstSet(ActionController, "UnknownFormat", UnknownFormat);
+rbModConstSet(ActionController, "RespondToMismatchError", RespondToMismatchError);
+rbModConstSet(ActionController, "MissingExactTemplate", MissingExactTemplate);

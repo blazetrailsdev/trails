@@ -1,4 +1,5 @@
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import type { Application } from "./application.js";
 
 export type InitializerGroup = string;
 
@@ -8,7 +9,11 @@ export interface InitializerOptions {
   group?: InitializerGroup;
 }
 
-export type InitializerBlock<C = unknown> = (this: C, ...args: unknown[]) => unknown;
+export type InitializerBlock<C = unknown> = (
+  this: C,
+  app: Application,
+  ...args: unknown[]
+) => unknown;
 
 export class Initializer<C = unknown> {
   readonly name: string;
@@ -45,7 +50,7 @@ export class Initializer<C = unknown> {
         `Initializer "${this.name}" is unbound; call bind(context) (or run via runInitializers) first`,
       );
     }
-    return this.block.apply(this._context, args);
+    return this.block.apply(this._context, args as Parameters<InitializerBlock<C>>);
   }
 
   bind<T>(context: T): Initializer<T> {

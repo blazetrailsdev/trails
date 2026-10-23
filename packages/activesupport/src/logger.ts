@@ -82,6 +82,10 @@ export class Formatter {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerThreadSafeLevel` (`logger_silence.rb:9`); the class/interface merge is how `include()` surfaces on the type side.
 export class Logger {
+  static toString(): string {
+    return "ActiveSupport::Logger";
+  }
+
   progname: string | null = null;
   /** @noRailsEquivalent PERMANENT */
   static Formatter = Formatter;
@@ -180,40 +184,28 @@ export class Logger {
 
   declare log: Logger["add"];
 
-  debug(progname?: unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.DEBUG, null, null, progname as () => unknown)
-      : this.add(Logger.DEBUG, null, progname);
+  debug(progname: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.DEBUG, null, progname, block);
   }
 
-  info(progname?: unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.INFO, null, null, progname as () => unknown)
-      : this.add(Logger.INFO, null, progname);
+  info(progname: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.INFO, null, progname, block);
   }
 
-  warn(progname?: unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.WARN, null, null, progname as () => unknown)
-      : this.add(Logger.WARN, null, progname);
+  warn(progname: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.WARN, null, progname, block);
   }
 
-  error(progname?: unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.ERROR, null, null, progname as () => unknown)
-      : this.add(Logger.ERROR, null, progname);
+  error(progname: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.ERROR, null, progname, block);
   }
 
-  fatal(progname?: unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.FATAL, null, null, progname as () => unknown)
-      : this.add(Logger.FATAL, null, progname);
+  fatal(progname: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.FATAL, null, progname, block);
   }
 
-  unknown(progname?: unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.UNKNOWN, null, null, progname as () => unknown)
-      : this.add(Logger.UNKNOWN, null, progname);
+  unknown(progname: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.UNKNOWN, null, progname, block);
   }
 
   get "debug?"(): boolean {
@@ -232,12 +224,8 @@ export class Logger {
     return this.level <= Logger.FATAL;
   }
 
-  silence(severity: number | LogLevel = Logger.ERROR, fn?: (logger: this) => void): void {
-    if (this.silencer) {
-      this.logAt(severity, () => fn?.(this));
-    } else {
-      fn?.(this);
-    }
+  silence<T>(severity: number | LogLevel = Logger.ERROR, fn?: (logger: this) => T): T | undefined {
+    return this.silencer ? this.logAt(severity, () => fn?.(this)) : fn?.(this);
   }
 
   debugBang(): void {
@@ -295,13 +283,17 @@ export interface Logger {
   set level(severity: number | LogLevel | string);
   get localLevel(): number | null;
   set localLevel(level: number | LogLevel | null);
-  logAt(level: number | LogLevel, fn: () => void): void;
+  logAt<T>(level: number | LogLevel, fn: () => T): T;
 }
 include(Logger, LoggerThreadSafeLevel);
 
 Logger.prototype.log = Logger.prototype.add;
 
 export class SimpleFormatter extends Formatter {
+  static toString(): string {
+    return "ActiveSupport::Logger::SimpleFormatter";
+  }
+
   override call(
     severity: string,
     timestamp: Temporal.Instant,

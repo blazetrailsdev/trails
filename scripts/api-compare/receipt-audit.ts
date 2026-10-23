@@ -50,6 +50,7 @@ export function stripReceipts(ts: ApiManifest): ApiManifest {
   };
   for (const pkg of Object.values(out.packages)) {
     delete pkg.fileNoRailsEquivalent;
+    delete pkg.fileConstantNoRailsEquivalent;
     for (const c of [...Object.values(pkg.classes), ...Object.values(pkg.modules)]) {
       delete c.noRailsEquivalent;
       for (const m of [...c.instanceMethods, ...c.classMethods]) strip(m);
@@ -91,7 +92,12 @@ export function receiptsCoveringNothing(
       extras.add(allowKeyOf({ package: f.package, tsFile: f.tsFile, name: e.name }));
     }
   }
-  return tagged.scored.filter((e) => !extras.has(allowKeyOf(e)) && !copied.has(allowKeyOf(e)));
+  return tagged.scored.filter(
+    (e) =>
+      (filterPkg === null || e.package === filterPkg) &&
+      !extras.has(allowKeyOf(e)) &&
+      !copied.has(allowKeyOf(e)),
+  );
 }
 
 export interface SourceFile {

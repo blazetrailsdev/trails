@@ -3,10 +3,7 @@ import {
   flatten,
   Hash,
   included,
-  initialize,
   isModuleIncluded,
-  merge,
-  Module,
   rbFCaller,
   rbModToS,
   rbObjAsString,
@@ -165,46 +162,24 @@ function _parseInitializationOptions(
   opts ||= rbObjDup(storedOpts);
 
   config ||= {};
-  config = Object.assign(merge(storedConfig, this._sharedConfiguration()), config as BaseConfig);
+  config = Object.assign({ ...storedConfig, ...this._sharedConfiguration() }, config as BaseConfig);
 
   return [args as unknown[], opts, config as BaseConfig];
 }
 
-export const Invocation = new Module((mod) => {
-  (mod as unknown as Record<symbol, unknown>)[included] = function (base: object): void {
+export const Invocation = {
+  ClassMethods,
+  [included](base: object): void {
     extend(base, ClassMethods);
-  };
-
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function* (
-    this: Invocation,
-    args: unknown[] = [],
-    options: unknown = {},
-    config: BaseConfig = {},
-  ): Generator<void, void, void> {
-    this._invocations =
-      (config.invocations as Invocations | undefined) ||
-      new Hash<unknown, string[]>((h, k) => {
-        const v: string[] = [];
-        h.set(k, v);
-        return v;
-      });
-    this._initializer = [args, options, config];
-    yield;
-  };
-
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      currentCommandChain,
-      invoke,
-      invokeCommand,
-      invokeTask,
-      invokeAll,
-      invokeWithPadding,
-      _sharedConfiguration,
-      _retrieveClassAndCommand,
-      _retrieveClassAndTask,
-      _parseInitializationOptions,
-    });
-  });
-}) as Module & { ClassMethods: typeof ClassMethods };
-Invocation.ClassMethods = ClassMethods;
+  },
+  currentCommandChain,
+  invoke,
+  invokeCommand,
+  invokeTask,
+  invokeAll,
+  invokeWithPadding,
+  _sharedConfiguration,
+  _retrieveClassAndCommand,
+  _retrieveClassAndTask,
+  _parseInitializationOptions,
+};

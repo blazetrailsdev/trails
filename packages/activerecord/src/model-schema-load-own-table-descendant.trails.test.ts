@@ -4,6 +4,7 @@ import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-dou
 import { registerModel } from "./associations.js";
 import { loadSchema } from "./model-schema.js";
 import { defaultValue } from "./type.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 type Cols = Record<string, { sqlType: string; name: string; default: null }>;
 
@@ -57,6 +58,7 @@ async function buildHierarchy(asked: string[]) {
 }
 
 describe("loadSchema — own-table descendant under an STI ancestor", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("reflects the descendant's own table, not the STI base's", async () => {
     const asked: string[] = [];
     const { Ticket } = await buildHierarchy(asked);
@@ -97,8 +99,8 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     const hash = VipTicket.columnsHash();
 
     expect(Object.keys(hash).sort()).toEqual(["id", "subject"]);
-    expect(Object.prototype.hasOwnProperty.call(VipTicket, "_schemaLoaded")).toBe(true);
-    expect(Object.prototype.hasOwnProperty.call(VipTicket, "_columnsHash")).toBe(true);
+    expect(Object.hasOwn(VipTicket, "_schemaLoaded")).toBe(true);
+    expect(Object.hasOwn(VipTicket, "_columnsHash")).toBe(true);
   });
 
   it("gives a genuine STI subclass the base's shared table", async () => {
@@ -109,7 +111,7 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
 
     expect(Object.keys(hash).sort()).toEqual(["id", "sides", "type"]);
     expect(asked).not.toContain("tickets");
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(true);
+    expect(Object.hasOwn(Circle, "_schemaLoaded")).toBe(true);
+    expect(Object.hasOwn(Circle, "_columnsHash")).toBe(true);
   });
 });

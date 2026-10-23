@@ -1,10 +1,13 @@
 import type { Duration, DurationParts } from "../duration.js";
 import { SECONDS_PER_DAY, SECONDS_PER_WEEK } from "../duration.js";
-import { isEmpty } from "@blazetrails/ruby-compat";
 
 const DATE_COMPONENTS: (keyof DurationParts)[] = ["years", "months", "days"];
 
 export class ISO8601Serializer {
+  static toString(): string {
+    return "ActiveSupport::Duration::ISO8601Serializer";
+  }
+
   private duration: Duration;
   private precision: number | null;
 
@@ -15,7 +18,7 @@ export class ISO8601Serializer {
 
   serialize(): string {
     const parts = this.normalize();
-    if (isEmpty(parts)) return "PT0S";
+    if (Object.keys(parts).length === 0) return "PT0S";
 
     let output = "P";
     if ("years" in parts) output += `${parts.years}Y`;

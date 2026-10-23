@@ -1,15 +1,19 @@
-import { isPresent, symbolizeKeys } from "@blazetrails/activesupport";
-import { Jaro } from "@blazetrails/did-you-mean";
+import { isPresent, SyntaxErrorProxy, symbolizeKeys } from "@blazetrails/activesupport";
+import { Correctable, Jaro } from "@blazetrails/did-you-mean";
 import {
   ArgumentError,
   type Encoding,
+  excBacktrace,
   excBacktraceLocations,
   File,
+  include,
   type Location,
   rbInspect,
   regexpEscape,
+  rbModConstSet,
   StandardError,
 } from "@blazetrails/ruby-compat";
+import { ActionView } from "../namespaces.js";
 import type { TemplatePath } from "../template-path.js";
 import type { Template } from "../template.js";
 
@@ -94,6 +98,10 @@ export class Results {
 type MissingTemplatePath = { allTemplatePaths?(): readonly TemplatePath[] } | null | undefined;
 
 export class MissingTemplate extends ActionViewError {
+  static {
+    include(this, Correctable);
+  }
+
   static Results = Results;
 
   readonly path: string;
@@ -197,38 +205,34 @@ export class MissingTemplate extends ActionViewError {
   }
 }
 
-export interface TemplateErrorOptions {
-  original: Error;
-  template: Template;
-}
-
-export class TemplateError extends Error {
+export class TemplateError extends ActionViewError {
   static readonly SOURCE_CODE_RADIUS = 3;
 
-  readonly original: Error;
-  readonly template: Template;
+  declare cause: Error;
+  readonly template: Template | string;
   private subTemplates?: Template[];
-  private _lineNumber?: number | null;
+  private _lineNumber?: string | null;
 
-  constructor(opts: TemplateErrorOptions) {
-    super(opts.original.message, { cause: opts.original });
+  constructor(template: Template | string, errinfo: Error) {
+    super(errinfo.message);
     this.name = "ActionView::Template::Error";
-    this.original = opts.original;
-    this.template = opts.template;
+    this.cause = errinfo;
+    if (this.cause instanceof SyntaxError) {
+      this.cause = new SyntaxErrorProxy(this.cause);
+    }
+    this.template = template;
   }
 
-  backtrace(): string[] {
-    const stack = this.original.stack;
-    if (stack == null) return [];
-    return stack.split("\n").slice(1);
+  backtrace(): string[] | null {
+    return excBacktrace(this.cause);
   }
 
   backtraceLocations(): Location[] | null {
-    return excBacktraceLocations(this.original);
+    return excBacktraceLocations(this.cause);
   }
 
   fileName(): string {
-    return this.template.identifier;
+    return (this.template as Template).identifier;
   }
 
   subTemplateMessage(): string {
@@ -239,10 +243,11 @@ export class TemplateError extends Error {
   }
 
   sourceExtract(indentation = 0): string[] {
-    const num = this.lineNumber();
+    let num: string | number | null = this.lineNumber();
     if (num == null) return [];
+    num = Number(num);
 
-    const sourceCode = this.template.encodeBang().split("\n");
+    const sourceCode = (this.template as Template).encodeBang().split("\n");
 
     const startOnLine = Math.max(num - TemplateError.SOURCE_CODE_RADIUS - 1, 0);
     const endOnLine = Math.min(num + TemplateError.SOURCE_CODE_RADIUS - 1, sourceCode.length);
@@ -259,7 +264,7 @@ export class TemplateError extends Error {
     this.subTemplates.push(templatePath);
   }
 
-  lineNumber(): number | null {
+  lineNumber(): string | null {
     if (this._lineNumber != null) return this._lineNumber;
     this._lineNumber = null;
     const fileName = this.fileName();
@@ -267,10 +272,10 @@ export class TemplateError extends Error {
       const regexp = new RegExp(`${regexpEscape(File.basename(fileName))}:(\\d+)`);
       const match =
         regexp.exec(this.message) ??
-        this.backtrace()
+        this.backtrace()!
           .map((line) => regexp.exec(line))
           .find((m) => m !== null);
-      if (match) this._lineNumber = Number(match[1]);
+      if (match) this._lineNumber = match[1];
     }
     return this._lineNumber;
   }
@@ -296,7 +301,7 @@ export class SyntaxErrorInTemplate extends TemplateError {
   private readonly offendingCodeString: string;
 
   constructor(template: Template, offendingCodeString: string, original: Error) {
-    super({ original, template });
+    super(template, original);
     this.offendingCodeString = offendingCodeString;
     this.name = "ActionView::SyntaxErrorInTemplate";
     this.message = `Encountered a syntax error while rendering template: check ${this.offendingCodeString}\n`;
@@ -309,3 +314,10 @@ export class SyntaxErrorInTemplate extends TemplateError {
     });
   }
 }
+
+rbModConstSet(ActionView, "ActionViewError", ActionViewError);
+rbModConstSet(ActionView, "EncodingError", EncodingError);
+rbModConstSet(ActionView, "WrongEncodingError", WrongEncodingError);
+rbModConstSet(ActionView, "StrictLocalsError", StrictLocalsError);
+rbModConstSet(ActionView, "MissingTemplate", MissingTemplate);
+rbModConstSet(ActionView, "SyntaxErrorInTemplate", SyntaxErrorInTemplate);

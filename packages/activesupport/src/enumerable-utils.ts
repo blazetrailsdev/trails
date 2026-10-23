@@ -3,6 +3,7 @@ import {
   groupBy as enumGroupBy,
   Hash,
   hashAref,
+  hashAset,
   numericPlus,
   rbBigNorm,
   rbEqual,
@@ -56,26 +57,30 @@ export function indexBy<T, K extends string | number>(
   return result;
 }
 
+export function indexWith<V>(
+  collection: readonly string[],
+  defaultOrBlock: V | ((elem: string) => V),
+): Record<string, V>;
 export function indexWith<T, V>(
   collection: readonly T[],
   defaultOrBlock: V | ((elem: T) => V),
-): Hash<T, V> {
-  const result = new Hash<T, V>();
+): Hash<T, V> | Record<string, V>;
+export function indexWith<T, V>(
+  collection: readonly T[],
+  defaultOrBlock: V | ((elem: T) => V),
+): Hash<T, V> | Record<string, V> {
+  const result: Hash<T, V> | Record<string, V> = collection.every(
+    (elem) => typeof elem === "string",
+  )
+    ? {}
+    : new Hash<T, V>();
+  const aset = (elem: T, value: V): unknown =>
+    result instanceof Hash ? result.set(elem, value) : hashAset(result, elem as string, value);
   if (typeof defaultOrBlock === "function") {
     const block = defaultOrBlock as (elem: T) => V;
-    for (const elem of collection) result.set(elem, block(elem));
+    for (const elem of collection) aset(elem, block(elem));
   } else {
-    for (const elem of collection) result.set(elem, defaultOrBlock);
-  }
-  return result;
-}
-
-export function groupBy<T, K>(collection: T[], fn: (item: T) => K): Map<K, T[]> {
-  const result = new Map<K, T[]>();
-  for (const item of collection) {
-    const key = fn(item);
-    if (!result.has(key)) result.set(key, []);
-    result.get(key)!.push(item);
+    for (const elem of collection) aset(elem, defaultOrBlock);
   }
   return result;
 }
@@ -97,14 +102,6 @@ export function maximum<T>(collection: T[], key: (item: T) => number): number | 
 export function minimum<T>(collection: T[], key: (item: T) => number): number | undefined {
   if (collection.length === 0) return undefined;
   return Math.min(...collection.map(key));
-}
-
-export function inBatchesOf<T>(collection: T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < collection.length; i += size) {
-    result.push(collection.slice(i, i + size));
-  }
-  return result;
 }
 
 export function compactBlank<T>(collection: T[]): T[] {
@@ -129,29 +126,6 @@ export function many<T>(collection: T[], fn?: (item: T) => boolean): boolean {
     }
   }
   return false;
-}
-
-export function tally<T extends string | number>(collection: T[]): Record<string, number> {
-  const result: Record<string, number> = {};
-  for (const item of collection) {
-    const key = String(item);
-    result[key] = (result[key] ?? 0) + 1;
-  }
-  return result;
-}
-
-export function filterMap<T, U>(
-  collection: readonly T[],
-  fn: (item: T) => U | false | null | undefined,
-): U[] {
-  const result: U[] = [];
-  for (const item of collection) {
-    const mapped = fn(item);
-    if (mapped !== null && mapped !== undefined && mapped !== false) {
-      result.push(mapped);
-    }
-  }
-  return result;
 }
 
 export function excluding<T extends Record<string, unknown>>(
@@ -195,14 +169,6 @@ export function eachCons<T>(collection: T[], n: number, block?: (slice: T[]) => 
   if (!block) return result;
   result.forEach(block);
   return collection;
-}
-
-export function eachSlice<T>(collection: T[], n: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < collection.length; i += n) {
-    result.push(collection.slice(i, i + n));
-  }
-  return result;
 }
 
 export function inOrderOf<T>(

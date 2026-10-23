@@ -6,6 +6,10 @@ import type { NumberToHumanSizeOptions } from "../number-helper.js";
 const STORAGE_UNITS = ["byte", "kb", "mb", "gb", "tb", "pb", "eb", "zb"];
 
 export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSizeOptions> {
+  static toString(): string {
+    return "ActiveSupport::NumberHelper::NumberToHumanSizeConverter";
+  }
+
   static {
     this.namespace = "human";
     this.validateFloat = true;

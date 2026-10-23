@@ -2,11 +2,13 @@ import type { Requested, TemplateDetails } from "./template-details.js";
 import type { TemplatePath } from "./template-path.js";
 import type { Template } from "./template.js";
 import { MissingTemplate } from "./template/error.js";
+import { ActionView } from "./namespaces.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 export type LookupDetails =
   | TemplateDetails
   | Requested
-  | Readonly<Record<string, ReadonlyArray<string | symbol>>>;
+  | Readonly<Record<string, ReadonlyArray<string | symbol> | ":any">>;
 
 export interface PathSetResolver {
   findAll(
@@ -50,6 +52,11 @@ export class PathSet implements Iterable<PathSetResolver> {
 
   includes(resolver: PathSetResolver): boolean {
     return this.paths.includes(resolver);
+  }
+
+  each(block: (resolver: PathSetResolver) => void): ReadonlyArray<PathSetResolver> {
+    this.paths.forEach(block);
+    return this.paths;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -114,7 +121,9 @@ export class PathSet implements Iterable<PathSetResolver> {
   /** @internal */
   private typecast(paths: ReadonlyArray<PathSetResolver | unknown>): PathSetResolver[] {
     return paths.map((path) => {
-      if (
+      if (typeof path === "string") {
+        return new ActionView.FileSystemResolver(path);
+      } else if (
         path !== null &&
         typeof path === "object" &&
         typeof (path as PathSetResolver).findAll === "function"
@@ -122,7 +131,7 @@ export class PathSet implements Iterable<PathSetResolver> {
         return path as PathSetResolver;
       }
       throw new TypeError(
-        `${String(path)} is not a valid path: must be a Resolver (strings are wrapped by PathRegistry.castFileSystemResolvers)`,
+        `${rbInspect(path)} is not a valid path: must be a String, Pathname, or Resolver`,
       );
     });
   }

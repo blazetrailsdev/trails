@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertEmpty, assertNoChanges, assertRaises } from "@blazetrails/activesupport";
-import { Module, registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Rollback, StatementInvalid } from "../errors.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
-registerConstant("ActiveRecord::Migration::UniqueConstraintTest", new Module());
+registerConstant("ActiveRecord::Migration::UniqueConstraintTest", {});
 
 class Section extends Base {
   static name = "ActiveRecord::Migration::UniqueConstraintTest::Section";

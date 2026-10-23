@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { DevcontainerGenerator } from "./devcontainer-generator.js";
 import { Generators } from "../../../generators.js";
 let tmpDir: string;
@@ -17,7 +18,11 @@ const run = (o: Opts = {}) =>
 const read = (rel: string) => fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 const exists = (rel: string) => fs.existsSync(path.join(tmpDir, rel));
 const dc = () => JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
-const cm = () => JSON.parse(read(".devcontainer/compose.yaml")) as Record<string, unknown>;
+const cm = () =>
+  JSON.parse(JSON.stringify(YAML.load(read(".devcontainer/compose.yaml")))) as Record<
+    string,
+    unknown
+  >;
 const features = () => dc().features as Record<string, unknown>;
 const env = () => (dc().containerEnv as Record<string, string> | undefined) ?? {};
 const services = () => cm().services as Record<string, Record<string, unknown>>;
@@ -140,7 +145,7 @@ describe("DevcontainerGeneratorTest", () => {
       '  drivenBy(":selenium", { using: ":headless_chrome" });\n',
     );
     run();
-    expect(env().CAPYBARA_SERVER_PORT).toBe("45678");
+    expect(env().TRAILS_SYSTEM_TESTING_SERVER_PORT).toBe("45678");
     expect(env().SELENIUM_HOST).toBe("selenium");
     expect(read("test/application_system_test_case.ts")).toMatch(/servedBy/);
   });
@@ -152,7 +157,7 @@ describe("DevcontainerGeneratorTest", () => {
     run({ systemTest: false });
     expect(services()["rails-app"].depends_on ?? []).not.toContain("selenium");
     expect(services().selenium).toBeUndefined();
-    expect(env().CAPYBARA_SERVER_PORT).toBeUndefined();
+    expect(env().TRAILS_SYSTEM_TESTING_SERVER_PORT).toBeUndefined();
   });
   it("test_dockerfile_content", () => {
     run({ nodeVersion: "20.0.0" });

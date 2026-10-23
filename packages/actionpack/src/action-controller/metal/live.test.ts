@@ -183,13 +183,15 @@ describe("ActionController::Live::Buffer", () => {
     buf.write("two");
     buf.write("three");
     buf.close();
-    expect([...buf.each()]).toEqual(["one", "two", "three"]);
+    const parts: unknown[] = [];
+    buf.each((part) => parts.push(part));
+    expect(parts).toEqual(["one", "two", "three"]);
   });
 
   it("a sync read of a live buffer raises rather than blocking before close", () => {
     const buf = new Buffer(makeResponse());
     buf.write("one");
-    expect(() => [...buf.each()]).toThrow(ThreadError);
+    expect(() => buf.each(() => {})).toThrow(ThreadError);
   });
 });
 
@@ -524,7 +526,7 @@ describe("ActionController::Live private helpers", () => {
       Base.logger = oldLogger;
     }
     expect(fatal).toHaveBeenCalledOnce();
-    const rendered = (fatal.mock.calls[0][0] as () => string)();
+    const rendered = (fatal.mock.calls[0][1] as () => string)();
     expect(rendered).toMatch(/^\nClientDisconnected \(oops\):\nsource\n {2}at .*\n {2}at /);
     expect(rendered.endsWith("\n\n")).toBe(true);
   });

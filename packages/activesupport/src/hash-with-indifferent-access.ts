@@ -1,4 +1,4 @@
-import { deepSymbolizeKeysBang, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
+import { deepSymbolizeKeysBang, isPlainObject, symbolizeKeysBang, toQuery } from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 import { DeepMergeable } from "./deep-mergeable.js";
 import { ActiveSupport } from "./namespaces.js";
@@ -16,6 +16,7 @@ import {
   rbObjRespondTo,
   symbolToS,
   toEnum,
+  transformValuesBang,
   type Enumerator,
 } from "@blazetrails/ruby-compat";
 
@@ -29,6 +30,10 @@ type DefaultBlock<V> = (key: string) => V;
 type ToHash = { toHash(): AnyObject | Hash<unknown, unknown> };
 
 export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
+  static toString(): string {
+    return "ActiveSupport::HashWithIndifferentAccess";
+  }
+
   constructor(
     constructor?: AnyObject | HashWithIndifferentAccess<V> | DefaultProc<string, V> | NoInfer<V>,
   ) {
@@ -478,12 +483,8 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return result;
   }
 
-  assoc(key: string): [string, V] | undefined {
-    key = this.convertKey(key);
-    if (super.has(key)) {
-      return [key, super.get(key)!];
-    }
-    return undefined;
+  override assoc(key: string): [string, V] | null {
+    return super.assoc(this.convertKey(key));
   }
 
   invert(): HashWithIndifferentAccess<string> {
@@ -532,17 +533,12 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return obj;
   }
 
-  toParam(): string {
-    const parts: string[] = [];
-    const sorted = [...this.entries()].sort(([a], [b]) => a.localeCompare(b));
-    for (const [k, v] of sorted) {
-      parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
-    }
-    return parts.join("&").replace(/%20/g, "+");
+  toQuery(namespace: string | null = null): string {
+    return toQuery(this, namespace ?? undefined);
   }
 
-  toQuery(): string {
-    return this.toParam();
+  toParam(namespace: string | null = null): string {
+    return this.toQuery(namespace);
   }
 
   withIndifferentAccess(): HashWithIndifferentAccess<V> {
@@ -557,16 +553,16 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this.transformKeysBang((k) => (isSymbol(k) ? symbolToS(k) : String(k)));
   }
 
-  symbolizeKeys(): Hash<string, unknown> {
-    return symbolizeKeysBang(this.toHash());
+  symbolizeKeys(): Hash<string, unknown> | AnyObject {
+    return symbolizeKeysBang(this.toHash() as AnyObject);
   }
 
-  toOptions(): Hash<string, unknown> {
+  toOptions(): Hash<string, unknown> | AnyObject {
     return this.symbolizeKeys();
   }
 
-  deepSymbolizeKeys(): Hash<string, unknown> {
-    return deepSymbolizeKeysBang(this.toHash());
+  deepSymbolizeKeys(): Hash<string, unknown> | AnyObject {
+    return deepSymbolizeKeysBang(this.toHash() as AnyObject);
   }
 
   toOptionsBang(): this {
@@ -577,15 +573,11 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this;
   }
 
-  toHash(): Hash<string, unknown> {
-    const copy = new Hash<string, unknown>();
-    for (const [key, value] of this) {
-      copy.set(key, value);
-    }
-    for (const [key, v] of copy) {
-      copy.set(key, this.convertValueToHash(v as V));
-    }
-    this.setDefaults(copy);
+  /** @inventedArm if — PERMANENT */
+  toHash(): Hash<string, unknown> | AnyObject {
+    const copy = this.toH() as Hash<string, unknown> | AnyObject;
+    transformValuesBang(copy, (v) => this.convertValueToHash(v as V));
+    if (copy instanceof Hash) this.setDefaults(copy);
     return copy;
   }
 

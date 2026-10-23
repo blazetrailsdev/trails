@@ -25,7 +25,8 @@ export function classifyCompareStep(command: string): string | null {
     command.includes("test-compare/compare.ts") ||
     // Pre-RFC-0092 entry-point names, kept so historic logs still parse.
     command.includes("test-compare/test-compare.ts") ||
-    command.includes("test-compare/convention-compare.ts")
+    command.includes("test-compare/convention-compare.ts") ||
+    /\bbg-gates\.mjs wait(?: \S+)* test-compare(?: |$)/.test(command)
   ) {
     return "test_compare";
   }

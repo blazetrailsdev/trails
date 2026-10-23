@@ -1,4 +1,5 @@
 import {
+  hashDelete,
   ArgumentError,
   valuesAt,
   getCrypto,
@@ -7,17 +8,15 @@ import {
   SecureRandom,
   verbose,
   rbInspect as inspect,
+  rbFSend,
   rbObjClassname,
   KeyError,
+  registerConstant,
+  eachPair,
 } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import {
-  RACK_ERRORS,
-  RACK_SESSION,
-  RACK_SESSION_OPTIONS,
-  Request,
-  ResponseRaw,
-} from "@blazetrails/rack";
+import { RACK_ERRORS, Request, Raw } from "@blazetrails/rack";
+import { RACK_SESSION, RACK_SESSION_OPTIONS } from "../constants.js";
 
 export class SessionId {
   static ID_VERSION = 2;
@@ -193,9 +192,9 @@ export class SessionHash implements PersistedSession {
     return this.data;
   }
 
-  destroy(): void {
+  async destroy(): Promise<void> {
     this.clear();
-    this.setId(this._store.deleteSession(this.req, this.id(), this.options()));
+    this.setId(await this._store.deleteSession(this.req, this.id(), this.options()));
   }
 
   toHash(): Record<string, unknown> {
@@ -276,7 +275,7 @@ export class SessionHash implements PersistedSession {
 
   /** @internal */
   loadBang(): void {
-    const [id, session] = this._store.loadSession(this.req);
+    const [id, session] = this._store.loadSession(this.req) as [unknown, Record<string, unknown>];
     this.setId(id);
     this.data = this.stringifyKeys(session);
     this.loaded = true;
@@ -290,9 +289,9 @@ export class SessionHash implements PersistedSession {
       typeof candidate?.toHash === "function"
         ? candidate.toHash()
         : (other as Record<string, unknown>);
-    for (const key of Object.keys(source)) {
-      hash[String(key)] = source[key];
-    }
+    eachPair(source, (key, value) => {
+      hash[String(key)] = value;
+    });
     return hash;
   }
 }
@@ -334,7 +333,8 @@ export interface PersistedRequest {
   cookies: Record<string, unknown>;
   params: Record<string, unknown>;
   getHeader(key: string): PersistedSession;
-  setHeader(key: string, value: unknown): void;
+  setHeader(key: string, value: unknown): unknown;
+  fetchHeader<T>(key: string, block: (key: string) => T): T;
   sessionOptions: Record<string, unknown>;
   ssl?: unknown;
 }
@@ -365,14 +365,10 @@ export class Persisted {
       ...(this.constructor as typeof Persisted).DEFAULT_OPTIONS,
       ...options,
     };
-    this.key = this.defaultOptions["key"] as string;
-    delete this.defaultOptions["key"];
-    this.assumeSsl = this.defaultOptions["assumeSsl"];
-    delete this.defaultOptions["assumeSsl"];
-    this.cookieOnly = this.defaultOptions["cookieOnly"];
-    delete this.defaultOptions["cookieOnly"];
-    this.sameSite = this.defaultOptions["sameSite"];
-    delete this.defaultOptions["sameSite"];
+    this.key = hashDelete(this.defaultOptions, "key") as string;
+    this.assumeSsl = hashDelete(this.defaultOptions, "assumeSsl");
+    this.cookieOnly = hashDelete(this.defaultOptions, "cookieOnly");
+    this.sameSite = hashDelete(this.defaultOptions, "sameSite");
     this.initializeSid();
   }
 
@@ -384,10 +380,10 @@ export class Persisted {
 
   async context(env: RackEnv, app: RackApp | undefined = this.app): Promise<RackResponse> {
     const req = this.makeRequest(env);
-    this.prepareSession(req);
-    const [status, headers, body] = await app!(req.env);
-    const res = new ResponseRaw(status, headers);
-    this.commitSession(req, res);
+    await this.prepareSession(req);
+    const [status, headers, body] = await (rbFSend(app, "call", req.env) as Promise<RackResponse>);
+    const res = new Raw(status, headers);
+    await this.commitSession(req, res);
     return [status, headers, body];
   }
 
@@ -427,10 +423,23 @@ export class Persisted {
     if (isTruthy(sessionWas)) session.mergeBang(sessionWas);
   }
 
-  /** @internal */
-  loadSession(req: PersistedRequest): [unknown, Record<string, unknown>] {
-    const currentSid = this.currentSessionId(req);
-    const [sid, session] = this.findSession(req, currentSid);
+  /**
+   * @internal
+   * @inventedArm then — PERMANENT
+   */
+  loadSession(
+    req: PersistedRequest,
+  ): [unknown, Record<string, unknown>] | Promise<[unknown, Record<string, unknown>]> {
+    let sid = this.currentSessionId(req);
+    const found = this.findSession(req, sid);
+    if (found instanceof Promise) {
+      return found.then(([sid, session]): [unknown, Record<string, unknown>] => [
+        sid,
+        session ?? {},
+      ]);
+    }
+    sid = found[0];
+    const session = found[1];
     return [sid, session ?? {}];
   }
 
@@ -485,14 +494,14 @@ export class Persisted {
     return isTruthy(request.ssl) || this.assumeSsl === true;
   }
 
-  commitSession(req: PersistedRequest, res: ResponseRaw): unknown {
+  async commitSession(req: PersistedRequest, res: Raw): Promise<unknown> {
     const session = req.getHeader(RACK_SESSION);
     const options: Record<string, unknown> = session.options();
 
     let sessionId: unknown;
     if (isTruthy(options["drop"]) || isTruthy(options["renew"])) {
       const currentId = session.id();
-      sessionId = this.deleteSession(
+      sessionId = await this.deleteSession(
         req,
         isTruthy(currentId) ? currentId : this.generateSid(),
         options,
@@ -509,7 +518,7 @@ export class Persisted {
       if (sessionData[k] == null) delete sessionData[k];
     }
 
-    const data = this.writeSession(req, sessionId, sessionData, options);
+    const data = await this.writeSession(req, sessionId, sessionData, options);
     if (!isTruthy(data)) {
       (req.getHeader(RACK_ERRORS) as unknown as RackErrors).puts(
         `Warning! ${this.constructor.name} failed to save session. Content dropped.`,
@@ -552,11 +561,7 @@ export class Persisted {
   }
 
   /** @internal */
-  setCookie(
-    request: PersistedRequest,
-    response: ResponseRaw,
-    cookie: Record<string, unknown>,
-  ): void {
+  setCookie(request: PersistedRequest, response: Raw, cookie: Record<string, unknown>): void {
     if (request.cookies[this.key] !== cookie["value"] || isTruthy(cookie["expires"])) {
       response.setCookie(this.key, cookie);
     }
@@ -567,22 +572,31 @@ export class Persisted {
     return SessionHash;
   }
 
-  findSession(_env: PersistedRequest, _sid: unknown): [unknown, Record<string, unknown> | null] {
+  findSession(
+    _env: PersistedRequest,
+    _sid: unknown,
+  ):
+    | [unknown, Record<string, unknown> | null]
+    | Promise<[unknown, Record<string, unknown> | null]> {
     // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:440 cluster=rack-session
     throw new Error("#find_session not implemented.");
   }
 
-  writeSession(
+  async writeSession(
     _req: PersistedRequest,
     _sid: unknown,
     _session: Record<string, unknown>,
     _options: Record<string, unknown>,
-  ): unknown {
+  ): Promise<unknown> {
     // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:448 cluster=rack-session
     throw new Error("#write_session not implemented.");
   }
 
-  deleteSession(_req: PersistedRequest, _sid: unknown, _options: Record<string, unknown>): unknown {
+  async deleteSession(
+    _req: PersistedRequest,
+    _sid: unknown,
+    _options: Record<string, unknown>,
+  ): Promise<unknown> {
     // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:455 cluster=rack-session
     throw new Error("#delete_session not implemented");
   }
@@ -629,7 +643,10 @@ export class PersistedSecure extends Persisted {
 }
 
 interface IdSubclass {
-  getSession(env: RackEnv, sid: unknown): [unknown, Record<string, unknown> | null];
+  getSession(
+    env: RackEnv,
+    sid: unknown,
+  ): Promise<[unknown, Record<string, unknown> | null]> | [unknown, Record<string, unknown> | null];
   setSession(
     env: RackEnv,
     sid: unknown,
@@ -643,25 +660,27 @@ export class ID extends Persisted {
   override findSession(
     req: PersistedRequest,
     sid: unknown,
-  ): [unknown, Record<string, unknown> | null] {
+  ):
+    | [unknown, Record<string, unknown> | null]
+    | Promise<[unknown, Record<string, unknown> | null]> {
     return (this as unknown as IdSubclass).getSession(req.env, sid);
   }
 
-  override writeSession(
+  override async writeSession(
     req: PersistedRequest,
     sid: unknown,
     session: Record<string, unknown>,
     options: Record<string, unknown>,
-  ): unknown {
-    return (this as unknown as IdSubclass).setSession(req.env, sid, session, options);
+  ): Promise<unknown> {
+    return await (this as unknown as IdSubclass).setSession(req.env, sid, session, options);
   }
 
-  override deleteSession(
+  override async deleteSession(
     req: PersistedRequest,
     sid: unknown,
     options: Record<string, unknown>,
-  ): unknown {
-    return (this as unknown as IdSubclass).destroySession(req.env, sid, options);
+  ): Promise<unknown> {
+    return await (this as unknown as IdSubclass).destroySession(req.env, sid, options);
   }
 }
 
@@ -674,3 +693,4 @@ Object.defineProperty(PersistedSecure, "name", {
   value: "Rack::Session::Abstract::PersistedSecure",
 });
 Object.defineProperty(ID, "name", { value: "Rack::Session::Abstract::ID" });
+registerConstant("Rack::Session::SessionId", SessionId);

@@ -1,3 +1,5 @@
+import { excBacktraceLocations, type Location } from "./backtrace-location.js";
+import { ThreadError } from "./thread-error.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import {
   getAsyncContext,
@@ -5,10 +7,27 @@ import {
   type AsyncContextAdapter,
 } from "./async-context-adapter.js";
 
+class IterBreak {
+  constructor(readonly value: unknown) {}
+}
+
+/**
+ * `rb_iter_break_value` (`vendor/ruby/v3.3.11/vm.c:2058`), Ruby's `break val`
+ * in a block: the walk the block was yielded from stops, and the method that
+ * yielded answers `val`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbIterBreakValue(val: unknown): never {
+  throw new IterBreak(val);
+}
+
 let _current: AsyncContext<Thread> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
 let _threadIdCounter = 0;
+const _threads = new Set<Thread>();
 const _locations = new WeakMap<object, string>();
+const _wakeups = new WeakMap<object, (() => void) | true>();
 const _locals = new WeakMap<object, Map<string, unknown>>();
 const _variables = new WeakMap<object, Map<string, unknown>>();
 
@@ -35,6 +54,16 @@ export class Thread<R = unknown> {
   });
 
   /**
+   * `Thread.list` (`vendor/ruby/v3.3.11/thread.c:2922` `thread_list`), the
+   * main thread and every thread still alive (`rb_thread_list`, `:2895`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.list` (`vendor/ruby/v3.3.11/thread.c:2922`).
+   */
+  static list(): Thread[] {
+    return [Thread.main, ..._threads];
+  }
+
+  /**
    * `rb_thread_s_handle_interrupt` (`vendor/ruby/v3.3.11/thread.c:2230`), which
    * masks asynchronous interrupts (`Thread#raise`, `Thread#kill`) around the
    * block. Nothing can interrupt a JS body from outside, so every mask is
@@ -48,12 +77,23 @@ export class Thread<R = unknown> {
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread.stop` (`vendor/ruby/v3.3.11/thread.c:2861`),
-   * which sleeps the current thread until another wakes or kills it. Nothing
-   * here wakes one, so the promise never settles and a killed thread's body
-   * stops at this call, as Ruby's does.
+   * which sleeps the current thread until another wakes or kills it. A thread
+   * woken by `wakeup` / `run` before it reaches this call does not sleep. This
+   * latch departs from MRI, where `rb_thread_wakeup_alive` changes the status
+   * only of a thread already stopped (`thread.c:2821-2824`), so an early wakeup
+   * is lost. MRI's GVL lets a new thread run to its first blocking point before
+   * its creator resumes, so Ruby's `t.run` finds it asleep; a JS body reaches
+   * this call only after awaits its creator does not wait for. A killed
+   * thread's body stops at this call, as Ruby's does.
    */
   static stop(): Promise<null> {
-    return new Promise(() => {});
+    const th = Thread.current();
+    if (_wakeups.get(th) === true) {
+      _wakeups.delete(th);
+      return Promise.resolve(null);
+    }
+    th.status = "sleep";
+    return new Promise((resolve) => _wakeups.set(th, () => resolve(null)));
   }
 
   /**
@@ -63,6 +103,37 @@ export class Thread<R = unknown> {
    */
   static pass(): Promise<null> {
     return new Promise((resolve) => setTimeout(() => resolve(null), 0));
+  }
+
+  /**
+   * `Thread.each_caller_location` (`vendor/ruby/v3.3.11/vm_backtrace.c:1273-1278`):
+   * yields each frame above the method calling it, as `caller_locations` would
+   * answer them, and answers nil. A block that calls `rbIterBreakValue(val)`
+   * stops the walk, and the call answers `val`. The break is a thrown value, so a
+   * block that catches every thrown value swallows it.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static eachCallerLocation<V = never>(block: (location: Location) => void): V | null {
+    const V8Error = Error as {
+      stackTraceLimit?: number;
+      captureStackTrace?: (exc: object, fn: unknown) => void;
+    };
+    const exc = new Error();
+    const stackTraceLimit = V8Error.stackTraceLimit;
+    V8Error.stackTraceLimit = Infinity;
+    try {
+      V8Error.captureStackTrace?.(exc, Thread.eachCallerLocation);
+    } finally {
+      V8Error.stackTraceLimit = stackTraceLimit;
+    }
+    try {
+      for (const location of (excBacktraceLocations(exc) ?? []).slice(1)) block(location);
+    } catch (e) {
+      if (e instanceof IterBreak) return e.value as V;
+      throw e;
+    }
+    return null;
   }
 
   /**
@@ -79,7 +150,7 @@ export class Thread<R = unknown> {
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#status` (`vendor/ruby/v3.3.11/thread.c:3480`).
    */
-  status: "run" | "dead";
+  status: "run" | "sleep" | "dead";
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#name` (`vendor/ruby/v3.3.11/thread.c:3396`).
    */
@@ -96,31 +167,41 @@ export class Thread<R = unknown> {
   readonly #killed = new Promise<void>((resolve) => (this.#kill = resolve));
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897`):
+   * the arguments before the block are handed to it (`thread_create_core`'s
+   * `proc.args`, `vendor/ruby/v3.3.11/thread.c:822`).
    */
-  constructor(block: () => R) {
+  constructor(...argsAndBlock: [...args: unknown[], block: (...args: never[]) => R]) {
+    const block = argsAndBlock.pop() as (...args: unknown[]) => R;
+    const args = argsAndBlock;
     this.id = ++_threadIdCounter;
+    _threads.add(this as Thread);
     this.status = "run";
     const frame = new Error().stack?.split("\n")[2] ?? "";
     const location = /\(?((?:file:\/\/)?[^\s()]+):(\d+):\d+\)?$/.exec(frame);
     if (location) _locations.set(this, `${location[1]}:${location[2]}`);
     try {
-      this.#value = currentSlot().run(this as Thread, block);
+      this.#value = currentSlot().run(this as Thread, () => block(...args));
     } catch (error) {
       this.#error = { raised: error };
       this.status = "dead";
+      _threads.delete(this as Thread);
       if (this.abortOnException) this.#abort(error);
       return;
     }
     const value = this.#value as unknown;
     if (value && typeof (value as PromiseLike<unknown>).then === "function") {
-      const die = () => void (this.status = "dead");
+      const die = () => {
+        this.status = "dead";
+        _threads.delete(this as Thread);
+      };
       (value as PromiseLike<unknown>).then(die, (error) => {
         die();
         if (this.abortOnException) this.#abort(error);
       });
     } else {
       this.status = "dead";
+      _threads.delete(this as Thread);
     }
   }
 
@@ -164,6 +245,34 @@ export class Thread<R = unknown> {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#wakeup` (`vendor/ruby/v3.3.11/thread.c:2805-2827`),
+   * which raises `ThreadError` for a killed thread and otherwise marks it
+   * eligible for scheduling, ending a `Thread.stop`.
+   */
+  wakeup(): this {
+    if (this.status === "dead") throw new ThreadError("killed thread");
+    const wake = _wakeups.get(this);
+    if (wake == null || wake === true) {
+      _wakeups.set(this, true);
+      return this;
+    }
+    _wakeups.delete(this);
+    this.status = "run";
+    wake();
+    return this;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#run` (`vendor/ruby/v3.3.11/thread.c:2852-2857`):
+   * `wakeup`, then `rb_thread_schedule`, which here is `Thread.pass`.
+   */
+  async run(): Promise<this> {
+    this.wakeup();
+    await Thread.pass();
+    return this;
+  }
+
+  /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#exit` / `#kill`
    * (`vendor/ruby/v3.3.11/thread.c:2710`), which terminates the thread and returns it.
    * MRI interrupts the thread wherever it is. JS cannot stop a running async
@@ -174,6 +283,7 @@ export class Thread<R = unknown> {
   exit(): this {
     if (this.status === "dead") return this;
     this.status = "dead";
+    _threads.delete(this as Thread);
     this.#kill();
     return this;
   }
@@ -197,6 +307,17 @@ export class Thread<R = unknown> {
    */
   isAlive(): boolean {
     return this.status !== "dead";
+  }
+
+  /**
+   * A dead thread answers `nil`, as Ruby's does. V8 exposes no stack for an
+   * async context other than the running one, so a live thread answers an
+   * empty backtrace.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#backtrace` (`vendor/ruby/v3.3.11/thread.c:5323`).
+   */
+  backtrace(): string[] | null {
+    return this.status === "dead" ? null : [];
   }
 
   /**

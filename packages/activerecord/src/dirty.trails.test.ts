@@ -1,4 +1,6 @@
+import { Hash } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
+import { hashAref, hasKey } from "@blazetrails/ruby-compat";
 import type { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -14,14 +16,14 @@ describe("Dirty restore of an in-place mutation", () => {
   it("restoreAttributes restores a serialized attribute mutated in place", async () => {
     const topic = await Topic.createBang({ content: { a: "a" } });
 
-    (topic.content as Record<string, string>)["b"] = "b";
+    (topic.content as Hash<string, string>).set("b", "b");
 
     expect(topic.isChanged).toBe(true);
     expect(topic.changed).toEqual(["content"]);
 
     (topic as unknown as { restoreAttributes(): void }).restoreAttributes();
 
-    expect(topic.content).toEqual({ a: "a" });
+    expect(topic.content).toEqual(new Hash().set("a", "a"));
     expect(topic.changed).toEqual([]);
     expect(topic.isChanged).toBe(false);
   });
@@ -29,20 +31,20 @@ describe("Dirty restore of an in-place mutation", () => {
   it("restoreAttributeBang restores a serialized attribute mutated in place", async () => {
     const topic = await Topic.createBang({ content: { a: "a" } });
 
-    (topic.content as Record<string, string>)["b"] = "b";
+    (topic.content as Hash<string, string>).set("b", "b");
 
     (topic as unknown as { restoreAttributeBang(name: string): void }).restoreAttributeBang(
       "content",
     );
 
-    expect(topic.content).toEqual({ a: "a" });
+    expect(topic.content).toEqual(new Hash().set("a", "a"));
     expect(topic.isChanged).toBe(false);
   });
 
   it("attributeChangedInPlace is true for a serialized attribute mutated in place", async () => {
     const topic = await Topic.createBang({ content: { a: "a" } });
 
-    (topic.content as Record<string, string>)["b"] = "b";
+    (topic.content as Hash<string, string>).set("b", "b");
 
     expect(topic.attributeChangedInPlace("content")).toBe(true);
   });
@@ -66,28 +68,44 @@ describe("Dirty restore of an in-place mutation", () => {
   it("previous changes includes in place serialized attribute mutation", async () => {
     const topic = await Topic.createBang({ content: { a: "a" } });
 
-    expect(topic.previousChanges.has("content")).toBe(true);
+    expect(hasKey(topic.previousChanges, "content")).toBe(true);
 
-    (topic.content as Record<string, string>)["b"] = "b";
+    (topic.content as Hash<string, string>).set("b", "b");
 
     expect(topic.isChanged).toBeTruthy();
 
     await topic.saveBang();
 
     expect(topic.isChanged).toBeFalsy();
-    expect(topic.previousChanges.has("content")).toBe(true);
+    expect(hasKey(topic.previousChanges, "content")).toBe(true);
     expect(topic.savedChanges.has("content")).toBe(true);
     expect(
-      (topic.previousChanges.get("content")![0] as HashWithIndifferentAccess<string>).get("a"),
+      (
+        (
+          hashAref(topic.previousChanges, "content") as [unknown, unknown]
+        )[0] as HashWithIndifferentAccess<string>
+      ).get("a"),
     ).toBe("a");
     expect(
-      (topic.previousChanges.get("content")![0] as HashWithIndifferentAccess<string>).get("b"),
+      (
+        (
+          hashAref(topic.previousChanges, "content") as [unknown, unknown]
+        )[0] as HashWithIndifferentAccess<string>
+      ).get("b"),
     ).toBeUndefined();
     expect(
-      (topic.previousChanges.get("content")![1] as HashWithIndifferentAccess<string>).get("a"),
+      (
+        (
+          hashAref(topic.previousChanges, "content") as [unknown, unknown]
+        )[1] as HashWithIndifferentAccess<string>
+      ).get("a"),
     ).toBe("a");
     expect(
-      (topic.previousChanges.get("content")![1] as HashWithIndifferentAccess<string>).get("b"),
+      (
+        (
+          hashAref(topic.previousChanges, "content") as [unknown, unknown]
+        )[1] as HashWithIndifferentAccess<string>
+      ).get("b"),
     ).toBe("b");
   });
 });

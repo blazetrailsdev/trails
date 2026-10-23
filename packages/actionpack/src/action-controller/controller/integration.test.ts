@@ -1,29 +1,33 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { bodyFromString, Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import { Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import { assertEqual } from "@blazetrails/activesupport";
 import {
+  assert,
   assertIncludes,
+  assertInstanceOf,
+  assertKindOf,
+  assertNot,
   assertNotIncludes,
   include,
+  type Included,
   sole,
   TopLevel,
   underscore,
-  type Included,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   Dir,
   File,
   LoadError,
-  Module,
   NoMethodError,
   rbFSend,
   rbObjSingletonClass,
   stderr,
 } from "@blazetrails/ruby-compat";
-import { XML } from "@blazetrails/nokogiri";
+import { HTML5, XML } from "@blazetrails/nokogiri";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
-import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
+import { IntegrationTest, Session } from "../../action-dispatch/testing/integration.js";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
@@ -48,22 +52,21 @@ describe("SessionTest", () => {
   const StubApp = (_env: RackEnv): RackResponse => [
     200,
     { "Content-Type": "text/html", "Content-Length": "13" },
-    bodyFromString("Hello, World!"),
+    ["Hello, World!"],
   ];
 
-  let session: IntegrationTest;
+  let session: Session;
 
-  beforeEach(({ task }) => {
-    session = new IntegrationTest(task.name);
-    session.app = StubApp;
+  beforeEach(() => {
+    session = new Session(StubApp);
   });
 
   it("https bang works and sets truth by default", () => {
-    expect(session.isHttps()).toBe(false);
+    assertNot(session.isHttps());
     session.httpsBang();
-    expect(session.isHttps()).toBe(true);
+    assert(session.isHttps());
     session.httpsBang(false);
-    expect(session.isHttps()).toBe(false);
+    assertNot(session.isHttps());
   });
 
   it("host!", () => {
@@ -212,23 +215,21 @@ describe("IntegrationTestTest", () => {
 
   it("child session assertions bubble up to root", () => {
     const assertionsBefore = test.assertions;
-    test.openSession().assertions += 1;
-    expect(test.assertions - assertionsBefore).toBe(1);
+    test.openSession().assert(true);
+    const assertionsAfter = test.assertions;
+
+    assertEqual(1, assertionsAfter - assertionsBefore);
   });
 
   it("does not prevent method missing passing up to ancestors", () => {
-    const mixin = new Module((mod) => {
-      mod.defineMethod("methodMissing", (name: string) => {
+    const mixin = {
+      methodMissing(name: string) {
         if (name === "foo") return "pass";
         throw new NoMethodError(`undefined method '${name}'`, name);
-      });
-    });
-    include(test.constructor as typeof IntegrationTest, mixin);
-    try {
-      expect(rbFSend(test, "foo")).toBe("pass");
-    } finally {
-      mixin.removeMethod("methodMissing");
-    }
+      },
+    };
+    include(rbObjSingletonClass(test) as typeof IntegrationTest, mixin);
+    expect(rbFSend(test, "foo")).toBe("pass");
   });
 });
 
@@ -249,7 +250,7 @@ describe("RackLintIntegrationTest", () => {
     const t = new RackLintIntegrationTest(task.name);
     await t.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.get("/", { to: (_: RackEnv): RackResponse => [200, {}, bodyFromString("")] });
+        this.get("/", { to: (_: RackEnv): RackResponse => [200, {}, [""]] });
       });
 
       await t.get("/");
@@ -401,7 +402,7 @@ describe("IntegrationProcessTest", () => {
     t = new IntegrationProcessTest(task.name);
   });
 
-  it.skip("get", async () => {
+  it("get", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/get");
       expect(t.status).toBe(200);
@@ -412,7 +413,7 @@ describe("IntegrationProcessTest", () => {
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("OK");
       expect(t.response.body).toBe("OK");
-      expect(t.htmlDocument).toBeInstanceOf(XML.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
     });
   });
@@ -429,13 +430,13 @@ describe("IntegrationProcessTest", () => {
         expect(t.cookies.toHash()).toEqual({});
         expect(t.body).toBe("<root></root>");
         expect(t.response.body).toBe("<root></root>");
-        expect(t.htmlDocument.constructor).toBe(XML.Document);
+        assertInstanceOf(XML.Document as unknown as new () => unknown, t.htmlDocument);
         expect(t.requestCount).toBe(1);
       });
     }
   });
 
-  it.skip("post", async () => {
+  it("post", async () => {
     await t.withTestRouteSet(async () => {
       await t.post("/post");
       expect(t.status).toBe(201);
@@ -446,7 +447,7 @@ describe("IntegrationProcessTest", () => {
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("Created");
       expect(t.response.body).toBe("Created");
-      expect(t.htmlDocument).toBeInstanceOf(XML.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
     });
   });
@@ -504,7 +505,7 @@ describe("IntegrationProcessTest", () => {
     });
   });
 
-  it.skip("redirect", async () => {
+  it("redirect", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/redirect");
       expect(t.status).toBe(302);
@@ -513,7 +514,7 @@ describe("IntegrationProcessTest", () => {
       assertResponse("redirect");
       assertResponse("found");
       expect(t.response.body).toBe("");
-      expect(t.htmlDocument).toBeInstanceOf(XML.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
 
       await t.followRedirectBang();
@@ -545,7 +546,7 @@ describe("IntegrationProcessTest", () => {
     });
   });
 
-  it.skip("redirect reset html document", async () => {
+  it("redirect reset html document", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/redirect");
       const previousHtmlDocument = t.htmlDocument;
@@ -785,13 +786,9 @@ describe("IntegrationProcessTest", () => {
 const Poller = {
   async call(env: RackEnv): Promise<RackResponse> {
     if (/^\/success/.test(env["PATH_INFO"] as string)) {
-      return [
-        200,
-        { "Content-Type": "text/plain", "Content-Length": "12" },
-        bodyFromString("Hello World!"),
-      ];
+      return [200, { "Content-Type": "text/plain", "Content-Length": "12" }, ["Hello World!"]];
     } else {
-      return [404, { "Content-Type": "text/plain", "Content-Length": "0" }, bodyFromString("")];
+      return [404, { "Content-Type": "text/plain", "Content-Length": "0" }, [""]];
     }
   },
 };
@@ -928,11 +925,7 @@ describe("ApplicationIntegrationTest", () => {
 
         this.mount(MountedApp as unknown as MountableApp, { at: "/mounted", as: "mounted" });
         this.get("fooz", {
-          to: (_env: RackEnv): RackResponse => [
-            200,
-            { [X_CASCADE]: "pass" },
-            bodyFromString("omg"),
-          ],
+          to: (_env: RackEnv): RackResponse => [200, { [X_CASCADE]: "pass" }, ["omg"]],
           anchor: false,
         });
         this.get("fooz", { to: "application_integration_test/test#index" });
@@ -1368,7 +1361,7 @@ describe("IntegrationRequestEncodersTest", () => {
       });
 
       assertResponse("success");
-      expect(t.response.parsedBody).toEqual({ foo: "fighters" });
+      assertEqual({ foo: "fighters" }, t.response.parsedBody);
     });
   });
 
@@ -1379,7 +1372,7 @@ describe("IntegrationRequestEncodersTest", () => {
       expect(t.request.accepts[0].toString()).toBe("application/json");
       expect(t.request.format.ref()).toBe(":json");
       expect(t.request.requestParameters).toEqual({ foo: "fighters" });
-      expect(t.response.parsedBody).toEqual({ foo: "fighters" });
+      assertEqual({ foo: "fighters" }, t.response.parsedBody);
     });
   });
 
@@ -1453,7 +1446,7 @@ describe("IntegrationRequestEncodersTest", () => {
 
       await t.get("/foos_json.json", { params: { foo: "heyo" } });
 
-      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+      assertEqual({ foo: "heyo" }, t.response.parsedBody);
     });
   });
 
@@ -1467,7 +1460,7 @@ describe("IntegrationRequestEncodersTest", () => {
 
       await t.get("/foos_json?foo=heyo", { as: "json" });
 
-      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+      assertEqual({ foo: "heyo" }, t.response.parsedBody);
     });
   });
 
@@ -1483,7 +1476,7 @@ describe("IntegrationRequestEncodersTest", () => {
 
       expect(t.request.method).toBe("POST");
       expect(t.request.headers.get("X-Http-Method-Override")).toBe("GET");
-      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+      assertEqual({ foo: "heyo" }, t.response.parsedBody);
     });
   });
 

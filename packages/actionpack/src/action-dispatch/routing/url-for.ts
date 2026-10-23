@@ -7,13 +7,15 @@ import {
 } from "@blazetrails/activesupport";
 import {
   extend,
-  type Hash,
+  Hash,
   dup,
   hashDelete,
   include,
   isSymbol,
   Module,
-  rbFPublicSend,
+  rbFSend,
+  rbModConstSet,
+  rbModMethodDefined,
   rbObjRespondTo,
   symbolToS,
   toH,
@@ -27,6 +29,7 @@ import {
   type ToModel,
 } from "./polymorphic-routes.js";
 import * as PolymorphicRoutes from "./polymorphic-routes.js";
+import { Routing } from "../../namespaces.js";
 import type { RouteSet } from "./route-set.js";
 
 export {
@@ -68,7 +71,7 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (options == null) {
     return this._routes!.urlFor({ ...this.urlOptions() });
   }
-  if (isPlainObject(options) || options instanceof Parameters) {
+  if (isPlainObject(options) || options instanceof Hash || options instanceof Parameters) {
     const routeName =
       options instanceof Parameters ? options.delete("useRoute") : hashDelete(options, "useRoute");
     const mergedUrlOptions = reverseMergeBang(
@@ -83,9 +86,8 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (typeof options === "string" && !isSymbol(options)) {
     return options;
   }
-  const target = this as unknown as PolymorphicHost;
   if (isSymbol(options)) {
-    return HelperMethodBuilder.url().handleStringCall(target, options);
+    return HelperMethodBuilder.url().handleStringCall(this as unknown as PolymorphicHost, options);
   }
   if (Array.isArray(options)) {
     const components = [...options];
@@ -93,13 +95,16 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
     return this.polymorphicUrl!(components, opts);
   }
   if (isModelClass(options)) {
-    return HelperMethodBuilder.url().handleClassCall(target, options);
+    return HelperMethodBuilder.url().handleClassCall(this as unknown as PolymorphicHost, options);
   }
-  return HelperMethodBuilder.url().handleModelCall(target, options as ToModel);
+  return HelperMethodBuilder.url().handleModelCall(
+    this as unknown as PolymorphicHost,
+    options as ToModel,
+  );
 }
 
 export function routeFor(this: UrlForHost, name: string, ...args: unknown[]): string {
-  return rbFPublicSend(this, camelize(`${name}_url`, "lower"), ...args) as string;
+  return rbFSend(this, camelize(`${name}_url`, "lower"), ...args) as string;
 }
 
 /** @internal */
@@ -169,7 +174,7 @@ export const UrlFor = new Module((mod) => {
   (
     mod as unknown as { included(base: null, block: (this: UrlForIncluder) => void): void }
   ).included(null, function (this: UrlForIncluder) {
-    if (!("defaultUrlOptions" in this.prototype)) {
+    if (!rbModMethodDefined(this, "defaultUrlOptions")) {
       if (typeof this === "function") {
         classAttribute.call(this, "defaultUrlOptions");
       } else {
@@ -194,3 +199,4 @@ export const UrlFor = new Module((mod) => {
     });
   });
 });
+rbModConstSet(Routing, "UrlFor", UrlFor);

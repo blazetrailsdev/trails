@@ -1,10 +1,18 @@
 import { constantize, include as includeMixin } from "@blazetrails/activesupport";
-import { ArgumentError, LoadError, NameError, SecureRandom } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  LoadError,
+  NameError,
+  SecureRandom,
+  hashDelete,
+} from "@blazetrails/ruby-compat";
 import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
-import { Request } from "../../request.js";
+import { Request } from "../../http/request.js";
 import { Session as RequestSession } from "../../request/session.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Session } from "../../../namespaces.js";
 
 export class SessionRestoreError extends Error {
   constructor(cause?: Error) {
@@ -26,9 +34,9 @@ export const Compatibility = {
   },
 
   /** @internal */
-  initializeSid(this: Persisted): void {
+  initializeSid(this: Persisted): unknown {
     delete this.defaultOptions.sidbits;
-    delete this.defaultOptions.secureRandom;
+    return hashDelete(this.defaultOptions, "secureRandom");
   },
 
   /** @internal */
@@ -43,7 +51,7 @@ export const StaleSessionCheck = {
   loadSession(
     this: StaleSessionCheckHost,
     env: PersistedRequest,
-  ): [unknown, Record<string, unknown>] {
+  ): [unknown, Record<string, unknown>] | Promise<[unknown, Record<string, unknown>]> {
     return this.staleSessionCheckBang(() => Persisted.prototype.loadSession.call(this, env));
   },
 
@@ -51,10 +59,28 @@ export const StaleSessionCheck = {
     return this.staleSessionCheckBang(() => Persisted.prototype.extractSessionId.call(this, env));
   },
 
-  staleSessionCheckBang<T>(block: () => T): T {
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm try — PERMANENT
+   */
+  staleSessionCheckBang<T>(
+    this: { staleSessionCheckBang<U>(block: () => U): U },
+    block: () => T,
+  ): T {
     for (;;) {
       try {
-        return block();
+        const result = block();
+        if (result instanceof Promise) {
+          return result.catch((argumentError: unknown) => {
+            let rescued = false;
+            return this.staleSessionCheckBang(() => {
+              if (rescued) return block();
+              rescued = true;
+              throw argumentError;
+            });
+          }) as T;
+        }
+        return result;
       } catch (argumentError) {
         if (!(argumentError instanceof ArgumentError)) throw argumentError;
         const match = /undefined class\/module ([\w:]*\w)/.exec(argumentError.message);
@@ -74,9 +100,9 @@ export const StaleSessionCheck = {
 };
 
 export const SessionObject = {
-  commitSession(this: Persisted, req: any, res: any): unknown {
-    req.commitCsrfToken?.();
-    return Persisted.prototype.commitSession.call(this, req, res);
+  async commitSession(this: Persisted, req: any, res: any): Promise<unknown> {
+    await req.commitCsrfToken?.();
+    return await Persisted.prototype.commitSession.call(this, req, res);
   },
 
   prepareSession(this: Persisted, req: { env: Record<string, unknown> }): RequestSession {
@@ -129,3 +155,6 @@ export class AbstractSecureStore extends PersistedSecure {
 includeMixin(AbstractSecureStore, Compatibility);
 includeMixin(AbstractSecureStore, StaleSessionCheck);
 includeMixin(AbstractSecureStore, SessionObject);
+
+rbModConstSet(Session, "AbstractStore", AbstractStore);
+rbModConstSet(Session, "AbstractSecureStore", AbstractSecureStore);

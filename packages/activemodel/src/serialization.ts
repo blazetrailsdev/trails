@@ -26,10 +26,10 @@ export type SerializableHash = Record<string, unknown> & PromiseLike<Record<stri
 
 export function serializableHash(
   this: SerializationRecord,
-  options: SerializeOptions = {},
+  options: SerializeOptions | null = null,
   sync = false,
 ): Record<string, unknown> {
-  if (options.include != null && (options.include as unknown) !== false && !sync) {
+  if (options?.include != null && (options.include as unknown) !== false && !sync) {
     return thenableHash(
       () => serializableHash.call(this, options, true),
       async () => {
@@ -40,7 +40,7 @@ export function serializableHash(
   }
   let attributeNames = this.attributeNamesForSerialization();
 
-  if (isBlank(options)) return this.serializableAttributes(attributeNames);
+  if (options == null || isBlank(options)) return this.serializableAttributes(attributeNames);
 
   if (options.only != null) {
     const present = new Set(attributeNames);
@@ -168,7 +168,7 @@ export function serializableAttributes(
     const { owner } = rbModInstanceMethod(this.constructor as never, n);
     return typeof owner === "function" && this instanceof owner;
   });
-  return Object.fromEntries(indexWith(readable, (n) => this.readAttributeForSerialization(n)));
+  return indexWith(readable, (n) => this.readAttributeForSerialization(n));
 }
 
 /** @internal */
@@ -309,7 +309,7 @@ export function thenableHash(
     },
     getOwnPropertyDescriptor(_t, key) {
       const obj = built();
-      if (!Object.prototype.hasOwnProperty.call(obj, key)) return undefined;
+      if (!Object.hasOwn(obj, key)) return undefined;
       const desc = Object.getOwnPropertyDescriptor(obj, key)!;
       desc.configurable = true;
       return desc;

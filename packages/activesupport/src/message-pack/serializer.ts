@@ -1,31 +1,29 @@
-import { RuntimeError, env as ENV, fetch, rbObjFrozenP, toI } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/ruby-compat/include";
+import { RuntimeError, env as ENV, fetch, rbStrGetbyte, toI } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat/include";
 import { Factory, type Pool } from "@blazetrails/msgpack";
 import { delegate } from "../module-ext.js";
 import { Extensions } from "./extensions.js";
 
 const SIGNATURE = Uint8Array.of(0xcc, 0x80);
-const SIGNATURE_INT = 128;
+export const SIGNATURE_INT = 128;
 
 export interface Serializer {
   dump(object: unknown): Uint8Array;
   load(dumped: Uint8Array | string): unknown;
-  isSignature(dumped: Uint8Array): boolean;
+  isSignature(dumped: Uint8Array | string): boolean;
   messagePackFactory: Factory;
   registerType(...args: Parameters<Factory["registerType"]>): void;
   warmup(): void;
 }
 
-type SerializerHost = Serializer & {
+export type SerializerHost = Serializer & {
   _messagePackFactory?: Factory;
   _messagePackPool?: Pool | null;
   messagePackPool(): Pool;
   installUnregisteredTypeHandler(): void;
 };
 
-export const Serializer = new Module((mod) => {
-  delegate.call(mod, "registerType", { to: "messagePackFactory" });
-}).include({
+export const Serializer = {
   dump(this: SerializerHost, object: unknown): Uint8Array {
     return this.messagePackPool().packer((packer) => {
       packer.write(SIGNATURE_INT);
@@ -43,8 +41,8 @@ export const Serializer = new Module((mod) => {
     });
   },
 
-  isSignature(dumped: Uint8Array): boolean {
-    return dumped[0] === SIGNATURE[0] && dumped[1] === SIGNATURE[1];
+  isSignature(dumped: Uint8Array | string): boolean {
+    return rbStrGetbyte(dumped, 0) === SIGNATURE[0] && rbStrGetbyte(dumped, 1) === SIGNATURE[1];
   },
 
   get messagePackFactory(): Factory {
@@ -65,7 +63,7 @@ export const Serializer = new Module((mod) => {
   /** @internal */
   messagePackPool(this: SerializerHost): Pool {
     if (this._messagePackPool == null) {
-      if (!rbObjFrozenP(this.messagePackFactory)) {
+      if (!Object.isFrozen(this.messagePackFactory)) {
         Extensions.install(this.messagePackFactory);
         this.installUnregisteredTypeHandler();
         this.messagePackFactory.freeze();
@@ -81,4 +79,7 @@ export const Serializer = new Module((mod) => {
   installUnregisteredTypeHandler(this: SerializerHost): void {
     Extensions.installUnregisteredTypeError(this.messagePackFactory);
   },
-}) as Module<Serializer>;
+};
+delegate.call(Serializer, "registerType", { to: "messagePackFactory" });
+rbModConstSet(Serializer, "SIGNATURE", SIGNATURE);
+rbModConstSet(Serializer, "SIGNATURE_INT", SIGNATURE_INT);

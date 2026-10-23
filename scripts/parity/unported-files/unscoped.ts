@@ -28,22 +28,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "is enrolled in relation/load-async.test.ts.",
   },
   {
-    pattern: "legacy_yaml_adapter.rb", // no test counterpart
-    reason:
-      "Migrates Psych::Coder YAML format versions (:nodoc:). Psych is Ruby-only; " +
-      "JS doesn't use YAML for AR column serialization.",
-  },
-  {
-    pattern: "coders/yaml_column.rb",
-    testFile: "coders/yaml_column_test.rb",
-    reason:
-      "YAML column coder. The store-column dump/load path and the Psych safe-dump class " +
-      "restriction are ported (coders/yaml-column.ts, backed by the `yaml` package — " +
-      '`store :col, coder: "YAML"`), but the Psych-specific safe-LOAD machinery ' +
-      "(permitted_classes on load, type-mismatch-on-Ruby-class) has no JS analog; those " +
-      "test cases stay Ruby-only.",
-  },
-  {
     testFile: "fixtures_test.rb",
     className: "FixturesTest",
     tests: [
@@ -631,7 +615,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "same Psych machinery already documented as having no JS analog in the " +
       "coders/yaml_column.rb and attribute_set/yaml_encoder.rb entries — and " +
       "(b) the 5.1→current legacy-format migration handled by " +
-      "legacy_yaml_adapter.rb (itself unported above). Our `yaml` parser yields " +
+      "legacy_yaml_adapter.rb. Our `yaml` parser yields " +
       "plain tagged nodes, not SchemaCache instances. The live schema-cache " +
       "round-trip is exercised by the portable tests in the same file " +
       "(test_yaml_dump_and_load[_with_gzip], which use our own dump path).",

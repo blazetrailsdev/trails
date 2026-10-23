@@ -139,6 +139,31 @@ importers:
         specifier: ^4.21.0
         version: 4.21.0
 
+  packages/actioncable:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
+      websocket-driver:
+        specifier: 0.7.4
+        version: 0.7.4
+
   packages/actionpack:
     dependencies:
       '@blazetrails/actionview':
@@ -180,12 +205,25 @@ importers:
       ua-parser-js:
         specifier: ^2.0.9
         version: 2.0.9
+      vitest:
+        specifier: '>=3.0.0'
+        version: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
+    devDependencies:
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/actionview:
     dependencies:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/builder':
+        specifier: workspace:*
+        version: link:../builder
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date
@@ -195,12 +233,25 @@ importers:
       '@blazetrails/html-sanitizer':
         specifier: workspace:*
         version: link:../html-sanitizer
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../nokogiri
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
+    devDependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
+      typescript:
+        specifier: 7.1.0-dev.20260920.1
+        version: 7.1.0-dev.20260920.1
 
   packages/activejob:
     dependencies:
@@ -219,6 +270,10 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/activemodel:
     dependencies:
@@ -284,6 +339,9 @@ importers:
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../actionview
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
       '@blazetrails/msgpack':
         specifier: workspace:*
         version: link:../msgpack
@@ -374,6 +432,15 @@ importers:
         specifier: ^3.0.3
         version: 3.0.3
 
+  packages/builder:
+    dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/date:
     dependencies:
       '@blazetrails/ruby-compat':
@@ -400,6 +467,9 @@ importers:
 
   packages/html-sanitizer:
     dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../nokogiri
@@ -422,10 +492,25 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
-    optionalDependencies:
-      yaml:
-        specifier: ^2.8.3
-        version: 2.8.3
+
+  packages/marcel:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
+  packages/mini-magick:
+    dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/msgpack:
     dependencies:
@@ -441,9 +526,15 @@ importers:
 
   packages/nokogiri:
     dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
       libxml2-wasm:
         specifier: ^0.7.1
         version: 0.7.1
+      parse5:
+        specifier: ^8.0.0
+        version: 8.0.0
 
   packages/rack:
     dependencies:
@@ -453,6 +544,10 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/rack-session:
     dependencies:
@@ -484,6 +579,33 @@ importers:
         specifier: ^2.8.3
         version: 2.8.3
 
+  packages/solid-queue:
+    dependencies:
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
+      '@blazetrails/activemodel':
+        specifier: workspace:*
+        version: link:../activemodel
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/arel':
+        specifier: workspace:*
+        version: link:../arel
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
+      '@blazetrails/globalid':
+        specifier: workspace:*
+        version: link:../globalid
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/trails-tsc:
     dependencies:
       '@blazetrails/actionview':
@@ -492,6 +614,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
@@ -507,6 +632,9 @@ importers:
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../actionview
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
       '@blazetrails/activemodel':
         specifier: workspace:*
         version: link:../activemodel
@@ -534,6 +662,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
@@ -552,6 +683,15 @@ importers:
         version: 7.1.0-dev.20260920.1
 
   packages/tse-compiler: {}
+
+  packages/vitest-matchers:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+      vitest:
+        specifier: '>=3.0.0'
+        version: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/website:
     devDependencies:
@@ -615,6 +755,9 @@ importers:
 
   scripts/guides-typecheck:
     dependencies:
+      '@blazetrails/actioncable':
+        specifier: workspace:*
+        version: link:../../packages/actioncable
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../../packages/actionpack
@@ -642,6 +785,9 @@ importers:
       '@blazetrails/bcrypt':
         specifier: workspace:*
         version: link:../../packages/bcrypt
+      '@blazetrails/builder':
+        specifier: workspace:*
+        version: link:../../packages/builder
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../../packages/date
@@ -657,6 +803,12 @@ importers:
       '@blazetrails/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@blazetrails/marcel':
+        specifier: workspace:*
+        version: link:../../packages/marcel
+      '@blazetrails/mini-magick':
+        specifier: workspace:*
+        version: link:../../packages/mini-magick
       '@blazetrails/msgpack':
         specifier: workspace:*
         version: link:../../packages/msgpack
@@ -675,6 +827,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../../packages/ruby-compat
+      '@blazetrails/solid-queue':
+        specifier: workspace:*
+        version: link:../../packages/solid-queue
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../../packages/trails-tsc
@@ -684,6 +839,9 @@ importers:
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../../packages/tse-compiler
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../../packages/vitest-matchers
 
   scripts/parity:
     dependencies:
@@ -4245,6 +4403,9 @@ packages:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
     engines: {node: '>= 0.8'}
 
+  http-parser-js@0.5.10:
+    resolution: {integrity: sha512-Pysuw9XpUq5dVc/2SMHpuTY01RFl8fttgcyunjL7eEMhGM3cI4eOmiCycJDVCo/7O7ClfQD3SaI6ftDzqOXYMA==}
+
   https-proxy-agent@7.0.6:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
@@ -6157,6 +6318,14 @@ packages:
   webidl-conversions@8.0.1:
     resolution: {integrity: sha512-BMhLD/Sw+GbJC21C/UgyaZX41nPt8bUTg+jWyDeg7e7YN4xOM05YPSIXceACnXVtqyEw/LMClUQMtMZ+PGGpqQ==}
     engines: {node: '>=20'}
+
+  websocket-driver@0.7.4:
+    resolution: {integrity: sha512-b17KeDIQVjvb0ssuSDF2cYXSg2iztliJ4B9WdsuB6J952qCPKmnVq4DyW5motImXHDC1cBT/1UezrJVsKw5zjg==}
+    engines: {node: '>=0.8.0'}
+
+  websocket-extensions@0.1.4:
+    resolution: {integrity: sha512-OqedPIGOfsDlo31UNwYbCFMSaO9m9G/0faIHj5/dZFDMFqPTcx6UwqyOy3COEaEOg/9VsGIpdqn62W5KhoKSpg==}
+    engines: {node: '>=0.8.0'}
 
   whatwg-fetch@3.6.20:
     resolution: {integrity: sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg==}
@@ -10196,6 +10365,8 @@ snapshots:
       statuses: 2.0.2
       toidentifier: 1.0.1
 
+  http-parser-js@0.5.10: {}
+
   https-proxy-agent@7.0.6(supports-color@8.1.1):
     dependencies:
       agent-base: 7.1.4
@@ -12373,6 +12544,14 @@ snapshots:
       defaults: 1.0.4
 
   webidl-conversions@8.0.1: {}
+
+  websocket-driver@0.7.4:
+    dependencies:
+      http-parser-js: 0.5.10
+      safe-buffer: 5.2.1
+      websocket-extensions: 0.1.4
+
+  websocket-extensions@0.1.4: {}
 
   whatwg-fetch@3.6.20: {}
 

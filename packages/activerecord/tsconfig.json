@@ -16,6 +16,7 @@
     { "path": "../globalid" },
     { "path": "../msgpack" },
     { "path": "../actionview" },
-    { "path": "../rack" }
+    { "path": "../rack" },
+    { "path": "../activejob" }
   ]
 }

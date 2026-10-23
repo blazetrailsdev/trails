@@ -1,4 +1,4 @@
-import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
+import { SafeBuffer, htmlSafe, isPlainObject } from "@blazetrails/activesupport";
 
 import { capture } from "./capture-helper.js";
 import { cdataSection, contentTag, type TagHelperHost } from "./tag-helper.js";
@@ -34,37 +34,41 @@ export function javascriptCdataSection(content: unknown): SafeBuffer {
   return htmlSafe(`\n//${cdataSection(`\n${String(content ?? "")}\n//`).toString()}\n`);
 }
 
+/**
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+ */
 export function javascriptTag(
-  this: TagHelperHost,
-  contentOrOptionsWithBlock?: unknown,
-  htmlOptions?: Record<string, unknown> | (() => unknown),
+  this: TagHelperHost & { contentSecurityPolicyNonce(): string | null },
+  contentOrOptionsWithBlock: unknown = null,
+  htmlOptions: Record<string, unknown> = {},
   block?: () => unknown,
-): SafeBuffer {
-  const resolvedBlock =
-    typeof htmlOptions === "function"
-      ? htmlOptions
-      : typeof block === "function"
-        ? block
-        : undefined;
-
-  let opts: Record<string, unknown>;
+): SafeBuffer | Promise<SafeBuffer> {
   let content: unknown;
-
-  if (resolvedBlock) {
-    const isHash =
-      contentOrOptionsWithBlock != null &&
-      typeof contentOrOptionsWithBlock === "object" &&
-      Object.getPrototypeOf(contentOrOptionsWithBlock) === Object.prototype;
-    opts = isHash
-      ? { ...(contentOrOptionsWithBlock as Record<string, unknown>) }
-      : typeof htmlOptions === "object" && htmlOptions !== null
-        ? { ...htmlOptions }
-        : {};
-    content = capture.call(this, resolvedBlock);
+  if (block) {
+    if (isPlainObject(contentOrOptionsWithBlock)) {
+      htmlOptions = contentOrOptionsWithBlock as Record<string, unknown>;
+    }
+    content = capture.call(this, block);
+    if (content instanceof Promise) {
+      return content.then((content) =>
+        javascriptTag.call(this, contentOrOptionsWithBlock, htmlOptions, () => content),
+      );
+    }
   } else {
     content = contentOrOptionsWithBlock;
-    opts = typeof htmlOptions === "object" && htmlOptions !== null ? { ...htmlOptions } : {};
   }
 
-  return contentTag.call(this, "script", javascriptCdataSection(content), opts);
+  if (htmlOptions.nonce === true) {
+    htmlOptions.nonce = this.contentSecurityPolicyNonce();
+  }
+
+  return contentTag.call(this, "script", javascriptCdataSection(content), htmlOptions);
 }
+
+export const JavaScriptHelper = {
+  escapeJavascript,
+  j,
+  javascriptCdataSection,
+  javascriptTag,
+};

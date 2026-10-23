@@ -7,8 +7,8 @@ await getCryptoAsync();
 const { dir, iterations } = workerData;
 const store = new FileStore(dir);
 
-parentPort.on("message", () => {
-  for (let i = 0; i < iterations; i++) store.increment("counter");
+parentPort.on("message", async () => {
+  for (let i = 0; i < iterations; i++) await store.increment("counter");
   parentPort.postMessage("done");
 });
 

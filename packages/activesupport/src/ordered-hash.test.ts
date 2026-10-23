@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { inspect } from "@blazetrails/ruby-compat";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import { OrderedHash } from "./ordered-hash.js";
 import { withIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 import { extractOptionsBang } from "./hash-utils.js";
@@ -300,12 +302,52 @@ describe("OrderedHashTest", () => {
     expect(extractOptionsBang([1, 2, orderedHash])).toEqual(orderedHash);
   });
 
-  it.skip("each after yaml serialization");
+  it("each after yaml serialization", () => {
+    expect([
+      ...(YAML.load(YAML.dump(orderedHash)) as OrderedHash<string, string>).values(),
+    ]).toEqual(values);
+  });
   it.skip("each when yielding to block with splat");
   it.skip("each pair when yielding to block with splat");
-  it.skip("order after yaml serialization");
-  it.skip("order after yaml serialization with nested arrays");
-  it.skip("psych serialize");
-  it.skip("psych serialize tag");
-  it.skip("has yaml tag");
+  it("order after yaml serialization", () => {
+    const deserializedOrderedHash = YAML.load(YAML.dump(orderedHash)) as OrderedHash<
+      string,
+      string
+    >;
+
+    expect([...deserializedOrderedHash.keys()]).toEqual(keys);
+    expect([...deserializedOrderedHash.values()]).toEqual(values);
+  });
+
+  it("order after yaml serialization with nested arrays", () => {
+    (orderedHash as OrderedHash<string, unknown>).set("array", ["a", "b", "c"]);
+
+    const deserializedOrderedHash = YAML.load(YAML.dump(orderedHash)) as OrderedHash<
+      string,
+      unknown
+    >;
+
+    expect([...deserializedOrderedHash.keys()]).toEqual([...orderedHash.keys()]);
+    expect([...deserializedOrderedHash.values()]).toEqual([...orderedHash.values()]);
+  });
+
+  it("psych serialize", () => {
+    const deserializedOrderedHash = Psych.load(Psych.dump(orderedHash)) as OrderedHash<
+      string,
+      string
+    >;
+
+    const values2 = [...deserializedOrderedHash].map(([, value]) => value);
+    expect(values2).toEqual(values);
+  });
+
+  it("psych serialize tag", () => {
+    const yaml = Psych.dump(orderedHash);
+    expect(yaml).toMatch("!omap");
+  });
+
+  it("has yaml tag", () => {
+    (orderedHash as OrderedHash<string, unknown>).set("array", ["a", "b", "c"]);
+    expect(YAML.dump(orderedHash)).toMatch("!omap");
+  });
 });

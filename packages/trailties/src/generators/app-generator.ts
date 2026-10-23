@@ -174,6 +174,7 @@ export class AppGenerator extends AppBase {
     this.createAppFiles(name);
     this.createDbFiles();
     this.createTestFiles();
+    if (this.dependsOnSystemTest()) this.systemTest();
     this.createPublicFiles();
     this.createDirectoryPlaceholders();
 
@@ -395,6 +396,15 @@ binstub:
 - Database: \`config/database.ts\`
 - Routes: \`config/routes.ts\`
 - Environment-specific: \`config/environments/\`
+
+## Views and deployment
+
+\`.tse\` views are precompiled into \`.trails/views/\`. In development,
+\`${this.pmRun()} dev\` watches \`app/views/\`, rebuilds a changed view and
+re-imports it on the next render. In production templates load once from the
+deploy-time build, so the deploy must run \`trails-tsc-views build --views
+app/views\` (the \`prepare\` script) before the server boots; a view with no
+built module raises \`LoadError\`.
 `,
     );
 
@@ -421,10 +431,34 @@ export default defineConfig({
   root: "app",
   test: {
     root: fileURLToPath(new URL(".", import.meta.url)),
-    include: ["test/**/*.test.ts"],
+${
+  this.dependsOnSystemTest()
+    ? `    globalSetup: ["test/global-setup.ts"],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          include: ["test/**/*.test.ts"],
+          exclude: ["test/{system,dummy,fixtures}/**/*.test.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "system",
+          include: ["test/system/**/*.test.ts"],
+          pool: "forks",
+          provide: { screenshotDirectory: "tmp/screenshots" },
+        },
+      },
+    ],
+`
+    : `    include: ["test/**/*.test.ts"],
     exclude: ["test/{system,dummy,fixtures}/**/*.test.ts"],
     globalSetup: ["test/global-setup.ts"],
-  },
+`
+}  },
   publicDir: false,
   build: {
     outDir: "../public/assets",
@@ -1035,17 +1069,7 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
     );
 
     if (!this.skip("ActiveJob")) {
-      this.createFile(
-        "app/jobs/application-job.ts",
-        tsModule({
-          declarations: [
-            tsClass({
-              name: "ApplicationJob",
-              body: [tsField("queueAs", "string", { inferType: true, initializer: '"default"' })],
-            }),
-          ],
-        }),
-      );
+      this.template("app/jobs/application_job.ts", "app/jobs/application-job.ts");
     }
 
     if (!this.skip("ActionMailer")) {
@@ -1089,6 +1113,8 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
+    <%= csrfMetaTags() %>
+    <%= cspMetaTag() %>
 
     <%= yield("head") %>
 
@@ -1159,6 +1185,24 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
 // Example:
 //   import { User } from "../app/models/user.js";
 //   await User.create({ name: "Admin", email: "admin@example.com" });
+`,
+    );
+  }
+
+  /** @internal */
+  private systemTest(): void {
+    this.createFile("test/system/.keep", "");
+
+    this.createFile(
+      "test/application-system-test-case.ts",
+      `import "./test-helper.js";
+import { SystemTestCase } from "@blazetrails/actionpack";
+
+export class ApplicationSystemTestCase extends SystemTestCase {
+  static {
+    this.drivenBy("playwright", { screenSize: [1400, 1400] });
+  }
+}
 `,
     );
   }

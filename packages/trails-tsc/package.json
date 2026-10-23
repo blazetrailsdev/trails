@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
     "typescript-5": "npm:typescript@5.9.3"
   },
@@ -33,5 +34,8 @@
     "dist",
     "bin"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  }
 }

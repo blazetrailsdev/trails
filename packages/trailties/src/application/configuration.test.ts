@@ -9,13 +9,7 @@ import {
   assertNil,
   assertNotNil,
 } from "@blazetrails/activesupport";
-import {
-  Base,
-  getSanitizerVendor,
-  Resolver,
-  SanitizeHelper,
-  setSanitizerVendor,
-} from "@blazetrails/actionview";
+import { Base, Resolver, SanitizeHelper } from "@blazetrails/actionview";
 import { HTML, HTML4 } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
 import { Trailtie as ActionViewTrailtie } from "../trailties/action-view.js";
@@ -65,7 +59,7 @@ async function app(railsEnv: string): Promise<Application> {
 
 describe("ConfigurationTest", () => {
   const trailsEnv = env.TRAILS_ENV;
-  const sanitizerVendor = getSanitizerVendor();
+  const sanitizerVendor = SanitizeHelper.sanitizerVendor;
 
   beforeEach(async () => {
     appPath = await mkdtemp(join(tmpdir(), "trails-config-for-"));
@@ -75,7 +69,7 @@ describe("ConfigurationTest", () => {
 
   afterEach(async () => {
     Resolver.caching = true;
-    setSanitizerVendor(sanitizerVendor);
+    SanitizeHelper.sanitizerVendor = sanitizerVendor;
     Application.appClass = null;
     delete ActionViewTrailtie.config.actionView.cacheTemplateLoading;
     setEnv("TRAILS_ENV", trailsEnv);

@@ -6,8 +6,8 @@ import { adapterType } from "./test-adapter.js";
 import { PreparedStatementCacheExpired } from "./errors.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
-function getPreparedStatementCache(connection: DatabaseAdapter): Map<string, unknown> {
-  return (connection as unknown as { _statements: { cache: Map<string, unknown> } })._statements
+function getPreparedStatementCache(connection: DatabaseAdapter): Record<string, unknown> {
+  return (connection as unknown as { _statements: { cache: Record<string, unknown> } })._statements
     .cache;
 }
 
@@ -93,7 +93,7 @@ describe("HotCompatibilityTest", () => {
             await record.reload();
           });
 
-          expect(getPreparedStatementCache(adapter).size > 0).toBeTruthy();
+          expect(Object.keys(getPreparedStatementCache(adapter)).length > 0).toBeTruthy();
 
           await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
 
@@ -123,7 +123,7 @@ describe("HotCompatibilityTest", () => {
             await record.reload();
           });
 
-          expect(getPreparedStatementCache(adapter).size > 0).toBeTruthy();
+          expect(Object.keys(getPreparedStatementCache(adapter)).length > 0).toBeTruthy();
 
           await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
 

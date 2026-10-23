@@ -1,4 +1,4 @@
-import { isEmpty, rbFPublicSend, rbObjRespondTo, toH, zip } from "@blazetrails/ruby-compat";
+import { isEmpty, rbFSend, rbObjRespondTo, toH, zip } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import { ActiveRecord } from "../../namespaces.js";
 import type { Relation } from "../../relation.js";
@@ -100,11 +100,11 @@ export class AssociationQueryValue {
         if (attribute === "id") {
           return (value as Base & { id_value: unknown }).id_value;
         } else {
-          return rbFPublicSend(value, attribute);
+          return rbFSend(value, attribute);
         }
       });
     } else if (rbObjRespondTo(value, primaryKey)) {
-      return rbFPublicSend(value, primaryKey);
+      return rbFSend(value, primaryKey);
     } else {
       return value;
     }

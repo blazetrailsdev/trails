@@ -1,13 +1,6 @@
 import { RuleTester } from "eslint";
 import { expect } from "vitest";
-import rule, { macroOfCall, mayContainMacroCall } from "./no-standalone-associations.mjs";
-
-// Point the rule at a non-existent exclude baseline so the committed list
-// never grandfathers these synthetic fixtures. The baseline suite at the
-// bottom of this file overrides it in a nested hook.
-beforeEach(() => {
-  process.env.NO_STANDALONE_ASSOCIATIONS_EXCLUDE_PATH = "/nonexistent-exclude.json";
-});
+import rule, { macroOfCall } from "./no-standalone-associations.mjs";
 
 const FILENAME = "packages/activerecord/src/associations.test.ts";
 
@@ -236,59 +229,7 @@ tester.run("no-standalone-associations", rule, {
   ],
 });
 
-// ── Baseline-exclusion path: a site whose key is in the committed exclude list
-// is grandfathered and must NOT be reported. Exercises the full
-// loadExclude → siteKey → Set.has path (otherwise never hit, since the global
-// env above points at a non-existent baseline). ──
-import fs from "fs";
-import os from "os";
-import path from "path";
-
-const tmpBaseline = path.join(os.tmpdir(), `nsa-exclude-${process.pid}.json`);
-// `Associations.hasMany.call(P, "cs", {})` in FILENAME → this exact site key.
-fs.writeFileSync(tmpBaseline, JSON.stringify([`${FILENAME}::P::hasMany::cs`]));
-process.env.NO_STANDALONE_ASSOCIATIONS_EXCLUDE_PATH = tmpBaseline;
-
-const baselineTester = new RuleTester({
-  languageOptions: {
-    parser: (await import("typescript-eslint")).parser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-  },
-});
-
-// RuleTester registers its cases through describe/it, whose bodies run only
-// after this module has finished evaluating — so the env var cannot be aimed
-// at a baseline at module scope: whichever value it lands on would apply to
-// every case in the file. Each suite points it where it needs through hooks
-// instead, and the tmp file is removed once the cases have actually run.
-describe("with a baseline exclude file", () => {
-  beforeEach(() => {
-    process.env.NO_STANDALONE_ASSOCIATIONS_EXCLUDE_PATH = tmpBaseline;
-  });
-
-  baselineTester.run("no-standalone-associations (baseline)", rule, {
-    valid: [
-      // Grandfathered site (key present in the baseline) → suppressed.
-      { filename: FILENAME, code: "Associations.hasMany.call(P, 'cs', {});" },
-    ],
-    invalid: [
-      // A different site in the same file (key NOT in the baseline) still fires
-      // — proves suppression is site-granular, not file-wide.
-      {
-        filename: FILENAME,
-        code: "Associations.hasMany.call(P, 'other', {});",
-        errors: [{ messageId: "standaloneNoFix" }],
-      },
-    ],
-  });
-});
-
-afterAll(() => {
-  fs.rmSync(tmpBaseline, { force: true });
-});
-
-describe("mayContainMacroCall", () => {
+describe("macroOfCall", () => {
   const macroCalls = async (code) => {
     const { parseForESLint } = (await import("typescript-eslint")).parser;
     const found = [];
@@ -303,22 +244,6 @@ describe("mayContainMacroCall", () => {
     walk(parseForESLint(code, { ecmaVersion: 2022, sourceType: "module" }).ast);
     return found;
   };
-
-  it("admits every source holding a call macroOfCall matches", async () => {
-    for (const code of [
-      "Associations.hasMany.call(P, 'cs', {});",
-      "Associations.belongsTo.call(P, 'c');",
-      "\\u0041ssociations.hasOne.call(P, 'c');",
-      "Associations.\\u0068asAndBelongsToMany.call(P, 'cs');",
-    ]) {
-      expect(await macroCalls(code)).toHaveLength(1);
-      expect(mayContainMacroCall(code)).toBe(true);
-    }
-  });
-
-  it("rejects a source that neither spells Associations nor escapes an identifier", () => {
-    expect(mayContainMacroCall("foo.hasMany.call(P, 'cs');")).toBe(false);
-  });
 
   it("macroOfCall matches only a callee rooted at the identifier Associations", async () => {
     for (const code of [

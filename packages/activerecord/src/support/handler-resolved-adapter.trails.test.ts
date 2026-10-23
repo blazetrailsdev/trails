@@ -40,7 +40,7 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   });
 
   it("model resolves adapter via handler — no static { this.adapter = X } needed", async () => {
-    expect(Object.prototype.hasOwnProperty.call(HandlerResolvedPost, "_adapter")).toBe(false);
+    expect(Object.hasOwn(HandlerResolvedPost, "_adapter")).toBe(false);
     await expect(HandlerResolvedPost.leaseConnection()).resolves.toBeDefined();
   });
 });

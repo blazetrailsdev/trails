@@ -49,6 +49,13 @@ describe("Ruby extractor literal quote style", () => {
     }
   }
 
+  it("joins a backslash-continued test name", () => {
+    const v = rubyAssertionValues(
+      'class FooTest < ActiveSupport::TestCase\n  test "a grandchild, and the " \\\n    "parent" do\n    assert true\n  end\nend\n',
+    );
+    expect(Object.keys(v)).toEqual(["a grandchild, and the parent"]);
+  });
+
   it("keeps a dynamic symbol from unbalancing the enclosing literal's stack", () => {
     // `:"x"` / `%s(y)` close with tstring_end, so they must also open the stack
     // — otherwise they pop an entry belonging to a still-open outer literal.

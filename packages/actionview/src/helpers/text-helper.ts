@@ -1,13 +1,16 @@
 import {
+  I18n,
   SafeBuffer,
   htmlEscape,
   htmlSafe,
   isBlank,
   pluralize as inflectorPluralize,
   truncate as stringTruncate,
+  Concern,
+  extend,
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
-import { Module, chomp, fetch, regexpEscape } from "@blazetrails/ruby-compat";
+import { chomp, fetch, regexpEscape, include } from "@blazetrails/ruby-compat";
 import { TagHelper, contentTag, type TagHelperHost } from "./tag-helper.js";
 import { SanitizeHelper, sanitize } from "./sanitize-helper.js";
 import { OutputSafetyHelper, raw } from "./output-safety-helper.js";
@@ -53,25 +56,21 @@ export function truncate(
 }
 
 export interface PluralizeOptions {
-  plural?: string;
+  plural?: string | null;
+  locale?: string;
 }
 
 export function pluralize(
   count: number | string | null | undefined,
   singular: string,
-  pluralOrOptions?: string | PluralizeOptions,
+  pluralArg: string | null = null,
+  { plural = pluralArg, locale = String(I18n.locale()) }: PluralizeOptions = {},
 ): string {
-  let plural: string | undefined;
-  if (typeof pluralOrOptions === "string") {
-    plural = pluralOrOptions;
-  } else if (pluralOrOptions && pluralOrOptions.plural !== undefined) {
-    plural = pluralOrOptions.plural;
-  }
+  const word =
+    count === 1 || /^1(\.0+)?$/.test(String(count ?? ""))
+      ? singular
+      : (plural ?? inflectorPluralize(singular, locale));
 
-  const isOne =
-    count === 1 || count === "1" || (typeof count === "string" && /^1(\.0+)?$/.test(count));
-
-  const word = isOne ? singular : (plural ?? inflectorPluralize(singular));
   return `${count ?? 0} ${word}`;
 }
 
@@ -81,6 +80,7 @@ export interface HighlightOptions {
 }
 
 export function highlight(
+  this: TagHelperHost,
   text: string | SafeBuffer | null | undefined,
   phrases: string | RegExp | Array<string | RegExp> | null | undefined,
   options: HighlightOptions = {},
@@ -91,7 +91,7 @@ export function highlight(
   if (text == null) {
     working = "";
   } else {
-    working = doSanitize ? sanitize(String(text))!.toString() : String(text);
+    working = doSanitize ? sanitize.call(this, String(text))!.toString() : String(text);
   }
 
   const phrasesBlank =
@@ -129,7 +129,7 @@ export function highlight(
 export interface ExcerptOptions {
   radius?: number;
   omission?: string;
-  separator?: string;
+  separator?: string | null;
 }
 
 export function excerpt(
@@ -230,7 +230,9 @@ export function simpleFormat(
 
   let working: string;
   if (options.sanitize !== false) {
-    working = sanitize(text == null ? "" : String(text), options.sanitizeOptions ?? {})!.toString();
+    working = sanitize
+      .call(this, text == null ? "" : String(text), options.sanitizeOptions ?? {})!
+      .toString();
   } else {
     working = text == null ? "" : String(text);
   }
@@ -372,13 +374,21 @@ function splitParagraphs(text: string): string[] {
     .map((t) => t.replace(/([^\n]\n)(?=[^\n])/g, "$1<br />"));
 }
 
-export const TextHelper = new Module((mod) => {
-  mod.include(SanitizeHelper);
-  mod.include(TagHelper);
-  mod.include(OutputSafetyHelper);
+export const TextHelper = {
+  concat,
+  safeConcat,
+  truncate,
+  highlight,
+  excerpt,
+  pluralize,
+  wordWrap,
+  simpleFormat,
+  cycle,
+  currentCycle,
+  resetCycle,
+};
 
-  mod.moduleEval((m) => {
-    Object.assign(m, { concat, safeConcat, truncate, highlight, excerpt, pluralize, wordWrap });
-    Object.assign(m, { simpleFormat, cycle, currentCycle, resetCycle });
-  });
-});
+extend(TextHelper, Concern);
+include(TextHelper, SanitizeHelper);
+include(TextHelper, TagHelper);
+include(TextHelper, OutputSafetyHelper);

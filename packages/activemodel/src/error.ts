@@ -58,7 +58,7 @@ function optionsEqual(a: unknown, b: unknown): boolean {
     const bk = Object.keys(b);
     if (ak.length !== bk.length) return false;
     for (const k of ak) {
-      if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+      if (!Object.hasOwn(b, k)) return false;
       if (!optionsEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
         return false;
     }

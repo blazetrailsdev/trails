@@ -27,5 +27,11 @@
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/i18n": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*"
   }
 }

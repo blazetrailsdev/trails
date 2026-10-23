@@ -12,35 +12,35 @@ export interface CacheIncrementDecrementBehaviorHost {
 }
 
 export function cacheIncrementDecrementBehavior(host: CacheIncrementDecrementBehaviorHost): void {
-  it("increment", () => {
+  it("increment", async () => {
     const cache = host.lookupStore();
     const key = uniqueKey();
-    cache.write(key, 1, { raw: true });
-    expect(Number(cache.read(key, { raw: true }))).toBe(1);
-    expect(cache.increment(key)).toBe(2);
-    expect(Number(cache.read(key, { raw: true }))).toBe(2);
-    expect(cache.increment(key)).toBe(3);
-    expect(Number(cache.read(key, { raw: true }))).toBe(3);
+    await cache.write(key, 1, { raw: true });
+    expect(Number(await cache.read(key, { raw: true }))).toBe(1);
+    expect(await cache.increment(key)).toBe(2);
+    expect(Number(await cache.read(key, { raw: true }))).toBe(2);
+    expect(await cache.increment(key)).toBe(3);
+    expect(Number(await cache.read(key, { raw: true }))).toBe(3);
 
-    let missing = cache.increment(uniqueKey());
+    let missing = await cache.increment(uniqueKey());
     expect(missing).toBe(1);
-    missing = cache.increment(uniqueKey(), 100);
+    missing = await cache.increment(uniqueKey(), 100);
     expect(missing).toBe(100);
   });
 
-  it("decrement", () => {
+  it("decrement", async () => {
     const cache = host.lookupStore();
     const key = uniqueKey();
-    cache.write(key, 3, { raw: true });
-    expect(Number(cache.read(key, { raw: true }))).toBe(3);
-    expect(cache.decrement(key)).toBe(2);
-    expect(Number(cache.read(key, { raw: true }))).toBe(2);
-    expect(cache.decrement(key)).toBe(1);
-    expect(Number(cache.read(key, { raw: true }))).toBe(1);
+    await cache.write(key, 3, { raw: true });
+    expect(Number(await cache.read(key, { raw: true }))).toBe(3);
+    expect(await cache.decrement(key)).toBe(2);
+    expect(Number(await cache.read(key, { raw: true }))).toBe(2);
+    expect(await cache.decrement(key)).toBe(1);
+    expect(Number(await cache.read(key, { raw: true }))).toBe(1);
 
-    let missing = cache.decrement(uniqueKey());
+    let missing = await cache.decrement(uniqueKey());
     expect(missing).toBe(-1);
-    missing = cache.decrement(uniqueKey(), 100);
+    missing = await cache.decrement(uniqueKey(), 100);
     expect(missing).toBe(-100);
   });
 
@@ -48,11 +48,11 @@ export function cacheIncrementDecrementBehavior(host: CacheIncrementDecrementBeh
     const cache = host.lookupStore();
     const key = uniqueKey();
 
-    expect(cache.increment(key, 1, { expiresIn: 0.1 })).toBe(1);
-    expect(cache.increment(key, 1, { expiresIn: 5000 })).toBe(2);
+    expect(await cache.increment(key, 1, { expiresIn: 0.1 })).toBe(1);
+    expect(await cache.increment(key, 1, { expiresIn: 5000 })).toBe(2);
 
     await new Promise((r) => setTimeout(r, 150));
 
-    assertNil(cache.read(key, { raw: true }));
+    assertNil(await cache.read(key, { raw: true }));
   });
 }

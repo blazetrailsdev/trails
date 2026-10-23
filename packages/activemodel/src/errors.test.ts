@@ -19,7 +19,6 @@ import {
 import {
   FrozenError,
   Marshal,
-  Module,
   rbModConstSet,
   rbObjIvarGet,
   registerConstant,
@@ -31,7 +30,7 @@ import { I18n } from "./i18n.js";
 import { Naming, type ModelName } from "./naming.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
-const ErrorsTest = new Module();
+const ErrorsTest = {};
 registerConstant("ErrorsTest", ErrorsTest);
 
 class Person {

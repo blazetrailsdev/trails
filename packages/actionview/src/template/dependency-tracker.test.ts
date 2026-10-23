@@ -5,7 +5,7 @@ import { TSETracker } from "../dependency-tracker/tse-tracker.js";
 import { PathSet } from "../path-set.js";
 import type { Template } from "../template.js";
 import { TemplateHandlers, type TemplateHandler } from "../template/handlers.js";
-import { Tse } from "../template/handlers/tse.js";
+import { TSE } from "../template/handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 
 const NeckbeardTracker = {
@@ -20,7 +20,7 @@ class FakeTemplate {
 
   constructor(source: string, handler: TemplateHandler | null | "tse" = Neckbeard) {
     this.source = source;
-    this.handler = handler === "tse" ? new Tse() : handler;
+    this.handler = handler === "tse" ? new TSE() : handler;
   }
 
   type(): string[] {
@@ -290,5 +290,61 @@ describe("TSETrackerTest", () => {
     const tracker = makeTracker("interpolation/_string", template, viewPaths);
 
     expect(tracker.dependencies()).toEqual(["*/comments"]);
+  });
+  it("dependencies with interpolation expr", () => {
+    const viewPaths = digestorViewPaths();
+
+    const template = new FakeTemplate(
+      `
+      <%= render \`orders/\${variable || "default"}\` %>
+    `,
+      "tse",
+    );
+
+    const tracker = makeTracker("interpolation/_string", template, viewPaths);
+
+    expect(tracker.dependencies()).toEqual([]);
+  });
+});
+
+describe("RubyTrackerTests", () => {
+  function makeTracker(name: string, template: FakeTemplate, viewPaths: PathSet | null = null) {
+    return new TSETracker(name, asTemplate(template), viewPaths);
+  }
+
+  it("dependencies skip unknown options", () => {
+    const template = new FakeTemplate(
+      `
+      <%= render({ partial: "unknown_render_call", unknownRenderOption: "yes" }) %>
+    `,
+      "tse",
+    );
+    const tracker = makeTracker("interpolation/_string", template);
+
+    expect(tracker.dependencies()).toEqual([]);
+  });
+
+  it("dependencies finds spacer templates", () => {
+    const template = new FakeTemplate(
+      `
+      <%= render({ partial: "messages/message", collection: books, spacerTemplate: "messages/message_spacer" }) %>
+    `,
+      "tse",
+    );
+    const tracker = makeTracker("messages/show", template);
+
+    expect(tracker.dependencies()).toEqual(["messages/message_spacer", "messages/message"]);
+  });
+
+  it("dependencies skip commented out renders", () => {
+    const template = new FakeTemplate(
+      `
+      <%# render "messages/legacy_message" %>
+    `,
+      "tse",
+    );
+    const tracker = makeTracker("messages/show", template);
+
+    expect(tracker.dependencies()).toEqual([]);
   });
 });

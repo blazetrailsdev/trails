@@ -19,11 +19,15 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "sanitize-html": "^2.13.0"
   },
   "devDependencies": {
     "@types/sanitize-html": "^2.13.0"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

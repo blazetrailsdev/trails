@@ -1,15 +1,14 @@
 import { Encoder, ExtData } from "@msgpack/msgpack";
 import {
+  moduleVisibility,
   ArgumentError,
   FrozenError,
   Hash,
-  Module,
   NoMethodError,
   RangeError,
   TypeError,
   isSymbol,
   kernelFloat,
-  rbAbsintSize,
   rbBuiltinClassName,
   rbCString,
   rbCSymbol,
@@ -41,6 +40,13 @@ export type PackerExtRegistry = Map<unknown, PackerExtType>;
 const encoder = new Encoder();
 const floatEncoder = new Encoder({ forceIntegerToFloat: true });
 
+function rbAbsintSize(val: bigint): [number, number] {
+  const v = val < 0n ? -val : val;
+  const bits = v === 0n ? 0 : v.toString(2).length;
+  const size = Math.ceil(bits / 8);
+  return [size, size * 8 - bits];
+}
+
 export class Packer<Io = unknown> {
   /** @internal */
   readonly extRegistry: PackerExtRegistry = new Map();
@@ -71,7 +77,10 @@ export class Packer<Io = unknown> {
     methodName: string | null = null,
     block?: PackerProc,
   ): null {
-    if (typeof klass !== "function" && !(klass instanceof Module)) {
+    if (
+      typeof klass !== "function" &&
+      !(typeof klass === "object" && klass !== null && Object.hasOwn(klass, moduleVisibility))
+    ) {
       throw new ArgumentError(`expected Module/Class got: ${rbInspect(klass)}`);
     }
     if (block == null && methodName == null) {

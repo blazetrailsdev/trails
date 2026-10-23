@@ -1,5 +1,4 @@
-import { getApp } from "./config.js";
-import { GID, validateApp, type GidComponents } from "./uri/gid.js";
+import { GID, type GidComponents } from "./uri/gid.js";
 import type { Identification as IdentificationModule } from "./identification.js";
 import type {
   LocateOptions,
@@ -10,12 +9,13 @@ import type {
 import type { Verifier as VerifierClass } from "./verifier.js";
 import {
   Autoload,
+  type HashWithIndifferentAccess,
   constantize,
   Deprecation,
   extend,
   type Extended,
 } from "@blazetrails/activesupport";
-import { ArgumentError, rbHash } from "@blazetrails/ruby-compat";
+import { ArgumentError, block, fetch, rbHash } from "@blazetrails/ruby-compat";
 
 let _deprecator: Deprecation | undefined;
 
@@ -36,7 +36,14 @@ export interface GlobalIDOptions {
 }
 
 export class GlobalID {
+  private static _app: string | undefined;
+
+  static get app(): string | undefined {
+    return this._app;
+  }
+
   readonly uri: GID;
+  private _modelClass: LocatorModel | undefined;
 
   constructor(gid: string | GID, _options: GlobalIDOptions = {}) {
     this.uri = gid instanceof GID ? gid : GID.parse(gid);
@@ -51,7 +58,7 @@ export class GlobalID {
   get modelId(): string | string[] {
     return this.uri.modelId;
   }
-  get params(): Record<string, string> {
+  get params(): HashWithIndifferentAccess<string> | null {
     return this.uri.params;
   }
 
@@ -65,10 +72,14 @@ export class GlobalID {
     options?: O,
   ): T {
     const opts: GlobalIDOptions = options ?? {};
-    const app = opts.app ?? getApp();
-    if (!app) {
-      throw new Error(
-        "An app is required to create a GlobalID. Pass the :app option or set the default GlobalID.app via setApp().",
+    const app = fetch<string | undefined>(
+      opts,
+      "app",
+      block(() => GlobalID.app),
+    );
+    if (app == null) {
+      throw new ArgumentError(
+        "An app is required to create a GlobalID. Pass the :app option or set the default GlobalID.app.",
       );
     }
     const { app: _a, verifier: _v, for: _f, ...rest } = opts;
@@ -80,6 +91,13 @@ export class GlobalID {
     return new this(GID.create(app, model, params), options);
   }
 
+  static async find(
+    gid: string | GlobalID,
+    options: LocateOptions & GlobalIDOptions = {},
+  ): Promise<unknown | null> {
+    return (await this.parse(gid, options)?.find(options)) ?? null;
+  }
+
   static parse(gid: string | GlobalID, options: GlobalIDOptions = {}): GlobalID | null {
     if (gid instanceof this) return gid;
     try {
@@ -87,6 +105,10 @@ export class GlobalID {
     } catch {
       return this.parseEncodedGid(gid, options);
     }
+  }
+
+  static setApp(app: string | null | undefined): void {
+    this._app = GID.validateApp(app);
   }
 
   private static parseEncodedGid(gid: string, options: GlobalIDOptions): GlobalID | null {
@@ -139,16 +161,14 @@ export class GlobalID {
     return (_deprecator ??= new Deprecation("2.1", "GlobalID"));
   }
 
-  static validateApp(app: string | null | undefined): string {
-    return validateApp(app);
-  }
-
   get modelClass(): LocatorModel {
-    const klass = constantize(this.modelName) as LocatorModel;
-    if (isOrExtends(klass, GlobalID)) {
+    if (this._modelClass !== undefined) return this._modelClass;
+    const model = constantize(this.modelName) as LocatorModel;
+
+    if (isOrExtends(model, GlobalID)) {
       throw new ArgumentError("GlobalID and SignedGlobalID cannot be used as model_class.");
     }
-    return klass;
+    return (this._modelClass = model);
   }
 
   async find(options?: LocateOptions): Promise<unknown | null> {

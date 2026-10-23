@@ -44,8 +44,7 @@ export class Reaper {
   }
 
   private static spawnThread(frequency: number): Thread {
-    return new Thread(async () => {
-      const t = frequency;
+    return new Thread(frequency, async (t: number) => {
       Thread.current().threadVariableSet("fork_safe", true);
       Thread.current().name = "AR Pool Reaper";
       let running = true;

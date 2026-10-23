@@ -10,6 +10,13 @@ import {
 } from "./query-parser.js";
 import {
   ArgumentError,
+  aryDeleteIf,
+  block,
+  compact,
+  last,
+  stringSplit,
+  fetch,
+  warn,
   Process,
   RFC2396_PARSER,
   URI,
@@ -17,6 +24,7 @@ import {
   rbInspect,
   stringToSym,
   symbolToS,
+  b as rbB,
 } from "@blazetrails/ruby-compat";
 
 export { ArgumentError };
@@ -29,62 +37,35 @@ let _defaultQueryParser = QueryParser.makeDefault(32);
 let _multipartFileLimit = 128;
 let _multipartTotalPartLimit = 4096;
 
-export function getDefaultQueryParser(): QueryParser {
+export function defaultQueryParser(): QueryParser {
   return _defaultQueryParser;
 }
 export function setDefaultQueryParser(parser: QueryParser): void {
   _defaultQueryParser = parser;
 }
 
-export function getParamDepthLimit(): number {
-  return _defaultQueryParser.paramDepthLimit;
-}
-export function setParamDepthLimit(v: number): void {
-  defaultQueryParser(defaultQueryParser().newDepthLimit(v));
-}
-
-export function getMultipartFileLimit(): number {
-  return _multipartFileLimit;
-}
-export function setMultipartFileLimit(v: number): void {
-  _multipartFileLimit = v;
-}
-
-export function getMultipartTotalPartLimit(): number {
+export function multipartTotalPartLimit(): number {
   return _multipartTotalPartLimit;
 }
 export function setMultipartTotalPartLimit(v: number): void {
   _multipartTotalPartLimit = v;
 }
 
-export function defaultQueryParser(): QueryParser;
-export function defaultQueryParser(parser: QueryParser): void;
-export function defaultQueryParser(parser?: QueryParser): QueryParser | void {
-  if (parser !== undefined) {
-    _defaultQueryParser = parser;
-    return;
-  }
-  return _defaultQueryParser;
-}
-
-export function multipartTotalPartLimit(): number;
-export function multipartTotalPartLimit(v: number): void;
-export function multipartTotalPartLimit(v?: number): number | void {
-  if (v !== undefined) {
-    _multipartTotalPartLimit = v;
-    return;
-  }
-  return _multipartTotalPartLimit;
-}
-
-export function multipartFileLimit(): number;
-export function multipartFileLimit(v: number): void;
-export function multipartFileLimit(v?: number): number | void {
-  if (v !== undefined) {
-    _multipartFileLimit = v;
-    return;
-  }
+export function multipartFileLimit(): number {
   return _multipartFileLimit;
+}
+export function setMultipartFileLimit(v: number): void {
+  _multipartFileLimit = v;
+}
+
+export const multipartPartLimit = multipartFileLimit;
+export const setMultipartPartLimit = setMultipartFileLimit;
+
+export function paramDepthLimit(): number {
+  return defaultQueryParser().paramDepthLimit;
+}
+export function setParamDepthLimit(v: number): void {
+  setDefaultQueryParser(defaultQueryParser().newDepthLimit(v));
 }
 
 export function clockTime(): number {
@@ -102,7 +83,7 @@ export function escapePath(s: string): string {
 }
 
 export function unescapePath(s: string): string {
-  return decodeURI(s);
+  return URI_PARSER.unescape(s);
 }
 
 export function unescape(s: string): string {
@@ -132,10 +113,12 @@ export function buildNestedQuery(value: any, prefix: string | null = null): stri
   if (Array.isArray(value)) {
     return value.map((v) => buildNestedQuery(v, `${prefix ?? ""}[]`)).join("&");
   } else if (value !== null && value !== undefined && typeof value === "object") {
-    return Object.entries(value)
-      .map(([k, v]) => buildNestedQuery(v, prefix != null ? `${prefix}[${k}]` : k))
-      .filter((s) => s.length > 0)
-      .join("&");
+    return aryDeleteIf(
+      Object.entries(value).map(([k, v]) =>
+        buildNestedQuery(v, prefix != null ? `${prefix}[${k}]` : k),
+      ),
+      (s) => s.length === 0,
+    ).join("&");
   } else if (value === null || value === undefined) {
     return escape(prefix);
   } else {
@@ -163,11 +146,12 @@ export function forwardedValues(
   forwardedHeader = forwardedHeader.replace(/\n/g, ";");
   const result: Record<string, string[]> = {};
 
-  for (const field of forwardedHeader.split(";")) {
-    for (const pair of field.split(",")) {
-      const trimmed = pair.trim().replace(/\s*=\s*/, "=");
-      if (!trimmed) continue;
-      const match = trimmed.match(/^(by|for|host|proto)="?([^"]+)"?$/i);
+  for (const field of stringSplit(forwardedHeader, ";")) {
+    for (let pair of stringSplit(field, ",")) {
+      pair = stringSplit(pair, "=")
+        .map((s) => s.trim())
+        .join("=");
+      const match = pair.match(/^(by|for|host|proto)="?([^"]+)"?$/i);
       if (!match) return null;
       const key = match[1].toLowerCase();
       if (!result[key]) result[key] = [];
@@ -179,20 +163,22 @@ export function forwardedValues(
 
 export function bestQMatch(qValueHeader: string, availableMimes: string[]): string | null {
   const values = qValues(qValueHeader);
-  let bestMatch: string | null = null;
-  let bestScore = -Infinity;
 
-  for (const [reqMime, quality] of values) {
-    const match = availableMimes.find((am) => RackMime.match(am, reqMime));
-    if (!match) continue;
-    const wildcards = match.split("/", 2).filter((p) => p === "*").length * -10;
-    const score = wildcards + quality;
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = match;
-    }
-  }
-  return bestMatch;
+  const matches = last(
+    compact(
+      values.map(([reqMime, quality]): [string, number] | null => {
+        const match = availableMimes.find((am) => RackMime.match(am, reqMime));
+        if (!match) return null;
+        return [match, quality];
+      }),
+    ).sort(
+      ([aMatch, aQuality], [bMatch, bQuality]) =>
+        aMatch.split("/", 2).filter((part) => part === "*").length * -10 +
+        aQuality -
+        (bMatch.split("/", 2).filter((part) => part === "*").length * -10 + bQuality),
+    ),
+  );
+  return matches?.[0] ?? null;
 }
 
 export function escapeHtml(string: any): string {
@@ -246,30 +232,28 @@ export function selectBestEncoding(
   return null;
 }
 
-export function parseCookiesHeader(value: string | null | undefined): Record<string, string> {
+export function parseCookiesHeader(
+  value: string | null | undefined,
+): Record<string, string | null> {
   if (!value) return {};
-  const cookies: Record<string, string> = {};
+  const cookies: Record<string, string | null> = {};
   for (const cookie of value.split(/; */)) {
     if (!cookie) continue;
     const eqIdx = cookie.indexOf("=");
-    let key: string, val: string;
-    if (eqIdx === -1) {
-      key = cookie;
-      val = "";
-    } else {
-      key = cookie.substring(0, eqIdx);
-      val = cookie.substring(eqIdx + 1);
-    }
-    try {
-      if (!(key in cookies)) cookies[key] = unescape(val);
-    } catch {
-      if (!(key in cookies)) cookies[key] = val;
+    const key = eqIdx === -1 ? cookie : cookie.substring(0, eqIdx);
+    value = eqIdx === -1 ? null : cookie.substring(eqIdx + 1);
+    if (!Object.hasOwn(cookies, key)) {
+      try {
+        cookies[key] = unescape(value!);
+      } catch {
+        cookies[key] = value;
+      }
     }
   }
   return cookies;
 }
 
-export function parseCookies(env: Record<string, any>): Record<string, string> {
+export function parseCookies(env: Record<string, any>): Record<string, string | null> {
   return parseCookiesHeader(env[HTTP_COOKIE]);
 }
 
@@ -300,24 +284,23 @@ export function setCookieHeader(
     partitioned = "";
 
   if (typeof value === "object" && !Array.isArray(value)) {
-    const opts = value;
-    if (opts.escapeKey !== false) key = escapeCookieKey(key);
-    if (opts.domain) domain = `; domain=${opts.domain}`;
-    if (opts.path) path = `; path=${opts.path}`;
-    if (opts.maxAge !== undefined) maxAge = `; max-age=${opts.maxAge}`;
-    if (opts.expires) expires = `; expires=${httpDate(opts.expires)}`;
-    if (opts.secure) secure = "; secure";
-    if ("httponly" in opts ? opts.httponly : opts.httpOnly) httponly = "; httponly";
-    if (opts.sameSite !== undefined && opts.sameSite !== false && opts.sameSite !== null) {
-      const ss = opts.sameSite;
+    if (value.escapeKey !== false) key = escapeCookieKey(key);
+    if (value.domain) domain = `; domain=${value.domain}`;
+    if (value.path) path = `; path=${value.path}`;
+    if (value.maxAge !== undefined) maxAge = `; max-age=${value.maxAge}`;
+    if (value.expires) expires = `; expires=${httpDate(value.expires)}`;
+    if (value.secure) secure = "; secure";
+    if ("httponly" in value ? value.httponly : value.httpOnly) httponly = "; httponly";
+    if (value.sameSite !== undefined && value.sameSite !== false && value.sameSite !== null) {
+      const ss = value.sameSite;
       if (ss === ":none" || ss === "None" || ss === ":None") sameSite = "; samesite=none";
       else if (ss === ":lax" || ss === "Lax" || ss === ":Lax") sameSite = "; samesite=lax";
       else if (ss === true || ss === ":strict" || ss === "Strict" || ss === ":Strict")
         sameSite = "; samesite=strict";
       else throw new ArgumentError(`Invalid :same_site value: ${rbInspect(ss)}`);
     }
-    if (opts.partitioned) partitioned = "; partitioned";
-    value = opts.value;
+    if (value.partitioned) partitioned = "; partitioned";
+    value = value.value;
   } else {
     key = escapeCookieKey(key);
   }
@@ -445,11 +428,13 @@ export function getByteRanges(
   return ranges;
 }
 
-export function secureCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
+export function secureCompare(a: string | Uint8Array, b: string | Uint8Array): boolean {
+  const l = rbB(a);
+  const r = rbB(b);
+  if (l.length !== r.length) return false;
   let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (let i = 0; i < l.length; i++) {
+    result |= l[i] ^ r[i];
   }
   return result === 0;
 }
@@ -460,16 +445,26 @@ export function statusCode(status: number | string): number {
     ((status.trim() !== "" && Number.isNaN(parseInt(status, 10))) || isSymbol(status))
   ) {
     const symbol = stringToSym(status);
-    const name = symbolToS(symbol);
-    if (Object.hasOwn(SYMBOL_TO_STATUS_CODE, name)) return SYMBOL_TO_STATUS_CODE[name];
-    if (!Object.hasOwn(OBSOLETE_SYMBOLS_TO_STATUS_CODES, name)) {
-      throw new ArgumentError(`Unrecognized status code ${rbInspect(symbol)}`);
-    }
-    const fallbackCode = OBSOLETE_SYMBOLS_TO_STATUS_CODES[name];
-    const message = `Status code ${rbInspect(symbol)} is deprecated and will be removed in a future version of Rack.`;
-    const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[name];
-    if (canonicalSymbol === undefined) console.warn(message);
-    return fallbackCode;
+    status = symbolToS(symbol);
+    return fetch(
+      SYMBOL_TO_STATUS_CODE,
+      status,
+      block(() => {
+        const fallbackCode = fetch(
+          OBSOLETE_SYMBOLS_TO_STATUS_CODES,
+          status as string,
+          block(() => {
+            throw new ArgumentError(`Unrecognized status code ${rbInspect(symbol)}`);
+          }),
+        ) as number;
+        const message = `Status code ${rbInspect(symbol)} is deprecated and will be removed in a future version of Rack.`;
+        const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[status];
+        if (canonicalSymbol == null) {
+          warn(message, { uplevel: 3 });
+        }
+        return fallbackCode;
+      }),
+    );
   } else {
     return typeof status === "number" ? Math.trunc(status) : parseInt(status, 10) || 0;
   }

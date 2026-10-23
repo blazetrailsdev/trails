@@ -1,9 +1,10 @@
-import { underscore } from "@blazetrails/activesupport";
+import { underscore, type SafeBuffer } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
-import { except, RFC2396_PARSER, rbInspect, SimpleDelegator } from "@blazetrails/ruby-compat";
+import { RFC2396_PARSER, rbInspect, SimpleDelegator } from "@blazetrails/ruby-compat";
 import type { Endpoint } from "./endpoint.js";
 import type { Route } from "../journey/route.js";
 import { RouteSet } from "./route-set.js";
+import { Routing } from "../../namespaces.js";
 
 export interface CollectedRoute {
   name: string;
@@ -20,16 +21,6 @@ export interface RoutesFilter {
 
 /** @internal */
 type NormalizedFilter = Record<string, RegExp | string> | null;
-
-/** @internal */
-function formatConstraints(c: Record<string, unknown>): string {
-  const parts = Object.entries(c).map(([k, v]) => {
-    if (v instanceof RegExp) return `${k}: ${v.toString()}`;
-    if (typeof v === "string") return `${k}: ${JSON.stringify(v)}`;
-    return `${k}: ${String(v)}`;
-  });
-  return `{${parts.join(", ")}}`;
-}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- types the names SimpleDelegator forwards to Route (inspector.rb:10).
 export interface RouteWrapper extends Pick<
@@ -65,7 +56,8 @@ export class RouteWrapper extends SimpleDelegator {
   }
 
   get constraints(): Record<string, unknown> {
-    return except(this.requirements, "controller", "action");
+    const { controller, action, ...constraints } = this.requirements;
+    return constraints;
   }
 
   get rackApp(): unknown {
@@ -89,11 +81,10 @@ export class RouteWrapper extends SimpleDelegator {
 
   get reqs(): string {
     if (this._reqs !== undefined) return this._reqs;
-    let s = this.endpoint;
-    const c = this.constraints;
-    if (Object.keys(c).length > 0) s += ` ${formatConstraints(c)}`;
-    this._reqs = s;
-    return s;
+    let reqs = this.endpoint;
+    if (Object.keys(this.constraints).length !== 0) reqs += ` ${rbInspect(this.constraints)}`;
+    this._reqs = reqs;
+    return reqs;
   }
 
   /** @internal */
@@ -107,20 +98,24 @@ export class RouteWrapper extends SimpleDelegator {
 }
 
 export class RoutesInspector {
-  private readonly routes: readonly Route[];
+  private readonly routes: Iterable<Route>;
   private engines: Record<string, CollectedRoute[]>;
 
-  constructor(routes: readonly Route[]) {
+  constructor(routes: Iterable<Route>) {
     this.routes = routes;
     this.engines = {};
   }
 
-  format(formatter: RoutesFormatter = new Sheet(), filter: RoutesFilter = {}): string {
+  format<F extends Omit<RoutesFormatter, "result"> & { result(): unknown } = Sheet>(
+    formatter: F = new Sheet() as RoutesFormatter as F,
+    filter: RoutesFilter = {},
+  ): ReturnType<F["result"]> {
     this.engines = {};
-    const routes = this.collectRoutes(this.filterRoutes(this.normalizeFilter(filter)));
+    const routesToDisplay = this.filterRoutes(this.normalizeFilter(filter));
+    const routes = this.collectRoutes(routesToDisplay);
     if (routes.length === 0) {
       formatter.noRoutes(this.collectRoutes(this.routes), filter);
-      return formatter.result();
+      return formatter.result() as ReturnType<F["result"]>;
     }
     formatter.header(routes);
     formatter.section(routes);
@@ -128,7 +123,7 @@ export class RoutesInspector {
       formatter.sectionTitle(`Routes for ${name}`);
       formatter.section(engineRoutes);
     }
-    return formatter.result();
+    return formatter.result() as ReturnType<F["result"]>;
   }
 
   /** @internal */
@@ -153,27 +148,32 @@ export class RoutesInspector {
   }
 
   /** @internal */
-  private filterRoutes(filter: NormalizedFilter): readonly Route[] {
-    if (!filter) return this.routes;
-    return this.routes.filter((route) => {
-      const w = new RouteWrapper(route);
-      return Object.entries(filter).some(([k, v]) => w.isMatchesFilter(k, v));
-    });
+  private filterRoutes(filter: NormalizedFilter): Iterable<Route> {
+    if (filter) {
+      return Array.from(this.routes).filter((route) => {
+        const routeWrapper = new RouteWrapper(route);
+        return Object.entries(filter).some(([filterType, value]) =>
+          routeWrapper.isMatchesFilter(filterType, value),
+        );
+      });
+    } else {
+      return this.routes;
+    }
   }
 
   /** @internal */
-  private collectRoutes(routes: readonly Route[]): CollectedRoute[] {
-    return routes
-      .map((r) => new RouteWrapper(r))
-      .filter((w) => !w.isInternal())
-      .map((w) => {
-        this.collectEngineRoutes(w);
+  private collectRoutes(routes: Iterable<Route>): CollectedRoute[] {
+    return Array.from(routes)
+      .map((route) => new RouteWrapper(route))
+      .filter((route) => !route.isInternal())
+      .map((route) => {
+        this.collectEngineRoutes(route);
         return {
-          name: w.name,
-          verb: w.verb,
-          path: w.path,
-          reqs: w.reqs,
-          sourceLocation: w.sourceLocation ?? undefined,
+          name: route.name,
+          verb: route.verb,
+          path: route.path,
+          reqs: route.reqs,
+          sourceLocation: route.sourceLocation ?? undefined,
         };
       });
   }
@@ -186,7 +186,7 @@ export class RoutesInspector {
 
     const routes = (route.rackApp as { routes(): unknown }).routes();
     if (routes instanceof RouteSet) {
-      this.engines[name] = this.collectRoutes(routes.routes.routes);
+      this.engines[name] = this.collectRoutes(routes.routes);
     }
   }
 }
@@ -270,7 +270,7 @@ export class Sheet extends Base {
 export class Expanded extends Base {
   private width: number;
 
-  constructor(width = 80) {
+  constructor({ width = 80 }: { width?: number } = {}) {
     super();
     this.width = width;
   }
@@ -320,3 +320,52 @@ export class Unused extends Sheet {
 }
 
 export const ConsoleFormatter = { Base, Sheet, Expanded, Unused };
+
+/** @internal */
+interface HtmlTableFormatterView {
+  render(options: object, locals?: object, block?: () => unknown): unknown;
+  raw(stringish: unknown): SafeBuffer;
+}
+
+export class HtmlTableFormatter {
+  private view: HtmlTableFormatterView;
+  private buffer: unknown[];
+
+  constructor(view: HtmlTableFormatterView) {
+    this.view = view;
+    this.buffer = [];
+  }
+
+  sectionTitle(title: string): void {
+    this.buffer.push(`<tr><th colspan="5">${title}</th></tr>`);
+  }
+
+  section(routes: CollectedRoute[]): void {
+    this.buffer.push(this.view.render({ partial: "routes/route", collection: routes }));
+  }
+
+  header(_routes: CollectedRoute[]): void {}
+
+  noRoutes(..._args: unknown[]): void {
+    this.buffer.push(`<p>You don't have any routes defined!</p>
+<ul>
+  <li>Please add some routes in <tt>config/routes.rb</tt>.</li>
+  <li>
+    For more information about routes, please see the Rails guide
+    <a href="https://guides.rubyonrails.org/routing.html">Rails Routing from the Outside In</a>.
+  </li>
+</ul>
+`);
+  }
+
+  async result(): Promise<SafeBuffer> {
+    const buffer = await Promise.all(this.buffer);
+    return this.view.raw(
+      await this.view.render({ layout: "routes/table" }, {}, () => {
+        return this.view.raw(buffer.join("\n"));
+      }),
+    );
+  }
+}
+
+Routing.HtmlTableFormatter = HtmlTableFormatter;

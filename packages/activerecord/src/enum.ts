@@ -165,12 +165,12 @@ export class EnumMethods extends Module {
 
     if (scopes) {
       klass.detectEnumConflictBang(name, scopeName, true);
-      klass.scope(scopeName, function (this: any) {
+      klass.scope(scopeName, function () {
         return this.where({ [name]: value });
       });
 
       klass.detectEnumConflictBang(name, notScopeName, true);
-      klass.scope(notScopeName, function (this: any) {
+      klass.scope(notScopeName, function () {
         return this.where().not({ [name]: value });
       });
     }
@@ -333,7 +333,7 @@ export function detectEnumConflictBang(
     });
   } else if (klassMethod && methodName === "id") {
     raiseConflictError.call(this, enumName, methodName);
-  } else if (!klassMethod && isDangerousAttributeMethod.call(this as any, methodName)) {
+  } else if (!klassMethod && isDangerousAttributeMethod.call(this, methodName)) {
     raiseConflictError.call(this, enumName, methodName);
   } else if (
     !klassMethod &&

@@ -10,18 +10,28 @@
  *   `ActiveSupport::TimeWithZone` Rails stores.
  */
 
-import { include, isSymbol, KeyError, rbEqual, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  include,
+  isSymbol,
+  rbEqual,
+  symbolToS,
+  rbFSend,
+  type Block,
+} from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
   isPlainObject,
   isPresent,
   mattrAccessor,
+  onLoad,
 } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import {
   SERIALIZERS,
   SerializerWithFallback,
+  type Serializer as SerializerWithFallbackSerializer,
 } from "@blazetrails/activesupport/messages/serializer-with-fallback";
 import {
   InvalidMessage,
@@ -29,6 +39,7 @@ import {
   NullSerializer,
 } from "@blazetrails/activesupport/message-encryptor";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Duration } from "@blazetrails/activesupport/duration";
 import { Response, escape as rackEscape } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { ActionDispatch } from "../../namespaces.js";
@@ -37,7 +48,9 @@ export type CookieExpires = Date | Temporal.Instant | { toF(): number; httpdate(
 
 type MetadataOptions = NonNullable<Parameters<MessageVerifier["generate"]>[1]>;
 
-function isFromNow(expires: unknown): expires is { fromNow(): CookieExpires } {
+type FromNowExpires = { fromNow(): CookieExpires };
+
+function isFromNow(expires: unknown): expires is FromNowExpires {
   return expires != null && typeof (expires as { fromNow?: unknown }).fromNow === "function";
 }
 
@@ -53,20 +66,15 @@ function hashEqual(a: Record<string, unknown> | undefined, b: Record<string, unk
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
   if (aKeys.length !== bKeys.length) return false;
-  return aKeys.every(
-    (key) => Object.prototype.hasOwnProperty.call(b, key) && rbEqual(a[key], b[key]),
-  );
+  return aKeys.every((key) => Object.hasOwn(b, key) && rbEqual(a[key], b[key]));
 }
-
-/** @internal */
-export const COOKIES_SAME_SITE_PROTECTION = "action_dispatch.cookies_same_site_protection";
 
 export interface SetCookieOptions {
   value: string;
   path?: string;
   domain?: string | string[] | ((request: unknown) => string | undefined);
   tldLength?: number;
-  expires?: CookieExpires;
+  expires?: CookieExpires | FromNowExpires;
   maxAge?: number;
   secure?: boolean;
   httpOnly?: boolean;
@@ -88,11 +96,11 @@ export interface SetCookieOptions {
 /** @noRailsEquivalent PERMANENT */
 export interface CookieResponse {
   setCookie(name: string, value: SetCookieOptions): void;
-  deleteCookie(name: string, options: { path?: string; domain?: string }): void;
+  deleteCookie(name: string, options: Partial<SetCookieOptions>): void;
 }
 
 export class ChainedCookieJars {
-  declare request: RequestCookieMethodsHost;
+  declare protected request: RequestCookieMethodsHost;
   declare _permanent?: PermanentCookieJar;
   declare _signed?: SignedKeyRotatingCookieJar;
   declare _encrypted?: EncryptedKeyRotatingCookieJar;
@@ -161,7 +169,7 @@ export class CookieJar implements Iterable<[string, string]> {
   declare isPrepareUpgradeLegacyHmacAesCbcCookies: () => boolean;
   private _cookies: Map<string, string> = new Map();
   private _setCookies: Map<string, SetCookieOptions> = new Map();
-  private _deletedCookies: Map<string, { path?: string; domain?: string }> = new Map();
+  private _deletedCookies: Map<string, Partial<SetCookieOptions>> = new Map();
   private _committed = false;
   private _request: RequestCookieMethodsHost;
 
@@ -200,11 +208,8 @@ export class CookieJar implements Iterable<[string, string]> {
     return this._cookies.get(key);
   }
 
-  fetch(name: string, args?: string): string {
-    const val = this._cookies.get(name);
-    if (val !== undefined) return val;
-    if (args !== undefined) return args;
-    throw new KeyError(`key not found: "${name}"`, { receiver: this._cookies, key: name });
+  fetch(name: string, ...args: [] | [unknown] | [Block<unknown>]): unknown {
+    return fetch(this._cookies, String(name), ...(args as [unknown]));
   }
 
   isKey(name: string): boolean {
@@ -213,29 +218,15 @@ export class CookieJar implements Iterable<[string, string]> {
 
   declare hasKey: CookieJar["isKey"];
 
-  get keys(): string[] {
-    return [...this._cookies.keys()];
-  }
-
-  get values(): string[] {
-    return [...this._cookies.values()];
-  }
-
-  get size(): number {
-    return this._cookies.size;
-  }
-
-  get empty(): boolean {
-    return this._cookies.size === 0;
-  }
-
-  toHash(): Record<string, string> {
+  toH(): Record<string, string> {
     const result: Record<string, string> = {};
     for (const [k, v] of this._cookies) {
       result[k] = v;
     }
     return result;
   }
+
+  declare toHash: CookieJar["toH"];
 
   update(otherHash: Record<string, string>): this {
     for (const [k, v] of Object.entries(otherHash)) this._cookies.set(k, v);
@@ -263,13 +254,11 @@ export class CookieJar implements Iterable<[string, string]> {
       value = options as string;
       options = { value };
     }
-    const opts = options as SetCookieOptions;
+    this.handleOptions(options as SetCookieOptions);
 
-    this.handleOptions(opts);
-
-    if (this._cookies.get(name) !== value || opts.expires) {
+    if (this._cookies.get(name) !== value || (options as SetCookieOptions).expires) {
       this._cookies.set(name, value);
-      this._setCookies.set(name, opts);
+      this._setCookies.set(name, options as SetCookieOptions);
       this._deletedCookies.delete(name);
     }
 
@@ -322,7 +311,7 @@ export class CookieJar implements Iterable<[string, string]> {
     }
   }
 
-  delete(name: string, options: { path?: string; domain?: string } = {}): string | undefined {
+  delete(name: string, options: Partial<SetCookieOptions> = {}): string | undefined {
     if (!this._cookies.has(name)) return undefined;
 
     this.handleOptions(options);
@@ -333,12 +322,12 @@ export class CookieJar implements Iterable<[string, string]> {
     return value;
   }
 
-  isDeleted(name: string, options: { path?: string; domain?: string } = {}): boolean {
+  isDeleted(name: string, options: Partial<SetCookieOptions> = {}): boolean {
     this.handleOptions(options);
     return hashEqual(this._deletedCookies.get(name), options);
   }
 
-  clear(options: { path?: string; domain?: string } = {}): void {
+  clear(options: Partial<SetCookieOptions> = {}): void {
     for (const k of [...this._cookies.keys()]) this.delete(k, options);
   }
 
@@ -447,7 +436,7 @@ export class AbstractCookieJar {
   /** @internal */
   protected expiryOptions(options: SerializedSetOptions): MetadataOptions {
     if (isFromNow(options.expires)) {
-      return { expiresIn: options.expires as unknown as number };
+      return { expiresIn: options.expires as Duration };
     } else {
       return { expiresAt: toInstant(options.expires) };
     }
@@ -468,6 +457,7 @@ export class AbstractCookieJar {
 }
 
 CookieJar.prototype.hasKey = CookieJar.prototype.isKey;
+CookieJar.prototype.toHash = CookieJar.prototype.toH;
 
 include(CookieJar, ChainedCookieJars);
 include(AbstractCookieJar, ChainedCookieJars);
@@ -619,6 +609,24 @@ type CookiesRequest = RequestCookieMethodsHost & {
 };
 
 export class Cookies {
+  static readonly HTTP_HEADER = "Set-Cookie";
+  static readonly GENERATOR_KEY = "action_dispatch.key_generator";
+  static readonly SIGNED_COOKIE_SALT = "action_dispatch.signed_cookie_salt";
+  static readonly ENCRYPTED_COOKIE_SALT = "action_dispatch.encrypted_cookie_salt";
+  static readonly ENCRYPTED_SIGNED_COOKIE_SALT = "action_dispatch.encrypted_signed_cookie_salt";
+  static readonly AUTHENTICATED_ENCRYPTED_COOKIE_SALT =
+    "action_dispatch.authenticated_encrypted_cookie_salt";
+  static readonly USE_AUTHENTICATED_COOKIE_ENCRYPTION =
+    "action_dispatch.use_authenticated_cookie_encryption";
+  static readonly ENCRYPTED_COOKIE_CIPHER = "action_dispatch.encrypted_cookie_cipher";
+  static readonly SIGNED_COOKIE_DIGEST = "action_dispatch.signed_cookie_digest";
+  static readonly SECRET_KEY_BASE = "action_dispatch.secret_key_base";
+  static readonly COOKIES_SERIALIZER = "action_dispatch.cookies_serializer";
+  static readonly COOKIES_DIGEST = "action_dispatch.cookies_digest";
+  static readonly COOKIES_ROTATIONS = "action_dispatch.cookies_rotations";
+  static readonly COOKIES_SAME_SITE_PROTECTION = "action_dispatch.cookies_same_site_protection";
+  static readonly USE_COOKIES_WITH_METADATA = "action_dispatch.use_cookies_with_metadata";
+
   private app: RackApp;
 
   constructor(app: RackApp) {
@@ -627,17 +635,19 @@ export class Cookies {
 
   async call(env: RackEnv): Promise<RackResponse> {
     const request = new ActionDispatch.Request(env) as CookiesRequest;
-    let response: RackResponse | Response = await this.app(env);
+    let response: RackResponse | Response = await (rbFSend(this.app, "call", env) as ReturnType<
+      typeof this.app
+    >);
 
     if (request.isHaveCookieJar()) {
       const cookieJar = request.cookieJar();
       if (!cookieJar.isCommitted()) {
-        response = Response.create(...response);
+        response = Response.get(...response);
         cookieJar.write(response);
       }
     }
 
-    return (response instanceof Response ? response.toArray() : response) as RackResponse;
+    return rbFSend(response, "toA") as RackResponse;
   }
 }
 
@@ -646,26 +656,26 @@ export interface RequestCookieMethodsHost {
   env: RackEnv;
   getHeader(name: string): any;
   hasHeader(name: string): boolean;
+  fetchHeader(name: string, block: (name: string) => unknown): unknown;
+  setHeader(name: string, value: unknown): unknown;
   cookies: Record<string, string>;
   cookiesSameSiteProtection?(): unknown;
 }
 
-const COOKIE_JAR_ENV = COOKIES_KEY;
-
-export function cookieJar(this: RequestCookieMethodsHost, jar?: CookieJar): CookieJar {
-  if (jar !== undefined) {
-    this.env[COOKIE_JAR_ENV] = jar;
+export function cookieJar(this: RequestCookieMethodsHost): CookieJar {
+  return this.fetchHeader("action_dispatch.cookies", () => {
+    const jar = CookieJar.build(this, this.cookies);
+    setCookieJar.call(this, jar);
     return jar;
-  }
-  const existing = this.env[COOKIE_JAR_ENV] as CookieJar | undefined;
-  if (existing) return existing;
-  const built = CookieJar.build(this, this.cookies);
-  this.env[COOKIE_JAR_ENV] = built;
-  return built;
+  }) as CookieJar;
 }
 
 export function isHaveCookieJar(this: RequestCookieMethodsHost): boolean {
   return this.hasHeader("action_dispatch.cookies");
+}
+
+export function setCookieJar(this: RequestCookieMethodsHost, jar: CookieJar): void {
+  this.setHeader("action_dispatch.cookies", jar);
 }
 
 const requestEnvAccessor = <T>(key: string) =>
@@ -676,63 +686,81 @@ const requestEnvAccessor = <T>(key: string) =>
 /** @internal */
 export const keyGenerator = requestEnvAccessor<{
   generateKey(salt: string, keySize?: number): Buffer | string;
-}>("action_dispatch.key_generator");
+}>(Cookies.GENERATOR_KEY);
 /** @internal */
-export const signedCookieSalt = requestEnvAccessor<string>("action_dispatch.signed_cookie_salt");
+export const signedCookieSalt = requestEnvAccessor<string>(Cookies.SIGNED_COOKIE_SALT);
 /** @internal */
-export const encryptedCookieSalt = requestEnvAccessor<string>(
-  "action_dispatch.encrypted_cookie_salt",
-);
+export const encryptedCookieSalt = requestEnvAccessor<string>(Cookies.ENCRYPTED_COOKIE_SALT);
 /** @internal */
 export const encryptedSignedCookieSalt = requestEnvAccessor<string>(
-  "action_dispatch.encrypted_signed_cookie_salt",
+  Cookies.ENCRYPTED_SIGNED_COOKIE_SALT,
 );
 /** @internal */
 export const authenticatedEncryptedCookieSalt = requestEnvAccessor<string>(
-  "action_dispatch.authenticated_encrypted_cookie_salt",
+  Cookies.AUTHENTICATED_ENCRYPTED_COOKIE_SALT,
 );
 /** @internal */
 export const useAuthenticatedCookieEncryption = requestEnvAccessor<boolean>(
-  "action_dispatch.use_authenticated_cookie_encryption",
+  Cookies.USE_AUTHENTICATED_COOKIE_ENCRYPTION,
 );
 /** @internal */
-export const encryptedCookieCipher = requestEnvAccessor<string>(
-  "action_dispatch.encrypted_cookie_cipher",
-);
+export const encryptedCookieCipher = requestEnvAccessor<string>(Cookies.ENCRYPTED_COOKIE_CIPHER);
 /** @internal */
-export const signedCookieDigest = requestEnvAccessor<string>(
-  "action_dispatch.signed_cookie_digest",
-);
+export const signedCookieDigest = requestEnvAccessor<string>(Cookies.SIGNED_COOKIE_DIGEST);
 /** @internal */
-export const secretKeyBase = requestEnvAccessor<string>("action_dispatch.secret_key_base");
+export const secretKeyBase = requestEnvAccessor<string>(Cookies.SECRET_KEY_BASE);
 /** @internal */
-export const cookiesSerializer = requestEnvAccessor<unknown>("action_dispatch.cookies_serializer");
+export const cookiesSerializer = requestEnvAccessor<unknown>(Cookies.COOKIES_SERIALIZER);
 /** @internal */
 export function cookiesSameSiteProtection(this: RequestCookieMethodsHost): unknown {
   return (
-    this.getHeader(COOKIES_SAME_SITE_PROTECTION) as
+    this.getHeader(Cookies.COOKIES_SAME_SITE_PROTECTION) as
       | ((request: unknown) => unknown)
       | undefined
       | null
   )?.(this);
 }
 /** @internal */
-export const cookiesDigest = requestEnvAccessor<string>("action_dispatch.cookies_digest");
+export const cookiesDigest = requestEnvAccessor<string>(Cookies.COOKIES_DIGEST);
 /** @internal */
 export const cookiesRotations = requestEnvAccessor<RotationConfiguration>(
-  "action_dispatch.cookies_rotations",
+  Cookies.COOKIES_ROTATIONS,
 );
 /** @internal */
 export const useCookiesWithMetadata = requestEnvAccessor<boolean>(
-  "action_dispatch.use_cookies_with_metadata",
+  Cookies.USE_COOKIES_WITH_METADATA,
 );
+
+export const RequestCookieMethods = {
+  cookieJar,
+  isHaveCookieJar,
+  setCookieJar,
+  keyGenerator,
+  signedCookieSalt,
+  encryptedCookieSalt,
+  encryptedSignedCookieSalt,
+  authenticatedEncryptedCookieSalt,
+  useAuthenticatedCookieEncryption,
+  encryptedCookieCipher,
+  signedCookieDigest,
+  secretKeyBase,
+  cookiesSerializer,
+  cookiesSameSiteProtection,
+  cookiesDigest,
+  cookiesRotations,
+  useCookiesWithMetadata,
+};
+
+onLoad("action_dispatch_request", function (this: object) {
+  include(this, RequestCookieMethods);
+});
 
 const MAX_COOKIE_SIZE = 4096;
 
 export interface CookieSerializer {
-  dump(value: unknown): string;
-  load(dumped: string): unknown;
-  dumped(payload: string): boolean;
+  dump(value: unknown): string | Uint8Array;
+  load(dumped: string | Uint8Array): unknown;
+  dumped(payload: string | Uint8Array): boolean;
 }
 
 /** @internal */
@@ -764,11 +792,14 @@ export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
 }
 
 /** @internal */
-export function isReserialize(this: SerializedCookieJarsHost, dumped: string): boolean {
+export function isReserialize(
+  this: SerializedCookieJarsHost,
+  dumped: string | Uint8Array,
+): boolean {
   const configured = serializer.call(this);
   return (
-    Object.values(SERIALIZERS).includes(configured as (typeof SERIALIZERS)["json"]) &&
-    configured !== SERIALIZERS.marshal &&
+    [...SERIALIZERS.values()].includes(configured as SerializerWithFallbackSerializer) &&
+    configured !== SerializerWithFallback.get("marshal") &&
     !configured.dumped(dumped)
   );
 }
@@ -783,12 +814,12 @@ export function parse(
   if (dumped != null) {
     let value: unknown;
     try {
-      value = serializer.call(this).load(dumped as string);
+      value = serializer.call(this).load(dumped as string | Uint8Array);
     } catch {
       return undefined;
     }
 
-    if (forceReserialize || isReserialize.call(this, dumped as string)) {
+    if (forceReserialize || isReserialize.call(this, dumped as string | Uint8Array)) {
       this.set(name, { value });
     }
 

@@ -7,6 +7,7 @@ import { Serialized } from "../type/serialized.js";
 import { JSON as CodersJSON } from "../coders/json.js";
 import { ColumnSerializer as CodersColumnSerializer } from "../coders/column-serializer.js";
 import { YAMLColumn, type YamlColumnOptions } from "../coders/yaml-column.js";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { AttributeMethods } from "../namespaces.js";
 
 export const ClassMethods = {
@@ -50,7 +51,7 @@ export function isTypeIncompatibleWithSerialize(
 ): boolean {
   return (
     (castType instanceof Json && coder === globalThis.JSON) ||
-    (rbObjRespondTo(castType, "typeCastArray", true) && type === Array)
+    (rbObjRespondTo(castType, "typeCastArray") && type === Array)
   );
 }
 
@@ -63,7 +64,7 @@ export function buildColumnSerializer(
 ): unknown {
   if (coder === globalThis.JSON) coder = CodersJSON;
 
-  if (coder === YAMLColumn) {
+  if (coder === YAML || coder === YAMLColumn) {
     return new YAMLColumn(attrName, type as new (...args: unknown[]) => unknown, yaml ?? {});
   }
 

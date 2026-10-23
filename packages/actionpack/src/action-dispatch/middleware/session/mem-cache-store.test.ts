@@ -5,13 +5,13 @@ import { MemCacheStore } from "./mem-cache-store.js";
 import { SessionId } from "@blazetrails/rack-session";
 
 describe("ActionDispatch::Session::MemCacheStore", () => {
-  it("aliases :expires to :expire_after", () => {
+  it("aliases :expires to :expire_after", async () => {
     const cache = new MemoryStore();
     const store = new MemCacheStore(undefined, { cache, expires: 600 });
     expect(store.options.expireAfter).toBe(600);
   });
 
-  it("keeps :expire_after when both are given", () => {
+  it("keeps :expire_after when both are given", async () => {
     const cache = new MemoryStore();
     const store = new MemCacheStore(undefined, {
       cache,
@@ -21,19 +21,19 @@ describe("ActionDispatch::Session::MemCacheStore", () => {
     expect(store.options.expireAfter).toBe(900);
   });
 
-  it("inherits CacheStore session behavior", () => {
+  it("inherits CacheStore session behavior", async () => {
     const cache = new MemoryStore();
     const store = new MemCacheStore(undefined, { cache });
-    const [sid, session] = store.findSession({}, null);
+    const [sid, session] = await store.findSession({}, null);
     expect(sid).toBeInstanceOf(SessionId);
     expect(session).toEqual({});
   });
 
-  it("requires a cache option", () => {
+  it("requires a cache option", async () => {
     expect(() => new MemCacheStore(undefined, {})).toThrow(/cache/);
   });
 
-  it("registers mixin methods as own properties on the prototype", () => {
+  it("registers mixin methods as own properties on the prototype", async () => {
     const proto = MemCacheStore.prototype;
     const ownNames = [
       "initializeSid",
@@ -49,7 +49,7 @@ describe("ActionDispatch::Session::MemCacheStore", () => {
     }
   });
 
-  it("keeps generateSid returning SessionId after mixin inclusion", () => {
+  it("keeps generateSid returning SessionId after mixin inclusion", async () => {
     const cache = new MemoryStore();
     const store = new MemCacheStore(undefined, { cache });
     expect(store.generateSid()).toBeInstanceOf(SessionId);

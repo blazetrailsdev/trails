@@ -22,6 +22,7 @@ import {
 } from "@blazetrails/activemodel";
 import {
   ArgumentError,
+  Hash,
   basicObjRespondTo,
   NoMethodError,
   hashAref,
@@ -181,13 +182,13 @@ describe("AttributeMethodsTest", () => {
     topic.content = { one: 1, two: 2 };
     await topic.save();
 
-    expect(((await CanonicalTopic.find(topic.id)) as any).content["two"]).toBe(2);
+    expect(((await CanonicalTopic.find(topic.id)) as any).content.get("two")).toBe(2);
 
     topic.contentWillChange();
-    topic.content["three"] = 3;
+    topic.content.set("three", 3);
     await topic.save();
 
-    expect(((await CanonicalTopic.find(topic.id)) as any).content["three"]).toBe(3);
+    expect(((await CanonicalTopic.find(topic.id)) as any).content.get("three")).toBe(3);
   });
 
   it("read_attribute_for_database", async () => {
@@ -509,7 +510,7 @@ describe("AttributeMethodsTest", () => {
     const myobj = { value1: "value2" };
     const topic = (await CanonicalTopic.create({ content: myobj } as any)) as any;
     topic.freeze();
-    expect(topic.content).toEqual(myobj);
+    expect(topic.content).toEqual(new Hash().set("value1", myobj.value1));
   });
   it("raises ActiveRecord::DangerousAttributeError when defining an AR method or dangerous Object method in a model", () => {
     for (const method of ["save", "createOrUpdate", "dup", "isFrozen"]) {
@@ -1555,11 +1556,11 @@ describe("AttributeMethodsTest", () => {
 
     const topic = new CanonicalTopic(newTopic) as any;
     expect(topic.title).toBe(newTopic["title"]);
-    expect(topic.content).toEqual(newTopic["content"]);
+    expect(topic.content).toEqual(new Hash().set("key", newTopic["content"].key));
 
     await topic.setAttributes(newTopicValues);
     expect(topic.title).toBe(newTopicValues["title"]);
-    expect(topic.content).toEqual(newTopicValues["content"]);
+    expect(topic.content).toEqual(new Hash().set("key", newTopicValues["content"].key));
   });
 
   it("create through factory", async () => {

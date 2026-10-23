@@ -18,7 +18,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { rbInspect, rbObjClassname, rbObjRespondTo } from "./object.js";
-import { rbEqual } from "./rb-equal.js";
+import { kDateP, rbEqual } from "./rb-equal.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 import { rbStrCmp } from "./string/support.js";
 
@@ -96,11 +96,17 @@ export function cmp(a: unknown, b: unknown): number | null {
     const y = (b as { epochNanoseconds?: bigint }).epochNanoseconds;
     if (x !== undefined && y !== undefined) return x < y ? -1 : x > y ? 1 : 0;
   }
-  if (kDateP(a) && (typeof b === "number" || typeof b === "bigint")) {
+  if (kTemporalDateP(a) && (typeof b === "number" || typeof b === "bigint")) {
     const ajd = mAjd(a);
     const n = Number(b);
     if (Number.isNaN(n)) return null;
     return ajd < n ? -1 : ajd > n ? 1 : 0;
+  }
+  if (temporalTag(a) !== null && temporalTag(b) === null) {
+    if (kDateP(a) && kDateP(b) && isCmpSpelling(b)) {
+      const c = b.cmp(a);
+      return c == null ? null : c === 0 ? 0 : -c;
+    }
   }
   if (temporalTag(a) !== null && temporalTag(b) !== null) {
     const x = widenPlainDate(a);
@@ -117,7 +123,7 @@ export function cmp(a: unknown, b: unknown): number | null {
     if (Number.isNaN(a as number)) return null;
     if (typeof b !== "number" && typeof b !== "bigint") {
       if (typeof a === "number" && !Number.isFinite(a)) {
-        const i = kDateP(b)
+        const i = kTemporalDateP(b)
           ? false
           : rbObjRespondTo(b, "isInfinite")
             ? (b as { isInfinite(): unknown }).isInfinite()
@@ -184,7 +190,7 @@ export function cmp(a: unknown, b: unknown): number | null {
   return rbEqual(a, b) ? 0 : null;
 }
 
-function kDateP(value: unknown): boolean {
+function kTemporalDateP(value: unknown): boolean {
   const tag = temporalTag(value);
   return tag === "Temporal.PlainDate" || tag === "Temporal.PlainDateTime";
 }

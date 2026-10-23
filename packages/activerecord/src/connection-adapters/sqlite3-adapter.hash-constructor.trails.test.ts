@@ -21,7 +21,7 @@ describe("SQLite3Adapter hash-only constructor", () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-hash-"));
     const file = path.join(tmpDir, "db.sqlite3");
     adapter = new BetterSQLite3Adapter({ database: file });
-    // eslint-disable-next-line blazetrails/require-table-teardown -- isolated per-test tmp DB, removed in afterEach
+
     await adapter.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)");
     await adapter.execute("INSERT INTO items (name) VALUES ('apple')");
     const rows = (await adapter.execute("SELECT name FROM items"))!;
@@ -32,7 +32,6 @@ describe("SQLite3Adapter hash-only constructor", () => {
   it("accepts a :memory: database via the config hash", async () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:" });
 
-    // eslint-disable-next-line blazetrails/require-table-teardown -- throwaway :memory: database
     await adapter.execute("CREATE TABLE items (id INTEGER PRIMARY KEY)");
     const rows = (await adapter.execute("SELECT count(*) AS c FROM items"))!;
     expect(Number(rows[0].c)).toBe(0);

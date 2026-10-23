@@ -30,7 +30,8 @@ import {
   slotDatabaseName,
   staleRunDatabases,
 } from "./run-token.js";
-import { quoteMysqlDatabaseName, quotePgDatabaseName } from "./quote-database-name.js";
+import { quoteTableName as quoteMysqlTableName } from "../connection-adapters/mysql/quoting.js";
+import { quoteTableName as quotePgTableName } from "../connection-adapters/postgresql/quoting.js";
 import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 import {
   driverConfig,
@@ -149,7 +150,7 @@ async function pgDatabaseNames(admin: pg.Client): Promise<string[]> {
 async function pgDropDatabases(admin: pg.Client, names: string[]): Promise<void> {
   for (const name of names) {
     await pgTerminateConnections(admin, name);
-    await admin.query(`DROP DATABASE IF EXISTS ${quotePgDatabaseName(name)}`);
+    await admin.query(`DROP DATABASE IF EXISTS ${quotePgTableName(name)}`);
   }
 }
 
@@ -167,7 +168,7 @@ const pgAdapter: DbTemplateAdapter = {
 
     await pgDropDatabases(admin, staleRunDatabases(base, runToken, await pgDatabaseNames(admin)));
 
-    await admin.query(`CREATE DATABASE ${quotePgDatabaseName(templateDb)}`);
+    await admin.query(`CREATE DATABASE ${quotePgTableName(templateDb)}`);
 
     const templateSettings = withDatabase(settings, templateDb);
     const { adapter, pool } = await pooledTemplateAdapter({
@@ -190,7 +191,7 @@ const pgAdapter: DbTemplateAdapter = {
     for (let slot = 1; slot <= slotCount(); slot++) {
       const slotDb = slotDatabaseName(base, runToken, slot);
       await admin.query(
-        `CREATE DATABASE ${quotePgDatabaseName(slotDb)} TEMPLATE ${quotePgDatabaseName(templateDb)}`,
+        `CREATE DATABASE ${quotePgTableName(slotDb)} TEMPLATE ${quotePgTableName(templateDb)}`,
       );
     }
 
@@ -222,7 +223,7 @@ async function mysqlDatabaseNames(admin: mysql.Connection): Promise<string[]> {
 
 async function mysqlDropDatabases(admin: mysql.Connection, names: string[]): Promise<void> {
   for (const name of names) {
-    await admin.query(`DROP DATABASE IF EXISTS ${quoteMysqlDatabaseName(name)}`);
+    await admin.query(`DROP DATABASE IF EXISTS ${quoteMysqlTableName(name)}`);
   }
 }
 
@@ -250,7 +251,7 @@ const mysqlAdapter: DbTemplateAdapter = {
     for (let slot = 1; slot <= n; slot++) {
       const slotDb = slotDatabaseName(baseDb, runToken, slot);
       await admin.query(
-        `CREATE DATABASE ${quoteMysqlDatabaseName(slotDb)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+        `CREATE DATABASE ${quoteMysqlTableName(slotDb)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
       );
     }
     await admin.end();

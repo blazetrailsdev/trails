@@ -1,3 +1,5 @@
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+
 export class BodyProxy {
   private body: any;
   private block: () => void;
@@ -17,7 +19,7 @@ export class BodyProxy {
         ) {
           return Reflect.get(target, prop, receiver);
         }
-        return (...args: unknown[]) => target.delegate(prop, ...args);
+        return (...args: unknown[]) => target.methodMissing(prop, ...args);
       },
     });
   }
@@ -26,7 +28,7 @@ export class BodyProxy {
     if (this._closed) return;
     this._closed = true;
     try {
-      if (this.body && typeof this.body.close === "function") {
+      if (rbObjRespondTo(this.body, "close")) {
         this.body.close();
       }
     } finally {
@@ -49,6 +51,14 @@ export class BodyProxy {
     }
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  *[Symbol.iterator](): Iterator<any> {
+    const items: any[] = [];
+    this.each((item) => items.push(item));
+    yield* items;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   each(callback: (item: any) => void): void {
     if (Array.isArray(this.body)) {
       for (const item of this.body) callback(item);
@@ -59,6 +69,7 @@ export class BodyProxy {
     }
   }
 
+  /** @noRailsEquivalent PERMANENT */
   toArray(): any[] {
     try {
       if (Array.isArray(this.body)) return this.body;
@@ -86,16 +97,20 @@ export class BodyProxy {
     return typeof this.body?.[methodName] === "function";
   }
 
-  delegate(method: string, ...args: unknown[]): any {
-    if (method === "toStr" || method === "to_str") {
+  methodMissing(methodName: string, ...args: unknown[]): any {
+    if (methodName === "toStr" || methodName === "to_str") {
       throw new Error("NoMethodError: undefined method 'to_str'");
     }
-    if (method === "toArray" || method === "to_ary") {
-      return this.toArray();
+    if (methodName === "toArray" || methodName === "to_ary") {
+      try {
+        return Array.isArray(this.body) ? this.body : this.body.toArray(...args);
+      } finally {
+        this.close();
+      }
     }
-    if (typeof this.body?.[method] === "function") {
-      return this.body[method](...args);
+    if (typeof this.body?.[methodName] === "function") {
+      return this.body[methodName](...args);
     }
-    throw new Error(`NoMethodError: undefined method '${method}'`);
+    throw new Error(`NoMethodError: undefined method '${methodName}'`);
   }
 }

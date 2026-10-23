@@ -10,9 +10,9 @@ export interface MethodsHost {
   /** @internal */
   _rackTestSessions?: Map<unknown, Session>;
   /** @internal */
-  get _rackTestCurrentSession(): Session | undefined;
+  __rackTestCurrentSession?: Session;
   /** @internal */
-  set _rackTestCurrentSession(value: Session | undefined);
+  _rackTestCurrentSession: Session | undefined;
 }
 
 function rackTestSession(this: MethodsHost, name: unknown = ":default"): Session {
@@ -42,7 +42,7 @@ function buildRackTestSession(this: MethodsHost, _name: unknown): Session {
 }
 
 function currentSession(this: MethodsHost): Session {
-  return (this._rackTestCurrentSession ??= rackTestSession.call(this));
+  return (this.__rackTestCurrentSession ??= rackTestSession.call(this));
 }
 
 async function withSession<T>(
@@ -52,9 +52,9 @@ async function withSession<T>(
 ): Promise<Awaited<T>> {
   const session = this._rackTestCurrentSession;
   try {
-    return await block((this._rackTestCurrentSession = rackTestSession.call(this, name)));
+    return await block((this.__rackTestCurrentSession = rackTestSession.call(this, name)));
   } finally {
-    this._rackTestCurrentSession = session;
+    this.__rackTestCurrentSession = session;
   }
 }
 
@@ -155,6 +155,13 @@ export const Methods = defineModule(
     basicAuthorize,
     lastResponse,
     lastRequest,
+    /** @internal */
+    get _rackTestCurrentSession(): Session | undefined {
+      return (this as unknown as MethodsHost).__rackTestCurrentSession;
+    },
+    set _rackTestCurrentSession(value: Session | undefined) {
+      (this as unknown as MethodsHost).__rackTestCurrentSession = value;
+    },
   },
   {},
   {},

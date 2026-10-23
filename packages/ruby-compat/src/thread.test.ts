@@ -1,7 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
+import { ThreadError } from "./thread-error.js";
 import { Thread } from "./thread.js";
 
 describe("Thread", () => {
+  it("Thread.new hands its arguments to the block", () => {
+    expect(new Thread(1, "a", (n: number, s: string) => `${s}${n}`).value()).toBe("a1");
+    expect(new Thread(() => 2).value()).toBe(2);
+  });
+
   it("is the main thread at top level", () => {
     expect(Thread.current()).toBe(Thread.main);
     expect(Thread.main.id).toBe(0);
@@ -138,5 +144,36 @@ describe("Thread", () => {
     } finally {
       queue.mockRestore();
     }
+  });
+
+  it("Thread#run wakes a thread parked in Thread.stop", async () => {
+    const log: string[] = [];
+    const a = new Thread(async () => {
+      log.push("a");
+      await Thread.stop();
+      log.push("c");
+    });
+    await Thread.pass();
+    expect(a.status).toBe("sleep");
+    log.push("b");
+    await (await a.run()).join();
+    expect(log.join("")).toBe("abc");
+  });
+
+  it("Thread#wakeup before Thread.stop is not lost", async () => {
+    const a = new Thread(async () => {
+      await Thread.pass();
+      await Thread.stop();
+      return 1;
+    });
+    a.wakeup();
+    expect(await (await a.join()).value()).toBe(1);
+  });
+
+  it("Thread#wakeup raises ThreadError for a killed thread", () => {
+    const a = new Thread(() => Thread.stop());
+    a.kill();
+    expect(() => a.wakeup()).toThrow(ThreadError);
+    expect(() => a.wakeup()).toThrow("killed thread");
   });
 });

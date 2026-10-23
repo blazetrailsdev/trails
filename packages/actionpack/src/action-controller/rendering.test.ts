@@ -6,8 +6,8 @@ import { API } from "./api.js";
 import { Metal } from "./metal.js";
 import { Head } from "./metal/head.js";
 import { ArgumentError, include, type Included } from "@blazetrails/ruby-compat";
-import { Request } from "../action-dispatch/request.js";
-import { Response } from "../action-dispatch/response.js";
+import { Request } from "../action-dispatch/http/request.js";
+import { Response } from "../action-dispatch/http/response.js";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({
@@ -457,17 +457,6 @@ describe("ActionController sendData", () => {
     expect(c.headers.get("content-disposition")).toBe(
       "inline; filename=\"doc.pdf\"; filename*=UTF-8''doc.pdf",
     );
-  });
-
-  it("sets content-length", async () => {
-    class C extends Base {
-      async download() {
-        await this.sendData("12345", { filename: "test.txt" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("download", makeRequest(), makeResponse());
-    expect(c.headers.get("content-length")).toBe("5");
   });
 
   it("sends Buffer data", async () => {

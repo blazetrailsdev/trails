@@ -1,0 +1,30 @@
+{
+  "name": "@blazetrails/marcel",
+  "version": "0.1.0",
+  "description": "MIME type detection for Trails, mirroring the marcel gem",
+  "type": "module",
+  "main": "dist/marcel.js",
+  "types": "dist/marcel.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/marcel.d.ts",
+      "default": "./dist/marcel.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -7,7 +7,7 @@ function primaryKeyOf(record: object): string[] {
 }
 
 function columnForDatabase(record: PrimaryKeyRecord, key: string): unknown {
-  const attrs = (record as any)._attributes;
+  const attrs = record._attributes;
   if (attrs?.getAttribute) {
     const attr = attrs.getAttribute(key);
     if (attr != null && "valueForDatabase" in attr) return attr.valueForDatabase;

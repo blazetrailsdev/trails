@@ -1,6 +1,7 @@
 import { onLoad } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import type { Application } from "../application.js";
 import { Generators, MiddlewareStackProxy } from "../configuration.js";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
@@ -38,21 +39,14 @@ export class Configuration {
         return target.methodMissing(name);
       },
       set(target, name, value, receiver) {
-        if (
-          typeof name === "symbol" ||
-          Object.prototype.hasOwnProperty.call(target, name) ||
-          hasWriter(target, name)
-        ) {
+        if (typeof name === "symbol" || Object.hasOwn(target, name) || hasWriter(target, name)) {
           return Reflect.set(target, name, value, receiver);
         }
         target.methodMissing(`${name}=`, value);
         return true;
       },
       has(target, name) {
-        return (
-          Reflect.has(target, name) ||
-          Object.prototype.hasOwnProperty.call(Configuration._options, name)
-        );
+        return Reflect.has(target, name) || Object.hasOwn(Configuration._options, name);
       },
     });
   }
@@ -86,7 +80,7 @@ export class Configuration {
     onLoad("before_initialize", { yield: true }, block);
   }
 
-  afterInitialize(block: ConfigurationBlock): void {
+  afterInitialize(block: (this: unknown, app: Application) => void): void {
     onLoad("after_initialize", { yield: true }, block);
   }
 
@@ -113,18 +107,16 @@ export class Configuration {
 
   isRespondTo(key: string): boolean {
     if (!key.startsWith("_")) {
-      if (Object.prototype.hasOwnProperty.call(this, key)) return true;
+      if (Object.hasOwn(this, key)) return true;
       for (let proto = Object.getPrototypeOf(this); proto; proto = Object.getPrototypeOf(proto)) {
-        if (Object.prototype.hasOwnProperty.call(proto, key)) return true;
+        if (Object.hasOwn(proto, key)) return true;
       }
     }
-    return Object.prototype.hasOwnProperty.call(Configuration._options, key);
+    return Object.hasOwn(Configuration._options, key);
   }
 
   private _actualMethod(key: string): boolean {
-    return (
-      !Object.prototype.hasOwnProperty.call(Configuration._options, key) && this.isRespondTo(key)
-    );
+    return !Object.hasOwn(Configuration._options, key) && this.isRespondTo(key);
   }
 
   methodMissing(name: string, ...args: unknown[]): unknown {
@@ -134,7 +126,7 @@ export class Configuration {
         throw new NoMethodError(`Cannot assign to \`${key}\`, it is a configuration method`);
       }
       return (Configuration._options[key] = args[0]);
-    } else if (Object.prototype.hasOwnProperty.call(Configuration._options, name)) {
+    } else if (Object.hasOwn(Configuration._options, name)) {
       return Configuration._options[name];
     } else {
       throw new NoMethodError(

@@ -1,8 +1,9 @@
 import { ArgumentError } from "../argument-error.js";
 import { regexpEscape } from "../regexp.js";
 import { b } from "../string/b.js";
-import { InvalidURIError, URI } from "./common.js";
-import { Generic } from "./generic.js";
+import { rbModConstGet } from "../variable.js";
+import type { InvalidURIError, URI } from "./common.js";
+import type { Generic } from "./generic.js";
 import type { SplitComponents } from "./rfc3986-parser.js";
 
 /**
@@ -83,10 +84,14 @@ export class RFC2396Parser {
       [scheme, opaque, userinfo, host, port, registry, path, query, fragment] = group(m, 9);
 
       if (scheme == null) {
-        throw new InvalidURIError(`bad URI(absolute but no scheme): ${uri}`);
+        throw new (rbModConstGet(Object, "URI::InvalidURIError") as typeof InvalidURIError)(
+          `bad URI(absolute but no scheme): ${uri}`,
+        );
       }
       if (opaque == null && path == null && host == null && registry == null) {
-        throw new InvalidURIError(`bad URI(absolute but no path): ${uri}`);
+        throw new (rbModConstGet(Object, "URI::InvalidURIError") as typeof InvalidURIError)(
+          `bad URI(absolute but no path): ${uri}`,
+        );
       }
     } else if ((m = this.regexp.REL_URI.exec(uri))) {
       scheme = null;
@@ -103,7 +108,9 @@ export class RFC2396Parser {
         path = absPath;
       }
     } else {
-      throw new InvalidURIError(`bad URI(is not URI?): ${uri}`);
+      throw new (rbModConstGet(Object, "URI::InvalidURIError") as typeof InvalidURIError)(
+        `bad URI(is not URI?): ${uri}`,
+      );
     }
 
     if (path == null && opaque == null) path = "";
@@ -112,7 +119,7 @@ export class RFC2396Parser {
 
   /** `parse` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:205`). */
   parse(uri: string): Generic {
-    return URI.for(...this.split(uri), this);
+    return (rbModConstGet(Object, "URI") as typeof URI).for(...this.split(uri), this);
   }
 
   /**
@@ -121,17 +128,20 @@ export class RFC2396Parser {
    * The second `else if` arm is not in the Ruby: `gsub` replaces every match
    * whatever the Regexp is, where a JS `replace` replaces one unless the
    * Regexp carries `g`, so a caller's own unsafe set is re-made global here.
+   * An ASCII-8BIT `str`, a `Uint8Array`, is searched a byte per character, and
+   * each matched character is the byte `each_byte` yields.
    */
-  escape(str: string, unsafe: RegExp | string = this.regexp.UNSAFE): string {
+  escape(str: string | Uint8Array, unsafe: RegExp | string = this.regexp.UNSAFE): string {
     if (!(unsafe instanceof RegExp)) {
       unsafe = new RegExp(`[${regexpEscape(unsafe)}]`, "g");
     } else if (!unsafe.flags.includes("g")) {
       unsafe = new RegExp(unsafe.source, `${unsafe.flags}g`);
     }
-    return str.replace(unsafe, (us) => {
+    const binary = str instanceof Uint8Array;
+    return (binary ? String.fromCharCode(...str) : str).replace(unsafe, (us) => {
       let tmp = "";
-      for (const uc of b(us)) {
-        tmp += `%${uc.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`;
+      for (const uc of binary ? Array.from(us, (c) => c.charCodeAt(0)) : b(us)) {
+        tmp += `%${uc.toString(16).toUpperCase().padStart(2, "0")}`;
       }
       return tmp;
     });
@@ -269,7 +279,7 @@ export class RFC2396Parser {
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails.
    */
   convertToUri(uri: Generic | string): Generic {
-    if (uri instanceof Generic) {
+    if (uri instanceof (rbModConstGet(Object, "URI::Generic") as typeof Generic)) {
       return uri;
     } else if (typeof uri === "string") {
       return this.parse(uri);

@@ -1,8 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ArgumentError } from "./date.js";
+import { ArgumentError, Date as RbDate, DateTime } from "./date.js";
 import { Time, Timezone, resetLocalTimeZoneId } from "./time.js";
-import { Rational, env, rbFSend, rbObjRespondTo, setEnv } from "@blazetrails/ruby-compat";
+import { Rational, env, rbFSend, rbObjRespondTo, setEnv, toF } from "@blazetrails/ruby-compat";
 
 describe("Time#utc?, #getutc and #getlocal on an Instant and a JS Date", () => {
   afterEach(() => {
@@ -859,5 +859,62 @@ describe("Time#hash", () => {
   it("differs for a different instant", () => {
     expect(Time.utc(2000).hash()).not.toBe(Time.utc(2000, 1, 1, 0, 0, 1).hash());
     expect(Time.at(0).hash()).not.toBe(Time.at(new Rational(1, 3_000_000_000)).hash());
+  });
+});
+
+describe("Time through Marshal", () => {
+  it("loads ruby -e 'Marshal.dump(Time.utc(2004,1,2,3,4,5.5r))' and round-trips a local time", async () => {
+    const { Marshal } = await import("@blazetrails/ruby-compat");
+    const dumpStr = (value: unknown): string => String.fromCharCode(...Marshal.dump(value));
+    const mri = '\x04\bIu:\tTime\rC\x00\x1A\xC0 \xA1W\x10\x06:\tzoneI"\bUTC\x06:\x06EF';
+    const t = Marshal.load(mri) as Time;
+    expect([t.toS(), t.usec]).toEqual(["2004-01-02 03:04:05 UTC", 500000]);
+    expect(dumpStr(Time.utc(2004, 1, 2, 3, 4, 5.5))).toBe(mri.replace(/F$/, "T"));
+    expect(dumpStr(Time.utc(1800, 3, 4, 5, 6, 7))).toBe(
+      '\x04\bIu:\tTime\x0F\x85\b\x00\xC0\x00\x00p\x18\x06d\x06:\tzoneI"\bUTC\x06:\x06ET',
+    );
+    expect(dumpStr(Time.utc(70000, 1, 1))).toBe(
+      '\x04\bIu:\tTime\x10 \xC0\xFF\xFF\x00\x00\x00\x00\x07\x05\n\x06:\tzoneI"\bUTC\x06:\x06ET',
+    );
+    const third =
+      '\x04\bIu:\tTime\r \x00\x1A\xC0\x00\x00\x00\x00\t:\rnano_numi\x02\xE8\x03:\rnano_deni\b:\rsubmicro"\x0730:\tzoneI"\bUTC\x06:\x06EF';
+    const loaded = Marshal.load(third) as Time;
+    expect([loaded.nsec, String(loaded.subsec)]).toEqual([333, "1/3000000"]);
+    expect((Marshal.load(Marshal.dump(loaded)) as Time).eql(loaded)).toBe(true);
+    const local = Time.local(2004);
+    const back = Marshal.load(Marshal.dump(local)) as Time;
+    expect([back.eql(local), back.utcOffset]).toEqual([true, local.utcOffset]);
+  });
+});
+
+describe("Date#iso8601, DateTime#iso8601 and Time#xmlschema on a Temporal seat", () => {
+  afterEach(() => {
+    resetLocalTimeZoneId();
+  });
+
+  it("answers MRI's output for each seat", () => {
+    expect(rbFSend(Temporal.PlainDate.from("2024-03-05"), "iso8601")).toBe("2024-03-05");
+    const zoned = Temporal.ZonedDateTime.from("2024-03-05T06:07:08.123456789+05:30[+05:30]");
+    expect(rbFSend(zoned, "iso8601", 9)).toBe("2024-03-05T06:07:08.123456789+05:30");
+    expect(rbFSend(zoned, "xmlschema")).toBe("2024-03-05T06:07:08+05:30");
+    resetLocalTimeZoneId("Asia/Tokyo");
+    const instant = Temporal.Instant.fromEpochNanoseconds(1709618828123456789n);
+    expect(rbFSend(instant, "xmlschema", 9)).toBe("2024-03-05T15:07:08.123456789+09:00");
+    const date = new globalThis.Date(1709618828123);
+    expect(rbFSend(date, "iso8601", 3)).toBe("2024-03-05T15:07:08.123+09:00");
+  });
+
+  it("round-trips Date.today and DateTime.now through their parsers", () => {
+    const today = RbDate.today();
+    expect(RbDate.iso8601(rbFSend(today, "iso8601") as string).equals(today)).toBe(true);
+    const now = DateTime.now();
+    const parsed = DateTime.iso8601(rbFSend(now, "iso8601", 9) as string);
+    expect(String(parsed)).toBe(String(now));
+  });
+});
+
+describe("Time.at with a boxed Float", () => {
+  it("reads an integral Float from toF as its seconds", () => {
+    expect(Time.at(toF(946684800)).toI()).toBe(946684800);
   });
 });

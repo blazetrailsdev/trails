@@ -83,7 +83,7 @@ export interface CurrentMembership {
 export class SuperMembership extends Membership {
   static {
     registerModel(SuperMembership);
-    this.belongsTo("member", function (this: any) {
+    this.belongsTo("member", function () {
       return this.order("members.id DESC");
     });
     this.belongsTo("club");
@@ -100,7 +100,7 @@ export interface SuperMembership {
 export class SelectedMembership extends Membership {
   static {
     registerModel(SelectedMembership);
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.select("'1' as foo");
     });
   }
@@ -114,7 +114,7 @@ export class TenantMembership extends Membership {
     registerModel(TenantMembership);
     this.belongsTo("member");
     this.belongsTo("club");
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       if (TenantMembership.currentMember) {
         return this.where({ member: TenantMembership.currentMember });
       }

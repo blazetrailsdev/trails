@@ -7,6 +7,7 @@ import {
   normalizeArgs,
   pairCallSites,
   resolveCalleeSigs,
+  VISIBILITY_PARAMS,
 } from "./call-args.js";
 
 function site(name: string, args: string[], flags: string[] = []): CallSite {
@@ -611,6 +612,30 @@ describe("compareCallArgs block-tail nil padding", () => {
     expect(compareCallArgs(ruby, ts, undefined, resolveCalleeSigs(inPkg, inDeps)).verdict).toBe(
       "mismatch",
     );
+  });
+
+  it("keeps the in-package signatures when no owner information is given", () => {
+    const inPkg = [[required("object")]];
+    const inDeps = [[optional("progname")]];
+    expect(resolveCalleeSigs(inPkg, inDeps)).toBe(inPkg);
+  });
+
+  it("lets the enclosing class's own signatures win over the package and dependencies", () => {
+    const own = [[optional("progname")]];
+    expect(resolveCalleeSigs([[required("object")]], [[required("x")]], own)).toBe(own);
+  });
+
+  it("does not let a same-package homonym on another class block the strip", () => {
+    const ruby = site("debug", [], ["block"]);
+    const ts = site("debug", ["nil"], ["block"]);
+    const homonym = [[required("object")]];
+    const inDeps = [[optional("progname"), optional("block")]];
+    expect(
+      compareCallArgs(ruby, ts, undefined, resolveCalleeSigs(homonym, inDeps, [])).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(ruby, ts, undefined, resolveCalleeSigs(homonym, inDeps, homonym)).verdict,
+    ).toBe("mismatch");
   });
 
   it("does not fire when neither side carries a block", () => {
@@ -1259,6 +1284,20 @@ describe("compareCallArgs Symbol-discriminated arguments", () => {
 });
 
 describe("comparableRubySites", () => {
+  it('drops an argument-less String.new, the literal "", so klass.new pairs with new klass', () => {
+    const stringNew = { ...site("new", []), recv: "const:String" };
+    const klassNew = { ...site("new", ["id:body"]), recv: "id:klass" };
+    const ts = [site("constructor", ["id:body"])];
+    expect(comparableRubySites([stringNew, klassNew], ts, () => false)).toEqual([klassNew]);
+  });
+
+  it("drops a String.new(x), the value itself, so klass.new pairs with new klass", () => {
+    const stringNew = { ...site("new", ["id:value"]), recv: "const:String" };
+    const klassNew = { ...site("new", ["id:body"]), recv: "id:klass" };
+    const ts = [site("constructor", ["id:body"])];
+    expect(comparableRubySites([stringNew, klassNew], ts, () => false)).toEqual([klassNew]);
+  });
+
   it("drops a weak site the TS body makes no such call for", () => {
     const kept = comparableRubySites(
       [site("map", ["id:x"], ["weak"])],
@@ -1385,6 +1424,24 @@ describe("pairCallSites core_ext receiver as argument 1", () => {
     const result = compareCallArgs(pairs[0].ruby, pairs[0].ts);
     expect(result.rubyArgs).toEqual(["ref:size"]);
     expect(result.tsArgs).toEqual(["ref:length"]);
+  });
+});
+
+describe("compareCallArgs function-form Hash#stringify_keys", () => {
+  const ruby = { ...site("stringify_keys", []), recv: "call:extract_options!" };
+
+  it("aligns the receiver of activesupport's stringifyKeys export", () => {
+    const ts = {
+      ...site("stringifyKeys", ["call:extractOptionsBang"]),
+      activeSupport: "stringifyKeys",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("match");
+  });
+
+  it("does not align a bare stringifyKeys that is not the export", () => {
+    expect(compareCallArgs(ruby, site("stringifyKeys", ["call:extractOptionsBang"])).verdict).toBe(
+      "mismatch",
+    );
   });
 });
 
@@ -1582,6 +1639,21 @@ describe("a native hash form's literal key (RFC 0190)", () => {
     expect(verdict(ruby, on("@in", "id:options", ["str:onlyPath"]))).toEqual(["match"]);
   });
 
+  it("pairs an ivar receiver with this._options and compares its key", () => {
+    const ruby = on("key?", "id:@options", ["sym:only_path"]);
+    expect(verdict(ruby, on("@in", "id:_options", ["str:onlyPath"]))).toEqual(["match"]);
+    const [pair] = pairCallSites([ruby], [on("@in", "id:_options", ["str:wrongKey"])]);
+    expect(compareCallArgs(pair.ruby, pair.ts)).toMatchObject({
+      verdict: "mismatch",
+      class: "shape",
+    });
+  });
+
+  it("does not pair a Ruby local with this._options", () => {
+    const ruby = on("key?", "id:options", ["sym:only_path"]);
+    expect(verdict(ruby, on("@in", "id:_options", ["str:onlyPath"]))).toEqual([]);
+  });
+
   it("reads a colon-spelled key as the Symbol, and only for a Symbol", () => {
     const form = on("@delete", "id:env", ["str::params"]);
     expect(verdict(on("delete", "id:env", ["sym:params"]), form)).toEqual(["match"]);
@@ -1626,5 +1698,63 @@ describe("a native hash form's literal key (RFC 0190)", () => {
     expect(
       comparableRubySites([publicDelete], [site("hashDelete", ["id:options"])], () => false),
     ).toEqual([]);
+  });
+});
+
+describe("compareCallArgs visibility flag", () => {
+  it("drops respond_to?(name, true)'s visibility boolean against a one-argument port", () => {
+    const ruby = site("respond_to?", ["id:name", "bool:true"]);
+    expect(compareCallArgs(ruby, site("rbObjRespondTo", ["id:this", "id:name"])).verdict).toBe(
+      "match",
+    );
+    const forwarded = site("respond_to_missing?", ["id:name", "id:include_private"]);
+    expect(compareCallArgs(forwarded, site("respondToMissing", ["id:name"])).verdict).toBe("match");
+  });
+
+  it("keeps methods(false), which is not a visibility flag", () => {
+    expect(compareCallArgs(site("methods", ["bool:false"]), site("methods", [])).verdict).toBe(
+      "mismatch",
+    );
+  });
+
+  it("shares its visibility parameters with extract-ruby-api.rb", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const rb = await readFile(new URL("./extract-ruby-api.rb", import.meta.url), "utf-8");
+    const names = /VISIBILITY_PARAM_NAMES = %w\[([^\]]*)\]/.exec(rb)![1].split(/\s+/);
+    expect([...VISIBILITY_PARAMS].map((p) => p.slice(3)).sort()).toEqual(names.sort());
+  });
+
+  it("still compares a non-boolean second argument", () => {
+    const ruby = site("respond_to?", ["id:name", "id:other"]);
+    expect(compareCallArgs(ruby, site("respondTo", ["id:name"]))).toMatchObject({
+      verdict: "mismatch",
+      class: "shape",
+    });
+  });
+});
+
+describe("compareCallArgs Enumerable free functions", () => {
+  const ts = (name: string, args: string[], flags: string[] = []): CallSite => ({
+    ...site(name, args, flags),
+    rubyCompat: name,
+  });
+
+  it("reads argument 1 as the receiver and a trailing callback as the block", () => {
+    const partition = { ...site("partition", [], ["blockpass", "blockarg=sym:x"]), recv: "id:xs" };
+    expect(compareCallArgs(partition, ts("partition", ["id:xs", "id:fn"])).verdict).not.toBe(
+      "mismatch",
+    );
+    const slice = { ...site("each_slice", ["num:2"], ["block"]), recv: "id:xs" };
+    expect(compareCallArgs(slice, ts("eachSlice", ["id:xs", "num:2", "id:fn"])).verdict).toBe(
+      "match",
+    );
+  });
+
+  it("still flags a differing argument", () => {
+    const slice = { ...site("each_slice", ["num:2"], ["block"]), recv: "id:xs" };
+    expect(compareCallArgs(slice, ts("eachSlice", ["id:xs", "num:3"], ["block"]))).toMatchObject({
+      verdict: "mismatch",
+      class: "shape",
+    });
   });
 });

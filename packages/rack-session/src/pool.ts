@@ -1,4 +1,5 @@
 import type { RackApp } from "@blazetrails/rack";
+import { hashDelete, Mutex } from "@blazetrails/ruby-compat";
 
 import {
   DEFAULT_OPTIONS as ID_DEFAULT_OPTIONS,
@@ -9,6 +10,7 @@ import {
 } from "./abstract/id.js";
 
 export class Pool extends PersistedSecure {
+  mutex!: Mutex;
   pool!: Record<string, Record<string, unknown> | undefined>;
 
   static override DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze({
@@ -19,15 +21,11 @@ export class Pool extends PersistedSecure {
 
   protected allowFallback: unknown;
 
-  /**
-   * @missingRailsCall new — PERMANENT
-   * @missingRailsCall delete — PERMANENT
-   */
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
     super(app, options);
     this.pool = {};
-    this.allowFallback = this.defaultOptions["allowFallback"];
-    delete this.defaultOptions["allowFallback"];
+    this.mutex = new Mutex();
+    this.allowFallback = hashDelete(this.defaultOptions, "allowFallback");
   }
 
   /** @missingRailsArgs super(*args) — PERMANENT */
@@ -53,21 +51,21 @@ export class Pool extends PersistedSecure {
   }
 
   /** @missingRailsCall store — PERMANENT */
-  override writeSession(
+  override async writeSession(
     _req: PersistedRequest,
     sessionId: SessionId,
     newSession: Record<string, unknown>,
     _options: Record<string, unknown>,
-  ): SessionId {
+  ): Promise<SessionId> {
     this.pool[sessionId.privateId] = newSession;
     return sessionId;
   }
 
-  override deleteSession(
+  override async deleteSession(
     _req: PersistedRequest,
     sessionId: SessionId,
     options: Record<string, unknown>,
-  ): SessionId | null {
+  ): Promise<SessionId | null> {
     delete this.pool[sessionId.publicId];
     delete this.pool[sessionId.privateId];
     if (!isTruthy(options["drop"])) return this.generateSid({ useMutex: false });

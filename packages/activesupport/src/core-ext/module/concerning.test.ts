@@ -31,9 +31,9 @@ describe("ModuleConcerningTest", () => {
     const hi = klass.prototype.hi;
 
     concerning.call(klass, "Foo", { prepend: true }, (mod) => {
-      mod.defineMethod("hi", function (this: any) {
+      mod.hi = function (this: any) {
         return `hello, ${hi.call(this)}`;
-      });
+      };
     });
 
     expect(new klass().hi()).toEqual("hello, self");
@@ -50,11 +50,11 @@ describe("ModuleConcernTest", () => {
       mod.prepended(null, function (this: any) {
         this["@foo"] = 2;
       });
-      mod.defineMethod("shouldBePublic", function () {});
+      mod.shouldBePublic = function () {};
     });
 
-    assert(Object.prototype.hasOwnProperty.call(klass, "Baz"));
-    assertNot(Object.prototype.hasOwnProperty.call(ModuleConcernTest, "Baz"));
+    assert(Object.hasOwn(klass, "Baz"));
+    assertNot(Object.hasOwn(ModuleConcernTest, "Baz"));
     expect(klass.Baz.appendFeatures).toBeInstanceOf(Function);
     expect(includedModules(klass)).not.toContain(klass.Baz);
 
@@ -112,7 +112,7 @@ describe("ModuleConcernTest", () => {
     assertRespondTo(Foo, "nicerDsl");
     assertRespondTo(Foo, "doesntClobber");
 
-    assert(Object.prototype.hasOwnProperty.call(Foo, "ClassMethods"));
+    assert(Object.hasOwn(Foo, "ClassMethods"));
     assert("willBeOrphaned" in Foo.ClassMethods);
   });
 
@@ -122,7 +122,7 @@ describe("ModuleConcernTest", () => {
     assertRespondTo(Foo, "nicerDslAlso");
     assertRespondTo(Foo, "doesntClobberAlso");
 
-    assert(Object.prototype.hasOwnProperty.call(Foo, "ClassMethods"));
+    assert(Object.hasOwn(Foo, "ClassMethods"));
     assert("willBeOrphanedAlso" in Foo.ClassMethods);
   });
 });

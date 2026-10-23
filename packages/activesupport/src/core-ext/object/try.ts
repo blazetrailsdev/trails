@@ -30,6 +30,10 @@ export const Tryable = {
 };
 
 export class Delegator implements Tryable {
+  static toString(): string {
+    return "Delegator";
+  }
+
   private _delegate: unknown;
 
   constructor(delegate: unknown) {

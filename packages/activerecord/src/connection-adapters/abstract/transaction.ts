@@ -13,7 +13,7 @@ import {
   type MonitorMixin,
   type NotificationHandle,
 } from "@blazetrails/activesupport";
-import { Hash, isEmpty, Thread, throwDataP, uniq } from "@blazetrails/ruby-compat";
+import { Hash, eachWithObject, rbObjId, Thread, throwDataP, uniq } from "@blazetrails/ruby-compat";
 import { beforeCommittedOnAllRecords } from "../../active-record.js";
 
 /** @internal */
@@ -448,10 +448,13 @@ export class Transaction {
         if (beforeCommittedOnAllRecords()) {
           const ite = this.uniqueRecords();
 
-          const instancesToRunCallbacksOn = new Hash<TransactionRecord, TransactionRecord>();
-          for (const record of this.records) {
-            instancesToRunCallbacksOn.set(record, record);
-          }
+          const instancesToRunCallbacksOn = eachWithObject(
+            this.records,
+            new Hash<TransactionRecord, TransactionRecord>(),
+            (record, candidates) => {
+              candidates.set(record, record);
+            },
+          );
 
           await this.runActionOnRecords(
             ite,
@@ -519,15 +522,7 @@ export class Transaction {
 
   /** @internal */
   private uniqueRecords(): TransactionRecord[] {
-    const seen = new Set<unknown>();
-    const result: TransactionRecord[] = [];
-    for (const record of this.records ?? []) {
-      if (!seen.has(record)) {
-        seen.add(record);
-        result.push(record);
-      }
-    }
-    return result;
+    return uniq(this.records!, (r) => rbObjId(r));
   }
 
   /** @internal */
@@ -547,28 +542,30 @@ export class Transaction {
   private prepareInstancesToRunCallbacksOn(
     records: TransactionRecord[],
   ): Hash<TransactionRecord, TransactionRecord> {
-    const candidates = new Hash<TransactionRecord, TransactionRecord>();
-    for (const record of records) {
-      if (!record.isTriggerTransactionalCallbacks()) continue;
+    return eachWithObject(
+      records,
+      new Hash<TransactionRecord, TransactionRecord>(),
+      (record, candidates) => {
+        if (!record.isTriggerTransactionalCallbacks()) return;
 
-      const earlierSavedCandidate = candidates.get(record);
+        const earlierSavedCandidate = candidates.get(record);
 
-      if (
-        earlierSavedCandidate &&
-        (record.constructor as typeof Base).runCommitCallbacksOnFirstSavedInstancesInTransaction
-      ) {
-        continue;
-      }
+        if (
+          earlierSavedCandidate &&
+          (record.constructor as typeof Base).runCommitCallbacksOnFirstSavedInstancesInTransaction
+        ) {
+          return;
+        }
 
-      if (earlierSavedCandidate?.isDestroyed() && !record.isDestroyed()) continue;
+        if (earlierSavedCandidate?.isDestroyed() && !record.isDestroyed()) return;
 
-      if (earlierSavedCandidate?._newRecordBeforeLastCommit) {
-        record._newRecordBeforeLastCommit = true;
-      }
+        if (earlierSavedCandidate?._newRecordBeforeLastCommit) {
+          record._newRecordBeforeLastCommit = true;
+        }
 
-      candidates.set(record, record);
-    }
-    return candidates;
+        candidates.set(record, record);
+      },
+    );
   }
 
   async restart(): Promise<void> {}
@@ -766,10 +763,7 @@ export class TransactionManager {
     this._connection = connection;
   }
 
-  /**
-   * @missingRailsName connection — PERMANENT
-   * @missingRailsName stack — PERMANENT
-   */
+  /** @missingRailsName connection — PERMANENT */
   async beginTransaction(
     options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
   ): Promise<Transaction> {
@@ -777,7 +771,7 @@ export class TransactionManager {
     return await this._connection.lock.synchronize(async () => {
       const runCommitCallbacks = !this.currentTransaction.joinable;
       let transaction: Transaction;
-      if (isEmpty(this._stack)) {
+      if (this._stack.length === 0) {
         transaction = new RealTransaction(this._connection, {
           isolation,
           joinable,

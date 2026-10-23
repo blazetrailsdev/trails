@@ -89,7 +89,7 @@ export class JoinAssociation extends JoinPart {
       }
 
       const arel = scope.arel(aliasTracker);
-      const nodes: Nodes.And["children"][number] = first(arel.constraints)!;
+      const nodes: Nodes.And["children"][number] = first(arel.constraints);
 
       let others: Nodes.And["children"] | undefined;
       if (nodes instanceof Nodes.And) {

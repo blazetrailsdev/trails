@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { AbstractController, ActionNotFound } from "./base.js";
+import { Base, ActionNotFound } from "./base.js";
 
 describe("ActionNotFound#corrections", () => {
   it("test_exceptions_have_suggestions_for_fix", () => {
-    class SimpleController extends AbstractController {
+    class SimpleController extends Base {
       hello(): void {}
       goodbye(): void {}
     }
@@ -21,7 +21,7 @@ describe("ActionNotFound#corrections", () => {
   });
 
   it("returns [] when no action method comes close", () => {
-    class C extends AbstractController {
+    class C extends Base {
       destroy(): void {}
     }
     const error = new ActionNotFound("missing", new C(), "wildlyDifferent");
@@ -30,7 +30,7 @@ describe("ActionNotFound#corrections", () => {
 });
 
 describe("AbstractController::Base, an action is named by its method", () => {
-  class StoriesController extends AbstractController {
+  class StoriesController extends Base {
     ran: string[] = [];
     nextBundle(): void {
       this.ran.push("nextBundle");

@@ -1,10 +1,23 @@
 import { Module, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { assigningSynchronously } from "@blazetrails/activemodel";
 import { camelize, classAttribute, kernelArray, singularize } from "@blazetrails/activesupport";
-import { Association, type AssociationInstanceHost } from "./association.js";
+import {
+  Association,
+  type AssociationInstanceHost,
+  type AssociationProxyLike,
+} from "./association.js";
 
 /** @noRailsEquivalent CONVERGEABLE retire-ids-name-helper-constructor-dispatch */
 export function idsName(name: string): string {
   return `${singularize(name)}Ids`;
+}
+
+interface SyncAssignmentHost {
+  association(name: string): AssociationProxyLike & {
+    syncWrite(value: unknown): void;
+    syncIdsWrite(value: unknown): void;
+  };
+  [assigningSynchronously]?: boolean;
 }
 
 const CALLBACKS = ["beforeAdd", "afterAdd", "beforeRemove", "afterRemove"] as const;
@@ -33,11 +46,12 @@ export class CollectionAssociation extends Association {
   static override defineExtensions(
     model: any,
     name: string,
-    block?: (mod: Module) => void,
-  ): Module | undefined {
+    block?: (mod: Record<string, unknown>) => void,
+  ): Record<string, unknown> | undefined {
     if (block) {
       const extensionModuleName = `${camelize(name)}AssociationExtension`;
-      const extension = new Module(block);
+      const extension: Record<string, unknown> = {};
+      block(extension);
       rbModConstSet(model, extensionModuleName, extension);
       return extension;
     }
@@ -89,15 +103,21 @@ export class CollectionAssociation extends Association {
     });
   }
 
+  /** @inventedArm if — CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace */
   static override defineWriters(mixin: Module, name: string): void {
-    mixin.defineMethod(`${name}=`, function (this: AssociationInstanceHost, value: unknown) {
-      return this.association(name).writer(value);
+    mixin.defineMethod(`${name}=`, function (this: SyncAssignmentHost, value: unknown) {
+      const association = this.association(name);
+      if (this[assigningSynchronously]) {
+        return association.syncWrite(value);
+      }
+      return association.writer(value);
     });
-    mixin.defineMethod(
-      `${idsName(name)}=`,
-      function (this: AssociationInstanceHost, value: unknown) {
-        return this.association(name).idsWriter(value);
-      },
-    );
+    mixin.defineMethod(`${idsName(name)}=`, function (this: SyncAssignmentHost, value: unknown) {
+      const association = this.association(name);
+      if (this[assigningSynchronously]) {
+        return association.syncIdsWrite(value);
+      }
+      return association.idsWriter(value);
+    });
   }
 }

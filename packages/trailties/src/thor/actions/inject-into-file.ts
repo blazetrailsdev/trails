@@ -4,7 +4,6 @@ import {
   getFs,
   hashDelete,
   last,
-  merge,
   rbEqual,
   rbFSend,
   rbStrSend,
@@ -52,7 +51,7 @@ export class InjectIntoFile extends EmptyDirectory {
     data: Data,
     config: Record<string, unknown>,
   ) {
-    super(base, destination, merge({ verbose: true }, config));
+    super(base, destination, { verbose: true, ...config });
 
     [this.behavior, this.flag] = (
       "after" in this.config

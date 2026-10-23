@@ -1,22 +1,24 @@
+import type { RackHeaders } from "./index.js";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { BodyProxy } from "./body-proxy.js";
 import { REQUEST_METHOD, ETAG, CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
 export class ConditionalGet {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const method = env[REQUEST_METHOD];
     if (method !== "GET" && method !== "HEAD") {
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<RackApp>;
     }
 
-    const response = await this.app(env);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
     const [status, headers, body] = response;
 
     if (status === 200 && this.fresh(env, headers)) {
@@ -31,10 +33,7 @@ export class ConditionalGet {
     return response;
   }
 
-  private fresh(
-    env: Record<string, any>,
-    headers: Record<string, string | string[]>,
-  ): boolean | undefined {
+  private fresh(env: Record<string, any>, headers: RackHeaders): boolean | undefined {
     const noneMatch = env["HTTP_IF_NONE_MATCH"];
     if (noneMatch) {
       return this.isEtagMatches(noneMatch, headers);
@@ -45,11 +44,11 @@ export class ConditionalGet {
     }
   }
 
-  private isEtagMatches(noneMatch: string, headers: Record<string, string | string[]>): boolean {
+  private isEtagMatches(noneMatch: string, headers: RackHeaders): boolean {
     return headers[ETAG] === noneMatch;
   }
 
-  private modifiedSince(modifiedSince: Time, headers: Record<string, string | string[]>): boolean {
+  private modifiedSince(modifiedSince: Time, headers: RackHeaders): boolean {
     const header = headers["last-modified"];
     const lastModified = this.toRfc2822(typeof header === "string" ? header : undefined);
     return lastModified != null && modifiedSince.compare(lastModified)! >= 0;

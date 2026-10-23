@@ -28,7 +28,7 @@ export class Reference extends Base {
 
   async makeComments() {
     if ((this.constructor as typeof Reference).makeComments) {
-      const person = await (this as any).person;
+      const person = await this.person;
       if (person) await person.update({ comments: "Reference destroyed" });
     }
   }
@@ -46,7 +46,7 @@ export class BadReference extends Base {
   static _tableName = "references";
 
   static {
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ favorite: false });
     });
   }

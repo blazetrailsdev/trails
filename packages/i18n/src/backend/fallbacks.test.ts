@@ -1,4 +1,4 @@
-import { Thread } from "@blazetrails/ruby-compat";
+import { Hash, Thread } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Fallbacks, fallbacks, setFallbacks } from "./fallbacks.js";
 import { Chain } from "./chain.js";
@@ -9,7 +9,6 @@ import { MissingTranslationData } from "../exceptions.js";
 import { Fallbacks as LocaleFallbacks } from "../locale/fallbacks.js";
 import { Date } from "@blazetrails/date";
 import { Time } from "@blazetrails/date";
-import type { TranslationData } from "../utils.js";
 
 class Backend extends Fallbacks(Simple) {}
 
@@ -26,7 +25,7 @@ function setup(): Backend {
 describe("I18nBackendFallbacksTranslateTest", () => {
   let backend: Backend;
 
-  function storeTranslations(locale: Locale, data: TranslationData): unknown {
+  function storeTranslations(locale: Locale, data: Record<string, unknown>): unknown {
     return backend.storeTranslations(locale, data);
   }
 
@@ -135,7 +134,7 @@ describe("I18nBackendFallbacksTranslateTest", () => {
     expect(
       t("missing_foo", {
         locale: "de-DE",
-        default: [":missing_bar", { other: "Default %{count} Bars" }, "Default Bar"],
+        default: [":missing_bar", new Hash().set(":other", "Default %{count} Bars"), "Default Bar"],
         count: 6,
       }),
     ).toBe("Default 6 Bars");
@@ -267,9 +266,7 @@ describe("I18nBackendFallbacksSymbolResolveRestartsLookupAtOriginalLocale", () =
         gregorian: {
           months: {
             format: {
-              abbreviated: {
-                1: "S-Ɔ",
-              },
+              abbreviated: new Hash().set(1, "S-Ɔ"),
             },
           },
         },
@@ -281,9 +278,7 @@ describe("I18nBackendFallbacksSymbolResolveRestartsLookupAtOriginalLocale", () =
           months: {
             format: {
               abbreviated: ":calendars.gregorian.months.format.wide",
-              wide: {
-                1: "M01",
-              },
+              wide: new Hash().set(1, "M01"),
             },
             "stand-alone": {
               abbreviated: ":calendars.gregorian.months.format.abbreviated",
@@ -295,9 +290,9 @@ describe("I18nBackendFallbacksSymbolResolveRestartsLookupAtOriginalLocale", () =
   });
 
   it("falls back to original locale when symbol resolved at fallback locale", () => {
-    expect(t("calendars.gregorian.months.stand-alone.abbreviated", { locale: "ak-GH" })).toEqual({
-      1: "S-Ɔ",
-    });
+    expect(t("calendars.gregorian.months.stand-alone.abbreviated", { locale: "ak-GH" })).toEqual(
+      new Hash().set(1, "S-Ɔ"),
+    );
   });
 });
 

@@ -18,6 +18,7 @@ import {
   rbInspect,
   rbObjAsString as toS,
   RuntimeError,
+  groupBy,
 } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import { Concurrent, rtest } from "@blazetrails/ruby-compat";
@@ -96,7 +97,6 @@ import {
   classAttribute,
   compactBlank,
   extractOptionsBang,
-  groupBy,
   include,
   isPresent,
   parameterize,
@@ -599,30 +599,30 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     const column = await this.columnFor(tableName, columnName);
     type ??= column.sqlType ?? "";
 
-    const opts: Record<string, unknown> = { ...options };
+    options = { ...options };
 
-    if (!Object.prototype.hasOwnProperty.call(opts, "default")) {
-      opts["default"] = column.defaultFunction ? () => column.defaultFunction : column.default;
+    if (!Object.hasOwn(options, "default")) {
+      options["default"] = column.defaultFunction ? () => column.defaultFunction : column.default;
     }
-    if (!Object.prototype.hasOwnProperty.call(opts, "null")) {
-      opts["null"] = column.null;
+    if (!Object.hasOwn(options, "null")) {
+      options["null"] = column.null;
     }
-    if (!Object.prototype.hasOwnProperty.call(opts, "comment")) {
-      opts["comment"] = column.comment ?? undefined;
+    if (!Object.hasOwn(options, "comment")) {
+      options["comment"] = column.comment ?? undefined;
     }
 
-    if (opts["collation"] === "no_collation") {
-      delete opts["collation"];
+    if (options["collation"] === "no_collation") {
+      delete options["collation"];
     } else if (this.isTextType(type)) {
-      opts["collation"] ??= column.collation ?? undefined;
+      options["collation"] ??= column.collation ?? undefined;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(opts, "autoIncrement")) {
-      opts["autoIncrement"] = (column as MysqlColumn).isAutoIncrement();
+    if (!Object.hasOwn(options, "autoIncrement")) {
+      options["autoIncrement"] = (column as MysqlColumn).isAutoIncrement();
     }
 
     const td = this.createTableDefinition(tableName);
-    const cd = td.newColumnDefinition(column.name, type as any, opts as any);
+    const cd = td.newColumnDefinition(column.name, type, options);
     return new ChangeColumnDefinition(cd, column.name);
   }
 
@@ -689,7 +689,10 @@ WHERE fk.referenced_column_name IS NOT NULL
       "SCHEMA",
     );
 
-    const groupedFk = [...groupBy(fkInfo.toArray(), (row) => row["name"]).values()];
+    const groupedFk: Record<string, unknown>[][] = groupBy(
+      fkInfo.toArray(),
+      (row) => row["name"],
+    ).values();
     for (const group of groupedFk) {
       group.sort((a, b) => (a["position"] as number) - (b["position"] as number));
     }
@@ -1385,7 +1388,7 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   /** @internal */
-  override returningColumnValues(result: Result): Promise<unknown[] | undefined> {
+  override returningColumnValues(result: Result): Promise<unknown[] | null> {
     return mysqlReturningColumnValues.call(this, result);
   }
 

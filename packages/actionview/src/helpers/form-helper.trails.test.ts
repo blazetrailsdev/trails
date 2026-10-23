@@ -11,6 +11,6 @@ describe("FormBuilder#submit", () => {
     const options = new Hash<string, unknown>();
     options.set("class", "extra");
     new FormBuilder("post", false, template, {}).submit(options);
-    expect(calls).toEqual([["Submit Post", options]]);
+    expect(calls).toEqual([["Save Post", options]]);
   });
 });

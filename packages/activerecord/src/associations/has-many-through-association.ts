@@ -11,15 +11,22 @@ import {
   include,
   NotImplementedError,
   rbEqual,
-  rbFPublicSend,
   rbFSend,
   rbDeclareIvar,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
-import { underscore, isBlank, wrap } from "@blazetrails/activesupport";
+import {
+  exceptBang,
+  underscore,
+  isBlank,
+  kernelArray as Array,
+  wrap,
+} from "@blazetrails/activesupport";
+import { eachWithObject, zip } from "@blazetrails/ruby-compat";
 import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
 import type { Association } from "./association.js";
+import type { HasOneAssociation } from "./has-one-association.js";
 
 export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
@@ -47,7 +54,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   declare throughReflection: () => unknown;
   /** @internal */
-  declare throughAssociation: () => unknown;
+  declare throughAssociation: () => Association;
   /** @internal */
   declare constructJoinAttributes: (...records: Base[]) => Record<string, unknown>;
   /** @internal */
@@ -68,9 +75,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   protected targetReflectionHasAssociatedRecord(): boolean {
-    const throughAssoc = (this.owner.constructor as typeof Base)._reflectOnAssociation(
+    const throughAssoc = this.owner.constructor._reflectOnAssociation(
       this.reflection.options.through!,
-    ) as unknown as AssociationDefinition | null;
+    ) as AssociationDefinition | null;
     if (!throughAssoc) return true;
     return targetReflectionHasAssociatedRecord(this.owner, throughAssoc);
   }
@@ -90,11 +97,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   protected distribution(array: Base[]): Distribution {
-    const distribution: Distribution = new Hash(0);
-    for (const record of array) {
+    return eachWithObject(array, new Hash(0) as Distribution, (record, distribution) => {
       distribution.set(record, distribution.get(record)! + 1);
-    }
-    return distribution;
+    });
   }
 
   /**
@@ -135,6 +140,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /**
    * @internal
    * @missingRailsName class — PERMANENT
+   * @inlinedFrom ActiveRecord::Associations::ThroughAssociation#build_record rails/v8.0.2/activerecord/lib/active_record/associations/through_association.rb:116-129
    */
   override buildRecord(
     attributes?: Record<string, unknown> | PermittedAttributes,
@@ -143,10 +149,24 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     this.ensureNotNested();
     this._throughScope = this.scope();
     try {
-      const record = super.buildRecord((attributes ??= {}), block)!;
+      attributes ??= {};
+      if (this.sourceReflection().isCollection()) {
+        const inverse = this.sourceReflection().inverseOf();
+        const target = this.throughAssociation().target;
+
+        if (inverse != null && target != null && !globalThis.Array.isArray(target)) {
+          zip(Array(target.id), Array(inverse.foreignKey())).map(
+            ([primaryKeyValue, foreignKeyColumn]) => {
+              (attributes as Record<string, unknown>)[foreignKeyColumn as string] = primaryKeyValue;
+            },
+          );
+        }
+      }
+
+      const record = super.buildRecord(attributes, block)!;
 
       const inverse = this.sourceReflection().isPolymorphic()
-        ? this.sourceReflection().polymorphicInverseOf(record.constructor as typeof Base)
+        ? this.sourceReflection().polymorphicInverseOf(record.constructor)
         : this.sourceReflection().inverseOf();
 
       if (inverse) {
@@ -155,11 +175,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
             this.buildThroughRecord(record),
           );
         } else if (inverse.isHasOne()) {
-          (
-            record.association(inverse.name) as unknown as {
-              syncWrite(record: Base | null): void;
-            }
-          ).syncWrite(this.buildThroughRecord(record));
+          void (record.association(inverse.name) as HasOneAssociation).writer(
+            this.buildThroughRecord(record),
+          );
         }
       }
 
@@ -197,7 +215,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   protected override async deleteRecords(records: Base[], method: string): Promise<number> {
     this.ensureNotNested();
 
-    let scope = (this.throughAssociation() as any).scope();
+    let scope = this.throughAssociation().scope();
     scope.whereBang(this.constructJoinAttributes(...records));
     scope = scope.where(this.throughScopeAttributes());
 
@@ -222,8 +240,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
 
     if (this.sourceReflection().options.counterCache && method !== "destroy") {
       const counter = this.sourceReflection().counterCacheColumn();
-      await (this.klass as any).decrementCounter(
-        counter,
+      await this.klass.decrementCounter(
+        counter!,
         records.map((record) => record.id),
       );
     }
@@ -278,25 +296,24 @@ function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base
 
 /** @internal */
 function throughScope(this: HasManyThroughAssociation): unknown {
-  return (this as any)._throughScope ?? null;
+  return this._throughScope ?? null;
 }
 
 /** @internal */
 function throughScopeAttributes(this: HasManyThroughAssociation): Record<string, unknown> {
   const throughName = this.reflection.options.through;
   if (!throughName) return {};
-  const throughAssoc = (this.owner as any).association?.(throughName);
+  const throughAssoc = this.owner.association(throughName);
   if (!throughAssoc) return {};
-  const scope: any = this.throughScope() ?? (this as any).scope?.() ?? throughAssoc.scope?.();
+  const scope: any = this.throughScope() ?? this.scope();
   if (!scope || typeof scope.whereValuesHash !== "function") return {};
-  const throughTable = throughAssoc.klass?.tableName ?? "";
+  const throughTable = throughAssoc.reflection.klass.tableName;
   const attrs = scope.whereValuesHash(throughTable) as Record<string, unknown>;
-  const throughFk = throughAssoc.reflection?.options?.foreignKey ?? "";
-  const inheritanceCol = throughAssoc.klass?.inheritanceColumn ?? "type";
-  for (const key of [String(throughFk), inheritanceCol]) {
-    if (key in attrs) delete attrs[key];
-  }
-  return attrs;
+  const exceptKeys = [
+    ...[throughAssoc.reflection.foreignKey()].flat(),
+    throughAssoc.reflection.klass.inheritanceColumn as string,
+  ];
+  return exceptBang(attrs, ...exceptKeys);
 }
 
 /** @internal */
@@ -309,7 +326,7 @@ async function saveThroughRecord(this: HasManyThroughAssociation, record: Base):
     const joinRecord = this.buildThroughRecord(record);
     if (!joinRecord) return true;
     if (!joinRecord.isChanged) return true;
-    await (joinRecord as any).saveBang();
+    await joinRecord.saveBang();
     return true;
   } finally {
     this._throughRecords.delete(record);
@@ -320,11 +337,11 @@ async function saveThroughRecord(this: HasManyThroughAssociation, record: Base):
 function isTargetReflectionHasAssociatedRecord(assoc: HasManyThroughAssociation): boolean {
   const throughRefl = assoc.reflection.options.through;
   if (!throughRefl) return false;
-  const throughAssoc = (assoc.owner as any).association?.(throughRefl);
+  const throughAssoc = assoc.owner.association(throughRefl);
   if (!throughAssoc) return false;
-  const fk = throughAssoc.reflection?.foreignKey();
+  const fk = throughAssoc.reflection.foreignKey();
   if (!fk) return true;
-  return !!(assoc.owner as any).readAttribute?.(fk as string);
+  return !!assoc.owner.readAttribute(fk as string);
 }
 
 /** @internal */
@@ -346,12 +363,12 @@ function updateThroughCounter(this: HasManyThroughAssociation, method: string): 
 /** @internal */
 async function throughRecordsFor(this: HasManyThroughAssociation, record: Base): Promise<Base[]> {
   const attributes = this.constructJoinAttributes(record);
-  const candidates = wrap((this.throughAssociation() as Association).target);
+  const candidates = wrap(this.throughAssociation().target);
   const found: Base[] = [];
   for (const c of candidates) {
     let all = true;
     for (const [key, value] of Object.entries(attributes)) {
-      if (!rbEqual(await rbFPublicSend(c, key), value)) {
+      if (!rbEqual(await rbFSend(c, key), value)) {
         all = false;
         break;
       }
@@ -366,7 +383,7 @@ async function deleteThroughRecords(
   this: HasManyThroughAssociation,
   records: Base[],
 ): Promise<void> {
-  const throughAssociation = this.throughAssociation() as Association;
+  const throughAssociation = this.throughAssociation();
   for (const record of records) {
     const throughRecords = await this.throughRecordsFor(record);
 
@@ -392,7 +409,7 @@ function targetReflectionHasAssociatedRecord(
 ): boolean {
   if (throughAssoc.macro !== "belongsTo") return true;
   const fk = throughAssoc.options.foreignKey ?? `${underscore(throughAssoc.name)}_id`;
-  const columns = Array.isArray(fk) ? fk : [fk];
+  const columns = globalThis.Array.isArray(fk) ? fk : [fk];
   return !columns.every((column) => isBlank(record._readAttribute(String(column))));
 }
 

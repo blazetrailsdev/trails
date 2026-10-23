@@ -8,6 +8,17 @@ describe("Gem::Version", () => {
     vi.restoreAllMocks();
   });
 
+  it("orders versions by their canonical segments", () => {
+    const v = (s: string) => new Gem.Version(s);
+    expect(v("3.1.14").compare(v("3"))).toBe(1);
+    expect(v("2.2.8").compare(v("3"))).toBe(-1);
+    expect(v("3.0.0").compare(v("3"))).toBe(0);
+    expect(v("3.0.a").compare(v("3"))).toBe(-1);
+    expect(v("1.2.b1").compare(v("1.2.a"))).toBe(1);
+    expect(v("1.10").compare("1.9")).toBe(1);
+    expect(v("1.0").compare(1)).toBeNull();
+  });
+
   it("renders the version it was given", () => {
     expect(new Gem.Version("8.0.2").version).toBe("8.0.2");
     expect(`${new Gem.Version(" 1.2 ")}`).toBe("1.2");

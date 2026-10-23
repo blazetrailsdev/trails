@@ -1,6 +1,20 @@
 import type { Time } from "@blazetrails/date";
 import { cattrAccessor, include, presence } from "@blazetrails/activesupport";
-import { File, IO, IOError, stringSplit } from "@blazetrails/ruby-compat";
+import {
+  hashAset,
+  File,
+  IO,
+  IOError,
+  basicObjRespondTo,
+  rbCheckArrayType,
+  rbObjAsString,
+  rbFSend,
+  rbObjRespondTo,
+  strNew,
+  stringSplit,
+  Struct,
+  toEnum,
+} from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
   Headers,
@@ -42,16 +56,18 @@ const CONTENT_TYPE = "Content-Type";
 const SET_COOKIE = "set-cookie";
 const NO_CONTENT_CODES = [100, 101, 102, 103, 204, 205, 304] as const;
 const CONTENT_TYPE_PARSER =
-  /^(?<mime_type>[^;\s]+\s*(?:;\s*(?!charset)[^;\s]+)*)?(?:;\s*charset="?(?<charset>[^;\s"]+)"?)?/;
+  /^(?<mime_type>[^;\s]+\s*(?:;\s*(?:(?!charset)[^;\s])+)*)?(?:;\s*charset=(?<quote>"?)(?<charset>[^;\s]+)\k<quote>)?/;
 
-interface ContentTypeHeader {
-  readonly mimeType: string | undefined;
-  readonly charset: string | undefined;
+/** @internal */
+export class ContentTypeHeader extends Struct.new("mimeType", "charset") {
+  declare mimeType: string | null;
+  declare charset: string | null;
 }
-const NULL_CONTENT_TYPE_HEADER: ContentTypeHeader = { mimeType: undefined, charset: undefined };
-const BODY_METHODS = ["toAry", "call", "toPath"] as const;
+const NULL_CONTENT_TYPE_HEADER = new ContentTypeHeader(null, null);
+type RubyArgs = unknown[] | [...unknown[], (...args: never[]) => unknown];
+const BODY_METHODS = { toAry: true, each: true, call: true, toPath: true } as const;
 
-export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>> {
+export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>> {
   /** @internal */
   protected _response: Response | null;
   /** @internal */
@@ -66,10 +82,19 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
     this._buf = buf;
   }
 
+  toAry(): unknown {
+    return rbObjRespondTo(this._buf, "toAry")
+      ? rbCheckArrayType(this._buf)
+      : (this._buf as unknown as { each(): unknown }).each();
+  }
+
   get body(): string {
     if (this._strBody !== null) return this._strBody;
     let buf = "";
-    for (const chunk of this.each()) buf += String(chunk);
+    for (const chunk of this.each() as Iterable<unknown>) {
+      const str = rbObjAsString(chunk) as string | Uint8Array;
+      buf += str instanceof Uint8Array ? strNew(Array.from(str)) : str;
+    }
     this._strBody = buf;
     return this._strBody;
   }
@@ -91,16 +116,17 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
     this._buf.push(string);
   }
 
-  *each(): IterableIterator<unknown> {
+  each(block?: (chunk: unknown) => unknown): unknown {
     if (this._strBody !== null) {
-      yield this._strBody;
+      if (!block) return toEnum(this, "each");
+
+      return block(this._strBody);
     } else {
-      const chunks: unknown[] = [];
-      this.eachChunk((chunk) => void chunks.push(chunk));
-      yield* chunks;
+      return this.eachChunk(block);
     }
   }
 
+  /** @noRailsEquivalent PERMANENT */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<unknown> {
     if (this._strBody !== null) {
       yield this._strBody;
@@ -147,43 +173,76 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
   }
 
   /** @internal */
-  protected eachChunk(block: (chunk: unknown) => void | Promise<void>): void | Promise<void> {
-    (this._buf as unknown as Array<unknown>).forEach(block);
+  protected eachChunk(block?: (chunk: unknown) => unknown): unknown {
+    return rbFSend(this._buf, "each", block);
   }
 }
 
 export class RackBody {
-  private response: Response;
+  /** @internal */
+  private _response: Response;
 
   constructor(response: Response) {
-    this.response = response;
-    const stream = this.response.stream as Record<string, unknown> | null;
-    for (const method of BODY_METHODS) {
-      if (stream && typeof stream[method] === "function") {
-        (this as unknown as Record<string, unknown>)[method] = (...args: unknown[]): unknown =>
-          (stream[method] as (...a: unknown[]) => unknown)(...args);
+    this._response = response;
+    for (const method of Object.keys(BODY_METHODS)) {
+      if (!this.isRespondTo(method)) {
+        Object.defineProperty(this, method, { value: undefined, configurable: true });
       }
     }
   }
 
   close(): void {
-    this.response.abort();
+    this._response.abort();
   }
 
   get body(): string {
-    return this.response.body;
+    return this._response.body;
   }
 
-  *each(): IterableIterator<unknown> {
-    yield* this.response.each();
+  isRespondTo(method: string, includePrivate = false): boolean {
+    if (Object.hasOwn(BODY_METHODS, method)) {
+      return rbObjRespondTo(this._response.stream, method);
+    } else {
+      return basicObjRespondTo(this, method);
+    }
   }
 
-  [Symbol.iterator](): IterableIterator<unknown> {
-    return this.each();
+  toAry(): unknown {
+    return (this._response.stream as unknown as { toAry(): unknown }).toAry();
   }
 
+  each(...args: RubyArgs): unknown {
+    return this._response.each(...(args as [((chunk: unknown) => unknown)?]));
+  }
+
+  call(...arguments_: RubyArgs): unknown {
+    return (this._response.stream as unknown as { call(...a: RubyArgs): unknown }).call(
+      ...arguments_,
+    );
+  }
+
+  toPath(): string {
+    return (this._response.stream as { toPath(): string }).toPath();
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  [Symbol.iterator](): Iterator<unknown> {
+    const chunks: unknown[] = [];
+    this.each((chunk: unknown) => chunks.push(chunk));
+    return chunks[Symbol.iterator]();
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<string | Uint8Array> {
-    for await (const chunk of this.response) yield chunk as string | Uint8Array;
+    const stream = this._response.stream as Partial<AsyncIterable<unknown>>;
+    this._response.sendingBang();
+    if (typeof stream[Symbol.asyncIterator] === "function") {
+      for await (const chunk of stream as AsyncIterable<unknown>)
+        yield chunk as string | Uint8Array;
+    } else {
+      for (const chunk of this._response.bodyParts()) yield chunk as string | Uint8Array;
+    }
+    this._response.sentBang();
   }
 }
 
@@ -198,23 +257,23 @@ export class FileBody {
     return this._toPath;
   }
 
-  get body(): string {
+  get body(): Uint8Array {
     return IO.binread(this.toPath());
   }
 
-  *each(): IterableIterator<string> {
-    const file = File.open(this.toPath(), "rb");
-    try {
-      let chunk: string | null;
-      while ((chunk = file.read(16384)) !== null) yield chunk;
-    } finally {
-      file.close();
-    }
+  each(block: (chunk: Uint8Array) => unknown): void {
+    File.open(this.toPath(), "rb", (file) => {
+      let chunk: Uint8Array | null;
+      while ((chunk = file.read(16384)) !== null) block(chunk);
+    });
   }
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
+  static Headers = Headers;
+  static Header = Headers;
+
   declare static defaultCharset: string | null;
   declare defaultCharset: string | null;
   declare static defaultHeaders: Record<string, string> | undefined;
@@ -225,23 +284,30 @@ export class Response {
     cattrAccessor.call(this, "defaultHeaders");
   }
 
-  private _status: number;
+  private _status!: number;
   private _headers: Headers;
   private _committed = false;
   private cv: Array<() => void> = [];
   private _sending = false;
   private _sent = false;
-  stream: ResponseBuffer<{ push(obj: unknown): unknown }> | FileBody | { toPath(): string };
+  stream: Buffer<{ push(obj: unknown): unknown }> | FileBody | { toPath(): string };
   request: Request | null = null;
 
-  constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
-    this._status = status;
+  constructor(
+    status: number | string = 200,
+    headers: Record<string, string> = {},
+    body: string[] = [],
+    block?: (response: Response) => void,
+  ) {
     this._headers = new Headers();
     for (const [key, value] of Object.entries(headers)) {
       this._headers.set(key, value);
     }
     this.stream = this.buildBuffer(this, this.mungeBodyObject([...body]));
+    this.status = status;
     this.prepareCacheControlBang();
+
+    if (block) block(this);
   }
 
   get status(): number {
@@ -253,9 +319,6 @@ export class Response {
 
   get code(): string {
     return String(this._status);
-  }
-  get statusCode(): number {
-    return this._status;
   }
 
   get message(): string {
@@ -286,12 +349,12 @@ export class Response {
     return this._headers.get(key);
   }
 
-  setHeader(key: string, v: string): void {
-    this._headers.set(key, v);
+  setHeader(key: string, v: string | null): string | null {
+    return hashAset(this._headers, key, v);
   }
 
-  deleteHeader(key: string): void {
-    this._headers.delete(key);
+  deleteHeader(key: string): string | undefined {
+    return this._headers.delete(key);
   }
 
   get contentType(): string | null | undefined {
@@ -332,13 +395,12 @@ export class Response {
     return (this.stream as { body: string }).body;
   }
 
-  set body(value: string | Buffer | { toPath(): string }) {
+  set body(value: string | Uint8Array | { toPath(): string }) {
     if (typeof (value as { toPath?: unknown }).toPath === "function") {
       this.stream = value as { toPath(): string };
       return;
     }
     this.stream = this.buildBuffer(this, this.mungeBodyObject(value));
-    this.setHeader("content-length", String(Buffer.byteLength(value as string | Buffer, "utf-8")));
   }
 
   get contentLength(): number | undefined {
@@ -347,8 +409,8 @@ export class Response {
     return parseInt(cl, 10);
   }
 
-  write(data: string): void {
-    (this.stream as { write(string: string): void }).write(data);
+  write(string: string): void {
+    (this.stream as { write(string: string): void }).write(string);
   }
 
   close(): void {
@@ -388,15 +450,15 @@ export class Response {
     this.setHeader(SET_COOKIE, Array.isArray(header) ? header.join("\n") : header);
   }
 
-  get cookies(): Record<string, string | undefined> {
-    const cookies: Record<string, string | undefined> = {};
+  get cookies(): Record<string, string | null> {
+    const cookies: Record<string, string | null> = {};
     let header: string | string[] | undefined = this.getHeader(SET_COOKIE);
     if (header != null) {
       if (typeof header === "string") header = stringSplit(header, "\n");
       for (const cookie of header) {
         const pair = stringSplit(cookie, ";")[0];
         if (pair != null) {
-          const [key, value] = stringSplit(pair, "=").map((v) => unescape(v));
+          const [key, value = null] = stringSplit(pair, "=").map((v) => unescape(v));
           cookies[key] = value;
         }
       }
@@ -443,15 +505,19 @@ export class Response {
   /** @internal */
   declare parameterFilteredLocation: () => string;
 
-  toRack(): [number, Record<string, string>, unknown] {
+  /** @missingRailsName status — PERMANENT */
+  toA(): [number, Record<string, string>, unknown] {
     this.commitBang();
-    return this.rackResponse(this._status, this._headers.toHash());
+    return this.rackResponse(this._status, this._headers.toH() as Record<string, string>);
+  }
+
+  prepareBang(): [number, Record<string, string>, unknown] {
+    return this.toA();
   }
 
   bodyParts(): unknown[] {
-    const stream = this.stream as { each(): IterableIterator<unknown> };
     const parts: unknown[] = [];
-    for (const chunk of stream.each()) parts.push(chunk);
+    (this.stream as { each(block: (x: unknown) => unknown): unknown }).each((x) => parts.push(x));
     return parts;
   }
 
@@ -464,24 +530,11 @@ export class Response {
     this.stream = this.buildBuffer(this, []);
   }
 
-  *each(): IterableIterator<unknown> {
-    const stream = this.stream as { each(): IterableIterator<unknown> };
+  each(block?: (chunk: unknown) => unknown): unknown {
     this.sendingBang();
-    for (const chunk of stream.each()) yield chunk;
+    const x = (this.stream as { each(block?: (chunk: unknown) => unknown): unknown }).each(block);
     this.sentBang();
-  }
-
-  async *[Symbol.asyncIterator](): AsyncIterableIterator<unknown> {
-    const stream = this.stream as Partial<AsyncIterable<unknown>> & {
-      each(): IterableIterator<unknown>;
-    };
-    this.sendingBang();
-    if (typeof stream[Symbol.asyncIterator] === "function") {
-      for await (const chunk of stream as AsyncIterable<unknown>) yield chunk;
-    } else {
-      for (const chunk of stream.each()) yield chunk;
-    }
-    this.sentBang();
+    return x;
   }
 
   abort(): void {
@@ -544,19 +597,21 @@ export class Response {
   get redirectUrl(): string | undefined {
     return this.location;
   }
-  get mediaType(): string | undefined {
+  get mediaType(): string | null {
     return this.parsedContentTypeHeader().mimeType;
   }
 
   /** @internal */
   parseContentType(contentType: string | undefined): ContentTypeHeader {
-    if (!contentType) return NULL_CONTENT_TYPE_HEADER;
-    const match = CONTENT_TYPE_PARSER.exec(contentType);
-    if (!match) return NULL_CONTENT_TYPE_HEADER;
-    return {
-      mimeType: match.groups?.["mime_type"]?.trim() || undefined,
-      charset: match.groups?.["charset"] || undefined,
-    };
+    let match: RegExpExecArray | null;
+    if (contentType && (match = CONTENT_TYPE_PARSER.exec(contentType))) {
+      return new ContentTypeHeader(
+        match.groups!["mime_type"] ?? null,
+        match.groups!["charset"] ?? null,
+      );
+    } else {
+      return NULL_CONTENT_TYPE_HEADER;
+    }
   }
 
   /** @internal */
@@ -565,10 +620,10 @@ export class Response {
   }
 
   /** @internal */
-  setContentType(contentType: string | undefined, charset: string | null | undefined): void {
-    const type = contentType ?? "";
-    const value = charset ? `${type}; charset=${String(charset).toLowerCase()}` : type;
-    this.setHeader(CONTENT_TYPE, value);
+  setContentType(contentType: string | null | undefined, charset: string | null | undefined): void {
+    let type = contentType ?? "";
+    if (charset) type = `${type}; charset=${String(charset).toLowerCase()}`;
+    this.setHeader(CONTENT_TYPE, type);
   }
 
   /** @internal */
@@ -588,8 +643,8 @@ export class Response {
   }
 
   /** @internal */
-  buildBuffer(response: unknown, body: unknown[]): ResponseBuffer<{ push(obj: unknown): unknown }> {
-    return new ResponseBuffer(response as Response, body);
+  buildBuffer(response: unknown, body: unknown[]): Buffer<{ push(obj: unknown): unknown }> {
+    return new Buffer(response as Response, body);
   }
 
   /** @internal */
@@ -654,10 +709,6 @@ export class Response {
     return { ...defaults, ...original };
   }
 
-  inspect(): string {
-    return `#<ActionDispatch::Response ${this._status} ${this.message}>`;
-  }
-
   static create<T extends typeof Response>(
     this: T,
     status = 200,
@@ -665,9 +716,9 @@ export class Response {
     body: string | string[] = [],
     { defaultHeaders }: { defaultHeaders?: Record<string, string> } = {},
   ): InstanceType<T> {
-    const merged = this.mergeDefaultHeaders(headers, defaultHeaders ?? this.defaultHeaders);
-    const parts = Array.isArray(body) ? body : [body];
-    return new this(status, merged, parts) as InstanceType<T>;
+    headers = this.mergeDefaultHeaders(headers, defaultHeaders ?? this.defaultHeaders);
+    body = Array.isArray(body) ? body : [body];
+    return new this(status, headers, body) as InstanceType<T>;
   }
 }
 

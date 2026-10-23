@@ -1,9 +1,10 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   deleteAt,
   except,
   flatten,
   last,
-  merge,
   rbFArray,
   rbObjDup,
   rbObjRespondTo,
@@ -209,14 +210,14 @@ export function wrapParameters(
   if (isPlainObject(nameOrModelOrOptions)) {
     options = nameOrModelOrOptions as Record<string, unknown>;
   } else if (nameOrModelOrOptions === false) {
-    options = merge(options, { format: [] });
+    options = { ...options, format: [] };
   } else if (typeof nameOrModelOrOptions === "string") {
-    options = merge(options, { name: nameOrModelOrOptions });
+    options = { ...options, name: nameOrModelOrOptions };
   } else {
     model = nameOrModelOrOptions;
   }
 
-  const opts = Options.fromHash(merge(slice(this._wrapperOptions.toH(), "format"), options));
+  const opts = Options.fromHash({ ...slice(this._wrapperOptions.toH(), "format"), ...options });
   opts.model = model;
   opts.klass = this;
 
@@ -248,10 +249,7 @@ export function deferInherited(this: WrapperHostClass): void {
   Object.defineProperty(this, "_wrapperOptions", {
     ...wrapperOptions,
     get(this: WrapperHostClass) {
-      if (
-        !Object.prototype.hasOwnProperty.call(this, "_wrapperOptions") &&
-        !Object.prototype.hasOwnProperty.call(this, INHERITED)
-      ) {
+      if (!Object.hasOwn(this, "_wrapperOptions") && !Object.hasOwn(this, INHERITED)) {
         Object.defineProperty(this, INHERITED, { value: true });
         inheritedParamsWrapper.call(this);
       }
@@ -352,3 +350,5 @@ export const ParamsWrapper = new Module((mod) => {
   mod.defineMethod("_performParameterWrapping", _performParameterWrapping);
 }) as Module & { ClassMethods: typeof ClassMethods };
 ParamsWrapper.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "ParamsWrapper", ParamsWrapper);

@@ -1,10 +1,4 @@
-import {
-  Hash,
-  kernelThrow,
-  rbModConstSet,
-  Module,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { Hash, kernelThrow, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Account } from "./account.js";
@@ -65,7 +59,7 @@ export class Company extends AbstractCompany {
     this.hasOne("dummyAccount", { foreignKey: "firm_id", className: "Account" });
     this.hasMany("contracts");
     this.hasMany("developers", { through: "contracts" });
-    this.hasMany("specialContracts", function (this: any) {
+    this.hasMany("specialContracts", function () {
       return this.includes(":specialDeveloper").where().not({ "developers.id": null });
     });
     this.hasMany("specialDevelopers", { through: "specialContracts" });
@@ -74,7 +68,7 @@ export class Company extends AbstractCompany {
     this.aliasAttribute("new_name", "name");
     this.attribute("metadata", "json");
 
-    this.scope("ofFirstFirm", function (this: any) {
+    this.scope("ofFirstFirm", function () {
       return this.joins({ ":account": ":firm" }).where({ "companies.id": 1 });
     });
   }
@@ -99,7 +93,7 @@ export interface Company {
 export class SpecialCo extends Company {}
 registerModel(SpecialCo);
 
-export const Namespaced = new Module();
+export const Namespaced = {};
 registerConstant("Namespaced", Namespaced);
 
 export class NamespacedCompany extends Company {
@@ -159,7 +153,7 @@ export class Firm extends Company {
 
     this.hasMany(
       "clients",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       {
@@ -172,14 +166,14 @@ export class Firm extends Company {
     this.hasMany("unsortedClientsWithSymbol", { className: "Client" });
     this.hasMany(
       "clientsSortedDesc",
-      function (this: any) {
+      function () {
         return this.order("id DESC");
       },
       { className: "Client" },
     );
     this.hasMany(
       "clientsOfFirm",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       {
@@ -189,7 +183,7 @@ export class Firm extends Company {
     );
     this.hasMany(
       "clientsOrderedByName",
-      function (this: any) {
+      function () {
         return this.order("name");
       },
       { className: "Client" },
@@ -201,7 +195,7 @@ export class Firm extends Company {
     });
     this.hasMany(
       "dependentClientsOfFirm",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       {
@@ -212,7 +206,7 @@ export class Firm extends Company {
     );
     this.hasMany(
       "exclusivelyDependentClientsOfFirm",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       {
@@ -223,21 +217,21 @@ export class Firm extends Company {
     );
     this.hasMany(
       "limitedClients",
-      function (this: any) {
+      function () {
         return this.limit(1);
       },
       { className: "Client" },
     );
     this.hasMany(
       "clientsWithInterpolatedConditions",
-      function (this: any, firm: any) {
+      function (firm: any) {
         return this.where(`rating > ${firm.rating}`);
       },
       { className: "Client" },
     );
     this.hasMany(
       "clientsLikeMs",
-      function (this: any) {
+      function () {
         return this.where("name = 'Microsoft'").order("id");
       },
       {
@@ -246,7 +240,7 @@ export class Firm extends Company {
     );
     this.hasMany(
       "clientsLikeMsWithHashConditions",
-      function (this: any) {
+      function () {
         return this.where({ name: "Microsoft" }).order("id");
       },
       { className: "Client" },
@@ -265,7 +259,7 @@ export class Firm extends Company {
     });
     this.hasMany(
       "clientsGroupedByFirmId",
-      function (this: any) {
+      function () {
         return this.group("firm_id").select("firm_id");
       },
       {
@@ -274,7 +268,7 @@ export class Firm extends Company {
     );
     this.hasMany(
       "clientsGroupedByName",
-      function (this: any) {
+      function () {
         return this.group("name").select("name");
       },
       {
@@ -290,7 +284,7 @@ export class Firm extends Company {
     });
     this.hasOne(
       "accountWithSelect",
-      function (this: any) {
+      function () {
         return this.select("id, firm_id");
       },
       {
@@ -300,7 +294,7 @@ export class Firm extends Company {
     );
     this.hasOne(
       "readonlyAccount",
-      function (this: any) {
+      function () {
         return this.readonly();
       },
       {
@@ -310,7 +304,7 @@ export class Firm extends Company {
     );
     this.hasOne(
       "accountUsingPrimaryKey",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       {
@@ -337,7 +331,7 @@ export class Firm extends Company {
 
     this.hasOne(
       "accountLimit500WithHashConditions",
-      function (this: any) {
+      function () {
         return this.where({ credit_limit: 500 });
       },
       {
@@ -360,7 +354,7 @@ export class Firm extends Company {
 
     this.hasMany(
       "associationWithReferences",
-      function (this: any) {
+      function () {
         return this.references(":foo");
       },
       {
@@ -370,7 +364,7 @@ export class Firm extends Company {
 
     this.hasMany(
       "developersWithSelect",
-      function (this: any) {
+      function () {
         return this.select("id, name, first_name");
       },
       {
@@ -430,7 +424,7 @@ export class DependentFirm extends Company {
   static {
     this.hasOne(
       "account",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       {
@@ -458,7 +452,7 @@ export class RestrictedWithExceptionFirm extends Company {
   static {
     this.hasOne(
       "account",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       {
@@ -468,7 +462,7 @@ export class RestrictedWithExceptionFirm extends Company {
     );
     this.hasMany(
       "companies",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       {
@@ -492,7 +486,7 @@ export class RestrictedWithErrorFirm extends Company {
   static {
     this.hasOne(
       "account",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       {
@@ -502,7 +496,7 @@ export class RestrictedWithErrorFirm extends Company {
     );
     this.hasMany(
       "companies",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       {
@@ -551,7 +545,7 @@ export class Client extends Company {
     this.belongsTo("firmWithBasicId", { className: "Firm", foreignKey: "firm_id" });
     this.belongsTo(
       "firmWithSelect",
-      function (this: any) {
+      function () {
         return this.select("id");
       },
       {
@@ -562,7 +556,7 @@ export class Client extends Company {
     this.belongsTo("firmWithOtherName", { className: "Firm", foreignKey: "client_of" });
     this.belongsTo(
       "firmWithCondition",
-      function (this: any) {
+      function () {
         return this.where("1 = ?", 1);
       },
       {
@@ -582,7 +576,7 @@ export class Client extends Company {
     });
     this.belongsTo(
       "readonlyFirm",
-      function (this: any) {
+      function () {
         return this.readonly();
       },
       {
@@ -592,7 +586,7 @@ export class Client extends Company {
     );
     this.belongsTo(
       "bobFirm",
-      function (this: any) {
+      function () {
         return this.where({ name: "Bob" });
       },
       {
@@ -627,7 +621,7 @@ export class Client extends Company {
       if (this.raiseOnDestroy) throw new Client.RaisedOnDestroy();
     });
     this.beforeDestroy(async function (this: Client) {
-      const firm = await (this as any).firm;
+      const firm = await this.firm;
       if (firm) {
         Client.destroyedClientIds.get(firm.id as number)!.push(this.id as number);
       }
@@ -641,7 +635,7 @@ export class Client extends Company {
   static RaisedOnDestroy = class extends Error {};
 
   isRating(): boolean {
-    return (this as any).queryAttribute("rating");
+    return this.queryAttribute("rating");
   }
 
   overwriteToRaise(): void {}
@@ -681,21 +675,21 @@ export class ExclusivelyDependentFirm extends Company {
     this.hasOne("account", { foreignKey: "firm_id", dependent: "delete" });
     this.hasMany(
       "dependentSanitizedConditionalClientsOfFirm",
-      function (this: any) {
+      function () {
         return this.order("id").where("name = 'BigShot Inc.'");
       },
       { foreignKey: "client_of", className: "Client", dependent: "deleteAll" },
     );
     this.hasMany(
       "dependentHashConditionalClientsOfFirm",
-      function (this: any) {
+      function () {
         return this.order("id").where({ name: "BigShot Inc." });
       },
       { foreignKey: "client_of", className: "Client", dependent: "deleteAll" },
     );
     this.hasMany(
       "dependentConditionalClientsOfFirm",
-      function (this: any) {
+      function () {
         return this.order("id").where("name = ?", "BigShot Inc.");
       },
       { foreignKey: "client_of", className: "Client", dependent: "deleteAll" },
@@ -720,7 +714,7 @@ export class LargeClient extends Client {
   }
 
   setExtraSize(): void {
-    (this as any)["extraSize"] = 50;
+    this["extraSize"] = 50;
   }
 }
 registerModel(LargeClient);

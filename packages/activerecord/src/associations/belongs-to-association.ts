@@ -2,7 +2,7 @@ import {
   fetch,
   rbEqual,
   rbFCaller,
-  rbFPublicSend,
+  rbFSend,
   rbObjAsString,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
@@ -28,14 +28,14 @@ export class BelongsToAssociation extends SingularAssociation {
         const foreignKey = this.reflection.foreignKey();
         if (Array.isArray(foreignKey)) {
           primaryKeyColumn = this.reflection.activeRecordPrimaryKey;
-          id = foreignKey.map((col) => rbFPublicSend(this.owner, col));
+          id = foreignKey.map((col) => rbFSend(this.owner, col));
         } else {
           primaryKeyColumn = this.reflection.activeRecordPrimaryKey;
-          id = rbFPublicSend(this.owner, foreignKey);
+          id = rbFSend(this.owner, foreignKey);
         }
 
         const associationClass = this.reflection.isPolymorphic()
-          ? rbFPublicSend(this.owner, this.reflection.foreignType!)
+          ? rbFSend(this.owner, this.reflection.foreignType!)
           : this.reflection.klass;
 
         this.enqueueDestroyAssociation({
@@ -53,7 +53,7 @@ export class BelongsToAssociation extends SingularAssociation {
         break;
       }
       default:
-        await rbFPublicSend(this.target, this.options.dependent);
+        await rbFSend(this.target, this.options.dependent);
     }
   }
 
@@ -89,9 +89,7 @@ export class BelongsToAssociation extends SingularAssociation {
     if (this.reflection.isPolymorphic()) {
       const modelTypeWas = this.owner.attributeBeforeLastSave(this.reflection.foreignType!);
       if (modelTypeWas != null) {
-        modelWas = (this.owner.constructor as typeof Base).polymorphicClassFor(
-          modelTypeWas as string,
-        );
+        modelWas = this.owner.constructor.polymorphicClassFor(modelTypeWas as string);
       }
     } else {
       modelWas = this.klass;
@@ -110,7 +108,7 @@ export class BelongsToAssociation extends SingularAssociation {
     const scope = klass.unscoped().whereBang(new Map([[this.primaryKey(klass), foreignKey]]));
     await scope.updateCounters({
       [this.reflection.counterCacheColumn()!]: by,
-      touch: (this.reflection.options as any).touch,
+      touch: this.reflection.options.touch,
     });
   }
 
@@ -180,9 +178,7 @@ export class BelongsToAssociation extends SingularAssociation {
     const reflectionFk = this.reflection.foreignKey();
     if (Array.isArray(reflectionFk)) {
       const targetKeyValues = record
-        ? kernelArray(this.primaryKey(record.constructor as typeof Base)).map((key) =>
-            record._readAttribute(key),
-          )
+        ? kernelArray(this.primaryKey(record.constructor)).map((key) => record._readAttribute(key))
         : [];
 
       if (
@@ -198,7 +194,7 @@ export class BelongsToAssociation extends SingularAssociation {
       }
     } else {
       const targetKeyValue = record
-        ? record._readAttribute(this.primaryKey(record.constructor as typeof Base) as string)
+        ? record._readAttribute(this.primaryKey(record.constructor) as string)
         : null;
 
       if (force || !rbEqual(this.owner._readAttribute(reflectionFk), targetKeyValue)) {

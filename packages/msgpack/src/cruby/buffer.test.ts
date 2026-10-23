@@ -445,10 +445,10 @@ describe("MessagePack::Buffer", () => {
 
   it("write_to", () => {
     for (const k of caseKeys()) {
-      const sio = new StringIO();
+      const sio = new StringIO(new Uint8Array(0));
       expect(cases()[k].writeTo(sio)).toBe(examples()[k].length);
       expect(cases()[k].size()).toBe(0);
-      expect(same(bin(sio.string()), examples()[k])).toBe(true);
+      expect(same(sio.string(), examples()[k])).toBe(true);
     }
   });
 

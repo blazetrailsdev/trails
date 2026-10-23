@@ -1,4 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { forceEncoding, registerConstant } from "@blazetrails/ruby-compat";
+import { htmlSafe } from "@blazetrails/activesupport";
 import {
   assert,
   Assertion,
@@ -33,7 +34,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { Engine } from "@blazetrails/trailties/engine";
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { describe, it, afterEach, beforeEach, vi } from "vitest";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
@@ -67,7 +68,7 @@ class TestController extends Base {
   }
 
   async setFlashNow() {
-    this.flash.now("test_now", `>${this.flash.get("test_now") ?? ""}<`);
+    this.flash.now.set("test_now", `>${this.flash.get("test_now") ?? ""}<`);
     await this.render({ plain: "ignore me" });
   }
 
@@ -84,11 +85,12 @@ class TestController extends Base {
 
   async renderRawPost() {
     if (isBlank(this.request.rawPost)) throw new Assertion("#raw_post is blank");
-    await this.render({ plain: this.request.rawPost });
+    await this.render({ plain: forceEncoding(this.request.rawPost, "UTF-8") as string });
   }
 
   async renderBody() {
-    await this.render({ plain: this.request.body });
+    this.request.body.rewind();
+    await this.render({ plain: this.request.body.read() });
   }
 
   async testParams() {
@@ -152,6 +154,25 @@ class TestController extends Base {
   async deleteCookie() {
     this.cookies().delete("foo");
     await this.render({ plain: "ok" });
+  }
+
+  async testXmlOutput() {
+    this.response.contentType = this.params.get("response_as") as string;
+    await this.render({
+      plain: `<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <area><p>area is an empty tag in HTML, so it won't contain this content</p></area>
+</root>
+`,
+    });
+  }
+
+  async testWithoutBody() {
+    await this.render({ html: htmlSafe('<div class="foo"></div>') });
+  }
+
+  async testWithBody() {
+    await this.render({ html: htmlSafe('<body class="foo"></body>') });
   }
 
   async renderJson() {
@@ -240,10 +261,6 @@ describe("TestCaseTest", () => {
   const FILES_DIR = `${FIXTURE_LOAD_PATH}/multipart`;
   const controllerInfo = { controller: "test_case_test/test", action: "testParams" };
   let tc: TestCaseTest;
-  const assertGenerates = (...args: Parameters<TestCaseTest["assertGenerates"]>) =>
-    tc.assertGenerates(...args);
-  const assertRouting = (...args: Parameters<TestCaseTest["assertRouting"]>) =>
-    tc.assertRouting(...args);
 
   beforeEach(async ({ task }) => {
     tc = new TestCaseTest(task.name);
@@ -251,11 +268,18 @@ describe("TestCaseTest", () => {
     tc.setup();
   });
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
-  it.skip("assert select without body", () => {});
+  it("assert select without body", async () => {
+    await tc.get("testWithoutBody");
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
-  it.skip("assert select with body", () => {});
+    tc.assertSelect("body", 0);
+    tc.assertSelect("div.foo");
+  });
+
+  it("assert select with body", async () => {
+    await tc.get("testWithBody");
+
+    tc.assertSelect("body.foo");
+  });
 
   it("url options reset", async () => {
     tc.controller = new DefaultUrlOptionsCachingController();
@@ -305,7 +329,7 @@ describe("TestCaseTest", () => {
     assertEqual(toQuery(params), tc.response.body);
   });
 
-  // BLOCKED: request-body-is-a-string-not-an-io
+  // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the body read is a JS string, so its encoding reads UTF-8 where Ruby's is BINARY.
   it.skip("body stream is binary", () => {});
 
   it("document body and params with post", async () => {
@@ -352,8 +376,26 @@ describe("TestCaseTest", () => {
 
   it("process with session", async () => {
     await tc.process("setSession");
-    expect(tc.session().get("string")).toBe("A wonder");
-    expect(tc.session().get("symbol")).toBe("it works");
+    assertEqual(
+      "A wonder",
+      tc.session().get("string"),
+      "A value stored in the session should be available by string key",
+    );
+    assertEqual(
+      "A wonder",
+      tc.session().get("string"),
+      "Test session hash should allow indifferent access",
+    );
+    assertEqual(
+      "it works",
+      tc.session().get("symbol"),
+      "Test session hash should allow indifferent access",
+    );
+    assertEqual(
+      "it works",
+      tc.session().get("symbol"),
+      "Test session hash should allow indifferent access",
+    );
   });
 
   it("process with session kwarg", async () => {
@@ -443,36 +485,48 @@ describe("TestCaseTest", () => {
     assertEqual("OK", tc.response.body);
   });
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
-  it.skip("should impose childless html tags in html", () => {});
+  it("should impose childless html tags in html", async () => {
+    await tc.process("testXmlOutput", { params: { response_as: "text/html" } });
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
-  it.skip("should not impose childless html tags in xml", () => {});
+    const JRUBY_VERSION: string | null = null;
+    // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors test_case_test.rb:435
+    if (JRUBY_VERSION != null) {
+      tc.assertSelect("root > map > area + p");
+    } else {
+      tc.assertSelect("root > area + p");
+    }
+  });
+
+  it("should not impose childless html tags in xml", async () => {
+    await tc.process("testXmlOutput", { params: { response_as: "application/xml" } });
+
+    tc.assertSelect("root > area > p");
+  });
 
   it("assert generates", () => {
-    assertGenerates("controller/action/5", {
+    tc.assertGenerates("controller/action/5", {
       controller: "controller",
       action: "action",
       id: "5",
     });
-    assertGenerates(
+    tc.assertGenerates(
       "controller/action/7",
       { id: "7" },
       { controller: "controller", action: "action" },
     );
-    assertGenerates(
+    tc.assertGenerates(
       "controller/action/5",
       { controller: "controller", action: "action", id: "5", name: "bob" },
       {},
       { name: "bob" },
     );
-    assertGenerates(
+    tc.assertGenerates(
       "controller/action/7",
       { id: "7", name: "bob" },
       { controller: "controller", action: "action" },
       { name: "bob" },
     );
-    assertGenerates(
+    tc.assertGenerates(
       "controller/action/7",
       { id: "7" },
       { controller: "controller", action: "action", name: "bob" },
@@ -481,7 +535,7 @@ describe("TestCaseTest", () => {
   });
 
   it("assert routing", () => {
-    assertRouting("content", { controller: "content", action: "index" });
+    tc.assertRouting("content", { controller: "content", action: "index" });
   });
 
   it("assert routing with method", () => {
@@ -489,7 +543,7 @@ describe("TestCaseTest", () => {
       set.draw(function () {
         this.resources("content");
       });
-      assertRouting(
+      tc.assertRouting(
         { method: "post", path: "content" },
         { controller: "content", action: "create" },
       );
@@ -504,7 +558,7 @@ describe("TestCaseTest", () => {
         });
       });
 
-      assertRouting("admin/user", { controller: "admin/user", action: "index" });
+      tc.assertRouting("admin/user", { controller: "admin/user", action: "index" });
     });
   });
 
@@ -513,7 +567,7 @@ describe("TestCaseTest", () => {
       set.draw(function () {
         this.get("*path", { to: "pages#show" });
       });
-      assertRouting("/company/about", {
+      tc.assertRouting("/company/about", {
         controller: "pages",
         action: "show",
         path: "company/about",
@@ -631,8 +685,7 @@ describe("TestCaseTest", () => {
     assertEqual("application/json", parsedEnv["CONTENT_TYPE"]);
   });
 
-  // BLOCKED: mime-type-initialize-validates-mime-regexp
-  it.skip("blank Content-Type header", async () => {
+  it("blank Content-Type header", async () => {
     tc.request.headers.set("Content-Type", "");
     await assertRaises([InvalidType], {}, async () => {
       await tc.get("testHeaders");
@@ -1337,9 +1390,27 @@ describe("ManuallySetStringNameTest", () => {
   });
 });
 
+class NamedRoutesControllerTest extends TestCase {
+  static {
+    this.tests(ContentController);
+  }
+}
+
 describe("NamedRoutesControllerTest", () => {
-  // BLOCKED: routing-assertions-method-missing-delegates-to-controller
-  it.skip("should be able to use named routes before a request is done", () => {});
+  it("should be able to use named routes before a request is done", async ({ task }) => {
+    const tc = new NamedRoutesControllerTest(task.name) as NamedRoutesControllerTest & {
+      newContentUrl(): string;
+      contentUrl(options: { id: number }): string;
+    };
+    await tc.beforeSetup();
+    tc.withRouting((set: RouteSet) => {
+      set.draw(function () {
+        this.resources("contents");
+      });
+      assertEqual("http://test.host/contents/new", tc.newContentUrl());
+      assertEqual("http://test.host/contents/1", tc.contentUrl({ id: 1 }));
+    });
+  });
 });
 
 class AnonymousControllerTest extends TestCase {

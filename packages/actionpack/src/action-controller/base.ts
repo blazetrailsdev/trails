@@ -5,13 +5,13 @@ import {
   type Configuration,
   type Included,
   type Rescuable,
-  type Module,
   runLoadHooks,
+  TopLevel,
 } from "@blazetrails/activesupport";
 import type { StatusSymbol } from "@blazetrails/rack";
 import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
 import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, rbModConstGet, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActionController } from "../namespaces.js";
 import { Metal } from "./metal.js";
 import type { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -24,7 +24,7 @@ import {
   type RequestForgeryProtectionHost,
 } from "./metal/request-forgery-protection.js";
 import type { MimeType } from "../action-dispatch/http/mime-type.js";
-import { respondTo } from "./metal/mime-responds.js";
+import { MimeResponds, type respondTo } from "./metal/mime-responds.js";
 import type { head } from "./metal/head.js";
 import {
   ConditionalGet,
@@ -138,12 +138,15 @@ import {
   type currentContentSecurityPolicy,
   type isContentSecurityPolicy,
 } from "./metal/content-security-policy.js";
-import { type Resolution, type HelpersClass } from "../abstract-controller/helpers.js";
+import {
+  type HelperMethodsModule,
+  type Resolution,
+  type HelpersClass,
+} from "../abstract-controller/helpers.js";
 import { Helpers, type helperAttr, type modulesForHelpers } from "./metal/helpers.js";
 import { FormBuilder, type defaultFormBuilder } from "./form-builder.js";
-import { instrumentPayload, instrumentName } from "./caching.js";
+import { Caching, type instrumentPayload, type instrumentName } from "./caching.js";
 import {
-  Caching,
   type cache,
   type CachingClassMethods,
   type LookupStoreArgument,
@@ -217,13 +220,14 @@ export interface RenderOptions {
   json?: unknown;
   js?: unknown;
   xml?: unknown;
-  plain?: string | number | boolean | null;
+  plain?: string | number | boolean | null | object;
   html?: string | SafeBuffer | boolean | null;
   body?: string | Buffer | boolean | null;
   action?: string;
   template?: string;
   file?: string | { toPath(): string };
   inline?: string;
+  assigns?: Record<string, unknown>;
   type?: string;
   renderable?: { renderIn(...args: never[]): unknown };
   partial?: string;
@@ -247,59 +251,23 @@ export interface RenderOptions {
 }
 
 type RenderOptionsFor<P extends string> = Omit<RenderOptions, "partial" | "locals"> & {
-  partial?: P;
+  partial?: P | true | object;
 } & (P extends keyof TemplateRegistry
     ? // eslint-disable-next-line @typescript-eslint/no-empty-object-type
       {} extends TemplateLocals<TemplateRegistry[P]>
       ? { locals?: TemplateLocals<TemplateRegistry[P]> }
       : { locals: TemplateLocals<TemplateRegistry[P]> }
-    : { locals?: Record<string, unknown> });
+    : { locals?: Record<string, unknown> | StrongParameters });
 
 type RenderArgs<P extends string> =
   | []
   | [RenderOptionsFor<P> | StrongParameters]
-  | [string | ToModel | NonNullable<RenderOptions["renderable"]>, RenderOptionsFor<P>?];
+  | [
+      string | ToModel | { toPartialPath(): string } | NonNullable<RenderOptions["renderable"]>,
+      RenderOptionsFor<P>?,
+    ];
 
 type StreamingBody = { each(block: (chunk: string) => void): Promise<unknown> };
-
-export const MODULES: readonly string[] = [
-  "AbstractController::Rendering",
-  "AbstractController::Translation",
-  "AbstractController::AssetPaths",
-  "Helpers",
-  "UrlFor",
-  "Redirecting",
-  "ActionView::Layouts",
-  "Rendering",
-  "Renderers::All",
-  "ConditionalGet",
-  "EtagWithTemplateDigest",
-  "EtagWithFlash",
-  "Caching",
-  "MimeResponds",
-  "ImplicitRender",
-  "StrongParameters",
-  "ParameterEncoding",
-  "Cookies",
-  "Flash",
-  "FormBuilder",
-  "RequestForgeryProtection",
-  "ContentSecurityPolicy",
-  "PermissionsPolicy",
-  "RateLimiting",
-  "AllowBrowser",
-  "Streaming",
-  "DataStreaming",
-  "HttpAuthentication::Basic::ControllerMethods",
-  "HttpAuthentication::Digest::ControllerMethods",
-  "HttpAuthentication::Token::ControllerMethods",
-  "DefaultHeaders",
-  "Logging",
-  "AbstractController::Callbacks",
-  "Rescue",
-  "Instrumentation",
-  "ParamsWrapper",
-];
 
 export const PROTECTED_IVARS: readonly string[] = [
   ...DEFAULT_PROTECTED_INSTANCE_VARIABLES,
@@ -440,8 +408,8 @@ export class Base extends Metal {
   declare static raiseOnOpenRedirects: boolean;
   declare static isIncludeAllHelpers: boolean;
 
-  declare static _helpers: Module;
-  declare readonly _helpers: Module;
+  declare static _helpers: HelperMethodsModule;
+  declare readonly _helpers: HelperMethodsModule;
   declare static _helperMethods: string[];
   declare static helperMethod: HelpersClass["helperMethod"];
   declare static helper: HelpersClass["helper"];
@@ -481,9 +449,15 @@ export class Base extends Metal {
 
   declare viewRenderer: typeof viewRenderer;
 
-  static withoutModules(...modules: string[]): readonly string[] {
-    const drop = new Set(modules);
-    return MODULES.filter((m) => !drop.has(m));
+  declare static MODULES: Array<Parameters<typeof include>[1]>;
+
+  static withoutModules(
+    ...modules: Array<string | Parameters<typeof include>[1]>
+  ): Array<Parameters<typeof include>[1]> {
+    const mods = modules.map((m) =>
+      typeof m === "string" ? rbModConstGet(ActionController, m) : m,
+    );
+    return Base.MODULES.filter((m) => !mods.includes(m));
   }
 
   /** @internal */
@@ -523,6 +497,9 @@ export class Base extends Metal {
     this._urlOptions = null;
     this._markedForSameOriginVerification = null;
     this.viewRuntime = null;
+    if (isModuleIncluded(new.target, TopLevel.ActiveRecord?.Railties.ControllerRuntime as never)) {
+      (this as unknown as { dbRuntime: number | null }).dbRuntime = null;
+    }
   }
 
   /**
@@ -538,7 +515,7 @@ export class Base extends Metal {
     return body;
   }
 
-  respondTo = respondTo;
+  declare respondTo: (...mimes: Parameters<OmitThisParameter<typeof respondTo>>) => unknown;
 
   declare translate: OmitThisParameter<typeof translate>;
   declare t: OmitThisParameter<typeof t>;
@@ -596,14 +573,9 @@ export class Base extends Metal {
   declare defaultFormBuilder: () => unknown;
 
   /** @internal */
-  instrumentPayload(key: unknown): { controller: string | null; action: string; key: unknown } {
-    return instrumentPayload.call(this, key);
-  }
-
+  declare instrumentPayload: typeof instrumentPayload;
   /** @internal */
-  instrumentName(): string {
-    return instrumentName.call(this);
-  }
+  declare instrumentName: typeof instrumentName;
 
   declare static _parameterEncodings: ParameterEncodingHost["_parameterEncodings"];
   /** @internal */
@@ -615,6 +587,8 @@ export class Base extends Metal {
 
   declare static _wrapperOptions: ParamsWrapperOptions;
   declare _wrapperOptions: ParamsWrapperOptions;
+  declare static _isWrapperOptions: boolean;
+  declare _isWrapperOptions: boolean;
   /** @internal */
   declare static _setWrapperOptions: OmitThisParameter<typeof _setWrapperOptions>;
   declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;
@@ -726,41 +700,48 @@ export class Base extends Metal {
   declare handlerForRescue: Rescuable["handlerForRescue"];
 }
 
-include(Base, AbstractControllerRendering);
-include(Base, Translation);
-include(Base, AssetPaths);
-include(Base, Helpers);
-include(Base, UrlFor);
-include(Base, Redirecting);
-include(Base, Layouts);
-include(Base, Rendering);
-include(Base, Renderers.All);
-include(Base, ConditionalGet);
-include(Base, EtagWithTemplateDigest);
-include(Base, EtagWithFlash);
-include(Base, Caching);
-include(Base, ImplicitRender);
-include(Base, StrongParametersModule);
-include(Base, ParameterEncoding);
-include(Base, Cookies);
-include(Base, Flash);
-include(Base, FormBuilder);
-include(Base, RequestForgeryProtection);
-include(Base, ContentSecurityPolicy);
-include(Base, PermissionsPolicy);
-include(Base, RateLimiting);
-include(Base, AllowBrowser);
-include(Base, Streaming);
-include(Base, DataStreaming);
-include(Base, HttpAuthentication.Basic.ControllerMethods);
-include(Base, HttpAuthentication.Digest.ControllerMethods);
-include(Base, HttpAuthentication.Token.ControllerMethods);
-include(Base, DefaultHeaders);
-include(Base, Logging);
-include(Base, Callbacks);
-include(Base, Rescue);
-include(Base, Instrumentation);
-include(Base, ParamsWrapper);
+Base.MODULES = [
+  AbstractControllerRendering,
+  Translation,
+  AssetPaths,
+  Helpers,
+  UrlFor,
+  Redirecting,
+  Layouts,
+  Rendering,
+  Renderers.All,
+  ConditionalGet,
+  EtagWithTemplateDigest,
+  EtagWithFlash,
+  Caching,
+  MimeResponds,
+  ImplicitRender,
+  StrongParametersModule,
+  ParameterEncoding,
+  Cookies,
+  Flash,
+  FormBuilder,
+  RequestForgeryProtection,
+  ContentSecurityPolicy,
+  PermissionsPolicy,
+  RateLimiting,
+  AllowBrowser,
+  Streaming,
+  DataStreaming,
+  HttpAuthentication.Basic.ControllerMethods,
+  HttpAuthentication.Digest.ControllerMethods,
+  HttpAuthentication.Token.ControllerMethods,
+  DefaultHeaders,
+  Logging,
+  Callbacks,
+  Rescue,
+  Instrumentation,
+  ParamsWrapper,
+];
+
+for (const mod of Base.MODULES) {
+  include(Base, mod);
+}
 Base.setupRendererBang();
 
 rbModConstSet(ActionController, "Base", Base);

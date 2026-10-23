@@ -1,8 +1,10 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import type { aroundAction, CallbackOptions } from "../../abstract-controller/callbacks.js";
-import { Concern, Module, extend, type LogLevel } from "@blazetrails/activesupport";
+import { Concern, extend, type LogLevel } from "@blazetrails/activesupport";
 
 interface LoggedController {
-  logger: { logAt(level: number | LogLevel, fn: () => void): void };
+  logger: { logAt<T>(level: number | LogLevel, fn: () => T): T };
 }
 
 export function logAt(
@@ -18,7 +20,7 @@ export function logAt(
 
 export const ClassMethods = { logAt };
 
-export const Logging = new Module((mod) => {
-  extend(mod, Concern);
-}) as Module & { ClassMethods: typeof ClassMethods };
-Logging.ClassMethods = ClassMethods;
+export const Logging = { ClassMethods };
+extend(Logging, Concern);
+
+rbModConstSet(ActionController, "Logging", Logging);

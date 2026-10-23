@@ -1,7 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { include, type Included } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
 import { FAKE_APP } from "./fixtures/fake-app.js";
 import { Methods, type MethodsHost, Session } from "./index.js";
 
@@ -55,7 +54,7 @@ describe("Rack::Test::Methods", () => {
     const envs: RackEnv[] = [];
     const app: RackApp = async (env): Promise<RackResponse> => {
       envs.push(env);
-      return [200, {}, bodyFromString("")];
+      return [200, {}, [""]];
     };
     spec.app = app;
 
@@ -68,7 +67,7 @@ describe("Rack::Test::Methods", () => {
     const envs: RackEnv[] = [];
     const app: RackApp = async (env): Promise<RackResponse> => {
       envs.push(env);
-      return [200, {}, bodyFromString("")];
+      return [200, {}, [""]];
     };
     spec.app = app;
     spec.defaultHost = "foo.example.com";

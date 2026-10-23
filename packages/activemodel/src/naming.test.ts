@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName, Naming } from "./naming.js";
 import { assert, assertNot, inflections } from "@blazetrails/activesupport";
-import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 
 class Post {
   static TrackBack = class TrackBack {};
@@ -10,7 +10,7 @@ class Post {
 registerConstant("Post", Post);
 rbModConstSet(Post, "TrackBack", Post.TrackBack);
 
-const Blog = new Module() as Module & { Post: { name: string } };
+const Blog = {} as { Post: { name: string } };
 registerConstant("Blog", Blog);
 rbModConstSet(Blog, "Post", class Post {});
 

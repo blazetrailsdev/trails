@@ -141,8 +141,8 @@ describe("BatchEnumerator (trails)", () => {
     const post = (await Post.first())!;
     post.writeAttribute("type", null);
     Object.defineProperty(post, "unrelated", { value: "from the property" });
-    expect(recordCursorValues.call(post, post, ["type"])).toEqual([null]);
-    expect(recordCursorValues.call(post, post, ["unrelated"])).toEqual([]);
+    expect(recordCursorValues.call(Post.all(), post, ["type"])).toEqual([null]);
+    expect(recordCursorValues.call(Post.all(), post, ["unrelated"])).toEqual([]);
   });
   it("raises when a cursor column is nil", async () => {
     const name = "Bourdain: The Definitive Oral Biography";

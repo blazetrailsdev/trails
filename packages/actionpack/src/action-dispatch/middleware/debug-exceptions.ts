@@ -1,4 +1,4 @@
-import { rbInspect, rbObjRespondTo, rtest, stderr } from "@blazetrails/ruby-compat";
+import { fetch, rbInspect, rbObjRespondTo, rtest, stderr, rbFSend } from "@blazetrails/ruby-compat";
 import {
   camelize,
   HASH_CONVERSIONS,
@@ -7,21 +7,18 @@ import {
 } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
+import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
+import { DebugView } from "./debug-view.js";
 import { X_CASCADE } from "../constants.js";
 import { Mime, type MimeType } from "../http/mime-type.js";
 import { Request } from "../http/request.js";
+import { InvalidType } from "../http/mime-negotiation.js";
+import { RoutesInspector } from "../routing/inspector.js";
+import type { RouteSet } from "../routing/route-set.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
-
-export interface DebugExceptionsOptions {
-  showDetailedExceptions?: boolean;
-  showExceptions?: boolean;
-  interceptors?: Interceptor[];
-  responseFormat?: "default" | "api";
-}
 
 export type Interceptor = (request: Request, exception: Error) => void;
 
@@ -34,18 +31,21 @@ export class DebugExceptions {
   }
 
   private app: RackApp;
-  private showDetailedExceptions: boolean;
-  private showExceptions: boolean;
-  private interceptors: Interceptor[];
+  private routesApp: { routes(): RouteSet } | null;
   private responseFormat: "default" | "api";
+  private interceptors: Interceptor[];
   private _stderrLogger?: ActiveSupportLogger;
 
-  constructor(app: RackApp, options: DebugExceptionsOptions = {}) {
+  constructor(
+    app: RackApp,
+    routesApp: { routes(): RouteSet } | null = null,
+    responseFormat: "default" | "api" = "default",
+    interceptors: Interceptor[] = DebugExceptions.interceptors,
+  ) {
     this.app = app;
-    this.showDetailedExceptions = options.showDetailedExceptions !== false;
-    this.showExceptions = options.showExceptions !== false;
-    this.interceptors = options.interceptors ?? [...DebugExceptions.interceptors];
-    this.responseFormat = options.responseFormat ?? "default";
+    this.routesApp = routesApp;
+    this.responseFormat = responseFormat;
+    this.interceptors = interceptors;
   }
 
   /** @internal */
@@ -63,7 +63,7 @@ export class DebugExceptions {
   renderForApiRequest(contentType: MimeType | undefined, wrapper: ExceptionWrapper): RackResponse {
     const body = {
       status: wrapper.statusCode,
-      error: wrapper.statusText,
+      error: fetch(HTTP_STATUS_CODES, String(wrapper.statusCode), HTTP_STATUS_CODES[500]),
       exception: wrapper.exceptionInspect(),
       traces: wrapper.traces,
     };
@@ -92,7 +92,7 @@ export class DebugExceptions {
         "content-type": `${format}; charset=${charset}`,
         "content-length": String(Buffer.byteLength(body, "utf8")),
       },
-      bodyFromString(body),
+      [body],
     ];
   }
 
@@ -103,26 +103,26 @@ export class DebugExceptions {
     if (logger == null) return;
     if (!rtest(this.isLogRescuedResponses(request)) && wrapper.rescueResponse()) return;
 
-    const lines: string[] = ["  "];
+    const message: string[] = ["  "];
     if (wrapper.hasCause()) {
-      lines.push(`${wrapper.exceptionClassName} (${wrapper.message})`);
+      message.push(`${wrapper.exceptionClassName} (${wrapper.message})`);
       for (const cause of wrapper.wrappedCauses) {
-        lines.push(`Caused by: ${cause.exceptionClassName} (${cause.message})`);
+        message.push(`Caused by: ${cause.exceptionClassName} (${cause.message})`);
       }
-      lines.push(`\nInformation for: ${wrapper.exceptionClassName} (${wrapper.message}):`);
+      message.push(`\nInformation for: ${wrapper.exceptionClassName} (${wrapper.message}):`);
     } else {
-      lines.push(`${wrapper.exceptionClassName} (${wrapper.message}):`);
+      message.push(`${wrapper.exceptionClassName} (${wrapper.message}):`);
     }
-    lines.push(...wrapper.annotatedSourceCode());
-    lines.push("  ");
-    lines.push(...wrapper.exceptionTrace().map(String));
+    message.push(...wrapper.annotatedSourceCode());
+    message.push("  ");
+    message.push(...wrapper.exceptionTrace().map(String));
     for (const cause of wrapper.hasCause() ? wrapper.wrappedCauses : []) {
-      lines.push(`\nInformation for cause: ${cause.exceptionClassName} (${cause.message}):`);
-      lines.push(...cause.annotatedSourceCode());
-      lines.push("  ");
-      lines.push(...cause.exceptionTrace().map(String));
+      message.push(`\nInformation for cause: ${cause.exceptionClassName} (${cause.message}):`);
+      message.push(...cause.annotatedSourceCode());
+      message.push("  ");
+      message.push(...cause.exceptionTrace().map(String));
     }
-    this.logArray(logger, lines, request);
+    this.logArray(logger, message, request);
   }
 
   /** @internal */
@@ -156,7 +156,13 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  routesInspector(_exception: ExceptionWrapper): unknown {
+  routesInspector(exception: ExceptionWrapper): RoutesInspector | null {
+    if (
+      rbObjRespondTo(this.routesApp, "routes") &&
+      (exception.isRoutingError() || exception.isTemplateError())
+    ) {
+      return new RoutesInspector(this.routesApp!.routes().routes);
+    }
     return null;
   }
 
@@ -172,7 +178,7 @@ export class DebugExceptions {
 
   async call(env: RackEnv): Promise<RackResponse> {
     try {
-      const response = await this.app(env);
+      const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
       const [, headers, body] = response;
 
       if (headers[X_CASCADE] === "pass") {
@@ -193,7 +199,7 @@ export class DebugExceptions {
       const wrapper = new ExceptionWrapper(backtraceCleaner, exception);
 
       this.invokeInterceptors(request, exception, wrapper);
-      if (!this.showExceptions) throw exception;
+      if (!wrapper.isShow(request)) throw exception;
       return this.renderException(request, exception, wrapper);
     }
   }
@@ -202,83 +208,59 @@ export class DebugExceptions {
     request: Request,
     exception: Error,
     wrapper: ExceptionWrapper,
-  ): RackResponse {
+  ): RackResponse | Promise<RackResponse> {
     this.logError(request, wrapper);
 
-    if (!this.showDetailedExceptions) {
+    if (rtest(request.getHeader("action_dispatch.show_detailed_exceptions"))) {
+      let contentType: MimeType | undefined;
+      try {
+        contentType = request.formats[0];
+      } catch (e) {
+        if (!(e instanceof InvalidType)) throw e;
+        contentType = Mime.get("text")!;
+      }
+
+      if (this.isApiRequest(contentType)) {
+        return this.renderForApiRequest(contentType, wrapper);
+      } else {
+        return this.renderForBrowserRequest(request, wrapper);
+      }
+    } else {
       throw exception;
     }
+  }
 
-    const contentType = request.formats[0];
-    if (this.isApiRequest(contentType)) {
-      return this.renderForApiRequest(contentType, wrapper);
-    }
+  /** @internal */
+  async renderForBrowserRequest(
+    request: Request,
+    wrapper: ExceptionWrapper,
+  ): Promise<RackResponse> {
+    const template = this.createTemplate(request, wrapper);
+    const file = `rescues/${wrapper.rescueTemplate()}`;
 
+    let body: string;
+    let format: string;
     if (request.xhr) {
-      return this.renderTextError(wrapper);
+      body = String(await template.render({ template: file, layout: false, formats: [":text"] }));
+      format = "text/plain";
+    } else {
+      body = String(await template.render({ template: file, layout: "rescues/layout" }));
+      format = "text/html";
     }
-
-    return this.renderHtmlError(request, wrapper);
+    return this.render(wrapper.statusCode, body, format);
   }
 
-  private renderTextError(wrapper: ExceptionWrapper): RackResponse {
-    const body = [
-      `${wrapper.exceptionName} (${wrapper.message})`,
-      "",
-      ...wrapper.applicationTrace.slice(0, 10),
-    ].join("\n");
-
-    return [
-      wrapper.statusCode,
-      { "content-type": "text/plain; charset=utf-8" },
-      bodyFromString(body),
-    ];
-  }
-
-  private renderHtmlError(request: Request, wrapper: ExceptionWrapper): RackResponse {
-    const method = (request.getHeader("REQUEST_METHOD") as string) ?? "GET";
-    const path = (request.getHeader("PATH_INFO") as string) ?? "/";
-    const controller = request.getHeader("action_dispatch.controller") as string | undefined;
-
-    const traceHtml = wrapper.applicationTrace
-      .slice(0, 20)
-      .map((line) => `  <li>${this.escapeHtml(String(line))}</li>`)
-      .join("\n");
-
-    const html = [
-      "<!DOCTYPE html>",
-      "<html>",
-      "<head>",
-      `  <title>${wrapper.exceptionName} at ${this.escapeHtml(path)}</title>`,
-      '  <meta charset="utf-8">',
-      "</head>",
-      "<body>",
-      `  <h1>${this.escapeHtml(wrapper.exceptionName)}</h1>`,
-      `  <h2>${this.escapeHtml(wrapper.message)}</h2>`,
-      controller ? `  <p>Controller: ${this.escapeHtml(controller)}</p>` : "",
-      `  <p>Request: ${this.escapeHtml(method)} ${this.escapeHtml(path)}</p>`,
-      "  <h3>Application Trace</h3>",
-      "  <ul>",
-      traceHtml,
-      "  </ul>",
-      "</body>",
-      "</html>",
-    ]
-      .filter((l) => l.length > 0)
-      .join("\n");
-
-    return [
-      wrapper.statusCode,
-      { "content-type": "text/html; charset=utf-8" },
-      bodyFromString(html),
-    ];
-  }
-
-  private escapeHtml(str: string): string {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  /** @internal */
+  createTemplate(request: Request, wrapper: ExceptionWrapper): DebugView {
+    return new DebugView({
+      request: request,
+      exceptionWrapper: wrapper,
+      exception: wrapper.exception,
+      traces: wrapper.traces,
+      showSourceIdx: wrapper.sourceToShowId(),
+      traceToShow: wrapper.traceToShow(),
+      routesInspector: this.routesInspector(wrapper),
+      sourceExtracts: wrapper.sourceExtracts,
+    });
   }
 }

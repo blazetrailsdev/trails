@@ -1,7 +1,8 @@
+import type { RackResponse } from "@blazetrails/rack";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { onLoad, resetLoadHooks } from "@blazetrails/activesupport";
 import { controllerConstants } from "@blazetrails/actionpack";
-import { bodyToString } from "@blazetrails/rack";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
@@ -35,12 +36,12 @@ describe("a generated app reloads its views in development", () => {
     (posts as unknown as { prependViewPath(path: string): void }).prependViewPath(tmp);
 
     const show = async (): Promise<string> => {
-      const [, , body] = await app.app()({
+      const [, , body] = await (rbFSend(app.app(), "call", {
         REQUEST_METHOD: "GET",
         PATH_INFO: "/posts/show",
         HTTP_ACCEPT: "*/*",
-      });
-      return bodyToString(body);
+      }) as Promise<RackResponse>);
+      return [...(body as Iterable<string>)].join("");
     };
 
     expect(await show()).toContain("<h1>Before edit</h1>");

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertNoChanges, assertRaises } from "@blazetrails/activesupport";
-import { Module, registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Rollback, StatementInvalid } from "../errors.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
@@ -10,7 +10,7 @@ import { fixtures } from "../test-helpers/use-fixtures.js";
 
 const EXPRESSION = "daterange(start_date, end_date) WITH &&";
 
-registerConstant("ActiveRecord::Migration::ExclusionConstraintTest", new Module());
+registerConstant("ActiveRecord::Migration::ExclusionConstraintTest", {});
 
 class Invoice extends Base {
   static name = "ActiveRecord::Migration::ExclusionConstraintTest::Invoice";

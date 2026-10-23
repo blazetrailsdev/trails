@@ -6,7 +6,7 @@ import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { Collector, VariantCollector } from "./mime-responds.js";
 import { RespondToMismatchError, UnknownFormat } from "./exceptions.js";
-import { MimeType } from "../../action-dispatch/http/mime-type.js";
+import { Mime } from "../../action-dispatch/http/mime-type.js";
 
 type Mimes = Collector & Record<string, (block?: unknown) => unknown>;
 
@@ -101,8 +101,8 @@ describe("Collector#custom", () => {
 
   it("keeps the first registration across repeated custom calls", () => {
     const collector = collect();
-    collector.custom(MimeType.HTML, () => "first");
-    collector.custom(MimeType.HTML, () => "second");
+    collector.custom(Mime.get(":html")!, () => "first");
+    collector.custom(Mime.get(":html")!, () => "second");
 
     collector.negotiateFormat(requestFor("html"));
     expect(collector.response?.()).toBe("first");
@@ -114,7 +114,7 @@ describe("Collector#initialize", () => {
     const collector = new Collector(["xml", "json"]);
 
     expect(collector.negotiateFormat(new Request({ HTTP_ACCEPT: "application/json" }))).toBe(
-      MimeType.JSON,
+      Mime.get(":json")!,
     );
     expect(collector.negotiateFormat(new Request({ HTTP_ACCEPT: "text/html" }))).toBeNull();
   });

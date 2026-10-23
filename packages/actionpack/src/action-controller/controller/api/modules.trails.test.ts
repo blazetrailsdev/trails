@@ -1,4 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, onLoad } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SharedTestRoutes } from "../../../test-helpers/abstract-unit.js";
 import { API } from "../../api.js";
@@ -127,4 +127,24 @@ describe("AbstractController::Callbacks#process_action", () => {
       expect(calls).toEqual(["before", "index", "after"]);
     });
   }
+});
+
+describe("ActionController::API load hooks", () => {
+  it("runs on_load(:action_controller_api) and on_load(:action_controller) for API", () => {
+    const seen: Record<string, unknown[]> = { action_controller_api: [], action_controller: [] };
+    for (const name of Object.keys(seen)) {
+      onLoad(name, function (this: unknown) {
+        seen[name].push(this);
+      });
+    }
+    expect(seen.action_controller_api).toEqual([API]);
+    expect(seen.action_controller).toContain(API);
+  });
+});
+
+describe("ActionController::API.withoutModules", () => {
+  it("returns MODULES minus the given modules, resolving a name through ActionController", () => {
+    const result = API.withoutModules("ParamsWrapper", API.MODULES[0]);
+    expect(result).toEqual(API.MODULES.slice(1, -1));
+  });
 });

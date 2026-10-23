@@ -6,6 +6,23 @@
 import * as path from "path";
 
 /**
+ * The words TS cannot spell as a binding name (`arguments` / `eval` are
+ * unusable in strict mode). A Ruby local, parameter, or kwarg binding with one
+ * of these names is ported with a trailing underscore: `I18n.translate`'s
+ * `throw:` kwarg (`vendor/i18n/v1.14.8/lib/i18n.rb:212`) binds `throw_`. The
+ * call-args gate reads `throw_` as Ruby `throw`; any other spelling is a
+ * rename and keeps reporting.
+ */
+export const JS_RESERVED_WORDS: ReadonlySet<string> = new Set(
+  (
+    "arguments await break case catch class const continue debugger default delete do else " +
+    "enum eval export extends false finally for function if implements import in instanceof " +
+    "interface let new null package private protected public return static super switch this " +
+    "throw true try typeof var void while with yield"
+  ).split(" "),
+);
+
+/**
  * Token-level Ruby→TS renames applied before camelization.
  *
  * `erb` → `tse`: trails uses a `.tse` (Trails Server Embedded) template
@@ -49,6 +66,8 @@ export const TOKEN_RENAMES: Record<string, string> = {
   rubocop: "eslint",
   RuboCop: "ESLint",
   Rubocop: "Eslint",
+  capybara: "vitest",
+  Capybara: "Vitest",
 };
 
 /**
@@ -64,6 +83,9 @@ export const TOKEN_RENAMES: Record<string, string> = {
  *   (`type/registry.rb:5`), same rationale under `ActiveModel::Type`.
  * - `Railtie` → `Trailtie`: trails railties are not `Rails::Railtie`
  *   subclasses; the pun name signals that distinction across all packages.
+ * - `Railties` → `Trailties`: the same pun on a namespace module
+ *   (`AbstractController::Railties`, `abstract_controller/railties/`), as the
+ *   `railties` path segment already reads `trailties`.
  * - `Rails` → `Trails`: top-level `module Rails` (`railties/lib/rails.rb`)
  *   maps to the `Trails` global in `packages/trailties/src/rails.ts`.
  *
@@ -76,6 +98,7 @@ export const TOKEN_RENAMES: Record<string, string> = {
 export const TS_CLASS_RENAMES: Record<string, string> = {
   Name: "ModelName",
   Railtie: "Trailtie",
+  Railties: "Trailties",
   Rails: "Trails",
   Registry: "TypeRegistry",
 };
@@ -520,9 +543,11 @@ export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Se
  */
 export const PROTOCOL_CALL_ENROLLED_PACKAGES: ReadonlySet<string> = new Set<string>([
   "abstractcontroller",
+  "actioncontroller",
   "actionview",
   "activemodel",
   "activerecord-test-support",
+  "activesupport",
   "arel",
   "bcrypt",
   "did-you-mean",
@@ -545,15 +570,13 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity " +
       "(`object_id`, `equal?`, `class`), reflection (`instance_of?`, " +
       "`instance_variable_get` / `instance_variable_set` / `instance_variables`), " +
-      "dispatch (`send`, `public_send`, `tap`, " +
+      "dispatch (`tap`, " +
       "`yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), and " +
       "`clone`.",
     names: [
       "clone",
       "object_id",
       "class",
-      "send",
-      "public_send",
       "tap",
       "yield_self",
       "instance_of?",
@@ -565,6 +588,26 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "to_f",
       "to_r",
       "to_c",
+    ],
+  },
+  {
+    reason:
+      "PERMANENT — dispatch by name and visibility reflection. trails has no runtime " +
+      "visibility, so `send` / `public_send` dispatch alike and the `*_methods` / " +
+      '`*_method_defined?` readers have no fact to report (CLAUDE.md § "Method ' +
+      'visibility is compile-time only"). A dispatch with a literal name is spelled ' +
+      'as the direct member call (CLAUDE.md § "A dispatch by name is spelled directly").',
+    names: [
+      "send",
+      "public_send",
+      "public_method_defined?",
+      "private_method_defined?",
+      "protected_method_defined?",
+      "public_methods",
+      "private_methods",
+      "protected_methods",
+      "public_instance_methods",
+      "public_instance_method",
     ],
   },
   {
@@ -653,9 +696,27 @@ export interface ScopedSkipGroup {
    * extra-surface allows every one of them.
    */
   tsMirrorName?: string | string[];
+  /**
+   * The packages whose `rubyFiles` the skip names, when a bare file path is
+   * not unique across packages: activemodel's `api.rb` and actioncontroller's
+   * `api.rb` are two files. Unset, the skip applies in every package.
+   */
+  packages?: string[];
 }
 
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
+  {
+    reason:
+      "Node's event loop stands in for Action Cable's `NIO::Selector` and its " +
+      "thread (CLAUDE.md, \"Node's event loop stands in for Action Cable's nio4r " +
+      'selector"). `spawn`, `run` and `wakeup` own and interrupt the selector ' +
+      "thread (stream_event_loop.rb:62-133); `writes_pending` (:47-54) and " +
+      "`Stream#flush_write_buffer` (stream.rb:72-92) carry a partial " +
+      "`write_nonblock`, which a `net.Socket` never leaves.",
+    names: ["spawn", "run", "wakeup", "writes_pending", "flush_write_buffer"],
+    rubyFiles: ["connection/stream_event_loop.rb", "connection/stream.rb"],
+    packages: ["actioncable"],
+  },
   {
     reason:
       "`Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs " +
@@ -851,23 +912,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "map to a `constructor`.",
     names: ["initialize"],
     rubyFiles: ["api.rb"],
-    tsMirrorName: "initialize",
-  },
-  {
-    reason:
-      "`ActiveRecord::Fixture#initialize` (fixtures.rb:817-820) is the method " +
-      "`ActiveRecord::Encryption::EncryptedFixtures` prepends onto " +
-      "(encrypted_fixtures.rb:6-11), so in Ruby the module's `initialize` runs " +
-      "first and reaches the class's own through `super`. TypeScript has no " +
-      "expression for that: `prepend()` (packages/ruby-compat/src/prepend.ts) " +
-      "wraps methods on the prototype and cannot wrap a constructor, so the " +
-      "port keeps the Rails name as an `initialize` method the constructor " +
-      "delegates to — the same shape " +
-      "`ActiveSupport::Messages::Rotator#initialize` above already carries. " +
-      "Scoped to fixtures.rb so a real class's `initialize` is still expected " +
-      "to map to a `constructor`.",
-    names: ["initialize"],
-    rubyFiles: ["fixtures.rb", "encryption/encrypted_fixtures.rb"],
+    packages: ["activemodel"],
     tsMirrorName: "initialize",
   },
   {
@@ -895,11 +940,12 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "autoload/reload machinery: an interlock guarding concurrent constant " +
       "loads, the autoload/eager-load path registries it walks, and the " +
       "`autoload :Const` / `eager_autoload` DSL that defers a constant to a " +
-      "file. ESM has neither half — every `import` is eager and resolved before " +
-      "the importing module's body, and there is no reloading — so trails has " +
+      "file. ESM has neither half — a module graph is resolved and evaluated " +
+      "eagerly at import, and there is no reloading — so trails has " +
       "no constant table to guard and nothing to reload. Where Ruby leans on " +
       "call-time constant resolution to break a load-order cycle, the port uses " +
-      'the zero-import slot module instead (CLAUDE.md, "Call-time constant ' +
+      "a plain ES import, whose binding is live and is read when the expression " +
+      'runs (CLAUDE.md, "Call-time constant ' +
       'resolution"); the two require_dependency suites in trails ' +
       "(dependencies.test.ts, autoload.test.ts) are permanent skips for the same " +
       "reason. That includes every `eager_load!` a module inherits from " +
@@ -1165,21 +1211,40 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     names: ["then"],
     rubyFiles: ["relation.rb"],
   },
+  {
+    reason:
+      "`OutputBuffer` delegates `encoding`, `encode!` and `force_encoding` to its " +
+      "raw String (buffers.rb:27). " +
+      "Each reads or rewrites a String's encoding tag, which a JS string does not " +
+      'have (CLAUDE.md § "A String has no encoding tag either"). PERMANENT.',
+    names: ["encoding", "encode!", "force_encoding"],
+    rubyFiles: ["buffers.rb"],
+    packages: ["actionview"],
+  },
+  {
+    reason:
+      "`Template#offset` and `#locals_code` (template.rb:541-576) build the " +
+      "`module_eval` line offset and the Ruby locals binding of `compiled_source`, " +
+      "which `virtualizeTse` writes as TypeScript at build time; " +
+      "`#find_node_by_id` (template.rb:405-415) walks the Prism tree `spot` " +
+      'parses, and `spot` is line-based (CLAUDE.md § "Templates are ' +
+      'precompiled"). PERMANENT.',
+    names: ["offset", "locals_code", "find_node_by_id"],
+    rubyFiles: ["template.rb"],
+    packages: ["actionview"],
+  },
 ];
 
-/** Map of scoped-skip Ruby method name → the set of Ruby files it's skipped in. */
-const SCOPED_SKIP_FILES = new Map<string, Set<string>>();
-for (const g of SCOPED_SKIP_GROUPS) {
-  for (const name of g.names) {
-    const files = SCOPED_SKIP_FILES.get(name) ?? new Set<string>();
-    for (const f of g.rubyFiles) files.add(f);
-    SCOPED_SKIP_FILES.set(name, files);
-  }
+function scopedSkipAppliesIn(g: ScopedSkipGroup, pkg: string | undefined): boolean {
+  return pkg === undefined || g.packages === undefined || g.packages.includes(pkg);
 }
 
 /** True when `rubyName` should be skipped specifically within `rubyFile`. */
-export function isScopedSkip(rubyName: string, rubyFile: string): boolean {
-  return SCOPED_SKIP_FILES.get(rubyName)?.has(rubyFile) ?? false;
+export function isScopedSkip(rubyName: string, rubyFile: string, pkg?: string): boolean {
+  return SCOPED_SKIP_GROUPS.some(
+    (g) =>
+      g.names.includes(rubyName) && g.rubyFiles.includes(rubyFile) && scopedSkipAppliesIn(g, pkg),
+  );
 }
 
 /**
@@ -1187,9 +1252,13 @@ export function isScopedSkip(rubyName: string, rubyFile: string): boolean {
  * a list, or null when the scoped skip declares no faithful TS spelling (or
  * doesn't apply).
  */
-export function scopedSkipMirrorName(rubyName: string, rubyFile: string): string[] | null {
+export function scopedSkipMirrorName(
+  rubyName: string,
+  rubyFile: string,
+  pkg?: string,
+): string[] | null {
   for (const g of SCOPED_SKIP_GROUPS) {
-    if (g.tsMirrorName === undefined) continue;
+    if (g.tsMirrorName === undefined || !scopedSkipAppliesIn(g, pkg)) continue;
     if (g.names.includes(rubyName) && g.rubyFiles.includes(rubyFile)) {
       return typeof g.tsMirrorName === "string" ? [g.tsMirrorName] : g.tsMirrorName;
     }
@@ -1675,7 +1744,8 @@ function rubyMethodToTsWithoutUnderscore(
     // moves.
     const collides = siblingRubyNames?.has(base) === true;
     const literal = collides ? [snakeToCamel(base) + "?"] : [];
-    const isPrefixed = "is" + camel.replace(/^./, (c) => c.toUpperCase());
+    const lead = /^_*/.exec(camel)![0];
+    const isPrefixed = lead + "is" + camel.slice(lead.length).replace(/^./, (c) => c.toUpperCase());
     // Names already starting with `is_` collapse to one candidate so
     // `is_number?` → ["isNumber"] (not ["isIsNumber", "isNumber"]).
     // The `isPrefixed` form is intentionally NOT offered as a fallback
@@ -1858,7 +1928,8 @@ the constructor against \`new\` then \`initialize\`, with \`new\`'s \`super\` sp
 on \`initialize\`. A \`ClassMethods#new\` in the class's own Ruby file pairs the
 same way. A module's \`initialize\`, or a \`ClassMethods#new\`, defined in another
 Ruby file is matched through the \`@inlinedFrom\` tag on the constructor it is
-inlined into (RFC 0188).
+inlined into (RFC 0188), and a module method whose body calls \`super\` through
+the tag on the includer's method of the same name (RFC 0197).
 
 Any other \`new\`, an instance method or a module's own \`self.new\`, maps to
 \`constructor\` only when its Ruby file does NOT also define \`initialize\`.
@@ -1933,6 +2004,16 @@ manifest and \`parity:api:extra\` resolve operators through that table, so a
 ported operator sorts into its Rails slot and does not read as extra surface.
 The pin is per-class on purpose: \`<<\` is \`bitwiseShiftLeft\` on \`Arel::Math\` and
 means _append_ on the collectors, so a global entry would mis-credit them.
+
+## Reserved-word locals
+
+A Ruby local, parameter, or kwarg binding whose name is a JS reserved word
+(\`throw\`, \`default\`, \`class\`, …; \`JS_RESERVED_WORDS\`) cannot be a TS
+binding name. It is ported with a trailing underscore: \`translate(key = nil,
+throw: false, …)\` (\`i18n.rb:212\`) destructures \`{ throw: throw_ = false }\`
+and passes \`throw_\` on. \`parity:api:calls:args\` reads \`throw_\` as Ruby
+\`throw\`. Any other spelling (\`throwOption\`) is a
+rename the gate reports.
 
 ## Token renames
 

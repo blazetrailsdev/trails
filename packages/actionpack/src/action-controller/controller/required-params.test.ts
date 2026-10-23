@@ -47,14 +47,14 @@ describe("ActionControllerRequiredParamsTest", () => {
   });
 
   it("exceptions have suggestions for fix", async () => {
-    let error = (await assertRaise([ParameterMissing], {}, async () => {
+    let error = await assertRaise([ParameterMissing], {}, async () => {
       await tc.post("create", { params: { boko: { name: "Mjallo!" } } });
-    })) as ParameterMissing;
+    });
     assertMatch("Did you mean?", error.detailedMessage());
 
-    error = (await assertRaise([ParameterMissing], {}, async () => {
+    error = await assertRaise([ParameterMissing], {}, async () => {
       await tc.post("create", { params: { book: { naem: "Mjallo!" } } });
-    })) as ParameterMissing;
+    });
     assertMatch("Did you mean?", error.detailedMessage());
   });
 

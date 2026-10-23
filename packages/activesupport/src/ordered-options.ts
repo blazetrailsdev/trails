@@ -1,7 +1,11 @@
 import { presence } from "./core-ext/object/blank.js";
-import { KeyError, merge, rbObjClassname } from "@blazetrails/ruby-compat";
+import { KeyError, rbObjClassname } from "@blazetrails/ruby-compat";
 
 export class OrderedOptions {
+  static toString(): string {
+    return "ActiveSupport::OrderedOptions";
+  }
+
   static name = "ActiveSupport::OrderedOptions";
 
   private readonly data: Map<string, unknown>;
@@ -170,6 +174,10 @@ export class OrderedOptions {
 }
 
 export class InheritableOptions extends OrderedOptions {
+  static toString(): string {
+    return "ActiveSupport::InheritableOptions";
+  }
+
   static override name = "ActiveSupport::InheritableOptions";
 
   private readonly parent: OrderedOptions | Record<string, unknown>;
@@ -188,10 +196,10 @@ export class InheritableOptions extends OrderedOptions {
   }
 
   override toH(): Record<string, unknown> {
-    return merge(
-      this.parent instanceof OrderedOptions ? this.parent.toH() : this.parent,
-      super.toH(),
-    );
+    return {
+      ...(this.parent instanceof OrderedOptions ? this.parent.toH() : this.parent),
+      ...super.toH(),
+    };
   }
 
   override inspect(): string {
@@ -235,6 +243,6 @@ export class InheritableOptions extends OrderedOptions {
   private parentIsKey(key: string): boolean {
     return this.parent instanceof OrderedOptions
       ? this.parent.isKey(key)
-      : key.startsWith(":") && Object.prototype.hasOwnProperty.call(this.parent, key.slice(1));
+      : key.startsWith(":") && Object.hasOwn(this.parent, key.slice(1));
   }
 }

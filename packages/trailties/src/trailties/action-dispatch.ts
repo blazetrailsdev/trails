@@ -1,13 +1,13 @@
-import { type Deprecators, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
   ActionDispatch,
+  Request,
   deprecator,
   X_REQUEST_ID,
   URL as HttpURL,
   QueryParser,
-  RequestUtils,
-  CacheConfig,
+  CacheRequest,
   Response,
   ExceptionWrapper,
   type CustomProxies,
@@ -55,11 +55,6 @@ declare module "../trailtie/configuration.js" {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
-interface TrailtieApp {
-  deprecators: Deprecators;
-}
-
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
@@ -100,16 +95,16 @@ export class Trailtie extends BaseTrailtie {
     } satisfies ActionDispatchConfig);
 
     this.initializer("action_dispatch.deprecator", { before: "load_environment_config" }, (app) => {
-      (app as TrailtieApp).deprecators.set("actionDispatch", deprecator());
+      app.deprecators.set("actionDispatch", deprecator());
     });
 
     this.initializer("action_dispatch.configure", (app) => {
-      const cfg = this.config.get("actionDispatch") as ActionDispatchConfig;
+      const cfg = this.config.actionDispatch;
 
       HttpURL.tldLength = cfg.tldLength;
       QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
-      RequestUtils.performDeepMunge = cfg.performDeepMunge;
-      CacheConfig.strictFreshness = cfg.strictFreshness;
+      Request.Utils.performDeepMunge = cfg.performDeepMunge;
+      CacheRequest.strictFreshness = cfg.strictFreshness;
       Response.defaultCharset = cfg.defaultCharset ?? "utf-8";
 
       Object.assign(ExceptionWrapper.rescueResponses, cfg.rescueResponses);
@@ -117,21 +112,16 @@ export class Trailtie extends BaseTrailtie {
       ActionDispatch.testApp = app;
     });
 
-    this.initializer(
-      "action_dispatch.require_message_pack",
-      { after: "finisher_hook" },
-      async () => {
-        const cookiesSerializer = (this.config.get("actionDispatch") as ActionDispatchConfig)
-          .cookiesSerializer;
-        if (
-          typeof cookiesSerializer === "string" &&
-          cookiesSerializer.includes("message_pack") &&
-          TopLevel.ActiveSupport!.MessagePack === undefined
-        ) {
-          await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
-        }
-      },
-    );
+    this.initializer("action_dispatch.require_message_pack", async () => {
+      const cookiesSerializer = this.config.actionDispatch.cookiesSerializer;
+      if (
+        typeof cookiesSerializer === "string" &&
+        cookiesSerializer.includes("message_pack") &&
+        TopLevel.ActiveSupport!.MessagePack === undefined
+      ) {
+        await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
+      }
+    });
   }
 }
 

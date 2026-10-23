@@ -1,3 +1,4 @@
+import { rbModAppendFeatures } from "@blazetrails/ruby-compat/include";
 import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -49,7 +50,7 @@ function overSuper(
     }
   }
   class Host extends Parent {}
-  QueryCache.appendFeatures(Host);
+  rbModAppendFeatures(Host, QueryCache);
   return Object.assign(new Host(), props);
 }
 

@@ -1,9 +1,4 @@
-import {
-  rbEqual,
-  rbObjAsString as toS,
-  rbStrSNew,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { rbEqual, rbObjAsString as toS, registerConstant } from "@blazetrails/ruby-compat";
 import { ImmutableStringType } from "./immutable-string.js";
 
 export class StringType extends ImmutableStringType {
@@ -25,7 +20,7 @@ export class StringType extends ImmutableStringType {
 
   /** @internal */
   protected castValue(value: unknown): string | null {
-    if (typeof value === "string") return rbStrSNew(value);
+    if (typeof value === "string") return value;
     else if (value === true) return this.true;
     else if (value === false) return this.false;
     else return toS(value);

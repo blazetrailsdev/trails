@@ -2,80 +2,101 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, Pathname } from "@blazetrails/ruby-compat";
+import { assert, assertEqual, assertNot, TopLevel } from "@blazetrails/activesupport";
 import {
   takeScreenshot,
   takeFailedScreenshot,
   imageName,
   imagePath,
   htmlPath,
+  relativeImagePath,
   screenshotsDir,
+  ScreenshotHelper,
   outputType,
   displayImage,
   incrementUnique,
   inlineBase64,
   supportsScreenshot,
-  type ScreenshotHelperHost,
 } from "../../system-testing/test-helpers/screenshot-helper.js";
+import type { BrowserType } from "playwright";
+import { requirePlaywright } from "../../system-testing/driver.js";
 
-function makeHost(testName: string): ScreenshotHelperHost & { metadata: Record<string, unknown> } {
-  return { _testName: testName, _screenshotCounter: undefined, _testFailed: false, metadata: {} };
-}
+const foundExecutable = new URL(import.meta.url).pathname;
+const { chromium, firefox } = (await requirePlaywright()) as {
+  chromium: BrowserType;
+  firefox: BrowserType;
+};
+vi.spyOn(chromium, "executablePath").mockImplementation(() => foundExecutable);
+vi.spyOn(firefox, "executablePath").mockImplementation(() => foundExecutable);
 
-describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
-  let host: ReturnType<typeof makeHost>;
+const { DrivenByRackTest, DrivenBySeleniumWithChrome } =
+  await import("../../../test-helpers/abstract-unit.js");
+
+const root = (path: string): string => new Pathname(Dir.pwd()).join(path).toString();
+
+describe("ScreenshotHelperTest", () => {
+  let trails: typeof TopLevel.Trails;
+  let host: InstanceType<typeof DrivenBySeleniumWithChrome>;
 
   beforeEach(() => {
-    host = makeHost("x");
+    host = new DrivenBySeleniumWithChrome("x");
+    host._screenshotCounter = undefined;
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT", "");
-    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT", "");
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
-    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
-    vi.stubEnv("CAPYBARA_SAVE_PATH", "");
+    trails = TopLevel.Trails;
+    TopLevel.Trails = { root: () => Dir.pwd() } as typeof TopLevel.Trails;
   });
 
   afterEach(() => {
+    TopLevel.Trails = trails;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
   it("image path is saved in tmp directory", () => {
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/0_x\.png$/);
+    assertEqual(root("tmp/screenshots/0_x.png"), imagePath.call(host));
   });
 
   it("image path unique counter is changed when incremented", () => {
     incrementUnique.call(host);
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/1_x\.png$/);
+    assertEqual(root("tmp/screenshots/1_x.png"), imagePath.call(host));
   });
 
   it("image path unique counter generates different path in same test", () => {
     incrementUnique.call(host);
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/1_x\.png$/);
+    assertEqual(root("tmp/screenshots/1_x.png"), imagePath.call(host));
     incrementUnique.call(host);
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/2_x\.png$/);
+    assertEqual(root("tmp/screenshots/2_x.png"), imagePath.call(host));
   });
 
-  it("image path uses the Capybara.save_path to set a custom directory", () => {
-    vi.stubEnv("CAPYBARA_SAVE_PATH", "custom_dir");
-    expect(imagePath.call(host)).toMatch(/custom_dir\/0_x\.png$/);
+  it("image path uses the Vitest.save_path to set a custom directory", () => {
+    const originalSavePath = ScreenshotHelper.screenshotDirectory;
+    ScreenshotHelper.screenshotDirectory = "custom_dir";
+    try {
+      assertEqual(root("custom_dir/0_x.png"), imagePath.call(host));
+    } finally {
+      ScreenshotHelper.screenshotDirectory = originalSavePath;
+    }
   });
 
   it("image path includes failures text if test did not pass", () => {
-    host._testFailed = true;
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/failures_x\.png$/);
-    expect(htmlPath.call(host)).toMatch(/tmp\/screenshots\/failures_x\.html$/);
+    vi.spyOn(host, "isPassed").mockReturnValue(false);
+    assertEqual(root("tmp/screenshots/failures_x.png"), imagePath.call(host));
+    assertEqual(root("tmp/screenshots/failures_x.html"), htmlPath.call(host));
   });
 
   it("image path does not include failures text if test skipped", () => {
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/0_x\.png$/);
-    expect(htmlPath.call(host)).toMatch(/tmp\/screenshots\/0_x\.html$/);
+    vi.spyOn(host, "isPassed").mockReturnValue(false);
+    vi.spyOn(host, "isSkipped").mockReturnValue(true);
+    assertEqual(root("tmp/screenshots/0_x.png"), imagePath.call(host));
+    assertEqual(root("tmp/screenshots/0_x.html"), htmlPath.call(host));
   });
 
   it("image name truncates names over 225 characters including counter", () => {
-    const longHost = makeHost("x".repeat(400));
-    const name = imageName.call(longHost);
-    expect(name.length).toBeLessThanOrEqual(225);
-    expect(name).toMatch(/^0_x+$/);
+    const longHost = new DrivenBySeleniumWithChrome("x".repeat(400));
+    assertEqual(root(`tmp/screenshots/0_${"x".repeat(223)}.png`), imagePath.call(longHost));
+    assertEqual(root(`tmp/screenshots/0_${"x".repeat(223)}.html`), htmlPath.call(longHost));
   });
 
   it("defaults to simple output for the screenshot", () => {
@@ -83,9 +104,9 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
   });
 
   it("Non word characters are replaced with dashes in paths", () => {
-    const h = makeHost("x/y\\z?<br>-span");
-    expect(imagePath.call(h)).toMatch(/tmp\/screenshots\/0_x-y-z-br-span\.png$/);
-    expect(htmlPath.call(h)).toMatch(/tmp\/screenshots\/0_x-y-z-br-span\.html$/);
+    const h = new DrivenBySeleniumWithChrome("x/y\\z?<br>-span");
+    assertEqual(root("tmp/screenshots/0_x-y-z-br-span.png"), imagePath.call(h));
+    assertEqual(root("tmp/screenshots/0_x-y-z-br-span.html"), htmlPath.call(h));
   });
 
   it("take_screenshot allows changing screenshot display format via screenshot: kwarg", () => {
@@ -95,7 +116,7 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
       content: vi.fn().mockResolvedValue("<html></html>"),
     };
-    host._page = page;
+    host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host, { screenshot: "artifact" }).then(() => {
       const out = msgs.join("\n");
       expect(out).toMatch(/url=artifact:\/\//);
@@ -105,16 +126,20 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
 
   it("take_screenshot saves HTML and shows link to it when using html: kwarg", () => {
     const msgs: string[] = [];
+    let calledSaveHtml = false;
     const consoleSpy = vi.spyOn(console, "log").mockImplementation((m: string) => msgs.push(m));
     const page = {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
-      content: vi.fn().mockResolvedValue("<html></html>"),
+      content: vi.fn(async () => {
+        calledSaveHtml = true;
+        return "<html></html>";
+      }),
     };
-    host._page = page;
+    host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host, { html: true }).then(() => {
       const out = msgs.join("\n");
+      assert(calledSaveHtml);
       expect(out).toMatch(/\[Screenshot HTML\]/);
-      expect(page.content).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
   });
@@ -122,14 +147,19 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
   it("take_screenshot saves HTML and shows link to it when using RAILS_SYSTEM_TESTING_SCREENSHOT_HTML env", () => {
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "1");
     const msgs: string[] = [];
+    let calledSaveHtml = false;
     const consoleSpy = vi.spyOn(console, "log").mockImplementation((m: string) => msgs.push(m));
     const page = {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
-      content: vi.fn().mockResolvedValue("<html></html>"),
+      content: vi.fn(async () => {
+        calledSaveHtml = true;
+        return "<html></html>";
+      }),
     };
-    host._page = page;
+    host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host).then(() => {
       const out = msgs.join("\n");
+      assert(calledSaveHtml);
       expect(out).toMatch(/\[Screenshot HTML\]/);
       consoleSpy.mockRestore();
     });
@@ -143,7 +173,7 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
       content: vi.fn().mockResolvedValue("<html></html>"),
     };
-    host._page = page;
+    host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host).then(() => {
       expect(msgs.join("\n")).toMatch(/url=artifact:\/\//);
       consoleSpy.mockRestore();
@@ -151,37 +181,21 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
   });
 
   it("take_failed_screenshot persists the image path in the test metadata", () => {
-    host._testFailed = true;
+    vi.spyOn(host, "isPassed").mockReturnValue(false);
     const page = {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
       content: vi.fn().mockResolvedValue("<html></html>"),
     };
-    host._page = page;
+    host._page = page as unknown as typeof host._page;
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     return takeFailedScreenshot.call(host).then(() => {
-      expect(host.metadata["failure_screenshot_path"]).toMatch(
-        /tmp\/screenshots\/failures_x\.png$/,
-      );
+      assertEqual(relativeImagePath.call(host), host.metadata["failure_screenshot_path"]);
       consoleSpy.mockRestore();
     });
   });
 
   it("image path returns the absolute path from root", () => {
-    const path = imagePath.call(host);
-    expect(path).toContain("tmp/screenshots");
-    expect(path).toMatch(/tmp\/screenshots\/0_x\.png$/);
-  });
-
-  it("rack_test driver does not support screenshot", () => {
-    expect(supportsScreenshot.call(host)).toBe(false);
-  });
-
-  it("selenium driver supports screenshot", () => {
-    host._page = {
-      screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
-      content: vi.fn().mockResolvedValue(""),
-    };
-    expect(supportsScreenshot.call(host)).toBe(true);
+    assertEqual(root("tmp/screenshots/0_x.png"), imagePath.call(host));
   });
 
   it("screenshotsDir defaults to tmp/screenshots", () => {
@@ -197,16 +211,35 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
     const dir = File.join(mkdtempSync(join(tmpdir(), "trails-screenshot-")), "tmp", "screenshots");
     FileUtils.mkdirP(dir);
     File.binwrite(File.join(dir, `${imageName.call(host)}.png`), "\u0089PNG");
-    vi.stubEnv("CAPYBARA_SAVE_PATH", dir);
+    const originalSavePath = ScreenshotHelper.screenshotDirectory;
+    ScreenshotHelper.screenshotDirectory = dir;
     vi.spyOn(globalThis.process, "cwd").mockReturnValue("");
 
-    const msg = displayImage.call(host, { html: false, screenshotOutput: "inline" });
-    expect(msg).toContain(Buffer.from(bytes).toString("base64"));
+    try {
+      const msg = displayImage.call(host, { html: false, screenshotOutput: "inline" });
+      expect(msg).toContain(Buffer.from(bytes).toString("base64"));
+    } finally {
+      ScreenshotHelper.screenshotDirectory = originalSavePath;
+    }
   });
 
   it("displayImage shows screenshot path in simple mode", () => {
     const msg = displayImage.call(host, { html: false, screenshotOutput: "simple" });
     expect(msg).toMatch(/\[Screenshot Image\]/);
     expect(msg).not.toMatch(/\[Screenshot HTML\]/);
+  });
+});
+
+describe("RackTestScreenshotsTest", () => {
+  it("rack_test driver does not support screenshot", () => {
+    const test = new DrivenByRackTest("rack_test driver does not support screenshot");
+    assertNot(supportsScreenshot.call(test));
+  });
+});
+
+describe("SeleniumScreenshotsTest", () => {
+  it("selenium driver supports screenshot", () => {
+    const test = new DrivenBySeleniumWithChrome("selenium driver supports screenshot");
+    assert(supportsScreenshot.call(test));
   });
 });

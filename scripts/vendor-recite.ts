@@ -51,7 +51,7 @@ export async function lockedVersions(root: string): Promise<Record<string, strin
   );
 }
 
-const VERSION_SEGMENT = /^v\d[\w.-]*$/;
+const VERSION_SEGMENT = /^v?\d[\w.-]*$/;
 
 function citationPattern(): RegExp {
   const names = SOURCES.map((s) => s.name.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&"));

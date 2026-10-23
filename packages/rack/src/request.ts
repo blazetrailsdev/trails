@@ -3,7 +3,6 @@ import {
   RACK_METHODOVERRIDE_ORIGINAL_METHOD,
   SERVER_NAME,
   SERVER_PORT,
-  SERVER_PROTOCOL,
   QUERY_STRING,
   PATH_INFO,
   SCRIPT_NAME,
@@ -34,23 +33,24 @@ import {
   RACK_REQUEST_FORM_ERROR,
   RACK_REQUEST_COOKIE_HASH,
   RACK_REQUEST_COOKIE_STRING,
-  HTTP_FORWARDED,
-  HTTP_X_FORWARDED_FOR,
-  HTTP_X_FORWARDED_PORT,
-  HTTP_X_FORWARDED_HOST,
-  HTTP_X_FORWARDED_PROTO,
-  HTTP_X_FORWARDED_SCHEME,
-  HTTP_X_FORWARDED_SSL,
 } from "./constants.js";
 import {
   forwardedValues,
-  getDefaultQueryParser,
+  defaultQueryParser,
   parseCookiesHeader,
   QueryParser,
   unescape,
 } from "./utils.js";
-import { block as rbBlock, fetch, include } from "@blazetrails/ruby-compat";
-import * as MediaTypeModule from "./media-type.js";
+import {
+  block as rbBlock,
+  fetch,
+  hashDelete,
+  include,
+  rbObjDup,
+  warn,
+  strNew,
+} from "@blazetrails/ruby-compat";
+import { MediaType } from "./media-type.js";
 import * as Multipart from "./multipart.js";
 
 const ipv6 = [
@@ -85,6 +85,20 @@ export const DEFAULT_PORTS: Record<string, number | undefined> = {
   coffee: 80,
 };
 
+export const HTTP_X_FORWARDED_FOR = "HTTP_X_FORWARDED_FOR";
+
+export const HTTP_X_FORWARDED_HOST = "HTTP_X_FORWARDED_HOST";
+
+export const HTTP_FORWARDED = "HTTP_FORWARDED";
+
+export const HTTP_X_FORWARDED_SCHEME = "HTTP_X_FORWARDED_SCHEME";
+
+export const HTTP_X_FORWARDED_PROTO = "HTTP_X_FORWARDED_PROTO";
+
+export const HTTP_X_FORWARDED_PORT = "HTTP_X_FORWARDED_PORT";
+
+export const HTTP_X_FORWARDED_SSL = "HTTP_X_FORWARDED_SSL";
+
 const ALLOWED_SCHEMES = ["https", "http", "wss", "ws"] as const;
 const FORWARDED_SCHEME_HEADERS: Record<string, string> = {
   proto: HTTP_X_FORWARDED_PROTO,
@@ -106,6 +120,54 @@ const trustedProxies = new RegExp(
   "i",
 );
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `module Env` (`rack/request.rb:82`); the class/interface merge is how the module's host state surfaces on the type side. */
+export interface Env {
+  env: Record<string, any>;
+}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
+export abstract class Env {
+  hasHeader(name: string): boolean {
+    return Object.hasOwn(this.env, name);
+  }
+
+  getHeader(name: string): any {
+    return this.env[name];
+  }
+
+  fetchHeader(name: string): any;
+  fetchHeader(name: string, block: (key: string) => any): any;
+  fetchHeader(name: string, block?: (key: string) => any): any {
+    return block === undefined ? fetch(this.env, name) : fetch(this.env, name, rbBlock(block));
+  }
+
+  eachHeader(callback: (key: string, value: any) => void): void {
+    for (const [k, v] of Object.entries(this.env)) callback(k, v);
+  }
+
+  setHeader(name: string, v: any): any {
+    return (this.env[name] = v);
+  }
+
+  addHeader(key: string, v: string | null): any {
+    if (v == null) {
+      return this.getHeader(key);
+    } else if (this.hasHeader(key)) {
+      return this.setHeader(key, `${this.getHeader(key)},${v}`);
+    } else {
+      return this.setHeader(key, v);
+    }
+  }
+
+  deleteHeader(name: string): any {
+    return hashDelete(this.env, name);
+  }
+
+  initializeCopy(other: Env): Record<string, any> {
+    return (this.env = rbObjDup(other.env));
+  }
+}
+
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers`; the class/interface merge is how the module's host state surfaces on the type side. */
 export interface Helpers {
   readonly env: Record<string, any>;
@@ -117,7 +179,7 @@ export interface Helpers {
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
 export abstract class Helpers {
   get body(): any {
-    return this.getHeader(RACK_INPUT);
+    return this.getHeader(RACK_INPUT) ?? null;
   }
 
   get scriptName(): string {
@@ -163,7 +225,9 @@ export abstract class Helpers {
   }
 
   get session(): Record<string, any> {
-    return this.fetchHeader(RACK_SESSION, (k) => this.setHeader(k, this.defaultSession()));
+    return this.fetchHeader(RACK_SESSION, (_k) =>
+      this.setHeader(RACK_SESSION, this.defaultSession()),
+    );
   }
 
   get sessionOptions(): Record<string, any> {
@@ -308,8 +372,13 @@ export abstract class Helpers {
   get forwardedFor(): Array<string | undefined> | null {
     for (const type of this.forwardedPriority()) {
       if (type === "forwarded") {
-        const forwardedFor = this.getHttpForwarded("for");
-        if (forwardedFor) return forwardedFor.map((authority) => this.splitAuthority(authority)[1]);
+        const forwardedFor: Array<string | undefined> | null = this.getHttpForwarded("for");
+        if (forwardedFor) {
+          for (const [i, authority] of forwardedFor.entries()) {
+            forwardedFor[i] = this.splitAuthority(authority)[1];
+          }
+          return forwardedFor;
+        }
       } else if (type === "x_forwarded") {
         const value = this.getHeader(HTTP_X_FORWARDED_FOR);
         if (value)
@@ -375,11 +444,11 @@ export abstract class Helpers {
   }
 
   get mediaType(): string | null {
-    return MediaTypeModule.type(this.contentType);
+    return MediaType.type(this.contentType);
   }
 
   get mediaTypeParams(): Record<string, string> {
-    return MediaTypeModule.params(this.contentType);
+    return MediaType.params(this.contentType);
   }
 
   get contentCharset(): string | null {
@@ -408,8 +477,9 @@ export abstract class Helpers {
       return this.getHeader(RACK_REQUEST_QUERY_HASH);
     } else {
       if (rrQueryString != null) {
-        console.warn(
+        warn(
           "query string used for GET parsing different from current query string. Starting in Rack 3.2, Rack will used the cached GET value instead of parsing the current query string.",
+          { uplevel: 1 },
         );
       }
       const queryHash = this.parseQuery(queryString, "&");
@@ -434,8 +504,9 @@ export abstract class Helpers {
         if (formInput === rackInput) {
           return formHash;
         } else if (formInput) {
-          console.warn(
+          warn(
             "input stream used for POST parsing different from current input stream. Starting in Rack 3.2, Rack will used the cached POST value instead of parsing the current input stream.",
+            { uplevel: 1 },
           );
         }
       }
@@ -453,7 +524,8 @@ export abstract class Helpers {
           this.setHeader(RACK_REQUEST_FORM_PAIRS, pairs);
           this.setHeader(RACK_REQUEST_FORM_HASH, this.expandParamPairs(pairs));
         } else {
-          let formVars: string = this.getHeader(RACK_INPUT).read();
+          const input: string | Uint8Array = this.getHeader(RACK_INPUT).read();
+          let formVars = typeof input === "string" ? input : strNew(Array.from(input));
 
           if (formVars.endsWith("\0")) formVars = formVars.slice(0, -1);
 
@@ -479,29 +551,23 @@ export abstract class Helpers {
   }
 
   updateParam(k: string, v: any): void {
-    const get = this.GET;
-    const post = this.POST;
-    if (k in post) {
-      post[k] = v;
-    } else {
-      get[k] = v;
+    let found = false;
+    if (Object.hasOwn(this.GET, k)) {
+      found = true;
+      this.GET[k] = v;
+    }
+    if (Object.hasOwn(this.POST, k)) {
+      found = true;
+      this.POST[k] = v;
+    }
+    if (!found) {
+      this.GET[k] = v;
     }
   }
 
   deleteParam(k: string): any {
-    const post = this.POST;
-    if (k in post) {
-      const val = post[k];
-      delete post[k];
-      return val;
-    }
-    const get = this.GET;
-    if (k in get) {
-      const val = get[k];
-      delete get[k];
-      return val;
-    }
-    return undefined;
+    const [postValue, getValue] = [hashDelete(this.POST, k), hashDelete(this.GET, k)];
+    return postValue != null && postValue !== false ? postValue : getValue;
   }
 
   get baseUrl(): string {
@@ -533,8 +599,9 @@ export abstract class Helpers {
   }
 
   valuesAt(...keys: string[]): any[] {
-    console.warn(
+    warn(
       "Request#values_at is deprecated and will be removed in a future version of Rack. Please use request.params.values_at instead",
+      { uplevel: 1 },
     );
 
     return keys.map((key) => this.params[key]);
@@ -579,7 +646,7 @@ export abstract class Helpers {
 
   /** @internal */
   queryParser(): QueryParser {
-    return getDefaultQueryParser();
+    return defaultQueryParser();
   }
 
   /** @internal */
@@ -671,84 +738,57 @@ export abstract class Helpers {
 export class Request {
   env: Record<string, any>;
 
-  static ipFilter: (ip: string | undefined) => boolean = (ip: string | undefined) =>
+  static #ipFilter: (ip: string | undefined) => boolean = (ip: string | undefined) =>
     ip != null && trustedProxies.test(ip);
+  static get ipFilter(): (ip: string | undefined) => boolean {
+    return Request.#ipFilter;
+  }
+  static set ipFilter(ipFilter: (ip: string | undefined) => boolean) {
+    Request.#ipFilter = ipFilter;
+  }
   static forwardedPriority: Array<"forwarded" | "x_forwarded" | null> = [
     "forwarded",
     "x_forwarded",
   ];
   static xForwardedProtoPriority: Array<"proto" | "scheme" | null> = ["proto", "scheme"];
 
+  /** @internal */
+  private _params: Record<string, any> | null;
+
   constructor(env: Record<string, any>) {
     this.env = env;
+    this._params = null;
+  }
+
+  get params(): Record<string, any> {
+    return (this._params ||= { ...this.GET, ...this.POST });
+  }
+
+  updateParam(k: string, v: any): void {
+    let found = false;
+    if (Object.hasOwn(this.GET, k)) {
+      found = true;
+      this.GET[k] = v;
+    }
+    if (Object.hasOwn(this.POST, k)) {
+      found = true;
+      this.POST[k] = v;
+    }
+    if (!found) {
+      this.GET[k] = v;
+    }
+    this._params = null;
+  }
+
+  deleteParam(k: string): any {
+    const [postValue, getValue] = [hashDelete(this.POST, k), hashDelete(this.GET, k)];
+    const v = postValue != null && postValue !== false ? postValue : getValue;
+    this._params = null;
+    return v;
   }
 
   dup(): Request {
     return new (this.constructor as typeof Request)({ ...this.env });
-  }
-
-  has(key: string): boolean {
-    return key in this.env;
-  }
-
-  getHeader(name: string): any {
-    return this.env[name];
-  }
-
-  get(key: string, defaultValue?: any): any {
-    if (key in this.env) return this.env[key];
-    if (typeof defaultValue === "function") return defaultValue();
-    return defaultValue;
-  }
-
-  set(key: string, value: any): void {
-    this.env[key] = value;
-  }
-
-  addHeader(key: string, v: string): void {
-    const existing = this.env[key];
-    if (existing) {
-      this.env[key] = existing + "," + v;
-    } else {
-      this.env[key] = v;
-    }
-  }
-
-  deleteHeader(name: string): any {
-    const val = this.env[name];
-    delete this.env[name];
-    return val;
-  }
-
-  each(callback: (key: string, value: any) => void): void {
-    for (const [k, v] of Object.entries(this.env)) {
-      callback(k, v);
-    }
-  }
-
-  fetchHeader(name: string): any;
-  fetchHeader(name: string, block: (key: string) => any): any;
-  fetchHeader(name: string, block?: (key: string) => any): any {
-    return block === undefined ? fetch(this.env, name) : fetch(this.env, name, rbBlock(block));
-  }
-
-  setHeader(name: string, v: any): any {
-    return (this.env[name] = v);
-  }
-
-  eachHeader(callback: (key: string, value: any) => void): void {
-    this.each(callback);
-  }
-
-  get serverProtocol(): string {
-    return this.env[SERVER_PROTOCOL];
-  }
-
-  get prefetch(): boolean {
-    const purpose = (this.env["HTTP_X_MOZ"] || "").toLowerCase();
-    const secPurpose = (this.env["HTTP_SEC_PURPOSE"] || "").toLowerCase();
-    const purpose2 = (this.env["HTTP_PURPOSE"] || "").toLowerCase();
-    return purpose === "prefetch" || secPurpose === "prefetch" || purpose2 === "prefetch";
   }
 
   /** @noRailsEquivalent CONVERGEABLE port-rack-request-form-pairs */
@@ -773,6 +813,8 @@ export class Request {
   }
 }
 
+include(Request, Env);
 include(Request, Helpers);
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/request.rb:790`); the class/interface merge is how a mixin surfaces on the type side. */
-export interface Request extends Omit<Helpers, "env" | "getHeader" | "setHeader" | "fetchHeader"> {}
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/request.rb:790`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Request
+  extends Env, Omit<Helpers, "env" | "getHeader" | "setHeader" | "fetchHeader"> {}

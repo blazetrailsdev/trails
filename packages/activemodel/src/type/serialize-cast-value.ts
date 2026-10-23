@@ -1,9 +1,5 @@
-import { Concern, extend, include, included, Module } from "@blazetrails/activesupport";
-import {
-  rbModAncestors,
-  rbModInstanceMethod,
-  rbModPublicMethodDefined,
-} from "@blazetrails/ruby-compat";
+import { Concern, extend, include, included } from "@blazetrails/activesupport";
+import { rbModAncestors, rbModInstanceMethod, rbModMethodDefined } from "@blazetrails/ruby-compat";
 
 interface SerializeCastValueHost {
   constructor: { serializeCastValueCompatible(): boolean };
@@ -14,11 +10,10 @@ interface SerializeCastValueType {
   serialize(value: unknown): unknown;
 }
 
-export const SerializeCastValue = new Module() as Module<{
+export const SerializeCastValue = {} as {
   itselfIfSerializeCastValueCompatible: typeof itselfIfSerializeCastValueCompatible;
-}> & {
   ClassMethods: typeof ClassMethods;
-  DefaultImplementation: Module;
+  DefaultImplementation: typeof DefaultImplementation;
   [included](klass: { prototype: object }): void;
   serialize(type: SerializeCastValueType, value: unknown): unknown;
 };
@@ -45,17 +40,17 @@ export const ClassMethods = {
   },
 };
 
-export const DefaultImplementation = new Module().include({
+export const DefaultImplementation = {
   serializeCastValue(value: unknown): unknown {
     return value;
   },
-});
+};
 
 SerializeCastValue.ClassMethods = ClassMethods;
 SerializeCastValue.DefaultImplementation = DefaultImplementation;
 
 SerializeCastValue[included] = function (klass: { prototype: object }): void {
-  if (!rbModPublicMethodDefined(klass, "serializeCastValue")) {
+  if (!rbModMethodDefined(klass, "serializeCastValue")) {
     include(klass, DefaultImplementation);
   }
 };
@@ -78,7 +73,7 @@ export function serialize(type: SerializeCastValueType, value: unknown): unknown
     return type.serialize(value);
   }
 }
-SerializeCastValue.serialize = serialize;
+Object.defineProperty(SerializeCastValue, "serialize", { value: serialize, writable: true });
 
 export function itselfIfSerializeCastValueCompatible<T extends SerializeCastValueHost>(
   this: T,
@@ -86,7 +81,4 @@ export function itselfIfSerializeCastValueCompatible<T extends SerializeCastValu
   if (this.constructor.serializeCastValueCompatible()) return this;
   return null;
 }
-SerializeCastValue.defineMethod(
-  "itselfIfSerializeCastValueCompatible",
-  itselfIfSerializeCastValueCompatible,
-);
+SerializeCastValue.itselfIfSerializeCastValueCompatible = itselfIfSerializeCastValueCompatible;

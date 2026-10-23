@@ -1,3 +1,4 @@
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 const ACTIVE_SUPPORT_EXECUTION_CONTEXT = "active_support_execution_context";
@@ -96,7 +97,7 @@ export const ExecutionContext = {
   },
 
   toH(): Record<string, unknown> {
-    return Object.fromEntries(store());
+    return Object.fromEntries(rbObjDup(store()));
   },
 
   clear(): void {

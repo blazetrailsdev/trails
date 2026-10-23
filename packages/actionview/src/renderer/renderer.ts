@@ -36,7 +36,7 @@ export class Renderer {
     | RenderedCollection
     | EmptyCollection
     | Promise<RenderedTemplate | RenderedCollection | EmptyCollection> {
-    if (Object.prototype.hasOwnProperty.call(options, "partial")) {
+    if (Object.hasOwn(options, "partial")) {
       return this.renderPartialToObject(context, options);
     }
     return this.renderTemplateToObject(context, options);
@@ -46,7 +46,7 @@ export class Renderer {
     context: ViewContext,
     options: RenderOptions,
   ): Promise<Body | (string | SafeBuffer | null)[]> {
-    if (Object.prototype.hasOwnProperty.call(options, "partial")) {
+    if (Object.hasOwn(options, "partial")) {
       return [await this.renderPartial(context, options)];
     }
     return new StreamingTemplateRenderer(this.lookupContext).render(context, options);
@@ -64,7 +64,10 @@ export class Renderer {
 
   cacheHits: Record<string, unknown> = {};
 
-  private renderTemplateToObject(context: ViewContext, options: RenderOptions): RenderedTemplate {
+  private renderTemplateToObject(
+    context: ViewContext,
+    options: RenderOptions,
+  ): Promise<RenderedTemplate> {
     return new TemplateRenderer(this.lookupContext).render(context, options);
   }
 
@@ -91,7 +94,7 @@ export class Renderer {
         );
       }
 
-      if (Object.prototype.hasOwnProperty.call(options, "object")) {
+      if (Object.hasOwn(options, "object")) {
         return new ObjectRenderer(this.lookupContext, options).renderObjectWithPartial(
           options.object,
           partial,
@@ -106,11 +109,8 @@ export class Renderer {
     const collection = collectionFromObject(partial) ?? collectionFromOptions(options);
 
     if (collection !== undefined) {
-      return new CollectionRenderer(this.lookupContext, options).renderCollectionDerivePartial(
-        collection,
-        context,
-        block,
-      );
+      const renderer = new CollectionRenderer(this.lookupContext, options);
+      return renderer.renderCollectionDerivePartial(collection, context, block);
     }
 
     return new ObjectRenderer(this.lookupContext, options).renderObjectDerivePartial(
@@ -127,13 +127,15 @@ function isThenable<T>(value: T | Promise<T>): value is Promise<T> {
 
 /** @internal */
 function collectionFromOptions(options: RenderOptions): readonly unknown[] | undefined {
-  if (!Object.prototype.hasOwnProperty.call(options, "collection")) return undefined;
+  if (!Object.hasOwn(options, "collection")) return undefined;
   return (options.collection as readonly unknown[] | null | undefined) ?? [];
 }
 
 /** @internal */
-function collectionFromObject(object: unknown): readonly unknown[] | undefined {
-  if (Array.isArray(object)) return object;
-  if (rbObjRespondTo(object, "toAry")) return (object as { toAry(): readonly unknown[] }).toAry();
+function collectionFromObject(
+  object: unknown,
+): readonly unknown[] | PromiseLike<readonly unknown[]> | undefined {
+  if (rbObjRespondTo(object, "toAry"))
+    return object as readonly unknown[] | PromiseLike<readonly unknown[]>;
   return undefined;
 }

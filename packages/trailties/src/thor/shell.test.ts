@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport";
-import { include, initializeIncludedModules, setEnv } from "@blazetrails/ruby-compat";
+import { include, rbObjRespondTo, setEnv } from "@blazetrails/ruby-compat";
 import { Base, Shell } from "./shell.js";
 import { Basic } from "./shell/basic.js";
 
@@ -9,9 +9,16 @@ Base.shell = Shell.Basic;
 class Counter {
   options: Record<string, unknown>;
 
-  constructor(args: unknown[] = [], options: Record<string, unknown> = {}, config: object = {}) {
+  constructor(
+    args: unknown[] = [],
+    options: Record<string, unknown> = {},
+    config: { shell?: Basic | null } = {},
+  ) {
     this.options = options;
-    initializeIncludedModules(this, args, options, config);
+    (this as unknown as Shell).shell = config.shell as Basic;
+    if (rbObjRespondTo((this as unknown as Shell).shell, "base")) {
+      (this as unknown as Shell).shell.base ||= this as never;
+    }
   }
 }
 include(Counter, Shell);

@@ -1,6 +1,22 @@
-import { excBacktraceLocations, File, type Location } from "@blazetrails/ruby-compat";
+import {
+  DelegateClass,
+  excBacktraceLocations,
+  File,
+  Location,
+  Pathname,
+  rbObjClassname,
+  rbObjRespondTo,
+  toEnum,
+  type Enumerator,
+} from "@blazetrails/ruby-compat";
 
-import { ActionableError, cattrAccessor, type BacktraceCleaner } from "@blazetrails/activesupport";
+import {
+  ActionableError,
+  cattrAccessor,
+  SyntaxErrorProxy,
+  TopLevel,
+  type BacktraceCleaner,
+} from "@blazetrails/activesupport";
 import { statusCode } from "@blazetrails/rack";
 import { PathRegistry, type Spot, type Template } from "@blazetrails/actionview";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
@@ -8,37 +24,20 @@ import { RoutingError } from "../../action-controller/metal/exceptions.js";
 /** @noRailsEquivalent PERMANENT */
 export type BacktraceLine = Location | SourceMapLocation;
 
-class SourceMapLocation {
-  private location: Location;
+/** @internal */
+export class SourceMapLocation extends DelegateClass(Location) {
   private template: Template;
 
   constructor(location: Location, template: Template) {
-    this.location = location;
+    super(location);
     this.template = template;
   }
 
-  get path(): string | null {
-    return this.location.path;
-  }
-
-  get lineno(): number {
-    return this.location.lineno;
-  }
-
-  get label(): string | null {
-    return this.location.label;
-  }
-
-  toString(): string {
-    return this.location.toString();
-  }
-
-  /** @missingRailsCall super — PERMANENT */
   spot(exc: Error): Spot | null {
-    const location = this.template.spot(this.location);
+    const location = this.template.spot(this.__getobj__());
 
     if (location) {
-      return this.template.translateLocation(this.location, location);
+      return this.template.translateLocation(this.__getobj__(), location);
     }
     return null;
   }
@@ -46,14 +45,6 @@ class SourceMapLocation {
 
 export interface ShowExceptionsRequest {
   getHeader(name: string): unknown;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function classNameOf(e: Error): string {
-  if (e.name && e.name !== "Error") return e.name;
-  const ctor = e.constructor?.name;
-  if (ctor && ctor !== "Error") return ctor;
-  return e.name || ctor || "Error";
 }
 
 const EXCEPTION_IDS = new WeakMap<object, number>();
@@ -69,16 +60,17 @@ function _idFor(err: object): number {
 
 export type TraceEntry = { file: string; line: number };
 export type TraceWithId = { exceptionObjectId: number; id: number; trace: string };
-export type SourceExtract = TraceEntry & {
-  code?: Record<number, string | [string, string, string]>;
+export type SourceExtract = {
+  code: Record<number, string | [string, string, string]> | null;
+  lineNumber: number;
 };
 
 export class ExceptionWrapper {
-  declare static rescueResponses: Record<string, string>;
+  declare static rescueResponses: Record<string, string | number>;
   declare static rescueTemplates: Record<string, string>;
   declare static wrapperExceptions: string[];
   declare static silentExceptions: string[];
-  declare rescueResponses: Record<string, string>;
+  declare rescueResponses: Record<string, string | number>;
   declare rescueTemplates: Record<string, string>;
   declare wrapperExceptions: string[];
   declare silentExceptions: string[];
@@ -132,7 +124,6 @@ export class ExceptionWrapper {
   readonly exceptionClassName: string;
   readonly wrappedCauses: ExceptionWrapper[];
   readonly statusCode: number;
-  readonly statusText: string;
   /** @internal */
   readonly backtrace: BacktraceLine[];
 
@@ -142,11 +133,13 @@ export class ExceptionWrapper {
     const backtraceCleaner = b !== undefined ? (a as BacktraceCleaner | null) : null;
     const exception = b !== undefined ? b : (a as Error);
     this.backtraceCleaner = backtraceCleaner;
-    this.exception = exception;
-    this.exceptionClassName = classNameOf(exception);
+    this.exceptionClassName = rbObjClassname(exception);
     this.wrappedCauses = this.wrappedCausesFor(exception, backtraceCleaner);
+    this.exception = exception;
+    if (exception instanceof SyntaxError) {
+      this.exception = new SyntaxErrorProxy(exception);
+    }
     this.statusCode = this.computeStatusCode();
-    this.statusText = STATUS_TEXTS[this.statusCode] ?? "Internal Server Error";
     this.backtrace = this.buildBacktrace();
   }
 
@@ -162,7 +155,7 @@ export class ExceptionWrapper {
 
   get exceptionName(): string {
     const cause = this.exception.cause;
-    return cause instanceof Error ? classNameOf(cause) : this.exceptionClassName;
+    return cause instanceof Error ? rbObjClassname(cause) : this.exceptionClassName;
   }
 
   get message(): string {
@@ -298,10 +291,10 @@ export class ExceptionWrapper {
     const status = Object.hasOwn(this.rescueResponses, className)
       ? this.rescueResponses[className]
       : ":internal_server_error";
-    return statusCode(status.slice(1));
+    return statusCode(status);
   }
 
-  show(request: ShowExceptionsRequest): boolean {
+  isShow(request: ShowExceptionsRequest): boolean {
     const config = request.getHeader("action_dispatch.show_exceptions");
     if (config === "none") return false;
     if (config === "rescuable") return this.rescueResponse();
@@ -324,14 +317,6 @@ export class ExceptionWrapper {
     return this.backtrace.map((trace) => this.extractSource(trace));
   }
 
-  toResponse(): [number, Record<string, string>, string] {
-    return [
-      this.statusCode,
-      { "content-type": "text/plain; charset=utf-8" },
-      `${this.statusCode} ${this.statusText}\n${this.message}\n`,
-    ];
-  }
-
   /** @internal */
   buildBacktrace(): BacktraceLine[] {
     const builtMethods = new Map<string, Template>();
@@ -352,12 +337,14 @@ export class ExceptionWrapper {
   }
 
   /** @internal */
-  *causesFor(exception: Error): Generator<Error> {
-    let cur: unknown = exception.cause;
-    while (cur instanceof Error) {
-      yield cur;
-      cur = cur.cause;
-    }
+  causesFor(exception: Error): Enumerator<Error>;
+  /** @internal */
+  causesFor(exception: Error, block: (cause: Error) => void): void;
+  /** @internal */
+  causesFor(exception: Error, block?: (cause: Error) => void): Enumerator<Error> | void {
+    if (!block) return toEnum(this, "causesFor", exception);
+
+    while ((exception = exception.cause as Error) != null) block(exception);
   }
 
   /** @internal */
@@ -374,14 +361,11 @@ export class ExceptionWrapper {
 
   /** @internal */
   cleanBacktrace(args: "silent" | "noise" | "all"): Array<BacktraceLine | string> {
-    const lines = this.backtrace;
-    const partitioned =
-      args === "silent"
-        ? lines.filter((l) => !String(l).includes("node_modules"))
-        : args === "noise"
-          ? lines.filter((l) => String(l).includes("node_modules"))
-          : lines;
-    return this.backtraceCleaner ? this.backtraceCleaner.clean(partitioned) : partitioned;
+    if (this.backtraceCleaner) {
+      return this.backtraceCleaner.clean(this.backtrace, args);
+    } else {
+      return this.backtrace;
+    }
   }
 
   /** @internal */
@@ -401,76 +385,53 @@ export class ExceptionWrapper {
         ];
       }
 
-      return { file: String(trace), line, code };
+      return {
+        code: code,
+        lineNumber: line,
+      };
     }
 
     const [file, lineNumber] = this.extractFileAndLineNumber(trace);
-    if (file == null) return { file: String(trace), line: 0 };
-    const code = this.sourceFragment(file, lineNumber);
-    return code ? { file, line: lineNumber, code } : { file, line: lineNumber };
+
+    return {
+      code: this.sourceFragment(file, lineNumber),
+      lineNumber: lineNumber,
+    };
   }
 
   /** @internal */
   extractSourceFragmentLines(
-    sourceLines: string[],
+    sourceLines: Iterable<string>,
     line: number,
   ): Record<number, string | [string, string, string]> {
     const start = Math.max(line - 3, 0);
-    const slice = sourceLines.slice(start, start + 6);
+    const slice = [...sourceLines].slice(start, start + 6);
     const out: Record<number, string> = {};
     for (let i = 0; i < slice.length; i++) out[start + 1 + i] = slice[i];
     return out;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall open — CONVERGEABLE source-fragment-resolves-against-cwd-not-rails-root
-   */
+  /** @internal */
   sourceFragment(
     path: string,
     line: number,
   ): Record<number, string | [string, string, string]> | null {
-    const full = File.expandPath(path);
-    if (!File.isExist(full)) return null;
-    try {
-      const lines = File.read(full).split(/\r?\n/);
-      return this.extractSourceFragmentLines(lines, line);
-    } catch {
-      return null;
+    if (!(rbObjRespondTo(TopLevel.Trails, "root") && TopLevel.Trails!.root() != null)) return null;
+    const fullPath = new Pathname(TopLevel.Trails!.root()!).join(path).toString();
+    if (File.isExist(fullPath)) {
+      return File.open(fullPath, "r", (file) =>
+        this.extractSourceFragmentLines(file.eachLine() as Generator<string>, line),
+      );
     }
+    return null;
   }
 
   /** @internal */
-  extractFileAndLineNumber(trace: BacktraceLine): [string | null, number] {
+  extractFileAndLineNumber(trace: BacktraceLine): [string, number] {
     return [trace.path, trace.lineno];
   }
 
   private computeStatusCode(): number {
-    return ExceptionWrapper.statusCodeForException(classNameOf(this.unwrappedException));
+    return ExceptionWrapper.statusCodeForException(rbObjClassname(this.unwrappedException));
   }
 }
-
-const STATUS_TEXTS: Record<number, string> = {
-  100: "Continue",
-  200: "OK",
-  201: "Created",
-  204: "No Content",
-  301: "Moved Permanently",
-  302: "Found",
-  304: "Not Modified",
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  405: "Method Not Allowed",
-  406: "Not Acceptable",
-  408: "Request Timeout",
-  409: "Conflict",
-  410: "Gone",
-  422: "Unprocessable Entity",
-  429: "Too Many Requests",
-  500: "Internal Server Error",
-  501: "Not Implemented",
-  502: "Bad Gateway",
-  503: "Service Unavailable",
-};

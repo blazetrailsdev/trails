@@ -5,7 +5,7 @@ import {
   InvalidURIError,
   Module,
   NoMethodError,
-  rbFPublicSend,
+  rbFSend,
   rbObjClassname,
   rbObjClone,
   rbObjMethod,
@@ -18,8 +18,8 @@ import { Assertion, assertEqual, Concern, message } from "@blazetrails/activesup
 import { RouteSet, type Config } from "../../routing/route-set.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
 import type { TestRequest } from "../../../action-controller/test-case.js";
-import { ActionController } from "../../../namespaces.js";
-import type { IntegrationTest } from "../integration.js";
+import { ActionController, ActionDispatch } from "../../../namespaces.js";
+import type { IntegrationTest, Session } from "../integration.js";
 
 export interface RoutingAssertionsHost {
   routes?: RouteSet;
@@ -50,7 +50,7 @@ export namespace WithIntegrationRouting {
     ): void {
       let oldRoutes: RouteSet | undefined;
       let oldRoutesCallMethod: Method | undefined;
-      let oldIntegrationSession: IntegrationTest | undefined;
+      let oldIntegrationSession: Session | undefined;
 
       this.setup(function () {
         oldRoutes = (this.app as { routes: RouteSet }).routes;
@@ -100,8 +100,12 @@ export namespace WithIntegrationRouting {
     const host = this.integrationSession.host;
 
     app.routes = routes;
-    this.integrationSession.httpsBang(https);
-    this.integrationSession.hostBang(host);
+    const klass = class extends ActionDispatch.Integration.Session {};
+    include(klass, app.routes.urlHelpers());
+    include(klass, app.routes.mountedHelpers());
+    this._integrationSession = new klass(app);
+    this._integrationSession.httpsBang(https);
+    this._integrationSession.hostBang(host);
     this.routes = routes;
 
     return block(routes);
@@ -112,12 +116,13 @@ export namespace WithIntegrationRouting {
     this: IntegrationTest,
     oldRoutes: RouteSet,
     oldRoutesCallMethod: Method,
-    _oldIntegrationSession: IntegrationTest,
+    oldIntegrationSession: Session,
   ): void {
     (this.app as { routes: RouteSet }).routes = oldRoutes;
     (rbObjSingletonClass(this._originalRoutes!).prototype as { call: unknown }).call = (
       ...args: unknown[]
     ) => oldRoutesCallMethod.call(...args);
+    this._integrationSession = oldIntegrationSession;
     this.routes = oldRoutes;
   }
 }
@@ -178,7 +183,7 @@ export function assertRecognizes(
   expectedOptions: Options,
   path: string | PathWithMethod,
   extras: Options = {},
-  msg?: string,
+  msg?: string | (() => string),
 ): void {
   if (typeof path !== "string" && String(path.method ?? "") === "all") {
     for (const method of ["get", "post", "put", "delete"] as const) {
@@ -186,20 +191,18 @@ export function assertRecognizes(
     }
     return;
   }
-  const request = recognizedRequestFor.call(this, path, extras, msg);
+  const request = recognizedRequestFor.call(this, path, extras, msg as string | undefined);
 
   expectedOptions = { ...expectedOptions };
 
-  assertEqual(
-    expectedOptions,
-    request.pathParameters,
-    message(
-      msg ?? null,
-      "",
-      () =>
-        `The recognized options <${inspect(request.pathParameters)}> did not match <${inspect(expectedOptions)}>, difference:`,
-    ),
+  msg = message(
+    msg ?? null,
+    "",
+    () =>
+      `The recognized options <${inspect(request.pathParameters)}> did not match <${inspect(expectedOptions)}>, difference:`,
   );
+
+  assertEqual(expectedOptions, request.pathParameters, msg);
 }
 
 export function assertGenerates(
@@ -210,26 +213,25 @@ export function assertGenerates(
   extras: Options = {},
   message?: string,
 ): void {
-  let path: string;
   if (URL_FORM_RE.test(expectedPath)) {
-    path = failOn(InvalidURIError, message, () => {
+    expectedPath = failOn(InvalidURIError, message, () => {
       const uri = URI.parse(expectedPath);
       return String(uri.path ?? "") === "" ? "/" : uri.path!;
     });
   } else {
-    path = expectedPath.startsWith("/") ? expectedPath : `/${expectedPath}`;
+    expectedPath = expectedPath.startsWith("/") ? expectedPath : `/${expectedPath}`;
   }
   const routes = requireRoutes(this);
-  const opts = { ...options };
-  const [generatedPath, queryStringKeys] = routes.generateExtras(opts, defaults);
+  options = { ...options };
+  const [generatedPath, queryStringKeys] = routes.generateExtras(options, defaults);
   const foundExtras = Object.fromEntries(
-    Object.entries(opts).filter(([k]) => queryStringKeys.includes(k)),
+    Object.entries(options).filter(([k]) => queryStringKeys.includes(k)),
   );
   let msg = message ?? `found extras <${inspect(foundExtras)}>, not <${inspect(extras)}>`;
   assertEqual(extras, foundExtras, msg);
 
-  msg = message ?? `The generated path <${generatedPath}> did not match <${path}>`;
-  assertEqual(path, generatedPath, msg);
+  msg = message ?? `The generated path <${generatedPath}> did not match <${expectedPath}>`;
+  assertEqual(expectedPath, generatedPath, msg);
 }
 
 export function assertRouting(
@@ -262,7 +264,7 @@ export function methodMissing(
   ...args: unknown[]
 ): unknown {
   if (this.controller != null && this.routes?.namedRoutes?.isRouteDefined(selector)) {
-    return rbFPublicSend(this.controller, selector, ...args);
+    return rbFSend(this.controller, selector, ...args);
   } else {
     const super_ = RoutingAssertions.superMethod(this, "methodMissing");
     if (super_ !== undefined) return super_(selector, ...args);
@@ -307,28 +309,28 @@ export function recognizedRequestFor(
   msg?: string,
 ): TestRequest {
   const method = typeof path === "string" ? "get" : String(path.method ?? "get");
-  let pathStr = typeof path === "string" ? path : path.path;
+  path = typeof path === "string" ? path : path.path;
 
   const controller = this.controller;
   const request = ActionController.TestRequest.create(
     (controller as object | undefined)?.constructor ?? null,
   );
-  if (URL_FORM_RE.test(pathStr)) {
+  if (URL_FORM_RE.test(path)) {
     failOn(InvalidURIError, msg, () => {
-      const uri = URI.parse(pathStr);
+      const uri = URI.parse(path as string);
       request.env["rack.url_scheme"] = uri.scheme ?? "http";
       if (uri.host != null) request.host = uri.host;
       if (uri.port != null) request.port = uri.port;
       request.path = String(uri.path ?? "") === "" ? "/" : uri.path!;
     });
   } else {
-    if (!pathStr.startsWith("/")) pathStr = `/${pathStr}`;
-    request.path = pathStr;
+    if (!path.startsWith("/")) path = `/${path}`;
+    request.path = path;
   }
   request.env["REQUEST_METHOD"] = method.toUpperCase();
 
   const params = failOn(RoutingError, msg, () =>
-    requireRoutes(this).recognizePath(pathStr, { method, extras }),
+    requireRoutes(this).recognizePath(path, { method, extras }),
   );
   request.pathParameters = params;
   return request;

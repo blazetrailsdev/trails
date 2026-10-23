@@ -1,5 +1,4 @@
 import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
 
 import { OutputBuffer } from "./buffers.js";
 import { OutputFlow } from "./flows.js";
@@ -25,8 +24,29 @@ function _layoutFor(this: Context, name: string | null = null): SafeBuffer | Pro
     : htmlSafe(content.toString());
 }
 
-export const Context = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { _prepareContext, _layoutFor });
-  });
-});
+export const Context = {
+  get outputBuffer(): OutputBuffer | null {
+    return null;
+  },
+  set outputBuffer(value: OutputBuffer | null) {
+    Object.defineProperty(this, "outputBuffer", {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  },
+  get viewFlow(): OutputFlow | null {
+    return null;
+  },
+  set viewFlow(value: OutputFlow | null) {
+    Object.defineProperty(this, "viewFlow", {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  },
+  _prepareContext,
+  _layoutFor,
+};

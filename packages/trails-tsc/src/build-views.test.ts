@@ -42,6 +42,19 @@ function write(root: string, rel: string, body: string): void {
 }
 
 describe("buildViews", () => {
+  it("reports a file with no registered handler as skipped", async () => {
+    const cwd = mkScratch();
+    write(cwd, "app/views/users/show.html.tse", "show");
+    write(cwd, "app/views/users/card.html.custom", "card");
+    write(cwd, "app/views/users/.keep", "");
+    write(cwd, "app/views/users/old.html.tse.js", "");
+
+    const { files, skipped } = await buildViews({ cwd });
+
+    expect(files).toEqual(["users/show.html.tse"]);
+    expect(skipped).toEqual(["users/card.html.custom"]);
+  });
+
   it("mirrors .tse files to .trails/views/ as typecheck shims", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/show.html.tse", "<h1><%= name %></h1>");
@@ -54,19 +67,63 @@ describe("buildViews", () => {
     expect(files).toEqual(["posts/index.html.tse", "users/edit.html.tse", "users/show.html.tse"]);
 
     const shim = fs.readFileSync(path.join(cwd, ".trails/views/users/show.html.tse.ts"), "utf8");
-    expect(shim).toContain("export default function render(");
-    expect(shim).toContain("_ob.append(name)");
+    expect(shim).toContain("export default async function render(");
+    expect(shim).toContain("_ob.append(await (name))");
   });
 
-  it("emits no runtime module — templates render from .tse source at request time", async () => {
+  it("emits a runtime module with a source map for every template, partials included", async () => {
     const cwd = mkScratch();
-    write(cwd, "app/views/users/show.html.tse", "ok");
+    write(cwd, "app/views/users/show.html.tse", "<h1><%= name %></h1>");
+    write(cwd, "app/views/users/_row.html.tse", "<%# locals: (user:) %><%= user %>");
 
     await buildViews({ cwd });
 
-    expect(fs.existsSync(path.join(cwd, ".trails/views/users/show.html.tse.js"))).toBe(false);
-    expect(fs.existsSync(path.join(cwd, ".trails/views/users/show.html.tse.js.map"))).toBe(false);
+    for (const rel of ["users/show.html.tse", "users/_row.html.tse"]) {
+      const base = path.join(cwd, ".trails/views", rel);
+      const js = fs.readFileSync(base + ".js", "utf8");
+      expect(js).toContain("export default async function render(");
+      expect(js).not.toMatch(/: View|as Scope</);
+      expect(js.trimEnd().endsWith(`//# sourceMappingURL=${path.basename(rel)}.js.map`)).toBe(true);
+      const map = JSON.parse(fs.readFileSync(base + ".js.map", "utf8"));
+      expect(path.resolve(path.dirname(base), map.sources[0])).toBe(
+        path.join(cwd, "app/views", rel),
+      );
+      expect(map.mappings).not.toBe("");
+    }
     expect(fs.existsSync(path.join(cwd, ".trails/views-manifest.ts"))).toBe(false);
+  });
+
+  it("emits a module wrapping Handlers::Builder's compiled source for a .builder template", async () => {
+    const cwd = mkScratch();
+    write(cwd, "app/views/feeds/index.xml.builder", 'xml.p("Hello");\n');
+
+    const { files } = await buildViews({ cwd });
+
+    expect(files).toEqual(["feeds/index.xml.builder"]);
+    const base = path.join(cwd, ".trails/views/feeds/index.xml.builder");
+    const js = fs.readFileSync(base + ".js", "utf8");
+    expect(js).toContain(
+      "new TopLevel.Builder.XmlMarkup({ indent: 2, target: outputBuffer.raw() })",
+    );
+    expect(js).toContain("return outputBuffer.toString();");
+    const map = JSON.parse(fs.readFileSync(base + ".js.map", "utf8"));
+    expect(path.resolve(path.dirname(base), map.sources[0])).toBe(
+      path.join(cwd, "app/views/feeds/index.xml.builder"),
+    );
+  });
+
+  it("writes only the runtime module and its map beside each template when built in place", async () => {
+    const cwd = mkScratch();
+    write(cwd, "templates/rescues/show.html.tse", "<%= 1 %>");
+
+    await buildViews({ cwd, viewsDir: "templates", inPlace: true });
+
+    expect(fs.readdirSync(path.join(cwd, "templates/rescues")).sort()).toEqual([
+      "show.html.tse",
+      "show.html.tse.js",
+      "show.html.tse.js.map",
+    ]);
+    expect(fs.existsSync(path.join(cwd, ".trails"))).toBe(false);
   });
 
   it("is a no-op when the views dir is absent", async () => {
@@ -269,7 +326,8 @@ describe("buildViews", () => {
       [
         "export interface TemplateRegistry {}",
         "export type TemplateLocals<T> = T;",
-        "export declare class Base { render(...args: unknown[]): string; }",
+        "export declare const TopLevel: {};",
+        "export declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};",
       ].join("\n"),
     );
     write(cwd, "app/models/post.ts", 'export class Post { title = ""; }');
@@ -638,6 +696,7 @@ describe("runCli", () => {
       [
         "export interface TemplateRegistry {}",
         "export type TemplateLocals<T> = T;",
+        "export declare const TopLevel: {};",
         "export declare class Base { csrfMetaTags(): string; }",
       ].join("\n"),
     );
@@ -752,7 +811,7 @@ describe("runCli", () => {
     write(
       cwd,
       "node_modules/@blazetrails/actionview/index.d.ts",
-      "export declare class Base { render(...args: unknown[]): string; }",
+      "export declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};",
     );
     write(cwd, "app/models/post.ts", 'export class Post { title = ""; }');
     write(

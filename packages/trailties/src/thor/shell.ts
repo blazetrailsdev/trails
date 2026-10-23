@@ -1,12 +1,4 @@
-import {
-  env,
-  initialize,
-  Module,
-  RbConfig,
-  rbConstGet,
-  rbEnsure,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { env, RbConfig, rbCallSuper, rbConstGet, rbEnsure } from "@blazetrails/ruby-compat";
 import { Basic } from "./shell/basic.js";
 import { Color } from "./shell/color.js";
 
@@ -34,10 +26,10 @@ const singleton = {
   },
 };
 
-export const Base = Object.defineProperties(
-  new Module(),
-  Object.getOwnPropertyDescriptors(singleton),
-) as Module & typeof singleton;
+const singletonMethods = Object.getOwnPropertyDescriptors(singleton);
+for (const descriptor of Object.values(singletonMethods)) descriptor.enumerable = false;
+
+export const Base = Object.defineProperties({}, singletonMethods) as typeof singleton;
 
 type Delegated = Record<string, (...args: unknown[]) => unknown>;
 
@@ -146,48 +138,39 @@ function withPadding<T>(this: Shell, block: () => T): T {
 
 /** @internal */
 function _sharedConfiguration(this: Shell): Record<string, unknown> {
-  return Object.assign(
-    Shell.superMethod(this, "_sharedConfiguration")!() as Record<string, unknown>,
-    { shell: this.shell },
-  );
+  return Object.assign(rbCallSuper(this, _sharedConfiguration) as Record<string, unknown>, {
+    shell: this.shell,
+  });
 }
 
-export const Shell = new Module((mod) => {
-  Object.assign(mod, { SHELL_DELEGATED_METHODS, Basic, Color });
-
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function (
-    this: Shell,
-    args: unknown[] = [],
-    options: unknown = {},
-    config: { shell?: Basic | null } = {},
-  ) {
-    this.shell = config.shell as Basic;
-    if (rbObjRespondTo(this.shell, "base")) this.shell.base ||= this as never;
-  };
-
-  mod.moduleEval((m) => {
-    Object.defineProperty(m, "shell", { get: shell, set: setShell, configurable: true });
-    Object.assign(m, {
-      ask,
-      error,
-      setColor,
-      isYes,
-      isNo,
-      say,
-      sayError,
-      sayStatus,
-      printInColumns,
-      printTable,
-      printWrapped,
-      fileCollision,
-      terminalWidth,
-      withPadding,
-      _sharedConfiguration,
-    });
-  });
-}) as Module & {
+export const Shell = {
+  SHELL_DELEGATED_METHODS,
+  Basic,
+  Color,
+  ask,
+  error,
+  setColor,
+  isYes,
+  isNo,
+  say,
+  sayError,
+  sayStatus,
+  printInColumns,
+  printTable,
+  printWrapped,
+  fileCollision,
+  terminalWidth,
+  withPadding,
+  _sharedConfiguration,
+} as {
   SHELL_DELEGATED_METHODS: string[];
   Basic: typeof Basic;
   Color: typeof Color;
   HTML?: typeof Basic;
-};
+} & Record<string, unknown>;
+Object.defineProperty(Shell, "shell", {
+  get: shell,
+  set: setShell,
+  enumerable: true,
+  configurable: true,
+});

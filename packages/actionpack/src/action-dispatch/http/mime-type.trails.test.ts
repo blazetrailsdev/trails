@@ -47,14 +47,14 @@ describe("ActionView::Template::Types once Action Dispatch loads", () => {
     });
     expect(template.type).toBe(Mime.get(":text"));
     expect(new TseHandler().call(template, template.source)).toMatch(
-      /_ob\.safeExprAppend\( name \)/,
+      /_ob\.safeExprAppend\(await \( name \)\)/,
     );
   });
 });
 
 describe("Mime::Type.lookup_by_extension", () => {
   it("reads EXTENSION_LOOKUP with no leading-dot normalization (mime_type.rb:175-177)", () => {
-    expect(MimeType.lookupByExtension("html")).toBe(MimeType.HTML);
+    expect(MimeType.lookupByExtension("html")).toBe(Mime.get(":html")!);
     expect(MimeType.lookupByExtension(".html")).toBeUndefined();
   });
 });
@@ -75,7 +75,7 @@ describe("Mime::Type.register fills LOOKUP and EXTENSION_LOOKUP separately (mime
     const alias = MimeType.registerAlias("application/xhtml+xml", ":foobar");
     expect([Mime.get(":foobar"), MimeType.lookup("application/xhtml+xml")]).toEqual([
       alias,
-      MimeType.HTML,
+      Mime.get(":html")!,
     ]);
     MimeType.unregister(":foobar");
   });
@@ -88,5 +88,40 @@ describe("Mime::Type#hash", () => {
     expect(one.eql(two)).toBe(true);
     expect(one.hash()).toBe(two.hash());
     expect(one.hash()).not.toBe(new MimeType("text/x-hash", ":other").hash());
+  });
+});
+
+describe("MimeType registry", () => {
+  it("lookup by extension", () => {
+    expect(MimeType.lookupByExtension("html")).toBe(Mime.get(":html")!);
+    expect(MimeType.lookupByExtension("json")).toBe(Mime.get(":json")!);
+    expect(MimeType.lookupByExtension("xml")).toBe(Mime.get(":xml")!);
+    expect(MimeType.lookupByExtension("txt")).toBe(Mime.get(":text")!);
+  });
+  it("all() returns unique registered types in registration order", () => {
+    const all = MimeType.all();
+    expect(new Set(all).size).toBe(all.length);
+    const htmlIdx = all.indexOf(Mime.get(":html")!);
+    const jsonIdx = all.indexOf(Mime.get(":json")!);
+    expect(htmlIdx).toBeGreaterThanOrEqual(0);
+    expect(jsonIdx).toBeGreaterThan(htmlIdx);
+  });
+  it("unregister sweeps extensionMap so lookupByExtension can't resolve a removed type", () => {
+    MimeType.register("application/ext-test", ":exttest", [], ["exttest"]);
+    expect(MimeType.lookupByExtension("exttest")?.symbol).toBe(":exttest");
+    MimeType.unregister(":exttest");
+    expect(MimeType.lookupByExtension("exttest")).toBeUndefined();
+  });
+  it("all() picks up a newly registered type and drops it on unregister", () => {
+    const before = MimeType.all().length;
+    MimeType.register("application/all-test", ":alltest");
+    try {
+      const fresh = MimeType.all();
+      expect(fresh.length).toBe(before + 1);
+      expect(fresh.map((t) => t.symbol)).toContain(":alltest");
+    } finally {
+      MimeType.unregister(":alltest");
+    }
+    expect(MimeType.all().length).toBe(before);
   });
 });

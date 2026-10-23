@@ -22,6 +22,7 @@ describe("InfoControllerTest", () => {
 
   beforeEach(async ({ task }) => {
     Trails.application = InfoControllerTestApp.instance();
+    Trails.application.config.secretKeyBase = "secret_key_base".repeat(4);
     const routes = Trails.application.routes() as unknown as RouteSet;
     routes.clearBang();
     routes.draw(function () {

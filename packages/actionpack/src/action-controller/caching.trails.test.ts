@@ -67,7 +67,7 @@ describe("AbstractController::Caching included into ActionController::Base", () 
     const controller = new CachedController();
     const view = new ActionViewBase(null, {}, controller) as ActionViewBase & CacheHelperHost;
 
-    view.cache("fragment", {}, () => {
+    await view.cache("fragment", {}, () => {
       view.outputBuffer.append("hello");
     });
     expect(view.outputBuffer.toStr()).toBe("hello");
@@ -76,7 +76,7 @@ describe("AbstractController::Caching included into ActionController::Base", () 
 
     events.length = 0;
     const view2 = new ActionViewBase(null, {}, controller) as ActionViewBase & CacheHelperHost;
-    view2.cache("fragment", {}, () => {
+    await view2.cache("fragment", {}, () => {
       view2.outputBuffer.append("miss");
     });
     expect(view2.outputBuffer.toStr()).toBe("hello");

@@ -64,6 +64,7 @@ jobs:
       actionpack_affected: ${{ steps.filter.outputs.actionpack_affected }}
       actionview_affected: ${{ steps.filter.outputs.actionview_affected }}
       rack_affected: ${{ steps.filter.outputs.rack_affected }}
+      actioncable_affected: ${{ steps.filter.outputs.actioncable_affected }}
       trailties_affected: ${{ steps.filter.outputs.trailties_affected }}
       trails_tsc_affected: ${{ steps.filter.outputs.trails_tsc_affected }}
       tse_compiler_affected: ${{ steps.filter.outputs.tse_compiler_affected }}
@@ -72,6 +73,7 @@ jobs:
       website_affected: ${{ steps.filter.outputs.website_affected }}
       comparison_affected: ${{ steps.filter.outputs.comparison_affected }}
       thor_only: ${{ steps.filter.outputs.thor_only }}
+      actioncable_only: ${{ steps.filter.outputs.actioncable_only }}
       website_label: ${{ steps.filter.outputs.website_label }}
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
       parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
@@ -89,6 +91,7 @@ jobs:
       sqlite_runs_on: ${{ steps.self_hosted.outputs.sqlite_runs_on }}
       sqlite_shards: ${{ steps.self_hosted.outputs.sqlite_shards }}
       unit_runs_on: ${{ steps.self_hosted.outputs.unit_runs_on }}
+      unit_shards: ${{ steps.self_hosted.outputs.unit_shards }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -112,14 +115,15 @@ jobs:
           ADDITIVE_CANDIDATE_RE='^(pnpm-lock\.yaml|tsconfig[^/]*\.json|vitest[^/]*\.config\.ts)$'
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
           INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|rails-file-structure-collisions|strip-asany|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|closing-story-references)(\.test)?\.ts$)'
-          AR_PKGS_RE='^packages/(activerecord|activerecord-cli|arel|activejob|activemodel|bcrypt|activesupport|globalid|date|did-you-mean|trails-tsc)/'
+          AR_PKGS_RE='^packages/(activerecord|activerecord-cli|arel|activejob|activemodel|bcrypt|activesupport|globalid|date|did-you-mean|solid-queue|trails-tsc|vitest-matchers)/'
           DB_ADAPTER_RE='^(packages/activerecord/src/(adapters/(postgresql|abstract-mysql-adapter)|connection-adapters/(postgresql|mysql|mysql2|abstract-mysql-adapter|abstract/|abstract-adapter\.ts|column\.ts|adapter-args\.ts|sql-classification\.ts|pool))|packages/arel/src/visitors/(postgres|mysql)|packages/activerecord-cli/src/__e2e__/(postgres|mysql))'
-          AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|bcrypt|activesupport|rack|rack-test|date|did-you-mean)/'
-          AV_PKGS_RE='^packages/(actionview|activesupport|date)/'
-          TRAILTIES_PKGS_RE='^packages/(trailties|actionpack|actionview|activerecord|arel|activejob|activemodel|bcrypt|activesupport|globalid|rack|date|did-you-mean|trails-tsc)/'
+          AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|bcrypt|activesupport|rack|rack-test|date|did-you-mean|vitest-matchers)/'
+          AV_PKGS_RE='^packages/(actionview|activesupport|date|vitest-matchers)/'
+          TRAILTIES_PKGS_RE='^packages/(trailties|actionpack|actionview|activerecord|arel|activejob|activemodel|bcrypt|activesupport|globalid|rack|date|did-you-mean|trails-tsc|vitest-matchers)/'
           TRAILS_TSC_PKGS_RE='^packages/trails-tsc/'
           TSE_COMPILER_PKGS_RE='^packages/tse-compiler/'
-          RACK_PKGS_RE='^packages/(rack|rack-session|rack-test|activesupport|date)/'
+          RACK_PKGS_RE='^packages/(rack|rack-session|rack-test|activesupport|date|vitest-matchers)/'
+          ACTIONCABLE_PKGS_RE='^(packages/(actioncable|actionpack|actionview|activemodel|activesupport|bcrypt|date|did-you-mean|html-sanitizer|i18n|msgpack|nokogiri|rack|rack-session|rack-test|ruby-compat|tse-compiler|vitest-matchers)/|scripts/parity/unported-files/actioncable\.ts$)'
           # `packages/`, `scripts/` and `eslint/` are listed whole rather than
           # enumerated, because several tests in this lane report on the WHOLE
           # tree rather than on their own package: stale-story-references
@@ -176,6 +180,7 @@ jobs:
             echo "actionpack_affected=true"   >> "$GITHUB_OUTPUT"
             echo "actionview_affected=true"   >> "$GITHUB_OUTPUT"
             echo "rack_affected=true"         >> "$GITHUB_OUTPUT"
+            echo "actioncable_affected=true"  >> "$GITHUB_OUTPUT"
             echo "trailties_affected=true"    >> "$GITHUB_OUTPUT"
             echo "trails_tsc_affected=true"   >> "$GITHUB_OUTPUT"
             echo "tse_compiler_affected=true" >> "$GITHUB_OUTPUT"
@@ -253,6 +258,7 @@ jobs:
                   echo "actionpack_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "actionview_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "rack_affected=false"         >> "$GITHUB_OUTPUT"
+                  echo "actioncable_affected=false"  >> "$GITHUB_OUTPUT"
                   echo "trailties_affected=false"    >> "$GITHUB_OUTPUT"
                   echo "trails_tsc_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "tse_compiler_affected=false" >> "$GITHUB_OUTPUT"
@@ -292,6 +298,7 @@ jobs:
                   set_gate actionpack_affected   "$AP_PKGS_RE"
                   set_gate actionview_affected   "$AV_PKGS_RE"
                   set_gate rack_affected         "$RACK_PKGS_RE"
+                  set_gate actioncable_affected  "$ACTIONCABLE_PKGS_RE"
                   set_gate trailties_affected    "$TRAILTIES_PKGS_RE"
                   set_gate trails_tsc_affected   "$TRAILS_TSC_PKGS_RE"
                   set_gate tse_compiler_affected "$TSE_COMPILER_PKGS_RE"
@@ -299,7 +306,7 @@ jobs:
                   set_gate guides_affected       "$GUIDES_PKGS_RE" "$GUIDES_EXCL_RE"
                   set_gate website_affected      "$WEBSITE_PKGS_RE"
                   set_gate comparison_affected   "$COMPARISON_RE" '^packages/website/'
-                  bash scripts/ci/thor-only.sh "$files" >> "$GITHUB_OUTPUT"
+                  bash scripts/ci/scoped-only.sh "$files" >> "$GITHUB_OUTPUT"
                 fi
                 ;;
             esac
@@ -349,6 +356,7 @@ jobs:
           sqlite_runs_on=$hosted
           sqlite_shards='[1, 2]'
           unit_runs_on=$hosted
+          unit_shards='[1, 2]'
           if [ "$SAME_REPO" = true ] && [ -n "$GH_TOKEN" ]; then
             idle=$(gh api "repos/$GITHUB_REPOSITORY/actions/runners" \
               --jq '[.runners[] | select(.status == "online" and (.busy | not) and ([.labels[].name] as $l | all("self-hosted", "debian", "ARM64"; IN($l[]))))] | length' \
@@ -359,6 +367,7 @@ jobs:
                 sqlite_shards='[1]'
               else
                 unit_runs_on=$self_hosted
+                unit_shards='[1]'
               fi
             fi
           fi
@@ -366,6 +375,7 @@ jobs:
             echo "sqlite_runs_on=$sqlite_runs_on"
             echo "sqlite_shards=$sqlite_shards"
             echo "unit_runs_on=$unit_runs_on"
+            echo "unit_shards=$unit_shards"
           } >> "$GITHUB_OUTPUT"
 
   # `vars.RUNNER` is a single runner label (e.g. `self-hosted` or
@@ -395,6 +405,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       # Lints only the changed files. `__ALL__` is the fallback sentinel from
@@ -414,6 +426,9 @@ jobs:
           else
             printf '%s\n' "$LINT_FILES" | xargs -r -d '\n' pnpm run lint:files
           fi
+      - name: ESLint violation counts
+        if: ${{ github.event_name == 'pull_request' }}
+        run: pnpm parity:lint:counts:ci
   # Consolidated sub-minute PR/push preflight checks. Each of prettier,
   # docs-AR-freeze, and pr-attribution does a few seconds of independent shell
   # work; GitHub bills every job rounded UP to a whole minute, so running them
@@ -615,6 +630,33 @@ jobs:
           pnpm install --frozen-lockfile --prefer-offline
           pnpm vitest run scripts/vendor-citations.test.ts
 
+      - name: ActiveRecord cast count
+        id: ar-cast-count
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm parity:types:casts
+          pnpm vitest run scripts/parity/cast-count.test.ts
+
+      - name: Literal-name send count
+        id: send-count
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm parity:api:sends
+          pnpm vitest run scripts/parity/send-count.test.ts
+
+      - name: ruby-compat Module count
+        id: module-count
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm parity:modules
+          pnpm vitest run scripts/parity/module-count.test.ts
+
       # PR attribution check. Scoped to deanmarano-authored PRs: the project
       # forbids Claude attribution in *his* PR descriptions and commits (see
       # CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other
@@ -803,7 +845,8 @@ jobs:
       (needs.changes.outputs.activerecord_affected == 'true' ||
       needs.changes.outputs.trails_tsc_affected == 'true' ||
       (needs.changes.outputs.trailties_affected == 'true' &&
-      needs.changes.outputs.thor_only != 'true'))
+      needs.changes.outputs.thor_only != 'true' &&
+      needs.changes.outputs.actioncable_only != 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -820,6 +863,10 @@ jobs:
       needs.changes.outputs.unit_tests_affected == 'true'
     runs-on: ${{ fromJSON(needs.changes.outputs.unit_runs_on) }}
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.changes.outputs.unit_shards) }}
     steps:
       - uses: actions/checkout@v5
       # scripts/stale-story-references.test.ts compares story citations in
@@ -833,10 +880,14 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
+      - name: Install ImageMagick
+        run: |
+          command -v magick >/dev/null || command -v convert >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick; }
+          { magick -version 2>/dev/null || convert -version; } | head -1
       # scripts/parity/pipeline/query/node spawns the dump runners as real subprocesses;
       # they resolve @blazetrails/* through package `main` entries, so the
       # dist/ trees have to exist before vitest starts.
-      - if: needs.changes.outputs.thor_only != 'true'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
         run: pnpm build
       # The scripts/* suites added here are the compare tooling's own unit
       # tests; none needs Ruby or the `pnpm build` above (that step exists for
@@ -845,24 +896,37 @@ jobs:
       # scripts/schema-compare is the one suite that belongs elsewhere: it
       # parses the REAL vendored test/schema/schema.rb, so it runs as a step of
       # rails-comparison, the job that fetches vendor/.
-      - if: needs.changes.outputs.thor_only != 'true'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 1
+        env:
+          AJ_ADAPTER: test
+        run: pnpm vitest run packages/activejob
+      # activejob/Rakefile:38-41 runs async_adapter_test.rb only in this lane.
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == strategy.job-total
+        env:
+          AJ_ADAPTER: async
+        run: pnpm vitest run packages/activejob
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
         env:
           AJ_ADAPTER: inline
         run: >
-          pnpm vitest run
+          pnpm vitest run --shard=${{matrix.shard}}/${{strategy.job-total}}
           packages/arel
           packages/activejob
           packages/activemodel
           packages/activesupport
           packages/bcrypt
+          packages/builder
           packages/date
           packages/did-you-mean
           packages/globalid
           packages/html-sanitizer
           packages/i18n
+          packages/marcel
+          packages/mini-magick
           packages/msgpack
           packages/nokogiri
           packages/ruby-compat
+          packages/vitest-matchers
           scripts/guides-typecheck
           scripts/tasks
           scripts/api-compare
@@ -889,13 +953,15 @@ jobs:
           scripts/package-files-field.test.ts
           scripts/require-canonical-rebuild-directives.test.ts
           scripts/ruby-compat-leaf.test.ts
+          scripts/ruby-compat-entry-modules.test.ts
+          scripts/actionview-test-case-dist.test.ts
           scripts/rack-activesupport-free.test.ts
           scripts/generate-canonical-zone-identifiers.test.ts
           scripts/generate-tzdata-isdst.test.ts
           scripts/vendor-recite.test.ts
           vendor/sources.test.ts
           vendor/fetch.test.ts
-      - if: needs.changes.outputs.thor_only == 'true'
+      - if: (needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true') && matrix.shard == 1
         run: >
           pnpm vitest run
           scripts/stale-story-references.test.ts
@@ -922,11 +988,13 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.rack_affected == 'true' ||
+      needs.changes.outputs.actioncable_affected == 'true' ||
       needs.changes.outputs.actionview_affected == 'true' ||
       needs.changes.outputs.tse_compiler_affected == 'true' ||
       needs.changes.outputs.activerecord_affected == 'true' ||
       (needs.changes.outputs.trailties_affected == 'true' &&
-      needs.changes.outputs.thor_only != 'true'))
+      needs.changes.outputs.thor_only != 'true' &&
+      needs.changes.outputs.actioncable_only != 'true'))
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -943,6 +1011,9 @@ jobs:
       - name: Rack tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.rack_affected == 'true' }}
         run: pnpm vitest run packages/rack packages/rack-session packages/rack-test
+      - name: Action Cable tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.actioncable_affected == 'true' }}
+        run: pnpm vitest run packages/actioncable
       - name: Action View tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.actionview_affected == 'true' }}
         run: pnpm vitest run packages/actionview
@@ -956,7 +1027,8 @@ jobs:
           ${{ !cancelled() && steps.install.outcome == 'success' &&
           (needs.changes.outputs.activerecord_affected == 'true' ||
           (needs.changes.outputs.trailties_affected == 'true' &&
-          needs.changes.outputs.thor_only != 'true')) }}
+          needs.changes.outputs.thor_only != 'true' &&
+          needs.changes.outputs.actioncable_only != 'true')) }}
         run: pnpm test:types
 
   actionpack-tests:
@@ -971,14 +1043,51 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm vitest run packages/actionpack
+      - run: pnpm vitest run packages/actionpack --project "!system"
+
+  # RFC 0166 system tests: the `system` Vitest project, against real browsers.
+  # Only chromium is installed: `Driver#browser` launches nothing else, and
+  # browser.trails.test.ts mocks playwright, so it needs no binary.
+  # webkit, firefox and webdriverio are not installed.
+  system-tests:
+    name: System Tests (chromium)
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      (needs.changes.outputs.actionpack_affected == 'true' ||
+      needs.changes.outputs.trailties_affected == 'true')
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Resolve the playwright-core version
+        id: playwright-version
+        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >>"$GITHUB_OUTPUT"
+      - name: Cache the chromium download
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-v1-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      # No `--with-deps`: that is an `apt-get update` against the Azure Ubuntu
+      # mirror, which intermittently stalls until the job's timeout and
+      # cancels the whole run. The runner image ships Chrome, so chromium's
+      # shared libraries are already installed; a missing one fails loudly at
+      # launch instead.
+      - name: Install chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright-core install chromium
+      - run: pnpm vitest run --project system
 
   trailties-tests:
     name: Trailties Tests
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.trailties_affected == 'true'
+      (needs.changes.outputs.trailties_affected == 'true' ||
+      needs.changes.outputs.actioncable_only == 'true')
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -986,8 +1095,12 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm build
-      - if: needs.changes.outputs.thor_only != 'true'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
         run: pnpm vitest run packages/trailties
+      - if: needs.changes.outputs.actioncable_only == 'true'
+        run: >
+          pnpm vitest related --run --passWithNoTests --project trailties
+          $(git ls-files 'packages/actioncable/src/*.ts')
       - if: needs.changes.outputs.thor_only == 'true'
         run: >
           pnpm vitest related --run --project trailties
@@ -1017,18 +1130,26 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Install ImageMagick
+        run: |
+          command -v magick >/dev/null || command -v convert >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick; }
+          { magick -version 2>/dev/null || convert -version; } | head -1
       - name: Run vitest with coverage (non-AR packages)
         run: >
           pnpm vitest run
           packages/arel
+          packages/actioncable
           packages/activejob
           packages/activemodel
           packages/activesupport
           packages/bcrypt
+          packages/builder
           packages/date
           packages/did-you-mean
           packages/globalid
           packages/i18n
+          packages/marcel
+          packages/mini-magick
           packages/msgpack
           packages/nokogiri
           packages/html-sanitizer
@@ -1039,6 +1160,7 @@ jobs:
           packages/actionview
           packages/trailties
           packages/tse-compiler
+          packages/vitest-matchers
           --coverage --coverage.all
       - name: Write coverage summary to run UI
         if: always()
@@ -1106,7 +1228,7 @@ jobs:
       # double-run across the two legs.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
-      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run packages/activerecord-cli
@@ -1141,7 +1263,7 @@ jobs:
       # Trailing slash for the reason given on `sqlite-tests`. The CLI package
       # is excluded: it owns no `inMemoryDb()` guards, so it has nothing this
       # lane can check.
-      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: sqlite3_mem
 
@@ -1421,7 +1543,7 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: postgresql
           PGHOST: localhost
@@ -1495,7 +1617,7 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - run: pnpm vitest run packages/activerecord/
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/
         env:
           ARCONN: mysql2
           MYSQL_HOST: localhost
@@ -1573,7 +1695,7 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: mysql2
           MYSQL_HOST: localhost
@@ -1633,7 +1755,7 @@ jobs:
             CREATE USER IF NOT EXISTS 'rails'@'localhost';
             GRANT ALL PRIVILEGES ON *.* TO 'rails'@'localhost';
             FLUSH PRIVILEGES;"
-      - run: pnpm vitest run packages/activerecord/
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/
         env:
           ARCONN: mysql2
           MYSQL_HOST: localhost
@@ -1684,11 +1806,17 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.comparison_affected == 'true' &&
-      needs.changes.outputs.thor_only != 'true'
+      needs.changes.outputs.thor_only != 'true' &&
+      needs.changes.outputs.actioncable_only != 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 30
       - uses: ./.github/actions/setup-pnpm
       - uses: ruby/setup-ruby@v1
         with:
@@ -1737,19 +1865,20 @@ jobs:
       - name: Start background gates
         env:
           RUBY_EXTRACTION_HIT: ${{ steps.ruby-extraction.outputs.cache-hit }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           node scripts/ci/bg-gates.mjs start <<'SPEC'
           ts-api: pnpm exec tsx scripts/api-compare/extract-ts-api.ts
           ruby-api: if [ "$RUBY_EXTRACTION_HIT" = true ]; then echo "rails-api.json restored from cache"; else cd scripts/api-compare && LIB_PATHS_JSON=$(cat $RUNNER_TEMP/ruby-extraction/lib-paths.json) LIB_ENTRY_FILES_JSON=$(cat $RUNNER_TEMP/ruby-extraction/lib-entry-files.json) LOCKFILE_PATH=$GITHUB_WORKSPACE/vendor/sources.lock.json ruby extract-ruby-api.rb; fi
           ruby-tests: if [ "$RUBY_EXTRACTION_HIT" = true ]; then echo "rails-tests.json restored from cache"; else cd scripts/test-compare && TEST_PATHS_JSON=$(cat $RUNNER_TEMP/ruby-extraction/test-paths.json) ruby extract-ruby-tests.rb; fi
           deprecated: pnpm exec tsx scripts/build-rails-privates-manifest.ts --check-deprecated
-          eslint-excludes: pnpm exec tsx scripts/generate-standalone-associations-exclude.ts && pnpm exec tsx scripts/test-deps/rails-test-deps.ts && pnpm exec tsx scripts/test-deps/build-fixture-baseline.ts
+          eslint-excludes: pnpm exec tsx scripts/test-deps/rails-test-deps.ts && pnpm exec tsx scripts/test-deps/build-fixture-baseline.ts
           privates-manifest after ruby-api,deprecated: pnpm exec tsx scripts/build-rails-privates-manifest.ts
           method-order-manifest after ruby-api: RAILS_STRUCTURE_REPORT=1 pnpm exec tsx scripts/build-rails-file-structure-manifest.ts
           test-names-manifest after ruby-tests: pnpm exec tsx scripts/build-rails-test-names-manifest.ts
           rails-private after privates-manifest: pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs packages
           method-order after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/arel/src packages/activemodel/src
-          test-names after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/actionview/src packages/arel/src packages/date/src packages/did-you-mean/src packages/i18n/src --max-warnings 0
+          test-names after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/actionview/src packages/arel/src packages/date/src packages/did-you-mean/src packages/globalid/src packages/i18n/src --max-warnings 0
           dep-lint after ruby-api: pnpm exec tsx scripts/api-compare/lint-deps.ts
           detached-jsdoc: pnpm exec tsx scripts/api-compare/lint-detached-jsdoc-tags.ts
           test-compare after ruby-tests: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/compare.ts --gates --check
@@ -1777,18 +1906,6 @@ jobs:
         # api-compare manifests the step above already wrote. No --exclude-glob:
         # an exclusion disarms the stale gate (see extra-surface.ts `main()`).
         run: pnpm exec tsx scripts/api-compare/extra-surface.ts
-      - name: Arity excludes gate
-        # Fails on a malformed or STALE entry in
-        # scripts/api-compare/arity-exclude.json (the reasoned suppression file
-        # for the advisory arity check, applied by the API comparison step
-        # above). Excludes only shrink — delete a converged entry by hand.
-        run: pnpm exec tsx scripts/api-compare/lint-arity-excludes.ts
-      - name: Inheritance excludes gate
-        # Fails on a malformed or STALE entry in
-        # scripts/api-compare/inheritance-exclude.json (the reasoned suppression
-        # file for the inheritance check, applied by the API comparison step
-        # above). Excludes only shrink — delete a converged entry by hand.
-        run: pnpm exec tsx scripts/api-compare/lint-inheritance-excludes.ts
       - name: Body-pins gate
         # Source-hash pinning (RFC 0025). Fails when a pinned pair's normalized
         # Rails body digest drifts from the current vendored source
@@ -1980,15 +2097,13 @@ jobs:
         # methods. Regenerate with `pnpm rails-privates:manifest`.
         run: node scripts/ci/bg-gates.mjs wait deprecated
       - name: ESLint exclude baselines up to date
-        # Both baselines are generated grandfather lists that only shrink as
-        # sites convert. Nothing read them back, so they drifted ~200 rows loose
-        # on main before this guard. Regenerate with
-        # `pnpm tsx scripts/generate-standalone-associations-exclude.ts` and
-        # `pnpm fixture-baseline:refresh`.
+        # A generated grandfather list that only shrinks as sites convert.
+        # Nothing read it back, so it drifted loose on main before this guard.
+        # Regenerate with `pnpm fixture-baseline:refresh`.
         run: |
           set -euo pipefail
           node scripts/ci/bg-gates.mjs wait eslint-excludes
-          baselines='eslint/no-standalone-associations-exclude.json eslint/expected-fixtures-exclude.json'
+          baselines='eslint/expected-fixtures-exclude.json'
           if git diff --quiet -- $baselines; then
             echo "ESLint exclude baselines are in sync with a fresh regeneration."
             exit 0
@@ -2087,9 +2202,22 @@ jobs:
         # Only-shrink gate on the assertion-count / kind / value totals inside
         # name-matched tests (RFC 0025). Reads output/convention-comparison.json
         # written by the step above — --no-regen because CI must not pay for the
-        # extraction twice. Reseed after convergence with
-        # `pnpm parity:test:assertions:reseed`.
+        # extraction twice.
         run: node scripts/ci/bg-gates.mjs wait assertions
+      - name: Stage parity outputs
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        run: |
+          set -euo pipefail
+          dir=$RUNNER_TEMP/parity-outputs
+          mkdir -p "$dir/scripts/test-compare/output"
+          cp scripts/test-compare/output/convention-comparison.json "$dir/scripts/test-compare/output/"
+      - name: Upload parity outputs
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-outputs-${{ github.sha }}
+          path: ${{ runner.temp }}/parity-outputs/
+          retention-days: 90
       - name: AR-closure test manifest guard
         # Fails when a file under vendor/rails/v8.0.2/activesupport/test/ is neither
         # derived by R1/R2 nor aliased nor listed out-of-closure, so a vendor
@@ -2104,17 +2232,25 @@ jobs:
         if: always()
         run: node scripts/ci/bg-gates.mjs summary
 
-  rails-comparison-thor:
-    name: Rails API/Test Comparison (thor)
+  rails-comparison-scoped:
+    name: Rails API/Test Comparison (scoped)
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.comparison_affected == 'true' &&
-      needs.changes.outputs.thor_only == 'true'
+      (needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      SCOPED_PACKAGE: ${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'actioncable' }}
+      SCOPED_SOURCE: ${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'rails' }}
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 30
       - uses: ./.github/actions/setup-pnpm
       - uses: ruby/setup-ruby@v1
         with:
@@ -2127,10 +2263,12 @@ jobs:
         with:
           path: vendor/*/*/
           key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}
-      - name: Fetch the thor source
-        run: pnpm vendor:fetch --source thor
-      - name: Thor comparison
-        run: bash scripts/ci/thor-comparison.sh
+      - name: Fetch the scoped package's source
+        run: pnpm vendor:fetch --source "$SCOPED_SOURCE"
+      - name: Scoped comparison
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci/scoped-comparison.sh "$SCOPED_PACKAGE"
 
   schema-parity-rails:
     name: Schema Parity (Rails side)
@@ -2345,6 +2483,7 @@ jobs:
       - trails-tsc-tests
       - unit-tests
       - actionpack-tests
+      - system-tests
       - trailties-tests
       - sqlite-tests
       - sqlite-mem-tests
@@ -2354,7 +2493,7 @@ jobs:
       - maria-tests
       - website
       - rails-comparison
-      - rails-comparison-thor
+      - rails-comparison-scoped
       - schema-parity-rails
       - schema-parity-trails
       - schema-parity-diff
@@ -2382,6 +2521,8 @@ jobs:
           WEBSITE_AFFECTED: ${{ needs.changes.outputs.website_affected }}
           COMPARISON_AFFECTED: ${{ needs.changes.outputs.comparison_affected }}
           THOR_ONLY: ${{ needs.changes.outputs.thor_only }}
+          ACTIONCABLE_ONLY: ${{ needs.changes.outputs.actioncable_only }}
+          ACTIONCABLE_AFFECTED: ${{ needs.changes.outputs.actioncable_affected }}
           WEBSITE_LABEL: ${{ needs.changes.outputs.website_label }}
           PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
@@ -2463,8 +2604,13 @@ jobs:
                     continue
                   fi
                   ;;
+                system-tests)
+                  if [ "$AP_AFFECTED" = "false" ] && [ "$TRAILTIES_AFFECTED" = "false" ]; then
+                    continue
+                  fi
+                  ;;
                 trailties-tests)
-                  if [ "$TRAILTIES_AFFECTED" = "false" ]; then
+                  if [ "$TRAILTIES_AFFECTED" = "false" ] && [ "$ACTIONCABLE_ONLY" != "true" ]; then
                     continue
                   fi
                   ;;
@@ -2473,10 +2619,11 @@ jobs:
                   # A skip is legitimate only when EVERY member flag is false
                   # (the DX type step is gated on activerecord OR trailties).
                   if [ "$RACK_AFFECTED" = "false" ] && \
+                     [ "$ACTIONCABLE_AFFECTED" = "false" ] && \
                      [ "$AV_AFFECTED" = "false" ] && \
                      [ "$TSE_COMPILER_AFFECTED" = "false" ] && \
                      [ "$AR_AFFECTED" = "false" ] && \
-                     { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }; then
+                     { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }; then
                     continue
                   fi
                   ;;
@@ -2496,12 +2643,12 @@ jobs:
                   # (no packages/**, scripts/{api,test,fixtures,schema}-compare/**,
                   # comparison-consumed manifest builders, vendor/**, or
                   # cross-cutting infra — see COMPARISON_RE).
-                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then
+                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; then
                     continue
                   fi
                   ;;
-                rails-comparison-thor)
-                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" != "true" ]; then
+                rails-comparison-scoped)
+                  if [ "$COMPARISON_AFFECTED" = "false" ] || { [ "$THOR_ONLY" != "true" ] && [ "$ACTIONCABLE_ONLY" != "true" ]; }; then
                     continue
                   fi
                   ;;
@@ -2522,7 +2669,7 @@ jobs:
                   ;;
                 virtualized-dx-type-tests)
                   if [ "$AR_AFFECTED" = "false" ] && [ "$TRAILS_TSC_AFFECTED" = "false" ] && \
-                     { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }; then
+                     { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }; then
                     continue
                   fi
                   ;;

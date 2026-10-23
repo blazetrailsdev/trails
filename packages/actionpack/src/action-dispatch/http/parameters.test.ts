@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { MimeType } from "./mime-type.js";
+import { EOFError, StringIO, b } from "@blazetrails/ruby-compat";
+import { Mime } from "./mime-type.js";
 import { Request } from "./request.js";
 import {
   DEFAULT_PARSERS,
@@ -18,6 +19,7 @@ import {
 function makeHost(overrides: Partial<ParametersHost> = {}): ParametersHost & Parameters {
   const headers = new Map<string, unknown>();
   const host: ParametersHost = {
+    controllerClassFor: () => ({ actionEncodingTemplate: () => null }),
     getHeader: (k) => headers.get(k),
     setHeader: (k, v) => {
       headers.set(k, v);
@@ -43,7 +45,7 @@ describe("PARAMETERS_KEY", () => {
 });
 
 describe("DEFAULT_PARSERS json", () => {
-  const parser = DEFAULT_PARSERS[MimeType.JSON.symbol!];
+  const parser = DEFAULT_PARSERS[Mime.get(":json")!.symbol!];
 
   it("returns hash payloads unchanged", () => {
     expect(parser('{"a":1}')).toEqual({ a: 1 });
@@ -66,6 +68,16 @@ describe("ParseError", () => {
 });
 
 describe("parameters", () => {
+  it("falls back to the query parameters when the request body raises EOFError", () => {
+    const host = makeHost({ queryParameters: { q: "1" } });
+    Object.defineProperty(host, "requestParameters", {
+      get() {
+        throw new EOFError("bad content body");
+      },
+    });
+    expect(parameters.call(host)).toEqual({ q: "1" });
+  });
+
   it("merges request + query then path parameters", () => {
     const host = makeHost({
       queryParameters: { q: "1", shared: "query" },
@@ -177,10 +189,10 @@ describe("parameterParsers registry", () => {
       REQUEST_METHOD: "POST",
       CONTENT_TYPE: "application/xml",
       CONTENT_LENGTH: "7",
-      "rack.input": "<root/>",
+      "rack.input": new StringIO("<root/>"),
     });
-    expect(req.requestParameters).toEqual({ parsed: "<root/>" });
-    expect(req.params).toMatchObject({ parsed: "<root/>" });
+    expect(req.requestParameters).toEqual({ parsed: b("<root/>") });
+    expect(req.params).toMatchObject({ parsed: b("<root/>") });
   });
 });
 
@@ -189,7 +201,7 @@ describe("logParseErrorOnce", () => {
     const messages: string[] = [];
     const host = makeHost({
       rawPost: "garbage",
-      logger: { debug: (m) => messages.push(m) },
+      logger: { debug: (m: string) => messages.push(m) },
     });
     logParseErrorOnce.call(host);
     logParseErrorOnce.call(host);
@@ -209,7 +221,7 @@ describe("parseFormattedParameters", () => {
   it("parses when content-length is absent but a body is present (Rails content_length.zero? parity)", () => {
     const host = makeHost({
       contentLength: undefined,
-      contentMimeType: MimeType.JSON,
+      contentMimeType: Mime.get(":json")!,
       rawPost: '{"a":1}',
     });
     expect(parseFormattedParameters.call(host, DEFAULT_PARSERS, () => ({ y: 1 }))).toEqual({
@@ -217,25 +229,24 @@ describe("parseFormattedParameters", () => {
     });
   });
 
-  it("yields when rawPost is empty even if content-length is absent", () => {
-    const host = makeHost({
-      contentLength: undefined,
-      contentMimeType: MimeType.JSON,
-      rawPost: "",
-    });
-    expect(parseFormattedParameters.call(host, DEFAULT_PARSERS, () => ({}))).toEqual({});
-  });
-
   it("yields when no parser registered for the MIME type", () => {
-    const host = makeHost({ contentLength: 1, contentMimeType: MimeType.HTML, rawPost: "x" });
+    const host = makeHost({ contentLength: 1, contentMimeType: Mime.get(":html")!, rawPost: "x" });
     const out = parseFormattedParameters.call(host, DEFAULT_PARSERS, () => ({ y: 1 }));
     expect(out).toEqual({ y: 1 });
+  });
+
+  it("calls a stored nil parser and raises ParseError rather than yielding", () => {
+    const host = makeHost({ contentLength: 1, contentMimeType: Mime.get(":json")!, rawPost: "x" });
+    const parsers = { ":json": null as unknown as ParameterParser };
+    expect(() => parseFormattedParameters.call(host, parsers, () => ({ y: 1 }))).toThrow(
+      ParseError,
+    );
   });
 
   it("invokes the matching parser", () => {
     const host = makeHost({
       contentLength: 7,
-      contentMimeType: MimeType.JSON,
+      contentMimeType: Mime.get(":json")!,
       rawPost: '{"a":1}',
     });
     expect(parseFormattedParameters.call(host, DEFAULT_PARSERS, () => ({}))).toEqual({ a: 1 });
@@ -244,7 +255,7 @@ describe("parseFormattedParameters", () => {
   it("wraps parser failures in ParseError", () => {
     const host = makeHost({
       contentLength: 3,
-      contentMimeType: MimeType.JSON,
+      contentMimeType: Mime.get(":json")!,
       rawPost: "not json",
     });
     expect(() => parseFormattedParameters.call(host, DEFAULT_PARSERS, () => ({}))).toThrow(

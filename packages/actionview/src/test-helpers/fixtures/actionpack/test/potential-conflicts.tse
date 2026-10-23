@@ -1,0 +1,4 @@
+First: <%= this.name %>
+<%= render({ partial: "person", locals: { name: "Stephan" } }) -%>
+Fourth: <%= this.name %>
+Fifth: <%= name %>

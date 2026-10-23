@@ -101,6 +101,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "aliasParams",
   "admitsBoolean",
   "returnsVoid",
+  "generator",
 ] as const;
 
 /**

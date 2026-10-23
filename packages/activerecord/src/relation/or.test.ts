@@ -8,9 +8,9 @@ import { Author } from "../test-helpers/models/author.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Paragraph } from "../test-helpers/models/paragraph.js";
-import { Categorization } from "../test-helpers/models/categorization.js";
+import "../test-helpers/models/categorization.js";
 
-registerModel([Author, Post, SpecialPost, Comment, Paragraph, Categorization]);
+registerModel([Author, Post, SpecialPost, Comment, Paragraph]);
 
 const byId = (records: any[]) =>
   [...records].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));

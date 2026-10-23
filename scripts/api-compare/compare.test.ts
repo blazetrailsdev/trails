@@ -68,6 +68,7 @@ import {
   ambiguousTsOwner,
   ownersWithBodies,
   ambiguousRubyOwner,
+  countsAsRubyOwner,
   rubyOwnerSeat,
   tsMemberStatesSeat,
   recordTsSeatOwners,
@@ -402,6 +403,19 @@ describe("significantMissingCalls", () => {
     expect(sig.has("last")).toBe(true);
   });
 
+  it("significantCallsForReceivers credits empty?/size on a proven string or hash, never first/last", () => {
+    const sig = significantCallsForReceivers({
+      "empty?": ["string"],
+      size: ["hash", "array"],
+      first: ["string"],
+    });
+    expect(sig.has("empty?")).toBe(false);
+    expect(sig.has("size")).toBe(false);
+    expect(sig.has("first")).toBe(true);
+    const local = significantCallsForReceivers({ "empty?": ["string", "local"] });
+    expect(local.has("empty?")).toBe(true);
+  });
+
   it("significantCallsForReceivers still flags a positional-array name with no receiver proof at all", () => {
     const sig = significantCallsForReceivers({});
     expect(sig.has("first")).toBe(true);
@@ -472,20 +486,27 @@ describe("significantMissingCalls", () => {
     expect(significantCallsForReceivers(undefined).has("new")).toBe(true);
   });
 
-  it("significantCallsForReceivers credits String.new(x) only to a TS body making the String(x) conversion call", () => {
-    const conversion = new Set(["String"]);
+  it("significantCallsForReceivers credits HashWithIndifferentAccess.new and with_indifferent_access only to a plain-object construction", () => {
+    const object = new Set(["object"]);
+    expect(significantCallsForReceivers({ new: ["hwia-new"] }, undefined, object).has("new")).toBe(
+      false,
+    );
+    expect(significantCallsForReceivers({ new: ["hwia-new"] }).has("new")).toBe(true);
     expect(
-      significantCallsForReceivers({ new: ["string-new"] }, undefined, conversion).has("new"),
-    ).toBe(false);
-    expect(significantCallsForReceivers({ new: ["string-new"] }).has("new")).toBe(true);
-    expect(
-      significantCallsForReceivers({ new: ["const", "string-new"] }, undefined, conversion).has(
-        "new",
-      ),
+      significantCallsForReceivers({ new: ["const", "hwia-new"] }, undefined, object).has("new"),
     ).toBe(true);
-    expect(significantCallsForReceivers({ new: ["const"] }, undefined, conversion).has("new")).toBe(
+    expect(significantCallsForReceivers({ new: ["const"] }, undefined, object).has("new")).toBe(
       true,
     );
+    expect(significantCallsForReceivers({}, undefined, object).has("with_indifferent_access")).toBe(
+      false,
+    );
+    expect(significantCallsForReceivers({}).has("with_indifferent_access")).toBe(true);
+  });
+
+  it("significantCallsForReceivers credits String.new to a TS body with no new expression", () => {
+    expect(significantCallsForReceivers({ new: ["string-new"] }).has("new")).toBe(false);
+    expect(significantCallsForReceivers({ new: ["const", "string-new"] }).has("new")).toBe(true);
   });
 
   it("significantCallsForReceivers still flags size for a TS body with no .length read", () => {
@@ -652,6 +673,68 @@ describe("significantMissingCalls", () => {
         new Set(["length", "length:MAX_ROWS"]),
         { size: ["MAX_ROWS"] },
       ).has("size"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers credits a native value form only on its proven receiver kind", () => {
+    const rows: [string, string, string][] = [
+      ["compact", "compact", "array"],
+      ["uniq", "uniq", "array"],
+      ["union", "union", "array"],
+      ["take", "take", "array"],
+      ["drop", "drop", "array"],
+      ["count", "count", "array"],
+      ["to_h", "toH", "array"],
+      ["zip", "zip", "array"],
+      ["keys", "keys", "hash"],
+      ["values", "values", "hash"],
+      ["transform_values", "transformValues", "hash"],
+      ["each_value", "eachValue", "hash"],
+      ["values_at", "valuesAt", "hash"],
+      ["dup", "dup", "hash"],
+      ["except", "except", "hash"],
+      ["to_i", "toI", "string"],
+      ["to_f", "toF", "string"],
+      ["round", "round", "numeric"],
+      ["nan?", "isNaN", "numeric"],
+      ["strip", "trim", "string"],
+      ["rstrip", "trimEnd", "string"],
+      ["chomp", "chomp", "string"],
+    ];
+    for (const [name, form, kind] of rows) {
+      const base = new Set([name]);
+      const forms = new Set([form]);
+      const sig = (kinds: string[], f: Set<string> = forms) =>
+        significantCallsForReceivers({ [name]: kinds }, base, f).has(name);
+      expect(sig([kind])).toBe(false);
+      expect(sig([kind], new Set())).toBe(true);
+      expect(sig(["ivar"])).toBe(true);
+      expect(sig([kind, "local"])).toBe(true);
+      expect(sig(["formless"])).toBe(true);
+      expect(significantCallsForReceivers({}, base, forms).has(name)).toBe(true);
+    }
+  });
+
+  it("significantCallsForReceivers never credits Array#sort or a numeric to_i", () => {
+    const sig = (name: string, kind: string, form: string) =>
+      significantCallsForReceivers({ [name]: [kind] }, new Set([name]), new Set([form])).has(name);
+    expect(sig("sort", "array", "sort")).toBe(true);
+    expect(sig("to_i", "numeric", "toI")).toBe(true);
+  });
+
+  it("significantCallsForReceivers credits a value form anywhere in the body, not on one receiver", () => {
+    const sig = significantCallsForReceivers(
+      { drop: ["array"] },
+      new Set(["drop"]),
+      new Set(["drop"]),
+    );
+    expect(sig.has("drop")).toBe(false);
+  });
+
+  it("significantCallsForReceivers never credits Hash#slice to a destructure or an object literal", () => {
+    const forms = new Set(["except", "dup", "spread"]);
+    expect(
+      significantCallsForReceivers({ slice: ["hash"] }, new Set(["slice"]), forms).has("slice"),
     ).toBe(true);
   });
 
@@ -2360,16 +2443,13 @@ describe("selectMisplacedFile", () => {
   });
 
   it("never clusters a bucket registered as a name collision", () => {
-    for (const bucketKey of NAME_COLLISION_CLUSTERS) {
-      expect(
-        selectMisplacedFile(hits(["deprecation.ts", 6], ["b.ts", 1]), 10, bucketKey),
-      ).toBeNull();
-    }
     // Only-shrink registry: `activesupport:deprecation/deprecators.rb` left it
     // when `deprecation/deprecators.ts` landed.
     expect(NAME_COLLISION_CLUSTERS.has("activesupport:deprecation/deprecators.rb")).toBe(false);
-    expect(NAME_COLLISION_CLUSTERS.has("actionview:dependency_tracker/ruby_tracker.rb")).toBe(true);
-    expect(NAME_COLLISION_CLUSTERS.size).toBe(1);
+    expect(NAME_COLLISION_CLUSTERS.has("actionview:dependency_tracker/ruby_tracker.rb")).toBe(
+      false,
+    );
+    expect(NAME_COLLISION_CLUSTERS.size).toBe(0);
   });
 
   it("leaves an unregistered bucket's cluster alone", () => {
@@ -3284,6 +3364,14 @@ describe("ambiguousRubyOwner", () => {
         rubyOwnersOnTsSeat: 2,
       }),
     ).toBe(true);
+  });
+});
+
+describe("countsAsRubyOwner", () => {
+  it("does not count a same-file module's flattened body as its includer's", () => {
+    expect(countsAsRubyOwner({ mixinFile: "test_case.rb" }, "test_case.rb")).toBe(false);
+    expect(countsAsRubyOwner({}, "test_case.rb")).toBe(true);
+    expect(countsAsRubyOwner({ mixinFile: "metal/testing.rb" }, "test_case.rb")).toBe(true);
   });
 });
 
@@ -4864,7 +4952,9 @@ describe("rubyDefinitionBreakdown", () => {
     };
   }
   const skipName = [...SKIP][0];
-  const scoped = SCOPED_SKIP_GROUPS.filter((g) => g.tsMirrorName === undefined)
+  const scoped = SCOPED_SKIP_GROUPS.filter(
+    (g) => g.tsMirrorName === undefined && g.packages === undefined,
+  )
     .flatMap((g) => g.names.map((name) => ({ name, rubyFile: g.rubyFiles[0] })))
     .find(({ name }) => rubyMethodToTs(name) !== null)!;
 

@@ -11,6 +11,7 @@
     { "path": "../date" },
     { "path": "../globalid" },
     { "path": "../i18n" },
-    { "path": "../ruby-compat" }
+    { "path": "../ruby-compat" },
+    { "path": "../vitest-matchers" }
   ]
 }

@@ -24,7 +24,7 @@ export class Password extends String {
   constructor(rawHash: string | Password) {
     super(rawHash);
     if (this.isValidHash(rawHash)) {
-      [this.version, this.cost, this.salt, this.checksum] = this.splitHash(this.toString());
+      [this.version, this.cost, this.salt, this.checksum] = this.splitHash(this);
     } else {
       throw new Errors.InvalidHash("invalid hash");
     }
@@ -42,7 +42,7 @@ export class Password extends String {
     return (this.constructor as typeof Password).isValidHash(h);
   }
 
-  private splitHash(h: string): [string, number, string, string] {
+  private splitHash(h: string | Password): [string, number, string, string] {
     const [, v, c, mash] = h.split("$");
     return [v, toI(c) as number, h.slice(0, 29), mash.slice(-31)];
   }

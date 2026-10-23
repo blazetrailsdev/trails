@@ -1,9 +1,16 @@
 import type { Relation } from "../../relation.js";
+import type { ScopeOn } from "../../scoping/named.js";
 import type { FirstPost } from "./post.js";
 import type { Person } from "./person.js";
 import type { Post } from "./post.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    skimmersOrNot: ScopeOn<T, LazyReader>;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Reader extends Base {
@@ -20,7 +27,7 @@ export class Reader extends Base {
       foreignKey: "person_id",
       inverseOf: "reader",
     });
-    this.belongsTo("firstPost", function (this: any) {
+    this.belongsTo("firstPost", function () {
       return this.where({ id: [2, 3] });
     });
   }
@@ -64,10 +71,10 @@ export class LazyReader extends Base {
 
   static {
     this._tableName = "readers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ skimmer: true });
     });
-    this.scope("skimmersOrNot", function (this: any) {
+    this.scope("skimmersOrNot", function () {
       return this.unscope({ ":where": "skimmer" });
     });
     this.belongsTo("post");

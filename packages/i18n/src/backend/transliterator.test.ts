@@ -2,12 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError } from "../exceptions.js";
 import { config, resetConfig, setBackend, transliterate } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
-import type { TranslationData } from "../utils.js";
 import { Simple } from "./simple.js";
 import { HashTransliterator, get } from "./transliterator.js";
 
 describe("I18nBackendTransliterator", () => {
-  function storeTranslations(locale: string, data: TranslationData): void {
+  function storeTranslations(locale: string, data: Record<string, unknown>): void {
     config().backend.storeTranslations(locale, data);
   }
 

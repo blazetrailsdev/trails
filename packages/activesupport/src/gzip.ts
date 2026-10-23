@@ -1,6 +1,10 @@
-import { StringIO, Zlib, getZlib } from "@blazetrails/ruby-compat";
+import { StringIO, Zlib, b, getZlib } from "@blazetrails/ruby-compat";
 
 export class Stream extends StringIO {
+  static toString(): string {
+    return "ActiveSupport::Gzip::Stream";
+  }
+
   constructor(string = "") {
     super(string);
     this.setEncoding("BINARY");
@@ -28,10 +32,10 @@ export namespace Gzip {
   }
 }
 
-export function deflate(source: string): string {
-  return Buffer.from(getZlib().deflate(Buffer.from(source, "utf8"))).toString("latin1");
+export function deflate(source: string | Uint8Array): Uint8Array {
+  return getZlib().deflate(typeof source === "string" ? b(source) : source);
 }
 
-export function inflate(source: string): string {
-  return Buffer.from(getZlib().inflate(Buffer.from(source, "latin1"))).toString("utf8");
+export function inflate(source: string | Uint8Array): Uint8Array {
+  return getZlib().inflate(typeof source === "string" ? b(source) : source);
 }

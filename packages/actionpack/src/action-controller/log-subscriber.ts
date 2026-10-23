@@ -9,9 +9,7 @@ import { Base } from "./base.js";
 import type { CachingClassMethods } from "../abstract-controller/caching.js";
 import { ExceptionWrapper } from "../action-dispatch/middleware/exception-wrapper.js";
 import {
-  eachPair,
   inspect,
-  isEmpty,
   isSymbol,
   rbInspect,
   rbObjAsString,
@@ -27,7 +25,6 @@ export class LogSubscriber extends BaseLogSubscriber {
     return Base.logger as BaseLogSubscriber["logger"];
   }
 
-  /** @missingRailsArgs each_pair — PERMANENT */
   startProcessing(event: Event): void {
     if (!this.logger?.["info?"]) return;
 
@@ -38,20 +35,19 @@ export class LogSubscriber extends BaseLogSubscriber {
       format?: string | null;
     };
     const params: Record<string, unknown> = {};
-    eachPair(payload.params, (k, v) => {
+    for (const [k, v] of Object.entries(payload.params)) {
       if (!INTERNAL_PARAMS.includes(k)) params[k] = v;
-    });
+    }
     let format = payload.format;
     if (isSymbol(format)) format = symbolToS(format).toUpperCase();
     if (format == null) format = "*/*";
 
-    this._info(`Processing by ${payload.controller}#${payload.action} as ${format}`);
-    if (!isEmpty(params)) this._info(`  Parameters: ${inspect(params)}`);
+    this.info(`Processing by ${payload.controller}#${payload.action} as ${format}`);
+    if (Object.keys(params).length !== 0) this.info(`  Parameters: ${inspect(params)}`);
   }
 
-  /** @missingRailsArgs round — PERMANENT */
   processAction(event: Event): void {
-    this._info(() => {
+    this.info(undefined, () => {
       const payload = event.payload as {
         status?: number | null;
         exception?: [string, string] | null;
@@ -76,31 +72,32 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   haltedCallback(event: Event): void {
-    this._info(
+    this.info(
+      undefined,
       () => `Filter chain halted as ${rbInspect(event.payload.filter)} rendered or redirected`,
     );
   }
 
-  /** @missingRailsArgs round — PERMANENT */
   sendFile(event: Event): void {
-    this._info(
+    this.info(
+      undefined,
       () => `Sent file ${rbObjAsString(event.payload.path)} (${round(event.duration, 1)}ms)`,
     );
   }
 
   redirectTo(event: Event): void {
-    this._info(() => `Redirected to ${rbObjAsString(event.payload.location)}`);
+    this.info(undefined, () => `Redirected to ${rbObjAsString(event.payload.location)}`);
   }
 
-  /** @missingRailsArgs round — PERMANENT */
   sendData(event: Event): void {
-    this._info(
+    this.info(
+      undefined,
       () => `Sent data ${rbObjAsString(event.payload.filename)} (${round(event.duration, 1)}ms)`,
     );
   }
 
   unpermittedParameters(event: Event): void {
-    this._debug(() => {
+    this.debug(undefined, () => {
       const unpermittedKeys = event.payload.keys as string[];
       const displayUnpermittedKeys = unpermittedKeys.map((e) => `:${e}`).join(", ");
       const context = Object.entries(event.payload.context as Record<string, unknown>)
@@ -117,28 +114,28 @@ export class LogSubscriber extends BaseLogSubscriber {
     if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
     const key = expandCacheKey(event.payload.key ?? event.payload.path);
     const humanName = "Write fragment";
-    this._info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
+    this.info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
   }
 
   readFragment(event: Event): void {
     if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
     const key = expandCacheKey(event.payload.key ?? event.payload.path);
     const humanName = "Read fragment";
-    this._info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
+    this.info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
   }
 
   isExistFragment(event: Event): void {
     if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
     const key = expandCacheKey(event.payload.key ?? event.payload.path);
     const humanName = "Exist fragment?";
-    this._info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
+    this.info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
   }
 
   expireFragment(event: Event): void {
     if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
     const key = expandCacheKey(event.payload.key ?? event.payload.path);
     const humanName = "Expire fragment";
-    this._info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
+    this.info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
   }
 }
 

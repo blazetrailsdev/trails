@@ -48,7 +48,7 @@ describe("TestRequest#assignParameters Content-Type case", () => {
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/xml");
     req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"]);
-    expect(req.getHeader("rack.input").string()).toContain("<x>1</x>");
+    expect(new TextDecoder().decode(req.getHeader("rack.input").string())).toContain("<x>1</x>");
   });
 
   it("encodes a :json body with ActiveSupport::JSON.encode", () => {
@@ -57,7 +57,9 @@ describe("TestRequest#assignParameters Content-Type case", () => {
     req.setHeader("CONTENT_TYPE", "application/json");
     const price = new BigDecimal("1.50");
     req.assignParameters(null, "api", "create", { price, name: "<b>" }, "/api", ["price", "name"]);
-    expect(req.getHeader("rack.input").string()).toBe(`{"price":"1.5","name":"\\u003cb\\u003e"}`);
+    expect(new TextDecoder().decode(req.getHeader("rack.input").string())).toBe(
+      `{"price":"1.5","name":"\\u003cb\\u003e"}`,
+    );
   });
 });
 
@@ -77,7 +79,7 @@ describe("TestRequest#assignParameters multipart body", () => {
     req.assignParameters(null, "u", "create", { upload: file, t: "café" }, "/u", ["upload", "t"]);
     const body = req.getHeader("rack.input").string();
     expect(req.getHeader("CONTENT_LENGTH")).toBe(String(body.length));
-    expect((req.requestParameters["upload"] as HttpUploadedFile).read()).toBe(b("héllo"));
+    expect((req.requestParameters["upload"] as HttpUploadedFile).read()).toEqual(b("héllo"));
     expect(req.requestParameters["t"]).toBe("café");
   });
 });
@@ -98,7 +100,7 @@ describe("TestCase._controllerClass", () => {
     class Sub1 extends Base1 {}
     Base1.tests(PostsController);
     expect(Sub1.controllerClass).toBe(PostsController);
-    expect(Sub1.is_controllerClass).toBe(true);
+    expect(Sub1._isControllerClass).toBe(true);
   });
 });
 
@@ -127,7 +129,7 @@ describe("ActionController::Live under test_case.rb", () => {
     class LiveControllerTest extends TestCase {}
     LiveControllerTest.tests(LiveController);
     const tc = new LiveControllerTest(task.name);
-    expect(tc.response).toBeUndefined();
+    expect(tc.response).toBeNull();
     await tc.beforeSetup();
     expect(tc.response).toBeInstanceOf(LiveTestResponse);
   });
@@ -136,7 +138,6 @@ describe("ActionController::Live under test_case.rb", () => {
 describe("TestCase::Behavior", () => {
   it("is the module TestCase includes", () => {
     expect(isModuleIncluded(TestCase, Behavior)).toBe(true);
-    expect(Object.hasOwn(TestCase.prototype, "process")).toBe(false);
   });
 
   it("is includable into a test class that is not an ActionController::TestCase", async () => {
@@ -178,7 +179,9 @@ describe("TestCase#wrap_execution", () => {
         return block();
       },
     };
-    TopLevel.Trails = { application: { executor } } as unknown as typeof trails;
+    TopLevel.Trails = {
+      application: { executor, envConfig: () => ({}) },
+    } as unknown as typeof trails;
     try {
       await request(task.name);
       expect(wrapped).toBe(0);
@@ -265,7 +268,7 @@ describe("TestCase#document_root_element", () => {
     await tc.beforeSetup();
     await tc.get("index");
     const first = tc.htmlDocument;
-    expect(tc["documentRootElement"].name).toBe("root");
+    expect(tc["documentRootElement"]()!.name).toBe("root");
     await tc.get("index");
     expect(tc.htmlDocument).not.toBe(first);
   });
@@ -631,7 +634,7 @@ describe("ActionController::TestRequest helpers", () => {
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/x-www-form-urlencoded");
     req.assignParameters(null, "posts", "create", { title: "Hello" }, "/posts", ["title"]);
-    const body = req.getHeader("rack.input").string();
+    const body = new TextDecoder().decode(req.getHeader("rack.input").string());
     expect(body).toContain("title=Hello");
     expect(req.requestParameters).toMatchObject({ title: "Hello" });
   });
@@ -646,14 +649,14 @@ describe("ActionController::TestRequest helpers", () => {
     const ct = req.getHeader("CONTENT_TYPE") ?? "";
     expect(ct).toContain("multipart/form-data");
     expect(ct).toContain("boundary=");
-    const body = req.getHeader("rack.input").string();
+    const body = new TextDecoder().decode(req.getHeader("rack.input").string());
     expect(body).toContain(`name="upload"; filename="hello.txt"`);
     const upload = req.requestParameters["upload"] as HttpUploadedFile;
     expect(upload).toBeInstanceOf(HttpUploadedFile);
     expect(upload).not.toBe(file);
     expect(upload.originalFilename).toBe("hello.txt");
     expect(upload.contentType).toBe("text/plain");
-    expect(upload.read()).toBe("hi");
+    expect(upload.read()).toEqual(b("hi"));
   });
 
   it("assignParameters registers custom parser for unknown content types, wired into requestParameters", () => {

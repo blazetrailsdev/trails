@@ -2,6 +2,10 @@ import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { isBlank } from "../object/blank.js";
 
 export class Array {
+  static toString(): string {
+    return "Array";
+  }
+
   static from<T>(self: T[], position: number): T[] {
     const start = position < 0 ? self.length + position : position;
     if (start < 0 || start > self.length) return [];

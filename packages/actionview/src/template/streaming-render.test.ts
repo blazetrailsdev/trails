@@ -4,7 +4,7 @@ import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { DetailsKey } from "../lookup-context.js";
 import { TemplateHandlers } from "./handlers.js";
-import { Tse } from "./handlers/tse.js";
+import { TSE } from "./handlers/tse.js";
 import { Raw } from "./handlers/raw.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import type { Body } from "../renderer/streaming-template-renderer.js";
@@ -51,7 +51,7 @@ function setupFiberedBase() {
   const state = {} as { assigns: Record<string, unknown>; view: Base };
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     TemplateHandlers.registerTemplateHandler("raw", new Raw());
     DetailsKey.clear();
 

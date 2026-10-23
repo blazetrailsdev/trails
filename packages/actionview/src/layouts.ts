@@ -1,4 +1,6 @@
-import { ArgumentError, NameError, rbInspect } from "@blazetrails/ruby-compat";
+import { ActionView } from "./namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { ArgumentError, NameError, rbFSend, rbInspect } from "@blazetrails/ruby-compat";
 import { Concern, classAttribute, dasherize, extend, underscore } from "@blazetrails/activesupport";
 import { include, Module } from "@blazetrails/ruby-compat/include";
 import type { LookupContext } from "./lookup-context.js";
@@ -21,6 +23,8 @@ export type Layouts = {
   _layoutConditions: Record<string, string[]>;
   _prefixes(): string[];
   _isConditionalLayout(): boolean | undefined;
+  isActionHasLayout(): boolean;
+  setActionHasLayout(value: boolean): void;
   _layout(
     lookupContext: LookupContext,
     formats: readonly string[],
@@ -101,9 +105,7 @@ export function _writeLayoutMethod(this: LayoutsClass): void {
     layoutDefinition = () => layoutOption;
   } else if (typeof layoutOption === "string") {
     layoutDefinition = function (lookupContext, formats, keys) {
-      const layout = (this as unknown as Record<string, () => LayoutValue>)[
-        layoutOption.slice(1)
-      ]();
+      const layout = rbFSend(this, layoutOption.slice(1)) as LayoutValue;
       if (layout == null) return defaultBehavior.call(this, lookupContext, formats, keys);
       if (!(typeof layout === "string" || layout === false)) {
         throw new ArgumentError(
@@ -158,6 +160,10 @@ export function _processRenderTemplateOptions(
   }
 }
 
+export function setActionHasLayout(this: Layouts, value: boolean): void {
+  this._actionHasLayout = value;
+}
+
 export function isActionHasLayout(this: Layouts): boolean {
   return this._actionHasLayout!;
 }
@@ -208,15 +214,14 @@ export function _defaultLayout(
 ): LayoutValue {
   let value: LayoutValue;
   try {
-    if (isActionHasLayout.call(this))
-      value = this._layout(lookupContext, formats, keys) as LayoutValue;
+    if (this.isActionHasLayout()) value = this._layout(lookupContext, formats, keys) as LayoutValue;
   } catch (e) {
     if (!(e instanceof NameError)) throw e;
     e.message = `Could not render layout: ${e.message}`;
     throw e;
   }
 
-  if (requireLayout && isActionHasLayout.call(this) && !value) {
+  if (requireLayout && this.isActionHasLayout() && !value) {
     throw new ArgumentError(
       `There was no default layout for ${this.constructor.name} in ${rbInspect((this.constructor as unknown as LayoutsClass).viewPaths())}`,
     );
@@ -253,6 +258,7 @@ export const Layouts = new Module((mod) => {
   );
 
   mod.defineMethod("_processRenderTemplateOptions", _processRenderTemplateOptions);
+  mod.defineMethod("setActionHasLayout", setActionHasLayout);
   mod.defineMethod("isActionHasLayout", isActionHasLayout);
   mod.defineMethod("_isConditionalLayout", _isConditionalLayout);
   mod.defineMethod("_layout", _layout);
@@ -262,3 +268,5 @@ export const Layouts = new Module((mod) => {
   mod.defineMethod("_isIncludeLayout", _isIncludeLayout);
 }) as Module & { ClassMethods: typeof ClassMethods };
 Layouts.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionView, "Layouts", Layouts);

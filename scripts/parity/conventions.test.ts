@@ -165,6 +165,11 @@ describe("snakeToCamel", () => {
     expect(rubyFileToTs("bin/rubocop.tt")).toBe("bin/eslint.tt.ts");
   });
 
+  it("renames the `capybara` token to `vitest` (trails system tests run on Vitest)", () => {
+    expect(snakeToCamel("capybara")).toBe("vitest");
+    expect(snakeToCamel("Capybara")).toBe("Vitest");
+  });
+
   it("does NOT rename `rubocop` inside another token", () => {
     expect(snakeToCamel("rubocops")).toBe("rubocops");
     expect(snakeToCamel("run_rubocopper")).toBe("runRubocopper");
@@ -387,6 +392,10 @@ describe("rubyMethodToTs predicates", () => {
     expect(bareCandidates("is_number?")).toEqual(["isNumber"]);
     expect(bareCandidates("is_integer?")).toEqual(["isInteger"]);
     expect(bareCandidates("is_hexadecimal_literal?")).toEqual(["isHexadecimalLiteral"]);
+  });
+
+  it("keeps a private predicate's leading underscore in front of the is", () => {
+    expect(rubyMethodToTs("_include_layout?")).toContain("_isIncludeLayout");
   });
 
   it("keeps prepending is for predicates that don't already start with one of the allowlisted prefixes", () => {

@@ -1,4 +1,3 @@
-import type { Bytes } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   dasherize,
@@ -6,13 +5,11 @@ import {
   include,
   months,
   onLoad,
-  type Deprecators,
 } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import {
   FixtureSet,
   type FixtureSetHost,
-  setApp,
   GlobalID,
   Identification,
   SignedGlobalID,
@@ -26,13 +23,6 @@ export interface GlobalIdConfig {
   verifier?: MessageVerifier;
 }
 
-export interface TrailtieApp {
-  railtieName: string;
-  config: { get(key: string): unknown; set(key: string, value: unknown): void };
-  deprecators?: Deprecators;
-  keyGenerator(): { generateKey(salt: string): string | Bytes };
-}
-
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
@@ -42,25 +32,21 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("global_id", (app) => {
       const defaultExpiresIn = months(1).toI();
-      const defaultAppName = dasherize(
-        (app as TrailtieApp).railtieName.replace("_application", ""),
-      );
+      const defaultAppName = dasherize(app.railtieName.replace("_application", ""));
 
-      const config = (app as TrailtieApp).config.get("globalId") as GlobalIdConfig;
-      setApp((config.app ??= defaultAppName));
+      const config = app.config.get("globalId") as GlobalIdConfig;
+      GlobalID.setApp((config.app ??= defaultAppName));
       SignedGlobalID.expiresIn =
         "expiresIn" in config ? (config.expiresIn ?? null) : defaultExpiresIn;
 
       this.config.afterInitialize(() => {
-        setApp((config.app ??= defaultAppName));
+        GlobalID.setApp((config.app ??= defaultAppName));
         SignedGlobalID.expiresIn =
           "expiresIn" in config ? (config.expiresIn ?? null) : defaultExpiresIn;
 
         config.verifier ??= (() => {
           try {
-            return new Verifier(
-              (app as TrailtieApp).keyGenerator().generateKey("signed_global_ids"),
-            );
+            return new Verifier(app.keyGenerator().generateKey("signed_global_ids"));
           } catch (error) {
             if (error instanceof ArgumentError) return undefined;
             throw error;
@@ -79,7 +65,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("web_console.deprecator", (app) => {
-      (app as TrailtieApp).deprecators?.set("globalId", GlobalID.deprecator());
+      app.deprecators.set("globalId", GlobalID.deprecator());
     });
   }
 }

@@ -13,7 +13,7 @@ import { SingularAssociation } from "./singular-association.js";
 import { belongsToRequiredValidatesForeignKey } from "../../active-record.js";
 
 export class BelongsTo extends SingularAssociation {
-  static override macro(): string {
+  static override macro(): "belongsTo" {
     return "belongsTo";
   }
 

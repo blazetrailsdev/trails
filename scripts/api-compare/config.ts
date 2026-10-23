@@ -193,6 +193,7 @@ export const MANIFEST_PACKAGES = [
   "abstractcontroller",
   "actionpackversion",
   "actionview",
+  "actioncable",
   "activejob",
   "trailties",
   "rack",

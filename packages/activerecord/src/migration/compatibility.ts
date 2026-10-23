@@ -1,9 +1,8 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent, reverseMergeBang } from "@blazetrails/activesupport";
 import {
-  Module,
-  except,
   include,
+  rbCallSuper,
   rbInspect,
   rbObjSingletonClass,
   rtest,
@@ -79,15 +78,15 @@ export class V7_0 extends V7_1 {
     }
   };
 
-  static TableDefinition: Module = new Module().include(V7_0.LegacyIndexName).include({
+  static TableDefinition: Record<string, (...args: never[]) => unknown> = {
     column(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, _skipValidateOptions: true };
-      return V7_0.TableDefinition.superMethod(this, "column")!(name, type, options);
+      return rbCallSuper(this, V7_0.TableDefinition.column, name, type, options);
     },
 
     change(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, _skipValidateOptions: true };
-      return V7_0.TableDefinition.superMethod(this, "change")!(name, type, options);
+      return rbCallSuper(this, V7_0.TableDefinition.change, name, type, options);
     },
 
     index(
@@ -101,19 +100,19 @@ export class V7_0 extends V7_1 {
       if (options.name == null) {
         options = { ...options, name: this.legacyIndexName(this.name, columnName) };
       }
-      return V7_0.TableDefinition.superMethod(this, "index")!(columnName, options);
+      return rbCallSuper(this, V7_0.TableDefinition.index, columnName, options);
     },
 
     references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       let options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
       options = { ...options, _skipValidateOptions: true };
-      return V7_0.TableDefinition.superMethod(this, "references")!(...args, options);
+      return rbCallSuper(this, V7_0.TableDefinition.references, ...args, options);
     },
 
     /** @internal */
     raiseOnIfExistOptions(_options: Options): void {},
-  });
+  };
 
   /** @internal */
   declare legacyIndexName: (tableName: string, options: Options | string | string[]) => string;
@@ -231,6 +230,7 @@ export class V7_0 extends V7_1 {
 }
 
 include(V7_0, V7_0.LegacyIndexName);
+include(V7_0.TableDefinition, V7_0.LegacyIndexName);
 
 export class V6_1 extends V7_0 {
   static PostgreSQLCompat = class PostgreSQLCompat {
@@ -271,7 +271,7 @@ export class V6_1 extends V7_0 {
     await super.changeColumn(tableName, columnName, type, options);
   }
 
-  static override TableDefinition: Module = new Module().include({
+  static override TableDefinition: Record<string, (...args: never[]) => unknown> = {
     newColumnDefinition(
       this: { conn: AbstractAdapter },
       name: string,
@@ -279,22 +279,22 @@ export class V6_1 extends V7_0 {
       options: Options = {},
     ) {
       type = V6_1.PostgreSQLCompat.compatibleTimestampType(type, this.conn);
-      return V6_1.TableDefinition.superMethod(this, "newColumnDefinition")!(name, type, options);
+      return rbCallSuper(this, V6_1.TableDefinition.newColumnDefinition, name, type, options);
     },
 
     change(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
-      return V6_1.TableDefinition.superMethod(this, "change")!(name, type, options);
+      return rbCallSuper(this, V6_1.TableDefinition.change, name, type, options);
     },
 
     column(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
-      return V6_1.TableDefinition.superMethod(this, "column")!(name, type, options);
+      return rbCallSuper(this, V6_1.TableDefinition.column, name, type, options);
     },
 
     /** @internal */
     raiseOnIfExistOptions(_options: Options): void {},
-  });
+  };
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
@@ -310,25 +310,25 @@ export class V6_0 extends V6_1 {
     }
   };
 
-  static override TableDefinition: Module = new Module().include({
+  static override TableDefinition: Record<string, (...args: never[]) => unknown> = {
     references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       let options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
       options = { ...options, _usesLegacyReferenceIndexName: true };
-      return V6_0.TableDefinition.superMethod(this, "references")!(...args, options);
+      return rbCallSuper(this, V6_0.TableDefinition.references, ...args, options);
     },
 
     column(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
-      return V6_0.TableDefinition.superMethod(this, "column")!(name, type, options);
+      return rbCallSuper(this, V6_0.TableDefinition.column, name, type, options);
     },
 
     /** @internal */
     raiseOnIfExistOptions(_options: Options): void {},
-  });
+  };
 
   static {
-    V6_0.TableDefinition.aliasMethod("belongsTo", "references");
+    V6_0.TableDefinition.belongsTo = V6_0.TableDefinition.references;
   }
 
   override async addReference(
@@ -360,15 +360,15 @@ export class V6_0 extends V6_1 {
 }
 
 export class V5_2 extends V6_0 {
-  static override TableDefinition: Module = new Module().include({
+  static override TableDefinition: Record<string, (...args: never[]) => unknown> = {
     timestamps(this: object, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
-      return V5_2.TableDefinition.superMethod(this, "timestamps")!(options);
+      return rbCallSuper(this, V5_2.TableDefinition.timestamps, options);
     },
 
     column(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
-      return V5_2.TableDefinition.superMethod(this, "column")!(name, type, options);
+      return rbCallSuper(this, V5_2.TableDefinition.column, name, type, options);
     },
 
     /** @internal */
@@ -376,9 +376,9 @@ export class V5_2 extends V6_0 {
 
     /** @internal */
     raiseOnDuplicateColumn(_name: string): void {},
-  });
+  };
 
-  static override CommandRecorder: Module = new Module().include({
+  static override CommandRecorder: Record<string, (...args: never[]) => unknown> = {
     invertTransaction(args: unknown[], block?: (...args: unknown[]) => unknown) {
       return ["transaction", args, block];
     },
@@ -390,7 +390,7 @@ export class V5_2 extends V6_0 {
     invertChangeTableComment(args: unknown[]) {
       return ["changeTableComment", args];
     },
-  });
+  };
 
   override async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
     options = {
@@ -423,12 +423,8 @@ export class V5_1 extends V5_2 {
   ): Promise<void> {
     const connection = await this.connection;
     if (connection.adapterName === "PostgreSQL") {
-      await super.changeColumn(
-        tableName,
-        columnName,
-        type,
-        except(options as Options, "default", "null", "comment"),
-      );
+      const { default: _default, null: _null, comment, ...rest } = options as Options;
+      await super.changeColumn(tableName, columnName, type, rest);
       if (Object.hasOwn(options, "default")) {
         await connection.changeColumnDefault(tableName, columnName, options.default);
       }
@@ -463,16 +459,16 @@ export class V5_1 extends V5_2 {
 }
 
 export class V5_0 extends V5_1 {
-  static override TableDefinition: Module = new Module().include({
+  static override TableDefinition: Record<string, (...args: never[]) => unknown> = {
     primaryKey(name: string, type: ColumnType = "primary_key", options: Options = {}) {
       if (type === "primary_key") type = "integer";
-      return V5_0.TableDefinition.superMethod(this, "primaryKey")!(name, type, options);
+      return rbCallSuper(this, V5_0.TableDefinition.primaryKey, name, type, options);
     },
 
     references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       const options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
-      return V5_0.TableDefinition.superMethod(this, "references")!(...args, {
+      return rbCallSuper(this, V5_0.TableDefinition.references, ...args, {
         type: "integer",
         ...options,
       });
@@ -480,10 +476,10 @@ export class V5_0 extends V5_1 {
 
     /** @internal */
     raiseOnIfExistOptions(_options: Options): void {},
-  });
+  };
 
   static {
-    V5_0.TableDefinition.aliasMethod("belongsTo", "references");
+    V5_0.TableDefinition.belongsTo = V5_0.TableDefinition.references;
   }
 
   override async createTable(
@@ -572,11 +568,11 @@ export class V5_0 extends V5_1 {
 type RemoveIndexOptions = { column?: string | string[]; name?: string; ifExists?: boolean };
 
 export class V4_2 extends V5_0 {
-  static override TableDefinition: Module = new Module().include({
+  static override TableDefinition: Record<string, (...args: never[]) => unknown> = {
     references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       const options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
-      return V4_2.TableDefinition.superMethod(this, "references")!(...args, {
+      return rbCallSuper(this, V4_2.TableDefinition.references, ...args, {
         ...options,
         index: options.index ?? false,
       });
@@ -584,15 +580,15 @@ export class V4_2 extends V5_0 {
 
     timestamps(this: object, options: Options = {}) {
       if (options.null == null) options = { ...options, null: true };
-      return V4_2.TableDefinition.superMethod(this, "timestamps")!(options);
+      return rbCallSuper(this, V4_2.TableDefinition.timestamps, options);
     },
 
     /** @internal */
     raiseOnIfExistOptions(_options: Options): void {},
-  });
+  };
 
   static {
-    V4_2.TableDefinition.aliasMethod("belongsTo", "references");
+    V4_2.TableDefinition.belongsTo = V4_2.TableDefinition.references;
   }
 
   override async addReference(
@@ -663,7 +659,7 @@ export class V4_2 extends V5_0 {
 
     if (!(await connection.indexNameExists(tableName, indexName))) {
       if (Object.hasOwn(options, "name")) {
-        const optionsWithoutColumn = except(options, "column");
+        const { column, ...optionsWithoutColumn } = options;
         const indexNameWithoutColumn = connection.indexName(tableName, optionsWithoutColumn);
 
         if (await connection.indexNameExists(tableName, indexNameWithoutColumn)) {

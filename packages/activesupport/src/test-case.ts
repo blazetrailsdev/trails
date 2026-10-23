@@ -3,11 +3,7 @@ import {
   testOrder as activeSupportTestOrder,
   setTestOrder as activeSupportSetTestOrder,
 } from "./active-support.js";
-import {
-  setTaggedLogger,
-  beforeSetup as taggedLoggingBeforeSetup,
-  taggedLogger,
-} from "./testing/tagged-logging.js";
+import { setTaggedLogger, taggedLogger, TaggedLogging } from "./testing/tagged-logging.js";
 import {
   prepended as setupAndTeardownPrepended,
   type ClassMethods as SetupAndTeardownClassMethods,
@@ -35,7 +31,7 @@ import {
   collectDeprecations,
 } from "./testing/deprecation.js";
 import {
-  afterTeardown as timeHelpersAfterTeardown,
+  TimeHelpers,
   travel,
   travelTo,
   travelBack,
@@ -47,6 +43,10 @@ import { include, type Extended } from "@blazetrails/ruby-compat/include";
 import { prepend, type PrependMethod } from "@blazetrails/ruby-compat";
 
 export class TestCase extends Minitest.Test {
+  static toString(): string {
+    return "ActiveSupport::TestCase";
+  }
+
   declare static fileFixturePath: string | null;
   declare readonly fileFixturePath: string | null;
   declare static isFileFixturePath: () => boolean;
@@ -74,27 +74,6 @@ export class TestCase extends Minitest.Test {
   /** @internal */
   static taggedLogger = taggedLogger;
 
-  override beforeSetup(): unknown {
-    const result = super.beforeSetup();
-    return result instanceof Promise
-      ? result.then(taggedLoggingBeforeSetup)
-      : taggedLoggingBeforeSetup();
-  }
-
-  override afterTeardown(): unknown {
-    let raised: [unknown] | undefined;
-    try {
-      timeHelpersAfterTeardown();
-    } catch (e) {
-      raised = [e];
-    }
-    const afterSuper = (): void => {
-      if (raised) throw raised[0];
-    };
-    const result = super.afterTeardown();
-    return result instanceof Promise ? result.then(afterSuper) : afterSuper();
-  }
-
   static assertNot = assertNot;
   static assertNotIncludes = assertNotIncludes;
   static assertRaises = assertRaises;
@@ -118,8 +97,7 @@ export class TestCase extends Minitest.Test {
   static unfreezeTime = unfreezeTime;
 }
 
-include(TestCase, ErrorReporterAssertions);
-include(TestCase, FileFixtures);
+include(TestCase, TaggedLogging);
 prepend(TestCase.prototype, {
   beforeSetup: setupAndTeardownBeforeSetup as PrependMethod,
   afterTeardown: setupAndTeardownAfterTeardown as PrependMethod,
@@ -128,5 +106,8 @@ setupAndTeardownPrepended(TestCase);
 prepend(TestCase.prototype, {
   afterTeardown: testsWithoutAssertionsAfterTeardown as PrependMethod,
 });
+include(TestCase, ErrorReporterAssertions);
+include(TestCase, TimeHelpers);
+include(TestCase, FileFixtures);
 
 runLoadHooks("active_support_test_case", TestCase);

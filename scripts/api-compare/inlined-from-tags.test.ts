@@ -32,12 +32,19 @@ describe("inlinedFromIn", () => {
     expect([tag.module, tag.hook]).toEqual(["ActiveRecord::Inheritance::ClassMethods", "new"]);
   });
 
+  it("reads a module method whose super an includer's method inlines", () => {
+    const [tag] = inlinedFromIn(
+      `/** ${TAG} ActionView::Helpers::ActiveModelInstanceTag#content_tag rails/v8.0.2/actionview/lib/action_view/helpers/active_model_helper.rb:20-22 */`,
+    );
+    expect([tag.module, tag.hook]).toEqual([
+      "ActionView::Helpers::ActiveModelInstanceTag",
+      "content_tag",
+    ]);
+  });
+
   it.each([
     ["a bare tag", `${TAG}`],
-    [
-      "a name that is not Module#initialize",
-      `${TAG} ActiveModel::API#assign_attributes rails/v8.0.2/a.rb:1-2`,
-    ],
+    ["a name with no method", `${TAG} ActiveModel::API rails/v8.0.2/a.rb:1-2`],
     ["a lowercase module", `${TAG} api#initialize rails/v8.0.2/a.rb:1-2`],
     [
       "`new` off a ClassMethods module",

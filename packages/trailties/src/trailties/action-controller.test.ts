@@ -95,15 +95,17 @@ describe("action_controller.set_helpers_path", () => {
     return HelpersReceiver as unknown as AbstractController.HelpersClassMethods;
   }
 
-  function bootAndInstantiate(klass: AbstractController.HelpersClassMethods): void {
+  async function bootAndInstantiate(klass: AbstractController.HelpersClassMethods): Promise<void> {
     runLoadHooks("action_controller", klass);
-    new (klass as unknown as new () => unknown)();
+    await ActionController.Railties.Helpers.inherited(
+      klass as ActionController.HelpersPathControllerClass,
+    );
   }
 
   it("test_all_helpers", async () => {
     const base = receivingController();
     await runTrailtieInitializers(Trailtie, app);
-    bootAndInstantiate(base);
+    await bootAndInstantiate(base);
 
     const methods = extend({}, base._helpers!);
     expect("bareA" in methods).toBe(true);
@@ -118,7 +120,7 @@ describe("action_controller.set_helpers_path", () => {
     );
     const base = receivingController();
     await runTrailtieInitializers(Trailtie, app);
-    bootAndInstantiate(base);
+    await bootAndInstantiate(base);
 
     expect("fromKlass" in extend({}, base._helpers!)).toBe(true);
   });
@@ -126,7 +128,7 @@ describe("action_controller.set_helpers_path", () => {
   it("sets helpersPath on the controller from config.helpersPaths", async () => {
     const base = receivingController();
     await runTrailtieInitializers(Trailtie, app);
-    bootAndInstantiate(base);
+    await bootAndInstantiate(base);
 
     expect((base as ActionController.HelpersPathControllerClass).helpersPath).toEqual([root]);
   });
@@ -142,7 +144,7 @@ describe("action_controller.set_helpers_path", () => {
 
     try {
       await runTrailtieInitializers(Trailtie, app);
-      bootAndInstantiate(base);
+      await bootAndInstantiate(base);
 
       expect("bareA" in extend({}, base._helpers!)).toBe(false);
       expect("baz" in extend({}, base._helpers!)).toBe(true);
@@ -157,7 +159,7 @@ describe("action_controller.set_helpers_path", () => {
 
     await runTrailtieInitializers(Trailtie, app);
 
-    expect(() => bootAndInstantiate(base)).toThrow("uninitialized constant TypoHelper");
+    await expect(bootAndInstantiate(base)).rejects.toThrow("uninitialized constant TypoHelper");
     expect("oops" in extend({}, base._helpers!)).toBe(false);
   });
 
@@ -169,7 +171,7 @@ describe("action_controller.set_helpers_path", () => {
     await runTrailtieInitializers(Trailtie, app);
     runLoadHooks("action_controller", ActionController.Base);
     try {
-      bootAndInstantiate(base);
+      await bootAndInstantiate(base);
       expect("bareA" in extend({}, base._helpers!)).toBe(false);
     } finally {
       ActionController.Base.includeAllHelpers = true;
@@ -181,7 +183,7 @@ describe("action_controller.set_helpers_path", () => {
     const base = receivingController();
 
     await runTrailtieInitializers(Trailtie, app);
-    bootAndInstantiate(base);
+    await bootAndInstantiate(base);
 
     expect("bareA" in extend({}, base._helpers!)).toBe(false);
   });

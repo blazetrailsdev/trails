@@ -2,6 +2,7 @@ import { PeriodNotFound, TimeZone, Timezone, TimezonePeriod } from "./values/tim
 import {
   Range,
   basicObjRespondTo,
+  rbObjRespondTo,
   equals as cmpEquals,
   greaterThan,
   greaterThanOrEqual,
@@ -10,6 +11,7 @@ import {
   lessThanOrEqual,
   NoMethodError,
   PROTOCOL_PROBES,
+  rbModConstSet,
   rbObjClassname,
   rubyClass,
 } from "@blazetrails/ruby-compat";
@@ -18,6 +20,8 @@ import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js";
 import { DateTime, Temporal } from "@blazetrails/date";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
+import { ActiveSupport } from "./namespaces.js";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
 import {
@@ -123,6 +127,10 @@ const METHOD_MISSING_HANDLER: ProxyHandler<TimeWithZone> = {
 };
 
 export class TimeWithZone {
+  static toString(): string {
+    return "ActiveSupport::TimeWithZone";
+  }
+
   private _utc!: Time | null;
   private _time!: TimeLike | null;
   private _timeZone!: TimeZone | Timezone;
@@ -137,22 +145,13 @@ export class TimeWithZone {
     localTime: TimeLike | null = null,
     period: TimezonePeriod | null = null,
   ) {
-    this.initialize(utcTime, timeZone, localTime, period);
-    return new Proxy(this, METHOD_MISSING_HANDLER);
-  }
-
-  initialize(
-    utcTime: TimeLike | null,
-    timeZone: TimeZone | Timezone,
-    localTime: TimeLike | null = null,
-    period: TimezonePeriod | null = null,
-  ): void {
     this._utc = utcTime ? this._transferTimeValuesToUtcConstructor(utcTime) : null;
     this._timeZone = timeZone;
     this._time = localTime;
     this._period = this._utc
       ? (period ?? undefined)
       : this._getPeriodAndEnsureValidLocalTime(period);
+    return new Proxy(this, METHOD_MISSING_HANDLER);
   }
 
   private get _zoned(): Temporal.ZonedDateTime {
@@ -169,12 +168,11 @@ export class TimeWithZone {
 
   isRespondTo(sym: string, includePriv: boolean = false): boolean {
     if (sym === "toStr") return false;
-    return basicObjRespondTo(this, sym, !includePriv);
+    return basicObjRespondTo(this, sym);
   }
 
   respondToMissing(sym: string, includePriv: boolean): boolean {
-    if (!includePriv && sym.startsWith("_")) return false;
-    return typeof (this.time as unknown as Record<string, unknown>)[sym] === "function";
+    return rbObjRespondTo(this.time, sym);
   }
 
   methodMissing(method: string, ...args: unknown[]): unknown {
@@ -555,6 +553,22 @@ export class TimeWithZone {
     return this.asJson();
   }
 
+  /** @inventedArm assign — PERMANENT */
+  initWith(coder: YAML.Coder): void {
+    Object.assign(
+      this,
+      new TimeWithZone(
+        coder["utc"] as TimeLike | null,
+        coder["zone"] as TimeZone | Timezone,
+        coder["time"] as TimeLike | null,
+      ),
+    );
+  }
+
+  encodeWith(coder: YAML.Coder): void {
+    coder.setMap({ utc: this.utc(), zone: this.timeZone, time: this.time });
+  }
+
   plus(other: number | Duration | TimeWithZone | Time): TimeWithZone {
     if (this.durationOfVariableLength(other)) {
       return this.methodMissing("plus", other) as TimeWithZone;
@@ -889,10 +903,9 @@ export class TimeWithZone {
   }
 
   marshalLoad(variables: [Time, string, Time]): void {
-    this.initialize(
-      variables[0].getutc(),
-      findZone(variables[1]) as TimeZone,
-      variables[2].getutc(),
+    Object.assign(
+      this,
+      new TimeWithZone(variables[0].utc(), findZone(variables[1]) as TimeZone, variables[2].utc()),
     );
   }
 
@@ -926,3 +939,7 @@ rbDefineAllocFunc(
   TimeWithZone,
   (klass) => new Proxy(Object.create(klass.prototype) as TimeWithZone, METHOD_MISSING_HANDLER),
 );
+
+YAML.loadTags["!ruby/object:ActiveSupport::TimeWithZone"] = "ActiveSupport::TimeWithZone";
+YAML.dumpTags.set(TimeWithZone, "!ruby/object:ActiveSupport::TimeWithZone");
+rbModConstSet(ActiveSupport, "TimeWithZone", TimeWithZone);

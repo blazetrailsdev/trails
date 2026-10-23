@@ -4,7 +4,7 @@ import type { Request } from "../../action-dispatch/http/request.js";
 import type { CookieResponse } from "../../action-dispatch/middleware/cookies.js";
 import {
   Response as DispatchResponse,
-  ResponseBuffer,
+  Buffer as ResponseBuffer,
 } from "../../action-dispatch/http/response.js";
 import {
   CachedThreadPool,
@@ -20,6 +20,7 @@ import {
   rbObjClassname,
   rbObjRespondTo,
   stringDelete,
+  toEnum,
   toS,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
@@ -33,6 +34,10 @@ type ErrorCallback = () => unknown;
 
 export class Buffer extends ResponseBuffer<Queue<string | null>> {
   static queueSize: number | null = 10;
+
+  static {
+    Object.defineProperty(this.prototype, "toAry", { value: undefined, configurable: true });
+  }
 
   ignoreDisconnect: boolean;
 
@@ -87,9 +92,11 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  override *each(): IterableIterator<unknown> {
+  override each(block?: (chunk: unknown) => unknown): unknown {
     if (this._strBody !== null) {
-      yield this._strBody;
+      if (!block) return toEnum(this, "each");
+
+      return block(this._strBody);
     } else {
       const popped: string[] = [];
       try {
@@ -102,7 +109,9 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
         if (e instanceof ThreadError) for (const str of popped) void this._buf.push(str);
         throw e;
       }
-      yield* popped;
+      if (!block) return toEnum(popped, "each");
+
+      popped.forEach(block);
     }
   }
 
@@ -160,7 +169,10 @@ export class SSE {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName options — PERMANENT
+   */
   private performWrite(
     json: string,
     options: { retry?: number | string; event?: string; id?: number | string },
@@ -294,7 +306,7 @@ export async function sendStream(
 export async function newControllerThread(
   this: LiveControllerHost,
   block: () => void | Promise<void>,
-): Promise<void> {
+): Promise<boolean> {
   return liveThreadPoolExecutor().post(() => {
     const t2 = Thread.current();
     t2.abortOnException = true;
@@ -337,7 +349,7 @@ export function logError(this: LiveControllerHost, exception: Error): void {
   const logger = ActionController.Base.logger;
   if (logger == null) return;
 
-  logger.fatal(() => {
+  logger.fatal(undefined, () => {
     let message = `\n${rbObjClassname(exception)} (${exception.message}):\n`;
     if (rbObjRespondTo(exception, "annotatedSourceCode")) {
       message += toS(

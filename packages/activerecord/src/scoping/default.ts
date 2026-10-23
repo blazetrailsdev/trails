@@ -25,7 +25,7 @@ export class Default {
     relation: any = this.relation(),
     { allQueries }: { allQueries?: boolean | null } = {},
   ): any {
-    if (this.abstractClass) return undefined;
+    if (this.isAbstractClass()) return undefined;
 
     if (this.defaultScopeOverride == null) {
       this.defaultScopeOverride = !rbObjIsKindOf(
@@ -54,7 +54,7 @@ export class Default {
     }
   }
 
-  static unscoped(this: any, block?: () => any): any {
+  static unscoped(this: typeof Base, block?: () => any): any {
     return block ? this.relation().scoping(block) : this.relation();
   }
 }
@@ -89,7 +89,7 @@ export function defaultScope<T extends typeof Base>(
       : (optionsOrAllQueries?.allQueries ?? false);
 
   const scopeObj = new DefaultScope(scope, allQueries);
-  (this as any).defaultScopes = [...(this as any).defaultScopes, scopeObj];
+  this.defaultScopes = [...this.defaultScopes, scopeObj];
 }
 
 export function unscoped<T extends typeof Base>(this: T): Relation<InstanceType<T>>;
@@ -140,17 +140,17 @@ function isExecuteScope(
 }
 
 /** @internal */
-export function isIgnoreDefaultScope(this: any): boolean {
+export function isIgnoreDefaultScope(this: typeof Base): boolean {
   return !!ScopeRegistry.ignoreDefaultScope(this.baseClass);
 }
 
 /** @internal */
-function setIgnoreDefaultScope(this: any, ignore: boolean | null): void {
+function setIgnoreDefaultScope(this: typeof Base, ignore: boolean | null): void {
   ScopeRegistry.setIgnoreDefaultScope(this.baseClass, ignore);
 }
 
 /** @internal */
-function evaluateDefaultScope(this: any, fn: () => unknown): unknown {
+function evaluateDefaultScope(this: typeof Base, fn: () => unknown): unknown {
   if (isIgnoreDefaultScope.call(this)) return undefined;
 
   try {

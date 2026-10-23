@@ -3,10 +3,15 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "trails": "./bin/trails.js"
+    "trails": "./bin/trails.js",
+    "trails-server": "./bin/trails-server.js"
   },
   "exports": {
     ".": "./dist/cli.js",
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
     "./all": "./dist/all.js",
     "./generators": "./dist/generators/index.js",
     "./engine": {
@@ -16,6 +21,10 @@
     "./trailtie": {
       "types": "./dist/trailtie.d.ts",
       "default": "./dist/trailtie.js"
+    },
+    "./trailtie/configuration": {
+      "types": "./dist/trailtie/configuration.d.ts",
+      "default": "./dist/trailtie/configuration.js"
     },
     "./test-help": {
       "types": "./dist/test-help.d.ts",
@@ -40,7 +49,7 @@
   },
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "node -e \"require('fs').cpSync('src/generators/active-record/migration/templates', 'dist/generators/active-record/migration/templates', { recursive: true })\""
+    "build:templates": "node -e \"require('fs').cpSync('src/generators/active-record/migration/templates', 'dist/generators/active-record/migration/templates', { recursive: true }); require('fs').cpSync('src/templates/rails', 'dist/templates/rails', { recursive: true })\" && trails-tsc-views build --views dist/templates/rails --in-place"
   },
   "files": [
     "dist",
@@ -50,6 +59,7 @@
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
+    "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",
@@ -58,6 +68,7 @@
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
     "commander": "^14.0.0",
     "vite": "^7.0.0"
@@ -73,5 +84,8 @@
     "typescript": {
       "optional": true
     }
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

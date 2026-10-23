@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import {
   Notifications,
   IsolatedExecutionState,
@@ -38,6 +39,7 @@ export class Subscriber {
     this._subscriber ??= Notifications.subscribe(/^[^!]/, (e) => this.call(e));
   }
 
+  /** @missingRailsName subscriber — PERMANENT */
   unsubscribe(): void {
     if (this._subscriber) {
       Notifications.unsubscribe(this._subscriber);
@@ -65,7 +67,7 @@ export class ServerTiming {
   async call(env: RackEnv): Promise<RackResponse> {
     let response: RackResponse | undefined;
     const events = await this.subscriber.collectEvents(async () => {
-      response = await this.app(env);
+      response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     });
 
     const headers = response![1];
@@ -79,7 +81,7 @@ export class ServerTiming {
       headerInfo.push(`${name};dur=${duration.toFixed(2)}`);
     }
 
-    const existing = headers[SERVER_TIMING];
+    const existing = headers[SERVER_TIMING] as string | string[];
     if (isPresent(existing)) {
       headerInfo.unshift(existing);
     }

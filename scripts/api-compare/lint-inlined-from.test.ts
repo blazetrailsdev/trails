@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ApiManifest, ClassInfo, InlinedFrom, MethodInfo } from "@blazetrails/parity/types";
+import type { InlinedFromPair } from "./inlined-bodies.js";
 import { MISSING_TAG_PACKAGES, fixCitations, inlinedFromFindings } from "./lint-inlined-from.js";
 
 const def = (name: string, vendorFile: string, line: number, endLine: number): MethodInfo =>
@@ -49,6 +50,10 @@ const ruby = {
           ],
         }),
         "ActiveRecord::Relation": entity("relation.rb"),
+        "ActiveRecord::Multi": entity("multi.rb", [], {
+          includes: ["ActiveModel::API", "Core"],
+          mixinOrder: [{ kind: "include", names: ["ActiveModel::API", "Core"] }],
+        }),
         "ActiveRecord::Proxy": entity(
           "proxy.rb",
           [{ ...def("initialize", `${AR}/proxy.rb`, 2, 4), calls: [] }],
@@ -76,13 +81,20 @@ const ruby = {
         }),
       },
       modules: {
-        "ActiveRecord::Core": entity("core.rb", [def("initialize", `${AR}/core.rb`, 471, 482)]),
-        "ActiveRecord::Inheritance": entity("inheritance.rb", [], CONCERN),
+        "ActiveRecord::Core": entity("core.rb", [
+          def("initialize", `${AR}/core.rb`, 471, 482),
+          def("save", `${AR}/core.rb`, 490, 492),
+        ]),
+        "ActiveRecord::Inheritance": entity(
+          "inheritance.rb",
+          [{ ...def("save", `${AR}/inheritance.rb`, 90, 92), calls: [] }],
+          CONCERN,
+        ),
         "ActiveRecord::First::ClassMethods": entity("first.rb", [
           def("new", `${AR}/first.rb`, 2, 4),
         ]),
         "ActiveRecord::Last::ClassMethods": entity("last.rb", [def("new", `${AR}/last.rb`, 2, 4)]),
-        "ActiveRecord::Plain": entity("plain.rb"),
+        "ActiveRecord::Plain": entity("plain.rb", [def("save", `${AR}/plain.rb`, 8, 10)]),
         "ActiveRecord::Plain::ClassMethods": entity("plain.rb", [
           def("new", `${AR}/plain.rb`, 2, 4),
         ]),
@@ -109,7 +121,7 @@ const tag = (name: string, citation: string): InlinedFrom => {
   )!;
   return {
     module,
-    hook: hook as InlinedFrom["hook"],
+    hook: hook,
     source,
     version,
     file,
@@ -133,6 +145,7 @@ function messages(
     reexport = false,
     alias = undefined as string | undefined,
     sibling = false,
+    pairs = [] as InlinedFromPair[],
   } = {},
 ): string[] {
   const ctor = { ...def("constructor", "", 1, 1), file, inlinedFrom };
@@ -144,8 +157,55 @@ function messages(
     : { [owner]: entity(file, [ctor]) };
   if (sibling) Object.assign(classes, { Sibling: entity(file) });
   const ts = { packages: { activerecord: { classes, modules: {} } } } as unknown as ApiManifest;
-  return inlinedFromFindings(ruby, ts, enrolled).map((f) => `${f.hook} ${f.message}`);
+  return inlinedFromFindings(ruby, ts, enrolled, pairs).map((f) => `${f.hook} ${f.message}`);
 }
+
+function methodMessages(inlinedFrom: InlinedFrom[], owner = "Base"): string[] {
+  const file = `${owner.toLowerCase()}.ts`;
+  const save = { ...def("save", "", 1, 1), file, inlinedFrom };
+  const ts = {
+    packages: { activerecord: { classes: { [owner]: entity(file, [save]) }, modules: {} } },
+  } as unknown as ApiManifest;
+  return inlinedFromFindings(ruby, ts, []).map((f) => `${f.member} ${f.hook} ${f.message}`);
+}
+
+describe("inlinedFromFindings on a method inlining module super", () => {
+  const PLAIN_SAVE = tag("ActiveRecord::Plain#save", `${AR}/plain.rb:8-10`);
+  const CORE_SAVE = tag("ActiveRecord::Core#save", `${AR}/core.rb:490-492`);
+
+  it("passes tags for the module methods the class reaches, in ancestor order", () => {
+    expect(methodMessages([PLAIN_SAVE, CORE_SAVE])).toEqual([]);
+  });
+
+  it("flags a stale citation, out-of-order tags and a module the class does not include", () => {
+    expect(methodMessages([tag("ActiveRecord::Core#save", `${AR}/core.rb:491-492`)])).toEqual([
+      "save ActiveRecord::Core#save citation is stale: cited at rails/v8.0.2/activerecord/lib/active_record/core.rb:491-492, the manifest has rails/v8.0.2/activerecord/lib/active_record/core.rb:490-492",
+    ]);
+    expect(methodMessages([CORE_SAVE, PLAIN_SAVE])).toEqual([
+      "save ActiveRecord::Plain#save is out of chain order: Rails runs it before ActiveRecord::Core#save",
+    ]);
+    expect(methodMessages([CORE_SAVE], "Relation")).toEqual([
+      "save ActiveRecord::Core#save names a module ActiveRecord::Relation does not include or prepend",
+    ]);
+  });
+
+  it("flags a tag naming a different method from the member's other tags", () => {
+    expect(
+      methodMessages([PLAIN_SAVE, tag("ActiveRecord::Core#initialize", `${AR}/core.rb:471-482`)]),
+    ).toEqual([
+      "save ActiveRecord::Core#initialize names a method other than save, which the other tags name",
+    ]);
+  });
+
+  it("flags a module method whose Rails body calls no super", () => {
+    const INHERITANCE_SAVE = tag("ActiveRecord::Inheritance#save", `${AR}/inheritance.rb:90-92`);
+    expect(methodMessages([CORE_SAVE, INHERITANCE_SAVE])).toEqual([]);
+    expect(methodMessages([INHERITANCE_SAVE, CORE_SAVE])).toEqual([
+      "save ActiveRecord::Inheritance#save names a module method whose Rails body calls no `super`, ending the chain",
+      "save ActiveRecord::Core#save is out of chain order: Rails runs it before ActiveRecord::Inheritance#save",
+    ]);
+  });
+});
 
 describe("inlinedFromFindings", () => {
   it("passes a constructor tagged for each cross-file hook its Rails class reaches", () => {
@@ -205,6 +265,37 @@ describe("inlinedFromFindings", () => {
     ]);
   });
 
+  it("pairs a constructor with the Rails class compare.ts compared it against", () => {
+    const pairs = [
+      {
+        package: "activerecord",
+        tsFile: "base.ts",
+        owner: "Helper",
+        rubyModule: "ActiveRecord::Base",
+      },
+    ];
+    const enrolled = ["activerecord"];
+    const tags = [LAST, NEW, FIRST, CORE, API];
+    expect(messages(tags, { owner: "Helper", sibling: true, enrolled, pairs })).toEqual([]);
+  });
+
+  it("refuses a constructor compare.ts paired with two Rails classes", () => {
+    const pair = { package: "activerecord", tsFile: "base.ts", owner: "Base" };
+    const pairs = [
+      { ...pair, rubyModule: "ActiveRecord::Base" },
+      { ...pair, rubyModule: "ActiveRecord::Relation" },
+    ];
+    expect(() => messages([LAST, NEW, FIRST, CORE, API], { pairs })).toThrow(/compared against/);
+  });
+
+  it("orders one include statement's first argument ahead of its second", () => {
+    const multi = { owner: "Multi", file: "multi.ts" };
+    expect(messages([API, CORE], multi)).toEqual([]);
+    expect(messages([CORE, API], multi)).toEqual([
+      "ActiveModel::API#initialize is out of chain order: Rails runs it before ActiveRecord::Core#initialize",
+    ]);
+  });
+
   it("flags a tag on a constructor that mirrors no Rails class", () => {
     expect(messages([CORE], { owner: "Helper", file: "helper.ts" })[0]).toContain(
       "mirror no Rails class or module",
@@ -229,7 +320,7 @@ describe("inlinedFromFindings", () => {
         },
       },
     } as unknown as ApiManifest;
-    const findings = inlinedFromFindings(ruby, ts);
+    const findings = inlinedFromFindings(ruby, ts, []);
     expect(findings.map((f) => f.fix)).toEqual([
       {
         cited: "rails/v7.1.0/activerecord/lib/active_record/core.rb:460-470",
@@ -259,11 +350,18 @@ describe("inlinedFromFindings", () => {
   it("leaves the missing-tag arm off for a package that is not enrolled", () => {
     expect(messages([])).toEqual([]);
     expect(MISSING_TAG_PACKAGES).toEqual([
+      "actioncable",
       "actioncontroller",
       "actiondispatch",
+      "actionview",
+      "activerecord",
+      "activejob",
       "activesupport",
       "i18n",
+      "rack",
       "rack-test",
+      "thor",
+      "trailties",
     ]);
   });
 

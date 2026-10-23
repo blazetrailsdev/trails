@@ -14,6 +14,10 @@ import { callerLocations, type CallerLocation } from "./deprecation.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 export class DelegationError extends Error {
+  static toString(): string {
+    return "ActiveSupport::DelegationError";
+  }
+
   constructor(message: string) {
     super(message);
     this.name = "DelegationError";
@@ -115,6 +119,7 @@ export namespace Delegation {
     const receiverName = receiver.startsWith("self.") ? receiver.slice("self.".length) : receiver;
 
     const methodNames: string[] = [];
+    const enumerable = typeof owner !== "function" && !Object.hasOwn(owner, "constructor");
 
     let explicitReceiver = false;
     let receiverClass: unknown;
@@ -157,9 +162,18 @@ export namespace Delegation {
           (_ as Record<string, unknown>)[attr] = arg;
         };
         iseqLocationSetup(set, file, line);
+        const reader = Object.getOwnPropertyDescriptor(owner, methodName.slice(0, -1));
+        const readerValue = reader?.value as ((this: unknown) => unknown) | undefined;
         Object.defineProperty(owner, methodName.slice(0, -1), {
           configurable: true,
-          enumerable: false,
+          enumerable,
+          get:
+            reader?.get ??
+            (typeof readerValue === "function"
+              ? function (this: unknown) {
+                  return readerValue.call(this);
+                }
+              : undefined),
           set,
         });
         continue;
@@ -200,7 +214,7 @@ export namespace Delegation {
         iseqLocationSetup(get, file, line);
         Object.defineProperty(owner, methodName, {
           configurable: true,
-          enumerable: false,
+          enumerable,
           get,
         });
         continue;
@@ -217,12 +231,21 @@ export namespace Delegation {
         Object.defineProperty(value, "length", { value: methodObject.length });
       }
       iseqLocationSetup(value, file, line);
-      Object.defineProperty(owner, methodName, {
-        configurable: true,
-        enumerable: false,
-        writable: true,
-        value,
-      });
+      const writer = Object.getOwnPropertyDescriptor(owner, methodName)?.set;
+      Object.defineProperty(
+        owner,
+        methodName,
+        writer
+          ? {
+              configurable: true,
+              enumerable,
+              get(this: Record<string, unknown>) {
+                return value.call(this);
+              },
+              set: writer,
+            }
+          : { configurable: true, enumerable, writable: true, value },
+      );
     }
 
     return methodNames;

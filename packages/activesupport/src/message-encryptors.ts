@@ -2,6 +2,10 @@ import { MessageEncryptor } from "./message-encryptor.js";
 import { RotationCoordinator, type BuildOptions } from "./messages/rotation-coordinator.js";
 
 export class MessageEncryptors extends RotationCoordinator<MessageEncryptor> {
+  static toString(): string {
+    return "ActiveSupport::MessageEncryptors";
+  }
+
   /** @internal */
   protected build(salt: string, options: BuildOptions): MessageEncryptor {
     const { secretGenerator, secretGeneratorOptions, ...rest } = options;

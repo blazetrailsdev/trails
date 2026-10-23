@@ -305,10 +305,10 @@ export class Buffer {
     if (this.chunks.length === 0) {
       return new Uint8Array(0);
     }
-    if (this.chunks.length !== 1) {
-      this.chunks = [concat(this.chunks)];
+    if (this.chunks.length === 1) {
+      return this.chunks[0].slice();
     }
-    return this.chunks[0];
+    return concat(this.chunks);
   }
 
   toS(): Uint8Array {

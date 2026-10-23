@@ -55,6 +55,6 @@ describe("defaultFormBuilder DSL", () => {
     expect(MyController._defaultFormBuilder).toBe(FakeBuilder);
     expect(new MyController().defaultFormBuilder()).toBe(FakeBuilder);
     class SiblingController extends Base {}
-    expect(SiblingController._defaultFormBuilder).toBeUndefined();
+    expect(SiblingController._defaultFormBuilder).toBeNull();
   });
 });

@@ -584,9 +584,9 @@ describe("ReflectionTest", () => {
     try {
       const reflection = UserWithInvalidRelation.reflectOnAssociation("notAClass")!;
 
-      const error = (await assertRaises([NameError], {}, () => {
+      const error = await assertRaises([NameError], {}, () => {
         void reflection.klass;
-      })) as NameError;
+      });
 
       expect(error.constantName).toBe("oops");
       expect(error.message).toMatch("oops");
@@ -612,9 +612,9 @@ describe("ReflectionTest", () => {
     try {
       const reflection = UserWithInvalidRelation.reflectOnAssociation("notAClass")!;
 
-      const error = (await assertRaises([NameError], {}, () => {
+      const error = await assertRaises([NameError], {}, () => {
         rbObjDup(reflection).hasInverse();
-      })) as NameError;
+      });
 
       expect(error.constantName).toBe("oops");
       expect(error.message).toMatch("oops");
@@ -754,9 +754,9 @@ describe("ReflectionTest", () => {
   });
 
   it("reflection klass not found with no class name option", async () => {
-    const error = (await assertRaise([NameError], {}, () => {
+    const error = await assertRaise([NameError], {}, () => {
       void UserWithInvalidRelation.reflectOnAssociation("notAClass")!.klass;
-    })) as NameError;
+    });
 
     expect(error.constantName).toBe("NotAClass");
     expect(error.message).toMatch(/missing/i);
@@ -766,9 +766,9 @@ describe("ReflectionTest", () => {
   });
 
   it("reflection klass not found with pointer to non existent class name", async () => {
-    const error = (await assertRaise([NameError], {}, () => {
+    const error = await assertRaise([NameError], {}, () => {
       void UserWithInvalidRelation.reflectOnAssociation("classNameProvidedNotAClass")!.klass;
-    })) as NameError;
+    });
 
     expect(error.constantName).toBe("NotAClass");
     expect(error.message).toMatch(/missing/i);

@@ -1,14 +1,12 @@
 import {
   Dir,
   Hash,
-  Module,
   File as RubyFile,
   NoMethodError,
+  rbCallSuper,
   RuntimeError,
   StandardError,
-  isEmpty,
   isSymbol,
-  merge,
   rbEql,
   rbObjClassname,
   strUminus,
@@ -46,7 +44,7 @@ interface TestFixturesClassHost {
 
 export const ClassMethods = {
   setFixtureClass(this: TestFixturesClassHost, classNames: Record<string, unknown> = {}): void {
-    this.fixtureClassNames = merge(this.fixtureClassNames, stringifyKeys(classNames));
+    this.fixtureClassNames = { ...this.fixtureClassNames, ...stringifyKeys(classNames) };
   },
 
   fixtures(this: TestFixturesClassHost, ...fixtureSetNames: unknown[]): void {
@@ -106,12 +104,12 @@ export const ClassMethods = {
   },
 
   usesTransaction(this: TestFixturesClassHost, ...methods: unknown[]): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_usesTransaction")) this._usesTransaction = [];
+    if (!Object.hasOwn(this, "_usesTransaction")) this._usesTransaction = [];
     this._usesTransaction!.push(...methods.map((m) => String(m)));
   },
 
   isUsesTransaction(this: TestFixturesClassHost, method: unknown): boolean {
-    if (!Object.prototype.hasOwnProperty.call(this, "_usesTransaction")) this._usesTransaction = [];
+    if (!Object.hasOwn(this, "_usesTransaction")) this._usesTransaction = [];
     return this._usesTransaction!.includes(String(method));
   },
 };
@@ -165,12 +163,12 @@ export interface TestFixtures {
 
 async function beforeSetup(this: TestFixtures): Promise<void> {
   await this.setupFixtures();
-  await TestFixtures.superMethod(this, "beforeSetup")!();
+  await rbCallSuper(this, beforeSetup);
 }
 
 async function afterTeardown(this: TestFixtures): Promise<void> {
   try {
-    await TestFixtures.superMethod(this, "afterTeardown")!();
+    await rbCallSuper(this, afterTeardown);
   } finally {
     await this.teardownFixtures();
   }
@@ -233,7 +231,7 @@ async function setupFixtures(this: TestFixtures, config: typeof Base = Base): Pr
 
 /** @internal */
 async function teardownFixtures(this: TestFixtures): Promise<void> {
-  this.teardownAsynchronousQueriesSession();
+  await this.teardownAsynchronousQueriesSession();
 
   if (this.isRunInTransaction()) {
     await this.teardownTransactionalFixtures();
@@ -251,8 +249,8 @@ function setupAsynchronousQueriesSession(this: TestFixtures): void {
 }
 
 /** @internal */
-function teardownAsynchronousQueriesSession(this: TestFixtures): void {
-  if (this._asyncQueriesSession) Base.asynchronousQueriesTracker().finalizeSession(true);
+async function teardownAsynchronousQueriesSession(this: TestFixtures): Promise<void> {
+  if (this._asyncQueriesSession) await Base.asynchronousQueriesTracker().finalizeSession(true);
 }
 
 /** @internal */
@@ -368,7 +366,7 @@ async function loadFixtures(
 /** @internal */
 async function instantiateFixtures(this: TestFixtures): Promise<void> {
   if (this.preLoadedFixtures) {
-    if (isEmpty(FixtureSet.allLoadedFixtures))
+    if (Object.keys(FixtureSet.allLoadedFixtures).length === 0)
       throw new RuntimeError("Load fixtures before instantiating them.");
     await FixtureSet.instantiateAllLoadedFixtures(this, this.isLoadInstances());
   } else {
@@ -386,7 +384,7 @@ function isLoadInstances(this: TestFixtures): boolean {
 }
 
 function methodMissing(this: TestFixtures, method: string, ...args: unknown[]): unknown {
-  if (Object.prototype.hasOwnProperty.call(this.fixtureSets, method)) {
+  if (Object.hasOwn(this.fixtureSets, method)) {
     return this.activeRecordFixture(method, ...args);
   } else {
     throw new NoMethodError(
@@ -404,7 +402,7 @@ function respondToMissing(
   method: string,
   includePrivate: boolean = false,
 ): boolean {
-  if (includePrivate && Object.prototype.hasOwnProperty.call(this.fixtureSets, method)) {
+  if (Object.hasOwn(this.fixtureSets, method)) {
     return true;
   } else {
     return false;
@@ -454,68 +452,58 @@ function accessFixture(this: TestFixtures, fsName: string, ...fixtureNames: unkn
   return returnSingleRecord ? instances[0] : instances;
 }
 
-export const TestFixtures = new Module((mod) => {
-  extend(mod, Concern);
+export const TestFixtures = {
+  beforeSetup,
+  afterTeardown,
+  fixture,
+  isRunInTransaction,
+  setupFixtures,
+  teardownFixtures,
+  setupAsynchronousQueriesSession,
+  teardownAsynchronousQueriesSession,
+  invalidateAlreadyLoadedFixtures,
+  setupTransactionalFixtures,
+  teardownTransactionalFixtures,
+  setupSharedConnectionPool,
+  teardownSharedConnectionPool,
+  loadFixtures,
+  instantiateFixtures,
+  isLoadInstances,
+  methodMissing,
+  respondToMissing,
+  activeRecordFixture,
+  accessFixture,
+};
+Object.defineProperty(TestFixtures, "ClassMethods", { value: ClassMethods });
+extend(TestFixtures, Concern);
 
-  (mod as unknown as { included(base: null, block: (this: TestCaseClass) => void): void }).included(
-    null,
-    function (this: TestCaseClass) {
-      classAttribute.call(this, "fixturePaths", { instanceWriter: false, default: [] });
-      classAttribute.call(this, "fixtureTableNames", { default: [] });
-      classAttribute.call(this, "fixtureClassNames", { default: {} });
-      classAttribute.call(this, "useTransactionalTests", { default: true });
-      classAttribute.call(this, "useInstantiatedFixtures", { default: false });
-      classAttribute.call(this, "preLoadedFixtures", { default: false });
-      classAttribute.call(this, "lockThreads", { default: true });
-      classAttribute.call(this, "fixtureSets", { default: {} });
+Concern.included.call(TestFixtures as never, null, function (this: TestCaseClass) {
+  classAttribute.call(this, "fixturePaths", { instanceWriter: false, default: [] });
+  classAttribute.call(this, "fixtureTableNames", { default: [] });
+  classAttribute.call(this, "fixtureClassNames", { default: {} });
+  classAttribute.call(this, "useTransactionalTests", { default: true });
+  classAttribute.call(this, "useInstantiatedFixtures", { default: false });
+  classAttribute.call(this, "preLoadedFixtures", { default: false });
+  classAttribute.call(this, "lockThreads", { default: true });
+  classAttribute.call(this, "fixtureSets", { default: {} });
 
-      runLoadHooks("active_record_fixtures", this);
+  runLoadHooks("active_record_fixtures", this);
 
-      const link = Object.getPrototypeOf(this.prototype) as object;
-      Object.setPrototypeOf(
-        link,
-        new Proxy(Object.create(Object.getPrototypeOf(link) as object) as object, {
-          get(target, prop, receiver: TestFixtures) {
-            const value = Reflect.get(target, prop, receiver);
-            if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
-              return value;
-            }
-            if (receiver.respondToMissing(prop, true)) {
-              return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
-            }
-            return value;
-          },
-        }),
-      );
-    },
+  Object.setPrototypeOf(
+    this.prototype,
+    new Proxy(Object.create(Object.getPrototypeOf(this.prototype) as object) as object, {
+      get(target, prop, receiver: TestFixtures) {
+        const value = Reflect.get(target, prop, receiver);
+        if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
+          return value;
+        }
+        if (receiver.respondToMissing(prop)) {
+          return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+        }
+        return value;
+      },
+    }),
   );
-
-  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
-
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      beforeSetup,
-      afterTeardown,
-      fixture,
-      isRunInTransaction,
-      setupFixtures,
-      teardownFixtures,
-      setupAsynchronousQueriesSession,
-      teardownAsynchronousQueriesSession,
-      invalidateAlreadyLoadedFixtures,
-      setupTransactionalFixtures,
-      teardownTransactionalFixtures,
-      setupSharedConnectionPool,
-      teardownSharedConnectionPool,
-      loadFixtures,
-      instantiateFixtures,
-      isLoadInstances,
-      methodMissing,
-      respondToMissing,
-      activeRecordFixture,
-      accessFixture,
-    });
-  });
 });
 
 function deferConnectionPoolPin(this: TestFixtures, pool: ConnectionPool): void {

@@ -7,7 +7,6 @@ import {
   Timeout,
   block,
   rbObjSingletonClass,
-  rbFPublicSend,
   rbFSend,
   rbObjIvarSet,
   RuntimeError,
@@ -196,9 +195,7 @@ it("full pool exception", async () => {
   pool.checkoutTimeout = 0.001;
   for (let i = 0; i < pool.size; i++) expect(await pool.checkout()).toBeTruthy();
 
-  const error = (await assertRaises([ConnectionTimeoutError], {}, () =>
-    pool.checkout(),
-  )) as ConnectionTimeoutError;
+  const error = await assertRaises([ConnectionTimeoutError], {}, () => pool.checkout());
   expect(error.connectionPool).toBe(pool);
 });
 
@@ -672,9 +669,9 @@ it("non bang disconnect and clear reloadable connections throw exception if thre
   pool.checkoutTimeout = 0.001;
   for (const groupActionMethod of ["disconnect", "clearReloadableConnections"]) {
     await pool.withConnection(async () => {
-      const error = (await assertRaises([ExclusiveConnectionTimeoutError], {}, () =>
-        newThread(() => rbFPublicSend(pool, groupActionMethod)).join(),
-      )) as ExclusiveConnectionTimeoutError;
+      const error = await assertRaises([ExclusiveConnectionTimeoutError], {}, () =>
+        newThread(() => rbFSend(pool, groupActionMethod)).join(),
+      );
       expect(error.connectionPool).toBe(pool);
     });
   }

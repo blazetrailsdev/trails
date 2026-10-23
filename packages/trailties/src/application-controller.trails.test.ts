@@ -9,6 +9,7 @@ class ApplicationControllerTestApp extends Application {}
 describe("Rails::ApplicationController", () => {
   beforeEach(() => {
     Trails.application = ApplicationControllerTestApp.instance();
+    Trails.application.config.secretKeyBase = "secret_key_base".repeat(4);
   });
 
   afterEach(() => {

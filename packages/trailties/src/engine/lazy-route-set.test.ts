@@ -5,7 +5,11 @@ import { LazyRouteSet } from "./lazy-route-set.js";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
 
-class StubController {}
+class StubController {
+  static actionEncodingTemplate(): null {
+    return null;
+  }
+}
 
 function assertOperator(o1: object, operator: "respond_to?", o2: string): void {
   expect(rbObjRespondTo(o1, o2), `Expected ${String(o1)} to be ${operator} ${o2}`).toBe(true);

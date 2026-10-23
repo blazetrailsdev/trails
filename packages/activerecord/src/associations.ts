@@ -15,13 +15,13 @@ import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import * as Reflection from "./reflection.js";
 import {
-  Module,
   include,
   rbClassInheritedP,
   rbClassSuperclass,
   rbModConstSet,
   rbModName,
   registerConstant,
+  rbCallSuper,
 } from "@blazetrails/ruby-compat";
 
 export type CollectionCallback<K extends string> =
@@ -61,10 +61,7 @@ export interface AssociationOptions {
   afterAdd?: CollectionCallback<"afterAdd"> | CollectionCallback<"afterAdd">[];
   beforeRemove?: CollectionCallback<"beforeRemove"> | CollectionCallback<"beforeRemove">[];
   afterRemove?: CollectionCallback<"afterRemove"> | CollectionCallback<"afterRemove">[];
-  extend?:
-    | Record<string, (...args: unknown[]) => unknown>
-    | Module
-    | Array<Record<string, (...args: unknown[]) => unknown> | Module>;
+  extend?: object | object[];
   disableJoins?: boolean;
   associationForeignKey?: string;
   foreignType?: string;
@@ -126,7 +123,7 @@ export function registerModel(
 
 /** @internal */
 export function _cacheSingularTarget(record: Base, assocName: string, target: Base | null): void {
-  const macro = (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)?.macro;
+  const macro = record.constructor._reflectOnAssociation?.(assocName)?.macro;
   if (macro === "belongsTo" || macro === "hasOne") {
     const assoc = record.association(assocName);
     assoc.inversedFrom(target);
@@ -139,93 +136,98 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
 
 export class Associations {
   static belongsTo(
+    this: typeof Base,
     name: string,
-    scope: ((...args: any[]) => any) | AssociationOptions | null = {},
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = null,
     options: AssociationOptions = {},
   ): void {
-    const reflection = BelongsToBuilder.build(
-      this,
-      name,
-      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
-      options as Record<string, unknown>,
-    );
-    Reflection.addReflection(this as any, name, reflection);
-  }
-
-  static hasOne(
-    name: string,
-    scope: ((...args: any[]) => any) | AssociationOptions | null = {},
-    options: AssociationOptions = {},
-  ): void {
-    const reflection = HasOneBuilder.build(
-      this,
-      name,
-      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
-      options as Record<string, unknown>,
-    );
-    Reflection.addReflection(this as any, name, reflection);
-  }
-
-  static hasMany(
-    name: string,
-    scope: ((...args: any[]) => any) | AssociationOptions | null = {},
-    options: AssociationOptions = {},
-    extension?: (mod: Module) => void,
-  ): void {
-    const reflection = HasManyBuilder.build(
-      this,
-      name,
-      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
-      options as Record<string, unknown>,
-      extension,
-    );
-    Reflection.addReflection(this as any, name, reflection);
-  }
-
-  static hasAndBelongsToMany(
-    name: string,
-    scope: ((...args: any[]) => any) | (AssociationOptions & { joinTable?: string }) | null = {},
-    options: AssociationOptions & { joinTable?: string } = {},
-    extension?: (mod: Module) => void,
-  ): void {
-    if (
-      typeof scope === "object" &&
-      scope !== null &&
-      !Array.isArray(scope) &&
-      !(scope instanceof Function)
-    ) {
+    if (typeof scope === "object" && scope !== null) {
       options = scope;
       scope = null;
     }
-    const self = this as any;
+    const reflection = BelongsToBuilder.build(
+      this,
+      name,
+      scope,
+      options as Record<string, unknown>,
+    );
+    Reflection.addReflection(this, name, reflection);
+  }
+
+  static hasOne(
+    this: typeof Base,
+    name: string,
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = null,
+    options: AssociationOptions = {},
+  ): void {
+    if (typeof scope === "object" && scope !== null) {
+      options = scope;
+      scope = null;
+    }
+    const reflection = HasOneBuilder.build(this, name, scope, options as Record<string, unknown>);
+    Reflection.addReflection(this, name, reflection);
+  }
+
+  static hasMany(
+    this: typeof Base,
+    name: string,
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = null,
+    options: AssociationOptions = {},
+    extension?: (mod: Record<string, unknown>) => void,
+  ): void {
+    if (typeof scope === "object" && scope !== null) {
+      options = scope;
+      scope = null;
+    }
+    const reflection = HasManyBuilder.build(
+      this,
+      name,
+      scope,
+      options as Record<string, unknown>,
+      extension,
+    );
+    Reflection.addReflection(this, name, reflection);
+  }
+
+  static hasAndBelongsToMany(
+    this: typeof Base,
+    name: string,
+    scope:
+      | ((this: Relation<any>, ...args: any[]) => any)
+      | (AssociationOptions & { joinTable?: string })
+      | null = null,
+    options: AssociationOptions & { joinTable?: string } = {},
+    extension?: (mod: Record<string, unknown>) => void,
+  ): void {
+    if (typeof scope === "object" && scope !== null) {
+      options = scope;
+      scope = null;
+    }
     const habtmReflection = new Reflection.HasAndBelongsToManyReflection(
       name,
-      scope as ((...args: any[]) => any) | null,
+      scope,
       options as Record<string, unknown>,
-      self,
+      this,
     );
 
-    const builder = new HabtmBuilder(name, self, options as Record<string, unknown>);
+    const builder = new HabtmBuilder(name, this, options as Record<string, unknown>);
 
     const joinModel = builder.throughModel();
 
-    rbModConstSet(self, joinModel.name, joinModel);
+    rbModConstSet(this, joinModel.name, joinModel);
 
     const middleReflection = builder.middleReflection(joinModel);
-    HasManyBuilder.defineCallbacks(self, middleReflection);
-    Reflection.addReflection(self, middleReflection.name, middleReflection);
+    HasManyBuilder.defineCallbacks(this, middleReflection);
+    Reflection.addReflection(this, middleReflection.name, middleReflection);
     middleReflection.parentReflection = habtmReflection;
 
-    include(
-      this,
-      new Module((mod) => {
-        mod.defineMethod("destroyAssociations", async function (this: any): Promise<void> {
-          await this.association(middleReflection.name).deleteAll("deleteAll");
-          this.association(name).reset();
-          await mod.superMethod(this, "destroyAssociations")!();
-        });
-      }),
-    );
+    include(this, {
+      destroyAssociations: async function destroyAssociations(this: any): Promise<void> {
+        await this.association(middleReflection.name).deleteAll("deleteAll");
+        this.association(name).reset();
+        await rbCallSuper(this, destroyAssociations);
+      },
+    });
 
     const hmOptions: Record<string, unknown> = {};
     hmOptions.through = middleReflection.name;
@@ -243,11 +245,11 @@ export class Associations {
       "extend",
       "strictLoading",
     ] as const) {
-      if (Object.prototype.hasOwnProperty.call(options, k)) hmOptions[k] = options[k];
+      if (Object.hasOwn(options, k)) hmOptions[k] = options[k];
     }
 
     this.hasMany(name, scope as ((...args: any[]) => any) | null, hmOptions, extension);
-    (self._reflections as Record<string, { parentReflection?: unknown }>)[name].parentReflection =
+    (this._reflections as Record<string, { parentReflection?: unknown }>)[name].parentReflection =
       habtmReflection;
   }
 }
@@ -273,18 +275,16 @@ export function _buildAssociationInstance(
   switch (assocDef.macro) {
     case "belongsTo":
       if (opts.polymorphic)
-        return new AssociationsNamespace.BelongsToPolymorphicAssociation(this, assocDef as any);
-      return new AssociationsNamespace.BelongsToAssociation(this, assocDef as any);
+        return new AssociationsNamespace.BelongsToPolymorphicAssociation(this, assocDef);
+      return new AssociationsNamespace.BelongsToAssociation(this, assocDef);
     case "hasOne":
-      if (opts.through)
-        return new AssociationsNamespace.HasOneThroughAssociation(this, assocDef as any);
-      return new AssociationsNamespace.HasOneAssociation(this, assocDef as any);
+      if (opts.through) return new AssociationsNamespace.HasOneThroughAssociation(this, assocDef);
+      return new AssociationsNamespace.HasOneAssociation(this, assocDef);
     case "hasMany":
-      if (opts.through)
-        return new AssociationsNamespace.HasManyThroughAssociation(this, assocDef as any);
-      return new AssociationsNamespace.HasManyAssociation(this, assocDef as any);
+      if (opts.through) return new AssociationsNamespace.HasManyThroughAssociation(this, assocDef);
+      return new AssociationsNamespace.HasManyAssociation(this, assocDef);
     default:
-      return new AssociationsNamespace.HasManyThroughAssociation(this, assocDef as any);
+      return new AssociationsNamespace.HasManyThroughAssociation(this, assocDef);
   }
 }
 
@@ -298,7 +298,7 @@ export function association(this: Base, name: string): AssociationInstance {
   const existing = associationInstanceGet.call(this, name) as AssociationInstance | null;
   if (existing) return existing;
 
-  const ctor = this.constructor as typeof Base;
+  const ctor = this.constructor;
   const assocDef = ctor._reflectOnAssociation?.(name) as unknown as
     | AssociationDefinition
     | undefined;
@@ -313,20 +313,25 @@ export function association(this: Base, name: string): AssociationInstance {
 
 /** @internal */
 export function initInternals(this: Base): void {
-  AssociationsNamespace.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._associationCache = new Map();
 }
 
 export function initializeDup(this: Base, other: unknown): void {
   this._associationCache = new Map();
-  AssociationsNamespace.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
 }
 
-AssociationsNamespace.defineMethod("initInternals", initInternals);
-AssociationsNamespace.defineMethod("initializeDup", initializeDup);
+Object.assign(AssociationsNamespace, {
+  initInternals,
+  initializeDup,
+});
 
 /** @internal */
-export function associationInstanceGet(this: Base, name: string): unknown {
+export function associationInstanceGet(
+  this: Pick<Base, "_associationCache">,
+  name: string,
+): unknown {
   return this._associationCache.get(name) ?? null;
 }
 

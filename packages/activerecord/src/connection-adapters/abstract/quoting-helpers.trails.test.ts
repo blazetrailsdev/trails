@@ -8,7 +8,7 @@ import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Value as TimeValue } from "../../type/time.js";
 import {
   quote,
-  quoteTableName,
+  ClassMethods,
   quotedBinary,
   quotedDate as quotedDateFn,
   quotedTime,
@@ -197,11 +197,13 @@ describe("type_cast dispatches through quoted_date/quoted_time", () => {
 describe("quote_table_name dispatches through quote_column_name", () => {
   it("routes through this.quoteColumnName", () => {
     const host = quotingHost({ quoteColumnName: (n: string) => `<<${n}>>` });
-    expect(quoteTableName.call(host, "people")).toBe("<<people>>");
+    expect(ClassMethods.quoteTableName.call(host, "people")).toBe("<<people>>");
   });
 
   it("raises on a receiver with no quoter rather than answering with ANSI quotes", () => {
-    expect(() => quoteTableName.call(quotingHost(), "people")).toThrow(NotImplementedError);
+    expect(() => ClassMethods.quoteTableName.call(quotingHost(), "people")).toThrow(
+      NotImplementedError,
+    );
   });
 });
 

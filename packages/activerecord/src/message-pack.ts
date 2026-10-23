@@ -85,9 +85,7 @@ export class Encoder {
   }
 
   addCachedAssociations(record: Base, entry: unknown[]): void {
-    for (const reflection of Object.values(
-      (record.constructor as typeof Base).normalizedReflections(),
-    )) {
+    for (const reflection of Object.values(record.constructor.normalizedReflections())) {
       if (
         record.isAssociationCached(reflection.name) &&
         record.association(reflection.name).isLoaded()

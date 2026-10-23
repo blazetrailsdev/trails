@@ -1,4 +1,10 @@
-import { classpaths, NameError, rbModName } from "@blazetrails/ruby-compat";
+import {
+  classpaths,
+  defineAccessorHalf,
+  Module,
+  NameError,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
@@ -47,27 +53,13 @@ function assertValidAttrName(name: string): void {
   }
 }
 
-function defineAccessorHalf(
-  target: object,
-  name: string,
-  half: { get?: () => unknown; set?: (value: unknown) => void },
-): void {
-  const existing = Object.getOwnPropertyDescriptor(target, name);
-  Object.defineProperty(target, name, {
-    configurable: true,
-    enumerable: false,
-    get: half.get ?? existing?.get,
-    set: half.set ?? existing?.set,
-  });
-}
-
 function setMattrDefault(
   target: any,
   name: string,
   storageKey: string,
   options: MattrOptions,
 ): void {
-  const rawDefault = options.default;
+  const rawDefault = options.default ?? null;
   const symDefaultValue = typeof rawDefault === "function" ? rawDefault() : rawDefault;
   if (!(symDefaultValue == null && Object.hasOwn(target, storageKey))) {
     target[storageKey] = symDefaultValue;
@@ -87,8 +79,14 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void
 
     defineAccessorHalf(target, sym, { get: () => target[storageKey] });
 
-    if (instanceReader && instanceAccessor && target.prototype) {
-      defineAccessorHalf(target.prototype, sym, { get: () => target[sym] });
+    if (instanceReader && instanceAccessor) {
+      const definition = (methodTable: object) =>
+        defineAccessorHalf(methodTable, sym, { get: () => target[sym] });
+      if (this instanceof Module) {
+        target.moduleEval(definition);
+      } else if (target.prototype) {
+        definition(target.prototype);
+      }
     }
 
     setMattrDefault(target, sym, storageKey, options);
@@ -114,12 +112,18 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
       },
     });
 
-    if (instanceWriter && instanceAccessor && target.prototype) {
-      defineAccessorHalf(target.prototype, sym, {
-        set: (val: unknown) => {
-          target[sym] = val;
-        },
-      });
+    if (instanceWriter && instanceAccessor) {
+      const definition = (methodTable: object) =>
+        defineAccessorHalf(methodTable, sym, {
+          set: (val: unknown) => {
+            target[sym] = val;
+          },
+        });
+      if (this instanceof Module) {
+        target.moduleEval(definition);
+      } else if (target.prototype) {
+        definition(target.prototype);
+      }
     }
 
     setMattrDefault(target, sym, storageKey, options);
@@ -141,14 +145,8 @@ export function mattrAccessor(this: any, ...syms: (string | MattrOptions)[]): vo
 export const cattrAccessor = mattrAccessor;
 
 /**
- * configAccessor — defines inheritable configuration accessors (config_accessor in Rails).
- * Works like mattrAccessor but uses a separate config hash namespace.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE Backed by the private
- * `Configurable::ClassMethods#config_accessor` (configurable.rb:111-128, made private at :129); the privates
- * manifest cannot back it here because trails hosts it in module-ext.ts rather than a
- * configurable.ts, and the manifest keys private names by the .rb they live in.
+ * @noRailsEquivalent CONVERGEABLE config-accessor-belongs-in-configurable-not-module-ext
  */
 export function configAccessor(this: any, ...syms: (string | MattrOptions)[]): void {
   mattrAccessor.call(this, ...syms);

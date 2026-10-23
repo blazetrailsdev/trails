@@ -1,16 +1,16 @@
-import { Dir, File, Hash, rbObjIsKindOf } from "@blazetrails/ruby-compat";
+import { Dir, File, Hash, rbObjIsKindOf, rbFSend } from "@blazetrails/ruby-compat";
 import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";
-import { cleanPathInfo, unescapePath } from "./utils.js";
+import { cleanPathInfo, unescape, unescapePath } from "./utils.js";
 
 export interface StaticOptions {
   urls?: string[] | Record<string, string>;
   root?: string;
   index?: string;
   cascade?: boolean;
-  header_rules?: [unknown, Record<string, string>][];
-  cache_control?: string;
+  headerRules?: [unknown, Record<string, string>][];
+  cacheControl?: string;
   gzip?: boolean;
 }
 
@@ -30,9 +30,9 @@ export class Static {
     this.cascade = options.cascade ?? false;
     this.gzip = options.gzip ?? false;
     const root = options.root ? File.expandPath(options.root) : Dir.pwd();
-    this.headerRules = options.header_rules ? [...options.header_rules] : [];
-    if (options.cache_control) {
-      this.headerRules.unshift(["all", { [CACHE_CONTROL]: options.cache_control }]);
+    this.headerRules = options.headerRules ? [...options.headerRules] : [];
+    if (options.cacheControl) {
+      this.headerRules.unshift(["all", { [CACHE_CONTROL]: options.cacheControl }]);
     }
     this.fileServer = new Files(root, {});
   }
@@ -60,11 +60,11 @@ export class Static {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
-    const path = (env["PATH_INFO"] || "/") as string;
+    let path = (env["PATH_INFO"] || "/") as string;
     const actualPath = cleanPathInfo(unescapePath(path));
 
     if (!this.canServe(actualPath)) {
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
 
     let response: [number, Record<string, any>, any] | null = null;
@@ -78,30 +78,30 @@ export class Static {
       env["HTTP_ACCEPT_ENCODING"] &&
       /\bgzip\b/.test(env["HTTP_ACCEPT_ENCODING"])
     ) {
-      const origPath = env["PATH_INFO"] as string;
-      env["PATH_INFO"] = origPath + ".gz";
+      path = env["PATH_INFO"] as string;
+      env["PATH_INFO"] += ".gz";
       response = await this.fileServer.call(env);
-      env["PATH_INFO"] = origPath;
+      env["PATH_INFO"] = path;
 
       if (response[0] === 404) {
         response = null;
       } else if (response[0] === 304) {
         /** @empty */
       } else {
-        response[1][CONTENT_TYPE] = mimeType(File.extname(origPath), "text/plain");
+        response[1][CONTENT_TYPE] = mimeType(File.extname(path), "text/plain");
         response[1]["content-encoding"] = "gzip";
       }
     }
 
-    const servePath = env["PATH_INFO"] as string;
+    path = env["PATH_INFO"] as string;
     response ??= await this.fileServer.call(env);
 
     if (this.cascade && response[0] === 404) {
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
 
     const headers = response[1];
-    for (const [_rule, newHeaders] of this.applicableRules(servePath)) {
+    for (const [_rule, newHeaders] of this.applicableRules(path)) {
       for (const [field, content] of Object.entries(newHeaders)) {
         headers[field] = content;
       }
@@ -115,8 +115,8 @@ export class Static {
       if (rule === "all") return true;
       if (rule === "fonts") return /\.(?:ttf|otf|eot|woff2|woff|svg)$/.test(path);
       if (typeof rule === "string") {
-        const decoded = unescapePath(path);
-        return decoded.startsWith(rule) || decoded.startsWith("/" + rule);
+        path = unescape(path);
+        return path.startsWith(rule) || path.startsWith("/" + rule);
       }
       if (Array.isArray(rule)) return new RegExp(`\\.(${rule.join("|")})$`).test(path);
       if (rule instanceof RegExp) return rule.test(path);

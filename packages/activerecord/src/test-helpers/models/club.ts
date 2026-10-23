@@ -1,3 +1,4 @@
+import type { ScopeOn } from "../../scoping/named.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Category } from "./category.js";
@@ -7,6 +8,12 @@ import type { Sponsor } from "./sponsor.js";
 import type { SuperMembership } from "./membership.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    general: ScopeOn<T, Club | Category>;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Club extends Base {
@@ -33,7 +40,7 @@ export class Club extends Base {
 
     this.hasMany(
       "favorites",
-      function (this: any) {
+      function () {
         return this.where({ memberships: { favorite: true } });
       },
       {
@@ -45,7 +52,7 @@ export class Club extends Base {
     this.hasMany("customMemberships", { className: "Membership" });
     this.hasMany(
       "customFavorites",
-      function (this: any) {
+      function () {
         return this.where({ memberships: { favorite: true } });
       },
       {
@@ -54,7 +61,7 @@ export class Club extends Base {
       },
     );
 
-    this.scope("general", function (this: any) {
+    this.scope("general", function () {
       return this.leftJoins(":category")
         .where({ categories: { name: "General" } })
         .unscope(":limit");

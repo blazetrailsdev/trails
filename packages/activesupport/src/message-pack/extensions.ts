@@ -1,4 +1,6 @@
 import { MessagePack, type Factory, type Packer, type Unpacker } from "@blazetrails/msgpack";
+import { extend, rbModConstSet } from "@blazetrails/ruby-compat/include";
+import { ActiveSupport } from "../namespaces.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { Temporal, Time } from "@blazetrails/date";
 import {
@@ -60,8 +62,16 @@ function offset(_datetime: Temporal.PlainDateTime): Rational {
   return rational(0, 1);
 }
 
-export class UnserializableObjectError extends Error {}
-export class MissingClassError extends Error {}
+export class UnserializableObjectError extends Error {
+  static toString(): string {
+    return "ActiveSupport::MessagePack::UnserializableObjectError";
+  }
+}
+export class MissingClassError extends Error {
+  static toString(): string {
+    return "ActiveSupport::MessagePack::MissingClassError";
+  }
+}
 
 export interface ObjectClass {
   name: string;
@@ -418,3 +428,10 @@ export const Extensions = {
     }
   },
 };
+
+extend(Extensions, Extensions);
+
+rbModConstSet(ActiveSupport, "MessagePack", {});
+rbModConstSet(ActiveSupport.MessagePack!, "UnserializableObjectError", UnserializableObjectError);
+rbModConstSet(ActiveSupport.MessagePack!, "MissingClassError", MissingClassError);
+rbModConstSet(ActiveSupport.MessagePack!, "Extensions", Extensions);

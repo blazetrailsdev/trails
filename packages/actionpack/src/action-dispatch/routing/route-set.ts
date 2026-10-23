@@ -17,12 +17,15 @@ import {
   type Included,
   InvalidURIError,
   merge,
+  block,
   mergeBang,
   Module,
   URI,
+  rbAnyToS,
   rbInspect,
   rbObjClone,
   rbObjRespondTo,
+  update,
   RFC2396_PARSER,
 } from "@blazetrails/ruby-compat";
 import { Mapper } from "./mapper.js";
@@ -61,7 +64,7 @@ import { ActionController } from "../../namespaces.js";
 import { Request as AdRequest } from "../http/request.js";
 import { camelize, NameError, squish } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { normalizePath } from "../journey/router/utils.js";
+import { Utils } from "../journey/router/utils.js";
 import { URL, type UrlOptions } from "../http/url.js";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
 import {
@@ -122,7 +125,7 @@ export class CustomUrlHelper implements PolymorphicMappingEntry {
 
   /** @internal */
   private mergeDefaults(options: Record<string, unknown>): Record<string, unknown> {
-    return this.defaults ? merge(this.defaults, options) : options;
+    return this.defaults ? { ...this.defaults, ...options } : options;
   }
 }
 
@@ -365,7 +368,7 @@ export class UrlHelper {
     urlStrategy: UrlStrategy,
   ): string {
     const controllerOptions = t.urlOptions();
-    const options = merge(controllerOptions, this.options);
+    const options = { ...controllerOptions, ...this.options };
     const hash = this.handlePositionalArgs(
       controllerOptions,
       innerOptions ?? {},
@@ -376,6 +379,7 @@ export class UrlHelper {
     return t._routes.urlFor(hash, this.routeName, urlStrategy, methodName);
   }
 
+  /** @inventedArm block — PERMANENT */
   handlePositionalArgs(
     controllerOptions: Record<string, unknown>,
     innerOptions: Record<string, unknown> | Hash<string, unknown>,
@@ -390,17 +394,17 @@ export class UrlHelper {
 
       if (args.length < pathParamsSize) {
         pathParams = pathParams.filter((k) => !Object.hasOwn(controllerOptions, k));
-        const supplied = merge(
-          (result["path_params"] as Record<string, unknown> | undefined) ?? {},
-          result,
-        );
+        const supplied = {
+          ...((result["pathParams"] as Record<string, unknown> | undefined) ?? {}),
+          ...result,
+        };
         pathParams = pathParams.filter((k) => !Object.hasOwn(supplied, k));
       } else {
         pathParams = [...pathParams];
       }
       eachKey(innerOptions, (key) => {
         const at = pathParams.indexOf(key);
-        if (at !== -1) pathParams.splice(at, 1);
+        if (at !== -1 && args[at] !== null) pathParams.splice(at, 1);
       });
 
       args.forEach((arg, index) => {
@@ -409,7 +413,13 @@ export class UrlHelper {
       });
     }
 
-    return mergeBang(result, innerOptions);
+    return mergeBang(
+      result,
+      innerOptions,
+      block((key: string, oldval: unknown, newval: unknown) =>
+        args[pathParams.indexOf(key)] === null ? oldval : newval,
+      ),
+    );
   }
 }
 
@@ -782,6 +792,10 @@ export class RouteSet {
     );
   }
 
+  inspect(): string {
+    return rbAnyToS(this);
+  }
+
   urlHelpers(supportsPath = true): UrlHelpersModule {
     if (supportsPath) {
       return (this._urlHelpersWithPaths ??= this.generateUrlHelpers(true));
@@ -944,11 +958,10 @@ export class RouteSet {
   /** @internal */
   private _defaultEnv?: Readonly<RackEnv>;
 
-  draw(callback: DrawCallback): void {
-    const railsSemantics = this._prepend.length > 0 || this._append.length > 0;
-    if (railsSemantics && !this.disableClearAndFinalize) this.clearBang();
-    this.evalBlock(callback);
-    if (railsSemantics && !this.disableClearAndFinalize) this.finalizeBang();
+  draw(block: DrawCallback): void {
+    if (!this.disableClearAndFinalize) this.clearBang();
+    this.evalBlock(block);
+    if (!this.disableClearAndFinalize) this.finalizeBang();
   }
 
   /** @internal */
@@ -1144,8 +1157,8 @@ export class RouteSet {
 
     if (Object.hasOwn(options, "params")) {
       const optParams = options["params"];
-      if (isPlainObject(optParams)) {
-        Object.assign(params, optParams);
+      if (rbObjRespondTo(optParams, "toHash")) {
+        update(params, optParams as Record<string, unknown>);
       } else {
         params["params"] = optParams;
       }
@@ -1245,7 +1258,7 @@ export class RouteSet {
     environment: { method?: string | null; extras?: Record<string, unknown> } = {},
   ): Record<string, unknown> {
     const method = String(environment.method ?? "GET").toUpperCase();
-    if (!(path != null && path.includes("://"))) path = normalizePath(path);
+    if (!(path != null && path.includes("://"))) path = Utils.normalizePath(path);
     const extras = environment.extras ?? {};
 
     let env: RackEnv;
@@ -1281,7 +1294,7 @@ export class RouteSet {
 
   async call(env: RackEnv): Promise<RackResponse> {
     const req = this.makeRequest(env);
-    req.pathInfo = normalizePath(req.pathInfo);
+    req.pathInfo = Utils.normalizePath(req.pathInfo);
     return (await this.router.serve(req as unknown as RouterRequest)) as unknown as RackResponse;
   }
 }

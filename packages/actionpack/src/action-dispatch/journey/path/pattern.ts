@@ -1,5 +1,5 @@
 import { regexpEscape, transformValues, uniq } from "@blazetrails/ruby-compat";
-import { Ast } from "../ast.js";
+import { Ast } from "../nodes/node.js";
 import { Cat, Group } from "../nodes/node.js";
 import type { Dot, Literal, Node, Or, Slash, Star } from "../nodes/node.js";
 import { FormatBuilder, Format, Visitor } from "../visitors.js";
@@ -42,28 +42,28 @@ function combinedFlagsFor(
   return out.join("");
 }
 
-function combinedFlagsUsed(matchers: Matchers, names: readonly string[]): string {
+function combinedFlagsUsed(matchers: Matchers, node: Node): string {
   const values: Array<Requirement | Requirement[]> = [];
-  for (const n of names) if (Object.hasOwn(matchers, n)) values.push(matchers[n]);
+  for (const n of node) {
+    if (n.isSymbol() && Object.hasOwn(matchers, n.toSym())) values.push(matchers[n.toSym()]);
+  }
   return combinedFlagsFor(values);
 }
 
 export class AnchoredRegexp extends Visitor {
   protected readonly _separator: string;
   protected readonly _matchers: Matchers;
-  protected readonly _names: readonly string[];
   private readonly _separatorRe: string;
 
-  constructor(separator: string, matchers: Matchers, names: readonly string[] = []) {
+  constructor(separator: string, matchers: Matchers) {
     super();
     this._separator = separator;
     this._matchers = matchers;
-    this._names = names;
     this._separatorRe = `([^${escapeCharClass(separator)}]+)`;
   }
 
   override accept(node: Node): RegExp {
-    return new RegExp(`^${this.visit(node)}$`, combinedFlagsUsed(this._matchers, this._names));
+    return new RegExp(`^${this.visit(node)}$`, combinedFlagsUsed(this._matchers, node));
   }
 
   protected override visitCAT(node: Node): string {
@@ -101,7 +101,7 @@ export class AnchoredRegexp extends Visitor {
   }
 
   protected override visitOR(node: Node): string {
-    const children = (node as Or).children().map((c) => this.visit(c) as string);
+    const children = (node as Or).children().map((n) => this.visit(n) as string);
     return `(?:${children.join("|")})`;
   }
 }
@@ -109,7 +109,7 @@ export class AnchoredRegexp extends Visitor {
 export class UnanchoredRegexp extends AnchoredRegexp {
   override accept(node: Node): RegExp {
     const path = this.visit(node) as string;
-    const flags = combinedFlagsUsed(this._matchers, this._names);
+    const flags = combinedFlagsUsed(this._matchers, node);
     if (path === "/") return new RegExp(`^/`, flags);
     return new RegExp(`^${path}(?:\\b|$|/)`, flags);
   }
@@ -234,10 +234,9 @@ export class Pattern {
   }
 
   match(other: string): MatchData | undefined {
-    const re = this.toRegexp();
-    const m = other.match(re);
-    if (!m) return undefined;
-    return new MatchData(this.names, this.offsets, m);
+    const match = other.match(this.toRegexp());
+    if (!match) return undefined;
+    return new MatchData(this.names, this.offsets, match);
   }
 
   isMatch(other: string): boolean {
@@ -248,10 +247,10 @@ export class Pattern {
     return this.toRegexp().source;
   }
 
+  /** @missingRailsName separators — PERMANENT */
   toRegexp(): RegExp {
     if (this._re) return this._re;
-    const Klass = this.anchored ? AnchoredRegexp : UnanchoredRegexp;
-    this._re = new Klass(this._separators, this.requirements, this.names).accept(this.spec);
+    this._re = new this.regexpVisitor(this._separators, this.requirements).accept(this.spec);
     return this._re;
   }
 

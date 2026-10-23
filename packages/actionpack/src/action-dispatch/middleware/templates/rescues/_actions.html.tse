@@ -1,0 +1,13 @@
+<% const actions = exceptionWrapper.actions() %>
+
+<% if (Object.keys(actions).length > 0) { %>
+  <div class="actions">
+    <% for (const action of Object.keys(actions)) { %>
+      <%= buttonTo(action, ActionDispatch.ActionableExceptions.endpoint, { params: {
+        error: exceptionWrapper.exceptionClassName,
+        action: action,
+        location: request.path
+      } }) %>
+    <% } %>
+  </div>
+<% } %>

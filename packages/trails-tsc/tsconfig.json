@@ -6,5 +6,10 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../activesupport" }, { "path": "../tse-compiler" }]
+  "references": [
+    { "path": "../activesupport" },
+    { "path": "../ruby-compat" },
+    { "path": "../tse-compiler" },
+    { "path": "../actionview" }
+  ]
 }

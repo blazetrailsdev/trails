@@ -4,7 +4,9 @@ import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
 import {
   ARRAY_METHOD_TABLE,
+  Hash as RubyHash,
   Kernel,
+  rbModDefineMethod,
   Range as RangeValue,
   STRING_METHOD_TABLE,
   toS,
@@ -32,6 +34,13 @@ function toJSON(
 
 export const ToJsonWithActiveSupportEncoder = { toJSON };
 
+export interface ToJsonWithActiveSupportEncoder {
+  toJSON(options: string): unknown;
+  toJSON(options?: EncodeOptions | null): string;
+}
+
+rbModDefineMethod(RubyHash, "toJson", toJSON);
+
 export class Module {
   static asJson(value: { name: string }, options: EncodeOptions | null = null): string {
     return value.name;
@@ -47,9 +56,15 @@ export class Object {
   }
 }
 
-Kernel.defineMethod("asJson", function (this: object, options: EncodeOptions | null = null) {
+declare module "@blazetrails/ruby-compat" {
+  interface KernelModule {
+    asJson(this: object, options?: EncodeOptions | null): unknown;
+  }
+}
+
+Kernel.asJson = function (this: object, options: EncodeOptions | null = null) {
   return Object.asJson(this, options);
-});
+};
 
 export class TrueClass {
   static asJson(value: boolean, options: EncodeOptions | null = null): boolean {
@@ -85,18 +100,30 @@ export class Numeric {
 }
 
 export class Float {
+  static toString(): string {
+    return "Float";
+  }
+
   static asJson(value: number, options: EncodeOptions | null = null): number | null {
     return globalThis.Number.isFinite(globalThis.Number(value)) ? value : null;
   }
 }
 
 export class BigDecimal {
+  static toString(): string {
+    return "BigDecimal";
+  }
+
   static asJson(value: BigDecimalValue, options: EncodeOptions | null = null): string {
     return value.toString();
   }
 }
 
 export class Regexp {
+  static toString(): string {
+    return "Regexp";
+  }
+
   static asJson(value: RegExp, options: EncodeOptions | null = null): string {
     return globalThis.String(value);
   }
@@ -275,12 +302,20 @@ export class DateTime {
 }
 
 export class Generic {
+  static toString(): string {
+    return "URI::Generic";
+  }
+
   static asJson(value: URL, options: EncodeOptions | null = null): string {
     return value.toString();
   }
 }
 
 export class Exception {
+  static toString(): string {
+    return "Exception";
+  }
+
   static asJson(value: Error, options: EncodeOptions | null = null): string {
     return value.message;
   }
@@ -306,17 +341,18 @@ export function isPlainObject(value: object): boolean {
   return proto === globalThis.Object.prototype || proto === null;
 }
 
-export function asJson(value: unknown, options: EncodeOptions | null = null): unknown {
+export function asJson(value: unknown, options?: EncodeOptions | null): unknown {
   if (value == null) return NilClass.asJson(value, options);
   if (typeof value === "boolean") return TrueClass.asJson(value, options);
   if (typeof value === "string") return String.asJson(value, options);
+  if (value instanceof Uint8Array) return String.asJson(new TextDecoder().decode(value), options);
   if (typeof value === "number" || value instanceof globalThis.Number) {
     return Float.asJson(value as number, options);
   }
   if (typeof value === "bigint") return Numeric.asJson(value, options);
 
   const own = (value as { asJson?: (o?: unknown) => unknown }).asJson;
-  if (typeof own === "function") return own.call(value, options ?? undefined);
+  if (typeof own === "function") return own.call(value, options);
 
   if (typeof value === "function") return Module.asJson(value as { name: string }, options);
 

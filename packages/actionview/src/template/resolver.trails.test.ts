@@ -8,7 +8,7 @@ import { FileSystemResolver } from "./resolver.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import { TemplateHandlers } from "./handlers.js";
 import type { Template } from "../template.js";
-import { Tse } from "./handlers/tse.js";
+import { TSE } from "./handlers/tse.js";
 import { Base } from "../base.js";
 
 describe("FileSystemResolver", () => {
@@ -28,7 +28,7 @@ describe("FileSystemResolver", () => {
     await write("i*x.html.tse", "<h1>Star</h1>");
     await fs.mkdir!(path.join(dir, "po?sts"), { recursive: true });
     await fs.writeFile!(path.join(dir, "po?sts", "index.html.tse"), "<h1>Query</h1>");
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(async () => {
@@ -53,16 +53,16 @@ describe("FileSystemResolver", () => {
     ]);
     const ctx = new LookupContext(null, {}, []);
     ctx.appendViewPaths([new FileSystemResolver(dir)]);
-    const render = (name: string) =>
+    const render = async (name: string) =>
       String(
-        (ctx.findTemplate(name, ["posts"]) as Template).render(
+        await (ctx.findTemplate(name, ["posts"]) as Template).render(
           new (Base.withEmptyTemplateCache())(null, {}, null),
           {},
         ),
       );
 
-    expect(render("utf8")).toBe("hello \u{fc}mlat");
-    expect(render("latin1")).toBe("\nhello \u{fc}mlat");
+    expect(await render("utf8")).toBe("hello \u{fc}mlat");
+    expect(await render("latin1")).toBe("\nhello \u{fc}mlat");
   });
 
   it("resolves a template through the same paths as exists?", () => {
@@ -216,7 +216,7 @@ describe("PathParser locales", () => {
   beforeEach(() => {
     originalLocale = I18n.locale();
     I18n.setEnforceAvailableLocales(false);
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {

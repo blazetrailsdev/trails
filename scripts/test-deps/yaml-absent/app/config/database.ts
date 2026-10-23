@@ -1,0 +1,4 @@
+export default {
+  development: { adapter: "sqlite3", database: ":memory:" },
+  test: { adapter: "sqlite3", database: ":memory:" },
+};

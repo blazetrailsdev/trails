@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { HTML, HTML4, Html } from "./index.js";
-import { HTML5 } from "./namespaces.js";
+import { HTML5 } from "./index.js";
 
 describe("RailsApiTest", () => {
   test("html_module_name_alias", () => {

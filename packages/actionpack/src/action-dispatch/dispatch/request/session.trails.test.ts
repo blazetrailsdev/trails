@@ -6,7 +6,7 @@ function makeReq(): { env: Record<string, unknown> } {
 }
 
 describe("Session::Options", () => {
-  it("answers the Hash-shaped reads Rack::Session::Abstract::Persisted makes", () => {
+  it("answers the Hash-shaped reads Rack::Session::Abstract::Persisted makes", async () => {
     const options = new Options(null, { skip: true, expireAfter: 60 });
 
     expect(options["skip"]).toBe(true);
@@ -21,7 +21,7 @@ describe("Session::Options", () => {
     expect(options.get("skip")).toBe(true);
   });
 
-  it("keeps id callable over the stored id, and to_hash unfiltered", () => {
+  it("keeps id callable over the stored id, and to_hash unfiltered", async () => {
     const store = { extractSessionId: () => "extracted" };
     const req = makeReq();
     const options = new Options(store as never, { id: "stored", path: "/" });
@@ -33,20 +33,20 @@ describe("Session::Options", () => {
 });
 
 describe("Session", () => {
-  it("destroy on a disabled session touches no store", () => {
+  it("destroy on a disabled session touches no store", async () => {
     const req = makeReq();
     const session = Session.disabled(req);
-    session.destroy();
+    await session.destroy();
     expect(session.isEmpty()).toBe(true);
   });
 
-  it("write to a disabled session raises DisabledSessionError", () => {
+  it("write to a disabled session raises DisabledSessionError", async () => {
     const req = makeReq();
     const session = Session.disabled(req);
     expect(() => session.set("foo", "bar")).toThrow(DisabledSessionError);
   });
 
-  it("destroy deletes the session through the store and reloads the new sid", () => {
+  it("destroy deletes the session through the store and reloads the new sid", async () => {
     const req = makeReq();
     const deleteSession = vi.fn().mockReturnValue(2);
     const store = {
@@ -55,29 +55,29 @@ describe("Session", () => {
       deleteSession,
       extractSessionId: () => 1,
     };
-    const session = Session.create(store, req, { key: "_session_id" });
+    const session = await Session.create(store, req, { key: "_session_id" });
 
-    session.destroy();
+    await session.destroy();
 
     expect(deleteSession).toHaveBeenCalledWith(req, 1, Options.find(req));
     expect(session.isLoaded()).toBe(true);
   });
 
-  it("update raises TypeError for a value that does not convert to a Hash", () => {
+  it("update raises TypeError for a value that does not convert to a Hash", async () => {
     const req = makeReq();
     const store = {
       loadSession: () => [1, {}] as [unknown, Record<string, unknown>],
       sessionExists: () => true,
-      deleteSession: () => null,
+      deleteSession: async () => null,
       extractSessionId: () => 1,
     };
-    const session = Session.create(store, req, {});
+    const session = await Session.create(store, req, {});
 
     expect(() => session.update(null)).toThrow("no implicit conversion of NilClass into Hash");
     expect(() => session.update([1, 2])).toThrow("no implicit conversion of Array into Hash");
   });
 
-  it("delete removes the session from the request", () => {
+  it("delete removes the session from the request", async () => {
     const req = makeReq();
     Session.disabled(req);
     expect(Session.find(req)).toBeNull();
@@ -89,16 +89,16 @@ describe("Session", () => {
     expect(Session.find(req)).toBeNull();
   });
 
-  it("inspect reports a not yet loaded session without loading it", () => {
+  it("inspect reports a not yet loaded session without loading it", async () => {
     const req = makeReq();
     const loadSession = vi.fn(() => [1, {}] as [unknown, Record<string, unknown>]);
     const store = {
       loadSession,
       sessionExists: () => true,
-      deleteSession: () => null,
+      deleteSession: async () => null,
       extractSessionId: () => 1,
     };
-    const session = Session.create(store, req, {});
+    const session = await Session.create(store, req, {});
 
     expect(session.inspect()).toMatch(
       /^#<ActionDispatch::Request::Session:0x[0-9a-f]+ not yet loaded>$/,
@@ -110,13 +110,13 @@ describe("Session", () => {
     expect(session.inspect()).toMatch(/^#<ActionDispatch::Request::Session:0x[0-9a-f]+>$/);
   });
 
-  it("inspect renders a subclass's own class rather than Session's", () => {
+  it("inspect renders a subclass's own class rather than Session's", async () => {
     class MySession extends Session {}
     const req = makeReq();
     const store = {
       loadSession: () => [1, {}] as [unknown, Record<string, unknown>],
       sessionExists: () => true,
-      deleteSession: () => null,
+      deleteSession: async () => null,
       extractSessionId: () => 1,
     };
     const session = new MySession(store, req, {});

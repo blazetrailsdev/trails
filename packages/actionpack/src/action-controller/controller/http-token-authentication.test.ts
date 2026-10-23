@@ -222,7 +222,7 @@ describe("HttpTokenAuthenticationTest", () => {
     const expectedToken = token;
     const expectedNonce = { nonce: nonceHash.nonce };
     expect(actual[0]).toBe(expectedToken);
-    expect(Object.fromEntries(actual[1].toHash())).toEqual(expectedNonce);
+    expect(actual[1].toHash()).toEqual(expectedNonce);
   });
 
   it("token_and_options returns nil with no value after the equal sign", () => {
@@ -237,7 +237,7 @@ describe("HttpTokenAuthenticationTest", () => {
 
     const actual = Token.tokenAndOptions(sampleRequest(token, {}))!;
     expect(actual[0]).toBe(expectedToken);
-    expect(Object.fromEntries(actual[1].toHash())).toEqual(expectedOptions);
+    expect(actual[1].toHash()).toEqual(expectedOptions);
   });
 
   it("raw_params returns a tuple of two key value pair strings", () => {

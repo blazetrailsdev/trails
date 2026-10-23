@@ -26,6 +26,7 @@ export type { PermittedAttributes } from "./forbidden-attributes-protection.js";
 export {
   assignAttributes,
   assertAssignedSynchronously,
+  assigningSynchronously,
   attributeWriterMissing,
   ArgumentError,
   NoMethodError,
@@ -73,6 +74,7 @@ export { Translation } from "./translation.js";
 export type { ModelLike } from "./naming.js";
 export { Dirty } from "./dirty.js";
 export type { DirtyOptions } from "./dirty.js";
+export { Callbacks } from "./callbacks.js";
 export type {
   CallbackConditions,
   CallbackObject,

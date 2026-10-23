@@ -1,3 +1,5 @@
+import type { RackHeaders } from "./index.js";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { REQUEST_METHOD, RACK_METHODOVERRIDE_ORIGINAL_METHOD, RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
@@ -10,9 +12,9 @@ const HTTP_METHODS = ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS", "PATCH"
 const ALLOWED_METHODS = ["POST"];
 
 export class MethodOverride {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
@@ -21,7 +23,7 @@ export class MethodOverride {
     return ALLOWED_METHODS;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     if (ALLOWED_METHODS.includes(env[REQUEST_METHOD])) {
       const method = this.methodOverride(env);
       if (method && HTTP_METHODS.includes(method)) {
@@ -29,7 +31,7 @@ export class MethodOverride {
         env[REQUEST_METHOD] = method;
       }
     }
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<RackApp>;
   }
 
   private methodOverride(env: Record<string, any>): string | null {

@@ -33,6 +33,7 @@ describe("vendor/sources.ts", () => {
         "abstractcontroller",
         "actioncontroller",
         "actiondispatch",
+        "actioncable",
         "actionpackversion",
         "actionview",
         "activejob",
@@ -119,7 +120,12 @@ describe("vendor/sources.ts", () => {
       ref: "v1.3.0",
     });
     expect(gid!.packages).toEqual([
-      { name: "globalid", libPath: "lib/global_id", testPath: "test/cases" },
+      {
+        name: "globalid",
+        libPath: "lib/global_id",
+        libEntryFile: "lib/global_id.rb",
+        testPath: "test/cases",
+      },
     ]);
   });
 
@@ -191,13 +197,18 @@ describe("vendor/sources.ts", () => {
     expect(Object.keys(libEntryFilesManifest())).toEqual([
       "arel",
       "activerecord",
+      "actioncable",
       "activejob",
       "rack-test",
+      "did-you-mean",
+      "globalid",
       "msgpack",
       "mysql2",
       "pg",
+      "marcel",
       "thor",
       "i18n",
+      "solid-queue",
     ]);
     expect(apiComparePackages()).toContain("i18n");
     expect(Object.keys(libPathsManifest())).toContain("i18n");
@@ -359,6 +370,7 @@ describe("vendor/sources.ts", () => {
         "abstractcontroller",
         "actioncontroller",
         "actiondispatch",
+        "actioncable",
         "actionpackversion",
         "actionview",
         "activejob",
@@ -371,6 +383,7 @@ describe("vendor/sources.ts", () => {
         "did-you-mean",
         "globalid",
         "i18n",
+        "marcel",
         "msgpack",
         "mysql2",
         "pg",
@@ -378,6 +391,7 @@ describe("vendor/sources.ts", () => {
         "rack-session",
         "rack-test",
         "sqlite3",
+        "solid-queue",
         "thor",
         "trailties",
       ].sort(),
@@ -403,6 +417,7 @@ describe("vendor/sources.ts", () => {
       [
         "abstractcontroller",
         "actioncontroller",
+        "actioncable",
         "actiondispatch",
         "actionview",
         "activejob",
@@ -415,11 +430,13 @@ describe("vendor/sources.ts", () => {
         "did-you-mean",
         "globalid",
         "i18n",
+        "marcel",
         "msgpack",
         "rack",
         "rack-session",
         "rack-test",
         "ruby-compat",
+        "solid-queue",
         "thor",
         "trailties",
       ].sort(),

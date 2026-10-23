@@ -7,38 +7,19 @@ import {
   extend,
   classAttribute,
   Concern,
-  Module,
-  type Included,
 } from "@blazetrails/activesupport";
 
 interface ConversionRecord {
   isPersisted(): boolean;
-  toKey(): unknown[] | null;
+  toKey(...args: Parameters<typeof toKey>): ReturnType<typeof toKey>;
 }
 
-export const Conversion = new Module((mod) => {
-  extend(mod, Concern);
-
-  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
-    null,
-    function (this: object) {
-      classAttribute.call(this, "paramDelimiter", { instanceReader: false, default: "-" });
-    },
-  );
-
-  mod.defineMethod("toModel", toModel);
-  mod.defineMethod("toKey", toKey);
-  mod.defineMethod("toParam", toParam);
-  mod.defineMethod("toPartialPath", toPartialPath);
-}) as Module<{
-  toModel: typeof toModel;
-  toKey: typeof toKey;
-  toParam: typeof toParam;
-  toPartialPath: typeof toPartialPath;
-}> & {
-  ClassMethods: typeof ClassMethods;
-};
-export type Conversion = Included<typeof Conversion>;
+export interface Conversion {
+  toModel<T>(this: T): T;
+  toKey(...args: Parameters<typeof toKey>): ReturnType<typeof toKey>;
+  toParam(...args: Parameters<typeof toParam>): ReturnType<typeof toParam>;
+  toPartialPath(...args: Parameters<typeof toPartialPath>): ReturnType<typeof toPartialPath>;
+}
 
 export function toModel<T>(this: T): T {
   return this;
@@ -65,19 +46,29 @@ export function toPartialPath(this: object): string {
 }
 
 export function _toPartialPath(this: ConversionHost): string {
-  return (this._cachedToPartialPath ||= (() => {
-    if (rbObjRespondTo(this, "modelName")) {
-      return `${this.modelName!.collection}/${this.modelName!.element}`;
-    } else {
-      const element = underscore(demodulize(this.name));
-      const collection = tableize(this.name);
-      return `${collection}/${element}`;
-    }
-  })());
+  return (
+    (Object.hasOwn(this, "_cachedToPartialPath") && this._cachedToPartialPath) ||
+    (this._cachedToPartialPath = (() => {
+      if (rbObjRespondTo(this, "modelName")) {
+        return `${this.modelName!.collection}/${this.modelName!.element}`;
+      } else {
+        const element = underscore(demodulize(this.name));
+        const collection = tableize(this.name);
+        return `${collection}/${element}`;
+      }
+    })())
+  );
 }
 
 export const ClassMethods = { _toPartialPath };
-Conversion.ClassMethods = ClassMethods;
+export const Conversion = { toModel, toKey, toParam, toPartialPath, ClassMethods };
+extend(Conversion, Concern);
+(Conversion as unknown as { included(base: null, block: (this: object) => void): void }).included(
+  null,
+  function (this: object) {
+    classAttribute.call(this, "paramDelimiter", { instanceReader: false, default: "-" });
+  },
+);
 
 interface ConversionHost {
   name: string;

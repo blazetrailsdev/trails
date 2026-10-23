@@ -18,7 +18,7 @@ export type ValueTransformation<T = unknown> = (v: T) => unknown;
 
 export interface AssociationScopeable {
   readonly owner: Base;
-  readonly reflection: AssociationReflection;
+  readonly reflection: AssociationReflection | ThroughReflection;
   readonly klass: typeof Base;
 }
 
@@ -65,7 +65,7 @@ export class AssociationScope {
 
     binds.push(...lastReflection.joinIdFor(owner));
     if (lastReflection.type) {
-      binds.push((owner.constructor as typeof Base).polymorphicName());
+      binds.push(owner.constructor.polymorphicName());
     }
 
     eachCons(chain as AssociationReflection[], 2).forEach(([reflection, nextReflection]) => {
@@ -125,9 +125,7 @@ export class AssociationScope {
     }
 
     if (reflection.type) {
-      const polymorphicType = this.transformValue(
-        (owner.constructor as typeof Base).polymorphicName(),
-      );
+      const polymorphicType = this.transformValue(owner.constructor.polymorphicName());
       scope = this.applyScope(scope, table, reflection.type, polymorphicType);
     }
 
@@ -135,7 +133,7 @@ export class AssociationScope {
   }
 
   protected getChain(
-    reflection: AssociationReflection,
+    reflection: AssociationReflection | ThroughReflection,
     association: AssociationScopeable,
     tracker: AliasTracker,
   ): Array<ChainReflection> {
@@ -195,7 +193,7 @@ export class AssociationScope {
 
         if (scopeChainItem === chainHead.scope) {
           scope.mergeBang(item.except("where", "includes", "unscope", "order"));
-        } else if (!isEmpty(item.referencesValues)) {
+        } else if (item.referencesValues.length !== 0) {
           scope.mergeBang(item.only("joins", "leftOuterJoins"));
 
           const associations = union(item.eagerLoadValues, item.includesValues);

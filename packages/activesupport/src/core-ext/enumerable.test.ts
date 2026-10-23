@@ -465,24 +465,9 @@ describe("EnumerableTests", () => {
       ]),
     );
 
-    expect(indexWith(["title", "body"], null)).toEqual(
-      new Map([
-        ["title", null],
-        ["body", null],
-      ]),
-    );
-    expect(indexWith(["title", "body"], [])).toEqual(
-      new Map([
-        ["title", []],
-        ["body", []],
-      ]),
-    );
-    expect(indexWith(["title", "body"], {})).toEqual(
-      new Map([
-        ["title", {}],
-        ["body", {}],
-      ]),
-    );
+    expect(indexWith(["title", "body"], null)).toEqual({ title: null, body: null });
+    expect(indexWith(["title", "body"], [])).toEqual({ title: [], body: [] });
+    expect(indexWith(["title", "body"], {})).toEqual({ title: {}, body: {} });
   });
 
   it.skip("doesnt bust constant cache", () => {

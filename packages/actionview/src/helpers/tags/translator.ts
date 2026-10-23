@@ -1,5 +1,6 @@
+import { Tags } from "../../namespaces.js";
 import { I18n, presence } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, rbModConstSet } from "@blazetrails/ruby-compat";
 
 interface TranslatorModel {
   modelName: { i18nKey: string };
@@ -52,3 +53,5 @@ export class Translator {
     return null;
   }
 }
+
+rbModConstSet(Tags, "Translator", Translator);

@@ -1,8 +1,9 @@
 import { ArgumentError } from "../argument-error.js";
 import { rbInspect } from "../object.js";
 import { stringValue } from "../string/support.js";
-import { InvalidURIError, URI } from "./common.js";
-import { Generic } from "./generic.js";
+import { rbModConstGet } from "../variable.js";
+import type { InvalidURIError, URI } from "./common.js";
+import type { Generic } from "./generic.js";
 
 /**
  * An atomic group, which is how the possessive quantifiers of
@@ -135,7 +136,9 @@ export class RFC3986Parser {
     uri = stringValue(uri);
     // eslint-disable-next-line no-control-regex
     if (!/^[\x00-\x7f]*$/.test(uri)) {
-      throw new InvalidURIError(`URI must be ascii only ${rbInspect(uri)}`);
+      throw new (rbModConstGet(Object, "URI::InvalidURIError") as typeof InvalidURIError)(
+        `URI must be ascii only ${rbInspect(uri)}`,
+      );
     }
     let m = RFC3986_URI.exec(uri);
     if (m) {
@@ -174,12 +177,14 @@ export class RFC3986Parser {
         g.fragment ?? null,
       ];
     }
-    throw new InvalidURIError(`bad URI(is not URI?): ${rbInspect(uri)}`);
+    throw new (rbModConstGet(Object, "URI::InvalidURIError") as typeof InvalidURIError)(
+      `bad URI(is not URI?): ${rbInspect(uri)}`,
+    );
   }
 
   /** `parse` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:130`). */
   parse(uri: string | Uint8Array): Generic {
-    return URI.for(...this.split(uri), this);
+    return (rbModConstGet(Object, "URI") as typeof URI).for(...this.split(uri), this);
   }
 
   /**
@@ -191,7 +196,7 @@ export class RFC3986Parser {
    * (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:166`).
    */
   convertToUri(uri: Generic | string): Generic {
-    if (uri instanceof Generic) {
+    if (uri instanceof (rbModConstGet(Object, "URI::Generic") as typeof Generic)) {
       return uri;
     } else if (typeof uri === "string") {
       return this.parse(uri);

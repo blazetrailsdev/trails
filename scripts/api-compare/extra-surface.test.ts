@@ -380,6 +380,26 @@ describe("a TS-only package", () => {
       expect.objectContaining({ name: "first", kind: "moved" }),
     ]);
   });
+
+  it("shows a receipt swapped for @internal: allowed falls, internal rises", () => {
+    const ruby: ApiManifest = { source: "ruby", generatedAt: "", packages: {} };
+    const report = (squeeze: MethodInfo) =>
+      buildReport(
+        ruby,
+        {
+          source: "typescript",
+          generatedAt: "",
+          packages: {
+            "ruby-compat": { classes: {}, modules: {}, fileFunctions: { "range.ts": [squeeze] } },
+          },
+        },
+        { filterPkg: "ruby-compat", excludeGlobs: [], novelOnly: false, topN: 50 },
+      ).packages[0];
+    const receipted = report({ ...method("squeeze"), noRailsEquivalent: "PERMANENT" });
+    const hidden = report({ ...method("squeeze"), internal: true });
+    expect([receipted?.totalAllowlisted, receipted?.totalInternal]).toEqual([1, 0]);
+    expect([hidden?.totalAllowlisted, hidden?.totalInternal]).toEqual([0, 1]);
+  });
 });
 
 describe("concernHookNames", () => {
@@ -1567,6 +1587,15 @@ describe("buildReport — novel vs moved classification", () => {
             }),
           },
           modules: {},
+          fileConstants: {
+            "type.rb": {
+              Value: {
+                kind: "alias",
+                target: "ActiveModel::Type::Value",
+                namespace: "ActiveRecord::Type",
+              },
+            },
+          },
         },
       },
     };
@@ -2386,6 +2415,46 @@ describe("buildReport — reopened modules", () => {
               classMethods: [],
             },
           },
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+
+  it("allows a reopening file's methods when the file also declares constants", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        i18n: {
+          classes: {},
+          modules: {
+            I18n: {
+              ...rubyClass({ name: "I18n", file: "i18n.rb" }),
+              instanceMethods: [],
+              classMethods: [{ ...method("interpolate"), file: "interpolate/ruby.rb" }],
+            },
+          },
+          fileConstants: {
+            "interpolate/ruby.rb": { DEFAULT_INTERPOLATION_PATTERNS: { kind: "array", value: "" } },
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        i18n: {
+          classes: {},
+          modules: {},
+          fileFunctions: { "interpolate/ruby.ts": [method("interpolate")] },
         },
       },
     };
@@ -4549,6 +4618,48 @@ describe("inlinedModuleMembers", () => {
     ]);
   });
 
+  it("drops an initialize the host's constructor names in an @inlinedFrom tag", () => {
+    const classes = {
+      "Arel::SelectManager": rubyClass({
+        name: "SelectManager",
+        file: "select_manager.rb",
+        includes: ["Crud"],
+      }),
+    };
+    const modules = {
+      "Arel::Crud": rubyClass({ name: "Crud", file: "crud.rb", instance: [method("initialize")] }),
+    };
+    const bodied = new Map([
+      ["select-manager.ts", new Set(["constructor"])],
+      ["crud.ts", new Set<string>()],
+    ]);
+    expect(inlinedModuleMembers("arel", classes, modules, byShort, bodied)).toHaveLength(1);
+    const tagged = new Map([["select-manager.ts", new Set(["Arel::Crud"])]]);
+    expect(inlinedModuleMembers("arel", classes, modules, byShort, bodied, tagged)).toEqual([]);
+  });
+
+  it("drops a module method whose super the host's tagged method inlines, and only that one", () => {
+    const modules = {
+      "Arel::Crud": rubyClass({
+        name: "Crud",
+        file: "crud.rb",
+        instance: [{ ...method("compile_insert"), calls: ["super"] }, method("compile_update")],
+      }),
+    };
+    const bodied = new Map([
+      ["select-manager.ts", new Set(["compileInsert", "compileUpdate"])],
+      ["crud.ts", new Set<string>()],
+    ]);
+    const tagged = new Map([
+      ["select-manager.ts", new Set(["Arel::Crud#compile_insert", "Arel::Crud#compile_update"])],
+    ]);
+    expect(
+      inlinedModuleMembers("arel", rubyClasses, modules, byShort, bodied, tagged).map(
+        (f) => f.tsName,
+      ),
+    ).toEqual(["compileUpdate"]);
+  });
+
   it("reports nothing when the module's own twin carries the body", () => {
     // The settled shape: the body stays in the file mirroring the mixin's own
     // Rails file, and the host keeps only the include seam.
@@ -4746,6 +4857,68 @@ describe("inlinedModuleMembers", () => {
       ]);
     });
   });
+
+  describe("a module `initialize` and a module name the includer's own `.rb` defines", () => {
+    const urlForModules = {
+      "ActionDispatch::Routing::UrlFor": rubyClass({
+        name: "UrlFor",
+        file: "routing/url_for.rb",
+        instance: [method("initialize"), method("default_url_options=")],
+      }),
+    };
+    const urlForShort = new Map([["UrlFor", ["ActionDispatch::Routing::UrlFor"]]]);
+
+    it("leaves the constructor of an includer that defines `initialize` alone", () => {
+      expect(
+        inlinedModuleMembers(
+          "actiondispatch",
+          {
+            "ActionDispatch::Routing::RoutesProxy": rubyClass({
+              name: "RoutesProxy",
+              file: "routing/routes_proxy.rb",
+              includes: ["UrlFor"],
+              instance: [method("initialize")],
+            }),
+          },
+          urlForModules,
+          urlForShort,
+          new Map([
+            ["routing/routes-proxy.ts", new Set(["constructor"])],
+            ["routing/url-for.ts", new Set<string>()],
+          ]),
+        ),
+      ).toEqual([]);
+    });
+
+    it("leaves a body a sibling in the includer's `.rb` defines alone", () => {
+      expect(
+        inlinedModuleMembers(
+          "actiondispatch",
+          {
+            "ActionDispatch::Integration::Session": rubyClass({
+              name: "Session",
+              file: "testing/integration.rb",
+              includes: ["UrlFor"],
+              instance: [],
+            }),
+          },
+          {
+            ...urlForModules,
+            "ActionDispatch::Integration::Runner": rubyClass({
+              name: "Runner",
+              file: "testing/integration.rb",
+              instance: [method("default_url_options=")],
+            }),
+          },
+          urlForShort,
+          new Map([
+            ["testing/integration.ts", new Set(["setDefaultUrlOptions"])],
+            ["routing/url-for.ts", new Set<string>()],
+          ]),
+        ),
+      ).toEqual([]);
+    });
+  });
 });
 
 describe("buildReport — members Ruby supplies without a def in the mapped file", () => {
@@ -4854,5 +5027,178 @@ describe("buildReport — members Ruby supplies without a def in the mapped file
       ).map((f) => f.tsName);
     expect(inlined([])).toEqual(["constructor"]);
     expect(inlined(["[initialize]"])).toEqual([]);
+  });
+});
+
+describe("buildReport — --package does not scope the stale-tag check", () => {
+  it("reports a stale tag in another package under a filtered run", () => {
+    const stale: MethodInfo = { ...method("_hidden"), noRailsEquivalent: "PERMANENT" };
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Foo": rubyClass({
+              name: "Foo",
+              file: "foo.rb",
+              instance: [method("bar")],
+            }),
+          },
+          modules: {},
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::Baz": rubyClass({
+              name: "Baz",
+              file: "baz.rb",
+              instance: [method("quux")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const host = (name: string, file: string, instanceMethods: MethodInfo[]) => ({
+      name,
+      file,
+      includes: [],
+      extends: [],
+      instanceMethods,
+      classMethods: [],
+    });
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: { Foo: host("Foo", "foo.ts", [method("bar"), stale]) },
+          modules: {},
+        },
+        activerecord: { classes: { Baz: host("Baz", "baz.ts", [method("quux")]) }, modules: {} },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages.map((p) => p.package)).toEqual(["activerecord"]);
+    expect(report.tagged.stale.map((e) => [e.package, e.tsFile])).toEqual([
+      ["activemodel", "foo.ts"],
+    ]);
+    expect(gateStale(report.tagged)).toContain("activemodel  foo.ts");
+  });
+});
+
+describe("buildReport — prepended modules", () => {
+  it("credits a lexically prepended module's methods to the host", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activesupport: {
+          classes: {
+            "ActiveSupport::TestCase": {
+              ...rubyClass({ name: "TestCase", file: "test_case.rb" }),
+              prepends: ["ActiveSupport::Testing::SetupAndTeardown"],
+            },
+          },
+          modules: {
+            "ActiveSupport::Testing::SetupAndTeardown": rubyClass({
+              name: "SetupAndTeardown",
+              file: "testing/setup_and_teardown.rb",
+              instance: [method("before_setup")],
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activesupport: {
+          classes: {
+            TestCase: {
+              name: "TestCase",
+              file: "test-case.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("beforeSetup")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+});
+
+describe("buildReport — DelegateClass resolution", () => {
+  it("resolves an unaliased DelegateClass name to nothing rather than a suffix match", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Type::Value": rubyClass({
+              name: "Value",
+              file: "type/value.rb",
+              instance: [method("cast")],
+            }),
+          },
+          modules: {},
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::Locking::LockingType": {
+              ...rubyClass({ name: "LockingType", file: "locking/optimistic.rb" }),
+              superclass: "Type::Value",
+              delegateClass: true,
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: { classes: {}, modules: {} },
+        activerecord: {
+          classes: {
+            LockingType: {
+              name: "LockingType",
+              file: "locking/optimistic.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("cast")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "locking/optimistic.ts");
+    expect(f!.extras.map((e) => e.name)).toEqual(["cast"]);
   });
 });

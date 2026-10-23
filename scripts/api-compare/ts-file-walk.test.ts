@@ -89,6 +89,86 @@ describe("walkTsFiles", () => {
   it("returns no files for a missing directory", async () => {
     expect(await walkTsFiles(path.join(root, "missing"), COMMITTED_TS_FILES)).toEqual([]);
   });
+
+  it("descends into a symlinked directory", async () => {
+    const linked = path.join(root, "linked");
+    await fs.mkdir(path.join(linked, "target"), { recursive: true });
+    await fs.writeFile(path.join(linked, "target", "fixture.ts"), "");
+    await fs.symlink(path.join(linked, "target"), path.join(linked, "alias"), "dir");
+
+    expect(
+      (await walkTsFiles(linked, COMMITTED_TS_FILES)).map((f) => path.relative(linked, f)).sort(),
+    ).toEqual([path.join("alias", "fixture.ts"), path.join("target", "fixture.ts")]);
+  });
+
+  it("stops at a symlink that loops back onto an ancestor", async () => {
+    const loop = path.join(root, "loop");
+    await fs.mkdir(path.join(loop, "inner"), { recursive: true });
+    await fs.writeFile(path.join(loop, "inner", "deep.ts"), "");
+    await fs.symlink(loop, path.join(loop, "inner", "up"), "dir");
+
+    expect(
+      (await walkTsFiles(loop, COMMITTED_TS_FILES)).map((f) => path.relative(loop, f)),
+    ).toEqual([path.join("inner", "deep.ts")]);
+  });
+
+  it("descends into a directory whose name ends in .ts", async () => {
+    const odd = path.join(root, "odd");
+    await fs.mkdir(path.join(odd, "looks-like-a-file.ts"), { recursive: true });
+    await fs.writeFile(path.join(odd, "looks-like-a-file.ts", "inner.ts"), "");
+
+    expect((await walkTsFiles(odd, COMMITTED_TS_FILES)).map((f) => path.relative(odd, f))).toEqual([
+      path.join("looks-like-a-file.ts", "inner.ts"),
+    ]);
+  });
+
+  it("raises rather than under-report when a walked subtree cannot be read", async () => {
+    const denied = path.join(root, "denied");
+    const inner = path.join(denied, "inner");
+    await fs.mkdir(inner, { recursive: true });
+    await fs.writeFile(path.join(denied, "kept.ts"), "");
+    await fs.chmod(inner, 0o000);
+    try {
+      await expect(walkTsFiles(denied, COMMITTED_TS_FILES)).rejects.toThrow(/EACCES/);
+    } finally {
+      await fs.chmod(inner, 0o755);
+    }
+  });
+
+  it("skips a symlink chain too long to resolve", async () => {
+    const chained = path.join(root, "chained");
+    await fs.mkdir(path.join(chained, "real"), { recursive: true });
+    await fs.writeFile(path.join(chained, "real", "deep.ts"), "");
+    await fs.writeFile(path.join(chained, "kept.ts"), "");
+    await fs.symlink(path.join(chained, "real"), path.join(chained, "hop44"), "dir");
+    for (let hop = 43; hop >= 0; hop--) {
+      await fs.symlink(path.join(chained, `hop${hop + 1}`), path.join(chained, `hop${hop}`), "dir");
+    }
+
+    const files = (await walkTsFiles(chained, COMMITTED_TS_FILES)).map((f) =>
+      path.relative(chained, f),
+    );
+
+    expect(files).toContain("kept.ts");
+    expect(files).toContain(path.join("real", "deep.ts"));
+    expect(files).not.toContain(path.join("hop0", "deep.ts"));
+    expect(files).toContain(path.join("hop44", "deep.ts"));
+  });
+
+  it("lists a root whose skipped subtree cannot be read", async () => {
+    const pruned = path.join(root, "pruned");
+    const deps = path.join(pruned, "node_modules");
+    await fs.mkdir(deps, { recursive: true });
+    await fs.writeFile(path.join(pruned, "kept.ts"), "");
+    await fs.chmod(deps, 0o000);
+    try {
+      expect(
+        (await walkTsFiles(pruned, COMMITTED_TS_FILES)).map((f) => path.relative(pruned, f)),
+      ).toEqual(["kept.ts"]);
+    } finally {
+      await fs.chmod(deps, 0o755);
+    }
+  });
 });
 
 describe("walkPackageTsFiles", () => {

@@ -1,8 +1,11 @@
+import { rbFSend, rbModConstSet, URI } from "@blazetrails/ruby-compat";
 import { ActionableError, cattrAccessor } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
+import { CONTENT_LENGTH, CONTENT_TYPE } from "@blazetrails/rack";
 import { LOCATION } from "../constants.js";
 import { Request } from "../http/request.js";
+import { Response } from "../http/response.js";
+import { ActionDispatch } from "../../namespaces.js";
 
 export class ActionableExceptions {
   static endpoint: string;
@@ -20,7 +23,7 @@ export class ActionableExceptions {
   async call(env: RackEnv): Promise<RackResponse> {
     const request = new Request(env);
     if (!this.actionableRequest(request)) {
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
 
     const params = request.params;
@@ -41,31 +44,25 @@ export class ActionableExceptions {
 
   /** @internal */
   private redirectTo(location: string): RackResponse {
-    let scheme: string | null = null;
-    let relative = false;
-    try {
-      const u = new URL(location);
-      scheme = u.protocol.replace(/:$/, "");
-    } catch {
-      relative = true;
-    }
+    const uri = URI.parse(location);
 
-    if (!relative && scheme !== "http" && scheme !== "https") {
-      return [
-        400,
-        { "content-type": "text/plain; charset=utf-8" },
-        bodyFromString("Invalid redirection URI"),
-      ];
+    let body: string;
+    if (uri.isRelative() || uri.scheme === "http" || uri.scheme === "https") {
+      body = "";
+    } else {
+      return [400, { [CONTENT_TYPE]: "text/plain; charset=utf-8" }, ["Invalid redirection URI"]];
     }
 
     return [
       302,
       {
-        "content-type": "text/html; charset=utf-8",
-        "content-length": "0",
+        [CONTENT_TYPE]: `text/html; charset=${Response.defaultCharset}`,
+        [CONTENT_LENGTH]: String(new TextEncoder().encode(body).byteLength),
         [LOCATION]: location,
       },
-      bodyFromString(""),
+      [body],
     ];
   }
 }
+
+rbModConstSet(ActionDispatch, "ActionableExceptions", ActionableExceptions);

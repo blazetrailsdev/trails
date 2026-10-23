@@ -1,10 +1,14 @@
 import { afterAll, beforeEach, describe, it, expect } from "vitest";
-import { Module, assertEqual } from "@blazetrails/activesupport";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { assertEqual, assertRaises } from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  registerConstant,
+  unregisterConstant,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import {
   CONTENT_TYPE,
   Lint,
-  bodyFromString,
   type RackApp,
   type RackEnv,
   type RackResponse,
@@ -50,11 +54,13 @@ describe("PermissionsPolicyTest", () => {
     );
   });
 
-  it("invalid directive source", () => {
+  it("invalid directive source", async () => {
     const policy = new PermissionsPolicy();
-    expect(() => policy.geolocation([":non_existent"] as unknown as string)).toThrow(
-      "Invalid HTTP permissions policy source: [:non_existent]",
-    );
+    const exception = await assertRaises([ArgumentError], {}, () => {
+      policy.geolocation([":non_existent"] as unknown as string);
+    });
+
+    assertEqual("Invalid HTTP permissions policy source: [:non_existent]", exception.message);
   });
 });
 
@@ -68,9 +74,9 @@ describe("PermissionsPolicyMiddlewareTest", () => {
 
     call(env: RackEnv): Promise<RackResponse> {
       env["action_dispatch.permissions_policy"] = POLICY;
-      env["action_dispatch.show_exceptions"] = ":none";
+      env["action_dispatch.show_exceptions"] = "none";
 
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
   }
 
@@ -87,7 +93,7 @@ describe("PermissionsPolicyMiddlewareTest", () => {
   });
 
   it("html requests will set a policy", async () => {
-    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "text/html" }, bodyFromString("")]);
+    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "text/html" }, [""]]);
 
     await t.get("/index");
 
@@ -95,7 +101,7 @@ describe("PermissionsPolicyMiddlewareTest", () => {
   });
 
   it("non-html requests will set a policy", async () => {
-    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "application/json" }, bodyFromString("")]);
+    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "application/json" }, [""]]);
 
     await t.get("/index");
 
@@ -103,11 +109,7 @@ describe("PermissionsPolicyMiddlewareTest", () => {
   });
 
   it("existing policies will not be overwritten", async () => {
-    t.app = buildApp(async () => [
-      200,
-      { [FEATURE_POLICY]: "gyroscope 'none'" },
-      bodyFromString(""),
-    ]);
+    t.app = buildApp(async () => [200, { [FEATURE_POLICY]: "gyroscope 'none'" }, [""]]);
 
     await t.get("/index");
 
@@ -167,9 +169,9 @@ describe("PermissionsPolicyIntegrationTest", () => {
 
     call(env: RackEnv): Promise<RackResponse> {
       env["action_dispatch.permissions_policy"] = POLICY;
-      env["action_dispatch.show_exceptions"] = ":none";
+      env["action_dispatch.show_exceptions"] = "none";
 
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
   }
 
@@ -208,11 +210,11 @@ describe("PermissionsPolicyIntegrationTest", () => {
 });
 
 describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
-  const ApplicationHelper = new Module().include({
+  const ApplicationHelper = {
     isPigsCanFly(): boolean {
       return false;
     },
-  });
+  };
 
   const helperName = "PermissionsPolicyWithHelpersIntegrationTest::ApplicationHelper";
   registerConstant(helperName, ApplicationHelper);
@@ -260,9 +262,9 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
 
     call(env: RackEnv): Promise<RackResponse> {
       env["action_dispatch.permissions_policy"] = POLICY;
-      env["action_dispatch.show_exceptions"] = ":none";
+      env["action_dispatch.show_exceptions"] = "none";
 
-      return this.app(env);
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
     }
   }
 
@@ -292,14 +294,5 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
   it("generates permissions policy header", async () => {
     await t.get("/");
     assertPolicy("gyroscope 'none'; usb 'self'");
-  });
-});
-
-describe("PermissionsPolicy constructor block", () => {
-  it("accepts a block", () => {
-    const policy = new PermissionsPolicy((p) => {
-      p.gyroscope(":self");
-    });
-    expect(policy.build()).toBe("gyroscope 'self'");
   });
 });

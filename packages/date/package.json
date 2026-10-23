@@ -20,5 +20,8 @@
   "dependencies": {
     "@blazetrails/ruby-compat": "workspace:*",
     "@js-temporal/polyfill": "^0.5.1"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

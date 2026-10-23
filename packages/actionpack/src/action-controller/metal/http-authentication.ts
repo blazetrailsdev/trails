@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 /* eslint-disable @typescript-eslint/no-namespace -- `HttpAuthentication::Basic`, `Digest` and `Token` each nest a `ControllerMethods` and share `authenticate` / `encode_credentials` / `authentication_request` (`action_controller/metal/http_authentication.rb:69,189,425`); nested namespaces keep every one at its Rails name. */
 import {
   ArgumentError,
@@ -329,10 +331,10 @@ export namespace HttpAuthentication {
     }
 
     export function secretToken(request: Request): string {
-      const keyGenerator = request.keyGenerator!;
+      const keyGenerator = request.keyGenerator()!;
       const httpAuthSalt = request.httpAuthSalt as string;
       const key = keyGenerator.generateKey(httpAuthSalt);
-      return typeof key === "string" ? b(key) : Buffer.from(key).toString("latin1");
+      return Buffer.from(key).toString("latin1");
     }
 
     export function nonce(secretKey: string, time: number = Math.floor(Date.now() / 1000)): string {
@@ -474,3 +476,5 @@ Object.defineProperty(HttpAuthentication.Basic.ControllerMethods, included, {
     extend(base, HttpAuthentication.Basic.ControllerMethods.ClassMethods);
   },
 });
+
+rbModConstSet(ActionController, "HttpAuthentication", HttpAuthentication);

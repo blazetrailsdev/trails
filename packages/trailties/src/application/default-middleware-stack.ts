@@ -102,7 +102,7 @@ export class DefaultMiddlewareStack {
 
     stack.use(Logger as never, { taggers: config.logTags });
     stack.use(ShowExceptions as never, this._showExceptionsApp());
-    stack.use(DebugExceptions as never, { responseFormat: config.debugExceptionResponseFormat });
+    stack.use(DebugExceptions as never, this.app, config.debugExceptionResponseFormat);
 
     if (config.considerAllRequestsLocal) {
       stack.use(ActionableExceptions as never);

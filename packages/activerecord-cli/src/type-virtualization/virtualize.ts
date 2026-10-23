@@ -1,5 +1,6 @@
 import * as ts from "typescript/unstable/ast";
 import { walk, findIncludeCalls, type WalkOptions, type ClassInfo } from "./walker.js";
+import { pluralize, underscore } from "@blazetrails/activesupport";
 import { synthesizeDeclares } from "./synthesize.js";
 import { tsApi } from "./ts-api.js";
 
@@ -27,6 +28,63 @@ export interface VirtualizeOptions extends WalkOptions {
   globalSuperNameOf?: ReadonlyMap<string, string>;
   composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
   isKnownTarget?: (name: string, host: import("./walker.js").ClassInfo) => boolean;
+  onModel?: (model: ModelTable) => void;
+}
+
+export interface ModelTable {
+  className: string;
+  superName?: string;
+  tableName?: string;
+  dynamicTableName: boolean;
+  abstract: boolean;
+  optedOut: boolean;
+  fileName: string;
+}
+
+export interface MissingTable {
+  className: string;
+  tableName: string;
+  fileName: string;
+}
+
+export function missingTables(
+  models: readonly ModelTable[],
+  schema: Readonly<Record<string, unknown>>,
+  rootNames: ReadonlySet<string> = new Set(["Base"]),
+): MissingTable[] {
+  const byName = new Map<string, ModelTable>();
+  for (const m of models) if (!byName.has(m.className)) byName.set(m.className, m);
+  const out: MissingTable[] = [];
+  for (const m of models) {
+    if (m.abstract || m.optedOut) continue;
+    const base = baseClassOf(m, byName);
+    if (base.superName && !byName.has(base.superName) && !rootNames.has(base.superName)) continue;
+    if (base !== m && base.optedOut) continue;
+    if (m.dynamicTableName || base.dynamicTableName) continue;
+    const tableName = m.tableName ?? base.tableName ?? pluralize(underscore(base.className));
+    if (Object.hasOwn(schema, tableName)) continue;
+    out.push({ className: m.className, tableName, fileName: m.fileName });
+  }
+  return out;
+}
+
+function baseClassOf(m: ModelTable, byName: ReadonlyMap<string, ModelTable>): ModelTable {
+  const seen = new Set<string>([m.className]);
+  let base = m;
+  for (
+    let parent = lookup(base.superName);
+    parent && !parent.abstract;
+    parent = lookup(base.superName)
+  ) {
+    if (seen.has(parent.className)) break;
+    seen.add(parent.className);
+    base = parent;
+  }
+  return base;
+
+  function lookup(name: string | undefined): ModelTable | undefined {
+    return name === undefined ? undefined : byName.get(name);
+  }
 }
 
 export function virtualize(
@@ -61,6 +119,18 @@ export function virtualize(
         (m) => m.kind === ts.SyntaxKind.ExportKeyword,
       ),
   );
+
+  for (const info of options.onModel ? classes : []) {
+    options.onModel!({
+      className: info.name,
+      superName: inFileSuperNameOf.get(info.name),
+      tableName: info.tableName,
+      dynamicTableName: info.dynamicTableName,
+      abstract: info.abstract,
+      optedOut: info.skip || info.noSchema,
+      fileName,
+    });
+  }
 
   for (const info of classes) {
     if (info.skip) continue;

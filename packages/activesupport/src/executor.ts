@@ -2,4 +2,8 @@
 
 import { ExecutionWrapper } from "./execution-wrapper.js";
 
-export class Executor extends ExecutionWrapper {}
+export class Executor extends ExecutionWrapper {
+  static toString(): string {
+    return "ActiveSupport::Executor";
+  }
+}

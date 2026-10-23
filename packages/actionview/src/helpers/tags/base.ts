@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import {
   ArgumentError,
   block,
@@ -6,13 +7,13 @@ import {
   hashDelete,
   include,
   type Included,
-  initializeIncludedModules,
-  rbFPublicSend,
+  rbFSend,
   rbInspect,
   rbObjRespondTo,
+  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 
-import { isBlank, isPresent } from "@blazetrails/activesupport";
+import { isBlank, isPresent, toParam } from "@blazetrails/activesupport";
 
 import { ActiveModelInstanceTag } from "../active-model-helper.js";
 import { FormTagHelper, type FormTagHelperHost } from "../form-tag-helper.js";
@@ -60,8 +61,6 @@ export class Base {
       this._generateIndexedNames = false;
       this._autoIndex = null;
     }
-
-    initializeIncludedModules(this);
   }
 
   render(): unknown {
@@ -77,10 +76,10 @@ export class Base {
       this._allowMethodNamesOutsideObject !== false
     ) {
       return rbObjRespondTo(this.object, this._methodName)
-        ? rbFPublicSend(this.object, this._methodName)
+        ? rbFSend(this.object, this._methodName)
         : null;
     } else {
-      return rbFPublicSend(this.object, this._methodName);
+      return rbFSend(this.object, this._methodName);
     }
   }
 
@@ -95,7 +94,7 @@ export class Base {
       cameFromUser !== false &&
       rbObjRespondTo(this.object, methodBeforeTypeCast)
     ) {
-      return rbFPublicSend(this.object, methodBeforeTypeCast);
+      return rbFSend(this.object, methodBeforeTypeCast);
     } else {
       return this.value();
     }
@@ -103,7 +102,7 @@ export class Base {
 
   protected isValueCameFromUser(): unknown {
     const methodName = `${this._methodName}CameFromUser`;
-    return !rbObjRespondTo(this.object, methodName) || rbFPublicSend(this.object, methodName);
+    return !rbObjRespondTo(this.object, methodName) || rbFSend(this.object, methodName);
   }
 
   protected retrieveObject(object: unknown): unknown {
@@ -122,8 +121,8 @@ export class Base {
         : Object.hasOwn(this._templateObject, preMatch)
           ? (this._templateObject as unknown as Record<string, unknown>)[preMatch]
           : null;
-    if (object != null && object !== false && rbObjRespondTo(object, "toParam")) {
-      return (object as { toParam(): unknown }).toParam();
+    if (object != null && object !== false) {
+      return toParam(object);
     } else {
       throw new ArgumentError(
         `object[] naming but object param and @object var don't exist or don't respond to to_param: ${rbInspect(object)}`,
@@ -220,3 +219,5 @@ export interface Base
 include(Base, FormTagHelper);
 include(Base, TagHelper);
 include(Base, ActiveModelInstanceTag);
+
+rbModConstSet(Tags, "Base", Base);

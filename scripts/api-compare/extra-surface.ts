@@ -253,21 +253,6 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
 };
 
 /**
- * Modules a host `prepend`s in its own body. The Ruby extractor records
- * `include` / `extend` only, so a prepended module never lands in the host's
- * `includes` and nothing walks it — or the mixins its `self.prepended` hook
- * injects (`HOOK_INJECTED_MIXINS`).
- *
- *   - `ActiveSupport::TestCase` prepends `Testing::SetupAndTeardown`
- *     (test_case.rb:145).
- */
-const LEXICAL_PREPENDS: Record<string, { includes: string[] }> = {
-  "ActiveSupport::TestCase": {
-    includes: ["ActiveSupport::Testing::SetupAndTeardown"],
-  },
-};
-
-/**
  * Methods a Rails file's host class/module gains by including a mixin whose
  * SOURCE file is on `UNPORTED_FILES` — so `collectAllowedNames`'s `walkMixin`
  * skips the mixin (mirroring `compare.flattenIncludedMethodInfos` at
@@ -832,6 +817,9 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
     for (const [file, fns] of Object.entries(tsPkg.fileFunctions ?? {})) {
       for (const fn of fns) pushMethod(pkg, file, fn);
     }
+    for (const [file, receipts] of Object.entries(tsPkg.fileConstantNoRailsEquivalent ?? {})) {
+      for (const [name, reason] of Object.entries(receipts)) push(pkg, file, name, reason);
+    }
     for (const [file, reason] of Object.entries(tsPkg.fileNoRailsEquivalent ?? {})) {
       const entry: TaggedEntry = { package: pkg, tsFile: file, name: FILE_TAG_NAME, reason };
       if (seen.has(allowKeyOf(entry))) continue;
@@ -914,6 +902,12 @@ interface PackageTotals {
    * interface count: the allowance has no per-declaration tag to count.
    */
   totalOverrideExempt: number;
+  /**
+   * Public declarations dropped from the surface by `internal: true` — the
+   * `@internal` escape (RFC 0120). Moving a name from `@noRailsEquivalent` to
+   * `@internal` lowers `totalAllowlisted` and raises this, so the swap shows.
+   */
+  totalInternal: number;
   /**
    * The `rubyFile === null` slice of the totals above — files no Rails file
    * maps onto. Broken out so a consumer can tell how much of a package's
@@ -1218,6 +1212,31 @@ function walkTsFileSurface(
     out.push({ name, interfaceDeclaration: false, interfaceMemberOf: null, owner: null });
   }
   return out;
+}
+
+/**
+ * The public names a file declares that `internal: true` keeps out of
+ * {@link walkTsFileSurface} — counted, not scored, so `@internal` is never a
+ * silent hiding place (RFC 0120).
+ */
+export function countTsInternalNames(
+  file: string,
+  classes: ClassInfo[],
+  modules: ClassInfo[],
+  fileFunctions: MethodInfo[] | undefined,
+  internalConstants: string[],
+): number {
+  const isInternal = (m: MethodInfo): boolean =>
+    m.internal === true && m.declaredIn === undefined && !m.name.startsWith("_");
+  const functionNames = new Set((fileFunctions ?? []).map((fn) => fn.name));
+  const isOwnMember = (m: MethodInfo): boolean =>
+    isInternal(m) && !(m.bodyless === true && functionNames.has(m.name));
+  let count = internalConstants.filter((n) => !n.startsWith("_")).length;
+  for (const c of [...classes, ...modules]) {
+    if (c.file !== file) continue;
+    count += [...c.instanceMethods, ...c.classMethods].filter(isOwnMember).length;
+  }
+  return count + (fileFunctions ?? []).filter(isInternal).length;
 }
 
 /**
@@ -1637,6 +1656,7 @@ function collectAllowedNames(
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
   crossPackageClasses: Record<string, ClassInfo>,
+  constantAliases: Record<string, string>,
   fileConstantNames: string[],
   rubyFile: string,
   fileHashKeyNames: string[] = [],
@@ -1693,7 +1713,7 @@ function collectAllowedNames(
       // mirroring a Rails-private method isn't *extra* surface, it's a
       // visibility divergence — the method exists in Rails. Excluding them
       // here would mislabel every public-port-of-a-private-method as drift.
-      const mirror = scopedSkipMirrorName(m.name, rubyFile);
+      const mirror = scopedSkipMirrorName(m.name, rubyFile, pkg);
       for (const c of mirror ?? []) allow(c);
       const candidates = rubyMethodCandidates(m.name);
       if (!candidates) continue;
@@ -1811,14 +1831,18 @@ function collectAllowedNames(
       ...(owner.prepends ?? []),
       ...(AMBIENT_RAILTIE_MIXINS[ownerFqn]?.includes ?? []),
       ...(HOOK_INJECTED_MIXINS[ownerFqn]?.includes ?? []),
-      ...(LEXICAL_PREPENDS[ownerFqn]?.includes ?? []),
     ];
     for (const inc of mixins) {
-      const mod = resolveDelegatedClass(inc, ownerFqn, crossPackageModules);
+      const mod = resolveDelegatedClass(inc, ownerFqn, crossPackageModules, constantAliases);
       if (mod !== undefined) addDelegated(mod, crossPackageModules[mod], target, seen);
     }
     if (!owner.superclass) return;
-    const sup = resolveDelegatedClass(owner.superclass, ownerFqn, crossPackageClasses);
+    const sup = resolveDelegatedClass(
+      owner.superclass,
+      ownerFqn,
+      crossPackageClasses,
+      constantAliases,
+    );
     if (sup !== undefined) addDelegated(sup, crossPackageClasses[sup], target, seen);
   };
 
@@ -1856,12 +1880,10 @@ function collectAllowedNames(
     addMethods(info.instanceMethods, fqn, methodFile, target);
     addMethods(info.classMethods, fqn, methodFile, target);
     for (const inc of info.includes ?? []) walkMixin(inc, fqn, target, methodFile);
+    for (const pre of info.prepends ?? []) walkMixin(pre, fqn, target, methodFile);
     for (const ext of info.extends ?? []) walkMixin(ext, fqn, target, methodFile);
 
     for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? [])
-      walkMixin(inc, fqn, target, methodFile);
-
-    for (const inc of LEXICAL_PREPENDS[fqn]?.includes ?? [])
       walkMixin(inc, fqn, target, methodFile);
 
     for (const inc of OBJECT_AMBIENT_MIXINS) walkMixin(inc, fqn, target);
@@ -1871,7 +1893,12 @@ function collectAllowedNames(
     for (const name of info.forwardedMethods ?? []) addRubyName(name, target);
 
     if (info.delegateClass === true && info.superclass) {
-      const delegated = resolveDelegatedClass(info.superclass, fqn, crossPackageClasses);
+      const delegated = resolveDelegatedClass(
+        info.superclass,
+        fqn,
+        crossPackageClasses,
+        constantAliases,
+      );
       if (delegated !== undefined)
         addDelegated(delegated, crossPackageClasses[delegated], target, new Set<string>());
     }
@@ -1882,11 +1909,11 @@ function collectAllowedNames(
 /**
  * The class a `DelegateClass(X)` superclass names, resolved the way Ruby binds
  * `X` from inside `contextFqn`: each enclosing namespace outward, then the top
- * level. A name that reaches its class through a constant alias Ruby follows
- * and the manifest does not record (`Type::Value` inside `ActiveRecord::Locking`
- * is `ActiveRecord::Type::Value = ActiveModel::Type::Value`,
- * `activerecord/lib/active_record/type.rb`) resolves to the one class whose FQN
- * ends in the written name; an ambiguous or unknown name resolves to nothing.
+ * level. A candidate that is a recorded constant alias is followed to its
+ * target, resolved from the alias's own namespace (`Type::Value` inside
+ * `ActiveRecord::Locking` is `ActiveRecord::Type::Value = ActiveModel::Type::Value`,
+ * `activerecord/lib/active_record/type.rb:67`); an unknown name resolves to
+ * nothing.
  * The delegated class's mixins and superclass chain are resolved the same way:
  * `DelegateClass` forwards `superclass.public_instance_methods` and
  * `protected_instance_methods`, inherited ones included
@@ -1896,19 +1923,26 @@ function resolveDelegatedClass(
   name: string,
   contextFqn: string,
   classes: Record<string, ClassInfo>,
+  constantAliases: Record<string, string>,
+  seen: Set<string> = new Set(),
 ): string | undefined {
   const written = name.replace(/^::/, "");
+  const candidates: string[] = [];
   if (!name.startsWith("::")) {
     const parts = contextFqn.split("::");
-    for (let i = parts.length; i > 0; i--) {
-      const candidate = `${parts.slice(0, i).join("::")}::${written}`;
-      if (candidate in classes) return candidate;
-    }
+    for (let i = parts.length; i > 0; i--)
+      candidates.push(`${parts.slice(0, i).join("::")}::${written}`);
   }
-  if (written in classes) return written;
-  if (name.startsWith("::")) return undefined;
-  const aliased = Object.keys(classes).filter((fqn) => fqn.endsWith(`::${written}`));
-  return aliased.length === 1 ? aliased[0] : undefined;
+  candidates.push(written);
+  for (const candidate of candidates) {
+    if (candidate in classes) return candidate;
+    const target = constantAliases[candidate];
+    if (target === undefined || seen.has(candidate)) continue;
+    seen.add(candidate);
+    const namespace = candidate.split("::").slice(0, -1).join("::");
+    return resolveDelegatedClass(target, namespace, classes, constantAliases, seen);
+  }
+  return undefined;
 }
 
 /**
@@ -2010,18 +2044,26 @@ export function buildCrossPackageModules(ruby: ApiManifest): {
   modules: Record<string, ClassInfo>;
   pkgByFqn: Record<string, string>;
   classes: Record<string, ClassInfo>;
+  constantAliases: Record<string, string>;
 } {
   const modules: Record<string, ClassInfo> = {};
   const pkgByFqn: Record<string, string> = {};
   const classes: Record<string, ClassInfo> = {};
+  const constantAliases: Record<string, string> = {};
   for (const [pkgName, pkg] of Object.entries(ruby.packages)) {
     Object.assign(classes, pkg.classes);
     for (const [fqn, info] of Object.entries(pkg.modules)) {
       modules[fqn] = info;
       pkgByFqn[fqn] = pkgName;
     }
+    for (const consts of Object.values(pkg.fileConstants ?? {})) {
+      for (const [name, lit] of Object.entries(consts)) {
+        if (lit.kind !== "alias" || lit.target === undefined) continue;
+        constantAliases[lit.namespace ? `${lit.namespace}::${name}` : name] = lit.target;
+      }
+    }
   }
-  return { modules, pkgByFqn, classes };
+  return { modules, pkgByFqn, classes, constantAliases };
 }
 
 /**
@@ -2156,9 +2198,22 @@ export function inlinedModuleMembers(
   rubyModules: Record<string, ClassInfo>,
   moduleFqnByShort: Map<string, string[]>,
   bodiedByTsFile: ReadonlyMap<string, ReadonlySet<string>>,
+  taggedByTsFile: ReadonlyMap<string, ReadonlySet<string>> = new Map(),
 ): InlinedFromFinding[] {
   const out: InlinedFromFinding[] = [];
   const seen = new Set<string>();
+  const definedByRubyFile = new Map<string, Map<string, Set<ClassInfo>>>();
+  for (const info of [...Object.values(rubyClasses), ...Object.values(rubyModules)]) {
+    for (const m of [...info.instanceMethods, ...info.classMethods]) {
+      const file = m.file ?? info.file;
+      if (!file) continue;
+      let names = definedByRubyFile.get(file);
+      if (names === undefined) definedByRubyFile.set(file, (names = new Map()));
+      let owners = names.get(m.name);
+      if (owners === undefined) names.set(m.name, (owners = new Set()));
+      owners.add(info);
+    }
+  }
   for (const [hostFqn, host] of Object.entries(rubyClasses)) {
     if (!host.file) continue;
     const hostTs = rubyFileToTs(host.file, pkg);
@@ -2181,7 +2236,20 @@ export function inlinedModuleMembers(
         if (m.file !== undefined && m.file !== mod.file) continue;
         const candidates = operatorSpelling(fqn, m.name) ?? rubyMethodCandidates(m.name);
         if (!candidates) continue;
+        // The constructor ports the includer's own `initialize` (`RoutesProxy#initialize`,
+        // `routes_proxy.rb:15-19`), and a sibling in the includer's `.rb` defining the name owns
+        // the body there (`Runner#default_url_options=`, `testing/integration.rb:432-434`).
+        if (m.name === "initialize" && hostDefinesInitialize) continue;
+        const sameFileOwners = definedByRubyFile.get(host.file)?.get(m.name);
+        if (sameFileOwners !== undefined && [...sameFileOwners].some((o) => o !== host)) continue;
         if (m.name === "initialize" && moduleBodies?.has(CONCERN_HOOK_MEMBERS.initialize)) continue;
+        if (m.name === "initialize" && taggedByTsFile.get(hostTs)?.has(fqn) === true) continue;
+        if (
+          (m.calls ?? []).includes("super") &&
+          taggedByTsFile.get(hostTs)?.has(`${fqn}#${m.name}`) === true
+        ) {
+          continue;
+        }
         if (m.name.endsWith("?") && candidates.some((c) => moduleBodies?.has(c) === true)) continue;
         const tsName = candidates.find(
           (c) =>
@@ -2224,6 +2292,7 @@ function buildPackageReport(
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
   crossPackageClasses: Record<string, ClassInfo>,
+  constantAliases: Record<string, string>,
   novelOnly: boolean,
   tagKeys: Set<string>,
   matchedTagKeys: Set<string>,
@@ -2242,6 +2311,7 @@ function buildPackageReport(
     totalAllowlisted: 0,
     totalInterfaceExempt: 0,
     totalOverrideExempt: 0,
+    totalInternal: 0,
     noCounterpartFiles: 0,
     noCounterpartExtras: 0,
     noCounterpartNovel: 0,
@@ -2324,12 +2394,29 @@ function buildPackageReport(
   }
   for (const [file, fns] of Object.entries(tsFileFunctions)) addBodied(file, fns);
 
+  const taggedByTsFile = new Map<string, Set<string>>();
+  for (const c of Object.values(tsPkg.classes)) {
+    if (c.reExportedFrom) continue;
+    for (const m of c.instanceMethods) {
+      const file = m.file ?? c.file;
+      if (!file) continue;
+      for (const tag of m.inlinedFrom ?? []) {
+        const isCtor = m.name === "constructor";
+        if (isCtor && tag.hook !== "initialize") continue;
+        const modules = taggedByTsFile.get(file) ?? new Set<string>();
+        modules.add(isCtor ? tag.module : `${tag.module}#${tag.hook}`);
+        taggedByTsFile.set(file, modules);
+      }
+    }
+  }
+
   result.inlinedFrom = inlinedModuleMembers(
     pkg,
     rubyPkg.classes,
     rubyPkg.modules,
     moduleFqnByShort,
     bodiedByTsFile,
+    taggedByTsFile,
   );
 
   // A Ruby file can declare file-level constants and no class/module at all
@@ -2366,7 +2453,7 @@ function buildPackageReport(
   }
   for (const rubyFile of [...overriddenRubyFiles(pkg), ...[...methodDeclarationFiles].sort()]) {
     const tsFile = rubyFileToTs(rubyFile, pkg);
-    const alreadyDeclared = rubyFiles.has(rubyFile);
+    const alreadyDeclared = rubyFileNames.has(rubyFile);
     if (!alreadyDeclared && coveredTsFiles.has(tsFile)) continue;
     const declared = new Set((rubyFiles.get(rubyFile) ?? []).map((e) => e.fqn));
     for (const [fqn, info] of [
@@ -2483,6 +2570,7 @@ function buildPackageReport(
       crossPackageModules,
       crossPackagePkgByFqn,
       crossPackageClasses,
+      constantAliases,
       Object.keys(rubyPkg.fileConstants?.[sourceRuby] ?? {}),
       sourceRuby,
       rubyPkg.fileHashKeys?.[sourceRuby] ?? [],
@@ -2515,6 +2603,9 @@ function buildPackageReport(
     const fileConsts = Object.keys(tsFileConstants[expectedTs] ?? {}).filter(
       (n) => !internalConsts.has(n),
     );
+    result.totalInternal += countTsInternalNames(expectedTs, classes, modules, fileFns, [
+      ...internalConsts,
+    ]);
     if (classes.length === 0 && modules.length === 0 && !fileFns && fileConsts.length === 0)
       continue;
 
@@ -2555,6 +2646,7 @@ function buildPackageReport(
             crossPackageModules,
             crossPackagePkgByFqn,
             crossPackageClasses,
+            constantAliases,
             Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
             rubyFile,
             rubyPkg.fileHashKeys?.[rubyFile] ?? [],
@@ -2846,19 +2938,22 @@ function printHumanReport(report: Report, topN: number, maxDetail: number, verbo
 
   console.log(`${p.bold}Per-package totals${p.reset}`);
   console.log(
-    `  ${"Package".padEnd(20)} ${"Files".padStart(7)} ${"Novel".padStart(7)} ${"Moved".padStart(7)} ${"Total".padStart(7)} ${"Allowed".padStart(7)} ${"NoCntrp".padStart(7)}`,
+    `  ${"Package".padEnd(20)} ${"Files".padStart(7)} ${"Novel".padStart(7)} ${"Moved".padStart(7)} ${"Total".padStart(7)} ${"Allowed".padStart(7)} ${"NoCntrp".padStart(7)} ${"Intrnl".padStart(7)}`,
   );
   console.log(
-    `  ${"-".repeat(20)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)}`,
+    `  ${"-".repeat(20)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)}`,
   );
   for (const pkg of report.packages) {
     const novel = padNumCell(pkg.totalNovel, colorCount(pkg.totalNovel, p), 7);
     console.log(
-      `  ${pkg.package.padEnd(20)} ${String(pkg.filesWithDrift).padStart(7)} ${novel} ${String(pkg.totalMoved).padStart(7)} ${String(pkg.totalExtras).padStart(7)} ${String(pkg.totalAllowlisted).padStart(7)} ${String(pkg.noCounterpartExtras).padStart(7)}`,
+      `  ${pkg.package.padEnd(20)} ${String(pkg.filesWithDrift).padStart(7)} ${novel} ${String(pkg.totalMoved).padStart(7)} ${String(pkg.totalExtras).padStart(7)} ${String(pkg.totalAllowlisted).padStart(7)} ${String(pkg.noCounterpartExtras).padStart(7)} ${String(pkg.totalInternal).padStart(7)}`,
     );
   }
   console.log(
     `${p.dim}  NoCntrp = the slice of Total from TS files no Rails file maps onto (scored with an empty allowed set).${p.reset}`,
+  );
+  console.log(
+    `${p.dim}  Intrnl = public declarations kept out of every column by \`internal: true\` (\`@internal\`, TS private/protected).${p.reset}`,
   );
   const interfaceExempt = report.packages.reduce((n, pkg) => n + pkg.totalInterfaceExempt, 0);
   console.log(
@@ -2976,33 +3071,34 @@ export function buildReport(
     modules: crossPackageModules,
     pkgByFqn: crossPackagePkgByFqn,
     classes: crossPackageClasses,
+    constantAliases,
   } = buildCrossPackageModules(ruby);
 
   const packages: PackageTotals[] = [];
   const fileTagRejections: FileTagRejection[] = [];
   const scannedPkgs = new Set<string>();
   for (const pkg of [...Object.keys(ruby.packages), ...TS_ONLY_PACKAGES]) {
-    if (opts.filterPkg && pkg !== opts.filterPkg) continue;
     if (!ts.packages[pkg]) continue;
     scannedPkgs.add(pkg);
-    packages.push(
-      buildPackageReport(
-        pkg,
-        ruby,
-        ts,
-        opts.excludeGlobs,
-        globalRubyCandidates,
-        crossPackageModules,
-        crossPackagePkgByFqn,
-        crossPackageClasses,
-        opts.novelOnly,
-        tagKeys,
-        matchedTagKeys,
-        redundantTagKeys,
-        fileTagRejections,
-        concernHooks,
-      ),
+    const report = buildPackageReport(
+      pkg,
+      ruby,
+      ts,
+      opts.excludeGlobs,
+      globalRubyCandidates,
+      crossPackageModules,
+      crossPackagePkgByFqn,
+      crossPackageClasses,
+      constantAliases,
+      opts.novelOnly,
+      tagKeys,
+      matchedTagKeys,
+      redundantTagKeys,
+      fileTagRejections,
+      concernHooks,
     );
+    if (opts.filterPkg && pkg !== opts.filterPkg) continue;
+    packages.push(report);
   }
   packages.sort((a, b) => b.totalNovel - a.totalNovel || b.totalExtras - a.totalExtras);
 
@@ -3216,7 +3312,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     excludeGlobs: args.excludeGlobs,
     novelOnly: args.novelOnly,
     topN: args.topN,
-    concernHooks: await loadConcernHooks(ruby, args.filterPkg),
+    concernHooks: await loadConcernHooks(ruby, null),
   });
 
   if (args.json) {

@@ -6,14 +6,14 @@ import { StreamingFlow } from "./flows.js";
 import type { Template } from "./template.js";
 import { LookupContext } from "./lookup-context.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import { Tse } from "./template/handlers/tse.js";
+import { TSE } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
 describe("StreamingFlow", () => {
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
   });
-  afterEach(() => {
+  afterEach(async () => {
     TemplateHandlers.clear();
   });
 
@@ -48,7 +48,7 @@ describe("StreamingFlow", () => {
     expect(fiber.isAlive()).toBe(true);
     expect(chunks.join("")).toBe("<title>");
 
-    view.viewFlow.set("layout", template.render(view, {}, null, {}, yielder));
+    view.viewFlow.set("layout", await template.render(view, {}, null, {}, yielder));
     while (fiber.isAlive()) await fiber.resume();
 
     expect(chunks.join("")).toBe("<title>Yes, </title>\nthis works\n\n like a charm");
@@ -63,7 +63,7 @@ describe("StreamingFlow", () => {
     await fiber.resume();
     expect(chunks).toEqual([]);
 
-    view.viewFlow.set("layout", template.render(view, {}, null, {}, yielder));
+    view.viewFlow.set("layout", await template.render(view, {}, null, {}, yielder));
     while (fiber.isAlive()) await fiber.resume();
 
     expect(chunks.join("")).toBe("foot|false");
@@ -79,7 +79,7 @@ describe("StreamingFlow", () => {
     };
 
     await fiber.resume();
-    view.viewFlow.set("layout", template.render(view, {}, null, {}, yielder));
+    view.viewFlow.set("layout", await template.render(view, {}, null, {}, yielder));
     await expect(
       (async () => {
         while (fiber.isAlive()) await fiber.resume();

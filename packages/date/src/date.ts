@@ -17,6 +17,7 @@ import {
   Rational,
   rational,
   rbCDate,
+  rbObjIsKindOf,
   rbDbl2num,
   rbDefineAllocFunc,
   rubyClass,
@@ -4426,6 +4427,11 @@ function cmpGen(self: Date, other: unknown): number | null {
   if (kNumericP(other)) return self.ajd.cmp(other);
   else if (other instanceof Date) return self.ajd.cmp(other.ajd);
   else if (other instanceof Temporal.PlainDate) return self.ajd.cmp(new Date(other).ajd);
+  else if (
+    (other instanceof Temporal.PlainDateTime || other instanceof Temporal.ZonedDateTime) &&
+    rbObjIsKindOf(other, rbCDate)
+  )
+    return self.ajd.cmp(new DateTime(other).ajd);
   return null;
 }
 
@@ -5568,8 +5574,8 @@ export class Date extends rbCDate {
     return aNth === bNth && aJd === bJd;
   }
 
-  isEql(other: unknown): boolean {
-    if (!(other instanceof Date)) return false;
+  eql(other: unknown): boolean {
+    if (!rbObjIsKindOf(other, rbCDate)) return false;
     return this.cmp(other) === 0;
   }
 
@@ -6709,7 +6715,15 @@ export class DateTime extends DateWithoutParseStatics {
     return dfToTime(this.mLocalDf())[1];
   }
 
+  get minute(): number {
+    return dfToTime(this.mLocalDf())[1];
+  }
+
   get sec(): number {
+    return dfToTime(this.mLocalDf())[2];
+  }
+
+  get second(): number {
     return dfToTime(this.mLocalDf())[2];
   }
 
@@ -6788,8 +6802,41 @@ rbDefineAllocFunc(
   (klass) => new klass(SEAT, 0n, 0, 0, new Rational(0, 1), 0, DEFAULT_SG),
 );
 
-TEMPORAL_METHOD_TABLE["Temporal.PlainDate"].marshalDump = (self: Temporal.PlainDate) =>
-  new Date(self).marshalDump();
+/** @internal */
+function dLiteZero(_self: unknown, ...argv: unknown[]): number {
+  if (argv.length !== 0) {
+    throw new ArgumentError(`wrong number of arguments (given ${argv.length}, expected 0)`);
+  }
+  return 0;
+}
+
+Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], {
+  marshalDump: (self: Temporal.PlainDate) => new Date(self).marshalDump(),
+  iso8601: (self: Temporal.PlainDate) => new Date(self).iso8601(),
+  xmlschema: (self: Temporal.PlainDate) => new Date(self).xmlschema(),
+  hour: dLiteZero,
+  min: dLiteZero,
+  minute: dLiteZero,
+  sec: dLiteZero,
+  second: dLiteZero,
+});
+
+Object.assign(TEMPORAL_METHOD_TABLE.rbCDate, {
+  hour: dLiteZero,
+  min: dLiteZero,
+  minute: dLiteZero,
+  sec: dLiteZero,
+  second: dLiteZero,
+});
+
+for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
+  Object.assign(TEMPORAL_METHOD_TABLE[seat], {
+    iso8601: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime, n = 0) =>
+      new DateTime(self).iso8601(n),
+    xmlschema: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime, n = 0) =>
+      new DateTime(self).xmlschema(n),
+  });
+}
 
 registerConstant("Date", Date);
 registerConstant("DateTime", DateTime);

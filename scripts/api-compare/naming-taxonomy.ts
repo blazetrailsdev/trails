@@ -15,7 +15,11 @@
  *
  * Hard rules: no node:* imports, no process.*, async fs.
  */
-import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
+import {
+  JS_RESERVED_WORDS,
+  rubyMethodToTsIgnoringSkip,
+  snakeToCamel,
+} from "@blazetrails/parity/conventions";
 import { RUBY_COMPAT_EXPORTS } from "../parity/ruby-compat.js";
 import { IDENTIFIER_STRING, RECEIVER_DROPPING_CONVERSIONS } from "./call-args.js";
 
@@ -30,6 +34,7 @@ export type NamingClass =
   | "block-idiom"
   | "ivar-reflection"
   | "implicit-to-s"
+  | "encoding-tag"
   | "burndown";
 
 export interface NamingClassInfo {
@@ -123,6 +128,18 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
       "dirty.rb:410, against a `attrName: string` parameter) has nothing to spell.",
   },
   {
+    name: "encoding-tag",
+    permanent: true,
+    reason:
+      "Ruby `String#b` re-tags a String ASCII-8BIT — `File.join(@root, path.b)` (static.rb:145). " +
+      "A JS string carries no encoding tag (CLAUDE.md, A String has no encoding tag either), so " +
+      "where the TS passes the receiver itself the value is the same and only Ruby's tag is gone. " +
+      "Its twin is an ASCII-8BIT read handed to a byte sink — `gzip.write(part)` " +
+      "(deflater.rb:105-106): ruby-compat's `IO#read` answers one char per byte and " +
+      "`GzipWriter#write` UTF-8-encodes a string, so the TS hands it the bytes (`Buffer.from`). " +
+      "Ruled permanent by the repo owner on 2026-10-19 (trails#9108).",
+  },
+  {
     name: "module-mixin-receiver",
     permanent: false,
     reason:
@@ -174,15 +191,6 @@ export const BLOCK_IDIOM_RUBY_REFS = new Set(["instance_exec", "instanceExec", "
  */
 export const IVAR_METHOD_COLLISION_RUBY_REFS = new Set(["value_for_database", "valueForDatabase"]);
 
-/** Identifiers a TS parameter or local cannot be named (`arguments`/`eval` are unusable in strict mode). */
-export const JS_RESERVED_WORDS = new Set(
-  (
-    "arguments await break case catch class const continue debugger default delete do else " +
-    "enum eval export extends false finally for function if import in instanceof new null " +
-    "return super switch this throw true try typeof var void while with yield"
-  ).split(" "),
-);
-
 /**
  * Ruby constructs whose TS spelling is the JS builtin doing the same work,
  * keyed by the RUBY name and valued by every TS spelling that counts as it.
@@ -192,6 +200,7 @@ export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   collect: ["map"],
   compact: ["filter"],
   detect: ["find"],
+  downcase: ["toLowerCase"],
   first: ["at"],
   gsub: ["replaceAll", "replace"],
   httpdate: ["toUTCString"],
@@ -208,7 +217,9 @@ export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   to_f: ["parseFloat", "Number"],
   to_i: ["parseInt", "Number"],
   to_s: ["toString", "String"],
+  tr: ["replace"],
   unicode_normalize: ["normalize"],
+  upcase: ["toUpperCase"],
 };
 
 /**
@@ -385,6 +396,9 @@ export function classifyPair(
     : undefined;
   if (chainExport !== undefined && recordedExport(chainExport) === tsRef) {
     return "no-js-equivalent";
+  }
+  if ((rubyRef === "b" && tsRef === "path") || (rubyRef === "part" && tsRef === "from")) {
+    return "encoding-tag";
   }
   if (tsRef === "toS" || tsRef === "toString" || rubyRef === "toS" || rubyRef === "to_s") {
     return "implicit-to-s";

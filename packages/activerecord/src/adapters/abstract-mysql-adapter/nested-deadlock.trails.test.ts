@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { SavepointTransaction } from "../../connection-adapters/abstract/transaction.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 async function makeParentDirty(a: Mysql2Adapter): Promise<void> {
   await a.execQuery("SELECT * FROM `samples` LIMIT 1");
@@ -17,6 +18,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   describe("NestedDeadlockTest", () => {
+    fixtures({}, { useTransactionalTests: false });
     beforeEach(async () => {
       await adapter.execute("DROP TABLE IF EXISTS `samples`");
       await adapter.execute(

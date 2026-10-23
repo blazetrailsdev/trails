@@ -1,4 +1,4 @@
-import { isSymbol } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
 
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
 import { deepMergeBang, deepSymbolizeKeys, type TranslationData } from "../utils.js";
@@ -14,17 +14,27 @@ import {
 } from "./flatten.js";
 import { Base, type TranslateOptions } from "./base.js";
 
-export interface Store {
-  get(key: string): string | undefined;
-  set(key: string, value: string): unknown;
-  keys(): Iterable<string>;
-}
+export type Store = Pick<Map<string, string>, "get" | "set" | "keys">;
 
 function isHash(value: unknown): value is TranslationData {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return value instanceof Map || value instanceof SubtreeProxy;
 }
 
-const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "isNil"]);
+const JSON = {
+  encode(value: unknown): string {
+    return globalThis.JSON.stringify(value);
+  },
+  decode(value: string): unknown {
+    return globalThis.JSON.parse(value, (_key, decoded: unknown) => {
+      if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return decoded;
+      const hash = new Hash<unknown, unknown>();
+      for (const [k, v] of Object.entries(decoded)) hash.set(k, v);
+      return hash;
+    });
+  },
+};
+
+const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "isNil", "inspect"]);
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is the point: it is `include Base` on the type side.
 export interface KeyValue extends Base {}
@@ -70,7 +80,7 @@ export class KeyValue {
 
   storeTranslations(
     locale: Locale,
-    data: TranslationData,
+    data: TranslationData | Record<string, unknown>,
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     const escape = "escape" in options ? options.escape : true;
@@ -81,7 +91,7 @@ export class KeyValue {
       if (isHash(value)) {
         let oldValue: unknown;
         if (this._subtrees && (oldValue = this.store!.get(key)) != null) {
-          oldValue = JSON.parse(oldValue as string);
+          oldValue = JSON.decode(oldValue as string);
           if (isHash(oldValue)) {
             value = deepMergeBang(deepSymbolizeKeys(oldValue), value);
           }
@@ -90,7 +100,7 @@ export class KeyValue {
         throw new Error("Key-value stores cannot handle procs");
       }
 
-      if (!isSymbol(value)) this.store!.set(key, JSON.stringify(value));
+      if (!isSymbol(value)) this.store!.set(key, JSON.encode(value));
     }
     return flattened;
   }
@@ -105,19 +115,24 @@ export class KeyValue {
     return locales as Locale[];
   }
 
+  /** @missingRailsName inject — PERMANENT */
   protected translations(): TranslationData {
-    const nested = [...this.store!.keys()].map((mainKey) => {
-      const mainValue: unknown = JSON.parse(this.store!.get(mainKey)!);
-      return String(mainKey)
-        .split(".")
-        .reverse()
-        .reduce<unknown>((value, key) => ({ [key]: value }), mainValue) as TranslationData;
-    });
     return (this.translationsStore = deepSymbolizeKeys(
-      nested.reduce<TranslationData | undefined>(
-        (hash, elem) => (hash === undefined ? elem : deepMergeBang(hash, elem)),
-        undefined,
-      )!,
+      [...this.store!.keys()]
+        .map((mainKey) => {
+          const mainValue: unknown = JSON.decode(this.store!.get(mainKey)!);
+          return String(mainKey)
+            .split(".")
+            .reverse()
+            .reduce<unknown>(
+              (value, key) => new Hash<unknown, unknown>().set(`:${key}`, value),
+              mainValue,
+            ) as TranslationData;
+        })
+        .reduce<TranslationData | undefined>(
+          (hash, elem) => (hash === undefined ? elem : deepMergeBang(hash, elem)),
+          undefined,
+        )!,
     ));
   }
 
@@ -140,7 +155,7 @@ export class KeyValue {
       options.separator as string | false | undefined,
     );
     const stored = this.store!.get(`${locale}.${key}`);
-    const value: unknown = stored != null ? JSON.parse(stored) : stored;
+    const value: unknown = stored != null ? JSON.decode(stored) : stored;
 
     if (isHash(value)) {
       return deepSymbolizeKeys(value);
@@ -158,7 +173,7 @@ export class KeyValue {
     } else {
       if (!isHash(entry)) return entry;
       const key = this.pluralizationKey(entry, count);
-      return entry[key];
+      return hashAref(entry, key);
     }
   }
 }
@@ -166,7 +181,7 @@ export class KeyValue {
 for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
-    if (Object.prototype.hasOwnProperty.call(KeyValue.prototype, key)) continue;
+    if (Object.hasOwn(KeyValue.prototype, key)) continue;
     Object.defineProperty(
       KeyValue.prototype,
       key,
@@ -198,16 +213,16 @@ export class SubtreeProxy {
   }
 
   hasKey(key: string): boolean {
-    return (this.#subtree != null && key in this.#subtree) || this.get(key) != null;
+    return (this.#subtree != null && this.#subtree.has(key)) || this.get(key) != null;
   }
 
   get(key: string): unknown {
     let value: unknown;
-    if (this.#subtree == null || (value = this.#subtree[key]) == null) {
-      value = this.#store.get(`${this.#masterKey}.${key}`);
+    if (this.#subtree == null || (value = this.#subtree.get(key)) == null) {
+      value = this.#store.get(`${this.#masterKey}.${isSymbol(key) ? symbolToS(key) : key}`);
       if (value != null) {
-        value = JSON.parse(value as string);
-        (this.#subtree ??= {})[key] = value;
+        value = JSON.decode(value as string);
+        (this.#subtree ??= new Hash()).set(key, value);
       }
     }
     return value;
@@ -215,5 +230,9 @@ export class SubtreeProxy {
 
   isNil(): boolean {
     return this.#subtree == null;
+  }
+
+  inspect(): string {
+    return rbInspect(this.#subtree);
   }
 }

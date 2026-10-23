@@ -1,16 +1,19 @@
 import { Logger, SimpleFormatter, type LoggerFormatter } from "./logger.js";
 import type { Temporal } from "@blazetrails/date";
 import {
-  aryPop,
+  ArgumentError,
   extend,
   extended,
-  isEmpty,
   rbObjAsString,
   rbObjClone,
   rbObjId,
 } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { isBlank } from "./core-ext/object/blank.js";
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return typeof (value as { then?: unknown } | null)?.then === "function";
+}
 
 type Tag = string | number | boolean | null | undefined | readonly Tag[];
 
@@ -59,13 +62,20 @@ export const Formatter = {
     );
   },
 
+  /** @inventedArm if — PERMANENT */
   tagged<T>(this: TaggedFormatter, ...tags: (Tag | ((formatter: TaggedFormatter) => T))[]): T {
     const block = tags.pop() as (formatter: TaggedFormatter) => T;
     const pushedCount = this.tagStack.pushTags(tags).length;
+    let deferred = false;
     try {
-      return block(this);
+      const result = block(this);
+      if (isThenable(result)) {
+        deferred = true;
+        return Promise.resolve(result).finally(() => this.popTags(pushedCount)) as T;
+      }
+      return result;
     } finally {
-      this.popTags(pushedCount);
+      if (!deferred) this.popTags(pushedCount);
     }
   },
 
@@ -100,6 +110,10 @@ export const Formatter = {
 };
 
 export class TagStack {
+  static toString(): string {
+    return "ActiveSupport::TaggedLogging::TagStack";
+  }
+
   private _tags: unknown[] = [];
   private _tagsString: string | null = null;
 
@@ -117,7 +131,8 @@ export class TagStack {
 
   popTags(count: number): unknown[] {
     this._tagsString = null;
-    return aryPop(this._tags, count);
+    if (count < 0) throw new ArgumentError("negative array size");
+    return this._tags.splice(Math.max(this._tags.length - count, 0), count);
   }
 
   clear(): unknown[] {
@@ -126,9 +141,8 @@ export class TagStack {
     return this._tags;
   }
 
-  /** @missingRailsName tags — PERMANENT */
   formatMessage(message: unknown): unknown {
-    if (isEmpty(this._tags)) {
+    if (this._tags.length === 0) {
       return message;
     } else if (this._tags.length === 1) {
       return `[${rbObjAsString(this._tags[0])}] ${rbObjAsString(message)}`;
@@ -159,8 +173,8 @@ export const TaggedLogging = {
     return TaggedLogging.new(new Logger(...args));
   },
 
-  new(logger: Logger): TaggedLogger {
-    logger = (logger as { dup?: () => Logger }).dup?.() ?? rbObjClone(logger);
+  new<L extends Logger>(logger: L): L & TaggedLogger {
+    logger = (logger as { dup?: () => L }).dup?.() ?? rbObjClone(logger);
 
     if (logger.formatter) {
       const formatter = logger.formatter;
@@ -174,7 +188,7 @@ export const TaggedLogging = {
 
     extend(logger.formatter, Formatter);
     extend(logger, TaggedLogging);
-    return logger as TaggedLogger;
+    return logger as L & TaggedLogger;
   },
 
   pushTags(this: TaggedLogger, ...tags: unknown[]): unknown[] {

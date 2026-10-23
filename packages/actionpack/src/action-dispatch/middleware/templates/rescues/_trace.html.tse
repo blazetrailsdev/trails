@@ -1,0 +1,62 @@
+<% const names = Object.keys(traces) %>
+<% var errorIndex = localAssigns.errorIndex ?? 0 %>
+
+<p><code>Rails.root: <%= TopLevel.Trails != null && typeof TopLevel.Trails.root === "function" ? TopLevel.Trails.root() : "unset" %></code></p>
+
+<div id="traces-<%= errorIndex %>">
+  <% for (const name of names) { %>
+    <%
+      const show = `show('${name.replace(/\s/g, '-')}-${errorIndex}');`;
+      const hide = names.filter((n) => n !== name).map((hideName) => `hide('${hideName.replace(/\s/g, '-')}-${errorIndex}');`);
+    %>
+    <a href="#" onclick="<%= hide.join("") %><%= show %>; return false;"><%= name %></a> <%= names.at(-1) == name ? null : '|' %>
+  <% } %>
+
+  <% for (const [name, trace] of Object.entries(traces)) { %>
+    <div id="<%= `${name.replace(/\s/g, '-')}-${errorIndex}` %>" style="display: <%= (name == traceToShow) ? 'block' : 'none' %>;">
+      <code class="traces">
+        <% for (const frame of trace) { %>
+          <a class="trace-frames trace-frames-<%= errorIndex %>" data-exception-object-id="<%= frame.exceptionObjectId %>" data-frame-id="<%= frame.id %>" href="#">
+            <%= frame.trace %>
+          </a>
+          <br>
+        <% } %>
+      </code>
+    </div>
+  <% } %>
+
+  <script>
+    (function() {
+      var traceFrames = document.getElementsByClassName('trace-frames-<%= errorIndex %>');
+      var selectedFrame, currentSource = document.getElementById('frame-source-<%= errorIndex %>-0');
+
+      // Add click listeners for all stack frames
+      for (var i = 0; i < traceFrames.length; i++) {
+        traceFrames[i].addEventListener('click', function(e) {
+          e.preventDefault();
+          var target = e.target;
+          var frame_id = target.dataset.frameId;
+
+          if (selectedFrame) {
+            selectedFrame.className = selectedFrame.className.replace("selected", "");
+          }
+
+          target.className += " selected";
+          selectedFrame = target;
+
+          // Change the extracted source code
+          changeSourceExtract(frame_id);
+        });
+
+        function changeSourceExtract(frame_id) {
+          var el = document.getElementById('frame-source-<%= errorIndex %>-' + frame_id);
+          if (currentSource && el) {
+            currentSource.className += " hidden";
+            el.className = el.className.replace(" hidden", "");
+            currentSource = el;
+          }
+        }
+      }
+    })();
+  </script>
+</div>

@@ -1,3 +1,5 @@
+import { Exception } from "./exception.js";
+
 /**
  * Ruby's core `LoadError` (`vendor/ruby/v3.3.11/error.c:3342`) — a `ScriptError`, not
  * a `StandardError`, raised by `require` when the file cannot be found. Its
@@ -7,6 +9,6 @@
  * @noRailsEquivalent PERMANENT — Ruby core `LoadError`, which Rails inherits
  * rather than defines.
  */
-export class LoadError extends Error {}
+export class LoadError extends Exception {}
 
 LoadError.prototype.name = "LoadError";

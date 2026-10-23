@@ -46,17 +46,25 @@ export class PP extends PrettyPrint {
     return (width ?? (columns !== 0 ? columns : 80)) - 1;
   }
 
-  /** @noRailsEquivalent PERMANENT — `PP.pp` (`vendor/ruby/v3.3.11/lib/pp.rb:95`). */
-  static async pp<O extends PrettyPrintOutput>(
+  /**
+   * Synchronous, as Ruby's is, unless an object's `pretty_print` is async (an
+   * association read): then the answer is a promise of `out`.
+   *
+   * @noRailsEquivalent PERMANENT — `PP.pp` (`vendor/ruby/v3.3.11/lib/pp.rb:95`).
+   */
+  static pp<O extends PrettyPrintOutput>(
     obj: unknown,
     out: O = STDOUT as unknown as O,
     width = PP.widthFor(out),
-  ): Promise<O> {
+  ): O | Promise<O> {
     const q = new PP(out, width);
-    await q.guardInspectKey(() => q.pp(obj));
-    q.flush();
-    out.write("\n");
-    return out;
+    const finish = (): O => {
+      q.flush();
+      out.write("\n");
+      return out;
+    };
+    const printed = q.guardInspectKey(() => q.pp(obj));
+    return printed instanceof Promise ? printed.then(finish) : finish();
   }
 
   /** @noRailsEquivalent PERMANENT — `PPMethods#guard_inspect_key` (`vendor/ruby/v3.3.11/lib/pp.rb:145`). */

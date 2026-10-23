@@ -6,10 +6,14 @@ import {
   RbConfig,
   StandardError,
   basicObjRespondTo,
+  rbDeclareIvar,
   Tempfile,
   env,
   isEmpty,
   getChildProcess,
+  hashAref,
+  keys,
+  isAbsentHalf,
   rbAnyToS,
   rbEqual,
   rbModToS,
@@ -66,8 +70,9 @@ export class Test {
   /** @noRailsEquivalent PERMANENT */
   failures: Assertion[];
   /** @noRailsEquivalent PERMANENT */
-  time: number | null = null;
+  declare time: number | null;
   private _assertions: number;
+  declare private _metadata?: Record<string, unknown>;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(name: string) {
@@ -83,6 +88,31 @@ export class Test {
 
   set assertions(assertions: number) {
     this._assertions = assertions;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  assert(test: unknown, msg: string | (() => string) | null = null): true {
+    this.assertions += 1;
+    if (test == null || test === false) {
+      msg ||= `Expected ${inspect(test)} to be truthy.`;
+      if (typeof msg === "function") msg = msg();
+      throw new Assertion(msg);
+    }
+    return true;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get metadata(): Record<string, unknown> {
+    return (this._metadata ??= {});
+  }
+
+  set metadata(metadata: Record<string, unknown>) {
+    this._metadata = metadata;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isMetadata(): boolean {
+    return this._metadata !== undefined;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -179,6 +209,8 @@ export class Test {
     return undefined;
   }
 }
+
+rbDeclareIvar(Test, "@NAME", "name");
 
 function classNameOf(e: Error): string {
   if (e.name && e.name !== "Error") return e.name;
@@ -278,17 +310,17 @@ export function assertNot(object: unknown, message?: string | (() => string) | n
   return assert(!(object != null && object !== false), message);
 }
 
-export async function assertRaises(
-  exp: (new (...args: any[]) => Error)[],
+export async function assertRaises<K extends new (...args: any[]) => Error>(
+  exp: K[],
   { match }: { match?: RegExp | string | null } = {},
   block?: () => unknown,
-): Promise<Error> {
-  let error: Error | undefined;
+): Promise<InstanceType<K>> {
+  let error: InstanceType<K> | undefined;
   try {
     await block?.();
   } catch (e) {
     if (!exp.some((klass) => e instanceof klass) && e instanceof Assertion) throw e;
-    error = e as Error;
+    error = e as InstanceType<K>;
   }
   if (!error)
     throw new Assertion(`${exp.map((e) => e.name).join(", ")} expected but nothing was raised`);
@@ -300,11 +332,11 @@ export async function assertRaises(
   return error;
 }
 
-export async function assertRaise(
-  exp: (new (...args: any[]) => Error)[],
+export async function assertRaise<K extends new (...args: any[]) => Error>(
+  exp: K[],
   options: { match?: RegExp | string | null } = {},
   block?: () => unknown,
-): Promise<Error> {
+): Promise<InstanceType<K>> {
   return assertRaises(exp, options, block);
 }
 
@@ -336,7 +368,7 @@ export async function assertDifference<T>(
     typeof args[args.length - 1] === "function" ? (args.pop() as () => T | Promise<T>) : undefined;
 
   let message: string | null | undefined;
-  let expressions: Map<Expression<number>, number>;
+  let expressions: Map<Expression<number>, number> | Record<string, number>;
   if (expression instanceof Map) {
     message = args[0] as string | null | undefined;
     expressions = expression;
@@ -346,14 +378,14 @@ export async function assertDifference<T>(
     expressions = indexWith(Array.isArray(expression) ? expression : [expression], difference);
   }
 
-  const exps = [...expressions.keys()];
+  const exps = keys(expressions);
   const before: number[] = [];
   for (const exp of exps) before.push(await exp());
 
   const retval = await _assertNothingRaisedOrWarn("assert_difference", block);
 
   for (const [index, exp] of exps.entries()) {
-    const diff = expressions.get(exp) as number;
+    const diff = hashAref(expressions, exp) as number;
     const beforeValue = before[index];
     const actual = await exp();
     const richMessage = () => {
@@ -591,12 +623,14 @@ function respondsTo(object: object, name: string, includeAll: boolean): boolean 
   if (name in object) {
     const descriptor = findDescriptor(object, name);
     if (descriptor && "value" in descriptor && descriptor.value === undefined) return false;
+    if (descriptor && "get" in descriptor && isAbsentHalf(descriptor.get)) {
+      return basicObjRespondTo(object, name);
+    }
     return !(descriptor && descriptor.set !== undefined && descriptor.get === undefined);
   }
-  if (name.endsWith("=") && findDescriptor(object, name.slice(0, -1))?.set !== undefined) {
-    return true;
-  }
-  return basicObjRespondTo(object, name, !includeAll);
+  const setter = name.endsWith("=") ? findDescriptor(object, name.slice(0, -1))?.set : undefined;
+  if (setter !== undefined && !isAbsentHalf(setter)) return true;
+  return basicObjRespondTo(object, name);
 }
 
 function findDescriptor(object: object, name: string): PropertyDescriptor | undefined {
@@ -651,10 +685,13 @@ export function assertIncludes(
   obj: unknown,
   message?: string,
 ): void | Promise<void> {
-  assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
+  assert(
+    respondsToInclude(collection),
+    () => `Expected ${inspect(collection)} to respond to include?`,
+  );
   const included = collectionIncludes(collection, obj);
   const check = (result: unknown): void => {
-    assert(result, message ?? `Expected ${inspect(collection)} to include ${inspect(obj)}`);
+    assert(result, message ?? (() => `Expected ${inspect(collection)} to include ${inspect(obj)}`));
   };
   return included instanceof Promise ? included.then(check) : check(included);
 }
@@ -670,10 +707,16 @@ export function assertNotIncludes(
   obj: unknown,
   message?: string,
 ): void | Promise<void> {
-  assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
+  assert(
+    respondsToInclude(collection),
+    () => `Expected ${inspect(collection)} to respond to include?`,
+  );
   const included = collectionIncludes(collection, obj);
   const check = (result: unknown): void => {
-    assertNot(result, message ?? `Expected ${inspect(collection)} to not include ${inspect(obj)}`);
+    assertNot(
+      result,
+      message ?? (() => `Expected ${inspect(collection)} to not include ${inspect(obj)}`),
+    );
   };
   return included instanceof Promise ? included.then(check) : check(included);
 }
@@ -684,7 +727,8 @@ function respondsToInclude(collection: unknown): boolean {
   return (
     typeof target?.include === "function" ||
     typeof target?.isInclude === "function" ||
-    typeof target?.has === "function"
+    typeof target?.has === "function" ||
+    basicObjRespondTo(collection, "isInclude")
   );
 }
 
@@ -699,7 +743,7 @@ function collectionIncludes(collection: unknown, obj: unknown): boolean | Promis
   if (typeof target.isInclude === "function") return target.isInclude(obj as never);
   if (typeof target.include === "function") return target.include(obj as never);
   if (typeof target.has === "function") return target.has(obj as never);
-  return false;
+  return rbFSend(collection, "isInclude", obj) as boolean;
 }
 
 function isEmptyCollection(actual: unknown): unknown {
@@ -719,7 +763,21 @@ export function assertNotSame(exp: unknown, act: unknown, msg?: string): void {
   );
 }
 
-function diff(exp: unknown, act: unknown): string {
+export function assertOperator(
+  o1: unknown,
+  op: string,
+  o2?: unknown,
+  msg: string | (() => string) | null = null,
+): true {
+  if (o2 === undefined) {
+    msg = message(msg, null, () => `Expected ${inspect(o1)} to be ${op}`);
+    return assert(rbFSend(o1, op), msg);
+  }
+  msg = message(msg, null, () => `Expected ${inspect(o1)} to be ${op} ${inspect(o2)}`);
+  return assert(rbFSend(o1, op, o2), msg);
+}
+
+export function diff(exp: unknown, act: unknown): string {
   let result = "";
 
   const [expect, butwas] = thingsToDiff(exp, act);

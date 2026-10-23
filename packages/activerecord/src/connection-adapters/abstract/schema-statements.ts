@@ -15,6 +15,7 @@ import {
   hasKey,
   toS,
   coreHashMergeKwd,
+  eachWithObject,
 } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
 import { findJoinTableName, joinTableName } from "../../migration/join-table.js";
@@ -712,7 +713,7 @@ export class SchemaStatements {
     ...columnNames: Array<string | ColumnOptions>
   ): Promise<void> {
     const { type = null, ...options } = extractOptionsBang(columnNames);
-    if (isEmpty(columnNames)) {
+    if (columnNames.length === 0) {
       throw new ArgumentError(
         "You must specify at least one column name. Example: remove_columns(:people, :first_name)",
       );
@@ -831,21 +832,17 @@ export class SchemaStatements {
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     let sql: string;
-    const native = type == null ? undefined : this.nativeDatabaseTypes()[type];
+    const native = (type == null ? undefined : this.nativeDatabaseTypes()[type]) as
+      | Record<string, any>
+      | undefined;
     if (native === undefined) {
       sql = type == null ? "" : String(type);
     } else {
-      const spec = (typeof native === "string" ? { name: native } : native) as {
-        name?: string;
-        limit?: number;
-        precision?: number;
-        scale?: number;
-      };
-      sql = spec.name ?? String(type);
+      sql = String(typeof native === "string" ? native : native["name"]);
       let { precision, scale, limit } = options;
       if (type === "decimal") {
-        scale ??= spec.scale;
-        precision ??= spec.precision;
+        scale ??= native["scale"];
+        precision ??= native["precision"];
         if (precision != null) {
           sql += scale != null ? `(${precision},${scale})` : `(${precision})`;
         } else if (scale != null) {
@@ -855,16 +852,16 @@ export class SchemaStatements {
         }
       } else if (
         (type === "datetime" || type === "timestamp" || type === "time" || type === "interval") &&
-        (precision ??= spec.precision) != null
+        (precision ??= native["precision"]) != null
       ) {
         if (precision >= 0 && precision <= 6) {
           sql += `(${precision})`;
         } else {
           throw new ArgumentError(
-            `No ${spec.name} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
+            `No ${native["name"]} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
           );
         }
-      } else if (type !== "primary_key" && (limit ??= spec.limit) != null) {
+      } else if (type !== "primary_key" && (limit ??= native["limit"]) != null) {
         sql += `(${limit})`;
       }
     }
@@ -1235,10 +1232,9 @@ export class SchemaStatements {
     columnNames: string[],
     options: Record<string, unknown> = {},
   ): Promise<string> {
-    const quotedColumns = new Map<string, string>();
-    for (const name of columnNames) {
-      quotedColumns.set(name, this.quoteColumnName(name));
-    }
+    const quotedColumns = eachWithObject(columnNames, new Map<string, string>(), (name, result) => {
+      result.set(name, this.quoteColumnName(name));
+    });
     return Array.from(
       (
         await this.addOptionsForIndexColumns(
@@ -1455,12 +1451,12 @@ export class SchemaStatements {
       const generatedIndexName = this.indexName(tableName, {
         column: index.columns,
         ...options,
-      } as any);
+      });
       if (generatedIndexName === index.name) {
         await this.renameIndex(
           newName,
           generatedIndexName,
-          this.indexName(newName, { column: index.columns, ...options } as any),
+          this.indexName(newName, { column: index.columns, ...options }),
         );
       }
     }
@@ -1529,7 +1525,7 @@ export class SchemaStatements {
   /** @internal */
   indexColumnNames(columnNames: string | string[]): string[] {
     if (this.isExpressionColumnName(columnNames as string)) {
-      return columnNames as unknown as string[];
+      return columnNames as string[];
     }
     return wrap(columnNames);
   }
@@ -1550,7 +1546,7 @@ export class SchemaStatements {
 
   /** @internal */
   stripTableNamePrefixAndSuffix(tableName: string): string {
-    const adapter = this as any;
+    const adapter = this as { tableNamePrefix?: string; tableNameSuffix?: string };
     const prefix: string = adapter.tableNamePrefix ?? ActiveRecord.Base.tableNamePrefix;
     const suffix: string = adapter.tableNameSuffix ?? ActiveRecord.Base.tableNameSuffix;
     const str = String(tableName);
@@ -1644,7 +1640,7 @@ export class SchemaStatements {
     tableName: string,
     options: { name?: string; expression?: string | null; validate?: boolean } = {},
   ): Promise<CheckConstraintDefinition | undefined> {
-    const adapter = this as any;
+    const adapter = this as Partial<Pick<DatabaseAdapter, "supportsCheckConstraints">>;
     if (
       typeof adapter.supportsCheckConstraints === "function" &&
       !(await adapter.supportsCheckConstraints())
@@ -1781,14 +1777,19 @@ export class SchemaStatements {
     tableName: string,
     options: ColumnOptions = {},
   ): Promise<Array<string | [string, () => Promise<void>]>> {
-    const opts: ColumnOptions = { ...options };
-    if (opts.null == null) opts.null = false;
-    if (!("precision" in opts) && (this as any).supportsDatetimeWithPrecision?.()) {
-      opts.precision = 6;
+    options = { ...options };
+    if (options.null == null) options.null = false;
+    if (
+      !("precision" in options) &&
+      (
+        this as Partial<Pick<DatabaseAdapter, "supportsDatetimeWithPrecision">>
+      ).supportsDatetimeWithPrecision?.()
+    ) {
+      options.precision = 6;
     }
     return [
-      await this.addColumnForAlter(tableName, "created_at", "datetime", opts),
-      await this.addColumnForAlter(tableName, "updated_at", "datetime", opts),
+      await this.addColumnForAlter(tableName, "created_at", "datetime", options),
+      await this.addColumnForAlter(tableName, "updated_at", "datetime", options),
     ];
   }
 

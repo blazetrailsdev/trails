@@ -102,13 +102,16 @@ const OPTION_READER_FUNCTIONS = new Set([
   "deleteWithDefault",
 ]);
 /**
- * ruby-compat's `Kernel#send` / `Kernel#public_send` (`rb_f_send`,
- * vendor/ruby/v3.3.11/vm_eval.c:1330). Called with a string-literal name, each
+ * ruby-compat's `Kernel#send` (`rb_f_send`,
+ * vendor/ruby/v3.3.11/vm_eval.c:1330). Called with a string-literal name, it
  * is a call to that method; a computed name is Ruby's own `send(name)`. In
  * ARGUMENT position the same literal names the descriptor (`call:usec` for
  * `rbFSend(value, "usec")`), as `dispatchedCallName` does for `X.call`.
  */
-const SEND_CALLEES = new Set(["rbFSend", "rbFPublicSend"]);
+const SEND_CALLEES = new Set(["rbFSend"]);
+const SEND_CALLEES_RUBY_NAME: Record<string, string> = {
+  rbFSend: "send",
+};
 /**
  * ruby-compat's `Kernel#load` (`rb_f_load`, vendor/ruby/v3.3.11/load.c:903),
  * which is a call to Ruby's `load`.
@@ -160,6 +163,8 @@ let currentChecker: ts.TypeChecker | undefined;
  * for `CallSite.rubyCompat`.
  */
 const rubyCompatBindings = new WeakMap<ts.SourceFile, ReadonlyMap<string, string>>();
+
+const activeSupportBindings = new WeakMap<ts.SourceFile, ReadonlyMap<string, string>>();
 
 interface CacheEntry {
   schemaVersion: string;
@@ -345,7 +350,10 @@ export function declaringFile(sym: ts.Symbol | undefined, srcDir: string): strin
   if (!decl) return undefined;
   const abs = decl.getSourceFile().fileName.replace(/\\/g, "/");
   const declFile = path.relative(srcDir, abs).replace(/\\/g, "/");
-  if (!declFile.startsWith("..")) return declFile;
+  if (!declFile.startsWith("..")) {
+    const nested = nestedPackageDeclFile(abs, srcDir);
+    return nested ?? declFile;
+  }
   // `srcDir` is `<root>/packages/<pkg>/src`, so its grandparent is the
   // workspace's packages directory — where a sibling package's own src (or the
   // `dist/*.d.ts` a cross-package import actually resolves through) lives.
@@ -354,6 +362,22 @@ export function declaringFile(sym: ts.Symbol | undefined, srcDir: string): strin
   const m = /^([^./][^/]*)\/(?:src|dist)\/(.+)$/.exec(rel);
   if (!m) return EXTERNAL_DECL_FILE;
   return `${PKG_DECL_PREFIX}${m[1]}:${m[2].replace(/\.d\.ts$/, ".ts")}`;
+}
+
+/**
+ * A file under a package that `parity:api` extracts from inside this one's
+ * `srcDir` (thor's `src/thor` within trailties) is that package's file, so it
+ * resolves through the package prefix and not as one of this package's own.
+ */
+function nestedPackageDeclFile(abs: string, srcDir: string): string | undefined {
+  const own = path.resolve(srcDir).replace(/\\/g, "/");
+  for (const pkg of TS_EXTRACT_PACKAGES) {
+    const dir = packageSrcDir(pkg).replace(/\\/g, "/");
+    if (dir.startsWith(own + "/") && abs.startsWith(dir + "/")) {
+      return `${PKG_DECL_PREFIX}${pkg}:${path.posix.relative(dir, abs)}`;
+    }
+  }
+  return undefined;
 }
 
 function resolveDeclarationSymbol(checker: ts.TypeChecker, node: ts.Node): ts.Symbol | undefined {
@@ -671,7 +695,11 @@ export function extractFromProgram(
     Required<
       Pick<
         PackageInfo,
-        "fileFunctions" | "fileConstants" | "fileInternalConstants" | "fileNoRailsEquivalent"
+        | "fileFunctions"
+        | "fileConstants"
+        | "fileInternalConstants"
+        | "fileConstantNoRailsEquivalent"
+        | "fileNoRailsEquivalent"
       >
     > = {
     classes: {},
@@ -679,6 +707,7 @@ export function extractFromProgram(
     fileFunctions: {},
     fileConstants: {},
     fileInternalConstants: {},
+    fileConstantNoRailsEquivalent: {},
     fileNoRailsEquivalent: {},
   };
   const pendingReExports: PendingReExport[] = [];
@@ -719,7 +748,13 @@ export function extractFromProgram(
             if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
           }
           for (const nested of staticModuleInstances(node, classInfo.name)) {
-            const instanceMethods = harvestModuleInstanceMethods(nested.init, checker, relPath);
+            const literal = unwrapAssertions(nested.init);
+            const instanceMethods =
+              ts.isObjectLiteralExpression(literal) &&
+              /^[A-Z]/.test(nested.name) &&
+              /[a-z]/.test(nested.name)
+                ? harvestObjectLiteralMethods(literal, checker, relPath)
+                : harvestModuleInstanceMethods(nested.init, checker, relPath);
             if (instanceMethods.length === 0) continue;
             info.modules[`${relPath}:${nested.seat}`] = {
               name: nested.name,
@@ -731,7 +766,16 @@ export function extractFromProgram(
             };
           }
         }
+      } else if (ts.isForOfStatement(node) && defineMethodLoop(node)) {
+        const { names, statement } = defineMethodLoop(node)!;
+        for (const name of names) {
+          fileFunctions.push(harvestDefineMethodSeat(statement, checker, relPath, name));
+        }
       } else if (ts.isExpressionStatement(node)) {
+        if (defineMethodSeat(node.expression)) {
+          fileFunctions.push(harvestDefineMethodSeat(node, checker, relPath));
+          return;
+        }
         const seated = seatedClassExpression(node);
         if (!seated) return;
         const classInfo = extractClass(seated.cls, checker, relPath, srcDir);
@@ -836,6 +880,7 @@ export function extractFromProgram(
             instanceMethods: [],
             classMethods: [],
             declaredAsNamespace: true,
+            noRailsEquivalent: noRailsEquivalentReason(node),
           };
           fileHasClassOrModule = true;
         } else if (
@@ -969,8 +1014,17 @@ export function extractFromProgram(
           const objectLiteral = ts.isObjectLiteralExpression(decl.initializer);
           const methods = ts.isObjectLiteralExpression(decl.initializer)
             ? harvestObjectLiteralMethods(decl.initializer, checker, relPath)
-            : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
-          if (methods.length === 0) continue;
+            : isDefineModuleCall(decl.initializer)
+              ? decl.initializer.arguments
+                  .map(unwrapAssertions)
+                  .filter(ts.isObjectLiteralExpression)
+                  .map((o) =>
+                    ts.factory.updateObjectLiteralExpression(o, o.properties.filter(ts.isAccessor)),
+                  )
+                  .flatMap((o) => harvestObjectLiteralMethods(o, checker, relPath))
+              : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
+          if (methods.length === 0 && !isDefineModuleCall(unwrapAssertions(decl.initializer)))
+            continue;
           const modKey = `${relPath}:${decl.name.text}`;
           if (info.classes[modKey]) continue;
           const prior = info.modules[modKey];
@@ -1172,14 +1226,22 @@ export function extractFromProgram(
       else entity.instanceMethods[at] = method;
     }
 
-    for (const attr of collectClassAttributeCalls(sourceFile)) {
+    // A top-level call on the file's own synthesized module (`mattrAccessor.call(Serializers, …)`
+    // in serializers.ts) cannot resolve until that module is synthesized below, so it retries.
+    const deferredAttributeCalls: ClassAttributeCall[] = [];
+    const creditAttribute = (attr: ClassAttributeCall, retry: boolean): boolean => {
       const target =
         [attr.enclosing, attr.receiver]
           .filter((n): n is string => n !== undefined)
           .map((n) => `${relPath}:${n}`)
           .find((key) => info.classes[key] || info.modules[key]) ??
         (attr.enclosingSeatsModule === true ? `${relPath}:${attr.enclosing}` : undefined);
-      if (target === undefined) continue;
+      if (target === undefined) {
+        if (!retry && attr.enclosing === undefined && attr.receiver !== undefined) {
+          deferredAttributeCalls.push(attr);
+        }
+        return false;
+      }
       if (!info.classes[target] && !info.modules[target]) {
         info.modules[target] = {
           name: attr.enclosing!,
@@ -1195,7 +1257,7 @@ export function extractFromProgram(
         const seats: boolean[] = [true];
         if (attr.instanceReader || attr.instanceWriter) seats.push(false);
         const predicate = attr.instancePredicate
-          ? `is${name.charAt(0).toUpperCase()}${name.slice(1)}`
+          ? name.replace(/^(_*)(.)/, (_m, lead: string, c: string) => `${lead}is${c.toUpperCase()}`)
           : undefined;
         for (const isStatic of seats) {
           const members = isStatic ? entity.classMethods : entity.instanceMethods;
@@ -1218,13 +1280,32 @@ export function extractFromProgram(
               line: attr.line,
               file: relPath,
               ...(writer ? { writer: true } : {}),
+              ...(attr.internal === true ? { internal: true } : {}),
             };
             if (at === -1) members.push(method);
             else members[at] = method;
           }
         }
       }
-      fileHasClassOrModule = true;
+      return true;
+    };
+    for (const attr of collectClassAttributeCalls(sourceFile)) {
+      if (creditAttribute(attr, false)) fileHasClassOrModule = true;
+    }
+
+    for (const { owner, methods } of collectIncludedHelperBlockMembers(
+      sourceFile,
+      checker,
+      relPath,
+    )) {
+      const mod = info.modules[`${relPath}:${owner}`];
+      if (mod === undefined) continue;
+      for (const method of methods) {
+        const at = mod.instanceMethods.findIndex((m) => m.name === method.name);
+        if (at !== -1 && mod.instanceMethods[at].bodyless !== true) continue;
+        if (at === -1) mod.instanceMethods.push(method);
+        else mod.instanceMethods[at] = method;
+      }
     }
 
     // Also capture functions exported via `export { foo, bar }` (named export lists).
@@ -1364,6 +1445,22 @@ export function extractFromProgram(
       fileFunctions.push(credited);
     }
 
+    for (const statement of sourceFile.statements) {
+      const call = ts.isExpressionStatement(statement) ? statement.expression : undefined;
+      if (!call || !ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression)) {
+        continue;
+      }
+      const [alias, original] = call.arguments;
+      if (call.expression.name.text !== "aliasMethod" || !alias || !original) continue;
+      if (!ts.isStringLiteralLike(alias) || !ts.isStringLiteralLike(original)) continue;
+      if (info.modules[`${relPath}:${call.expression.expression.getText(sourceFile)}`]) continue;
+      const receiver = call.expression.expression;
+      if (!ts.isIdentifier(receiver) || !importedModuleBinding(receiver, checker)) continue;
+      const aliased = fileFunctions.find((f) => f.name === original.text);
+      if (!aliased || fileFunctions.some((f) => f.name === alias.text)) continue;
+      fileFunctions.push({ ...aliased, name: alias.text, aliasOf: original.text });
+    }
+
     // Always record file-level functions so compare.ts can match methods
     // against the file regardless of whether a class/interface wrapper exists.
     if (fileFunctions.length > 0) {
@@ -1374,6 +1471,10 @@ export function extractFromProgram(
     if (Object.keys(fileConstants).length > 0) info.fileConstants[relPath] = fileConstants;
     const internalConstants = extractInternalFileConstants(sourceFile);
     if (internalConstants.length > 0) info.fileInternalConstants[relPath] = internalConstants;
+    const constantReceipts = extractFileConstantReceipts(sourceFile);
+    if (Object.keys(constantReceipts).length > 0) {
+      info.fileConstantNoRailsEquivalent[relPath] = constantReceipts;
+    }
 
     const fileReason = fileLevelNoRailsEquivalentReason(sourceFile);
     if (fileReason !== undefined) info.fileNoRailsEquivalent[relPath] = fileReason;
@@ -1407,6 +1508,7 @@ export function extractFromProgram(
         };
       }
     }
+    for (const attr of deferredAttributeCalls) creditAttribute(attr, true);
     currentImportAliases = undefined;
   }
 
@@ -1449,17 +1551,6 @@ export function extractFromProgram(
       if (sourceClass) {
         info.classes[key] = {
           ...sourceClass,
-          name: re.localName,
-          file: re.fromFile,
-          reExportedFrom: declaringKey(sourceKey),
-        };
-        clonedThisRound = true;
-        continue;
-      }
-      const sourceModule = info.modules[sourceKey];
-      if (sourceModule) {
-        info.modules[key] = {
-          ...sourceModule,
           name: re.localName,
           file: re.fromFile,
           reExportedFrom: declaringKey(sourceKey),
@@ -1534,11 +1625,19 @@ export function extractFromProgram(
       const hostInfo = info.classes[hostKey];
       if (!hostInfo) return;
 
-      const pushMethods = (methods: MethodInfo[]): void => {
+      const pushMethods = (methods: MethodInfo[], from?: ts.Node): void => {
+        const fromFile =
+          from === undefined
+            ? hostInfo.file
+            : path.relative(srcDir, from.getSourceFile().fileName).replace(/\\/g, "/");
         for (const m of methods) {
           if (m.name === "[initialize]") continue;
           if (hostInfo.instanceMethods.some((existing) => existing.name === m.name)) continue;
-          hostInfo.instanceMethods.push({ ...m, file: hostInfo.file });
+          hostInfo.instanceMethods.push({
+            ...m,
+            file: hostInfo.file,
+            ...(fromFile !== hostInfo.file ? { declaredIn: fromFile } : {}),
+          });
         }
       };
 
@@ -1568,6 +1667,7 @@ export function extractFromProgram(
           ) {
             pushMethods(
               harvestObjectLiteralMethods(propDecl.initializer, checker, hostInfo.file ?? ""),
+              propDecl,
             );
           }
           return;
@@ -1596,7 +1696,10 @@ export function extractFromProgram(
           // (b): const object literal → harvest directly, then fall through to
           // also push the name onto extends for compare.ts resolution.
           for (const literal of moduleObjectLiterals(sym, checker)) {
-            pushMethods(harvestObjectLiteralMethods(literal, checker, hostInfo.file ?? ""));
+            pushMethods(
+              harvestObjectLiteralMethods(literal, checker, hostInfo.file ?? ""),
+              literal,
+            );
           }
 
           // (a): class / interface / module — push name for later resolution.
@@ -2259,6 +2362,13 @@ function extractPrototypeAssignmentForOf(
   for (const stmt of loopBodyStatements(node)) {
     if (!ts.isExpressionStatement(stmt)) continue;
     const expr = stmt.expression;
+    const defined = definePropertyValueCall(expr, nameVar);
+    if (defined !== null) {
+      hosts = resolvePrototypeHosts(defined.target, info, checker, srcDir, program);
+      if (hosts.length === 0) continue;
+      params = paramsOfDescriptorValue(defined.value, checker);
+      break;
+    }
     if (!ts.isBinaryExpression(expr)) continue;
     if (expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) continue;
     const lhs = unwrapTsExpression(expr.left);
@@ -2290,6 +2400,26 @@ function extractPrototypeAssignmentForOf(
       });
     }
   }
+}
+
+/**
+ * `Object.defineProperty(<target>, <nameVar>, { value: fn })`, the
+ * non-enumerable spelling of `Cls.prototype[name] = fn` for a generator whose
+ * Ruby methods are private (`date_helper.rb:867-876`).
+ */
+function definePropertyValueCall(
+  expr: ts.Expression,
+  nameVar: string,
+): { target: ts.Expression; value: ts.Expression } | null {
+  if (!ts.isCallExpression(expr) || !ts.isPropertyAccessExpression(expr.expression)) return null;
+  const pa = expr.expression;
+  if (!ts.isIdentifier(pa.expression) || pa.expression.text !== "Object") return null;
+  if (pa.name.text !== "defineProperty" || expr.arguments.length < 3) return null;
+  const [target, propName, descriptor] = expr.arguments;
+  if (!ts.isIdentifier(propName) || propName.text !== nameVar) return null;
+  if (!ts.isObjectLiteralExpression(descriptor)) return null;
+  const value = definePropertyValue(descriptor);
+  return value === null ? null : { target, value };
 }
 
 /** The `get` / `set` initializers of an `Object.defineProperty` descriptor. */
@@ -2344,6 +2474,7 @@ function pushGeneratedAccessor(
   name: string,
   line: number,
   writerParams: ParamInfo[] | null,
+  noRailsEquivalent?: string,
 ): void {
   if (!members.some((m) => m.name === name && m.writer !== true)) {
     members.push({
@@ -2352,6 +2483,7 @@ function pushGeneratedAccessor(
       params: [],
       line,
       file,
+      ...(noRailsEquivalent !== undefined && { noRailsEquivalent }),
     });
   }
   if (writerParams === null) return;
@@ -2363,6 +2495,7 @@ function pushGeneratedAccessor(
     line,
     file,
     writer: true,
+    ...(noRailsEquivalent !== undefined && { noRailsEquivalent }),
   });
 }
 
@@ -2540,9 +2673,12 @@ function extractDefinePropertyAccessorDirect(
   const set = definePropertyAccessors(call.descriptor).set;
   const writerParams = set === null ? null : setterParams(set);
   const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
+  const receipt = ts.isExpressionStatement(expr.parent)
+    ? noRailsEquivalentReason(expr.parent)
+    : undefined;
   for (const host of resolvePrototypeHosts(call.target, info, checker, srcDir, program)) {
     const { members, file } = generatedAccessorMembers(expr, host, info, srcDir);
-    pushGeneratedAccessor(members, file, call.nameExpr.text, line, writerParams);
+    pushGeneratedAccessor(members, file, call.nameExpr.text, line, writerParams, receipt);
   }
 }
 
@@ -2668,9 +2804,9 @@ export function inventedArmTags(node: ts.Node): string[] | undefined {
 }
 
 /**
- * The Ruby bodies a constructor's JSDoc names as inlined into it
- * (`@inlinedFrom Module#initialize <citation>`, RFC 0188), in written order, or
- * undefined. compare.ts joins them to the constructor's Rails call set.
+ * The Ruby bodies a constructor's or method's JSDoc names as inlined into it
+ * (`@inlinedFrom Module#method <citation>`, RFC 0188 / RFC 0197), in written
+ * order, or undefined. compare.ts joins them to the member's Rails call set.
  */
 export function inlinedFromTags(node: ts.Node): InlinedFrom[] | undefined {
   const tags = taggedCommentOf(node, INLINED_FROM_TAG, fileHasInlinedFromTag, inlinedFromIn);
@@ -2939,6 +3075,13 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
     }
     const sf = node.getSourceFile();
     const line = sf.getLineAndCharacterOfPosition(tag.getStart()).line + 1;
+    if (!hasConvergeableStoryId(reason)) {
+      throw new Error(
+        `@noRailsEquivalent CONVERGEABLE needs a story id: ${sf.fileName}:${line} — ` +
+          "write `CONVERGEABLE <story-id>` with the bare kebab-case id of the story " +
+          "that removes this surface, or `PERMANENT` if nothing ever will.",
+      );
+    }
     const proseTag = proseTagAfter(tag);
     if (proseTag !== undefined) {
       throw new Error(
@@ -2955,6 +3098,16 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
     return reason;
   }
   return undefined;
+}
+
+/**
+ * False only for a `CONVERGEABLE` reason whose next token is not a story id
+ * (bare kebab-case, no RFC prefix). The shape is checked, not the story's
+ * existence, which needs the tasks checkout (RFC 0120).
+ */
+export function hasConvergeableStoryId(reason: string): boolean {
+  const claim = /^CONVERGEABLE\b\s*(\S*)/.exec(reason);
+  return claim === null || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(claim[1]);
 }
 
 /**
@@ -3316,6 +3469,7 @@ function collectDefineColumnMethodsMembers(
  */
 interface ClassAttributeCall {
   enclosing?: string;
+  internal?: boolean;
   enclosingSeatsModule?: boolean;
   receiver?: string;
   names: string[];
@@ -3377,6 +3531,25 @@ function attrMacro(name: string): { reader: boolean; writer: boolean } | undefin
   }
 }
 
+/**
+ * The `.call` receivers of `attr_internal_*` (`core_ext/module/attr_internal.rb:5-23`),
+ * which define instance methods only: `attrInternal.call(m, "x")` is `x` and `x=`
+ * on `m`, the `moduleEval` carrier of the module it is called inside.
+ */
+function attrInternalMacro(name: string): { reader: boolean; writer: boolean } | undefined {
+  switch (name) {
+    case "attrInternal":
+    case "attrInternalAccessor":
+      return { reader: true, writer: true };
+    case "attrInternalReader":
+      return { reader: true, writer: false };
+    case "attrInternalWriter":
+      return { reader: false, writer: true };
+    default:
+      return undefined;
+  }
+}
+
 function importedName(id: ts.Identifier, sourceFile: ts.SourceFile): string {
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
@@ -3390,11 +3563,14 @@ function importedName(id: ts.Identifier, sourceFile: ts.SourceFile): string {
 }
 
 function isClassAttributeCallee(expr: ts.Expression): boolean {
+  if (isConfigAccessorCallee(expr)) return true;
   return (
     ts.isPropertyAccessExpression(expr) &&
     ts.isIdentifier(expr.expression) &&
     (expr.name.text === "call"
-      ? attributeMacro(expr.expression.text) !== undefined
+      ? attributeMacro(expr.expression.text) !== undefined ||
+        attrInternalMacro(expr.expression.text) !== undefined ||
+        importedName(expr.expression, expr.getSourceFile()) === "delegate"
       : attrMacro(expr.name.text) !== undefined)
   );
 }
@@ -3403,15 +3579,35 @@ function readClassAttributeCall(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,
 ): ClassAttributeCall | null {
+  if (isConfigAccessorCallee(node.expression)) return readConfigAccessorCall(node, sourceFile);
   const callee = node.expression as ts.PropertyAccessExpression;
-  const attr = callee.name.text === "call" ? undefined : attrMacro(callee.name.text);
+  if (
+    callee.name.text === "call" &&
+    importedName(callee.expression as ts.Identifier, sourceFile) === "delegate"
+  ) {
+    return readPrototypeDelegateCall(node, sourceFile);
+  }
+  const internal =
+    callee.name.text === "call"
+      ? attrInternalMacro(importedName(callee.expression as ts.Identifier, sourceFile))
+      : undefined;
+  const attr = callee.name.text === "call" ? internal : attrMacro(callee.name.text);
   if (attr !== undefined) {
-    const names = node.arguments.filter(ts.isStringLiteralLike).map((arg) => arg.text);
-    if (names.length === 0 || names.length !== node.arguments.length) return null;
+    const args: readonly ts.Expression[] =
+      internal !== undefined ? node.arguments.slice(1) : node.arguments;
+    const names = args.filter(ts.isStringLiteralLike).map((arg) => arg.text);
+    if (names.length === 0 || names.length !== args.length) return null;
     const enclosing = enclosingEntity(node);
+    const recv = internal !== undefined ? node.arguments[0] : callee.expression;
+    const prototypeOf = recv !== undefined ? prototypeReceiver(recv) : undefined;
     return {
       ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
-      receiver: importedName(callee.expression as ts.Identifier, sourceFile),
+      ...(internal !== undefined && enclosing?.seatsModule === true
+        ? { enclosingSeatsModule: true }
+        : {}),
+      ...(internal !== undefined && internalStatement(node) ? { internal: true } : {}),
+      ...(ts.isIdentifier(recv) ? { receiver: importedName(recv, sourceFile) } : {}),
+      ...(internal !== undefined && prototypeOf !== undefined ? { receiver: prototypeOf } : {}),
       names,
       reader: false,
       writer: false,
@@ -3449,6 +3645,116 @@ function readClassAttributeCall(
   };
 }
 
+/** `Klass.prototype`, a top-level macro's receiver for a class module's instance side. */
+function prototypeReceiver(expr: ts.Expression): string | undefined {
+  return ts.isPropertyAccessExpression(expr) &&
+    expr.name.text === "prototype" &&
+    ts.isIdentifier(expr.expression)
+    ? expr.expression.text
+    : undefined;
+}
+
+/** A same-file `const NAME = ["a", "b"] as const`'s strings, for a `...NAME` macro argument. */
+function sameFileConstStrings(name: string, sourceFile: ts.SourceFile): string[] | undefined {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const decl of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || decl.name.text !== name || !decl.initializer) continue;
+      const init = unwrapAssertions(decl.initializer);
+      if (!ts.isArrayLiteralExpression(init)) return undefined;
+      if (!init.elements.every(ts.isStringLiteralLike)) return undefined;
+      return init.elements.map((e) => (e as ts.StringLiteralLike).text);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * `delegate.call(Klass.prototype, "m", …, { to: "target" })` at a file's top level —
+ * Ruby's `delegate :m, to: :target` in a class module's body
+ * (`core_ext/module/delegation.rb:171`), which defines instance readers only.
+ */
+function readPrototypeDelegateCall(
+  node: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+): ClassAttributeCall | null {
+  const [recv, ...rest] = node.arguments;
+  const receiver = recv !== undefined ? prototypeReceiver(recv) : undefined;
+  if (receiver === undefined || enclosingEntity(node) !== undefined) return null;
+  const opts = rest.at(-1);
+  const options = opts !== undefined && ts.isObjectLiteralExpression(opts) ? opts : undefined;
+  if (
+    options === undefined ||
+    options.properties.some(
+      (p) =>
+        !ts.isPropertyAssignment(p) ||
+        !ts.isIdentifier(p.name) ||
+        (p.name.text !== "to" && p.name.text !== "allowNil"),
+    )
+  ) {
+    return null;
+  }
+  const names: string[] = [];
+  for (const arg of rest.slice(0, -1)) {
+    if (ts.isStringLiteralLike(arg)) names.push(arg.text);
+    else if (ts.isSpreadElement(arg) && ts.isIdentifier(arg.expression)) {
+      const spread = sameFileConstStrings(arg.expression.text, sourceFile);
+      if (spread === undefined) return null;
+      names.push(...spread);
+    } else return null;
+  }
+  if (names.length === 0) return null;
+  return {
+    receiver,
+    names,
+    reader: false,
+    writer: false,
+    instanceReader: true,
+    instanceWriter: false,
+    instancePredicate: false,
+    line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+  };
+}
+
+function isConfigAccessorCallee(expr: ts.Expression): boolean {
+  return (
+    ts.isPropertyAccessExpression(expr) &&
+    expr.name.text === "configAccessor" &&
+    (ts.isIdentifier(expr.expression) || expr.expression.kind === ts.SyntaxKind.ThisKeyword)
+  );
+}
+
+function readConfigAccessorCall(
+  node: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+): ClassAttributeCall | null {
+  const names = node.arguments.filter(ts.isStringLiteralLike).map((arg) => arg.text);
+  if (names.length === 0) return null;
+  const opts = node.arguments.at(-1);
+  const options = opts !== undefined && ts.isObjectLiteralExpression(opts) ? opts : undefined;
+  const instanceAccessor = optionBool(options, "instanceAccessor") ?? true;
+  const enclosing = enclosingEntity(node);
+  return {
+    ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
+    ...(enclosing?.seatsModule === true ? { enclosingSeatsModule: true } : {}),
+    names,
+    reader: true,
+    writer: true,
+    instanceReader: instanceAccessor && optionBool(options, "instanceReader") !== false,
+    instanceWriter: instanceAccessor && optionBool(options, "instanceWriter") !== false,
+    instancePredicate: false,
+    line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+  };
+}
+
+/** Whether the statement a macro call sits in carries `@internal`, Ruby's `private` above it. */
+function internalStatement(node: ts.Node): boolean {
+  for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
+    if (ts.isExpressionStatement(cur) && internalJsDocTagApplies(cur)) return true;
+  }
+  return false;
+}
+
 function optionBool(
   options: ts.ObjectLiteralExpression | undefined,
   key: string,
@@ -3466,6 +3772,9 @@ function enclosingEntity(node: ts.Node): { name: string; seatsModule: boolean } 
   for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
     if (ts.isClassDeclaration(cur) && cur.name) return { name: cur.name.text, seatsModule: false };
     if (ts.isVariableDeclaration(cur) && ts.isIdentifier(cur.name)) {
+      if (isExportedModuleConst(cur.getSourceFile(), cur.name.text)) {
+        return { name: cur.name.text, seatsModule: true };
+      }
       const seatsModule =
         cur.initializer !== undefined &&
         ts.isObjectLiteralExpression(cur.initializer) &&
@@ -3482,19 +3791,65 @@ function enclosingEntity(node: ts.Node): { name: string; seatsModule: boolean } 
       return { name: cur.name.text, seatsModule };
     }
     if (ts.isExpressionStatement(cur) && ts.isSourceFile(cur.parent)) {
+      const hook = onLoadHookModule(cur.expression);
+      if (hook !== undefined) return { name: hook, seatsModule: true };
       const name = includedHookOwner(cur.expression);
-      if (name !== undefined) return { name, seatsModule: isExportedModuleConst(cur.parent, name) };
+      if (name !== undefined) {
+        return {
+          name,
+          seatsModule: isExportedModuleConst(cur.parent, name) || isExportedConst(cur.parent, name),
+        };
+      }
     }
   }
   return undefined;
 }
 
+function onLoadHookModule(expr: ts.Expression): string | undefined {
+  if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
+  if (expr.expression.text !== "onLoad") return undefined;
+  const [hook] = expr.arguments;
+  if (hook === undefined || !ts.isStringLiteralLike(hook)) return undefined;
+  const frameworkHooks = [
+    "action_cable",
+    "action_controller",
+    "action_dispatch",
+    "action_mailer",
+    "action_view",
+    "active_job",
+    "active_model",
+    "active_record",
+    "active_storage",
+    "active_support",
+  ];
+  if (!frameworkHooks.includes(hook.text)) return undefined;
+  return hook.text
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+
 /**
  * The module a top-level `included do ... end` port hangs its block on:
- * `X.included(null, fn)` or `X[included] = fn`, where the block's `this` is the
- * includer and so names no entity itself.
+ * `X.included(null, fn)`, `Concern.included.call(X, null, fn)` or
+ * `X[included] = fn`, where the block's `this` is the includer and so names no
+ * entity itself.
  */
 function includedHookOwner(expr: ts.Expression): string | undefined {
+  if (
+    ts.isCallExpression(expr) &&
+    ts.isPropertyAccessExpression(expr.expression) &&
+    expr.expression.name.text === "call" &&
+    ts.isPropertyAccessExpression(expr.expression.expression) &&
+    ts.isIdentifier(expr.expression.expression.expression) &&
+    expr.expression.expression.expression.text === "Concern" &&
+    expr.expression.expression.name.text === "included"
+  ) {
+    let owner: ts.Expression | undefined = expr.arguments[0];
+    while (owner && (ts.isParenthesizedExpression(owner) || ts.isAsExpression(owner)))
+      owner = owner.expression;
+    return owner && ts.isIdentifier(owner) ? owner.text : undefined;
+  }
   const hook =
     ts.isCallExpression(expr) && ts.isPropertyAccessExpression(expr.expression)
       ? expr.expression
@@ -3503,9 +3858,71 @@ function includedHookOwner(expr: ts.Expression): string | undefined {
           ts.isElementAccessExpression(expr.left)
         ? expr.left
         : undefined;
-  if (hook === undefined || !ts.isIdentifier(hook.expression)) return undefined;
+  if (hook === undefined) return undefined;
+  let owner: ts.Expression = hook.expression;
+  while (ts.isParenthesizedExpression(owner) || ts.isAsExpression(owner)) owner = owner.expression;
+  if (!ts.isIdentifier(owner)) return undefined;
   const name = ts.isPropertyAccessExpression(hook) ? hook.name : hook.argumentExpression;
-  return ts.isIdentifier(name) && name.text === "included" ? hook.expression.text : undefined;
+  return ts.isIdentifier(name) && name.text === "included" ? owner.text : undefined;
+}
+
+/**
+ * The methods of a `helper do ... end` block inside an `included do` port:
+ * `X.included(null, function () { this.helper((helper) => { Object.assign(helper, { ... }) }) })`.
+ * `extract-ruby-api.rb` files the block's `def`s under `X`
+ * (`action_view/test_case.rb:209-217`), so they are credited to `X` here.
+ */
+function collectIncludedHelperBlockMembers(
+  sourceFile: ts.SourceFile,
+  checker: ts.TypeChecker,
+  relPath: string,
+): { owner: string; methods: MethodInfo[] }[] {
+  const out: { owner: string; methods: MethodInfo[] }[] = [];
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isExpressionStatement(stmt)) continue;
+    const owner = includedHookOwner(stmt.expression);
+    if (owner === undefined) continue;
+    const visit = (node: ts.Node, inHelper: boolean): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
+        node.expression.name.text === "helper"
+      ) {
+        node.arguments.forEach((arg) => visit(arg, true));
+        return;
+      }
+      if (
+        inHelper &&
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.expression) &&
+        node.expression.expression.text === "Object" &&
+        node.expression.name.text === "assign"
+      ) {
+        for (const arg of node.arguments.slice(1)) {
+          if (ts.isObjectLiteralExpression(arg)) {
+            out.push({ owner, methods: harvestObjectLiteralMethods(arg, checker, relPath) });
+          }
+        }
+        return;
+      }
+      ts.forEachChild(node, (child) => visit(child, inHelper));
+    };
+    visit(stmt.expression, false);
+  }
+  return out;
+}
+
+function isExportedConst(sourceFile: ts.SourceFile, name: string): boolean {
+  return sourceFile.statements.some(
+    (stmt) =>
+      ts.isVariableStatement(stmt) &&
+      isExported(stmt) &&
+      stmt.declarationList.declarations.some(
+        (decl) => ts.isIdentifier(decl.name) && decl.name.text === name,
+      ),
+  );
 }
 
 function isExportedModuleConst(sourceFile: ts.SourceFile, name: string): boolean {
@@ -3566,6 +3983,20 @@ function moduleObjectLiterals(
   return out;
 }
 
+function isDefineModuleCall(expr: ts.Expression): expr is ts.CallExpression {
+  return (
+    ts.isCallExpression(expr) &&
+    ts.isIdentifier(expr.expression) &&
+    expr.expression.text === "defineModule"
+  );
+}
+
+/** An object-literal value that holds no value yet: `undefined` / `null`, through `as` casts. */
+function isUnsetSlot(expr: ts.Expression): boolean {
+  const e = unwrapAssertions(expr);
+  return (ts.isIdentifier(e) && e.text === "undefined") || e.kind === ts.SyntaxKind.NullKeyword;
+}
+
 function unwrapAssertions(expr: ts.Expression): ts.Expression {
   let cur = expr;
   while (ts.isAsExpression(cur) || ts.isSatisfiesExpression(cur)) cur = cur.expression;
@@ -3599,8 +4030,8 @@ export function harvestModuleInstanceMethods(
     ts.isPropertyAccessExpression(cur.expression) &&
     cur.expression.name.text === "include"
   ) {
-    const arg = cur.arguments[0] && unwrapAssertions(cur.arguments[0]);
-    if (arg && ts.isObjectLiteralExpression(arg)) literals.unshift(arg);
+    const arg = cur.arguments[0] && sameFileObjectLiteral(unwrapAssertions(cur.arguments[0]));
+    if (arg) literals.unshift(arg);
     cur = unwrapAssertions(cur.expression.expression);
   }
   if (!ts.isNewExpression(cur) || !ts.isIdentifier(cur.expression)) return [];
@@ -3686,6 +4117,114 @@ export function harvestModuleInstanceMethods(
   return out;
 }
 
+function importedModuleBinding(receiver: ts.Identifier, checker: ts.TypeChecker): boolean {
+  const symbol = checker.getSymbolAtLocation(receiver);
+  if (!symbol?.declarations?.some((d) => ts.isImportSpecifier(d))) return false;
+  const target = checker.getAliasedSymbol(symbol);
+  return (target.declarations ?? []).some(
+    (d) =>
+      ts.isVariableDeclaration(d) &&
+      d.initializer !== undefined &&
+      /^\(?new Module\b/.test(unwrapAssertions(d.initializer).getText()),
+  );
+}
+
+/**
+ * A top-level `rbModDefineMethod(Klass, "name", function () {})`: Ruby's
+ * `class Klass; def name; end; end` reopening a core class
+ * (msgpack's core_ext.rb), seated on the class the call names.
+ */
+function defineMethodSeat(
+  expr: ts.Expression,
+): { name: ts.StringLiteralLike; body: ts.FunctionExpression | ts.ArrowFunction } | undefined {
+  if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
+  if (expr.expression.text !== "rbModDefineMethod") return undefined;
+  const [, name, body] = expr.arguments;
+  if (!name || !ts.isStringLiteralLike(name) || !body) return undefined;
+  if (!ts.isFunctionExpression(body) && !ts.isArrowFunction(body)) return undefined;
+  return { name, body };
+}
+
+/**
+ * A top-level `for (const m of ["a", "b"] as const) rbModDefineMethod(Klass, m, fn)`:
+ * Ruby's `%i( a b ).each { |m| define_method(m) { … } }`
+ * (`connection/tagged_logger_proxy.rb:35-39`), one seat per listed name.
+ */
+function defineMethodLoop(
+  node: ts.ForOfStatement,
+): { names: string[]; statement: ts.ExpressionStatement } | undefined {
+  const decls = node.initializer;
+  if (!ts.isVariableDeclarationList(decls) || decls.declarations.length !== 1) return undefined;
+  const loopVar = decls.declarations[0].name;
+  if (!ts.isIdentifier(loopVar)) return undefined;
+  const list = unwrapAssertions(node.expression);
+  if (!ts.isArrayLiteralExpression(list)) return undefined;
+  if (!list.elements.every((e) => ts.isStringLiteralLike(e))) return undefined;
+  let statement: ts.Statement = node.statement;
+  if (ts.isBlock(statement)) {
+    if (statement.statements.length !== 1) return undefined;
+    statement = statement.statements[0];
+  }
+  if (!ts.isExpressionStatement(statement)) return undefined;
+  const call = statement.expression;
+  if (!ts.isCallExpression(call) || !ts.isIdentifier(call.expression)) return undefined;
+  if (call.expression.text !== "rbModDefineMethod") return undefined;
+  const [, name, body] = call.arguments;
+  if (!name || !ts.isIdentifier(name) || name.text !== loopVar.text || !body) return undefined;
+  if (!ts.isFunctionExpression(body) && !ts.isArrowFunction(body)) return undefined;
+  return { names: list.elements.map((e) => (e as ts.StringLiteralLike).text), statement };
+}
+
+function harvestDefineMethodSeat(
+  node: ts.ExpressionStatement,
+  checker: ts.TypeChecker,
+  file: string,
+  name: string = defineMethodSeat(node.expression)!.name.text,
+): MethodInfo {
+  const body = (node.expression as ts.CallExpression).arguments[2] as
+    | ts.FunctionExpression
+    | ts.ArrowFunction;
+  const optionKeys = extractOptionKeys(body.parameters, checker);
+  const calls = extractCalls(body.body);
+  const callSeq = extractCallSeq(body.body);
+  const callArgs = extractCallArgs(body.body);
+  const skeleton = extractSkeleton(body.body);
+  const noRailsEquivalent = noRailsEquivalentReason(node);
+  return {
+    name,
+    visibility: "public",
+    params: extractParameters(body.parameters),
+    isStatic: false,
+    line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+    file,
+    ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+    ...(optionKeys !== undefined ? { optionKeys } : {}),
+    ...(calls !== undefined ? { calls } : {}),
+    ...(callSeq !== undefined ? { callSeq } : {}),
+    ...(callArgs !== undefined ? { callArgs } : {}),
+    ...(skeleton !== undefined ? { skeleton } : {}),
+  };
+}
+
+/**
+ * An object literal, or a same-file `const` an identifier names whose
+ * initializer is one: `new Module().include(ExtensionsMethods)`.
+ */
+function sameFileObjectLiteral(expr: ts.Expression): ts.ObjectLiteralExpression | undefined {
+  if (ts.isObjectLiteralExpression(expr)) return expr;
+  if (!ts.isIdentifier(expr)) return undefined;
+  for (const statement of expr.getSourceFile().statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const decl of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || decl.name.text !== expr.text || !decl.initializer)
+        continue;
+      const init = unwrapAssertions(decl.initializer);
+      return ts.isObjectLiteralExpression(init) ? init : undefined;
+    }
+  }
+  return undefined;
+}
+
 function moduleInitializeHook(node: ts.Node, mod: string): ts.FunctionExpression | undefined {
   if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
     return undefined;
@@ -3721,6 +4260,7 @@ export function harvestObjectLiteralMethods(
   file: string,
 ): MethodInfo[] {
   const out: MethodInfo[] = [];
+  const slots = new Set<string>();
   for (const prop of obj.properties) {
     let mname: string | null = null;
     // Params are recoverable for inline method/function forms; identifier
@@ -3748,7 +4288,9 @@ export function harvestObjectLiteralMethods(
     const propMissingRailsCalls = missingRailsCallTags(prop);
     const propMissingRailsArgs = missingRailsArgsTags(prop);
     const propMissingRailsNames = missingRailsNameTags(prop);
-    const propInventedArms = inventedArmTags(prop);
+    const declaredHere =
+      file === "" || prop.getSourceFile().fileName.replace(/\\/g, "/").endsWith(`/${file}`);
+    const propInventedArms = declaredHere ? inventedArmTags(prop) : undefined;
     const propMissingRailsCallReasons = missingRailsCallTagReasons(prop);
     const propMissingRailsArgsReasons = missingRailsArgsTagReasons(prop);
     if (
@@ -3796,6 +4338,16 @@ export function harvestObjectLiteralMethods(
         callSeq = extractCallSeq(init.body);
         callArgs = extractCallArgs(init.body);
         skeleton = extractSkeleton(init.body);
+      } else if (
+        isUnsetSlot(init) &&
+        checker.getNonNullableType(checker.getTypeAtLocation(prop.name)).getCallSignatures()
+          .length === 0
+      ) {
+        // `controller: undefined as T | undefined` — a module's `attr_accessor`
+        // slot, credited as a class field is (see the PropertyDeclaration arm).
+        // A holder with no methods (`{ klass: null }`) is state, not a module.
+        mname = prop.name.text;
+        slots.add(mname);
       } else {
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
@@ -3857,7 +4409,7 @@ export function harvestObjectLiteralMethods(
       ...(aliasOf !== undefined ? { aliasOf } : {}),
     });
   }
-  return out;
+  return out.every((m) => slots.has(m.name)) ? [] : out;
 }
 
 /**
@@ -4016,6 +4568,27 @@ export function extractFileLocalHelpers(
     if (!ts.isIdentifier(decl.name)) continue;
     const init = decl.initializer;
     if (!init) continue;
+    if (ts.isIdentifier(init)) {
+      const target = node
+        .getSourceFile()
+        .statements.find(
+          (s): s is ts.FunctionDeclaration =>
+            ts.isFunctionDeclaration(s) && s.name?.text === init.text && s.body !== undefined,
+        );
+      if (!target) continue;
+      out.push({
+        name: decl.name.text,
+        visibility: "private",
+        params: extractParameters(target.parameters),
+        isStatic: false,
+        line: decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1,
+        file: relPath,
+        internal: true,
+        bodyless: true,
+        aliasOf: init.text,
+      });
+      continue;
+    }
     if (!ts.isArrowFunction(init) && !ts.isFunctionExpression(init)) continue;
     if (isNotImplementedStub(init.body)) continue;
     const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
@@ -4177,7 +4750,9 @@ export function extractClass(
       if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
         const expr = clause.types[0] && unwrapTsExpression(clause.types[0].expression);
         if (!expr) continue;
-        superclass = expr.getText();
+        superclass = ts.isIdentifier(expr)
+          ? importedName(expr, node.getSourceFile())
+          : expr.getText();
         if (srcDir !== undefined) {
           superclassFile = declaringFile(resolveDeclarationSymbol(checker, expr), srcDir);
         }
@@ -4220,6 +4795,7 @@ export function extractClass(
     const memberInventedArms = inventedArmTags(member);
     const memberMissingRailsCallReasons = missingRailsCallTagReasons(member);
     const memberMissingRailsArgsReasons = missingRailsArgsTagReasons(member);
+    const inlinedFrom = inlinedFromTags(member);
     const tagged = {
       ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       ...(memberMissingRailsCalls !== undefined
@@ -4236,6 +4812,7 @@ export function extractClass(
       ...(memberMissingRailsArgsReasons !== undefined
         ? { missingRailsArgsReasons: memberMissingRailsArgsReasons }
         : {}),
+      ...(inlinedFrom !== undefined ? { inlinedFrom } : {}),
     };
     const isStatic = hasModifier(member, ts.SyntaxKind.StaticKeyword);
     const line = member.getSourceFile().getLineAndCharacterOfPosition(member.getStart()).line + 1;
@@ -4272,6 +4849,7 @@ export function extractClass(
         ...(internal ? { internal: true } : {}),
         ...tagged,
         ...(signatureReturnsVoid(member, checker) ? { returnsVoid: true } : {}),
+        ...(member.asteriskToken ? { generator: true } : {}),
         ...(optionKeys !== undefined ? { optionKeys } : {}),
         ...(optionKeys != null && optionReads !== undefined ? { optionReads } : {}),
         ...(calls !== undefined ? { calls } : {}),
@@ -4302,7 +4880,6 @@ export function extractClass(
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
       const shapeTokens = extractShapeTokens(member.body);
-      const inlinedFrom = inlinedFromTags(member);
       instanceMethods.push({
         name: "constructor",
         visibility,
@@ -4311,7 +4888,6 @@ export function extractClass(
         file,
         ...(internal ? { internal: true } : {}),
         ...tagged,
-        ...(inlinedFrom !== undefined ? { inlinedFrom } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
@@ -4604,6 +5180,7 @@ function extractInterface(
         line,
         file,
         bodyless: true,
+        ...(internalJsDocTagApplies(member) ? { internal: true } : {}),
         ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       });
     } else if (ts.isPropertySignature(member)) {
@@ -4615,6 +5192,7 @@ function extractInterface(
         line,
         file,
         bodyless: true,
+        ...(internalJsDocTagApplies(member) ? { internal: true } : {}),
         ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       });
     }
@@ -4800,16 +5378,45 @@ export function extractInternalFileConstants(sourceFile: ts.SourceFile): string[
   return out;
 }
 
+/**
+ * The `extractFileConstants` names whose declaration carries a
+ * `@noRailsEquivalent` receipt, mapped to its reason.
+ */
+export function extractFileConstantReceipts(sourceFile: ts.SourceFile): Record<string, string> {
+  const out: Record<string, string> = {};
+  ts.forEachChild(sourceFile, (node) => {
+    if (!ts.isVariableStatement(node) || !isExported(node)) return;
+    if (!(node.declarationList.flags & ts.NodeFlags.Const)) return;
+    const reason = noRailsEquivalentReason(node);
+    if (reason === undefined) return;
+    for (const decl of node.declarationList.declarations) {
+      if (ts.isIdentifier(decl.name) && decl.initializer && tsLiteralValue(decl.initializer)) {
+        out[decl.name.text] = reason;
+      }
+    }
+  });
+  return out;
+}
+
 function rubyCompatBindingsFor(sourceFile: ts.SourceFile): ReadonlyMap<string, string> {
   let bindings = rubyCompatBindings.get(sourceFile);
   if (!bindings) {
-    bindings = collectRubyCompatBindings(sourceFile);
+    bindings = collectPackageBindings(sourceFile, "@blazetrails/ruby-compat");
     rubyCompatBindings.set(sourceFile, bindings);
   }
   return bindings;
 }
 
-function collectRubyCompatBindings(sourceFile: ts.SourceFile): Map<string, string> {
+function activeSupportBindingsFor(sourceFile: ts.SourceFile): ReadonlyMap<string, string> {
+  let bindings = activeSupportBindings.get(sourceFile);
+  if (!bindings) {
+    bindings = collectPackageBindings(sourceFile, "@blazetrails/activesupport");
+    activeSupportBindings.set(sourceFile, bindings);
+  }
+  return bindings;
+}
+
+function collectPackageBindings(sourceFile: ts.SourceFile, pkg: string): Map<string, string> {
   const bindings = new Map<string, string>();
   ts.forEachChild(sourceFile, (node) => {
     if (
@@ -4820,7 +5427,7 @@ function collectRubyCompatBindings(sourceFile: ts.SourceFile): Map<string, strin
     ) {
       return;
     }
-    if (!node.moduleSpecifier.text.startsWith("@blazetrails/ruby-compat")) return;
+    if (!node.moduleSpecifier.text.startsWith(pkg)) return;
     for (const el of node.importClause.namedBindings.elements) {
       bindings.set(el.name.text, (el.propertyName ?? el.name).text);
     }
@@ -5473,7 +6080,7 @@ function awaitedFilter(statement: ts.ForOfStatement): ts.Expression | undefined 
   return awaits ? guard.expression : undefined;
 }
 
-function isRescueClassGuard(statement: ts.Statement): boolean {
+function isRescueClassGuard(statement: ts.Statement, bound: string | undefined): boolean {
   if (!ts.isIfStatement(statement) || statement.elseStatement !== undefined) return false;
   const test = statement.expression;
   if (!ts.isPrefixUnaryExpression(test) || test.operator !== ts.SyntaxKind.ExclamationToken) {
@@ -5483,10 +6090,7 @@ function isRescueClassGuard(statement: ts.Statement): boolean {
     ? test.operand.expression
     : test.operand;
   if (!isInstanceOfTest(operand)) return false;
-  const then = ts.isBlock(statement.thenStatement)
-    ? statement.thenStatement.statements
-    : [statement.thenStatement];
-  return then.length === 1 && ts.isThrowStatement(then[0]) && ts.isIdentifier(then[0].expression);
+  return isRethrowOf(statement.thenStatement, bound);
 }
 
 /**
@@ -6281,7 +6885,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
     const chain = statements.find((s) => ts.isIfStatement(s) && isInstanceOfTest(s.expression));
     if (chain === undefined) {
       tokens.push("rescue");
-      const guarded = statements.length > 0 && isRescueClassGuard(statements[0]);
+      const guarded = statements.length > 0 && isRescueClassGuard(statements[0], bound);
       statements.slice(guarded ? 1 : 0).forEach(visit);
       return;
     }
@@ -6420,6 +7024,9 @@ function recordCallSite(
     const rubyCompat = ts.isIdentifier(callee)
       ? rubyCompatBindingsFor(call.getSourceFile()).get(callee.text)
       : undefined;
+    const activeSupport = ts.isIdentifier(callee)
+      ? activeSupportBindingsFor(call.getSourceFile()).get(callee.text)
+      : undefined;
     sites.push({
       name,
       args,
@@ -6428,6 +7035,7 @@ function recordCallSite(
         ? { recv }
         : {}),
       ...(rubyCompat !== undefined ? { rubyCompat } : {}),
+      ...(activeSupport !== undefined ? { activeSupport } : {}),
     });
   }
 
@@ -6594,12 +7202,12 @@ function describeArg(node: ts.Expression, flags: string[]): string {
     const dispatched = dispatchedCallName(expr);
     if (dispatched !== undefined) return `call:${dispatched}`;
     const sent = expr.arguments[1];
-    if (
-      ts.isIdentifier(expr.expression) &&
-      SEND_CALLEES.has(currentImportAliases?.get(expr.expression.text) ?? expr.expression.text) &&
-      sent !== undefined &&
-      ts.isStringLiteralLike(sent)
-    ) {
+    const sender = ts.isIdentifier(expr.expression)
+      ? (currentImportAliases?.get(expr.expression.text) ?? expr.expression.text)
+      : undefined;
+    if (sender !== undefined && SEND_CALLEES.has(sender) && sent !== undefined) {
+      // A computed method name is Ruby's own `send` / `public_send` call.
+      if (!ts.isStringLiteralLike(sent)) return `call:${SEND_CALLEES_RUBY_NAME[sender]}`;
       return `call:${sent.text}`;
     }
     const name = callSiteName(expr);
@@ -6756,11 +7364,19 @@ function collectCalls(
   const addHashForm = (form: string, receiver: ts.Expression | undefined): void => {
     if (skipHoistedClosures || receiver === undefined) return;
     hashForms.add(`${NATIVE_FORM_PREFIX}${form}`);
-    const tail = receiverTailName(receiver);
-    if (tail !== undefined) hashForms.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
+    const tails = form === "spread" ? spreadReceiverNames(receiver) : [receiverTailName(receiver)];
+    for (const tail of tails) {
+      if (tail !== undefined) hashForms.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
+    }
   };
   const visit = (n: ts.Node): void => {
     for (const [form, receiver] of nativeHashForms(n)) addHashForm(form, receiver);
+    if (!skipHoistedClosures) {
+      for (const form of nativeValueForms(n)) names.add(`${NATIVE_FORM_PREFIX}${form}`);
+    }
+    if (!skipHoistedClosures && isPlainObjectConstruction(n)) {
+      names.add(`${NATIVE_FORM_PREFIX}object`);
+    }
     if (ts.isNewExpression(n)) {
       // `new Foo(...)` is Ruby's `Foo.new(...)`. The Ruby extractor records the
       // call as `new`, which conventions.ts maps to the TS `constructor`; record
@@ -6806,16 +7422,13 @@ function collectCalls(
         }
         const kernel = KERNEL_CALLEES.get(resolve(callee.text));
         if (kernel !== undefined) called.push(kernel);
-        if (!skipHoistedClosures && callee.text === "String" && n.arguments.length > 0) {
-          names.add(`${NATIVE_FORM_PREFIX}String`);
-        }
         if (!skipHoistedClosures && isSuspensionTimer(callee.text, n, promiseSettlers)) {
           names.add(`${NATIVE_FORM_PREFIX}timer`);
         }
       } else if (ts.isPropertyAccessExpression(callee)) {
         visit(callee.expression);
         const prop = memberNameText(callee.name);
-        called.push(prop);
+        if (!(skipHoistedClosures && isOperatorIndexRead(n))) called.push(prop);
         negated.push(prop);
         if (!skipHoistedClosures && prop === "unshift") {
           names.add(`${NATIVE_FORM_PREFIX}unshift`);
@@ -6938,6 +7551,26 @@ function collectCalls(
   return [...names, ...hashForms];
 }
 
+/**
+ * A `this._scope.get("key")`: `Mapper::Scope#[]` (`mapper.rb:2359-2361`), ported
+ * as `Scope#get`, read off Mapper's `@scope`. extract-ruby-api.rb#walk_call_in_order
+ * records no `[]` send, so the ORDER stream leaves it out, and it cannot take
+ * the position of the routing `get` the same body makes (`Mapper#resource`'s
+ * `@scope[:shallow]` beside `get :new`, `mapper.rb:1357-1363`).
+ */
+function isOperatorIndexRead(n: ts.CallExpression): boolean {
+  const callee = n.expression;
+  return (
+    ts.isPropertyAccessExpression(callee) &&
+    memberNameText(callee.name) === "get" &&
+    ts.isPropertyAccessExpression(callee.expression) &&
+    callee.expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
+    callee.expression.name.text === "_scope" &&
+    n.arguments.length === 1 &&
+    ts.isStringLiteralLike(n.arguments[0])
+  );
+}
+
 function nativeHashForms(
   n: ts.Node,
 ): [form: string, receiver: ts.Expression | undefined, key?: string][] {
@@ -6984,6 +7617,256 @@ function nativeHashForms(
   return [];
 }
 
+function unwrapped(e: ts.Expression): ts.Expression {
+  while (ts.isParenthesizedExpression(e) || ts.isNonNullExpression(e) || ts.isAsExpression(e)) {
+    e = e.expression;
+  }
+  return e;
+}
+
+function callbackParams(e: ts.Expression | undefined): string[] | undefined {
+  if (e === undefined || !(ts.isArrowFunction(e) || ts.isFunctionExpression(e))) return undefined;
+  const names: string[] = [];
+  for (const p of e.parameters) {
+    if (!ts.isIdentifier(p.name)) return undefined;
+    names.push(p.name.text);
+  }
+  return names;
+}
+
+function callbackResult(e: ts.Expression): ts.Expression | undefined {
+  if (!(ts.isArrowFunction(e) || ts.isFunctionExpression(e))) return undefined;
+  if (!ts.isBlock(e.body)) return unwrapped(e.body);
+  const [stmt] = e.body.statements;
+  return e.body.statements.length === 1 && stmt !== undefined && ts.isReturnStatement(stmt)
+    ? stmt.expression && unwrapped(stmt.expression)
+    : undefined;
+}
+
+function isIdent(e: ts.Node | undefined, name: string): boolean {
+  return e !== undefined && ts.isIdentifier(e) && e.text === name;
+}
+
+function isNotNullTest(e: ts.Expression | undefined, param: string): boolean {
+  if (e === undefined || !ts.isBinaryExpression(e)) return false;
+  if (e.operatorToken.kind !== ts.SyntaxKind.ExclamationEqualsToken) return false;
+  const isNull = (x: ts.Expression): boolean => x.kind === ts.SyntaxKind.NullKeyword;
+  return (isIdent(e.left, param) && isNull(e.right)) || (isNull(e.left) && isIdent(e.right, param));
+}
+
+function setOperand(e: ts.Expression | undefined): ts.Expression | undefined {
+  if (e === undefined) return undefined;
+  const n = unwrapped(e);
+  return ts.isNewExpression(n) && n.expression.getText() === "Set" && n.arguments?.length === 1
+    ? unwrapped(n.arguments[0])
+    : undefined;
+}
+
+function setRoundTripForms(operand: ts.Expression | undefined): string[] {
+  if (operand === undefined) return [];
+  const union =
+    ts.isArrayLiteralExpression(operand) &&
+    operand.elements.length >= 2 &&
+    operand.elements.every(ts.isSpreadElement);
+  return union ? ["union"] : ["uniq"];
+}
+
+function nativeValueForms(n: ts.Node): string[] {
+  if (ts.isArrayLiteralExpression(n)) {
+    const [only] = n.elements;
+    return n.elements.length === 1 && only !== undefined && ts.isSpreadElement(only)
+      ? setRoundTripForms(setOperand(only.expression))
+      : [];
+  }
+  if (ts.isObjectLiteralExpression(n)) {
+    const [only] = n.properties;
+    return n.properties.length === 1 && only !== undefined && ts.isSpreadAssignment(only)
+      ? ["dup"]
+      : [];
+  }
+  if (ts.isObjectBindingPattern(n)) {
+    const last = n.elements.at(-1);
+    if (last?.dotDotDotToken === undefined || n.elements.length < 2) return [];
+    const literal = n.elements
+      .slice(0, -1)
+      .every(
+        (el) =>
+          el.dotDotDotToken === undefined &&
+          (el.propertyName === undefined ||
+            ts.isIdentifier(el.propertyName) ||
+            ts.isStringLiteral(el.propertyName)),
+      );
+    return literal ? ["except"] : [];
+  }
+  if (ts.isForOfStatement(n)) {
+    const iterated = unwrapped(n.expression);
+    return ts.isCallExpression(iterated) && iterated.expression.getText() === "Object.values"
+      ? ["eachValue"]
+      : [];
+  }
+  if (ts.isPropertyAccessExpression(n) && n.name.text === "length") {
+    const counted = unwrapped(n.expression);
+    return ts.isCallExpression(counted) &&
+      ts.isPropertyAccessExpression(counted.expression) &&
+      counted.expression.name.text === "filter"
+      ? ["count"]
+      : [];
+  }
+  if (ts.isConditionalExpression(n)) {
+    const test = unwrapped(n.condition);
+    const sliced = unwrapped(n.whenTrue);
+    if (!ts.isCallExpression(test) || !ts.isPropertyAccessExpression(test.expression)) return [];
+    if (test.expression.name.text !== "endsWith" || test.arguments.length !== 1) return [];
+    if (!ts.isCallExpression(sliced) || !ts.isPropertyAccessExpression(sliced.expression)) {
+      return [];
+    }
+    const subject = test.expression.expression.getText();
+    const suffix = test.arguments[0];
+    const [start, end] = sliced.arguments;
+    const suffixLength = ts.isStringLiteral(suffix) ? `${suffix.text.length}` : undefined;
+    const chomped =
+      sliced.expression.name.text === "slice" &&
+      sliced.expression.expression.getText() === subject &&
+      unwrapped(n.whenFalse).getText() === subject &&
+      start?.getText() === "0" &&
+      end !== undefined &&
+      (end.getText() === `-${suffix.getText()}.length` ||
+        (suffixLength !== undefined && end.getText() === `-${suffixLength}`));
+    return chomped ? ["chomp"] : [];
+  }
+  if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.AsteriskToken) {
+    const callee = (e: ts.Expression | undefined): string | undefined => {
+      const call = e && unwrapped(e);
+      return call !== undefined && ts.isCallExpression(call)
+        ? call.expression.getText()
+        : undefined;
+    };
+    const rounded = unwrapped(n.right);
+    const halfAway =
+      callee(n.left) === "Math.sign" &&
+      callee(rounded) === "Math.round" &&
+      callee((rounded as ts.CallExpression).arguments[0]) === "Math.abs";
+    return halfAway ? ["round"] : [];
+  }
+  if (!ts.isCallExpression(n)) return [];
+  const callee = n.expression.getText();
+  const args = n.arguments;
+  switch (callee) {
+    case "Array.from":
+      return args.length === 1 ? setRoundTripForms(setOperand(args[0])) : [];
+    case "Object.keys":
+      return ["keys"];
+    case "Object.values":
+      return ["values"];
+    case "Object.fromEntries": {
+      const mapped = args[0] && unwrapped(args[0]);
+      const transform =
+        mapped !== undefined &&
+        ts.isCallExpression(mapped) &&
+        ts.isPropertyAccessExpression(mapped.expression) &&
+        mapped.expression.name.text === "map" &&
+        mapped.expression.expression.getText().startsWith("Object.entries(");
+      return transform ? ["toH", "transformValues"] : ["toH"];
+    }
+    case "Number.parseInt":
+      return args.length === 2 && args[1].getText() === "10" ? ["toI"] : [];
+    case "Number.parseFloat":
+      return ["toF"];
+    case "Number.isNaN":
+      return ["isNaN"];
+  }
+  if (!ts.isPropertyAccessExpression(n.expression)) return [];
+  const method = n.expression.name.text;
+  const [first, second] = args;
+  switch (method) {
+    case "slice":
+      if (args.length === 1) return ["drop"];
+      return args.length === 2 && first.getText() === "0" ? ["take"] : [];
+    case "trim":
+    case "trimEnd":
+      return args.length === 0 ? [method] : [];
+    case "filter": {
+      const [param] = callbackParams(first) ?? [];
+      return param !== undefined && isNotNullTest(callbackResult(first), param) ? ["compact"] : [];
+    }
+    case "map": {
+      const params = callbackParams(first);
+      const result = first && callbackResult(first);
+      if (params === undefined || result === undefined) return [];
+      if (params.length === 1 && ts.isElementAccessExpression(result)) {
+        return isIdent(result.argumentExpression, params[0]) ? ["valuesAt"] : [];
+      }
+      const zipped =
+        params.length === 2 &&
+        second === undefined &&
+        ts.isArrayLiteralExpression(result) &&
+        result.elements.length === 2 &&
+        isIdent(result.elements[0], params[0]) &&
+        ts.isElementAccessExpression(result.elements[1]) &&
+        isIdent(result.elements[1].argumentExpression, params[1]);
+      return zipped ? ["zip"] : [];
+    }
+  }
+  return [];
+}
+
+/**
+ * A `{}` literal, an `Object.create(null)` or a `new HashWithIndifferentAccess(…)`
+ * — the constructions a Rails `HashWithIndifferentAccess.new` /
+ * `with_indifferent_access` ports as (RFC 0190; compare.ts#isCoreNewWithNoNewExpression).
+ */
+function isPlainObjectConstruction(n: ts.Node): boolean {
+  if (ts.isObjectLiteralExpression(n)) return n.properties.length === 0;
+  if (ts.isNewExpression(n)) return n.expression.getText() === "HashWithIndifferentAccess";
+  return (
+    ts.isCallExpression(n) &&
+    n.expression.getText() === "Object.create" &&
+    n.arguments.length === 1 &&
+    n.arguments[0].kind === ts.SyntaxKind.NullKeyword
+  );
+}
+
+/**
+ * The names a leading spread's operand answers a Ruby `merge` receiver by, the
+ * TS half of extract-ruby-api.rb#merge_receiver_name: {@link receiverTailName},
+ * `super` for a `super.m()` / `superFn()` call (`super.merge(...)`), the
+ * left operand of `x || {}` / `x ?? {}` (`(options || {}).merge`), the
+ * camelized key of a string-keyed index read (`result["path_params"]`, Ruby
+ * `result[:path_params]`), and either branch of a conditional.
+ */
+function spreadReceiverNames(receiver: ts.Expression): (string | undefined)[] {
+  let e = receiver;
+  while (ts.isParenthesizedExpression(e) || ts.isNonNullExpression(e) || ts.isAsExpression(e)) {
+    e = e.expression;
+  }
+  if (ts.isConditionalExpression(e)) {
+    return [...spreadReceiverNames(e.whenTrue), ...spreadReceiverNames(e.whenFalse)];
+  }
+  if (
+    ts.isBinaryExpression(e) &&
+    (e.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+      e.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken) &&
+    ts.isObjectLiteralExpression(e.right) &&
+    e.right.properties.length === 0
+  ) {
+    return spreadReceiverNames(e.left);
+  }
+  if (ts.isCallExpression(e)) {
+    const callee = e.expression;
+    if (
+      (ts.isPropertyAccessExpression(callee) &&
+        callee.expression.kind === ts.SyntaxKind.SuperKeyword) ||
+      (ts.isIdentifier(callee) && callee.text === "superFn")
+    ) {
+      return ["super"];
+    }
+  }
+  if (ts.isElementAccessExpression(e) && ts.isStringLiteral(e.argumentExpression)) {
+    return [snakeToCamel(e.argumentExpression.text)];
+  }
+  return [receiverTailName(e)];
+}
+
 /**
  * The name a `.length` read's receiver ends in — `cursor`, `result.columns` →
  * `columns`, `(await c.selectRows(…))` → `selectRows`, `wrap(ids)` → `wrap` —
@@ -6999,7 +7882,26 @@ function receiverTailName(receiver: ts.Expression): string | undefined {
   ) {
     e = e.expression;
   }
+  if (ts.isElementAccessExpression(e) && ts.isStringLiteralLike(e.argumentExpression)) {
+    return e.argumentExpression.text;
+  }
+  if (
+    ts.isCallExpression(e) &&
+    ts.isPropertyAccessExpression(e.expression) &&
+    e.expression.name.text === "get" &&
+    e.arguments.length === 1 &&
+    ts.isStringLiteralLike(e.arguments[0])
+  ) {
+    return e.arguments[0].text;
+  }
   if (ts.isCallExpression(e)) e = e.expression;
+  if (
+    ts.isBinaryExpression(e) &&
+    e.operatorToken.kind === ts.SyntaxKind.QuestionQuestionEqualsToken &&
+    ts.isElementAccessExpression(e.left)
+  ) {
+    return receiverTailName(e.left.expression);
+  }
   if (ts.isIdentifier(e)) return e.text;
   if (ts.isPropertyAccessExpression(e)) return e.name.text;
   return undefined;
@@ -7286,12 +8188,20 @@ function extractParameters(params: ts.NodeArray<ts.ParameterDeclaration>): Param
 
 /** Can a function be passed in this parameter's position? An untyped parameter
  *  is judged by nothing, so it does not count. `any`/`unknown` do not either: a
- *  port that took Ruby's block would type it. */
+ *  port that took Ruby's block would type it. A rest typed as a tuple whose
+ *  element is a function (`...args: unknown[] | [...unknown[], Fn]`) is Ruby's
+ *  `*args, &block`, the block riding last in the splat. */
 function admitsFunction(p: ts.ParameterDeclaration): boolean {
   if (!p.type) return false;
   if (!currentChecker) return ts.isFunctionTypeNode(p.type);
-  let type = currentChecker.getTypeAtLocation(p.type);
-  if (p.dotDotDotToken) type = currentChecker.getIndexTypeOfType(type, ts.IndexKind.Number) ?? type;
+  const checker = currentChecker;
+  let type = checker.getTypeAtLocation(p.type);
+  if (p.dotDotDotToken) {
+    const tuples = (type.isUnion() ? type.types : [type]).filter((t) => checker.isTupleType(t));
+    const elements = tuples.flatMap((t) => checker.getTypeArguments(t as ts.TypeReference));
+    if (elements.some((t) => t.getCallSignatures().length > 0)) return true;
+    type = checker.getIndexTypeOfType(type, ts.IndexKind.Number) ?? type;
+  }
   const members = type.isUnion() ? type.types : [type];
   return members.some(
     (t) =>

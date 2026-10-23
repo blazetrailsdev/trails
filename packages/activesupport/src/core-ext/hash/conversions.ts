@@ -8,6 +8,10 @@ import { isPlainObject } from "../../hash-utils.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 
 export class DisallowedType extends Error {
+  static toString(): string {
+    return "ActiveSupport::XMLConverter::DisallowedType";
+  }
+
   override name = "DisallowedType";
 
   constructor(type: unknown) {
@@ -18,10 +22,17 @@ export class DisallowedType extends Error {
 export const DISALLOWED_TYPES = ["symbol", "yaml"];
 
 export class XMLConverter {
+  static toString(): string {
+    return "ActiveSupport::XMLConverter";
+  }
+
   private xml: unknown;
   private disallowedTypes: string[];
 
-  constructor(xml: string | StringIO | null | undefined, disallowedTypes?: string[] | null) {
+  constructor(
+    xml: string | Uint8Array | StringIO | null | undefined,
+    disallowedTypes?: string[] | null,
+  ) {
     this.xml = this.normalizeKeys(XmlMini.parse(xml));
     this.disallowedTypes = disallowedTypes ?? DISALLOWED_TYPES;
   }

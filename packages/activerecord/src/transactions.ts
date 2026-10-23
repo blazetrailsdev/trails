@@ -15,7 +15,7 @@ import {
   type Extended,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { mergeBang, Module, rtest } from "@blazetrails/ruby-compat";
+import { mergeBang, rtest, rbCallSuper } from "@blazetrails/ruby-compat";
 import type { TouchArgs } from "./timestamp.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
@@ -26,9 +26,39 @@ import { runAfterTransactionCallbacksInOrderDefined } from "./active-record.js";
 
 type TransactionAction = "create" | "update" | "destroy";
 
+interface TransactionRecordState {
+  id: unknown;
+  newRecord: boolean;
+  previouslyNewRecord: boolean;
+  destroyed: boolean;
+  attributes: AttributeSet;
+  frozen: boolean;
+  level: number;
+}
+
+type TransactionsRecord = Omit<
+  Base,
+  | "_committedAlreadyCalled"
+  | "_newRecordBeforeLastCommit"
+  | "_triggerUpdateCallback"
+  | "_triggerDestroyCallback"
+> & {
+  _newRecord: boolean;
+  _previouslyNewRecord: boolean;
+  _destroyed: boolean;
+  _attributes: AttributeSet;
+  _mutationsFromDatabase?: unknown;
+  _mutationsBeforeLastSave?: unknown;
+  _startTransactionState?: TransactionRecordState | null;
+  _committedAlreadyCalled?: boolean | null;
+  _newRecordBeforeLastCommit?: boolean | null;
+  _triggerUpdateCallback?: boolean | null;
+  _triggerDestroyCallback?: boolean | null;
+};
+
 export async function transaction<T>(
   modelClass: typeof Base,
-  fn: (tx: PublicTransaction) => Promise<T>,
+  fn: (tx: PublicTransaction) => Promise<T> | T,
   options: { isolation?: string; requiresNew?: boolean; joinable?: boolean } = {},
 ): Promise<T | undefined> {
   return modelClass.withConnection((connection) => {
@@ -57,7 +87,7 @@ type CallbackOptions = {
   prepend?: boolean;
 };
 
-export const Transactions = Object.assign(new Module(), {
+export const Transactions = {
   [included](base: typeof Model): void {
     (base as typeof Model & Extended<typeof Callbacks.ClassMethods>).defineCallbacks(
       "commit",
@@ -66,7 +96,7 @@ export const Transactions = Object.assign(new Module(), {
       { scope: ["kind", "name"] },
     );
   },
-});
+};
 
 export function beforeCommit<T extends typeof Base>(
   this: T,
@@ -168,25 +198,24 @@ export async function beforeCommittedBang(this: Base): Promise<void> {
 }
 
 export async function committedBang(
-  this: Base,
+  this: TransactionsRecord,
   { shouldRunCallbacks = true }: { shouldRunCallbacks?: boolean } = {},
 ): Promise<void> {
-  const r = this as any;
-  r._startTransactionState = null;
+  this._startTransactionState = null;
   try {
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
-      r._committedAlreadyCalled = true;
+      this._committedAlreadyCalled = true;
       await this._runCommitCallbacks();
     }
   } finally {
-    r._committedAlreadyCalled = false;
-    r._triggerUpdateCallback = false;
-    r._triggerDestroyCallback = false;
+    this._committedAlreadyCalled = false;
+    this._triggerUpdateCallback = false;
+    this._triggerDestroyCallback = false;
   }
 }
 
 export async function rolledbackBang(
-  this: Base,
+  this: TransactionsRecord,
   {
     forceRestoreState = false,
     shouldRunCallbacks = true,
@@ -200,67 +229,68 @@ export async function rolledbackBang(
     restoreTransactionRecordState.call(this, forceRestoreState);
     clearTransactionRecordState.call(this);
     if (forceRestoreState) {
-      (this as any)._startTransactionState = null;
-      (this as any)._triggerUpdateCallback = false;
-      (this as any)._triggerDestroyCallback = false;
+      this._startTransactionState = null;
+      this._triggerUpdateCallback = false;
+      this._triggerDestroyCallback = false;
     }
   }
 }
 
 /** @internal */
-export function rememberTransactionRecordState(this: Base): void {
-  const r = this as any;
-  r._startTransactionState ||= {
+export function rememberTransactionRecordState(this: TransactionsRecord): void {
+  this._startTransactionState ||= {
     id: this.id,
-    newRecord: r._newRecord,
-    previouslyNewRecord: r._previouslyNewRecord,
-    destroyed: r._destroyed,
-    attributes: r._attributes,
+    newRecord: this._newRecord,
+    previouslyNewRecord: this._previouslyNewRecord,
+    destroyed: this._destroyed,
+    attributes: this._attributes,
     frozen: this.isFrozen(),
     level: 0,
   };
-  r._startTransactionState.level += 1;
+  this._startTransactionState.level += 1;
 
-  if (r._committedAlreadyCalled) {
-    r._newRecordBeforeLastCommit = false;
+  if (this._committedAlreadyCalled) {
+    this._newRecordBeforeLastCommit = false;
   } else {
-    r._newRecordBeforeLastCommit = r._startTransactionState.newRecord;
+    this._newRecordBeforeLastCommit = this._startTransactionState.newRecord;
   }
 }
 
 /** @internal */
-export function restoreTransactionRecordState(this: Base, forceRestoreState = false): void {
-  const r = this as any;
-  const restoreState = r._startTransactionState;
+export function restoreTransactionRecordState(
+  this: TransactionsRecord,
+  forceRestoreState = false,
+): void {
+  const restoreState = this._startTransactionState;
   if (restoreState) {
     if (forceRestoreState || restoreState.level <= 1) {
-      r._newRecord = restoreState.newRecord;
-      r._previouslyNewRecord = restoreState.previouslyNewRecord;
-      r._destroyed = restoreState.destroyed;
-      r._attributes = (restoreState.attributes as AttributeSet).map((attr) => {
-        const value = r._attributes.fetchValue(attr.name);
+      this._newRecord = restoreState.newRecord;
+      this._previouslyNewRecord = restoreState.previouslyNewRecord;
+      this._destroyed = restoreState.destroyed;
+      this._attributes = restoreState.attributes.map((attr) => {
+        const value = this._attributes.fetchValue(attr.name!);
         if (attr.value() !== value) attr = attr.withValueFromUser(value);
         return attr;
       });
-      r._mutationsFromDatabase = null;
-      r._mutationsBeforeLastSave = null;
-      const ctor = this.constructor as typeof Base;
+      this._mutationsFromDatabase = null;
+      this._mutationsBeforeLastSave = null;
+      const ctor = this.constructor;
       const primaryKey = ctor.primaryKey;
       if (ctor.isCompositePrimaryKey()) {
         const cols = primaryKey as string[];
         const savedId = restoreState.id as unknown[];
-        if (cols.some((col, i) => r._attributes.fetchValue(col) !== savedId[i])) {
+        if (cols.some((col, i) => this._attributes.fetchValue(col) !== savedId[i])) {
           cols.forEach((col, i) => {
-            r._attributes.writeFromUser(col, savedId[i]);
+            this._attributes.writeFromUser(col, savedId[i]);
           });
         }
       } else {
-        if (r._attributes.fetchValue(primaryKey as string) !== restoreState.id) {
-          r._attributes.writeFromUser(primaryKey as string, restoreState.id);
+        if (this._attributes.fetchValue(primaryKey as string) !== restoreState.id) {
+          this._attributes.writeFromUser(primaryKey as string, restoreState.id);
         }
       }
 
-      if (restoreState.frozen) r._attributes.freeze();
+      if (restoreState.frozen) this._attributes.freeze();
     }
   }
 }
@@ -270,19 +300,19 @@ export function destroy<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
 }
 
 export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
-  await (this.constructor as typeof Base).ensureSchemaLoaded();
+  await this.constructor.ensureSchemaLoaded();
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
 export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
-  await (this.constructor as typeof Base).ensureSchemaLoaded();
+  await this.constructor.ensureSchemaLoaded();
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
 export function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
   return withTransactionReturningStatus.call(
     this,
-    () => Transactions.superMethod(this, "touch")!(...names) as Promise<boolean>,
+    () => rbCallSuper(this, touch, ...names) as Promise<boolean>,
   ) as Promise<boolean>;
 }
 
@@ -290,9 +320,7 @@ export async function withTransactionReturningStatus<T>(
   this: Base,
   fn: () => Promise<T>,
 ): Promise<T> {
-  const modelClass = this.constructor as typeof Base;
-
-  const r = this as any;
+  const modelClass = this.constructor;
 
   let status: T;
 
@@ -314,15 +342,14 @@ export async function withTransactionReturningStatus<T>(
   return status!;
 }
 
-export function _newRecordBeforeLastCommit(this: Base): boolean {
-  return (this as any)._newRecordBeforeLastCommit ?? false;
+export function _newRecordBeforeLastCommit(this: TransactionsRecord): boolean {
+  return this._newRecordBeforeLastCommit ?? false;
 }
 
-export function isTriggerTransactionalCallbacks(this: Base): boolean {
-  const r = this as any;
-  const newBeforeLastCommit = r._newRecordBeforeLastCommit === true;
-  const triggerUpdate = r._triggerUpdateCallback === true;
-  const triggerDestroy = r._triggerDestroyCallback === true;
+export function isTriggerTransactionalCallbacks(this: TransactionsRecord): boolean {
+  const newBeforeLastCommit = this._newRecordBeforeLastCommit === true;
+  const triggerUpdate = this._triggerUpdateCallback === true;
+  const triggerDestroy = this._triggerDestroyCallback === true;
   return (
     ((newBeforeLastCommit || triggerUpdate) && this.isPersisted()) ||
     (triggerDestroy && this.isDestroyed())
@@ -332,50 +359,51 @@ export function isTriggerTransactionalCallbacks(this: Base): boolean {
 // Exported so base.ts can wire them into include(Base, {...}) for parity:api.
 
 /** @internal */
-export function _committedAlreadyCalled(this: Base): boolean | null {
-  return (this as any)._committedAlreadyCalled ?? null;
+export function _committedAlreadyCalled(this: TransactionsRecord): boolean | null {
+  return this._committedAlreadyCalled ?? null;
 }
 
 /** @internal */
-export function _triggerUpdateCallback(this: Base): boolean | null {
-  return (this as any)._triggerUpdateCallback ?? null;
+export function _triggerUpdateCallback(this: TransactionsRecord): boolean | null {
+  return this._triggerUpdateCallback ?? null;
 }
 
 /** @internal */
-export function _triggerDestroyCallback(this: Base): boolean | null {
-  return (this as any)._triggerDestroyCallback ?? null;
+export function _triggerDestroyCallback(this: TransactionsRecord): boolean | null {
+  return this._triggerDestroyCallback ?? null;
 }
 
 /** @internal */
-export function initInternals(this: Base): void {
-  Transactions.superMethod(this, "initInternals")!();
-  const r = this as any;
-  r._startTransactionState = null;
-  r._committedAlreadyCalled = null;
-  r._newRecordBeforeLastCommit = null;
+export function initInternals(this: TransactionsRecord): void {
+  rbCallSuper(this, initInternals);
+  this._startTransactionState = null;
+  this._committedAlreadyCalled = null;
+  this._newRecordBeforeLastCommit = null;
 }
 
 /** @internal */
-export function clearTransactionRecordState(this: Base): void {
-  const r = this as any;
-  if (!r._startTransactionState) return;
-  r._startTransactionState.level -= 1;
-  if (r._startTransactionState.level < 1) r._startTransactionState = null;
+export function clearTransactionRecordState(this: TransactionsRecord): void {
+  if (!this._startTransactionState) return;
+  this._startTransactionState.level -= 1;
+  if (this._startTransactionState.level < 1) this._startTransactionState = null;
 }
 
 /** @internal */
-export function isTransactionIncludeAnyAction(this: Base, actions: string[]): boolean {
-  const r = this as any;
+export function isTransactionIncludeAnyAction(
+  this: TransactionsRecord,
+  actions: string[],
+): boolean {
   return actions.some((action) => {
     switch (action) {
       case "create":
-        return this.isPersisted() && r._newRecordBeforeLastCommit === true;
+        return this.isPersisted() && this._newRecordBeforeLastCommit === true;
       case "update":
         return (
-          !(r._newRecordBeforeLastCommit || this.isDestroyed()) && r._triggerUpdateCallback === true
+          !(this._newRecordBeforeLastCommit || this.isDestroyed()) &&
+          this._triggerUpdateCallback === true
         );
       case "destroy":
-        return r._triggerDestroyCallback === true;
+        return this._triggerDestroyCallback === true;
       default:
         return false;
     }
@@ -442,6 +470,8 @@ function assertValidTransactionAction(actions: string[]): void {
   }
 }
 
-Transactions.defineMethod("beforeCommittedBang", beforeCommittedBang);
-Transactions.defineMethod("touch", touch);
-Transactions.defineMethod("initInternals", initInternals);
+Object.assign(Transactions, {
+  beforeCommittedBang,
+  touch,
+  initInternals,
+});

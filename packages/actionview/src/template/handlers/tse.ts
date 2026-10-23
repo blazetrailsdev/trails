@@ -1,30 +1,51 @@
-import { chomp, classAttribute } from "@blazetrails/activesupport";
-import { rbEqual, registerConstant } from "@blazetrails/ruby-compat";
-import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
-import { ActionView } from "../../namespaces.js";
-import type { TemplateHandler } from "../handlers.js";
+import { chomp, classAttribute, tokenize } from "@blazetrails/activesupport";
 import {
-  translateLocation as translateLocationImpl,
-  type BacktraceLocation,
-  type Spot,
-} from "./tse-translate-location.js";
+  b,
+  encode,
+  Encoding,
+  forceEncoding,
+  isValidEncoding,
+  NotImplementedError,
+  rbEqual,
+  rbObjEncoding,
+  rbStrEnumerateLines,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
+import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
+import { ENCODING_FLAG } from "../../action-view.js";
+import { ActionView } from "../../namespaces.js";
+import { WrongEncodingError } from "../error.js";
+import type { TemplateHandler } from "../handlers.js";
+export class LocationParsingError extends Error {
+  override name = "LocationParsingError";
+}
 
-export {
-  LocationParsingError,
-  type BacktraceLocation,
-  type Spot,
-} from "./tse-translate-location.js";
+/** @noRailsEquivalent PERMANENT */
+export interface BacktraceLocation {
+  lineno: number;
+  column?: number;
+}
+
+export interface Spot {
+  snippet: string;
+  firstLineno: number;
+  lastLineno: number;
+  firstColumn: number;
+  lastColumn: number;
+  scriptLines?: string[];
+}
+
+type OffsetToken = [name: string, str: string | null, offset: number];
 
 export interface TseTemplate {
   type?: unknown;
   format?: string | null;
   shortIdentifier?: string | null;
-  _streaming?: boolean;
 }
 
 export type TseImplementation = (source: string, options?: EmitJsOptions) => EmitResult;
 
-export class Tse implements TemplateHandler {
+export class TSE implements TemplateHandler {
   declare static tseTrimMode: string;
   declare static isTseTrimMode: boolean;
   declare static tseImplementation: TseImplementation;
@@ -34,6 +55,8 @@ export class Tse implements TemplateHandler {
   declare static stripTrailingNewlines: boolean;
   declare static isStripTrailingNewlines: boolean;
   declare stripTrailingNewlines: boolean;
+
+  static readonly ENCODING_TAG = new RegExp(`^(<%${ENCODING_FLAG}-?%>)[ \\t]*`);
 
   static {
     classAttribute.call(this, "tseTrimMode", { default: "-" });
@@ -55,17 +78,54 @@ export class Tse implements TemplateHandler {
   }
 
   translateLocation(spot: Spot, backtraceLocation: BacktraceLocation, source: string): Spot | null {
-    return translateLocationImpl(spot, backtraceLocation, source);
+    try {
+      const sourceLines = rbStrEnumerateLines(source, []);
+      if (sourceLines.length < backtraceLocation.lineno) return null;
+      const tokens = tokenize(sourceLines[backtraceLocation.lineno - 1]);
+      const newFirstColumn = this.findOffset(spot.snippet, tokens, spot.firstColumn);
+      const linenoDelta = spot.firstLineno - backtraceLocation.lineno;
+      spot.firstLineno -= linenoDelta;
+      spot.lastLineno -= linenoDelta;
+
+      const columnDelta = spot.firstColumn - newFirstColumn;
+      spot.firstColumn -= columnDelta;
+      spot.lastColumn -= columnDelta;
+      spot.scriptLines = sourceLines;
+
+      return spot;
+    } catch (e) {
+      if (e instanceof NotImplementedError || e instanceof LocationParsingError) return null;
+      throw e;
+    }
   }
 
-  /** @missingRailsCall include? — PERMANENT */
+  /**
+   * @missingRailsCall include? — PERMANENT
+   * @missingRailsArgs encode! — PERMANENT
+   */
   call(template: TseTemplate, source: string): string {
-    const ctor = this.constructor as typeof Tse;
-    const prepared = this.stripTrailingNewlines ? chomp(source) : source;
+    const ctor = this.constructor as typeof TSE;
+    const templateSource = b(source);
+
+    let encoding: string | null = null;
+    let scanned = "";
+    for (const byte of templateSource) scanned += String.fromCharCode(byte);
+    scanned = scanned.replace(ctor.ENCODING_TAG, (_tag, _comment, name: string) => {
+      encoding = name;
+      return "";
+    });
+    let tse = forceEncoding(
+      Uint8Array.from(scanned, (c) => c.charCodeAt(0)),
+      this.validEncoding(source, encoding),
+    );
+
+    tse = encode(tse, Encoding.defaultInternal ?? Encoding.UTF_8);
+
+    const prepared = this.stripTrailingNewlines ? chomp(tse as string) : (tse as string);
     const options: EmitJsOptions = {
       escapeIgnore: ctor.escapeIgnoreList.some((type) => rbEqual(type, template.type)),
       trim: ctor.tseTrimMode === "-",
-      async: template._streaming === true,
+      async: true,
     };
     if (
       ActionView.Base.annotateRenderedViewWithFilenames &&
@@ -84,6 +144,70 @@ export class Tse implements TemplateHandler {
       )
       .replace(/\}\n$/u, "");
   }
+
+  /** @internal */
+  private validEncoding(string: string | Uint8Array, encoding: string | null): Encoding {
+    if (encoding != null) string = forceEncoding(b(string), encoding);
+
+    if (
+      typeof string === "string" ||
+      isValidEncoding(
+        Array.from(string, (byte) => String.fromCharCode(byte)).join(""),
+        rbObjEncoding(string),
+      )
+    ) {
+      return rbObjEncoding(string);
+    }
+
+    throw new WrongEncodingError(
+      Array.from(string, (byte) => String.fromCharCode(byte)).join(""),
+      rbObjEncoding(string),
+    );
+  }
+
+  /** @internal */
+  private findOffset(
+    compiled: string,
+    sourceTokens: [string, string][],
+    errorColumn: number,
+  ): number {
+    const tokens = this.offsetSourceTokens(sourceTokens);
+    let pos = 0;
+
+    for (let i = 0; i < tokens.length - 1; i++) {
+      const [name, str, offset] = tokens[i] as [string, string, number];
+      const [, nextStr] = tokens[i + 1];
+      let matchedStr = false;
+
+      while (pos < compiled.length) {
+        if (matchedStr && nextStr != null && compiled.startsWith(nextStr, pos)) {
+          break;
+        } else if (compiled.startsWith(str, pos)) {
+          matchedStr = true;
+          if (name === ":CODE" && pos <= errorColumn && pos + str.length >= errorColumn) {
+            return errorColumn - pos + offset;
+          }
+          pos += str.length;
+        } else {
+          pos += 1;
+        }
+      }
+    }
+
+    throw new LocationParsingError("Couldn't find code snippet");
+  }
+
+  /** @internal */
+  private offsetSourceTokens(sourceTokens: [string, string][]): OffsetToken[] {
+    let sourceOffset = 0;
+    const withOffset: OffsetToken[] = [];
+    for (const [name, str] of sourceTokens) {
+      if (name === ":CODE" || name === ":TEXT") withOffset.push([name, str, sourceOffset]);
+      sourceOffset += str.length;
+    }
+    withOffset.push([":EOS", null, sourceOffset]);
+    return withOffset;
+  }
 }
 
-registerConstant("ActionView::Template::Handlers::TSE", Tse);
+registerConstant("ActionView::Template::Handlers::TSE", TSE);

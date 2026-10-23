@@ -12,9 +12,11 @@ import {
   ArgumentError,
   File,
   NoMethodError,
+  rbObjRespondTo,
   rtest,
   stringToSym,
   symbolToS,
+  include,
 } from "@blazetrails/ruby-compat";
 import { Template } from "../template.js";
 import {
@@ -24,10 +26,11 @@ import {
   pathToStylesheet,
   type AssetPathOptions,
   type AssetUrlHelperHost,
+  AssetUrlHelper,
 } from "./asset-url-helper.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
 import { safeJoin } from "./output-safety-helper.js";
-import { contentTag, tag, type TagBuilder, type TagHelperHost } from "./tag-helper.js";
+import { contentTag, tag, type TagBuilder, type TagHelperHost, TagHelper } from "./tag-helper.js";
 
 export let imageLoading: string | null = null;
 
@@ -57,7 +60,7 @@ export const MAX_HEADER_SIZE = 1_000;
 
 interface PreloadHeaderHost {
   request?: { sendEarlyHints(links: Record<string, string>): void } | null;
-  response?: {
+  response?(): {
     readonly isSending: boolean;
     headers: { get(key: string): string | undefined; set(key: string, value: string): void };
   } | null;
@@ -316,9 +319,13 @@ export function imageTag(
   return tag.call(this, "img", options) as SafeBuffer;
 }
 
+/**
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+ */
 export function pictureTag(
   this: AssetTagHelperHost & CaptureHelperHost,
-  ...sources: unknown[]
+  ...sources: [...unknown[], () => unknown] | unknown[]
 ): SafeBuffer {
   const block =
     typeof sources[sources.length - 1] === "function"
@@ -332,7 +339,10 @@ export function pictureTag(
 
   return contentTag.call(this, "picture", options, null, undefined, () => {
     if (isPresent(block)) {
-      return htmlSafe(capture.call(this, block!)!.toString());
+      const captured = capture.call(this, block!);
+      if (captured instanceof Promise)
+        return captured.then((captured) => htmlSafe(captured!.toString()));
+      return htmlSafe(captured!.toString());
     } else if (sources.length <= 1) {
       return imageTag.call(this, sources[sources.length - 1], imageOptions);
     } else {
@@ -474,8 +484,8 @@ export function sendPreloadLinksHeader(
   maxHeaderSize: number = MAX_HEADER_SIZE,
 ): void {
   if (preloadLinks.length === 0) return;
-  const responsePresent = this.response ?? null;
-  if (responsePresent && responsePresent.isSending) return;
+  const responsePresent = rbObjRespondTo(this, "response") && this.response!();
+  if (rtest(responsePresent) && responsePresent.isSending) return;
 
   if (this.request) {
     this.request.sendEarlyHints({ link: preloadLinks.join(",") });
@@ -517,3 +527,24 @@ function deleteKey(hash: Record<string, unknown>, key: string): unknown {
   delete hash[key];
   return value;
 }
+
+export const AssetTagHelper = {
+  javascriptIncludeTag,
+  stylesheetLinkTag,
+  autoDiscoveryLinkTag,
+  faviconLinkTag,
+  preloadLinkTag,
+  imageTag,
+  pictureTag,
+  videoTag,
+  audioTag,
+  multipleSourcesTagBuilder,
+  resolveAssetSource,
+  extractDimensions,
+  checkForImageTagErrors,
+  resolveLinkAs,
+  sendPreloadLinksHeader,
+};
+
+include(AssetTagHelper, AssetUrlHelper);
+include(AssetTagHelper, TagHelper);

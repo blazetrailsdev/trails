@@ -53,10 +53,8 @@ describe("MessageEncryptorTest", () => {
   });
 
   it("messing with either encrypted values causes failure", () => {
-    const [text, iv] = (verifier.verify(encryptor.encryptAndSign(data)) as string).split("--") as [
-      string,
-      string,
-    ];
+    const verified = verifier.verify(encryptor.encryptAndSign(data)) as Uint8Array;
+    const [text, iv] = new TextDecoder().decode(verified).split("--") as [string, string];
     assertNotDecrypted([iv, text].join("--"));
     assertNotDecrypted([text, munge(iv)].join("--"));
     assertNotDecrypted([munge(text), iv].join("--"));

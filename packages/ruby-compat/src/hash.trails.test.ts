@@ -38,6 +38,7 @@ import { KeyError } from "./key-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { IndexError } from "./index-error.js";
 import { RuntimeError } from "./runtime-error.js";
+import { rbObjDup } from "./include.js";
 
 describe("Hash#fetch", () => {
   it("looks up an object key in a Map, keeping a stored nil or false", () => {
@@ -518,6 +519,24 @@ describe("Hash and JSON.stringify", () => {
     hash.set("name", [1]);
     expect(JSON.stringify({ errors: hash })).toBe('{"errors":{"name":[1]}}');
   });
+
+  it("writes a Symbol key under its name, as Symbol#to_s does", () => {
+    const hash = new Hash<unknown, number>().set(":name", 1).set(2, 3);
+    expect(JSON.stringify(hash)).toBe('{"2":3,"name":1}');
+  });
+});
+
+describe("rbObjDup of a Hash", () => {
+  it("copies the table through Hash#initialize_copy, unfrozen", () => {
+    const hash = new Hash<unknown, number>().set(":a", 1).freeze();
+    const dup = rbObjDup(hash);
+    dup.set(":b", 2);
+    expect([...dup]).toEqual([
+      [":a", 1],
+      [":b", 2],
+    ]);
+    expect([...hash]).toEqual([[":a", 1]]);
+  });
 });
 
 describe("Hash#slice", () => {
@@ -670,6 +689,8 @@ describe("Hash#default", () => {
 
     expect(dup(hash)).toBeInstanceOf(Upcased);
     expect([...dup(hash)]).toEqual([["a", 1]]);
+    expect(hash.toH()).toEqual({ a: 1 });
+    hash.setDefault(0);
     expect(hash.toH().constructor).toBe(Hash);
   });
 
@@ -809,9 +830,21 @@ describe("hashReplace", () => {
   it("raises FrozenError on a frozen receiver", () => {
     expect(() => hashReplace(Object.freeze({ foo: 0 }), {})).toThrow(/can't modify frozen Hash/);
   });
+
+  it("empties a Hash receiver and copies a plain object into it", () => {
+    const hash = new Hash<string, unknown>().set("foo", 0).set("bar", 1);
+    expect(hashReplace(hash, { baz: 2 })).toBe(hash);
+    expect([...hash]).toEqual([["baz", 2]]);
+  });
 });
 
 describe("hashDelete", () => {
+  it("raises FrozenError on a frozen receiver, hit or miss, as rb_hash_modify_check does", () => {
+    const hash = Object.freeze({ foo: 0 });
+    expect(() => hashDelete(hash, "foo")).toThrow(FrozenError);
+    expect(() => hashDelete(hash, "missing")).toThrow(FrozenError);
+  });
+
   it("removes the entry and returns its stored value, including a stored nil", () => {
     const hash: Record<string, number | null> = { foo: 0, bar: null };
     expect(hashDelete(hash, "foo")).toBe(0);
@@ -863,8 +896,15 @@ describe("hashAref / hashAset", () => {
 describe("Array#values_at", () => {
   it("reads each index, counting a negative one from the end", () => {
     expect(valuesAt("a.b".split("."), -2, -1)).toEqual(["a", "b"]);
-    expect(valuesAt("b".split("."), -2, -1)).toEqual([undefined, "b"]);
-    expect(valuesAt([1, 2, 3], 0, 5, -4, -1)).toEqual([1, undefined, undefined, 3]);
+    expect(valuesAt("b".split("."), -2, -1)).toEqual([null, "b"]);
+    expect(valuesAt([1, 2, 3], 0, 5, -4, -1)).toEqual([1, null, null, 3]);
+  });
+});
+
+describe("Hash#values_at", () => {
+  it("answers nil for a key the hash does not hold", () => {
+    expect(valuesAt({ a: 1 }, "a", "b")).toEqual([1, null]);
+    expect(valuesAt(new Map([["a", 1]]), "a", "b")).toEqual([1, null]);
   });
 });
 
@@ -1297,5 +1337,32 @@ describe("Hash#merge (Hash receiver)", () => {
       ["a", 3],
       ["b", 3],
     ]);
+  });
+});
+
+const fetchAny = fetch as (...args: unknown[]) => unknown;
+
+describe("Hash#fetch arity", () => {
+  it("raises ArgumentError for more than two arguments", () => {
+    expect(() => fetchAny({}, "k", 1, 2)).toThrow(
+      "wrong number of arguments (given 3, expected 1..2)",
+    );
+  });
+
+  it("lets a block supersede the default", () => {
+    expect(
+      fetchAny(
+        {},
+        "k",
+        1,
+        block((k: string) => `${k}!`),
+      ),
+    ).toBe("k!");
+  });
+});
+
+describe("Hash.new", () => {
+  it("raises ArgumentError for a default and a block", () => {
+    expect(() => new Hash("1", () => "2")).toThrow(ArgumentError);
   });
 });

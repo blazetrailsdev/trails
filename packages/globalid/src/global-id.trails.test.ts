@@ -1,23 +1,19 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { setApp, _resetApp } from "./config.js";
 import { GlobalID } from "./global-id.js";
 import { Locator } from "./locator.js";
 import { GID } from "./uri/gid.js";
 
 describe("GlobalID (trails)", () => {
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
   });
 
   it("deconstruct_keys delegates to the uri", () => {
-    setApp("bcx");
+    GlobalID.setApp("bcx");
     const gid = GlobalID.create({ id: 5, constructor: { name: "Person" } }, { db: "primary" });
-    expect(gid.deconstructKeys()).toEqual({
-      app: "bcx",
-      modelName: "Person",
-      modelId: "5",
-      params: { db: "primary" },
-    });
+    const keys = gid.deconstructKeys();
+    expect([keys.app, keys.modelName, keys.modelId]).toEqual(["bcx", "Person", "5"]);
+    expect(keys.params!.get("db")).toBe("primary");
   });
 
   it("default_locator sets Locator.default_locator", async () => {
@@ -44,7 +40,7 @@ describe("GlobalID (trails)", () => {
   });
 
   it("parse falls back to parse_encoded_gid", () => {
-    setApp("bcx");
+    GlobalID.setApp("bcx");
     const gid = GlobalID.create({ id: 5, constructor: { name: "Person" } });
     expect(GlobalID.parse(gid.toParam())!.toString()).toBe("gid://bcx/Person/5");
     expect(GlobalID.parse("not a gid at all")).toBeNull();

@@ -28,6 +28,46 @@ the `declare` / associations / enums / schema reference live in
   never raw SQL strings. Use `@blazetrails/activemodel` for
   validations/callbacks and `@blazetrails/activesupport` for inflection.
 
+## Porting a Minitest assertion
+
+A Minitest built-in assertion (`vendor/minitest/v5.27.0/lib/minitest/assertions.rb`)
+ports as a Vitest `expect`, never as a helper. The built-in matcher is the
+default. A matcher from `@blazetrails/vitest-matchers` (loaded in every vitest
+project through `@blazetrails/vitest-matchers/setup`) is used only where the
+built-in gives the wrong result for that test, and test code never calls a
+ruby-compat function to assert. In Minitest `exp` is the first argument; in
+`expect` the actual value goes in `expect(...)`, so the order flips. A `msg`
+argument becomes `expect(x, msg)`. The `refute_*` / `assert_not_*` forms
+(`refute_equal`, `refute_nil`, `assert_not_empty`, …) are the same row with
+`.not`. `scripts/test-compare/assertion-kinds.ts` credits the built-in and the
+Ruby matcher of a row with the same kind.
+
+| Minitest (`assertions.rb`)               | Built-in                                                                               | Ruby matcher                           | Use the Ruby matcher only when                                   |
+| ---------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------- |
+| `assert x` / `refute x` (`:171`, `:650`) | `toBeTruthy()` / `toBeFalsy()`                                                         | `toBeRubyTruthy()` / `toBeRubyFalsy()` | the value can be `0`, `""` or `NaN`                              |
+| `assert_predicate o, :foo?` (`:394`)     | `expect(o.isFoo()).toBe(true)`                                                         | `expect(o.foo()).toBeRubyTruthy()`     | `foo?` returns a value rather than a boolean                     |
+| `assert_equal exp, act` (`:220`)         | `expect(act).toEqual(exp)`                                                             | `expect(act).toEqualRuby(exp)`         | the value defines Ruby `==` (records, `Duration`, `BigDecimal`)  |
+| `assert_nil x` (`:305`)                  | `toBeNull()`                                                                           |                                        |                                                                  |
+| `assert_same exp, act` (`:463`)          | `expect(act).toBe(exp)`                                                                |                                        |                                                                  |
+| `assert_in_delta exp, act, d` (`:241`)   | `expect(act).toBeCloseTo(exp, digits)`                                                 | `expect(act).toBeWithinDelta(exp, d)`  | `toBeCloseTo`'s digit precision does not express the delta       |
+| `assert_empty o` (`:188`)                | `expect(o).toHaveLength(0)`                                                            | `expect(o).toBeEmpty()`                | the receiver has no `length` (`Map`, `Set`, a Hash, an `empty?`) |
+| `assert_includes c, o` (`:260`)          | `toContainEqual(o)` (Array), `toContain(o)` (String), `toHaveProperty([o])` (Hash key) |                                        |                                                                  |
+| `assert_instance_of cls, o` (`:271`)     | `expect(o).toBeInstanceOf(cls)`                                                        | `expect(o).toBeExactInstanceOf(cls)`   | the subclass distinction matters                                 |
+| `assert_kind_of cls, o` (`:282`)         | `expect(o).toBeInstanceOf(cls)`                                                        |                                        |                                                                  |
+| `assert_respond_to o, :m` (`:453`)       | `expect(typeof o.m).toBe("function")`                                                  | `expect(o).toRespondTo("m")`           | the name is answered by `respond_to_missing?`                    |
+| `assert_match m, s` (`:293`)             | `expect(s).toMatch(m)`                                                                 |                                        |                                                                  |
+| `assert_operator a, :<, b` (`:315`)      | `toBeLessThan` / `toBeGreaterThan` / `…OrEqual`                                        |                                        |                                                                  |
+| `flunk msg` (`:624`)                     | `expect.unreachable(msg)`                                                              |                                        |                                                                  |
+| `skip msg` (`:825`)                      | `ctx.skip()`, or `it.skip` under a `PERMANENT-SKIP:` line                              |                                        |                                                                  |
+
+A built-in can also wrongly _pass_: `toBeFalsy` passes on `0`, which Ruby
+treats as truthy, so a test going green is not the only signal. Check the type
+of the value under test before choosing the built-in.
+
+A Rails test that asserts on a Minitest failure message or `diff` output loses
+that assertion permanently. Record it with a row in
+`scripts/test-compare/assertion-receipts.ts`.
+
 ## Rails-private helpers and `@internal` JSDoc
 
 **Rails-private helpers must carry `@internal` JSDoc.** The website's
@@ -299,71 +339,36 @@ pinned by an only-shrink ratchet (RFC 0025):
 
 ```sh
 pnpm parity:test:assertions          # gate
-pnpm parity:test:assertions:reseed   # lower the mark after convergence
 ```
 
-The high-water mark is `scripts/test-compare/assertion-mismatch-mark.json`: one
-entry per package, three counters each. **A `0` there means converged only
-because every package is measured.** While the counters were scoped to a subset,
-a package outside it carried a 0/0/0 mark that read as convergence and was
-really "never measured": its three counters had a single increment site each,
-all behind the scoping guard, so the zero was produced by construction. RFC 0105
-left six packages in that state — abstractcontroller, actioncontroller,
-actiondispatch, actionview, rack and trailties — and because `--write` only
-lowers, reseeding could not correct them; the six marks had to be written up to
-their first real measurement by hand, once, when the scoping set was removed. CI runs the gate in the
-`rails-comparison` job ("Assertion-mismatch ratchet"). Like the call-mismatch
-unreviewed counter, the arm is **aggregate** — the guarantee is "assertion-level
-debt never grows", not that every remaining mismatch has been reviewed.
-Converging one test while porting another that asserts less is a neutral trade
-the gate lets through; the reviewer of the diff enforces the stronger rule.
-Shrinkage is auto-acknowledged: `--write` (the `:reseed` script) lowers each
-counter to its current value and never raises one, so a run that grew a counter
-cannot buy headroom by reseeding.
-
-**A reseed is refused while `scripts/test-compare/assertion-mismatch-mark.freeze`
-exists**, and the marker's own text says which campaign froze the mark and which
-story lifts it. `--write` is not scoped — it rewrites every package in the
-artifact — so during a convergence campaign whose stories all land in one
-package, a single reflexive reseed both serializes those stories onto this file
-and tightens unrelated packages in a diff nobody asked for. Freezing costs
-nothing the gate was providing: the mark only shrinks, so one sitting above the
-measurement stays green, and the campaign lowers it in one pass at the end. What
-it does cost is ENFORCEMENT on the ground already converged: a regression inside
-the accumulated slack does not fail the gate. So a freeze is scoped to one
-campaign and deleted with it, and while it is up every gate run over a
-complete artifact prints the slack it is carrying, per package and per counter —
-including a run that FAILS on some other counter — the protection currently suspended,
-stated in the run that is not enforcing it. Those numbers only ever fall; one
-that rises is a regression the gate deliberately let through, and the reviewer of
-the converging PR is who catches it. RFC 0132 (ar-closure-assertion-parity) held the one freeze to
-date; its closing story deleted the marker and reseeded once, so no freeze is up
-now.
+Nothing is committed (RFC 0127). Main's CI uploads
+`convention-comparison.json` as the artifact `parity-outputs-<sha>`, and the
+gate compares each package's three counters against that artifact for its base
+— the merge commit's first parent under CI, `origin/main` locally
+(`scripts/parity/main-artifact.ts`). When main has no artifact for that commit
+the gate recomputes it on a detached worktree of the base. A counter above its
+base count, or a package the base never measured, fails the gate; shrinkage
+needs no write, so there is no reseed, no freeze and no mark to conflict on.
+CI runs the gate in the `rails-comparison` job ("Assertion-mismatch ratchet").
+The arm is **aggregate** — the guarantee is "assertion-level debt never grows",
+not that every remaining mismatch has been reviewed. Converging one test while
+porting another that asserts less is a neutral trade the gate lets through; the
+reviewer of the diff enforces the stronger rule.
 
 **The stale-artifact trap**: the counts are read from
 `scripts/test-compare/output/convention-comparison.json` — no second extractor.
 Gating a file written before a sibling PR's tests landed reports movement that
-never happened, and reseeding would commit that fiction as the new mark. So a
-plain local run regenerates the artifact itself (`pnpm parity:test --json`)
-before gating. `--no-regen` (what CI uses, since it writes the artifact in the
-preceding step) gates whatever is on disk. A partial-scope run is caught
-separately: if a package in the mark is missing from the artifact — a
-`--package` filter, an unfetched vendor source — the lint fails rather than
-letting the reseed drop that package's mark.
+never happened, so a plain local run regenerates the artifact itself
+(`pnpm parity:test --json`) before gating. `--no-regen` (what CI uses, since it
+writes the artifact in the preceding step) gates whatever is on disk. Locally
+the base is your `origin/main` ref, so `git fetch` first or the gate compares
+against an old base. A partial-scope run is caught separately: if a package in
+the base is missing from the artifact — a `--package` filter, an unfetched
+vendor source — the lint fails rather than reading it as converged.
 
 Once the counters are pinned their burn rate is measurable, which is what the
 ActiveRecord release estimate needs to price promoting this from a ratchet to a
 hard release gate (the path `gates.ts` already took: advisory → ratchet → zero).
-
-The advisory **arity** check has its own reasoned suppression file,
-`scripts/api-compare/arity-exclude.json` (RFC 0072), keyed by
-`package + rubyFile + rubyName` with a mandatory `reason` per entry. `pnpm
-parity:api` applies it — an excluded pair drops out of both the mismatch list
-and the compared denominator, and the summary reports `N excluded`. `pnpm
-parity:api:arity` (a CI step) fails on a malformed entry or a **stale** one: excludes
-are a ratchet, so an entry whose pair converged (or no longer exists) must be
-deleted by hand. There is deliberately no reseed — an exclude only ever earns
-its place by being written with its justification.
 
 "Misplaced" means tests exist but are in
 the wrong file per Rails layout — they need to be moved, not rewritten. The

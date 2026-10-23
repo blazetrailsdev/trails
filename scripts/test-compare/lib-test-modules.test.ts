@@ -4,7 +4,11 @@ import * as os from "os";
 import * as path from "path";
 import { promisify } from "util";
 import { describe, expect, it } from "vitest";
-import { collectLibTests, extractTestsFromSource } from "./extract-ts-core.js";
+import {
+  collectLibTests,
+  collectRequiredTests,
+  extractTestsFromSource,
+} from "./extract-ts-core.js";
 
 const RUBY_SCRIPT = path.join(__dirname, "extract-ruby-tests.rb");
 
@@ -85,5 +89,36 @@ describe("a test case that includes a lib module of tests", () => {
     const source = `it("to key", () => { other.testToKey(model); });`;
     const { testCases } = extractTestsFromSource(source, "lint.test.ts", libTests);
     expect(testCases[0].assertionCount).toBe(0);
+  });
+});
+
+describe("a shared suite imported from a required test module", () => {
+  const COMMON_TS = `
+    import { expect, it } from "vitest";
+    export function commonSubscriptionAdapterTest(host) {
+      it("basic broadcast", async () => {
+        expect(await host.queue.pop()).toBe("hello world");
+      });
+    }
+  `;
+  const requiredTests = collectRequiredTests(
+    COMMON_TS,
+    "common.ts",
+    "commonSubscriptionAdapterTest",
+  );
+
+  it("credits the suite's cases to the file that calls it", () => {
+    const source = `describe("AsyncAdapterTest", () => {
+      commonSubscriptionAdapterTest(host);
+    });`;
+    const { testCases } = extractTestsFromSource(source, "async.test.ts", new Map(), requiredTests);
+    expect(testCases.map((tc) => tc.description)).toEqual(["basic broadcast"]);
+    expect(testCases[0].assertionKinds).toEqual(["toBe"]);
+  });
+
+  it("credits nothing to a file that does not call it", () => {
+    const source = `describe("AsyncAdapterTest", () => {});`;
+    const { testCases } = extractTestsFromSource(source, "async.test.ts", new Map(), requiredTests);
+    expect(testCases).toEqual([]);
   });
 });

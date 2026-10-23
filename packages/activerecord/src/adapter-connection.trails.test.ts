@@ -7,6 +7,7 @@ import { Result } from "./result.js";
 import { adapterType } from "./test-adapter.js";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { resultFromRowHashes } from "./test-helpers/result-from-row-hashes.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class LifecycleTestAdapter extends AbstractAdapter {
   private _connected = false;
@@ -79,6 +80,7 @@ class PostForRetryTest extends Base {
 }
 
 describe("AdapterConnection retryable classification (trails-only)", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("a from(Arel node) clause does not reset the SELECT's retryable classification", async () => {
     const adapter = new QueryTestAdapter({});
     adapter.simulateConnect();
@@ -148,6 +150,7 @@ class ReconnectLifecycleAdapter extends AbstractAdapter {
 }
 
 describe("AbstractAdapter reconnect/verify lifecycle", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("reconnectBang re-enables lazy transactions, clears the cache, and reconfigures", async () => {
     const a = new ReconnectLifecycleAdapter({});
     a.attachRawConnection();
@@ -262,6 +265,7 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
 });
 
 describe("AbstractAdapter#isValidType spelling (trails-only)", () => {
+  fixtures({}, { useTransactionalTests: false });
   it.runIf(adapterType === "postgres")(
     "rejects a camelCase spelling of a native type",
     async () => {

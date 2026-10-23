@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { constantize } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import * as ActiveJobModule from "./index.js";
-import { ActiveJob, QueueAdapters, Serializers } from "./namespaces.js";
+import { ActiveJob, QueueAdapters } from "./namespaces.js";
+import { Serializers } from "./serializers.js";
 
 describe("ActiveJob", () => {
   afterEach(() => ActiveJobModule.setVerboseEnqueueLogs(false));

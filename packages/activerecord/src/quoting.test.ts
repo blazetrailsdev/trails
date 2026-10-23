@@ -7,7 +7,7 @@ import {
   quote as quoteFn,
   quoteString,
   quoteColumnName,
-  quoteTableName as quoteTableNameFn,
+  ClassMethods,
   quotedDate as quotedDateFn,
   quotedTime as quotedTimeFn,
   quotedTrue,
@@ -17,7 +17,7 @@ import {
 
 const HOST = quotingHost();
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
-const quoteTableName = (name: string): string => quoteTableNameFn.call(HOST, name);
+const quoteTableName = (name: string): string => ClassMethods.quoteTableName.call(HOST, name);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 const quotedTime = (value: Parameters<typeof quotedTimeFn>[0]): string =>
   quotedTimeFn.call(HOST, value);
@@ -125,7 +125,7 @@ describe("QuotingTest", () => {
         return "lol";
       },
     });
-    expect(quoteTableNameFn.call(host, "foo")).toBe("lol");
+    expect(ClassMethods.quoteTableName.call(host, "foo")).toBe("lol");
   });
   it("quoted timestamp local", () => {
     setDefaultTimezone("local");

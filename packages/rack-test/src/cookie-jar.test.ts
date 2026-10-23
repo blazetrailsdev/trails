@@ -1,5 +1,5 @@
 import { assertEmpty } from "@blazetrails/activesupport";
-import { URI } from "@blazetrails/ruby-compat";
+import { URI, rbObjClone, rbObjDup } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Cookie, CookieJar } from "./cookie-jar.js";
 
@@ -7,13 +7,10 @@ describe("Rack::Test::CookieJar", () => {
   const cookieValue = "foo;abc";
   const cookieName = "a_cookie_name";
 
-  const dup = (jar: CookieJar): CookieJar =>
-    (Object.create(CookieJar.prototype) as CookieJar).initializeCopy(jar);
-
   it("copies should not share a cookie jar", () => {
     const jar = new CookieJar();
-    const jarDup = dup(jar);
-    const jarClone = dup(jar);
+    const jarDup = rbObjDup(jar);
+    const jarClone = rbObjClone(jar);
 
     jar.set("a", "b");
     expect(jar.toHash()).toEqual({ a: "b" });

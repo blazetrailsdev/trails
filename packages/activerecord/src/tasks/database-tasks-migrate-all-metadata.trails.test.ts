@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -7,18 +7,23 @@ import { DEFAULT_ENV } from "../connection-handling.js";
 import { Base } from "../base.js";
 import { dumpSchemaAfterMigration, setDumpSchemaAfterMigration } from "../active-record.js";
 import { MIGRATIONS_ROOT } from "../config.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
+import { restoreWorkerConnection } from "../support/connection.js";
 
 describe("DatabaseTasksMigrateAllMetadataTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   const dirs: string[] = [];
+  let prevConfigs: ReturnType<typeof Base.configurations>;
+
+  beforeEach(() => {
+    prevConfigs = Base.configurations();
+  });
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    Base.configurations({});
-    try {
-      await Base.removeConnection();
-    } catch {
-      void 0;
-    }
+    await Base.removeConnection();
+    Base.configurations(prevConfigs);
+    await restoreWorkerConnection();
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
   });
 

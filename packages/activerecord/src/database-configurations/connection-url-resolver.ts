@@ -6,13 +6,7 @@ import {
   reverseMerge,
   transformKeys,
 } from "@blazetrails/activesupport";
-import {
-  type Generic,
-  merge,
-  RFC2396Parser,
-  RuntimeError,
-  stringSplit,
-} from "@blazetrails/ruby-compat";
+import { type Generic, RFC2396Parser, RuntimeError, stringSplit } from "@blazetrails/ruby-compat";
 import { protocolAdapters } from "../active-record.js";
 
 export class ConnectionUrlResolver {
@@ -62,10 +56,7 @@ export class ConnectionUrlResolver {
   /** @internal */
   private rawConfig(): Record<string, unknown> {
     if (this.uri.opaque != null) {
-      return merge(this.queryHash(), {
-        adapter: this.adapter,
-        database: this.uri.opaque,
-      });
+      return { ...this.queryHash(), adapter: this.adapter, database: this.uri.opaque };
     } else {
       return reverseMerge(this.queryHash(), {
         adapter: this.adapter,

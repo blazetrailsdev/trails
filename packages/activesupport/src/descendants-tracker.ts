@@ -1,4 +1,4 @@
-import { Module } from "@blazetrails/ruby-compat";
+import { classModule } from "@blazetrails/ruby-compat";
 
 export type AnyClass = abstract new (...args: unknown[]) => unknown;
 
@@ -15,6 +15,10 @@ export const ReloadedClassesFiltering = {
 };
 
 export class WeakSet<T extends object> {
+  static toString(): string {
+    return "ActiveSupport::DescendantsTracker::WeakSet";
+  }
+
   private _map = new globalThis.WeakMap<T, boolean>();
   private _refs: WeakRef<T>[] = [];
   private _addsSinceCompact = 0;
@@ -113,34 +117,24 @@ export declare namespace DescendantsTracker {
   export type WeakSet<T extends object> = WeakSetInstance<T>;
 }
 
-export const DescendantsTracker = new Module() as Module & {
-  WeakSet: typeof WeakSet;
-  registerSubclass: typeof registerSubclass;
-  subclasses: typeof subclasses;
-  descendants: typeof descendants;
-  disableClearBang: typeof disableClearBang;
-  clear: typeof clear;
-  rejectBang: typeof rejectBang;
-};
-DescendantsTracker.WeakSet = WeakSet;
-DescendantsTracker.registerSubclass = registerSubclass;
-DescendantsTracker.subclasses = subclasses;
-DescendantsTracker.descendants = descendants;
-DescendantsTracker.disableClearBang = disableClearBang;
-DescendantsTracker.clear = clear;
-DescendantsTracker.rejectBang = rejectBang;
-DescendantsTracker.moduleEval((carrier) =>
-  Object.defineProperty(carrier, "descendants", {
-    get(this: AnyClass): AnyClass[] {
-      const subclasses = DescendantsTracker.rejectBang(DescendantsTracker.subclasses(this));
-      return subclasses.concat(
-        subclasses.flatMap(
-          (klass) => (klass as unknown as { descendants: AnyClass[] }).descendants,
-        ),
-      );
-    },
-    configurable: true,
-  }),
-);
+export class DescendantsTracker {
+  static readonly [classModule] = true;
+  static WeakSet = WeakSet;
+  static registerSubclass = registerSubclass;
+  static subclasses = subclasses;
+  static descendants = descendants;
+  static disableClearBang = disableClearBang;
+  static clear = clear;
+  static rejectBang = rejectBang;
+
+  get descendants(): AnyClass[] {
+    const subclasses = DescendantsTracker.rejectBang(
+      DescendantsTracker.subclasses(this as unknown as AnyClass),
+    );
+    return subclasses.concat(
+      subclasses.flatMap((klass) => (klass as unknown as { descendants: AnyClass[] }).descendants),
+    );
+  }
+}
 
 export { DescendantsTracker as default };

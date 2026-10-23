@@ -1,8 +1,10 @@
 import { beforeEach, afterEach, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 describeIfMysqlAdapter("TestAdapterWithInvalidConnection", () => {
+  fixtures({}, { useTransactionalTests: false });
   class Bird extends Base {}
 
   beforeEach(async () => {

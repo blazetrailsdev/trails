@@ -32,7 +32,7 @@ export class User extends Base {
     this.hasOne("ownedRoom", { className: "Room", foreignKey: "owner_id" });
     this.hasOne(
       "familyTree",
-      function (this: any) {
+      function () {
         return this.where({ token: null });
       },
       { foreignKey: "member_id" },

@@ -1,4 +1,4 @@
-import { Module, registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 
-export const UsersHelpeR = new Module().include({});
+export const UsersHelpeR = {};
 registerConstant("Admin::UsersHelpeR", UsersHelpeR);

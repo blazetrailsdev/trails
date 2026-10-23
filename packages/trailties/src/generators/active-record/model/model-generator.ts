@@ -96,7 +96,11 @@ export class ModelGenerator extends NamedBase {
       `app/models/${fileName}${ext}`,
       `${importPath}
 
-export class ${className} extends ${parentClass} {${staticBlock}}
+export class ${className} extends ${parentClass} {
+  static toString(): string {
+    return ${JSON.stringify(this.className())};
+  }
+${staticBlock}}
 `,
     );
   }

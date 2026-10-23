@@ -4,14 +4,14 @@ import { KeyValue, type Store } from "./key-value.js";
 import { Simple } from "./simple.js";
 import { config, resetConfig, t } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
-import type { TranslationData } from "../utils.js";
+import { deepSymbolizeKeys, type TranslationData } from "../utils.js";
 
 describe("I18nBackendChainTest", () => {
   let first: Simple;
   let second: Simple;
   let chain: Chain;
 
-  function backend(translations: TranslationData): Simple {
+  function backend(translations: Record<string, unknown>): Simple {
     const backend = new Simple();
     for (const [locale, data] of Object.entries(translations)) {
       backend.storeTranslations(locale, data as TranslationData);
@@ -59,12 +59,12 @@ describe("I18nBackendChainTest", () => {
   });
 
   it("looks up translations from the first chained backend", () => {
-    expect((send(first, "translations")["en"] as TranslationData)["foo"]).toBe("Foo");
+    expect((send(first, "translations").get(":en") as TranslationData).get(":foo")).toBe("Foo");
     expect(t("foo")).toBe("Foo");
   });
 
   it("looks up translations from the second chained backend", () => {
-    expect((send(second, "translations")["en"] as TranslationData)["bar"]).toBe("Bar");
+    expect((send(second, "translations").get(":en") as TranslationData).get(":bar")).toBe("Bar");
     expect(t("bar")).toBe("Bar");
   });
 
@@ -76,8 +76,10 @@ describe("I18nBackendChainTest", () => {
 
   it("default", () => {
     expect(t(null, { default: "Fuh" })).toBe("Fuh");
-    expect(t(null, { default: { zero: "Zero" }, count: 0 })).toBe("Zero");
-    expect(t(null, { default: { zero: "Zero" } })).toEqual({ zero: "Zero" });
+    expect(t(null, { default: deepSymbolizeKeys({ zero: "Zero" }), count: 0 })).toBe("Zero");
+    expect(t(null, { default: deepSymbolizeKeys({ zero: "Zero" }) })).toEqual(
+      deepSymbolizeKeys({ zero: "Zero" }),
+    );
     expect(t(null, { default: ":foo" })).toBe("Foo");
   });
 
@@ -86,19 +88,21 @@ describe("I18nBackendChainTest", () => {
   });
 
   it("namespace lookup collects results from all backends and merges deep hashes", () => {
-    expect(t("formats")).toEqual({
-      long: "long",
-      subformats: { long: "long", short: "short" },
-      short: "short",
-    });
+    expect(t("formats")).toEqual(
+      deepSymbolizeKeys({
+        long: "long",
+        subformats: { long: "long", short: "short" },
+        short: "short",
+      }),
+    );
   });
 
   it("namespace lookup collects results from all backends and lets leftmost backend take priority", () => {
-    expect(t("dates")).toEqual({ a: "A", b: "B" });
+    expect(t("dates")).toEqual(deepSymbolizeKeys({ a: "A", b: "B" }));
   });
 
   it("namespace lookup with only the first backend returning a result", () => {
-    expect(t("plural_1")).toEqual({ one: "%{count}" });
+    expect(t("plural_1")).toEqual(deepSymbolizeKeys({ one: "%{count}" }));
   });
 
   it("pluralization still works", () => {
@@ -110,8 +114,12 @@ describe("I18nBackendChainTest", () => {
     expect(t(["foo", "bar"])).toEqual(["Foo", "Bar"]);
     expect(t(["foo", "bar", "bah"], { default: "Bah" })).toEqual(["Foo", "Bar", "Bah"]);
     expect(t(["formats", "plural_2", "bah"], { default: "Bah" })).toEqual([
-      { long: "long", subformats: { long: "long", short: "short" }, short: "short" },
-      { one: "one" },
+      deepSymbolizeKeys({
+        long: "long",
+        subformats: { long: "long", short: "short" },
+        short: "short",
+      }),
+      deepSymbolizeKeys({ one: "one" }),
       "Bah",
     ]);
   });
@@ -149,8 +157,12 @@ describe("I18nBackendChainTest", () => {
   });
 
   it("falls back to other backends for nil values", () => {
-    expect((send(first, "translations")["en"] as TranslationData)["fallback_bar"]).toBeNull();
-    expect((send(second, "translations")["en"] as TranslationData)["fallback_bar"]).toBe("Bar");
+    expect(
+      (send(first, "translations").get(":en") as TranslationData).get(":fallback_bar"),
+    ).toBeNull();
+    expect((send(second, "translations").get(":en") as TranslationData).get(":fallback_bar")).toBe(
+      "Bar",
+    );
     expect(t("fallback_bar")).toBe("Bar");
   });
 
@@ -170,7 +182,7 @@ describe("I18nBackendChainTest", () => {
         fallback_bar: "Bar",
       },
     };
-    expect(send(chain, "translations")).toEqual(expected);
+    expect(send(chain, "translations")).toEqual(deepSymbolizeKeys(expected));
   });
 });
 

@@ -3,15 +3,17 @@
     "total": 0,
     "byFile": {}
   },
+  "actioncable": {
+    "total": 0,
+    "byFile": {}
+  },
   "actioncontroller": {
     "total": 0,
     "byFile": {}
   },
   "actiondispatch": {
-    "total": 1,
-    "byFile": {
-      "http/request.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "actionpackversion": {
     "total": 0,
@@ -69,10 +71,8 @@
     "byFile": {}
   },
   "rack": {
-    "total": 1,
-    "byFile": {
-      "rewindable-input.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "rack-session": {
     "total": 0,

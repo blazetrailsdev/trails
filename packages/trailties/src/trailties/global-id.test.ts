@@ -1,10 +1,24 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
-import { ArgumentError, months, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  Deprecators,
+  months,
+  resetLoadHooks,
+  runLoadHooks,
+} from "@blazetrails/activesupport";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { Trailtie, type GlobalIdConfig, type TrailtieApp } from "./global-id.js";
-import { getApp, _resetApp } from "@blazetrails/globalid";
+import { Trailtie, type GlobalIdConfig } from "./global-id.js";
+import type { Configuration } from "../trailtie/configuration.js";
+
+interface TrailtieApp {
+  railtieName: string;
+  config: Pick<Configuration, "get" | "set">;
+  deprecators: Deprecators;
+  keyGenerator(): KeyGenerator;
+}
+import { GlobalID } from "@blazetrails/globalid";
 import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "@blazetrails/globalid";
 import { Verifier } from "@blazetrails/globalid";
 
@@ -14,6 +28,7 @@ function blogApp(secretKeyBase: string | null = SECRET_KEY_BASE): TrailtieApp {
   const options: Record<string, unknown> = { globalId: {} as GlobalIdConfig };
   return {
     railtieName: "blog_app_application",
+    deprecators: new Deprecators(),
     config: {
       get: (key) => options[key],
       set: (key, value) => {
@@ -38,21 +53,21 @@ async function initializeApp(app: TrailtieApp): Promise<void> {
 
 describe("RailtieTest", () => {
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     _resetSignedGlobalIDClassConfig();
     resetLoadHooks();
   });
 
   it("GlobalID.app for Blog::Application defaults to blog", async () => {
     await initializeApp(blogApp());
-    expect(getApp()).toBe("blog-app");
+    expect(GlobalID.app).toBe("blog-app");
   });
 
   it("GlobalID.app can be set with config.global_id.app =", async () => {
     const app = blogApp();
     (app.config.get("globalId") as GlobalIdConfig).app = "foo";
     await initializeApp(app);
-    expect(getApp()).toBe("foo");
+    expect(GlobalID.app).toBe("foo");
   });
 
   it("SignedGlobalID.expires_in can be explicitly set to nil with config.global_id.expires_in", async () => {
@@ -69,7 +84,7 @@ describe("RailtieTest", () => {
     (app.config.get("globalId") as GlobalIdConfig).expiresIn = months(12).toI();
     runLoadHooks("after_initialize", app);
 
-    expect(getApp()).toBe("foobar");
+    expect(GlobalID.app).toBe("foobar");
     expect(SignedGlobalID.expiresIn).toBe(months(12).toI());
   });
 

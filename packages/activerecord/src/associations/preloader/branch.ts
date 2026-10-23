@@ -13,7 +13,11 @@ import {
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { Relation } from "../../relation.js";
-import type { AbstractReflection } from "../../reflection.js";
+import type {
+  AbstractReflection,
+  AssociationReflection,
+  ThroughReflection,
+} from "../../reflection.js";
 import { Association } from "./association.js";
 import { ThroughAssociation } from "./through-association.js";
 
@@ -106,7 +110,7 @@ export class Branch {
     if (this.isDone()) {
       const seen = new Set<typeof Base>();
       return (await this.preloadedRecords())
-        .map((r) => r.constructor as typeof Base)
+        .map((r) => r.constructor)
         .filter((k) => {
           if (seen.has(k)) return false;
           seen.add(k);
@@ -164,19 +168,14 @@ export class Branch {
     return runnableLoaders.flat().filter((l) => !l.isRun());
   }
 
-  async groupedRecords(): Promise<Map<AbstractReflection, Base[]>> {
-    const h = new Map<AbstractReflection, Base[]>();
+  async groupedRecords(): Promise<Map<AssociationReflection | ThroughReflection, Base[]>> {
+    const h = new Map<AssociationReflection | ThroughReflection, Base[]>();
     const polymorphicParent = !this.isRoot() && (await this.parent!.isPolymorphic());
 
     for (const record of await this.sourceRecords()) {
-      const reflection = (record.constructor as typeof Base)._reflectOnAssociation(
-        this.association!,
-      );
+      const reflection = record.constructor._reflectOnAssociation(this.association!);
 
-      if (
-        (polymorphicParent && !reflection) ||
-        !(record as any).association(this.association!).klass
-      ) {
+      if ((polymorphicParent && !reflection) || !record.association(this.association!).klass) {
         continue;
       }
 
@@ -186,17 +185,17 @@ export class Branch {
   }
 
   preloadersForReflection(
-    reflection: AbstractReflection,
+    reflection: AssociationReflection | ThroughReflection,
     reflectionRecords: Base[],
   ): Association[] {
     return [
       ...groupBy(reflectionRecords, (record) => {
-        const klass: typeof Base = (record as any).association(this.association!).klass;
+        const klass: typeof Base = record.association(this.association!).klass;
 
         let reflectionScope: any;
         if (reflection.scope != null && reflection.scope.length !== 0) {
-          reflectionScope = (reflection as any)
-            .joinScopes(klass.arelTable, (klass as any).predicateBuilder, klass, record)
+          reflectionScope = reflection
+            .joinScopes(klass.arelTable, klass.predicateBuilder, klass, record)
             .reduce((memo: any, scope: any) => memo.mergeBang(scope));
         }
 
@@ -207,7 +206,7 @@ export class Branch {
         new (this.preloaderFor(reflection))(
           rhsKlass,
           rs,
-          reflection as any,
+          reflection,
           this.scope,
           reflectionScope,
           this.associateByDefault,
@@ -220,9 +219,7 @@ export class Branch {
     if (this._polymorphic !== undefined) return this._polymorphic;
 
     this._polymorphic = (await this.sourceRecords()).some((record) => {
-      const reflection = (record.constructor as typeof Base)._reflectOnAssociation(
-        this.association!,
-      );
+      const reflection = record.constructor._reflectOnAssociation(this.association!);
       return reflection != null && reflection.isPolymorphic();
     });
     return this._polymorphic;
@@ -252,9 +249,9 @@ export class Branch {
   }
 
   private preloaderFor(
-    reflection: AbstractReflection,
+    reflection: AssociationReflection | ThroughReflection,
   ): typeof Association | typeof ThroughAssociation {
-    if ((reflection as any).options.through != null) {
+    if (reflection.options.through != null) {
       return ThroughAssociation;
     } else {
       return Association;

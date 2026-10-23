@@ -10,9 +10,11 @@ class Exposed extends ShowExceptions {
     return captured;
   }
   capture: Frame[] = [];
-  protected template(_env: Record<string, any>, _e: Error, _path?: string, frames?: Frame[]) {
-    this.capture.push(...(frames ?? []));
-    return "";
+  protected template() {
+    return ({ frames }: { frames: Frame[] }) => {
+      this.capture.push(...frames);
+      return "";
+    };
   }
 }
 

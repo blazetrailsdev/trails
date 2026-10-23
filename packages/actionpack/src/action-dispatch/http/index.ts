@@ -53,7 +53,7 @@ export {
   variant,
   negotiateMime,
   shouldApplyVaryHeader,
-  paramsReadable,
+  isParamsReadable,
   validAcceptHeader,
   useAcceptHeader,
   formatFromPathExtension,

@@ -37,6 +37,10 @@
     "./yaml": {
       "types": "./dist/yaml.d.ts",
       "default": "./dist/yaml.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
     }
   },
   "files": [
@@ -47,5 +51,8 @@
   },
   "optionalDependencies": {
     "yaml": "^2.8.3"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

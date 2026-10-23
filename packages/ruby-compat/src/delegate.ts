@@ -2,6 +2,7 @@ import { ArgumentError } from "./argument-error.js";
 import { rbDefineAllocFunc } from "./include.js";
 import { methodMissingProxy } from "./method-missing-proxy.js";
 import { NotImplementedError } from "./not-implemented-error.js";
+import { rbObjInstanceVariables, rbObjIvarGet, rbObjIvarSet } from "./object.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TS2545: a mixin base's constructor rest parameter must be typed `any[]`.
 type MixinBase = new (...args: any[]) => object;
@@ -77,6 +78,10 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * Static members resolve separately, through the constructor chain
  * `klass -> delegator -> superclass` that `Object.setPrototypeOf` links.
  *
+ * The generated constructor is `Delegator#initialize(obj)`
+ * (`vendor/ruby/v3.3.11/lib/delegate.rb:75-77`), so a subclass with no
+ * `initialize` of its own is built with the object to delegate to.
+ *
  * `@delegate_dc_obj` (`delegate.rb:405`) is a plain `delegateDcObj` property rather
  * than a `#private` field: a `#` field is unreachable through the
  * `method_missing` Proxy, whose `get` rebinds the receiver
@@ -88,15 +93,15 @@ export function DelegateClass<T extends MixinBase>(
   superclass: T,
   block?: (this: Delegating<T>) => void,
 ): Delegating<T> {
-  const delegator = function () {} as unknown as T;
+  const delegator = function () {} as unknown as new () => object;
   Object.setPrototypeOf(delegator, superclass);
   delegator.prototype = superclass.prototype;
   const klass = class extends delegator {
     declare delegateDcObj: unknown;
 
-    constructor(...args: ConstructorParameters<MixinBase>) {
+    constructor(obj: unknown) {
       super();
-      this.__setobj__(args[0] as unknown);
+      this.__setobj__(obj);
       return methodMissingProxy(this, { delegate: (self) => self.__getobj__() });
     }
 
@@ -114,6 +119,17 @@ export function DelegateClass<T extends MixinBase>(
       return String(this.__getobj__());
     }
   };
+
+  Object.defineProperty(klass.prototype, "marshalDump", {
+    configurable: true,
+    writable: true,
+    value: Delegator.prototype.marshalDump,
+  });
+  Object.defineProperty(klass.prototype, "marshalLoad", {
+    configurable: true,
+    writable: true,
+    value: Delegator.prototype.marshalLoad,
+  });
 
   Object.defineProperty(klass.prototype, Symbol.for("@blazetrails/ruby-compat:delegateClass"), {
     value: true,
@@ -196,6 +212,37 @@ export class Delegator {
   // eslint-disable-next-line unused-imports/no-unused-vars -- the abstract method names the parameter its overrides take.
   __setobj__(obj: unknown): void {
     throw new NotImplementedError("need to define `__setobj__'");
+  }
+
+  /**
+   * `Delegator#marshal_dump` (`vendor/ruby/v3.3.11/lib/delegate.rb:203-210`). `@delegate_dc_obj`
+   * and `@delegate_sd_obj` are spelled `@delegateDcObj` and `@delegateSdObj`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  marshalDump(): unknown[] {
+    const ivars = rbObjInstanceVariables(this).filter((v) => !/^@delegate[A-Z]/.test(v));
+    return [":__v2__", ivars, ivars.map((v) => rbObjIvarGet(this, v)), this.__getobj__()];
+  }
+
+  /**
+   * `Delegator#marshal_load` (`vendor/ruby/v3.3.11/lib/delegate.rb:215-223`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  marshalLoad(data: unknown): void {
+    const [version, vars, values, obj] = (Array.isArray(data) ? data : [data]) as [
+      unknown,
+      string[],
+      unknown[],
+      unknown,
+    ];
+    if (version === ":__v2__") {
+      vars.forEach((v, i) => rbObjIvarSet(this, v, values[i]));
+      this.__setobj__(obj);
+    } else {
+      this.__setobj__(data);
+    }
   }
 }
 

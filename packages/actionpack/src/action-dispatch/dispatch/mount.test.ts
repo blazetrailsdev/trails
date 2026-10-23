@@ -1,6 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
 import { assert, assertEqual, assertNotEqual, TopLevel } from "@blazetrails/activesupport";
-import { bodyFromString, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import { type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import type { MountableApp } from "../routing/mapper.js";
@@ -30,7 +30,7 @@ class SinatraLikeApp {
   }
 
   static call(_env: RackEnv): RackResponse {
-    return [200, { "Content-Type": "text/html" }, bodyFromString("OK")];
+    return [200, { "Content-Type": "text/html" }, ["OK"]];
   }
 }
 
@@ -38,7 +38,7 @@ Router.draw(function () {
   const SprocketsApp = (env: RackEnv): RackResponse => [
     200,
     { "Content-Type": "text/html" },
-    bodyFromString(`${env["SCRIPT_NAME"]} -- ${env["PATH_INFO"]}`),
+    [`${env["SCRIPT_NAME"]} -- ${env["PATH_INFO"]}`],
   ];
 
   this.mount(SprocketsApp, { at: "/sprockets" });

@@ -1,13 +1,19 @@
 import { cattrAccessor } from "@blazetrails/activesupport";
-import { ArgumentError, bytes, strNew } from "@blazetrails/ruby-compat";
+import { deprecator } from "../deprecator.js";
+import { QueryParser as RackQueryParser } from "@blazetrails/rack";
+import { ArgumentError, bytes, strNew, toEnum, type Enumerator } from "@blazetrails/ruby-compat";
 
 const DEFAULT_SEP = /& */;
+const COMPAT_SEP = /[&;] */;
 const COMMON_SEP: Record<string, RegExp> = Object.assign(Object.create(null), {
   ";": /; */,
   ";,": /[;,] */,
   "&": /& */,
   "&;": /[&;] */,
 });
+
+const SEMICOLON_COMPAT =
+  RackQueryParser.DEFAULT_SEP != null && RackQueryParser.DEFAULT_SEP.source.includes(";");
 
 export type QueryPair = [string, string | null];
 
@@ -19,17 +25,38 @@ export class QueryParser {
     cattrAccessor.call(this, "strictQueryStringSeparator");
   }
 
-  static *eachPair(s: string | null | undefined, separator?: string | null): Generator<QueryPair> {
-    const str = s ?? "";
+  static eachPair(s: string | null | undefined, separator?: string | null): Enumerator<QueryPair>;
+  static eachPair(
+    s: string | null | undefined,
+    separator: string | null | undefined,
+    block: (k: string, v: string | null) => void,
+  ): null;
+  static eachPair(
+    s: string | null | undefined,
+    separator: string | null = null,
+    block?: (k: string, v: string | null) => void,
+  ): Enumerator<QueryPair> | null {
+    if (!block) return toEnum(this, "eachPair", s, separator);
+
+    s ??= "";
 
     let splitter: RegExp;
     if (separator) {
       splitter = COMMON_SEP[separator] ?? new RegExp(`[${escapeChars(separator)}] *`);
+    } else if (this.strictQueryStringSeparator) {
+      splitter = DEFAULT_SEP;
+    } else if (SEMICOLON_COMPAT && s.includes(";")) {
+      if (this.strictQueryStringSeparator == null) {
+        deprecator().warn(
+          "Using semicolon as a query string separator is deprecated and will not be supported in Rails 8.1 or Rack 3.0. Use `&` instead.",
+        );
+      }
+      splitter = COMPAT_SEP;
     } else {
       splitter = DEFAULT_SEP;
     }
 
-    for (const part of str.split(splitter)) {
+    for (const part of s.split(splitter)) {
       if (part === "") continue;
 
       const eq = part.indexOf("=");
@@ -46,8 +73,10 @@ export class QueryParser {
       k = decodeFormComponent(k);
       if (v !== null) v = decodeFormComponent(v);
 
-      yield [k, v];
+      block(k, v);
     }
+
+    return null;
   }
 }
 

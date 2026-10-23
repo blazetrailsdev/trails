@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport";
 import { Parser } from "../parser.js";
-import { Ast } from "../ast.js";
+import { Ast } from "./node.js";
 import { Symbol as SymbolNode, Terminal } from "./node.js";
 
 describe("TestAst", () => {

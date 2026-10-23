@@ -6,10 +6,9 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 
-// Hermetic fixtures: point the rule at tmp manifest + exclude files via the
+// Hermetic fixtures: point the rule at a tmp manifest via the
 // env overrides it reads lazily, so the test never touches the committed one.
 const MANIFEST_FIXTURE = path.join(__dirname, ".tmp-rails-error-classes.test.json");
-const EXCLUDE_FIXTURE = path.join(__dirname, ".tmp-rails-error-parity-exclude.test.json");
 
 const manifest = {
   generatedAt: "test",
@@ -59,13 +58,10 @@ manifest.errinfo = { activerecord: ["RestoreError"] };
 const excludedRel = "packages/activerecord/src/excluded.ts";
 
 fs.writeFileSync(MANIFEST_FIXTURE, JSON.stringify(manifest, null, 2));
-fs.writeFileSync(EXCLUDE_FIXTURE, JSON.stringify([excludedRel], null, 2));
 process.env.RAILS_ERROR_CLASSES_PATH = MANIFEST_FIXTURE;
-process.env.RAILS_ERROR_PARITY_EXCLUDE_PATH = EXCLUDE_FIXTURE;
 
 process.on("exit", () => {
   fs.rmSync(MANIFEST_FIXTURE, { force: true });
-  fs.rmSync(EXCLUDE_FIXTURE, { force: true });
 });
 
 // Imported after the env vars are set; the rule resolves the paths lazily so
@@ -134,8 +130,6 @@ tester.run("rails-error-parity", rule, {
       filename: baseFile,
       code: `import { RangeError } from "./errors.js";\nthrow new RangeError("nope");\n`,
     },
-    // Excluded file: bare throw is skipped.
-    { filename: excludedFile, code: `throw new Error("bare");\n` },
     // activesupport is in scope: errors.ts mirrors its manifest class.
     {
       filename: asErrorsFile,
@@ -153,6 +147,12 @@ tester.run("rails-error-parity", rule, {
     },
   ],
   invalid: [
+    // No file is grandfathered: a bare throw reports everywhere in scope.
+    {
+      filename: excludedFile,
+      code: `throw new Error("bare");\n`,
+      errors: [{ messageId: "bareThrow" }],
+    },
     // Missing class: errors.ts omits RecordNotFound.
     { filename: errorsFile, code: nl(ARE, AD, SI), errors: [{ messageId: "missingClass" }] },
     // Wrong parent: StatementInvalid should extend AdapterError.
@@ -245,7 +245,6 @@ tester.run("rails-error-parity", rule, {
       code: `export function getHeader() { throw new ArgumentError("no"); }\n`,
       errors: [{ messageId: "inventedMessage" }],
     },
-    // The exclude list grandfathers native throws only, never an invented message.
     {
       filename: excludedFile,
       code: `class S { dump() { throw new ForbiddenClass("no"); } }\n`,

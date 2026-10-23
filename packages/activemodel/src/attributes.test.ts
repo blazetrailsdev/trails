@@ -16,7 +16,6 @@ import {
   ArgumentError,
   FrozenError,
   Marshal,
-  Module,
   rbModConstSet,
   rbEqual,
   rbObjIvarGet,
@@ -41,7 +40,7 @@ expect.addEqualityTesters([
   },
 ]);
 
-const AttributesTest = new Module();
+const AttributesTest = {};
 registerConstant("ActiveModel::AttributesTest", AttributesTest);
 
 describe("AttributesTest", () => {

@@ -1,19 +1,21 @@
+import type { RackHeaders } from "./index.js";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { clockTime } from "./utils.js";
 import type { RackApp } from "./mock-request.js";
 
 export class Runtime {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private headerName: string;
 
-  constructor(app: RackApp, name?: string) {
+  constructor(app: RackApp | { call: RackApp }, name?: string) {
     this.app = app;
     this.headerName = "x-runtime";
     if (name) this.headerName += `-${String(name).toLowerCase()}`;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const startTime = clockTime();
-    const response = await this.app(env);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
     const [, headers] = response;
     const requestTime = clockTime() - startTime;
 

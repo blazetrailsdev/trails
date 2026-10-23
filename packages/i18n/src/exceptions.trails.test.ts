@@ -138,3 +138,16 @@ describe("exceptions", () => {
     expect(() => handler.call(data, "de", "foo", {})).toThrow(data);
   });
 });
+
+describe("MissingTranslation::Base", () => {
+  it("holds PERMITTED_KEYS as its own constant", () => {
+    expect(MissingTranslation.Base.PERMITTED_KEYS).toEqual(["scope", "default"]);
+    const data = new MissingTranslationData("en", "foo", { scope: "a", other: 1 });
+    expect(data.options).toEqual({ scope: "a" });
+  });
+
+  it("aliases to_s to message", () => {
+    const error = new MissingTranslation("en", "foo");
+    expect(error.toString()).toBe(error.message);
+  });
+});

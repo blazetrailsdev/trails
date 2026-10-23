@@ -1,3 +1,0 @@
-builder.run(async function(env) { return [200, {}, ["OK"]]; });
-__END__
-this should be ignored

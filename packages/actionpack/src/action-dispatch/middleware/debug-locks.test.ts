@@ -1,19 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { bodyFromString, bodyToString } from "@blazetrails/rack";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { DebugLocks, type InterlockLike, type ThreadLike, type ThreadInfo } from "./debug-locks.js";
+import { Dependencies, type ShareLockThreadInfo } from "@blazetrails/activesupport";
+import type { Thread } from "@blazetrails/ruby-compat";
+import { DebugLocks } from "./debug-locks.js";
 import { Response } from "../http/response.js";
 
-const passthrough = async (_env: RackEnv): Promise<RackResponse> => [200, {}, bodyFromString("ok")];
+const passthrough = async (_env: RackEnv): Promise<RackResponse> => [200, {}, ["ok"]];
 
-function setInterlock(threads: Array<[ThreadLike, ThreadInfo]>): void {
-  const map = new Map(threads);
-  const interlock: InterlockLike = {
-    rawState(block) {
-      return block(map);
-    },
-  };
-  DebugLocks.interlock = interlock;
+type ThreadLike = { id: number; status: string | false | null; backtrace(): string[] | null };
+
+function setInterlock(threads: Array<[ThreadLike, Partial<ShareLockThreadInfo>]>): void {
+  const map = new Map(
+    threads.map(([thread, info]) => [
+      thread as Thread,
+      { sharing: 0, ...info } as ShareLockThreadInfo,
+    ]),
+  );
+  vi.spyOn(Dependencies.interlock, "rawState").mockImplementation(async (block) => block(map));
 }
 
 function thread(id: number, status: string | null = "run", backtrace: string[] = []): ThreadLike {
@@ -25,20 +28,20 @@ describe("DebugLocks", () => {
     setInterlock([]);
   });
   afterEach(() => {
-    DebugLocks.interlock = null;
+    vi.restoreAllMocks();
   });
 
   it("passes non-matching paths to the inner app", async () => {
     const mw = new DebugLocks(passthrough);
     const res = await mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/other" });
     expect(res[0]).toBe(200);
-    expect(await bodyToString(res[2])).toBe("ok");
+    expect([...(res[2] as Iterable<string>)].join("")).toBe("ok");
   });
 
   it("passes non-GET requests to the inner app", async () => {
     const mw = new DebugLocks(passthrough);
     const res = await mw.call({ REQUEST_METHOD: "POST", PATH_INFO: "/rails/locks" });
-    expect(await bodyToString(res[2])).toBe("ok");
+    expect([...(res[2] as Iterable<string>)].join("")).toBe("ok");
   });
 
   it("renders thread details at /rails/locks", async () => {
@@ -50,7 +53,7 @@ describe("DebugLocks", () => {
     const res = await mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/rails/locks" });
     expect(res[0]).toBe(200);
     expect(res[1]["content-type"]).toBe("text/plain; charset=utf-8");
-    const body = await bodyToString(res[2]);
+    const body = [...(res[2] as Iterable<string>)].join("");
     expect(body).toContain("Thread 0 [0x1a sleep]  Exclusive");
     expect(body).toContain("Thread 1 [0x2b run]  Sharing x2");
     expect(body).toContain("a.rb:1");
@@ -70,7 +73,7 @@ describe("DebugLocks", () => {
     ]);
     const mw = new DebugLocks(passthrough);
     const res = await mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/rails/locks" });
-    const body = await bodyToString(res[2]);
+    const body = [...(res[2] as Iterable<string>)].join("");
     expect(body).toContain("Waiting in start_exclusive");
     expect(body).toContain("blocked by: 1");
     expect(body).toContain("blocking: 0");
@@ -92,7 +95,7 @@ describe("DebugLocks", () => {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/rails/locks",
     });
-    const body = await bodyToString(res[2]);
+    const body = [...(res[2] as Iterable<string>)].join("");
     expect(body).toMatch(/Thread 0[\s\S]*?blocked by: 1/);
   });
 
@@ -106,7 +109,7 @@ describe("DebugLocks", () => {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/rails/locks",
     });
-    const body = await bodyToString(res[2]);
+    const body = [...(res[2] as Iterable<string>)].join("");
     expect(body).toMatch(/Thread 0[\s\S]*?blocked by: 2\n/);
   });
 
@@ -119,7 +122,7 @@ describe("DebugLocks", () => {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/rails/locks",
     });
-    const body = await bodyToString(res[2]);
+    const body = [...(res[2] as Iterable<string>)].join("");
     expect(body).toMatch(/Thread 0[\s\S]*?blocked by: 1/);
   });
 
@@ -129,7 +132,7 @@ describe("DebugLocks", () => {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/rails/locks",
     });
-    const body = await bodyToString(res[2]);
+    const body = [...(res[2] as Iterable<string>)].join("");
     expect(body).toContain("Thread 0 [0x5 dead]");
   });
 
@@ -146,24 +149,5 @@ describe("DebugLocks", () => {
     } finally {
       Response.defaultCharset = prior;
     }
-  });
-
-  it("DebugLocks.defaultCharset setter writes through to Response.defaultCharset", () => {
-    const prior = Response.defaultCharset;
-    try {
-      DebugLocks.defaultCharset = "us-ascii";
-      expect(Response.defaultCharset).toBe("us-ascii");
-      expect(DebugLocks.defaultCharset).toBe("us-ascii");
-    } finally {
-      Response.defaultCharset = prior;
-    }
-  });
-
-  it("throws when no interlock is configured", async () => {
-    DebugLocks.interlock = null;
-    const mw = new DebugLocks(passthrough);
-    await expect(mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/rails/locks" })).rejects.toThrow(
-      /interlock is not configured/,
-    );
   });
 });

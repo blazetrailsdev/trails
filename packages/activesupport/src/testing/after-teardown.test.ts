@@ -2,16 +2,17 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { UnexpectedError, assert, assertChanges } from "./assertions.js";
 import { TestCase } from "../test-case.js";
-import { Module, include } from "@blazetrails/ruby-compat";
+import { include, rbCallSuper } from "@blazetrails/ruby-compat";
 
 class MyError extends Error {}
 
-const OtherAfterTeardown = new Module();
-OtherAfterTeardown.defineMethod("afterTeardown", function (this: { witness: boolean }): unknown {
-  const result = OtherAfterTeardown.superMethod(this, "afterTeardown")!();
-  this.witness = true;
-  return result;
-});
+const OtherAfterTeardown = {
+  afterTeardown(this: { witness: boolean }): unknown {
+    const result = rbCallSuper(this, OtherAfterTeardown.afterTeardown);
+    this.witness = true;
+    return result;
+  },
+};
 
 describe("AfterTeardownTest", () => {
   let test: TestCase & { witness: boolean };

@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
   extend,
@@ -175,7 +177,7 @@ export interface RenderingClassHost extends RendererController {
 }
 
 export function renderer(this: RenderingClassHost): Renderer {
-  if (!Object.prototype.hasOwnProperty.call(this, "_renderer")) this.setupRendererBang();
+  if (!Object.hasOwn(this, "_renderer")) this.setupRendererBang();
   return this._renderer!;
 }
 
@@ -213,3 +215,5 @@ export const Rendering = new Module((mod) => {
   mod.defineMethod("_processOptions", _processOptions);
 }) as Module & { ClassMethods: Module };
 Rendering.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "Rendering", Rendering);

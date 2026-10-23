@@ -32,11 +32,10 @@ import {
 } from "./i18n.js";
 import { Config, resetClassConfig } from "./config.js";
 import { Simple } from "./backend/simple.js";
-import type { TranslationData } from "./utils.js";
 import type { TranslationKey } from "./i18n.js";
 
 describe("I18nTest", () => {
-  function storeTranslations(locale: string, data: TranslationData): void {
+  function storeTranslations(locale: string, data: Record<string, unknown>): void {
     config().backend.storeTranslations(locale, data);
   }
 

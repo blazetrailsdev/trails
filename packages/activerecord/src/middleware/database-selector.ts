@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Resolver } from "./database-selector/resolver.js";
 import type { ResolverContext } from "./database-selector/resolver.js";
@@ -37,7 +38,10 @@ export class DatabaseSelector {
   async call(env: Record<string, unknown>): Promise<unknown> {
     const request = new TopLevel.ActionDispatch!.Request(env);
 
-    return this.selectDatabase(request, () => this.app(env));
+    return this.selectDatabase(
+      request,
+      () => rbFSend(this.app, "call", env) as ReturnType<typeof this.app>,
+    );
   }
 
   /** @internal */

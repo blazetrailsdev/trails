@@ -1,5 +1,6 @@
-import { Module, NoMethodError, include, symbolToS } from "@blazetrails/ruby-compat";
+import { NoMethodError, include, symbolToS } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
+import { assertNotRespondTo, assertRespondTo } from "@blazetrails/activesupport";
 import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 import { Collector } from "./collector.js";
 
@@ -18,22 +19,22 @@ include(MyCollector, Collector);
 describe("TestCollector", () => {
   it("responds to default mime types", () => {
     const collector = new MyCollector();
-    expect("html" in collector).toBe(true);
-    expect("text" in collector).toBe(true);
+    assertRespondTo(collector, "html");
+    assertRespondTo(collector, "text");
   });
 
   it("does not respond to unknown mime types", () => {
     const collector = new MyCollector();
-    expect("unknown" in collector).toBe(false);
+    assertNotRespondTo(collector, "unknown");
   });
 
   it("register mime types on method missing", () => {
     Collector.removeMethod("js");
     try {
       const collector = new MyCollector() as MyCollector & { js: (...a: unknown[]) => unknown };
-      expect("js" in collector).toBe(false);
+      assertNotRespondTo(collector, "js");
       collector.js();
-      expect("js" in collector).toBe(true);
+      assertRespondTo(collector, "js");
     } finally {
       if (!Collector.isMethodDefined("js")) {
         Collector.generateMethodForMime(":js");
@@ -57,9 +58,9 @@ describe("TestCollector", () => {
     const block = (): string => "baz";
     collector.js("bar", block);
 
-    expect(collector.responses[0]).toEqual([MimeType.HTML, [], null]);
-    expect(collector.responses[1]).toEqual([MimeType.TEXT, ["foo", { bar: "baz" }], null]);
-    expect(collector.responses[2].slice(0, 2)).toEqual([MimeType.JS, ["bar"]]);
+    expect(collector.responses[0]).toEqual([Mime.get(":html")!, [], null]);
+    expect(collector.responses[1]).toEqual([Mime.get(":text")!, ["foo", { bar: "baz" }], null]);
+    expect(collector.responses[2].slice(0, 2)).toEqual([Mime.get(":js")!, ["bar"]]);
     expect((collector.responses[2][2] as () => string)()).toBe("baz");
   });
 });
@@ -128,7 +129,7 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
     }
     include(ThisChecker, Collector);
     const c = new ThisChecker() as ThisChecker & { html: () => unknown };
-    c.custom(MimeType.HTML);
+    c.custom(Mime.get(":html")!);
     const viaDirect = c.seenThis;
     c.seenThis = undefined;
     c.html();
@@ -180,10 +181,10 @@ describe("AbstractController::Collector — the method_missing splice", () => {
       }
     }
     include(Late, Collector);
-    include(Late, new Module((mod) => mod.defineMethod("extra", () => "extra")));
+    include(Late, { extra: () => "extra" });
     const c = new Late() as Late & { extra(): string; unknown(): void; html(): unknown };
     expect(c.extra()).toBe("extra");
-    expect(c.html()).toBe(MimeType.HTML);
+    expect(c.html()).toBe(Mime.get(":html")!);
     expect(() => c.unknown()).toThrow(NoMethodError);
   });
 
@@ -193,7 +194,7 @@ describe("AbstractController::Collector — the method_missing splice", () => {
     include(MyCollector, Collector);
     const c = new Sub() as Sub & { unknown(): void; html(): unknown };
     c.html();
-    expect(c.responses[0][0]).toBe(MimeType.HTML);
+    expect(c.responses[0][0]).toBe(Mime.get(":html")!);
     expect(() => c.unknown()).toThrow(NoMethodError);
     expect(c).toBeInstanceOf(MyCollector);
   });

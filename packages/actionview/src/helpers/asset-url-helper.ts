@@ -288,3 +288,38 @@ export function fontUrl(
 }
 
 export const urlToFont = fontUrl;
+
+export const AssetUrlHelper = {
+  assetPath,
+  pathToAsset,
+  assetUrl,
+  urlToAsset,
+  computeAssetExtname,
+  computeAssetPath,
+  publicComputeAssetPath,
+  computeAssetHost,
+  javascriptPath,
+  pathToJavascript,
+  javascriptUrl,
+  urlToJavascript,
+  stylesheetPath,
+  pathToStylesheet,
+  stylesheetUrl,
+  urlToStylesheet,
+  imagePath,
+  pathToImage,
+  imageUrl,
+  urlToImage,
+  videoPath,
+  pathToVideo,
+  videoUrl,
+  urlToVideo,
+  audioPath,
+  pathToAudio,
+  audioUrl,
+  urlToAudio,
+  fontPath,
+  pathToFont,
+  fontUrl,
+  urlToFont,
+};

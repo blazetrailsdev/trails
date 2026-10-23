@@ -1,5 +1,8 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { BodyProxy } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import type { BacktraceCleaner } from "@blazetrails/activesupport";
+import { Request } from "../http/request.js";
 import { ExceptionWrapper } from "./exception-wrapper.js";
 
 export interface ExecutorState {
@@ -26,9 +29,9 @@ export class Executor {
 
   async call(env: RackEnv): Promise<RackResponse> {
     const state = await this.executor.runBang({ reset: true });
-    let returned = false;
+    let returned: RackResponse | null = null;
     try {
-      const response = await this.app(env);
+      const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
 
       if (env["action_dispatch.report_exception"]) {
         const error = env["action_dispatch.exception"];
@@ -38,18 +41,22 @@ export class Executor {
         });
       }
 
-      const [status, headers, body] = response;
-      const wrapped = new BodyProxy(body, () => state.completeBang());
-      returned = true;
-      return [status, headers, wrapped];
+      const parts = response as unknown[];
+      parts.push(new BodyProxy(parts.pop() as RackResponse[2], () => state.completeBang()));
+      returned = response;
+      return returned;
     } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      const wrapper = new ExceptionWrapper(err);
+      const request = new Request(env);
+      const backtraceCleaner = request.getHeader("action_dispatch.backtrace_cleaner") as
+        | BacktraceCleaner
+        | null
+        | undefined;
+      const wrapper = new ExceptionWrapper(backtraceCleaner ?? null, error as Error);
       this.executor.errorReporter().report(wrapper.unwrappedException, {
         handled: false,
         source: "application.action_dispatch",
       });
-      throw err;
+      throw error;
     } finally {
       if (!returned) state.completeBang();
     }

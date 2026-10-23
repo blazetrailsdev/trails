@@ -22,7 +22,7 @@ export interface ReadStream {
   setNoecho?(): void;
 }
 
-export type SignalName = "SIGINT" | "SIGTERM";
+export type SignalName = "SIGINT" | "SIGTERM" | "SIGQUIT";
 
 export interface ProcessAdapter {
   envSnapshot(): Record<string, string | undefined>;
@@ -32,6 +32,8 @@ export interface ProcessAdapter {
   platform(): string;
   execPath?(): string;
   pid(): number;
+  ppid?(): number;
+  hostname?(): string;
   setEnv(key: string, value: string | undefined): void;
   exit(code?: number): never;
   /**
@@ -42,6 +44,7 @@ export interface ProcessAdapter {
    */
   exec?(argv: readonly string[]): never;
   setExitCode(code: number): void;
+  setSourceMapsSupport?(enabled: boolean): void;
   onSignal(name: SignalName, handler: () => void): () => void;
   readonly stdout: WriteStream;
   readonly stderr: WriteStream;
@@ -364,9 +367,22 @@ export function exit(code?: number | boolean): never {
   return requireAdapter().exit(typeof code === "boolean" ? (code ? 0 : 1) : code);
 }
 
+/**
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#exit!`
+ * (`vendor/ruby/v3.3.11/process.c:4438`), whose status defaults to false.
+ */
+export function exitBang(status: number | boolean = false): never {
+  return requireAdapter().exit(typeof status === "boolean" ? (status ? 0 : 1) : status);
+}
+
 /** @noRailsEquivalent PERMANENT */
 export function setExitCode(code: number): void {
   requireAdapter().setExitCode(code);
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function setSourceMapsSupport(enabled: boolean): void {
+  requireAdapter().setSourceMapsSupport?.(enabled);
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -512,6 +528,7 @@ interface NodeProcessLike {
   platform: string;
   execPath: string;
   pid: number;
+  ppid: number;
   exit(code?: number): never;
   exitCode: number | string | undefined;
   on(event: string, handler: () => void): void;
@@ -582,6 +599,8 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
     platform: () => proc.platform,
     execPath: () => proc.execPath,
     pid: () => proc.pid,
+    ppid: () => proc.ppid,
+    hostname: () => (proc.getBuiltinModule?.("node:os") as { hostname(): string }).hostname(),
     setEnv: (key, value) => {
       if (value === undefined) delete proc.env[key];
       else proc.env[key] = value;
@@ -609,6 +628,12 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
     },
     setExitCode: (code) => {
       proc.exitCode = code;
+    },
+    setSourceMapsSupport: (enabled) => {
+      const nodeModule = proc.getBuiltinModule?.("node:module") as
+        | { setSourceMapsSupport?(enabled: boolean): void }
+        | undefined;
+      nodeModule?.setSourceMapsSupport?.(enabled);
     },
     onSignal: (name, handler) => {
       proc.on(name, handler);

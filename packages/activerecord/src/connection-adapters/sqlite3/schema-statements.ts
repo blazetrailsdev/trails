@@ -2,7 +2,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { any, isPresent, pluralize, symbolizeKeys } from "@blazetrails/activesupport";
 import {
   coreHashMergeKwd,
-  except,
   hashDelete,
   rbInspect,
   rbObjAsString as toS,
@@ -141,7 +140,8 @@ export async function removeForeignKey(
   }
 
   toTable ??= options.toTable ?? null;
-  options = except(options as Record<string, unknown>, "name", "toTable", "validate");
+  const { name, toTable: _toTable, validate, ...rest } = options as Record<string, unknown>;
+  options = rest;
   const foreignKeys = await this.foreignKeys(fromTable);
 
   const fkey = foreignKeys.find((fk) => {

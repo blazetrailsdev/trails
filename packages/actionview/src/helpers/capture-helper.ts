@@ -1,6 +1,5 @@
-import { SafeBuffer, htmlEscape, isPresent } from "@blazetrails/activesupport";
+import { SafeBuffer, htmlEscape, isPresent, presence } from "@blazetrails/activesupport";
 
-import { Module } from "@blazetrails/ruby-compat";
 import { OutputBuffer } from "../buffers.js";
 import { OutputFlow } from "../flows.js";
 
@@ -11,15 +10,36 @@ export interface CaptureHelperHost {
 
 export function capture<TArgs extends unknown[]>(
   this: CaptureHelperHost,
+  block: (...args: TArgs) => PromiseLike<unknown>,
+  ...args: TArgs
+): Promise<SafeBuffer | null>;
+export function capture<TArgs extends unknown[]>(
+  this: CaptureHelperHost,
   block: (...args: TArgs) => unknown,
   ...args: TArgs
-): SafeBuffer | null {
+): SafeBuffer | null;
+/**
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+ */
+export function capture<TArgs extends unknown[]>(
+  this: CaptureHelperHost,
+  block: (...args: TArgs) => unknown,
+  ...args: TArgs
+): SafeBuffer | null | Promise<SafeBuffer | null> {
   let value: unknown = null;
   if (!this.outputBuffer) this.outputBuffer = new OutputBuffer();
   const buf = this.outputBuffer;
-  const buffer = buf.capture(() => {
-    value = block(...args);
-  });
+  const buffer = buf.capture(() => (value = block(...args)));
+  if (buffer instanceof Promise) {
+    return buffer.then(async (buffer) => {
+      const resolved = await value;
+      return capture.call(this, () => {
+        buf.safeConcat(buffer);
+        return resolved;
+      });
+    });
+  }
 
   let string: unknown;
   if (buf === value) {
@@ -34,47 +54,35 @@ export function capture<TArgs extends unknown[]>(
   return null;
 }
 
+/** @inventedArm if — PERMANENT */
 export function contentFor(
   this: CaptureHelperHost,
   name: string,
-  content?: unknown,
-  options?: { flush?: boolean },
+  content: unknown = null,
+  options: { flush?: boolean } = {},
   block?: () => unknown,
 ): SafeBuffer | null | Promise<SafeBuffer | null> {
   if (typeof content === "function" && block === undefined) {
     block = content as () => unknown;
-    content = undefined;
+    content = null;
   }
-  if (content != null || block) {
-    let opts = options;
-    let body: unknown = content;
+  if ((content != null && content !== false) || block) {
     if (block) {
-      if (options === undefined && isPlainOptions(content)) {
-        opts = content;
-      }
-      body = capture.call(this, block);
+      if (content != null && content !== false) options = content as { flush?: boolean };
+      content = capture.call(this, block);
     }
-    if (body !== undefined && body !== null) {
-      if (opts?.flush) {
-        this.viewFlow.set(name, body);
+    if (content != null && content !== false) {
+      if (options.flush) {
+        this.viewFlow.set(name, content);
       } else {
-        this.viewFlow.append(name, body);
+        this.viewFlow.append(name, content);
       }
     }
     return null;
+  } else {
+    const stored = this.viewFlow.get(name);
+    return stored instanceof Promise ? stored.then((value) => presence(value)) : presence(stored);
   }
-  const stored = this.viewFlow.get(name);
-  return stored instanceof Promise
-    ? stored.then((value) => (isPresent(value.toString()) ? value : null))
-    : isPresent(stored.toString())
-      ? stored
-      : null;
-}
-
-function isPlainOptions(value: unknown): value is { flush?: boolean } {
-  return (
-    typeof value === "object" && value !== null && Object.getPrototypeOf(value) === Object.prototype
-  );
 }
 
 export function provide(
@@ -116,8 +124,10 @@ export function withOutputBuffer(
   }
 }
 
-export const CaptureHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { capture, contentFor, provide, isContentFor, withOutputBuffer });
-  });
-});
+export const CaptureHelper = {
+  capture,
+  contentFor,
+  provide,
+  isContentFor,
+  withOutputBuffer,
+};

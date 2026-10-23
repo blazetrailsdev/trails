@@ -222,14 +222,6 @@ describe("TestFixtures#before_setup / #after_teardown", () => {
     ))();
   });
 
-  it("splices the module beneath the includer's prototype", () => {
-    const proto = Object.getPrototypeOf(testCase) as object;
-    expect(Object.prototype.hasOwnProperty.call(proto, "beforeSetup")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(proto), "beforeSetup")).toBe(
-      true,
-    );
-  });
-
   it("before_setup sets up fixtures, then calls super", async () => {
     await testCase.beforeSetup();
     expect(calls).toEqual(["setup_fixtures", "super before_setup"]);
@@ -250,26 +242,6 @@ describe("TestFixtures#before_setup / #after_teardown", () => {
     ))();
     await expect(testCase.afterTeardown()).rejects.toThrow("super raised");
     expect(calls).toEqual(["teardown_fixtures"]);
-  });
-
-  it("an includer's own before_setup outranks the module's and reaches it through super", async () => {
-    class Parent {
-      async beforeSetup(): Promise<void> {
-        calls.push("super before_setup");
-      }
-    }
-    const k = class extends Parent {
-      async beforeSetup(): Promise<void> {
-        calls.push("own before_setup");
-        await super.beforeSetup();
-      }
-      async setupFixtures() {
-        calls.push("setup_fixtures");
-      }
-    };
-    include(k, TestFixtures);
-    await new k().beforeSetup();
-    expect(calls).toEqual(["own before_setup", "setup_fixtures", "super before_setup"]);
   });
 
   it("a subclass's before_setup reaches the module through the includer", async () => {
@@ -369,7 +341,7 @@ describe("useFixtures seeds composite-primary-key tables", () => {
 
   it("Fixture#find locates a composite-primary-key row by its full key tuple", async () => {
     const book = cpkBooks("cpk_book_with_generated_pk");
-    const modelClass = book.constructor as typeof Base;
+    const modelClass = book.constructor;
     expect(modelClass.primaryKey).toEqual(["author_id", "id"]);
     const fixture = new Fixture(
       {

@@ -1,0 +1,12 @@
+import { MiniMagick } from "./mini-magick.js";
+import "./test-helpers/spec-helper.js";
+import { expect, it, describe } from "vitest";
+
+describe("MiniMagick", () => {
+  describe(".cli_version", () => {
+    // BLOCKED: mini-magick-cli-tool-shortcuts
+    it.fails("returns ImageMagick's version", async () => {
+      expect(await MiniMagick.cliVersion()).toMatch(/^\d+\.\d+\.\d+-\d+$/m);
+    });
+  });
+});

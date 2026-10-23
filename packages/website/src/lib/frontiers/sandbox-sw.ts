@@ -18,6 +18,8 @@ import { createTrailsCLI, type CliResult } from "./trails-cli.js";
 import { createAppServer, type AppServer } from "./app-server.js";
 import { requestToRackEnvWithBody, rackResponseToFetchResponse } from "./rack-bridge.js";
 import { resolveVfsPath } from "./vfs-resolve.js";
+import * as yaml from "yaml";
+import { registerPsychAdapter } from "@blazetrails/ruby-compat/psych-adapter";
 import { Base } from "@blazetrails/activerecord/base";
 import { register } from "@blazetrails/activerecord/connection-adapters";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter";
@@ -29,6 +31,8 @@ import { ActionController } from "@blazetrails/actionpack";
 // sql.js is loaded via importScripts before the IIFE (see vite.sw.config.ts banner).
 // The Vite build externalizes it and maps the import to the global `initSqlJs`.
 import initSqlJs from "sql.js";
+
+registerPsychAdapter("yaml", yaml);
 
 const DEV_PREFIX = "/~dev/";
 

@@ -8,6 +8,8 @@ export class File {
   }
 
   toString(): string {
-    return RubyFile.binread(this._filename);
+    let source = "";
+    for (const byte of RubyFile.binread(this._filename)) source += String.fromCharCode(byte);
+    return source;
   }
 }

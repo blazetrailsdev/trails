@@ -95,7 +95,7 @@ describe("DatabaseConfigurations", () => {
       );
       await load("trails_unloaded_adapter");
       config.validateBang();
-      expect((config.adapterClass() as { name: string }).name).toBe("TrailsFirstAdapter");
+      expect(config.adapterClass().name).toBe("TrailsFirstAdapter");
     });
 
     it("validate! keeps a memoized adapter class and seats one read before it loaded", async () => {
@@ -103,12 +103,12 @@ describe("DatabaseConfigurations", () => {
       const config = new HashConfig("default_env", "primary", { adapter: "trails_memo_adapter" });
       await load("trails_memo_adapter");
       config.validateBang();
-      expect((config.adapterClass() as { name: string }).name).toBe("TrailsFirstAdapter");
+      expect(config.adapterClass().name).toBe("TrailsFirstAdapter");
 
       register("trails_memo_adapter", "TrailsSecondAdapter", adaptersPath);
       await load("trails_memo_adapter");
       config.validateBang();
-      expect((config.adapterClass() as { name: string }).name).toBe("TrailsFirstAdapter");
+      expect(config.adapterClass().name).toBe("TrailsFirstAdapter");
     });
 
     it("inspect renders the resolved adapter class", async () => {

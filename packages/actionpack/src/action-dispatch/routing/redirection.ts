@@ -2,13 +2,18 @@ import { extractOptionsBang, Notifications } from "@blazetrails/activesupport";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 import { URL as UrlHelpers, type UrlOptions } from "../http/url.js";
-import {
-  escapeFragment as journeyEscapeFragment,
-  escapePath as journeyEscapePath,
-} from "../journey/router/utils.js";
+import { Utils } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
 import { Utils as RackUtils, type RackEnv } from "@blazetrails/rack";
-import { ArgumentError, hashDelete, isEmpty, URI } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  hashDelete,
+  isEmpty,
+  rbFSend,
+  rbObjIsProc,
+  rbObjRespondTo,
+  URI,
+} from "@blazetrails/ruby-compat";
 
 export { Endpoint } from "./endpoint.js";
 
@@ -36,7 +41,7 @@ function scriptName(req: Request): string {
   return (req.env["SCRIPT_NAME"] as string) ?? "";
 }
 
-export class Redirect<B = RedirectBlock> extends Endpoint {
+export class Redirect<B = unknown> extends Endpoint {
   readonly status: number;
   readonly block: B;
 
@@ -57,7 +62,7 @@ export class Redirect<B = RedirectBlock> extends Endpoint {
       payload.status = this.status;
       payload.location = response.headers.get("Location");
       payload.request = request;
-      return response.toRack();
+      return response.toA();
     });
   }
 
@@ -88,7 +93,7 @@ export class Redirect<B = RedirectBlock> extends Endpoint {
   }
 
   path(params: Record<string, string>, request: Request): string {
-    return (this.block as RedirectBlock)(params, request);
+    return rbFSend(this.block, "call", params, request) as string;
   }
 
   inspect(): string {
@@ -97,7 +102,7 @@ export class Redirect<B = RedirectBlock> extends Endpoint {
 
   /** @internal */
   protected relativePath(path: string | null): boolean {
-    return path != null && !isEmpty(path) && !path.startsWith("/");
+    return path != null && path.length !== 0 && !path.startsWith("/");
   }
 
   /** @internal */
@@ -107,12 +112,12 @@ export class Redirect<B = RedirectBlock> extends Endpoint {
 
   /** @internal */
   protected escapeFragment(params: Record<string, string>): Record<string, string> {
-    return transformValues(params, journeyEscapeFragment);
+    return transformValues(params, (v) => Utils.escapeFragment(v));
   }
 
   /** @internal */
   protected escapePath(params: Record<string, string>): Record<string, string> {
-    return transformValues(params, journeyEscapePath);
+    return transformValues(params, (v) => Utils.escapePath(v));
   }
 }
 
@@ -216,8 +221,10 @@ export function redirect(
     string | (OptionRedirectOptions & { status?: number }) | RedirectBlock | RedirectCallable
   >
 ): Redirect<unknown> {
-  let block: RedirectBlock | undefined =
-    typeof args[args.length - 1] === "function" ? (args.pop() as RedirectBlock) : undefined;
+  const last = args[args.length - 1];
+  let block: RedirectBlock | RedirectCallable | undefined = rbObjIsProc(last)
+    ? (args.pop() as RedirectBlock)
+    : undefined;
   const options = extractOptionsBang(args) as OptionRedirectOptions & { status?: number };
   const deleted = hashDelete(options, "status") as number | false | null;
   const status = deleted != null && deleted !== false ? deleted : 301;
@@ -229,12 +236,8 @@ export function redirect(
   if (typeof path === "string") {
     return new PathRedirect(status, path);
   }
-  if (typeof path === "function") {
-    block = path;
-  } else if (path && typeof (path as RedirectCallable).call === "function") {
-    const callable = path as RedirectCallable;
-    block = (params, request) => callable.call(params, request);
-  }
+
+  if (rbObjRespondTo(path, "call")) block = path as RedirectBlock | RedirectCallable;
   if (!block) throw new ArgumentError("redirection argument not supported");
   return new Redirect(status, block);
 }

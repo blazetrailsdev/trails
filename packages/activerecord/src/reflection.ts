@@ -8,7 +8,6 @@ import {
   rbModName,
   rbModToS,
   zip,
-  merge,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
@@ -70,7 +69,7 @@ import {
 import { polymorphicName, typeCondition } from "./inheritance.js";
 import { Relation } from "./relation.js";
 
-type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
+export type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
 
 export interface ConcreteReflection {
   readonly macro: MacroType;
@@ -129,7 +128,7 @@ export abstract class AbstractReflection {
     attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes = {},
     block?: (record: InstanceType<typeof Base>) => void,
   ): InstanceType<typeof Base> {
-    return new (this.klass as any)(attributes, block);
+    return new this.klass(attributes, block);
   }
 
   get className(): string {
@@ -194,9 +193,7 @@ export abstract class AbstractReflection {
     foreignTable: Table | Nodes.TableAlias,
     foreignKlass: typeof Base,
   ): any {
-    const predicateBuilder = (this.klass as any).predicateBuilder.with(
-      new TableMetadata(this.klass, table),
-    );
+    const predicateBuilder = this.klass.predicateBuilder.with(new TableMetadata(this.klass, table));
     const scopeChainItems = this.joinScopes(table, predicateBuilder);
     const klassScope = this.klassJoinScope(table, predicateBuilder);
 
@@ -218,8 +215,8 @@ export abstract class AbstractReflection {
       );
     }
 
-    if ((this.klass as any).isFinderNeedsTypeCondition()) {
-      klassScope.whereBang(typeCondition(this.klass as any, table));
+    if (this.klass.isFinderNeedsTypeCondition()) {
+      klassScope.whereBang(typeCondition(this.klass, table));
     }
 
     return klassScope;
@@ -239,7 +236,7 @@ export abstract class AbstractReflection {
 
   klassJoinScope(table?: Table | Nodes.TableAlias, predicateBuilder?: any): any {
     const relation = this.buildScope(table, predicateBuilder);
-    return (this.klass as any).scopeForAssociation(relation);
+    return this.klass.scopeForAssociation(relation);
   }
 
   constraints(): Array<(...args: any[]) => any> {
@@ -319,7 +316,7 @@ export abstract class AbstractReflection {
       this._concrete().options.counterCache ||
       (this.inverseWhichUpdatesCounterCache() &&
         asConcrete(this.inverseWhichUpdatesCounterCache()!).options.counterCache &&
-        (this._concrete().activeRecord as any).hasAttribute(this.counterCacheColumn()))
+        this._concrete().activeRecord.hasAttribute(this.counterCacheColumn()!))
     );
   }
 
@@ -412,13 +409,13 @@ export class MacroReflection extends AbstractReflection {
   }
 
   set autosave(value: boolean) {
-    (this.options as any).autosave = value;
+    this.options.autosave = value;
     const parent = asConcrete(this).parentReflection;
     if (parent) {
       if (parent instanceof MacroReflection) {
         parent.autosave = value;
       } else {
-        (parent.options as any).autosave = value;
+        parent.options.autosave = value;
       }
     }
   }
@@ -471,9 +468,9 @@ export class MacroReflection extends AbstractReflection {
       if (typeof counterCache === "string") {
         column = counterCache;
       } else if (typeof counterCache === "object") {
-        const cc = counterCache as Record<string, unknown>;
-        active = fetch(cc, "active", true);
-        column = cc.column != null ? String(cc.column) : null;
+        active = fetch(counterCache as Record<string, unknown>, "active", true);
+        const { column: counterCacheColumn } = counterCache as Record<string, unknown>;
+        column = counterCacheColumn != null ? String(counterCacheColumn) : null;
       }
 
       options.counterCache = { active, column };
@@ -550,7 +547,7 @@ export class AssociationReflection extends MacroReflection {
     } else {
       let derivedFk: string | string[] = this.deriveForeignKey({ inferFromInverseOf });
 
-      if (hasQueryConstraints.call(this.activeRecord as any)) {
+      if (hasQueryConstraints.call(this.activeRecord)) {
         derivedFk = this.deriveFkQueryConstraints(derivedFk);
       }
 
@@ -573,7 +570,7 @@ export class AssociationReflection extends MacroReflection {
   }
 
   private deriveFkQueryConstraints(foreignKey: string): string | string[] {
-    const primaryQueryConstraints = queryConstraintsList.call(this.activeRecord as any)!;
+    const primaryQueryConstraints = queryConstraintsList.call(this.activeRecord)!;
     const ownerPk = this.activeRecord.primaryKey as string;
 
     if (primaryQueryConstraints.length > 2) {
@@ -767,12 +764,9 @@ export class AssociationReflection extends MacroReflection {
       this._activeRecordPrimaryKeyCache = Array.isArray(customPk)
         ? customPk.map(String)
         : String(customPk);
-    } else if (
-      hasQueryConstraints.call(this.activeRecord as any) ||
-      this.options.queryConstraints
-    ) {
+    } else if (hasQueryConstraints.call(this.activeRecord) || this.options.queryConstraints) {
       this._activeRecordPrimaryKeyCache =
-        queryConstraintsList.call(this.activeRecord as any) ?? this.activeRecord.primaryKey;
+        queryConstraintsList.call(this.activeRecord) ?? this.activeRecord.primaryKey;
     } else if (this.activeRecord.isCompositePrimaryKey()) {
       const pk = this.primaryKey(this.activeRecord);
       this._activeRecordPrimaryKeyCache = Array.isArray(pk) && pk.includes("id") ? "id" : pk;
@@ -789,7 +783,7 @@ export class AssociationReflection extends MacroReflection {
       key = [key, owner._readAttribute(this.foreignType)];
     }
     return klass.withConnection((connection) =>
-      cachedFindByStatement.call(klass as any, connection, key, block),
+      cachedFindByStatement.call(klass, connection, key, block),
     );
   }
 
@@ -880,7 +874,7 @@ export class AssociationReflection extends MacroReflection {
   }
 
   polymorphicName(): string {
-    return (this.activeRecord as any).polymorphicName?.() ?? this.activeRecord.name;
+    return this.activeRecord.polymorphicName();
   }
 
   addAsSource(seed: AbstractReflection[]): AbstractReflection[] {
@@ -888,7 +882,7 @@ export class AssociationReflection extends MacroReflection {
   }
 
   addAsPolymorphicThrough(
-    reflection: AbstractReflection,
+    reflection: AssociationReflection | ThroughReflection,
     seed: AbstractReflection[],
   ): AbstractReflection[] {
     return [...seed, new PolymorphicReflection(this, reflection)];
@@ -1022,8 +1016,8 @@ export class BelongsToReflection extends AssociationReflection {
     }
 
     const targetKlass = klass || this.klass;
-    if (hasQueryConstraints.call(targetKlass as any) || this.options.queryConstraints) {
-      return compositeQueryConstraintsList.call(targetKlass as any);
+    if (hasQueryConstraints.call(targetKlass) || this.options.queryConstraints) {
+      return compositeQueryConstraintsList.call(targetKlass);
     }
 
     if (targetKlass.isCompositePrimaryKey()) {
@@ -1204,7 +1198,7 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get throughReflection(): AssociationReflection | ThroughReflection | null {
-    return this.activeRecord._reflectOnAssociation(this.through) ?? null;
+    return this.activeRecord._reflectOnAssociation(this.options.through as string) ?? null;
   }
 
   get joinTable(): string {
@@ -1257,15 +1251,15 @@ export class ThroughReflection extends AbstractReflection {
     return (
       !!this.scope ||
       !!this.options.sourceType ||
-      !!(this.sourceReflection as any)?.hasScope?.() ||
-      !!(this.throughReflection as any)?.hasScope?.()
+      !!this.sourceReflection?.hasScope() ||
+      !!this.throughReflection?.hasScope()
     );
   }
 
   isNested(): boolean {
     return (
-      !!(this.sourceReflection as any)?.isThroughReflection?.() ||
-      !!(this.throughReflection as any)?.isThroughReflection?.()
+      !!this.sourceReflection?.isThroughReflection() ||
+      !!this.throughReflection?.isThroughReflection()
     );
   }
 
@@ -1346,7 +1340,7 @@ export class ThroughReflection extends AbstractReflection {
 
   checkValidityBang(): void {
     if (!this.throughReflection) {
-      throw new HasManyThroughAssociationNotFoundError(this.activeRecord as any, this as any);
+      throw new HasManyThroughAssociationNotFoundError(this.activeRecord, this);
     }
 
     if (this.throughReflection.isPolymorphic()) {
@@ -1373,7 +1367,7 @@ export class ThroughReflection extends AbstractReflection {
       throw new HasManyThroughAssociationPointlessSourceTypeError(
         this.activeRecord.name,
         this.name,
-        (this.sourceReflection as any).name,
+        this.sourceReflection.name,
       );
     }
 
@@ -1381,7 +1375,7 @@ export class ThroughReflection extends AbstractReflection {
       throw new HasManyThroughAssociationPolymorphicSourceError(
         this.activeRecord.name,
         this.name,
-        (this.sourceReflection as any).name,
+        this.sourceReflection.name,
       );
     }
 
@@ -1389,19 +1383,19 @@ export class ThroughReflection extends AbstractReflection {
       throw new HasOneThroughCantAssociateThroughCollection(
         this.activeRecord.name,
         this.name,
-        (this.throughReflection as any).name,
+        this.throughReflection.name,
       );
     }
 
-    if (!(this._delegate as any).parentReflection) {
+    if (!this._delegate.parentReflection) {
       const refs = Object.keys(normalizedReflections(this.activeRecord));
-      const throughIdx = refs.indexOf((this.throughReflection as any).name);
+      const throughIdx = refs.indexOf(this.throughReflection.name);
       const selfIdx = refs.indexOf(this.name);
       if (throughIdx > selfIdx) {
         throw new HasManyThroughOrderError(
           this.activeRecord.name,
           this.name,
-          (this.throughReflection as any).name,
+          this.throughReflection.name,
         );
       }
     }
@@ -1420,7 +1414,7 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   addAsPolymorphicThrough(
-    reflection: AbstractReflection,
+    reflection: AssociationReflection | ThroughReflection,
     seed: AbstractReflection[],
   ): AbstractReflection[] {
     return this.collectJoinReflections([...seed, new PolymorphicReflection(this, reflection)]);
@@ -1454,29 +1448,32 @@ export class ThroughReflection extends AbstractReflection {
 }
 
 export class PolymorphicReflection extends AbstractReflection {
-  private _reflection: AbstractReflection;
-  private _previousReflection: AbstractReflection;
+  private _reflection: AssociationReflection | ThroughReflection;
+  private _previousReflection: AssociationReflection | ThroughReflection;
 
-  constructor(reflection: AbstractReflection, previousReflection: AbstractReflection) {
+  constructor(
+    reflection: AssociationReflection | ThroughReflection,
+    previousReflection: AssociationReflection | ThroughReflection,
+  ) {
     super();
     this._reflection = reflection;
     this._previousReflection = previousReflection;
   }
 
   get klass(): typeof Base {
-    return (this._reflection as any).klass;
+    return this._reflection.klass;
   }
 
   get scope(): ((...args: any[]) => any) | null {
-    return (this._reflection as any).scope;
+    return this._reflection.scope;
   }
 
   get pluralName(): string {
-    return (this._reflection as any).pluralName;
+    return this._reflection.pluralName;
   }
 
   get type(): string | null {
-    return (this._reflection as any).type;
+    return this._reflection.type;
   }
 
   joinPrimaryKey(klass: typeof Base = this.klass): string | string[] {
@@ -1484,15 +1481,15 @@ export class PolymorphicReflection extends AbstractReflection {
   }
 
   get joinForeignKey(): string | string[] {
-    return (this._reflection as any).joinForeignKey;
+    return this._reflection.joinForeignKey;
   }
 
   get name(): string {
-    return (this._reflection as any).name;
+    return this._reflection.name;
   }
 
   scopeFor(relation: any, owner?: any): any {
-    return (this._reflection as any).scopeFor?.(relation, owner) ?? relation;
+    return this._reflection.scopeFor(relation, owner);
   }
 
   joinScopes(
@@ -1502,10 +1499,13 @@ export class PolymorphicReflection extends AbstractReflection {
     record?: any,
   ): any[] {
     const scopes = super.joinScopes(table, predicateBuilder, klass, record);
-    if (!(this._previousReflection as any).isThroughReflection?.()) {
-      const prevScopes =
-        (this._previousReflection as any).joinScopes?.(table, predicateBuilder, klass, record) ??
-        [];
+    if (!this._previousReflection.isThroughReflection()) {
+      const prevScopes = this._previousReflection.joinScopes(
+        table,
+        predicateBuilder,
+        klass,
+        record,
+      );
       scopes.push(...prevScopes);
     }
     scopes.push(
@@ -1520,30 +1520,30 @@ export class PolymorphicReflection extends AbstractReflection {
 
   /** @internal */
   private sourceTypeScope(): (...args: any[]) => any {
-    const type = (this._previousReflection as any).foreignType;
-    const sourceType = (this._previousReflection as any).options?.sourceType;
+    const type = this._previousReflection.foreignType;
+    const sourceType = this._previousReflection.options.sourceType;
     return function (this: any, object: any) {
-      return this.where({ [type]: sourceType });
+      return this.where({ [type!]: sourceType });
     };
   }
 }
 
 export class RuntimeReflection extends AbstractReflection {
-  private _reflection: AbstractReflection;
+  private _reflection: AssociationReflection | ThroughReflection;
   private _association: any;
 
-  constructor(reflection: AbstractReflection, association: any) {
+  constructor(reflection: AssociationReflection | ThroughReflection, association: any) {
     super();
     this._reflection = reflection;
     this._association = association;
   }
 
   get scope(): ((...args: any[]) => any) | null {
-    return (this._reflection as any).scope;
+    return this._reflection.scope;
   }
 
   get type(): string | null {
-    return (this._reflection as any).type;
+    return this._reflection.type;
   }
 
   constraints(): Array<(...args: any[]) => any> {
@@ -1551,7 +1551,7 @@ export class RuntimeReflection extends AbstractReflection {
   }
 
   get joinForeignKey(): string | string[] {
-    return (this._reflection as any).joinForeignKey;
+    return this._reflection.joinForeignKey;
   }
 
   get klass(): typeof Base {
@@ -1559,7 +1559,7 @@ export class RuntimeReflection extends AbstractReflection {
   }
 
   get aliasedTable(): Table {
-    return (this.klass as any).arelTable;
+    return this.klass.arelTable;
   }
 
   joinPrimaryKey(klass: typeof Base = this.klass): string | string[] {
@@ -1629,7 +1629,7 @@ export function addReflection(
 ): void {
   clearReflectionsCache(ar);
   (ar as any)._reflections = Object.assign(
-    except((ar as any)._reflections as Record<string, unknown>, name),
+    except(ar._reflections as Record<string, unknown>, name),
     { [name]: reflection },
   );
 }
@@ -1639,7 +1639,7 @@ export function addAggregateReflection(
   name: string,
   reflection: AggregateReflection,
 ): void {
-  ar.aggregateReflections = merge(ar.aggregateReflections, { [name]: reflection });
+  ar.aggregateReflections = { ...ar.aggregateReflections, [name]: reflection };
 }
 
 export function reflections(

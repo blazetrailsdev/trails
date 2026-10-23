@@ -1,12 +1,7 @@
-import type { Locale } from "../../i18n.js";
+import type { Rfc4646 } from "./rfc4646.js";
+import type { Simple } from "./simple.js";
 
-export interface Parents {
-  toA(): string[];
-  toSym(): Locale;
-  parent(): Parents | null;
-  parents(): Parents[];
-  selfAndParents(): Parents[];
-}
+export type Parents = Simple | Rfc4646;
 
 /** @internal */
 interface TagClass {

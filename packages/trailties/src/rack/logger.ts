@@ -1,5 +1,6 @@
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { BodyProxy } from "@blazetrails/rack";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { Request } from "@blazetrails/actionpack";
 import { LogSubscriber, Notifications } from "@blazetrails/activesupport";
 import type { NotificationHandle } from "@blazetrails/activesupport";
@@ -51,7 +52,7 @@ export class Logger {
 
     try {
       this.logger.info?.(() => this.startedRequestMessage(request));
-      const response = await this.app.call(this.app, env);
+      const response = await (rbFSend(this.app, "call", env) as Promise<RackResponse>);
       const [status, headers, body] = response;
       const wrapped = new BodyProxy(body as AsyncIterable<unknown>, () =>
         this.finishRequestInstrumentation(handle, loggerTagPopCount),

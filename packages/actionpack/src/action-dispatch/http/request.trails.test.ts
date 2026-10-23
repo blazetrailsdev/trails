@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ENV_METHODS, Request } from "./request.js";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { StringIO } from "@blazetrails/ruby-compat";
+import { Request as CacheRequest } from "./cache.js";
 
 describe("Request#GET / #POST", () => {
   it("GET raises BadRequest when the query string cannot be parsed", () => {
@@ -47,7 +48,11 @@ describe("Request ENV_METHODS readers", () => {
 
 describe("Request include MimeNegotiation", () => {
   it("keeps its own format / formats / variant readers beside the module's writers", () => {
-    for (const name of ["format", "formats", "variant"]) {
+    expect(typeof Object.getOwnPropertyDescriptor(Request.prototype, "format")?.get).toBe(
+      "function",
+    );
+    expect(typeof Request.prototype.setFormat).toBe("function");
+    for (const name of ["formats", "variant"]) {
       const descriptor = Object.getOwnPropertyDescriptor(Request.prototype, name);
       expect(typeof descriptor?.get).toBe("function");
       expect(typeof descriptor?.set).toBe("function");
@@ -86,5 +91,35 @@ describe("Request module initialize bodies", () => {
     const request = new Request({ PATH_INFO: "/a", QUERY_STRING: "" });
     expect(request.filteredPath()).toBe("/a");
     expect(request._filteredPath).toBe("/a");
+  });
+});
+
+describe("Request on_load(:action_dispatch_request)", () => {
+  it("includes RequestCookieMethods onto Request.prototype", () => {
+    expect(Object.hasOwn(Request.prototype, "cookieJar")).toBe(true);
+    const keyGenerator = { generateKey: () => "k" };
+    const request = new Request({ "action_dispatch.key_generator": keyGenerator });
+    expect(request.keyGenerator()).toBe(keyGenerator);
+    expect(request.isHaveCookieJar()).toBe(false);
+  });
+});
+
+describe("Cache::Request.strict_freshness", () => {
+  it("is read by Request#fresh through the module-level seat", () => {
+    const old = CacheRequest.strictFreshness;
+    const req = new Request({
+      HTTP_IF_NONE_MATCH: '"abc"',
+      HTTP_IF_MODIFIED_SINCE: "Tue, 01 Jan 2030 00:00:00 GMT",
+    });
+    const response = { etag: '"abc"', lastModified: new Date("2031-01-01T00:00:00Z") };
+    try {
+      expect(req.strictFreshness).toBe(false);
+      expect(req.fresh(response)).toBe(false);
+      CacheRequest.strictFreshness = true;
+      expect(req.strictFreshness).toBe(true);
+      expect(req.fresh(response)).toBe(true);
+    } finally {
+      CacheRequest.strictFreshness = old;
+    }
   });
 });

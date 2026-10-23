@@ -1,17 +1,21 @@
-import { rbObjId } from "@blazetrails/ruby-compat";
+import { rbObjId, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import { EncryptedFile, MissingContentError } from "./encrypted-file.js";
 import { presence } from "./core-ext/object/blank.js";
+import { deepTransformKeys } from "./hash-utils.js";
 import { delegateMissingTo } from "./module-ext.js";
 import { OrderedOptions } from "./ordered-options.js";
 
 export class InvalidContentError extends Error {
+  static toString(): string {
+    return "ActiveSupport::EncryptedConfiguration::InvalidContentError";
+  }
+
   constructor(contentPath: string, options: { cause?: unknown } = {}) {
     const message = `Invalid YAML in '${contentPath}'.`;
     const cause = options.cause;
     super(
-      cause instanceof Error && cause.name === "YAMLParseError"
-        ? `${message}\n\n  ${cause.message}`
-        : message,
+      cause instanceof Psych.SyntaxError ? `${message}\n\n  ${cause.message}` : message,
       options,
     );
     this.name = "InvalidContentError";
@@ -19,6 +23,10 @@ export class InvalidContentError extends Error {
 }
 
 export class InvalidKeyError extends Error {
+  static toString(): string {
+    return "ActiveSupport::EncryptedConfiguration::InvalidKeyError";
+  }
+
   constructor(contentPath: string, key: unknown) {
     super(
       `Key '${String(key)}' is invalid, it must respond to '#to_sym' from configuration in '${contentPath}'.`,
@@ -34,6 +42,10 @@ export interface EncryptedConfiguration {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class EncryptedConfiguration extends EncryptedFile {
+  static toString(): string {
+    return "ActiveSupport::EncryptedConfiguration";
+  }
+
   static name = "ActiveSupport::EncryptedConfiguration";
 
   private _config: Record<string, unknown> | null = null;
@@ -65,13 +77,14 @@ export class EncryptedConfiguration extends EncryptedFile {
   }
 
   async validateBang(): Promise<void> {
-    for (const key of (await this.deserialize(await this.read())).keys()) {
+    const hash = this.deserialize(await this.read());
+    for (const key of hash instanceof Map ? hash.keys() : Object.keys(hash)) {
       if (typeof key !== "string") throw new InvalidKeyError(this.contentPath, key);
     }
   }
 
   async config(): Promise<Record<string, unknown>> {
-    return (this._config ??= this.deepSymbolizeKeys(await this.deserialize(await this.read())));
+    return (this._config ??= this.deepSymbolizeKeys(this.deserialize(await this.read())));
   }
 
   inspect(): string {
@@ -80,18 +93,11 @@ export class EncryptedConfiguration extends EncryptedFile {
   }
 
   /** @internal */
-  private deepSymbolizeKeys(hash: Map<unknown, unknown>): Record<string, unknown> {
-    const transform = (value: unknown): unknown => {
-      if (Array.isArray(value)) return value.map(transform);
-      if (!(value instanceof Map)) return value;
-      const result: Record<string, unknown> = {};
-      for (const [key, v] of value) {
-        if (typeof key !== "string") throw new InvalidKeyError(this.contentPath, key);
-        result[key] = transform(v);
-      }
-      return result;
-    };
-    return transform(hash) as Record<string, unknown>;
+  private deepSymbolizeKeys(hash: object): Record<string, unknown> {
+    return deepTransformKeys(hash, (key: unknown) => {
+      if (typeof key !== "string") throw new InvalidKeyError(this.contentPath, key);
+      return key;
+    }) as Record<string, unknown>;
   }
 
   /** @internal */
@@ -99,7 +105,7 @@ export class EncryptedConfiguration extends EncryptedFile {
     if (hash === null || typeof hash !== "object" || Array.isArray(hash)) return hash;
 
     const h = new OrderedOptions();
-    for (const [k, v] of Object.entries(hash)) {
+    for (const [k, v] of hash instanceof Map ? hash : Object.entries(hash)) {
       h.set(k, this.deepTransform(v));
     }
     return h;
@@ -112,17 +118,18 @@ export class EncryptedConfiguration extends EncryptedFile {
   }
 
   /** @internal */
-  private async deserialize(content: string): Promise<Map<unknown, unknown>> {
-    const { parse } = await import("@blazetrails/ruby-compat/psych-adapter");
+  private deserialize(content: string): object {
     let config: unknown;
     try {
-      config = parse(content, { mapAsMap: true, version: "1.1" });
+      config = rbObjRespondTo(Psych, "unsafeLoad")
+        ? Psych.unsafeLoad(content, { filename: this.contentPath })
+        : Psych.load(content, { filename: this.contentPath });
     } catch (e) {
-      if (e instanceof Error && e.name === "YAMLParseError") {
+      if (e instanceof Psych.SyntaxError) {
         throw new InvalidContentError(this.contentPath, { cause: e });
       }
       throw e;
     }
-    return (presence(config) as Map<unknown, unknown> | undefined) ?? new Map();
+    return (presence(config) as object | undefined) ?? {};
   }
 }

@@ -7,6 +7,9 @@ import { join } from "node:path";
 import { isPlainObject } from "@blazetrails/activesupport";
 import { Dir } from "@blazetrails/ruby-compat";
 import { createProgram } from "../cli.js";
+import { lookupBang } from "../command/behavior.js";
+
+await lookupBang();
 
 const io = vi.hoisted(() => ({ server: null as REPLServer | null, output: "", piped: "" }));
 

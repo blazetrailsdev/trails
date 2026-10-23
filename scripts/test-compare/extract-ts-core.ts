@@ -111,6 +111,34 @@ export function collectLibTests(content: string, file: string, namespace: string
   return tests;
 }
 
+/**
+ * The TS twin of extract-ruby-tests.rb's `REQUIRED_TEST_MODULES`: a function
+ * that registers a shared suite's `it`s, exported from a test-helpers file and
+ * called by each test file that mirrors a Ruby class `include`-ing the module
+ * (actioncable `subscription_adapter/common.rb`). Its cases are credited to
+ * every calling file, as the Ruby side emits them for every including file.
+ * Only-grow, like its twin.
+ */
+export const REQUIRED_TEST_MODULES: Record<string, string> = {
+  commonSubscriptionAdapterTest:
+    "packages/actioncable/src/test-helpers/subscription-adapter/common.ts",
+  channelPrefixTest: "packages/actioncable/src/test-helpers/subscription-adapter/channel-prefix.ts",
+};
+
+/** The top-level function `name` declared in a required test-module file. */
+export function collectRequiredTests(content: string, file: string, name: string): HelperMap {
+  const sourceFile = ts.createSourceFile(file, content, ts.ScriptTarget.ESNext, false);
+  const tests: HelperMap = new Map();
+  for (const n of sourceFile.statements) {
+    if (ts.isFunctionDeclaration(n) && n.name?.text === name && n.body) {
+      tests.set(name, [
+        { body: n.body, lambda: false, scopeStart: 0, scopeEnd: Infinity, sourceFile },
+      ]);
+    }
+  }
+  return tests;
+}
+
 function isReceiverExpect(call: ts.CallExpression): boolean {
   return (
     ts.isPropertyAccessExpression(call.expression) &&
@@ -119,14 +147,59 @@ function isReceiverExpect(call: ts.CallExpression): boolean {
   );
 }
 
+/**
+ * The test-case instance a Rails test helper is called on: Rails calls its
+ * private helpers bare (`assert_recognizes`, `actionpack/test/controller/resources_test.rb:1178-1470`),
+ * and trails calls the ported `TestCase` methods on `self()`, the `testCase`
+ * fixture, or the suite's `tc` / `t` instance (`tc = new ResourcesTest(task.name)`,
+ * `t = testCase as TestRoutingMapper`).
+ */
 function isTestObject(owner: ts.Expression): boolean {
   if (ts.isCallExpression(owner)) owner = owner.arguments.length === 0 ? owner.expression : owner;
-  return ts.isIdentifier(owner) && (owner.text === "self" || owner.text === "testCase");
+  if (ts.isPropertyAccessExpression(owner) && owner.name.text === "openSession") {
+    owner = owner.expression;
+  }
+  return (
+    ts.isIdentifier(owner) &&
+    (owner.text === "self" ||
+      owner.text === "testCase" ||
+      owner.text === "test" ||
+      owner.text === "tc" ||
+      owner.text === "t")
+  );
+}
+
+function isAssertionDotCall(expression: ts.Expression): boolean {
+  return (
+    ts.isPropertyAccessExpression(expression) &&
+    expression.name.text === "call" &&
+    ts.isIdentifier(expression.expression) &&
+    isAssertionCallee(expression.expression.text)
+  );
+}
+
+function helperCalleeArguments(call: ts.CallExpression): readonly ts.Expression[] {
+  return isAssertionDotCall(call.expression) ? call.arguments.slice(1) : call.arguments;
+}
+
+/**
+ * `mustBe(obj, "isEmpty")` / `wontBe(obj, "isEmpty")` with no third operand are
+ * minitest's `assert_predicate` / `refute_predicate`, the twin of the Ruby
+ * extractor's PREDICATE_FORMS (`assert_operator`'s `UNDEFINED == o2` arm,
+ * vendor/minitest/v5.27.0/lib/minitest/assertions.rb:315-316).
+ */
+function predicateFormOf(name: string, args: readonly ts.Expression[]): string | null {
+  if (args.length !== 2) return null;
+  const nilPred = ts.isStringLiteralLike(args[1]) && args[1].text === "isNil";
+  if (name === "mustBe") return nilPred ? "assertNil" : "assertPredicate";
+  if (name === "wontBe") return nilPred ? "refuteNil" : "refutePredicate";
+  return null;
 }
 
 function helperCalleeName(expression: ts.Expression, helpers: HelperMap): string | null {
   if (ts.isIdentifier(expression)) return expression.text;
   if (!ts.isPropertyAccessExpression(expression)) return null;
+  if (isAssertionDotCall(expression)) return (expression.expression as ts.Identifier).text;
   const owner = expression.expression;
   if (isTestObject(owner)) return expression.name.text;
   const namespace = ts.isIdentifier(owner)
@@ -380,8 +453,8 @@ function collectAssertionKinds(
             // Bare `expect(...)` is recorded via its matcher chain above; a helper
             // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
             if (name !== "expect") {
-              kinds.push(name);
-              values.push(helperCalleeValue(name, n.arguments, sourceFile));
+              kinds.push(predicateFormOf(name, helperCalleeArguments(n)) ?? name);
+              values.push(helperCalleeValue(name, helperCalleeArguments(n), sourceFile));
             }
           } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
             visiting.add(name);
@@ -434,10 +507,13 @@ export function extractTestsFromSource(
   content: string,
   relativePath: string,
   libTests: HelperMap = new Map(),
+  requiredTests: HelperMap = new Map(),
 ): TestFileInfo {
-  const sourceFile = ts.createSourceFile(relativePath, content, ts.ScriptTarget.ESNext, false);
+  const fileSourceFile = ts.createSourceFile(relativePath, content, ts.ScriptTarget.ESNext, false);
+  let sourceFile = fileSourceFile;
   const helpers = collectHelpers(sourceFile);
   for (const [name, defs] of libTests) helpers.set(name, defs);
+  for (const [name, defs] of requiredTests) if (!helpers.has(name)) helpers.set(name, defs);
   const constDecls = collectConstDeclarations(sourceFile);
   const bindings = new Map<string, BoundValue>();
 
@@ -454,6 +530,7 @@ export function extractTestsFromSource(
   const registrars = testRegisteringHelpers(sourceFile, helpers);
   const deferredBodies = new Map<string, ts.Node>();
   const callSiteGates = new Map<string, (TestGate | undefined)[]>();
+  const callSiteAncestors = new Map<string, string[][]>();
   // An `it()` whose title stays dynamic inside an expanded `for...of` is
   // visited once per element, but the skeleton is the same every time, so it
   // is recorded once — the Ruby extractor records one row per `test` call
@@ -611,6 +688,9 @@ export function extractTestsFromSource(
           const gates = callSiteGates.get(funcName) ?? [];
           gates.push(activeGate());
           callSiteGates.set(funcName, gates);
+          const sites = callSiteAncestors.get(funcName) ?? [];
+          sites.push([...currentAncestors]);
+          callSiteAncestors.set(funcName, sites);
         }
 
         if (ADAPTER_SUITE_WRAPPERS.has(funcName)) {
@@ -736,7 +816,26 @@ export function extractTestsFromSource(
   }
 
   visit(sourceFile);
+  for (const name of registrars) {
+    const def = requiredTests.get(name)?.[0];
+    if (def && helpers.get(name)?.[0] === def) deferredBodies.set(name, def.body);
+  }
   for (const [name, body] of deferredBodies) {
+    sourceFile = requiredTests.get(name)?.[0].sourceFile ?? fileSourceFile;
+    const sites = callSiteAncestors.get(name) ?? [];
+    if (sites.some((outer) => sites.some((inner) => extendsSuite(inner, outer)))) {
+      sites.forEach((site, i) => {
+        const siteGate = callSiteGates.get(name)![i];
+        const seen = new Set(dynamicSites);
+        currentAncestors.push(...site);
+        if (siteGate) gateStack.push(siteGate);
+        visit(body);
+        for (const node of dynamicSites) if (!seen.has(node)) dynamicSites.delete(node);
+        if (siteGate) gateStack.pop();
+        currentAncestors.length -= site.length;
+      });
+      continue;
+    }
     const gate = agreedGate(callSiteGates.get(name));
     if (gate) gateStack.push(gate);
     visit(body);
@@ -744,6 +843,11 @@ export function extractTestsFromSource(
   }
   fileInfo.testCount = fileInfo.testCases.length;
   return fileInfo;
+}
+
+/** Is suite path `inner` nested strictly inside suite path `outer`? */
+function extendsSuite(inner: readonly string[], outer: readonly string[]): boolean {
+  return inner.length > outer.length && outer.every((title, i) => inner[i] === title);
 }
 
 /**

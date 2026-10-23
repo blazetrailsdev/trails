@@ -13,7 +13,7 @@ import railsErrorParity from "./eslint/rails-error-parity.mjs";
 import railsCallbackInvocations from "./eslint/rails-callback-invocations.mjs";
 import railsArelTosql from "./eslint/rails-arel-tosql.mjs";
 import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
-import inlinedFromOnlyOnConstructors from "./eslint/inlined-from-only-on-constructors.mjs";
+import inlinedFromPlacement from "./eslint/inlined-from-placement.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
 import noConditionalInTest from "./eslint/no-conditional-in-test.mjs";
@@ -22,6 +22,7 @@ import asyncQueryingEmpty from "./eslint/async-querying-empty.mjs";
 import noQSuffixPredicate from "./eslint/no-q-suffix-predicate.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 import preferAwaitRelation from "./eslint/prefer-await-relation.mjs";
+import classToStringSeat from "./eslint/class-to-string-seat.mjs";
 import railsFileStructureMethodOrder, {
   isManifestAvailable as railsFileStructureManifestAvailable,
 } from "./eslint/rails-file-structure-method-order.mjs";
@@ -82,14 +83,6 @@ if (!railsFileStructureManifestReady) {
   );
 }
 
-/** @type {string[]} */
-const noExplicitAnySrcExclude = JSON.parse(
-  readFileSync(new URL("./eslint/no-explicit-any-src-exclude.json", import.meta.url), "utf8"),
-);
-/** @type {string[]} */
-const noExplicitAnyTestExclude = JSON.parse(
-  readFileSync(new URL("./eslint/no-explicit-any-test-exclude.json", import.meta.url), "utf8"),
-);
 // AR test files with a backlog of un-torn-down raw `CREATE TABLE` SQL strings.
 // They keep the createTable/dropTable helper check but opt out of the raw-SQL
 // balance (`rawSql: false`) until ported. Ratchet this to zero — see
@@ -142,7 +135,17 @@ export default defineConfig(
       // index.html.tse is that directory's index.html.erb. TransitionTable#visualizer
       // reads all three off disk (transition_table.rb:128-131).
       "packages/actionpack/src/action-dispatch/journey/visualizer/**",
+      // Byte-for-byte copies of vendor/rails/v8.0.2/actionpack/test/fixtures/{public,公共}.
+      "packages/actionpack/src/test-helpers/fixtures/public/**",
+      "packages/actionpack/src/test-helpers/fixtures/公共/**",
+      // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
+      "packages/marcel/src/test-helpers/fixtures/**",
+      // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
+      "packages/mini-magick/src/test-helpers/fixtures/**",
+      // Byte-for-byte copies of vendor/rack/v3.1.14/test/cgi/assets.
+      "packages/rack/test/cgi/assets/**",
       "**/dist-test/**",
+      "**/.trails/**",
       "packages/website/static/**",
       "packages/website/build/**",
       // Vite/Vitest config files outside any tsconfig program — the typed
@@ -208,7 +211,7 @@ export default defineConfig(
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": [
         "error",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },
       ],
       "@typescript-eslint/no-unused-vars": "off",
     },
@@ -288,7 +291,7 @@ export default defineConfig(
           "rails-callback-invocations": railsCallbackInvocations,
           "rails-arel-tosql": railsArelTosql,
           "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
-          "inlined-from-only-on-constructors": inlinedFromOnlyOnConstructors,
+          "inlined-from-placement": inlinedFromPlacement,
           "no-native-date": noNativeDate,
           "no-conditional-in-test": noConditionalInTest,
           "no-getter-called-as-method": noGetterCalledAsMethod,
@@ -298,6 +301,7 @@ export default defineConfig(
           "prefer-await-relation": preferAwaitRelation,
           "nie-requires-annotation": nieRequiresAnnotation,
           "rails-file-structure-method-order": railsFileStructureMethodOrder,
+          "class-to-string-seat": classToStringSeat,
           "rails-test-name-parity": railsTestNameParity,
           "expected-fixtures": expectedFixtures,
           "test-fixture-parity": testFixtureParity,
@@ -416,6 +420,7 @@ export default defineConfig(
       "packages/activemodel/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
+      "packages/actioncable/src/**/*.ts",
       "packages/activejob/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
@@ -449,6 +454,7 @@ export default defineConfig(
       "packages/did-you-mean/src/**/*.ts",
       "packages/bcrypt/src/**/*.ts",
       "packages/arel/src/**/*.ts",
+      "packages/actioncable/src/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).
       "packages/ruby-compat/src/**/*.ts",
@@ -468,9 +474,10 @@ export default defineConfig(
   //    files — and Rails-mirroring source must throw
   //    ported error classes rather than the bare global `Error`. Manifest:
   //    eslint/rails-error-classes.json (built by
-  //    `pnpm tsx scripts/build-rails-error-manifest.ts`). Pre-existing
-  //    violators are grandfathered in eslint/rails-error-parity-exclude.json
-  //    and ratcheted down. ──
+  //    `pnpm tsx scripts/build-rails-error-manifest.ts`). At `warn` here:
+  //    pre-existing violations are counted per file against origin/main by
+  //    `pnpm parity:lint:counts` (scripts/parity/eslint-count.ts), which reds
+  //    any increase. ──
   {
     files: [
       "packages/activerecord/src/**/*.ts",
@@ -479,7 +486,7 @@ export default defineConfig(
     ],
     ignores: ["**/*.test.ts"],
     rules: {
-      "blazetrails/rails-error-parity": "error",
+      "blazetrails/rails-error-parity": "warn",
     },
   },
 
@@ -553,7 +560,7 @@ export default defineConfig(
   {
     files: ["packages/*/src/**/*.ts"],
     rules: {
-      "blazetrails/inlined-from-only-on-constructors": "error",
+      "blazetrails/inlined-from-placement": "error",
     },
   },
 
@@ -593,12 +600,20 @@ export default defineConfig(
           files: [
             "packages/arel/src/**/*.ts",
             "packages/activemodel/src/**/*.ts",
+            "packages/actioncable/src/**/*.ts",
             "packages/activerecord/src/connection-adapters/**/*.ts",
             "packages/activerecord/src/adapters/**/*.ts",
           ],
           ignores: ["**/*.test.ts"],
           rules: {
             "blazetrails/rails-file-structure-method-order": "error",
+          },
+        },
+        {
+          files: ["packages/activejob/src/**/*.ts", "packages/activesupport/src/**/*.ts"],
+          ignores: ["**/*.test.ts", "**/test-helpers/**"],
+          rules: {
+            "blazetrails/class-to-string-seat": "error",
           },
         },
       ]
@@ -617,6 +632,7 @@ export default defineConfig(
             "packages/arel/src/**/*.test.ts",
             "packages/date/src/**/*.test.ts",
             "packages/did-you-mean/src/**/*.test.ts",
+            "packages/globalid/src/**/*.test.ts",
             "packages/i18n/src/**/*.test.ts",
           ],
           rules: {
@@ -731,15 +747,13 @@ export default defineConfig(
   //    in-class form lets materialize-model-declares.ts generate the `declare`
   //    accessors so `parent.children` reads naturally. Autofixable when the
   //    target class is same-file with a static block (else report-only).
-  //    ~1.9k pre-existing sites are grandfathered in
-  //    eslint/no-standalone-associations-exclude.json (a generated data file,
-  //    refreshed by scripts/generate-standalone-associations-exclude.ts) and
-  //    ratcheted down as sites convert; only NEW standalone usages fail.
-  //    See eslint/no-standalone-associations.mjs. ──
+  //    At `warn` here: pre-existing sites are counted per file against
+  //    origin/main by `pnpm parity:lint:counts`, so only NEW standalone usages
+  //    fail. See eslint/no-standalone-associations.mjs. ──
   {
     files: ["packages/*/src/**/*.ts"],
     rules: {
-      "blazetrails/no-standalone-associations": "error",
+      "blazetrails/no-standalone-associations": "warn",
     },
   },
 
@@ -916,28 +930,13 @@ export default defineConfig(
       "no-useless-assignment": "off",
     },
   },
-  // no-explicit-any is "error", ratcheted via a shrinking allowlist (RFC 0037).
-  // src and tests get their own block so each area burns down independently.
-  // The grandfathered violators live in
-  // eslint/no-explicit-any-{src,test}-exclude.json (generated by
-  // `pnpm lint:no-explicit-any:allowlist`) and are turned `off` by the trailing
-  // override block below. Clean files are enforced now and cannot regress; a
-  // burndown PR fixes files and drops their entries from the JSON. NEVER
-  // hand-add an entry to silence a new violation — fix the `any`.
+  // no-explicit-any is a burndown (RFC 0037), held at `warn` here and counted
+  // per file against origin/main by `pnpm parity:lint:counts`
+  // (scripts/parity/eslint-count.ts): a file above its base count, or a new
+  // file with any `any`, is red. Fix the `any`.
   {
     files: ["packages/activerecord/src/**/*.ts"],
-    ignores: ["packages/activerecord/src/**/*.test.ts"],
-    rules: { "@typescript-eslint/no-explicit-any": "error" },
-  },
-  {
-    files: ["packages/activerecord/src/**/*.test.ts"],
-    rules: { "@typescript-eslint/no-explicit-any": "error" },
-  },
-  // Grandfathered no-explicit-any violators — turned off until burned down.
-  // Must stay LAST of the activerecord blocks so it overrides the two above.
-  {
-    files: [...noExplicitAnySrcExclude, ...noExplicitAnyTestExclude],
-    rules: { "@typescript-eslint/no-explicit-any": "off" },
+    rules: { "@typescript-eslint/no-explicit-any": "warn" },
   },
   // ── no-explicit-any-disable: forbid silencing `no-explicit-any` inline.
   //    With the rule at `error`, the workaround shifts from `as any` to an
@@ -1048,6 +1047,20 @@ export default defineConfig(
       "vitest/no-conditional-in-test": "error",
       "vitest/no-conditional-expect": "error",
       "vitest/no-conditional-tests": "error",
+    },
+  },
+
+  {
+    files: ["packages/marcel/src/extension.test.ts"],
+    rules: {
+      "vitest/no-conditional-tests": "off",
+    },
+  },
+  {
+    files: ["packages/marcel/src/test-helpers/test-helper.ts"],
+    rules: {
+      "no-useless-assignment": "off",
+      "prefer-const": ["error", { destructuring: "all" }],
     },
   },
 

@@ -47,17 +47,19 @@ describe("HashWithIndifferentAccess", () => {
   it("symbolize keys keeps the seat to_hash gave the copy", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
     h.setDefault(0);
-    expect(h.symbolizeKeys().default()).toBe(0);
-    expect(h.deepSymbolizeKeys().default()).toBe(0);
+    expect((h.symbolizeKeys() as Hash<string, unknown>).default()).toBe(0);
+    expect((h.deepSymbolizeKeys() as Hash<string, unknown>).default()).toBe(0);
   });
   it("to_h does not convert nested values the way to_hash does", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: { b: 1 } });
     h.setDefault(0);
-    const toH = h.toH();
+    const toH = h.toH() as Hash<string, unknown>;
     expect(toH).toBeInstanceOf(Hash);
     expect(toH).not.toBeInstanceOf(HashWithIndifferentAccess);
     expect(toH.get("a")).toBeInstanceOf(HashWithIndifferentAccess);
     expect(toH.default()).toBe(0);
-    expect(h.toHash().get("a")).not.toBeInstanceOf(HashWithIndifferentAccess);
+    expect((h.toHash() as Hash<string, unknown>).get("a")).not.toBeInstanceOf(
+      HashWithIndifferentAccess,
+    );
   });
 });

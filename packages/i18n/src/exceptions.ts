@@ -2,10 +2,11 @@ import { EMPTY_HASH, normalizeKeys, toSym } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
 import {
   ArgumentError as RubyArgumentError,
-  Module,
   NoMethodError,
   include,
+  isSymbol,
   rbInspect,
+  symbolToS,
 } from "@blazetrails/ruby-compat";
 
 export { NoMethodError };
@@ -13,7 +14,8 @@ export { NoMethodError };
 function deepSymbolizeKeys(object: unknown): unknown {
   if (Array.isArray(object)) return object.map(deepSymbolizeKeys);
   if (typeof object !== "object" || object === null) return object;
-  if (Object.getPrototypeOf(object) !== Object.prototype) return object;
+  const proto: unknown = Object.getPrototypeOf(object);
+  if (proto !== Object.prototype && proto !== null) return object;
   return Object.fromEntries(
     Object.entries(object).map(([key, value]) => [toSym(key), deepSymbolizeKeys(value)]),
   );
@@ -68,8 +70,6 @@ export interface MissingTranslationOptions {
   [key: string]: unknown;
 }
 
-const PERMITTED_KEYS = ["scope", "default"] as const;
-
 interface BaseHost extends Base {
   _keys?: TranslationKey[];
 }
@@ -85,7 +85,9 @@ export interface Base {
   toException(): MissingTranslationData;
 }
 
-export const Base: Module = new Module().include({
+export const Base = {
+  PERMITTED_KEYS: Object.freeze(["scope", "default"]),
+
   keys(this: BaseHost): TranslationKey[] {
     if (!this._keys) {
       const keys = normalizeKeys(this.locale, this.key, this.options.scope);
@@ -118,13 +120,15 @@ export const Base: Module = new Module().include({
   toException(this: Base): MissingTranslationData {
     return new MissingTranslationData(this.locale, this.key, this.options);
   },
-});
+};
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is `include Base` on the type side.
 export interface MissingTranslation extends Base {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class MissingTranslation extends ArgumentError {
+  declare options: MissingTranslationOptions;
+
   static readonly Base = Base;
 
   constructor(
@@ -138,7 +142,7 @@ export class MissingTranslation extends ArgumentError {
     this.locale = locale;
     this.options = {};
     const slice = this.options as Record<string, unknown>;
-    for (const permitted of PERMITTED_KEYS) {
+    for (const permitted of Base.PERMITTED_KEYS) {
       if (permitted in options) slice[permitted] = options[permitted];
     }
     for (const [k, v] of Object.entries(options)) {
@@ -153,6 +157,8 @@ export interface MissingTranslationData extends Base {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class MissingTranslationData extends ArgumentError {
+  declare options: MissingTranslationOptions;
+
   constructor(
     locale: Locale,
     key: TranslationKey,
@@ -164,7 +170,7 @@ export class MissingTranslationData extends ArgumentError {
     this.locale = locale;
     this.options = {};
     const slice = this.options as Record<string, unknown>;
-    for (const permitted of PERMITTED_KEYS) {
+    for (const permitted of Base.PERMITTED_KEYS) {
       if (permitted in options) slice[permitted] = options[permitted];
     }
     for (const [k, v] of Object.entries(options)) {
@@ -181,7 +187,7 @@ export class InvalidPluralizationData extends ArgumentError {
 
   constructor(entry: unknown, count: unknown, key: TranslationKey) {
     super(
-      `translation data ${rbInspect(deepSymbolizeKeys(entry))} can not be used with :count => ${count}. key '${key}' is missing.`,
+      `translation data ${rbInspect(deepSymbolizeKeys(entry))} can not be used with :count => ${count}. key '${isSymbol(key) ? symbolToS(key) : key}' is missing.`,
     );
     this.name = "InvalidPluralizationData";
     this.entry = entry;

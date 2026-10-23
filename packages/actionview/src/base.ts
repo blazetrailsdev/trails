@@ -1,5 +1,4 @@
 import {
-  attrInternal,
   cattrAccessor,
   classAttribute,
   delegate,
@@ -7,9 +6,10 @@ import {
   htmlEscape,
   htmlEscapeOnce,
   InheritableOptions,
-  initializeIncludedModules,
   jsonEscape,
   runLoadHooks,
+  TopLevel,
+  TseUtil,
   xmlNameEscape,
   type SafeBuffer,
 } from "@blazetrails/activesupport";
@@ -21,16 +21,8 @@ import { Context } from "./context.js";
 import { Helpers } from "./helpers.js";
 import type * as HelperExports from "./helpers/index.js";
 import type { _objectForFormBuilder } from "./helpers/form-helper.js";
-import {
-  ClassMethods as UrlHelperClassMethods,
-  type _backUrl,
-  type _filteredReferrer,
-} from "./helpers/url-helper.js";
-import {
-  assignController,
-  installControllerDelegates,
-  installControllerInternals,
-} from "./helpers/controller-helper.js";
+import type { _backUrl, _filteredReferrer } from "./helpers/url-helper.js";
+import { assignController } from "./helpers/controller-helper.js";
 import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
 import { StrictLocalsError } from "./template/error.js";
@@ -39,8 +31,9 @@ import { Renderer } from "./renderer/renderer.js";
 import {
   ArgumentError,
   excBacktraceLocations,
-  extend,
   include,
+  isModuleIncluded,
+  NotImplementedError,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Resolver } from "./template/resolver.js";
@@ -86,10 +79,12 @@ export class Base {
   declare defaultFormats: readonly string[] | null | undefined;
   declare static automaticallyDisableSubmitTag: boolean;
   declare automaticallyDisableSubmitTag: boolean;
+  declare static debugMissingTranslation: boolean;
+  declare debugMissingTranslation: boolean;
   declare static annotateRenderedViewWithFilenames: boolean;
   declare annotateRenderedViewWithFilenames: boolean;
   declare static _routes: unknown;
-  declare static is_routes: boolean;
+  declare static _isRoutes: boolean;
   declare _routes: unknown;
   declare static logger: unknown;
   declare static isLogger: boolean;
@@ -164,20 +159,22 @@ export class Base {
     return this.withViewPaths([]);
   }
 
-  static withViewPaths(
+  static withViewPaths<T extends typeof Base>(
+    this: T,
     viewPaths: ConstructorParameters<typeof LookupContext>[0],
     assigns: Record<string, unknown> = {},
     controller: unknown = null,
-  ): Base {
+  ): InstanceType<T> {
     return this.withContext(new LookupContext(viewPaths), assigns, controller);
   }
 
-  static withContext(
+  static withContext<T extends typeof Base>(
+    this: T,
     context: LookupContext | null,
     assigns: Record<string, unknown> = {},
     controller: unknown = null,
-  ): Base {
-    return new this(context, assigns, controller);
+  ): InstanceType<T> {
+    return new this(context, assigns, controller) as InstanceType<T>;
   }
 
   private _viewRenderer: Renderer;
@@ -195,7 +192,7 @@ export class Base {
     return this.lookupContext?.formats;
   }
 
-  set formats(values: LookupContext["formats"]) {
+  set formats(values: LookupContext["formats"] | null) {
     if (this.lookupContext) this.lookupContext.formats = values;
   }
 
@@ -244,19 +241,21 @@ export class Base {
     this._config = value;
   }
 
+  /** @inventedArm if — PERMANENT */
   constructor(
     lookupContext: LookupContext | null = null,
     assigns: Record<string, unknown> = {},
     controller: unknown = null,
   ) {
+    if (isModuleIncluded(new.target, TopLevel.ActionDispatch?.Routing.UrlFor as never)) {
+      this._routes = null;
+    }
     this._config = new InheritableOptions();
     this._lookupContext = lookupContext;
     this._viewRenderer = new Renderer(this._lookupContext!);
     this.currentTemplate = null;
     this.assignController(controller as Parameters<typeof assignController>[0]);
     this._prepareContext();
-
-    initializeIncludedModules(this);
 
     this.assign(assigns);
   }
@@ -269,7 +268,12 @@ export class Base {
   }
 
   compiledMethodContainer(): CompiledMethodContainer {
-    return (this.constructor as typeof Base).compiledMethodContainer();
+    // @nie disposition=port-real rails=actionview/lib/action_view/base.rb:285
+    throw new NotImplementedError(
+      "Subclasses of ActionView::Base must implement `compiledMethodContainer` " +
+        "or use the class method `withEmptyTemplateCache` for constructing " +
+        "an ActionView::Base subclass that has an empty cache.",
+    );
   }
 
   /** @missingRailsArgs _run — PERMANENT */
@@ -330,16 +334,18 @@ export class Base {
     block?: () => unknown,
   ): string | SafeBuffer | null | Promise<string | SafeBuffer | null> {
     if ((options as object | null)?.constructor === Object) {
-      const hash = options as RenderOptions;
-      return this.inRenderingContext(hash, () => {
+      return this.inRenderingContext(options as RenderOptions, () => {
         if (block) {
           return this.viewRenderer.renderPartial(
             this,
-            { ...hash, partial: hash.layout as RenderOptions["partial"] },
+            {
+              ...(options as RenderOptions),
+              partial: (options as RenderOptions).layout as RenderOptions["partial"],
+            },
             block,
           );
         } else {
-          return this.viewRenderer.render(this, hash);
+          return this.viewRenderer.render(this, options as RenderOptions);
         }
       });
     } else {
@@ -388,17 +394,8 @@ export class Base {
   }
 }
 
-const TseUtil = { h, htmlEscape, htmlEscapeOnce, jsonEscape, xmlNameEscape };
-for (const [name, value] of Object.entries(TseUtil)) {
-  (Base.prototype as unknown as Record<string, unknown>)[name] = value;
-}
-
-installControllerInternals(Base.prototype);
-attrInternal.call(Base.prototype, "defaultFormBuilder");
-installControllerDelegates(Base.prototype);
-
 Object.defineProperty(Base.prototype, "yield", {
-  get(this: Base): SafeBuffer | Promise<SafeBuffer> {
+  get(this: Base): SafeBuffer | Promise<SafeBuffer> | null {
     return this._layoutFor();
   },
   enumerable: false,
@@ -406,7 +403,9 @@ Object.defineProperty(Base.prototype, "yield", {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
-export interface Base extends Context, Omit<HelperMethods, "logger">, TseUtilMethods {
+export interface Base
+  extends Omit<Context, "_layoutFor">, Omit<HelperMethods, "logger">, TseUtilMethods {
+  _layoutFor: (typeof HelperExports)["_layoutFor"];
   controller: Parameters<typeof assignController>[0];
   request: unknown;
   _backUrl: typeof _backUrl;
@@ -417,8 +416,8 @@ export interface Base extends Context, Omit<HelperMethods, "logger">, TseUtilMet
 }
 
 include(Base, Context);
+include(Base, TseUtil);
 include(Base, Helpers);
-extend(Base, UrlHelperClassMethods);
 
 runLoadHooks("action_view", Base);
 

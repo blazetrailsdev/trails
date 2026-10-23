@@ -1,12 +1,5 @@
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
-import {
-  eachPair,
-  eachValue,
-  isEmpty,
-  rbInspect,
-  rbStrToF,
-  rbStrToI,
-} from "@blazetrails/ruby-compat";
+import { eachPair, eachValue, rbInspect, rbStrToF, rbStrToI } from "@blazetrails/ruby-compat";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
@@ -144,9 +137,10 @@ export function extractCallstackForMultiparameterAttributes(
     const attributeName = multiparameterName.split("(")[0];
     attributes[attributeName] ??= {};
 
-    const parameterValue = isEmpty(value as string)
-      ? null
-      : typeCastAttributeValue(multiparameterName, value as string);
+    const parameterValue =
+      (value as string).length === 0
+        ? null
+        : typeCastAttributeValue(multiparameterName, value as string);
     attributes[attributeName][findParameterPosition(multiparameterName)] ??= parameterValue;
   }
 

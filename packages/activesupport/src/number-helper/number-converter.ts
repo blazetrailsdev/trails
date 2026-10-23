@@ -1,4 +1,4 @@
-import { Rational } from "@blazetrails/ruby-compat";
+import { Hash, Rational, isSymbol, rbObjDup, symbolToS } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
@@ -44,7 +44,7 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
     storage_units: {
       format: "%n %u",
       units: {
-        byte: { one: "Byte", other: "Bytes" },
+        byte: new Hash<unknown, unknown>().set(":one", "Byte").set(":other", "Bytes"),
         kb: "KB",
         mb: "MB",
         gb: "GB",
@@ -69,6 +69,10 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
 };
 
 export abstract class NumberConverter<TOptions extends NumberFormatOptions = NumberFormatOptions> {
+  static toString(): string {
+    return "ActiveSupport::NumberHelper::NumberConverter";
+  }
+
   protected number: unknown;
   protected opts: TOptions;
   protected _options: Record<string, unknown> | undefined;
@@ -136,7 +140,7 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   protected defaultFormatOptions(): Record<string, unknown> {
     const ns = (this.constructor as typeof NumberConverter).namespace;
-    const base = { ...DEFAULTS.format };
+    const base = rbObjDup(DEFAULTS.format);
     if (ns && DEFAULTS[ns]) {
       const nsDefaults = DEFAULTS[ns];
       for (const [k, v] of Object.entries(nsDefaults)) {
@@ -150,11 +154,11 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   protected i18nFormatOptions(): Record<string, unknown> {
     const locale = (this.opts as Record<string, unknown>).locale as string | undefined;
-    const raw = I18n.translate("number.format", { locale, default: {} });
+    const raw = rbObjDup(I18n.translate("number.format", { locale, default: {} }));
     const options: Record<string, unknown> = {};
     if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
-      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-        options[camelize(k, "lower")] = v;
+      for (const [k, v] of raw instanceof Map ? raw : Object.entries(raw)) {
+        options[camelize(isSymbol(k) ? symbolToS(k) : String(k), "lower")] = v;
       }
     }
 
@@ -162,8 +166,8 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
     if (ns) {
       const nsRaw = I18n.translate(`number.${ns}.format`, { locale, default: {} });
       if (typeof nsRaw === "object" && nsRaw !== null && !Array.isArray(nsRaw)) {
-        for (const [k, v] of Object.entries(nsRaw as Record<string, unknown>)) {
-          options[camelize(k, "lower")] = v;
+        for (const [k, v] of nsRaw instanceof Map ? nsRaw : Object.entries(nsRaw)) {
+          options[camelize(isSymbol(k) ? symbolToS(k) : String(k), "lower")] = v;
         }
       }
     }

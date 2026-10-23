@@ -6,6 +6,10 @@ type LineSilencer = (line: string) => boolean;
 export type CleanKind = "silent" | "noise" | "all";
 
 export class BacktraceCleaner {
+  static toString(): string {
+    return "ActiveSupport::BacktraceCleaner";
+  }
+
   protected _filters: LineFilter[] = [];
   protected _silencers: LineSilencer[] = [];
 
@@ -53,8 +57,12 @@ export class BacktraceCleaner {
     return this.clean(backtrace, kind);
   }
 
-  cleanFrame(frame: string, kind: CleanKind = "silent"): string | undefined {
-    for (const f of this._filters) frame = f(frame);
+  cleanFrame(
+    frame: string | object | number | bigint | boolean | null | undefined,
+    kind: CleanKind = "silent",
+  ): string | undefined {
+    frame = rbObjAsString(frame);
+    for (const f of this._filters) frame = f(rbObjAsString(frame));
 
     switch (kind) {
       case "silent":
@@ -89,7 +97,7 @@ export class BacktraceCleaner {
   }
 
   /** @internal */
-  private addCoreSilencer(): void {
+  protected addCoreSilencer(): void {
     this.addSilencer((line) => line.includes("<internal:"));
   }
 
@@ -99,7 +107,7 @@ export class BacktraceCleaner {
   }
 
   /** @internal */
-  private addStdlibSilencer(): void {
+  protected addStdlibSilencer(): void {
     this.addSilencer((line) => line.startsWith(RbConfig.CONFIG["rubylibdir"]));
   }
 

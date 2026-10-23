@@ -1,11 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
-import { Request, controllerConstants } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
+import { Request, controllerConstants } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 import { Base } from "../base.js";
 import { API } from "../api.js";
-import { bodyToString } from "@blazetrails/rack";
+import { StringIO } from "@blazetrails/ruby-compat";
 
 afterEach(() => {
   controllerConstants.delete("posts");
@@ -25,7 +25,7 @@ describe("Controller JSON rendering integration", () => {
 
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("application/json; charset=utf-8");
-    expect(JSON.parse(await bodyToString(body))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       posts: [{ id: 1, title: "Hello" }],
     });
   });
@@ -94,7 +94,7 @@ describe("Controller JSON rendering integration", () => {
         PATH_INFO: "/posts",
         CONTENT_TYPE: "application/json",
         CONTENT_LENGTH: "20",
-        "rack.input": JSON.stringify({ title: "New Post" }),
+        "rack.input": new StringIO(JSON.stringify({ title: "New Post" })),
       }),
       new Response(),
     );
@@ -124,7 +124,10 @@ describe("Controller JSON rendering integration", () => {
 
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("application/json; charset=utf-8");
-    expect(JSON.parse(await bodyToString(body))).toEqual({ id: "7", found: true });
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
+      id: "7",
+      found: true,
+    });
   });
 
   it("returns 404 for unmatched routes", async () => {
@@ -139,7 +142,7 @@ describe("Controller JSON rendering integration", () => {
     });
 
     expect(status).toBe(404);
-    expect(await bodyToString(body)).toContain("Not Found");
+    expect([...(body as Iterable<string>)].join("")).toContain("Not Found");
   });
 
   it("API controller renders JSON", async () => {
@@ -198,7 +201,7 @@ describe("Controller JSON rendering integration", () => {
         QUERY_STRING: "page=2",
         CONTENT_TYPE: "application/json",
         CONTENT_LENGTH: "19",
-        "rack.input": JSON.stringify({ title: "Updated" }),
+        "rack.input": new StringIO(JSON.stringify({ title: "Updated" })),
         "action_dispatch.request.path_parameters": {
           controller: "posts",
           action: "update",

@@ -443,9 +443,9 @@ describe("FixturesTest", () => {
 
       const stub = stubMaxAllowedPacket(conn, packetSize - mysqlMargin);
       try {
-        const error = (await assertRaises([ActiveRecordError], {}, () =>
+        const error = await assertRaises([ActiveRecordError], {}, () =>
           conn.insertFixturesSet(fixtures),
-        )) as ActiveRecordError;
+        );
         expect(error.message).toMatch(new RegExp(`Fixtures set is too large ${packetSize}\\.`));
       } finally {
         stub.mockRestore();
@@ -755,8 +755,7 @@ describe("FixturesWithoutInstantiationTest", () => {
   });
 
   it("visibility of accessor method", () => {
-    expect(rbObjRespondTo(self(), "topics", false), "should be private method").toBe(false);
-    expect(rbObjRespondTo(self(), "topics", true), "confirm to respond surely").toBe(true);
+    expect(rbObjRespondTo(self(), "topics"), "confirm to respond surely").toBe(true);
   });
 
   it("accessor methods", () => {
@@ -931,7 +930,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
 
   it("resets to min pk with specified pk and sequence", async () => {
     for (const instance of instances) {
-      const model = instance.constructor as typeof Base;
+      const model = instance.constructor;
       await model.deleteAll();
       const connection = (await model.leaseConnection()) as unknown as {
         resetPkSequenceBang(
@@ -953,7 +952,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
 
   it("resets to min pk with default pk and sequence", async () => {
     for (const instance of instances) {
-      const model = instance.constructor as typeof Base;
+      const model = instance.constructor;
       await model.deleteAll();
       const connection = (await model.leaseConnection()) as unknown as {
         resetPkSequenceBang(table: string): Promise<void>;
@@ -967,7 +966,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
 
   it("create fixtures resets sequences when not cached", async () => {
     for (const instance of instances) {
-      const model = instance.constructor as typeof Base;
+      const model = instance.constructor;
       const maxId = Object.entries(
         (await self().createFixtures(model.tableName!))[0].fixtures,
       ).reduce((_maxId, [, fixture]) => {

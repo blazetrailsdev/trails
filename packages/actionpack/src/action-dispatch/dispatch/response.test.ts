@@ -1,77 +1,137 @@
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { Request } from "../request.js";
-import { Response } from "../response.js";
+import { beforeEach, describe, it, expect } from "vitest";
+import { Request } from "../http/request.js";
+import { Response } from "../http/response.js";
 import { IOError } from "@blazetrails/ruby-compat";
-import { assertRaises } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertEqual,
+  assertNil,
+  assertNot,
+  assertEmpty,
+  assertNotRespondTo,
+  assertRaises,
+} from "@blazetrails/activesupport";
+import { flatten } from "@blazetrails/ruby-compat";
+import {
+  ContentLength,
+  MockRequest,
+  type RackBody as RackBodyType,
+  type RackEnv,
+  type RackResponse,
+} from "@blazetrails/rack";
+import { RackBody } from "../http/response.js";
+import { Mime } from "../http/mime-type.js";
+import { IntegrationTest } from "../testing/integration.js";
+import { CookieAssertions, HeadersAssertions } from "../../test-helpers/abstract-unit.js";
 
-function withTempFile<T>(contents: string, fn: (path: string) => T): T {
-  const dir = mkdtempSync(join(tmpdir(), "trails-response-"));
-  const path = join(dir, "fixture");
-  writeFileSync(path, contents);
-  try {
-    return fn(path);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+const self = {
+  ...HeadersAssertions,
+  ...CookieAssertions,
+  response: { headers: new Map<string, string | string[]>() },
+};
+
+function newResponse(): Response {
+  const response = Response.create();
+  response.request = Request.empty();
+  return response;
 }
 
 describe("ResponseTest", () => {
   it("simple output", () => {
-    const res = Response.create(200, { "content-type": "text/html" }, "Hello");
-    expect(res.status).toBe(200);
-    expect(res.body).toBe("Hello");
+    const response = newResponse();
+    response.body = "Hello, World!";
+
+    const [status, headers, body] = response.toA();
+    assertEqual(200, status);
+
+    self.assertHeaders({ "content-type": "text/html; charset=utf-8" }, headers);
+
+    const parts: unknown[] = [];
+    (body as RackBody).each((part: unknown) => parts.push(part));
+    assertEqual(["Hello, World!"], parts);
   });
 
   it("status handled properly in initialize", () => {
-    const res = new Response(404);
-    expect(res.status).toBe(404);
-    expect(res.message).toBe("Not Found");
+    assertEqual(200, new Response("200 OK").status);
   });
 
   it("response code", () => {
-    const res = new Response(200);
-    expect(res.code).toBe("200");
-    expect(res.statusCode).toBe(200);
+    const response = newResponse();
+    response.status = "200 OK";
+    assertEqual(200, response.responseCode);
+
+    response.status = "200";
+    assertEqual(200, response.responseCode);
+
+    response.status = 200;
+    assertEqual(200, response.responseCode);
   });
 
   it("message", () => {
-    expect(new Response(200).message).toBe("OK");
-    expect(new Response(404).message).toBe("Not Found");
-    expect(new Response(500).message).toBe("Internal Server Error");
-    expect(new Response(301).message).toBe("Moved Permanently");
+    const response = newResponse();
+    response.status = "200 OK";
+    assertEqual("OK", response.message);
+
+    response.status = "200";
+    assertEqual("OK", response.message);
+
+    response.status = 200;
+    assertEqual("OK", response.message);
   });
 
   it("only set charset still defaults to text html", () => {
-    const res = new Response();
-    res.charset = "utf-8";
-    res.contentType = "text/html";
-    expect(res.charset).toBe("utf-8");
+    const response = new Response();
+    response.charset = "utf-16";
+    const [, headers] = response.toA();
+    assertEqual("text/html; charset=utf-16", headers["content-type"]);
   });
 
   it("utf8 output", () => {
-    const res = Response.create(200, {}, "héllo");
-    expect(res.body).toBe("héllo");
+    const response = newResponse();
+    response.body = String.fromCodePoint(1090, 1077, 1089, 1090);
+
+    const [status, headers] = response.toA();
+    assertEqual(200, status);
+    self.assertHeaders({ "content-type": "text/html; charset=utf-8" }, headers);
   });
 
   it("content length", () => {
-    const res = new Response();
-    res.body = "hello";
-    expect(res.contentLength).toBe(5);
+    for (const c of [100, 101, 102, 103, 204]) {
+      const response = new Response();
+      response.status = String(c);
+      response.setHeader("Content-Length", "0");
+      const [, headers] = response.toA();
+      assertNot(
+        Object.hasOwn(headers, "Content-Length"),
+        `${c} must not have a Content-Length header field`,
+      );
+    }
   });
 
   it("does not contain a message-body", () => {
-    const res = new Response(204);
-    expect(res.status).toBe(204);
-    expect(res.message).toBe("No Content");
+    for (const c of [100, 101, 102, 103, 204, 304]) {
+      const response = new Response();
+      response.status = String(c);
+      response.body = "Body must not be included";
+      const [, , body] = response.toA();
+      assertEmpty(body, `${c} must not have a message-body but actually contains ${body}`);
+    }
   });
 
   it("content type", () => {
-    const res = new Response();
-    res.contentType = "application/json";
-    expect(res.contentType).toBe("application/json; charset=utf-8");
+    for (const c of [204, 304]) {
+      const response = new Response();
+      response.status = String(c);
+      const [, headers] = response.toA();
+      assertNot(Object.hasOwn(headers, "content-type"), `${c} should not have Content-Type header`);
+    }
+
+    for (const c of [200, 302, 404, 500]) {
+      const response = new Response();
+      response.status = String(c);
+      const [, headers] = response.toA();
+      assert(Object.hasOwn(headers, "content-type"), `${c} did not have Content-Type header`);
+    }
   });
 
   it("empty content type returns nil", () => {
@@ -80,21 +140,24 @@ describe("ResponseTest", () => {
   });
 
   it("setting content type header impacts content type method", () => {
-    const res = new Response();
-    res.setHeader("content-type", "application/xml");
-    expect(res.contentType).toBe("application/xml");
+    const response = newResponse();
+    response.headers.set("Content-Type", "application/aaron");
+    assertEqual("application/aaron", response.contentType);
   });
 
   it("response charset writer", () => {
-    const res = new Response();
-    res.charset = "iso-8859-1";
-    expect(res.charset).toBe("iso-8859-1");
+    const response = newResponse();
+    response.charset = "utf-16";
+    assertEqual("utf-16", response.charset);
+    response.charset = null;
+    assertEqual("utf-8", response.charset);
   });
 
   it("cookies", () => {
     const res = new Response();
     res.setCookie("user_name", { value: "david", path: "/" });
-    expect(res.headers.get("set-cookie")).toBe("user_name=david; path=/");
+    const [, headers] = res.toA();
+    self.assertSetCookieHeader("user_name=david; path=/", headers["set-cookie"]);
     expect(res.cookies).toEqual({ user_name: "david" });
   });
 
@@ -106,8 +169,10 @@ describe("ResponseTest", () => {
       path: "/",
       expires: new Date(Date.UTC(2005, 9, 10, 5)),
     });
-    expect(res.headers.get("set-cookie")).toBe(
+    const [, headers] = res.toA();
+    self.assertSetCookieHeader(
       "user_name=david; path=/\nlogin=foo%26bar; path=/; expires=Mon, 10 Oct 2005 05:00:00 GMT",
+      headers["set-cookie"],
     );
     expect(res.cookies).toEqual({ login: "foo&bar", user_name: "david" });
   });
@@ -121,30 +186,50 @@ describe("ResponseTest", () => {
       expires: new Date(Date.UTC(2005, 9, 10, 5)),
     });
     res.deleteCookie("login");
-    expect(res.cookies).toStrictEqual({ user_name: "david", login: undefined });
+    expect(res.cookies).toStrictEqual({ user_name: "david", login: null });
   });
 
   it("read ETag and Cache-Control", () => {
-    const res = new Response();
-    res.weakEtag("abc123");
-    res._cacheControl = "public, max-age=3600";
-    expect(res.etag?.startsWith('W/"')).toBe(true);
-    expect(res._cacheControl).toBe("public, max-age=3600");
+    const resp = new Response();
+    resp.cacheControl.public = true;
+    resp.etag = "123";
+    resp.body = "Hello";
+    resp.toA();
+
+    assert(resp.isEtag);
+    assert(resp.isWeakEtag());
+    assertNot(resp.isStrongEtag());
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', resp.etag);
+    assertEqual({ public: true }, resp.cacheControl);
+
+    assertEqual("public", resp.headers.get("Cache-Control"));
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', resp.headers.get("ETag"));
   });
 
   it("read strong ETag", () => {
-    const res = new Response();
-    res.strongEtag("strong-etag");
-    expect(res.isStrongEtag()).toBe(true);
-    expect(res.isWeakEtag()).toBe(false);
+    const resp = new Response();
+    resp.cacheControl.public = true;
+    resp.strongEtag("123");
+    resp.body = "Hello";
+    resp.toA();
+
+    assert(resp.isEtag);
+    assertNot(resp.isWeakEtag());
+    assert(resp.isStrongEtag());
+    assertEqual('"202cb962ac59075b964b07152d234b70"', resp.etag);
   });
 
   it("read charset and content type", () => {
-    const res = new Response();
-    res.setHeader("content-type", "text/html; charset=utf-8");
-    expect(res.contentType).toBe("text/html; charset=utf-8");
-    expect(res.mediaType).toBe("text/html");
-    expect(res.charset).toBe("utf-8");
+    const resp = new Response();
+    resp.charset = "utf-16";
+    resp.contentType = Mime.get(":xml")!;
+    resp.body = "Hello";
+    resp.toA();
+
+    assertEqual("utf-16", resp.charset);
+    assertEqual(Mime.get(":xml")!.toString(), resp.mediaType);
+    assertEqual("application/xml; charset=utf-16", resp.contentType);
+    assertEqual("application/xml; charset=utf-16", resp.headers.get("Content-Type"));
   });
 
   it("respect no-store cache-control", () => {
@@ -160,28 +245,35 @@ describe("ResponseTest", () => {
   });
 
   it("does not include Status header", () => {
-    const res = new Response(200);
-    expect(res.headers.get("Status")).toBeUndefined();
+    const response = newResponse();
+    response.status = "200 OK";
+    const [, headers] = response.toA();
+    assertNot(Object.hasOwn(headers, "status"));
   });
 
-  it("can wait until commit", () => {
-    const res = new Response();
-    expect(res.committed).toBe(false);
-    res.close();
-    expect(res.committed).toBe(true);
+  it("can wait until commit", async () => {
+    const response = newResponse();
+    const t = response.awaitCommit();
+    response.commitBang();
+    assert(response.committed);
+    assert(
+      await Promise.race([t.then(() => true), new Promise((r) => setTimeout(() => r(false), 500))]),
+    );
   });
 
   it("stream close", () => {
-    const res = new Response();
-    res.close();
-    expect(res.committed).toBe(true);
+    const response = newResponse();
+    const stream = response.stream as { close(): void; isClosed: boolean };
+    stream.close();
+    assert(stream.isClosed);
   });
 
   it("stream write", () => {
-    const res = new Response();
-    res.write("hello");
-    res.write(" world");
-    expect(res.body).toBe("hello world");
+    const response = newResponse();
+    const stream = response.stream as { write(s: string): void; close(): void };
+    stream.write("foo");
+    stream.close();
+    assertEqual("foo", response.body);
   });
 
   it("write after close", async () => {
@@ -195,202 +287,77 @@ describe("ResponseTest", () => {
   });
 
   it("each isnt called if str body is written", () => {
-    const res = new Response();
-    res.body = "direct body";
-    expect(res.body).toBe("direct body");
-  });
+    const response = newResponse();
+    let eachCounter = 0;
+    response.body = {
+      *[Symbol.iterator]() {
+        eachCounter += 1;
+        yield "foo";
+      },
+    } as unknown as string;
+    response.setHeader("X-Foo", response.body);
 
-  it("toRack returns rack-compatible triple", () => {
-    const res = Response.create(200, { "content-type": "text/plain" }, "hi");
-    const [status, headers, body] = res.toRack();
-    expect(status).toBe(200);
-    expect(headers["content-type"]).toBe("text/plain");
-    expect([...(body as Iterable<unknown>)]).toEqual(["hi"]);
-  });
+    assertEqual(1, eachCounter, "#each was not called once");
 
-  it("inspect", () => {
-    const res = new Response(200);
-    expect(res.inspect()).toBe("#<ActionDispatch::Response 200 OK>");
+    const [status, headers, body] = response.toA();
+
+    assertEqual(200, status);
+    assertEqual("foo", headers["x-foo"]);
+    const chunks: string[] = [];
+    (body as { each(block: (chunk: string) => void): void }).each((c) => chunks.push(c));
+    assertEqual("foo", chunks.join(""));
+
+    assertEqual(1, eachCounter, "#each was not called once");
   });
 
   it("response body encoding", () => {
-    const res = new Response();
-    res.body = "テスト";
-    expect(res.body).toBe("テスト");
-    expect(res.contentLength).toBe(Buffer.byteLength("テスト", "utf-8"));
-  });
-
-  it("getHeader is case insensitive", () => {
-    const res = new Response();
-    res.setHeader("X-Custom", "value");
-    expect(res.getHeader("X-Custom")).toBe("value");
-  });
-
-  it("deleteHeader removes the header", () => {
-    const res = new Response();
-    res.setHeader("X-Custom", "value");
-    res.deleteHeader("X-Custom");
-    expect(res.getHeader("X-Custom")).toBeUndefined();
-  });
-
-  it("setHeader overwrites existing header", () => {
-    const res = new Response();
-    res.setHeader("X-Custom", "first");
-    res.setHeader("X-Custom", "second");
-    expect(res.getHeader("X-Custom")).toBe("second");
-  });
-
-  it("weak ETag detection", () => {
-    const res = new Response();
-    res.setHeader("etag", 'W/"abc"');
-    expect(res.isWeakEtag()).toBe(true);
-    expect(res.isStrongEtag()).toBe(false);
-  });
-
-  it("etag= delegates to setWeakEtag (Rails parity)", () => {
-    const res = new Response();
-    res.etag = "abc";
-    expect(res.etag?.startsWith('W/"')).toBe(true);
-    expect(res.isWeakEtag()).toBe(true);
-  });
-
-  it("setting _cacheControl to undefined removes it", () => {
-    const res = new Response();
-    res._cacheControl = "no-cache";
-    res._cacheControl = undefined;
-    expect(res._cacheControl).toBeUndefined();
-  });
-
-  it("text content type gets charset appended", () => {
-    const res = new Response();
-    res.contentType = "text/plain";
-    expect(res.getHeader("content-type")).toBe("text/plain; charset=utf-8");
-  });
-
-  it("setCookie with options", () => {
-    const res = new Response();
-    res.setCookie("session", { value: "abc", path: "/", httpOnly: true, secure: true });
-    expect(res.cookies.session).toBe("abc");
-  });
-
-  it("deleteCookie sets empty value and past expiry", () => {
-    const res = new Response();
-    res.setCookie("token", "val");
-    res.deleteCookie("token");
-    expect(res.cookies.token).toBeUndefined();
-  });
-
-  it("Response.create with no body", () => {
-    const res = Response.create(404);
-    expect(res.status).toBe(404);
-    expect(res.body).toBe("");
-  });
-
-  it("Response.create with all args", () => {
-    const res = Response.create(201, { "x-custom": "yes" }, "created");
-    expect(res.status).toBe(201);
-    expect(res.getHeader("x-custom")).toBe("yes");
-    expect(res.body).toBe("created");
-  });
-
-  it("Response.create with an enumerable body", () => {
-    const res = Response.create(200, {}, ["Hello", " ", "World"]);
-    expect(res.body).toBe("Hello World");
-  });
-
-  it("default constructor has status 200", () => {
-    const res = new Response();
-    expect(res.status).toBe(200);
-    expect(res.body).toBe("");
-  });
-
-  it("status messages for common codes", () => {
-    expect(new Response(201).message).toBe("Created");
-    expect(new Response(204).message).toBe("No Content");
-    expect(new Response(302).message).toBe("Found");
-    expect(new Response(400).message).toBe("Bad Request");
-    expect(new Response(401).message).toBe("Unauthorized");
-    expect(new Response(403).message).toBe("Forbidden");
-    expect(new Response(422).message).toBe("Unprocessable Content");
-    expect(new Response(503).message).toBe("Service Unavailable");
-  });
-
-  it("contentLength returns undefined when not set", () => {
-    const res = new Response();
-    expect(res.contentLength).toBeUndefined();
-  });
-
-  it("inspect for error status", () => {
-    expect(new Response(500).inspect()).toBe(
-      "#<ActionDispatch::Response 500 Internal Server Error>",
-    );
-  });
-
-  it("inspect for redirect", () => {
-    expect(new Response(302).inspect()).toBe("#<ActionDispatch::Response 302 Found>");
-  });
-
-  it("successful predicate", () => {
-    expect(new Response(200).successful).toBe(true);
-    expect(new Response(299).successful).toBe(true);
-    expect(new Response(300).successful).toBe(false);
-    expect(new Response(404).successful).toBe(false);
-  });
-
-  it("redirection predicate", () => {
-    expect(new Response(301).isRedirection).toBe(true);
-    expect(new Response(302).isRedirection).toBe(true);
-    expect(new Response(200).isRedirection).toBe(false);
-    expect(new Response(400).isRedirection).toBe(false);
-  });
-
-  it("clientError predicate", () => {
-    expect(new Response(400).clientError).toBe(true);
-    expect(new Response(404).clientError).toBe(true);
-    expect(new Response(499).clientError).toBe(true);
-    expect(new Response(500).clientError).toBe(false);
-  });
-
-  it("serverError predicate", () => {
-    expect(new Response(500).serverError).toBe(true);
-    expect(new Response(599).serverError).toBe(true);
-    expect(new Response(404).serverError).toBe(false);
-  });
-
-  it("notFound predicate", () => {
-    expect(new Response(404).notFound).toBe(true);
-    expect(new Response(400).notFound).toBe(false);
-    expect(new Response(200).notFound).toBe(false);
-  });
-
-  it("defaultCharset static is utf-8", () => {
-    expect(Response.defaultCharset).toBe("utf-8");
-  });
-
-  it("contentType setter honors a customized Response.defaultCharset", () => {
-    const prior = Response.defaultCharset;
-    try {
-      Response.defaultCharset = "iso-8859-1";
-      const res = new Response();
-      res.contentType = "text/plain";
-      expect(res.headers.get("content-type")).toBe("text/plain; charset=iso-8859-1");
-    } finally {
-      Response.defaultCharset = prior;
-    }
+    const body = ["hello"];
+    const response = new Response(200, {}, body);
+    response.request = Request.empty();
+    assertEqual("hello", response.body);
   });
 
   it("set header after read body during action", () => {
-    const res = new Response();
-    void res.body;
-    res.setHeader("x-header", "Best of all possible worlds.");
-    const [status, headers] = res.toRack();
-    expect(status).toBe(200);
-    expect(headers["x-header"]).toBe("Best of all possible worlds.");
+    const response = newResponse();
+    void response.body;
+
+    response.setHeader("x-header", "Best of all possible worlds.");
+
+    const [status, headers, body] = response.toA();
+    assertEqual(200, status);
+    assertEqual("", (body as RackBody).body);
+
+    assertEqual("Best of all possible worlds.", headers["x-header"]);
   });
 
-  it.skip("read body during action", () => {});
+  it("read body during action", () => {
+    const response = newResponse();
+    response.body = "Hello, World!";
 
-  it.skip("code", () => {});
+    assertNil(response.contentType);
+
+    assertEqual("Hello, World!", response.body);
+
+    const [status, headers, body] = response.toA();
+    assertEqual(200, status);
+    self.assertHeaders({ "content-type": "text/html; charset=utf-8" }, headers);
+
+    const parts: unknown[] = [];
+    (body as RackBody).each((part: unknown) => parts.push(part));
+    assertEqual(["Hello, World!"], parts);
+  });
+
+  it("code", () => {
+    const response = newResponse();
+    response.status = "200 OK";
+    assertEqual("200", response.code);
+
+    response.status = "200";
+    assertEqual("200", response.code);
+
+    response.status = 200;
+    assertEqual("200", response.code);
+  });
 
   it("read content type with default charset utf-8", () => {
     const res = new Response(200, { "Content-Type": "text/xml" });
@@ -420,7 +387,7 @@ describe("ResponseTest", () => {
       };
       const resp = Response.create();
       resp.body = "Hello";
-      resp.toRack();
+      resp.toA();
       expect(resp.headers.get("X-Frame-Options")).toBe("DENY");
       expect(resp.headers.get("X-Content-Type-Options")).toBe("nosniff");
       expect(resp.headers.get("X-XSS-Protection")).toBe("0");
@@ -439,18 +406,20 @@ describe("ResponseTest", () => {
       };
       const resp = Response.create();
       resp.body = "Hello";
-      resp.toRack();
+      resp.toA();
       expect(resp.headers.get("X-XX-XXXX")).toBe("Here is my phone number");
     } finally {
       Response.defaultHeaders = original;
     }
   });
 
-  it.skip("respond_to? accepts include_private", () => {});
+  it("respond_to? accepts include_private", () => {
+    assertNotRespondTo(newResponse(), "methodMissing");
+  });
 
   it("can be explicitly destructured into status, headers and an enumerable body", () => {
     const res = new Response(404, { "Content-Type": "text/plain" }, ["Not Found"]);
-    const [status, headers, body] = res.toRack() as [
+    const [status, headers, body] = res.toA() as [
       number,
       Record<string, string>,
       Iterable<unknown>,
@@ -460,197 +429,34 @@ describe("ResponseTest", () => {
     expect([...body]).toEqual(["Not Found"]);
   });
 
-  it.skip("[response.to_a].flatten does not recurse infinitely", () => {});
-
-  it.skip("compatibility with Rack::ContentLength", () => {});
-});
-
-describe("ResponseFilterRedirect", () => {
-  it("location getter/setter round-trips through the Location header", () => {
-    const res = new Response();
-    res.location = "https://example.com/foo";
-    expect(res.location).toBe("https://example.com/foo");
-    expect(res.headers.get("location")).toBe("https://example.com/foo");
+  it("[response.to_a].flatten does not recurse infinitely", () => {
+    const response = newResponse();
+    const [status, headers, body] = flatten([response.toA()]);
+    assertEqual(200, status);
+    assertEqual(headers, response.headers.toHash());
+    assertNil(body);
   });
 
-  it("filteredLocation strips sensitive query params using the request filter", () => {
-    const req = new Request({
-      "action_dispatch.parameter_filter": ["token"],
-    });
-    const res = new Response();
-    res.request = req;
-    res.location = "https://example.com/foo?token=secret&name=alice";
-    const filtered = res.filteredLocation();
-    expect(filtered).toContain("name=alice");
-    expect(filtered).not.toContain("secret");
-    expect(filtered).toContain("token=");
-  });
+  it("compatibility with Rack::ContentLength", async () => {
+    const response = newResponse();
+    response.body = "Hello";
+    const app = (_env: RackEnv) => response.toA() as unknown as RackResponse;
+    const env = MockRequest.envFor("/");
 
-  it("filteredLocation replaces the entire location when redirect_filter matches", () => {
-    const req = new Request({
-      "action_dispatch.redirect_filter": [/secret/],
-    });
-    const res = new Response();
-    res.request = req;
-    res.location = "https://example.com/secret/path";
-    expect(res.filteredLocation()).toBe("[FILTERED]");
-  });
+    let [, headers] = await app(env);
+    self.assertNotHeader("content-length", headers);
 
-  it("filteredLocation returns the unmodified location when no filters are configured", () => {
-    const req = new Request({});
-    const res = new Response();
-    res.request = req;
-    res.location = "https://example.com/foo";
-    expect(res.filteredLocation()).toBe("https://example.com/foo");
-  });
-});
-
-describe("Response Cache::Response wiring", () => {
-  it("lastModified round-trips through Last-Modified header", () => {
-    const res = new Response();
-    const t = new Date("1994-11-06T08:49:37Z");
-    res.lastModified = t;
-    expect(res.isLastModified).toBe(true);
-    expect(res.getHeader("Last-Modified")).toBe("Sun, 06 Nov 1994 08:49:37 GMT");
-    expect(res.lastModified?.getTime()).toBe(t.getTime());
-  });
-
-  it("lastModified returns undefined when absent", () => {
-    const res = new Response();
-    expect(res.isLastModified).toBe(false);
-    expect(res.lastModified).toBeUndefined();
-  });
-
-  it("date round-trips through Date header", () => {
-    const res = new Response();
-    const t = new Date("1994-11-06T08:49:37Z");
-    res.date = t;
-    expect(res.isDate).toBe(true);
-    expect(res.date?.getTime()).toBe(t.getTime());
-  });
-
-  it("setWeakEtag writes a W/-prefixed strong-form digest", () => {
-    const res = new Response();
-    res.weakEtag(["abc", 1]);
-    const e = res.getHeader("ETag")!;
-    expect(e.startsWith('W/"')).toBe(true);
-    expect(res.isWeakEtag()).toBe(true);
-    expect(res.isStrongEtag()).toBe(false);
-    expect(res.isEtag).toBe(e);
-    expect(res.getHeader("etag")).toBe(e);
-    expect(res.getHeader("ETAG")).toBe(e);
-  });
-
-  it("setStrongEtag writes an unprefixed digest", () => {
-    const res = new Response();
-    res.strongEtag(["abc", 1]);
-    const e = res.getHeader("ETag")!;
-    expect(e.startsWith('"')).toBe(true);
-    expect(e.startsWith('W/"')).toBe(false);
-    expect(res.isStrongEtag()).toBe(true);
-    expect(res.isWeakEtag()).toBe(false);
-  });
-
-  it("cacheControl returns a parsed directive hash", () => {
-    const res = new Response(200, { "Cache-Control": "max-age=600, public, foo=bar" });
-    const hash = res.cacheControl;
-    expect(hash["maxAge"]).toBe("600");
-    expect(hash["public"]).toBe(true);
-    expect(hash.extras).toEqual(["foo=bar"]);
-  });
-
-  it("mergeAndNormalizeCacheControl writes back the combined directive set", () => {
-    const res = new Response();
-    res._cacheControl = "no-cache";
-    res.mergeAndNormalizeCacheControlBang({ public: true, maxAge: 30 });
-    const cc = res._cacheControl;
-    expect(cc).toContain("max-age=30");
-    expect(cc).toContain("public");
-  });
-
-  it("handleConditionalGet sets a default Cache-Control when an ETag is present", () => {
-    const res = new Response();
-    res.weakEtag("v1");
-    res.handleConditionalGetBang();
-    expect(res.getHeader("Cache-Control")).toBe("max-age=0, private, must-revalidate");
-    expect(res.getHeader("cache-control")).toBe("max-age=0, private, must-revalidate");
-  });
-
-  it("handleConditionalGet is a no-op when Cache-Control is already set", () => {
-    const res = new Response();
-    res.weakEtag("v1");
-    res.setHeader("Cache-Control", "public, max-age=60");
-    res.handleConditionalGetBang();
-    expect(res.getHeader("Cache-Control")).toBe("public, max-age=60");
-  });
-
-  it("handleConditionalGet is a no-op without ETag or Last-Modified", () => {
-    const res = new Response();
-    res.handleConditionalGetBang();
-    expect(res.getHeader("Cache-Control")).toBeUndefined();
-  });
-
-  describe("lifecycle (commit / sending / sent)", () => {
-    it("commitBang is idempotent and runs beforeCommitted once", () => {
-      const res = new Response();
-      res.commitBang();
-      expect(res.committed).toBe(true);
-      expect(res.getHeader("content-type")).toMatch(/text\/html/);
-      res.commitBang();
-      expect(res.committed).toBe(true);
-    });
-
-    it("each wraps iteration in sending! / sent!", () => {
-      const res = new Response(200, {}, ["hello", " world"]);
-      const chunks: unknown[] = [];
-      for (const chunk of res.each()) chunks.push(chunk);
-      expect(chunks).toEqual(["hello", " world"]);
-      expect(res.isSending).toBe(true);
-      expect(res.isSent).toBe(true);
-    });
-  });
-
-  describe("sendFile", () => {
-    it("commits the response and exposes a Rack-compatible file body", () => {
-      withTempFile("hello", (path) => {
-        const res = new Response();
-        res.sendFile(path);
-        expect(res.committed).toBe(true);
-        const stream = res.stream as { toPath(): string; each(): IterableIterator<string> };
-        expect(typeof stream.toPath).toBe("function");
-        expect(stream.toPath()).toBe(path);
-      });
-    });
-
-    it("toRack surfaces the stream itself (preserving toPath) when sendFile was called", () => {
-      withTempFile("hello", (path) => {
-        const res = new Response();
-        res.sendFile(path);
-        const [status, , body] = res.toRack();
-        expect(status).toBe(200);
-        const stream = body as { toPath(): string; each(): IterableIterator<string> };
-        expect(stream.toPath()).toBe(path);
-        const chunks: string[] = [];
-        for (const c of stream.each()) chunks.push(c);
-        expect(chunks.join("")).toBe("hello");
-      });
-    });
-  });
-
-  describe("bodyParts", () => {
-    it("drains the buffered body when no explicit stream is set", () => {
-      const res = new Response(200, {}, ["a", "b"]);
-      expect(res.bodyParts()).toEqual(["a", "b"]);
-    });
+    [, headers] = await new ContentLength(app).call(env);
+    self.assertHeader("content-length", "5", headers);
   });
 });
 
 describe("ResponseHeadersTest", () => {
   it("has_header?", () => {
-    const res = Response.create();
-    res.setHeader("Foo", "1");
-    expect(res.hasHeader("Foo")).toBe(true);
-    expect(res.hasHeader("foo")).toBe(true);
+    const response = Response.create();
+    response.setHeader("Foo", "1");
+    assert(response.hasHeader("Foo"));
+    assert(response.hasHeader("foo"));
   });
 
   it("get_header", () => {
@@ -661,41 +467,213 @@ describe("ResponseHeadersTest", () => {
   });
 
   it("set_header", () => {
-    const res = Response.create();
-    res.setHeader("Foo", "1");
-    res.setHeader("Foo", "2");
-    expect(res.hasHeader("Foo")).toBe(true);
-    expect(res.getHeader("Foo")).toBe("2");
+    const response = Response.create();
+    response.setHeader("Foo", "1");
+    assertEqual("2", response.setHeader("Foo", "2"));
+    assert(response.hasHeader("Foo"));
+    assertEqual("2", response.getHeader("Foo"));
+
+    assertNil(response.setHeader("Foo", null));
+    assert(response.hasHeader("Foo"));
+    assertNil(response.getHeader("Foo"));
   });
 
   it("delete_header", () => {
-    const res = Response.create();
-    res.setHeader("Foo", "1");
-    res.deleteHeader("Foo");
-    expect(res.hasHeader("Foo")).toBe(false);
+    const response = Response.create();
+    response.setHeader("Foo", "1");
+    assertEqual("1", response.deleteHeader("Foo"));
+    assertNot(response.hasHeader("Foo"));
   });
 
-  it.skip("add_header", () => {});
+  it("add_header", () => {
+    const response = Response.create();
+    response.setHeader("Foo", "1");
+
+    self.assertHeaderValue("1,2", response.addHeader("Foo", "2"));
+    self.assertHeaderValue("1,2", response.getHeader("Foo"));
+
+    self.assertHeaderValue("1,2", response.addHeader("Foo", null));
+    self.assertHeaderValue("1,2", response.getHeader("Foo"));
+
+    assertNil(response.addHeader("Bar", null));
+    assertNot(response.hasHeader("Bar"));
+    assertNil(response.getHeader("Bar"));
+
+    self.assertHeaderValue("1", response.addHeader("Bar", "1"));
+    assert(response.hasHeader("Bar"));
+    self.assertHeaderValue("1", response.getHeader("Bar"));
+  });
 });
 
 describe("ResponseIntegrationTest", () => {
-  it.skip("response cache control from railsish app", () => {});
+  let testCase: IntegrationTest;
+  beforeEach(({ task }) => {
+    testCase = new IntegrationTest(task.name);
+  });
 
-  it.skip("response cache control from rackish app", () => {});
+  function railsishApp(block: (resp: Response) => void) {
+    return () => {
+      const resp = new Response();
+      block(resp);
+      resp.request = Request.empty();
+      return resp.toA();
+    };
+  }
 
-  it.skip("response charset and content type from railsish app", () => {});
+  function rackishApp(headers: Record<string, string>, body: RackBodyType = ["Hello"]) {
+    return (): RackResponse => [200, headers, body];
+  }
 
-  it.skip("response charset and content type from rackish app", () => {});
+  it("response cache control from railsish app", async () => {
+    testCase.app = railsishApp((resp) => {
+      resp.cacheControl.public = true;
+      resp.etag = "123";
+      resp.body = "Hello";
+    });
 
-  it.skip("strong ETag validator", () => {});
+    await testCase.get("/");
+    testCase.assertResponse("success");
 
-  it.skip("response Content-Type with optional parameters", () => {});
+    assertEqual("public", testCase.response.headers.get("Cache-Control"));
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', testCase.response.headers.get("ETag"));
 
-  it.skip("response Content-Type with optional parameters that set before charset", () => {});
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', testCase.response.etag);
+    assertEqual({ public: true }, testCase.response.cacheControl);
+  });
 
-  it.skip("response Content-Type with quoted-string", () => {});
+  it("response cache control from rackish app", async () => {
+    testCase.app = rackishApp({
+      ETag: 'W/"202cb962ac59075b964b07152d234b70"',
+      "Cache-Control": "public",
+    });
 
-  it.skip("response body with enumerator", () => {});
+    await testCase.get("/");
+    testCase.assertResponse("success");
 
-  it.skip("response body with lazy enumerator", () => {});
+    assertEqual("public", testCase.response.headers.get("Cache-Control"));
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', testCase.response.headers.get("ETag"));
+
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', testCase.response.etag);
+    assertEqual({ public: true }, testCase.response.cacheControl);
+  });
+
+  it("response charset and content type from railsish app", async () => {
+    testCase.app = railsishApp((resp) => {
+      resp.charset = "utf-16";
+      resp.contentType = Mime.get("xml")!;
+      resp.body = "Hello";
+    });
+
+    await testCase.get("/");
+    testCase.assertResponse("success");
+
+    assertEqual("utf-16", testCase.response.charset);
+    assertEqual(Mime.get("xml"), testCase.response.mediaType);
+    assertEqual("application/xml; charset=utf-16", testCase.response.contentType);
+    assertEqual("application/xml; charset=utf-16", testCase.response.headers.get("Content-Type"));
+  });
+
+  it("response charset and content type from rackish app", async () => {
+    testCase.app = rackishApp({ "Content-Type": "application/xml; charset=utf-16" });
+
+    await testCase.get("/");
+    testCase.assertResponse("success");
+
+    assertEqual("utf-16", testCase.response.charset);
+    assertEqual(Mime.get("xml"), testCase.response.mediaType);
+    assertEqual("application/xml; charset=utf-16", testCase.response.contentType);
+    assertEqual("application/xml; charset=utf-16", testCase.response.headers.get("Content-Type"));
+  });
+
+  it("strong ETag validator", async () => {
+    testCase.app = railsishApp((resp) => {
+      resp.strongEtag("123");
+      resp.body = "Hello";
+    });
+
+    await testCase.get("/");
+    testCase.assertResponse("ok");
+
+    assertEqual('"202cb962ac59075b964b07152d234b70"', testCase.response.headers.get("ETag"));
+    assertEqual('"202cb962ac59075b964b07152d234b70"', testCase.response.etag);
+  });
+
+  it("response Content-Type with optional parameters", async () => {
+    testCase.app = rackishApp({ "Content-Type": "text/csv; charset=utf-16; header=present" });
+
+    await testCase.get("/");
+    testCase.assertResponse("success");
+
+    assertEqual(
+      "text/csv; charset=utf-16; header=present",
+      testCase.response.headers.get("Content-Type"),
+    );
+    assertEqual("text/csv; charset=utf-16; header=present", testCase.response.contentType);
+    assertEqual("text/csv", testCase.response.mediaType);
+    assertEqual("utf-16", testCase.response.charset);
+  });
+
+  it("response Content-Type with optional parameters that set before charset", async () => {
+    testCase.app = rackishApp({ "Content-Type": "text/csv; header=present; charset=utf-16" });
+
+    await testCase.get("/");
+    testCase.assertResponse("success");
+
+    assertEqual(
+      "text/csv; header=present; charset=utf-16",
+      testCase.response.headers.get("Content-Type"),
+    );
+    assertEqual("text/csv; header=present; charset=utf-16", testCase.response.contentType);
+    assertEqual("text/csv; header=present", testCase.response.mediaType);
+    assertEqual("utf-16", testCase.response.charset);
+  });
+
+  it("response Content-Type with quoted-string", async () => {
+    testCase.app = rackishApp({ "Content-Type": 'text/csv; header=present; charset="utf-16"' });
+
+    await testCase.get("/");
+    testCase.assertResponse("success");
+
+    assertEqual(
+      'text/csv; header=present; charset="utf-16"',
+      testCase.response.headers.get("Content-Type"),
+    );
+    assertEqual('text/csv; header=present; charset="utf-16"', testCase.response.contentType);
+    assertEqual("text/csv; header=present", testCase.response.mediaType);
+    assertEqual("utf-16", testCase.response.charset);
+  });
+
+  it("response body with enumerator", async () => {
+    testCase.app = rackishApp(
+      { "Content-Type": "text/plain" },
+      (function* () {
+        for (let n = 0; n < 10; n++) yield String(n);
+      })(),
+    );
+    await testCase.get("/");
+    testCase.assertResponse("success");
+
+    assertEqual("text/plain", testCase.response.headers.get("Content-Type"));
+    assertEqual("text/plain", testCase.response.contentType);
+    assertEqual("text/plain", testCase.response.mediaType);
+    assertEqual("utf-8", testCase.response.charset);
+    assertEqual("0123456789", testCase.response.body);
+  });
+
+  it("response body with lazy enumerator", async () => {
+    testCase.app = rackishApp(
+      { "Content-Type": "text/plain" },
+      (function* () {
+        for (let n = 0; n <= 10; n++) yield String(n);
+      })(),
+    );
+    await testCase.get("/");
+    testCase.assertResponse("success");
+
+    assertEqual("text/plain", testCase.response.headers.get("Content-Type"));
+    assertEqual("text/plain", testCase.response.contentType);
+    assertEqual("text/plain", testCase.response.mediaType);
+    assertEqual("utf-8", testCase.response.charset);
+    assertEqual("012345678910", testCase.response.body);
+  });
 });

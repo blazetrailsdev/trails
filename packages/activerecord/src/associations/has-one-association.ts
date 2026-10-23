@@ -1,4 +1,11 @@
-import { fetch, include, kernelThrow, rbEqual, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  include,
+  kernelThrow,
+  rbEqual,
+  rbFSend,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError } from "./errors.js";
@@ -10,13 +17,13 @@ import { queryConstraintsList } from "../persistence.js";
 import { assertAssignedSynchronously, type PermittedAttributes } from "@blazetrails/activemodel";
 
 export class HasOneAssociation extends SingularAssociation {
-  /** @internal */
-  protected syncWrite(record: Base | null): void {
+  /** @noRailsEquivalent CONVERGEABLE base-constructor-assigns-associations-through-writer */
+  syncWrite(record: Base | null): void {
     assertAssignedSynchronously(this.replace(record, false), `${this.reflection.name}=`);
   }
 
   async handleDependency(): Promise<void> {
-    switch (this.reflection.options.dependent) {
+    switch (this.options.dependent) {
       case "restrictWithException":
         if (await this.loadTarget()) {
           throw new DeleteRestrictionError(this.reflection.name);
@@ -46,7 +53,7 @@ export class HasOneAssociation extends SingularAssociation {
     method: string | undefined = this.options.dependent as string | undefined,
   ): Promise<void> {
     if (await this.loadTarget()) {
-      const target = this.target as any;
+      const target = this.target as Base;
       switch (method) {
         case "delete":
           await target.delete();
@@ -59,17 +66,18 @@ export class HasOneAssociation extends SingularAssociation {
         case "destroyAsync": {
           let primaryKeyColumn: string | string[];
           let id: unknown;
-          if (queryConstraintsList.call(target.constructor)) {
-            primaryKeyColumn = queryConstraintsList.call(target.constructor)!;
-            id = primaryKeyColumn.map((col) => target[col]);
+          const klass = target.constructor;
+          if (queryConstraintsList.call(klass)) {
+            primaryKeyColumn = queryConstraintsList.call(klass)!;
+            id = primaryKeyColumn.map((col) => rbFSend(target, col));
           } else {
-            primaryKeyColumn = target.constructor.primaryKey as string;
-            id = target[primaryKeyColumn];
+            primaryKeyColumn = klass.primaryKey as string;
+            id = rbFSend(target, primaryKeyColumn);
           }
 
           this.enqueueDestroyAssociation({
             ownerModelName: this.owner.constructor.name,
-            ownerId: (this.owner as any).id,
+            ownerId: this.owner.id,
             associationClass: String(this.reflection.klass.name),
             associationIds: [id],
             associationPrimaryKeyColumn: primaryKeyColumn,
@@ -118,7 +126,7 @@ export class HasOneAssociation extends SingularAssociation {
   protected override replace(record: Base | null, save = true): Base | null | Promise<Base | null> {
     if (save) {
       return (async () => {
-        if (record) (this as any).raiseOnTypeMismatchBang(record);
+        if (record) this.raiseOnTypeMismatchBang(record);
         if (!((await this.loadTarget()) || record)) return this.target;
         const assigningAnotherRecord = !rbEqual(this.target, record);
         if (assigningAnotherRecord || record!.hasChangesToSave) {
@@ -145,7 +153,7 @@ export class HasOneAssociation extends SingularAssociation {
       })();
     }
     {
-      if (record) (this as any).raiseOnTypeMismatchBang(record);
+      if (record) this.raiseOnTypeMismatchBang(record);
       const assigningAnotherRecord = !rbEqual(this.target, record);
       if (assigningAnotherRecord || record?.hasChangesToSave === true) {
         if (
@@ -230,7 +238,7 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private async removeTargetBang(method: string | undefined): Promise<void> {
-    const target = this.target as any;
+    const target = this.target!;
     switch (method) {
       case "delete":
         await target.delete();
@@ -258,7 +266,7 @@ export class HasOneAssociation extends SingularAssociation {
 
   private nullifyOwnerAttributes(record: Base): void {
     for (const foreignKeyColumn of kernelArray(this.reflection.foreignKey())) {
-      if (!kernelArray((record.constructor as typeof Base).primaryKey).includes(foreignKeyColumn)) {
+      if (!kernelArray(record.constructor.primaryKey).includes(foreignKeyColumn)) {
         record.writeAttribute(foreignKeyColumn, null);
       }
     }
@@ -272,7 +280,7 @@ function transactionIf(
   block: () => Promise<void>,
 ): Promise<void> {
   if (value) {
-    return (assoc.reflection.klass as any).transaction(block);
+    return assoc.reflection.klass.transaction(block);
   } else {
     return block();
   }

@@ -10,7 +10,9 @@ const TestApiFileUtils = {
     return new URL(import.meta.url).pathname;
   },
   fileData(this: { data?: string }): string {
-    return (this.data ||= File.binread(TestApiFileUtils.filePath()));
+    return (this.data ||= Buffer.from(File.binread(TestApiFileUtils.filePath())).toString(
+      "latin1",
+    ));
   },
 };
 

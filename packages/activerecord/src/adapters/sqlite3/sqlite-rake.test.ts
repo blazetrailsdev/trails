@@ -249,7 +249,6 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
   let database: string;
   let configuration: HashConfig;
 
-  let previous: Awaited<ReturnType<typeof Base.removeConnection>>;
   let previousFlags: typeof DatabaseTasks.structureDumpFlags;
 
   beforeEach(async () => {
@@ -261,8 +260,6 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
       adapter: "sqlite3",
       database,
     });
-    previous = await Base.removeConnection();
-    await Base.establishConnection({ adapter: "sqlite3", database });
     previousFlags = DatabaseTasks.structureDumpFlags;
   });
 
@@ -270,8 +267,6 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     vi.restoreAllMocks();
     DatabaseTasks.structureDumpFlags = previousFlags;
     SchemaDumper.ignoreTables = [];
-    await Base.removeConnection();
-    if (previous) await Base.establishConnection(previous.configurationHash);
     for (const file of created) {
       try {
         fs.unlinkSync(file);
@@ -297,8 +292,12 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     const dbfile = database;
     const filename = awesomeFile();
     created.push(filename);
-    runSqlite3(database, "CREATE TABLE prefix_foo(id INTEGER)");
-    runSqlite3(database, "CREATE TABLE ignored_foo(id INTEGER)");
+    vi.spyOn(await Base.leaseConnection(), "dataSources").mockResolvedValue([
+      "foo",
+      "bar",
+      "prefix_foo",
+      "ignored_foo",
+    ]);
     SchemaDumper.ignoreTables = [/^prefix_/, "ignored_foo"];
 
     await DatabaseTasks.structureDump(configuration, filename, "/rails/root");

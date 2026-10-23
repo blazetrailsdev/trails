@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 
 export class AssumeSSL {
@@ -13,6 +14,6 @@ export class AssumeSSL {
     env["HTTP_X_FORWARDED_PROTO"] = "https";
     env["rack.url_scheme"] = "https";
 
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }
 }

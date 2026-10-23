@@ -10,6 +10,7 @@ import { dropWeakCalls, significantMissingCalls } from "./compare.js";
 import { compareArms, type SkeletonRow } from "./report-arms.js";
 import {
   blockRidesZsuper,
+  inlinedHookBody,
   inlinedHookCreditedBy,
   inlinedHookTags,
   inlinedRubyBody,
@@ -18,6 +19,7 @@ import {
   inlinedSegments,
   isInitializeLessTaggedClass,
   moduleAncestors,
+  portsSiblingClass,
   type ModuleBody,
   sameFileInitializeModules,
   taggedBodies,
@@ -91,9 +93,9 @@ describe("a tagged constructor's Rails call set", () => {
     expect(inlinedRubyBody(segments).calls).toEqual([
       "init_internals",
       "initialize_internals_callback",
-      "run_callbacks",
       "assign_attributes",
       "super",
+      "run_callbacks",
     ]);
     expect(inlinedRubyCallArgs(segments).map((s) => s.name)).toEqual([
       "init_internals",
@@ -101,6 +103,20 @@ describe("a tagged constructor's Rails call set", () => {
       "run_callbacks",
       "assign_attributes",
       "super",
+    ]);
+  });
+
+  it("orders a super-first module's calls after the module its super reaches", () => {
+    const model = of("Rails::Generators::ModelHelpers", body(["super", "plural_model_name?"]));
+    const resource = of(
+      "Rails::Generators::ResourceHelpers",
+      body(["super", "assign_controller_names!"]),
+    );
+    const segments = inlinedSegments(undefined, none, [], [model, resource]);
+    expect(inlinedRubyBody(segments).calls).toEqual([
+      "super",
+      "assign_controller_names!",
+      "plural_model_name?",
     ]);
   });
 
@@ -273,6 +289,39 @@ describe("same-file module bodies join by convention", () => {
     );
   });
 
+  it("checks a method-level tag's citation against the def span", () => {
+    const save = body(["with_transaction_returning_status", "super"], {
+      name: "save",
+      line: 360,
+      endLine: 362,
+      vendorFile: "rails/v8.0.2/activerecord/lib/active_record/transactions.rb",
+    });
+    const manifest = {
+      packages: {
+        activerecord: {
+          classes: {},
+          modules: {
+            "ActiveRecord::Transactions": entity("transactions.rb", [], [save]),
+          },
+        },
+      },
+    } as unknown as ApiManifest;
+    const methodTag = (lastLine: number): InlinedFrom => ({
+      module: "ActiveRecord::Transactions",
+      hook: "save",
+      source: "rails",
+      version: "v8.0.2",
+      file: "activerecord/lib/active_record/transactions.rb",
+      firstLine: 360,
+      lastLine,
+    });
+    const where = "activerecord/base.ts Base#save";
+    expect(inlinedHookBody(manifest, methodTag(362), where)).toBe(save);
+    expect(() => inlinedHookBody(manifest, methodTag(363), where)).toThrow(
+      /@inlinedFrom citation is stale: .*\/transactions\.rb:360-362\./,
+    );
+  });
+
   it("reds on a tag naming a same-file module", () => {
     expect(() => taggedBodies(ruby, [tag(sameFile[0])], sameFile, at)).toThrow(
       /@inlinedFrom is redundant/,
@@ -394,6 +443,17 @@ describe("the chain follows the class's ancestor order", () => {
     });
   });
 
+  it("orders by statement, a later include first and one statement's first argument ahead", () => {
+    const pool = {
+      ...entity("pool.rb", ["A", "B", "C"], []),
+      mixinOrder: [
+        { kind: "include" as const, names: ["A", "B"] },
+        { kind: "include" as const, names: ["C"] },
+      ],
+    };
+    expect(moduleAncestors(pool, "Pool", modules, resolve).included).toEqual(["C", "A", "B"]);
+  });
+
   it("runs a prepended same-file module ahead of the class's own body", () => {
     const { ancestors, sameFile } = sameFileBodies(entity("pool.rb", ["Lock"], [], ["Dirties"]));
     const segments = inlinedSegments(own, ancestors, sameFile, []);
@@ -509,7 +569,7 @@ describe("a module hook is credited through the tag on an includer's constructor
         new Set(["model.ts"]),
         tags,
       ),
-    ).toEqual({ package: "activemodel", tsFile: "model.ts" });
+    ).toEqual({ package: "activemodel", tsFile: "model.ts", tsName: "constructor" });
   });
 
   it("leaves it uncredited when the tagged file in its package includes no such module", () => {
@@ -531,7 +591,7 @@ describe("a module hook is credited through the tag on an includer's constructor
   it("credits a tag on a constructor in another package", () => {
     expect(
       inlinedHookCreditedBy("ActiveModel::API", "initialize", "activemodel", new Set(), tags),
-    ).toEqual({ package: "activerecord", tsFile: "base.ts" });
+    ).toEqual({ package: "activerecord", tsFile: "base.ts", tsName: "constructor" });
   });
 
   it("keys a ClassMethods#new apart from the module's initialize, and an untagged hook from both", () => {
@@ -541,5 +601,35 @@ describe("a module hook is credited through the tag on an includer's constructor
     expect(credited("ActiveRecord::Inheritance::ClassMethods", "new")).toBe("base.ts");
     expect(credited("ActiveRecord::Inheritance::ClassMethods", "initialize")).toBeUndefined();
     expect(credited("ActiveRecord::Core", "initialize")).toBeUndefined();
+  });
+});
+
+describe("portsSiblingClass", () => {
+  const klass = (file: string) => ({ file }) as unknown as ClassInfo;
+  const classes = {
+    "ActionDispatch::Integration::Session": klass("action_dispatch/testing/integration.rb"),
+    "ActionDispatch::IntegrationTest": klass("action_dispatch/testing/integration.rb"),
+    "ActionDispatch::Request": klass("action_dispatch/http/request.rb"),
+  };
+
+  it("refuses a TS class named after a sibling Ruby class of the same file", () => {
+    expect(
+      portsSiblingClass("IntegrationTest", "ActionDispatch::Integration::Session", classes),
+    ).toBe(true);
+  });
+
+  it("keeps the same-named TS class", () => {
+    expect(portsSiblingClass("IntegrationTest", "ActionDispatch::IntegrationTest", classes)).toBe(
+      false,
+    );
+  });
+
+  it("keeps a renamed TS class no Ruby class of the file is named after", () => {
+    expect(portsSiblingClass("Helper", "ActionDispatch::Integration::Session", classes)).toBe(
+      false,
+    );
+    expect(portsSiblingClass("Request", "ActionDispatch::Integration::Session", classes)).toBe(
+      false,
+    );
   });
 });

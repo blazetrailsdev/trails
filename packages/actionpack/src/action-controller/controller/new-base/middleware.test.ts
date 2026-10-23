@@ -1,3 +1,4 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { describe, expect, it, beforeEach } from "vitest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { MockRequest } from "@blazetrails/rack";
@@ -5,6 +6,7 @@ import { block } from "@blazetrails/ruby-compat";
 import { Metal } from "../../metal.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
+type RackAppObject = { call(env: RackEnv): Promise<RackResponse> };
 
 class MyMiddleware {
   constructor(
@@ -12,7 +14,7 @@ class MyMiddleware {
     _options?: { kw?: number },
   ) {}
   async call(env: RackEnv): Promise<RackResponse> {
-    const result = await this.app(env);
+    const result = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     result[1]["Middleware-Test"] = "Success";
     result[1]["Middleware-Order"] = "First";
     return result;
@@ -25,7 +27,7 @@ class ExclaimerMiddleware {
     _options?: { kw?: number },
   ) {}
   async call(env: RackEnv): Promise<RackResponse> {
-    const result = await this.app(env);
+    const result = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     result[1]["Middleware-Order"] += "!";
     return result;
   }
@@ -40,7 +42,7 @@ class BlockMiddleware {
     block?.(this);
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    const result = await this.app(env);
+    const result = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     result[1]["Configurable-Message"] = this.configurableMessage!;
     return result;
   }
@@ -87,63 +89,79 @@ async function bodyToString(body: unknown): Promise<string> {
 }
 
 describe("TestMiddleware", () => {
-  let app: RackApp;
+  let app: RackApp | RackAppObject;
   beforeEach(() => {
     app = MyController.action("index");
   });
 
   it("middleware that is 'use'd is called as part of the Rack application", async () => {
-    const result = await app(envFor("/"));
+    const result = await (rbFSend(app, "call", envFor("/")) as Promise<RackResponse>);
     expect(await bodyToString(result[2])).toBe("Hello World");
     expect(result[1]["Middleware-Test"]).toBe("Success");
   });
 
   it("the middleware stack is exposed as 'middleware' in the controller", async () => {
-    const result = await app(envFor("/"));
+    const result = await (rbFSend(app, "call", envFor("/")) as Promise<RackResponse>);
     expect(result[1]["Middleware-Order"]).toBe("First!");
   });
 
   it("middleware stack accepts block arguments", async () => {
-    const result = await app(envFor("/"));
+    const result = await (rbFSend(app, "call", envFor("/")) as Promise<RackResponse>);
     expect(result[1]["Configurable-Message"]).toBe("Configured by block.");
   });
 
   it("middleware stack accepts only and except as options", async () => {
-    let result = await ActionsController.action("show")(envFor("/"));
+    let result = await (rbFSend(
+      ActionsController.action("show"),
+      "call",
+      envFor("/"),
+    ) as Promise<RackResponse>);
     expect(result[1]["Middleware-Order"]).toBe("First!");
 
-    result = await ActionsController.action("index")(envFor("/"));
+    result = await (rbFSend(
+      ActionsController.action("index"),
+      "call",
+      envFor("/"),
+    ) as Promise<RackResponse>);
     expect(result[1]["Middleware-Order"]).toBeUndefined();
   });
 });
 
 describe("TestInheritedMiddleware", () => {
-  let app: RackApp;
+  let app: RackApp | RackAppObject;
   beforeEach(() => {
     app = InheritedController.action("index");
   });
 
   it("middleware that is 'use'd is called as part of the Rack application", async () => {
-    const result = await app(envFor("/"));
+    const result = await (rbFSend(app, "call", envFor("/")) as Promise<RackResponse>);
     expect(await bodyToString(result[2])).toBe("Hello World");
     expect(result[1]["Middleware-Test"]).toBe("Success");
   });
 
   it("the middleware stack is exposed as 'middleware' in the controller", async () => {
-    const result = await app(envFor("/"));
+    const result = await (rbFSend(app, "call", envFor("/")) as Promise<RackResponse>);
     expect(result[1]["Middleware-Order"]).toBe("First!");
   });
 
   it("middleware stack accepts block arguments", async () => {
-    const result = await app(envFor("/"));
+    const result = await (rbFSend(app, "call", envFor("/")) as Promise<RackResponse>);
     expect(result[1]["Configurable-Message"]).toBe("Configured by block.");
   });
 
   it("middleware stack accepts only and except as options", async () => {
-    let result = await ActionsController.action("show")(envFor("/"));
+    let result = await (rbFSend(
+      ActionsController.action("show"),
+      "call",
+      envFor("/"),
+    ) as Promise<RackResponse>);
     expect(result[1]["Middleware-Order"]).toBe("First!");
 
-    result = await ActionsController.action("index")(envFor("/"));
+    result = await (rbFSend(
+      ActionsController.action("index"),
+      "call",
+      envFor("/"),
+    ) as Promise<RackResponse>);
     expect(result[1]["Middleware-Order"]).toBeUndefined();
   });
 });

@@ -22,7 +22,7 @@ function toMsgpackExt(bigint: number | bigint): Uint8Array {
     offset += CHUNK_BITLENGTH;
   }
 
-  return Uint8Array.from(pack(members, FORMAT), (c) => c.charCodeAt(0));
+  return pack(members, FORMAT);
 }
 
 function fromMsgpackExt(data: Uint8Array): number | bigint {

@@ -1,5 +1,5 @@
 import { Date, DateTime, Temporal, Time } from "@blazetrails/date";
-import { Rational, rational, rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
+import { Rational, rational, rbCallSuper, rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { Duration } from "../duration.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
@@ -11,6 +11,10 @@ import { toTime } from "../core-ext/time/compatibility.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
 class Stub {
+  static toString(): string {
+    return "ActiveSupport::Testing::SimpleStubs::Stub";
+  }
+
   constructor(
     readonly object: object,
     readonly methodName: string,
@@ -19,6 +23,10 @@ class Stub {
 }
 
 export class SimpleStubs {
+  static toString(): string {
+    return "ActiveSupport::Testing::SimpleStubs";
+  }
+
   private stubs: Map<object, Map<string, Stub>>;
 
   constructor() {
@@ -70,9 +78,12 @@ export class SimpleStubs {
 let _simpleStubs: SimpleStubs | undefined;
 let _inBlock = false;
 
-export function afterTeardown(): void {
+export function afterTeardown(this: object): unknown {
   travelBack();
+  return rbCallSuper(this, afterTeardown);
 }
+
+export const TimeHelpers = { afterTeardown };
 
 export function travel(
   duration: Duration | number,
@@ -155,7 +166,7 @@ export function travelTo(
   });
 
   stubs.stubObject(Time, "new", (...args: unknown[]) => {
-    if (isEmpty(args)) {
+    if (args.length === 0) {
       return Time.at(now);
     } else {
       const stub = stubs.stubbing(Time, "new")!;

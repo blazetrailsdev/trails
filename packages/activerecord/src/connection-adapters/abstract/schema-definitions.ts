@@ -1,13 +1,10 @@
 import {
   block,
-  except,
   fetch,
   include,
   included,
   isSymbol,
   keywordSplat,
-  merge,
-  Module,
   rbRegMatchP,
   registerConstant,
   slice,
@@ -537,10 +534,10 @@ export type ColumnMethodsBase = {
   prototype: Record<string, unknown>;
 };
 
-export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
-  new Module();
-
-ColumnMethods.defineMethod("primaryKey", primaryKey);
+export const ColumnMethods: {
+  primaryKey: typeof primaryKey;
+  [included]?: (base: ColumnMethodsBase) => void;
+} = { primaryKey };
 
 ColumnMethods[included] = function (base: ColumnMethodsBase): void {
   base.defineColumnMethods(
@@ -660,10 +657,11 @@ export class ReferenceDefinition {
 
   /** @internal */
   private polymorphicOptions(): ColumnOptions {
-    return merge(
-      merge(this.asOptions(this.polymorphic), this.conditionalOptions()),
-      slice(this.options as Record<string, unknown>, "null", "first", "after"),
-    );
+    return {
+      ...this.asOptions(this.polymorphic),
+      ...this.conditionalOptions(),
+      ...slice(this.options as Record<string, unknown>, "null", "first", "after"),
+    };
   }
 
   /** @internal */
@@ -673,10 +671,10 @@ export class ReferenceDefinition {
 
   /** @internal */
   protected indexOptions(tableName: string): AddIndexOptions {
-    const indexOptions: AddIndexOptions = merge(
-      this.asOptions(this.index),
-      this.conditionalOptions(),
-    );
+    const indexOptions: AddIndexOptions = {
+      ...this.asOptions(this.index),
+      ...this.conditionalOptions(),
+    };
 
     if (this.options._usesLegacyReferenceIndexName) return indexOptions;
 
@@ -686,10 +684,11 @@ export class ReferenceDefinition {
 
   /** @internal */
   private foreignKeyOptions(): ReferenceForeignKeyOptions {
-    return merge(this.asOptions(this.foreignKey), {
+    return {
+      ...this.asOptions(this.foreignKey),
       column: this.columnName(),
       ...this.conditionalOptions(),
-    }) as ReferenceForeignKeyOptions;
+    } as ReferenceForeignKeyOptions;
   }
 
   /** @internal */
@@ -830,7 +829,8 @@ export class TableDefinition {
       const pk = primaryKey || (ActiveRecord.Base.getPrimaryKey(singularize(tableName)) as string);
 
       if (isPlainObject(id)) {
-        update(options, except(id as Record<string, unknown>, "type"));
+        const { type, ...idOptions } = id as Record<string, unknown>;
+        update(options, idOptions);
         id = fetch(id as Record<string, ColumnType>, "type", "primary_key");
       }
 

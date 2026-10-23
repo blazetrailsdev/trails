@@ -602,9 +602,9 @@ describe("EagerAssociationTest", () => {
   });
 
   it("exceptions have suggestions for fix", async () => {
-    const error = (await assertRaise([AssociationNotFoundError], {}, () =>
+    const error = await assertRaise([AssociationNotFoundError], {}, () =>
       Post.includes(":taggingz").find(posts("welcome").id),
-    )) as AssociationNotFoundError;
+    );
     expect(error.detailedMessage()).toMatch("Did you mean?  tagging");
   });
   it("eager has many through with order", async () => {

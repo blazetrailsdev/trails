@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Hash } from "@blazetrails/ruby-compat";
 import { toXml as toXmlArray } from "./array-utils.js";
 import {
   deepMerge,
@@ -22,11 +23,9 @@ import {
   excluding,
   sum,
   indexBy,
-  groupBy,
   pluck,
   maximum,
   minimum,
-  inBatchesOf,
   compactBlank,
   HashWithIndifferentAccess,
 } from "./index.js";
@@ -198,11 +197,13 @@ describe("reverseMerge", () => {
   });
 
   it("reads the defaults of a Hash", () => {
-    const defaults = new Map([
-      ["a", 99],
+    const defaults = new Hash<string, number>().set("a", 99).set("b", 2);
+    const result = reverseMerge({ a: 1 }, defaults);
+    expect(result).toBeInstanceOf(Hash);
+    expect([...(result as unknown as Hash<string, number>)]).toEqual([
+      ["a", 1],
       ["b", 2],
     ]);
-    expect(reverseMerge({ a: 1 }, defaults)).toEqual({ a: 1, b: 2 });
   });
 
   it("does not mutate the original", () => {
@@ -456,28 +457,6 @@ describe("indexBy", () => {
   });
 });
 
-describe("groupBy", () => {
-  it("groups by key function", () => {
-    const items = [
-      { type: "a", v: 1 },
-      { type: "b", v: 2 },
-      { type: "a", v: 3 },
-    ];
-    expect(groupBy(items, (x) => x.type)).toEqual(
-      new Map([
-        [
-          "a",
-          [
-            { type: "a", v: 1 },
-            { type: "a", v: 3 },
-          ],
-        ],
-        ["b", [{ type: "b", v: 2 }]],
-      ]),
-    );
-  });
-});
-
 describe("pluck", () => {
   it("extracts property values", () => {
     const items = [{ name: "a" }, { name: "b" }];
@@ -502,16 +481,6 @@ describe("minimum", () => {
 
   it("returns undefined for empty", () => {
     expect(minimum([], (x: any) => x)).toBeUndefined();
-  });
-});
-
-describe("inBatchesOf", () => {
-  it("splits into batches", () => {
-    expect(inBatchesOf([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
-  });
-
-  it("handles empty array", () => {
-    expect(inBatchesOf([], 3)).toEqual([]);
   });
 });
 
@@ -558,15 +527,13 @@ describe("HashWithIndifferentAccess", () => {
     const h1 = new HashWithIndifferentAccess({ a: 1 });
     const h2 = new HashWithIndifferentAccess({ b: 2 });
     const h3 = h1.merge(h2);
-    expect(Object.fromEntries(h3.toHash())).toEqual({ a: 1, b: 2 });
+    expect(h3.toHash()).toEqual({ a: 1, b: 2 });
   });
 
   it("deepMerge merges nested objects", () => {
     const h1 = new HashWithIndifferentAccess({ a: { b: 1, c: 2 } });
     const h2 = h1.deepMerge({ a: { c: 3, d: 4 } });
-    expect(
-      Object.fromEntries((h2.get("a") as HashWithIndifferentAccess<unknown>).toHash()),
-    ).toEqual({
+    expect((h2.get("a") as HashWithIndifferentAccess<unknown>).toHash()).toEqual({
       b: 1,
       c: 3,
       d: 4,
@@ -576,18 +543,18 @@ describe("HashWithIndifferentAccess", () => {
   it("slice picks keys", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2, c: 3 });
     const sliced = h.slice("a", "c");
-    expect(Object.fromEntries(sliced.toHash())).toEqual({ a: 1, c: 3 });
+    expect(sliced.toHash()).toEqual({ a: 1, c: 3 });
   });
 
   it("except omits keys", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2, c: 3 });
     const result = h.except("b");
-    expect(Object.fromEntries(result.toHash())).toEqual({ a: 1, c: 3 });
+    expect(result.toHash()).toEqual({ a: 1, c: 3 });
   });
 
   it("toHash converts to plain object", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(Object.fromEntries(h.toHash())).toEqual({ a: 1 });
+    expect(h.toHash()).toEqual({ a: 1 });
   });
 
   it("forEach iterates entries", () => {
@@ -606,14 +573,14 @@ describe("HashWithIndifferentAccess", () => {
 
   it("symbolizeKeys returns plain object with string keys", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    expect(Object.fromEntries(h.symbolizeKeys())).toEqual({ ":a": 1, ":b": 2 });
+    expect(h.symbolizeKeys()).toEqual({ ":a": 1, ":b": 2 });
   });
 
   it("stringifyKeys returns a new HashWithIndifferentAccess", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const stringified = h.stringifyKeys();
     expect(stringified).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(Object.fromEntries(stringified.toHash())).toEqual({ a: 1, b: 2 });
+    expect(stringified.toHash()).toEqual({ a: 1, b: 2 });
   });
 });
 

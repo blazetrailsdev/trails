@@ -70,6 +70,30 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "ActionController::Parameters": { "[]": ["get"], "[]=": ["set"] },
   "ActionDispatch::Journey::Path::Pattern::MatchData": { "[]": ["at"] },
   "ActionDispatch::Journey::GTG::TransitionTable": { "[]=": ["set"] },
+  // action_dispatch/http/headers.rb:63 `def [](key)` → http/headers.ts
+  // `Headers#get`, and :68 `def []=(key, value)` → `set`.
+  "ActionDispatch::Http::Headers": { "[]": ["get"], "[]=": ["set"] },
+  // rack/headers.rb:91 `def self.[](*items)` → headers.ts `static get`, :110
+  // `def [](key)` → `get`, and :114 `def []=(key, value)` → `set`.
+  "Rack::Headers": { "self.[]": ["get"], "[]": ["get"], "[]=": ["set"] },
+  "Rack::Response": { "self.[]": ["get"] },
+  "I18n::Locale::Fallbacks": { "[]": ["get"] },
+  "I18n::Backend::KeyValue::SubtreeProxy": { "[]": ["get"] },
+  "DidYouMean::DeprecatedMapping": { "[]=": ["set"] },
+  "Rack::Multipart::ParamList": { "<<": ["push"] },
+  "Rack::NullLogger": { "<<": ["append"] },
+  // action_dispatch/middleware/cookies.rb:345 `def [](name)` → middleware/cookies.ts
+  // `CookieJar#get`, :379 `def []=(name, options)` → `set`; :513 / :525 on
+  // `AbstractCookieJar` likewise.
+  "ActionDispatch::Cookies::CookieJar": { "[]": ["get"], "[]=": ["set"] },
+  "ActionDispatch::Cookies::AbstractCookieJar": { "[]": ["get"], "[]=": ["set"] },
+  // action_dispatch/middleware/flash.rb:97 / :104 `FlashNow#[]=` / `#[]`, and
+  // :163 / :169 `FlashHash#[]=` / `#[]` → middleware/flash.ts `set` / `get`.
+  "ActionDispatch::Flash::FlashNow": { "[]": ["get"], "[]=": ["set"] },
+  "ActionDispatch::Flash::FlashHash": { "[]": ["get"], "[]=": ["set"] },
+  // action_dispatch/http/mime_type.rb:51 `def [](type)` inside `class << self`
+  // → http/mime-type.ts `Mime.get`.
+  Mime: { "self.[]": ["get"] },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.
   "Arel::Table": { "[]": ["get"] },
   // arel/nodes/table_alias.rb:10 `def [](name)` → nodes/table-alias.ts `get`.
@@ -119,6 +143,8 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // multibyte/chars.rb:53 `delegate :<=>, :=~, :match?, :acts_like_string?, to: :wrapped_string`
   // → chars.ts `compareTo` and `matchOperator` (`match?` is `isMatch`).
   "ActiveSupport::Multibyte::Chars": { "<=>": ["compareTo"], "=~": ["matchOperator"] },
+  "ActiveSupport::TimeWithZone": { "<=>": ["compareTo"] },
+  "ActiveSupport::TimeZone": { "<=>": ["compareTo"] },
   // abstract_adapter.rb:252 `def <=>(version_string)` → abstract-adapter.ts
   // `compare`. `Version` does `include Comparable`, so `>=` / `<` are derived
   // and have no TS member of their own.
@@ -131,6 +157,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // reflection.rb:440 `def ==(other_aggregation)` → reflection.ts `equals`
   // (on `MacroReflection`, declared reflection.rb:369).
   "ActiveRecord::Reflection::MacroReflection": { "==": ["equals"] },
+  // middleware/stack.rb:93 `def [](i)` → middleware/stack.ts `get`, the
+  // `Arel::Table#[]` spelling.
+  "ActionDispatch::MiddlewareStack": { "[]": ["get"] },
   // relation/predicate_builder.rb:53 `def [](attr_name, value, operator = nil)`
   // → relation/predicate-builder.ts `get`, the `Arel::Table#[]` spelling.
   "ActiveRecord::PredicateBuilder": { "[]": ["get"] },

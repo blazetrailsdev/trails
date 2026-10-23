@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { hashDelete, rbModConstSet } from "@blazetrails/ruby-compat";
 import { statusCode, type StatusSymbol } from "@blazetrails/rack";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 import type { UrlOptions } from "../../action-dispatch/http/url.js";
@@ -173,10 +175,7 @@ export function _extractRedirectToStatus(
     !Array.isArray(options) &&
     Object.hasOwn(options, "status")
   ) {
-    const opts = options as Record<string, unknown>;
-    const status = opts.status;
-    delete opts.status;
-    return statusCode(status as number | string);
+    return statusCode(hashDelete(options, "status") as number | string);
   }
   if (Object.hasOwn(responseOptions, "status")) {
     return statusCode(responseOptions.status as number | string);
@@ -254,3 +253,5 @@ export const Redirecting = new Module((mod) => {
   urlFrom: typeof urlFrom;
 }> & { _computeRedirectToLocation: OmitThisParameter<typeof _computeRedirectToLocation> };
 Redirecting._computeRedirectToLocation = _computeRedirectToLocation;
+
+rbModConstSet(ActionController, "Redirecting", Redirecting);

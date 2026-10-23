@@ -1,16 +1,18 @@
+import type { RackHeaders } from "./index.js";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { RACK_LOGGER } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
 export class NullLogger {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     env[RACK_LOGGER] = this;
-    return this.app(env);
+    return rbFSend(this.app, "call", env) as ReturnType<RackApp>;
   }
 
   info(_progname?: any, _block?: () => any): void {}

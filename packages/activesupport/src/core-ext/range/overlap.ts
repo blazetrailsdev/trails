@@ -20,7 +20,7 @@ function eq<T extends number | Date>(b: T | null, e: T | null): boolean {
   return toNum(b) === toNum(e);
 }
 
-function is_emptyRange<T extends number | Date>(b: T | null, e: T | null, excl: boolean): boolean {
+function _isEmptyRange<T extends number | Date>(b: T | null, e: T | null, excl: boolean): boolean {
   if (b === null || e === null) return false;
 
   const comp = toNum(b) - toNum(e);
@@ -34,17 +34,17 @@ export function overlap<T extends number | Date>(this: Range<T>, other: Range<T>
   const otherEnd = other.end;
   const otherExcl = other.excludeEnd;
 
-  if (is_emptyRange(selfBegin, otherEnd, otherExcl)) return false;
+  if (_isEmptyRange(selfBegin, otherEnd, otherExcl)) return false;
 
   const otherBegin = other.begin;
   const selfEnd = this.end;
   const selfExcl = this.excludeEnd;
 
-  if (is_emptyRange(otherBegin, selfEnd, selfExcl)) return false;
+  if (_isEmptyRange(otherBegin, selfEnd, selfExcl)) return false;
   if (eq(selfBegin, otherBegin)) return true;
 
-  if (is_emptyRange(selfBegin, selfEnd, selfExcl)) return false;
-  if (is_emptyRange(otherBegin, otherEnd, otherExcl)) return false;
+  if (_isEmptyRange(selfBegin, selfEnd, selfExcl)) return false;
+  if (_isEmptyRange(otherBegin, otherEnd, otherExcl)) return false;
 
   return true;
 }

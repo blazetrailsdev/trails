@@ -57,6 +57,24 @@ function isPrepended(method: unknown, mod: object): boolean {
 }
 
 /**
+ * The link beneath the lowest module prepended over `method`, where Ruby's
+ * `include` inserts a module (`include_modules_at`, vendor/ruby/v3.3.11/class.c:1253,
+ * starts at the class's origin, below its prepended modules). Undefined when
+ * no module is prepended over it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function prependOriginLink(method: unknown): { original: object } | undefined {
+  let link = typeof method === "function" ? prepended.get(method) : undefined;
+  while (link) {
+    const below = prepended.get(link.original);
+    if (!below) return link;
+    link = below;
+  }
+  return undefined;
+}
+
+/**
  * Mirrors: Ruby's Module#prepend — vendor/ruby/v3.3.11/eval.c:1196 `rb_mod_prepend`,
  * backed by vendor/ruby/v3.3.11/class.c:1430 `rb_prepend_module`.
  *
@@ -130,7 +148,8 @@ export function prepend<T extends object>(target: T, module: PrependModule | Cla
       ...args: unknown[]
     ) => unknown;
     const wrapped = function (this: unknown, ...args: unknown[]) {
-      return wrapper.call(this, original.bind(this), ...args);
+      const link = prepended.get(wrapped)!.original as (...args: unknown[]) => unknown;
+      return wrapper.call(this, link.bind(this), ...args);
     };
     prepended.set(wrapped, { mod: module, original });
     Object.defineProperty(target, name, {

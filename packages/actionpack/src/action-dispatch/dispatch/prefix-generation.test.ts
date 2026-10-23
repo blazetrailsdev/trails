@@ -4,13 +4,7 @@
 import { beforeEach, describe, it, expect } from "vitest";
 import { ModelName, Naming } from "@blazetrails/activemodel";
 import { assertRespondTo, extend, TopLevel } from "@blazetrails/activesupport";
-import {
-  File,
-  include,
-  initialize,
-  initializeIncludedModules,
-  Module,
-} from "@blazetrails/ruby-compat";
+import { File, include } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
@@ -194,16 +188,8 @@ describe("WithMountedEngine", () => {
   include(OutsideEngineGeneratingController, RailsApplication.routes().urlHelpers());
   controllerConstants.set("outside_engine_generating", OutsideEngineGeneratingController);
 
-  const KwObject = new Module((mod) => {
-    (mod as unknown as Record<symbol, unknown>)[initialize] = function (_options: {
-      kw: unknown;
-    }) {};
-  });
-
   class EngineObject {
-    constructor(...args: unknown[]) {
-      initializeIncludedModules(this, ...args);
-    }
+    constructor(_kw: { kw: unknown }) {}
   }
   interface EngineObject {
     postPath: Helper;
@@ -213,19 +199,15 @@ describe("WithMountedEngine", () => {
     polymorphicPath: Helper;
     polymorphicUrl: Helper;
   }
-  include(EngineObject, KwObject);
   include(EngineObject, UrlFor);
   include(EngineObject, BlogEngine.routes().urlHelpers());
 
   class AppObject {
-    constructor(...args: unknown[]) {
-      initializeIncludedModules(this, ...args);
-    }
+    constructor(_kw: { kw: unknown }) {}
   }
   interface AppObject {
     rootPath: Helper;
   }
-  include(AppObject, KwObject);
   include(AppObject, UrlFor);
   include(AppObject, RailsApplication.routes().urlHelpers());
 

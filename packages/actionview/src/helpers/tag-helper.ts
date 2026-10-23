@@ -17,6 +17,7 @@ import {
   BigDecimal,
   eachPair,
   Hash,
+  hashAref,
   Module,
   rbInspect,
 } from "@blazetrails/ruby-compat";
@@ -82,11 +83,11 @@ const BOOLEAN_ATTRIBUTES = new Set([
 const ARIA_PREFIXES = new Set(["aria"]);
 const DATA_PREFIXES = new Set(["data"]);
 
-const TAG_TYPES = new Map<string, string>([
-  ...indexWith([...BOOLEAN_ATTRIBUTES], "boolean"),
-  ...indexWith([...DATA_PREFIXES], "data"),
-  ...indexWith([...ARIA_PREFIXES], "aria"),
-]);
+const TAG_TYPES: Record<string, string> = {};
+Object.assign(TAG_TYPES, indexWith([...BOOLEAN_ATTRIBUTES], "boolean"));
+Object.assign(TAG_TYPES, indexWith([...DATA_PREFIXES], "data"));
+Object.assign(TAG_TYPES, indexWith([...ARIA_PREFIXES], "aria"));
+Object.freeze(TAG_TYPES);
 
 const PRE_CONTENT_STRINGS: Record<string, string> = {
   textarea: "\n",
@@ -124,6 +125,21 @@ export function buildTagValues(...args: unknown[]): Array<string | SafeBuffer> {
   return tagValues;
 }
 
+export function tag(this: TagHelperHost): ElementTagBuilder;
+export function tag(
+  this: TagHelperHost,
+  name: string,
+  options?: Record<string, unknown> | null,
+  open?: boolean,
+  escape?: boolean,
+): SafeBuffer;
+export function tag(
+  this: TagHelperHost,
+  name?: string,
+  options?: Record<string, unknown> | null,
+  open?: boolean,
+  escape?: boolean,
+): SafeBuffer | TagBuilder;
 export function tag(
   this: TagHelperHost,
   name?: string,
@@ -144,11 +160,31 @@ export function tag(
 export function contentTag(
   this: TagHelperHost,
   name: string,
+  contentOrOptionsWithBlock: unknown,
+  options: Record<string, unknown> | Hash<string, unknown> | null | undefined,
+  escape: boolean | undefined,
+  block: () => PromiseLike<unknown>,
+): Promise<SafeBuffer>;
+export function contentTag(
+  this: TagHelperHost,
+  name: string,
   contentOrOptionsWithBlock?: unknown,
   options?: Record<string, unknown> | Hash<string, unknown> | null,
   escape?: boolean,
   block?: () => unknown,
-): SafeBuffer {
+): SafeBuffer;
+/**
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+ */
+export function contentTag(
+  this: TagHelperHost,
+  name: string,
+  contentOrOptionsWithBlock?: unknown,
+  options?: Record<string, unknown> | Hash<string, unknown> | null,
+  escape?: boolean,
+  block?: () => unknown,
+): SafeBuffer | Promise<SafeBuffer> {
   ensureValidHtml5TagName(name);
   const esc = escape !== undefined ? escape : true;
 
@@ -156,7 +192,13 @@ export function contentTag(
     if (isPlainObject(contentOrOptionsWithBlock) || contentOrOptionsWithBlock instanceof Hash) {
       options = contentOrOptionsWithBlock as Record<string, unknown> | Hash<string, unknown>;
     }
-    return tagBuilder.call(this).contentTagString(name, capture.call(this, block), options, esc);
+    const content = capture.call(this, block);
+    if (content instanceof Promise) {
+      return content.then((content) =>
+        contentTag.call(this, name, contentOrOptionsWithBlock, options, escape, () => content),
+      );
+    }
+    return tagBuilder.call(this).contentTagString(name, content, options, esc);
   }
 
   return tagBuilder.call(this).contentTagString(name, contentOrOptionsWithBlock, options, esc);
@@ -199,6 +241,143 @@ export function escapeOnce(html: string): SafeBuffer {
   return htmlEscapeOnce(html);
 }
 
+type TagElementName =
+  | "area"
+  | "base"
+  | "br"
+  | "col"
+  | "embed"
+  | "hr"
+  | "img"
+  | "input"
+  | "keygen"
+  | "link"
+  | "meta"
+  | "source"
+  | "track"
+  | "wbr"
+  | "animate"
+  | "animate_motion"
+  | "animate_transform"
+  | "circle"
+  | "ellipse"
+  | "line"
+  | "path"
+  | "polygon"
+  | "polyline"
+  | "rect"
+  | "set"
+  | "stop"
+  | "use"
+  | "view"
+  | "a"
+  | "abbr"
+  | "address"
+  | "article"
+  | "aside"
+  | "audio"
+  | "b"
+  | "bdi"
+  | "bdo"
+  | "blockquote"
+  | "body"
+  | "button"
+  | "canvas"
+  | "caption"
+  | "cite"
+  | "code"
+  | "colgroup"
+  | "data"
+  | "datalist"
+  | "dd"
+  | "del"
+  | "details"
+  | "dfn"
+  | "dialog"
+  | "div"
+  | "dl"
+  | "dt"
+  | "em"
+  | "fieldset"
+  | "figcaption"
+  | "figure"
+  | "footer"
+  | "form"
+  | "h1"
+  | "h2"
+  | "h3"
+  | "h4"
+  | "h5"
+  | "h6"
+  | "head"
+  | "header"
+  | "hgroup"
+  | "html"
+  | "i"
+  | "iframe"
+  | "ins"
+  | "kbd"
+  | "label"
+  | "legend"
+  | "li"
+  | "main"
+  | "map"
+  | "mark"
+  | "menu"
+  | "meter"
+  | "nav"
+  | "noscript"
+  | "object"
+  | "ol"
+  | "optgroup"
+  | "option"
+  | "output"
+  | "p"
+  | "picture"
+  | "portal"
+  | "pre"
+  | "progress"
+  | "q"
+  | "rp"
+  | "rt"
+  | "ruby"
+  | "s"
+  | "samp"
+  | "script"
+  | "search"
+  | "section"
+  | "select"
+  | "slot"
+  | "small"
+  | "span"
+  | "strong"
+  | "style"
+  | "sub"
+  | "summary"
+  | "sup"
+  | "table"
+  | "tbody"
+  | "td"
+  | "template"
+  | "textarea"
+  | "tfoot"
+  | "th"
+  | "thead"
+  | "time"
+  | "title"
+  | "tr"
+  | "u"
+  | "ul"
+  | "var"
+  | "video";
+
+type TagElement = {
+  (...args: [...unknown[], (tagBuilder: TagBuilder) => PromiseLike<unknown>]): Promise<SafeBuffer>;
+  (...args: unknown[]): SafeBuffer;
+};
+
+type ElementTagBuilder = TagBuilder & Record<TagElementName, TagElement>;
+
 export class TagBuilder {
   static defineElement(
     name: string,
@@ -211,7 +390,7 @@ export class TagBuilder {
         Object.defineProperty(mod, methodName, {
           writable: true,
           configurable: true,
-          value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+          value(this: TagBuilder, ...args: unknown[]): SafeBuffer | Promise<SafeBuffer> {
             const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
               | TagBlock
               | undefined;
@@ -233,7 +412,7 @@ export class TagBuilder {
         Object.defineProperty(mod, methodName, {
           writable: true,
           configurable: true,
-          value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+          value(this: TagBuilder, ...args: unknown[]): SafeBuffer | Promise<SafeBuffer> {
             if (typeof args[args.length - 1] === "function") args.pop();
             const { escape = true, ...options } = extractOptionsBang(args);
             if (args.length > 0) {
@@ -257,7 +436,7 @@ export class TagBuilder {
         Object.defineProperty(mod, methodName, {
           writable: true,
           configurable: true,
-          value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+          value(this: TagBuilder, ...args: unknown[]): SafeBuffer | Promise<SafeBuffer> {
             const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
               | TagBlock
               | undefined;
@@ -426,12 +605,16 @@ export class TagBuilder {
     return htmlSafe(result);
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+   */
   tagString(
     name: string,
     content: unknown,
     options?: Record<string, unknown> | null,
     opts?: { escape?: boolean; block?: TagBlock },
-  ): SafeBuffer {
+  ): SafeBuffer | Promise<SafeBuffer> {
     const escape = opts?.escape !== false;
     let actualContent: unknown = content;
     if (opts?.block)
@@ -440,6 +623,11 @@ export class TagBuilder {
         opts.block as (...args: unknown[]) => unknown,
         this,
       );
+    if (actualContent instanceof Promise) {
+      return actualContent.then((actualContent) =>
+        this.tagString(name, actualContent, options, { escape }),
+      );
+    }
     return this.contentTagString(name, actualContent, options, escape);
   }
 
@@ -477,7 +665,7 @@ export class TagBuilder {
     let output = "";
     const sep = " ";
     eachPair(options!, (key: string, value: unknown) => {
-      const type = TAG_TYPES.get(key);
+      const type = hashAref(TAG_TYPES, key);
       if (type === "data" && (isPlainObject(value) || value instanceof Hash)) {
         eachPair(value, (k: string, v: unknown) => {
           if (v == null) return;
@@ -544,7 +732,11 @@ export class TagBuilder {
     return this.tagOption(key, value, escape);
   }
 
-  private methodMissing(called: string, ...args: unknown[]): SafeBuffer {
+  private respondToMissing(..._args: unknown[]): boolean {
+    return true;
+  }
+
+  private methodMissing(called: string, ...args: unknown[]): SafeBuffer | Promise<SafeBuffer> {
     const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
       | TagBlock
       | undefined;

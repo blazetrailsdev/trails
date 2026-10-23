@@ -1,6 +1,6 @@
 import { isBlank } from "@blazetrails/activesupport";
 import type { RackEnv } from "@blazetrails/rack";
-import { dup, hashAref, hashAset, merge, mergeBang, rbEqual } from "@blazetrails/ruby-compat";
+import { dup, hashAref, hashAset, mergeBang, rbEqual } from "@blazetrails/ruby-compat";
 
 import { Request } from "../action-dispatch/http/request.js";
 import type { Response } from "../action-dispatch/http/response.js";
@@ -72,13 +72,16 @@ export class Renderer {
   }
 
   withDefaults(defaults: Env): Renderer {
-    return new (this.constructor as typeof Renderer)(
-      this.controller,
-      this._env,
-      merge(this._defaults, defaults),
-    );
+    return new (this.constructor as typeof Renderer)(this.controller, this._env, {
+      ...this._defaults,
+      ...defaults,
+    });
   }
 
+  /**
+   * @missingRailsName defaults — PERMANENT
+   * @missingRailsName env — PERMANENT
+   */
   constructor(controller: RendererController, env: Env | null | undefined, defaults: Env) {
     this.controller = controller;
     this._defaults = defaults;
@@ -90,6 +93,7 @@ export class Renderer {
     }
   }
 
+  /** @missingRailsName defaults — PERMANENT */
   get defaults(): Env {
     if (Object.isFrozen(this._defaults)) this._defaults = dup(this._defaults);
     return this._defaults;
@@ -121,11 +125,12 @@ export class Renderer {
     return (this.constructor as typeof Renderer).normalizeEnv(env);
   }
 
+  /** @missingRailsName env — PERMANENT */
   private envForRequest(): Env {
     if ("HTTP_HOST" in this._env || this.controller._routes == null) {
       return dup(this._env);
     } else {
-      return merge(this.controller._routes.defaultEnv(), this._env);
+      return { ...this.controller._routes.defaultEnv(), ...this._env };
     }
   }
 }

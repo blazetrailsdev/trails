@@ -4,6 +4,7 @@ import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { reloadSchemaFromCache } from "./model-schema.js";
 import { registerModel } from "./associations.js";
+import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class UuidType extends ValueType {
   override type(): string {
@@ -29,9 +30,10 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
 }
 
 const own = <T>(host: object, key: string): T | undefined =>
-  Object.prototype.hasOwnProperty.call(host, key) ? (host as Record<string, T>)[key] : undefined;
+  Object.hasOwn(host, key) ? (host as Record<string, T>)[key] : undefined;
 
 describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () => {
+  fixtures({}, { useTransactionalTests: false });
   it("invalidates an own-table descendant's schema memos when an STI ancestor reloads", async () => {
     class Shape extends Base {
       static override tableName = "shapes";

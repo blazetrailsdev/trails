@@ -6,10 +6,12 @@ import { afterAll, afterEach, expect } from "vitest";
 import { Timeout } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import "./test-case.js";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { rootTestCase } from "../test-helpers/use-fixtures.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { I18n } from "@blazetrails/activemodel";
-import { afterTeardown, zone as timeZone, setZone } from "@blazetrails/activesupport";
+import { travelBack, zone as timeZone, setZone } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
 import { register } from "../connection-adapters.js";
 import { Encryption } from "../encryption.js";
@@ -38,6 +40,8 @@ expect.addEqualityTesters([
     return a.equals(b);
   },
 ]);
+
+registerSpecType(/(?:)/, rootTestCase());
 
 DelegateCache.delegateBaseMethods = false;
 
@@ -110,7 +114,7 @@ export function writingPoolsLeakedSinceBaseline(): string[] {
 }
 
 afterEach(() => {
-  afterTeardown();
+  travelBack();
 });
 
 afterAll(() => {

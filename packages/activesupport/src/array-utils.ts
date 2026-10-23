@@ -3,8 +3,8 @@ import { I18n } from "./i18n.js";
 import { camelize, pluralize, singularize, underscore } from "./inflector.js";
 import * as XmlMini from "./xml-mini.js";
 import { rbInspect as inspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
-import { ARRAY_METHOD_TABLE, isEmpty } from "@blazetrails/ruby-compat";
-import { rbEqq, rbObjClassname } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE, eachSlice } from "@blazetrails/ruby-compat";
+import { isSymbol, rbEqq, rbObjClassname, symbolToS } from "@blazetrails/ruby-compat";
 
 export function wrap<T>(object: T | T[] | null | undefined): T[] {
   if (object === null || object === undefined) return [];
@@ -17,11 +17,16 @@ export function wrap<T>(object: T | T[] | null | undefined): T[] {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function kernelArray<T>(value: T | T[] | null | undefined): T[] {
+export function kernelArray<T>(value: T | T[] | null | undefined): T[];
+export function kernelArray<T>(value: Iterable<T> | null | undefined): T[];
+export function kernelArray<T>(value: T | T[] | Iterable<T> | null | undefined): T[] {
   if (value === null || value === undefined) return [];
   if (Array.isArray(value)) return value;
   if (typeof value === "object" && typeof (value as any)[Symbol.iterator] === "function") {
     return [...(value as unknown as Iterable<T>)];
+  }
+  if (typeof (value as { toA?: unknown } | null)?.toA === "function") {
+    return (value as unknown as { toA(): T[] }).toA();
   }
   return [value] as T[];
 }
@@ -47,12 +52,12 @@ export function inGroupsOf<T>(
     );
   }
 
-  const result: (T | null | false)[][] = [];
-  for (let i = 0; i < collection.length; i += numberToI) {
-    result.push(collection.slice(i, i + numberToI));
+  if (block) {
+    eachSlice(collection, number, block);
+    return collection as unknown as (T | null | false)[][];
+  } else {
+    return eachSlice(collection, number);
   }
-  if (block) result.forEach(block);
-  return result;
 }
 
 export function toSentence(
@@ -75,21 +80,25 @@ export function toSentence(
     const i18nConnectors = I18n.translate("support.array", {
       locale: options.locale ?? null,
       default: {},
-    }) as Record<string, string>;
-    for (const [k, v] of Object.entries(i18nConnectors)) {
-      defaultConnectors[camelize(k, "lower")] = v;
+    }) as Record<string, string> | Map<unknown, string>;
+    for (const [k, v] of i18nConnectors instanceof Map
+      ? i18nConnectors
+      : Object.entries(i18nConnectors)) {
+      defaultConnectors[camelize(isSymbol(k) ? symbolToS(k) : String(k), "lower")] = v;
     }
   }
-  for (const [k, v] of Object.entries(options)) {
-    if (v !== undefined) defaultConnectors[k] = (v ?? "") as string;
+  options = Object.assign(defaultConnectors, options);
+
+  switch (array.length) {
+    case 0:
+      return "";
+    case 1:
+      return `${array[0]}`;
+    case 2:
+      return `${array[0]}${options.twoWordsConnector ?? ""}${array[1]}`;
+    default:
+      return `${array.slice(0, -1).join(options.wordsConnector ?? "")}${options.lastWordConnector ?? ""}${array.at(-1)}`;
   }
-  const { wordsConnector, twoWordsConnector, lastWordConnector } = defaultConnectors;
-
-  if (array.length === 0) return "";
-  if (array.length === 1) return `${array[0]}`;
-  if (array.length === 2) return `${array[0]}${twoWordsConnector}${array[1]}`;
-
-  return `${array.slice(0, -1).join(wordsConnector)}${lastWordConnector}${array[array.length - 1]}`;
 }
 
 export function inGroups<T>(
@@ -168,7 +177,7 @@ export function extractBang<T>(array: T[], predicate: (item: T) => boolean): T[]
 export function toFs(self: unknown[], format = "default"): string {
   switch (format) {
     case "db":
-      if (isEmpty(self)) {
+      if (self.length === 0) {
         return "null";
       } else {
         return self.map((e) => (e as { id: unknown }).id).join(",");
@@ -216,7 +225,7 @@ export function toXml(
   delete options.children;
   const attributes: Record<string, string> = options.skipTypes ? {} : { type: "array" };
 
-  if (isEmpty(self)) {
+  if (self.length === 0) {
     builder.tag(root, null, attributes);
   } else {
     builder.openTag(root, attributes);

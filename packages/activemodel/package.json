@@ -30,5 +30,8 @@
   },
   "devDependencies": {
     "@blazetrails/bcrypt": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

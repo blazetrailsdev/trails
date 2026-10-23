@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 
-import { CookieJar, cookieJar } from "../../action-dispatch/middleware/cookies.js";
+import { CookieJar, cookieJar, setCookieJar } from "../../action-dispatch/middleware/cookies.js";
 import { Response } from "@blazetrails/rack";
 import { SessionHash, SessionId } from "@blazetrails/rack-session";
 import {
@@ -30,6 +30,9 @@ function buildRequest(): NullSessionRequest {
     env,
     getHeader: (name: string) => env[name],
     hasHeader: (name: string) => name in env,
+    fetchHeader: (name: string, block: (name: string) => unknown) =>
+      name in env ? env[name] : block(name),
+    setHeader: (name: string, value: unknown) => (env[name] = value),
     cookies: {},
     session: undefined,
     flash: { note: "hi" },
@@ -78,7 +81,7 @@ describe("NullSession", () => {
   it("CookieStore round-trips the token through the encrypted jar, bound to the session id", () => {
     const request = buildRequest();
     const jar = new CookieJar(request);
-    cookieJar.call(request, jar);
+    setCookieJar.call(request, jar);
     const session = {
       id: () => new SessionId("sid-1"),
       idWas: () => new SessionId("sid-1"),
@@ -103,7 +106,7 @@ describe("NullSession", () => {
   it("CookieStore ignores a token stored under another session id", () => {
     const request = buildRequest();
     const jar = new CookieJar(request);
-    cookieJar.call(request, jar);
+    setCookieJar.call(request, jar);
     const csrfRequest = {
       method: "POST",
       baseUrl: "https://example.com",
@@ -120,7 +123,7 @@ describe("NullSession", () => {
   it("CookieStore returns null for cookie contents that are not JSON", () => {
     const request = buildRequest();
     const jar = new CookieJar(request);
-    cookieJar.call(request, jar);
+    setCookieJar.call(request, jar);
     const csrfRequest = {
       method: "POST",
       baseUrl: "https://example.com",
@@ -135,7 +138,7 @@ describe("NullSession", () => {
   it("CookieStore writes the envelope Rails writes, keyed session_id / public_id", () => {
     const request = buildRequest();
     const jar = new CookieJar(request);
-    cookieJar.call(request, jar);
+    setCookieJar.call(request, jar);
     const csrfRequest = {
       method: "POST",
       baseUrl: "https://example.com",

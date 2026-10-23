@@ -9,7 +9,6 @@ import {
   merge,
   rbEqual,
   rbObjIsKindOf,
-  rbStrSNew,
   rtest,
   toS,
 } from "@blazetrails/ruby-compat";
@@ -50,7 +49,7 @@ export class CreateFile extends EmptyDirectory {
       (await this.isExists()) &&
       rbEqual(
         await getFs().readFile(this.destination),
-        Uint8Array.from(bytes(forceEncoding(rbStrSNew(await this.render()), "ASCII-8BIT"))),
+        Uint8Array.from(bytes(forceEncoding(await this.render(), "ASCII-8BIT"))),
       )
     );
   }

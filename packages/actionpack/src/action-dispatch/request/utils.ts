@@ -1,8 +1,21 @@
 import { mattrAccessor } from "@blazetrails/activesupport";
-import { bytes, forceEncoding, isValidEncoding, scrub, toS } from "@blazetrails/ruby-compat";
+import {
+  bytes,
+  compactBang,
+  eachPair,
+  eachValue,
+  forceEncoding,
+  Hash,
+  hasKey,
+  isValidEncoding,
+  rbObjIsKindOf,
+  scrub,
+  toS,
+} from "@blazetrails/ruby-compat";
 import { InvalidParameterError } from "@blazetrails/rack";
-import { MissingController } from "../http/request.js";
+import { ActionDispatch } from "../../namespaces.js";
 import type { EncodingTemplate } from "../http/param-builder.js";
+import { UploadedFile, type UploadedFileOptions } from "../http/upload.js";
 
 export type ParamValue =
   | string
@@ -12,76 +25,52 @@ export type ParamValue =
   | ParamValue[]
   | { [key: string]: ParamValue };
 export type ParamHash = { [key: string]: ParamValue };
+type ParamInput = ParamValue | Hash<string, ParamValue>;
 
-export class RequestUtils {
-  declare static performDeepMunge: boolean;
-  declare performDeepMunge: boolean;
-
-  static {
-    mattrAccessor.call(this, "performDeepMunge", { default: true });
-  }
-
-  static eachParamValue(params: ParamValue, block: (param: string) => string | void): ParamValue {
+export class ParamEncoder {
+  static normalizeEncodeParams(params: ParamInput): ParamValue {
     if (Array.isArray(params)) {
-      params.forEach((element, i) => {
-        const replaced = RequestUtils.eachParamValue(element, block);
-        if (replaced === element) return;
-        if (Object.isFrozen(params)) params = [...(params as ParamValue[])];
-        (params as ParamValue[])[i] = replaced;
-      });
-    } else if (params !== null && typeof params === "object") {
-      for (const [key, value] of Object.entries(params)) {
-        const replaced = RequestUtils.eachParamValue(value, block);
-        if (replaced === value) continue;
-        if (Object.isFrozen(params)) params = { ...(params as ParamHash) };
-        (params as ParamHash)[key] = replaced;
+      return this.handleArray(params);
+    } else if (rbObjIsKindOf(params, Hash)) {
+      if (hasKey(params as object, "tempfile")) {
+        return new UploadedFile(params as UploadedFileOptions) as unknown as ParamValue;
+      } else {
+        const hwia: ParamHash = Object.create(null);
+        eachPair(params as ParamHash, (key, val) => {
+          hwia[key] = this.normalizeEncodeParams(val);
+        });
+        return hwia;
       }
-    } else if (typeof params === "string") {
-      return block(params) ?? params;
-    }
-    return params;
-  }
-
-  static normalizeEncodeParams(params: ParamValue): ParamValue {
-    return normalize(params, this.performDeepMunge);
-  }
-
-  static checkParamEncoding(params: ParamValue): void {
-    if (Array.isArray(params)) {
-      params.forEach((element) => RequestUtils.checkParamEncoding(element));
-    } else if (params !== null && typeof params === "object") {
-      Object.values(params).forEach((value) => RequestUtils.checkParamEncoding(value));
-    } else if (typeof params === "string") {
-      if (/\p{Cs}/u.test(params)) {
-        throw new InvalidParameterError(`Invalid encoding for parameter: ${scrub(params)}`);
-      }
+    } else {
+      return params as ParamValue;
     }
   }
 
-  /** @internal */
-  static setBinaryEncoding<P extends ParamValue>(
-    _request: unknown,
-    params: P,
-    _controller: string | undefined,
-    _action: string | undefined,
-  ): P {
+  static handleArray(params: ParamValue[]): ParamValue[] {
+    params.forEach((el, i) => {
+      params[i] = this.normalizeEncodeParams(el);
+    });
     return params;
   }
+}
 
-  static deepMunge(params: ParamValue): ParamValue {
-    return normalize(params, true);
+export class NoNilParamEncoder extends ParamEncoder {
+  static override handleArray(params: ParamValue[]): ParamValue[] {
+    const list = super.handleArray(params);
+    compactBang(list);
+    return list;
   }
 }
 
 export class CustomParamEncoder {
-  static encodeForTemplate(
-    params: ParamHash,
+  static encodeForTemplate<P extends ParamHash | Hash<string, ParamValue>>(
+    params: P,
     encodingTemplate: EncodingTemplate | false | null | undefined,
-  ): ParamHash {
+  ): P {
     if (!encodingTemplate) return params;
-    for (const [key, value] of Object.entries(params)) {
+    for (const [key, value] of params instanceof Hash ? params.entries() : Object.entries(params)) {
       if (key === "controller" || key === "action") continue;
-      const replaced = RequestUtils.eachParamValue(value, (param) => {
+      const replaced = Utils.eachParamValue(value, (param) => {
         if (encodingTemplate.get(toS(key))) {
           const b = bytes(param);
           const forced = b.map((byte) => String.fromCharCode(byte)).join("");
@@ -94,10 +83,24 @@ export class CustomParamEncoder {
         }
       });
       if (replaced === value) continue;
+      if (params instanceof Hash) {
+        params.set(key, replaced);
+        continue;
+      }
       if (Object.isFrozen(params)) params = { ...params };
-      params[key] = replaced;
+      (params as ParamHash)[key] = replaced;
     }
     return params;
+  }
+
+  static encode(
+    request: { controllerClassFor(name: string): unknown },
+    params: ParamHash,
+    controller: string | undefined,
+    action: string | undefined,
+  ): ParamHash {
+    const encodingTemplate = CustomParamEncoder.actionEncodingTemplate(request, controller, action);
+    return CustomParamEncoder.encodeForTemplate(params, encodingTemplate);
   }
 
   static actionEncodingTemplate(
@@ -118,23 +121,81 @@ export class CustomParamEncoder {
         ).actionEncodingTemplate(action)
       );
     } catch (e) {
-      if (e instanceof MissingController) return null;
+      if (e instanceof ActionDispatch.MissingController) return null;
       throw e;
     }
   }
 }
 
-function normalize(params: ParamValue, stripNil: boolean): ParamValue {
-  if (Array.isArray(params)) {
-    const mapped = params.map((el) => normalize(el, stripNil));
-    return stripNil ? mapped.filter((el) => el !== null) : mapped;
+export class Utils {
+  declare static performDeepMunge: boolean;
+  declare performDeepMunge: boolean;
+
+  static {
+    mattrAccessor.call(this, "performDeepMunge", { default: true });
   }
-  if (params !== null && typeof params === "object") {
-    const proto = Object.getPrototypeOf(params);
-    if (proto !== null && proto !== Object.prototype) return params;
-    const out: ParamHash = Object.create(null);
-    for (const [k, v] of Object.entries(params)) out[k] = normalize(v, stripNil);
-    return out;
+
+  /** @inventedArm if — PERMANENT */
+  static eachParamValue<P extends ParamInput>(
+    params: P,
+    block: (param: string) => string | void,
+  ): P {
+    if (Array.isArray(params)) {
+      params.forEach((element, i) => {
+        const replaced = Utils.eachParamValue(element, block);
+        if (replaced === element) return;
+        if (Object.isFrozen(params)) params = [...(params as ParamValue[])] as P;
+        (params as ParamValue[])[i] = replaced;
+      });
+    } else if (params instanceof Hash) {
+      for (const [key, value] of params.entries()) {
+        const replaced = Utils.eachParamValue(value, block);
+        if (replaced !== value) params.set(key, replaced);
+      }
+    } else if (params !== null && typeof params === "object") {
+      for (const [key, value] of Object.entries(params)) {
+        const replaced = Utils.eachParamValue(value, block);
+        if (replaced === value) continue;
+        if (Object.isFrozen(params)) params = { ...(params as ParamHash) } as P;
+        (params as ParamHash)[key] = replaced;
+      }
+    } else if (typeof params === "string") {
+      return (block(params) ?? params) as P;
+    }
+    return params;
   }
-  return params;
+
+  static normalizeEncodeParams(params: ParamInput): ParamValue {
+    if (this.performDeepMunge) {
+      return NoNilParamEncoder.normalizeEncodeParams(params);
+    } else {
+      return ParamEncoder.normalizeEncodeParams(params);
+    }
+  }
+
+  static checkParamEncoding(params: ParamInput): void {
+    if (Array.isArray(params)) {
+      params.forEach((element) => Utils.checkParamEncoding(element));
+    } else if (params !== null && typeof params === "object") {
+      eachValue(params as ParamHash, (value) => Utils.checkParamEncoding(value));
+    } else if (typeof params === "string") {
+      if (/\p{Cs}/u.test(params)) {
+        throw new InvalidParameterError(`Invalid encoding for parameter: ${scrub(params)}`);
+      }
+    }
+  }
+
+  /** @internal */
+  static setBinaryEncoding(
+    request: { controllerClassFor(name: string): unknown },
+    params: ParamHash,
+    controller: string | undefined,
+    action: string | undefined,
+  ): ParamHash {
+    return CustomParamEncoder.encode(request, params, controller, action);
+  }
+
+  static ParamEncoder = ParamEncoder;
+  static NoNilParamEncoder = NoNilParamEncoder;
+  static CustomParamEncoder = CustomParamEncoder;
 }

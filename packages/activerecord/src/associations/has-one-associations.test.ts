@@ -315,7 +315,7 @@ describe("HasOneAssociationsTest", () => {
     const chef = await (department as any).chefs.create({ employable: designer });
 
     expect(chef.employable_id).toBe(designer.id);
-    expect(chef.employable_type).toBe((designer.constructor as typeof Base).name);
+    expect(chef.employable_type).toBe(designer.constructor.name);
 
     await designer.destroy();
     await chef.reload();
@@ -520,10 +520,8 @@ describe("HasOneAssociationsTest", () => {
       await (firm as any).createAccount();
     });
 
-    expect((error as RecordNotSaved).message).toBe(
-      "You cannot call create unless the parent is saved",
-    );
-    expect((error as RecordNotSaved).record).toBe(firm);
+    expect(error.message).toBe("You cannot call create unless the parent is saved");
+    expect(error.record).toBe(firm);
   });
 
   it("clearing an association clears the associations inverse", async () => {
@@ -976,7 +974,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("has one with touch option on create", async () => {
     await assertQueriesCount(5, false, async () => {
-      await Club.create({ name: "1000 Oaks", membershipAttributes: { favorite: true } });
+      await Club.create({ name: "1000 Oaks", membership_attributes: { favorite: true } });
     });
   });
 

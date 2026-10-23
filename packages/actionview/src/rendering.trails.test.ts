@@ -1,3 +1,4 @@
+import "./test-helpers/abstract-unit.js";
 import { describe, expect, it } from "vitest";
 import {
   AbstractController,
@@ -5,12 +6,8 @@ import {
   Request,
   Response,
   RouteSet,
-  UrlFor,
 } from "@blazetrails/actionpack";
-import { include } from "@blazetrails/ruby-compat";
-import { RoutingUrlFor } from "./routing-url-for.js";
-
-include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
+import { urlFor } from "./routing-url-for.js";
 
 describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
   it("includes RoutingUrlFor through routes.url_helpers' UrlFor included hook", async () => {
@@ -23,7 +20,7 @@ describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
         await this.render({ plain: "" });
       }
     }
-    AbstractController.withRoutesHelpers(routes as never)(FooController as never);
+    AbstractController.Trailties.RoutesHelpers.with(routes as never)(FooController as never);
     const controller = new FooController();
     await controller.dispatch(
       "other",
@@ -35,7 +32,21 @@ describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
       urlFor(options?: unknown): string;
     };
 
-    expect(view.urlFor).toBe(RoutingUrlFor.prototype.urlFor);
+    expect(view.urlFor).toBe(urlFor);
     expect(view.urlFor({ controller: "foo", action: "other" })).toBe("/other");
+  });
+});
+
+describe("ActionView::Rendering::ClassMethods#eager_load!", () => {
+  it("calls super, then builds the view context class", () => {
+    class EagerController extends ActionController.Base {}
+    const klass = EagerController as unknown as {
+      eagerLoadBang(): null;
+      _actionMethodCache?: unknown;
+      _viewContextClass?: unknown;
+    };
+    expect(klass.eagerLoadBang()).toBeNull();
+    expect(Object.hasOwn(klass, "_actionMethodCache")).toBe(true);
+    expect(Object.hasOwn(klass, "_viewContextClass")).toBe(true);
   });
 });

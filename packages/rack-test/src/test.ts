@@ -1,5 +1,14 @@
 import { isPlainObject, type Included } from "@blazetrails/activesupport";
-import { Generic, HTTPS, URI, b, pack } from "@blazetrails/ruby-compat";
+import {
+  Generic,
+  HTTPS,
+  URI,
+  b,
+  hashDelete,
+  pack,
+  rbFSend,
+  rbObjDup,
+} from "@blazetrails/ruby-compat";
 import {
   MockRequest,
   MockResponse,
@@ -9,6 +18,7 @@ import {
   type RackApp,
   type RackEnv,
   type RackMiddleware,
+  type RackResponse,
 } from "@blazetrails/rack";
 import { CookieJar } from "./cookie-jar.js";
 import type { Utils } from "./utils.js";
@@ -148,26 +158,30 @@ export class Session {
     return this._lastResponse;
   }
 
-  async request(uri: string, env: RackEnv = {}, block?: ResponseBlock): Promise<MockResponse> {
-    const parsedUri = this.parseUri(uri, env);
-    env = this.envFor(parsedUri, env);
-    return this.processRequest(parsedUri, env, block);
+  async request(
+    uri: string | Generic,
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
+    uri = this.parseUri(uri as string, env);
+    env = this.envFor(uri, env);
+    return this.processRequest(uri, env, block);
   }
 
   async customRequest(
     verb: string,
-    uri: string,
+    uri: string | Generic,
     params: unknown = {},
     env: RackEnv = {},
     block?: ResponseBlock,
   ): Promise<MockResponse> {
-    const parsedUri = this.parseUri(uri, env);
-    env = this.envFor(parsedUri, {
+    uri = this.parseUri(uri as string, env);
+    env = this.envFor(uri, {
       ...env,
       ":method": String(verb).toUpperCase(),
       ":params": params,
     });
-    return this.processRequest(parsedUri, env, block);
+    return this.processRequest(uri, env, block);
   }
 
   header(name: string, value: unknown): void {
@@ -222,10 +236,8 @@ export class Session {
   async restoreState<T>(block: () => T | Promise<T>): Promise<T> {
     const request = this._lastRequest;
     const response = this._lastResponse;
-    const cookieJar = (Object.create(CookieJar.prototype) as CookieJar).initializeCopy(
-      this.cookieJar,
-    );
-    const afterRequest = this._afterRequest.slice();
+    const cookieJar = rbObjDup(this.cookieJar);
+    const afterRequest = rbObjDup(this._afterRequest);
 
     try {
       return await block();
@@ -295,7 +307,7 @@ export class Session {
       }
 
       if (isPlainObject(params)) {
-        let data: string | null;
+        let data: Uint8Array | null;
         if (
           Object.keys(params).length !== 0 &&
           (data = this.buildMultipart(params, false, multipart as boolean)) != null
@@ -320,11 +332,7 @@ export class Session {
     queryArray = queryArray.filter((q) => q !== "");
     uri.query = queryArray.join("&");
 
-    if (":cookie" in env) {
-      const cookie = env[":cookie"];
-      delete env[":cookie"];
-      this.setCookie(cookie, uri);
-    }
+    if (":cookie" in env) this.setCookie(hashDelete(env, ":cookie"), uri);
 
     return MockRequest.envFor(uri.toString(), env);
   }
@@ -357,12 +365,11 @@ export class Session {
     env["HTTP_COOKIE"] ??= this.cookieJar.for(uri);
     this._lastRequest = new Request(env);
     const app = this.app;
-    const [status, headers, rackBody] = await (typeof app === "function" &&
+    const response = await (typeof app === "function" &&
     Object.getOwnPropertyDescriptor(app, "prototype")?.writable !== false
       ? app(env)
       : (app as RackMiddleware).call(env));
-    const body: string[] = [];
-    for await (const chunk of rackBody) body.push(String(chunk));
+    const [status, headers, body] = rbFSend(response, "toA") as RackResponse;
 
     this._lastResponse = new MockResponse(
       status,
@@ -370,8 +377,11 @@ export class Session {
       body,
       (env["rack.errors"] as { flush(): unknown }).flush(),
     );
-    this.closeBody(rackBody);
-    this.cookieJar.merge(this.lastResponse().headers["set-cookie"], uri);
+    this.closeBody(body);
+    this.cookieJar.merge(
+      this.lastResponse().headers["set-cookie"] as string | string[] | undefined,
+      uri,
+    );
     this._afterRequest.forEach((hook) => hook());
     this._lastResponse.finish();
 
@@ -384,3 +394,5 @@ export class Session {
 export function encodingAwareStrings(): boolean {
   return release() >= "1.6";
 }
+
+export const MockSession = Session;

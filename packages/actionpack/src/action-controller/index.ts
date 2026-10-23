@@ -1,5 +1,4 @@
 export {
-  AbstractController,
   ActionNotFound,
   type ActionCallback,
   type AroundCallback,
@@ -65,8 +64,10 @@ export { addRenderer, removeRenderer } from "./metal/renderers.js";
 export { TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
 export { fragmentCacheKey } from "./caching.js";
 export { FormBuilder, defaultFormBuilder } from "./form-builder.js";
-export { assertTemplate } from "./template-assertions.js";
+export { assertTemplate, TemplateAssertions } from "./template-assertions.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export { type HelpersPathControllerClass } from "./trailties/helpers.js";
+import * as RailtiesHelpers from "./trailties/helpers.js";
+export const Railties = { Helpers: RailtiesHelpers };
 export { helperAttr, helpersPath, setHelpersPath, modulesForHelpers } from "./metal/helpers.js";
 export { ParameterEncoding } from "./metal/parameter-encoding.js";

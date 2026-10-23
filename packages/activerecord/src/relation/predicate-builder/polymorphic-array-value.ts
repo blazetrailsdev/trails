@@ -1,5 +1,5 @@
 import type { Base } from "../../base.js";
-import { Hash, isEmpty } from "@blazetrails/ruby-compat";
+import { Hash, eachWithObject, isEmpty } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../../namespaces.js";
 export class PolymorphicArrayValue {
   private readonly _associatedTable: {
@@ -51,10 +51,9 @@ export class PolymorphicArrayValue {
       hsh.set(key, ids);
       return ids;
     });
-    for (const value of this.values) {
-      defaultHash.get(this.klass(value)?.polymorphicName())!.push(this.convertToId(value));
-    }
-    return defaultHash;
+    return eachWithObject(this.values, defaultHash, (value, hash) => {
+      hash.get(this.klass(value)?.polymorphicName())!.push(this.convertToId(value));
+    });
   }
 
   /** @internal */
@@ -65,7 +64,7 @@ export class PolymorphicArrayValue {
   /** @internal */
   private klass(value: unknown): typeof Base | undefined {
     if (value instanceof ActiveRecord.Base) {
-      return value.constructor as typeof Base;
+      return value.constructor;
     } else if (value instanceof ActiveRecord.Relation) {
       return value.model;
     }

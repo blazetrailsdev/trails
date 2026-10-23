@@ -19,8 +19,13 @@ import {
   type UrlForRoutes,
 } from "./url-for.js";
 import type { PolymorphicHost } from "./polymorphic-routes.js";
-import { include } from "@blazetrails/activesupport";
-import { objRespondToMissing, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { extractOptionsBang, include } from "@blazetrails/activesupport";
+import {
+  NoMethodError,
+  objRespondToMissing,
+  rbFSend,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { Routing } from "../../namespaces.js";
 
 export type RoutesProxyHelpers = Record<string, unknown>;
@@ -80,16 +85,13 @@ export class RoutesProxy implements UrlForHost {
 
     return new Proxy(this, {
       get(target, prop, receiver) {
-        if (typeof prop === "string" && !(prop in target)) {
-          const fn = target._helpers[prop];
-          if (typeof fn === "function") {
-            return (...args: unknown[]) => target._dispatch(prop, args);
-          }
+        if (typeof prop === "string" && !(prop in target) && target.respondToMissing(prop, false)) {
+          return (...args: unknown[]) => target.methodMissing(prop, ...args);
         }
         return Reflect.get(target, prop, receiver);
       },
       has(target, prop) {
-        if (typeof prop === "string" && prop in target._helpers) return true;
+        if (typeof prop === "string" && target.respondToMissing(prop, false)) return true;
         return Reflect.has(target, prop);
       },
     }) as RoutesProxy;
@@ -116,23 +118,29 @@ export class RoutesProxy implements UrlForHost {
   }
 
   /** @internal */
-  private _dispatch(method: string, args: unknown[]): unknown {
-    const fn = this._helpers[method];
-    if (typeof fn !== "function") {
-      throw new TypeError(`undefined helper '${method}' on RoutesProxy`);
-    }
-    const inlineOptions = extractOptions(args);
-    const options: Record<string, unknown> = { ...this.urlOptions(), ...inlineOptions };
+  private methodMissing(method: string, ...args: unknown[]): unknown {
+    if (rbObjRespondTo(this._helpers, method)) {
+      let options: Record<string, unknown> = extractOptionsBang(args);
+      options = { ...this.urlOptions(), ...(options ?? {}) };
 
-    if (this._scriptNamer) {
-      options["scriptName"] = mergeScriptNames(
-        options["scriptName"] as string | null | undefined,
-        this._scriptNamer(options),
+      if (this._scriptNamer) {
+        options["scriptName"] = mergeScriptNames(
+          options["scriptName"] as string | null | undefined,
+          this._scriptNamer(options),
+        );
+      }
+
+      args.push(options);
+      return rbFSend(this._helpers, method, ...args);
+    } else {
+      throw new NoMethodError(
+        `undefined method '${method}' for an instance of RoutesProxy`,
+        method,
+        args,
+        false,
+        { receiver: this },
       );
     }
-
-    args.push(options);
-    return (fn as (...a: unknown[]) => unknown).apply(this._helpers, args);
   }
 }
 
@@ -157,19 +165,6 @@ function countSlashes(s: string): number {
   let n = 0;
   for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) === 47) n++;
   return n;
-}
-
-/** @internal */
-function extractOptions(arr: unknown[]): Record<string, unknown> {
-  const last = arr[arr.length - 1];
-  if (last != null && typeof last === "object" && !Array.isArray(last)) {
-    const proto = Object.getPrototypeOf(last);
-    if (proto === null || proto === Object.prototype) {
-      arr.pop();
-      return last as Record<string, unknown>;
-    }
-  }
-  return {};
 }
 
 include(RoutesProxy, UrlFor);
