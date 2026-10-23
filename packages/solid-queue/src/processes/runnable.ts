@@ -96,17 +96,17 @@ export class Runnable {
 
   /** @internal */
   isRunningInline(this: RunnableHost): boolean {
-    return this.mode["inline?"]();
+    return this.mode.isInline();
   }
 
   /** @internal */
   isRunningAsync(this: RunnableHost): boolean {
-    return this.mode["async?"]();
+    return this.mode.isAsync();
   }
 
   /** @internal */
   isRunningAsFork(this: RunnableHost): boolean {
-    return this.mode["fork?"]();
+    return this.mode.isFork();
   }
 
   /** @internal */

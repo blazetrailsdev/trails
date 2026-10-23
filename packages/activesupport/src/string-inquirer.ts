@@ -1,4 +1,4 @@
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbMethodName } from "@blazetrails/ruby-compat";
 
 export class StringInquirer extends String {
   static toString(): string {
@@ -17,8 +17,8 @@ export class StringInquirer extends String {
             : value;
         }
         if (typeof prop === "symbol") return Reflect.get(target, prop, receiver);
-        if (prop.endsWith("?")) {
-          const methodName = prop;
+        const methodName = /^is[A-Z]/.test(prop) ? rbMethodName(prop) : prop;
+        if (methodName.endsWith("?")) {
           return () => target.valueOf() === methodName.slice(0, -1);
         }
         return () => {
@@ -28,7 +28,7 @@ export class StringInquirer extends String {
         };
       },
       has(target, prop) {
-        if (typeof prop === "string" && prop.endsWith("?")) return true;
+        if (typeof prop === "string" && (prop.endsWith("?") || /^is[A-Z]/.test(prop))) return true;
         return Reflect.has(target, prop);
       },
     });
