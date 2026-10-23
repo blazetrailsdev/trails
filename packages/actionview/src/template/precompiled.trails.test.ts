@@ -113,7 +113,10 @@ describe("Templates are precompiled", () => {
   it("precompiles a file under a handler the application registers", async () => {
     const root = fixture("precompiled-handlers");
     try {
-      const { files } = await buildViews({ cwd: root });
+      const { files } = await buildViews({
+        cwd: root,
+        handlers: ["config/initializers/shout-handler.js"],
+      });
       expect(files).toEqual(["greetings/loud.html.shout"]);
       shipped();
       const template = find(root, "loud", "greetings");

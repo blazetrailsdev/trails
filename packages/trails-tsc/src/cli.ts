@@ -4,9 +4,9 @@ import { buildViews, type BuildViewsOptions } from "./build-views.js";
 import { watchViews, type WatchHandle } from "./watch-views.js";
 
 const USAGE =
-  "usage: trails-tsc-views <build|dev> [--cwd <dir>] [--views <dir>] [--out <dir>] [--in-place]\n";
+  "usage: trails-tsc-views <build|dev> [--cwd <dir>] [--views <dir>] [--out <dir>] [--in-place] [--handlers <module>]...\n";
 
-const VALUE_FLAGS = new Set(["--cwd", "--views", "--out"]);
+const VALUE_FLAGS = new Set(["--cwd", "--views", "--out", "--handlers"]);
 
 export async function runCli(argv: readonly string[]): Promise<number> {
   const cmd = argv[0];
@@ -33,6 +33,7 @@ export async function runCli(argv: readonly string[]): Promise<number> {
       }
       if (a === "--cwd") opts.cwd = v;
       else if (a === "--views") opts.viewsDir = v;
+      else if (a === "--handlers") opts.handlers = [...(opts.handlers ?? []), v];
       else opts.outDir = v;
       i++;
       continue;
