@@ -3,8 +3,8 @@ import { assertRaises, include } from "@blazetrails/activesupport";
 import { NameError } from "@blazetrails/ruby-compat";
 import { AbstractController } from "@blazetrails/actionpack";
 import { Rendering } from "../../rendering.js";
-import "../../test-helpers/fixtures/helpers/abc-helper.js";
-import "../../test-helpers/fixtures/helpers/helpery-test-helper.js";
+import "../../test/fixtures/helpers/abc-helper.js";
+import "../../test/fixtures/helpers/helpery-test-helper.js";
 
 interface HelpersStatics {
   helper(...args: unknown[]): void;

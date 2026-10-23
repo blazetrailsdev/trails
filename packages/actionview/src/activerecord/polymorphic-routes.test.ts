@@ -22,7 +22,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Context } from "../context.js";
 import { RoutingUrlFor } from "../routing-url-for.js";
-import { Project } from "../test-helpers/fixtures/project.js";
+import { Project } from "../test/fixtures/project.js";
 
 class Task extends Base {
   static {

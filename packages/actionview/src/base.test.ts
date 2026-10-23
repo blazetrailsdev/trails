@@ -73,7 +73,7 @@ describe("ActionView::Base", () => {
     expect(() => new Base(null, {}, null).compiledMethodContainer()).toThrow(
       /must implement `compiledMethodContainer`/,
     );
-    expect(() => Base.compiledMethodContainer()).toThrow(/must implement/);
+    expect("compiledMethodContainer" in Base).toBe(false);
   });
 
   it("changed? compares the two classes' compiled method containers", () => {

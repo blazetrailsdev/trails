@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { ActiveRecordTestCase } from "../test-helpers/active-record-unit.js";
-import { Topic } from "../test-helpers/fixtures/topic.js";
+import { Topic } from "../test/fixtures/topic.js";
 import {
   Notifications,
   assertEqual,
@@ -20,7 +20,7 @@ describe("PartialRenderingQueryTest", () => {
       this.view = Base.withEmptyTemplateCache().withViewPaths(
         [
           new FileSystemResolver(
-            File.expandPath("../test-helpers/fixtures", new URL(".", import.meta.url).pathname),
+            File.expandPath("../test/fixtures", new URL(".", import.meta.url).pathname),
           ),
         ],
         {},

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import "../test-helpers/active-record-unit.js";
-import { Developer } from "../test-helpers/fixtures/developer.js";
-import { Project } from "../test-helpers/fixtures/project.js";
+import { Developer } from "../test/fixtures/developer.js";
+import { Project } from "../test/fixtures/project.js";
 import * as ActiveRecord from "@blazetrails/activerecord";
 import { RouteSet } from "@blazetrails/actionpack";
 import { include } from "@blazetrails/ruby-compat";

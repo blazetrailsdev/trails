@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Base } from "./base.js";
+import { Base, type ViewContextClass } from "./base.js";
 import { DetailsKey } from "./lookup-context.js";
 import { Template } from "./template.js";
 import { TemplateHandlers } from "./template/handlers.js";
@@ -20,7 +20,7 @@ class Controller {
   static isInheritViewContextClass = isInheritViewContextClass;
   static buildViewContextClass = buildViewContextClass;
   static viewContextClass = viewContextClass;
-  static _viewContextClass?: typeof Base;
+  static _viewContextClass?: ViewContextClass;
 }
 
 const routesWith = (helpers: object): ViewContextRoutes => ({

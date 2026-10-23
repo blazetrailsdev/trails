@@ -14,7 +14,7 @@
       "@blazetrails/trailties/trailtie": ["../trailties/src/trailtie.ts"]
     }
   },
-  "include": ["src/**/*.test.ts", "src/test-helpers/**/*.ts"],
+  "include": ["src/**/*.test.ts", "src/test-helpers/**/*.ts", "src/test/**/*.ts"],
   "references": [
     { "path": "./tsconfig.json" },
     { "path": "./tsconfig.test-case.json" },

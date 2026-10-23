@@ -12,7 +12,7 @@ import {
 import { include } from "@blazetrails/ruby-compat";
 import { FixtureResolver } from "../testing/resolvers.js";
 import { PartialRenderer } from "../renderer/partial-renderer.js";
-import { Topic } from "../test-helpers/fixtures/topic.js";
+import { Topic } from "../test/fixtures/topic.js";
 
 type DrawCallback = Parameters<RouteSet["draw"]>[0];
 

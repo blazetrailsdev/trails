@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import "../test-helpers/active-record-unit.js";
 import * as ActiveRecord from "@blazetrails/activerecord";
-import { Developer } from "../test-helpers/fixtures/developer.js";
-import { Project } from "../test-helpers/fixtures/project.js";
+import { Developer } from "../test/fixtures/developer.js";
+import { Project } from "../test/fixtures/project.js";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { FixtureResolver } from "../testing/resolvers.js";
