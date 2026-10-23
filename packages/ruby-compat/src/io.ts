@@ -1264,3 +1264,12 @@ function prepStdio(f: WriteStream, fd: number, fmode: string, klass: typeof IO, 
  * @noRailsEquivalent PERMANENT — Ruby core `STDOUT` (`vendor/ruby/v3.3.11/io.c:15586`).
  */
 export const STDOUT: IO = prepStdio(stdout, 1, "w", IO, "<STDOUT>");
+
+/**
+ * `STDERR` / `$stderr`, `rb_io_prep_stderr` (`vendor/ruby/v3.3.11/io.c:9344`), defined
+ * at `io.c:15588`: an `IO` answering `write` / `puts` / `print` over the process
+ * adapter's stderr.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `STDERR` (`vendor/ruby/v3.3.11/io.c:15588`).
+ */
+export const STDERR: IO = prepStdio(stderr, 2, "w", IO, "<STDERR>");

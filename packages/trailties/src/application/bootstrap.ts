@@ -11,7 +11,7 @@ import {
   TopLevel,
 } from "@blazetrails/activesupport";
 import { Runtime } from "@blazetrails/rack";
-import { LoadError, rbObjRespondTo, StandardError, stderr } from "@blazetrails/ruby-compat";
+import { LoadError, rbObjRespondTo, StandardError, STDERR } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 
 export interface BootstrapConfig {
@@ -48,7 +48,7 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, asyn
       } catch (error) {
         if (!(error instanceof StandardError)) throw error;
         const path = await this.config.paths().get("log")!.first();
-        const logger = TaggedLogging.new(new Logger(stderr));
+        const logger = TaggedLogging.new(new Logger(STDERR));
         logger.level = Logger.WARN;
         logger.warn(
           `Rails Error: Unable to access log file. Please ensure that ${path} exists and is writable ` +

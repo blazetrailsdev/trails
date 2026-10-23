@@ -1,5 +1,5 @@
 import { type BroadcastLogger, getEnv, Logger, presence } from "@blazetrails/activesupport";
-import { getFs, getPath, setEnv, stderr, stdout } from "@blazetrails/ruby-compat";
+import { getFs, getPath, setEnv, STDERR, STDOUT } from "@blazetrails/ruby-compat";
 import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { Handler, type RackEnv } from "@blazetrails/rack";
@@ -71,11 +71,11 @@ interface ServerOptions {
 
 /** @internal */
 function logToStdout(): void {
-  const console = new Logger(stdout);
+  const console = new Logger(STDOUT);
   console.formatter = Trails.logger!.formatter;
   console.level = Trails.logger!.level;
 
-  if (!Logger.isLoggerOutputsTo(Trails.logger!, stderr, stdout)) {
+  if (!Logger.isLoggerOutputsTo(Trails.logger!, STDERR, STDOUT)) {
     (Trails.logger as BroadcastLogger).broadcastTo(console);
   }
 }
