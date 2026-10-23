@@ -739,27 +739,12 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
   return ret != null && ret !== false;
 }
 
-const chainEntry = (() => {
-  const entries = new WeakMap<object, Record<string, unknown>>();
-  return (obj: unknown, name: string): unknown => {
-    const self: object = Object(obj);
-    if (Object.hasOwn(self, name)) return Object.getOwnPropertyDescriptor(self, name)?.value;
-    const proto = Object.getPrototypeOf(self) as object | null;
-    if (proto === null) return undefined;
-    let cached = entries.get(proto);
-    if (cached === undefined)
-      entries.set(proto, (cached = Object.create(null) as Record<string, unknown>));
-    if (name in cached) return cached[name];
-    let value: unknown;
-    for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
-      if (Object.hasOwn(o, name)) {
-        value = Object.getOwnPropertyDescriptor(o, name)?.value;
-        break;
-      }
-    }
-    return (cached[name] = value);
-  };
-})();
+function chainEntry(obj: unknown, name: string): unknown {
+  for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
+    if (Object.hasOwn(o, name)) return Object.getOwnPropertyDescriptor(o, name)?.value;
+  }
+  return undefined;
+}
 
 /**
  * `Object#respond_to_missing?` (`obj_respond_to_missing`,

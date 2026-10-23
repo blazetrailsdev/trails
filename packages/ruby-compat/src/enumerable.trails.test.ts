@@ -416,6 +416,10 @@ describe("Enumerable free functions over any receiver", () => {
     });
   }
 
+  it("sort_by raises when <=> answers nil", () => {
+    expect(() => sortBy([1, "a"], (i) => i)).toThrow(ArgumentError);
+  });
+
   it("iterate a Map as [key, value] pairs", () => {
     const map = new Map([
       ["a", 1],

@@ -379,6 +379,19 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo(new Uint8Array(1), "bytesize")).toBe(true);
     expect(basicObjRespondTo(1, "isFinite")).toBe(true);
     expect(basicObjRespondTo(1n, "isInfinite")).toBe(true);
+    expect(basicObjRespondTo("abc", "toSym")).toBe(true);
+    expect(basicObjRespondTo([1], "toA")).toBe(true);
+    expect(basicObjRespondTo([1], "partition")).toBe(true);
+    expect(basicObjRespondTo(new Map(), "get")).toBe(true);
+  });
+
+  it("answers a respond_to_missing? defined on the prototype after the first query", () => {
+    class Late {}
+    expect(basicObjRespondTo(new Late(), "dynamic")).toBe(false);
+    Object.defineProperty(Late.prototype, "respondToMissing", {
+      value: (mid: string) => mid === "dynamic",
+    });
+    expect(basicObjRespondTo(new Late(), "dynamic")).toBe(true);
   });
 
   it("reads respond_to_missing? and respond_to? off the receiver before its cached prototype", () => {
@@ -388,7 +401,6 @@ describe("Object#respond_to?", () => {
       }
     }
     expect(basicObjRespondTo(new Dynamic(), "dynamic")).toBe(true);
-    expect(basicObjRespondTo(new Dynamic(), "other")).toBe(false);
     const own = Object.assign(new Dynamic(), { respondToMissing: () => true });
     expect(basicObjRespondTo(own, "other")).toBe(true);
     expect(basicObjRespondTo(new Dynamic(), "other")).toBe(false);
