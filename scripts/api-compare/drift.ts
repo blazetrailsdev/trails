@@ -174,12 +174,18 @@ async function rebuildBaseManifest(): Promise<void> {
     ["--silent", "vendor:fetch", "--print-lib-entry-files"],
     { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 },
   );
+  const { stdout: libExtraPathsJson } = await execFileAsync(
+    "pnpm",
+    ["--silent", "vendor:fetch", "--print-lib-extra-paths"],
+    { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 },
+  );
   await execFileAsync("ruby", [join(DIR, "extract-ruby-api.rb")], {
     cwd: ROOT,
     env: {
       ...process.env,
       LIB_PATHS_JSON: libPathsJson.trim(),
       LIB_ENTRY_FILES_JSON: libEntryFilesJson.trim(),
+      LIB_EXTRA_PATHS_JSON: libExtraPathsJson.trim(),
       LOCKFILE_PATH: join(ROOT, "vendor/sources.lock.json"),
       API_COMPARE_FORCE: "1",
     },

@@ -2,7 +2,8 @@ import "./trailties/active-support.js";
 import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
 import { getEnv } from "@blazetrails/activesupport";
-import { TopLevel } from "@blazetrails/activesupport";
+import { ActiveSupport, TopLevel } from "@blazetrails/activesupport";
+import type { ErrorReporter } from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
@@ -106,6 +107,10 @@ export class Trails {
     const paths = app.paths();
     const expanded = await paths.get("public")?.expanded();
     return expanded?.[0] ?? null;
+  }
+
+  static get error(): ErrorReporter {
+    return ActiveSupport.errorReporter;
   }
 
   static groups(...args: Array<string | Record<string, string[]>>): string[] {

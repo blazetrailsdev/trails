@@ -68,6 +68,21 @@ if __FILE__ == $PROGRAM_NAME
             "If you set it manually, re-run via `LIB_ENTRY_FILES_JSON=$(pnpm --silent vendor:fetch --print-lib-entry-files)`."
     end
 
+  # A package's `extraLibPaths` (vendor/sources.ts): further lib roots whose
+  # files map onto the same TS src as PACKAGE_DIRS' — an engine's
+  # `app/models/<gem>/`. Optional, like PACKAGE_ENTRY_FILES.
+  PACKAGE_EXTRA_DIRS =
+    begin
+      parsed = JSON.parse(ENV.fetch("LIB_EXTRA_PATHS_JSON", "{}"))
+      unless parsed.is_a?(Hash) && parsed.values.all? { |v| v.is_a?(Array) && v.all?(String) }
+        abort "extract-ruby-api.rb: LIB_EXTRA_PATHS_JSON must be a JSON object of " \
+              "{string: [string]}; got #{parsed.class}. Re-run vendor:fetch --print-lib-extra-paths."
+      end
+      parsed
+    rescue JSON::ParserError => e
+      abort "extract-ruby-api.rb: LIB_EXTRA_PATHS_JSON is not valid JSON (#{e.message})."
+    end
+
   # Cache gate: invalidate on (a) a re-fetch (lockfile mtime bumped), (b) a
   # registry edit (sources.ts mtime bumped — covers compareApi flips, libPath
   # edits, source add/remove), or (c) an extractor edit (this script's mtime
@@ -375,6 +390,7 @@ class ApiExtractor
 
   def initialize
     @in_on_load = 0
+    @in_concern_included = 0
     @classes = {}
     @modules = {}
     # rel_path → { CONST_NAME => literal_value }. Non-literal RHSs (hashes with
@@ -661,7 +677,9 @@ class ApiExtractor
         @in_on_load += 1 if on_load_block?(node)
         included_target = concern_included_block?(node) ? (@modules[current_fqn]) : nil
         included_mark = included_target && included_target[:classMethods].length
+        @in_concern_included += 1 if included_target
         (consumed_call ? [node[2]] : node).each { |child| walk(child) if child.is_a?(Array) }
+        @in_concern_included -= 1 if included_target
         if included_target
           included_target[:classMethods][included_mark..].each { |m| m[:included] = true }
         end
@@ -1308,7 +1326,20 @@ class ApiExtractor
     names = extract_const_args(args, keep_absolute: true)
     names.each { |mod_name| target[:includes] << mod_name }
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
-    (target[:mixinOrder] ||= []) << { kind: "include", names: names } if names.any?
+    record_include_order(target, names)
+  end
+
+  # An `include` inside a Concern's `included do` block runs on the including
+  # class after the concern is appended, so it lands above the concern in the
+  # host's ancestors, the way a `self.included` hook's `base.include` does.
+  def record_include_order(target, names)
+    return unless names.any?
+    order = (target[:mixinOrder] ||= [])
+    if @in_concern_included.positive?
+      (target[:includedHookMixins] ||= []) << { kind: "include", names: names }
+    else
+      order << { kind: "include", names: names }
+    end
   end
 
   def maybe_record_module_list(lhs, rhs)
@@ -1363,7 +1394,7 @@ class ApiExtractor
     names = extract_const_args_from_paren(args, keep_absolute: true)
     names.each { |mod_name| target[:includes] << mod_name }
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
-    (target[:mixinOrder] ||= []) << { kind: "include", names: names } if names.any?
+    record_include_order(target, names)
   end
 
   def process_prepend(names)
@@ -5195,6 +5226,13 @@ def run
 
     rb_files.each do |filepath|
       extractor.process_file(filepath, pkg_dir)
+    end
+
+    PACKAGE_EXTRA_DIRS.fetch(pkg_name, []).each do |extra_dir|
+      abort "Extra lib directory for #{pkg_name} not found at #{extra_dir}." unless File.directory?(extra_dir)
+      Dir.glob(File.join(extra_dir, "**", "*.rb")).sort.each do |filepath|
+        extractor.process_file(filepath, extra_dir)
+      end
     end
 
     # A gem's `libEntryFile` is walked as an ordinary file, relative to its own

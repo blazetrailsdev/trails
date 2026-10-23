@@ -243,7 +243,10 @@ export function inlinedFromFindings(
       const ctor = klass.instanceMethods.find((m) => m.name === "constructor");
       const tags = ctor?.inlinedFrom ?? [];
       const methods = klass.instanceMethods.filter(
-        (m) => m.name !== "constructor" && m.inlinedFrom !== undefined,
+        (m) =>
+          m.name !== "constructor" &&
+          m.inlinedFrom !== undefined &&
+          (m.file === undefined || klass.file === undefined || m.file === klass.file),
       );
       if (tags.length === 0 && methods.length === 0 && !enrolled.includes(name)) continue;
       if (ctor?.file !== undefined && klass.file !== undefined && ctor.file !== klass.file)

@@ -1,0 +1,24 @@
+[
+  {
+    "package": "solid-queue",
+    "tsFile": "queue-selector.ts",
+    "rubyName": "all_queues",
+    "call": "distinct",
+    "kind": "args",
+    "rubyArgs": [
+      "str:queueName"
+    ],
+    "reason": "queue_selector.rb:46,56 passes `distinct(:queue_name)`, a truthy Symbol standing for `distinct(true)`; the port's `Relation#distinct(value?: boolean)` takes the default `true`, which selects the same DISTINCT."
+  },
+  {
+    "package": "solid-queue",
+    "tsFile": "queue-selector.ts",
+    "rubyName": "prefixed_names",
+    "call": "distinct",
+    "kind": "args",
+    "rubyArgs": [
+      "str:queueName"
+    ],
+    "reason": "queue_selector.rb:46,56 passes `distinct(:queue_name)`, a truthy Symbol standing for `distinct(true)`; the port's `Relation#distinct(value?: boolean)` takes the default `true`, which selects the same DISTINCT."
+  }
+]

@@ -1,14 +1,20 @@
 import {
+  Logger,
   Notifications,
+  runLoadHooks,
   days,
   mattrAccessor,
   minutes,
   seconds,
   type Duration,
 } from "@blazetrails/activesupport";
+import { STDOUT } from "@blazetrails/ruby-compat";
 
 export const SolidQueue = {
+  name: "SolidQueue",
   tableNamePrefix: "solid_queue_",
+
+  DEFAULT_LOGGER: new Logger(STDOUT),
 
   onWorkerStart(block: () => unknown): void {
     SolidQueue.Worker!.onStart(block);
@@ -42,7 +48,10 @@ export const SolidQueue = {
     return Notifications.instrument(`${channel}.solid_queue`, options, block) as never;
   },
 } as {
+  name: string;
   tableNamePrefix: string;
+  DEFAULT_LOGGER: Logger;
+  logger: Logger;
   appExecutor: { wrap<T>(block: () => T, options?: { source?: string }): T } | null;
   onThreadError: ((error: unknown) => unknown) | null;
   connectsTo: Record<string, unknown> | null;
@@ -68,6 +77,7 @@ export const SolidQueue = {
   ): T extends undefined ? void : T;
 };
 
+mattrAccessor.call(SolidQueue, "logger", { default: SolidQueue.DEFAULT_LOGGER });
 mattrAccessor.call(SolidQueue, "appExecutor", "onThreadError", "connectsTo");
 mattrAccessor.call(SolidQueue, "useSkipLocked", { default: true });
 mattrAccessor.call(SolidQueue, "processHeartbeatInterval", { default: seconds(60) });
@@ -76,3 +86,5 @@ mattrAccessor.call(SolidQueue, "silencePolling", { default: true });
 mattrAccessor.call(SolidQueue, "preserveFinishedJobs", { default: true });
 mattrAccessor.call(SolidQueue, "clearFinishedJobsAfter", { default: days(1) });
 mattrAccessor.call(SolidQueue, "defaultConcurrencyControlPeriod", { default: minutes(3) });
+
+runLoadHooks("solid_queue", SolidQueue);

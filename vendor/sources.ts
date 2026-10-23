@@ -36,6 +36,13 @@ export interface PackageEntry {
    * scanned for its class, module and constant declarations.
    */
   libEntryFile?: string;
+  /**
+   * Further lib directories, relative to the source's vendored root, whose
+   * `.rb` files map onto the same TS `src/` as `libPath`'s. An engine gem keeps
+   * its models under `app/models/<gem>/` beside `lib/<gem>/`, and
+   * `app/models/solid_queue/job.rb` ports to `packages/solid-queue/src/job.ts`.
+   */
+  extraLibPaths?: string[];
   /** Path relative to the source's vendored root; omitted = test-compare ignores. */
   testPath?: string;
   /**
@@ -739,6 +746,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "solid-queue",
         libPath: "lib/solid_queue",
         libEntryFile: "lib/solid_queue.rb",
+        extraLibPaths: ["app/models/solid_queue", "app/jobs/solid_queue"],
         testPath: "test",
         compareApi: true,
         compareTests: true,
@@ -920,6 +928,23 @@ export function libPathsManifest(): Record<string, string> {
     for (const pkg of source.packages) {
       if (pkg.compareApi === false) continue;
       out[pkg.name] = resolve(sourceRoot(source), pkg.libPath);
+    }
+  }
+  return out;
+}
+
+/**
+ * Map of package name → absolute `extraLibPaths` directories, for every
+ * package with `compareApi !== false` that declares any. Feeds
+ * extract-ruby-api.rb via the `LIB_EXTRA_PATHS_JSON` env var.
+ */
+export function libExtraPathsManifest(): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const source of SOURCES) {
+    for (const pkg of source.packages) {
+      if (pkg.compareApi === false) continue;
+      if (!pkg.extraLibPaths) continue;
+      out[pkg.name] = pkg.extraLibPaths.map((p) => resolve(sourceRoot(source), p));
     }
   }
   return out;

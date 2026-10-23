@@ -1852,6 +1852,7 @@ jobs:
           mkdir -p "$dir"
           pnpm --silent vendor:fetch --print-lib-paths > "$dir/lib-paths.json"
           pnpm --silent vendor:fetch --print-lib-entry-files > "$dir/lib-entry-files.json"
+          pnpm --silent vendor:fetch --print-lib-extra-paths > "$dir/lib-extra-paths.json"
           pnpm --silent vendor:fetch --print-test-paths > "$dir/test-paths.json"
           ruby -e 'print RUBY_DESCRIPTION' > "$dir/ruby-version.txt"
           echo "hash=$(cat "$dir"/* | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
@@ -1870,7 +1871,7 @@ jobs:
         run: |
           node scripts/ci/bg-gates.mjs start <<'SPEC'
           ts-api: pnpm exec tsx scripts/api-compare/extract-ts-api.ts
-          ruby-api: if [ "$RUBY_EXTRACTION_HIT" = true ]; then echo "rails-api.json restored from cache"; else cd scripts/api-compare && LIB_PATHS_JSON=$(cat $RUNNER_TEMP/ruby-extraction/lib-paths.json) LIB_ENTRY_FILES_JSON=$(cat $RUNNER_TEMP/ruby-extraction/lib-entry-files.json) LOCKFILE_PATH=$GITHUB_WORKSPACE/vendor/sources.lock.json ruby extract-ruby-api.rb; fi
+          ruby-api: if [ "$RUBY_EXTRACTION_HIT" = true ]; then echo "rails-api.json restored from cache"; else cd scripts/api-compare && LIB_PATHS_JSON=$(cat $RUNNER_TEMP/ruby-extraction/lib-paths.json) LIB_ENTRY_FILES_JSON=$(cat $RUNNER_TEMP/ruby-extraction/lib-entry-files.json) LIB_EXTRA_PATHS_JSON=$(cat $RUNNER_TEMP/ruby-extraction/lib-extra-paths.json) LOCKFILE_PATH=$GITHUB_WORKSPACE/vendor/sources.lock.json ruby extract-ruby-api.rb; fi
           ruby-tests: if [ "$RUBY_EXTRACTION_HIT" = true ]; then echo "rails-tests.json restored from cache"; else cd scripts/test-compare && TEST_PATHS_JSON=$(cat $RUNNER_TEMP/ruby-extraction/test-paths.json) ruby extract-ruby-tests.rb; fi
           deprecated: pnpm exec tsx scripts/build-rails-privates-manifest.ts --check-deprecated
           eslint-excludes: pnpm exec tsx scripts/test-deps/rails-test-deps.ts && pnpm exec tsx scripts/test-deps/build-fixture-baseline.ts

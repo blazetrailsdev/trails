@@ -23,6 +23,7 @@
 //                         via the TEST_PATHS_JSON env var.
 //   --print-lib-paths:    no fetch; print JSON map {package: absolute_lib_dir}
 //   --print-lib-entry-files: no fetch; print JSON map {package: absolute_entry_file}
+//   --print-lib-extra-paths: no fetch; print JSON map {package: [absolute_lib_dir]}
 //                         for every package with compareApi !== false. Used by
 //                         extract-ruby-api.rb via the LIB_PATHS_JSON env var.
 
@@ -37,6 +38,7 @@ const execFileAsync = promisify(execFile);
 import {
   activeVersion,
   libEntryFilesManifest,
+  libExtraPathsManifest,
   libPathsManifest,
   SOURCES,
   testPathsManifest,
@@ -256,6 +258,10 @@ function printLibPaths(): void {
   process.stdout.write(JSON.stringify(libPathsManifest()) + "\n");
 }
 
+function printLibExtraPaths(): void {
+  process.stdout.write(JSON.stringify(libExtraPathsManifest()) + "\n");
+}
+
 function printLibEntryFiles(): void {
   process.stdout.write(JSON.stringify(libEntryFilesManifest()) + "\n");
 }
@@ -269,6 +275,7 @@ export interface ParsedArgs {
   printTestPaths: boolean;
   printLibPaths: boolean;
   printLibEntryFiles: boolean;
+  printLibExtraPaths: boolean;
 }
 
 export function parseArgs(argv: string[]): ParsedArgs {
@@ -279,6 +286,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     printTestPaths: false,
     printLibPaths: false,
     printLibEntryFiles: false,
+    printLibExtraPaths: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -289,6 +297,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     else if (a === "--print-test-paths") out.printTestPaths = true;
     else if (a === "--print-lib-paths") out.printLibPaths = true;
     else if (a === "--print-lib-entry-files") out.printLibEntryFiles = true;
+    else if (a === "--print-lib-extra-paths") out.printLibExtraPaths = true;
     else if (a === "--print-paths") {
       const next = argv[i + 1];
       out.printPaths = {
@@ -386,6 +395,10 @@ async function main(argv: string[]): Promise<void> {
   }
   if (args.printLibEntryFiles) {
     printLibEntryFiles();
+    return;
+  }
+  if (args.printLibExtraPaths) {
+    printLibExtraPaths();
     return;
   }
   if (args.printLibPaths) {

@@ -19,3 +19,4 @@ export { Process } from "./process.js";
 export { Pool } from "./pool.js";
 export { Worker } from "./worker.js";
 export { Dispatcher } from "./dispatcher.js";
+export { Engine } from "./engine.js";

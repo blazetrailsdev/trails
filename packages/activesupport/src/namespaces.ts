@@ -5,6 +5,7 @@ import type { BroadcastLogger } from "./broadcast-logger.js";
 import type { CacheStore } from "./cache/index.js";
 import type { Duration } from "./duration.js";
 import type { EnvironmentInquirer } from "./environment-inquirer.js";
+import type { ErrorReporter } from "./error-reporter.js";
 import type { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import type * as Inflector from "./inflector.js";
 import type { Logger } from "./logger.js";
@@ -62,6 +63,7 @@ export const TopLevel: {
     env: EnvironmentInquirer;
     logger: Logger | null;
     cache: CacheStore | null;
+    error: ErrorReporter;
     application: {
       config: {
         considerAllRequestsLocal: boolean;

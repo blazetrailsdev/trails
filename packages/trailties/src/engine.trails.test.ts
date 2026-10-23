@@ -84,3 +84,10 @@ describe("Engine.isolate_namespace", () => {
     expect(mod.trailtieRoutesUrlHelpers!()).toBe(routes.urlHelpers());
   });
 });
+
+describe("Engine.findRoot", () => {
+  it("stops at a package root that has a package.json and no lib", () => {
+    const src = new URL("./", import.meta.url).pathname;
+    expect(Engine.findRoot(src)).toBe(new URL("../", import.meta.url).pathname.replace(/\/$/, ""));
+  });
+});

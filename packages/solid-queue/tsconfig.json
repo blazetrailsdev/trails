@@ -14,6 +14,7 @@
     { "path": "../arel" },
     { "path": "../date" },
     { "path": "../globalid" },
-    { "path": "../ruby-compat" }
+    { "path": "../ruby-compat" },
+    { "path": "../trailties" }
   ]
 }
