@@ -67,6 +67,7 @@ export class GlobalID {
     return this.uri.deconstructKeys(keys);
   }
 
+  /** @inventedArm underscore — PERMANENT */
   static create<T extends GlobalID, O extends GlobalIDOptions>(
     this: new (gid: string | GID, options?: O) => T,
     model: GlobalIDModel,
