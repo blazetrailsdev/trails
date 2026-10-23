@@ -314,10 +314,10 @@ separate one-argument `registerSubclass`: activesupport's two-argument
 child in hand (`attributes.ts`, activemodel's `attribute-registration.ts`) keep
 calling it.
 
-`registerConstant` (ruby-compat) stays the general seat for a constant that is
-not a model, the namespace module a model sits in included: a namespaced model
-is seated with a plain assignment, `Sharded.Blog = this`, and then registered
-with `registerModel(this)`.
+A constant that is not a model, the namespace module a model sits in
+included, is seated with a plain assignment per root CLAUDE.md § "Call-time
+constant resolution": a namespaced model is `Sharded.Blog = this`, then
+`registerModel(this)`.
 
 This is a genuine language shortcoming, ratified here by the repo owner
 (2026-10-09). The ruling is recorded in the tasks-repo story
