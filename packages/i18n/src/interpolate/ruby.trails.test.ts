@@ -1,15 +1,12 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import * as TestCase from "../test-helpers/test-case.js";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { interpolate } from "./ruby.js";
-import { resetConfig } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
 import { ArgumentError as RubyArgumentError, Range } from "@blazetrails/ruby-compat";
 import { ReservedInterpolationKey } from "../exceptions.js";
 
 describe("I18n.interpolate", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
-  });
+  beforeEach(TestCase.setup);
+  afterEach(TestCase.teardown);
 
   it("calls a callable value with the values hash", () => {
     const values = {
@@ -26,6 +23,13 @@ describe("I18n.interpolate", () => {
 
   it("raises ReservedInterpolationKey for a reserved key", () => {
     expect(() => interpolate("%{scope}", { scope: "x" })).toThrow(ReservedInterpolationKey);
+  });
+
+  it("matches reserved keys by their Ruby spelling only", () => {
+    expect(() => interpolate("%{deep_interpolation}", { deep_interpolation: "x" })).toThrow(
+      ReservedInterpolationKey,
+    );
+    expect(interpolate("%{deepInterpolation}", { deepInterpolation: "x" })).toBe("x");
   });
 
   it("formats %<> placeholders the way sprintf does", () => {

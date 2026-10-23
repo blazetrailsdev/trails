@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import {
+  b,
   Encoding,
   forceEncoding,
   rbObjRespondTo,
@@ -203,11 +204,7 @@ it("notice environment errors", async () => {
   );
 
   expect(
-    (
-      await new Lint(async () => [200, {}, []]).call(
-        env({ QUERY_STRING: new TextEncoder().encode("\u1234") }),
-      )
-    )[0],
+    (await new Lint(async () => [200, {}, []]).call(env({ QUERY_STRING: b("\u1234") })))[0],
   ).toBe(200);
 
   e = env();

@@ -239,7 +239,7 @@ export class URI {
     str: { toString(): string } | null | undefined,
     enc: Encoding | null,
   ): string {
-    let s: string | Uint8Array = str == null ? "" : String(str);
+    let s: string | Uint8Array = str == null ? "" : str instanceof Uint8Array ? str : String(str);
     if (rbObjEncoding(s) !== Encoding.ASCII_8BIT) {
       if (enc != null && enc !== Encoding.ASCII_8BIT) {
         s = encode(s, Encoding.UTF_8, { invalid: ":replace", undef: ":replace" });

@@ -1,5 +1,7 @@
 import { it, expect } from "vitest";
+import { toEnum } from "@blazetrails/ruby-compat";
 import { NullLogger } from "./null-logger.js";
+import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
 
 it("act as a noop logger", async () => {
@@ -11,9 +13,10 @@ it("act as a noop logger", async () => {
       any,
     ];
   };
-  const logger = new NullLogger(app);
-  const res = await logger.call(MockRequest.envFor("/"));
-  expect(res[0]).toBe(200);
-  expect(res[1]["content-type"]).toBe("text/plain");
-  expect(res[2]).toEqual(["Hello, World!"]);
+
+  const logger = new Lint(new NullLogger(app));
+
+  const res = await logger.call(MockRequest.envFor());
+  expect(res.slice(0, 2)).toEqual([200, { "content-type": "text/plain" }]);
+  expect(await toEnum(res[2]).toA()).toEqual(["Hello, World!"]);
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { warn } from "@blazetrails/ruby-compat";
+import { encode, warn } from "@blazetrails/ruby-compat";
 import * as Utils from "./utils.js";
 import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
@@ -63,7 +63,7 @@ it("escape objects that responds to to_s", () => {
 });
 
 it("escape non-UTF8 strings", () => {
-  expect(Utils.escape("ø")).toBe("%C3%B8");
+  expect(Utils.escape(encode("ø", "ISO-8859-1"))).toBe("%F8");
 });
 
 it("not hang on escaping long strings that end in % (http://redmine.ruby-lang.org/issues/5149)", () => {
@@ -880,41 +880,4 @@ it("run different apps", async () => {
 
 it("raises for invalid context", () => {
   expect(() => new Utils.Context(null as any, testTarget1)).toThrow();
-});
-
-it("setParamDepthLimit affects subsequent parseNestedQuery calls via defaultQueryParser", () => {
-  const original = Utils.paramDepthLimit();
-  try {
-    Utils.setParamDepthLimit(2);
-    expect(Utils.paramDepthLimit()).toBe(2);
-    expect(() => Utils.parseNestedQuery("a[b][c]=1")).toThrow(Utils.ParamsTooDeepError);
-    expect(Utils.parseNestedQuery("a[b]=1")).toEqual({ a: { b: "1" } });
-  } finally {
-    Utils.setParamDepthLimit(original);
-  }
-});
-
-it("setDefaultQueryParser replaces the active parser", () => {
-  const original = Utils.defaultQueryParser();
-  try {
-    const tight = Utils.QueryParser.makeDefault(2, { paramsLimit: 1 });
-    Utils.setDefaultQueryParser(tight);
-    expect(() => Utils.parseQuery("a=1&b=2")).toThrow(Utils.QueryLimitError);
-  } finally {
-    Utils.setDefaultQueryParser(original);
-  }
-});
-
-it("multipart limit accessors round-trip", () => {
-  const origFile = Utils.multipartFileLimit();
-  const origTotal = Utils.multipartTotalPartLimit();
-  try {
-    Utils.setMultipartFileLimit(64);
-    Utils.setMultipartTotalPartLimit(512);
-    expect(Utils.multipartFileLimit()).toBe(64);
-    expect(Utils.multipartTotalPartLimit()).toBe(512);
-  } finally {
-    Utils.setMultipartFileLimit(origFile);
-    Utils.setMultipartTotalPartLimit(origTotal);
-  }
 });

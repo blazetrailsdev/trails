@@ -1,10 +1,19 @@
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertNil, assertEqual } from "@blazetrails/activesupport";
-import { rbHash, registerConstant, resetConstants, uniq } from "@blazetrails/ruby-compat";
-import { GlobalID } from "./global-id.js";
+import { assertNil, assertEqual, tryCall } from "@blazetrails/activesupport";
+import {
+  Enumerable,
+  include,
+  rbHash,
+  registerConstant,
+  resetConstants,
+  uniq,
+} from "@blazetrails/ruby-compat";
+import { Model } from "@blazetrails/activemodel";
+import { GlobalID } from "./index.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { GID } from "./uri/gid.js";
+import { Identification } from "./identification.js";
 import { type LocatorModel } from "./locator.js";
 
 const fakeModel = (id: unknown, name = "Person") => ({ id, constructor: { name } });
@@ -22,22 +31,30 @@ class Person {
     return new this(idOrIds);
   }
 }
+include(Person, Identification);
 class PersonUuid extends Person {
   static primaryKey = "uuid";
 }
 class PersonChild extends Person {}
 Object.defineProperty(PersonChild, "name", { value: "Person::Child" });
 
-class PersonModel {
+class PersonModel extends Model {
   static primaryKey = "id";
-  id: unknown;
-  constructor(attrs: { id: unknown }) {
-    this.id = attrs.id;
+  declare private _id: unknown;
+  get id(): unknown {
+    return this._id;
+  }
+  set id(id: unknown) {
+    this._id = id;
   }
   static find(id: unknown): PersonModel {
     return new PersonModel({ id });
   }
+  equals(other: unknown): boolean {
+    return this.id === tryCall(other as object, "id");
+  }
 }
+include(PersonModel, Identification);
 
 class CompositePrimaryKeyModel {
   static primaryKey: string[] = ["tenant_key", "id"];
@@ -76,6 +93,9 @@ const FIXTURE_REGISTRY: Record<string, LocatorModel> = {
   PersonModel: PersonModel as unknown as LocatorModel,
   CompositePrimaryKeyModel: CompositePrimaryKeyModel as unknown as LocatorModel,
 };
+
+const Forwardable = {};
+const Base64 = {};
 
 describe("GlobalIDTest", () => {
   it("value equality", () => {
@@ -140,7 +160,7 @@ describe("GlobalIDCreationTest", () => {
     expect(Person.find(personGid.modelId)).toEqual(await personGid.find());
     expect(Person.find(personUuidGid.modelId)).toEqual(await personUuidGid.find());
     expect(PersonChild.find(personNamespacedGid.modelId)).toEqual(await personNamespacedGid.find());
-    expect(PersonModel.find(personModelGid.modelId)).toEqual(await personModelGid.find());
+    assertEqual(PersonModel.find(personModelGid.modelId), await personModelGid.find());
     expect(CompositePrimaryKeyModel.find(cpkModelGid.modelId as unknown[])).toEqual(
       await cpkModelGid.find(),
     );
@@ -153,7 +173,8 @@ describe("GlobalIDCreationTest", () => {
     expect(Person.find(personUuidGid.modelId)).toEqual(
       await personUuidGid.find({ only: Person as unknown as LocatorModel }),
     );
-    expect(PersonModel.find(personModelGid.modelId)).toEqual(
+    assertEqual(
+      PersonModel.find(personModelGid.modelId),
       await personModelGid.find({ only: PersonModel as unknown as LocatorModel }),
     );
     expect(CompositePrimaryKeyModel.find(cpkModelGid.modelId as unknown[])).toEqual(
@@ -179,6 +200,27 @@ describe("GlobalIDCreationTest", () => {
     assertNil(await personNamespacedGid.find({ only: String as unknown as LocatorModel }));
   });
 
+  it("find with module", async () => {
+    expect(Person.find(personGid.modelId)).toEqual(await personGid.find({ only: Identification }));
+    expect(Person.find(personUuidGid.modelId)).toEqual(
+      await personUuidGid.find({ only: Identification }),
+    );
+    assertEqual(
+      PersonModel.find(personModelGid.modelId),
+      await personModelGid.find({ only: Model }),
+    );
+    expect(PersonChild.find(personNamespacedGid.modelId)).toEqual(
+      await personNamespacedGid.find({ only: Identification }),
+    );
+  });
+
+  it("find with module no match", async () => {
+    assertNil(await personGid.find({ only: Enumerable }));
+    assertNil(await personUuidGid.find({ only: Forwardable }));
+    assertNil(await personNamespacedGid.find({ only: Base64 }));
+    assertNil(await personModelGid.find({ only: Enumerable }));
+  });
+
   it("find with multiple class", async () => {
     expect(Person.find(personGid.modelId)).toEqual(
       await personGid.find({
@@ -190,7 +232,8 @@ describe("GlobalIDCreationTest", () => {
         only: [Number as unknown as LocatorModel, Person as unknown as LocatorModel],
       }),
     );
-    expect(PersonModel.find(personModelGid.modelId)).toEqual(
+    assertEqual(
+      PersonModel.find(personModelGid.modelId),
       await personModelGid.find({
         only: [Number as unknown as LocatorModel, PersonModel as unknown as LocatorModel],
       }),
@@ -223,6 +266,29 @@ describe("GlobalIDCreationTest", () => {
         only: [String as unknown as LocatorModel, Set as unknown as LocatorModel],
       }),
     );
+  });
+
+  it("find with multiple module", async () => {
+    expect(Person.find(personGid.modelId)).toEqual(
+      await personGid.find({ only: [Enumerable, Identification] }),
+    );
+    expect(Person.find(personUuidGid.modelId)).toEqual(
+      await personUuidGid.find({ only: [BigInt, Identification] }),
+    );
+    assertEqual(
+      PersonModel.find(personModelGid.modelId),
+      await personModelGid.find({ only: [String, Model] }),
+    );
+    expect(PersonChild.find(personNamespacedGid.modelId)).toEqual(
+      await personNamespacedGid.find({ only: [Number, Identification] }),
+    );
+  });
+
+  it("find with multiple module no match", async () => {
+    assertNil(await personGid.find({ only: [Enumerable, Base64] }));
+    assertNil(await personUuidGid.find({ only: [Enumerable, Forwardable] }));
+    assertNil(await personModelGid.find({ only: [Base64, Enumerable] }));
+    assertNil(await personNamespacedGid.find({ only: [Enumerable, Forwardable] }));
   });
 
   it("as string", () => {

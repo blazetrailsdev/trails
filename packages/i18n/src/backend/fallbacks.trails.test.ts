@@ -1,14 +1,15 @@
+import * as TestCase from "../test-helpers/test-case.js";
 import { kernelCatch } from "@blazetrails/ruby-compat";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { Fallbacks, setFallbacks } from "./fallbacks.js";
 import { Simple } from "./simple.js";
-import { config, resetConfig, t, withLocale } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
+import { config, t, withLocale } from "../i18n.js";
 import { MissingTranslation } from "../exceptions.js";
 
 class Backend extends Fallbacks(Simple) {}
 
 describe("Backend::Fallbacks over the ActiveRecord error-message scopes", () => {
+  beforeEach(TestCase.setup);
   let backend: Backend;
 
   function generateMessage(attribute: string, type: string): unknown {
@@ -26,9 +27,7 @@ describe("Backend::Fallbacks over the ActiveRecord error-message scopes", () => 
     return t(defaults[0], { default: defaults.slice(1).map((key) => `:${key}`) });
   }
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
     setFallbacks(null);
     config().enforceAvailableLocales = false;
     backend = new Backend();
@@ -42,6 +41,7 @@ describe("Backend::Fallbacks over the ActiveRecord error-message scopes", () => 
       errors: { messages: { taken: "generic en-US fallback" } },
     });
   });
+  afterEach(TestCase.teardown);
 
   it("activerecord attributes scope falls back to parent locale before it falls back to the :errors namespace", () => {
     withLocale("en-US", () => {

@@ -1,3 +1,4 @@
+import { rtest } from "./object.js";
 import { ConverterNotFoundError } from "./converter-not-found-error.js";
 import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 import { Encoding } from "./encoding.js";
@@ -331,6 +332,9 @@ const FMODE_READWRITE = FMODE_READABLE | FMODE_WRITABLE;
 /** `FMODE_BINMODE` (`vendor/ruby/v3.3.11/include/ruby/io.h:287`). */
 const FMODE_BINMODE = 0x00000004;
 
+/** `FMODE_SYNC` (`vendor/ruby/v3.3.11/include/ruby/io.h:294`). */
+const FMODE_SYNC = 0x00000008;
+
 /** `FMODE_APPEND` (`vendor/ruby/v3.3.11/include/ruby/io.h:315`). */
 const FMODE_APPEND = 0x00000040;
 
@@ -601,6 +605,31 @@ export class IO {
     const ref = new WeakRef(this);
     ioObjects.add(ref);
     ioObjectsSweep.register(this, ref);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/io.c:2703` `rb_io_sync`: whether the stream is in sync
+   * mode. {@link write} never buffers, so every stream behaves as a synced one.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#sync`
+   * (`vendor/ruby/v3.3.11/io.c:2703`).
+   */
+  get sync(): boolean {
+    return (this.mode & FMODE_SYNC) !== 0;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/io.c:2740` `rb_io_set_sync`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#sync=`
+   * (`vendor/ruby/v3.3.11/io.c:2740`).
+   */
+  set sync(sync: unknown) {
+    if (rtest(sync)) {
+      this.mode |= FMODE_SYNC;
+    } else {
+      this.mode &= ~FMODE_SYNC;
+    }
   }
 
   /**
@@ -1264,3 +1293,12 @@ function prepStdio(f: WriteStream, fd: number, fmode: string, klass: typeof IO, 
  * @noRailsEquivalent PERMANENT — Ruby core `STDOUT` (`vendor/ruby/v3.3.11/io.c:15586`).
  */
 export const STDOUT: IO = prepStdio(stdout, 1, "w", IO, "<STDOUT>");
+
+/**
+ * `STDERR` / `$stderr`, `rb_io_prep_stderr` (`vendor/ruby/v3.3.11/io.c:9344`), defined
+ * at `io.c:15588`: an `IO` answering `write` / `puts` / `print` over the process
+ * adapter's stderr.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `STDERR` (`vendor/ruby/v3.3.11/io.c:15588`).
+ */
+export const STDERR: IO = prepStdio(stderr, 2, "w", IO, "<STDERR>");

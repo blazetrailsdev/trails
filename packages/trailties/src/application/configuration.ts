@@ -8,8 +8,10 @@ import {
   FileUpdateChecker,
   getEnv,
   isPresent,
+  type Logger,
   OrderedOptions,
   setUtcToLocalReturnsUtcOffsetTimes,
+  SimpleFormatter,
 } from "@blazetrails/activesupport";
 import { HTML } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
@@ -21,7 +23,7 @@ import {
   OpenSSL,
   SecureRandom,
 } from "@blazetrails/ruby-compat";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { FileUtils, RuntimeError } from "@blazetrails/ruby-compat";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { Trails } from "../rails.js";
 import type { Root } from "../paths.js";
@@ -67,10 +69,11 @@ export class Configuration extends EngineConfiguration {
   beginningOfWeek: WeekDay = ":monday";
   logger: unknown = null;
   logLevel: LogLevel | number | string = "debug";
-  logFormatter: unknown = null;
+  logFormatter: Logger["formatter"] = new SimpleFormatter();
   logTags: unknown[] = [];
   logFileSize: number | null = null;
   autoflushLog = true;
+  broadcastLogLevel: LogLevel | number | string | null = null;
   silenceHealthcheckPath: string | null = null;
   cacheClasses: boolean | null = null;
   cacheStore: unknown = [":file_store", `${this.root ?? ""}/tmp/cache/`];
@@ -530,10 +533,23 @@ export class Configuration extends EngineConfiguration {
     if (!paths.get("config/environment"))
       paths.add("config/environment", { with: "config/environment.ts" });
     if (!paths.get("lib/templates")) paths.add("lib/templates");
+    if (!paths.get("log")) paths.add("log", { with: `log/${Trails.env}.log` });
     if (!paths.get("public")) paths.add("public");
     if (!paths.get("public/javascripts")) paths.add("public/javascripts");
     if (!paths.get("public/stylesheets")) paths.add("public/stylesheets");
     return paths;
+  }
+
+  async defaultLogFile(): Promise<File> {
+    const path = (await this.paths().get("log")!.first())!;
+    if (!File.isExist(File.dirname(path))) {
+      await FileUtils.mkdirPAsync(File.dirname(path));
+    }
+
+    const f = File.open(path, "a");
+    f.binmode();
+    f.sync = this.autoflushLog;
+    return f;
   }
 
   /** @internal */

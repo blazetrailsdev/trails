@@ -65,3 +65,40 @@ describe("Rack::Utils.parse_cookies_header", () => {
     expect(Utils.parseCookiesHeader("foo; bar=baz")).toEqual({ foo: null, bar: "baz" });
   });
 });
+
+it("setParamDepthLimit affects subsequent parseNestedQuery calls via defaultQueryParser", () => {
+  const original = Utils.paramDepthLimit();
+  try {
+    Utils.setParamDepthLimit(2);
+    expect(Utils.paramDepthLimit()).toBe(2);
+    expect(() => Utils.parseNestedQuery("a[b][c]=1")).toThrow(Utils.ParamsTooDeepError);
+    expect(Utils.parseNestedQuery("a[b]=1")).toEqual({ a: { b: "1" } });
+  } finally {
+    Utils.setParamDepthLimit(original);
+  }
+});
+
+it("setDefaultQueryParser replaces the active parser", () => {
+  const original = Utils.defaultQueryParser();
+  try {
+    const tight = Utils.QueryParser.makeDefault(2, { paramsLimit: 1 });
+    Utils.setDefaultQueryParser(tight);
+    expect(() => Utils.parseQuery("a=1&b=2")).toThrow(Utils.QueryLimitError);
+  } finally {
+    Utils.setDefaultQueryParser(original);
+  }
+});
+
+it("multipart limit accessors round-trip", () => {
+  const origFile = Utils.multipartFileLimit();
+  const origTotal = Utils.multipartTotalPartLimit();
+  try {
+    Utils.setMultipartFileLimit(64);
+    Utils.setMultipartTotalPartLimit(512);
+    expect(Utils.multipartFileLimit()).toBe(64);
+    expect(Utils.multipartTotalPartLimit()).toBe(512);
+  } finally {
+    Utils.setMultipartFileLimit(origFile);
+    Utils.setMultipartTotalPartLimit(origTotal);
+  }
+});

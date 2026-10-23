@@ -202,6 +202,8 @@ describe("AppGenerator", () => {
     expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
     expect(pkg.dependencies["@blazetrails/activerecord"]).toBeDefined();
     expect(pkg.dependencies["@blazetrails/activemodel"]).toBeDefined();
+    expect(fs.existsSync(appPath("app/jobs/application-job.ts"))).toBe(true);
+    expect(pkg.dependencies["@blazetrails/activejob"]).toBeDefined();
     expect(pkg.scripts["db:migrate"]).toBeDefined();
     expect(pkg.scripts["db:seed"]).toBeDefined();
     expect(pkg.scripts["db:setup"]).toBeDefined();

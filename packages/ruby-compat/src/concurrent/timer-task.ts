@@ -22,6 +22,7 @@ const MAX_TIMEOUT = 2 ** 31 - 1;
 export class TimerTask {
   /** @noRailsEquivalent PERMANENT */
   readonly executionInterval: number;
+  private readonly _runNow: boolean;
   private readonly _task: (task: TimerTask) => unknown;
   private _running = false;
   private _timer: ReturnType<typeof setTimeout> | undefined;
@@ -31,7 +32,7 @@ export class TimerTask {
 
   /** @noRailsEquivalent PERMANENT */
   constructor(
-    { executionInterval }: { executionInterval: number },
+    { executionInterval, runNow = false }: { executionInterval: number; runNow?: boolean },
     task: (task: TimerTask) => unknown,
   ) {
     if (typeof task !== "function") throw new ArgumentError("no block given");
@@ -39,6 +40,7 @@ export class TimerTask {
       throw new ArgumentError("execution_interval must be greater than zero");
     }
     this.executionInterval = executionInterval;
+    this._runNow = runNow;
     this._task = task;
   }
 
@@ -52,7 +54,7 @@ export class TimerTask {
           if (generation === this._generation) this._scheduleNextTask();
         });
       } else {
-        this._scheduleNextTask();
+        this._scheduleNextTask(this._runNow ? 0 : this.executionInterval);
       }
     }
     return this;

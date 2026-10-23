@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import * as TestCase from "../test-helpers/test-case.js";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { ArgumentError } from "../exceptions.js";
-import { config, resetConfig, setBackend, transliterate } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
+import { config, setBackend, transliterate } from "../i18n.js";
 import { Simple } from "./simple.js";
 import { HashTransliterator, get } from "./transliterator.js";
 
@@ -14,15 +14,15 @@ describe("I18nBackendTransliterator", () => {
   let hash: Record<string, string>;
   let transliterator: ReturnType<typeof get>;
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     setBackend(new Simple());
     config().enforceAvailableLocales = false;
     proc = (n: string) => n.toUpperCase();
     hash = { ü: "ue", ö: "oe", a: "a" };
     transliterator = get();
   });
+  afterEach(TestCase.teardown);
 
   it("transliteration rule can be a proc", () => {
     storeTranslations("xx", { i18n: { transliterate: { rule: proc } } });

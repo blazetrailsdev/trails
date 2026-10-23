@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import * as TestCase from "./test-helpers/test-case.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import {
   ArgumentError,
@@ -14,15 +15,11 @@ import {
   UnknownFileType,
   UnsupportedMethod,
 } from "./exceptions.js";
-import { resetClassConfig } from "./config.js";
-import { resetConfig } from "./i18n.js";
 import { Simple } from "./backend/simple.js";
 
 describe("exceptions", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
-  });
+  beforeEach(TestCase.setup);
+  afterEach(TestCase.teardown);
 
   it("roots every error at I18n::ArgumentError", () => {
     const errors = [

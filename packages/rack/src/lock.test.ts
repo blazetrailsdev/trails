@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Lock } from "./lock.js";
 import { MockRequest } from "./mock-request.js";
+import { kernelThrow, UncaughtThrowError } from "@blazetrails/ruby-compat";
+import type {} from "@blazetrails/vitest-matchers";
 
 class TestLock {
   synchronized = false;
@@ -39,7 +41,7 @@ describe("Proxy", () => {
     res.toPath = () => "/tmp/hello.txt";
     const app = new Lock(async () => [200, { "content-type": "text/plain" }, res] as any, lock);
     const body = (await app.call(env))[2];
-    expect(typeof body.toPath).toBe("function");
+    expect(body).toRespondTo("toPath");
     expect(body.toPath()).toBe("/tmp/hello.txt");
   });
 
@@ -49,7 +51,7 @@ describe("Proxy", () => {
       async () => [200, { "content-type": "text/plain" }, ["Hello World"]] as any,
     );
     const body = (await app.call(env))[2];
-    expect(body.toPath).toBeUndefined();
+    expect(body).not.toRespondTo("toPath");
   });
 });
 
@@ -117,10 +119,8 @@ it("unlock if the app raises", async () => {
 it("unlock if the app throws", async () => {
   const lock = new TestLock();
   const env = MockRequest.envFor("/");
-  const app = new Lock(async () => {
-    throw new Error("bacon");
-  }, lock);
-  await expect(app.call(env)).rejects.toThrow("bacon");
+  const app = new Lock(async () => kernelThrow(":bacon"), lock);
+  await expect(app.call(env)).rejects.toThrow(UncaughtThrowError);
   expect(lock.synchronized).toBe(false);
 });
 

@@ -1,5 +1,6 @@
+import * as TestCase from "./test-helpers/test-case.js";
 import { readFile } from "node:fs/promises";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 
 import { Simple } from "./backend/simple.js";
 import {
@@ -7,9 +8,8 @@ import {
   registerFileReader,
   registerLocaleModule,
 } from "./backend/base.js";
-import { resetClassConfig } from "./config.js";
 import { InvalidLocaleData } from "./exceptions.js";
-import { config, resetConfig, setLocale, t } from "./i18n.js";
+import { config, setLocale, t } from "./i18n.js";
 import { en } from "./test-data/locales/en.js";
 
 function localesDir(): string {
@@ -20,8 +20,7 @@ describe("I18nLoadPathTest", () => {
   let backend: Simple;
 
   beforeEach(async () => {
-    resetConfig();
-    resetClassConfig();
+    await TestCase.setup();
     config().enforceAvailableLocales = false;
     registerFileReader((filename) => readFile(filename, "utf8"));
     await preloadTranslationFiles(
@@ -35,6 +34,7 @@ describe("I18nLoadPathTest", () => {
     config().backend = backend;
     backend.storeTranslations("en", { foo: { bar: "bar", baz: "baz" } });
   });
+  afterEach(TestCase.teardown);
 
   it("nested load paths do not break locale loading", async () => {
     await config().setLoadPath([[`${localesDir()}/en.yml`]]);

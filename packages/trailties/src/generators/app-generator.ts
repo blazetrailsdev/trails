@@ -240,6 +240,7 @@ export class AppGenerator extends AppBase {
               "@blazetrails/actionpack",
               "@blazetrails/actionview",
               "@blazetrails/trailties",
+              ...(this.skip("ActiveJob") ? [] : ["@blazetrails/activejob"]),
             ]),
             ...dbDep,
           },

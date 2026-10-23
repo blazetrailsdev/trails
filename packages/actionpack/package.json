@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc && cp -R src/action-dispatch/journey/visualizer dist/action-dispatch/journey/ && cp -R src/action-dispatch/middleware/templates dist/action-dispatch/middleware/ && trails-tsc-views build --views dist/action-dispatch/middleware/templates --in-place && trails-tsc-views build --views dist/action-dispatch/journey/visualizer --in-place"
+    "build": "tsc && pnpm build:templates",
+    "build:templates": "cp -R src/action-dispatch/journey/visualizer dist/action-dispatch/journey/ && cp -R src/action-dispatch/middleware/templates dist/action-dispatch/middleware/ && trails-tsc-views build --views dist/action-dispatch/middleware/templates --in-place && trails-tsc-views build --views dist/action-dispatch/journey/visualizer --in-place"
   },
   "files": [
     "dist"

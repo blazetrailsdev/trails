@@ -10,7 +10,7 @@ export { Errno, SystemCallError } from "./errno.js";
 export { File } from "./file.js";
 export { Base64 } from "./base64.js";
 export { CGI } from "./cgi.js";
-export { IO, STDOUT, print, printf, puts } from "./io.js";
+export { IO, STDERR, STDOUT, print, printf, puts } from "./io.js";
 export { IOError } from "./io-error.js";
 export {
   cmp,
@@ -396,7 +396,7 @@ export { b } from "./string/b.js";
 export { bytes, strNew } from "./string/bytes.js";
 export { byteslice, rbStrByteslice, rbStrGetbyte } from "./string/byte-methods.js";
 export { scrub } from "./string/scrub.js";
-export { capitalize, casecmp } from "./string/case-mapping.js";
+export { capitalize, casecmp, upcase } from "./string/case-mapping.js";
 export { chomp } from "./string/chomp.js";
 export { rbStrEnumerateLines } from "./string/each.js";
 export { rbStrDump, rbStrHex, rbStrToF, rbStrToI } from "./string/convert.js";

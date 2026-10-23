@@ -72531,6 +72531,20 @@
   {
     "package": "globalid",
     "rubyFile": "global_id.rb",
+    "rubyName": "deprecator",
+    "digest": "cef7c7ba0723e3ca",
+    "ref": "v1.3.0"
+  },
+  {
+    "package": "globalid",
+    "rubyFile": "global_id.rb",
+    "rubyName": "eager_load!",
+    "digest": "142cf4f02e7fc646",
+    "ref": "v1.3.0"
+  },
+  {
+    "package": "globalid",
+    "rubyFile": "global_id.rb",
     "rubyName": "find",
     "digest": "937736ced3c1706e",
     "ref": "v1.3.0"
@@ -78069,8 +78083,29 @@
   {
     "package": "rack-session",
     "rubyFile": "encryptor.rb",
+    "rubyName": "cipher_secret_from_message_secret",
+    "digest": "80eca07f870e200b",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
+    "rubyName": "compute_signature",
+    "digest": "667dc4888bcdf376",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
     "rubyName": "decrypt",
     "digest": "b282276ffadb7299",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
+    "rubyName": "deserialized_message",
+    "digest": "b05cbc25d3c4dc17",
     "ref": "v2.1.0"
   },
   {
@@ -78099,6 +78134,13 @@
     "rubyFile": "encryptor.rb",
     "rubyName": "new_message_and_cipher_secret",
     "digest": "330c5a704500ae67",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
+    "rubyName": "serialize_payload",
+    "digest": "02b715bec669f92d",
     "ref": "v2.1.0"
   },
   {

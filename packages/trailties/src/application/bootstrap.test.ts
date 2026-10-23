@@ -1,11 +1,25 @@
-import { Logger, NullLogger, NullStore, onLoad, resetLoadHooks } from "@blazetrails/activesupport";
+import {
+  BroadcastLogger,
+  Logger,
+  NullStore,
+  onLoad,
+  resetLoadHooks,
+} from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Initializable } from "../initializable.js";
 import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./bootstrap.js";
 import { Trails } from "../rails.js";
 
+const baseConfig = (): BootstrapConfig => ({
+  activeSupport: {},
+  logLevel: "debug",
+  logFormatter: null,
+  defaultLogFile: async () => ({ write() {} }),
+  paths: () => ({ get: () => ({ first: async () => "log/test.log" }) }),
+});
+
 class TestApp extends Bootstrap implements BootstrapHost {
-  config: BootstrapConfig = { activeSupport: {} };
+  config: BootstrapConfig = { ...baseConfig() };
 }
 
 describe("Bootstrap", () => {
@@ -30,27 +44,34 @@ describe("Bootstrap", () => {
     it("uses config.logger when provided", async () => {
       const app = new TestApp();
       const custom = new Logger(null);
-      app.config = { activeSupport: {}, logger: custom };
+      app.config = { ...baseConfig(), logger: custom };
       await app.runInitializers("all");
-      expect(Trails.logger).toBe(custom);
+      expect(Trails.logger).toBeInstanceOf(BroadcastLogger);
+      expect((Trails.logger as BroadcastLogger).broadcasts).toEqual([custom]);
     });
 
-    it("falls back to a NullLogger when config.logger is unset", async () => {
+    it("logs to config.defaultLogFile when config.logger is unset", async () => {
       const app = new TestApp();
+      const lines: string[] = [];
+      app.config = {
+        ...baseConfig(),
+        defaultLogFile: async () => ({ write: (s) => lines.push(s) }),
+      };
       await app.runInitializers("all");
-      expect(Trails.logger).toBeInstanceOf(NullLogger);
+      Trails.logger!.error("boom");
+      expect(lines.join("")).toContain("boom");
     });
 
     it("applies config.logLevel to the resulting logger", async () => {
       const app = new TestApp();
-      app.config = { activeSupport: {}, logLevel: "warn" };
+      app.config = { ...baseConfig(), logLevel: "warn" };
       await app.runInitializers("all");
       expect(Trails.logger?.level).toBe(Logger.WARN);
     });
 
     it("preserves a pre-existing logger", async () => {
       const app = new TestApp();
-      const preset = new Logger(null);
+      const preset = new BroadcastLogger(new Logger(null));
       Trails.logger = preset;
       await app.runInitializers("all");
       expect(Trails.logger).toBe(preset);
@@ -61,7 +82,7 @@ describe("Bootstrap", () => {
     it("uses config.cacheStore when provided", async () => {
       const app = new TestApp();
       const store = new NullStore();
-      app.config = { activeSupport: {}, cacheStore: store };
+      app.config = { ...baseConfig(), cacheStore: store };
       await app.runInitializers("all");
       expect(Trails.cache).toBe(store);
     });

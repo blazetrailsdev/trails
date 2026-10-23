@@ -13,13 +13,13 @@ export const EMPTY_HASH: Readonly<Record<string, never>> = Object.freeze({});
 
 export const RESERVED_KEYS: string[] = [
   "cascade",
-  "deepInterpolation",
-  "skipInterpolation",
+  "deep_interpolation",
+  "skip_interpolation",
   "default",
-  "exceptionHandler",
+  "exception_handler",
   "fallback",
-  "fallbackInProgress",
-  "fallbackOriginalLocale",
+  "fallback_in_progress",
+  "fallback_original_locale",
   "format",
   "object",
   "raise",
@@ -33,10 +33,6 @@ export function newDoubleNestedCache<K = unknown, V = TranslationKey[]>(): Map<s
   return new Map();
 }
 
-function underscore(key: string): string {
-  return key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-}
-
 let reservedKeysPatternCache: RegExp | undefined;
 
 export function reserveKey(key: string): void {
@@ -46,8 +42,7 @@ export function reserveKey(key: string): void {
 
 export function reservedKeysPattern(): RegExp {
   if (!reservedKeysPatternCache) {
-    const spellings = new Set(RESERVED_KEYS.flatMap((key) => [key, underscore(key)]));
-    reservedKeysPatternCache = new RegExp(`(?<!%)%\\{(${[...spellings].join("|")})\\}`);
+    reservedKeysPatternCache = new RegExp(`(?<!%)%\\{(${RESERVED_KEYS.join("|")})\\}`);
   }
   return reservedKeysPatternCache;
 }
@@ -63,20 +58,11 @@ export function setConfig(value: Config): void {
   Thread.current().threadVariableSet(":i18n_config", value);
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE i18n-reset-seams-fold-into-config-assignment
- */
-export function resetConfig(): void {
-  Thread.current().threadVariableSet(":i18n_config", null);
-  normalizedKeyCache.clear();
-}
-
 export function locale(): Locale | false {
   return config().locale;
 }
 
-export function setLocale(value: Locale | false): void {
+export function setLocale(value: Locale | false | null): void {
   config().locale = value;
 }
 
@@ -84,7 +70,7 @@ export function backend(): Base {
   return config().backend;
 }
 
-export function setBackend(value: Base): void {
+export function setBackend(value: Base | null): void {
   config().backend = value;
 }
 
@@ -92,7 +78,7 @@ export function defaultLocale(): Locale {
   return config().defaultLocale;
 }
 
-export function setDefaultLocale(value: Locale): void {
+export function setDefaultLocale(value: Locale | null): void {
   config().defaultLocale = value;
 }
 
@@ -108,7 +94,7 @@ export function defaultSeparator(): string {
   return config().defaultSeparator;
 }
 
-export function setDefaultSeparator(value: string): void {
+export function setDefaultSeparator(value: string | null): void {
   config().defaultSeparator = value;
 }
 
@@ -124,7 +110,7 @@ export function loadPath(): (string | string[])[] {
   return config().loadPath;
 }
 
-export async function setLoadPath(value: (string | string[])[]): Promise<void> {
+export async function setLoadPath(value: (string | string[])[] | null): Promise<void> {
   await config().setLoadPath(value);
 }
 

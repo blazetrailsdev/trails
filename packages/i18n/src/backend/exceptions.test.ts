@@ -1,8 +1,8 @@
+import * as TestCase from "../test-helpers/test-case.js";
 import { kernelCatch, rbInspect } from "@blazetrails/ruby-compat";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { MissingInterpolationArgument, MissingTranslationData } from "../exceptions.js";
-import { config, l, resetConfig, setBackend, t } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
+import { config, l, setBackend, t } from "../i18n.js";
 import { Simple } from "./simple.js";
 
 const timeNow = {
@@ -13,12 +13,12 @@ const timeNow = {
 };
 
 describe("I18nBackendExceptionsTest", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     setBackend(new Simple());
     config().enforceAvailableLocales = false;
   });
+  afterEach(TestCase.teardown);
 
   it("throw message: MissingTranslation message from #translate includes the given scope and full key", () => {
     const exception = kernelCatch(":exception", () =>

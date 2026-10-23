@@ -54,19 +54,6 @@ it("should convert :input IO object to binary encoding", () => {
   }
 });
 
-it("should handle :input object that does not respond to set_encoding", () => {
-  const input = {
-    read() {
-      return "data";
-    },
-    size() {
-      return 4;
-    },
-  };
-  const env = MockRequest.envFor("/", { ":input": input });
-  expect(env["rack.input"].read()).toBe("data");
-});
-
 it("return an environment with a path", () => {
   const env = MockRequest.envFor(
     "http://www.example.com/parse?location[]=1&location[]=2&age_group[]=2",

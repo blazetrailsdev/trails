@@ -463,41 +463,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "protocol; callers read `.app` / `.modelName` / `.modelId` / `.params` " +
       "directly off the GID instance.",
   },
-  // --- globalid: module-based `only:` filters (Ruby modules have no TS analogue) ---
-  {
-    testFile: "global_locator_test.rb",
-    className: "GlobalLocatorTest",
-    tests: [
-      "by GID with only: restriction by module",
-      "by GID with only: restriction by module no match",
-      "by GID with only: restriction by multiple types w/module",
-      "by SGID with only: restriction by module",
-      "by SGID with only: restriction by module no match",
-      "by SGID with only: restriction by multiple types w/module",
-    ],
-    reason:
-      "Ruby `only:` accepts a Module to filter records whose class includes " +
-      "that module. TypeScript has no module-include relationship for " +
-      "classes; `instanceof` only works against constructors. The " +
-      "class-based `only:` cases are covered by the matching non-module " +
-      "tests in the same file.",
-  },
-  // --- globalid: module-based `only:` filters on GlobalID#find (same as above) ---
-  {
-    testFile: "global_id_test.rb",
-    className: "GlobalIDCreationTest",
-    tests: [
-      "find with module",
-      "find with module no match",
-      "find with multiple module",
-      "find with multiple module no match",
-    ],
-    reason:
-      "Ruby `only:` accepts a Module to filter records whose class includes " +
-      "that module. TypeScript has no module-include relationship for " +
-      "classes; the class-based equivalents (`find with class`, `find with " +
-      "multiple class`) cover the same routing logic.",
-  },
   // --- globalid: eager-loading `includes:` (AR feature, out of GlobalID scope) ---
   {
     testFile: "global_locator_test.rb",

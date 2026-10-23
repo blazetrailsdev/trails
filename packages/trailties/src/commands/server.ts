@@ -1,5 +1,5 @@
-import { getEnv, presence } from "@blazetrails/activesupport";
-import { getFs, getPath, setEnv } from "@blazetrails/ruby-compat";
+import { type BroadcastLogger, getEnv, Logger, presence } from "@blazetrails/activesupport";
+import { block, fetch, getFs, getPath, setEnv, STDERR, STDOUT } from "@blazetrails/ruby-compat";
 import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { Handler, type RackEnv } from "@blazetrails/rack";
@@ -23,6 +23,11 @@ export function serverCommand(): Command {
       "-e, --environment <name>",
       "The environment to run `server` in (e.g. test / development / production).",
     )
+    .option(
+      "--log-to-stdout",
+      "Whether to log to stdout. Enabled by default in development when not daemonized.",
+    )
+    .option("--no-log-to-stdout")
     .action(async (options) => {
       options.environment = environment(options);
       setEnvironment(options);
@@ -30,6 +35,7 @@ export function serverCommand(): Command {
       const root = Dir.pwd();
       await requireApplicationBang();
       const app = await Trails.initialize();
+      if (isLogToStdout(options)) logToStdout();
       await watchViews(app, root);
       const port = parseInt(options.port, 10);
       const railsApp = (env: RackEnv) => app.call(env);
@@ -57,9 +63,30 @@ export function serverCommand(): Command {
   return cmd;
 }
 
-interface ServerOptions {
+type ServerOptions = {
   binding?: string;
   environment?: string;
+  logToStdout?: boolean;
+};
+
+/** @internal */
+function logToStdout(): void {
+  const console = new Logger(STDOUT);
+  console.formatter = Trails.logger!.formatter;
+  console.level = Trails.logger!.level;
+
+  if (!Logger.isLoggerOutputsTo(Trails.logger!, STDERR, STDOUT)) {
+    (Trails.logger as BroadcastLogger).broadcastTo(console);
+  }
+}
+
+/** @internal */
+function isLogToStdout(options: ServerOptions): boolean {
+  return fetch<boolean>(
+    options,
+    "logToStdout",
+    block(() => environment(options) === "development"),
+  );
 }
 
 function setEnvironment(options: ServerOptions): void {
