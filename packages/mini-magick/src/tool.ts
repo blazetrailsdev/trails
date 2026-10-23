@@ -237,6 +237,10 @@ export class Tool {
   ]) {
     (Tool as unknown as Record<string, typeof Tool>)[rbStrSend(tool, "capitalize")[0] as string] =
       class extends Tool {
+        static toString(): string {
+          return `MiniMagick::Tool::${rbStrSend(tool, "capitalize")[0] as string}`;
+        }
+
         constructor(...args: unknown[]) {
           super(tool, ...(args as [Record<string, unknown>?]));
         }

@@ -1,4 +1,3 @@
-import "./utilities.js";
 import { Logger } from "@blazetrails/activesupport";
 import { Dir, stdout as $stdout, classModule } from "@blazetrails/ruby-compat";
 
