@@ -10,8 +10,9 @@ const MAX_TIMEOUT = 2 ** 31 - 1;
  * `run_now: false` and `interval_type: :fixed_delay`: the first run is one
  * `execution_interval` (seconds) after {@link execute}, and each later one is
  * scheduled when the previous run has settled, so an async block never
- * overlaps itself. A raising block is reported to no one and does not stop the
- * timer (`timer_task.rb:330-345` `execute_task`). The wait is an unref'd
+ * overlaps itself. A raising block does not stop the timer, and each run's
+ * `(time, result, error)` goes to the observers {@link addObserver} registered
+ * (`timer_task.rb:330-345` `execute_task`). The wait is an unref'd
  * `setTimeout`, so a pending run does not hold the process open, where
  * concurrent-ruby's timer thread waits through `rb_mutex_sleep`
  * (`vendor/ruby/v3.3.11/thread_sync.c:626`).
@@ -26,6 +27,7 @@ export class TimerTask {
   private _timer: ReturnType<typeof setTimeout> | undefined;
   private _generation = 0;
   private _inFlight: Promise<unknown> | null = null;
+  private readonly _observers: ((time: Date, result: unknown, error: unknown) => unknown)[] = [];
 
   /** @noRailsEquivalent PERMANENT */
   constructor(
@@ -57,6 +59,12 @@ export class TimerTask {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  addObserver<O extends (time: Date, result: unknown, error: unknown) => unknown>(observer: O): O {
+    this._observers.push(observer);
+    return observer;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   shutdown(): true {
     this._running = false;
     this._generation += 1;
@@ -75,10 +83,19 @@ export class TimerTask {
     (timer as { unref?: () => unknown }).unref?.();
   }
 
+  private _notifyObservers(result: unknown, error: unknown): void {
+    const time = new Date();
+    for (const observer of this._observers) observer(time, result, error);
+  }
+
   private async _executeTask(generation: number): Promise<void> {
     if (!this._running || generation !== this._generation) return;
     this._inFlight = Promise.resolve()
       .then(() => this._task(this))
+      .then(
+        (result) => this._notifyObservers(result, null),
+        (error: unknown) => this._notifyObservers(null, error),
+      )
       .catch(() => null);
     await this._inFlight;
     this._inFlight = null;

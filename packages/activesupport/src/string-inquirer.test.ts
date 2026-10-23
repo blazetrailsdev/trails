@@ -74,6 +74,19 @@ describe("StringInquirer", () => {
     expect((env as any)["development?"]()).toBe(true);
   });
 
+  it("answers the is-spelled predicate", () => {
+    const s = inquiry.call("are_you_ready");
+    expect(s.isAreYouReady()).toBe(true);
+    expect(s.isProduction()).toBe(false);
+  });
+
+  it("leaves Kernel and protocol is-names to the receiver", () => {
+    const s = inquiry.call("blank") as any;
+    expect("isBlank" in s).toBe(false);
+    expect("isNil" in s).toBe(false);
+    expect(() => s.isNil()).toThrow(/undefined method .isNil./);
+  });
+
   it("valueOf returns original string", () => {
     const s = inquiry.call("test");
     expect(s.valueOf()).toBe("test");

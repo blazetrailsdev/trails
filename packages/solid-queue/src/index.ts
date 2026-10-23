@@ -15,3 +15,6 @@ export { Queue } from "./queue.js";
 export { QueueSelector } from "./queue-selector.js";
 export { ConcurrencyControls } from "./active-job/concurrency-controls.js";
 export { SolidQueueAdapter } from "./active-job/queue-adapters/solid-queue-adapter.js";
+export { Process } from "./process.js";
+export { Pool } from "./pool.js";
+export { Worker } from "./worker.js";
