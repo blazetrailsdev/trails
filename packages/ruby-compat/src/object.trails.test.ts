@@ -45,6 +45,7 @@ import {
   rbModToS,
   rbObjClassname,
   rbSetClassPathString,
+  TEMPORAL_METHOD_TABLE,
 } from "./object.js";
 import {
   Kernel,
@@ -388,7 +389,24 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo({ a: 1 }, "get")).toBe(true);
     expect(basicObjRespondTo(new Set([1]), "each")).toBe(true);
     expect(basicObjRespondTo(new Set([1]), "isEmpty")).toBe(true);
-    expect(basicObjRespondTo({ [Symbol.toStringTag]: "Temporal.PlainDate" }, "toDate")).toBe(true);
+    class PlainDate {
+      get [Symbol.toStringTag]() {
+        return "Temporal.PlainDate";
+      }
+    }
+    expect(basicObjRespondTo(new PlainDate(), "toDate")).toBe(true);
+    const seated = "Date" in TEMPORAL_METHOD_TABLE;
+    const dateTable = (TEMPORAL_METHOD_TABLE.Date ??= {});
+    dateTable.probe = () => null;
+    TEMPORAL_METHOD_TABLE.rbCDate.probe = () => null;
+    try {
+      expect(basicObjRespondTo(new Date(), "probe")).toBe(true);
+      expect(basicObjRespondTo(new rbCDate(), "probe")).toBe(true);
+    } finally {
+      delete dateTable.probe;
+      if (!seated) delete TEMPORAL_METHOD_TABLE.Date;
+      delete TEMPORAL_METHOD_TABLE.rbCDate.probe;
+    }
   });
 
   it("answers a respond_to_missing? defined on the prototype after the first query", () => {
