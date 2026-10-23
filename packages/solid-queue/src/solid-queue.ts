@@ -10,6 +10,14 @@ import {
 export const SolidQueue = {
   tableNamePrefix: "solid_queue_",
 
+  onWorkerStart(block: () => unknown): void {
+    SolidQueue.Worker!.onStart(block);
+  },
+
+  onWorkerStop(block: () => unknown): void {
+    SolidQueue.Worker!.onStop(block);
+  },
+
   isSilencePolling(): boolean {
     return SolidQueue.silencePolling;
   },
@@ -37,6 +45,9 @@ export const SolidQueue = {
   preserveFinishedJobs: boolean;
   clearFinishedJobsAfter: Duration;
   defaultConcurrencyControlPeriod: Duration;
+  Worker?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
+  onWorkerStart(block: () => unknown): void;
+  onWorkerStop(block: () => unknown): void;
   isSilencePolling(): boolean;
   isPreserveFinishedJobs(): boolean;
   instrument<T>(

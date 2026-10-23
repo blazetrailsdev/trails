@@ -22,7 +22,7 @@ export interface ReadStream {
   setNoecho?(): void;
 }
 
-export type SignalName = "SIGINT" | "SIGTERM";
+export type SignalName = "SIGINT" | "SIGTERM" | "SIGQUIT";
 
 export interface ProcessAdapter {
   envSnapshot(): Record<string, string | undefined>;
@@ -365,6 +365,14 @@ export function chdir(dir: string): void {
  */
 export function exit(code?: number | boolean): never {
   return requireAdapter().exit(typeof code === "boolean" ? (code ? 0 : 1) : code);
+}
+
+/**
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#exit!`
+ * (`vendor/ruby/v3.3.11/process.c:4438`), whose status defaults to false.
+ */
+export function exitBang(status: number | boolean = false): never {
+  return requireAdapter().exit(typeof status === "boolean" ? (status ? 0 : 1) : status);
 }
 
 /** @noRailsEquivalent PERMANENT */

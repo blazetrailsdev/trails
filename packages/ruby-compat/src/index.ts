@@ -316,6 +316,7 @@ export {
   env,
   exec,
   exit,
+  exitBang,
   getProcessAdapter,
   onSignal,
   processAdapterConfig,

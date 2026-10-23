@@ -4,8 +4,8 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
-import { ActiveSupport, Executor, minutes, seconds } from "@blazetrails/activesupport";
-import { RuntimeError, registerConstant } from "@blazetrails/ruby-compat";
+import { ActiveSupport, Executor, Logger, minutes, seconds } from "@blazetrails/activesupport";
+import { RuntimeError, StringIO, registerConstant } from "@blazetrails/ruby-compat";
 import {
   Job,
   Process,
@@ -190,18 +190,61 @@ describe("WorkerTest", () => {
     ).toBe(3);
   });
 
-  it("silencing polling queries when there's no Active Record logger", async () => {
-    const oldLogger = ARBase.logger;
+  async function withPolling(silence: boolean, block: () => Promise<void>) {
     const oldSilencePolling = SolidQueue.silencePolling;
-    ARBase.logger = null;
-    SolidQueue.silencePolling = true;
+    SolidQueue.silencePolling = silence;
     try {
-      await worker.start();
-      await sleep(0.2);
+      await block();
     } finally {
       SolidQueue.silencePolling = oldSilencePolling;
+    }
+  }
+
+  async function withActiveRecordLogger(logger: Logger | null, block: () => Promise<void>) {
+    const oldLogger = ARBase.logger;
+    ARBase.logger = logger as typeof ARBase.logger;
+    try {
+      await block();
+    } finally {
       ARBase.logger = oldLogger;
     }
+  }
+
+  it("polling queries are logged", async () => {
+    const log = new StringIO();
+    await withActiveRecordLogger(new Logger(log), () =>
+      withPolling(false, async () => {
+        await worker.start();
+        await sleep(0.2);
+      }),
+    );
+
+    expect(log.string()).toMatch(
+      /SELECT .* FROM .solid_queue_ready_executions. WHERE .solid_queue_ready_executions...queue_name./,
+    );
+  });
+
+  it("polling queries can be silenced", async () => {
+    const log = new StringIO();
+    await withActiveRecordLogger(new Logger(log), () =>
+      withPolling(true, async () => {
+        await worker.start();
+        await sleep(0.2);
+      }),
+    );
+
+    expect(log.string()).not.toMatch(
+      /SELECT .* FROM .solid_queue_ready_executions. WHERE .solid_queue_ready_executions...queue_name./,
+    );
+  });
+
+  it("silencing polling queries when there's no Active Record logger", async () => {
+    await withActiveRecordLogger(null, () =>
+      withPolling(true, async () => {
+        await worker.start();
+        await sleep(0.2);
+      }),
+    );
 
     await worker.stop();
     await waitForRegisteredProcesses(0, { timeout: 1 });

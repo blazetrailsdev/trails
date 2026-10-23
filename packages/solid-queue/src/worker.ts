@@ -1,5 +1,5 @@
 import { include, minutes } from "@blazetrails/activesupport";
-import { rbFArray } from "@blazetrails/ruby-compat";
+import { rbFArray, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Configuration } from "./configuration.js";
 import {
   LifecycleHooks,
@@ -88,3 +88,5 @@ export class Worker extends Poller {
     this.procline(`waiting for jobs in ${this.queues.join(",")}`);
   }
 }
+
+rbModConstSet(SolidQueue as never, "Worker", Worker);

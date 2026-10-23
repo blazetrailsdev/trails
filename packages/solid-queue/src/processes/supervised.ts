@@ -1,5 +1,11 @@
 import { included, isPresent } from "@blazetrails/activesupport";
-import { Process, classModule, onSignal, rbModAttrReader } from "@blazetrails/ruby-compat";
+import {
+  Process,
+  classModule,
+  exitBang,
+  onSignal,
+  rbModAttrReader,
+} from "@blazetrails/ruby-compat";
 
 interface SupervisedHost {
   _supervisor: { pid: number } | null;
@@ -42,5 +48,9 @@ export class Supervised {
         void this.stop();
       });
     }
+
+    onSignal("SIGQUIT", () => {
+      exitBang();
+    });
   }
 }
