@@ -1,0 +1,30 @@
+{
+  "name": "@blazetrails/et-orbi",
+  "version": "0.1.0",
+  "description": "Zoned times for Trails, mirroring the et-orbi gem",
+  "type": "module",
+  "main": "dist/et-orbi.js",
+  "types": "dist/et-orbi.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/et-orbi.d.ts",
+      "default": "./dist/et-orbi.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

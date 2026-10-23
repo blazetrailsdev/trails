@@ -176,7 +176,11 @@ export function collectUnits(file: IrFile): Unit[] {
         s.k === "call" &&
         // A test case's body is emitted in order by `emitTestCase`.
         !/(^|::)TestCase$/.test((into.superclass?.path ?? []).join("::")) &&
-        (s.recv?.k === "const" || namesNested(s, (into as any).nestedNames))
+        // A call after one already moved runs after it, as in Ruby (raabro's
+        // `extend ModuleMethods` then `make_includable`).
+        (s.recv?.k === "const" ||
+          namesNested(s, (into as any).nestedNames) ||
+          (!!into.late?.length && !(s.recv === null && BODY_DIRECTIVES.has(s.name))))
       ) {
         (into.late ??= []).push(s);
       } else if (into) {
@@ -187,6 +191,23 @@ export function collectUnits(file: IrFile): Unit[] {
   visit(file.body.body, []);
   return units;
 }
+
+/** Class-body calls that declare rather than run: they keep their place in the body. */
+const BODY_DIRECTIVES = new Set([
+  "private",
+  "protected",
+  "public",
+  "private_constant",
+  "module_function",
+  "private_class_method",
+  "public_class_method",
+  "require",
+  "require_relative",
+  "attr_reader",
+  "attr_writer",
+  "attr_accessor",
+  "alias_method",
+]);
 
 /** Constants whose every use is ruled out repo-wide, with the CLAUDE.md section that rules it. */
 const PERMANENT_CONSTS: Record<string, string> = {

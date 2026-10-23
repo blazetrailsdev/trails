@@ -1,0 +1,30 @@
+{
+  "name": "@blazetrails/raabro",
+  "version": "0.1.0",
+  "description": "Parser combinators for Trails, mirroring the raabro gem",
+  "type": "module",
+  "main": "dist/raabro.js",
+  "types": "dist/raabro.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/raabro.d.ts",
+      "default": "./dist/raabro.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

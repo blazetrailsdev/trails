@@ -1,0 +1,30 @@
+{
+  "name": "@blazetrails/fugit",
+  "version": "0.1.0",
+  "description": "Cron, duration and time parsing for Trails, mirroring the fugit gem",
+  "type": "module",
+  "main": "dist/fugit.js",
+  "types": "dist/fugit.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/fugit.d.ts",
+      "default": "./dist/fugit.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

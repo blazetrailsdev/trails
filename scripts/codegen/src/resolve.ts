@@ -849,6 +849,9 @@ export function rubyFileToTsAr(rubyFile: string): string {
       const lib = rel.slice("lib/".length).replace(new RegExp(`^${GEM.rubyRoot}/`), "");
       return `${kebab(lib).replace(/-spec$/, "")}.test.ts`;
     }
+    // A flat `spec/` (raabro's `spec/seq_spec.rb`, fugit's `spec/cron_spec.rb`).
+    if (rel.endsWith("_spec") && !rel.includes("/"))
+      return `${kebab(rel).replace(/-spec$/, "")}.test.ts`;
     return `test-helpers/${kebab(rel)}.ts`;
   }
   const root = GEM.rubyRoot;

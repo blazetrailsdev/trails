@@ -205,13 +205,33 @@ rule("send __send__", (c) => {
  * `obj.send(name, *args)` with a name known at run time: the TS member it
  * names (docs/ruby-ts-conventions.md: snake_case is camelCase, `x?` is `isX`).
  */
+export function tsNameAtRunTime(arg: string): string {
+  return `((s: string) => { const c = s.replace(/[?!]$/, "").replace(/_([a-z0-9])/g, (_m: string, x: string) => x.toUpperCase()); return s.endsWith("?") ? "is" + c[0].toUpperCase() + c.slice(1) : c; })(String(${arg}))`;
+}
+
+/**
+ * `method(name)`: ruby-compat's `Method` for the TS member the name maps to
+ * (its `call`, `arity` and `parameters` are Ruby's, where a bound function's
+ * `call` would take its first argument as `this`).
+ */
+export function methodObject(c: Parameters<CallRule>[0], self: string): string {
+  const a = c.n.args[0];
+  const name =
+    a?.k === "sym" || a?.k === "str"
+      ? JSON.stringify(tsMethodName(a.value))
+      : tsNameAtRunTime(c.lw.argExpr(a, c.ctx));
+  return `${c.rc("rbObjMethod")}(${self}, ${name})`;
+}
+
 function dynamicSend(c: Parameters<CallRule>[0]): string {
   const { n, R, ctx, lw } = c;
-  const name = `((s: string) => { const c = s.replace(/[?!]$/, "").replace(/_([a-z0-9])/g, (_m: string, x: string) => x.toUpperCase()); return s.endsWith("?") ? "is" + c[0].toUpperCase() + c.slice(1) : c; })(String(${lw.argExpr(n.args[0], ctx)}))`;
+  const name = tsNameAtRunTime(lw.argExpr(n.args[0], ctx));
   const rest = n.args.slice(1).map((x: N) => lw.argExpr(x, ctx));
   if (n.block) rest.push(lw.blockArg(n.block, ctx));
   return `(${R} as unknown as { [name: string]: (...args: unknown[]) => unknown })[${name}](${rest.join(", ")})`;
 }
+
+rule("method", (c) => (argc(c.n) === 1 && !c.n.block ? methodObject(c, c.R) : null));
 
 // Ruby `Range#cover?` is ruby-compat Range's `cover`.
 rule("cover?", (c) =>

@@ -8,6 +8,7 @@ import type { N } from "../ir.js";
 import { tsMethodName } from "../lower.js";
 import { snakeToCamel } from "../../../parity/conventions.js";
 import { constName, ruleTable, type CallRule } from "./call-site.js";
+import { methodObject } from "./object-methods.js";
 
 /**
  * Minitest's and ActiveSupport's assertion modules: flat functions in trails
@@ -99,6 +100,10 @@ rule(
     `${c.rc("rbModMethodDefined")}(${[c.ctx.selfExpr, c.lw.methodNameArg(c.n.args[0], c.ctx), ...c.n.args.slice(1).map((a: N) => c.lw.expr(a, c.ctx))].join(", ")})`,
 );
 
+// `method(name)` on self (raabro's `_narrow`).
+rule("method", (c) =>
+  c.n.args.length === 1 && !c.n.block ? methodObject(c, c.ctx.selfExpr) : null,
+);
 rule("puts warn", (c) => `console.warn(${c.argList()})`);
 rule("format sprintf", (c) => `${c.rc("rbFormat")}(${c.argList()})`);
 rule("Array", (c) => c.lw.aryEnsure(c.argList()));

@@ -654,6 +654,22 @@ export class Lowerer {
           });
           return [`${recv}.${tsMethodName(n.name)} = ${fn};`];
         }
+        // `def self.m` run by a method (raabro's `make_includable` defining
+        // `self.included`): a method of whatever `self` is when it runs, seated
+        // as an own property; a Ruby lifecycle hook under ruby-compat's symbol.
+        if (n.singleton && (!n.receiver || n.receiver.k === "self")) {
+          const fn = this.selfFunction(n.params, n.body, ctx, {
+            testMode: false,
+            defName: n.name,
+            defParams: n.params,
+            objSingletonSuper: true,
+          });
+          const key =
+            n.name === "included" || n.name === "extended"
+              ? `[${this.rc(ctx, n.name)}]`
+              : `.${tsMethodName(n.name)}`;
+          return [`${ctx.selfExpr}${key} = ${fn};`];
+        }
         return ret(this.decline(ctx, "unhandled-node", n, `nested ${n.k} in body`));
       case "class":
       case "module":
@@ -3086,6 +3102,25 @@ export class Lowerer {
       const blk = this.expr(n.block.value, ctx);
       const args = n.args.map((x: N) => this.argExpr(x, ctx));
       return `${needsParens(blk) ? `(${blk})` : blk}.call(${[self, ...args].join(", ")})`;
+    }
+    // `recv.instance_eval { … }` with a literal block:
+    // the block's body with `self` the receiver, run in place (raabro's
+    // `target.instance_eval do extend … end`).
+    if (
+      n.name === "instance_eval" &&
+      n.recv &&
+      !n.args.length &&
+      n.block?.k === "block" &&
+      !(n.block.params ?? []).length
+    ) {
+      const recv = this.expr(n.recv, ctx);
+      const cctx = this.child(ctx, {
+        selfExpr: "_self",
+        selfKind: "static",
+        methodSelf: undefined,
+      });
+      const lines = this.block(this.seqBody(n.block.body), cctx, true);
+      return `((_self: any) => {\n${lines.map((l) => `  ${l}`).join("\n")}\n})(${recv})`;
     }
     // `Proc#arity` of a block or lambda is the function's `length`.
     if (

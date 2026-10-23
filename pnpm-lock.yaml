@@ -443,6 +443,18 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
 
+  packages/et-orbi:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
+  packages/fugit:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/globalid:
     dependencies:
       '@blazetrails/activesupport':
@@ -522,6 +534,12 @@ importers:
       parse5:
         specifier: ^8.0.0
         version: 8.0.0
+
+  packages/raabro:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
 
   packages/rack:
     dependencies:

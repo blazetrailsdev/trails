@@ -168,6 +168,37 @@ GEMS.builder = {
   pkg: "builder",
 };
 
+// fugit (floraison/fugit v1.11.1, vendor/rails/v8.0.2/Gemfile.lock:234): solid_queue's
+// recurring-task schedules (`Fugit.parse`, `Fugit::Cron`), on raabro's parser
+// combinators and et-orbi's zoned times, each a generator target of its own.
+GEMS.raabro = {
+  gem: "raabro",
+  rubyRoot: "raabro",
+  namespace: "Raabro",
+  vendor: "raabro/v1.4.0",
+  hand: false,
+  pkg: "raabro",
+  testDir: "spec",
+};
+GEMS.et_orbi = {
+  gem: "et_orbi",
+  rubyRoot: "et-orbi",
+  namespace: "EtOrbi",
+  vendor: "et-orbi/v1.2.11",
+  hand: false,
+  pkg: "et-orbi",
+  testDir: "spec",
+};
+GEMS.fugit = {
+  gem: "fugit",
+  rubyRoot: "fugit",
+  namespace: "Fugit",
+  vendor: "fugit/v1.11.1",
+  hand: false,
+  pkg: "fugit",
+  testDir: "spec",
+};
+
 // solid_queue (rails/solid_queue v1.1.3, vendor/rails/v8.0.2/Gemfile.lock:586),
 // RFC 0196: the database-backed ActiveJob backend, an engine whose models are
 // in app/models.
