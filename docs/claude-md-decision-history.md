@@ -380,3 +380,22 @@ methods, files, inheritance, arity and params and 307/307 tests on that split.
 Settled by trails#9180, which also records why the parked
 `translate caching backend` test keeps an empty body: the Rails body names
 `I18n::Backend::Cache`, so a kept body would not type-check.
+
+## Call-time constant resolution: a seat is a plain assignment
+
+Reversed by the repo owner on 2026-10-22 (RFC
+`0205-namespace-seats-are-plain-javascript`). The earlier text told every
+defining module to seat its class with `rbModConstSet(Namespace, "Name",
+Klass)`, on the reasoning that Ruby's `const_set` binding is what paths a
+class. Following it, the call grew from 15 sites to 790 across 407 files in
+four weeks, against 18 `const_set` calls in the whole vendored Rails tree.
+
+The 772-site difference was an invented call, which neither call gate can see
+(they flag only what Rails does and the port omits), and it discarded a type
+check: the helper does not relate `value` to the declared type of `mod[id]`,
+where `Nodes.Not = Not` is checked against `Nodes`' property. The path the
+helper recorded is derivable: each of the 39 namespace objects already carries
+its own path in `name`, so `rbModName` derives `owner.name + "::" + key` on
+first read and memoizes it. `rbModConstSet` stays for the 18 sites whose Rails
+body calls `const_set`; the per-package sweeps and the gate that holds the line
+are stories of the same RFC.

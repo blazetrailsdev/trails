@@ -993,8 +993,8 @@ Two shapes are sanctioned, and only these:
 
 - **A namespace object extended with `ActiveSupport::Autoload`** (RFC 0151),
   mirroring Rails' `autoload` lists: each autoloaded constant is seated by its
-  defining module with `rbModConstSet(Namespace, "Name", Klass)` — the constant
-  binding is what paths it, as Ruby's `const_set` does — and read as a property
+  defining module with a plain assignment, `Owner.Name = Klass`, type-checked
+  against the namespace object's declared property, and read as a property
   at call time (`new Nodes.Not(this)`, `ActiveRecord.Base`). A constant Rails
   `require`s rather than autoloads is seated with no `autoload` call. Ruby's
   top-level `Object` is `TopLevel` in `activesupport/src/namespaces.ts`: the
@@ -1002,6 +1002,18 @@ Two shapes are sanctioned, and only these:
   call time (`TopLevel.Trails!.env`), carrying a guard only where Rails has a
   `defined?`. A `globalThis` seat was rejected because a `declare global` in a
   published `.d.ts` reaches every consumer.
+
+  A seat registers nothing. A class's Ruby path (`Arel::Nodes::Not`) is
+  derived on its first `rbModName` read from the registered namespace objects,
+  each of which carries its own path in `name`: the first one holding the class
+  as an own property gives `owner.name + "::" + key`, memoized (RFC 0205).
+  **`rbModConstSet` is written only where the Rails body calls `const_set`**,
+  the 18 vendored sites tabled in RFC
+  `0205-namespace-seats-are-plain-javascript` (generated modules and classes
+  whose constant name is computed, such as `GeneratedAttributeMethods`,
+  `attribute_methods.rb:43`). Anywhere else it is an invented call no call gate
+  can see. Ruled by the repo owner on 2026-10-22.
+
 - **A zero-import slot module**: a file with no runtime imports at all (so it
   cannot join any cycle) exporting a mutable binding plus a `_setX()` setter,
   which the defining module calls at the bottom of its own body. Readers import

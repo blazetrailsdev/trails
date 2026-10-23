@@ -316,8 +316,8 @@ calling it.
 
 `registerConstant` (ruby-compat) stays the general seat for a constant that is
 not a model, the namespace module a model sits in included: a namespaced model
-is `registerModel(rbModConstSet(Sharded, "Blog", this))`, as
-`test-helpers/models/sharded/*.ts` do.
+is seated with a plain assignment, `Sharded.Blog = this`, and then registered
+with `registerModel(this)`.
 
 This is a genuine language shortcoming, ratified here by the repo owner
 (2026-10-09). The ruling is recorded in the tasks-repo story
@@ -538,7 +538,8 @@ resolution". `activerecord/src/namespaces.ts` holds the `ActiveRecord`,
 `ActiveRecord::Encryption` and `ActiveRecord::Tasks` namespace objects, extended with
 `ActiveSupport::Autoload` like arel's, mirroring `active_record.rb:43-112`,
 `associations.rb:15,29-41` and `encryption.rb:10-35`. Each constant is seated
-by the module that defines it:
+by the module that defines it, with a plain assignment
+(`ActiveRecord.Base = Base`), per the root rule:
 
 - `ActiveRecord.Base`, `.Encryption`, `.Associations`, `.ConnectionAdapters`,
   `.ConnectionHandling` (`DEFAULT_ENV`), `.ModelSchema` (`derive_join_table_name`),

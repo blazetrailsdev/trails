@@ -44,6 +44,10 @@ shaped the same way.
   with no `autoload` call: `ActiveSupport.BroadcastLogger` (`active_support.rb:30`,
   read at `logger.rb:21`) and `Attribute.UserProvidedDefault` on the class Rails
   nests it in (`attribute_registration.rb:5`).
+- Every seat above is a plain assignment (`ActionView.Base = Base`), per the
+  root rule; the `const_set` sites in this group are `concern.rb:212`,
+  `concerning.rb:133`, `constant_stubbing.rb:33-45`, `helpers.rb:232` and
+  `template.rb:189`.
 - `TopLevel` in `activesupport/src/namespaces.ts` is Ruby's top-level `Object`,
   for a constant the reading gem does not depend on the defining gem for, or
   `::Rails` itself. The defining gem seats it: `TopLevel.Trails = Trails`
