@@ -211,7 +211,7 @@ export class Command extends Struct.new(
    * @internal
    * @missingRailsCall privateMethods — PERMANENT
    */
-  protected isPrivateMethod(_instance: Instance): boolean {
+  protected isPrivateMethod(instance: Instance): boolean {
     return false;
   }
 

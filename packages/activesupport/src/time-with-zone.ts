@@ -171,7 +171,7 @@ export class TimeWithZone {
     return basicObjRespondTo(this, sym);
   }
 
-  respondToMissing(sym: string, _includePriv: boolean): boolean {
+  respondToMissing(sym: string, includePriv: boolean): boolean {
     return rbObjRespondTo(this.time, sym);
   }
 
