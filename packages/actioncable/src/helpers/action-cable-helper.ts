@@ -1,5 +1,5 @@
 import { RuntimeError, defineModule } from "@blazetrails/ruby-compat";
-import { ActionCable } from "../index.js";
+import { ActionCable } from "../namespaces.js";
 import type { Base as Server } from "../server/base.js";
 
 interface ActionCableHelperHost {

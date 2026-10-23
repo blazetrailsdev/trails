@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { LoadError } from "@blazetrails/ruby-compat";
 import { SubscriptionAdapter } from "../namespaces.js";
 import { Configuration } from "./configuration.js";
+import { Inline } from "../subscription-adapter/inline.js";
 
 class Async {}
 class PostgreSQL {}
@@ -44,6 +45,12 @@ describe("ActionCable::Server::Configuration", () => {
     config.cable = { adapter: "async" };
     expect(await config.pubsubAdapter()).toBe(Async);
     expect(loaded).toEqual(["async"]);
+  });
+
+  it("resolves a built-in adapter with nothing registered", async () => {
+    const config = new Configuration();
+    config.cable = { adapter: "inline" };
+    expect(await config.pubsubAdapter()).toBe(Inline);
   });
 
   it("fixes up PostgreSQL", async () => {
