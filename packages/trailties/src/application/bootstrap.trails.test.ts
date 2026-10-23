@@ -13,9 +13,17 @@ import { Configuration } from "./configuration.js";
 import type { MiddlewareStackProxy } from "../configuration.js";
 import { Trails } from "../rails.js";
 
+const baseConfig = (): BootstrapConfig => ({
+  activeSupport: {},
+  logLevel: "debug",
+  logFormatter: null,
+  defaultLogFile: async () => ({ write() {} }),
+  paths: () => ({ get: () => ({ first: async () => "log/test.log" }) }),
+});
+
 class TestApp extends Bootstrap implements BootstrapHost {
   logger: Logger | null = null;
-  config: BootstrapConfig = { activeSupport: {} };
+  config: BootstrapConfig = { ...baseConfig() };
 }
 
 describe(":initialize_cache lookup_store arms", () => {
@@ -30,14 +38,14 @@ describe(":initialize_cache lookup_store arms", () => {
 
   it("builds the store a Symbol names", async () => {
     const app = new TestApp();
-    app.config = { activeSupport: {}, cacheStore: ":null_store" };
+    app.config = { ...baseConfig(), cacheStore: ":null_store" };
     await app.runInitializers("all");
     expect(Trails.cache).toBeInstanceOf(NullStore);
   });
 
   it("splats an Array store into the Symbol and its arguments", async () => {
     const app = new TestApp();
-    app.config = { activeSupport: {}, cacheStore: [":file_store", "/app/tmp/cache/"] };
+    app.config = { ...baseConfig(), cacheStore: [":file_store", "/app/tmp/cache/"] };
     await app.runInitializers("all");
     expect(Trails.cache).toBeInstanceOf(FileStore);
     expect((Trails.cache as FileStore).cachePath).toBe("/app/tmp/cache/");
@@ -53,7 +61,7 @@ describe(":initialize_cache lookup_store arms", () => {
     const app = new TestApp();
     const preset = new NullStore();
     Trails.cache = preset;
-    app.config = { activeSupport: {}, cacheStore: ":memory_store" };
+    app.config = { ...baseConfig(), cacheStore: ":memory_store" };
     await app.runInitializers("all");
     expect(Trails.cache).toBe(preset);
   });
