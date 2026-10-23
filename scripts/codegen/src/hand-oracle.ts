@@ -252,6 +252,23 @@ function main(): void {
         const m = memberInfo(p, node);
         if (m) info.static[p.getName()] = m;
       }
+      // The constructor (Ruby's `initialize`) is no property: its declaration's
+      // parameter types, under the name `candidates("initialize")` looks up.
+      const ctors = node.members.filter(ts.isConstructorDeclaration);
+      const ctor = ctors.find((c) => c.body) ?? ctors[0];
+      const csig = ctor && checker.getSignatureFromDeclaration(ctor);
+      if (csig) {
+        const params = csig.parameters.map((ps) =>
+          refOf(checker.getTypeOfSymbolAtLocation(ps, ctor)),
+        );
+        info.instance["constructor"] = {
+          kind: "method",
+          async: false,
+          ret: null,
+          arity: csig.parameters.length,
+          ...(params.some(Boolean) ? { params } : {}),
+        };
+      }
       // Private members are not in getPropertiesOfType for some shapes; read the AST.
       for (const mem of node.members) {
         if (!mem.name || !ts.isIdentifier(mem.name)) continue;

@@ -1830,8 +1830,10 @@ export class Emitter {
       ...(opts.selfExpr ? { selfExpr: opts.selfExpr } : {}),
     });
     ctx.scope.body = d.body;
-    const twin = isCtor ? undefined : this.handTwin(u, d.name, opts);
-    if (twin?.info.async) ctx.defAsync = true;
+    // A constructor takes only its twin's parameter types: it is never async
+    // and returns nothing.
+    const twin = this.handTwin(u, d.name, opts);
+    if (twin?.info.async && !isCtor) ctx.defAsync = true;
     if (twin?.info.params) ctx.paramTypes = twin.info.params.map((t) => this.lw.tsType(t, ctx));
     let ps = this.lw.paramList(params, ctx, false);
     // Seed parameter types from the hand twin's declared parameter types.
