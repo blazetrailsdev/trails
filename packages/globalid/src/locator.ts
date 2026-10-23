@@ -7,6 +7,7 @@ import {
   except,
   Hash,
   rbFArray,
+  rbClassInheritedP,
   rbModConstSet,
   rbObjMethod,
   slice,
@@ -27,7 +28,7 @@ export interface LocatorModel {
 export class InvalidModelIdError extends StandardError {}
 
 export interface LocateOptions {
-  only?: LocatorModel | LocatorModel[];
+  only?: LocatorModel | object | Array<LocatorModel | object>;
   ignoreMissing?: boolean;
   includes?: unknown;
 }
@@ -145,10 +146,7 @@ export class BlockLocator {
 
   async locateMany(gids: GlobalID[], options: LocateOptions = {}): Promise<unknown[]> {
     const results: unknown[] = [];
-    for (const gid of gids) {
-      const r = await this.locate(gid, options);
-      if (r !== null) results.push(r);
-    }
+    for (const gid of gids) results.push(await this.locate(gid, options));
     return results;
   }
 }
@@ -236,14 +234,10 @@ export class Locator {
   }
 
   /** @internal */
-  static findAllowed(modelClass: LocatorModel, only?: LocateOptions["only"]): boolean {
-    if (!only) return true;
-    const list = Array.isArray(only) ? only : [only];
-    const fn = modelClass as unknown as Ctor;
-    return list.some((c) => {
-      const cFn = c as unknown as Ctor;
-      return fn === cFn || fn.prototype instanceof cFn;
-    });
+  static findAllowed(modelClass: LocatorModel, only: LocateOptions["only"] = undefined): boolean {
+    return only != null
+      ? (Array.isArray(only) ? only : [only]).some((c) => rbClassInheritedP(modelClass, c) === true)
+      : true;
   }
 
   /** @internal */
@@ -264,8 +258,6 @@ export function _resetLocators(): void {
   _appLocators.clear();
   _defaultLocator = new UnscopedLocator();
 }
-
-type Ctor = new (...args: never[]) => unknown;
 
 type LocatorInvalidModelIdError = typeof InvalidModelIdError;
 

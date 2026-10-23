@@ -13,13 +13,13 @@ export const EMPTY_HASH: Readonly<Record<string, never>> = Object.freeze({});
 
 export const RESERVED_KEYS: string[] = [
   "cascade",
-  "deepInterpolation",
-  "skipInterpolation",
+  "deep_interpolation",
+  "skip_interpolation",
   "default",
-  "exceptionHandler",
+  "exception_handler",
   "fallback",
-  "fallbackInProgress",
-  "fallbackOriginalLocale",
+  "fallback_in_progress",
+  "fallback_original_locale",
   "format",
   "object",
   "raise",
@@ -33,10 +33,6 @@ export function newDoubleNestedCache<K = unknown, V = TranslationKey[]>(): Map<s
   return new Map();
 }
 
-function underscore(key: string): string {
-  return key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-}
-
 let reservedKeysPatternCache: RegExp | undefined;
 
 export function reserveKey(key: string): void {
@@ -46,8 +42,7 @@ export function reserveKey(key: string): void {
 
 export function reservedKeysPattern(): RegExp {
   if (!reservedKeysPatternCache) {
-    const spellings = new Set(RESERVED_KEYS.flatMap((key) => [key, underscore(key)]));
-    reservedKeysPatternCache = new RegExp(`(?<!%)%\\{(${[...spellings].join("|")})\\}`);
+    reservedKeysPatternCache = new RegExp(`(?<!%)%\\{(${RESERVED_KEYS.join("|")})\\}`);
   }
   return reservedKeysPatternCache;
 }

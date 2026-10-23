@@ -104,6 +104,7 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   refute_match: "noMatch",
   assert_not_match: "noMatch",
   assert_raises: "raises",
+  assert_throws: "raises",
   assert_raise: "raises",
   assert_raise_with_message: "raises",
   assert_nothing_raised: "nothingRaised",
@@ -267,6 +268,7 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
   toBeWithinDelta: "inDelta",
   toBeEmpty: "empty",
   toRespondTo: "respondTo",
+  toInclude: "includes",
   toHaveLength: "length",
   toBeGreaterThan: "operator",
   toBeGreaterThanOrEqual: "operator",
@@ -325,6 +327,7 @@ export const NON_ASSERTION_TRAILS_HELPERS = new Set(["mustBeLike", "expectCalled
 const SPEC_FORM_ALIAS: Record<string, string> = {
   must_be_nil: "assert_nil",
   must_include: "assert_includes",
+  must_throw: "assert_throws",
   wont_include: "refute_includes",
   wont_be_nil: "refute_nil",
   must_be_empty: "assert_empty",

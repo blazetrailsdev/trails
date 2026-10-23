@@ -1,5 +1,6 @@
 import {
   File,
+  b,
   basicObjRespondTo,
   rbCheckArrayType,
   each,
@@ -367,7 +368,7 @@ export class Wrapper {
       if (typeof value !== "string") {
         throw new LintError(`env variable ${key} has non-string value ${rbInspect(value)}`);
       }
-      if (/[\u0080-\uffff]/.test(value)) {
+      if (/[\x80-\xff]/.test(String.fromCharCode(...b(value)))) {
         throw new LintError(
           `env variable ${key} has value containing non-ASCII characters and has non-ASCII-8BIT encoding ${rbInspect(value)} encoding: UTF-8`,
         );

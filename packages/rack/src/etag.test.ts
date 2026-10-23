@@ -1,4 +1,5 @@
 import { it, expect } from "vitest";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { ETag } from "./etag.js";
 import { MockRequest } from "./mock-request.js";
 
@@ -116,17 +117,10 @@ it("set etag even if no-cache is given", async () => {
 });
 
 it("close the original body", async () => {
-  let closed = false;
-  const body = {
-    closed: false,
-    close() {
-      this.closed = true;
-      closed = true;
-    },
-  };
+  const body = new StringIO();
   const app = async () => [200, {}, body] as any;
   const response = await etag(app).call(request());
-  expect(closed).toBe(false);
-  response[2].close();
-  expect(closed).toBe(true);
+  expect(body.isClosed()).toBeFalsy();
+  await response[2].close();
+  expect(body.isClosed()).toBeTruthy();
 });

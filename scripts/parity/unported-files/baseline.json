@@ -104,17 +104,6 @@
     "reason": "Ruby `only:` accepts a Module to filter records whose class includes that module. TypeScript has no module-include relationship for classes; `instanceof` only works against constructors. The class-based `only:` cases are covered by the matching non-module tests in the same file."
   },
   {
-    "testFile": "global_id_test.rb",
-    "className": "GlobalIDCreationTest",
-    "tests": [
-      "find with module",
-      "find with module no match",
-      "find with multiple module",
-      "find with multiple module no match"
-    ],
-    "reason": "Ruby `only:` accepts a Module to filter records whose class includes that module. TypeScript has no module-include relationship for classes; the class-based equivalents (`find with class`, `find with multiple class`) cover the same routing logic."
-  },
-  {
     "testFile": "global_locator_test.rb",
     "className": "GlobalLocatorTest",
     "tests": [

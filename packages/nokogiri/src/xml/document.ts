@@ -32,7 +32,7 @@ export class XmlDocument {
     } catch (e) {
       if (e instanceof XmlParseError) {
         for (const detail of e.details) {
-          errors.push(new SyntaxError(detail.message, "fatal", detail.line, detail.col));
+          errors.push(new SyntaxError(detail.message, 3, detail.line, detail.col));
         }
         return new XmlDocument(null, errors);
       }

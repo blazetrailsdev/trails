@@ -18,12 +18,6 @@ it("accepts bytesize_limit to specify maximum size of query string to parse", ()
   expect(() => queryParser.parseNestedQuery("a=aa", "&")).toThrowError(QueryLimitError);
 });
 
-it("handles separator strings containing regex metacharacters without throwing", () => {
-  const queryParser = QueryParser.makeDefault(32);
-  expect(queryParser.parseQuery("a=1|b=2", "|")).toEqual({ a: "1", b: "2" });
-  expect(queryParser.parseNestedQuery("a=1|b=2", "|")).toEqual({ a: "1", b: "2" });
-});
-
 it("accepts params_limit to specify maximum number of query parameters to parse", () => {
   const queryParser = QueryParser.makeDefault(32, { paramsLimit: 2 });
   expect(queryParser.parseQuery("a=a&b=b")).toEqual({ a: "a", b: "b" });

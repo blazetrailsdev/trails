@@ -1,52 +1,47 @@
 import { it, expect } from "vitest";
+import { StringIO, toEnum } from "@blazetrails/ruby-compat";
 import { Head } from "./head.js";
+import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
 
-function testResponse(headers: Record<string, any> = {}) {
-  let closed = false;
-  const body = ["foo"];
-  (body as any).close = () => {
-    closed = true;
-  };
+async function testResponse(headers: Record<string, any> = {}): Promise<[any, StringIO]> {
+  const body = new StringIO("foo");
   const app = async () =>
     [200, { "content-type": "test/plain", "content-length": "3" }, body] as any;
-  const env = MockRequest.envFor("/", headers);
-  const head = new Head(app);
-  return { promise: head.call(env), body, getClosed: () => closed };
+  const request = MockRequest.envFor("/", headers);
+  const response = await new Lint(new Head(app)).call(request);
+
+  return [response, body];
 }
 
 it("response", async () => {
-  const { promise } = testResponse({ REQUEST_METHOD: "HEAD" });
-  const resp = await promise;
-  expect(resp[0]).toBe(200);
-  expect(resp[1]["content-length"]).toBe("3");
+  await testResponse();
 });
 
 it("pass GET, POST, PUT, DELETE, OPTIONS, TRACE requests", async () => {
   for (const type of ["GET", "POST", "PUT", "DELETE", "OPTIONS", "TRACE"]) {
-    const { promise } = testResponse({ REQUEST_METHOD: type });
-    const resp = await promise;
+    const [resp] = await testResponse({ REQUEST_METHOD: type });
+
     expect(resp[0]).toBe(200);
     expect(resp[1]).toEqual({ "content-type": "test/plain", "content-length": "3" });
-    expect([...resp[2]]).toEqual(["foo"]);
+    expect(await toEnum(resp[2]).toA()).toEqual(["foo"]);
   }
 });
 
 it("remove body from HEAD requests", async () => {
-  const { promise } = testResponse({ REQUEST_METHOD: "HEAD" });
-  const resp = await promise;
+  const [resp] = await testResponse({ REQUEST_METHOD: "HEAD" });
+
   expect(resp[0]).toBe(200);
   expect(resp[1]).toEqual({ "content-type": "test/plain", "content-length": "3" });
-  expect([...resp[2]]).toEqual([]);
+  expect(await toEnum(resp[2]).toA()).toEqual([]);
 });
 
 it("close the body when it is removed", async () => {
-  const { promise, getClosed } = testResponse({ REQUEST_METHOD: "HEAD" });
-  const resp = await promise;
+  const [resp, body] = await testResponse({ REQUEST_METHOD: "HEAD" });
   expect(resp[0]).toBe(200);
   expect(resp[1]).toEqual({ "content-type": "test/plain", "content-length": "3" });
-  expect([...resp[2]]).toEqual([]);
-  expect(getClosed()).toBe(false);
-  resp[2].close();
-  expect(getClosed()).toBe(true);
+  expect(await toEnum(resp[2]).toA()).toEqual([]);
+  expect(body.isClosed()).toBeFalsy();
+  await resp[2].close();
+  expect(body.isClosed()).toBeTruthy();
 });

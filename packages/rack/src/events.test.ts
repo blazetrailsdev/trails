@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Events, BufferedResponse, type EventHandler } from "./events.js";
 import { Request } from "./request.js";
 import type { RackApp, RackBody } from "./index.js";
+import { groupBy } from "@blazetrails/ruby-compat";
 
 function makeHandler(events: [any, string][]): EventHandler & { self: object } {
   const handler = {
@@ -37,24 +38,24 @@ async function consumeBody(body: RackBody): Promise<string[]> {
 describe("TestEvents", () => {
   it("events fire", async () => {
     const events: [any, string][] = [];
-    const appMarker = { name: "app" };
+    const ret: [number, Record<string, string>, any] = [200, {}, []];
     const app: RackApp = async (_env) => {
-      events.push([appMarker, "call"]);
-      return [200, {}, (async function* () {})()];
+      events.push([app, "call"]);
+      return ret;
     };
     const se = makeHandler(events);
     const e = new Events(app, [se]);
-
-    const [_status, _headers, body] = await e.call({});
-    await consumeBody(body);
-    (body as any).close();
-
-    expect(events.map(([_o, m]) => m)).toEqual([
-      "on_start",
-      "call",
-      "on_commit",
-      "on_send",
-      "on_finish",
+    const triple = await e.call({});
+    const responseBody = await consumeBody(triple[2]);
+    (triple[2] as any).close();
+    triple[2] = responseBody;
+    expect(triple).toEqual(ret);
+    expect(events).toEqual([
+      [se, "on_start"],
+      [app, "call"],
+      [se, "on_commit"],
+      [se, "on_send"],
+      [se, "on_finish"],
     ]);
   });
 
@@ -110,22 +111,33 @@ describe("TestEvents", () => {
 
   it("finish is called in reverse order", async () => {
     const events: [any, string][] = [];
+    const ret: [number, Record<string, string>, any] = [200, {}, []];
     const app: RackApp = async (_env) => {
-      events.push([null, "call"]);
-      return [200, {}, (async function* () {})()];
+      events.push([app, "call"]);
+      return ret;
     };
     const se1 = makeHandler(events);
     const se2 = makeHandler(events);
     const se3 = makeHandler(events);
 
     const e = new Events(app, [se1, se2, se3]);
-    const [_s, _h, body] = await e.call({});
-    await consumeBody(body);
-    (body as any).close();
+    const triple = await e.call({});
+    await consumeBody(triple[2]);
+    (triple[2] as any).close();
 
-    const starts = events.filter(([_, m]) => m === "on_start").map(([o]) => o);
-    const finishes = events.filter(([_, m]) => m === "on_finish").map(([o]) => o);
-    expect(starts).toEqual(finishes.reverse());
+    const groups = groupBy(events, (x) => x[1]);
+    expect(groups.get("on_start")!.map((x) => x[0])).toEqual(
+      groups
+        .get("on_finish")!
+        .map((x) => x[0])
+        .reverse(),
+    );
+    expect(groups.get("on_commit")!.map((x) => x[0])).toEqual(
+      groups.get("on_finish")!.map((x) => x[0]),
+    );
+    expect(groups.get("on_send")!.map((x) => x[0])).toEqual(
+      groups.get("on_finish")!.map((x) => x[0]),
+    );
   });
 
   it("finish is called if there is an exception", async () => {

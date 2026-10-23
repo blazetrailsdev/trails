@@ -122,3 +122,10 @@ describe("Parser::MULTIPART_CONTENT_TYPE", () => {
     expect(file.type).toBe("text/plain\r; x=1");
   });
 });
+
+describe("Parser#dequote", () => {
+  it("strips quotes from a value with a trailing newline, as Ruby's \\Z anchor does", () => {
+    expect(new Parser("b", null, 1024, qp).dequote('"hello"\n')).toBe("hello");
+    expect(new Parser("b", null, 1024, qp).dequote('"hello"\n\n')).toBe('"hello"\n\n');
+  });
+});

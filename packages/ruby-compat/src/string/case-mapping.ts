@@ -94,6 +94,7 @@ function titlecaseChar(c: string, flags: CaseFlags): string {
  */
 export function upcase(str: string, argv: unknown[]): string {
   const flags = checkCaseOptions(argv, false);
+  if (!flags.ascii && /\p{Surrogate}/u.test(str)) throw new ArgumentError("input string invalid");
   return Array.from(str, (c) => upcaseChar(c, flags)).join("");
 }
 

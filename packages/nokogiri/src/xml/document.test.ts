@@ -18,7 +18,8 @@ describe("Nokogiri::XML::Document", () => {
   it("parse collects errors on malformed input", () => {
     doc = XmlDocument.parse("<unclosed");
     expect(doc.errors.length).toBeGreaterThan(0);
-    expect(doc.errors[0].level).toBe("fatal");
+    expect(doc.errors[0].level).toBe(3);
+    expect(doc.errors[0].isFatal()).toBe(true);
   });
 
   it("root node has children", () => {

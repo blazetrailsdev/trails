@@ -20,6 +20,12 @@ describe("SignedGlobalIDExpirationTest", () => {
   beforeEach(() => GlobalID.setApp(TEST_APP));
   afterEach(() => (GlobalID["_app"] = undefined));
 
+  it("emits Ruby's snake_case expires_in query key and parses it back", () => {
+    const sgid = SignedGlobalID.create(person(), { expiresIn: 60, verifier: makeVerifier() });
+    expect(sgid.uri.toString()).toBe("gid://bcx/Person/5?expires_in=60");
+    expect(GlobalID.parse(sgid.uri.toString())!.params!.get("expires_in")).toBe("60");
+  });
+
   it("expires_at: undefined falls through to expires_in (spread-defaults case)", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), {

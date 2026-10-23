@@ -37,3 +37,9 @@ describe("Rack::QueryParser::ParamsTooDeepError", () => {
     expect(new ParamsTooDeepError("x").name).toBe("QueryLimitError");
   });
 });
+
+it("handles separator strings containing regex metacharacters without throwing", () => {
+  const queryParser = QueryParser.makeDefault(32);
+  expect(queryParser.parseQuery("a=1|b=2", "|")).toEqual({ a: "1", b: "2" });
+  expect(queryParser.parseNestedQuery("a=1|b=2", "|")).toEqual({ a: "1", b: "2" });
+});

@@ -482,22 +482,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "class-based `only:` cases are covered by the matching non-module " +
       "tests in the same file.",
   },
-  // --- globalid: module-based `only:` filters on GlobalID#find (same as above) ---
-  {
-    testFile: "global_id_test.rb",
-    className: "GlobalIDCreationTest",
-    tests: [
-      "find with module",
-      "find with module no match",
-      "find with multiple module",
-      "find with multiple module no match",
-    ],
-    reason:
-      "Ruby `only:` accepts a Module to filter records whose class includes " +
-      "that module. TypeScript has no module-include relationship for " +
-      "classes; the class-based equivalents (`find with class`, `find with " +
-      "multiple class`) cover the same routing logic.",
-  },
   // --- globalid: eager-loading `includes:` (AR feature, out of GlobalID scope) ---
   {
     testFile: "global_locator_test.rb",

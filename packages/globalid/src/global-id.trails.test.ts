@@ -24,7 +24,7 @@ describe("GlobalID (trails)", () => {
       locateMany: async () => [sentinel],
     };
     try {
-      await GlobalID.defaultLocator(myLocator);
+      GlobalID.defaultLocator(myLocator);
       expect(Locator.defaultLocator).toBe(myLocator);
     } finally {
       Locator.defaultLocator = previous;

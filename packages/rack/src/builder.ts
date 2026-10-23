@@ -65,11 +65,11 @@ export class Builder {
     const builder = new this(null, options);
     const binding = rbFSend(BUILDER_TOPLEVEL_BINDING, "call", builder) as Builder;
     const source =
-      `"use strict";\n${builderScript}` +
+      `(function (builder) { "use strict"; ${builderScript}\n})` +
       `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
     let configFn: (b: Builder) => void;
     try {
-      configFn = new Function("builder", source) as (b: Builder) => void;
+      configFn = (0, eval)(source) as (b: Builder) => void;
     } catch (err) {
       throw new Error(`Error parsing config from ${path}: ${(err as Error).message}`, {
         cause: err,

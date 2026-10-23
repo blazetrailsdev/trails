@@ -248,6 +248,8 @@ function includes(received: unknown, e: unknown): boolean {
       );
     return hashHas(received, e);
   }
+  if (received != null && typeof (received as { isInclude?: unknown }).isInclude === "function")
+    return (received as { isInclude(e: unknown): boolean }).isInclude(e);
   if (received != null && typeof (received as Iterable<unknown>)[Symbol.iterator] === "function")
     return [...(received as Iterable<unknown>)].some((x) => rbEqual(e, x));
   return false;
