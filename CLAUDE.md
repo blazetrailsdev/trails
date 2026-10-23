@@ -995,7 +995,7 @@ Two shapes are sanctioned, and only these:
   mirroring Rails' `autoload` lists: each autoloaded constant is seated by its
   defining module with a plain assignment, `Owner.Name = Klass`, type-checked
   against the namespace object's declared property, and read as a property
-  at call time (`new Nodes.Not(this)`, `ActiveRecord.Base`). A constant Rails
+  at call time (`new Nodes.Grouping(expr)`, `ActiveRecord.Base`). A constant Rails
   `require`s rather than autoloads is seated with no `autoload` call. Ruby's
   top-level `Object` is `TopLevel` in `activesupport/src/namespaces.ts`: the
   defining gem seats it (`TopLevel.Trails = Trails`) and a reader names it at
@@ -1003,7 +1003,7 @@ Two shapes are sanctioned, and only these:
   `defined?`. A `globalThis` seat was rejected because a `declare global` in a
   published `.d.ts` reaches every consumer.
 
-  A seat registers nothing. A class's Ruby path (`Arel::Nodes::Not`) is
+  A seat registers nothing. A class's Ruby path (`Arel::Nodes::Grouping`) is
   derived on its first `rbModName` read from the registered namespace objects,
   each of which carries its own path in `name`: the first one holding the class
   as an own property gives `owner.name + "::" + key`, memoized (RFC 0205).
