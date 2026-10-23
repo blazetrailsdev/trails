@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { LoadError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat";
 import { SubscriptionAdapter } from "../namespaces.js";
 import { Configuration } from "./configuration.js";
+import { Inline } from "../subscription-adapter/inline.js";
 
 class Async {}
 class PostgreSQL {}
@@ -9,11 +10,11 @@ const loaded: string[] = [];
 Object.assign(SubscriptionAdapter.loadPath, {
   "action_cable/subscription_adapter/async": async () => {
     loaded.push("async");
-    rbModConstSet(SubscriptionAdapter, "Async", Async);
+    return { Async };
   },
   "action_cable/subscription_adapter/postgresql": async () => {
     loaded.push("postgresql");
-    rbModConstSet(SubscriptionAdapter, "PostgreSQL", PostgreSQL);
+    return { PostgreSQL };
   },
   "action_cable/subscription_adapter/redis": async () => {
     loaded.push("redis");
@@ -44,6 +45,12 @@ describe("ActionCable::Server::Configuration", () => {
     config.cable = { adapter: "async" };
     expect(await config.pubsubAdapter()).toBe(Async);
     expect(loaded).toEqual(["async"]);
+  });
+
+  it("resolves a built-in adapter with nothing registered", async () => {
+    const config = new Configuration();
+    config.cable = { adapter: "inline" };
+    expect(await config.pubsubAdapter()).toBe(Inline);
   });
 
   it("fixes up PostgreSQL", async () => {

@@ -1,4 +1,4 @@
-import { camelize, constantize } from "@blazetrails/activesupport";
+import { camelize } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { CONTENT_TYPE } from "@blazetrails/rack";
 import {
@@ -11,6 +11,12 @@ import {
   rbObjClass,
 } from "@blazetrails/ruby-compat";
 import { ActionCable, Server } from "../namespaces.js";
+
+const BUILT_IN_ADAPTERS: Record<string, () => Promise<Record<string, unknown>>> = {
+  "action_cable/subscription_adapter/inline": () => import("../subscription-adapter/inline.js"),
+  "action_cable/subscription_adapter/async": () => import("../subscription-adapter/async.js"),
+  "action_cable/subscription_adapter/test": () => import("../subscription-adapter/test.js"),
+};
 
 type RackResponse = [number, Record<string, string>, unknown[]];
 
@@ -55,13 +61,13 @@ export class Configuration {
     );
 
     const pathToAdapter = `action_cable/subscription_adapter/${adapter}`;
-    const require = async (path: string): Promise<void> => {
-      const load = ActionCable.SubscriptionAdapter.loadPath[path];
+    const require = async (path: string): Promise<Record<string, unknown>> => {
+      const load = ActionCable.SubscriptionAdapter.loadPath[path] ?? BUILT_IN_ADAPTERS[path];
       if (load === undefined) {
         throw Object.assign(new LoadError(`cannot load such file -- ${path}`), { path });
       }
       try {
-        await load();
+        return (await load()) as Record<string, unknown>;
       } catch (e) {
         if ((e as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND") throw e;
         throw Object.assign(new LoadError((e as Error).message, { cause: e }), {
@@ -69,8 +75,9 @@ export class Configuration {
         });
       }
     };
+    let feature: Record<string, unknown>;
     try {
-      await require(pathToAdapter);
+      feature = await require(pathToAdapter);
     } catch (e) {
       if (!(e instanceof LoadError)) throw e;
       const klass = rbObjClass(e) as typeof LoadError;
@@ -91,7 +98,7 @@ export class Configuration {
 
     adapter = camelize(adapter);
     if (adapter === "Postgresql") adapter = "PostgreSQL";
-    return constantize(`ActionCable::SubscriptionAdapter::${adapter}`);
+    return feature[adapter];
   }
 }
 

@@ -70,7 +70,7 @@ function queueDoPop<T>(
  * blocked in `pop` sleeps until a `push` wakes it; here `pop` is a promise that
  * the waking `push` resolves. Only the members trails calls are ported
  * (`packages/ruby-compat/README.md` rule 1): there is no `close`, `closed?`,
- * `empty?`, `num_waiting` or `SizedQueue#max=`, so no queue is ever
+ * `num_waiting` or `SizedQueue#max=`, so no queue is ever
  * closed and `push` never raises `ClosedQueueError`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue`
@@ -125,6 +125,16 @@ export class Queue<T = unknown> {
    */
   get length(): number {
     return queuePtr<T>(this).que.length;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/thread_sync.c:1175` `rb_queue_empty_p`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue#empty?`
+   * (`vendor/ruby/v3.3.11/thread_sync.c:1175`).
+   */
+  isEmpty(): boolean {
+    return queuePtr<T>(this).que.length === 0;
   }
 
   /**

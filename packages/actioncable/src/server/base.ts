@@ -5,6 +5,7 @@ import { StreamEventLoop } from "../connection/stream-event-loop.js";
 import { Broadcasting } from "./broadcasting.js";
 import { Configuration } from "./configuration.js";
 import { Connections } from "./connections.js";
+import { RemoteConnections } from "../remote-connections.js";
 import { Worker } from "./worker.js";
 
 interface Connection {
@@ -20,10 +21,6 @@ interface ConnectionClass {
 interface PubSub {
   broadcast(channel: string, payload: unknown): unknown;
   shutdown(): unknown;
-}
-
-interface RemoteConnections {
-  where(identifiers: unknown): { disconnect(): unknown };
 }
 
 type Logger = { debug(progname: unknown, block: () => unknown): unknown };
@@ -66,7 +63,7 @@ export class Base {
     return new (this.config.connectionClass() as ConnectionClass)(this, env).process();
   }
 
-  disconnect(identifiers: unknown): unknown {
+  disconnect(identifiers: Record<string, unknown>): unknown {
     return this.remoteConnections.where(identifiers).disconnect();
   }
 
@@ -85,9 +82,7 @@ export class Base {
   }
 
   get remoteConnections(): RemoteConnections {
-    return (this._remoteConnections ??= new (
-      ActionCable as unknown as { RemoteConnections: new (server: Base) => RemoteConnections }
-    ).RemoteConnections(this));
+    return (this._remoteConnections ??= new RemoteConnections(this));
   }
 
   get eventLoop(): StreamEventLoop {
