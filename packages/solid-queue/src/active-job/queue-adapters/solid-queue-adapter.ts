@@ -1,5 +1,4 @@
 import { Time } from "@blazetrails/date";
-import "../../job.js";
 import { Job } from "../../job.js";
 
 type ActiveJob = Parameters<typeof Job.enqueue>[0];
