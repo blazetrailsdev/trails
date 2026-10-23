@@ -194,3 +194,30 @@ export class Post extends Struct.new(
   tags: unknown;
   setTagsAttributes(_attributes: unknown): void {}
 }
+
+export const Blog = { name: "Blog", isUseRelativeModelNaming: () => true } as {
+  name: string;
+  isUseRelativeModelNaming(): boolean;
+  Post: new (title: string, id: unknown) => { title: string; id: unknown };
+};
+registerConstant("Blog", Blog);
+
+rbModConstSet(
+  Blog,
+  "Post",
+  class Post {
+    static {
+      extend(this, Naming);
+      include(this, Conversion);
+    }
+
+    constructor(
+      public title: string,
+      public id: unknown,
+    ) {}
+
+    isPersisted(): boolean {
+      return isPresent(this.id);
+    }
+  },
+);
