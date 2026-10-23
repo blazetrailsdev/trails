@@ -11,7 +11,13 @@ import {
   TopLevel,
 } from "@blazetrails/activesupport";
 import { Runtime } from "@blazetrails/rack";
-import { LoadError, rbObjRespondTo, StandardError, STDERR } from "@blazetrails/ruby-compat";
+import {
+  LoadError,
+  rbModConstGet,
+  rbObjRespondTo,
+  StandardError,
+  STDERR,
+} from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 
 export interface BootstrapConfig {
@@ -66,10 +72,16 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, asyn
 
   if (TopLevel.Trails!.logger instanceof BroadcastLogger) {
     if (this.config.broadcastLogLevel != null) {
-      TopLevel.Trails!.logger.level = this.config.broadcastLogLevel;
+      TopLevel.Trails!.logger.level = rbModConstGet(
+        Logger,
+        String(this.config.broadcastLogLevel).replace(/^:/, "").toUpperCase(),
+      ) as number;
     }
   } else {
-    TopLevel.Trails!.logger.level = this.config.logLevel;
+    TopLevel.Trails!.logger.level = rbModConstGet(
+      Logger,
+      String(this.config.logLevel).replace(/^:/, "").toUpperCase(),
+    ) as number;
     const broadcastLogger = new BroadcastLogger(TopLevel.Trails!.logger);
     broadcastLogger.formatter = TopLevel.Trails!.logger.formatter;
     TopLevel.Trails!.logger = broadcastLogger;

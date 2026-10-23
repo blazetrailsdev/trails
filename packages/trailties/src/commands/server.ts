@@ -1,11 +1,5 @@
-import {
-  type BroadcastLogger,
-  getEnv,
-  isBlank,
-  Logger,
-  presence,
-} from "@blazetrails/activesupport";
-import { getFs, getPath, setEnv, STDERR, STDOUT } from "@blazetrails/ruby-compat";
+import { type BroadcastLogger, getEnv, Logger, presence } from "@blazetrails/activesupport";
+import { block, fetch, getFs, getPath, setEnv, STDERR, STDOUT } from "@blazetrails/ruby-compat";
 import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { Handler, type RackEnv } from "@blazetrails/rack";
@@ -69,12 +63,11 @@ export function serverCommand(): Command {
   return cmd;
 }
 
-interface ServerOptions {
+type ServerOptions = {
   binding?: string;
   environment?: string;
   logToStdout?: boolean;
-  daemon?: boolean;
-}
+};
 
 /** @internal */
 function logToStdout(): void {
@@ -89,7 +82,11 @@ function logToStdout(): void {
 
 /** @internal */
 function isLogToStdout(options: ServerOptions): boolean {
-  return options.logToStdout ?? (isBlank(options.daemon) && environment(options) === "development");
+  return fetch<boolean>(
+    options,
+    "logToStdout",
+    block(() => environment(options) === "development"),
+  );
 }
 
 function setEnvironment(options: ServerOptions): void {
