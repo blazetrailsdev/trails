@@ -1,6 +1,7 @@
 import {
   ArgumentError,
   EOFError,
+  Enumerable,
   Encoding,
   Errno,
   File,
@@ -200,6 +201,7 @@ export class TempfilePart extends MimePart {
   }
 }
 
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (`rack/multipart/parser.rb:139`); the class/interface merge is how a mixin surfaces on the type side. */
 /** @internal */
 export class Collector {
   private mimeParts: (BufferPart | TempfilePart)[] = [];
@@ -208,10 +210,6 @@ export class Collector {
 
   each(cb: (part: BufferPart | TempfilePart) => void) {
     this.mimeParts.forEach((part) => cb(part));
-  }
-
-  findAll(predicate: (part: BufferPart | TempfilePart) => boolean): (BufferPart | TempfilePart)[] {
-    return this.mimeParts.filter((part) => predicate(part));
   }
 
   onMimeHead(
@@ -267,6 +265,15 @@ export class Collector {
     }
   }
 }
+
+/** @internal */
+export interface Collector {
+  /** @noRailsEquivalent PERMANENT */
+  findAll(block: (part: BufferPart | TempfilePart) => unknown): (BufferPart | TempfilePart)[];
+}
+/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+
+include(Collector, Enumerable);
 
 type State = "FAST_FORWARD" | "CONSUME_TOKEN" | "MIME_HEAD" | "MIME_BODY" | "DONE";
 const CONTENT_DISPOSITION_MAX_PARAMS = 16;
@@ -371,7 +378,7 @@ export class Parser {
 
   /** @internal */
   dequote(str: string): string {
-    const m = /^"([^\n]*)"$/.exec(str);
+    const m = /^"([^\n]*)"(?=\n?$)/.exec(str);
     return (m ? m[1] : str).replace(/\\([^\n])/g, "$1");
   }
 

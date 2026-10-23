@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbFSend, upcase } from "@blazetrails/ruby-compat";
 import { REQUEST_METHOD, RACK_METHODOVERRIDE_ORIGINAL_METHOD, RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
@@ -36,16 +36,14 @@ export class MethodOverride {
 
   private methodOverride(env: Record<string, any>): string | null {
     const req = new Request(env);
-    const method = this.methodOverrideParam(req) || env[HTTP_METHOD_OVERRIDE_HEADER] || null;
-    if (method) {
-      try {
-        return method.toString().toUpperCase();
-      } catch {
-        env[RACK_ERRORS].puts("Invalid string for method");
-        return null;
-      }
+    const method = this.methodOverrideParam(req) ?? env[HTTP_METHOD_OVERRIDE_HEADER];
+    try {
+      return upcase(String(method ?? ""), []);
+    } catch (e) {
+      if (!(e instanceof ArgumentError)) throw e;
+      env[RACK_ERRORS].puts("Invalid string for method");
+      return null;
     }
-    return null;
   }
 
   private methodOverrideParam(req: Request): string | null {

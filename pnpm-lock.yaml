@@ -464,6 +464,10 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/activemodel':
+        specifier: workspace:*
+        version: link:../activemodel
 
   packages/html-sanitizer:
     dependencies:

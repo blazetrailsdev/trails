@@ -256,7 +256,15 @@ export abstract class Base {
 
     const deepInterpolation = options.deepInterpolation;
     const skipInterpolation = options.skipInterpolation;
-    const values = Object.keys(options).length > 0 ? except(options, ...RESERVED_KEYS) : undefined;
+    const values =
+      Object.keys(options).length > 0
+        ? except(
+            options,
+            ...RESERVED_KEYS.map((key) =>
+              key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()),
+            ),
+          )
+        : undefined;
     if (!truthy(skipInterpolation) && values && Object.keys(values).length > 0) {
       entry = truthy(deepInterpolation)
         ? this.deepInterpolate(locale!, entry, values)

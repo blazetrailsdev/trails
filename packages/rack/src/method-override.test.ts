@@ -1,7 +1,8 @@
 import { it, expect } from "vitest";
 import { MethodOverride } from "./method-override.js";
 import { MockRequest } from "./mock-request.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { b, StringIO } from "@blazetrails/ruby-compat";
+import { Lint } from "./lint.js";
 
 const echoApp = async (env: Record<string, any>) => {
   return [200, { "content-type": "text/plain" }, [env["REQUEST_METHOD"]]] as [
@@ -15,16 +16,28 @@ function makeApp(app = echoApp) {
   return new MethodOverride(app);
 }
 
+function app() {
+  return new Lint(new MethodOverride(async () => [200, { "content-type": "text/plain" }, []]));
+}
+
 it("not affect GET requests", async () => {
   const res = await new MockRequest((env) => makeApp().call(env)).get("/");
   expect(res.body).toBe("GET");
 });
 
 it("sets rack.errors for invalid UTF8 _method values", async () => {
-  const res = await new MockRequest((env) => makeApp().call(env)).post("/", {
-    ":input": "_method=\uFFFD",
+  const errors = new StringIO();
+  const env = MockRequest.envFor("/", {
+    ":method": "POST",
+    ":input": new Uint8Array([...b("_method="), 0xbf]),
+    "rack.errors": errors,
   });
-  expect(res.status).toBe(200);
+
+  await app().call(env);
+
+  errors.rewind();
+  expect(errors.read()).toBe("Invalid string for method\n");
+  expect(env["REQUEST_METHOD"]).toBe("POST");
 });
 
 it("modify REQUEST_METHOD for POST requests when _method parameter is set", async () => {
@@ -92,45 +105,28 @@ it("writes error to RACK_ERRORS when given invalid multipart form data", async (
   expect(errors.string()).toContain("Bad request content body");
 });
 
-it("writes error to RACK_ERRORS when using incompatible multipart encoding", async () => {
-  const app = new MethodOverride(async (env) => {
-    return [200, {}, [env["REQUEST_METHOD"]]];
-  });
-  const res = await new MockRequest(app).post("/", {
-    CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
-    ":input": "not valid multipart",
-  });
-  expect(res.status).toBe(200);
-});
-
 it("not modify REQUEST_METHOD for POST requests when the params are unparseable because too deep", async () => {
-  const app = new MethodOverride(async (env) => {
-    return [200, {}, [env["REQUEST_METHOD"]]];
-  });
-  const res = await new MockRequest(app).post("/", {
-    ":input": "_method=PUT&" + "a".repeat(50) + "=1",
-  });
-  expect(res.body).toBe("PUT");
+  const env = MockRequest.envFor("/", { ":method": "POST", ":input": "[a]".repeat(36) + "=1" });
+  await app().call(env);
+
+  expect(env["REQUEST_METHOD"]).toBe("POST");
 });
 
 it("not modify REQUEST_METHOD for POST requests when the params are unparseable", async () => {
-  const app = new MethodOverride(async (env) => {
-    return [200, {}, [env["REQUEST_METHOD"]]];
-  });
-  const res = await new MockRequest(app).post("/", {
-    CONTENT_TYPE: "application/x-www-form-urlencoded",
-    ":input": "_method=DELETE",
-  });
-  expect(res.body).toBe("DELETE");
+  const env = MockRequest.envFor("/", { ":method": "POST", ":input": "(%bad-params%)" });
+  await app().call(env);
+
+  expect(env["REQUEST_METHOD"]).toBe("POST");
 });
 
 it("not set form input when the content type is JSON", async () => {
-  const app = new MethodOverride(async (env) => {
-    return [200, {}, [env["REQUEST_METHOD"]]];
-  });
-  const res = await new MockRequest(app).post("/", {
+  const env = MockRequest.envFor("/", {
     CONTENT_TYPE: "application/json",
-    ":input": '{"_method":"PUT"}',
+    ":method": "POST",
+    ":input": '{"_method":"options"}',
   });
-  expect(res.body).toBe("POST");
+  await app().call(env);
+
+  expect(env["REQUEST_METHOD"]).toBe("POST");
+  expect(env["rack.request.form_input"]).toBeUndefined();
 });

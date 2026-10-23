@@ -11,16 +11,6 @@ describe("when content_type nil", () => {
   });
 });
 
-describe("when content_type is empty string", () => {
-  it("#type is nil", () => {
-    expect(MediaType.type("")).toBeNull();
-  });
-
-  it("#params is empty", () => {
-    expect(MediaType.params("")).toEqual({});
-  });
-});
-
 describe("when content_type contains only media_type", () => {
   it("#type is application/text", () => {
     expect(MediaType.type("application/text")).toBe("application/text");

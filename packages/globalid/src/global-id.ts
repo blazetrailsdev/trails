@@ -14,6 +14,7 @@ import {
   Deprecation,
   extend,
   type Extended,
+  underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError, block, fetch, rbHash } from "@blazetrails/ruby-compat";
 
@@ -85,7 +86,7 @@ export class GlobalID {
     const { app: _a, verifier: _v, for: _f, ...rest } = opts;
     const filteredParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(rest)) {
-      if (v != null) filteredParams[k] = String(v);
+      if (v != null) filteredParams[underscore(k)] = String(v);
     }
     const params = Object.keys(filteredParams).length ? filteredParams : null;
     return new this(GID.create(app, model, params), options);
@@ -121,9 +122,8 @@ export class GlobalID {
     }
   }
 
-  static async defaultLocator(defaultLocator: LocatorLike): Promise<void> {
-    const { Locator } = await import("./locator.js");
-    Locator.defaultLocator = defaultLocator;
+  static defaultLocator(defaultLocator: LocatorLike): void {
+    GlobalID.Locator.defaultLocator = defaultLocator;
   }
 
   toParam(): string {
@@ -172,8 +172,7 @@ export class GlobalID {
   }
 
   async find(options?: LocateOptions): Promise<unknown | null> {
-    const { Locator } = await import("./locator.js");
-    return Locator.locate(this, options);
+    return GlobalID.Locator.locate(this, options);
   }
 }
 

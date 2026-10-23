@@ -28,6 +28,13 @@ describe("I18n.interpolate", () => {
     expect(() => interpolate("%{scope}", { scope: "x" })).toThrow(ReservedInterpolationKey);
   });
 
+  it("matches reserved keys by their Ruby spelling only", () => {
+    expect(() => interpolate("%{deep_interpolation}", { deep_interpolation: "x" })).toThrow(
+      ReservedInterpolationKey,
+    );
+    expect(interpolate("%{deepInterpolation}", { deepInterpolation: "x" })).toBe("x");
+  });
+
   it("formats %<> placeholders the way sprintf does", () => {
     const cases: [string, unknown, string][] = [
       ["%<v>#x", 255, "0xff"],

@@ -4,6 +4,7 @@ import { Time } from "@blazetrails/date";
 import { CommonLogger } from "./common-logger.js";
 import { MockRequest } from "./mock-request.js";
 import { Lint } from "./lint.js";
+import type {} from "@blazetrails/vitest-matchers";
 
 const length = 6;
 const app = new Lint(
@@ -101,7 +102,7 @@ it("log in common log format", async () => {
   expect(time).toBe(Time.at(0).strftime("%d/%b/%Y:%H:%M:%S %z"));
   expect(method).toBe("GET");
   expect(status).toBe("200");
-  expect(new Range(0, 1).isInclude(parseFloat(duration))).toBeTruthy();
+  expect(new Range(0, 1)).toInclude(parseFloat(duration));
 });
 
 it("escapes non printable characters including newline", async () => {
