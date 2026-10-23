@@ -316,7 +316,9 @@ await Base.establishConnection({ adapter: "postgresql", url: process.env.DATABAS
 with migrations, `belongsTo` / `hasMany` / `hasMany … through`
 (self-referential follows), scopes typed on `Relation<T>`, validations, eager
 loading and error mapping. `pnpm smoke` runs the whole flow against an
-in-memory database (`TRAILS_ENV=test`), and ends with `Smoke test passed ✅`.
+in-memory database (`TRAILS_ENV=test`). It currently fails: the example's
+migrations extend `Migration` directly, which raises since #8794
+(`twitter-clone-smoke-migrations-extend-migration-directly`).
 
 ## Contributing and measuring parity
 
