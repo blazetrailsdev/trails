@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import "./test-helpers/dummy-application.js";
 import { Base as ARBase } from "@blazetrails/activerecord";
 import {
   permanentConnectionCheckout,

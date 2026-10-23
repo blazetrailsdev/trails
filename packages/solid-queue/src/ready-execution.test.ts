@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import "./test-helpers/dummy-application.js";
 import { assertDifference, assertNoDifference } from "@blazetrails/activesupport";
 import type { Relation } from "@blazetrails/activerecord";
 import {
