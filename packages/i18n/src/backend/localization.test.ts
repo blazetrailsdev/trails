@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import * as TestCase from "../test-helpers/test-case.js";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { Simple } from "./simple.js";
-import { config, l, resetConfig } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
+import { config, l } from "../i18n.js";
 import { ArgumentError, MissingTranslationData } from "../exceptions.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime as RubyDateTime } from "@blazetrails/date";
@@ -188,9 +188,8 @@ describe("I18nSimpleBackendApiTest", () => {
   let datetime: RubyDateTime;
   let otherDatetime: RubyDateTime;
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     config().backend = new Simple();
     config().enforceAvailableLocales = false;
     setupDateTranslations();
@@ -202,6 +201,7 @@ describe("I18nSimpleBackendApiTest", () => {
     datetime = new RubyDateTime(2008, 3, 1, 6);
     otherDatetime = new RubyDateTime(2008, 3, 1, 18);
   });
+  afterEach(TestCase.teardown);
 
   it("localize Date: given the short format it uses it", () => {
     expect(l(date, { format: ":short", locale: "de" })).toBe("01. Mär");

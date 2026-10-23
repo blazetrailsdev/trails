@@ -1,5 +1,7 @@
+import * as TestCase from "./test-helpers/test-case.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, Disabled, InvalidLocale, NoMethodError } from "./exceptions.js";
+import type { Locale } from "./i18n.js";
 import * as I18n from "./i18n.js";
 import {
   RESERVED_KEYS,
@@ -17,7 +19,6 @@ import {
   normalizeKeys,
   reloadBang,
   reserveKey,
-  resetConfig,
   setConfig,
   setAvailableLocales,
   setBackend,
@@ -30,7 +31,7 @@ import {
   transliterate,
   withLocale,
 } from "./i18n.js";
-import { Config, resetClassConfig } from "./config.js";
+import { Config } from "./config.js";
 import { Simple } from "./backend/simple.js";
 import type { TranslationKey } from "./i18n.js";
 
@@ -45,9 +46,8 @@ describe("I18nTest", () => {
     return customExceptionHandler;
   }
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     config().backend = new Simple();
     config().enforceAvailableLocales = false;
 
@@ -55,6 +55,7 @@ describe("I18nTest", () => {
     storeTranslations("nl", { currency: { format: { separator: ",", delimiter: "." } } });
     storeTranslations("en", { true: "Yes", false: "No" });
   });
+  afterEach(TestCase.teardown);
 
   afterEach(() => {
     delete (I18n as unknown as Record<string, unknown>).customExceptionHandler;
@@ -284,15 +285,25 @@ describe("I18nTest", () => {
   });
 
   it("can use a lambda as an exception handler", () => {
-    setExceptionHandler((_exception, _locale, key) => key);
-    expect(translate("test_proc_handler")).toBe("test_proc_handler");
+    const previousExceptionHandler = config().exceptionHandler;
+    try {
+      setExceptionHandler((_exception, _locale, key) => key);
+      expect(translate("test_proc_handler")).toBe("test_proc_handler");
+    } finally {
+      setExceptionHandler(previousExceptionHandler);
+    }
   });
 
   it("can use an object responding to #call as an exception handler", () => {
-    setExceptionHandler({
-      call: (_exception: Error, _locale: string, key: TranslationKey) => key,
-    });
-    expect(translate("test_proc_handler")).toBe("test_proc_handler");
+    const previousExceptionHandler = config().exceptionHandler;
+    try {
+      setExceptionHandler({
+        call: (_exception: Error, _locale: string, key: TranslationKey) => key,
+      });
+      expect(translate("test_proc_handler")).toBe("test_proc_handler");
+    } finally {
+      setExceptionHandler(previousExceptionHandler);
+    }
   });
 
   it("I18n.with_locale temporarily sets the given locale", () => {
@@ -318,23 +329,33 @@ describe("I18nTest", () => {
   });
 
   it("I18n.transliterate handles I18n::ArgumentError exception", () => {
-    storeTranslations("en", { i18n: { transliterate: { rule: "not a rule" } } });
-    const exceptionHandler = vi.fn(() => {
-      throw new ArgumentError();
-    });
-    setExceptionHandler(exceptionHandler);
+    const previousExceptionHandler = config().exceptionHandler;
+    try {
+      storeTranslations("en", { i18n: { transliterate: { rule: "not a rule" } } });
+      const exceptionHandler = vi.fn(() => {
+        throw new ArgumentError();
+      });
+      setExceptionHandler(exceptionHandler);
 
-    expect(() => transliterate("ąćó")).toThrow(ArgumentError);
-    expect(exceptionHandler).toHaveBeenCalled();
+      expect(() => transliterate("ąćó")).toThrow(ArgumentError);
+      expect(exceptionHandler).toHaveBeenCalled();
+    } finally {
+      setExceptionHandler(previousExceptionHandler);
+    }
   });
 
   it("I18n.transliterate raises I18n::ArgumentError exception", () => {
-    storeTranslations("en", { i18n: { transliterate: { rule: "not a rule" } } });
-    const exceptionHandler = vi.fn();
-    setExceptionHandler(exceptionHandler);
+    const previousExceptionHandler = config().exceptionHandler;
+    try {
+      storeTranslations("en", { i18n: { transliterate: { rule: "not a rule" } } });
+      const exceptionHandler = vi.fn();
+      setExceptionHandler(exceptionHandler);
 
-    expect(() => transliterate("ąćó", { raise: true })).toThrow(ArgumentError);
-    expect(exceptionHandler).not.toHaveBeenCalled();
+      expect(() => transliterate("ąćó", { raise: true })).toThrow(ArgumentError);
+      expect(exceptionHandler).not.toHaveBeenCalled();
+    } finally {
+      setExceptionHandler(previousExceptionHandler);
+    }
   });
 
   it("transliterate given an unavailable locale rases an I18n::InvalidLocale", () => {
@@ -374,8 +395,12 @@ describe("I18nTest", () => {
   });
 
   it("raises an I18n::InvalidLocale exception when setting an unavailable default locale", () => {
-    config().enforceAvailableLocales = true;
-    expect(() => setDefaultLocale("klingon")).toThrow(InvalidLocale);
+    try {
+      config().enforceAvailableLocales = true;
+      expect(() => setDefaultLocale("klingon")).toThrow(InvalidLocale);
+    } finally {
+      config().enforceAvailableLocales = false;
+    }
   });
 
   it("uses the default locale as a locale by default", () => {
@@ -387,8 +412,12 @@ describe("I18nTest", () => {
   });
 
   it("raises an I18n::InvalidLocale exception when setting an unavailable locale", () => {
-    config().enforceAvailableLocales = true;
-    expect(() => setLocale("klingon")).toThrow(InvalidLocale);
+    try {
+      config().enforceAvailableLocales = true;
+      expect(() => setLocale("klingon")).toThrow(InvalidLocale);
+    } finally {
+      config().enforceAvailableLocales = false;
+    }
   });
 
   it("can set the configuration object", () => {
@@ -498,14 +527,22 @@ describe("I18nTest", () => {
   });
 
   it("I18n.enforce_available_locales! raises an I18n::InvalidLocale when the passed locale is unavailable", () => {
-    config().enforceAvailableLocales = true;
-    expect(() => enforceAvailableLocalesBang("klingon")).toThrow(InvalidLocale);
+    try {
+      config().enforceAvailableLocales = true;
+      expect(() => enforceAvailableLocalesBang("klingon")).toThrow(InvalidLocale);
+    } finally {
+      config().enforceAvailableLocales = false;
+    }
   });
 
   it("I18n.enforce_available_locales! does nothing when the passed locale is available", () => {
     setAvailableLocales(["en", "de"]);
-    config().enforceAvailableLocales = true;
-    expect(() => enforceAvailableLocalesBang("en")).not.toThrow();
+    try {
+      config().enforceAvailableLocales = true;
+      expect(() => enforceAvailableLocalesBang("en")).not.toThrow();
+    } finally {
+      config().enforceAvailableLocales = false;
+    }
   });
 
   it("I18n.enforce_available_locales config can be set to false", () => {
@@ -514,49 +551,60 @@ describe("I18nTest", () => {
   });
 
   it("available_locales can be replaced at runtime", () => {
-    config().enforceAvailableLocales = true;
-    expect(() => t("foo", { locale: "klingon" })).toThrow(InvalidLocale);
-    setAvailableLocales(["klingon"]);
-    t("foo", { locale: "klingon" });
+    let oldLocales: Locale[] = [];
+    try {
+      config().enforceAvailableLocales = true;
+      expect(() => t("foo", { locale: "klingon" })).toThrow(InvalidLocale);
+      oldLocales = config().availableLocales;
+      config().availableLocales = ["klingon"];
+      t("foo", { locale: "klingon" });
+    } finally {
+      config().enforceAvailableLocales = false;
+      config().availableLocales = oldLocales;
+    }
   });
 
   it("I18n.reload! reloads the set of locales that are enforced", async () => {
-    setBackend(new Simple());
+    try {
+      setBackend(new Simple());
 
-    expect(!availableLocales().includes("de")).toBeTruthy();
+      expect(!availableLocales().includes("de")).toBeTruthy();
 
-    config().enforceAvailableLocales = true;
+      config().enforceAvailableLocales = true;
 
-    expect(() => setDefaultLocale("de")).toThrow(InvalidLocale);
-    expect(() => setLocale("de")).toThrow(InvalidLocale);
+      expect(() => setDefaultLocale("de")).toThrow(InvalidLocale);
+      expect(() => setLocale("de")).toThrow(InvalidLocale);
 
-    storeTranslations("de", { foo: "Foo in :de" });
+      storeTranslations("de", { foo: "Foo in :de" });
 
-    expect(() => setDefaultLocale("de")).toThrow(InvalidLocale);
-    expect(() => setLocale("de")).toThrow(InvalidLocale);
+      expect(() => setDefaultLocale("de")).toThrow(InvalidLocale);
+      expect(() => setLocale("de")).toThrow(InvalidLocale);
 
-    await reloadBang();
+      await reloadBang();
 
-    storeTranslations("en", { foo: "Foo in :en" });
-    storeTranslations("de", { foo: "Foo in :de" });
-    storeTranslations("pl", { foo: "Foo in :pl" });
+      storeTranslations("en", { foo: "Foo in :en" });
+      storeTranslations("de", { foo: "Foo in :de" });
+      storeTranslations("pl", { foo: "Foo in :pl" });
 
-    expect(availableLocales().includes("de")).toBeTruthy();
-    expect(availableLocales().includes("en")).toBeTruthy();
-    expect(availableLocales().includes("pl")).toBeTruthy();
+      expect(availableLocales().includes("de")).toBeTruthy();
+      expect(availableLocales().includes("en")).toBeTruthy();
+      expect(availableLocales().includes("pl")).toBeTruthy();
 
-    expect(() => {
-      setDefaultLocale("en");
-      setLocale("en");
-    }).not.toThrow();
-    expect(() => {
-      setDefaultLocale("de");
-      setLocale("de");
-    }).not.toThrow();
-    expect(() => {
-      setDefaultLocale("pl");
-      setLocale("pl");
-    }).not.toThrow();
+      expect(() => {
+        setDefaultLocale("en");
+        setLocale("en");
+      }).not.toThrow();
+      expect(() => {
+        setDefaultLocale("de");
+        setLocale("de");
+      }).not.toThrow();
+      expect(() => {
+        setDefaultLocale("pl");
+        setLocale("pl");
+      }).not.toThrow();
+    } finally {
+      config().enforceAvailableLocales = false;
+    }
   });
 
   it("can reserve a key", () => {

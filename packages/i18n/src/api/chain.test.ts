@@ -1,16 +1,16 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import * as TestCase from "../test-helpers/test-case.js";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 
 import { Chain } from "../backend/chain.js";
 import { Simple } from "../backend/simple.js";
-import { resetClassConfig } from "../config.js";
-import { config, resetConfig } from "../i18n.js";
+import { config } from "../i18n.js";
 
 describe("I18nApiChainTest", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     config().backend = new Chain(new Simple(), config().backend);
   });
+  afterEach(TestCase.teardown);
 
   it("make sure we use the Chain backend", () => {
     expect(config().backend.constructor).toBe(Chain);

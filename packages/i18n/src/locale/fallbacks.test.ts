@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import * as TestCase from "../test-helpers/test-case.js";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { Fallbacks } from "./fallbacks.js";
-import { config, resetConfig, setDefaultLocale } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
+import { config, setDefaultLocale } from "../i18n.js";
 
 function assertPredicate<T>(actual: T, predicate: (value: T) => unknown): void {
   expect(predicate(actual)).toBe(true);
@@ -12,9 +12,10 @@ function refutePredicate<T>(actual: T, predicate: (value: T) => unknown): void {
 }
 import { Disabled } from "../exceptions.js";
 
-function setup(): void {
-  resetConfig();
-  resetClassConfig();
+afterEach(TestCase.teardown);
+
+async function setup(): Promise<void> {
+  await TestCase.setup();
   config().enforceAvailableLocales = false;
 }
 

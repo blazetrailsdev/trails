@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { assertDeprecated, assertNil } from "@blazetrails/activesupport";
-import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
+import { Enumerable, include, registerConstant, resetConstants } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
+import { Identification } from "./identification.js";
 import { Locator, BlockLocator, _resetLocators, type LocatorModel } from "./locator.js";
 
 const TEST_APP = "bcx";
@@ -33,6 +34,7 @@ class Person {
     return Promise.resolve(ids.filter((id) => id !== "missing").map(make));
   }
 }
+include(Person, Identification);
 class PersonChild extends Person {}
 class PersonUuid extends Person {}
 
@@ -50,6 +52,8 @@ class CompositePrimaryKeyModel {
     return new CompositePrimaryKeyModel((arr as string[]).map(String));
   }
 }
+
+const Forwardable = {};
 
 function registerConstants(registry: Record<string, LocatorModel>): void {
   for (const [name, klass] of Object.entries(registry)) {
@@ -138,6 +142,29 @@ describe("GlobalLocatorTest", () => {
         CompositePrimaryKeyModel as unknown as LocatorModel,
         Person as unknown as LocatorModel,
       ],
+    })) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe(personGid.modelId);
+  });
+
+  it("by GID with only: restriction by module", async () => {
+    const found = (await Locator.locate(personGid, {
+      only: Identification as unknown as LocatorModel,
+    })) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe(personGid.modelId);
+  });
+
+  it("by GID with only: restriction by module no match", async () => {
+    const found = await Locator.locate(personGid, {
+      only: Forwardable as unknown as LocatorModel,
+    });
+    assertNil(found);
+  });
+
+  it("by GID with only: restriction by multiple types w/module", async () => {
+    const found = (await Locator.locate(personGid, {
+      only: [String as unknown as LocatorModel, Identification as unknown as LocatorModel],
     })) as Person;
     expect(found).toBeInstanceOf(Person);
     expect(found.id).toBe(personGid.modelId);
@@ -248,6 +275,32 @@ describe("GlobalLocatorTest", () => {
         CompositePrimaryKeyModel as unknown as LocatorModel,
         Person as unknown as LocatorModel,
       ],
+    })) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe(personSgid.modelId);
+  });
+
+  it("by SGID with only: restriction by module", async () => {
+    const found = (await Locator.locateSigned(personSgid, {
+      verifier,
+      only: Identification as unknown as LocatorModel,
+    })) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe(personSgid.modelId);
+  });
+
+  it("by SGID with only: restriction by module no match", async () => {
+    const found = await Locator.locateSigned(personSgid, {
+      verifier,
+      only: Enumerable as unknown as LocatorModel,
+    });
+    assertNil(found);
+  });
+
+  it("by SGID with only: restriction by multiple types w/module", async () => {
+    const found = (await Locator.locateSigned(personSgid, {
+      verifier,
+      only: [String as unknown as LocatorModel, Identification as unknown as LocatorModel],
     })) as Person;
     expect(found).toBeInstanceOf(Person);
     expect(found.id).toBe(personSgid.modelId);

@@ -1,9 +1,9 @@
+import * as TestCase from "../test-helpers/test-case.js";
 import { Hash, kernelCatch, UncaughtThrowError } from "@blazetrails/ruby-compat";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Simple } from "./simple.js";
-import { config, l, resetConfig } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
+import { config, l } from "../i18n.js";
 import {
   ArgumentError,
   InvalidLocale,
@@ -14,15 +14,15 @@ import {
 import type { TranslateOptions } from "./base.js";
 
 describe("I18n::Backend::Base", () => {
+  beforeEach(TestCase.setup);
   let backend: Simple;
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
     backend = new Simple();
     config().backend = backend;
     config().enforceAvailableLocales = false;
   });
+  afterEach(TestCase.teardown);
 
   function translate(key: string | null, options: TranslateOptions = {}): unknown {
     return backend.translate("en", key, options);
@@ -125,9 +125,13 @@ describe("I18n::Backend::Base", () => {
   it("resolves a Symbol default through I18n.translate, so its guards run", () => {
     backend.storeTranslations("en", { foo: "bar" });
     config().availableLocales = ["en"];
-    config().enforceAvailableLocales = true;
+    try {
+      config().enforceAvailableLocales = true;
 
-    expect(() => backend.translate("de", "missing", { default: ":foo" })).toThrow(InvalidLocale);
+      expect(() => backend.translate("de", "missing", { default: ":foo" })).toThrow(InvalidLocale);
+    } finally {
+      config().enforceAvailableLocales = false;
+    }
   });
 
   it("availableLocales skips locales holding only i18n metadata", () => {
@@ -139,11 +143,10 @@ describe("I18n::Backend::Base", () => {
 });
 
 describe("I18n::Backend::Base#localize over a Temporal subject", () => {
+  beforeEach(TestCase.setup);
   let backend: Simple;
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
     backend = new Simple();
     config().backend = backend;
     config().enforceAvailableLocales = false;
@@ -197,6 +200,7 @@ describe("I18n::Backend::Base#localize over a Temporal subject", () => {
       },
     });
   });
+  afterEach(TestCase.teardown);
 
   it("resolves a PlainDate against date.formats", () => {
     const date = Temporal.PlainDate.from("2008-03-01");

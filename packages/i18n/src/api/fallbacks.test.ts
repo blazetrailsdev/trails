@@ -1,18 +1,18 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import * as TestCase from "../test-helpers/test-case.js";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 
 import { Fallbacks } from "../backend/fallbacks.js";
 import { Simple } from "../backend/simple.js";
-import { resetClassConfig } from "../config.js";
-import { config, resetConfig } from "../i18n.js";
+import { config } from "../i18n.js";
 
 class Backend extends Fallbacks(Simple) {}
 
 describe("I18nFallbacksApiTest", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     config().backend = new Backend();
   });
+  afterEach(TestCase.teardown);
 
   it("make sure we use a backend with Fallbacks included", () => {
     expect(config().backend.constructor).toBe(Backend);

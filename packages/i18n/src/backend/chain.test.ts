@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as TestCase from "../test-helpers/test-case.js";
+import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 import { Chain } from "./chain.js";
 import { KeyValue, type Store } from "./key-value.js";
 import { Simple } from "./simple.js";
-import { config, resetConfig, t } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
+import { config, t } from "../i18n.js";
 import { deepSymbolizeKeys, type TranslationData } from "../utils.js";
 
 describe("I18nBackendChainTest", () => {
@@ -26,9 +26,8 @@ describe("I18nBackendChainTest", () => {
     return (target as unknown as Record<typeof name, () => TranslationData>)[name]();
   }
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     config().enforceAvailableLocales = false;
     first = backend({
       en: {
@@ -57,6 +56,7 @@ describe("I18nBackendChainTest", () => {
     chain = new Chain(first, second);
     config().backend = chain;
   });
+  afterEach(TestCase.teardown);
 
   it("looks up translations from the first chained backend", () => {
     expect((send(first, "translations").get(":en") as TranslationData).get(":foo")).toBe("Foo");
@@ -187,11 +187,11 @@ describe("I18nBackendChainTest", () => {
 });
 
 describe("I18nBackendChainWithKeyValueTest", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     config().enforceAvailableLocales = false;
   });
+  afterEach(TestCase.teardown);
 
   function setupBackend(subtrees = true): void {
     const first = new KeyValue(new Map<string, string>() as Store, subtrees);

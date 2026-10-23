@@ -118,6 +118,7 @@ export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
   "i18n",
   "marcel",
   "rack",
+  "rack-session",
   "rack-test",
 ];
 

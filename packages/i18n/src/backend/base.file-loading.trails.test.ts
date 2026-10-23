@@ -1,10 +1,10 @@
+import * as TestCase from "../test-helpers/test-case.js";
 import { readFile } from "node:fs/promises";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { psychAdapterConfig } from "@blazetrails/ruby-compat/psych-adapter";
 import { Hash } from "@blazetrails/ruby-compat";
 import { Simple } from "./simple.js";
-import { config, eagerLoadBang, reloadBang, resetConfig } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
+import { config, eagerLoadBang, reloadBang } from "../i18n.js";
 import { InvalidLocaleData, UnknownFileType } from "../exceptions.js";
 import { preloadTranslationFiles, registerFileReader, registerLocaleModule } from "./base.js";
 
@@ -26,11 +26,10 @@ function localesDir(): string {
 }
 
 describe("I18n::Backend::Base file loading", () => {
+  beforeEach(TestCase.setup);
   let backend: Simple;
 
   beforeEach(async () => {
-    resetConfig();
-    resetClassConfig();
     registerFileReader((filename) => readFile(filename, "utf8"));
     await preloadTranslationFiles(
       ["en.yml", "fr.yml", "psych.yml", "invalid/empty.yml", "invalid/syntax.yml"].map(
@@ -41,6 +40,7 @@ describe("I18n::Backend::Base file loading", () => {
     config().backend = backend;
     config().enforceAvailableLocales = false;
   });
+  afterEach(TestCase.teardown);
 
   it("load_yaml takes a filename and keeps the load_yml entry it aliased", () => {
     class Overriding extends Simple {

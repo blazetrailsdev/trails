@@ -85,11 +85,8 @@ export class GlobalID {
       );
     }
     const { app: _a, verifier: _v, for: _f, ...rest } = opts;
-    const filteredParams: Record<string, string> = {};
-    for (const [k, v] of Object.entries(rest)) {
-      if (v != null) filteredParams[underscore(k)] = String(v);
-    }
-    const params = Object.keys(filteredParams).length ? filteredParams : null;
+    const params: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rest)) params[underscore(k)] = v;
     return new this(GID.create(app, model, params), options);
   }
 

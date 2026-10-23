@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import * as TestCase from "./test-helpers/test-case.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { Config, resetClassConfig } from "./config.js";
+import { Config } from "./config.js";
 import { ExceptionHandler, InvalidLocale, MissingInterpolationArgument } from "./exceptions.js";
 import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
-import { resetConfig } from "./i18n.js";
 import { Base } from "./backend/base.js";
 import { Simple } from "./backend/simple.js";
 
@@ -29,11 +29,11 @@ class FakeBackend extends Base {
 describe("Config", () => {
   let config: Config;
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
     config = new Config();
   });
+  beforeEach(TestCase.setup);
+  afterEach(TestCase.teardown);
 
   it("locale defaults to the default locale and is per-instance", () => {
     expect(config.locale).toBe("en");
@@ -44,17 +44,27 @@ describe("Config", () => {
   });
 
   it("locale= enforces available locales", () => {
-    expect(() => (config.locale = "klingon")).toThrow(InvalidLocale);
-    config.availableLocales = ["en", "de"];
-    config.locale = "de";
-    expect(config.locale).toBe("de");
+    try {
+      config.enforceAvailableLocales = true;
+      expect(() => (config.locale = "klingon")).toThrow(InvalidLocale);
+      config.availableLocales = ["en", "de"];
+      config.locale = "de";
+      expect(config.locale).toBe("de");
+    } finally {
+      config.enforceAvailableLocales = false;
+    }
   });
 
   it("defaultLocale= enforces available locales and is shared across instances", () => {
-    expect(() => (config.defaultLocale = "klingon")).toThrow(InvalidLocale);
-    config.availableLocales = ["en", "de"];
-    config.defaultLocale = "de";
-    expect(new Config().defaultLocale).toBe("de");
+    try {
+      config.enforceAvailableLocales = true;
+      expect(() => (config.defaultLocale = "klingon")).toThrow(InvalidLocale);
+      config.availableLocales = ["en", "de"];
+      config.defaultLocale = "de";
+      expect(new Config().defaultLocale).toBe("de");
+    } finally {
+      config.enforceAvailableLocales = false;
+    }
   });
 
   it("backend defaults to Backend::Simple and is settable", () => {
@@ -126,7 +136,8 @@ describe("Config", () => {
     expect(config.availableLocalesSet.has("en")).toBe(true);
   });
 
-  it("enforceAvailableLocales defaults to true", () => {
+  it("enforceAvailableLocales defaults to true", async () => {
+    await TestCase.teardown();
     expect(config.enforceAvailableLocales).toBe(true);
     config.enforceAvailableLocales = false;
     expect(new Config().enforceAvailableLocales).toBe(false);

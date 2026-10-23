@@ -1,10 +1,10 @@
+import * as TestCase from "../test-helpers/test-case.js";
 import { kernelCatch } from "@blazetrails/ruby-compat";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 
 import { Simple } from "../backend/simple.js";
-import { resetClassConfig } from "../config.js";
 import * as I18n from "../i18n.js";
-import { config, resetConfig } from "../i18n.js";
+import { config } from "../i18n.js";
 import type { MissingTranslation } from "../exceptions.js";
 
 type I18nModule = Omit<typeof I18n, "translate" | "t"> & {
@@ -22,13 +22,13 @@ describe("I18nOverrideTest", () => {
 
   let dupI18n: I18nModule;
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     config().enforceAvailableLocales = false;
     dupI18n = { ...I18n } as unknown as I18nModule;
     config().backend = new Simple();
   });
+  afterEach(TestCase.teardown);
 
   it("make sure modules can overwrite I18n methods", () => {
     const OverrideInverse = {

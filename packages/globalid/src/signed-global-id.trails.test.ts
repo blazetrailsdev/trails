@@ -26,6 +26,11 @@ describe("SignedGlobalIDExpirationTest", () => {
     expect(GlobalID.parse(sgid.uri.toString())!.params!.get("expires_in")).toBe("60");
   });
 
+  it("emits a nil expires_in as a bare query key", () => {
+    const sgid = SignedGlobalID.create(person(), { expiresIn: null, verifier: makeVerifier() });
+    expect(sgid.uri.toString()).toBe("gid://bcx/Person/5?expires_in");
+  });
+
   it("expires_at: undefined falls through to expires_in (spread-defaults case)", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), {
