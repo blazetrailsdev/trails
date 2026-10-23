@@ -47,6 +47,7 @@
     { "path": "packages/i18n" },
     { "path": "packages/builder" },
     { "path": "packages/marcel" },
+    { "path": "packages/mini-magick" },
     { "path": "packages/html-sanitizer" },
     { "path": "packages/nokogiri" },
     { "path": "packages/activerecord-cli" },

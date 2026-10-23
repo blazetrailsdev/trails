@@ -387,6 +387,26 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "mini_magick",
+    origin: {
+      type: "git",
+      url: "https://github.com/minimagick/minimagick.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:352 resolves mini_magick (5.2.0), which
+      // image_processing (Active Storage's variant processor) depends on.
+      ref: "v5.2.0",
+    },
+    packages: [
+      {
+        name: "mini-magick",
+        libPath: "lib/mini_magick",
+        libEntryFile: "lib/mini_magick.rb",
+        testPath: "spec",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "thor",
     origin: {
       type: "git",
