@@ -1,0 +1,262 @@
+{
+  "file": "active_job/sample.rb",
+  "body": {
+    "k": "seq",
+    "body": [
+      {
+        "k": "module",
+        "path": ["ActiveJob"],
+        "body": {
+          "k": "seq",
+          "body": [
+            {
+              "k": "module",
+              "path": ["Sample"],
+              "body": {
+                "k": "seq",
+                "body": [
+                  {
+                    "k": "def",
+                    "name": "collect",
+                    "singleton": false,
+                    "receiver": null,
+                    "params": [
+                      {
+                        "kind": "req",
+                        "name": "jobs"
+                      },
+                      {
+                        "kind": "req",
+                        "name": "payload"
+                      },
+                      {
+                        "kind": "req",
+                        "name": "expected"
+                      }
+                    ],
+                    "body": {
+                      "k": "seq",
+                      "body": [
+                        {
+                          "k": "call",
+                          "recv": {
+                            "k": "lvar",
+                            "name": "jobs"
+                          },
+                          "name": "delete",
+                          "args": [
+                            {
+                              "k": "lvar",
+                              "name": "payload"
+                            }
+                          ],
+                          "block": null,
+                          "safe": false,
+                          "l": 4,
+                          "vcall": false
+                        },
+                        {
+                          "k": "lasgn",
+                          "name": "message",
+                          "value": {
+                            "k": "dstr",
+                            "parts": [
+                              {
+                                "k": "str",
+                                "value": "No job found with "
+                              },
+                              {
+                                "k": "lvar",
+                                "name": "expected"
+                              }
+                            ]
+                          },
+                          "l": 5
+                        },
+                        {
+                          "k": "call",
+                          "recv": {
+                            "k": "lvar",
+                            "name": "message"
+                          },
+                          "name": "<<",
+                          "args": [
+                            {
+                              "k": "str",
+                              "value": "\n\nNone",
+                              "frozen": false,
+                              "heredoc": false
+                            }
+                          ],
+                          "block": null,
+                          "safe": false,
+                          "l": 6,
+                          "vcall": false
+                        },
+                        {
+                          "k": "lasgn",
+                          "name": "ok",
+                          "value": {
+                            "k": "call",
+                            "recv": {
+                              "k": "lvar",
+                              "name": "expected"
+                            },
+                            "name": "all?",
+                            "args": [],
+                            "block": {
+                              "k": "block",
+                              "params": [
+                                {
+                                  "kind": "req",
+                                  "name": "key"
+                                },
+                                {
+                                  "kind": "req",
+                                  "name": "value"
+                                }
+                              ],
+                              "body": {
+                                "k": "seq",
+                                "body": [
+                                  {
+                                    "k": "call",
+                                    "recv": {
+                                      "k": "lvar",
+                                      "name": "value"
+                                    },
+                                    "name": "==",
+                                    "args": [
+                                      {
+                                        "k": "lvar",
+                                        "name": "key"
+                                      }
+                                    ],
+                                    "block": null,
+                                    "safe": false,
+                                    "l": 7,
+                                    "vcall": false
+                                  }
+                                ]
+                              },
+                              "l": 7
+                            },
+                            "safe": false,
+                            "l": 7,
+                            "vcall": false
+                          },
+                          "l": 7
+                        },
+                        {
+                          "k": "call",
+                          "recv": {
+                            "k": "int",
+                            "value": "3"
+                          },
+                          "name": "times",
+                          "args": [],
+                          "block": {
+                            "k": "block",
+                            "params": [
+                              {
+                                "kind": "req",
+                                "name": "i"
+                              }
+                            ],
+                            "body": {
+                              "k": "seq",
+                              "body": [
+                                {
+                                  "k": "call",
+                                  "recv": {
+                                    "k": "lvar",
+                                    "name": "jobs"
+                                  },
+                                  "name": "<<",
+                                  "args": [
+                                    {
+                                      "k": "lvar",
+                                      "name": "i"
+                                    }
+                                  ],
+                                  "block": null,
+                                  "safe": false,
+                                  "l": 8,
+                                  "vcall": false
+                                }
+                              ]
+                            },
+                            "l": 8
+                          },
+                          "safe": false,
+                          "l": 8,
+                          "vcall": false
+                        },
+                        {
+                          "k": "array",
+                          "elems": [
+                            {
+                              "k": "lvar",
+                              "name": "ok"
+                            },
+                            {
+                              "k": "lvar",
+                              "name": "message"
+                            },
+                            {
+                              "k": "call",
+                              "recv": {
+                                "k": "lvar",
+                                "name": "payload"
+                              },
+                              "name": "is_a?",
+                              "args": [
+                                {
+                                  "k": "const",
+                                  "path": ["Hash"]
+                                }
+                              ],
+                              "block": null,
+                              "safe": false,
+                              "l": 9,
+                              "vcall": false
+                            },
+                            {
+                              "k": "call",
+                              "recv": {
+                                "k": "lvar",
+                                "name": "jobs"
+                              },
+                              "name": "join",
+                              "args": [
+                                {
+                                  "k": "str",
+                                  "value": ", ",
+                                  "frozen": false,
+                                  "heredoc": false
+                                }
+                              ],
+                              "block": null,
+                              "safe": false,
+                              "l": 9,
+                              "vcall": false
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "l": 3,
+                    "lend": 10,
+                    "endless": false
+                  }
+                ]
+              },
+              "l": 2
+            }
+          ]
+        },
+        "l": 1
+      }
+    ]
+  }
+}

@@ -2,6 +2,7 @@ import { LoadError, registerConstant, warn } from "@blazetrails/ruby-compat";
 import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
+import type { BacktraceCleaner } from "./backtrace-cleaner.js";
 import type { CacheStore } from "./cache/index.js";
 import type { Duration } from "./duration.js";
 import type { EnvironmentInquirer } from "./environment-inquirer.js";
@@ -64,6 +65,7 @@ export const TopLevel: {
     logger: Logger | null;
     cache: CacheStore | null;
     error: ErrorReporter;
+    backtraceCleaner: BacktraceCleaner;
     application: {
       config: {
         considerAllRequestsLocal: boolean;
@@ -77,7 +79,7 @@ export const TopLevel: {
     } | null;
     Application: abstract new (...args: never[]) => unknown;
     Engine: abstract new (...args: never[]) => unknown;
-    Trailtie: abstract new (...args: never[]) => unknown;
+    Trailtie: abstract new (...args: never[]) => object;
     root(): string | null | undefined;
   };
   ActionDispatch?: {
