@@ -19,6 +19,10 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
   }
 }
 
+/**
+ * @missingRailsCall rake_tasks — CONVERGEABLE port-solid-queue-tasks
+ * @missingRailsCall attach_to — CONVERGEABLE port-solid-queue-log-subscriber
+ */
 export class Engine extends TrailsEngine {
   static toString(): string {
     return "SolidQueue::Engine";

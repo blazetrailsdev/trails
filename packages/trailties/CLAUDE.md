@@ -130,3 +130,24 @@ As a consequence:
 This is ratified repo-wide here, and there is no story to port Zeitwerk. It is
 about the application loader only: framework-internal call-time constant
 resolution is root § "Call-time constant resolution".
+
+## A package-shipped engine's root is its package root (`Engine.find_root`)
+
+Rails' `Engine.find_root` (`vendor/rails/v8.0.2/railties/lib/rails/engine.rb:375-377`)
+is `find_root_with_flag "lib", from`: it walks up from `called_from` to the
+first directory holding `lib/`, which for a gem is the gem's root. An npm
+package has `src/` and `dist/`, never `lib/`, so the walk from an engine's
+`dist/` either finds nothing and raises, or, under `node_modules`, climbs into
+the host application and takes the application's `lib/` for the engine's root.
+
+**`Engine.findRoot` stops at the nearest ancestor holding `lib/` or
+`package.json`**: a `lib/` there is Rails' answer, and a `package.json` with no
+`lib/` is the package root. Anything else falls through to Rails'
+`findRootWithFlag("lib", from)` and its error. An engine registers with
+`Engine.register(this, import.meta.dirname)`, the `called_from` Rails reads off
+`caller_locations` (`engine.rb:354-366`). A per-engine `findRoot` override was
+rejected because every package-shipped engine would carry the same one.
+
+This is a genuine runtime difference, ruled by the repo owner on 2026-10-23
+(trails#9280). `findRoot` carries `@inventedArm loop` / `if — PERMANENT`
+against this section.

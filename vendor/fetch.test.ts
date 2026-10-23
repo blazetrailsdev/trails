@@ -54,6 +54,7 @@ describe("vendor/fetch.ts parseArgs", () => {
       printTestPaths: false,
       printLibPaths: false,
       printLibEntryFiles: false,
+      printLibExtraPaths: false,
     });
   });
 
@@ -143,6 +144,21 @@ describe("vendor/fetch.ts parseArgs", () => {
     );
     const { libEntryFilesManifest } = await import("./sources.js");
     expect(JSON.parse(out)).toEqual(libEntryFilesManifest());
+  });
+
+  it("--print-lib-extra-paths emits valid JSON matching libExtraPathsManifest()", async () => {
+    const { execFileSync } = await import("node:child_process");
+    const { fileURLToPath } = await import("node:url");
+    const { dirname, join } = await import("node:path");
+    const here = dirname(fileURLToPath(import.meta.url));
+    const out = execFileSync(
+      "pnpm",
+      ["--silent", "tsx", join(here, "fetch.ts"), "--print-lib-extra-paths"],
+      { encoding: "utf8" },
+    );
+    const { libExtraPathsManifest } = await import("./sources.js");
+    expect(JSON.parse(out)).toEqual(libExtraPathsManifest());
+    expect(Object.keys(libExtraPathsManifest())).toContain("solid-queue");
   });
 
   it("--ref <ref> needs --source", () => {

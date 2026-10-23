@@ -14,7 +14,7 @@ export const SolidQueue = {
   name: "SolidQueue",
   tableNamePrefix: "solid_queue_",
 
-  DEFAULT_LOGGER: new Logger(STDOUT as never),
+  DEFAULT_LOGGER: new Logger(STDOUT),
 
   onWorkerStart(block: () => unknown): void {
     SolidQueue.Worker!.onStart(block);
