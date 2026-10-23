@@ -12,7 +12,6 @@ export class RecurringExecution extends Execution {
 
   static {
     registerModel(this);
-    Object.defineProperty(this, "AlreadyRecorded", { value: AlreadyRecorded });
 
     this.scope("clearable", function () {
       return this.where().missing("job");

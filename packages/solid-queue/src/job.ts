@@ -72,7 +72,6 @@ export class Job extends Record {
 
   static {
     registerModel(this);
-    Object.defineProperty(this, "EnqueueError", { value: EnqueueError });
 
     include(this, Recurrable);
     include(this, Clearable);

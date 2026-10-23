@@ -22,7 +22,6 @@ export class Execution extends Record {
   declare priority: number;
 
   static {
-    Object.defineProperty(this, "UndiscardableError", { value: UndiscardableError });
     include(this, JobAttributes);
 
     this.abstractClass = true;

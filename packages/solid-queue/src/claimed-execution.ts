@@ -17,13 +17,11 @@ export class Result {
 
 export class ClaimedExecution extends Execution {
   declare static orphaned: () => Relation<ClaimedExecution>;
-  declare static Result: typeof Result;
   declare process_id: unknown;
   declare process: Promise<Base | null>;
 
   static {
     registerModel(this);
-    Object.defineProperty(this, "Result", { value: Result });
 
     this.belongsTo("process");
 

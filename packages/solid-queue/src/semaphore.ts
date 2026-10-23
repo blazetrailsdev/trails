@@ -7,7 +7,6 @@ import type { Job } from "./job.js";
 export class Semaphore extends Record {
   declare static available: () => Relation<Semaphore>;
   declare static expired: () => Relation<Semaphore>;
-  declare static Proxy: typeof Proxy;
   declare key: string;
   declare value: number;
   declare expires_at: Time;
@@ -130,4 +129,3 @@ export class Proxy {
     return this.job.concurrencyLimit() ?? 1;
   }
 }
-Object.defineProperty(Semaphore, "Proxy", { value: Proxy });
