@@ -6,7 +6,7 @@
   "actionpackversion": 0,
   "actionview": 424,
   "activemodel": 239,
-  "activerecord": 2190,
+  "activerecord": 2189,
   "arel": 288,
   "bcrypt": 2,
   "did-you-mean": 8,
@@ -16,6 +16,6 @@
   "rack": 214,
   "rack-session": 60,
   "rack-test": 45,
-  "ruby-compat": 926,
+  "ruby-compat": 924,
   "thor": 175
 }
