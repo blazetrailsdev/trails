@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { ArgumentError, rbFSend, upcase } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbFSend, toS, upcase } from "@blazetrails/ruby-compat";
 import { REQUEST_METHOD, RACK_METHODOVERRIDE_ORIGINAL_METHOD, RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
@@ -26,7 +26,7 @@ export class MethodOverride {
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     if (ALLOWED_METHODS.includes(env[REQUEST_METHOD])) {
       const method = this.methodOverride(env);
-      if (method && HTTP_METHODS.includes(method)) {
+      if (HTTP_METHODS.includes(method!)) {
         env[RACK_METHODOVERRIDE_ORIGINAL_METHOD] = env[REQUEST_METHOD];
         env[REQUEST_METHOD] = method;
       }
@@ -38,7 +38,7 @@ export class MethodOverride {
     const req = new Request(env);
     const method = this.methodOverrideParam(req) ?? env[HTTP_METHOD_OVERRIDE_HEADER];
     try {
-      return upcase(String(method ?? ""), []);
+      return upcase(toS(method), []);
     } catch (e) {
       if (!(e instanceof ArgumentError)) throw e;
       env[RACK_ERRORS].puts("Invalid string for method");

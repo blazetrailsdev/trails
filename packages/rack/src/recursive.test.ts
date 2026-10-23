@@ -48,7 +48,9 @@ it("raise error on requests not below the app", async () => {
   });
   const p = new MockRequest(outerMap).get("/app/2");
   await expect(p).rejects.toThrow(ArgumentError);
-  expect((await p.catch((e: ArgumentError) => e)).message).toMatch(/can only include below/);
+  expect(((await p.catch((e: unknown) => e)) as ArgumentError).message).toMatch(
+    /can only include below/,
+  );
 });
 
 it("support forwarding", async () => {
