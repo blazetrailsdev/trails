@@ -76,7 +76,10 @@ export function rbObjClass(obj: unknown): Klass {
       ? rbCClass
       : rbCProc;
   }
-  if (hasEpochNanoseconds(obj)) {
+  if (
+    temporalTag(obj) !== null &&
+    typeof (obj as { epochNanoseconds?: unknown }).epochNanoseconds === "bigint"
+  ) {
     return reopened(
       (obj as { [rubyClass]?: string })[rubyClass] === "DateTime" ? rbCDateTime : rbCTime,
     ) as Klass;
@@ -149,14 +152,6 @@ export const RCLASS_CONST_TBL = new Map<string, unknown>();
 export function reopened(klass: object): object {
   const path = classpaths.get(klass)?.path;
   return path === undefined ? klass : (RCLASS_CONST_TBL.get(path) ?? klass);
-}
-
-function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigint } {
-  return (
-    typeof (value as { [Symbol.toStringTag]?: unknown })[Symbol.toStringTag] === "string" &&
-    (value as { [Symbol.toStringTag]: string })[Symbol.toStringTag].startsWith("Temporal.") &&
-    typeof (value as { epochNanoseconds?: unknown }).epochNanoseconds === "bigint"
-  );
 }
 
 /**
@@ -601,21 +596,6 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
     : undefined;
 }
 
-function isCoreReceiver(obj: unknown): boolean {
-  if (obj === null || obj === undefined) return false;
-  if (typeof obj !== "object") return typeof obj !== "function";
-  return (
-    Array.isArray(obj) ||
-    obj instanceof Map ||
-    obj instanceof Set ||
-    obj instanceof Uint8Array ||
-    obj instanceof Date ||
-    obj instanceof rbCDate ||
-    temporalTag(obj) !== null ||
-    isPlainHash(obj)
-  );
-}
-
 /**
  * `basic_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2864`) — the default
  * `Object#respond_to?`, which answers whether the receiver's class defines the
@@ -666,7 +646,20 @@ function isCoreReceiver(obj: unknown): boolean {
  */
 export function basicObjRespondTo(obj: unknown, mid: string): boolean {
   if (mid === "toYaml") return true;
-  if (isCoreReceiver(obj)) {
+  const core =
+    obj === null || obj === undefined
+      ? false
+      : typeof obj !== "object"
+        ? typeof obj !== "function"
+        : Array.isArray(obj) ||
+          obj instanceof Map ||
+          obj instanceof Set ||
+          obj instanceof Uint8Array ||
+          obj instanceof Date ||
+          obj instanceof rbCDate ||
+          temporalTag(obj) !== null ||
+          isPlainHash(obj);
+  if (core) {
     if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
     if (Array.isArray(obj) && mid === "toAry") return true;
     if (
@@ -740,31 +733,33 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     if (typeof Object.getOwnPropertyDescriptor(o, mid)?.value === "function") return true;
   }
   if (reopenedSeatMethod(obj, mid) !== undefined) return true;
-  const respondToMissing = chainEntry(obj, "respondToMissing", respondToMissingEntries);
+  const respondToMissing = chainEntry(obj, "respondToMissing");
   if (typeof respondToMissing !== "function") return false;
   const ret = (respondToMissing as (mid: string) => unknown).call(obj, mid);
   return ret != null && ret !== false;
 }
 
-const respondToMissingEntries = new WeakMap<object, unknown>();
-const isRespondToEntries = new WeakMap<object, unknown>();
-
-function chainEntry(obj: unknown, name: string, entries: WeakMap<object, unknown>): unknown {
-  const self: object = Object(obj);
-  if (Object.hasOwn(self, name)) return Object.getOwnPropertyDescriptor(self, name)?.value;
-  const proto = Object.getPrototypeOf(self) as object | null;
-  if (proto === null) return undefined;
-  if (entries.has(proto)) return entries.get(proto);
-  let value: unknown;
-  for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
-    if (Object.hasOwn(o, name)) {
-      value = Object.getOwnPropertyDescriptor(o, name)?.value;
-      break;
+const chainEntry = (() => {
+  const entries = new WeakMap<object, Record<string, unknown>>();
+  return (obj: unknown, name: string): unknown => {
+    const self: object = Object(obj);
+    if (Object.hasOwn(self, name)) return Object.getOwnPropertyDescriptor(self, name)?.value;
+    const proto = Object.getPrototypeOf(self) as object | null;
+    if (proto === null) return undefined;
+    let cached = entries.get(proto);
+    if (cached === undefined)
+      entries.set(proto, (cached = Object.create(null) as Record<string, unknown>));
+    if (name in cached) return cached[name];
+    let value: unknown;
+    for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
+      if (Object.hasOwn(o, name)) {
+        value = Object.getOwnPropertyDescriptor(o, name)?.value;
+        break;
+      }
     }
-  }
-  entries.set(proto, value);
-  return value;
-}
+    return (cached[name] = value);
+  };
+})();
 
 /**
  * `Object#respond_to_missing?` (`obj_respond_to_missing`,
@@ -1328,7 +1323,7 @@ type AnyFunction = (...args: unknown[]) => unknown;
  * (`vendor/ruby/v3.3.11/vm_method.c:2934`).
  */
 export function rbObjRespondTo(obj: unknown, mid: string): boolean {
-  const isRespondTo = chainEntry(obj, "isRespondTo", isRespondToEntries);
+  const isRespondTo = chainEntry(obj, "isRespondTo");
   if (typeof isRespondTo === "function") {
     const result = (isRespondTo as (mid: string) => unknown).call(obj, mid);
     return result != null && result !== false;
