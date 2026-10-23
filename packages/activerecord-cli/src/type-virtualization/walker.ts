@@ -220,6 +220,15 @@ function hasMarker(cls: ts.ClassDeclaration, sf: ts.SourceFile, pattern: RegExp)
 function readStaticAssignment(stmt: ts.Statement, info: ClassInfo): void {
   if (!ts.isExpressionStatement(stmt)) return;
   const expr = stmt.expression;
+  if (
+    ts.isCallExpression(expr) &&
+    ts.isPropertyAccessExpression(expr.expression) &&
+    expr.expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
+    expr.expression.name.text === "primaryAbstractClass"
+  ) {
+    info.abstract = true;
+    return;
+  }
   if (!ts.isBinaryExpression(expr) || expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return;
   const left = expr.left;
   if (!ts.isPropertyAccessExpression(left)) return;

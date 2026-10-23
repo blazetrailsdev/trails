@@ -1005,6 +1005,13 @@ describe("virtualize — missingTables", () => {
     ]);
   });
 
+  test("resolves the table below a primaryAbstractClass() class", () => {
+    const abstract =
+      "export class ApplicationRecord extends Base {\n  static {\n    this.primaryAbstractClass();\n  }\n}\n";
+    expect(missing(abstract)).toEqual([]);
+    expect(missing("export class Post extends ApplicationRecord {}\n", abstract)).toEqual([]);
+  });
+
   test("a no-schema model keeps its synthesized associations", () => {
     const src =
       "/** @trails-typegen no-schema */\n" +
