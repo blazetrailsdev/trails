@@ -13,7 +13,7 @@ export const AppExecutor = {
     SolidQueue.instrument("thread_error", { error: error });
 
     if (SolidQueue.onThreadError) {
-      SolidQueue.onThreadError(error);
+      SolidQueue.onThreadError.call(undefined, error);
     }
   },
 };

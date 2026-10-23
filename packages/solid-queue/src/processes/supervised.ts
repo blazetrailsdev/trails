@@ -35,10 +35,7 @@ export class Supervised {
     return isPresent(this.supervisor);
   }
 
-  /**
-   * @missingRailsCall exit! — CONVERGEABLE port-solid-queue-supervisor
-   * @internal
-   */
+  /** @internal */
   registerSignalHandlers(this: SupervisedHost): void {
     for (const signal of ["SIGINT", "SIGTERM"] as const) {
       onSignal(signal, () => {

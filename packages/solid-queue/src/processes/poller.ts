@@ -27,7 +27,7 @@ export class Poller extends Base {
     return { ...super.metadata(), polling_interval: this.pollingInterval };
   }
 
-  /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.1.3/lib/solid_queue/processes/runnable.rb:20-25 */
+  /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.1.3/lib/solid_queue/processes/runnable.rb:19-24 */
   override async stop(): Promise<void> {
     await super.stop();
 
