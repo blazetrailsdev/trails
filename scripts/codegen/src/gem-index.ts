@@ -65,6 +65,8 @@ export interface ConstInfo {
   file: string;
   /** The value is a Hash / Array literal (possibly `.freeze`d): data, not a gem object. */
   literal?: "hash" | "array";
+  /** A String / Symbol / Integer / Float literal value (`ADAPTER = "Adapter"`). */
+  scalar?: N;
 }
 
 /** A dependency module's `initialize`, as read from the Rails manifest and its file's IR. */
@@ -300,7 +302,13 @@ export class GemIndex {
       const v =
         node.value?.k === "call" && node.value.name === "freeze" ? node.value.recv : node.value;
       const literal = v?.k === "hash" ? "hash" : v?.k === "array" ? "array" : undefined;
-      this.consts.set(`${cur}::${node.path[0]}`, { fqn: `${cur}::${node.path[0]}`, file, literal });
+      const scalar = ["str", "sym", "int", "float"].includes(v?.k) ? v : undefined;
+      this.consts.set(`${cur}::${node.path[0]}`, {
+        fqn: `${cur}::${node.path[0]}`,
+        file,
+        literal,
+        scalar,
+      });
       // `OID = PostgreSQL::OID` — a constant naming a module is an alias of it.
       if (node.value?.k === "const")
         this.aliasPaths.set(`${cur}::${node.path[0]}`, {
@@ -319,6 +327,7 @@ export class GemIndex {
       for (const a of node.args.filter((x: N) => x.k === "sym")) {
         s.sattrs.add(a.value);
         s.sclassAttrs.add(a.value);
+        this.noteMethod(a.value, "attr");
       }
       return;
     }
@@ -375,7 +384,8 @@ export class GemIndex {
         for (const a of node.args) {
           if (a.k !== "const") continue;
           if (a.path.join("::").endsWith("ActiveSupport::Concern")) s.concern = true;
-          else s.extends.push(a.path);
+          // `ActiveSupport::Autoload` fills seats an `autoload` names; there are none.
+          else if (!a.path.join("::").endsWith("ActiveSupport::Autoload")) s.extends.push(a.path);
         }
       } else if (
         name === "private" ||
@@ -555,6 +565,27 @@ export class GemIndex {
  * superclass is not inserted again (`include_modules_at` skips it), so the
  * deeper occurrence is the one kept.
  */
+/** Whether a class is one GemConfig.namedClasses enters in the constant registry. */
+export function isNamedClass(index: GemIndex, fqn: string): boolean {
+  const sc = index.scopes.get(fqn);
+  if (sc?.kind !== "class") return false;
+  // A test's own top-level class, which its fixtures name by String (a job's
+  // `"DiscardableError"`), is a constant of `Object` the test resolves.
+  if (!fqn.includes("::") && sc.primaryFile?.startsWith("test/")) return true;
+  const names = new Set(GEM.namedClasses ?? []);
+  if (!names.size) return false;
+  return rubyAncestors(index, fqn).some((a) => {
+    const s = index.scopes.get(a);
+    return (
+      names.has(a) ||
+      (!!s &&
+        [...s.includes, s.superclassPath ?? []].some((p) =>
+          names.has(p.filter((x) => x).join("::")),
+        ))
+    );
+  });
+}
+
 export function rubyAncestors(index: GemIndex, fqn: string, seen = new Set<string>()): string[] {
   const s = index.scopes.get(fqn);
   if (!s || seen.has(fqn)) return [];

@@ -19,7 +19,14 @@ import { TS_CONSTANT_RENAMES } from "./constant-renames.js";
 import { TS_CLASS_RENAMES } from "../../parity/conventions.js";
 import type { IrFile, N, Param } from "./ir.js";
 import { walk } from "./ir.js";
-import { GemIndex, lexicalChain, qualify, rubyAncestors, type ScopeInfo } from "./gem-index.js";
+import {
+  GemIndex,
+  isNamedClass,
+  lexicalChain,
+  qualify,
+  rubyAncestors,
+  type ScopeInfo,
+} from "./gem-index.js";
 import {
   indent,
   jsIdent,
@@ -798,7 +805,6 @@ export class Emitter {
               : `class ${short} extends ${host} {}`,
             // The test class is module-local: its merged interface is too.
             ...(mix.iface ? [mix.iface.replace(/^export interface /, "interface ")] : []),
-            `${this.lw.rc(hctx, "registerConstant")}(${JSON.stringify(short)}, ${short});`,
           ]),
       ...classLines,
       `${desc}(${JSON.stringify(short)}, () => {`,
@@ -1289,12 +1295,7 @@ export class Emitter {
     // which a test `constantize`s by that name) is still their namespace.
     const nests = [...this.index.scopes.keys()].some((k) => k.startsWith(`${u.fqn}::`));
     return spaceBlocks([
-      ...(nests
-        ? [
-            `class ${short} {}`,
-            `${this.lw.rc(hctx, "registerConstant")}(${JSON.stringify(short)}, ${short});`,
-          ]
-        : []),
+      ...(nests ? [`class ${short} {}`] : []),
       `${vitest("describe")}(${JSON.stringify(short)}, () => {`,
       ...indent([...lets, ...helperLines.flatMap((h) => h.split("\n")), ...out]),
       "});",
@@ -1438,11 +1439,6 @@ export class Emitter {
       const r = u.kind === "class" ? this.emitClass(u, name, f) : this.emitModule(u, name, f);
       defs += r.defs;
       chunks.push(r.text);
-      // A test's module is named for `Module#name` the way its classes are.
-      if (u.kind === "module" && file.file.startsWith("test/") && !u.fqn.includes("::"))
-        chunks.push(
-          `${this.lw.rc(this.baseCtx(u, f, {}), "registerConstant")}(${JSON.stringify(u.fqn)}, ${name});`,
-        );
     }
     // A test fixture's top-level statements (`adapters/inline.rb`'s
     // `ActiveJob::Base.queue_adapter = :inline`) run when it is loaded.
@@ -1625,44 +1621,13 @@ export class Emitter {
         return [u.fqn, exp && exp.tsFile === tsFile ? exp.name : u.fqn.split("::").join("")];
       }),
     );
-    // Each constant is seated on its parent module, `rbModConstSet(ActiveJob,
-    // "Base", Base)` (activejob base.ts), which is what `const_get` and an
-    // `autoload` read, and what names it (`rbModName`). A parent the hand port
-    // seats in `namespaces.ts` is read from there; a parent in this file, or in
-    // a file this one already imports (`relation.ts` seats `WhereClause`), is
-    // read directly. Seating on a parent this file does not import would add an
-    // edge that closes a cycle whenever that file imports its children
-    // (`serializers.rb` names every serializer), so such a constant stays
-    // unseated and is listed in the report.
-    {
-      const bctx = this.baseCtx(units[0] ?? ({} as Unit), f, {});
-      for (const u of units) {
-        const i = u.fqn.lastIndexOf("::");
-        if (i < 0 || nativeUnits.has(u.fqn)) continue;
-        const parent = u.fqn.slice(0, i);
-        if (this.plainModules.has(parent)) continue;
-        const seat = handNamespaceFqns().get(parent);
-        const parentExp = this.resolver.exportNames.get(parent);
-        const parentSpec = parentExp && `@root/${parentExp.tsFile.replace(/\.ts$/, ".js")}`;
-        const ref = seat
-          ? this.lw.imp(bctx, "@root/namespaces.js", seat, `${seat}Seat`)
-          : names.has(parent)
-            ? names.get(parent)!
-            : parentSpec && f.imports.get(parentSpec)?.has(parentExp.name)
-              ? f.imports.get(parentSpec)!.get(parentExp.name)!
-              : null;
-        // A reopened constant of another gem (`ActiveSupport::TestCase`) is
-        // already seated where that gem defines it.
-        if (!ref && !this.index.scopes.has(parent) && !handNamespaceFqns().has(parent)) continue;
-        if (!ref) {
-          f.stats["unseated-constant"] = (f.stats["unseated-constant"] ?? 0) + 1;
-          this.unseated.push(u.fqn);
-          continue;
-        }
-        chunks.push(
-          `${this.lw.rc(bctx, "rbModConstSet")}(${ref}, ${JSON.stringify(u.fqn.slice(i + 2))}, ${names.get(u.fqn)});`,
-        );
-      }
+    // A Concern's `ClassMethods` is the property `append_features` extends the
+    // includer with: a plain property of the module, not a constant seat.
+    for (const u of units) {
+      if (!u.fqn.endsWith("::ClassMethods")) continue;
+      const parent = u.fqn.slice(0, -"::ClassMethods".length);
+      if (!this.index.scopes.get(parent)?.concern || !names.has(parent)) continue;
+      chunks.push(`Object.assign(${names.get(parent)}, { ClassMethods: ${names.get(u.fqn)} });`);
     }
     for (const u of units) {
       if (!u.late?.length) continue;
@@ -2464,10 +2429,9 @@ export class Emitter {
         staticStmts.push(s);
       }
     }
-    // A top-level class is a constant of `Object` (`rb_const_set` on `rb_cObject`,
-    // ruby-compat's `registerConstant`), which `constantize` reads. A nested one
-    // is seated on its parent instead (`emitFile`), as the hand port does.
-    if (!u.fqn.includes("::"))
+    // A class Rails resolves from a name in data is entered in the constant
+    // registry by its Ruby path (GemConfig.namedClasses), the one table kept.
+    if (isNamedClass(this.index, u.fqn))
       after.unshift(
         `${this.lw.rc(ctxStatic, "registerConstant")}(${JSON.stringify(u.fqn)}, ${name});`,
       );
@@ -3471,7 +3435,8 @@ export class Emitter {
     // of functions (activejob arguments.ts), as do a module that mixes into its
     // own singleton class (a JS class has no singleton class apart from its
     // statics) and a namespace seat.
-    if (this.resolver.isClassModule(u.fqn) && this.resolver.exportNames.get(u.fqn)?.name === name)
+    const primary = this.resolver.exportNames.get(u.fqn);
+    if (this.resolver.isClassModule(u.fqn) && primary?.name === name && primary.tsFile === f.tsFile)
       return this.emitModuleClass(u, name, f);
     const fileFns: Set<string> = (f.fileFns ??= new Set<string>());
     const members: string[] = [];
@@ -3882,15 +3847,28 @@ export class Emitter {
       : seatNames.length
         ? `Object.assign(new ${ModuleRef}${tableType()}(${ctorBody}), { ${seatNames.join(", ")} })`
         : `new ${ModuleRef}${tableType()}(${ctorBody})`;
-    // The gem's top namespace is seated by the hand port's `namespaces.ts`, a
-    // plain object extended with `ActiveSupport::Autoload` (CLAUDE.md, "Call-time
-    // constant resolution"); this file adds its module functions, not a second object.
+    // A namespace module is a plain object of its module functions, named by its
+    // Ruby path; its constants are imports where they are read, not members.
     if (!ctorBody && handNamespaceFqns().get(u.fqn) === name) {
-      // The same object, typed `any`: the generated module functions keep their
-      // state on it (`X._x`), where the hand port uses module-level variables.
-      const seat = this.lw.imp(this.baseCtx(u, f, {}), "@root/namespaces.js", name, `${name}Seat`);
-      out.push(`export const ${name}: any = ${seat};`);
-      if (seatLine) out.push(seatLine);
+      // A reopening of a namespace whose class another file declares only
+      // exports its functions: callers import them (`version()`), and nothing is
+      // added to the class, which would close an import cycle with its file.
+      // Its functions' `self` (`@deprecator` on `ActiveJob`) is that class, read
+      // at call time.
+      if (this.resolver.isClassModule(u.fqn) && primary && primary.tsFile !== f.tsFile) {
+        const text = [...out, ...after].join("\n");
+        if (new RegExp(`\\b${name}\\b`).test(text))
+          this.resolver.importFrom(primary.tsFile, primary.name, this.baseCtx(u, f, {}), this.lw);
+        return { text, defs };
+      }
+      // Typed by what it carries: its functions, and the accessors
+      // `mattr_accessor` / `singleton_class.attr_accessor` define on it.
+      const sc = this.index.scopes.get(u.fqn);
+      const attrs = [...(sc?.sattrs ?? [])].map((a) => `${propName(a)}: unknown;`);
+      const fnTypes = seatNames.map((n) => `${n}: typeof ${n};`);
+      out.push(
+        `export const ${name}: { toString(): string; ${[...fnTypes, ...attrs].join(" ")} } = Object.assign({ toString: () => ${JSON.stringify(u.fqn)} }, { ${seatNames.join(", ")} }) as never;`,
+      );
       if (concernLine()) out.push(concernLine());
       if (incl) out.push(incl);
       if (tops.length) {
@@ -3904,13 +3882,6 @@ export class Emitter {
     // `included do` port from (includedHookOwner).
     if (!plain) out.push(...hoistedFns.flatMap((x) => [x, ""]));
     out.push(`export const ${name}${plain && !stateful ? "" : plain ? ": any" : ""} = ${modExpr};`);
-    // A constant in the module body (`VERSION::STRING`) lives in the module's
-    // constant table, as well as the file's flat export.
-    {
-      const cs = plain ? [] : u.body.filter((s: N) => s.k === "casgn" && s.path?.length === 1);
-      const set = cs.length ? this.lw.rc(this.baseCtx(u, f, {}), "rbModConstSet") : "";
-      for (const c of cs) out.push(`${set}(${name}, ${JSON.stringify(c.path[0])}, ${c.path[0]});`);
-    }
     if (seatLine && !plain && !modExpr.startsWith("Object.assign(")) out.push(seatLine);
     if (isConcern && !plain) out.push(concernLine());
     if (incl) out.push(incl);

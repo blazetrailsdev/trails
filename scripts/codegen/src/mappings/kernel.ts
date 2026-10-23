@@ -30,6 +30,8 @@ rule("extend include", (c) => {
     c.lw.stat(ctx, "flat-assertion-module");
     return `void "include ${mod}: the test host's"`;
   }
+  // `extend ActiveSupport::Autoload` fills seats an `autoload` names; there are none.
+  if (name === "extend" && mod?.endsWith("ActiveSupport::Autoload")) return "undefined";
   if (ctx.selfKind === "static" && n.args.length)
     return n.args.map((a: N) => `${c.rc(name)}(${ctx.selfExpr}, ${c.lw.expr(a, ctx)})`).join(", ");
   return null;

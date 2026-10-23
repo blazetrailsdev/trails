@@ -10,7 +10,7 @@ import ts from "typescript-5";
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { GEM, PKG_DIR, ROOT, handNamespaceFqns, handSeatMembers } from "./gem.js";
+import { GEM, PKG_DIR, ROOT } from "./gem.js";
 import { walk } from "./ir.js";
 import { TS_CLASS_RENAMES, rubyFileToTs } from "../../parity/conventions.js";
 import { TS_CONSTANT_RENAMES, tsConstantRenameKey } from "./constant-renames.js";
@@ -136,13 +136,7 @@ export class Resolver {
     memo.set(fqn, false);
     const s = this.index.scopes.get(fqn);
     const e = this.exportNames.get(fqn);
-    let yes =
-      !!s &&
-      s.kind === "module" &&
-      !s.moduleFunction &&
-      !s.sclassMixin &&
-      !!e &&
-      handNamespaceFqns().get(fqn) !== e.name;
+    let yes = !!s && s.kind === "module" && !s.moduleFunction && !s.sclassMixin && !!e;
     // A `super` this module's methods cannot resolve statically keeps the
     // Module, whose `superMethod` finds it at run time (the hand port's
     // aggregations.ts): `include()` flattens a class module's methods.
@@ -219,17 +213,12 @@ export class Resolver {
     // CLAUDE.md: ActiveRecord::Promise (and ::Complete) is the native promise.
     if (fqn === "ActiveRecord::Promise" || fqn === "ActiveRecord::Promise::Complete")
       return "Promise";
-    // A namespace the hand port seats in `namespaces.ts` is read from there,
-    // which imports nothing, so a child module reaching its parent closes no cycle.
-    const seat = handNamespaceFqns().get(fqn);
-    // Read as `any`: the generated module functions keep state on the object
-    // (`ActiveRecord._schemaFormat`), which the hand port's type does not list.
-    if (seat && ctx.f.tsFile !== "namespaces.ts")
-      return `(${lw.imp(ctx, "@root/namespaces.js", seat, ctx.f.usedLocalNames.has(seat) ? `${seat}Seat` : seat)} as any)`;
     // An autoloaded constant named in a test (`ActiveJob::QueueAdapters::SidekiqAdapter`
-    // in a `case` arm) is read off its module when reached, as Ruby's autoload
-    // loads it then: importing it would load every adapter's backend gem.
+    // in a `case` arm) whose backend gem trails does not port is read off its
+    // module when reached; one the generator emits (image_processing's `Vips`,
+    // backed by wasm-vips) is an import like any other.
     if (
+      !(this.exportNames.get(fqn) && GEM.externals) &&
       this.index.autoloads.has(fqn) &&
       ctx.f.rubyFile.startsWith("test/") &&
       [...(this.index.scopes.get(fqn)?.files ?? [])].some((f) => this.index.externalFiles.has(f))
@@ -240,34 +229,15 @@ export class Resolver {
     const exp = this.exportNames.get(fqn);
     if (exp) return this.importFrom(exp.tsFile, exp.name, ctx, lw);
     const c = this.index.consts.get(fqn);
+    // A scalar constant read from another file is its value: no import edge,
+    // so it closes no cycle (`OBJECT_SERIALIZER_KEY` in object_serializer.rb).
+    if (c?.scalar && this.tsFileOf(c.file) !== ctx.f.tsFile) return lw.expr(c.scalar, ctx);
     if (c) {
       const owner = fqn.slice(0, fqn.lastIndexOf("::"));
       const constName = fqn.slice(fqn.lastIndexOf("::") + 2);
       const ownerScope = this.index.scopes.get(owner);
       // A class's constant, and a module's (a module is a class too, unless the
       // hand port seats it as a namespace object), is a static property.
-      // A constant another file defines, on a module the hand port's seat
-      // declares, is read through the seat at call time (`ActiveJob.Arguments.
-      // OBJECT_SERIALIZER_KEY`, the hand port's object-serializer.ts): no
-      // import edge into that file.
-      if (this.tsFileOf(c.file) !== ctx.f.tsFile && ctx.f.tsFile !== "namespaces.ts") {
-        const i = owner.lastIndexOf("::");
-        const seatName = i > 0 ? handNamespaceFqns().get(owner.slice(0, i)) : undefined;
-        if (
-          seatName &&
-          handSeatMembers()
-            .get(seatName)
-            ?.has(owner.slice(i + 2))
-        ) {
-          const seat = lw.imp(
-            ctx,
-            "@root/namespaces.js",
-            seatName,
-            ctx.f.usedLocalNames.has(seatName) ? `${seatName}Seat` : seatName,
-          );
-          return `${seat}.${owner.slice(i + 2)}.${constName}`;
-        }
-      }
       if (ownerScope?.kind === "class" || this.isClassModule(owner))
         return `${this.fqnRef(owner, ctx, lw)}.${constName}`;
       return this.importFrom(this.tsFileOf(c.file), constName, ctx, lw);

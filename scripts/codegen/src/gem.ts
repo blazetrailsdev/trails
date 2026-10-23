@@ -42,6 +42,14 @@ export interface GemConfig {
    * methods come from the table, not the class body).
    */
   schema?: string;
+  /**
+   * Classes Rails turns back into a class from a name in data (`constantize` on
+   * a serialized job's `job_class`, an `_aj_serialized` serializer, a GlobalID's
+   * model): a class with one of these among its Ruby ancestors or includes is
+   * entered in ruby-compat's constant registry by its Ruby path. Nothing else
+   * is seated; every other constant is an import.
+   */
+  namedClasses?: string[];
   /** The engine's `isolate_namespace` table prefix (`solid_queue_`). */
   tablePrefix?: string;
   /** The vendored gem directory and the trails package name (`activerecord`). */
@@ -93,6 +101,11 @@ const GEMS: Record<string, GemConfig> = {
     rubyRoot: "active_job",
     namespace: "ActiveJob",
     dataHashColon: true,
+    namedClasses: [
+      "ActiveJob::Base",
+      "ActiveJob::Serializers::ObjectSerializer",
+      "GlobalID::Identification",
+    ],
   },
 };
 

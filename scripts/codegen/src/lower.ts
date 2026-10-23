@@ -50,14 +50,7 @@ import {
   rubyAncestors,
   type ScopeInfo,
 } from "./gem-index.js";
-import {
-  GEM,
-  PKG_DIR,
-  ROOT,
-  coreExtSends,
-  handNamespaceAutoloads,
-  handNamespaceFqns,
-} from "./gem.js";
+import { GEM, PKG_DIR, ROOT, coreExtSends } from "./gem.js";
 import type { Resolver } from "./resolve.js";
 import { isBool, isObjectLike, type TypeRef } from "./types.js";
 
@@ -1148,23 +1141,22 @@ export class Lowerer {
       ctx.owner &&
       n.args[0]?.k === "sym"
     ) {
-      const cname: string = n.args[0].value;
-      const target = this.resolver.exportNames.get(`${ctx.owner}::${cname}`);
-      // The hand port decides loading for the constants its `namespaces.ts`
-      // autoloads (lazily, through `loadPath`); only the rest load eagerly.
-      const seat = handNamespaceFqns().get(ctx.owner);
-      const handDeclared = !!seat && handNamespaceAutoloads().has(`${seat}::${cname}`);
-      if (
-        target &&
-        target.tsFile !== ctx.f.tsFile &&
-        !handDeclared &&
-        !this.resolver.unresolvedFiles.has(target.tsFile)
-      )
-        this.imp(ctx, `@root/${target.tsFile.replace(/\.ts$/, ".js")}`, "", "");
-      // Rails' explicit path (`autoload :DeserializationError, "active_job/arguments"`) is kept.
-      const pathArg = n.args[1] ? `, ${this.expr(n.args[1], ctx)}` : "";
-      return [`${ctx.selfExpr}.autoload(${JSON.stringify(cname)}${pathArg});`];
+      // An autoloaded constant is imported where it is read, as Ruby loads it
+      // when it is first named; the `autoload` line itself loads nothing.
+      return [];
     }
+    // `extend ActiveSupport::Autoload` serves the seats an autoload fills; there are none.
+    if (
+      n.recv === null &&
+      n.name === "extend" &&
+      n.args.length === 1 &&
+      n.args[0].k === "const" &&
+      n.args[0].path
+        .filter((x: string) => x)
+        .join("::")
+        .endsWith("ActiveSupport::Autoload")
+    )
+      return [];
     if (
       n.recv === null &&
       (n.name === "require" ||
@@ -1192,7 +1184,11 @@ export class Lowerer {
       // `setX()` spelling), not a property: `self.queue_adapter = :async` calls it.
       const w = this.resolver.member(n, n.recv ?? { k: "self" }, ctx, this);
       const owner = this.writerOwner(n.name, n.recv ?? { k: "self" }, ctx);
-      if ((w?.kind === "method" || (!w && owner)) && owner?.kind === "module") {
+      if (
+        (w?.kind === "method" || (!w && owner)) &&
+        owner?.kind === "module" &&
+        !(this.resolver.isClassModule(owner.fqn) && owner.sclassAttrs.has(n.name.slice(0, -1)))
+      ) {
         // The emitter's name for a module writer function (emit.ts `fnName`).
         const wn = w?.name ?? propName(n.name.slice(0, -1));
         const fnName = wn.startsWith("set") ? wn : `set${wn[0].toUpperCase()}${wn.slice(1)}`;
@@ -2215,6 +2211,17 @@ export class Lowerer {
   plainArg(n: N, e: string, ctx: Ctx): string {
     if (n.k === "hash" || n.k === "kwargs" || this.plainHash(n, ctx)) return e;
     return this.withOnce(e, (x) => `(${x} instanceof Map ? Object.fromEntries(${x}) : ${x})`);
+  }
+
+  /**
+   * `Module#name`: the Ruby path a class declares as its own `toString()`, else
+   * its JS name (a class written without the seat), and nil for an anonymous one.
+   */
+  modName(r: string): string {
+    return this.withOnce(
+      r,
+      (x) => `(Object.hasOwn(${x}, "toString") ? String(${x}) : ${x}.name || null)`,
+    );
   }
 
   /**
@@ -3493,16 +3500,16 @@ export class Lowerer {
       !this.index.methodNames.has("name") &&
       !this.typeOf(recvNode, ctx)
     )
-      return `${this.rc(ctx, "rbModName")}(${r})`;
-    // ── `Module#name` on a module value is its Ruby constant path (`rbModName`),
-    // not a JS class's short `name`.
+      return this.modName(r);
+    // ── `Module#name` is the Ruby constant path, which every class and module
+    // answers as its `toString()`, not a JS class's short `name`.
     if (
       name === "name" &&
       n.args.length === 0 &&
       recvNode &&
       this.classKey(this.typeOf(recvNode, ctx)) === "@ruby-compat/include.ts#Module"
     )
-      return `${this.rc(ctx, "rbModName")}(${r})`;
+      return this.modName(r);
 
     const rc = (x: string) => this.rc(ctx, x);
     const site = (r0: string | null, R0: string): CallSite => ({
@@ -3553,10 +3560,37 @@ export class Lowerer {
     if (objectMethod != null) return objectMethod;
 
     // ── `Mod.x` where `def self.x` is a gem module function → the exported function.
+    // An implicit-self call in a module's singleton methods to one another file's
+    // reopening defines (`instrument_enqueue_all` from enqueuing.rb) is the same.
+    const selfMod =
+      (!recvNode || recvNode.k === "self") && ctx.selfKind === "static" && ctx.owner
+        ? this.index.scopes.get(ctx.owner)
+        : undefined;
+    const sd = selfMod?.kind === "module" ? selfMod.sdefs.get(name) : undefined;
+    if (sd && !/=$/.test(name) && this.resolver.tsFileOf(sd.file) !== ctx.f.tsFile) {
+      this.stat(ctx, "module-function-call");
+      const fn = this.resolver.importFrom(
+        this.resolver.tsFileOf(sd.file),
+        tsMethodName(name, selfMod!.fqn, true),
+        ctx,
+        this,
+      );
+      if (!this.isLocal(ctx, fn)) return `${fn}(${argList()})`;
+    }
     if (recvNode?.k === "const") {
       const hit = this.index.resolveConst(recvNode.path, ctx.nesting);
       const s = hit?.kind === "scope" ? this.index.scopes.get(hit.fqn) : undefined;
       const exp = s ? this.resolver.exportNames.get(s.fqn) : undefined;
+      // `singleton_class.attr_accessor :x` on a module that is a class: a static
+      // accessor property (`ActiveJob.verbose_enqueue_logs`).
+      if (
+        s &&
+        this.resolver.isClassModule(s.fqn) &&
+        s.sclassAttrs.has(name) &&
+        !n.args.length &&
+        !n.block
+      )
+        return `${r}.${propName(name)}`;
       // A module is a class (emit.ts emitModuleClass): its singleton method is
       // a static one, called on it as Ruby calls it.
       if (
@@ -3575,10 +3609,18 @@ export class Lowerer {
         // A reopened module's function lives in the reopening file's twin
         // (`ActiveJob.deprecator`, active_job/deprecator.rb).
         const tsFile = this.resolver.tsFileOf(s.sdefs.get(name)!.file);
-        const fn = this.resolver.importFrom(tsFile, tsMethodName(name, s.fqn, true), ctx, this);
+        const tsName = tsMethodName(name, s.fqn, true);
+        const fn = this.resolver.importFrom(tsFile, tsName, ctx, this);
         // A local of the same name (`adapter_name = ActiveJob.adapter_name(x)`)
-        // shadows the function: keep Ruby's qualified call on the module object.
-        if (this.isLocal(ctx, fn) || ctx.assigning === fn) return `${r}.${fn}(${argList()})`;
+        // shadows the function: it is imported under another name.
+        if (this.isLocal(ctx, fn) || ctx.assigning === fn) {
+          // In its own file the function declaration is hoisted, so an alias after
+          // the imports already names it.
+          if (tsFile === ctx.f.tsFile)
+            (ctx.f.prelude ??= new Set()).add(`const ${tsName}Fn = ${tsName};`);
+          else this.imp(ctx, `@root/${tsFile.replace(/\.ts$/, ".js")}`, tsName, `${tsName}Fn`);
+          return `${tsName}Fn(${argList()})`;
+        }
         return `${fn}(${argList()})`;
       }
     }
@@ -3701,8 +3743,8 @@ export class Lowerer {
       recvNode.recv &&
       recvNode.recv.k !== "self"
     )
-      return `${rc("rbModName")}(${r})`;
-    // activejob's hand port writes `self.class.name` as `rbModName(this.constructor)`
+      return this.modName(r);
+    // activejob's `self.class.name` is the Ruby path of the serializer's class
     // (serializers/object-serializer.ts): the serialized payload names the
     // serializer by its Ruby path, which `safe_constantize` reads back.
     if (
@@ -3713,8 +3755,8 @@ export class Lowerer {
       recvNode.name === "class" &&
       recvNode.args.length === 0
     )
-      return `${rc("rbModName")}(${r})`;
-    // ── `klass.name` on a class is the JS class name.
+      return this.modName(r);
+    // ── `klass.name` on a class is its Ruby path, the class's `toString()`.
     if (
       name === "name" &&
       n.args.length === 0 &&
@@ -3722,7 +3764,7 @@ export class Lowerer {
       ((recvNode.k === "call" && recvNode.name === "class") ||
         this.isStaticClass(this.typeOf(recvNode, ctx)))
     ) {
-      return `${r}.name`;
+      return this.modName(r);
     }
 
     // ── `ENV[k]` / `ENV.fetch(k, d)` → activesupport `getEnv` (the hand port's idiom).

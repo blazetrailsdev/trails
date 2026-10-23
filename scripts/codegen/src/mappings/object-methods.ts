@@ -35,11 +35,53 @@ const CONST_FNS: Record<string, string> = {
   "const_defined?": "rbModConstDefined",
   const_set: "rbModConstSet",
 };
-rule("const_get const_defined? const_set", (c) =>
-  c.lw.index.methodNames.has(c.name)
-    ? null
-    : `${c.rc(CONST_FNS[c.name])}(${[c.R, ...c.args()].join(", ")})`,
-);
+rule("const_get const_defined? const_set", (c) => {
+  if (c.lw.index.methodNames.has(c.name)) return null;
+  return staticConstGet(c) ?? `${c.rc(CONST_FNS[c.name])}(${[c.R, ...c.args()].join(", ")})`;
+});
+
+/**
+ * `Mod.const_get(name)` / `const_defined?` on a module of this gem, read
+ * statically: a literal name is the constant itself, and a name known only at
+ * run time indexes the module's constants, each an import. No module object
+ * holds them.
+ */
+function staticConstGet(c: Parameters<CallRule>[0]): string | null {
+  const { n, ctx, lw, recvNode } = c;
+  if (c.name === "const_set" || argc(n) !== 1) return null;
+  const owner =
+    recvNode?.k === "const"
+      ? lw.index.resolveConst(recvNode.path, ctx.nesting)
+      : (!recvNode || recvNode.k === "self") && ctx.selfKind === "static" && ctx.owner
+        ? { kind: "scope", fqn: ctx.owner }
+        : null;
+  if (owner?.kind !== "scope") return null;
+  const prefix = `${owner.fqn}::`;
+  const children = [...new Set([...lw.index.scopes.keys(), ...lw.index.consts.keys()])].filter(
+    (k) => {
+      if (!k.startsWith(prefix) || k.slice(prefix.length).includes("::")) return false;
+      // A constant of the library that trails generates: not a test's, and not
+      // one whose file needs a gem trails does not port (an adapter's backend).
+      const rubyFile = lw.index.scopes.get(k)?.primaryFile ?? lw.index.consts.get(k)?.file;
+      const ts = lw.resolver.exportNames.get(k)?.tsFile;
+      return (
+        !!rubyFile &&
+        !rubyFile.startsWith("test/") &&
+        !lw.index.externalFiles.has(rubyFile) &&
+        !(ts && lw.resolver.unresolvedFiles.has(ts))
+      );
+    },
+  );
+  if (!children.length) return null;
+  const arg = n.args[0];
+  if ((arg.k === "sym" || arg.k === "str") && children.includes(prefix + arg.value))
+    return c.name === "const_get" ? lw.resolver.fqnRef(prefix + arg.value, ctx, lw) : "true";
+  const table = `{ ${children.map((k) => `${k.slice(prefix.length)}: ${lw.resolver.fqnRef(k, ctx, lw)}`).join(", ")} }`;
+  const key = lw.argExpr(arg, ctx);
+  return c.name === "const_get"
+    ? `(${table} as { [name: string]: unknown })[${key}]`
+    : `Object.hasOwn(${table}, ${key})`;
+}
 
 // A Ruby Symbol is a JS string (CLAUDE.md), so `to_sym` on a String or Symbol
 // is the value itself, whatever the receiver's static type, unless the gem
