@@ -800,6 +800,9 @@ importers:
       '@blazetrails/marcel':
         specifier: workspace:*
         version: link:../../packages/marcel
+      '@blazetrails/mini-magick':
+        specifier: workspace:*
+        version: link:../../packages/mini-magick
       '@blazetrails/msgpack':
         specifier: workspace:*
         version: link:../../packages/msgpack
