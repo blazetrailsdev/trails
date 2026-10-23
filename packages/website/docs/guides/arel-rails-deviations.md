@@ -54,23 +54,33 @@ imports none of the classes it names, so it cannot join a cycle. It
 `autoload`s each constant, the defining module seats it at the bottom of its
 own body (`Nodes.Not = Not`), and the reader names it at call time.
 
-In Arel that exception is almost empty: 278 of its 287 namespace reads are
-plain imports, and the remaining few are TypeScript type positions, which are
-erased and cost no edge at all. The namespace objects stay as the public
-`Arel.Nodes` / `Arel.Collectors` / `Arel.Visitors` surface regardless. Reads
-still written against the namespace are being converted to plain imports
-(RFC 0205), so this is a shrinking deviation, not a standing one.
+In Arel that exception is almost empty: of its 287 cross-module class
+references, 278 are in a method body and so are plain imports, and the
+remaining nine are TypeScript type positions, which are erased and cost no
+edge at all. The namespace objects stay as the public `Arel.Nodes` /
+`Arel.Collectors` / `Arel.Visitors` surface regardless.
+
+So a class named in a method body is imported directly, cycle or not:
 
 <!-- typecheck:skip -->
 
 ```ts
 // nodes/binary.ts — Rails: left.is_a?(Arel::Attributes::Attribute)
-if (this.left instanceof Attributes.Attribute) return block(this.left);
+import { Attribute } from "../attributes/attribute.js";
+
+if (this.left instanceof Attribute) return block(this.left);
 ```
 
-The narrowing itself is plain `instanceof`, the direct equivalent of Ruby's
-`is_a?`; the namespace only defers _which module the class arrives from_. This
-is a pure-TS concern; Rails never needs it.
+`attributes/attribute.ts` is inside Arel's cycle cluster, and the import is
+still correct, because the method runs after every module body in the cycle
+has finished. The narrowing itself is plain `instanceof`, the direct
+equivalent of Ruby's `is_a?` — so this line has no deviation left in it at
+all.
+
+Some of Arel's method bodies still spell that read off the namespace
+(`Attributes.Attribute`) rather than importing the class. Those are the
+pre-correction shape and are being converted (RFC 0205); a new one should not
+be written.
 
 ## No `method_missing`, no Proxy
 

@@ -64,11 +64,15 @@ a relabeling: the 790 calls become 790 assignments, the import graph still says
 nothing about where a class comes from, and the reader still cannot tell
 ("I only want the namespace seating when necessary, I want to lean on ES
 imports / exports"). Deriving a class's Ruby path at run time by walking the
-namespace objects was rejected once the reads became imports, because a class
-is then not seated anywhere to walk; the path comes instead from a table
-generated out of `rails-api.json`, which already holds every class's `fqn` and
-defining file and is already matched to its TS counterpart by `parity:api` —
-verified by CI rather than by hand.
+namespace objects looked attractive because **all 39 namespace objects across
+the 13 `packages/*/src/namespaces.ts` files already carry their own
+fully-qualified path in `name`** (`{ name: "Arel::Nodes" }`), so 39 facts would
+have replaced 790 registration calls. It was rejected once the reads became
+imports: a class reached by a plain import is not seated on a namespace at all,
+so there is nothing left to walk. The path comes instead from a table generated
+out of `rails-api.json`, which already holds every class's `fqn` and defining
+file and is already matched to its TS counterpart by `parity:api` — verified by
+CI rather than by hand.
 
 Deferring the subclass edges instead (a slot per `extends` site) looks smaller
 and does not work: nothing then loads the subclass modules at all, so their
