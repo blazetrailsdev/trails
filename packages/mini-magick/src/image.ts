@@ -23,11 +23,10 @@ import {
   rbObjDup,
   Pathname,
   FileUtils,
-  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { replace, rbAref, lines } from "./codegen-runtime.js";
 import { Invalid, Error } from "./mini-magick.js";
-import { MiniMagick } from "./namespaces.js";
+import { MiniMagick } from "./mini-magick.js";
 import { Shell } from "./shell.js";
 import type { Tempfile } from "@blazetrails/ruby-compat";
 
@@ -488,4 +487,3 @@ export class Image {
   Image.attribute("signature");
   Image.attribute("data");
 }
-rbModConstSet(MiniMagick, "Image", Image);

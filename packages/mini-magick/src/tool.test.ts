@@ -1,7 +1,7 @@
 import type {} from "@blazetrails/vitest-matchers";
-import { File, block as rbBlock, update, rbObjClone } from "@blazetrails/ruby-compat";
+import { File, update, rbObjClone } from "@blazetrails/ruby-compat";
 import { rbBinop } from "./codegen-runtime.js";
-import { MiniMagick } from "./namespaces.js";
+import { MiniMagick } from "./mini-magick.js";
 import { Shell } from "./shell.js";
 import "./test-helpers/spec-helper.js";
 import { imagePath } from "./test-helpers/support/helpers.js";
@@ -58,16 +58,14 @@ describe("MiniMagick::Tool", () => {
     it.fails("accepts a block, and immediately executes the command", async () => {
       const output = new Tool(
         "identify",
-        rbBlock(
-          async (builder) =>
-            await (typeof builder === "string"
-              ? builder + imagePath("gif")
-              : Array.isArray(builder)
-                ? (builder.push(imagePath("gif")), builder)
-                : builder instanceof globalThis.Set
-                  ? builder.add(imagePath("gif"))
-                  : builder.append(imagePath("gif"))),
-        ),
+        async (builder) =>
+          await (typeof builder === "string"
+            ? builder + imagePath("gif")
+            : Array.isArray(builder)
+              ? (builder.push(imagePath("gif")), builder)
+              : builder instanceof globalThis.Set
+                ? builder.add(imagePath("gif"))
+                : builder.append(imagePath("gif"))),
       );
       expect(output).toMatch("GIF");
     });
@@ -182,20 +180,18 @@ describe("MiniMagick::Tool", () => {
   describe("#stack", () => {
     // BLOCKED: mini-magick-cli-tool-shortcuts
     it.fails("it surrounds added arguments with parentheses", async () => {
-      await subject.stack(
-        rbBlock(async (stack) => {
-          if (Array.isArray(stack)) stack.push("foo");
-          else if (stack instanceof globalThis.Set) stack.add("foo");
-          else stack.append("foo");
-          return await (typeof stack === "string"
-            ? stack + "bar"
-            : Array.isArray(stack)
-              ? (stack.push("bar"), stack)
-              : stack instanceof globalThis.Set
-                ? stack.add("bar")
-                : stack.append("bar"));
-        }),
-      );
+      await subject.stack(async (stack) => {
+        if (Array.isArray(stack)) stack.push("foo");
+        else if (stack instanceof globalThis.Set) stack.add("foo");
+        else stack.append("foo");
+        return await (typeof stack === "string"
+          ? stack + "bar"
+          : Array.isArray(stack)
+            ? (stack.push("bar"), stack)
+            : stack instanceof globalThis.Set
+              ? stack.add("bar")
+              : stack.append("bar"));
+      });
       expect(await subject.args).toEqual(["(", "foo", "bar", ")"]);
     });
 

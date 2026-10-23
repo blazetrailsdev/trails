@@ -1,6 +1,5 @@
 import { Shell } from "./shell.js";
 import {
-  rbBlockGivenP,
   PROTOCOL_PROBES,
   merge,
   rbCheckArrayType,
@@ -11,13 +10,9 @@ import {
   rbObjIsKindOf,
   Hash,
   rbFSend,
-  rbModConstSet,
   rbModDeprecateConstant,
-  rbModDefineMethod,
 } from "@blazetrails/ruby-compat";
-import { rbCallSuper } from "./codegen-runtime.js";
-import { isImagemagick7 } from "./mini-magick.js";
-import { MiniMagick } from "./namespaces.js";
+import { MiniMagick, isImagemagick7 } from "./mini-magick.js";
 
 export class Tool {
   declare _name: string;
@@ -42,11 +37,14 @@ export class Tool {
   ];
 
   static new(...args: unknown[]) {
-    const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
-    const instance = rbCallSuper(this, "constructor", "MiniMagick::Tool", ...args);
+    const block =
+      typeof args[args.length - 1] === "function"
+        ? (args.pop() as (instance: Tool) => unknown)
+        : undefined;
+    const instance = new this(...(args as [string, Record<string, unknown>?]));
     if (block != null) {
       block(instance);
-      return instance();
+      return instance.call();
     } else {
       return instance;
     }
@@ -124,7 +122,10 @@ export class Tool {
   }
 
   stack(...args: unknown[]) {
-    const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+    const block =
+      typeof args[args.length - 1] === "function"
+        ? (args.pop() as (tool: this) => unknown)
+        : undefined;
     this.append("(");
     for (const value of args) {
       if (rbObjIsKindOf(value, Hash)) {
@@ -234,18 +235,12 @@ export class Tool {
     "montage",
     "stream",
   ]) {
-    rbModConstSet(
-      Tool,
-      rbStrSend(tool, "capitalize")[0] as string,
+    (Tool as unknown as Record<string, typeof Tool>)[rbStrSend(tool, "capitalize")[0] as string] =
       class extends Tool {
-        static {
-          rbModDefineMethod(this, "initialize", (...args: unknown[][]) =>
-            rbCallSuper(this, "", "MiniMagick::Tool", tool, ...args),
-          );
+        constructor(...args: unknown[]) {
+          super(tool, ...(args as [Record<string, unknown>?]));
         }
-      },
-    );
+      };
     rbModDeprecateConstant(Tool, rbStrSend(tool, "capitalize")[0] as string);
   }
 }
-rbModConstSet(MiniMagick, "Tool", Tool);

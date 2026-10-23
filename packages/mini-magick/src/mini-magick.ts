@@ -1,10 +1,9 @@
-import "./version.js";
+import { version } from "./version.js";
 import { Configuration } from "./configuration.js";
 import { Utilities } from "./utilities.js";
 import "./tool.js";
 import "./image.js";
-import { extend, RuntimeError, StandardError, rbModConstSet } from "@blazetrails/ruby-compat";
-import { MiniMagick as MiniMagickSeat } from "./namespaces.js";
+import { extend, RuntimeError, StandardError } from "@blazetrails/ruby-compat";
 
 export function isImagemagick7() {
   if (MiniMagick.graphicsmagick != null && MiniMagick.graphicsmagick !== false) {
@@ -17,15 +16,17 @@ export function isImagemagick7() {
 }
 
 export function cliVersion(): unknown {
-  const output = MiniMagickSeat.identify((x: unknown) => x.version);
+  const output = MiniMagick.identify((x: unknown) => x.version);
   return output[/\d+\.\d+\.\d+(-\d+)?/];
 }
 
-export const MiniMagick = MiniMagickSeat;
-Object.assign(MiniMagick, { isImagemagick7, cliVersion });
-{
-  extend(MiniMagick, Configuration);
-}
+export const MiniMagick = { version, isImagemagick7, cliVersion } as {
+  version: typeof version;
+  isImagemagick7: typeof isImagemagick7;
+  cliVersion: typeof cliVersion;
+  _imagemagick7?: boolean;
+} & Configuration;
+extend(MiniMagick, Configuration);
 export class Error extends RuntimeError {
   static toString(): string {
     return "MiniMagick::Error";
@@ -41,6 +42,3 @@ export class TimeoutError extends Error {
     return "MiniMagick::TimeoutError";
   }
 }
-rbModConstSet(MiniMagickSeat, "Error", Error);
-rbModConstSet(MiniMagickSeat, "Invalid", Invalid);
-rbModConstSet(MiniMagickSeat, "TimeoutError", TimeoutError);

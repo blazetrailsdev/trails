@@ -1,7 +1,6 @@
 import "./utilities.js";
 import { Logger } from "@blazetrails/activesupport";
-import { Dir, stdout as $stdout, classModule, rbModConstSet } from "@blazetrails/ruby-compat";
-import { MiniMagick as MiniMagickSeat } from "./namespaces.js";
+import { Dir, stdout as $stdout, classModule } from "@blazetrails/ruby-compat";
 
 export class Configuration {
   declare _graphicsmagick: unknown;
@@ -110,4 +109,3 @@ export class Configuration {
     return block(this);
   }
 }
-rbModConstSet(MiniMagickSeat, "Configuration", Configuration);

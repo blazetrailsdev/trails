@@ -13,10 +13,9 @@ import {
   IOError,
   first,
   format,
-  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { TimeoutError, Error } from "./mini-magick.js";
-import { MiniMagick } from "./namespaces.js";
+import { MiniMagick } from "./mini-magick.js";
 
 export class Shell {
   static toString(): string {
@@ -102,4 +101,3 @@ export class Shell {
     return value;
   }
 }
-rbModConstSet(MiniMagick, "Shell", Shell);

@@ -1,12 +1,9 @@
-import { Gem, compact, classModule, rbModConstSet } from "@blazetrails/ruby-compat";
-import { MiniMagick as MiniMagickSeat } from "./namespaces.js";
+import { Gem, compact, classModule } from "@blazetrails/ruby-compat";
 
 export function version() {
   return new Gem.Version(VERSION.STRING as string | number | null);
 }
 
-export const MiniMagick = MiniMagickSeat;
-Object.assign(MiniMagick, { version });
 export class VERSION {
   static readonly [classModule] = true;
 
@@ -26,4 +23,3 @@ export class VERSION {
     ".",
   );
 }
-rbModConstSet(MiniMagickSeat, "VERSION", VERSION);

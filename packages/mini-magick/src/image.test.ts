@@ -5,7 +5,6 @@ import {
   StringIO,
   Tempfile,
   FileUtils,
-  block as rbBlock,
   pack,
   rbCheckArrayType,
   HTTP,
@@ -22,7 +21,7 @@ import {
 import { inject, lines } from "./codegen-runtime.js";
 import { Image } from "./image.js";
 import { cliVersion, Error } from "./mini-magick.js";
-import { MiniMagick } from "./namespaces.js";
+import { MiniMagick } from "./mini-magick.js";
 import "./test-helpers/spec-helper.js";
 import { imagePath, randomPath } from "./test-helpers/support/helpers.js";
 import { Tool } from "./tool.js";
@@ -97,7 +96,7 @@ describe("MiniMagick::Image", () => {
     });
 
     beforeEach(async () => {
-      pixels = [await inject(dimensions, "*"), rbBlock((i) => i)];
+      pixels = [await inject(dimensions, "*"), (i) => i];
     });
 
     beforeEach(async () => {
@@ -264,10 +263,7 @@ describe("MiniMagick::Image", () => {
     // BLOCKED: mini-magick-lib-native-idioms
 
     it.fails("accepts a block which it passes on to #combine_options", async () => {
-      const image = new Image(
-        await subject.path(),
-        rbBlock(async (b) => await b.resize("100x100!")),
-      );
+      const image = new Image(await subject.path(), async (b) => await b.resize("100x100!"));
       expect(await image.dimensions()).toEqual([100, 100]);
     });
   });

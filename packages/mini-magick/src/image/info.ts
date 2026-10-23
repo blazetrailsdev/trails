@@ -6,7 +6,6 @@ import {
   update,
   kernelInteger,
   File,
-  block as rbBlock,
   ArgumentError,
   TypeError,
   excSetupMessage,
@@ -15,7 +14,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { rbBinop } from "../codegen-runtime.js";
 import { Invalid } from "../mini-magick.js";
-import { MiniMagick } from "../namespaces.js";
+import { MiniMagick } from "../mini-magick.js";
 
 export class Info {
   declare _path: string;
@@ -65,30 +64,27 @@ export class Info {
 
   cheapInfo(value: string) {
     try {
-      return fetch(
-        this._info,
-        value,
-        rbBlock(() => {
-          const [format, width, height, size] = rbStrSend(
-            this.parseWarnings(this.get("%m %w %h %b")) as string,
-            "split",
-            " ",
-          )[0] as string[];
-          let path = this._path;
-          if ((matchOperator(path, /\[\d+\]$/m) ?? false) !== false) {
-            path = path.match(/\[\d+\]$/m).preMatch();
-          }
-          update(this._info, {
-            format: format,
-            width: kernelInteger(width),
-            height: kernelInteger(height),
-            dimensions: [kernelInteger(width), kernelInteger(height)],
-            size: File.size(path),
-            human_size: size,
-          });
-          return fetch(this._info, value);
-        }),
-      );
+      if (Object.hasOwn(this._info, value)) {
+        return this._info[value];
+      }
+      const [format, width, height, size] = rbStrSend(
+        this.parseWarnings(this.get("%m %w %h %b")) as string,
+        "split",
+        " ",
+      )[0] as string[];
+      let path = this._path;
+      if ((matchOperator(path, /\[\d+\]$/m) ?? false) !== false) {
+        path = path.match(/\[\d+\]$/m).preMatch();
+      }
+      update(this._info, {
+        format: format,
+        width: kernelInteger(width),
+        height: kernelInteger(height),
+        dimensions: [kernelInteger(width), kernelInteger(height)],
+        size: File.size(path),
+        human_size: size,
+      });
+      return fetch(this._info, value);
     } catch (error) {
       if (error instanceof ArgumentError || error instanceof TypeError) {
         throw excSetupMessage(new Invalid("image data can't be read"), error);

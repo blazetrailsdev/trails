@@ -1,6 +1,6 @@
 import { getEnv } from "@blazetrails/activesupport";
-import { rbStrSend, fetch, File, Tempfile, rbModConstSet } from "@blazetrails/ruby-compat";
-import { MiniMagick } from "./namespaces.js";
+import { rbStrSend, fetch, File, Tempfile } from "@blazetrails/ruby-compat";
+import { MiniMagick } from "./mini-magick.js";
 
 export function which(cmd: string) {
   const exts =
@@ -36,4 +36,3 @@ export const Utilities = {
   which,
   tempfile,
 };
-rbModConstSet(MiniMagick, "Utilities", Utilities);

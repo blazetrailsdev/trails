@@ -9,7 +9,7 @@ import {
   hashDelete,
 } from "@blazetrails/ruby-compat";
 import { Error, TimeoutError } from "./mini-magick.js";
-import { MiniMagick } from "./namespaces.js";
+import { MiniMagick } from "./mini-magick.js";
 import { Shell } from "./shell.js";
 import "./test-helpers/spec-helper.js";
 import { imagePath } from "./test-helpers/support/helpers.js";

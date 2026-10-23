@@ -1,4 +1,4 @@
-import { MiniMagick } from "./namespaces.js";
+import { MiniMagick } from "./mini-magick.js";
 import "./test-helpers/spec-helper.js";
 import { expect, it, describe } from "vitest";
 
