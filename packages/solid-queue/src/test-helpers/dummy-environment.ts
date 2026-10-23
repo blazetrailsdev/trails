@@ -1,6 +1,7 @@
 import { afterAll } from "vitest";
 import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/activerecord";
 import { SolidQueue } from "../solid-queue.js";
+import { loadQueueSchema, loadShardSchemas } from "./queue-schema.js";
 
 const configurations = Base.configurations();
 const primary = configurations.configsFor({ envName: "arunit", name: "primary" })!;
@@ -24,7 +25,9 @@ const dummyConfigs = ["shard_one", "shard_two", "queue"].map(
 );
 Base.configurations([...configurations.configurations, ...dummyConfigs]);
 DatabaseTasks.root = import.meta.dirname;
-for (const dbConfig of dummyConfigs) await DatabaseTasks.create(dbConfig);
+for (const dbConfig of dummyConfigs) await DatabaseTasks.purge(dbConfig);
+await loadShardSchemas();
+await loadQueueSchema();
 await Base.establishConnection(primary);
 
 SolidQueue.connectsTo = { database: { writing: ":queue" } };

@@ -28,7 +28,7 @@ import { AddToBufferJob } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
 import { ShardedJobResult } from "./test-helpers/sharded-job-result.js";
 import { ShardedRecord } from "./test-helpers/sharded-record.js";
-import { loadAppSchema, loadQueueSchema, loadShardSchemas } from "./test-helpers/queue-schema.js";
+import { loadAppSchema } from "./test-helpers/queue-schema.js";
 
 class NonOverlappingJob extends ApplicationJob {
   static {
@@ -58,9 +58,7 @@ describe("SolidQueue::JobTest", () => {
   let result: JobResult;
 
   beforeAll(async () => {
-    await loadQueueSchema();
     await loadAppSchema();
-    await loadShardSchemas();
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
   });
 
@@ -167,7 +165,7 @@ describe("SolidQueue::JobTest", () => {
     });
 
     const job = (await Job.last()) as Job;
-    expect(job.arguments["arguments"][0]).toBe("enqueued within block");
+    expect((job.arguments["arguments"] as unknown[])[0]).toBe("enqueued within block");
   });
 
   it("enqueue jobs without concurrency controls", async () => {
@@ -336,6 +334,8 @@ describe("SolidQueue::JobTest", () => {
   it("enqueue successfully inside a rolled-back transaction in the app DB", async () => {
     await assertDifference(
       () => Job.count(),
+      1,
+      null,
       async () => {
         await assertNoDifference(
           () => JobResult.count(),
@@ -355,7 +355,9 @@ describe("SolidQueue::JobTest", () => {
     );
 
     const job = (await Job.last()) as Job;
-    expect(job.arguments["arguments"][0]).toBe("enqueued inside a rolled back transaction");
+    expect((job.arguments["arguments"] as unknown[])[0]).toBe(
+      "enqueued inside a rolled back transaction",
+    );
   });
 
   it("raise EnqueueError when there's an ActiveRecordError", async () => {

@@ -18,7 +18,7 @@ import {
 } from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { AddToBufferJob } from "./test-helpers/add-to-buffer-job.js";
-import { loadAppSchema, loadQueueSchema } from "./test-helpers/queue-schema.js";
+import { loadAppSchema } from "./test-helpers/queue-schema.js";
 
 const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
@@ -42,7 +42,6 @@ describe("DispatcherTest", () => {
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
 
   beforeAll(async () => {
-    await loadQueueSchema();
     await loadAppSchema();
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
     oldPermanentConnectionCheckout = permanentConnectionCheckout();

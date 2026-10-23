@@ -19,7 +19,7 @@ import {
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { AddToBufferJob, JobBuffer } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
-import { loadAppSchema, loadQueueSchema } from "./test-helpers/queue-schema.js";
+import { loadAppSchema } from "./test-helpers/queue-schema.js";
 
 class ExpectedTestError extends RuntimeError {
   static toString(): string {
@@ -77,7 +77,6 @@ describe("WorkerTest", () => {
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
 
   beforeAll(async () => {
-    await loadQueueSchema();
     await loadAppSchema();
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
     oldPermanentConnectionCheckout = permanentConnectionCheckout();
