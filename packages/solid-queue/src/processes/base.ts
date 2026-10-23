@@ -2,13 +2,11 @@ import { demodulize, include } from "@blazetrails/activesupport";
 import { Process, SecureRandom, Socket } from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
 import { Callbacks } from "./callbacks.js";
-import { Interruptible } from "./interruptible.js";
 import { Procline } from "./procline.js";
 import { Registrable } from "./registrable.js";
 import type { Process as ProcessRecord } from "../process.js";
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` of the process concerns (`processes/base.rb:6-7`). */
-/** @inventedArm include — CONVERGEABLE port-solid-queue-engine */
 export class Base {
   static toString(): string {
     return "SolidQueue::Processes::Base";
@@ -19,7 +17,6 @@ export class Base {
     include(this, AppExecutor);
     include(this, Registrable);
     include(this, Procline);
-    include(this, Interruptible);
   }
 
   readonly name: string;

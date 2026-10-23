@@ -1,14 +1,11 @@
 import { Base } from "@blazetrails/activejob";
-import { include, onLoad, type Duration } from "@blazetrails/activesupport";
+import { type Duration } from "@blazetrails/activesupport";
 import { registerConstant } from "@blazetrails/ruby-compat";
+import "./dummy-application.js";
 import {
   ConcurrencyControls,
   type ClassMethods as ConcurrencyControlsClassMethods,
 } from "../active-job/concurrency-controls.js";
-
-onLoad("active_job", function (this: typeof Base) {
-  include(this, ConcurrencyControls);
-});
 
 export class ApplicationJob extends Base {
   declare static concurrencyKey: unknown;

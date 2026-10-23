@@ -319,6 +319,7 @@ const alias = {
   "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/src") + "/",
   "@blazetrails/solid-queue": path.resolve(__dirname, "packages/solid-queue/src/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/src/index.ts"),
+  "@blazetrails/trailties/all": path.resolve(__dirname, "packages/trailties/src/all.ts"),
   "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/src/engine.ts"),
   "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/src/trailtie.ts"),
   "@blazetrails/ruby-compat/": path.resolve(__dirname, "packages/ruby-compat/src") + "/",

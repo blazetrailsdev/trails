@@ -609,6 +609,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../trailties
 
   packages/trails-tsc:
     dependencies:

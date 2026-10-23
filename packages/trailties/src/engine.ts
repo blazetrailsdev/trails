@@ -147,7 +147,28 @@ export class Engine extends Trailtie {
     return File.realpath(root);
   }
 
+  /**
+   * @inventedArm loop — PERMANENT
+   * @inventedArm if — PERMANENT
+   */
   static findRoot(from: string | undefined): string {
+    let packageRoot = from;
+    while (
+      packageRoot &&
+      File.isDirectory(packageRoot) &&
+      !File.isExist(`${packageRoot}/lib`) &&
+      !File.isExist(`${packageRoot}/package.json`)
+    ) {
+      const parent = File.dirname(packageRoot);
+      packageRoot = parent !== packageRoot ? parent : undefined;
+    }
+    if (
+      packageRoot &&
+      !File.isExist(`${packageRoot}/lib`) &&
+      File.isExist(`${packageRoot}/package.json`)
+    ) {
+      return File.realpath(packageRoot);
+    }
     return this.findRootWithFlag("lib", from);
   }
 
