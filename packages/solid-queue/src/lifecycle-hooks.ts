@@ -1,5 +1,5 @@
 import { Concern, extend, mattrReader } from "@blazetrails/activesupport";
-import { classModule } from "@blazetrails/ruby-compat";
+import { classModule, fetch } from "@blazetrails/ruby-compat";
 
 type Hooks = Record<"start" | "stop", (() => unknown)[]>;
 
@@ -40,7 +40,7 @@ export class LifecycleHooks {
 
   /** @internal */
   async runHooksFor(this: LifecycleHooksHost, event: "start" | "stop"): Promise<void> {
-    for (const block of this.constructor.lifecycleHooks[event] ?? []) {
+    for (const block of fetch<(() => unknown)[]>(this.constructor.lifecycleHooks, event, [])) {
       try {
         await block();
       } catch (exception) {

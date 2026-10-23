@@ -1,5 +1,5 @@
 import { Queue, RuntimeError } from "@blazetrails/ruby-compat";
-import type { Duration } from "@blazetrails/activesupport";
+import { include, type Duration } from "@blazetrails/activesupport";
 import { AppExecutor } from "../app-executor.js";
 
 interface InterruptibleHost {
@@ -10,8 +10,6 @@ interface InterruptibleHost {
 }
 
 export const Interruptible = {
-  ...AppExecutor,
-
   async wakeUp(this: InterruptibleHost): Promise<void> {
     await this.interrupt();
   },
@@ -42,3 +40,4 @@ export const Interruptible = {
     return (this._queue ??= new Queue<boolean>());
   },
 };
+include(Interruptible, AppExecutor);
