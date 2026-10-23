@@ -7,6 +7,10 @@
 #   scripts/codegen/golden.sh check    # regenerate all, diff against .golden/
 #   scripts/codegen/golden.sh check activejob builder   # only these gems
 #
+# activejob also runs its generated tests against its generated tree
+# (swap-tree.sh SWAP_GENERATED_TESTS=1): update records the failing tests,
+# check fails on any test not in that list (GOLDEN_NO_TESTS=1 skips it).
+#
 # The snapshot (scripts/codegen/.golden/<gem>/) is local and gitignored. Each
 # gem regenerates in parallel; it has its own IR dir, oracle and codegen-out.
 set -uo pipefail
@@ -71,6 +75,34 @@ for g in "${gems[@]}"; do
     diff -r -u "$GOLDEN/$g" "$out" >"$LOGS/$g.diff"
     echo "  diff: $LOGS/$g.diff"
     status=1
+  fi
+done
+
+# The generated-tests gate: one at a time, since it swaps packages/activejob/src.
+for g in "${gems[@]}"; do
+  [[ "$g" == activejob && -z "${GOLDEN_NO_TESTS:-}" && -d "$ROOT/packages/activejob/codegen-out/src" ]] || continue
+  SWAP_GENERATED_TESTS=1 CODEGEN_GEM=activejob "$ROOT/scripts/codegen/swap-tree.sh" >"$LOGS/$g.gate.log" 2>&1
+  counts=$(grep -E "Tests  " "$LOGS/$g.gate.log" | sed 's/^ *Tests *//')
+  grep -E '^ FAIL ' "$ROOT/packages/activejob/codegen-out/swap-tree-vitest.txt" | sed 's/^ FAIL  |[^|]*| //' | sort -u >"$LOGS/$g.failing"
+  if [[ "$mode" == update ]]; then
+    cp "$LOGS/$g.failing" "$GOLDEN/$g.failing"
+    echo "$g tests: snapshot updated  ${counts:-(no result: see $LOGS/$g.gate.log)}"
+  elif [[ ! -f "$GOLDEN/$g.failing" ]]; then
+    echo "$g tests: no snapshot — run '$0 update' first"
+    status=1
+  else
+    new=$(comm -13 "$GOLDEN/$g.failing" "$LOGS/$g.failing")
+    fixed=$(comm -23 "$GOLDEN/$g.failing" "$LOGS/$g.failing" | grep -c . || true)
+    if [[ -z "$counts" ]]; then
+      echo "$g tests: no result — see $LOGS/$g.gate.log"
+      status=1
+    elif [[ -n "$new" ]]; then
+      echo "$g tests: NEW FAILURES  $counts"
+      echo "$new" | sed 's/^/  /'
+      status=1
+    else
+      echo "$g tests: no new failures ($fixed fixed)  $counts"
+    fi
   fi
 done
 exit $status
