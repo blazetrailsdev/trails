@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { TopLevel } from "../namespaces.js";
 import { assertDifference, UnexpectedError } from "./assertions.js";
-import { beforeSetup, setTaggedLogger, taggedLogger } from "./tagged-logging.js";
+import { setTaggedLogger, taggedLogger } from "./tagged-logging.js";
+import { TestCase } from "../test-case.js";
 
 describe("TaggedLoggingTest", () => {
   it("the tagged_logger writer receives the assertion warning with the test-case identity", async () => {
@@ -42,7 +43,7 @@ describe("TaggedLoggingTest", () => {
       "info?": true,
     } as never);
     try {
-      beforeSetup();
+      new TestCase("a test").beforeSetup();
     } finally {
       setTaggedLogger(null);
     }
@@ -61,7 +62,7 @@ describe("TaggedLoggingTest", () => {
       "info?": false,
     } as never);
     try {
-      beforeSetup();
+      new TestCase("a test").beforeSetup();
     } finally {
       setTaggedLogger(null);
     }

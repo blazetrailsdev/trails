@@ -65172,13 +65172,6 @@
   {
     "package": "activesupport",
     "rubyFile": "test_case.rb",
-    "rubyName": "after_teardown",
-    "digest": "a8f3d958a334581d",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "test_case.rb",
     "rubyName": "assert_changes",
     "digest": "de3c27a691918c86",
     "ref": "v8.0.2"
@@ -65237,13 +65230,6 @@
     "rubyFile": "test_case.rb",
     "rubyName": "assert_raises",
     "digest": "74590b17a30d9d66",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "test_case.rb",
-    "rubyName": "before_setup",
-    "digest": "a1c9c7f0e5bdec1d",
     "ref": "v8.0.2"
   },
   {

@@ -1,3 +1,4 @@
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import { TopLevel } from "../namespaces.js";
 
 type TaggedLogger = {
@@ -13,7 +14,7 @@ export function setTaggedLogger(logger: TaggedLogger | null): void {
   taggedLoggerValue = logger;
 }
 
-export function beforeSetup(): void {
+export function beforeSetup(this: object): unknown {
   const logger = taggedLogger();
   if (logger && logger["info?"]) {
     const heading = _testCaseIdentity(": ");
@@ -22,7 +23,10 @@ export function beforeSetup(): void {
     logger.info?.(heading);
     logger.info?.(divider);
   }
+  return rbCallSuper(this, beforeSetup);
 }
+
+export const TaggedLogging = { beforeSetup };
 
 /** @internal */
 export function taggedLogger(): TaggedLogger | null {

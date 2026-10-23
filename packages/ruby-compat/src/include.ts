@@ -64,6 +64,7 @@ import {
   superSlots,
 } from "./object.js";
 import { isSymbol } from "./symbol.js";
+import { prependOriginLink } from "./prepend.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -1776,6 +1777,23 @@ export function rbModAppendFeatures(
         if (key === "constructor" || (typeof key === "string" && /^[A-Z]/.test(key))) continue;
         if ("value" in modDesc && typeof modDesc.value !== "function") continue;
         if (Object.hasOwn(descriptors, key)) continue;
+        const origin =
+          typeof key === "string" && typeof modDesc.value === "function"
+            ? prependOriginLink(Object.getOwnPropertyDescriptor(klass.prototype, key)?.value)
+            : undefined;
+        if (origin) {
+          let entry = superSlots.get(modDesc.value);
+          if (entry === undefined) {
+            superSlots.set(
+              modDesc.value,
+              (entry = { slot: Symbol(`super:${String(key)}`), key: String(key) }),
+            );
+          }
+          descriptors[entry.slot] = { value: origin.original, configurable: true };
+          origin.original = modDesc.value;
+          installed.add(key);
+          continue;
+        }
         if (Object.hasOwn(klass.prototype, key) && !installed.has(key)) {
           continue;
         }

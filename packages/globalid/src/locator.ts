@@ -1,11 +1,11 @@
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID, type ParseOptions } from "./signed-global-id.js";
 import { GID } from "./uri/gid.js";
-import { indexBy } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   compact,
   except,
+  Hash,
   rbFArray,
   rbModConstSet,
   rbObjMethod,
@@ -59,7 +59,10 @@ export class BaseLocator {
       idsByModel.get(gid.modelClass)!.push(gid.modelId);
     }
 
-    const recordsByModelNameAndId = Object.create(null) as Record<string, Record<string, unknown>>;
+    const recordsByModelNameAndId = Object.create(null) as Record<
+      string,
+      Hash<string | string[], unknown>
+    >;
 
     for (const [model, ids] of idsByModel) {
       const records = await this.findRecords(model, ids, {
@@ -67,15 +70,19 @@ export class BaseLocator {
         includes: options.includes,
       });
 
-      const recordsById = indexBy(records as Array<{ id: unknown }>, (record) =>
-        Array.isArray(record.id) ? String(record.id.map(String)) : String(record.id),
-      );
+      const recordsById = new Hash<string | string[], unknown>();
+      for (const record of records as Array<{ id: unknown }>) {
+        recordsById.set(
+          Array.isArray(record.id) ? record.id.map(String) : String(record.id),
+          record,
+        );
+      }
 
       recordsByModelNameAndId[model.name] = recordsById;
     }
 
     return gids
-      .map((gid) => recordsByModelNameAndId[gid.modelName][String(gid.modelId)])
+      .map((gid) => recordsByModelNameAndId[gid.modelName].get(gid.modelId))
       .filter((record) => record != null && record !== false);
   }
 

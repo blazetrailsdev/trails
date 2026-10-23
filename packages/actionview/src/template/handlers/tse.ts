@@ -1,12 +1,20 @@
 import { chomp, classAttribute, tokenize } from "@blazetrails/activesupport";
 import {
+  b,
+  encode,
+  Encoding,
+  forceEncoding,
+  isValidEncoding,
   NotImplementedError,
   rbEqual,
+  rbObjEncoding,
   rbStrEnumerateLines,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
+import { ENCODING_FLAG } from "../../action-view.js";
 import { ActionView } from "../../namespaces.js";
+import { WrongEncodingError } from "../error.js";
 import type { TemplateHandler } from "../handlers.js";
 export class LocationParsingError extends Error {
   override name = "LocationParsingError";
@@ -47,6 +55,8 @@ export class TSE implements TemplateHandler {
   declare static stripTrailingNewlines: boolean;
   declare static isStripTrailingNewlines: boolean;
   declare stripTrailingNewlines: boolean;
+
+  static readonly ENCODING_TAG = new RegExp(`^(<%${ENCODING_FLAG}-?%>)[ \\t]*`);
 
   static {
     classAttribute.call(this, "tseTrimMode", { default: "-" });
@@ -89,10 +99,29 @@ export class TSE implements TemplateHandler {
     }
   }
 
-  /** @missingRailsCall include? — PERMANENT */
+  /**
+   * @missingRailsCall include? — PERMANENT
+   * @missingRailsArgs encode! — PERMANENT
+   */
   call(template: TseTemplate, source: string): string {
     const ctor = this.constructor as typeof TSE;
-    const prepared = this.stripTrailingNewlines ? chomp(source) : source;
+    const templateSource = b(source);
+
+    let encoding: string | null = null;
+    let scanned = "";
+    for (const byte of templateSource) scanned += String.fromCharCode(byte);
+    scanned = scanned.replace(ctor.ENCODING_TAG, (_tag, _comment, name: string) => {
+      encoding = name;
+      return "";
+    });
+    let tse = forceEncoding(
+      Uint8Array.from(scanned, (c) => c.charCodeAt(0)),
+      this.validEncoding(source, encoding),
+    );
+
+    tse = encode(tse, Encoding.defaultInternal ?? Encoding.UTF_8);
+
+    const prepared = this.stripTrailingNewlines ? chomp(tse as string) : (tse as string);
     const options: EmitJsOptions = {
       escapeIgnore: ctor.escapeIgnoreList.some((type) => rbEqual(type, template.type)),
       trim: ctor.tseTrimMode === "-",
@@ -114,6 +143,26 @@ export class TSE implements TemplateHandler {
         "const context = this;",
       )
       .replace(/\}\n$/u, "");
+  }
+
+  /** @internal */
+  private validEncoding(string: string | Uint8Array, encoding: string | null): Encoding {
+    if (encoding != null) string = forceEncoding(b(string), encoding);
+
+    if (
+      typeof string === "string" ||
+      isValidEncoding(
+        Array.from(string, (byte) => String.fromCharCode(byte)).join(""),
+        rbObjEncoding(string),
+      )
+    ) {
+      return rbObjEncoding(string);
+    }
+
+    throw new WrongEncodingError(
+      Array.from(string, (byte) => String.fromCharCode(byte)).join(""),
+      rbObjEncoding(string),
+    );
   }
 
   /** @internal */
