@@ -1,7 +1,10 @@
-import { Base, DatabaseTasks, Schema } from "@blazetrails/activerecord";
+import { ActiveRecord, Base, DatabaseTasks, Schema } from "@blazetrails/activerecord";
 
 function dbConfig(name: string) {
-  return Base.configurations().configsFor({ name })!;
+  return Base.configurations().configsFor({
+    envName: String(ActiveRecord.ConnectionHandling.DEFAULT_ENV()),
+    name,
+  })!;
 }
 
 export async function loadQueueSchema(): Promise<void> {

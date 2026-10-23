@@ -9,6 +9,7 @@ const envName = String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
 
 function databaseNameFrom(name: string): string {
   const database = String(primary.database);
+  if (database === ":memory:") return database;
   const dot = database.lastIndexOf(".");
   if (primary.adapter !== "sqlite3" || dot < database.lastIndexOf("/")) {
     return `${database}_${name}`;
