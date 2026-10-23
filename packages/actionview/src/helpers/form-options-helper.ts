@@ -3,7 +3,6 @@ import {
   I18n,
   TimeZone,
   extractOptionsBang,
-  filterMap,
   htmlSafe,
   isPlainObject,
   kernelArray as Array,
@@ -22,6 +21,7 @@ import {
   rbObjRespondTo,
   rtest,
   include,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 
 import { contentTag, tagBuilder, type TagHelperHost } from "./tag-helper.js";

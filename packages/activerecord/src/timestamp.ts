@@ -1,9 +1,8 @@
 import { Time as RubyTime } from "@blazetrails/date";
-import { Rational, max, rbCallSuper } from "@blazetrails/ruby-compat";
+import { Rational, max, rbCallSuper, filterMap } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   currentTimeInstant,
-  filterMap,
   included,
   indexWith,
 } from "@blazetrails/activesupport";

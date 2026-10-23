@@ -4,11 +4,10 @@ import { type ValueType } from "@blazetrails/activemodel";
 import {
   classAttribute,
   extractOptionsBang,
-  filterMap,
   included,
   kernelArray as Array,
 } from "@blazetrails/activesupport";
-import { Module, include } from "@blazetrails/ruby-compat";
+import { Module, include, filterMap } from "@blazetrails/ruby-compat";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Encryption } from "../encryption.js";
 import type { Base } from "../base.js";

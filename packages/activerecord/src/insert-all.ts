@@ -18,9 +18,9 @@ import {
   sort,
   symbolToS,
   toSym,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import {
-  filterMap,
   indexWith,
   isPresent,
   many,

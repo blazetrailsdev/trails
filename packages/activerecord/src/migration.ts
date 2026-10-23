@@ -1,9 +1,8 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbModConstSet, groupBy, filterMap } from "@blazetrails/ruby-compat";
 import {
   getEnv,
   camelize,
   constantize,
-  groupBy,
   underscore,
   humanize,
   isPlainObject,
@@ -17,7 +16,6 @@ import {
   extend,
   type Extended,
   wrap,
-  filterMap,
 } from "@blazetrails/activesupport";
 import {
   format,

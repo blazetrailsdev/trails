@@ -4,7 +4,7 @@ import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
 import { Hash } from "./hash.js";
 import { IndexError } from "./index-error.js";
-import { Enumerable } from "./enumerable.js";
+import { find, partition } from "./enumerable.js";
 import { rbBigNorm, rbPlus } from "./numeric.js";
 import { NoMethodError } from "./no-method-error.js";
 import {
@@ -719,23 +719,6 @@ export function aryCount<T>(ary: readonly T[], block?: (item: T) => unknown): nu
 }
 
 /**
- * Ruby `Enumerable#partition` (`vendor/ruby/v3.3.11/enum.c:1102` `enum_partition`):
- * two arrays, the elements the block answers truthily for (`RTEST`,
- * `partition_i`, `:1057`) and all the others.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function partition<T>(ary: readonly T[], block: (item: T) => unknown): [T[], T[]] {
-  const v1: T[] = [];
-  const v2: T[] = [];
-  for (const i of ary) {
-    const result = block(i);
-    (result != null && result !== false ? v1 : v2).push(i);
-  }
-  return [v1, v2];
-}
-
-/**
  * Ruby `Array#reject` (`vendor/ruby/v3.3.11/array.c:4301` `rb_ary_reject`): a new
  * array of the elements the block does not answer truthily for (`RTEST`,
  * `ary_reject`, `:4210`). Each block result is awaited before the next element
@@ -766,27 +749,6 @@ export function each<T>(ary: T[], block?: (item: T) => unknown): T[] {
     block(i);
   }
   return ary;
-}
-
-/**
- * Ruby `Enumerable#group_by` (`vendor/ruby/v3.3.11/enum.c:1157` `enum_group_by`): a
- * Hash keyed by the block's result, each value the Array of the elements that
- * produced it, in the receiver's order (`group_by_i`, `:1115`).
- *
- * @noRailsEquivalent PERMANENT
- */
-export function groupBy<T, K>(ary: readonly T[], block: (item: T) => K): Hash<K, T[]> {
-  const hash = new Hash<K, T[]>();
-  for (const i of ary) {
-    const group = block(i);
-    const values = hash.get(group);
-    if (values === undefined) {
-      hash.set(group, [i]);
-    } else {
-      values.push(i);
-    }
-  }
-  return hash;
 }
 
 /**
@@ -1215,11 +1177,10 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
   /** `enum_find` (`vendor/ruby/v3.3.11/enum.c:361`). */
   detect: (self, ifNone?: unknown, block?: Block) => {
     if (!block) return [...self];
-    const obj = { each: (block: (i: unknown) => void) => each(self, block) };
-    return Enumerable.find.call(obj, ...(ifNone === undefined ? [block] : [ifNone, block]));
+    return find(self, ...(ifNone === undefined ? [block] : [ifNone, block]));
   },
   /** `enum_partition` (`vendor/ruby/v3.3.11/enum.c:1102`). */
-  partition: (self, block?: Block) => (block ? partition(self, block) : [...self]),
+  partition: (self, block?: Block) => (block ? partition(self, block) : partition(self)),
   /** `enum_sort_by` (`vendor/ruby/v3.3.11/enum.c:1651`). */
   sortBy: (self, block?: Block) =>
     !block

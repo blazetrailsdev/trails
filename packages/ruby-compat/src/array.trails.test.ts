@@ -21,8 +21,6 @@ import {
   last,
   pack,
   each,
-  groupBy,
-  partition,
   sort,
   toA,
   union,
@@ -352,32 +350,6 @@ describe("Array#each", () => {
     expect(each(ary, (i) => seen.push(i))).toBe(ary);
     expect(seen).toEqual([1, 2]);
     expect(each(ary)).toBe(ary);
-  });
-});
-
-describe("Enumerable#group_by", () => {
-  it("groups the elements under the block's result, keeping order", () => {
-    const hash = groupBy(["apple", "avocado", "banana"], (i) => i[0]);
-    expect([...hash]).toEqual([
-      ["a", ["apple", "avocado"]],
-      ["b", ["banana"]],
-    ]);
-  });
-});
-
-describe("Enumerable#partition", () => {
-  it("splits on the block's truthiness, keeping order", () => {
-    expect(partition([1, 2, 3, 4], (i) => i % 2 === 0)).toEqual([
-      [2, 4],
-      [1, 3],
-    ]);
-  });
-
-  it("counts 0 and the empty string as truthy, nil and false as not", () => {
-    expect(partition([0, "", null, false, undefined], (i) => i)).toEqual([
-      [0, ""],
-      [null, false, undefined],
-    ]);
   });
 });
 

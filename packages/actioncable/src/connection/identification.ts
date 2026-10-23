@@ -1,4 +1,4 @@
-import { Concern, classAttribute, extend, filterMap, underscore } from "@blazetrails/activesupport";
+import { Concern, classAttribute, extend, underscore } from "@blazetrails/activesupport";
 import {
   Set,
   defineModule,
@@ -8,6 +8,7 @@ import {
   rbObjIvarGet,
   rbObjRespondTo,
   toS,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import { Connection } from "../namespaces.js";
 

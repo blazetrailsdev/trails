@@ -9,6 +9,7 @@ import {
   rbFPublicSend,
   toI,
   rbModConstSet,
+  eachSlice,
 } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
@@ -18,7 +19,7 @@ import { DeleteRestrictionError } from "./errors.js";
 import { CollectionAssociation, isThenable } from "./collection-association.js";
 import { ForeignAssociation } from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
-import { eachSlice, min, selectBang } from "@blazetrails/activesupport";
+import { min, selectBang } from "@blazetrails/activesupport";
 
 export class HasManyAssociation extends CollectionAssociation {
   /** @internal */

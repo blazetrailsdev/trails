@@ -28,7 +28,7 @@ import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotUnique } from "./errors.js";
-import { compact, max, min, take } from "@blazetrails/ruby-compat";
+import { compact, groupBy, max, min, take } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { PermittedAttributes, SerializeOptions } from "@blazetrails/activemodel";
 
@@ -39,7 +39,6 @@ import {
   any,
   compactBlank,
   extractOptionsBang,
-  groupBy,
   indexBy,
   many,
 } from "@blazetrails/activesupport";

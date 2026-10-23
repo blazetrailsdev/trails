@@ -26,6 +26,7 @@ import {
   union,
   uniq,
   TypeError,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import {
@@ -60,7 +61,6 @@ import {
   actsLike,
   compactBlank,
   defineModule,
-  filterMap,
   foreignKey,
   included,
   indexWith,
