@@ -4577,7 +4577,24 @@ export class Lowerer {
     walk([body], (n) => {
       if (n.k === "casgn" && n.path && n.value?.k === "hash")
         this.constHashes.set(n.path.filter((x: string) => x).at(-1), n.value);
-      if (n.k === "casgn" && n.path && n.value?.k === "array")
+      // …or a chain ending in an Array-answering Enumerable call (`(…).sort_by(&:size).reverse`).
+      const arrayCall = (v: N): boolean =>
+        v?.k === "array" ||
+        (v?.k === "call" &&
+          !!v.recv &&
+          [
+            "sort_by",
+            "sort",
+            "map",
+            "collect",
+            "select",
+            "reject",
+            "flatten",
+            "uniq",
+            "compact",
+          ].includes(v.name)) ||
+        (v?.k === "call" && v.name === "reverse" && arrayCall(v.recv));
+      if (n.k === "casgn" && n.path && arrayCall(n.value))
         this.constArrays.add(n.path.filter((x: string) => x).at(-1));
     });
     // A Range written straight into `[]` (`content_type[-content_type.size..-1]`)

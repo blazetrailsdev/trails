@@ -333,6 +333,13 @@ export class Emitter {
       for (const s of u.sbody ?? [])
         if (s.k === "casgn" && s.path?.length === 1)
           this.resolver.sclassConsts.set(`${u.fqn}::${s.path[0]}`, tsFile);
+      // So is a module constant a reopening file exports (zones.rb's
+      // `ZONE_ALIASES`): its module is declared in another file.
+      const sc = this.index.scopes.get(u.fqn);
+      if (sc?.kind === "module" && sc.primaryFile !== file.file)
+        for (const s of u.body ?? [])
+          if (s.k === "casgn" && s.path?.length === 1)
+            this.resolver.sclassConsts.set(`${u.fqn}::${s.path[0]}`, tsFile);
       if (
         this.resolver.exportNames.has(u.fqn) &&
         this.index.scopes.get(u.fqn)?.primaryFile !== file.file
