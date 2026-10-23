@@ -40,6 +40,7 @@
     }
   },
   "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*",
     "websocket-driver": "0.7.4"
   }
 }

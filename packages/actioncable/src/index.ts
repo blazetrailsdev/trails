@@ -25,3 +25,5 @@ import "./server/base.js";
 import "./channel/broadcasting.js";
 import "./connection/base.js";
 import "./channel/streams.js";
+import "./remote-connections.js";
+import "./helpers/action-cable-helper.js";

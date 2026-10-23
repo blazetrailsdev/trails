@@ -111,6 +111,34 @@ export function collectLibTests(content: string, file: string, namespace: string
   return tests;
 }
 
+/**
+ * The TS twin of extract-ruby-tests.rb's `REQUIRED_TEST_MODULES`: a function
+ * that registers a shared suite's `it`s, exported from a test-helpers file and
+ * called by each test file that mirrors a Ruby class `include`-ing the module
+ * (actioncable `subscription_adapter/common.rb`). Its cases are credited to
+ * every calling file, as the Ruby side emits them for every including file.
+ * Only-grow, like its twin.
+ */
+export const REQUIRED_TEST_MODULES: Record<string, string> = {
+  commonSubscriptionAdapterTest:
+    "packages/actioncable/src/test-helpers/subscription-adapter/common.ts",
+  channelPrefixTest: "packages/actioncable/src/test-helpers/subscription-adapter/channel-prefix.ts",
+};
+
+/** The top-level function `name` declared in a required test-module file. */
+export function collectRequiredTests(content: string, file: string, name: string): HelperMap {
+  const sourceFile = ts.createSourceFile(file, content, ts.ScriptTarget.ESNext, false);
+  const tests: HelperMap = new Map();
+  for (const n of sourceFile.statements) {
+    if (ts.isFunctionDeclaration(n) && n.name?.text === name && n.body) {
+      tests.set(name, [
+        { body: n.body, lambda: false, scopeStart: 0, scopeEnd: Infinity, sourceFile },
+      ]);
+    }
+  }
+  return tests;
+}
+
 function isReceiverExpect(call: ts.CallExpression): boolean {
   return (
     ts.isPropertyAccessExpression(call.expression) &&
@@ -479,10 +507,13 @@ export function extractTestsFromSource(
   content: string,
   relativePath: string,
   libTests: HelperMap = new Map(),
+  requiredTests: HelperMap = new Map(),
 ): TestFileInfo {
-  const sourceFile = ts.createSourceFile(relativePath, content, ts.ScriptTarget.ESNext, false);
+  const fileSourceFile = ts.createSourceFile(relativePath, content, ts.ScriptTarget.ESNext, false);
+  let sourceFile = fileSourceFile;
   const helpers = collectHelpers(sourceFile);
   for (const [name, defs] of libTests) helpers.set(name, defs);
+  for (const [name, defs] of requiredTests) if (!helpers.has(name)) helpers.set(name, defs);
   const constDecls = collectConstDeclarations(sourceFile);
   const bindings = new Map<string, BoundValue>();
 
@@ -785,7 +816,12 @@ export function extractTestsFromSource(
   }
 
   visit(sourceFile);
+  for (const name of registrars) {
+    const def = requiredTests.get(name)?.[0];
+    if (def && helpers.get(name)?.[0] === def) deferredBodies.set(name, def.body);
+  }
   for (const [name, body] of deferredBodies) {
+    sourceFile = requiredTests.get(name)?.[0].sourceFile ?? fileSourceFile;
     const sites = callSiteAncestors.get(name) ?? [];
     if (sites.some((outer) => sites.some((inner) => extendsSuite(inner, outer)))) {
       sites.forEach((site, i) => {

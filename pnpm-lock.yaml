@@ -157,6 +157,9 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
     devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
       websocket-driver:
         specifier: 0.7.4
         version: 0.7.4

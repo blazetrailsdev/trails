@@ -4,6 +4,8 @@ import { globSync } from "tinyglobby";
 import type { TestManifest, TestPackageInfo } from "./types.js";
 import {
   LIB_TEST_MODULES,
+  REQUIRED_TEST_MODULES,
+  collectRequiredTests,
   collectLibTests,
   extractTestsFromSource,
   type HelperMap,
@@ -106,11 +108,16 @@ export async function main(only: string | null = null) {
     const content = await fs.promises.readFile(path.join(ROOT_DIR, file), "utf-8");
     for (const [name, defs] of collectLibTests(content, file, namespace)) libTests.set(name, defs);
   }
+  const requiredTests: HelperMap = new Map();
+  for (const [name, file] of Object.entries(REQUIRED_TEST_MODULES)) {
+    const content = await fs.promises.readFile(path.join(ROOT_DIR, file), "utf-8");
+    for (const [n, defs] of collectRequiredTests(content, file, name)) requiredTests.set(n, defs);
+  }
 
   for (const [pkg, files] of Object.entries(packageTestFiles)) {
     if (only !== null && pkg !== only) continue;
     const absoluteFiles = files.map((f) => path.join(ROOT_DIR, f));
-    manifest.packages[pkg] = extractPackageTests(absoluteFiles, libTests);
+    manifest.packages[pkg] = extractPackageTests(absoluteFiles, libTests, requiredTests);
   }
 
   // Print summary
@@ -130,7 +137,11 @@ export async function main(only: string | null = null) {
   console.log(`\nWritten to ${outputPath}`);
 }
 
-function extractPackageTests(files: string[], libTests: HelperMap): TestPackageInfo {
+function extractPackageTests(
+  files: string[],
+  libTests: HelperMap,
+  requiredTests: HelperMap,
+): TestPackageInfo {
   const pkgInfo: TestPackageInfo = {
     files: [],
     totalTests: 0,
@@ -138,7 +149,9 @@ function extractPackageTests(files: string[], libTests: HelperMap): TestPackageI
 
   for (const file of files) {
     const content = fs.readFileSync(file, "utf-8");
-    pkgInfo.files.push(extractTestsFromSource(content, path.relative(ROOT_DIR, file), libTests));
+    pkgInfo.files.push(
+      extractTestsFromSource(content, path.relative(ROOT_DIR, file), libTests, requiredTests),
+    );
   }
 
   pkgInfo.totalTests = pkgInfo.files.reduce((sum, f) => sum + f.testCases.length, 0);
