@@ -26,7 +26,7 @@ describe("Rack::Multipart::UploadedFile", () => {
     expect(file.path!.endsWith(".png")).toBe(true);
     expect(File.stat(file.path!).size).toBe(File.stat(logo).size);
 
-    (file.tempfile as Tempfile).write("clobber");
+    (file as unknown as Tempfile).write("clobber");
     expect(File.open(file.path!, "rb", (f) => f.read(7))).toEqual(b("clobber"));
     expect(File.open(logo, "rb", (f) => f.read(7))).not.toEqual(b("clobber"));
   });

@@ -19,6 +19,8 @@ export interface UploadedFileOptions {
 export interface UploadedFile {
   /** @noRailsEquivalent PERMANENT */
   read(): string;
+  /** @noRailsEquivalent PERMANENT */
+  isBinmode(): boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
@@ -72,34 +74,5 @@ export class UploadedFile {
 
   get localPath(): string | undefined {
     return this.path;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE rack-uploaded-file-publishes-tempfile-and-filename-readers
-   */
-  get tempfile(): Tempfile | StringIO {
-    return this._tempfile;
-  }
-
-  /**
-   * `binmode?` (`vendor/ruby/v3.3.11/io.c:6400`), reached through
-   * `UploadedFile#method_missing`
-   * (`vendor/rack/v3.1.14/lib/rack/multipart/uploaded_file.rb:39`) and so answered by
-   * the tempfile — an `io:` stand-in that has no `binmode?` raises, as
-   * `StringIO` does in Ruby.
-   *
-   * @noRailsEquivalent CONVERGEABLE rack-uploaded-file-publishes-tempfile-and-filename-readers
-   */
-  isBinmode(): boolean {
-    return (this._tempfile as Tempfile).isBinmode();
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE rack-uploaded-file-publishes-tempfile-and-filename-readers
-   */
-  get filename(): string {
-    return this.originalFilename;
   }
 }
