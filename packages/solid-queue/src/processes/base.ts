@@ -7,7 +7,8 @@ import { Procline } from "./procline.js";
 import { Registrable } from "./registrable.js";
 import type { Process as ProcessRecord } from "../process.js";
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below. */
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` of the process concerns (`processes/base.rb:6-7`). */
+/** @inventedArm include — CONVERGEABLE port-solid-queue-engine */
 export class Base {
   static toString(): string {
     return "SolidQueue::Processes::Base";
@@ -62,7 +63,6 @@ export class Base {
   }
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` of the process concerns (`processes/base.rb:6-7`). */
 export interface Base {
   process: ProcessRecord | null;
   readonly processId: unknown;
