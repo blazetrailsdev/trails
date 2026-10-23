@@ -692,11 +692,13 @@ is `classAttribute()` from `@blazetrails/activesupport`, which already gives
 Rails' semantics (reads walk the constructor chain, writes are local to the
 class); do not hand-roll copy-on-first-write per call site.
 
-### A Ruby module is a plain object or a class module
+### A Ruby module is a JS object or a JS class
 
-ruby-compat's `Module` class, and any carrier object spliced into an
-includer's prototype chain, is being retired (RFC 0197). A Ruby module takes
-one of two shapes:
+**A Ruby module is a JavaScript object or a JavaScript class. There is no
+third shape.** ruby-compat's `Module` class, and any carrier object spliced
+into an includer's prototype chain, is not one of them: it is a carrier trails
+invented, it is being deleted (RFC 0197), and a new one is never the answer to
+a porting problem. Ruled by the repo owner on 2026-10-22.
 
 - **Plain-object module.** Its own enumerable members are its instance
   methods, which `include()` copies onto the includer's prototype. Its own
@@ -723,8 +725,19 @@ module's ancestry, so `mod`'s own methods outrank them and the class reports
 form: Ruby's includers share the module's method table (`rb_include_module`,
 `vendor/ruby/v3.3.11/class.c:1179`), and the repo owner has ruled out both a
 carrier and a list of a module's includers. Each such site is ported so that
-its definitions exist before the include, or is left on a `Module` until its
-own story settles it.
+its definitions exist before the include. That is the whole remedy — "leave it
+on a `Module` until its own story settles it" is not a second one, and reaching
+for the carrier because the ordering is awkward is how the 61 remaining
+instances got there.
+
+`pnpm parity:modules` (`scripts/parity/module-count.ts`) counts, per package,
+the `new Module` expressions, `superMethod(` calls and `Module` imports from
+`@blazetrails/ruby-compat`, against `scripts/parity/module-count-mark.json`.
+It is **only-shrink** with no reseed: `--tighten` writes each mark DOWN, every
+mark's destination is 0, and the file is deleted with the class
+(`delete-ruby-compat-module-class-final`). Finding a `Module` next to your work
+is a reason to converge it, not to match it (§ "A documented deviation is debt,
+not permission").
 
 ## A module's `initialize` is inlined into the constructor (`@inlinedFrom`)
 
@@ -982,20 +995,40 @@ and Zeitwerk autoloads the file at that moment. So `contexts.rb:36` can name
 `EncryptingOnlyEncryptor` and `config.rb` can name `DerivedSecretKeyProvider`
 without either file taking a load-order dependency on them.
 
-ESM has no equivalent. Every `import` is eager and evaluated before the
-importing module's body, so naming a constant in a method body still costs a
-module-eval edge. When that edge closes a cycle whose participants include a
-`class Sub extends Super`, entering the graph at `super.ts` evaluates `Sub`
-with `Super` still in TDZ and the module throws
-`Cannot access 'Super' before initialization`.
+**ESM already does this inside a function body, so a plain `import` is the
+default.** An import binding is live: it is read when the expression runs, not
+when the module is evaluated. So `import { Not } from "./unary.js"` named
+inside a method is resolved at call time — what Zeitwerk's autoload buys Rails
+— and it stays correct when the two modules sit in a cycle, because the method
+runs long after both bodies have finished. Lean on ES imports and exports.
 
-Two shapes are sanctioned, and only these:
+The `import` _edge_ is eager even though the read is not, and that matters in
+one case: a read evaluated **while the module body runs** — an `extends`
+clause, a top-level call, a top-level `new`. When such an edge closes a cycle
+whose participants include a `class Sub extends Super`, entering the graph at
+`super.ts` evaluates `Sub` with `Super` still in TDZ and the module throws
+`Cannot access 'Super' before initialization`. A TypeScript type position
+(`T extends Nodes.X`, `: Nodes.X`) is erased and costs no edge, so it is an
+`import type`.
+
+Measured on 2026-10-22, 631 of 686 namespace reads in the repo were inside a
+function or method body and 55 at module-eval time — of those, 8 erased type
+positions and ~35 `extends Migration.Current` migration fixtures, leaving fewer
+than ten genuine framework sites. The namespace read is for those; a plain
+import is for everything else, and "it is in a cycle" is not a reason on its
+own (RFC 0205).
+
+For a module-eval read, two shapes are sanctioned, and only these:
 
 - **A namespace object extended with `ActiveSupport::Autoload`** (RFC 0151),
-  mirroring Rails' `autoload` lists: each autoloaded constant is seated by its
-  defining module with `rbModConstSet(Namespace, "Name", Klass)` — the constant
-  binding is what paths it, as Ruby's `const_set` does — and read as a property
-  at call time (`new Nodes.Not(this)`, `ActiveRecord.Base`). A constant Rails
+  mirroring Rails' `autoload` lists: each constant is seated by its defining
+  module with a plain `Namespace.Name = Klass` assignment, which is
+  type-checked against the namespace's declared property, and read at
+  module-eval time (`include(Base, ActiveRecord.Scoping)`). `rbModConstSet` is
+  written only where the Rails body itself calls `const_set` (18 sites in the
+  vendored tree), never as the seat spelling; a class's qualified Ruby path
+  comes from the table generated out of `rails-api.json`, not from the seat. A
+  constant Rails
   `require`s rather than autoloads is seated with no `autoload` call. Ruby's
   top-level `Object` is `TopLevel` in `activesupport/src/namespaces.ts`: the
   defining gem seats it (`TopLevel.Trails = Trails`) and a reader names it at
@@ -1006,8 +1039,9 @@ Two shapes are sanctioned, and only these:
   cannot join any cycle) exporting a mutable binding plus a `_setX()` setter,
   which the defining module calls at the bottom of its own body. Readers import
   the binding from the slot and use it at call time. No instance remains:
-  every slot has converged onto a namespace seat, which is the shape to reach
-  for first.
+  every slot has converged onto a namespace seat. Neither shape is what to
+  reach for first — a plain ES import is, and the two above are for a
+  module-eval read only.
 
 The per-package inventories of namespace objects, seats and the cycles they
 break live in [packages/arel/CLAUDE.md](packages/arel/CLAUDE.md#call-time-constant-resolution-arel),
@@ -1016,7 +1050,9 @@ and [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#call-time-
 
 This is a genuine language shortcoming, not a preference, and it is the one
 sanctioned shape for it — do not re-derive a per-cluster justification, and do
-not reach for a slot when a plain import does not actually close a cycle.
+not reach for a namespace read or a slot when a plain import would do. Before
+writing either, check whether the read runs during module evaluation; if it is
+inside a function or method body, it is an ES import, cycle or no cycle.
 Verify both directions with a plain-node import of the **built** `dist/**.js`
 modules as entry modules; a vitest run enters the funnel module first and masks
 the TDZ, so a green suite proves nothing here. Deferring the subclass edges

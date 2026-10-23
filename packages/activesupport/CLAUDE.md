@@ -29,6 +29,14 @@ The activesupport inventory for root CLAUDE.md § "Call-time constant
 resolution", which also covers the actionview and actionpack namespace objects
 shaped the same way.
 
+A seat below is a plain `Owner.Name = Klass` assignment, and the inventory is
+of reads that happen **at module-eval time**. A read inside a function or
+method body is a plain ES import, correct even inside a cycle, so it is not
+listed here and does not need a namespace — see root CLAUDE.md
+§ "Call-time constant resolution". `rbModConstSet` appears only where the Rails
+body calls `const_set`, and a class's qualified Ruby path comes from the table
+generated out of `rails-api.json`, not from the seat (RFC 0205).
+
 - `activesupport/src/namespaces.ts`, `actionview/src/namespaces.ts`,
   `actionpack/src/namespaces.ts` hold the `ActiveSupport`, `ActionView` and
   `ActionDispatch` namespace objects. Autoloaded and seated there:

@@ -316,8 +316,10 @@ calling it.
 
 `registerConstant` (ruby-compat) stays the general seat for a constant that is
 not a model, the namespace module a model sits in included: a namespaced model
-is `registerModel(rbModConstSet(Sharded, "Blog", this))`, as
-`test-helpers/models/sharded/*.ts` do.
+is `registerModel((Sharded.Blog = this))`, a plain assignment, as
+`test-helpers/models/sharded/*.ts` do. The seat does not path the class — a
+model's qualified Ruby name comes from the table generated out of
+`rails-api.json` (RFC 0205).
 
 This is a genuine language shortcoming, ratified here by the repo owner
 (2026-10-09). The ruling is recorded in the tasks-repo story
@@ -538,7 +540,17 @@ resolution". `activerecord/src/namespaces.ts` holds the `ActiveRecord`,
 `ActiveRecord::Encryption` and `ActiveRecord::Tasks` namespace objects, extended with
 `ActiveSupport::Autoload` like arel's, mirroring `active_record.rb:43-112`,
 `associations.rb:15,29-41` and `encryption.rb:10-35`. Each constant is seated
-by the module that defines it:
+by the module that defines it.
+
+A seat below is a plain `Owner.Name = Klass` assignment, and the inventory is
+of reads that happen **at module-eval time**. A read inside a function or
+method body is a plain ES import, correct even inside a cycle, so it is not
+listed here and does not need a namespace — see root CLAUDE.md
+§ "Call-time constant resolution". `rbModConstSet` appears only where the Rails
+body calls `const_set`, and a class's qualified Ruby path comes from the table
+generated out of `rails-api.json`, not from the seat (RFC 0205).
+
+The seated constants:
 
 - `ActiveRecord.Base`, `.Encryption`, `.Associations`, `.ConnectionAdapters`,
   `.ConnectionHandling` (`DEFAULT_ENV`), `.ModelSchema` (`derive_join_table_name`),
