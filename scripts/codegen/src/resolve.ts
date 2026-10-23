@@ -747,9 +747,8 @@ export class Resolver {
     const hit = this.index.resolveConst(p, nesting);
     if (hit?.kind === "scope") {
       const k = this.oracleKey(hit.fqn);
-      return k ? { k: "class", key: k, static: true } : null;
-    }
-    if (hit) return null;
+      if (k) return { k: "class", key: k, static: true };
+    } else if (hit) return null;
     const segs = p[0] === "" ? p.slice(1) : p;
     // Ruby's core Time is `@blazetrails/date`'s class (activesupport only
     // reopens it). Not Date / DateTime: trails also carries a Ruby Date as a

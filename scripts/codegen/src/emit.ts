@@ -13,6 +13,7 @@
  *   CONST = v            → `static CONST = v` / `export const CONST = v`
  *   other class-body call→ `static { this.macro(...) }`
  */
+import { handPortGem } from "./hand-port-gems.js";
 import { VITEST_MATCHERS } from "./mappings/vitest-matchers.js";
 import { rubyMethodToTsIgnoringSkip } from "../../parity/conventions.js";
 import { TS_CONSTANT_RENAMES } from "./constant-renames.js";
@@ -221,7 +222,7 @@ const PERMANENT_CONSTS: Record<string, string> = {
  */
 function spaceBlocks(lines: string[]): string[] {
   const opener =
-    /^(it|it\.\w+(\([^)]*\))?|beforeEach|afterEach|describe)\(|^\/\/ PERMANENT-SKIP|^(async )?function /;
+    /^(it|it\.\w+(\([^)]*\))?|beforeEach|afterEach|describe)\(|^\/\/ (PERMANENT-SKIP|HAND-PORT)|^(async )?function /;
   const ind = (l: string) => l.length - l.trimStart().length;
   const levels = new Set(lines.filter((l) => opener.test(l.trim())).map(ind));
   const out: string[] = [];
@@ -245,7 +246,7 @@ function spaceBlocks(lines: string[]): string[] {
       prev !== undefined &&
       prev.trim() !== "" &&
       !prev.trimEnd().endsWith("{") &&
-      !prev.trim().startsWith("// PERMANENT-SKIP") &&
+      !/^\/\/ (PERMANENT-SKIP|HAND-PORT)/.test(prev.trim()) &&
       opener.test(t)
     )
       out.push("");
@@ -1190,12 +1191,37 @@ export class Emitter {
       c.scope.body = classBody;
       return c;
     };
+    // The hand-port gem a `context`'s hooks set up (`before { require_chronic }`):
+    // every example in it is left for a hand port.
+    let handScope: string | null = null;
     const emitBody = (stmts: N[], out: string[], guard: string | null): void => {
+      const outerHand = handScope;
+      handScope ??=
+        stmts
+          .filter(
+            (x) =>
+              x.k === "call" &&
+              x.recv === null &&
+              ["before", "after", "setup", "teardown"].includes(x.name) &&
+              x.block?.k === "block",
+          )
+          .map((x) => handPortGem(x.block.body))
+          .find(Boolean) ?? null;
       const it = (nm: string, b: N) => {
         const lines = body(b, loopLocals);
         const why =
           GEM.skipTests?.[JSON.parse(nm.startsWith('"') ? nm : '""')] ??
           this.permanentSkip(u, this.lw.seqBody(b));
+        const handGem = !why && (handScope ?? handPortGem(b));
+        if (handGem) {
+          out.push(
+            `// HAND-PORT: needs the ${handGem} gem, which trails does not port`,
+            `${vitest("it")}.skip(${nm}, ${fnHead(lines)} => {`,
+            ...indent(lines),
+            "});",
+          );
+          return;
+        }
         if (why) {
           out.push(
             `// PERMANENT-SKIP: ${why}`,
@@ -1353,6 +1379,7 @@ export class Emitter {
           );
         }
       }
+      handScope = outerHand;
     };
     emitBody(u.body, out, null);
     const lets = [...ivarLocals.values(), ...specLets].map((x) => `let ${x}: unknown;`);

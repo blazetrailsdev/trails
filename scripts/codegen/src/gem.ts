@@ -70,6 +70,13 @@ export interface GemConfig {
    * emitted `it.skip` under a `PERMANENT-SKIP:` line giving the reason.
    */
   skipTests?: Record<string, string>;
+  /**
+   * A gem the tests use that trails does not port, by name → the constants it
+   * defines or the tests alias it as. The test files' setup naming one is
+   * dropped, and an example that reaches one is emitted `it.skip` under a
+   * `HAND-PORT:` line, left for a hand port.
+   */
+  handPortGems?: Record<string, string[]>;
   /** The package directory under `packages/`, where it differs from `gem` (`image-processing`). */
   pkg?: string;
   /** The gem's test directory beside `lib/`: `test` (Minitest), or `spec` (RSpec). */
@@ -181,6 +188,8 @@ GEMS.raabro = {
   testDir: "spec",
 };
 GEMS.et_orbi = {
+  // The specs' natural-language times (`Khronic.parse`), a development dependency.
+  handPortGems: { chronic: ["Chronic", "Khronic"] },
   gem: "et_orbi",
   rubyRoot: "et-orbi",
   namespace: "EtOrbi",
@@ -190,6 +199,8 @@ GEMS.et_orbi = {
   testDir: "spec",
 };
 GEMS.fugit = {
+  // The specs' natural-language times (`Khronic.parse`), a development dependency.
+  handPortGems: { chronic: ["Chronic", "Khronic"] },
   gem: "fugit",
   rubyRoot: "fugit",
   namespace: "Fugit",
