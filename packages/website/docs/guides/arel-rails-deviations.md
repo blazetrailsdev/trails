@@ -25,27 +25,41 @@ index: [method casing](./index.md#method-casing) (camelCase everywhere) and
 `Arel::Table.new(:users, as: "u")` becomes `new Table("users", { as:
 "u" })`. Nothing Arel-specific about this.
 
-## Call-time constant resolution: the zero-import slot
+## Call-time constant resolution
 
 Ruby resolves a constant named inside a method body when the method _runs_, and
 Zeitwerk autoloads the file at that moment. So `Arel::Nodes.build_quoted` can
 name `Arel::Attributes::Attribute` (`casted.rb:47-59`) without `casted.rb`
 taking a load-order dependency on it.
 
-ESM has no equivalent: every `import` is eager, so naming a class in a method
-body costs a module-evaluation edge — and in Arel those edges close cycles
-whose members all `extend Node` / `extend Binary`, which throws
-`Cannot access 'Binary' before initialization` depending on which module you
-enter the graph through.
+**ESM gives the same thing inside a method body, so a plain `import` is what
+the port uses.** An import binding is live: it is read when the expression
+runs, not when the module is evaluated. So `casted.ts` imports `Attribute`
+directly and reads it where Ruby resolves the constant. Arel's class graph
+really is cyclic — its nodes `extends Node` / `extends Binary` and reference
+each other, and 65 of the package's 92 modules sit in one cycle cluster — and
+the plain import is still correct there, because a method runs long after every
+module body in the cycle has finished.
 
-Where that happens, the constant is read off a namespace object in
-`packages/arel/src/namespaces.ts` — `Arel`, `Arel::Attributes`, `Arel::Nodes`,
-`Arel::Visitors` — each extended with trails' port of `ActiveSupport::Autoload`
+The exception is a read evaluated _while the module body runs_: an `extends`
+clause, a `static` field initializer, a top-level call, a top-level `new` or
+`const`. Those do throw
+`Cannot access 'Binary' before initialization`, depending on which module you
+enter the graph through. For one of those, the constant is read off a namespace
+object in `packages/arel/src/namespaces.ts` — `Arel`, `Arel::Attributes`,
+`Arel::Nodes`, `Arel::Visitors` — each extended with trails' port of
+`ActiveSupport::Autoload`
 (`activesupport/lib/active_support/dependencies/autoload.rb`). That module
 imports none of the classes it names, so it cannot join a cycle. It
-`autoload`s each constant, the defining module seats it at the bottom of its own
-body (`Nodes.Not = Not`), and readers use it at call time — exactly where Ruby
-resolves the constant.
+`autoload`s each constant, the defining module seats it at the bottom of its
+own body (`Nodes.Not = Not`), and the reader names it at call time.
+
+In Arel that exception is almost empty: 278 of its 287 namespace reads are
+plain imports, and the remaining few are TypeScript type positions, which are
+erased and cost no edge at all. The namespace objects stay as the public
+`Arel.Nodes` / `Arel.Collectors` / `Arel.Visitors` surface regardless. Reads
+still written against the namespace are being converted to plain imports
+(RFC 0205), so this is a shrinking deviation, not a standing one.
 
 <!-- typecheck:skip -->
 
