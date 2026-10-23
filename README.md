@@ -567,7 +567,7 @@ The parity figures are in the [next section](#status-and-parity-snapshot).
 
 ## Status and parity snapshot
 
-**As of 2026-10-14, `main` at `bff6cb85f6`.** To regenerate from a checkout:
+**As of 2026-10-23, `main` at `9a59b3b073`.** To regenerate from a checkout:
 
 ```sh
 pnpm parity:api --public-only   # "Public API" column: Rails public methods with a TS counterpart
@@ -581,30 +581,33 @@ under the rules in [docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md).
 `parity:test` matches each Rails test case to a ported test of the same name. A
 matched test passes in CI or is counted as skipped.
 
-| Package (parity row)                               | Public API            | All methods           | Rails tests           |
-| -------------------------------------------------- | --------------------- | --------------------- | --------------------- |
-| activerecord                                       | 5010 / 5119 (97.9%)   | 6980 / 6980 (100%)    | 8883 / 8900 (99.8%)   |
-| activemodel                                        | 625 / 627 (99.7%)     | 821 / 821 (100%)      | 1037 / 1037 (100%)    |
-| arel                                               | 783 / 784 (99.9%)     | 1052 / 1052 (100%)    | 739 / 739 (100%)      |
-| activesupport                                      | 1659 / 1800 (92.2%)   | 2039 / 2187 (93.2%)   | 2995 / 3343 (89.6%)   |
-| actionpack: ActionDispatch                         | 1243 / 1376 (90.3%)   | 1740 / 1801 (96.6%)   | 1279 / 1724 (74.2%)   |
-| actionpack: ActionController                       | 545 / 604 (90.2%)     | 800 / 803 (99.6%)     | 1768 / 1949 (90.7%)   |
-| actionpack: AbstractController                     | 97 / 114 (85.1%)      | 132 / 132 (100%)      | 52 / 52 (100%)        |
-| actionview                                         | 904 / 1136 (79.6%)    | 1215 / 1482 (82.0%)   | 728 / 2579 (28.2%)    |
-| trailties (railties)                               | 601 / 1221 (49.2%)    | 789 / 1660 (47.5%)    | 223 / 2419 (9.2%)     |
-| rack                                               | 454 / 509 (89.2%)     | 539 / 584 (92.3%)     | 773 / 870 (88.9%)     |
-| rack-session                                       | 50 / 60 (83.3%)       | 69 / 98 (70.4%)       | 58 / 124 (46.8%)      |
-| rack-test                                          | 61 / 87 (70.1%)       | 105 / 108 (97.2%)     | 229 / 234 (97.9%)     |
-| globalid                                           | 60 / 62 (96.8%)       | 89 / 91 (97.8%)       | 131 / 138 (94.9%)     |
-| i18n                                               | 197 / 200 (98.5%)     | 287 / 289 (99.3%)     | 307 / 307 (100%)      |
-| did-you-mean                                       | 6 / 6 (100%)          | 8 / 8 (100%)          | 6 / 6 (100%)          |
-| date                                               | n/a (C extension)     | n/a                   | 137 / 137 (100%)      |
-| bcrypt                                             | 16 / 16 (100%)        | 18 / 18 (100%)        | 39 / 39 (100%)        |
-| msgpack                                            | 31 / 33 (93.9%)       | 34 / 34 (100%)        | 140 / 356 (39.3%)     |
-| activejob                                          | 5 / 269 (1.9%)        | 5 / 369 (1.4%)        | 0 / 396 (0%)          |
-| ruby-compat                                        | n/a (not a gem)       | n/a                   | 20 / 503 (4.0%)       |
-| **Data layer** (activerecord + activemodel + arel) | 6418 / 6530 (98.3%)   | 8853 / 8853 (100%)    | 10659 / 10676 (99.8%) |
-| **Overall**                                        | 12940 / 14852 (87.1%) | 17482 / 19511 (89.6%) | 19923 / 26643 (74.8%) |
+| Package (parity row)                               | Public API            | All methods           | Rails tests             |
+| -------------------------------------------------- | --------------------- | --------------------- | ----------------------- |
+| activerecord                                       | 5007 / 5125 (97.7%)   | 6985 / 6989 (99.9%)   | 8898 / 8923 (99.7%)     |
+| activemodel                                        | 624 / 627 (99.5%)     | 820 / 821 (99.9%)     | 1037 / 1037 (100%)      |
+| arel                                               | 783 / 784 (99.9%)     | 1052 / 1052 (100%)    | 739 / 739 (100%)        |
+| activesupport                                      | 1675 / 1813 (92.4%)   | 2058 / 2201 (93.5%)   | 3001 / 3343 (89.8%)     |
+| actionpack: ActionDispatch                         | 1292 / 1384 (93.4%)   | 1801 / 1809 (99.6%)   | 1612 / 1670 (96.5%)     |
+| actionpack: ActionController                       | 597 / 655 (91.1%)     | 852 / 854 (99.8%)     | 1906 / 1949 (97.8%)     |
+| actionpack: AbstractController                     | 143 / 160 (89.4%)     | 178 / 178 (100%)      | 52 / 52 (100%)          |
+| actionview                                         | 2335 / 2406 (97.0%)   | 3035 / 3039 (99.9%)   | 2489 / 2562 (97.2%)     |
+| actioncable                                        | 231 / 368 (62.8%)     | 310 / 447 (69.4%)     | 39 / 200 (19.5%)        |
+| activejob                                          | 267 / 269 (99.3%)     | 369 / 369 (100%)      | 395 / 395 (100%)        |
+| trailties (railties)                               | 611 / 1229 (49.7%)    | 838 / 1704 (49.2%)    | 223 / 2419 (9.2%)       |
+| rack                                               | 512 / 517 (99.0%)     | 592 / 592 (100%)      | 866 / 872 (99.3%)       |
+| rack-session                                       | 60 / 60 (100%)        | 98 / 98 (100%)        | 123 / 124 (99.2%)       |
+| rack-test                                          | 62 / 87 (71.3%)       | 108 / 108 (100%)      | 233 / 234 (99.6%)       |
+| globalid                                           | 64 / 64 (100%)        | 93 / 93 (100%)        | 138 / 138 (100%)        |
+| i18n                                               | 235 / 236 (99.6%)     | 329 / 329 (100%)      | 307 / 307 (100%)        |
+| did-you-mean                                       | 14 / 14 (100%)        | 16 / 16 (100%)        | 7 / 7 (100%)            |
+| date                                               | n/a (C extension)     | n/a                   | 137 / 137 (100%)        |
+| bcrypt                                             | 16 / 16 (100%)        | 18 / 18 (100%)        | 39 / 39 (100%)          |
+| msgpack                                            | 32 / 34 (94.1%)       | 35 / 35 (100%)        | 165 / 374 (44.1%)       |
+| marcel                                             | 25 / 25 (100%)        | 32 / 32 (100%)        | 19 / 20 (95.0%)         |
+| solid-queue                                        | 56 / 202 (27.7%)      | 127 / 376 (33.8%)     | n/a (no tests vendored) |
+| ruby-compat                                        | n/a (not a gem)       | n/a                   | 64 / 563 (11.4%)        |
+| **Data layer** (activerecord + activemodel + arel) | 6414 / 6536 (98.1%)   | 8857 / 8862 (99.9%)   | 10674 / 10699 (99.8%)   |
+| **Overall**                                        | 15231 / 16911 (90.1%) | 20504 / 22161 (92.5%) | 22868 / 26895 (85.0%)   |
 
 The Overall row also counts the ported `thor`, `pg`, `mysql2` and `sqlite3`
 gem rows, which `parity:api` reports separately. The activerecord row also counts the ported `sqlite3` gem internals the SQLite
@@ -615,9 +618,9 @@ Read the columns this way. API coverage says a method with the Rails name
 exists. The fidelity gates in [CONTRIBUTING.md](CONTRIBUTING.md#measuring-progress)
 (call sets, call arguments, parameter names, arity) say how closely its body
 follows the Rails body. Test coverage is the better signal of what works. By
-that measure the data layer, ActionController, Rack, i18n, globalid and date
-are close to done, and ActionView and trailties are where most of the remaining
-work is.
+that measure the data layer, ActionPack, ActionView, ActiveJob, Rack, i18n,
+globalid and date are close to done, and trailties, ActionCable and the
+vendored gem rows (thor, msgpack) are where most of the remaining work is.
 
 What the prose above means in practice:
 
