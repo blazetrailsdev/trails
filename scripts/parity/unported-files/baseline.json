@@ -104,17 +104,6 @@
     "reason": "Ruby `only:` accepts a Module to filter records whose class includes that module. TypeScript has no module-include relationship for classes; `instanceof` only works against constructors. The class-based `only:` cases are covered by the matching non-module tests in the same file."
   },
   {
-    "testFile": "global_id_test.rb",
-    "className": "GlobalIDCreationTest",
-    "tests": [
-      "find with module",
-      "find with module no match",
-      "find with multiple module",
-      "find with multiple module no match"
-    ],
-    "reason": "Ruby `only:` accepts a Module to filter records whose class includes that module. TypeScript has no module-include relationship for classes; the class-based equivalents (`find with class`, `find with multiple class`) cover the same routing logic."
-  },
-  {
     "testFile": "global_locator_test.rb",
     "className": "GlobalLocatorTest",
     "tests": [
@@ -257,7 +246,7 @@
     "pattern": "backend/cache.rb",
     "testFile": "backend/cache_test.rb",
     "package": "i18n",
-    "reason": "PERMANENT: its `_fetch` reads a cache store inside the lookup, and every ActiveSupport::Cache store read is async — CLAUDE.md § \"A translation lookup is synchronous; the load is an awaited step\". Opt-in mixin; no default configuration includes it."
+    "reason": "PERMANENT: its `_fetch` reads a cache store inside the lookup, and every ActiveSupport::Cache store read is async — CLAUDE.md \u00a7 \"A translation lookup is synchronous; the load is an awaited step\". Opt-in mixin; no default configuration includes it."
   },
   {
     "pattern": "backend/cache_file.rb",
