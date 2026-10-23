@@ -601,6 +601,21 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
     : undefined;
 }
 
+function isCoreReceiver(obj: unknown): boolean {
+  if (obj === null || obj === undefined) return false;
+  if (typeof obj !== "object") return typeof obj !== "function";
+  return (
+    Array.isArray(obj) ||
+    obj instanceof Map ||
+    obj instanceof Set ||
+    obj instanceof Uint8Array ||
+    obj instanceof Date ||
+    obj instanceof rbCDate ||
+    temporalTag(obj) !== null ||
+    isPlainHash(obj)
+  );
+}
+
 /**
  * `basic_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2864`) — the default
  * `Object#respond_to?`, which answers whether the receiver's class defines the
@@ -651,43 +666,45 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  */
 export function basicObjRespondTo(obj: unknown, mid: string): boolean {
   if (mid === "toYaml") return true;
-  if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
-  if (Array.isArray(obj) && mid === "toAry") return true;
-  if (
-    (typeof obj === "number" || typeof obj === "bigint") &&
-    (mid === "isInfinite" || mid === "isFinite")
-  ) {
-    return true;
-  }
-  if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
-  if (obj instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) return true;
-  if (Array.isArray(obj) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) return true;
-  if (Array.isArray(obj) && Object.hasOwn(enumerableModule(), mid)) return true;
-  if (temporalMethod(obj, mid) !== undefined) return true;
-  if (enumerableMethod(obj, mid) !== undefined) return true;
-  if (
-    mid === "each" &&
-    (Array.isArray(obj) || obj instanceof Set || obj instanceof Map || isPlainHash(obj))
-  ) {
-    return true;
-  }
-  if (mid === "eachPair" && (obj instanceof Map || isPlainHash(obj))) return true;
-  if (mid === "toHash" && (obj instanceof Map || isPlainHash(obj))) return true;
-  if (
-    mid === "get" &&
-    (typeof obj === "string" || Array.isArray(obj) || obj instanceof Map || isPlainHash(obj))
-  ) {
-    return true;
-  }
-  if (
-    (mid === "isEmpty" || mid === "isInclude") &&
-    (typeof obj === "string" ||
-      Array.isArray(obj) ||
-      obj instanceof Set ||
-      obj instanceof Map ||
-      isPlainHash(obj))
-  ) {
-    return true;
+  if (isCoreReceiver(obj)) {
+    if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
+    if (Array.isArray(obj) && mid === "toAry") return true;
+    if (
+      (typeof obj === "number" || typeof obj === "bigint") &&
+      (mid === "isInfinite" || mid === "isFinite")
+    ) {
+      return true;
+    }
+    if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
+    if (obj instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) return true;
+    if (Array.isArray(obj) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) return true;
+    if (Array.isArray(obj) && Object.hasOwn(enumerableModule(), mid)) return true;
+    if (temporalMethod(obj, mid) !== undefined) return true;
+    if (enumerableMethod(obj, mid) !== undefined) return true;
+    if (
+      mid === "each" &&
+      (Array.isArray(obj) || obj instanceof Set || obj instanceof Map || isPlainHash(obj))
+    ) {
+      return true;
+    }
+    if (mid === "eachPair" && (obj instanceof Map || isPlainHash(obj))) return true;
+    if (mid === "toHash" && (obj instanceof Map || isPlainHash(obj))) return true;
+    if (
+      mid === "get" &&
+      (typeof obj === "string" || Array.isArray(obj) || obj instanceof Map || isPlainHash(obj))
+    ) {
+      return true;
+    }
+    if (
+      (mid === "isEmpty" || mid === "isInclude") &&
+      (typeof obj === "string" ||
+        Array.isArray(obj) ||
+        obj instanceof Set ||
+        obj instanceof Map ||
+        isPlainHash(obj))
+    ) {
+      return true;
+    }
   }
   const klass =
     typeof obj === "function" &&
@@ -700,7 +717,7 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     o && !(klass && o === Function.prototype);
     o = Object.getPrototypeOf(o) as object | null
   ) {
-    const entry = Object.getOwnPropertyDescriptor(o, mid);
+    const entry = Object.hasOwn(o, mid) ? Object.getOwnPropertyDescriptor(o, mid) : undefined;
     if (entry && !isAbsentHalf(entry.get)) {
       if (!("value" in entry)) return true;
       return klass ? typeof entry.value === "function" : entry.value !== undefined;
@@ -723,17 +740,30 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     if (typeof Object.getOwnPropertyDescriptor(o, mid)?.value === "function") return true;
   }
   if (reopenedSeatMethod(obj, mid) !== undefined) return true;
-  let cme: PropertyDescriptor | undefined;
-  for (
-    let o: object | null = Object(obj);
-    o && !cme;
-    o = Object.getPrototypeOf(o) as object | null
-  ) {
-    cme = Object.getOwnPropertyDescriptor(o, "respondToMissing");
-  }
-  if (typeof cme?.value !== "function") return false;
-  const ret = (cme.value as (mid: string) => unknown).call(obj, mid);
+  const respondToMissing = chainEntry(obj, "respondToMissing", respondToMissingEntries);
+  if (typeof respondToMissing !== "function") return false;
+  const ret = (respondToMissing as (mid: string) => unknown).call(obj, mid);
   return ret != null && ret !== false;
+}
+
+const respondToMissingEntries = new WeakMap<object, unknown>();
+const isRespondToEntries = new WeakMap<object, unknown>();
+
+function chainEntry(obj: unknown, name: string, entries: WeakMap<object, unknown>): unknown {
+  const self: object = Object(obj);
+  if (Object.hasOwn(self, name)) return Object.getOwnPropertyDescriptor(self, name)?.value;
+  const proto = Object.getPrototypeOf(self) as object | null;
+  if (proto === null) return undefined;
+  if (entries.has(proto)) return entries.get(proto);
+  let value: unknown;
+  for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
+    if (Object.hasOwn(o, name)) {
+      value = Object.getOwnPropertyDescriptor(o, name)?.value;
+      break;
+    }
+  }
+  entries.set(proto, value);
+  return value;
 }
 
 /**
@@ -1298,15 +1328,7 @@ type AnyFunction = (...args: unknown[]) => unknown;
  * (`vendor/ruby/v3.3.11/vm_method.c:2934`).
  */
 export function rbObjRespondTo(obj: unknown, mid: string): boolean {
-  let me: PropertyDescriptor | undefined;
-  for (
-    let o: object | null = Object(obj);
-    o && !me;
-    o = Object.getPrototypeOf(o) as object | null
-  ) {
-    me = Object.getOwnPropertyDescriptor(o, "isRespondTo");
-  }
-  const isRespondTo = me?.value;
+  const isRespondTo = chainEntry(obj, "isRespondTo", isRespondToEntries);
   if (typeof isRespondTo === "function") {
     const result = (isRespondTo as (mid: string) => unknown).call(obj, mid);
     return result != null && result !== false;

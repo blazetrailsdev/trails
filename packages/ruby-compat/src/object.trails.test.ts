@@ -365,6 +365,42 @@ describe("Object#respond_to?", () => {
     expect(rbFSend(map, "toHash")).toBe(map);
   });
 
+  it("answers a class instance from its own chain only, never from a core receiver's table", () => {
+    class Record {
+      each() {}
+    }
+    const record = new Record();
+    for (const mid of ["toStr", "toAry", "eachPair", "toHash", "get", "isEmpty", "upcase"]) {
+      expect(basicObjRespondTo(record, mid)).toBe(false);
+    }
+    expect(basicObjRespondTo(record, "each")).toBe(true);
+    expect(basicObjRespondTo(record, "toYaml")).toBe(true);
+    expect(basicObjRespondTo(new Set([1]), "isInclude")).toBe(true);
+    expect(basicObjRespondTo(new Uint8Array(1), "bytesize")).toBe(true);
+    expect(basicObjRespondTo(1, "isFinite")).toBe(true);
+    expect(basicObjRespondTo(1n, "isInfinite")).toBe(true);
+  });
+
+  it("reads respond_to_missing? and respond_to? off the receiver before its cached prototype", () => {
+    class Dynamic {
+      respondToMissing(mid: string) {
+        return mid === "dynamic";
+      }
+    }
+    expect(basicObjRespondTo(new Dynamic(), "dynamic")).toBe(true);
+    expect(basicObjRespondTo(new Dynamic(), "other")).toBe(false);
+    const own = Object.assign(new Dynamic(), { respondToMissing: () => true });
+    expect(basicObjRespondTo(own, "other")).toBe(true);
+    expect(basicObjRespondTo(new Dynamic(), "other")).toBe(false);
+    class Overriding {
+      isRespondTo(mid: string) {
+        return mid === "name";
+      }
+    }
+    expect(rbObjRespondTo(new Overriding(), "name")).toBe(true);
+    expect(rbObjRespondTo(new Overriding(), "isRespondTo")).toBe(false);
+  });
+
   it("answers [] for an Array, a Hash and a String, whose JS values index without a method", () => {
     for (const obj of ["abc", [1], new Map(), {}]) {
       expect(basicObjRespondTo(obj, "get")).toBe(true);
