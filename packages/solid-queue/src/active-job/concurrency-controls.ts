@@ -6,8 +6,7 @@ import {
   isPresent,
   type Duration,
 } from "@blazetrails/activesupport";
-import { classModule, rbModName, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "@blazetrails/activejob";
+import { classModule, rbModName } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 
 type ConcurrencyOption = string | ((this: ConcurrencyControls, ...args: unknown[]) => unknown);
@@ -105,5 +104,3 @@ Object.defineProperty(ConcurrencyControls, "DEFAULT_CONCURRENCY_GROUP", {
     default: SolidQueue.defaultConcurrencyControlPeriod,
   });
 });
-
-rbModConstSet(ActiveJob, "ConcurrencyControls", ConcurrencyControls);

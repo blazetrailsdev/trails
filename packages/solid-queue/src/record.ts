@@ -1,12 +1,11 @@
 import { Base, registerModel, type Relation } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "./solid-queue.js";
 
 export class Record extends Base {
   static {
-    rbModConstSet(SolidQueue, "Record", this);
     this.abstractClass = true;
+    this.tableNamePrefix = SolidQueue.tableNamePrefix;
 
     if (SolidQueue.connectsTo) this.connectsTo(SolidQueue.connectsTo);
   }

@@ -1,8 +1,9 @@
 import { Concern, delegate, extend, isPresent, safeConstantize } from "@blazetrails/activesupport";
 import type { Base } from "@blazetrails/activerecord";
 import { classModule } from "@blazetrails/ruby-compat";
-import { SolidQueue } from "../solid-queue.js";
 import type { Job } from "../job.js";
+import { Semaphore } from "../semaphore.js";
+import { BlockedExecution } from "../blocked-execution.js";
 
 type ConcurrencyControlsClass = typeof Job;
 
@@ -11,9 +12,7 @@ export class ClassMethods {
     this: ConcurrencyControlsClass,
     jobs: Iterable<Job>,
   ): Promise<number> {
-    return await SolidQueue.Semaphore.signalAll(
-      Array.from(jobs).filter((job) => job.isConcurrencyLimited()),
-    );
+    return await Semaphore.signalAll(Array.from(jobs).filter((job) => job.isConcurrencyLimited()));
   }
 }
 
@@ -45,24 +44,24 @@ export class ConcurrencyControls {
   async acquireConcurrencyLock(): Promise<boolean> {
     if (!this.isConcurrencyLimited()) return true;
 
-    return await SolidQueue.Semaphore.wait(this as unknown as Job);
+    return await Semaphore.wait(this as unknown as Job);
   }
 
   /** @internal */
   async releaseConcurrencyLock(): Promise<boolean> {
     if (!this.isConcurrencyLimited()) return false;
 
-    return await SolidQueue.Semaphore.signal(this as unknown as Job);
+    return await Semaphore.signal(this as unknown as Job);
   }
 
   /** @internal */
   async block(): Promise<Base> {
-    return (await SolidQueue.BlockedExecution.createOrFindByBang({ job_id: this.id }))!;
+    return (await BlockedExecution.createOrFindByBang({ job_id: this.id }))!;
   }
 
   /** @internal */
   async releaseNextBlockedJob(): Promise<unknown> {
-    return await SolidQueue.BlockedExecution.releaseOne(this.concurrency_key);
+    return await BlockedExecution.releaseOne(this.concurrency_key);
   }
 
   /** @internal */

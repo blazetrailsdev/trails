@@ -1,8 +1,8 @@
 import type { Relation } from "@blazetrails/activerecord";
 import { presence } from "@blazetrails/activesupport";
-import { aryDelete, rbFArray, rbModConstSet, toS } from "@blazetrails/ruby-compat";
-import { SolidQueue } from "./solid-queue.js";
+import { aryDelete, rbFArray, toS } from "@blazetrails/ruby-compat";
 import type { ReadyExecution } from "./ready-execution.js";
+import { Pause } from "./pause.js";
 
 export class QueueSelector {
   readonly rawQueues: string[];
@@ -101,7 +101,7 @@ export class QueueSelector {
 
   /** @internal */
   private async pausedQueues(): Promise<string[]> {
-    return (this._pausedQueues ??= (await SolidQueue.Pause.all().pluck("queue_name")) as string[]);
+    return (this._pausedQueues ??= (await Pause.all().pluck("queue_name")) as string[]);
   }
 
   /** @internal */
@@ -128,4 +128,3 @@ export class QueueSelector {
     return null;
   }
 }
-rbModConstSet(SolidQueue, "QueueSelector", QueueSelector);

@@ -1,16 +1,15 @@
 import { registerModel, type Relation } from "@blazetrails/activerecord";
 import { indexBy } from "@blazetrails/activesupport";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Execution } from "./execution.js";
 import { QueueSelector } from "./queue-selector.js";
-import { SolidQueue } from "./solid-queue.js";
-import type { ClaimedExecution } from "./claimed-execution.js";
+import { ClaimedExecution } from "./claimed-execution.js";
+import { Job } from "./job.js";
 
 export class ReadyExecution extends Execution {
   declare static queuedAs: (queueName: unknown) => Relation<ReadyExecution>;
 
   static {
-    registerModel(rbModConstSet(SolidQueue, "ReadyExecution", this));
+    registerModel(this);
 
     this.scope("queuedAs", function (queueName: unknown) {
       return this.where({ queue_name: queueName });
@@ -77,7 +76,7 @@ export class ReadyExecution extends Execution {
     if (await executions.isNone()) return [];
 
     const records = await executions.toArray();
-    return await SolidQueue.ClaimedExecution.claiming(
+    return await ClaimedExecution.claiming(
       records.map((execution) => execution.job_id),
       processId,
       async (claimed) => {
@@ -90,9 +89,7 @@ export class ReadyExecution extends Execution {
 
   /** @internal */
   protected static override async discardJobs(jobIds: unknown[]): Promise<number> {
-    await SolidQueue.Job.releaseAllConcurrencyLocks(
-      await SolidQueue.Job.where({ id: jobIds }).toArray(),
-    );
+    await Job.releaseAllConcurrencyLocks(await Job.where({ id: jobIds }).toArray());
     return await super.discardJobs(jobIds);
   }
 }

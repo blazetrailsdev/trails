@@ -1,6 +1,7 @@
 export { VERSION } from "./version.js";
 export { SolidQueue } from "./solid-queue.js";
 export { Record } from "./record.js";
+export { Job, EnqueueError } from "./job.js";
 export { Execution, UndiscardableError } from "./execution.js";
 export { ReadyExecution } from "./ready-execution.js";
 export { ScheduledExecution } from "./scheduled-execution.js";
@@ -12,6 +13,5 @@ export { Semaphore } from "./semaphore.js";
 export { Pause } from "./pause.js";
 export { Queue } from "./queue.js";
 export { QueueSelector } from "./queue-selector.js";
-export { Job, EnqueueError } from "./job.js";
 export { ConcurrencyControls } from "./active-job/concurrency-controls.js";
 export { SolidQueueAdapter } from "./active-job/queue-adapters/solid-queue-adapter.js";

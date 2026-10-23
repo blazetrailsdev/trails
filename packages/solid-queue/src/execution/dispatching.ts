@@ -1,13 +1,13 @@
 import { Concern, extend } from "@blazetrails/activesupport";
 import { classModule } from "@blazetrails/ruby-compat";
-import { SolidQueue } from "../solid-queue.js";
 import type { Execution } from "../execution.js";
+import { Job } from "../job.js";
 
 export class ClassMethods {
   static async dispatchJobs(this: typeof Execution, jobIds: unknown[]): Promise<number> {
-    const jobs = await SolidQueue.Job.where({ id: jobIds }).toArray();
+    const jobs = await Job.where({ id: jobIds }).toArray();
 
-    const dispatchedJobIds = (await SolidQueue.Job.dispatchAll(jobs)).map((job) => job.id);
+    const dispatchedJobIds = (await Job.dispatchAll(jobs)).map((job) => job.id);
     return await this.where({
       id: await this.where({ job_id: dispatchedJobIds }).pluck("id"),
     }).deleteAll();

@@ -1,9 +1,8 @@
 import { Concern, extend } from "@blazetrails/activesupport";
 import type { Base } from "@blazetrails/activerecord";
 import { classModule } from "@blazetrails/ruby-compat";
-import { SolidQueue } from "../solid-queue.js";
 import type { Job } from "../job.js";
-import type { FailedExecution } from "../failed-execution.js";
+import { FailedExecution } from "../failed-execution.js";
 
 export class Retryable {
   static readonly [classModule] = true;
@@ -17,7 +16,7 @@ export class Retryable {
   }
 
   async failedWith(exception: unknown): Promise<Base> {
-    return (await SolidQueue.FailedExecution.createOrFindByBang({ job_id: this.id, exception }))!;
+    return (await FailedExecution.createOrFindByBang({ job_id: this.id, exception }))!;
   }
 
   async resetExecutionCounters(): Promise<unknown> {

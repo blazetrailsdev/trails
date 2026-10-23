@@ -1,10 +1,11 @@
 import { registerModel, type Relation } from "@blazetrails/activerecord";
 import { slice } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { Range, rbFArray, rbModConstSet } from "@blazetrails/ruby-compat";
+import { Range, rbFArray } from "@blazetrails/ruby-compat";
 import { Execution } from "./execution.js";
 import { SolidQueue } from "./solid-queue.js";
-import type { Semaphore } from "./semaphore.js";
+import { Semaphore } from "./semaphore.js";
+import { ReadyExecution } from "./ready-execution.js";
 
 export class BlockedExecution extends Execution {
   declare static expired: () => Relation<BlockedExecution>;
@@ -13,7 +14,7 @@ export class BlockedExecution extends Execution {
   declare semaphore: Promise<Semaphore | null>;
 
   static {
-    registerModel(rbModConstSet(SolidQueue, "BlockedExecution", this));
+    registerModel(this);
 
     this.assumesAttributesFromJob("concurrency_key");
     this.beforeCreate(function (this: BlockedExecution) {
@@ -64,10 +65,7 @@ export class BlockedExecution extends Execution {
   /** @internal */
   private static async releasable(concurrencyKeys: string[]): Promise<string[]> {
     const semaphores = Object.fromEntries(
-      (await SolidQueue.Semaphore.where({ key: concurrencyKeys }).pluck("key", "value")) as [
-        string,
-        number,
-      ][],
+      (await Semaphore.where({ key: concurrencyKeys }).pluck("key", "value")) as [string, number][],
     );
 
     const keys = [
@@ -103,12 +101,12 @@ export class BlockedExecution extends Execution {
 
   /** @internal */
   private async acquireConcurrencyLock(): Promise<boolean> {
-    return await SolidQueue.Semaphore.wait(await this.job);
+    return await Semaphore.wait(await this.job);
   }
 
   /** @internal */
   private async promoteToReady(): Promise<unknown> {
-    return await SolidQueue.ReadyExecution.createBang(this.readyAttributes());
+    return await ReadyExecution.createBang(this.readyAttributes());
   }
 
   /** @internal */

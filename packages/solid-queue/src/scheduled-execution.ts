@@ -1,7 +1,7 @@
 import { registerModel, type Relation } from "@blazetrails/activerecord";
 import { include } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { Range, rbModConstSet } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat";
 import { Execution } from "./execution.js";
 import {
   Dispatching,
@@ -16,7 +16,7 @@ export class ScheduledExecution extends Execution {
   declare scheduled_at: Time | null;
 
   static {
-    registerModel(rbModConstSet(SolidQueue, "ScheduledExecution", this));
+    registerModel(this);
     include(this, Dispatching);
 
     this.scope("due", function () {

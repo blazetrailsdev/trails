@@ -2,8 +2,8 @@ import { Concern, extend, isPresent } from "@blazetrails/activesupport";
 import type { Base } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { classModule } from "@blazetrails/ruby-compat";
-import { SolidQueue } from "../solid-queue.js";
 import type { Job } from "../job.js";
+import { ScheduledExecution } from "../scheduled-execution.js";
 
 type SchedulableClass = typeof Job;
 
@@ -15,7 +15,7 @@ export class ClassMethods {
 
   /** @internal */
   private static async scheduleAllAtOnce(this: SchedulableClass, jobs: Base[]): Promise<unknown> {
-    return await SolidQueue.ScheduledExecution.createAllFromJobs(jobs);
+    return await ScheduledExecution.createAllFromJobs(jobs);
   }
 
   /** @internal */
@@ -24,9 +24,7 @@ export class ClassMethods {
     jobs: Base[],
   ): Promise<Base[]> {
     return await this.where({
-      id: await SolidQueue.ScheduledExecution.where({ job_id: jobs.map((job) => job.id) }).pluck(
-        "job_id",
-      ),
+      id: await ScheduledExecution.where({ job_id: jobs.map((job) => job.id) }).pluck("job_id"),
     }).toArray();
   }
 }
@@ -48,7 +46,7 @@ export class Schedulable {
 
   /** @internal */
   async schedule(): Promise<Base> {
-    return (await SolidQueue.ScheduledExecution.createOrFindByBang({ job_id: this.id }))!;
+    return (await ScheduledExecution.createOrFindByBang({ job_id: this.id }))!;
   }
 }
 extend(Schedulable, Concern);

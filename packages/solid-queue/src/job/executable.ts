@@ -8,6 +8,8 @@ import type { Execution } from "../execution.js";
 import { ConcurrencyControls } from "./concurrency-controls.js";
 import { Retryable } from "./retryable.js";
 import { Schedulable } from "./schedulable.js";
+import { ReadyExecution } from "../ready-execution.js";
+import { BlockedExecution } from "../blocked-execution.js";
 
 type ExecutableClass = typeof Job;
 
@@ -30,7 +32,7 @@ export class ClassMethods {
 
   /** @internal */
   private static async dispatchAllAtOnce(this: ExecutableClass, jobs: Base[]): Promise<unknown> {
-    return await SolidQueue.ReadyExecution.createAllFromJobs(jobs);
+    return await ReadyExecution.createAllFromJobs(jobs);
   }
 
   /** @internal */
@@ -52,18 +54,14 @@ export class ClassMethods {
   /** @internal */
   private static async dispatchedAndReady(this: ExecutableClass, jobs: Base[]): Promise<Base[]> {
     return await this.where({
-      id: await SolidQueue.ReadyExecution.where({ job_id: jobs.map((job) => job.id) }).pluck(
-        "job_id",
-      ),
+      id: await ReadyExecution.where({ job_id: jobs.map((job) => job.id) }).pluck("job_id"),
     }).toArray();
   }
 
   /** @internal */
   private static async dispatchedAndBlocked(this: ExecutableClass, jobs: Base[]): Promise<Base[]> {
     return await this.where({
-      id: await SolidQueue.BlockedExecution.where({ job_id: jobs.map((job) => job.id) }).pluck(
-        "job_id",
-      ),
+      id: await BlockedExecution.where({ job_id: jobs.map((job) => job.id) }).pluck("job_id"),
     }).toArray();
   }
 }
@@ -142,7 +140,7 @@ export class Executable {
 
   /** @internal */
   async ready(): Promise<Base> {
-    return (await SolidQueue.ReadyExecution.createOrFindByBang({ job_id: this.id }))!;
+    return (await ReadyExecution.createOrFindByBang({ job_id: this.id }))!;
   }
 }
 extend(Executable, Concern);

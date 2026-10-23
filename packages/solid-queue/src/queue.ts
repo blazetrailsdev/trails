@@ -1,7 +1,9 @@
 import { Duration } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { rbHash, rbModConstSet, toI } from "@blazetrails/ruby-compat";
-import { SolidQueue } from "./solid-queue.js";
+import { rbHash, toI } from "@blazetrails/ruby-compat";
+import { Job } from "./job.js";
+import { Pause } from "./pause.js";
+import { ReadyExecution } from "./ready-execution.js";
 
 export class Queue {
   name: string;
@@ -9,7 +11,7 @@ export class Queue {
   declare private _latency: number | undefined;
 
   static async all(): Promise<Queue[]> {
-    return (await SolidQueue.Job.select("queue_name").distinct().toArray()).map(
+    return (await Job.select("queue_name").distinct().toArray()).map(
       (job) => new this(job.queue_name),
     );
   }
@@ -23,34 +25,32 @@ export class Queue {
   }
 
   async isPaused(): Promise<boolean> {
-    return await SolidQueue.Pause.isExists({ queue_name: this.name });
+    return await Pause.isExists({ queue_name: this.name });
   }
 
   async pause(): Promise<unknown> {
-    return await SolidQueue.Pause.createOrFindByBang({ queue_name: this.name });
+    return await Pause.createOrFindByBang({ queue_name: this.name });
   }
 
   async resume(): Promise<number> {
-    return await SolidQueue.Pause.where({ queue_name: this.name }).deleteAll();
+    return await Pause.where({ queue_name: this.name }).deleteAll();
   }
 
   async clear(): Promise<void> {
     await (
-      SolidQueue.ReadyExecution.queuedAs(this.name) as unknown as typeof SolidQueue.ReadyExecution
+      ReadyExecution.queuedAs(this.name) as unknown as typeof ReadyExecution
     ).discardAllInBatches();
   }
 
   async size(): Promise<number> {
-    return (this._size ??= await SolidQueue.ReadyExecution.queuedAs(this.name).count());
+    return (this._size ??= await ReadyExecution.queuedAs(this.name).count());
   }
 
   async latency(): Promise<number> {
     if (this._latency === undefined) {
       const now = Time.current();
       const oldestEnqueuedAt =
-        ((await SolidQueue.ReadyExecution.queuedAs(this.name).minimum(
-          "created_at",
-        )) as Time | null) ?? now;
+        ((await ReadyExecution.queuedAs(this.name).minimum("created_at")) as Time | null) ?? now;
 
       this._latency = toI(now.minus(oldestEnqueuedAt as never)) as number;
     }
@@ -73,4 +73,3 @@ export class Queue {
     return rbHash(this.name);
   }
 }
-rbModConstSet(SolidQueue, "Queue", Queue);

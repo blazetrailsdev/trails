@@ -1,13 +1,13 @@
 import { registerModel, type Base, type Relation } from "@blazetrails/activerecord";
 import { include } from "@blazetrails/activesupport";
-import { StandardError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import { SolidQueue } from "./solid-queue.js";
-import type { Job } from "./job.js";
 import {
   JobAttributes,
   type ClassMethods as JobAttributesClassMethods,
 } from "./execution/job-attributes.js";
+import { Job } from "./job.js";
 
 export class UndiscardableError extends StandardError {}
 
@@ -22,8 +22,7 @@ export class Execution extends Record {
   declare priority: number;
 
   static {
-    rbModConstSet(SolidQueue, "Execution", this);
-    rbModConstSet(this, "UndiscardableError", UndiscardableError);
+    Object.defineProperty(this, "UndiscardableError", { value: UndiscardableError });
     include(this, JobAttributes);
 
     this.abstractClass = true;
@@ -100,7 +99,7 @@ export class Execution extends Record {
 
   /** @internal */
   protected static async discardJobs(jobIds: unknown[]): Promise<number> {
-    return await SolidQueue.Job.where({ id: jobIds }).deleteAll();
+    return await Job.where({ id: jobIds }).deleteAll();
   }
 
   type(): string {

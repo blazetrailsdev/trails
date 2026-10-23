@@ -1,8 +1,7 @@
 import { RecordNotUnique, registerModel, type Relation } from "@blazetrails/activerecord";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { StandardError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat";
 import { Execution } from "./execution.js";
-import { SolidQueue } from "./solid-queue.js";
 
 export class AlreadyRecorded extends StandardError {}
 
@@ -12,8 +11,8 @@ export class RecurringExecution extends Execution {
   declare run_at: unknown;
 
   static {
-    registerModel(rbModConstSet(SolidQueue, "RecurringExecution", this));
-    rbModConstSet(this, "AlreadyRecorded", AlreadyRecorded);
+    registerModel(this);
+    Object.defineProperty(this, "AlreadyRecorded", { value: AlreadyRecorded });
 
     this.scope("clearable", function () {
       return this.where().missing("job");

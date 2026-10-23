@@ -10,7 +10,7 @@ import {
 import { Deadlocked } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { performAllLater } from "@blazetrails/activejob";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import {
   BlockedExecution,
   EnqueueError,
@@ -26,43 +26,29 @@ import { AddToBufferJob } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
 import { loadAppSchema, loadQueueSchema } from "./test-helpers/queue-schema.js";
 
-const JobTest = {};
-rbModConstSet(SolidQueue, "JobTest", JobTest);
-
 class NonOverlappingJob extends ApplicationJob {
-  static toString(): string {
-    return "SolidQueue::JobTest::NonOverlappingJob";
-  }
-
   static {
     this.limitsConcurrency({ key: (jobResult: unknown) => jobResult });
   }
 
   perform(_jobResult: unknown): void {}
 }
-rbModConstSet(JobTest, "NonOverlappingJob", NonOverlappingJob);
 
 class NonOverlappingGroupedJob1 extends NonOverlappingJob {
-  static toString(): string {
-    return "SolidQueue::JobTest::NonOverlappingGroupedJob1";
-  }
-
   static {
     this.limitsConcurrency({ key: (jobResult: unknown) => jobResult, group: "MyGroup" });
   }
 }
-rbModConstSet(JobTest, "NonOverlappingGroupedJob1", NonOverlappingGroupedJob1);
 
 class NonOverlappingGroupedJob2 extends NonOverlappingJob {
-  static toString(): string {
-    return "SolidQueue::JobTest::NonOverlappingGroupedJob2";
-  }
-
   static {
     this.limitsConcurrency({ key: (jobResult: unknown) => jobResult, group: "MyGroup" });
   }
 }
-rbModConstSet(JobTest, "NonOverlappingGroupedJob2", NonOverlappingGroupedJob2);
+
+for (const klass of [NonOverlappingJob, NonOverlappingGroupedJob1, NonOverlappingGroupedJob2]) {
+  registerConstant(`SolidQueue::JobTest::${klass.name}`, klass);
+}
 
 describe("SolidQueue::JobTest", () => {
   let result: JobResult;

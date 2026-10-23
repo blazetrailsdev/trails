@@ -7,17 +7,10 @@ import {
 import { include, indexBy } from "@blazetrails/activesupport";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Time } from "@blazetrails/date";
-import {
-  StandardError,
-  excBacktrace,
-  excSetBacktrace,
-  rbModConstSet,
-  rbModName,
-} from "@blazetrails/ruby-compat";
+import { StandardError, excBacktrace, excSetBacktrace, rbModName } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import type { Execution } from "./execution.js";
 import type { FailedExecution } from "./failed-execution.js";
-import { SolidQueue } from "./solid-queue.js";
 import { Executable, type ClassMethods as ExecutableClassMethods } from "./job/executable.js";
 import type { ClassMethods as SchedulableClassMethods } from "./job/schedulable.js";
 import { Clearable, type ClassMethods as ClearableClassMethods } from "./job/clearable.js";
@@ -78,8 +71,8 @@ export class Job extends Record {
   declare resetExecutionCounters: typeof Retryable.prototype.resetExecutionCounters;
 
   static {
-    registerModel(rbModConstSet(SolidQueue, "Job", this));
-    rbModConstSet(this, "EnqueueError", EnqueueError);
+    registerModel(this);
+    Object.defineProperty(this, "EnqueueError", { value: EnqueueError });
 
     include(this, Recurrable);
     include(this, Clearable);
