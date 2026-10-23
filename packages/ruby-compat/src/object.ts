@@ -949,7 +949,7 @@ function absentHalf(id: string, write: boolean): (this: object, value?: unknown)
  * defers to the next table up the prototype chain, as Ruby's method search
  * does for an entry the table lacks. `enumerable` is set on a plain-object
  * module, whose enumerable members are the instance methods `include()` copies
- * (CLAUDE.md, "A Ruby module is a plain object or a class module").
+ * (CLAUDE.md, "A Ruby module is a JS object or a JS class").
  *
  * @noRailsEquivalent PERMANENT
  */

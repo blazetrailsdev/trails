@@ -940,11 +940,12 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "autoload/reload machinery: an interlock guarding concurrent constant " +
       "loads, the autoload/eager-load path registries it walks, and the " +
       "`autoload :Const` / `eager_autoload` DSL that defers a constant to a " +
-      "file. ESM has neither half — every `import` is eager and resolved before " +
-      "the importing module's body, and there is no reloading — so trails has " +
+      "file. ESM has neither half — a module graph is resolved and evaluated " +
+      "eagerly at import, and there is no reloading — so trails has " +
       "no constant table to guard and nothing to reload. Where Ruby leans on " +
       "call-time constant resolution to break a load-order cycle, the port uses " +
-      'the zero-import slot module instead (CLAUDE.md, "Call-time constant ' +
+      "a plain ES import, whose binding is live and is read when the expression " +
+      'runs (CLAUDE.md, "Call-time constant ' +
       'resolution"); the two require_dependency suites in trails ' +
       "(dependencies.test.ts, autoload.test.ts) are permanent skips for the same " +
       "reason. That includes every `eager_load!` a module inherits from " +
