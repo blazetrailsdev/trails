@@ -1,4 +1,4 @@
-import { camelize, constantize } from "@blazetrails/activesupport";
+import { camelize } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { CONTENT_TYPE } from "@blazetrails/rack";
 import {
@@ -55,13 +55,13 @@ export class Configuration {
     );
 
     const pathToAdapter = `action_cable/subscription_adapter/${adapter}`;
-    const require = async (path: string): Promise<void> => {
+    const require = async (path: string): Promise<Record<string, unknown>> => {
       const load = ActionCable.SubscriptionAdapter.loadPath[path];
       if (load === undefined) {
         throw Object.assign(new LoadError(`cannot load such file -- ${path}`), { path });
       }
       try {
-        await load();
+        return (await load()) as Record<string, unknown>;
       } catch (e) {
         if ((e as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND") throw e;
         throw Object.assign(new LoadError((e as Error).message, { cause: e }), {
@@ -69,8 +69,9 @@ export class Configuration {
         });
       }
     };
+    let feature: Record<string, unknown>;
     try {
-      await require(pathToAdapter);
+      feature = await require(pathToAdapter);
     } catch (e) {
       if (!(e instanceof LoadError)) throw e;
       const klass = rbObjClass(e) as typeof LoadError;
@@ -91,7 +92,7 @@ export class Configuration {
 
     adapter = camelize(adapter);
     if (adapter === "Postgresql") adapter = "PostgreSQL";
-    return constantize(`ActionCable::SubscriptionAdapter::${adapter}`);
+    return feature[adapter];
   }
 }
 

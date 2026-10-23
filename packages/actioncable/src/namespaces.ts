@@ -17,12 +17,8 @@ extend(Channel, Autoload);
 
 export const SubscriptionAdapter = {
   name: "ActionCable::SubscriptionAdapter",
-  loadPath: {
-    "action_cable/subscription_adapter/inline": () => import("./subscription-adapter/inline.js"),
-    "action_cable/subscription_adapter/async": () => import("./subscription-adapter/async.js"),
-    "action_cable/subscription_adapter/test": () => import("./subscription-adapter/test.js"),
-  },
-} as unknown as AutoloadModule;
+  loadPath: {},
+} as AutoloadModule;
 extend(SubscriptionAdapter, Autoload);
 
 export const Helpers = { name: "ActionCable::Helpers" } as AutoloadModule;

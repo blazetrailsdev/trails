@@ -3,7 +3,14 @@ import { Logger } from "@blazetrails/activesupport";
 import { Queue, StringIO } from "@blazetrails/ruby-compat";
 import { Event } from "@blazetrails/ruby-compat/concurrent/event";
 import { afterEach, beforeEach, expect, it } from "vitest";
+import { ActionCable } from "../../index.js";
 import { Base as Server } from "../../server/base.js";
+
+Object.assign(ActionCable.SubscriptionAdapter.loadPath, {
+  "action_cable/subscription_adapter/inline": () => import("../../subscription-adapter/inline.js"),
+  "action_cable/subscription_adapter/async": () => import("../../subscription-adapter/async.js"),
+  "action_cable/subscription_adapter/test": () => import("../../subscription-adapter/test.js"),
+});
 
 export const WAIT_WHEN_EXPECTING_EVENT = 3;
 export const WAIT_WHEN_NOT_EXPECTING_EVENT = 0.2;

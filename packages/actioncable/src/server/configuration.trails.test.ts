@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LoadError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat";
 import { SubscriptionAdapter } from "../namespaces.js";
 import { Configuration } from "./configuration.js";
 
@@ -9,11 +9,11 @@ const loaded: string[] = [];
 Object.assign(SubscriptionAdapter.loadPath, {
   "action_cable/subscription_adapter/async": async () => {
     loaded.push("async");
-    rbModConstSet(SubscriptionAdapter, "Async", Async);
+    return { Async };
   },
   "action_cable/subscription_adapter/postgresql": async () => {
     loaded.push("postgresql");
-    rbModConstSet(SubscriptionAdapter, "PostgreSQL", PostgreSQL);
+    return { PostgreSQL };
   },
   "action_cable/subscription_adapter/redis": async () => {
     loaded.push("redis");

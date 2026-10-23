@@ -1,5 +1,3 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { SubscriptionAdapter } from "../namespaces.js";
 import type { StreamEventLoop } from "../connection/stream-event-loop.js";
 import { Inline, type InlineServer } from "./inline.js";
 import { SubscriberMap } from "./subscriber-map.js";
@@ -39,5 +37,3 @@ export class AsyncSubscriberMap extends SubscriberMap {
     this.eventLoop.post(null, () => super.invokeCallback(callback, message));
   }
 }
-
-rbModConstSet(SubscriptionAdapter, "Async", Async);

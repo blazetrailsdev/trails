@@ -1,5 +1,3 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { SubscriptionAdapter } from "../namespaces.js";
 import { Async } from "./async.js";
 
 export class Test extends Async {
@@ -27,5 +25,3 @@ export class Test extends Async {
     return (this._channelsData ??= {});
   }
 }
-
-rbModConstSet(SubscriptionAdapter, "Test", Test);

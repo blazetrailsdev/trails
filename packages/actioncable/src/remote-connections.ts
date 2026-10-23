@@ -1,7 +1,6 @@
 import { include } from "@blazetrails/activesupport";
-import { StandardError, rbModConstSet, rbObjIvarSet } from "@blazetrails/ruby-compat";
+import { StandardError, rbObjIvarSet } from "@blazetrails/ruby-compat";
 import { underscore } from "@blazetrails/activesupport";
-import { ActionCable } from "./namespaces.js";
 import { Identification } from "./connection/identification.js";
 import { InternalChannel } from "./connection/internal-channel.js";
 
@@ -65,5 +64,3 @@ export class RemoteConnections {
     return new RemoteConnection(this.server, identifier);
   }
 }
-
-rbModConstSet(ActionCable, "RemoteConnections", RemoteConnections);

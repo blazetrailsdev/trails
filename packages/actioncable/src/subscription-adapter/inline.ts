@@ -1,5 +1,3 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { SubscriptionAdapter } from "../namespaces.js";
 import { Base, type AdapterServer } from "./base.js";
 import { SubscriberMap } from "./subscriber-map.js";
 import type { Monitor } from "@blazetrails/ruby-compat";
@@ -53,5 +51,3 @@ export class Inline extends Base {
     return new SubscriberMap();
   }
 }
-
-rbModConstSet(SubscriptionAdapter, "Inline", Inline);

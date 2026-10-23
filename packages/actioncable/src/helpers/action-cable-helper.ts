@@ -1,5 +1,5 @@
-import { RuntimeError, defineModule, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActionCable, Helpers } from "../namespaces.js";
+import { RuntimeError, defineModule } from "@blazetrails/ruby-compat";
+import { ActionCable } from "../index.js";
 import type { Base as Server } from "../server/base.js";
 
 interface ActionCableHelperHost {
@@ -18,5 +18,3 @@ function actionCableMetaTag(this: ActionCableHelperHost): unknown {
 }
 
 export const ActionCableHelper = defineModule({ actionCableMetaTag });
-
-rbModConstSet(Helpers, "ActionCableHelper", ActionCableHelper);
