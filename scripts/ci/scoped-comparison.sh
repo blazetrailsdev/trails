@@ -12,7 +12,8 @@ case "$pkg" in
 esac
 
 only="with_entries(select(.key == \"$pkg\"))"
-LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths | jq -c "with_entries(select(.key == \"$pkg\" or .key == \"activesupport\"))")
+with_activesupport="with_entries(select(.key == \"$pkg\" or .key == \"activesupport\"))"
+LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths | jq -c "$with_activesupport")
 if [ "$(echo "$LIB_PATHS_JSON" | jq -c "$only")" = "{}" ]; then
   echo "::error::$pkg has no vendored lib path, so it is not enrolled in the compare tooling and cannot be compared alone"
   exit 1
