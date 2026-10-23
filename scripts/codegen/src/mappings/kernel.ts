@@ -14,7 +14,7 @@ import { constName, ruleTable, type CallRule } from "./call-site.js";
  * (activesupport testing/assertions.ts), carried by the test host that stands
  * in for `ActiveSupport::TestCase`; there is no module value to include.
  */
-const FLAT_ASSERTION_MODULES = new Set([
+export const FLAT_ASSERTION_MODULES = new Set([
   "ActiveSupport::Testing::Assertions",
   "Minitest::Assertions",
 ]);

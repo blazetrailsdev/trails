@@ -41,6 +41,11 @@ import {
   type Scope,
 } from "./lower.js";
 import { Resolver, rubyFileToTsAr } from "./resolve.js";
+import { depClassSide } from "./dep-types.js";
+import { FLAT_ASSERTION_MODULES } from "./mappings/kernel.js";
+
+/** A JS class's own statics, which a `declare static` may not redeclare. */
+const FUNCTION_OWN = new Set(["prototype", "name", "length", "caller", "arguments"]);
 import { CITE_PREFIX, GEM, PKG_DIR, handNamespaceFqns } from "./gem.js";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -2808,6 +2813,64 @@ export class Emitter {
             cmRef
               ? `declare static ${n}: typeof ${cmRef}.${n};`
               : `declare static ${n}: ${this.lw.imp(ctx, "@blazetrails/ruby-compat", "Extended")}<typeof ${ref(cm.fqn)}>[${quote(n)}];`,
+          );
+        }
+      }
+    }
+    // A dependency module the class or one of those modules includes
+    // (`include ActiveSupport::Callbacks` in an `included do`): its instance
+    // side through `Included<>`, its Concern `ClassMethods` (the Rails
+    // manifest's names) as statics typed off the dependency's own export.
+    const depSeen = new Set<string>();
+    for (const m of [u.fqn, ...mods]) {
+      const ms = this.index.scopes.get(m);
+      if (!ms) continue;
+      const chain = [...lexicalChain(this.index, ms.lexicalParent), m];
+      for (const p of ms.includes) {
+        if (this.index.resolveConst(p, chain)?.kind === "scope") continue;
+        const dep = this.index.depChains.get(p.filter((x) => x).join("::"))?.[0];
+        if (!dep || depSeen.has(dep.fqn) || FLAT_ASSERTION_MODULES.has(dep.fqn)) continue;
+        depSeen.add(dep.fqn);
+        // A dependency constant with no TS export declines; that probe is not
+        // an emitted reference, so its decline and import are taken back.
+        const declines = ctx.f.declines.length;
+        const r = ref(dep.fqn);
+        if (!/^[\w$.]+$/.test(r)) {
+          ctx.f.declines.length = declines;
+          if (!declines) ctx.f.imports.delete("@root/codegen-declined.js");
+          continue;
+        }
+        const t = `${this.lw.imp(ctx, "@blazetrails/ruby-compat", "Included")}<typeof ${r}>`;
+        const names = [...dep.methods].map((d) => fnName(d, dep.fqn));
+        const omit = names.filter((n) => own.inst.has(n) || overridden.has(n));
+        if (names.length)
+          bases.push(omit.length ? `Omit<${t}, ${omit.map(quote).join(" | ")}>` : t);
+        for (const n of names) own.inst.add(n);
+        // The TS port's own `ClassMethods`: a member it lacks is not declared,
+        // and the statics its members' `this` types require of the host
+        // (`class_attribute :__callbacks` in the Concern's `included` block)
+        // are declared at the type the dependency gives them.
+        const imported = [...ctx.f.imports].flatMap(([spec, mm]) =>
+          [...mm].filter(([, l]) => l === r).map(([exp]) => ({ spec, exp })),
+        )[0];
+        const side = imported ? depClassSide(imported.spec, imported.exp) : null;
+        for (const d of dep.classMethods) {
+          const n = fnName(d, `${dep.fqn}::ClassMethods`);
+          if (d === "new" || d === "initialize" || own.stat.has(n)) continue;
+          if (side && !side.methods.has(n)) continue;
+          own.stat.add(n);
+          statics.push(`declare static ${n}: typeof ${r}.ClassMethods.${n};`);
+        }
+        for (const [h, via] of side?.host ?? []) {
+          if (
+            FUNCTION_OWN.has(h) ||
+            own.stat.has(h) ||
+            members.some((x) => new RegExp(`^static (?:get |set )?${h}\\b`).test(x))
+          )
+            continue;
+          own.stat.add(h);
+          statics.push(
+            `declare static ${h}: NonNullable<ThisParameterType<typeof ${r}.ClassMethods.${via}>>[${quote(h)}];`,
           );
         }
       }

@@ -308,6 +308,19 @@ export class Lowerer {
     // `ActionController::Parameters` stub).
     if (local === name && (name === "Parameters" || name === "ConstructorParameters"))
       local = `${name}Class`;
+    // A package export whose name another import already binds (activesupport's
+    // `Callbacks` beside the gem's own) takes the package's name as a prefix.
+    if (local === name && name !== "*" && spec.startsWith("@blazetrails/")) {
+      const bound = [...ctx.f.imports, ...(ctx.f.typeImports ?? [])].some(
+        ([s, mm]) => s !== spec && [...mm.values()].includes(name),
+      );
+      const pkg = spec.slice("@blazetrails/".length).split("/")[0];
+      if (bound)
+        local =
+          pkg
+            .replace(/^active(\w)/, (_m, c: string) => `Active${c.toUpperCase()}`)
+            .replace(/(^|-)(\w)/g, (_m, _d, c: string) => c.toUpperCase()) + name;
+    }
     if (local === name && name !== "*" && NS[spec] && ctx.f.usedLocalNames.has(name)) {
       m.delete(name);
       if (m.size === 0) ctx.f.imports.delete(spec);
