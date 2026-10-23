@@ -16,6 +16,6 @@
   "rack": 214,
   "rack-session": 60,
   "rack-test": 45,
-  "ruby-compat": 924,
+  "ruby-compat": 926,
   "thor": 175
 }
