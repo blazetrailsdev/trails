@@ -123,7 +123,7 @@ const fixtures: Record<string, string> = {
   "test/_changing_priority.html.tse": "HTML",
   "test/_changing_priority.json.tse": "JSON",
   "with_format.json.tse": '<%= render({ partial: "missing", formats: [":json"] }) %>\n',
-  "comments/empty.html.builder": 'xml.h1("No Comment");\n',
+  "comments/empty.html.builder": 'xml.h1("No Comment")\n',
   "plain_text.raw": "<%= hello_world %>\n",
   "plain_text_with_characters.raw": "Here are some characters: !@#$%^&*()-=\"'}{`\n",
   "test/hello_world.da.html.tse": "Hey verden",

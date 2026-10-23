@@ -144,8 +144,7 @@ export class Base {
   }
 
   static compiledMethodContainer(): CompiledMethodContainer {
-    // @nie disposition=TODO
-    throw new NotImplementedError(
+    throw new Error(
       "Subclasses of ActionView::Base must implement `compiledMethodContainer` " +
         "or use the class method `withEmptyTemplateCache` for constructing " +
         "an ActionView::Base subclass that has an empty cache.",
@@ -269,7 +268,7 @@ export class Base {
   }
 
   compiledMethodContainer(): CompiledMethodContainer {
-    // @nie disposition=TODO
+    // @nie disposition=port-real rails=actionview/lib/action_view/base.rb:285
     throw new NotImplementedError(
       "Subclasses of ActionView::Base must implement `compiledMethodContainer` " +
         "or use the class method `withEmptyTemplateCache` for constructing " +
