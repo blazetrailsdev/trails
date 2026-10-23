@@ -111,7 +111,7 @@ const fixtures: Record<string, string> = {
   "test/_second_layer.html.tse":
     '{"format":"HTML", "children":\n[\n  <%= raw((String(await render({ partial: "first" })).trimEnd())) %>\n]}\n',
   "test/js_html_fallback.js.tse":
-    'document.write("<%= j(raw((String(await render({ partial: "js_html_fallback" })).trimEnd())) %>")\n',
+    'document.write("<%= j(raw((String(await render({ partial: "js_html_fallback" })).trimEnd()))) %>")\n',
   "test/_js_html_fallback.html.tse": "<b>Hello from a HTML partial!</b>\n",
   "test/html_template.html.tse":
     '<%= render({ partial: "test/first_json_partial", formats: ":json" }) %>',
@@ -119,11 +119,11 @@ const fixtures: Record<string, string> = {
   "test/_second_json_partial.json.tse": "Third level",
   "test/change_priority.html.tse":
     '<%= render({ partial: "test/json_change_priority", formats: ":json" }) %>\nHTML Template, but <%= render({ partial: "test/changing_priority" }) %> partial',
-  "test/_json_change_priority.json.tse": '<%= render({ partial: "test/changing_priority" }) %>',
+  "test/_json_change_priority.json.tse": "",
   "test/_changing_priority.html.tse": "HTML",
   "test/_changing_priority.json.tse": "JSON",
   "with_format.json.tse": '<%= render({ partial: "missing", formats: [":json"] }) %>\n',
-  "comments/empty.html.builder": "<h1>No Comment</h1>\n",
+  "comments/empty.html.builder": 'xml.h1("No Comment")\n',
   "plain_text.raw": "<%= hello_world %>\n",
   "plain_text_with_characters.raw": "Here are some characters: !@#$%^&*()-=\"'}{`\n",
   "test/hello_world.da.html.tse": "Hey verden",
@@ -172,25 +172,25 @@ const fixtures: Record<string, string> = {
   "test/_partial_with_layout.tse":
     "<%= render({ partial: 'test/partial', layout: 'test/layout_for_partial', locals: { name: 'Bar!' } }) %>\npartial with layout\n",
   "test/_partial_with_layout_block_partial.tse":
-    "<%= render({ layout: 'test/layout_for_partial', locals: { name: 'Bar!' } }, {}, async () => { %>\n  <%= render('test/partial') %>\n<% }) %>\npartial with layout\n",
+    "<%= render({ layout: 'test/layout_for_partial', locals: { name: 'Bar!' } }, {}, async () => { %>\n  <%= await render('test/partial') %>\n<% }) %>\npartial with layout\n",
   "test/_partial_with_layout_block_content.tse":
     "<%= render({ layout: 'test/layout_for_partial', locals: { name: 'Bar!' } }, {}, () => { %>\n  Content from inside layout!\n<% }) %>\npartial with layout\n",
   "test/_partial_with_only_html_version.html.tse": "partial with only HTML version",
   "test/template.tse": "<%= template.path %>",
   "test/_directory/_partial_with_locales.html.tse": "Hello <%= name %>",
   "test/nested_layout.tse":
-    '<% contentFor("title", "title") -%>\n<% contentFor("column", () => { -%>column<% }) -%>\n<%= render({ layout: \'layouts/column\' }, {}, () => { -%>content<% }) -%>',
+    '<% contentFor("title", "title") -%>\n<% contentFor(":column", () => { -%>column<% }) -%>\n<%= render({ layout: \'layouts/column\' }, {}, () => { -%>content<% }) -%>',
   "layouts/_column.html.tse":
-    '<div id="column"><%= yield("column") %></div>\n<div id="content"><%= yield %></div>',
+    '<div id="column"><%= yield(":column") %></div>\n<div id="content"><%= yield %></div>',
   "test/layout_render_file.tse":
     "<% contentFor(\"title\", () => { %>title<% }) -%>\n<%= render({ template: 'layouts/yield' }) -%>\n",
   "test/layout_render_object.tse":
     '<%= render({ layout: "layouts/customers" }, {}, (customer) => { %><%= customer.name %><% }) %>',
   "layouts/_customers.tse": '<title><%= yield({ name: "David" }) %></title>',
   "test/cache_fragment_inside_render_layout_block_1.html.tse":
-    '<%= render({ layout: "layouts/yield_only" }, {}, async () => { %><%= cache("foo", {}, () => { %>CAT<% }) %><% }) %>',
+    '<%= render({ layout: "layouts/yield_only" }, {}, async () => { %><%= await cache("foo", {}, () => { %>CAT<% }) %><% }) %>',
   "test/cache_fragment_inside_render_layout_block_2.html.tse":
-    '<%= render({ layout: "layouts/yield_only" }, {}, async () => { %><%= cache("foo", {}, () => { %>DOG<% }) %><% }) %>',
+    '<%= render({ layout: "layouts/yield_only" }, {}, async () => { %><%= await cache("foo", {}, () => { %>DOG<% }) %><% }) %>',
   "test/caching_predicate.html.tse":
     '<%= cache("foo", {}, () => { %>\n  <%= isCaching() ? "Cached!" : null %>\n<% }) %>\n',
   "test/caching_predicate_outside_cache.html.tse": '<%= isCaching() ? null : "Not cached!" %>\n',
@@ -691,8 +691,7 @@ describe("CachedViewRenderTest", () => {
     assertEqual("Third level", String(await view.render({ template: "test/html_template" })));
   });
 
-  // BLOCKED: render-test-surfaced-rendering-gaps
-  it.skip("render partial use last prepended format for partials with the same names", async () => {
+  it("render partial use last prepended format for partials with the same names", async () => {
     view.lookupContext!.formats = [":html"];
     assertEqual(
       "\nHTML Template, but HTML partial",
@@ -717,8 +716,7 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-surfaced-rendering-gaps
-  it.skip("render template with handlers", async () => {
+  it("render template with handlers", async () => {
     assertEqual(
       "<h1>No Comment</h1>\n",
       String(await view.render({ template: "comments/empty", handlers: [":builder"] })),
@@ -783,8 +781,7 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-surfaced-rendering-gaps
-  it.skip("render template with syntax error", async () => {
+  it("render template with syntax error", async () => {
     const e = await assertRaises([TemplateError], {}, () =>
       view.render({ template: "test/syntax_error" }),
     );
@@ -922,8 +919,7 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-surfaced-rendering-gaps
-  it.skip("without compiled method container is deprecated", async () => {
+  it("without compiled method container is deprecated", async () => {
     const view = Base.withViewPaths(ActionController.Base.viewPaths());
     await assertRaises([NotImplementedError], {}, () =>
       view.render({ template: "test/hello_world" }),
@@ -1201,8 +1197,7 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-surfaced-rendering-gaps
-  it.skip("render layout with a nested render layout call using block with render partial", async () => {
+  it("render layout with a nested render layout call using block with render partial", async () => {
     assertEqual(
       "Before (Foo!)\nBefore (Bar!)\n\n  partial html\n\nAfterpartial with layout\n\nAfter",
       String(
@@ -1297,8 +1292,7 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-surfaced-rendering-gaps
-  it.skip("render with nested layout", async () => {
+  it("render with nested layout", async () => {
     assertEqual(
       '<title>title</title>\n\n<div id="column">column</div>\n<div id="content">content</div>\n',
       String(await view.render({ template: "test/nested_layout", layout: "layouts/yield" })),
@@ -1345,8 +1339,7 @@ describe("CachedViewRenderTest", () => {
   // PERMANENT-SKIP: `type: :ruby` evaluates Ruby source, and a JS string has no in-place `<<`. (CLAUDE.md, "Templates are precompiled"; CLAUDE.md, "Ruby Strings are JS string primitives").
   it.skip("render mutate string literal", () => {});
 
-  // BLOCKED: render-test-surfaced-rendering-gaps
-  it.skip("cache fragments inside render layout call with block", async () => {
+  it("cache fragments inside render layout call with block", async () => {
     const cat = await view.render({ template: "test/cache_fragment_inside_render_layout_block_1" });
     const dog = await view.render({ template: "test/cache_fragment_inside_render_layout_block_2" });
     assertNotEqual(String(cat), String(dog));

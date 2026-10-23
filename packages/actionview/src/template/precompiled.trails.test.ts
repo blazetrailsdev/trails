@@ -40,8 +40,8 @@ describe("Templates are precompiled", () => {
     const error = await greeting(fixture("unbuilt"))
       .render(view(), { name: "Ada" })
       .catch((e: unknown) => e);
-    expect((error as Error).cause).toBeInstanceOf(LoadError);
-    expect(((error as Error).cause as Error).message).toBe(
+    expect(error).toBeInstanceOf(LoadError);
+    expect((error as Error).message).toBe(
       `cannot load such file -- ${fixture("unbuilt")}/.trails/views/greetings/show.html.tse.js`,
     );
   });
@@ -53,7 +53,7 @@ describe("Templates are precompiled", () => {
       format: ":html",
     });
     const error = await template.render(view()).catch((e: unknown) => e);
-    expect((error as Error).cause).toBeInstanceOf(NotImplementedError);
+    expect(error).toBeInstanceOf(NotImplementedError);
   });
 
   it("compiles a string-source template with the test compiler installed", async () => {
