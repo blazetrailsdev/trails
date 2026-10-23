@@ -14,13 +14,13 @@ import {
   rbModConstSet,
   regexpEscape,
   unpack1,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import {
   camelize,
   classAttribute,
   CodeGenerator,
   extend,
-  filterMap,
   include,
   included,
   type Extended,

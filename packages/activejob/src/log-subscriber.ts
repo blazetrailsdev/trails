@@ -7,7 +7,6 @@ import {
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
   pluralize,
-  tally,
   type Logger,
 } from "@blazetrails/activesupport";
 import { GlobalID } from "@blazetrails/globalid";
@@ -28,6 +27,7 @@ import {
   rtest,
   toI,
   transformValues,
+  tally,
 } from "@blazetrails/ruby-compat";
 import { verboseEnqueueLogs } from "./active-job.js";
 import { ActiveJob } from "./namespaces.js";

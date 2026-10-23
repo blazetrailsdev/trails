@@ -3,13 +3,12 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import {
   classAttribute,
   extractOptionsBang,
-  filterMap,
   included,
   isPresent,
   kernelArray,
   wrap,
 } from "@blazetrails/activesupport";
-import { rbEqual, rbFSend, rtest, toSym, union } from "@blazetrails/ruby-compat";
+import { rbEqual, rbFSend, rtest, toSym, union, filterMap } from "@blazetrails/ruby-compat";
 import { ThroughReflection } from "./reflection.js";
 import { type CounterCacheTouchOption, type TouchAllOptions } from "./timestamp.js";
 

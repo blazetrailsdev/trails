@@ -21,6 +21,7 @@ import {
   rbFPublicSend,
   rbObjSingletonClass,
   rbCallSuper,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import {
   NameError,
@@ -37,7 +38,6 @@ import {
   isPlainObject,
   constantize,
   delegate,
-  filterMap,
 } from "@blazetrails/activesupport";
 import { AsynchronousQueriesTracker, type Session } from "./asynchronous-queries-tracker.js";
 import { _reflectOnAssociation, reflectOnAggregation } from "./reflection.js";

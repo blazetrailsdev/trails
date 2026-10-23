@@ -101,10 +101,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall filter_map — PERMANENT
-   */
+  /** @internal */
   private normalizeOptions(options: RotateOptions & Record<string, unknown>): BuildOptions {
     options = rbObjDup(options);
 

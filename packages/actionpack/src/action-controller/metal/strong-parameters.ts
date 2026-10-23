@@ -36,6 +36,7 @@ import {
   toEnum,
   toH,
   transformValues,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import { coderTag, type Psych } from "@blazetrails/ruby-compat/psych";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
@@ -50,7 +51,6 @@ import {
   deepDup,
   deepTransformKeys,
   deepTransformKeysBang,
-  filterMap,
   include,
   isBlank,
   toQuery,

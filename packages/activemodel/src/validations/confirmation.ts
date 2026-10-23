@@ -1,6 +1,5 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { filterMap } from "@blazetrails/activesupport";
 import {
   casecmp,
   except,
@@ -11,6 +10,7 @@ import {
   rbModAttrWriter,
   rbModMethodDefined,
   rtest,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 

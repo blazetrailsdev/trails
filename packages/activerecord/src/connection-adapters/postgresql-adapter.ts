@@ -12,6 +12,7 @@ import {
   rbObjRespondTo,
   setEnv,
   valuesAt,
+  filterMap,
 } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import {
@@ -19,7 +20,6 @@ import {
   include,
   runLoadHooks,
   compact,
-  filterMap,
   sliceBang,
   tryCall,
 } from "@blazetrails/activesupport";

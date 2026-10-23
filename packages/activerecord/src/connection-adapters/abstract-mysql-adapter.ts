@@ -18,6 +18,7 @@ import {
   rbInspect,
   rbObjAsString as toS,
   RuntimeError,
+  groupBy,
 } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import { Concurrent, rtest } from "@blazetrails/ruby-compat";
@@ -96,7 +97,6 @@ import {
   classAttribute,
   compactBlank,
   extractOptionsBang,
-  groupBy,
   include,
   isPresent,
   parameterize,
@@ -689,7 +689,10 @@ WHERE fk.referenced_column_name IS NOT NULL
       "SCHEMA",
     );
 
-    const groupedFk = [...groupBy(fkInfo.toArray(), (row) => row["name"]).values()];
+    const groupedFk: Record<string, unknown>[][] = groupBy(
+      fkInfo.toArray(),
+      (row) => row["name"],
+    ).values();
     for (const group of groupedFk) {
       group.sort((a, b) => (a["position"] as number) - (b["position"] as number));
     }

@@ -14,8 +14,9 @@ import {
   rbEqual,
   transformValues,
   zip,
+  filterMap,
 } from "@blazetrails/ruby-compat";
-import { delegate, filterMap, kernelArray as Array, presence } from "@blazetrails/activesupport";
+import { delegate, kernelArray as Array, presence } from "@blazetrails/activesupport";
 
 /** @internal */
 export interface ThroughAssociationHost {

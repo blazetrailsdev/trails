@@ -23,11 +23,9 @@ import {
   excluding,
   sum,
   indexBy,
-  groupBy,
   pluck,
   maximum,
   minimum,
-  inBatchesOf,
   compactBlank,
   HashWithIndifferentAccess,
 } from "./index.js";
@@ -459,28 +457,6 @@ describe("indexBy", () => {
   });
 });
 
-describe("groupBy", () => {
-  it("groups by key function", () => {
-    const items = [
-      { type: "a", v: 1 },
-      { type: "b", v: 2 },
-      { type: "a", v: 3 },
-    ];
-    expect(groupBy(items, (x) => x.type)).toEqual(
-      new Map([
-        [
-          "a",
-          [
-            { type: "a", v: 1 },
-            { type: "a", v: 3 },
-          ],
-        ],
-        ["b", [{ type: "b", v: 2 }]],
-      ]),
-    );
-  });
-});
-
 describe("pluck", () => {
   it("extracts property values", () => {
     const items = [{ name: "a" }, { name: "b" }];
@@ -505,16 +481,6 @@ describe("minimum", () => {
 
   it("returns undefined for empty", () => {
     expect(minimum([], (x: any) => x)).toBeUndefined();
-  });
-});
-
-describe("inBatchesOf", () => {
-  it("splits into batches", () => {
-    expect(inBatchesOf([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
-  });
-
-  it("handles empty array", () => {
-    expect(inBatchesOf([], 3)).toEqual([]);
   });
 });
 

@@ -27,7 +27,17 @@ export {
   rubyClass,
 } from "./comparable.js";
 export type { Comparable } from "./comparable.js";
-export { AsyncEnumerable, Enumerable, reduce } from "./enumerable.js";
+export {
+  AsyncEnumerable,
+  Enumerable,
+  eachSlice,
+  filterMap,
+  findAll,
+  groupBy,
+  partition,
+  reduce,
+  tally,
+} from "./enumerable.js";
 export type { AsyncEach, AsyncEnumerator, Each } from "./enumerable.js";
 export {
   basicObjRespondTo,
@@ -197,10 +207,8 @@ export {
   flatten,
   rbFArray,
   rbCheckArrayType,
-  groupBy,
   last,
   pack,
-  partition,
   aryReject,
   sort,
   take,

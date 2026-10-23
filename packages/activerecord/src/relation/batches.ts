@@ -1,6 +1,14 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { defineModule, eachSlice, kernelArray as Array, pluck } from "@blazetrails/activesupport";
-import { cmp, isEmpty, rbCmpint, rbInspect, rtest, slice } from "@blazetrails/ruby-compat";
+import { defineModule, kernelArray as Array, pluck } from "@blazetrails/activesupport";
+import {
+  cmp,
+  isEmpty,
+  rbCmpint,
+  rbInspect,
+  rtest,
+  slice,
+  eachSlice,
+} from "@blazetrails/ruby-compat";
 import { stripThenable } from "@blazetrails/activesupport";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
 import type { Base } from "../base.js";

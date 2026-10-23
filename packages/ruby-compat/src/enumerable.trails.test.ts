@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { AsyncEnumerable, Enumerable, reduce } from "./enumerable.js";
+import {
+  AsyncEnumerable,
+  Enumerable,
+  eachSlice,
+  filterMap,
+  find,
+  findAll,
+  first,
+  groupBy,
+  partition,
+  reduce,
+  sum,
+  tally,
+  drop,
+} from "./enumerable.js";
 import { Hash } from "./hash.js";
 import { include } from "./include.js";
 import { Rational } from "./rational.js";
@@ -355,5 +369,111 @@ describe("Enumerable#find", () => {
 
   it("answers a promise where each does", async () => {
     await expect(find(new LazyBag([1, 2, 3]), (i: number) => i > 1)).resolves.toBe(2);
+  });
+});
+
+function* gen(items: unknown[]): Generator<unknown> {
+  yield* items;
+}
+
+const receivers: [string, (items: unknown[]) => Iterable<unknown> | Bag | LazyBag][] = [
+  ["an Array", (items) => items],
+  ["a Set", (items) => new Set(items)],
+  ["a generator", (items) => gen(items)],
+  ["an each-answerer", (items) => new Bag(items)],
+];
+
+describe("Enumerable free functions over any receiver", () => {
+  for (const [kind, build] of receivers) {
+    it(`iterate ${kind}`, () => {
+      expect(partition(build([1, 2, 3, 4]), (i) => (i as number) % 2 === 0)).toEqual([
+        [2, 4],
+        [1, 3],
+      ]);
+      expect([...groupBy(build(["apple", "avocado", "banana"]), (i) => (i as string)[0])]).toEqual([
+        ["a", ["apple", "avocado"]],
+        ["b", ["banana"]],
+      ]);
+      expect([...tally(build(["a", "b"]))]).toEqual([
+        ["a", 1],
+        ["b", 1],
+      ]);
+      expect(filterMap(build([0, 1, 2, 3]), (i) => (i === 1 ? false : i === 2 ? null : i))).toEqual(
+        [0, 3],
+      );
+      expect(eachSlice(build([1, 2, 3, 4, 5]), 2)).toEqual([[1, 2], [3, 4], [5]]);
+      expect(find(build([1, 2, 3]), (i: unknown) => (i as number) > 1)).toBe(2);
+      expect(findAll(build([1, null, 2]), (i) => i)).toEqual([1, 2]);
+      expect(first(build([1, 2, 3]), 2)).toEqual([1, 2]);
+      expect(drop(build([1, 2, 3]), 1)).toEqual([2, 3]);
+      expect(sum(build([1, 2, 3]))).toBe(6);
+    });
+  }
+
+  it("iterate a Map as [key, value] pairs", () => {
+    const map = new Map([
+      ["a", 1],
+      ["b", 2],
+    ]);
+    expect(partition(map, ([, v]) => v > 1)).toEqual([[["b", 2]], [["a", 1]]]);
+    expect(filterMap(map, ([k, v]) => v > 1 && k)).toEqual(["b"]);
+    expect(eachSlice(map, 1)).toEqual([[["a", 1]], [["b", 2]]]);
+    expect([...groupBy(map, ([, v]) => v % 2)]).toEqual([
+      [1, [["a", 1]]],
+      [0, [["b", 2]]],
+    ]);
+    expect([...tally(map)]).toEqual([
+      [["a", 1], 1],
+      [["b", 2], 1],
+    ]);
+  });
+
+  it("answer a promise over an each that answers one", async () => {
+    const bag = new LazyBag([1, 2, 3]);
+    expect(await partition(bag, (i) => (i as number) > 1)).toEqual([[2, 3], [1]]);
+    expect([...(await tally(bag))]).toEqual([
+      [1, 1],
+      [2, 1],
+      [3, 1],
+    ]);
+    expect(await filterMap(bag, (i) => (i as number) > 1 && i)).toEqual([2, 3]);
+    expect(await eachSlice(bag, 2)).toEqual([[1, 2], [3]]);
+    expect(await first(bag)).toBe(1);
+  });
+
+  it("break out of a generator early", () => {
+    let yielded = 0;
+    function* counting(): Generator<number> {
+      for (let i = 1; ; i++) {
+        yielded++;
+        yield i;
+      }
+    }
+    expect(first(counting(), 2)).toEqual([1, 2]);
+    expect(yielded).toBe(2);
+  });
+
+  it("partition counts 0 and the empty string as truthy, nil and false as not", () => {
+    expect(partition([0, "", null, false, undefined], (i) => i)).toEqual([
+      [0, ""],
+      [null, false, undefined],
+    ]);
+  });
+
+  it("tally keys on element identity", () => {
+    const a = { toString: () => "Job" };
+    const b = { toString: () => "Job" };
+    expect([...tally([a, b, a])]).toEqual([
+      [a, 2],
+      [b, 1],
+    ]);
+  });
+
+  it("each_slice yields each slice and answers the receiver, and raises on a non-positive size", () => {
+    const ary = [1, 2, 3];
+    const seen: unknown[] = [];
+    expect(eachSlice(ary, 2, (slice) => seen.push(slice))).toBe(ary);
+    expect(seen).toEqual([[1, 2], [3]]);
+    expect(() => eachSlice(ary, 0)).toThrow(ArgumentError);
   });
 });

@@ -85,16 +85,6 @@ export function indexWith<T, V>(
   return result;
 }
 
-export function groupBy<T, K>(collection: T[], fn: (item: T) => K): Map<K, T[]> {
-  const result = new Map<K, T[]>();
-  for (const item of collection) {
-    const key = fn(item);
-    if (!result.has(key)) result.set(key, []);
-    result.get(key)!.push(item);
-  }
-  return result;
-}
-
 export function pluck<T, K extends keyof T>(collection: T[], ...keys: K[]): T[K][] | T[K][][] {
   if (keys.length > 1) {
     return collection.map((element) => keys.map((key) => hashAref(element as object, key) as T[K]));
@@ -112,14 +102,6 @@ export function maximum<T>(collection: T[], key: (item: T) => number): number | 
 export function minimum<T>(collection: T[], key: (item: T) => number): number | undefined {
   if (collection.length === 0) return undefined;
   return Math.min(...collection.map(key));
-}
-
-export function inBatchesOf<T>(collection: T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < collection.length; i += size) {
-    result.push(collection.slice(i, i + size));
-  }
-  return result;
 }
 
 export function compactBlank<T>(collection: T[]): T[] {
@@ -144,28 +126,6 @@ export function many<T>(collection: T[], fn?: (item: T) => boolean): boolean {
     }
   }
   return false;
-}
-
-export function tally<T>(collection: readonly T[]): Map<T, number> {
-  const result = new Map<T, number>();
-  for (const item of collection) {
-    result.set(item, (result.get(item) ?? 0) + 1);
-  }
-  return result;
-}
-
-export function filterMap<T, U>(
-  collection: readonly T[],
-  fn: (item: T) => U | false | null | undefined,
-): U[] {
-  const result: U[] = [];
-  for (const item of collection) {
-    const mapped = fn(item);
-    if (mapped !== null && mapped !== undefined && mapped !== false) {
-      result.push(mapped);
-    }
-  }
-  return result;
 }
 
 export function excluding<T extends Record<string, unknown>>(
@@ -209,14 +169,6 @@ export function eachCons<T>(collection: T[], n: number, block?: (slice: T[]) => 
   if (!block) return result;
   result.forEach(block);
   return collection;
-}
-
-export function eachSlice<T>(collection: T[], n: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < collection.length; i += n) {
-    result.push(collection.slice(i, i + n));
-  }
-  return result;
 }
 
 export function inOrderOf<T>(
