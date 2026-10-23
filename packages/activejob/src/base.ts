@@ -7,10 +7,12 @@ import {
 } from "@blazetrails/activesupport";
 import {
   extend,
+  Hash,
   include,
   rbHashSRuby2KeywordsHash,
   rbModConstSet,
   rbObjClass,
+  rbObjIsKindOf,
   SecureRandom,
 } from "@blazetrails/ruby-compat";
 import { Callbacks, ClassMethods as CallbacksClassMethods } from "./callbacks.js";
@@ -106,7 +108,8 @@ export class Base {
     if (
       typeof last === "object" &&
       last !== null &&
-      Object.getPrototypeOf(last) === Object.prototype
+      Object.getPrototypeOf(last) === Object.prototype &&
+      rbObjIsKindOf(last, Hash)
     ) {
       arguments_[arguments_.length - 1] = rbHashSRuby2KeywordsHash(last);
     }

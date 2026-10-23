@@ -2,7 +2,7 @@ import { describe, it, vi, afterEach } from "vitest";
 import "../test-helpers/active-record-unit.js";
 import * as ActiveRecord from "@blazetrails/activerecord";
 import { assertMatch } from "@blazetrails/activesupport";
-import { Company } from "../test-helpers/fixtures/company.js";
+import { Company } from "../test/fixtures/company.js";
 import { debug as _debug } from "../helpers/debug-helper.js";
 import { Base } from "../base.js";
 

@@ -23,7 +23,6 @@ import {
   ArgumentError,
   Hash,
   include,
-  rbModConstSet,
   publicInstanceMethods,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -41,6 +40,7 @@ import { urlFor } from "../../helpers/url-helper.js";
 import { FormBuilder as FormBuilderClass, type FormBuilder } from "../../helpers/form-helper.js";
 import { CheckBoxBuilder } from "../../helpers/tags/collection-check-boxes.js";
 import { RadioButtonBuilder } from "../../helpers/tags/collection-radio-buttons.js";
+import { Blog } from "../../test-helpers/fake-models.js";
 import { assertDomEqual } from "../../testing/dom-assertions.js";
 
 function withDefaultEnforceUtf8(value: boolean, block: () => void): void {
@@ -387,26 +387,6 @@ class ArelLike {
     const a: Comment[] = [];
     this.each((c) => a.push(c));
     yield* a;
-  }
-}
-
-const Blog = { name: "Blog", isUseRelativeModelNaming: () => true };
-registerConstant("Blog", Blog);
-
-class BlogPost {
-  static {
-    rbModConstSet(Blog, "Post", this);
-    extend(this, Naming);
-    include(this, Conversion);
-  }
-
-  constructor(
-    public title: string,
-    public id: unknown,
-  ) {}
-
-  isPersisted(): boolean {
-    return isPresent(this.id);
   }
 }
 
@@ -813,7 +793,7 @@ describe("FormWithActsLikeFormForTest", () => {
   });
 
   it("submit with object which is namespaced", () => {
-    const blogPost = new BlogPost("And his name will be forty and four.", 44);
+    const blogPost = new Blog.Post("And his name will be forty and four.", 44);
     I18n.withLocale("submit", () => {
       formWith({ model: blogPost }, (f: FormBuilder) => concat(f.submit()));
 
@@ -1613,7 +1593,7 @@ describe("FormWithActsLikeFormForTest", () => {
   });
 
   it("form with with model using relative model naming", () => {
-    const blogPost = new BlogPost("And his name will be forty and four.", 44);
+    const blogPost = new Blog.Post("And his name will be forty and four.", 44);
 
     formWith({ model: blogPost }, (f) => {
       concat(f.textField("title"));

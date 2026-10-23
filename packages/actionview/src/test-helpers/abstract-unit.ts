@@ -25,7 +25,7 @@ I18n.setEnforceAvailableLocales(false);
 
 export const ORIGINAL_LOCALES = I18n.availableLocales().map(String).sort();
 
-export const FIXTURE_LOAD_PATH = File.expandPath("fixtures", __dir__);
+export const FIXTURE_LOAD_PATH = File.expandPath("../test/fixtures", __dir__);
 
 RoutingUrlFor.include(UrlFor);
 

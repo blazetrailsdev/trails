@@ -1451,12 +1451,11 @@ describe("RenderTest", () => {
     );
   });
 
-  // BLOCKED: actionview-test-fixtures-under-test-fixtures — the fixture path has no `test/fixtures/` segment
-  test.skip("template annotations", async () => {
+  test("template annotations", async () => {
     await withAnnotationsEnabled(() => testCase.get("greeting"));
     expect(testCase.response.body).toContain("<!-- BEGIN");
     expect(testCase.response.body).toContain("<!-- END");
-    expect(testCase.response.body).toContain("fixtures/actionpack/test/greeting.html.tse");
+    expect(testCase.response.body).toContain("test/fixtures/actionpack/test/greeting.html.tse");
     expect(testCase.response.body).toContain("This is grand!");
   });
 

@@ -8,7 +8,7 @@ import { CacheHelper } from "../helpers/cache-helper.js";
 import { LookupContext } from "../lookup-context.js";
 import { Renderer } from "../renderer.js";
 import { TestCase } from "../test-case.js";
-import { Project } from "../test-helpers/fixtures/project.js";
+import { Project } from "../test/fixtures/project.js";
 
 interface Tc {
   viewRenderer: Renderer;

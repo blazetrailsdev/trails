@@ -9,26 +9,26 @@ import type { AssociationProxy } from "@blazetrails/activerecord";
 import { Base } from "../base.js";
 import { DetailsKey } from "../lookup-context.js";
 import { FixtureResolver } from "../testing/resolvers.js";
-import { Company } from "../test-helpers/fixtures/company.js";
-import { Developer } from "../test-helpers/fixtures/developer.js";
-import { Reply } from "../test-helpers/fixtures/reply.js";
-import { Topic } from "../test-helpers/fixtures/topic.js";
-import { Mascot } from "../test-helpers/fixtures/mascot.js";
-import { Project } from "../test-helpers/fixtures/project.js";
+import { Company } from "../test/fixtures/company.js";
+import { Developer } from "../test/fixtures/developer.js";
+import { Reply } from "../test/fixtures/reply.js";
+import { Topic } from "../test/fixtures/topic.js";
+import { Mascot } from "../test/fixtures/mascot.js";
+import { Project } from "../test/fixtures/project.js";
 
 type DrawCallback = Parameters<RouteSet["draw"]>[0];
 
-declare module "../test-helpers/fixtures/developer.js" {
+declare module "../test/fixtures/developer.js" {
   interface Developer {
     projects: AssociationProxy<Project>;
   }
 }
-declare module "../test-helpers/fixtures/topic.js" {
+declare module "../test/fixtures/topic.js" {
   interface Topic {
     replies: AssociationProxy<Reply>;
   }
 }
-declare module "../test-helpers/fixtures/company.js" {
+declare module "../test/fixtures/company.js" {
   interface Company {
     mascot: Promise<Mascot>;
   }

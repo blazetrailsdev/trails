@@ -11,7 +11,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Hash, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { include, Module, rbCallSuper } from "@blazetrails/ruby-compat/include";
-import { Base } from "./base.js";
+import { Base, type ViewContextClass } from "./base.js";
 import { DetailsKey, type LookupContext } from "./lookup-context.js";
 import { Renderer } from "./renderer.js";
 import { Template } from "./template.js";
@@ -65,16 +65,16 @@ export interface ViewContextClassMethods {
   _routes?: ViewContextRoutes | null;
   _helpers?: object | null;
   supportsPath(): boolean;
-  viewContextClass(): typeof Base;
+  viewContextClass(): ViewContextClass;
   buildViewContextClass(
-    klass: typeof Base,
+    klass: ViewContextClass,
     supportsPath: boolean,
     routes: ViewContextRoutes | null | undefined,
     helpers: object | null | undefined,
-  ): typeof Base;
+  ): ViewContextClass;
   isInheritViewContextClass(): boolean;
   /** @internal */
-  _viewContextClass?: typeof Base;
+  _viewContextClass?: ViewContextClass;
 }
 
 export interface ViewContextRoutes {
@@ -113,11 +113,11 @@ export function isInheritViewContextClass(this: ViewContextClassMethods): boolea
 
 export function buildViewContextClass(
   this: ViewContextClassMethods,
-  klass: typeof Base,
+  klass: ViewContextClass,
   supportsPath: boolean,
   routes: ViewContextRoutes | null | undefined,
   helpers: object | null | undefined,
-): typeof Base {
+): ViewContextClass {
   if (this.isInheritViewContextClass()) {
     return superclassOf(this)!.viewContextClass();
   }
@@ -140,7 +140,7 @@ export function eagerLoadBang(this: ViewContextClassMethods): null {
   return null;
 }
 
-export function viewContextClass(this: ViewContextClassMethods): typeof Base {
+export function viewContextClass(this: ViewContextClassMethods): ViewContextClass {
   const klass = DetailsKey.viewContextClass();
 
   if (this._viewContextClass === undefined || !Object.hasOwn(this, "_viewContextClass")) {
@@ -166,7 +166,7 @@ export function viewContextClass(this: ViewContextClassMethods): typeof Base {
 
 /** @internal */
 export interface ViewContextHost {
-  viewContextClass(): typeof Base;
+  viewContextClass(): ViewContextClass;
   lookupContext: LookupContext;
   viewAssigns(): Record<string, unknown>;
 }

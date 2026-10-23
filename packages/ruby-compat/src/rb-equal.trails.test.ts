@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 import { Range } from "./range.js";
+import { defineModule } from "./include.js";
 import { stringSuperclass } from "./string/method-table.js";
 
 describe("rbEqual over the values a Ruby binary String stands in for", () => {
@@ -77,6 +78,17 @@ describe("rbEqual over the two JS seats of a Ruby Hash", () => {
     expect(rbEqual(2n, 1)).toBe(false);
     expect(rbEqual(1.5, 1n)).toBe(false);
     expect(rbEqual(1n, "1")).toBe(false);
+  });
+});
+
+describe("rbEqual over a plain-object module", () => {
+  it("answers identity for two never-included modules with equal members", () => {
+    const greet = (): string => "hi";
+    const a = defineModule({ greet });
+    const b = defineModule({ greet });
+    expect(rbEqual(a, b)).toBe(false);
+    expect(rbEql(a, b)).toBe(false);
+    expect(rbEqual(a, a)).toBe(true);
   });
 });
 

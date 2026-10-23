@@ -50,6 +50,10 @@ export interface CompiledMethodContainer {
   _compiledMethods: Map<string, CompiledMethod>;
 }
 
+export type ViewContextClass = typeof Base & {
+  compiledMethodContainer(): CompiledMethodContainer;
+};
+
 type HelperMethods = {
   [K in keyof typeof HelperExports as (typeof HelperExports)[K] extends (...args: never) => unknown
     ? K extends Capitalize<string & K>
@@ -124,11 +128,11 @@ export class Base {
     return true;
   }
 
-  static withEmptyTemplateCache(): typeof Base {
+  static withEmptyTemplateCache(): ViewContextClass {
     const subclass = class extends this {
       static override _compiledMethods: Map<string, CompiledMethod> = new Map();
 
-      static override compiledMethodContainer(): CompiledMethodContainer {
+      static compiledMethodContainer(): CompiledMethodContainer {
         return subclass;
       }
 
@@ -143,15 +147,7 @@ export class Base {
     return subclass;
   }
 
-  static compiledMethodContainer(): CompiledMethodContainer {
-    throw new Error(
-      "Subclasses of ActionView::Base must implement `compiledMethodContainer` " +
-        "or use the class method `withEmptyTemplateCache` for constructing " +
-        "an ActionView::Base subclass that has an empty cache.",
-    );
-  }
-
-  static isChanged(other: typeof Base): boolean {
+  static isChanged(this: ViewContextClass, other: ViewContextClass): boolean {
     return this.compiledMethodContainer() !== other.compiledMethodContainer();
   }
 

@@ -28,6 +28,7 @@ import { Date as RubyDate, DateTime } from "@blazetrails/date";
 import {
   ArgumentError,
   Hash,
+  NoMethodError,
   NotImplementedError,
   Range,
   Struct,
@@ -52,10 +53,12 @@ import {
 import { defaultEnforceUtf8, setDefaultEnforceUtf8 } from "../helpers/form-tag-helper.js";
 import { Base as TagsBase } from "../helpers/tags/base.js";
 import type { LabelBuilder } from "../helpers/tags/label.js";
+import type { CheckBoxBuilder } from "../helpers/tags/collection-check-boxes.js";
+import type { RadioButtonBuilder } from "../helpers/tags/collection-radio-buttons.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 import { assertSelect } from "../testing/selector-assertions.js";
 import { Testing } from "../testing.js";
-import { Cpk } from "../test-helpers/fake-models.js";
+import { Blog, Cpk } from "../test-helpers/fake-models.js";
 
 class Post {
   static {
@@ -246,6 +249,18 @@ class FakeAssociationProxy {
   }
 }
 
+class RecordForm {
+  #toModel: unknown;
+
+  constructor({ toModel }: { toModel: unknown }) {
+    this.#toModel = toModel;
+  }
+
+  toModel(): unknown {
+    return this.#toModel;
+  }
+}
+
 class Car {
   constructor(public color: string) {}
 }
@@ -374,6 +389,17 @@ describe("FormHelperTest", () => {
         },
       },
     });
+    I18n.backend().storeTranslations("submit", {
+      helpers: {
+        submit: {
+          create: "Create %{model}",
+          update: "Confirm %{model} changes",
+          submit: "Save changes",
+          another_post: { update: "Update your %{model}" },
+          "blog/post": { update: "Update your %{model}" },
+        },
+      },
+    });
     I18n.backend().storeTranslations("placeholder", {
       activemodel: {
         attributes: {
@@ -407,7 +433,13 @@ describe("FormHelperTest", () => {
     } as typeof view.urlFor;
     post = new Post();
     comment = new Comment();
-    Object.assign(post, { toKey: () => [123], id: 0, toParam: () => "123" });
+    Object.assign(post, {
+      toKey: () => [123],
+      id: 0,
+      idBeforeTypeCast: () => "omg",
+      idCameFromUser: () => true,
+      toParam: () => "123",
+    });
     post.persisted = true;
     post.title = "Hello World";
     post.author_name = "";
@@ -4567,5 +4599,504 @@ describe("FormHelperTest", () => {
     );
 
     assertDomEqual(expected, rendered);
+  });
+
+  it("inputs use before type cast to retain information from validations like numericality", () => {
+    assertDomEqual(
+      `<textarea id="post_id" name="post[id]">\nomg</textarea>`,
+      view.textarea("post", "id"),
+    );
+  });
+
+  it("inputs dont use before type cast when value did not come from user", () => {
+    Object.assign(post, { idCameFromUser: () => false });
+
+    assertDomEqual(
+      `<textarea id="post_id" name="post[id]">\n0</textarea>`,
+      view.textarea("post", "id"),
+    );
+  });
+
+  it("inputs use before typecast when object doesnt respond to came from user", () => {
+    delete (post as Post & { idCameFromUser?: unknown }).idCameFromUser;
+    assertDomEqual(
+      `<textarea id="post_id" name="post[id]">\nomg</textarea>`,
+      view.textarea("post", "id"),
+    );
+  });
+
+  it("form for with collection radio buttons with custom builder block", () => {
+    const post = new Post();
+    Object.assign(post, { active: false });
+
+    formFor(post, {}, (f) => {
+      const renderedRadioButtons = f.collectionRadioButtons(
+        "active",
+        [true, false],
+        "toString",
+        "toString",
+        {},
+        {},
+        (b) => b.label({}, () => (b as RadioButtonBuilder).radioButton().plus(b.text)),
+      );
+      concat(renderedRadioButtons);
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_post",
+      "new_post",
+      {},
+      () =>
+        "<input type='hidden' name='post[active]' value='' autocomplete='off' />" +
+        "<label for='post_active_true'>" +
+        "<input id='post_active_true' name='post[active]' type='radio' value='true' />" +
+        "true</label>" +
+        "<label for='post_active_false'>" +
+        "<input checked='checked' id='post_active_false' name='post[active]' type='radio' value='false' />" +
+        "false</label>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with collection radio buttons with custom builder block does not leak the template", () => {
+    const post = new Post();
+    Object.assign(post, { active: false, id: 1 });
+
+    formFor(post, {}, (f) => {
+      const renderedRadioButtons = f.collectionRadioButtons(
+        "active",
+        [true, false],
+        "toString",
+        "toString",
+        {},
+        {},
+        (b) => b.label({}, () => (b as RadioButtonBuilder).radioButton().plus(b.text)),
+      );
+      concat(renderedRadioButtons);
+      concat(f.hiddenField("id"));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_post_1",
+      "new_post",
+      {},
+      () =>
+        "<input type='hidden' name='post[active]' value='' autocomplete='off' />" +
+        "<label for='post_active_true'>" +
+        "<input id='post_active_true' name='post[active]' type='radio' value='true' />" +
+        "true</label>" +
+        "<label for='post_active_false'>" +
+        "<input checked='checked' id='post_active_false' name='post[active]' type='radio' value='false' />" +
+        "false</label>" +
+        "<input id='post_id' name='post[id]' type='hidden' value='1' autocomplete='off' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with namespace and with collection radio buttons", () => {
+    const post = new Post();
+    Object.assign(post, { active: false });
+
+    formFor(post, { namespace: "foo" }, (f) => {
+      concat(f.collectionRadioButtons("active", [true, false], "toString", "toString"));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "foo_new_post",
+      "new_post",
+      {},
+      () =>
+        "<input type='hidden' name='post[active]' value='' autocomplete='off' />" +
+        "<input id='foo_post_active_true' name='post[active]' type='radio' value='true' />" +
+        "<label for='foo_post_active_true'>true</label>" +
+        "<input checked='checked' id='foo_post_active_false' name='post[active]' type='radio' value='false' />" +
+        "<label for='foo_post_active_false'>false</label>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with index and with collection radio buttons", () => {
+    const post = new Post();
+    Object.assign(post, { active: false });
+
+    formFor(post, { index: "1" }, (f) => {
+      concat(f.collectionRadioButtons("active", [true, false], "toString", "toString"));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_post",
+      "new_post",
+      {},
+      () =>
+        "<input type='hidden' name='post[1][active]' value='' autocomplete='off' />" +
+        "<input id='post_1_active_true' name='post[1][active]' type='radio' value='true' />" +
+        "<label for='post_1_active_true'>true</label>" +
+        "<input checked='checked' id='post_1_active_false' name='post[1][active]' type='radio' value='false' />" +
+        "<label for='post_1_active_false'>false</label>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with collection checkboxes", () => {
+    const post = new Post();
+    Object.assign(post, { tag_ids: [1, 3] });
+    const collection = [1, 2, 3].map((i) => [i, `Tag ${i}`]);
+    formFor(post, {}, (f) => {
+      concat(f.collectionCheckboxes("tag_ids", collection, "first", "last"));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_post",
+      "new_post",
+      {},
+      () =>
+        "<input name='post[tag_ids][]' type='hidden' value='' autocomplete='off' />" +
+        "<input checked='checked' id='post_tag_ids_1' name='post[tag_ids][]' type='checkbox' value='1' />" +
+        "<label for='post_tag_ids_1'>Tag 1</label>" +
+        "<input id='post_tag_ids_2' name='post[tag_ids][]' type='checkbox' value='2' />" +
+        "<label for='post_tag_ids_2'>Tag 2</label>" +
+        "<input checked='checked' id='post_tag_ids_3' name='post[tag_ids][]' type='checkbox' value='3' />" +
+        "<label for='post_tag_ids_3'>Tag 3</label>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with collection checkboxes with custom builder block", () => {
+    const post = new Post();
+    Object.assign(post, { tag_ids: [1, 3] });
+    const collection = [1, 2, 3].map((i) => [i, `Tag ${i}`]);
+    formFor(post, {}, (f) => {
+      const renderedCheckboxes = f.collectionCheckboxes(
+        "tag_ids",
+        collection,
+        "first",
+        "last",
+        {},
+        {},
+        (b) => b.label({}, () => (b as CheckBoxBuilder).checkbox().plus(b.text)),
+      );
+      concat(renderedCheckboxes);
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_post",
+      "new_post",
+      {},
+      () =>
+        "<input name='post[tag_ids][]' type='hidden' value='' autocomplete='off' />" +
+        "<label for='post_tag_ids_1'>" +
+        "<input checked='checked' id='post_tag_ids_1' name='post[tag_ids][]' type='checkbox' value='1' />" +
+        "Tag 1</label>" +
+        "<label for='post_tag_ids_2'>" +
+        "<input id='post_tag_ids_2' name='post[tag_ids][]' type='checkbox' value='2' />" +
+        "Tag 2</label>" +
+        "<label for='post_tag_ids_3'>" +
+        "<input checked='checked' id='post_tag_ids_3' name='post[tag_ids][]' type='checkbox' value='3' />" +
+        "Tag 3</label>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with collection checkboxes with custom builder block does not leak the template", () => {
+    const post = new Post();
+    Object.assign(post, { tag_ids: [1, 3], id: 1 });
+    const collection = [1, 2, 3].map((i) => [i, `Tag ${i}`]);
+
+    formFor(post, {}, (f) => {
+      const renderedCheckboxes = f.collectionCheckboxes(
+        "tag_ids",
+        collection,
+        "first",
+        "last",
+        {},
+        {},
+        (b) => b.label({}, () => (b as CheckBoxBuilder).checkbox().plus(b.text)),
+      );
+      concat(renderedCheckboxes);
+      concat(f.hiddenField("id"));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_post_1",
+      "new_post",
+      {},
+      () =>
+        "<input name='post[tag_ids][]' type='hidden' value='' autocomplete='off' />" +
+        "<label for='post_tag_ids_1'>" +
+        "<input checked='checked' id='post_tag_ids_1' name='post[tag_ids][]' type='checkbox' value='1' />" +
+        "Tag 1</label>" +
+        "<label for='post_tag_ids_2'>" +
+        "<input id='post_tag_ids_2' name='post[tag_ids][]' type='checkbox' value='2' />" +
+        "Tag 2</label>" +
+        "<label for='post_tag_ids_3'>" +
+        "<input checked='checked' id='post_tag_ids_3' name='post[tag_ids][]' type='checkbox' value='3' />" +
+        "Tag 3</label>" +
+        "<input id='post_id' name='post[id]' type='hidden' value='1' autocomplete='off' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with namespace and with collection checkboxes", () => {
+    const post = new Post();
+    Object.assign(post, { tag_ids: [1] });
+    const collection = [[1, "Tag 1"]];
+
+    formFor(post, { namespace: "foo" }, (f) => {
+      concat(f.collectionCheckboxes("tag_ids", collection, "first", "last"));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "foo_new_post",
+      "new_post",
+      {},
+      () =>
+        "<input name='post[tag_ids][]' type='hidden' value='' autocomplete='off' />" +
+        "<input checked='checked' id='foo_post_tag_ids_1' name='post[tag_ids][]' type='checkbox' value='1' />" +
+        "<label for='foo_post_tag_ids_1'>Tag 1</label>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with index and with collection checkboxes", () => {
+    const post = new Post();
+    Object.assign(post, { tag_ids: [1] });
+    const collection = [[1, "Tag 1"]];
+
+    formFor(post, { index: "1" }, (f) => {
+      concat(f.collectionCheckboxes("tag_ids", collection, "first", "last"));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_post",
+      "new_post",
+      {},
+      () =>
+        "<input name='post[1][tag_ids][]' type='hidden' value='' autocomplete='off' />" +
+        "<input checked='checked' id='post_1_tag_ids_1' name='post[1][tag_ids][]' type='checkbox' value='1' />" +
+        "<label for='post_1_tag_ids_1'>Tag 1</label>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with persisted to model", () => {
+    const postForm = new RecordForm({ toModel: post });
+
+    formFor(postForm, {}, () => {});
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () => "",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with new record to model", () => {
+    const postForm = new RecordForm({ toModel: new Post() });
+
+    formFor(postForm, {}, () => {});
+
+    const expected = wholeForm("/posts", "new_post", "new_post", { method: "post" }, () => "");
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with model using relative model naming", () => {
+    const blogPost = new Blog.Post("And his name will be forty and four.", 44);
+
+    formFor(blogPost, {}, (f) => {
+      concat(f.textField("title"));
+      concat(f.submit("Edit post"));
+    });
+
+    const expected = wholeForm(
+      "/posts/44",
+      "edit_post_44",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<input name='post[title]' type='text' id='post_title' value='And his name will be forty and four.' />" +
+        "<input name='commit' data-disable-with='Edit post' type='submit' value='Edit post' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "Method visibility is compile-time only (`Module#private`, `basic_obj_respond_to`'s `pub`)" — a TS private method is callable at run time, so no NoMethodError is raised.
+  it.skip("form tags do not call private properties on form object", () => {
+    const obj = new (class {
+      private privateProperty(): never {
+        throw new Error("This method should not be called.");
+      }
+    })();
+
+    formFor(obj, { as: "other_name", url: "/", html: { id: "edit-other-name" } }, (f) => {
+      assertRaises([NoMethodError], {}, () => f.hiddenField("privateProperty"));
+    });
+  });
+
+  it("form for label error wrapping", () => {
+    formFor(post, {}, (f) => {
+      concat(f.label("author_name", { class: "label" }));
+      concat(f.textField("author_name"));
+      concat(f.submit("Create post"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<div class='field_with_errors'><label for='post_author_name' class='label'>Author name</label></div>" +
+        "<div class='field_with_errors'><input name='post[author_name]' type='text' id='post_author_name' value='' /></div>" +
+        "<input name='commit' data-disable-with='Create post' type='submit' value='Create post' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for label error wrapping without conventional instance variable", () => {
+    const post = view.post;
+    delete (view as Partial<View>).post;
+
+    formFor(post, {}, (f) => {
+      concat(f.label("author_name", { class: "label" }));
+      concat(f.textField("author_name"));
+      concat(f.submit("Create post"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<div class='field_with_errors'><label for='post_author_name' class='label'>Author name</label></div>" +
+        "<div class='field_with_errors'><input name='post[author_name]' type='text' id='post_author_name' value='' /></div>" +
+        "<input name='commit' data-disable-with='Create post' type='submit' value='Create post' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("submit with object as new record and locale strings", () => {
+    I18n.withLocale("submit", () => {
+      post.persisted = false;
+      stub(post as Post & { toKey(): unknown }, "toKey", null, [], () => {
+        formFor(post, {}, (f) => {
+          concat(f.submit());
+        });
+
+        const expected = wholeForm(
+          "/posts",
+          "new_post",
+          "new_post",
+          {},
+          () =>
+            "<input name='commit' data-disable-with='Create Post' type='submit' value='Create Post' />",
+        );
+
+        assertDomEqual(expected, rendered);
+      });
+    });
+  });
+
+  it("submit with object as existing record and locale strings", () => {
+    I18n.withLocale("submit", () => {
+      formFor(post, {}, (f) => {
+        concat(f.submit());
+      });
+
+      const expected = wholeForm(
+        "/posts/123",
+        "edit_post_123",
+        "edit_post",
+        { method: "patch" },
+        () =>
+          "<input name='commit' data-disable-with='Confirm Post changes' type='submit' value='Confirm Post changes' />",
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("submit without object and locale strings", () => {
+    I18n.withLocale("submit", () => {
+      formFor("post", {}, (f) => {
+        concat(f.submit({ class: "extra" }));
+      });
+
+      const expected = wholeForm(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        () =>
+          "<input name='commit' class='extra' data-disable-with='Save changes' type='submit' value='Save changes' />",
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("submit with object which is overwritten by as option", () => {
+    I18n.withLocale("submit", () => {
+      formFor(post, { as: "another_post" }, (f) => {
+        concat(f.submit());
+      });
+
+      const expected = wholeForm(
+        "/posts/123",
+        "edit_another_post",
+        "edit_another_post",
+        { method: "patch" },
+        () =>
+          "<input name='commit' data-disable-with='Update your Post' type='submit' value='Update your Post' />",
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("submit with object which is namespaced", () => {
+    const blogPost = new Blog.Post("And his name will be forty and four.", 44);
+    I18n.withLocale("submit", () => {
+      formFor(blogPost, {}, (f) => {
+        concat(f.submit());
+      });
+
+      const expected = wholeForm(
+        "/posts/44",
+        "edit_post_44",
+        "edit_post",
+        { method: "patch" },
+        () =>
+          "<input name='commit' data-disable-with='Update your Post' type='submit' value='Update your Post' />",
+      );
+
+      assertDomEqual(expected, rendered);
+    });
   });
 });

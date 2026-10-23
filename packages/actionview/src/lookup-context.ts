@@ -11,7 +11,7 @@ import {
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import type { NestedDependencies } from "./digestor.js";
-import { Base } from "./base.js";
+import { Base, type ViewContextClass } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Template } from "./template.js";
 import { PathRegistry } from "./path-registry.js";
@@ -92,12 +92,12 @@ export class DetailsKey {
     return Array.from(DetailsKey._digestCache.values());
   }
 
-  static viewContextClass(): typeof Base {
+  static viewContextClass(): ViewContextClass {
     return (DetailsKey._viewContextClass ??= Base.withEmptyTemplateCache());
   }
 
   /** @internal */
-  private static _viewContextClass: typeof Base | null = null;
+  private static _viewContextClass: ViewContextClass | null = null;
 
   static clear(): void {
     for (const resolver of PathRegistry.allResolvers()) {

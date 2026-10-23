@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import "../test-helpers/active-record-unit.js";
 import { ControllerRuntime, RuntimeRegistry } from "@blazetrails/activerecord";
-import { Project } from "../test-helpers/fixtures/project.js";
+import { Project } from "../test/fixtures/project.js";
 import {
   assertEqual,
   assertMatch,
