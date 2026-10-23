@@ -1,6 +1,12 @@
-import { BigDecimal, hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
-import { Serializers } from "../namespaces.js";
-import { ObjectSerializer } from "./object-serializer.js";
+import {
+  BigDecimal,
+  isSymbol,
+  symbolToS,
+  rbObjAsString,
+  hashAref,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
+import { ObjectSerializer } from "../serializers/object-serializer.js";
 
 export class BigDecimalSerializer extends ObjectSerializer {
   static toString(): string {
@@ -8,11 +14,20 @@ export class BigDecimalSerializer extends ObjectSerializer {
   }
 
   serialize(bigDecimal: BigDecimal): Record<string, unknown> {
-    return super.serialize({ value: bigDecimal.toString() });
+    return super.serialize({
+      value: isSymbol(bigDecimal) ? symbolToS(bigDecimal) : rbObjAsString(bigDecimal),
+    });
   }
 
-  deserialize(hash: Record<string, unknown> | Map<string, unknown>): BigDecimal {
-    return new BigDecimal(hashAref(hash, "value") as string);
+  deserialize(hash: Map<unknown, unknown>): BigDecimal {
+    return new BigDecimal(
+      hashAref(hash, "value") as
+        | string
+        | number
+        | bigint
+        | BigDecimal
+        | { numerator: bigint; denominator: bigint },
+    );
   }
 
   /** @internal */
@@ -20,4 +35,4 @@ export class BigDecimalSerializer extends ObjectSerializer {
     return BigDecimal;
   }
 }
-rbModConstSet(Serializers, "BigDecimalSerializer", BigDecimalSerializer);
+registerConstant("ActiveJob::Serializers::BigDecimalSerializer", BigDecimalSerializer);

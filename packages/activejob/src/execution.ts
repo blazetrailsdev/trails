@@ -1,72 +1,75 @@
-import { Concern, ExecutionContext, extend, Rescuable } from "@blazetrails/activesupport";
-import { classModule, include, NotImplementedError, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
-
-type JobData = Record<string, unknown>;
-
-interface ExecutionJob {
-  executions: number | null;
-  arguments: unknown[];
-  deserializeArgumentsIfNeeded(): Promise<void>;
-  rescueWithHandler(exception: unknown): unknown;
-  runAfterDiscardProcs(exception: unknown): Promise<void>;
-  runCallbacks(kind: string, block?: () => unknown): unknown;
-  perform(...arguments_: unknown[]): unknown;
-  performNow(): Promise<unknown>;
-  _performJob(): Promise<unknown>;
-}
-
-interface ExecutionClass {
-  jobOrInstantiate(...args: unknown[]): unknown;
-  deserialize(jobData: JobData): unknown;
-}
-
-export class ClassMethods {
-  static async performNow(this: ExecutionClass, ...args: unknown[]): Promise<unknown> {
-    return (this.jobOrInstantiate(...args) as ExecutionJob).performNow();
-  }
-
-  /** @internal */
-  static async execute(this: ExecutionClass, jobData: JobData): Promise<unknown> {
-    return ActiveJob.Callbacks.runCallbacks("execute", async () => {
-      const job = this.deserialize(jobData) as ExecutionJob;
-      return job.performNow();
-    });
-  }
-}
+import { Rescuable, ExecutionContext, Concern } from "@blazetrails/activesupport";
+import {
+  include,
+  Exception,
+  NotImplementedError,
+  extend,
+  classModule,
+  Extended,
+} from "@blazetrails/ruby-compat";
+import { Callbacks } from "./callbacks.js";
+import { rbBinop } from "./codegen-runtime.js";
+import type { Base } from "./base.js";
 
 export class Execution {
-  static readonly [classModule] = true;
+  declare static included: Extended<typeof Concern>["included"];
   declare static ClassMethods: typeof ClassMethods;
 
-  async performNow(this: ExecutionJob): Promise<unknown> {
+  static readonly [classModule] = true;
+
+  static toString(): string {
+    return "ActiveJob::Execution";
+  }
+
+  async performNow(this: Base) {
+    let _t, handled;
     try {
-      this.executions = (this.executions ?? 0) + 1;
-
+      this.executions = rbBinop(((_t = this.executions) ?? false) !== false ? _t : 0, "+", 1);
       await this.deserializeArgumentsIfNeeded();
-
       return await this._performJob();
     } catch (exception) {
-      const handled = await this.rescueWithHandler(exception);
-      if (handled != null && handled !== false) return handled;
-
-      await this.runAfterDiscardProcs(exception);
-      throw exception;
+      if (exception instanceof Exception) {
+        handled = this.rescueWithHandler(exception);
+        if (handled != null && handled !== false) {
+          return handled;
+        }
+        await this.runAfterDiscardProcs(exception);
+        throw exception;
+      } else {
+        throw exception;
+      }
     }
   }
 
-  perform(..._arguments: unknown[]): unknown {
+  perform(this: Base, ...rest: unknown[]) {
     throw new NotImplementedError();
   }
 
   /** @internal */
-  async _performJob(this: ExecutionJob): Promise<unknown> {
+  async _performJob(this: Base) {
     ExecutionContext.setKey("job", this);
-    return this.runCallbacks("perform", () => this.perform(...this.arguments));
+    return await this.runCallbacks("perform", () => this.perform(...this.arguments));
   }
 }
 extend(Execution, Concern);
 include(Execution, Rescuable);
-Object.defineProperty(Execution, "ClassMethods", { value: ClassMethods });
+export class ClassMethods {
+  static toString(): string {
+    return "ActiveJob::Execution::ClassMethods";
+  }
 
-rbModConstSet(ActiveJob, "Execution", Execution);
+  static async performNow(
+    this: typeof Base,
+    ...args: ({ argument: number } | string | number | { keyword: boolean })[]
+  ) {
+    return await this.jobOrInstantiate(...args).performNow();
+  }
+
+  static async execute(this: typeof Base, jobData: Record<string, unknown>) {
+    return await Callbacks.runCallbacks("execute", async () => {
+      const job = this.deserialize(jobData);
+      return await job.performNow();
+    });
+  }
+}
+Object.assign(Execution, { ClassMethods: ClassMethods });

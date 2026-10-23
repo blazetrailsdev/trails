@@ -1,32 +1,24 @@
-import { getEnv } from "@blazetrails/activesupport";
+import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { GlobalID } from "@blazetrails/globalid";
-import { include, LoadError, puts, setEnv, stdout } from "@blazetrails/ruby-compat";
+import { include, rbInspect } from "@blazetrails/ruby-compat";
+import "../active-job.js";
 import { Base } from "../base.js";
 import { EnqueueAfterTransactionCommit } from "../enqueue-after-transaction-commit.js";
-import "./support/job-buffer.js";
 
+if (!((process.env["AJ_ADAPTER"] ?? false) !== false)) process.env["AJ_ADAPTER"] = "inline";
+await (
+  {
+    inline: () => import("./adapters/inline.js"),
+    async: () => import("./adapters/async.js"),
+    test: () => import("./adapters/test.js"),
+  } as Record<string, () => Promise<unknown>>
+)[process.env["AJ_ADAPTER"]!]();
+registerSpecType(/(?:)/, ActiveSupportTestCase);
 GlobalID.setApp("aj");
-
-/** @noRailsEquivalent PERMANENT */
-const adapters: Record<string, () => Promise<unknown>> = {
-  async: () => import("./adapters/async.js"),
-  inline: () => import("./adapters/inline.js"),
-  test: () => import("./adapters/test.js"),
-};
-
-let adapter = getEnv("AJ_ADAPTER");
-if (adapter == null) setEnv("AJ_ADAPTER", (adapter = "inline"));
-puts.call(stdout, `Using ${adapter}`);
-
-if (!Object.hasOwn(adapters, adapter)) {
-  throw new LoadError(`cannot load such file -- adapters/${adapter}`);
-}
-await adapters[adapter]();
-
-await import("@blazetrails/activesupport/testing/autorun");
-
-export function isAdapterIs(...adapterClassSymbols: string[]): boolean {
-  return adapterClassSymbols.map(String).includes(Base.queueAdapterName);
-}
-
 include(Base, EnqueueAfterTransactionCommit);
+export function isAdapterIs(...adapterClassSymbols: string[]) {
+  return adapterClassSymbols
+    .map((x) => (Array.isArray(x) ? rbInspect(x) : String(x ?? "")))
+    .includes(Base.queueAdapterName);
+}

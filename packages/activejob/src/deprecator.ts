@@ -1,7 +1,8 @@
 import { Deprecation } from "@blazetrails/activesupport";
-
-let _deprecator: Deprecation | undefined;
+import { ActiveJob } from "./active-job.js";
 
 export function deprecator(): Deprecation {
-  return (_deprecator ??= new Deprecation());
+  if (!(ActiveJob._deprecator != null && ActiveJob._deprecator !== false))
+    ActiveJob._deprecator = new Deprecation();
+  return ActiveJob._deprecator;
 }

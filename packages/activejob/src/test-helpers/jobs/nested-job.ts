@@ -1,21 +1,21 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { LoggingJob } from "./logging-job.js";
+import { LoggingJob } from "../../test-helpers/jobs/logging-job.js";
 
 export class NestedJob extends Base {
   static toString(): string {
     return "NestedJob";
   }
 
-  async perform(): Promise<void> {
-    await LoggingJob.performLater("NestedJob");
+  async perform() {
+    return await LoggingJob.performLater("NestedJob");
   }
 
-  get jobId(): string {
+  get jobId() {
     return "NESTED-JOB-ID";
   }
 
-  set jobId(value: string) {
+  set jobId(value) {
     this._jobId = value;
   }
 }

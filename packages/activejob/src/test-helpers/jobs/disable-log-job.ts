@@ -1,5 +1,4 @@
-import { rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
-import type { Logger } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class DisableLogJob extends Base {
@@ -7,17 +6,19 @@ export class DisableLogJob extends Base {
     return "DisableLogJob";
   }
 
-  perform(dummy: unknown): void {
-    (this.logger as Logger).info(`Dummy, here is it: ${rbObjAsString(dummy)}`);
+  perform(dummy: unknown) {
+    return this.logger.info(`Dummy, here is it: ${dummy ?? ""}`);
   }
 
-  get jobId(): string {
+  get jobId() {
     return "LOGGING-JOB-ID";
   }
 
-  set jobId(value: string) {
+  set jobId(value) {
     this._jobId = value;
   }
 }
-DisableLogJob.logArguments = false;
 registerConstant("DisableLogJob", DisableLogJob);
+{
+  DisableLogJob.logArguments = false;
+}

@@ -1,5 +1,4 @@
 import { aryJoin, registerConstant } from "@blazetrails/ruby-compat";
-import type { Logger } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 
 export class LoggingJob extends Base {
@@ -7,15 +6,15 @@ export class LoggingJob extends Base {
     return "LoggingJob";
   }
 
-  perform(...dummy: unknown[]): void {
-    (this.logger as Logger).info(`Dummy, here is it: ${aryJoin(dummy, " ")}`);
+  perform(...dummy: unknown[]) {
+    return this.logger.info(`Dummy, here is it: ${aryJoin(dummy, " ") ?? ""}`);
   }
 
-  get jobId(): string {
+  get jobId() {
     return "LOGGING-JOB-ID";
   }
 
-  set jobId(value: string) {
+  set jobId(value) {
     this._jobId = value;
   }
 }

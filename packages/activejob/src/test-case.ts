@@ -1,18 +1,21 @@
-import { runLoadHooks } from "@blazetrails/activesupport";
+import { ActiveSupport, runLoadHooks } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import { include, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
+import { include } from "@blazetrails/ruby-compat";
 import { TestHelper } from "./test-helper.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TestCase extends ActiveSupportTestCase {
-  static override toString(): string {
+  static toString(): string {
     return "ActiveJob::TestCase";
   }
 }
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
-export interface TestCase extends Omit<TestHelper, "beforeSetup" | "afterTeardown"> {}
+export interface TestCase extends Omit<TestHelper, "queueAdapterForTest"> {
+  enqueuedJobs: unknown;
+  performedJobs: unknown;
+  queueAdapterForTest(
+    ...args: Parameters<TestHelper["queueAdapterForTest"]>
+  ): ReturnType<TestHelper["queueAdapterForTest"]>;
+}
 include(TestCase, TestHelper);
-
-runLoadHooks("active_job_test_case", TestCase);
-rbModConstSet(ActiveJob, "TestCase", TestCase);
+{
+  runLoadHooks("active_job_test_case", TestCase);
+}

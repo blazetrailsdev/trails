@@ -1,171 +1,73 @@
-import { classAttribute, Concern, Duration, extend, seconds } from "@blazetrails/activesupport";
+import { Duration, Concern, classAttribute } from "@blazetrails/activesupport";
 import {
-  block,
-  classModule,
-  Kernel,
-  rbBlockGivenP,
-  rbInspect,
-  rbModConstSet,
-  rbObjClass,
   slice,
   RuntimeError,
+  rbInspect,
+  Kernel,
+  kernelRand,
   StandardError,
+  extend,
+  classModule,
+  Extended,
+  block as rbBlock,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
-
-type AfterDiscardProc = (this: unknown, job: unknown, exception: unknown) => unknown;
-type RetryBlock = (job: unknown, error: unknown) => unknown;
-
-interface ExceptionsJob {
-  executions: number | null;
-  exceptionExecutions: Record<string, number> | null;
-  afterDiscardProcs: AfterDiscardProc[];
-  instrument(
-    operation: string,
-    payload?: Record<string, unknown>,
-    block?: () => unknown,
-  ): Promise<unknown>;
-  enqueue(options?: Record<string, unknown>): Promise<unknown>;
-  retryJob(options?: Record<string, unknown>): Promise<unknown>;
-  determineDelay(options: {
-    secondsOrDurationOrAlgorithm: unknown;
-    executions: number;
-    jitter?: unknown;
-  }): unknown;
-  determineJitterForDelay(delay: number, jitter: number): number;
-  executionsFor(exceptions: unknown[]): number | null;
-  runAfterDiscardProcs(exception: unknown): Promise<void>;
-}
-
-interface ExceptionsClass {
-  afterDiscardProcs: AfterDiscardProc[];
-  retryJitter: number;
-  rescueFrom(...args: unknown[]): void;
-}
-
-interface RetryOnOptions {
-  wait?: unknown;
-  attempts?: number | ":unlimited";
-  queue?: unknown;
-  priority?: unknown;
-  jitter?: unknown;
-}
-
-const JITTER_DEFAULT = {};
-
-export class ClassMethods {
-  static retryOn(this: ExceptionsClass, ...exceptions: unknown[]): void {
-    const blk = rbBlockGivenP(exceptions[exceptions.length - 1])
-      ? (exceptions.pop() as RetryBlock)
-      : undefined;
-    const last = exceptions[exceptions.length - 1];
-    const options: RetryOnOptions =
-      typeof last === "object" && last !== null && Object.getPrototypeOf(last) === Object.prototype
-        ? (exceptions.pop() as RetryOnOptions)
-        : {};
-    const {
-      wait = seconds(3),
-      attempts = 5,
-      queue = null,
-      priority = null,
-      jitter = JITTER_DEFAULT,
-    } = options;
-    this.rescueFrom(
-      ...exceptions,
-      block(async function (this: ExceptionsJob, error: unknown) {
-        const executions = this.executionsFor(exceptions);
-        if (attempts === ":unlimited" || executions! < attempts) {
-          return await this.retryJob({
-            wait: this.determineDelay({
-              secondsOrDurationOrAlgorithm: wait,
-              executions: executions!,
-              jitter: jitter,
-            }),
-            queue: queue,
-            priority: priority,
-            error: error,
-          });
-        } else {
-          if (blk !== undefined) {
-            await this.instrument("retry_stopped", { error: error }, () => blk(this, error));
-            return await this.runAfterDiscardProcs(error);
-          } else {
-            await this.instrument("retry_stopped", { error: error });
-            await this.runAfterDiscardProcs(error);
-            throw error;
-          }
-        }
-      }),
-    );
-  }
-
-  static discardOn(this: ExceptionsClass, ...exceptions: unknown[]): void {
-    const blk = rbBlockGivenP(exceptions[exceptions.length - 1])
-      ? (exceptions.pop() as RetryBlock)
-      : undefined;
-    this.rescueFrom(
-      ...exceptions,
-      block(async function (this: ExceptionsJob, error: unknown) {
-        return await this.instrument("discard", { error: error }, async () => {
-          if (blk !== undefined) await blk(this, error);
-          return await this.runAfterDiscardProcs(error);
-        });
-      }),
-    );
-  }
-
-  static afterDiscard(this: ExceptionsClass, blk: AfterDiscardProc): void {
-    this.afterDiscardProcs = [...this.afterDiscardProcs, blk];
-  }
-}
+import { rbBinop } from "./codegen-runtime.js";
+import type { Base } from "./base.js";
+import type { DeserializationError } from "./arguments.js";
 
 export class Exceptions {
-  static readonly [classModule] = true;
+  declare static included: Extended<typeof Concern>["included"];
   declare static ClassMethods: typeof ClassMethods;
-  declare afterDiscardProcs: AfterDiscardProc[];
 
-  async retryJob(this: ExceptionsJob, options: Record<string, unknown> = {}): Promise<unknown> {
-    return await this.instrument("enqueue_retry", slice(options, "error", "wait"), () =>
-      this.enqueue(options),
+  static readonly [classModule] = true;
+
+  static toString(): string {
+    return "ActiveJob::Exceptions";
+  }
+
+  async retryJob(this: Base, options: Record<string, unknown> = {}) {
+    return await this.instrument(
+      "enqueue_retry",
+      slice(options, "error", "wait"),
+      async () => await this.enqueue(options),
     );
   }
+
+  static JITTER_DEFAULT: unknown = new (class Object {})();
 
   /** @internal */
   determineDelay(
-    this: ExceptionsJob,
+    this: Base,
     {
       secondsOrDurationOrAlgorithm,
       executions,
-      jitter = JITTER_DEFAULT,
-    }: {
-      secondsOrDurationOrAlgorithm: unknown;
-      executions: number;
-      jitter?: unknown;
-    },
-  ): unknown {
+      jitter = Exceptions.JITTER_DEFAULT,
+    }: { secondsOrDurationOrAlgorithm: unknown; executions: number | null; jitter?: unknown } = {},
+  ) {
+    let delay, delayJitter, algorithm;
     jitter =
-      jitter === JITTER_DEFAULT
-        ? (rbObjClass(this) as unknown as ExceptionsClass).retryJitter
+      jitter === Exceptions.JITTER_DEFAULT
+        ? this.constructor.retryJitter
         : jitter != null && jitter !== false
           ? jitter
-          : 0.0;
-
-    if (secondsOrDurationOrAlgorithm === ":polynomially_longer") {
-      const delay = executions ** 4;
-      const delayJitter = this.determineJitterForDelay(delay, jitter as number);
-      return delay + delayJitter + 2;
+          : 0;
+    if (secondsOrDurationOrAlgorithm === "polynomially_longer") {
+      delay = executions ** 4;
+      delayJitter = this.determineJitterForDelay(delay, jitter as number);
+      return rbBinop(rbBinop(delay, "+", delayJitter), "+", 2);
     } else if (
       secondsOrDurationOrAlgorithm instanceof Duration ||
+      typeof secondsOrDurationOrAlgorithm === "bigint" ||
       Number.isInteger(secondsOrDurationOrAlgorithm)
     ) {
-      const delay =
-        secondsOrDurationOrAlgorithm instanceof Duration
-          ? secondsOrDurationOrAlgorithm.toI()
-          : (secondsOrDurationOrAlgorithm as number);
-      const delayJitter = this.determineJitterForDelay(delay, jitter as number);
+      delay = parseInt(String(secondsOrDurationOrAlgorithm), 10) || 0;
+      delayJitter = this.determineJitterForDelay(delay, jitter as number);
       return delay + delayJitter;
-    } else if (typeof secondsOrDurationOrAlgorithm === "function") {
-      const algorithm = secondsOrDurationOrAlgorithm as (executions: number) => unknown;
+    } else if (
+      typeof secondsOrDurationOrAlgorithm === "function" &&
+      !Function.prototype.toString.call(secondsOrDurationOrAlgorithm).startsWith("class")
+    ) {
+      algorithm = secondsOrDurationOrAlgorithm;
       return algorithm(executions);
     } else {
       throw new RuntimeError(
@@ -175,48 +77,133 @@ export class Exceptions {
   }
 
   /** @internal */
-  determineJitterForDelay(delay: number, jitter: number): number {
-    if (jitter === 0) return 0.0;
-    return (Kernel.rand() as number) * delay * jitter;
+  determineJitterForDelay(this: Base, delay: number, jitter: number): number {
+    if (jitter === 0) {
+      return 0;
+    }
+    return rbBinop(
+      rbBinop(((Kernel as { rand?: typeof kernelRand }).rand ?? kernelRand)(), "*", delay),
+      "*",
+      jitter,
+    );
   }
 
   /** @internal */
-  executionsFor(this: ExceptionsJob, exceptions: unknown[]): number | null {
-    const exceptionExecutions = this.exceptionExecutions;
-    if (exceptionExecutions != null) {
-      const key = rbInspect(exceptions);
-      return (exceptionExecutions[key] = (exceptionExecutions[key] ?? 0) + 1);
+  executionsFor(this: Base, exceptions: unknown[]): number | null {
+    if (this.exceptionExecutions != null && this.exceptionExecutions !== false) {
+      return (this.exceptionExecutions[rbInspect(exceptions)] = rbBinop(
+        this.exceptionExecutions[rbInspect(exceptions)] ?? 0,
+        "+",
+        1,
+      ));
     } else {
       return this.executions;
     }
   }
 
   /** @internal */
-  async runAfterDiscardProcs(exception: unknown): Promise<void> {
-    const exceptions: unknown[] = [];
+  async runAfterDiscardProcs(this: Base, exception: unknown) {
+    let exceptions = [];
     for (const blk of this.afterDiscardProcs) {
       try {
-        await blk.call(this, this, exception);
+        blk.call(this, this, exception);
       } catch (e) {
-        if (!(e instanceof StandardError)) throw e;
-        exceptions.push(e);
+        if (e instanceof StandardError) {
+          exceptions.push(e);
+        } else {
+          throw e;
+        }
       }
     }
-    if (exceptions.length !== 0) throw exceptions[exceptions.length - 1];
+    if (!(exceptions.length === 0)) {
+      throw ((x) =>
+        typeof x === "string" ? new RuntimeError(x) : typeof x === "function" ? new x() : x)(
+        exceptions.at(-1),
+      );
+    }
+    return null;
   }
 }
 extend(Exceptions, Concern);
-(Exceptions as unknown as { included(base: null, block: (this: object) => void): void }).included(
-  null,
-  function (this: object) {
-    classAttribute.call(this, "retryJitter", {
-      instanceAccessor: false,
-      instancePredicate: false,
-      default: 0.0,
-    });
-    classAttribute.call(this, "afterDiscardProcs", { default: [] });
-  },
-);
-Object.defineProperty(Exceptions, "ClassMethods", { value: ClassMethods });
+Exceptions.included(null, function (this: typeof Base): void {
+  classAttribute.call(this, "retryJitter", {
+    instanceAccessor: false,
+    instancePredicate: false,
+    default: 0,
+  });
+  classAttribute.call(this, "afterDiscardProcs", { default: [] });
+});
+export class ClassMethods {
+  static toString(): string {
+    return "ActiveJob::Exceptions::ClassMethods";
+  }
 
-rbModConstSet(ActiveJob, "Exceptions", Exceptions);
+  static retryOn(this: typeof Base, ...exceptions: unknown[]) {
+    const block =
+      typeof exceptions[exceptions.length - 1] === "function" &&
+      !Function.prototype.toString.call(exceptions[exceptions.length - 1]).startsWith("class")
+        ? (exceptions.pop() as (...args: unknown[]) => unknown)
+        : undefined;
+    const {
+      wait = Duration.seconds(3),
+      attempts = 5,
+      queue = null,
+      priority = null,
+      jitter = Exceptions.JITTER_DEFAULT,
+    } = Object.getPrototypeOf(exceptions.at(-1) ?? 0) === Object.prototype ? exceptions.pop() : {};
+    return this.rescueFrom(
+      ...exceptions,
+      rbBlock(async function (this: Base, error) {
+        const executions = this.executionsFor(exceptions);
+        if (attempts === "unlimited" || rbBinop(executions, "<", attempts)) {
+          return await this.retryJob({
+            wait: this.determineDelay({
+              secondsOrDurationOrAlgorithm: wait,
+              executions: executions,
+              jitter: jitter,
+            }),
+            queue: queue,
+            priority: priority,
+            error: error,
+          });
+        } else if (block != null) {
+          await this.instrument("retry_stopped", { error: error }, () => block(this, error));
+          return await this.runAfterDiscardProcs(error);
+        } else {
+          await this.instrument("retry_stopped", { error: error });
+          await this.runAfterDiscardProcs(error);
+          throw typeof error === "string"
+            ? new RuntimeError(error)
+            : typeof error === "function"
+              ? new error()
+              : error;
+        }
+      }),
+    );
+  }
+
+  static discardOn(this: typeof Base, ...exceptions: unknown[]) {
+    const block =
+      typeof exceptions[exceptions.length - 1] === "function" &&
+      !Function.prototype.toString.call(exceptions[exceptions.length - 1]).startsWith("class")
+        ? (exceptions.pop() as (...args: unknown[]) => unknown)
+        : undefined;
+    return this.rescueFrom(
+      ...exceptions,
+      rbBlock(async function (this: Base, error) {
+        return await this.instrument("discard", { error: error }, async () => {
+          if (block != null) {
+            block(this, error);
+          }
+          return await this.runAfterDiscardProcs(error);
+        });
+      }),
+    );
+  }
+
+  static afterDiscard(this: typeof Base, blk?: (...args: unknown[]) => unknown) {
+    this.afterDiscardProcs = rbBinop(this.afterDiscardProcs, "+", [blk]);
+    return this.afterDiscardProcs;
+  }
+}
+Object.assign(Exceptions, { ClassMethods: ClassMethods });

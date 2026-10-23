@@ -1,20 +1,19 @@
-import { Date, DateTime, dtNewByFrags } from "@blazetrails/date";
-import { hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
-import { Serializers } from "../namespaces.js";
-import { TimeObjectSerializer } from "./time-object-serializer.js";
+import { DateTime as RubyDateTime } from "@blazetrails/date";
+import { hashAref, registerConstant } from "@blazetrails/ruby-compat";
+import { TimeObjectSerializer } from "../serializers/time-object-serializer.js";
 
 export class DateTimeSerializer extends TimeObjectSerializer {
   static toString(): string {
     return "ActiveJob::Serializers::DateTimeSerializer";
   }
 
-  deserialize(hash: Record<string, unknown> | Map<string, unknown>): DateTime {
-    return dtNewByFrags(Date._iso8601(hashAref(hash, "value") as string));
+  deserialize(hash: Map<unknown, unknown>): RubyDateTime {
+    return RubyDateTime.iso8601(hashAref(hash, "value") as undefined | string);
   }
 
   /** @internal */
-  protected klass(): typeof DateTime {
-    return DateTime;
+  protected klass(): typeof RubyDateTime {
+    return RubyDateTime;
   }
 }
-rbModConstSet(Serializers, "DateTimeSerializer", DateTimeSerializer);
+registerConstant("ActiveJob::Serializers::DateTimeSerializer", DateTimeSerializer);

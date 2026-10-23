@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { assertIncludes, assertNotIncludes } from "@blazetrails/activesupport";
 import "./test-helpers/helper.js";
-import { RescueJob } from "./test-helpers/jobs/rescue-job.js";
+import { assertRaises } from "@blazetrails/activesupport";
+import { RescueJob, OtherError } from "./test-helpers/jobs/rescue-job.js";
 import { Person } from "./test-helpers/models/person.js";
 import { JobBuffer } from "./test-helpers/support/job-buffer.js";
+import { beforeEach, expect, it, describe } from "vitest";
 
 describe("RescueTest", () => {
   beforeEach(() => {
@@ -22,25 +22,21 @@ describe("RescueTest", () => {
 
   it("let through unhandled perform exception", async () => {
     const job = new RescueJob("other");
-    await expect(job.performNow()).rejects.toThrow(
-      (RescueJob as unknown as { OtherError: new () => Error }).OtherError,
-    );
+    await assertRaises([OtherError], {}, async () => await job.performNow());
   });
 
   it("rescue from deserialization errors", async () => {
     await RescueJob.performLater(new Person(404));
-    assertIncludes(JobBuffer.values(), "rescued from DeserializationError");
-    assertIncludes(
-      JobBuffer.values(),
+    expect(JobBuffer.values()).toContainEqual("rescued from DeserializationError");
+    expect(JobBuffer.values()).toContainEqual(
       "DeserializationError original exception was Person::RecordNotFound",
     );
-    assertNotIncludes(JobBuffer.values(), "performed beautifully");
+    expect(JobBuffer.values()).not.toContainEqual("performed beautifully");
   });
 
   it("should not wrap DeserializationError in DeserializationError", async () => {
     await RescueJob.performLater([new Person(404)]);
-    assertIncludes(
-      JobBuffer.values(),
+    expect(JobBuffer.values()).toContainEqual(
       "DeserializationError original exception was Person::RecordNotFound",
     );
   });

@@ -1,87 +1,88 @@
-import { Concern, extend, Notifications } from "@blazetrails/activesupport";
-import { block, defineModule, rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
+import { Notifications, Callbacks, Concern } from "@blazetrails/activesupport";
+import { extend, classModule, Extended } from "@blazetrails/ruby-compat";
+import { Execution } from "./execution.js";
+import type { Base } from "./base.js";
 
-interface InstrumentationJob {
-  scheduledAt: unknown;
-  queueAdapter: unknown;
-  _haltedCallbackHookCalled?: unknown;
-  instrument(
-    operation: string,
-    payload?: Record<string, unknown>,
-    block?: () => unknown,
-  ): Promise<unknown>;
-}
-
-interface InstrumentationClass {
-  aroundEnqueue(...filters: unknown[]): void;
-}
-
-/** @internal */
-export async function instrumentEnqueueAll(
+export function instrumentEnqueueAll(
   queueAdapter: unknown,
   jobs: unknown[],
-  block: (payload: Record<string, unknown>) => Promise<unknown>,
-): Promise<unknown> {
+  block?: (...args: unknown[]) => unknown,
+) {
   const payload: Record<string, unknown> = { adapter: queueAdapter, jobs: jobs };
-  return await Notifications.instrument("enqueue_all.active_job", payload, async () => {
-    const result = await block(payload);
+  return Notifications.instrument("enqueue_all.active_job", payload, () => {
+    const result = block(payload);
     payload["enqueued_count"] = result;
     return result;
   });
 }
-Object.assign(ActiveJob, { instrumentEnqueueAll });
 
-async function performNow(this: InstrumentationJob): Promise<unknown> {
-  return await this.instrument("perform", {}, () => rbCallSuper(this, performNow));
+export class Instrumentation {
+  declare _haltedCallbackHookCalled: boolean | null;
+  declare static included: Extended<typeof Concern>["included"];
+
+  static readonly [classModule] = true;
+
+  static toString(): string {
+    return "ActiveJob::Instrumentation";
+  }
+
+  async performNow(this: Base) {
+    return await this.instrument(
+      "perform",
+      undefined,
+      async () => await Execution.prototype.performNow.call(this),
+    );
+  }
+
+  /** @internal */
+  async _performJob(this: Base) {
+    await this.instrument("perform_start");
+    return await Execution.prototype._performJob.call(this);
+  }
+
+  /** @internal */
+  async instrument(
+    this: Base,
+    operation: string,
+    payload: Record<string, unknown> | undefined = {},
+    block?: (...args: unknown[]) => unknown,
+  ) {
+    payload["job"] = this;
+    payload["adapter"] = this.queueAdapter;
+    return Notifications.instrument(`${operation}.active_job`, payload, async () => {
+      let value;
+      if (block != null) {
+        value = await block();
+      }
+      if (this._haltedCallbackHookCalled !== undefined) {
+        payload["aborted"] = this._haltedCallbackHookCalled;
+      }
+      this._haltedCallbackHookCalled = null;
+      return value;
+    });
+  }
+
+  /** @internal */
+  haltedCallbackHook(this: Base, ...rest: unknown[][]) {
+    Callbacks.instanceMethod("haltedCallbackHook")!.value.call(this, ...rest);
+    return (this._haltedCallbackHookCalled = true);
+  }
 }
-
-/** @internal */
-async function _performJob(this: InstrumentationJob): Promise<unknown> {
-  await this.instrument("perform_start");
-  return await rbCallSuper(this, _performJob);
-}
-
-/** @internal */
-async function instrument(
-  this: InstrumentationJob,
-  operation: string,
-  payload: Record<string, unknown> = {},
-  block?: () => unknown,
-): Promise<unknown> {
-  payload["job"] = this;
-  payload["adapter"] = this.queueAdapter;
-
-  return await Notifications.instrument(`${operation}.active_job`, payload, async () => {
-    const value = block ? await block() : null;
-    if (Object.hasOwn(this, "_haltedCallbackHookCalled"))
-      payload["aborted"] = this._haltedCallbackHookCalled;
-    this._haltedCallbackHookCalled = null;
-    return value;
-  });
-}
-
-/** @internal */
-function haltedCallbackHook(this: InstrumentationJob, ...args: unknown[]): void {
-  rbCallSuper(this, haltedCallbackHook, ...args);
-  this._haltedCallbackHookCalled = true;
-}
-
-export const Instrumentation = defineModule(
-  { performNow },
-  {},
-  { _performJob, instrument, haltedCallbackHook },
-);
 extend(Instrumentation, Concern);
-
-Concern.included.call(Instrumentation as never, null, function (this: InstrumentationClass) {
-  this.aroundEnqueue(
-    block(function (this: InstrumentationJob, _: unknown, block: () => unknown) {
-      return this.scheduledAt != null && this.scheduledAt !== false
-        ? this.instrument("enqueue_at", {}, block)
-        : this.instrument("enqueue", {}, block);
-    }),
-  );
+Instrumentation.included(null, function (this: typeof Base): void {
+  this.aroundEnqueue(async function (this: Base, _: unknown, block: unknown) {
+    if (this.scheduledAt != null) {
+      return await this.instrument(
+        "enqueue_at",
+        undefined,
+        block as undefined | ((...args: unknown[]) => unknown),
+      );
+    } else {
+      return await this.instrument(
+        "enqueue",
+        undefined,
+        block as undefined | ((...args: unknown[]) => unknown),
+      );
+    }
+  });
 });
-
-rbModConstSet(ActiveJob, "Instrumentation", Instrumentation);

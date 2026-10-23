@@ -1,77 +1,75 @@
 import {
+  Concern,
+  TaggedLogging,
+  Logger,
   cattrAccessor,
   classAttribute,
-  Concern,
-  extend,
-  Logger,
-  TaggedLogging,
 } from "@blazetrails/activesupport";
 import {
   block as rbBlock,
-  defineModule,
-  rbCallSuper,
-  rbModConstSet,
-  rbModName,
-  rbObjClass,
-  rbObjRespondTo,
+  Enumerator,
+  extend,
   STDOUT,
+  classModule,
+  Extended,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
+import { Instrumentation } from "./instrumentation.js";
+import type { Base } from "./base.js";
 
-interface TaggedLike {
-  tagged(...tags: unknown[]): unknown;
-  formatter: { currentTags: unknown[] };
-}
+export class Logging {
+  declare static included: Extended<typeof Concern>["included"];
 
-interface LoggingJob {
-  logger: unknown;
-  jobId: string;
-  tagLogger(...tags: unknown[]): unknown;
-  isLoggerTaggedByActiveJob(): boolean;
-}
+  static readonly [classModule] = true;
 
-interface LoggingClass {
-  aroundEnqueue(...filters: unknown[]): void;
-}
+  static toString(): string {
+    return "ActiveJob::Logging";
+  }
 
-async function performNow(this: LoggingJob): Promise<unknown> {
-  return await this.tagLogger(rbModName(rbObjClass(this)), this.jobId, () =>
-    rbCallSuper(this, performNow),
-  );
-}
+  async performNow(this: Base) {
+    return this.tagLogger(
+      Object.hasOwn(this.constructor, "toString")
+        ? String(this.constructor)
+        : this.constructor.name || null,
+      this.jobId,
+      async () => await Instrumentation.prototype.performNow.call(this),
+    );
+  }
 
-/** @internal */
-function tagLogger(this: LoggingJob, ...tags: unknown[]): unknown {
-  const block = tags.pop() as () => unknown;
-  if (rbObjRespondTo(this.logger, "tagged")) {
-    if (!this.isLoggerTaggedByActiveJob()) tags.unshift("ActiveJob");
-    return (this.logger as TaggedLike).tagged(...tags, block);
-  } else {
-    return block();
+  /** @internal */
+  tagLogger(this: Base, ...tags: (string | (() => Promise<unknown>) | null)[]) {
+    const block =
+      typeof tags[tags.length - 1] === "function" &&
+      !Function.prototype.toString.call(tags[tags.length - 1]).startsWith("class")
+        ? (tags.pop() as (...args: unknown[]) => unknown)
+        : undefined;
+    if ("tagged" in Object(this.logger)) {
+      if (!this.isLoggerTaggedByActiveJob()) {
+        tags.unshift("ActiveJob");
+      }
+      return this.logger.tagged(...tags, ...(block != null ? [rbBlock(block)] : []));
+    } else {
+      return block();
+    }
+  }
+
+  /** @internal */
+  isLoggerTaggedByActiveJob(this: Base): boolean {
+    return (
+      this.logger.formatter.currentTags instanceof globalThis.Set ||
+      this.logger.formatter.currentTags instanceof globalThis.Map ||
+      this.logger.formatter.currentTags instanceof Enumerator
+        ? [...this.logger.formatter.currentTags]
+        : Object.getPrototypeOf(this.logger.formatter.currentTags) === Object.prototype
+          ? Object.entries(this.logger.formatter.currentTags as object)
+          : (this.logger.formatter.currentTags as unknown[])
+    ).includes("ActiveJob");
   }
 }
-
-/** @internal */
-function isLoggerTaggedByActiveJob(this: LoggingJob): boolean {
-  return (this.logger as TaggedLike).formatter.currentTags.includes("ActiveJob");
-}
-
-export const Logging = defineModule({ performNow }, {}, { tagLogger, isLoggerTaggedByActiveJob });
 extend(Logging, Concern);
-
-Concern.included.call(Logging as never, null, function (this: LoggingClass) {
-  cattrAccessor.call(this, "logger", {
-    default: TaggedLogging.new(new Logger(STDOUT as never)),
-  });
-
+Logging.included(null, function (this: typeof Base): void {
+  cattrAccessor.call(this, "logger", { default: TaggedLogging.new(new Logger(STDOUT)) });
   classAttribute.call(this, "logArguments", { instanceAccessor: false, default: true });
-
-  this.aroundEnqueue(
-    { prepend: true },
-    rbBlock(function (this: LoggingJob, _: unknown, block: () => unknown) {
-      return this.tagLogger(block);
-    }),
-  );
+  this.aroundEnqueue({ prepend: true }, function (this: Base, _: unknown, block: unknown) {
+    return this.tagLogger(block as string | (() => Promise<unknown>) | null);
+  });
 });
-
-rbModConstSet(ActiveJob, "Logging", Logging);

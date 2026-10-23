@@ -1,115 +1,147 @@
-import { describe, expect, it } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
+import "./test-helpers/helper.js";
+import { assertRaises } from "@blazetrails/activesupport";
+import "@blazetrails/activesupport/testing/autorun";
 import {
-  ArgumentError,
-  Mutex,
-  extend,
-  rbModConstSet,
   registerConstant,
+  include,
+  Mutex,
+  ArgumentError,
+  classModule,
 } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
-import { QueueAdapters } from "./namespaces.js";
 import { AsyncAdapter } from "./queue-adapters/async-adapter.js";
 import { TestCase } from "./test-case.js";
-import type { TestQueueAdapterClass } from "./test-helper.js";
-import "./test-helpers/helper.js";
+import { TestHelper } from "./test-helper.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-class StubOneAdapter {
-  enqueue(..._args: unknown[]): void {}
-  enqueueAt(..._args: unknown[]): void {}
-}
-rbModConstSet(QueueAdapters, "StubOneAdapter", StubOneAdapter);
-
-class StubTwoAdapter {
-  enqueue(..._args: unknown[]): void {}
-  enqueueAt(..._args: unknown[]): void {}
-}
-rbModConstSet(QueueAdapters, "StubTwoAdapter", StubTwoAdapter);
-
-class QueueAdapterTest extends TestCase {
-  static override toString(): string {
-    return "QueueAdapterTest";
+export const ActiveJobQueueAdapters = {};
+export class StubOneAdapter {
+  static toString(): string {
+    return "ActiveJob::QueueAdapters::StubOneAdapter";
   }
+
+  enqueue(...rest: unknown[]) {}
+
+  enqueueAt(...rest: unknown[]) {}
 }
+registerConstant("ActiveJob::QueueAdapters::StubOneAdapter", StubOneAdapter);
+export class StubTwoAdapter {
+  static toString(): string {
+    return "ActiveJob::QueueAdapters::StubTwoAdapter";
+  }
+
+  enqueue(...rest: unknown[]) {}
+
+  enqueueAt(...rest: unknown[]) {}
+}
+registerConstant("ActiveJob::QueueAdapters::StubTwoAdapter", StubTwoAdapter);
+class QueueAdapterTest extends TestCase {}
 registerConstant("QueueAdapterTest", QueueAdapterTest);
+include(QueueAdapterTest, TestHelper);
 
 describe("QueueAdapterTest", () => {
-  it("should forbid nonsense arguments", () => {
-    expect(() => Base.setQueueAdapter(Mutex)).toThrow(ArgumentError);
-    expect(() => Base.setQueueAdapter(new Mutex())).toThrow(ArgumentError);
+  beforeEach<{ testCase: QueueAdapterTest }>(async ({ testCase }) => {
+    await testCase.setup();
   });
-
-  it("should allow overriding the queue_adapter at the child class level without affecting the parent or its sibling", () => {
-    const baseQueueAdapter = Base.queueAdapter;
-
-    const childJobOne = class extends Base {};
-    expect(childJobOne.queueAdapterName).toBe(Base.queueAdapterName);
-
+  afterEach<{ testCase: QueueAdapterTest }>(async ({ testCase }) => {
+    await testCase.teardown();
+  });
+  it<{ testCase: QueueAdapterTest }>("should forbid nonsense arguments", async ({ testCase }) => {
+    await assertRaises([ArgumentError], {}, () => {
+      Base.setQueueAdapter(Mutex);
+      return Mutex;
+    });
+    await assertRaises([ArgumentError], {}, () => {
+      Base.setQueueAdapter(new Mutex());
+      return new Mutex();
+    });
+  });
+  it<{
+    testCase: QueueAdapterTest;
+  }>("should allow overriding the queue_adapter at the child class level without affecting the parent or its sibling", async ({
+    testCase,
+  }) => {
+    Base.disableTestAdapter();
+    let baseQueueAdapter = await Base.queueAdapter;
+    let childJobOne = class extends Base {};
+    expect(await Base.queueAdapterName).toEqualRuby(await childJobOne.queueAdapterName());
     childJobOne.setQueueAdapter("stub_one");
-
-    expect(childJobOne.queueAdapter).not.toBe(Base.queueAdapter);
-    expect(childJobOne.queueAdapterName).toBe("stub_one");
-    expect(childJobOne.queueAdapter).toBeInstanceOf(StubOneAdapter);
-    expect(new childJobOne().queueAdapter).toBeInstanceOf(StubOneAdapter);
-
-    const childJobTwo = class extends Base {};
+    expect(await childJobOne.queueAdapter()).not.toEqualRuby(await Base.queueAdapter);
+    expect(await childJobOne.queueAdapterName()).toEqual("stub_one");
+    expect(await childJobOne.queueAdapter()).toBeInstanceOf(StubOneAdapter);
+    expect(await new childJobOne().queueAdapter()).toBeInstanceOf(StubOneAdapter);
+    let childJobTwo = class extends Base {};
     childJobTwo.setQueueAdapter("stub_two");
-
-    expect(childJobTwo.queueAdapterName).toBe("stub_two");
-
-    expect(childJobTwo.queueAdapter).toBeInstanceOf(StubTwoAdapter);
-    expect(new childJobTwo().queueAdapter).toBeInstanceOf(StubTwoAdapter);
-    expect(childJobOne.queueAdapter).toBeInstanceOf(StubOneAdapter);
-    expect(Base.queueAdapter).toBe(baseQueueAdapter);
-
-    const childJobThree = class extends Base {};
-
-    expect(childJobThree.queueAdapter).toBe(baseQueueAdapter);
+    expect(await childJobTwo.queueAdapterName()).toEqual("stub_two");
+    expect(await childJobTwo.queueAdapter()).toBeInstanceOf(StubTwoAdapter);
+    expect(await new childJobTwo().queueAdapter()).toBeInstanceOf(StubTwoAdapter);
+    expect(await childJobOne.queueAdapter()).toBeInstanceOf(StubOneAdapter);
+    expect(await Base.queueAdapter).toEqualRuby(baseQueueAdapter);
+    let childJobThree = class extends Base {};
+    expect(await childJobThree.queueAdapter()).toEqualRuby(baseQueueAdapter);
   });
-
-  it("should default to :async adapter if no adapters are set at all", () => {
-    (Base as typeof Base & TestQueueAdapterClass).disableTestAdapter();
-    const queueAdapterWas = Base._queueAdapter;
-    const queueAdapterNameWas = Base._queueAdapterName;
-    Base._queueAdapter = Base._queueAdapterName = null;
+  it<{
+    testCase: QueueAdapterTest;
+  }>("should default to :async adapter if no adapters are set at all", async ({ testCase }) => {
+    let _queueAdapterWas, _queueAdapterNameWas;
     try {
-      expect(Base.queueAdapterName).toBe("async");
-      expect(Base.queueAdapter).toBeInstanceOf(AsyncAdapter);
+      Base.disableTestAdapter();
+      _queueAdapterWas = await Base._queueAdapter;
+      _queueAdapterNameWas = await Base._queueAdapterName;
+      Base._queueAdapter = Base._queueAdapterName = null;
+      expect(await Base.queueAdapterName).toEqual("async");
+      expect(await Base.queueAdapter).toBeInstanceOf(AsyncAdapter);
     } finally {
-      Base._queueAdapter = queueAdapterWas;
-      Base._queueAdapterName = queueAdapterNameWas;
+      Base._queueAdapter = _queueAdapterWas;
+      Base._queueAdapterName = _queueAdapterNameWas;
     }
   });
-
-  it("should extract a reasonable name from a class instance", () => {
-    const childJob = class extends Base {};
+  it<{
+    testCase: QueueAdapterTest;
+  }>("should extract a reasonable name from a class instance", async ({ testCase }) => {
+    let childJob = class extends Base {};
     childJob.setQueueAdapter(new StubOneAdapter());
-    expect(childJob.queueAdapterName).toBe("stub_one");
+    expect(await childJob.queueAdapterName()).toEqual("stub_one");
   });
-
-  const StubThreeAdapter = {};
-  extend(StubThreeAdapter, {
-    enqueue(..._args: unknown[]): void {},
-    enqueueAt(..._args: unknown[]): void {},
-  });
-  rbModConstSet(QueueAdapterTest, "StubThreeAdapter", StubThreeAdapter);
-
-  it("should extract a reasonable name from a class or module", () => {
-    const childJob = class extends Base {};
+  it<{
+    testCase: QueueAdapterTest;
+  }>("should extract a reasonable name from a class or module", async ({ testCase }) => {
+    let childJob = class extends Base {};
     childJob.setQueueAdapter(StubThreeAdapter);
-    expect(childJob.queueAdapterName).toBe("stub_three");
+    expect(await childJob.queueAdapterName()).toEqual("stub_three");
   });
-
-  class StubFourAdapter {
-    enqueue(..._args: unknown[]): void {}
-    enqueueAt(..._args: unknown[]): void {}
-    get queueAdapterName(): string {
-      return "fancy_name";
-    }
-  }
-
-  it("should use the name provided by the adapter", () => {
-    const childJob = class extends Base {};
+  it<{ testCase: QueueAdapterTest }>("should use the name provided by the adapter", async ({
+    testCase,
+  }) => {
+    let childJob = class extends Base {};
     childJob.setQueueAdapter(new StubFourAdapter());
-    expect(childJob.queueAdapterName).toBe("fancy_name");
+    expect(await childJob.queueAdapterName()).toEqual("fancy_name");
   });
 });
+export class StubThreeAdapter {
+  static readonly [classModule] = true;
+
+  static toString(): string {
+    return "QueueAdapterTest::StubThreeAdapter";
+  }
+
+  static enqueue(...rest: unknown[]) {}
+
+  static enqueueAt(...rest: unknown[]) {}
+}
+registerConstant("QueueAdapterTest::StubThreeAdapter", StubThreeAdapter);
+export class StubFourAdapter {
+  static toString(): string {
+    return "QueueAdapterTest::StubFourAdapter";
+  }
+
+  enqueue(...rest: unknown[]) {}
+
+  enqueueAt(...rest: unknown[]) {}
+
+  queueAdapterName() {
+    return "fancy_name";
+  }
+}
+registerConstant("QueueAdapterTest::StubFourAdapter", StubFourAdapter);

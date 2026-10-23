@@ -1,111 +1,79 @@
-import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
+import { Concern, classAttribute } from "@blazetrails/activesupport";
 import {
-  aryCount,
-  classModule,
-  flatten,
   groupBy,
-  rbBlockGivenP,
-  rbModConstSet,
-  rbObjIsKindOf,
-  rbObjRespondTo,
+  Enumerator,
   StandardError,
   toF,
+  extend,
+  classModule,
+  Extended,
+  rbHashSRuby2KeywordsHash,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
+import { instrumentEnqueueAll } from "./instrumentation.js";
+import type { Base } from "./base.js";
+
+export function performAllLater(...jobs: unknown[]) {
+  jobs.some(Array.isArray) ? (jobs.splice(0, jobs.length, ...jobs.flat(Infinity)), jobs) : null;
+  for (const [queueAdapter, adapterJobs] of ((x) =>
+    x instanceof globalThis.Map ? [...x] : Array.isArray(x) ? x : Object.entries(x ?? {}))(
+    groupBy(jobs, (x) => x.queueAdapter),
+  )) {
+    instrumentEnqueueAll(queueAdapter, adapterJobs as unknown[], () => {
+      if ("enqueueAll" in Object(queueAdapter)) {
+        return queueAdapter.enqueueAll(adapterJobs);
+      } else {
+        for (const job of adapterJobs) {
+          try {
+            job.successfullyEnqueued = false;
+            if (job.scheduledAt != null && job.scheduledAt !== false) {
+              queueAdapter.enqueueAt(job, Number(job.scheduledAt));
+            } else {
+              queueAdapter.enqueue(job);
+            }
+            job.successfullyEnqueued = true;
+          } catch (e) {
+            if (e instanceof EnqueueError) {
+              job.enqueueError = e;
+            } else {
+              throw e;
+            }
+          }
+        }
+        return (
+          adapterJobs instanceof globalThis.Set ||
+          adapterJobs instanceof globalThis.Map ||
+          adapterJobs instanceof Enumerator
+            ? [...adapterJobs]
+            : Object.getPrototypeOf(adapterJobs) === Object.prototype
+              ? Object.entries(adapterJobs as object)
+              : (adapterJobs as unknown[])
+        ).filter((x) => x.isSuccessfullyEnqueued()).length;
+      }
+    });
+  }
+  return null;
+}
 
 export class EnqueueError extends StandardError {
   static toString(): string {
     return "ActiveJob::EnqueueError";
   }
 }
-rbModConstSet(ActiveJob, "EnqueueError", EnqueueError);
-
-interface QueueAdapterLike {
-  enqueue(job: unknown): unknown;
-  enqueueAt(job: unknown, timestamp: number): unknown;
-  enqueueAll?(jobs: unknown[]): unknown;
-}
-
-interface EnqueuingJob {
-  queueAdapter: unknown;
-  scheduledAt: unknown;
-  successfullyEnqueued: unknown;
-  enqueueError: unknown;
-  isSuccessfullyEnqueued(): unknown;
-  set(options: Record<string, unknown>): unknown;
-  runCallbacks(kind: string, block?: () => unknown): unknown;
-  enqueue(options?: Record<string, unknown>): Promise<unknown>;
-}
-
-export async function performAllLater(...jobs: unknown[]): Promise<null> {
-  jobs.splice(0, jobs.length, ...flatten(jobs));
-  for (const [queueAdapter, adapterJobs] of groupBy(
-    jobs as EnqueuingJob[],
-    (job) => job.queueAdapter as QueueAdapterLike,
-  )) {
-    await ActiveJob.instrumentEnqueueAll(queueAdapter, adapterJobs, async () => {
-      if (rbObjRespondTo(queueAdapter, "enqueueAll")) {
-        return await queueAdapter.enqueueAll!(adapterJobs);
-      } else {
-        for (const job of adapterJobs) {
-          try {
-            job.successfullyEnqueued = false;
-            if (job.scheduledAt != null && job.scheduledAt !== false) {
-              await queueAdapter.enqueueAt(job, toF(job.scheduledAt));
-            } else {
-              await queueAdapter.enqueue(job);
-            }
-            job.successfullyEnqueued = true;
-          } catch (e) {
-            if (!(e instanceof EnqueueError)) throw e;
-            job.enqueueError = e;
-          }
-        }
-        return aryCount(adapterJobs, (job) => job.isSuccessfullyEnqueued());
-      }
-    });
-  }
-  return null;
-}
-Object.assign(ActiveJob, { performAllLater });
-
-export class ClassMethods {
-  static async performLater(
-    this: { jobOrInstantiate(...args: unknown[]): unknown },
-    ...args: unknown[]
-  ): Promise<unknown> {
-    const blk = rbBlockGivenP(args[args.length - 1])
-      ? (args.pop() as (job: unknown) => unknown)
-      : undefined;
-    const job = this.jobOrInstantiate(...args) as EnqueuingJob;
-    const enqueueResult = await job.enqueue();
-
-    if (blk !== undefined) await blk(job);
-
-    return enqueueResult;
-  }
-
-  /** @internal */
-  static jobOrInstantiate(this: new (...args: unknown[]) => unknown, ...args: unknown[]): unknown {
-    return rbObjIsKindOf(args[0], this) ? args[0] : new this(...args);
-  }
-}
-
 export class Enqueuing {
-  static readonly [classModule] = true;
+  declare static included: Extended<typeof Concern>["included"];
   declare static ClassMethods: typeof ClassMethods;
 
-  async enqueue(
-    this: Enqueuing & EnqueuingJob,
-    options: Record<string, unknown> = {},
-  ): Promise<unknown> {
+  static readonly [classModule] = true;
+
+  static toString(): string {
+    return "ActiveJob::Enqueuing";
+  }
+
+  async enqueue(this: Base, options: Record<string, unknown> = {}) {
     this.set(options);
     this.successfullyEnqueued = false;
-
-    await this.runCallbacks("enqueue", () => this.rawEnqueue());
-
-    const successfullyEnqueued = this.isSuccessfullyEnqueued();
-    if (successfullyEnqueued != null && successfullyEnqueued !== false) {
+    await this.runCallbacks("enqueue", async () => await this.rawEnqueue());
+    if (this.isSuccessfullyEnqueued()) {
       return this;
     } else {
       return false;
@@ -113,32 +81,71 @@ export class Enqueuing {
   }
 
   /** @internal */
-  private async rawEnqueue(this: Enqueuing & EnqueuingJob): Promise<unknown> {
+  async rawEnqueue(this: Base) {
     try {
-      if (this.scheduledAt != null && this.scheduledAt !== false) {
-        await (this.queueAdapter as QueueAdapterLike).enqueueAt(this, toF(this.scheduledAt));
+      if (this.scheduledAt != null) {
+        this.queueAdapter.enqueueAt(this, toF(this.scheduledAt!));
       } else {
-        await (this.queueAdapter as QueueAdapterLike).enqueue(this);
+        this.queueAdapter.enqueue(this);
       }
-
-      return (this.successfullyEnqueued = true);
+      this.successfullyEnqueued = true;
+      return await this.successfullyEnqueued;
     } catch (e) {
-      if (!(e instanceof EnqueueError)) throw e;
-      return (this.enqueueError = e);
+      if (e instanceof EnqueueError) {
+        this.enqueueError = e;
+        return this.enqueueError;
+      } else {
+        throw e;
+      }
     }
   }
 }
 extend(Enqueuing, Concern);
-(Enqueuing as unknown as { included(base: null, block: (this: object) => void): void }).included(
-  null,
-  function (this: object) {
-    classAttribute.call(this, "enqueueAfterTransactionCommit", {
-      instanceAccessor: false,
-      instancePredicate: false,
-      default: false,
-    });
-  },
-);
-Object.defineProperty(Enqueuing, "ClassMethods", { value: ClassMethods });
+Enqueuing.included(null, function (this: typeof Base): void {
+  classAttribute.call(this, "enqueueAfterTransactionCommit", {
+    instanceAccessor: false,
+    instancePredicate: false,
+    default: false,
+  });
+});
+export class ClassMethods {
+  static toString(): string {
+    return "ActiveJob::Enqueuing::ClassMethods";
+  }
 
-rbModConstSet(ActiveJob, "Enqueuing", Enqueuing);
+  static async performLater(this: typeof Base, ...args: unknown[]) {
+    const block =
+      typeof args[args.length - 1] === "function" &&
+      !Function.prototype.toString.call(args[args.length - 1]).startsWith("class")
+        ? (args.pop() as (...args: unknown[]) => unknown)
+        : undefined;
+    const job = this.jobOrInstantiate(...args);
+    const enqueueResult = job.enqueue();
+    if (block != null) {
+      await block(job);
+    }
+    return enqueueResult;
+  }
+
+  /** @internal */
+  static jobOrInstantiate(this: typeof Base, ...args: unknown[]) {
+    const last = args[args.length - 1];
+    if (
+      typeof last === "object" &&
+      last !== null &&
+      Object.getPrototypeOf(last) === Object.prototype
+    )
+      args[args.length - 1] = rbHashSRuby2KeywordsHash(last);
+    const _ =
+      typeof args[args.length - 1] === "function" &&
+      !Function.prototype.toString.call(args[args.length - 1]).startsWith("class")
+        ? (args.pop() as (...args: unknown[]) => unknown)
+        : undefined;
+    if (args[0] instanceof this) {
+      return args[0];
+    } else {
+      return new this(...args);
+    }
+  }
+}
+Object.assign(Enqueuing, { ClassMethods: ClassMethods });

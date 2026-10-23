@@ -1,41 +1,56 @@
-import { block, kernelThrow, registerConstant, StandardError } from "@blazetrails/ruby-compat";
+import {
+  RuntimeError,
+  kernelThrow,
+  registerConstant,
+  StandardError,
+} from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
-class MyError extends StandardError {}
-
 export class AbortBeforeEnqueueJob extends Base {
+  declare _flag: unknown;
+
   static toString(): string {
     return "AbortBeforeEnqueueJob";
   }
 
-  static MyError = MyError;
-
-  flag: unknown = null;
-
-  perform(): void {
-    throw new Error("This should never be called");
+  get flag() {
+    return this._flag ?? null;
   }
 
-  throwOrRaise(): void {
-    const first = this.arguments[0];
-    if ((first != null && first !== false ? first : ":abort") === ":abort") {
-      kernelThrow(":abort");
+  set flag(value) {
+    this._flag = value;
+  }
+
+  perform() {
+    throw new RuntimeError("This should never be called");
+  }
+
+  throwOrRaise() {
+    if ((this.arguments[0] ?? "abort") === "abort") {
+      return kernelThrow(":abort");
     } else {
       throw new MyError();
     }
   }
 }
 registerConstant("AbortBeforeEnqueueJob", AbortBeforeEnqueueJob);
-
-AbortBeforeEnqueueJob.beforeEnqueue(":throwOrRaise");
-AbortBeforeEnqueueJob.afterEnqueue(
-  block(function (this: AbortBeforeEnqueueJob) {
+{
+  AbortBeforeEnqueueJob.beforeEnqueue(":throwOrRaise");
+  AbortBeforeEnqueueJob.afterEnqueue(function () {
     this.flag = "after_enqueue";
-  }),
-);
-AbortBeforeEnqueueJob.beforePerform(block(() => kernelThrow(":abort")));
-AbortBeforeEnqueueJob.afterPerform(
-  block(function (this: AbortBeforeEnqueueJob) {
+    return this.flag;
+  });
+  AbortBeforeEnqueueJob.beforePerform(function () {
+    return kernelThrow(":abort");
+  });
+  AbortBeforeEnqueueJob.afterPerform(function () {
     this.flag = "after_perform";
-  }),
-);
+    return this.flag;
+  });
+}
+export class MyError extends StandardError {
+  static toString(): string {
+    return "AbortBeforeEnqueueJob::MyError";
+  }
+}
+registerConstant("AbortBeforeEnqueueJob::MyError", MyError);

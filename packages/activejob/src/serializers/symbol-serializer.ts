@@ -1,6 +1,13 @@
-import { hashAref, rbCSymbol, rbModConstSet, symbolToS, toSym } from "@blazetrails/ruby-compat";
-import { Serializers } from "../namespaces.js";
-import { ObjectSerializer } from "./object-serializer.js";
+import {
+  isSymbol,
+  symbolToS,
+  rbObjAsString,
+  hashAref,
+  stringToSym,
+  rbCSymbol,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
+import { ObjectSerializer } from "../serializers/object-serializer.js";
 
 export class SymbolSerializer extends ObjectSerializer {
   static toString(): string {
@@ -8,16 +15,18 @@ export class SymbolSerializer extends ObjectSerializer {
   }
 
   serialize(argument: string): Record<string, unknown> {
-    return super.serialize({ value: symbolToS(argument) });
+    return super.serialize({
+      value: isSymbol(argument) ? symbolToS(argument) : rbObjAsString(argument),
+    });
   }
 
-  deserialize(argument: Record<string, unknown> | Map<string, unknown>): string {
-    return toSym(hashAref(argument, "value"));
+  deserialize(argument: Map<unknown, unknown>): string {
+    return stringToSym(hashAref(argument, "value") as string);
   }
 
   /** @internal */
-  protected klass(): typeof rbCSymbol {
+  protected klass() {
     return rbCSymbol;
   }
 }
-rbModConstSet(Serializers, "SymbolSerializer", SymbolSerializer);
+registerConstant("ActiveJob::Serializers::SymbolSerializer", SymbolSerializer);

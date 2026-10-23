@@ -1,85 +1,69 @@
-import {
-  Concern,
-  classAttribute,
-  extend,
-  mattrAccessor,
-  presence,
-} from "@blazetrails/activesupport";
-import {
-  aryJoin,
-  classModule,
-  compact,
-  rbModConstSet,
-  rbObjClass,
-  rbObjIsProc,
-} from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
-
-interface QueueNameClass {
-  defaultQueueName: unknown;
-  queueName: unknown;
-  queueNameDelimiter: string;
-  queueNamePrefix: unknown;
-  queueNameFromPart(partName: unknown): string;
-}
-
-interface QueueNameJob {
-  _queueName: unknown;
-}
-
-export class ClassMethods {
-  declare static defaultQueueName: unknown;
-
-  static queueAs(
-    this: QueueNameClass,
-    partName: unknown = null,
-    block?: (this: QueueNameJob) => unknown,
-  ): void {
-    if (block !== undefined) {
-      this.queueName = block;
-    } else {
-      this.queueName = this.queueNameFromPart(partName);
-    }
-  }
-
-  /** @internal */
-  static queueNameFromPart(this: QueueNameClass, partName: unknown): string {
-    const queueName = partName != null && partName !== false ? partName : this.defaultQueueName;
-    const nameParts = [presence(this.queueNamePrefix), queueName];
-    return aryJoin(compact(nameParts), this.queueNameDelimiter);
-  }
-}
-mattrAccessor.call(ClassMethods, "defaultQueueName", { default: "default" });
+import { Concern, classAttribute, presence, mattrAccessor } from "@blazetrails/activesupport";
+import { extend, classModule, Extended, aryJoin } from "@blazetrails/ruby-compat";
+import type { Base } from "./base.js";
 
 export class QueueName {
-  static readonly [classModule] = true;
+  declare _queueName: string | null;
+  declare static included: Extended<typeof Concern>["included"];
   declare static ClassMethods: typeof ClassMethods;
-  declare _queueName: unknown;
-  declare queueNamePrefix: unknown;
-  declare isQueueNamePrefix: () => boolean;
 
-  get queueName(): unknown {
-    if (rbObjIsProc(this._queueName)) {
-      this._queueName = (rbObjClass(this) as unknown as QueueNameClass).queueNameFromPart(
-        (this._queueName as (this: QueueNameJob) => unknown).call(this),
-      );
+  static readonly [classModule] = true;
+
+  static toString(): string {
+    return "ActiveJob::QueueName";
+  }
+
+  get queueName() {
+    if (
+      ((x) => typeof x === "function" && !Function.prototype.toString.call(x).startsWith("class"))(
+        this._queueName!,
+      )
+    ) {
+      this._queueName = this.constructor.queueNameFromPart(this._queueName.call(this));
     }
-    return this._queueName;
+    return this._queueName ?? null;
   }
 }
 extend(QueueName, Concern);
-Object.defineProperty(QueueName, "ClassMethods", { value: ClassMethods });
-(
-  QueueName as unknown as { included(base: null, block: (this: QueueNameClass) => void): void }
-).included(null, function (this: QueueNameClass) {
+QueueName.included(null, function (this: typeof Base): void {
   classAttribute.call(this, "queueName", {
     instanceAccessor: false,
-    default: function (this: QueueNameJob) {
-      return (rbObjClass(this) as unknown as QueueNameClass).defaultQueueName;
+    default: function (this: unknown) {
+      return this.constructor.defaultQueueName;
     },
   });
   classAttribute.call(this, "queueNameDelimiter", { instanceAccessor: false, default: "_" });
   classAttribute.call(this, "queueNamePrefix");
 });
+export class ClassMethods {
+  static toString(): string {
+    return "ActiveJob::QueueName::ClassMethods";
+  }
 
-rbModConstSet(ActiveJob, "QueueName", QueueName);
+  static queueAs(
+    this: typeof Base,
+    partName: unknown = null,
+    block?: (...args: unknown[]) => unknown,
+  ) {
+    if (block != null) {
+      this.queueName = block;
+      return this.queueName;
+    } else {
+      this.queueName = this.queueNameFromPart(partName);
+      return this.queueName;
+    }
+  }
+
+  static queueNameFromPart(this: typeof Base, partName: unknown): string {
+    const queueName = partName != null && partName !== false ? partName : this.defaultQueueName;
+    const nameParts = [presence(this.queueNamePrefix), queueName];
+    return aryJoin(
+      nameParts.filter((x) => x != null),
+      this.queueNameDelimiter,
+    );
+  }
+}
+{
+  mattrAccessor.call(ClassMethods, "defaultQueueName", { default: "default" });
+}
+Object.assign(QueueName, { ClassMethods: ClassMethods });

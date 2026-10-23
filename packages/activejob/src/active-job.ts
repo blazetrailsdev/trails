@@ -1,14 +1,26 @@
-import { ActiveJob } from "./namespaces.js";
+import "./version.js";
+import "./deprecator.js";
+import { Autoload } from "@blazetrails/activesupport";
+import { extend, classModule } from "@blazetrails/ruby-compat";
 
-let _verboseEnqueueLogs: boolean;
+export class ActiveJob {
+  declare static _verboseEnqueueLogs: unknown;
 
-export function verboseEnqueueLogs(): boolean {
-  return _verboseEnqueueLogs;
+  static readonly [classModule] = true;
+
+  static toString(): string {
+    return "ActiveJob";
+  }
+
+  static get verboseEnqueueLogs() {
+    return this._verboseEnqueueLogs ?? null;
+  }
+
+  static set verboseEnqueueLogs(value) {
+    this._verboseEnqueueLogs = value;
+  }
 }
-
-export function setVerboseEnqueueLogs(verboseEnqueueLogs: boolean): void {
-  _verboseEnqueueLogs = verboseEnqueueLogs;
+extend(ActiveJob, Autoload);
+{
+  ActiveJob.verboseEnqueueLogs = false;
 }
-
-Object.assign(ActiveJob, { verboseEnqueueLogs, setVerboseEnqueueLogs });
-setVerboseEnqueueLogs(false);

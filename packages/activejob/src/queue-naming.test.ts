@@ -1,104 +1,101 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { Base } from "./base.js";
 import "./test-helpers/helper.js";
+import { Base } from "./base.js";
 import { ConfigurationJob } from "./test-helpers/jobs/configuration-job.js";
 import { HelloJob } from "./test-helpers/jobs/hello-job.js";
 import { PrefixedJob } from "./test-helpers/jobs/prefixed-job.js";
 import { JobBuffer } from "./test-helpers/support/job-buffer.js";
-
-type ConfiguredJob = { performNow(): Promise<unknown>; performLater(): Promise<unknown> };
+import { beforeEach, expect, it, describe } from "vitest";
 
 describe("QueueNamingTest", () => {
   beforeEach(() => {
     JobBuffer.clear();
   });
 
-  it("name derived from base", () => {
-    expect(new HelloJob().queueName).toBe("default");
+  it("name derived from base", async () => {
+    expect(await new HelloJob().queueName).toEqual("default");
   });
 
-  it("uses given queue name job", () => {
-    const originalQueueName = HelloJob.queueName;
-
+  it("uses given queue name job", async () => {
+    const originalQueueName = await HelloJob.queueName;
     try {
       HelloJob.queueAs("greetings");
-      expect(new HelloJob().queueName).toBe("greetings");
+      expect(await new HelloJob().queueName).toEqual("greetings");
     } finally {
       HelloJob.queueName = originalQueueName;
     }
   });
 
-  it("allows a blank queue name", () => {
-    const originalQueueName = HelloJob.queueName;
-
+  it("allows a blank queue name", async () => {
+    const originalQueueName = await HelloJob.queueName;
     try {
       HelloJob.queueAs("");
-      expect(new HelloJob().queueName).toBe("");
+      expect(await new HelloJob().queueName).toEqual("");
     } finally {
       HelloJob.queueName = originalQueueName;
     }
   });
 
-  it("does not use a nil queue name", () => {
-    const originalQueueName = HelloJob.queueName;
-
+  it("does not use a nil queue name", async () => {
+    const originalQueueName = await HelloJob.queueName;
     try {
       HelloJob.queueAs(null);
-      expect(new HelloJob().queueName).toBe("default");
+      expect(await new HelloJob().queueName).toEqual("default");
     } finally {
       HelloJob.queueName = originalQueueName;
     }
   });
 
-  it("evals block given to queue_as to determine queue", () => {
-    const originalQueueName = HelloJob.queueName;
-
+  it("evals block given to queue_as to determine queue", async () => {
+    const originalQueueName = await HelloJob.queueName;
     try {
-      HelloJob.queueAs(undefined, () => "another");
-      expect(new HelloJob().queueName).toBe("another");
-    } finally {
-      HelloJob.queueName = originalQueueName;
-    }
-  });
-
-  it("can use arguments to determine queue_name in queue_as block", () => {
-    const originalQueueName = HelloJob.queueName;
-
-    try {
-      HelloJob.queueAs(undefined, function (this: unknown) {
-        return (this as HelloJob).arguments[0] === "1" ? "one" : "two";
+      await HelloJob.queueAs(undefined, function () {
+        return "another";
       });
-      expect(new HelloJob("1").queueName).toBe("one");
-      expect(new HelloJob("3").queueName).toBe("two");
+      expect(await new HelloJob().queueName).toEqual("another");
     } finally {
       HelloJob.queueName = originalQueueName;
     }
   });
 
-  it("queue_name_prefix prepended to the queue name with default delimiter", () => {
-    const originalQueueNamePrefix = Base.queueNamePrefix;
-    const originalQueueName = HelloJob.queueName;
+  it("can use arguments to determine queue_name in queue_as block", async () => {
+    const originalQueueName = await HelloJob.queueName;
+    try {
+      await HelloJob.queueAs(undefined, function () {
+        if (this.arguments[0] === "1") {
+          return "one";
+        } else {
+          return "two";
+        }
+      });
+      expect(await new HelloJob("1").queueName).toEqual("one");
+      expect(await new HelloJob("3").queueName).toEqual("two");
+    } finally {
+      HelloJob.queueName = originalQueueName;
+    }
+  });
 
+  it("queue_name_prefix prepended to the queue name with default delimiter", async () => {
+    const originalQueueNamePrefix = await Base.queueNamePrefix;
+    const originalQueueName = await HelloJob.queueName;
     try {
       Base.queueNamePrefix = "aj";
       HelloJob.queueAs("low");
-      expect(HelloJob.queueName).toBe("aj_low");
+      expect(await HelloJob.queueName).toEqual("aj_low");
     } finally {
       Base.queueNamePrefix = originalQueueNamePrefix;
       HelloJob.queueName = originalQueueName;
     }
   });
 
-  it("queue_name_prefix prepended to the queue name with custom delimiter", () => {
-    const originalQueueNamePrefix = Base.queueNamePrefix;
-    const originalQueueNameDelimiter = Base.queueNameDelimiter;
-    const originalQueueName = HelloJob.queueName;
-
+  it("queue_name_prefix prepended to the queue name with custom delimiter", async () => {
+    const originalQueueNamePrefix = await Base.queueNamePrefix;
+    const originalQueueNameDelimiter = await Base.queueNameDelimiter;
+    const originalQueueName = await HelloJob.queueName;
     try {
       Base.queueNameDelimiter = ".";
       Base.queueNamePrefix = "aj";
       HelloJob.queueAs("low");
-      expect(HelloJob.queueName).toBe("aj.low");
+      expect(await HelloJob.queueName).toEqual("aj.low");
     } finally {
       Base.queueNamePrefix = originalQueueNamePrefix;
       Base.queueNameDelimiter = originalQueueNameDelimiter;
@@ -106,60 +103,54 @@ describe("QueueNamingTest", () => {
     }
   });
 
-  it("using a custom default_queue_name", () => {
+  it("using a custom default_queue_name", async () => {
     const originalDefaultQueueName = Base.defaultQueueName;
-
     try {
       Base.defaultQueueName = "default_queue_name";
-
-      expect(new HelloJob().queueName).toBe("default_queue_name");
+      expect(await new HelloJob().queueName).toEqual("default_queue_name");
     } finally {
       Base.defaultQueueName = originalDefaultQueueName;
     }
   });
 
-  it("queue_name_prefix prepended to the default_queue_name", () => {
-    const originalQueueNamePrefix = Base.queueNamePrefix;
+  it("queue_name_prefix prepended to the default_queue_name", async () => {
+    const originalQueueNamePrefix = await Base.queueNamePrefix;
     const originalDefaultQueueName = Base.defaultQueueName;
-
     try {
       Base.queueNamePrefix = "prefix";
       Base.defaultQueueName = "default_queue_name";
-
-      expect(new HelloJob().queueName).toBe("prefix_default_queue_name");
+      expect(await new HelloJob().queueName).toEqual("prefix_default_queue_name");
     } finally {
       Base.queueNamePrefix = originalQueueNamePrefix;
       Base.defaultQueueName = originalDefaultQueueName;
     }
   });
 
-  it("can change queue_name_prefix in a job class definition without affecting other jobs", () => {
-    expect(PrefixedJob.queueNamePrefix).toBe("production");
-    expect(HelloJob.queueNamePrefix).toBeNull();
+  it("can change queue_name_prefix in a job class definition without affecting other jobs", async () => {
+    expect(await PrefixedJob.queueNamePrefix).toEqual("production");
+    expect(await HelloJob.queueNamePrefix).toBeNull();
   });
 
-  it("can change queue_name_prefix in a job class without affecting other jobs", () => {
-    const originalPrefix = PrefixedJob.queueNamePrefix;
-
+  it("can change queue_name_prefix in a job class without affecting other jobs", async () => {
+    const originalPrefix = await PrefixedJob.queueNamePrefix;
     try {
       PrefixedJob.queueNamePrefix = "staging";
-
-      expect(PrefixedJob.queueNamePrefix).toBe("staging");
-      expect(HelloJob.queueNamePrefix).toBeNull();
+      expect(await PrefixedJob.queueNamePrefix).toEqual("staging");
+      expect(await HelloJob.queueNamePrefix).toBeNull();
     } finally {
       PrefixedJob.queueNamePrefix = originalPrefix;
     }
   });
 
   it("is assigned when perform_now", async () => {
-    await (ConfigurationJob.set({ queue: "some_queue" }) as ConfiguredJob).performNow();
-    const job = JobBuffer.lastValue() as ConfigurationJob;
-    expect(job.queueName).toBe("some_queue");
+    await ConfigurationJob.set({ queue: "some_queue" }).performNow();
+    const job = JobBuffer.lastValue();
+    expect(await job.queueName).toEqual("some_queue");
   });
 
   it("is assigned when perform_later", async () => {
-    await (ConfigurationJob.set({ queue: "some_queue" }) as ConfiguredJob).performLater();
-    const job = JobBuffer.lastValue() as ConfigurationJob;
-    expect(job.queueName).toBe("some_queue");
+    await ConfigurationJob.set({ queue: "some_queue" }).performLater();
+    const job = JobBuffer.lastValue();
+    expect(await job.queueName).toEqual("some_queue");
   });
 });

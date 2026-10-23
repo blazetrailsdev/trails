@@ -1,26 +1,25 @@
-import { afterEach, beforeEach, describe, it } from "vitest";
-import { assertEqual } from "@blazetrails/activesupport";
-import { setAvailableLocales } from "@blazetrails/i18n";
 import "./test-helpers/helper.js";
+import { I18n } from "@blazetrails/activesupport";
 import { TranslatedHelloJob } from "./test-helpers/jobs/translated-hello-job.js";
 import { JobBuffer } from "./test-helpers/support/job-buffer.js";
+import { beforeEach, afterEach, expect, it, describe } from "vitest";
 
 describe("TranslationTest", () => {
-  let job: TranslatedHelloJob;
+  let job: unknown;
 
   beforeEach(() => {
     JobBuffer.clear();
-    setAvailableLocales(["en", "de"]);
+    I18n.setAvailableLocales(["en", "de"]);
     job = new TranslatedHelloJob("Johannes");
   });
 
   afterEach(() => {
-    setAvailableLocales(["en"]);
+    I18n.setAvailableLocales(["en"]);
   });
 
   it("it performs the job in the given locale", async () => {
     job.locale = "de";
     await job.performNow();
-    assertEqual("Johannes says Guten Tag", JobBuffer.lastValue());
+    expect(JobBuffer.lastValue()).toEqual("Johannes says Guten Tag");
   });
 });
