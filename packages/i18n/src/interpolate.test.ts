@@ -1,16 +1,15 @@
+import * as TestCase from "./test-helpers/test-case.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as I18n from "./index.js";
 import { ArgumentError, rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { MissingInterpolationArgument, config } from "./index.js";
 import type { MissingInterpolationArgumentHandler } from "./index.js";
-import { resetConfig } from "./i18n.js";
-import { resetClassConfig } from "./config.js";
 
 describe("I18nInterpolateTest", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
   });
+  afterEach(TestCase.teardown);
 
   it("String interpolates a hash argument w/ named placeholders", () => {
     expect(I18n.interpolate("%{first} %{last}", { first: "Masao", last: "Mutoh" })).toBe(
@@ -103,13 +102,13 @@ describe("I18nInterpolateTest", () => {
 describe("I18nMissingInterpolationCustomHandlerTest", () => {
   let oldHandler: MissingInterpolationArgumentHandler;
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     oldHandler = config().missingInterpolationArgumentHandler;
     config().missingInterpolationArgumentHandler = (key, values, string) =>
       `missing key is ${key.slice(1)}, values are ${inspect(values)}, given string is '${string}'`;
   });
+  afterEach(TestCase.teardown);
 
   afterEach(() => {
     config().missingInterpolationArgumentHandler = oldHandler;
@@ -125,12 +124,12 @@ describe("I18nMissingInterpolationCustomHandlerTest", () => {
 describe("I18nCustomInterpolationPatternTest", () => {
   let oldInterpolationPatterns: RegExp[];
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     oldInterpolationPatterns = config().interpolationPatterns;
     config().interpolationPatterns.push(/\{\{(\w+)\}\}/);
   });
+  afterEach(TestCase.teardown);
 
   afterEach(() => {
     config().interpolationPatterns = oldInterpolationPatterns;

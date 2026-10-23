@@ -1,10 +1,10 @@
+import * as TestCase from "../test-helpers/test-case.js";
 import { Hash, Thread } from "@blazetrails/ruby-compat";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { Fallbacks, fallbacks, setFallbacks } from "./fallbacks.js";
 import { Chain } from "./chain.js";
 import { Simple } from "./simple.js";
-import { config, exists, l, resetConfig, setLocale, t, type Locale } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
+import { config, exists, l, setLocale, t, type Locale } from "../i18n.js";
 import { MissingTranslationData } from "../exceptions.js";
 import { Fallbacks as LocaleFallbacks } from "../locale/fallbacks.js";
 import { Date } from "@blazetrails/date";
@@ -12,9 +12,10 @@ import { Time } from "@blazetrails/date";
 
 class Backend extends Fallbacks(Simple) {}
 
-function setup(): Backend {
-  resetConfig();
-  resetClassConfig();
+afterEach(TestCase.teardown);
+
+async function setup(): Promise<Backend> {
+  await TestCase.setup();
   setFallbacks(null);
   config().enforceAvailableLocales = false;
   const backend = new Backend();
@@ -29,8 +30,8 @@ describe("I18nBackendFallbacksTranslateTest", () => {
     return backend.storeTranslations(locale, data);
   }
 
-  beforeEach(() => {
-    backend = setup();
+  beforeEach(async () => {
+    backend = await setup();
     storeTranslations("en", {
       foo: "Foo in :en",
       bar: "Bar in :en",
@@ -200,8 +201,8 @@ describe("I18nBackendFallbacksTranslateTest", () => {
 describe("I18nBackendFallbacksLocalizeTestWithDefaultLocale", () => {
   let backend: Backend;
 
-  beforeEach(() => {
-    backend = setup();
+  beforeEach(async () => {
+    backend = await setup();
     config().enforceAvailableLocales = false;
     setFallbacks([config().defaultLocale]);
     backend.storeTranslations("en", { time: { formats: { fallback: "en fallback" } } });
@@ -217,8 +218,8 @@ describe("I18nBackendFallbacksLocalizeTestWithDefaultLocale", () => {
 describe("I18nBackendFallbacksLocalizeTestWithMultipleThreads", () => {
   let backend: Backend;
 
-  beforeEach(() => {
-    backend = setup();
+  beforeEach(async () => {
+    backend = await setup();
     config().enforceAvailableLocales = false;
     setFallbacks([config().defaultLocale]);
     backend.storeTranslations("en", { time: { formats: { fallback: "en fallback" } } });
@@ -240,8 +241,8 @@ describe("I18nBackendFallbacksWithCustomClass", () => {
     }
   }
 
-  beforeEach(() => {
-    backend = setup();
+  beforeEach(async () => {
+    backend = await setup();
     config().enforceAvailableLocales = false;
     setFallbacks(new MyDefaultFallback());
     backend.storeTranslations("my_language", { foo: "customer foo" });
@@ -257,8 +258,8 @@ describe("I18nBackendFallbacksWithCustomClass", () => {
 describe("I18nBackendFallbacksSymbolResolveRestartsLookupAtOriginalLocale", () => {
   let backend: Backend;
 
-  beforeEach(() => {
-    backend = setup();
+  beforeEach(async () => {
+    backend = await setup();
     config().enforceAvailableLocales = false;
     setFallbacks(["root"]);
     backend.storeTranslations("ak", {
@@ -299,8 +300,8 @@ describe("I18nBackendFallbacksSymbolResolveRestartsLookupAtOriginalLocale", () =
 describe("RegressionTestFor617", () => {
   let backend: Backend;
 
-  beforeEach(() => {
-    backend = setup();
+  beforeEach(async () => {
+    backend = await setup();
     config().enforceAvailableLocales = false;
     setFallbacks(
       new Map([
@@ -330,8 +331,8 @@ describe("RegressionTestFor617", () => {
 describe("I18nBackendFallbacksLocalizeTest", () => {
   let backend: Backend;
 
-  beforeEach(() => {
-    backend = setup();
+  beforeEach(async () => {
+    backend = await setup();
     backend.storeTranslations("en", { date: { formats: { en: "en" }, day_names: ["Sunday"] } });
     backend.storeTranslations("de", { date: { formats: { de: "de" }, day_names: ["Sunday"] } });
   });
@@ -356,8 +357,8 @@ describe("I18nBackendFallbacksLocalizeTest", () => {
 describe("I18nBackendFallbacksWithChainTest", () => {
   class ChainBackend extends Fallbacks(Chain) {}
 
-  beforeEach(() => {
-    const backend = setup();
+  beforeEach(async () => {
+    const backend = await setup();
     backend.storeTranslations("de", { foo: "FOO", nested: { key: "value" } });
     backend.storeTranslations("pt-BR", { foo: "Baz in :pt-BR" });
     config().backend = new ChainBackend(new Simple(), backend);
@@ -396,8 +397,8 @@ describe("I18nBackendFallbacksWithChainTest", () => {
 describe("I18nBackendFallbacksExistsTest", () => {
   let backend: Backend;
 
-  beforeEach(() => {
-    backend = setup();
+  beforeEach(async () => {
+    backend = await setup();
     backend.storeTranslations("en", { foo: "Foo in :en", bar: "Bar in :en" });
     backend.storeTranslations("de", { bar: "Bar in :de" });
     backend.storeTranslations("de-DE", { baz: "Baz in :de-DE" });
@@ -451,9 +452,8 @@ describe("I18nBackendOnFallbackHookTest", () => {
 
   let backend: Backend;
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     setFallbacks(null);
     config().enforceAvailableLocales = false;
     backend = new Backend();

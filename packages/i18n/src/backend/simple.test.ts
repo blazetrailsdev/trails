@@ -1,9 +1,9 @@
+import * as TestCase from "../test-helpers/test-case.js";
 import { Hash, kernelCatch } from "@blazetrails/ruby-compat";
 import { readFile } from "node:fs/promises";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { Simple } from "./simple.js";
-import { config, resetConfig, type TranslationKey } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
+import { config, type TranslationKey } from "../i18n.js";
 import { UnknownFileType } from "../exceptions.js";
 import {
   preloadTranslationFiles,
@@ -22,8 +22,7 @@ describe("I18nBackendSimpleTest", () => {
   let backend: Simple;
 
   beforeEach(async () => {
-    resetConfig();
-    resetClassConfig();
+    await TestCase.setup();
     registerFileReader((filename) => readFile(filename, "utf8"));
     await preloadTranslationFiles(
       ["en.yml", "en.yaml", "en.json", "fr.yml", "invalid/empty.yml", "invalid/syntax.yml"].map(
@@ -35,6 +34,7 @@ describe("I18nBackendSimpleTest", () => {
     config().backend = backend;
     config().enforceAvailableLocales = false;
   });
+  afterEach(TestCase.teardown);
 
   function assertPredicate<T>(actual: T, predicate: (value: T) => unknown): void {
     expect(predicate(actual)).toBe(true);

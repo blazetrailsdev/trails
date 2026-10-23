@@ -16,25 +16,25 @@ export type MissingInterpolationArgumentHandler = (
   string: string,
 ) => unknown;
 
-let backend: Base | undefined;
-let defaultLocale: Locale | undefined;
+let backend: Base | null | undefined;
+let defaultLocale: Locale | null | undefined;
 let availableLocales: Locale[] | undefined;
 let availableLocalesSet: Set<Locale> | undefined;
-let defaultSeparator: string | undefined;
-let exceptionHandler: ExceptionHandlerLike | undefined;
-let missingInterpolationArgumentHandler: MissingInterpolationArgumentHandler | undefined;
-let loadPath: (string | string[])[] | undefined;
+let defaultSeparator: string | null | undefined;
+let exceptionHandler: ExceptionHandlerLike | null | undefined;
+let missingInterpolationArgumentHandler: MissingInterpolationArgumentHandler | null | undefined;
+let loadPath: (string | string[])[] | null | undefined;
 let enforceAvailableLocalesFlag = true;
-let interpolationPatterns: RegExp[] | undefined;
+let interpolationPatterns: RegExp[] | null | undefined;
 
 export class Config {
-  private localeValue?: Locale | false;
+  private localeValue?: Locale | false | null;
 
   get locale(): Locale | false {
     return this.localeValue ?? this.defaultLocale;
   }
 
-  set locale(locale: Locale | false) {
+  set locale(locale: Locale | false | null) {
     enforceAvailableLocalesBang(locale);
     if (locale != null && locale !== false && typeof locale !== "string") {
       throw new NoMethodError(`undefined method 'to_sym' for ${rbInspect(locale)}`);
@@ -47,7 +47,7 @@ export class Config {
     return backend;
   }
 
-  set backend(value: Base) {
+  set backend(value: Base | null) {
     backend = value;
   }
 
@@ -56,7 +56,7 @@ export class Config {
     return defaultLocale;
   }
 
-  set defaultLocale(locale: Locale) {
+  set defaultLocale(locale: Locale | null) {
     enforceAvailableLocalesBang(locale);
     if (locale != null && (locale as unknown) !== false && typeof locale !== "string") {
       throw new NoMethodError(`undefined method 'to_sym' for ${rbInspect(locale)}`);
@@ -95,7 +95,7 @@ export class Config {
     return defaultSeparator;
   }
 
-  set defaultSeparator(separator: string) {
+  set defaultSeparator(separator: string | null) {
     defaultSeparator = separator;
   }
 
@@ -104,7 +104,7 @@ export class Config {
     return exceptionHandler;
   }
 
-  set exceptionHandler(handler: ExceptionHandlerLike) {
+  set exceptionHandler(handler: ExceptionHandlerLike | null) {
     exceptionHandler = handler;
   }
 
@@ -115,7 +115,7 @@ export class Config {
     return missingInterpolationArgumentHandler;
   }
 
-  set missingInterpolationArgumentHandler(handler: MissingInterpolationArgumentHandler) {
+  set missingInterpolationArgumentHandler(handler: MissingInterpolationArgumentHandler | null) {
     missingInterpolationArgumentHandler = handler;
   }
 
@@ -124,7 +124,7 @@ export class Config {
     return loadPath;
   }
 
-  async setLoadPath(value: (string | string[])[]): Promise<void> {
+  async setLoadPath(value: (string | string[])[] | null): Promise<void> {
     loadPath = value;
     availableLocalesSet = undefined;
     await this.backend.reloadBang();
@@ -143,24 +143,7 @@ export class Config {
     return interpolationPatterns;
   }
 
-  set interpolationPatterns(patterns: RegExp[]) {
+  set interpolationPatterns(patterns: RegExp[] | null) {
     interpolationPatterns = patterns;
   }
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE i18n-reset-seams-fold-into-config-assignment
- */
-export function resetClassConfig(): void {
-  backend = undefined;
-  defaultLocale = undefined;
-  availableLocales = undefined;
-  availableLocalesSet = undefined;
-  defaultSeparator = undefined;
-  exceptionHandler = undefined;
-  missingInterpolationArgumentHandler = undefined;
-  loadPath = undefined;
-  enforceAvailableLocalesFlag = true;
-  interpolationPatterns = undefined;
 }

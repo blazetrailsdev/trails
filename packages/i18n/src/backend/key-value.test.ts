@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import * as TestCase from "../test-helpers/test-case.js";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { KeyValue, type Store } from "./key-value.js";
 import { Fallbacks } from "./fallbacks.js";
 import { InvalidPluralizationData, MissingTranslationData } from "../exceptions.js";
-import { config, resetConfig, t, type TranslateKey } from "../i18n.js";
-import { resetClassConfig } from "../config.js";
+import { config, t, type TranslateKey } from "../i18n.js";
 import type { TranslateOptions } from "./base.js";
 import { deepSymbolizeKeys, type TranslationData } from "../utils.js";
 
@@ -12,11 +12,11 @@ class FallbacksBackend extends Fallbacks(KeyValue) {}
 describe("I18nBackendKeyValueTest", () => {
   let backend: KeyValue;
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     config().enforceAvailableLocales = false;
   });
+  afterEach(TestCase.teardown);
 
   function setupBackend(subtree = true, Backend: typeof KeyValue = KeyValue): void {
     backend = new Backend(new Map<string, string>() as Store, subtree);

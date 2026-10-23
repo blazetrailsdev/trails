@@ -58,20 +58,11 @@ export function setConfig(value: Config): void {
   Thread.current().threadVariableSet(":i18n_config", value);
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE i18n-reset-seams-fold-into-config-assignment
- */
-export function resetConfig(): void {
-  Thread.current().threadVariableSet(":i18n_config", null);
-  normalizedKeyCache.clear();
-}
-
 export function locale(): Locale | false {
   return config().locale;
 }
 
-export function setLocale(value: Locale | false): void {
+export function setLocale(value: Locale | false | null): void {
   config().locale = value;
 }
 
@@ -79,7 +70,7 @@ export function backend(): Base {
   return config().backend;
 }
 
-export function setBackend(value: Base): void {
+export function setBackend(value: Base | null): void {
   config().backend = value;
 }
 
@@ -87,7 +78,7 @@ export function defaultLocale(): Locale {
   return config().defaultLocale;
 }
 
-export function setDefaultLocale(value: Locale): void {
+export function setDefaultLocale(value: Locale | null): void {
   config().defaultLocale = value;
 }
 
@@ -103,7 +94,7 @@ export function defaultSeparator(): string {
   return config().defaultSeparator;
 }
 
-export function setDefaultSeparator(value: string): void {
+export function setDefaultSeparator(value: string | null): void {
   config().defaultSeparator = value;
 }
 
@@ -119,7 +110,7 @@ export function loadPath(): (string | string[])[] {
   return config().loadPath;
 }
 
-export async function setLoadPath(value: (string | string[])[]): Promise<void> {
+export async function setLoadPath(value: (string | string[])[] | null): Promise<void> {
   await config().setLoadPath(value);
 }
 

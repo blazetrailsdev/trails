@@ -77,7 +77,7 @@ export class GID extends Generic {
   static create(
     app: string,
     model: { id: unknown; constructor: { name: string } },
-    params: Record<string, string> | null = null,
+    params: Record<string, unknown> | null = null,
   ): GID {
     return GID.build({ app, modelName: model.constructor.name, modelId: model.id, params });
   }
@@ -86,7 +86,7 @@ export class GID extends Generic {
     app: string;
     modelName: string;
     modelId: unknown;
-    params?: Record<string, string> | null;
+    params?: Record<string, unknown> | null;
   }): GID {
     const parts = Util.makeComponentsHash(this, args);
     parts["host"] = parts["app"];
@@ -95,7 +95,7 @@ export class GID extends Generic {
       .join(COMPOSITE_MODEL_ID_DELIMITER);
     parts["path"] = `/${parts["modelName"] as string}/${modelIdSegment}`;
 
-    const params = parts["params"] as Record<string, string> | null | undefined;
+    const params = parts["params"] as Record<string, unknown> | null | undefined;
     if (params != null && Object.keys(params).length > 0) {
       parts["query"] = URI.encodeWwwForm(params);
     }

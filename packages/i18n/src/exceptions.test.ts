@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import * as TestCase from "./test-helpers/test-case.js";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { Hash, rbInspect } from "@blazetrails/ruby-compat";
 
 import {
@@ -10,8 +11,7 @@ import {
   MissingTranslationData,
   ReservedInterpolationKey,
 } from "./exceptions.js";
-import { config, resetConfig, translate } from "./i18n.js";
-import { resetClassConfig } from "./config.js";
+import { config, translate } from "./i18n.js";
 import { Simple } from "./backend/simple.js";
 
 describe("I18nExceptionsTest", () => {
@@ -21,13 +21,13 @@ describe("I18nExceptionsTest", () => {
     backend.storeTranslations(locale, data);
   }
 
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
+    await TestCase.setup();
     backend = new Simple();
     config().backend = backend;
     config().enforceAvailableLocales = false;
   });
+  afterEach(TestCase.teardown);
 
   it("invalid locale stores locale", () => {
     forceInvalidLocale((exception) => {

@@ -1,25 +1,24 @@
+import * as TestCase from "./test-helpers/test-case.js";
 import { Thread } from "@blazetrails/ruby-compat";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { MissingTranslationData } from "./exceptions.js";
 import {
   config,
   locale,
   newDoubleNestedCache,
   normalizeKeys,
-  resetConfig,
   translateBang,
   withLocale,
 } from "./i18n.js";
-import { resetClassConfig } from "./config.js";
 import { Simple } from "./backend/simple.js";
 
 describe("I18n.translateBang", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
     config().backend = new Simple();
     config().enforceAvailableLocales = false;
   });
+  beforeEach(TestCase.setup);
+  afterEach(TestCase.teardown);
 
   it("raises MissingTranslationData for a bogus key", () => {
     expect(() => translateBang("bogus")).toThrow(MissingTranslationData);
@@ -27,11 +26,11 @@ describe("I18n.translateBang", () => {
 });
 
 describe("I18n.withLocale", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
+  beforeEach(async () => {
     config().enforceAvailableLocales = false;
   });
+  beforeEach(TestCase.setup);
+  afterEach(TestCase.teardown);
 
   it("gives each Thread its own locale while concurrent blocks await", async () => {
     const read = (tmpLocale: string) =>
@@ -77,10 +76,8 @@ describe("I18n.newDoubleNestedCache", () => {
 });
 
 describe("I18n.normalizeKeys memoization", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
-  });
+  beforeEach(TestCase.setup);
+  afterEach(TestCase.teardown);
 
   it("does not let a caller mutating its result corrupt the cached segments", () => {
     normalizeKeys(null, "foo.bar", null).push("baz");
@@ -98,10 +95,8 @@ describe("I18n.normalizeKeys memoization", () => {
 });
 
 describe("I18n.normalizeKeys on a Symbol key", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
-  });
+  beforeEach(TestCase.setup);
+  afterEach(TestCase.teardown);
 
   it("drops the leading colon of a Symbol key, scope and locale", () => {
     expect(normalizeKeys(null, ":errors.format", null)).toEqual(["errors", "format"]);
