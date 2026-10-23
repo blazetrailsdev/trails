@@ -165,17 +165,30 @@ export function tally<T, E = unknown>(
  * pushing each element whose block result `RTEST`s (`find_all_i`, `:456`).
  * @noRailsEquivalent PERMANENT
  */
-function findAll<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown): Enumerated<E, T[]> {
-  if (!block) return enumToA(this);
+function enumFindAll<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block?: (i: T) => unknown,
+): Enumerated<E, T[]> {
+  if (!block) return enumToA(obj);
   const ary: T[] = [];
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       const result = block(i);
       if (result != null && result !== false) ary.push(i);
     },
     () => ary,
   );
+}
+export { enumFindAll as findAll };
+
+/**
+ * The mixin member over `self`, bound as `find_all` and `select`
+ * (`vendor/ruby/v3.3.11/enum.c:5075-5076`).
+ * @noRailsEquivalent PERMANENT
+ */
+function findAll<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown): Enumerated<E, T[]> {
+  return enumFindAll(this, block);
 }
 
 /**

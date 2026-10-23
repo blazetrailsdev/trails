@@ -32,6 +32,7 @@ export {
   Enumerable,
   eachSlice,
   filterMap,
+  findAll,
   groupBy,
   partition,
   reduce,

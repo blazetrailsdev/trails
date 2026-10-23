@@ -6,6 +6,7 @@ import {
   eachSlice,
   filterMap,
   find,
+  findAll,
   first,
   groupBy,
   partition,
@@ -402,6 +403,7 @@ describe("Enumerable free functions over any receiver", () => {
       );
       expect(eachSlice(build([1, 2, 3, 4, 5]), 2)).toEqual([[1, 2], [3, 4], [5]]);
       expect(find(build([1, 2, 3]), (i: unknown) => (i as number) > 1)).toBe(2);
+      expect(findAll(build([1, null, 2]), (i) => i)).toEqual([1, 2]);
       expect(first(build([1, 2, 3]), 2)).toEqual([1, 2]);
       expect(drop(build([1, 2, 3]), 1)).toEqual([2, 3]);
       expect(sum(build([1, 2, 3]))).toBe(6);
