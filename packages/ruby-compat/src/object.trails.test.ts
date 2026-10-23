@@ -383,6 +383,12 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo([1], "toA")).toBe(true);
     expect(basicObjRespondTo([1], "partition")).toBe(true);
     expect(basicObjRespondTo(new Map(), "get")).toBe(true);
+    expect(basicObjRespondTo({ a: 1 }, "eachPair")).toBe(true);
+    expect(basicObjRespondTo({ a: 1 }, "toHash")).toBe(true);
+    expect(basicObjRespondTo({ a: 1 }, "get")).toBe(true);
+    expect(basicObjRespondTo(new Set([1]), "each")).toBe(true);
+    expect(basicObjRespondTo(new Set([1]), "isEmpty")).toBe(true);
+    expect(basicObjRespondTo({ [Symbol.toStringTag]: "Temporal.PlainDate" }, "toDate")).toBe(true);
   });
 
   it("answers a respond_to_missing? defined on the prototype after the first query", () => {
@@ -394,7 +400,7 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo(new Late(), "dynamic")).toBe(true);
   });
 
-  it("reads respond_to_missing? and respond_to? off the receiver before its cached prototype", () => {
+  it("reads respond_to_missing? and respond_to? off the receiver before its prototype", () => {
     class Dynamic {
       respondToMissing(mid: string) {
         return mid === "dynamic";
