@@ -449,6 +449,16 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'base_test.rb:991 `assert_equal("c", duped_topic.title)` — reads the `duped_topic.title.replace "c"` of :979 back after save; a JS string cannot be mutated in place (CLAUDE.md, "Ruby Strings are JS string primitives")',
     },
   ],
+  "activerecord:fixtures_test.rb › FixturesWithoutInstantiationTest › visibility of accessor method":
+    [
+      {
+        kind: "assert_equal",
+        value: "b:false",
+        as: null,
+        reason:
+          'fixtures_test.rb:771 `assert_equal false, respond_to?(:topics, false)` — a JS method entry carries no visibility, so a fixture accessor answers `respond_to?` at both `include_private` values (CLAUDE.md, "Method visibility is compile-time only")',
+      },
+    ],
   "activerecord:connection_adapters/standalone_connection_test.rb › StandaloneConnectionTest › async fallback":
     [
       {

@@ -755,7 +755,6 @@ describe("FixturesWithoutInstantiationTest", () => {
   });
 
   it("visibility of accessor method", () => {
-    // PERMANENT-SKIP: the "should be private method" assertion turns on run-time visibility (CLAUDE.md, "Method visibility is compile-time only").
     expect(rbObjRespondTo(self(), "topics"), "confirm to respond surely").toBe(true);
   });
 

@@ -2,6 +2,7 @@ import { PeriodNotFound, TimeZone, Timezone, TimezonePeriod } from "./values/tim
 import {
   Range,
   basicObjRespondTo,
+  rbObjRespondTo,
   equals as cmpEquals,
   greaterThan,
   greaterThanOrEqual,
@@ -170,9 +171,8 @@ export class TimeWithZone {
     return basicObjRespondTo(this, sym);
   }
 
-  respondToMissing(sym: string, includePriv: boolean): boolean {
-    if (sym.startsWith("_")) return false;
-    return typeof (this.time as unknown as Record<string, unknown>)[sym] === "function";
+  respondToMissing(sym: string, _includePriv: boolean): boolean {
+    return rbObjRespondTo(this.time, sym);
   }
 
   methodMissing(method: string, ...args: unknown[]): unknown {
