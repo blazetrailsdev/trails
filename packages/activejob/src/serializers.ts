@@ -1,86 +1,104 @@
-import { mattrAccessor, safeConstantize } from "@blazetrails/activesupport";
+import { Autoload, safeConstantize, mattrAccessor } from "@blazetrails/activesupport";
 import {
-  ArgumentError,
+  extend,
+  Enumerator,
   hashAref,
-  rtest,
   rbInspect,
-  rbModConstSet,
-  rbModName,
-  rbObjClass,
+  ArgumentError,
+  Set,
+  classModule,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob, Serializers, type SerializerLike } from "./namespaces.js";
-import { SymbolSerializer } from "./serializers/symbol-serializer.js";
-import { DurationSerializer } from "./serializers/duration-serializer.js";
-import { DateTimeSerializer } from "./serializers/date-time-serializer.js";
+import { SerializationError } from "./arguments.js";
+import { rbBinop } from "./codegen-runtime.js";
+import { BigDecimalSerializer } from "./serializers/big-decimal-serializer.js";
 import { DateSerializer } from "./serializers/date-serializer.js";
-import { TimeWithZoneSerializer } from "./serializers/time-with-zone-serializer.js";
-import { TimeSerializer } from "./serializers/time-serializer.js";
+import { DateTimeSerializer } from "./serializers/date-time-serializer.js";
+import { DurationSerializer } from "./serializers/duration-serializer.js";
 import { ModuleSerializer } from "./serializers/module-serializer.js";
 import { RangeSerializer } from "./serializers/range-serializer.js";
-import { BigDecimalSerializer } from "./serializers/big-decimal-serializer.js";
+import { SymbolSerializer } from "./serializers/symbol-serializer.js";
+import { TimeSerializer } from "./serializers/time-serializer.js";
+import { TimeWithZoneSerializer } from "./serializers/time-with-zone-serializer.js";
+import type { SerializerLike } from "./namespaces.js";
+import type { ObjectSerializer } from "./serializers/object-serializer.js";
 
-Serializers.autoload("ObjectSerializer");
-Serializers.autoload("TimeObjectSerializer");
-Serializers.autoload("SymbolSerializer");
-Serializers.autoload("DurationSerializer");
-Serializers.autoload("DateTimeSerializer");
-Serializers.autoload("DateSerializer");
-Serializers.autoload("TimeWithZoneSerializer");
-Serializers.autoload("TimeSerializer");
-Serializers.autoload("ModuleSerializer");
-Serializers.autoload("RangeSerializer");
-Serializers.autoload("BigDecimalSerializer");
+export class Serializers {
+  declare static _additionalSerializers: Set<unknown>;
 
-mattrAccessor.call(Serializers, "_additionalSerializers");
-Serializers._additionalSerializers = new Set();
+  static readonly [classModule] = true;
 
-export function serialize(argument: unknown): unknown {
-  const serializer = [...serializers()].find((s) => s.isSerialize(argument));
-  if (!serializer) {
-    throw new ActiveJob.SerializationError(
-      `Unsupported argument type: ${rbModName(rbObjClass(argument))}`,
-    );
-  }
-  return serializer.serialize(argument);
-}
-
-export function deserialize(argument: Record<string, unknown> | Map<string, unknown>): unknown {
-  const serializerName = hashAref(argument, ActiveJob.Arguments.OBJECT_SERIALIZER_KEY);
-  if (!rtest(serializerName)) {
-    throw new ArgumentError(
-      `Serializer name is not present in the argument: ${rbInspect(argument)}`,
-    );
+  static toString(): string {
+    return "ActiveJob::Serializers";
   }
 
-  const serializer = safeConstantize(serializerName as string) as SerializerLike | null;
-  if (serializer == null) throw new ArgumentError(`Serializer ${serializerName} is not known`);
+  static serialize(argument: unknown) {
+    const serializer = ((x) =>
+      x instanceof globalThis.Set || x instanceof globalThis.Map || x instanceof Enumerator
+        ? [...x]
+        : Object.getPrototypeOf(x) === Object.prototype
+          ? Object.entries(x as object)
+          : (x as unknown[]))(this.serializers()).find((s) => s.isSerialize(argument));
+    if (!(serializer != null && serializer !== false)) {
+      throw new SerializationError(
+        `Unsupported argument type: ${(Object.hasOwn(argument.constructor, "toString") ? String(argument.constructor) : argument.constructor.name || null) ?? ""}`,
+      );
+    }
+    return serializer.serialize(argument);
+  }
 
-  return serializer.deserialize(argument);
+  static deserialize(argument: Map<unknown, unknown>) {
+    const serializerName = hashAref(argument, "_aj_serialized");
+    if (!(serializerName != null && serializerName !== false)) {
+      throw new ArgumentError(
+        `Serializer name is not present in the argument: ${rbInspect(argument)}`,
+      );
+    }
+    const serializer = safeConstantize(serializerName);
+    if (!(serializer != null && serializer !== false)) {
+      throw new ArgumentError(`Serializer ${serializerName ?? ""} is not known`);
+    }
+    return serializer.deserialize(argument);
+  }
+
+  static serializers(): Set<SerializerLike> {
+    return this._additionalSerializers;
+  }
+
+  static addSerializers(
+    ...newSerializers: (
+      | typeof ObjectSerializer
+      | typeof SymbolSerializer
+      | typeof DurationSerializer
+      | typeof DateTimeSerializer
+      | typeof DateSerializer
+      | typeof TimeWithZoneSerializer
+      | typeof TimeSerializer
+      | typeof ModuleSerializer
+      | typeof RangeSerializer
+      | typeof BigDecimalSerializer
+    )[]
+  ) {
+    this._additionalSerializers = rbBinop(
+      this._additionalSerializers,
+      "+",
+      newSerializers.flat(Infinity),
+    );
+    return this._additionalSerializers;
+  }
 }
-
-export function serializers(): Set<SerializerLike> {
-  return Serializers._additionalSerializers;
+extend(Serializers, Autoload);
+{
+  mattrAccessor.call(Serializers, "_additionalSerializers");
+  Serializers._additionalSerializers = new Set();
+  Serializers.addSerializers(
+    SymbolSerializer,
+    DurationSerializer,
+    DateTimeSerializer,
+    DateSerializer,
+    TimeWithZoneSerializer,
+    TimeSerializer,
+    ModuleSerializer,
+    RangeSerializer,
+    BigDecimalSerializer,
+  );
 }
-
-export function addSerializers(...newSerializers: (SerializerLike | SerializerLike[])[]): void {
-  Serializers._additionalSerializers = new Set([
-    ...Serializers._additionalSerializers,
-    ...newSerializers.flat(),
-  ]);
-}
-
-Object.assign(Serializers, { serialize, deserialize, serializers, addSerializers });
-
-addSerializers(
-  SymbolSerializer,
-  DurationSerializer,
-  DateTimeSerializer,
-  DateSerializer,
-  TimeWithZoneSerializer,
-  TimeSerializer,
-  ModuleSerializer,
-  RangeSerializer,
-  BigDecimalSerializer,
-);
-rbModConstSet(ActiveJob, "Serializers", Serializers);
-export { Serializers };

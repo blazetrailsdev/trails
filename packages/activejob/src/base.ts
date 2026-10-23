@@ -1,131 +1,133 @@
-import {
-  Callbacks as ASCallbacks,
-  type Included,
-  Rescuable,
-  runLoadHooks,
-  zone,
-} from "@blazetrails/activesupport";
-import {
-  extend,
-  include,
-  rbHashSRuby2KeywordsHash,
-  rbModConstSet,
-  rbObjClass,
-  SecureRandom,
-} from "@blazetrails/ruby-compat";
-import { Callbacks, ClassMethods as CallbacksClassMethods } from "./callbacks.js";
-import { ClassMethods, Core } from "./core.js";
-import { Enqueuing, ClassMethods as EnqueuingClassMethods } from "./enqueuing.js";
-import { ClassMethods as ExceptionsClassMethods, Exceptions } from "./exceptions.js";
-import { ClassMethods as ExecutionClassMethods, Execution } from "./execution.js";
-import "./configured-job.js";
-import { Instrumentation } from "./instrumentation.js";
+import { Core } from "./core.js";
+import { QueueAdapter } from "./queue-adapter.js";
+import { QueueName } from "./queue-name.js";
+import { QueuePriority } from "./queue-priority.js";
+import { Enqueuing } from "./enqueuing.js";
+import { Execution } from "./execution.js";
+import { Callbacks } from "./callbacks.js";
+import { Exceptions } from "./exceptions.js";
 import "./log-subscriber.js";
 import { Logging } from "./logging.js";
-import { ActiveJob } from "./namespaces.js";
-import { ClassMethods as QueueAdapterClassMethods, QueueAdapter } from "./queue-adapter.js";
-import "./queue-adapters.js";
-import { ClassMethods as QueueNameClassMethods, QueueName } from "./queue-name.js";
-import { ClassMethods as QueuePriorityClassMethods, QueuePriority } from "./queue-priority.js";
+import { Instrumentation } from "./instrumentation.js";
 import { Timezones } from "./timezones.js";
 import { Translation } from "./translation.js";
+import { zone, ActiveSupport, runLoadHooks } from "@blazetrails/activesupport";
+import { Time as RubyTime } from "@blazetrails/date";
+import {
+  SecureRandom,
+  rbHashSRuby2KeywordsHash,
+  include,
+  registerConstant,
+  Included,
+} from "@blazetrails/ruby-compat";
+import type { ClassMethods as ClassMethods3 } from "./callbacks.js";
+import type { ClassMethods as ClassMethods9 } from "./core.js";
+import type { EnqueueAfterTransactionCommit } from "./enqueue-after-transaction-commit.js";
+import type { ClassMethods as ClassMethods5 } from "./enqueuing.js";
+import type { ClassMethods as ClassMethods2 } from "./exceptions.js";
+import type { ClassMethods as ClassMethods4 } from "./execution.js";
+import type { ClassMethods as ClassMethods8 } from "./queue-adapter.js";
+import type { ClassMethods as ClassMethods7 } from "./queue-name.js";
+import type { ClassMethods as ClassMethods6 } from "./queue-priority.js";
+import type { TestQueueAdapter, ClassMethods } from "./test-helper.js";
+import type { TimeWithZone } from "@blazetrails/activesupport";
+import type { EnqueueError } from "./enqueuing.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base
-  extends
-    Core,
-    QueueAdapter,
-    Enqueuing,
-    Execution,
-    Exceptions,
-    Rescuable,
-    Included<typeof ASCallbacks>,
-    Pick<Included<typeof Instrumentation>, "instrument"> {
-  get logger(): unknown;
-  set logger(logger: unknown);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
+  declare static _testAdapter: null;
+  declare static queueAdapter: typeof ClassMethods.queueAdapter;
+  declare static disableTestAdapter: typeof ClassMethods.disableTestAdapter;
+  declare static enableTestAdapter: typeof ClassMethods.enableTestAdapter;
+  declare static logger: unknown;
+  declare static logArguments: boolean;
+  declare static retryJitter: number;
+  declare static afterDiscardProcs: ((...args: unknown[]) => unknown)[];
+  declare static retryOn: typeof ClassMethods2.retryOn;
+  declare static discardOn: typeof ClassMethods2.discardOn;
+  declare static afterDiscard: typeof ClassMethods2.afterDiscard;
+  declare static beforePerform: typeof ClassMethods3.beforePerform;
+  declare static afterPerform: typeof ClassMethods3.afterPerform;
+  declare static aroundPerform: typeof ClassMethods3.aroundPerform;
+  declare static beforeEnqueue: typeof ClassMethods3.beforeEnqueue;
+  declare static afterEnqueue: typeof ClassMethods3.afterEnqueue;
+  declare static aroundEnqueue: typeof ClassMethods3.aroundEnqueue;
+  declare static performNow: typeof ClassMethods4.performNow;
+  declare static execute: typeof ClassMethods4.execute;
+  declare static enqueueAfterTransactionCommit: string | boolean;
+  declare static performLater: typeof ClassMethods5.performLater;
+  declare static jobOrInstantiate: typeof ClassMethods5.jobOrInstantiate;
+  declare static priority: (...args: unknown[]) => unknown;
+  declare static queueWithPriority: typeof ClassMethods6.queueWithPriority;
+  declare static queueName: ((...args: unknown[]) => unknown) | string;
+  declare static queueNameDelimiter: string;
+  declare static queueNamePrefix: string;
+  declare static queueAs: typeof ClassMethods7.queueAs;
+  declare static queueNameFromPart: typeof ClassMethods7.queueNameFromPart;
+  declare static _queueAdapterName: string | null;
+  declare static _queueAdapter: null;
+  declare static queueAdapterName: typeof ClassMethods8.queueAdapterName;
+  declare static setQueueAdapter: typeof ClassMethods8.setQueueAdapter;
+  declare static assignAdapter: typeof ClassMethods8.assignAdapter;
+  declare static isQueueAdapter: typeof ClassMethods8.isQueueAdapter;
+  declare static deserialize: typeof ClassMethods9.deserialize;
+  declare static set: typeof ClassMethods9.set;
+
   static toString(): string {
     return "ActiveJob::Base";
   }
 
-  declare static deserialize: typeof ClassMethods.deserialize;
-  declare static set: typeof ClassMethods.set;
-  declare static queueAdapter: unknown;
-  declare static queueAdapterName: string;
-  declare static _queueAdapterName: string | null;
-  declare static _queueAdapter: unknown;
-  declare static setQueueAdapter: typeof QueueAdapterClassMethods.setQueueAdapter;
-  /** @internal */
-  declare static assignAdapter: typeof QueueAdapterClassMethods.assignAdapter;
-  /** @internal */
-  declare static isQueueAdapter: typeof QueueAdapterClassMethods.isQueueAdapter;
-  declare static defaultQueueName: unknown;
-  declare static setCallback: typeof ASCallbacks.ClassMethods.setCallback;
-  declare static beforePerform: typeof CallbacksClassMethods.beforePerform;
-  declare static afterPerform: typeof CallbacksClassMethods.afterPerform;
-  declare static aroundPerform: typeof CallbacksClassMethods.aroundPerform;
-  declare static beforeEnqueue: typeof CallbacksClassMethods.beforeEnqueue;
-  declare static afterEnqueue: typeof CallbacksClassMethods.afterEnqueue;
-  declare static aroundEnqueue: typeof CallbacksClassMethods.aroundEnqueue;
-  declare static queueAs: typeof QueueNameClassMethods.queueAs;
-  declare static queueNameFromPart: typeof QueueNameClassMethods.queueNameFromPart;
-  declare static queueName: unknown;
-  declare static queueNameDelimiter: string;
-  declare static isQueueNameDelimiter: boolean;
-  declare static queueNamePrefix: unknown;
-  declare static defaultPriority: unknown;
-  declare static queueWithPriority: typeof QueuePriorityClassMethods.queueWithPriority;
-  declare static priority: unknown;
-  declare static enqueueAfterTransactionCommit: boolean | string;
-  declare static performLater: typeof EnqueuingClassMethods.performLater;
-  declare static jobOrInstantiate: typeof EnqueuingClassMethods.jobOrInstantiate;
-  declare static performNow: typeof ExecutionClassMethods.performNow;
-  declare static execute: typeof ExecutionClassMethods.execute;
-  declare static rescueFrom: typeof Rescuable.ClassMethods.rescueFrom;
-  declare static afterDiscardProcs: Exceptions["afterDiscardProcs"];
-  declare static isAfterDiscardProcs: boolean;
-  declare static retryJitter: number;
-  declare static retryOn: typeof ExceptionsClassMethods.retryOn;
-  declare static discardOn: typeof ExceptionsClassMethods.discardOn;
-  declare static afterDiscard: typeof ExceptionsClassMethods.afterDiscard;
-  declare static logger: unknown;
-  declare static logArguments: boolean;
-  declare static isLogArguments: boolean;
-  declare static rescueHandlers: unknown[][];
-
-  /**
-   * @inventedArm if — PERMANENT
-   * @inventedArm getPrototypeOf — PERMANENT
-   * @inlinedFrom ActiveJob::Core#initialize rails/v8.0.2/activejob/lib/active_job/core.rb:93-102
-   */
-  constructor(...arguments_: unknown[]) {
+  /** @inlinedFrom ActiveJob::Core#initialize rails/v8.0.2/activejob/lib/active_job/core.rb:93-102 */
+  constructor(...arguments_: (string | number | { argument1: string; argument2: number })[]) {
     const last = arguments_[arguments_.length - 1];
     if (
       typeof last === "object" &&
       last !== null &&
       Object.getPrototypeOf(last) === Object.prototype
-    ) {
+    )
       arguments_[arguments_.length - 1] = rbHashSRuby2KeywordsHash(last);
-    }
-    const klass = rbObjClass(this) as unknown as { queueName: unknown; priority: unknown };
     this._arguments = arguments_;
-    this.jobId = SecureRandom.uuid();
-    this.queueName = klass.queueName;
-    this.scheduledAt = null;
-    this.priority = klass.priority;
-    this.executions = 0;
-    this.exceptionExecutions = {};
-    this.timezone = zone()?.name ?? null;
+    this._jobId = SecureRandom.uuid();
+    this._queueName = (this.constructor as typeof Base).queueName;
+    this._scheduledAt = null;
+    this._priority = (this.constructor as typeof Base).priority;
+    this._executions = 0;
+    this._exceptionExecutions = {};
+    this._timezone = zone()?.name ?? null;
   }
 }
+export interface Base
+  extends
+    EnqueueAfterTransactionCommit,
+    Logging,
+    Omit<Instrumentation, "performNow">,
+    Exceptions,
+    Omit<Execution, "performNow" | "perform" | "_performJob">,
+    Omit<Enqueuing, "rawEnqueue">,
+    Core {
+  logger: unknown;
+  afterDiscardProcs: unknown[];
+  queueNamePrefix: unknown;
+  arguments: unknown[];
+  serializedArguments: unknown[] | null;
+  scheduledAt: RubyTime | TimeWithZone;
+  jobId: string | null;
+  queueName: unknown;
+  priority: number;
+  providerJobId: string;
+  executions: number | null;
+  exceptionExecutions: null;
+  locale: string | null;
+  timezone: string | null;
+  enqueuedAt: RubyTime | null;
+  successfullyEnqueued: boolean;
+  enqueueError: EnqueueError;
+  perform(...args: Parameters<Execution["perform"]>): ReturnType<Execution["perform"]>;
+}
+registerConstant("ActiveJob::Base", Base);
 include(Base, Core);
 include(Base, QueueAdapter);
 include(Base, QueueName);
 include(Base, QueuePriority);
-extend(Base, ClassMethods);
 include(Base, Enqueuing);
 include(Base, Execution);
 include(Base, Callbacks);
@@ -134,6 +136,6 @@ include(Base, Instrumentation);
 include(Base, Logging);
 include(Base, Timezones);
 include(Base, Translation);
-rbModConstSet(ActiveJob, "Base", Base);
-
-runLoadHooks("active_job", Base);
+{
+  runLoadHooks("active_job", Base);
+}

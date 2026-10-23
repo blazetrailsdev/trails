@@ -1,213 +1,225 @@
 import {
-  any,
-  BacktraceCleaner,
-  callerLocations,
-  classAttribute,
-  isPresent,
-  LogSubscriber as BaseLogSubscriber,
-  NotificationEvent as Event,
+  LogSubscriber as ActiveSupportLogSubscriber,
   pluralize,
-  type Logger,
+  isPresent,
+  Logger,
+  BacktraceCleaner,
+  classAttribute,
 } from "@blazetrails/activesupport";
-import { GlobalID } from "@blazetrails/globalid";
-import { Time } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
+import { Identification } from "@blazetrails/globalid";
 import {
-  excBacktrace,
-  Hash,
-  rbFArray,
-  rbInspect,
-  rbModConstSet,
-  rbModName,
-  rbObjAsString,
-  rbObjClass,
-  rbObjIsKindOf,
+  rbObjClassname,
+  Enumerator,
+  rbFSend,
   round,
-  StandardError,
-  Exception,
-  rtest,
-  toI,
+  excBacktrace,
+  aryJoin,
+  rbInspect,
   transformValues,
-  sortBy,
-  tally,
+  rbObjIsKindOf,
+  StandardError,
+  Thread,
+  rbIterBreakValue,
+  cmp,
 } from "@blazetrails/ruby-compat";
-import { verboseEnqueueLogs } from "./active-job.js";
-import { ActiveJob } from "./namespaces.js";
+import { ActiveJob } from "./active-job.js";
+import { Base } from "./base.js";
+import { rbBinop } from "./codegen-runtime.js";
+import { adapterName } from "./queue-adapter.js";
 
-interface LoggedJob {
-  jobId: string | null;
-  queueName: string;
-  arguments: unknown[];
-  executions: number | null;
-  enqueuedAt: { utc(): { iso8601(fractionDigits: number): string } } | null;
-  scheduledAt: unknown;
-  enqueueError: unknown;
-  isSuccessfullyEnqueued(): unknown;
-}
-
-export class LogSubscriber extends BaseLogSubscriber {
-  static override toString(): string {
+export class LogSubscriber extends ActiveSupportLogSubscriber {
+  static toString(): string {
     return "ActiveJob::LogSubscriber";
   }
 
-  declare static backtraceCleaner: BacktraceCleaner;
-  declare backtraceCleaner: BacktraceCleaner;
-
-  enqueue(event: Event): void {
-    const job = event.payload.job as LoggedJob;
-    const ex = (event.payload.exception_object as Error | null) || (job.enqueueError as Error);
-
-    if (ex) {
-      this.error(null, () => {
-        return `Failed enqueuing ${rbModName(rbObjClass(job))} to ${this.queueName(event)}: ${rbObjAsString(rbObjClass(ex))} (${rbObjAsString(ex.message)})`;
-      });
-    } else if (rtest(event.payload.aborted)) {
-      this.info(null, () => {
-        return `Failed enqueuing ${rbModName(rbObjClass(job))} to ${this.queueName(event)}, a before_enqueue callback halted the enqueuing execution.`;
-      });
+  enqueue(event: Record<string, unknown>) {
+    const job = event.payload["job"];
+    const ex = event.payload["exception_object"] ?? job.enqueueError;
+    if (ex != null && ex !== false) {
+      return this.error(
+        undefined,
+        () =>
+          `Failed enqueuing ${(Object.hasOwn(job.constructor, "toString") ? String(job.constructor) : job.constructor.name || null) ?? ""} to ${this.queueName(event)}: ${rbObjClassname(ex)} (${ex.message ?? ""})`,
+      );
+    } else if ((event.payload["aborted"] ?? false) !== false) {
+      return this.info(
+        undefined,
+        () =>
+          `Failed enqueuing ${(Object.hasOwn(job.constructor, "toString") ? String(job.constructor) : job.constructor.name || null) ?? ""} to ${this.queueName(event)}, a before_enqueue callback halted the enqueuing execution.`,
+      );
     } else {
-      this.info(null, () => {
-        return (
-          `Enqueued ${rbModName(rbObjClass(job))} (Job ID: ${job.jobId}) to ${this.queueName(event)}` +
-          this.argsInfo(job)
-        );
-      });
+      return this.info(
+        undefined,
+        () =>
+          `Enqueued ${(Object.hasOwn(job.constructor, "toString") ? String(job.constructor) : job.constructor.name || null) ?? ""} (Job ID: ${job.jobId ?? ""}) to ${this.queueName(event)}` +
+          this.argsInfo(job),
+      );
     }
   }
 
-  enqueueAt(event: Event): void {
-    const job = event.payload.job as LoggedJob;
-    const ex = (event.payload.exception_object as Error | null) || (job.enqueueError as Error);
-
-    if (ex) {
-      this.error(null, () => {
-        return `Failed enqueuing ${rbModName(rbObjClass(job))} to ${this.queueName(event)}: ${rbObjAsString(rbObjClass(ex))} (${rbObjAsString(ex.message)})`;
-      });
-    } else if (rtest(event.payload.aborted)) {
-      this.info(null, () => {
-        return `Failed enqueuing ${rbModName(rbObjClass(job))} to ${this.queueName(event)}, a before_enqueue callback halted the enqueuing execution.`;
-      });
+  enqueueAt(event: Record<string, unknown>) {
+    const job = event.payload["job"];
+    const ex = event.payload["exception_object"] ?? job.enqueueError;
+    if (ex != null && ex !== false) {
+      return this.error(
+        undefined,
+        () =>
+          `Failed enqueuing ${(Object.hasOwn(job.constructor, "toString") ? String(job.constructor) : job.constructor.name || null) ?? ""} to ${this.queueName(event)}: ${rbObjClassname(ex)} (${ex.message ?? ""})`,
+      );
+    } else if ((event.payload["aborted"] ?? false) !== false) {
+      return this.info(
+        undefined,
+        () =>
+          `Failed enqueuing ${(Object.hasOwn(job.constructor, "toString") ? String(job.constructor) : job.constructor.name || null) ?? ""} to ${this.queueName(event)}, a before_enqueue callback halted the enqueuing execution.`,
+      );
     } else {
-      this.info(null, () => {
-        return (
-          `Enqueued ${rbModName(rbObjClass(job))} (Job ID: ${job.jobId}) to ${this.queueName(event)} at ${rbObjAsString(this.scheduledAt(event))}` +
-          this.argsInfo(job)
-        );
-      });
+      return this.info(
+        undefined,
+        () =>
+          `Enqueued ${(Object.hasOwn(job.constructor, "toString") ? String(job.constructor) : job.constructor.name || null) ?? ""} (Job ID: ${job.jobId ?? ""}) to ${this.queueName(event)} at ${this.scheduledAt(event) ?? ""}` +
+          this.argsInfo(job),
+      );
     }
   }
 
-  enqueueAll(event: Event): void {
-    this.info(null, () => {
-      const jobs = event.payload.jobs as LoggedJob[];
-      const adapter = event.payload.adapter;
-      const enqueuedCount = Number(toI(event.payload.enqueued_count ?? null));
-
+  enqueueAll(event: Record<string, unknown>) {
+    return this.info(undefined, () => {
+      let enqueuedJobs, failedEnqueueCount;
+      const jobs = event.payload["jobs"];
+      const adapter = event.payload["adapter"];
+      const enqueuedCount = parseInt(String(event.payload["enqueued_count"]), 10) || 0;
       if (enqueuedCount === jobs.length) {
         return this.enqueuedJobsMessage(adapter, jobs);
-      } else if (any(jobs, (job) => job.isSuccessfullyEnqueued())) {
-        const enqueuedJobs = jobs.filter((job) => rtest(job.isSuccessfullyEnqueued()));
-
-        const failedEnqueueCount = jobs.length - enqueuedCount;
+      } else if (
+        (jobs instanceof globalThis.Set ||
+        jobs instanceof globalThis.Map ||
+        jobs instanceof Enumerator
+          ? [...jobs]
+          : Object.getPrototypeOf(jobs) === Object.prototype
+            ? Object.entries(jobs as object)
+            : (jobs as unknown[])
+        ).some((x) => x.isSuccessfullyEnqueued()) ??
+        null
+      ) {
+        enqueuedJobs = (
+          jobs instanceof globalThis.Set ||
+          jobs instanceof globalThis.Map ||
+          jobs instanceof Enumerator
+            ? [...jobs]
+            : Object.getPrototypeOf(jobs) === Object.prototype
+              ? Object.entries(jobs as object)
+              : (jobs as unknown[])
+        ).filter((x) => x.isSuccessfullyEnqueued());
+        failedEnqueueCount = jobs.length - enqueuedCount;
         if (failedEnqueueCount === 0) {
           return this.enqueuedJobsMessage(adapter, enqueuedJobs);
         } else {
-          return (
-            `${this.enqueuedJobsMessage(adapter, enqueuedJobs)}. ` +
-            `Failed enqueuing ${failedEnqueueCount} ${pluralize("job", failedEnqueueCount)}`
-          );
+          return `${`${this.enqueuedJobsMessage(adapter, enqueuedJobs)}. `}${`Failed enqueuing ${failedEnqueueCount} ${pluralize("job", failedEnqueueCount) ?? ""}`}`;
         }
       } else {
-        const failedEnqueueCount = jobs.length - enqueuedCount;
-        return (
-          `Failed enqueuing ${failedEnqueueCount} ${pluralize("job", failedEnqueueCount)} ` +
-          `to ${ActiveJob.adapterName(adapter)}`
-        );
+        failedEnqueueCount = jobs.length - enqueuedCount;
+        return `${`Failed enqueuing ${failedEnqueueCount} ${pluralize("job", failedEnqueueCount) ?? ""} `}${`to ${adapterName(adapter) ?? ""}`}`;
       }
     });
   }
 
-  performStart(event: Event): void {
-    this.info(null, () => {
-      const job = event.payload.job as LoggedJob;
+  performStart(event: Record<string, unknown>) {
+    return this.info(undefined, () => {
+      const job = event.payload["job"];
       const enqueueInfo = isPresent(job.enqueuedAt)
-        ? ` enqueued at ${job.enqueuedAt!.utc().iso8601(9)}`
+        ? ` enqueued at ${rbFSend(job.enqueuedAt.utc(), "iso8601", 9) ?? ""}`
         : "";
-
       return (
-        `Performing ${rbModName(rbObjClass(job))} (Job ID: ${job.jobId}) from ${this.queueName(event)}` +
+        `Performing ${(Object.hasOwn(job.constructor, "toString") ? String(job.constructor) : job.constructor.name || null) ?? ""} (Job ID: ${job.jobId ?? ""}) from ${this.queueName(event)}` +
         enqueueInfo +
         this.argsInfo(job)
       );
     });
   }
 
-  perform(event: Event): void {
-    const job = event.payload.job as LoggedJob;
-    const ex = event.payload.exception_object as Error | null | undefined;
-    if (ex) {
-      this.error(null, () => {
-        return (
-          `Error performing ${rbModName(rbObjClass(job))} (Job ID: ${job.jobId}) from ${this.queueName(event)} in ${rbObjAsString(new Number(round(event.duration, 2)))}ms: ${rbObjAsString(rbObjClass(ex))} (${rbObjAsString(ex.message)}):\n` +
-          rbFArray(excBacktrace(ex)).join("\n")
-        );
-      });
-    } else if (rtest(event.payload.aborted)) {
-      this.error(null, () => {
-        return `Error performing ${rbModName(rbObjClass(job))} (Job ID: ${job.jobId}) from ${this.queueName(event)} in ${rbObjAsString(new Number(round(event.duration, 2)))}ms: a before_perform callback halted the job execution`;
-      });
+  perform(event: Record<string, unknown>) {
+    const job = event.payload["job"];
+    const ex = event.payload["exception_object"];
+    if (ex != null && ex !== false) {
+      return this.error(
+        undefined,
+        () =>
+          `Error performing ${(Object.hasOwn(job.constructor, "toString") ? String(job.constructor) : job.constructor.name || null) ?? ""} (Job ID: ${job.jobId ?? ""}) from ${this.queueName(event)} in ${round(event.duration, 2)}ms: ${rbObjClassname(ex)} (${ex.message ?? ""}):\n` +
+          aryJoin(
+            ((x) => (x == null ? [] : Array.isArray(x) ? (x as unknown[]) : [x]))(excBacktrace(ex)),
+            "\n",
+          ),
+      );
+    } else if ((event.payload["aborted"] ?? false) !== false) {
+      return this.error(
+        undefined,
+        () =>
+          `Error performing ${(Object.hasOwn(job.constructor, "toString") ? String(job.constructor) : job.constructor.name || null) ?? ""} (Job ID: ${job.jobId ?? ""}) from ${this.queueName(event)} in ${round(event.duration, 2)}ms: a before_perform callback halted the job execution`,
+      );
     } else {
-      this.info(null, () => {
-        return `Performed ${rbModName(rbObjClass(job))} (Job ID: ${job.jobId}) from ${this.queueName(event)} in ${rbObjAsString(new Number(round(event.duration, 2)))}ms`;
-      });
+      return this.info(
+        undefined,
+        () =>
+          `Performed ${(Object.hasOwn(job.constructor, "toString") ? String(job.constructor) : job.constructor.name || null) ?? ""} (Job ID: ${job.jobId ?? ""}) from ${this.queueName(event)} in ${round(event.duration, 2)}ms`,
+      );
     }
   }
 
-  enqueueRetry(event: Event): void {
-    const job = event.payload.job as LoggedJob;
-    const ex = event.payload.error as Error | null | undefined;
-    const wait = event.payload.wait;
-
-    this.info(null, () => {
-      if (ex) {
-        return `Retrying ${rbObjAsString(rbObjClass(job))} (Job ID: ${job.jobId}) after ${job.executions} attempts in ${toI(wait)} seconds, due to a ${rbObjAsString(rbObjClass(ex))} (${rbObjAsString(ex.message)}).`;
+  enqueueRetry(event: Record<string, unknown>) {
+    const job = event.payload["job"];
+    const ex = event.payload["error"];
+    const wait = event.payload["wait"];
+    return this.info(undefined, () => {
+      if (ex != null && ex !== false) {
+        return `Retrying ${rbObjClassname(job)} (Job ID: ${job.jobId ?? ""}) after ${job.executions ?? ""} attempts in ${parseInt(String(wait), 10) || 0} seconds, due to a ${rbObjClassname(ex)} (${ex.message ?? ""}).`;
       } else {
-        return `Retrying ${rbObjAsString(rbObjClass(job))} (Job ID: ${job.jobId}) after ${job.executions} attempts in ${toI(wait)} seconds.`;
+        return `Retrying ${rbObjClassname(job)} (Job ID: ${job.jobId ?? ""}) after ${job.executions ?? ""} attempts in ${parseInt(String(wait), 10) || 0} seconds.`;
       }
     });
   }
 
-  retryStopped(event: Event): void {
-    const job = event.payload.job as LoggedJob;
-    const ex = event.payload.error as Error;
-
-    this.error(null, () => {
-      return `Stopped retrying ${rbObjAsString(rbObjClass(job))} (Job ID: ${job.jobId}) due to a ${rbObjAsString(rbObjClass(ex))} (${rbObjAsString(ex.message)}), which reoccurred on ${job.executions} attempts.`;
-    });
+  retryStopped(event: Record<string, unknown>) {
+    const job = event.payload["job"];
+    const ex = event.payload["error"];
+    return this.error(
+      undefined,
+      () =>
+        `Stopped retrying ${rbObjClassname(job)} (Job ID: ${job.jobId ?? ""}) due to a ${rbObjClassname(ex)} (${ex.message ?? ""}), which reoccurred on ${job.executions ?? ""} attempts.`,
+    );
   }
 
-  discard(event: Event): void {
-    const job = event.payload.job as LoggedJob;
-    const ex = event.payload.error as Error;
-
-    this.error(null, () => {
-      return `Discarded ${rbObjAsString(rbObjClass(job))} (Job ID: ${job.jobId}) due to a ${rbObjAsString(rbObjClass(ex))} (${rbObjAsString(ex.message)}).`;
-    });
-  }
-
-  /** @internal */
-  private queueName(event: Event): string {
-    return (
-      ActiveJob.adapterName(event.payload.adapter) +
-      `(${rbObjAsString((event.payload.job as LoggedJob).queueName)})`
+  discard(event: Record<string, unknown>) {
+    const job = event.payload["job"];
+    const ex = event.payload["error"];
+    return this.error(
+      undefined,
+      () =>
+        `Discarded ${rbObjClassname(job)} (Job ID: ${job.jobId ?? ""}) due to a ${rbObjClassname(ex)} (${ex.message ?? ""}).`,
     );
   }
 
   /** @internal */
-  private argsInfo(job: LoggedJob): string {
-    const klass = rbObjClass(job) as unknown as { isLogArguments: boolean };
-    if (klass.isLogArguments && any(job.arguments)) {
+  protected queueName(event: Record<string, unknown>): string {
+    return rbBinop(
+      adapterName(event.payload["adapter"]),
+      "+",
+      `(${event.payload["job"].queueName ?? ""})`,
+    );
+  }
+
+  /** @internal */
+  protected argsInfo(job: Record<string, unknown>): string {
+    if (
+      job.constructor.isLogArguments &&
+      job.arguments.some((x: unknown) => x != null && x !== false)
+    ) {
       return (
-        " with arguments: " + job.arguments.map((arg) => rbInspect(this.format(arg))).join(", ")
+        " with arguments: " +
+        aryJoin(
+          job.arguments.map((arg: unknown) => rbInspect(this.format(arg))),
+          ", ",
+        )
       );
     } else {
       return "";
@@ -215,17 +227,31 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   /** @internal */
-  private format(arg: unknown): unknown {
-    if (rbObjIsKindOf(arg, Hash)) {
-      return transformValues(arg as Record<string, unknown>, (value) => this.format(value));
+  protected format(arg: unknown): unknown {
+    if (
+      typeof arg === "object" &&
+      arg !== null &&
+      ([Object.prototype, null].includes(Object.getPrototypeOf(arg)) ||
+        (arg instanceof Map && arg.constructor !== Map))
+    ) {
+      return transformValues(arg, (value) => this.format(value));
     } else if (Array.isArray(arg)) {
-      return arg.map((value) => this.format(value));
-    } else if (rbObjIsKindOf(arg, GlobalID.Identification)) {
+      return (
+        arg instanceof globalThis.Set || arg instanceof globalThis.Map || arg instanceof Enumerator
+          ? [...arg]
+          : Object.getPrototypeOf(arg) === Object.prototype
+            ? Object.entries(arg as object)
+            : (arg as unknown[])
+      ).map((value): unknown => this.format(value));
+    } else if (rbObjIsKindOf(arg, Identification)) {
       try {
-        return (arg as { toGlobalId(): unknown }).toGlobalId();
+        return arg.toGlobalId();
       } catch (error) {
-        if (error instanceof Exception && !(error instanceof StandardError)) throw error;
-        return arg;
+        if (error instanceof StandardError) {
+          return arg;
+        } else {
+          throw error;
+        }
       }
     } else {
       return arg;
@@ -233,77 +259,98 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   /** @internal */
-  private scheduledAt(event: Event): Time {
-    return Time.at((event.payload.job as LoggedJob).scheduledAt).utc();
+  protected scheduledAt(event: Record<string, unknown>): RubyTime {
+    return RubyTime.at(event.payload["job"].scheduledAt).utc();
   }
 
   /** @internal */
-  override get logger(): Logger | null {
-    return ActiveJob.Base.logger as Logger | null;
+  get logger(): Logger | null {
+    return Base.logger;
   }
 
-  protected override info(progname: string | null = null, block?: () => string): boolean | null {
-    if (!super.info(progname, block)) return null;
-
-    if (verboseEnqueueLogs()) {
-      return this.logEnqueueSource();
+  /** @internal */
+  protected info(
+    progname: string | null = null,
+    block?: (...args: unknown[]) => unknown,
+  ): boolean | null {
+    if (!((super.info(progname, block) ?? false) !== false)) {
+      return null;
     }
-    return null;
-  }
-
-  protected override error(progname: string | null = null, block?: () => string): boolean | null {
-    if (!super.error(progname, block)) return null;
-
-    if (verboseEnqueueLogs()) {
+    if (ActiveJob.verboseEnqueueLogs) {
       return this.logEnqueueSource();
     }
     return null;
   }
 
   /** @internal */
-  private logEnqueueSource(): boolean | null {
+  protected error(
+    progname: string | null = null,
+    block?: (...args: unknown[]) => unknown,
+  ): boolean | null {
+    if (!((super.error(progname, block) ?? false) !== false)) {
+      return null;
+    }
+    if (ActiveJob.verboseEnqueueLogs) {
+      return this.logEnqueueSource();
+    }
+    return null;
+  }
+
+  /** @internal */
+  protected logEnqueueSource(): boolean | null {
     const source = this.enqueueSourceLocation();
-
-    if (source) {
+    if (source != null) {
       return this.logger!.info(`↳ ${source}`);
     }
     return null;
   }
 
   /** @internal */
-  private enqueueSourceLocation(): string | null {
-    for (const location of callerLocations()) {
-      const frame = this.backtraceCleaner.cleanFrame(String(location));
-      if (frame) return frame;
-    }
-    return null;
+  protected enqueueSourceLocation(): string | null {
+    return Thread.eachCallerLocation((location) => {
+      const frame = this.backtraceCleaner.cleanFrame(location);
+      if (frame != null) {
+        rbIterBreakValue(frame);
+      }
+      return null;
+    });
   }
 
   /** @internal */
-  private enqueuedJobsMessage(adapter: unknown, enqueuedJobs: LoggedJob[]): string {
+  protected enqueuedJobsMessage(adapter: unknown, enqueuedJobs: unknown[]): string {
     const enqueuedCount = enqueuedJobs.length;
-    const jobClassesCounts = sortBy(
-      tally(enqueuedJobs.map((job) => rbObjClass(job))),
-      ([, v]) => -v,
-    );
-    return (
-      `Enqueued ${enqueuedCount} ${pluralize("job", enqueuedCount)} to ${ActiveJob.adapterName(adapter)}` +
-      ` (${jobClassesCounts.map(([klass, count]) => `${count} ${klass}`).join(", ")})`
-    );
+    const jobClassesCounts = [
+      ...((x) =>
+        x instanceof globalThis.Set || x instanceof globalThis.Map || x instanceof Enumerator
+          ? [...x]
+          : Object.getPrototypeOf(x) === Object.prototype
+            ? Object.entries(x as object)
+            : (x as unknown[]))(
+        enqueuedJobs
+          .map((x) => x.constructor)
+          .reduce((h: Map<unknown, number>, x) => h.set(x, (h.get(x) ?? 0) + 1), new Map()),
+      ),
+    ]
+      .map((x) => [(([_k, v]: unknown) => -v)(x), x])
+      .sort((a, b) => cmp(a[0], b[0]) ?? 0)
+      .map((p) => p[1]);
+    return `${`Enqueued ${enqueuedCount} ${pluralize("job", enqueuedCount) ?? ""} to ${adapterName(adapter) ?? ""}`}${` (${
+      aryJoin(
+        jobClassesCounts.map(([klass, count]) => `${count ?? ""} ${klass ?? ""}`),
+        ", ",
+      ) ?? ""
+    })`}`;
   }
 }
-
-classAttribute.call(LogSubscriber, "backtraceCleaner", { default: new BacktraceCleaner() });
-
-LogSubscriber.subscribeLogLevel("enqueue", "info");
-LogSubscriber.subscribeLogLevel("enqueue_at", "info");
-LogSubscriber.subscribeLogLevel("enqueue_all", "info");
-LogSubscriber.subscribeLogLevel("perform_start", "info");
-LogSubscriber.subscribeLogLevel("perform", "info");
-LogSubscriber.subscribeLogLevel("enqueue_retry", "info");
-LogSubscriber.subscribeLogLevel("retry_stopped", "error");
-LogSubscriber.subscribeLogLevel("discard", "error");
-
-rbModConstSet(ActiveJob, "LogSubscriber", LogSubscriber);
-
+{
+  classAttribute.call(LogSubscriber, "backtraceCleaner", { default: new BacktraceCleaner() });
+  LogSubscriber.subscribeLogLevel("enqueue", "info");
+  LogSubscriber.subscribeLogLevel("enqueue_at", "info");
+  LogSubscriber.subscribeLogLevel("enqueue_all", "info");
+  LogSubscriber.subscribeLogLevel("perform_start", "info");
+  LogSubscriber.subscribeLogLevel("perform", "info");
+  LogSubscriber.subscribeLogLevel("enqueue_retry", "info");
+  LogSubscriber.subscribeLogLevel("retry_stopped", "error");
+  LogSubscriber.subscribeLogLevel("discard", "error");
+}
 LogSubscriber.attachTo("active_job");

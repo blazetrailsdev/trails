@@ -1,39 +1,98 @@
-import { block, registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class CallbackJob extends Base {
+  declare _history: string[];
+
   static toString(): string {
     return "CallbackJob";
   }
 
-  perform(_person: unknown = "david"): void {}
+  perform(_person: unknown = "david") {}
 
-  get history(): string[] {
-    return (this._history ??= []);
+  history(): string[] {
+    if (!(this._history != null && this._history !== false)) this._history = [];
+    return this._history;
   }
-
-  private _history?: string[];
 }
 registerConstant("CallbackJob", CallbackJob);
-
-CallbackJob.beforePerform((job: CallbackJob) => job.history.push("CallbackJob ran before_perform"));
-CallbackJob.afterPerform((job: CallbackJob) => job.history.push("CallbackJob ran after_perform"));
-
-CallbackJob.beforeEnqueue((job: CallbackJob) => job.history.push("CallbackJob ran before_enqueue"));
-CallbackJob.afterEnqueue((job: CallbackJob) => job.history.push("CallbackJob ran after_enqueue"));
-
-CallbackJob.aroundPerform(
-  block(async (job: CallbackJob, block: () => unknown) => {
-    job.history.push("CallbackJob ran around_perform_start");
-    await block();
-    job.history.push("CallbackJob ran around_perform_stop");
-  }),
-);
-
-CallbackJob.aroundEnqueue(
-  block(async (job: CallbackJob, block: () => unknown) => {
-    job.history.push("CallbackJob ran around_enqueue_start");
-    await block();
-    job.history.push("CallbackJob ran around_enqueue_stop");
-  }),
-);
+{
+  CallbackJob.beforePerform((job: unknown) =>
+    ((x) =>
+      typeof x === "string"
+        ? x + "CallbackJob ran before_perform"
+        : Array.isArray(x)
+          ? (x.push("CallbackJob ran before_perform"), x)
+          : x instanceof globalThis.Set
+            ? x.add("CallbackJob ran before_perform")
+            : x.append("CallbackJob ran before_perform"))(job.history()),
+  );
+  CallbackJob.afterPerform((job: unknown) =>
+    ((x) =>
+      typeof x === "string"
+        ? x + "CallbackJob ran after_perform"
+        : Array.isArray(x)
+          ? (x.push("CallbackJob ran after_perform"), x)
+          : x instanceof globalThis.Set
+            ? x.add("CallbackJob ran after_perform")
+            : x.append("CallbackJob ran after_perform"))(job.history()),
+  );
+  CallbackJob.beforeEnqueue((job: unknown) =>
+    ((x) =>
+      typeof x === "string"
+        ? x + "CallbackJob ran before_enqueue"
+        : Array.isArray(x)
+          ? (x.push("CallbackJob ran before_enqueue"), x)
+          : x instanceof globalThis.Set
+            ? x.add("CallbackJob ran before_enqueue")
+            : x.append("CallbackJob ran before_enqueue"))(job.history()),
+  );
+  CallbackJob.afterEnqueue((job: unknown) =>
+    ((x) =>
+      typeof x === "string"
+        ? x + "CallbackJob ran after_enqueue"
+        : Array.isArray(x)
+          ? (x.push("CallbackJob ran after_enqueue"), x)
+          : x instanceof globalThis.Set
+            ? x.add("CallbackJob ran after_enqueue")
+            : x.append("CallbackJob ran after_enqueue"))(job.history()),
+  );
+  CallbackJob.aroundPerform(function (job: unknown, block: unknown) {
+    ((x) =>
+      typeof x === "string"
+        ? x + "CallbackJob ran around_perform_start"
+        : Array.isArray(x)
+          ? (x.push("CallbackJob ran around_perform_start"), x)
+          : x instanceof globalThis.Set
+            ? x.add("CallbackJob ran around_perform_start")
+            : x.append("CallbackJob ran around_perform_start"))(job.history());
+    block();
+    return ((x) =>
+      typeof x === "string"
+        ? x + "CallbackJob ran around_perform_stop"
+        : Array.isArray(x)
+          ? (x.push("CallbackJob ran around_perform_stop"), x)
+          : x instanceof globalThis.Set
+            ? x.add("CallbackJob ran around_perform_stop")
+            : x.append("CallbackJob ran around_perform_stop"))(job.history());
+  });
+  CallbackJob.aroundEnqueue(function (job: unknown, block: unknown) {
+    ((x) =>
+      typeof x === "string"
+        ? x + "CallbackJob ran around_enqueue_start"
+        : Array.isArray(x)
+          ? (x.push("CallbackJob ran around_enqueue_start"), x)
+          : x instanceof globalThis.Set
+            ? x.add("CallbackJob ran around_enqueue_start")
+            : x.append("CallbackJob ran around_enqueue_start"))(job.history());
+    block();
+    return ((x) =>
+      typeof x === "string"
+        ? x + "CallbackJob ran around_enqueue_stop"
+        : Array.isArray(x)
+          ? (x.push("CallbackJob ran around_enqueue_stop"), x)
+          : x instanceof globalThis.Set
+            ? x.add("CallbackJob ran around_enqueue_stop")
+            : x.append("CallbackJob ran around_enqueue_stop"))(job.history());
+  });
+}

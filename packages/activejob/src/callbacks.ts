@@ -1,64 +1,103 @@
+import { Callbacks as ActiveSupportCallbacks, Concern } from "@blazetrails/activesupport";
 import {
-  Callbacks as ASCallbacks,
-  Concern,
-  extend,
-  type FilterListEntry,
-} from "@blazetrails/activesupport";
-import {
-  defineModule,
   include,
-  rbModConstSet,
   rbObjSingletonClass,
+  Module,
+  extend,
+  block as rbBlock,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
+import type { Base } from "./base.js";
 
-interface CallbacksClass {
-  defineCallbacks(...names: Array<string | Record<string, unknown>>): void;
-}
-
-interface CallbacksClassMethodsHost {
-  setCallback(name: string, ...filterList: FilterListEntry[]): void;
-}
-
-export class ClassMethods {
-  static beforePerform(this: CallbacksClassMethodsHost, ...filters: FilterListEntry[]): void {
-    this.setCallback("perform", "before", ...filters);
-  }
-
-  static afterPerform(this: CallbacksClassMethodsHost, ...filters: FilterListEntry[]): void {
-    this.setCallback("perform", "after", ...filters);
-  }
-
-  static aroundPerform(this: CallbacksClassMethodsHost, ...filters: FilterListEntry[]): void {
-    this.setCallback("perform", "around", ...filters);
-  }
-
-  static beforeEnqueue(this: CallbacksClassMethodsHost, ...filters: FilterListEntry[]): void {
-    this.setCallback("enqueue", "before", ...filters);
-  }
-
-  static afterEnqueue(this: CallbacksClassMethodsHost, ...filters: FilterListEntry[]): void {
-    this.setCallback("enqueue", "after", ...filters);
-  }
-
-  static aroundEnqueue(this: CallbacksClassMethodsHost, ...filters: FilterListEntry[]): void {
-    this.setCallback("enqueue", "around", ...filters);
-  }
-}
-
-export const Callbacks = defineModule({}) as {
-  runCallbacks(kind: string, block?: () => unknown): unknown;
-};
+export const Callbacks = new Module();
 extend(Callbacks, Concern);
-include(Callbacks, ASCallbacks);
-Object.defineProperty(Callbacks, "ClassMethods", { value: ClassMethods });
-
-include(rbObjSingletonClass(Callbacks), ASCallbacks);
-(rbObjSingletonClass(Callbacks) as unknown as CallbacksClass).defineCallbacks("execute");
-
-Concern.included.call(Callbacks as never, null, function (this: CallbacksClass) {
-  this.defineCallbacks("perform", { skipAfterCallbacksIfTerminated: true });
-  this.defineCallbacks("enqueue", { skipAfterCallbacksIfTerminated: true });
+Callbacks.included(null, function (): void {
+  const base = this;
+  base.defineCallbacks("perform", { skipAfterCallbacksIfTerminated: true });
+  base.defineCallbacks("enqueue", { skipAfterCallbacksIfTerminated: true });
 });
+const CallbacksSingleton = rbObjSingletonClass(Callbacks);
+include(CallbacksSingleton, ActiveSupportCallbacks);
+CallbacksSingleton.defineCallbacks("execute");
+{
+  include(Callbacks, ActiveSupportCallbacks);
+}
+export class ClassMethods {
+  static toString(): string {
+    return "ActiveJob::Callbacks::ClassMethods";
+  }
 
-rbModConstSet(ActiveJob, "Callbacks", Callbacks);
+  static beforePerform(this: typeof Base, ...filters: unknown[]) {
+    const blk =
+      typeof filters[filters.length - 1] === "function" &&
+      !Function.prototype.toString.call(filters[filters.length - 1]).startsWith("class")
+        ? (filters.pop() as (...args: unknown[]) => unknown)
+        : undefined;
+    return this.setCallback(
+      "perform",
+      "before",
+      ...filters,
+      ...(blk != null ? [rbBlock(blk)] : []),
+    );
+  }
+
+  static afterPerform(this: typeof Base, ...filters: unknown[]) {
+    const blk =
+      typeof filters[filters.length - 1] === "function" &&
+      !Function.prototype.toString.call(filters[filters.length - 1]).startsWith("class")
+        ? (filters.pop() as (...args: unknown[]) => unknown)
+        : undefined;
+    return this.setCallback("perform", "after", ...filters, ...(blk != null ? [rbBlock(blk)] : []));
+  }
+
+  static aroundPerform(this: typeof Base, ...filters: unknown[]) {
+    const blk =
+      typeof filters[filters.length - 1] === "function" &&
+      !Function.prototype.toString.call(filters[filters.length - 1]).startsWith("class")
+        ? (filters.pop() as (...args: unknown[]) => unknown)
+        : undefined;
+    return this.setCallback(
+      "perform",
+      "around",
+      ...filters,
+      ...(blk != null ? [rbBlock(blk)] : []),
+    );
+  }
+
+  static beforeEnqueue(this: typeof Base, ...filters: unknown[]) {
+    const blk =
+      typeof filters[filters.length - 1] === "function" &&
+      !Function.prototype.toString.call(filters[filters.length - 1]).startsWith("class")
+        ? (filters.pop() as (...args: unknown[]) => unknown)
+        : undefined;
+    return this.setCallback(
+      "enqueue",
+      "before",
+      ...filters,
+      ...(blk != null ? [rbBlock(blk)] : []),
+    );
+  }
+
+  static afterEnqueue(this: typeof Base, ...filters: unknown[]) {
+    const blk =
+      typeof filters[filters.length - 1] === "function" &&
+      !Function.prototype.toString.call(filters[filters.length - 1]).startsWith("class")
+        ? (filters.pop() as (...args: unknown[]) => unknown)
+        : undefined;
+    return this.setCallback("enqueue", "after", ...filters, ...(blk != null ? [rbBlock(blk)] : []));
+  }
+
+  static aroundEnqueue(this: typeof Base, ...filters: unknown[]) {
+    const blk =
+      typeof filters[filters.length - 1] === "function" &&
+      !Function.prototype.toString.call(filters[filters.length - 1]).startsWith("class")
+        ? (filters.pop() as (...args: unknown[]) => unknown)
+        : undefined;
+    return this.setCallback(
+      "enqueue",
+      "around",
+      ...filters,
+      ...(blk != null ? [rbBlock(blk)] : []),
+    );
+  }
+}
+Object.assign(Callbacks, { ClassMethods: ClassMethods });

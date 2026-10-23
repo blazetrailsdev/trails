@@ -1,71 +1,91 @@
 import {
+  demodulize,
   Concern,
-  DescendantsTracker,
   classAttribute,
   delegate,
-  demodulize,
-  extend,
   tryCall,
   underscore,
 } from "@blazetrails/activesupport";
 import {
-  ArgumentError,
+  Module,
+  rbStrSend,
+  extend,
   classModule,
-  deleteSuffix,
-  rbCModule,
-  rbClassSuperclass,
-  rbModConstSet,
-  rbModName,
-  rbObjClass,
-  rbObjIsKindOf,
-  rbObjRespondTo,
+  Extended,
+  rbInspect,
+  ArgumentError,
+  Enumerator,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob, QueueAdapters } from "./namespaces.js";
+import { ActiveJob } from "./active-job.js";
+import { QueueAdapters } from "./queue-adapters.js";
+import type { Base } from "./base.js";
 
-interface QueueAdapterClass {
-  _queueAdapterName: string | null;
-  _queueAdapter: unknown;
-  queueAdapter: unknown;
-  setQueueAdapter(nameOrAdapter: unknown): void;
-  assignAdapter(adapterName: string, queueAdapter: unknown): void;
-  isQueueAdapter(object: unknown): boolean;
+const adapterNameFn = adapterName;
+
+export function adapterName(adapter: unknown): string {
+  if ("queueAdapterName" in Object(adapter)) {
+    return adapter.queueAdapterName();
+  }
+  const adapterClass =
+    typeof adapter === "function" || adapter instanceof Module ? adapter : adapter.constructor;
+  return `${rbStrSend(demodulize(Object.hasOwn(adapterClass, "toString") ? String(adapterClass) : adapterClass.name || null), "deleteSuffix", "Adapter")[0] ?? ""}`;
 }
 
-/** @missingRailsArgs delete_suffix — PERMANENT */
-export function adapterName(adapter: unknown): string {
-  if (rbObjRespondTo(adapter, "queueAdapterName")) {
-    return (adapter as { queueAdapterName: string }).queueAdapterName;
+export class QueueAdapter {
+  declare static included: Extended<typeof Concern>["included"];
+  declare static ClassMethods: typeof ClassMethods;
+
+  static readonly [classModule] = true;
+
+  static toString(): string {
+    return "ActiveJob::QueueAdapter";
+  }
+}
+extend(QueueAdapter, Concern);
+QueueAdapter.included(null, function (this: typeof Base): void {
+  classAttribute.call(this, "_queueAdapterName", {
+    instanceAccessor: false,
+    instancePredicate: false,
+  });
+  classAttribute.call(this, "_queueAdapter", { instanceAccessor: false, instancePredicate: false });
+  delegate.call(this.prototype, "queueAdapter", { to: "class" });
+});
+export class ClassMethods {
+  declare _queueAdapterName: string | null;
+  declare _queueAdapter: unknown;
+  declare static _queueAdapter: unknown;
+  declare static _queueAdapterName: string | null;
+
+  static toString(): string {
+    return "ActiveJob::QueueAdapter::ClassMethods";
   }
 
-  const adapterClass = rbObjIsKindOf(adapter, rbCModule) ? adapter : rbObjClass(adapter);
-  const name = demodulize(rbModName(adapterClass as object) as string);
-  return `${deleteSuffix(name, "Adapter")}`;
-}
-Object.assign(ActiveJob, { adapterName });
-
-const QUEUE_ADAPTER_METHODS = Object.freeze(["enqueue", "enqueueAt"]);
-
-export class ClassMethods {
-  static get queueAdapter(): unknown {
-    const self = this as unknown as QueueAdapterClass;
-    if (self._queueAdapter == null) self.setQueueAdapter("async");
-    return self._queueAdapter;
+  static get queueAdapter() {
+    if (this._queueAdapter == null) {
+      this.setQueueAdapter("async");
+    }
+    return this._queueAdapter;
   }
 
   static get queueAdapterName(): string {
-    const self = this as unknown as QueueAdapterClass;
-    if (self._queueAdapterName == null) self.setQueueAdapter("async");
-    return self._queueAdapterName!;
+    if (this._queueAdapterName == null) {
+      this.setQueueAdapter("async");
+    }
+    return this._queueAdapterName!;
   }
 
-  static setQueueAdapter(this: QueueAdapterClass, nameOrAdapter: unknown): void {
-    if (typeof nameOrAdapter === "string") {
-      const queueAdapter = new (QueueAdapters.lookup(nameOrAdapter) as new () => object)();
+  static setQueueAdapter(this: typeof Base, nameOrAdapter: unknown) {
+    let queueAdapter, adapterName;
+    if (typeof nameOrAdapter === "string" || typeof nameOrAdapter === "string") {
+      queueAdapter = new (QueueAdapters.lookup(nameOrAdapter))();
       tryCall(queueAdapter, "checkAdapter");
-      this.assignAdapter(String(nameOrAdapter), queueAdapter);
+      this.assignAdapter(
+        Array.isArray(nameOrAdapter) ? rbInspect(nameOrAdapter) : String(nameOrAdapter ?? ""),
+        queueAdapter,
+      );
     } else {
       if (this.isQueueAdapter(nameOrAdapter)) {
-        const adapterName = underscore(ActiveJob.adapterName(nameOrAdapter));
+        adapterName = underscore(adapterNameFn(nameOrAdapter));
         this.assignAdapter(adapterName, nameOrAdapter);
       } else {
         throw new ArgumentError();
@@ -74,43 +94,34 @@ export class ClassMethods {
   }
 
   /** @internal */
-  static assignAdapter(this: QueueAdapterClass, adapterName: string, queueAdapter: unknown): void {
+  static assignAdapter(this: typeof Base, adapterName: string, queueAdapter: unknown) {
     this._queueAdapterName = adapterName;
-    this._queueAdapter = queueAdapter;
-    let klass = this as unknown as Parameters<typeof DescendantsTracker.registerSubclass>[1];
-    for (let superclass; (superclass = rbClassSuperclass(klass)); klass = superclass) {
-      DescendantsTracker.registerSubclass(superclass, klass);
-    }
+    this._queueAdapter = queueAdapter as null;
+    return this._queueAdapter;
   }
+
+  static QUEUE_ADAPTER_METHODS: unknown = Object.freeze(["enqueue", "enqueue_at"]);
 
   /** @internal */
-  static isQueueAdapter(object: unknown): boolean {
-    return QUEUE_ADAPTER_METHODS.every((meth) => rbObjRespondTo(object, meth));
+  static isQueueAdapter(this: typeof Base, object: unknown): boolean {
+    return (
+      (ClassMethods.QUEUE_ADAPTER_METHODS instanceof globalThis.Set ||
+      ClassMethods.QUEUE_ADAPTER_METHODS instanceof globalThis.Map ||
+      ClassMethods.QUEUE_ADAPTER_METHODS instanceof Enumerator
+        ? [...ClassMethods.QUEUE_ADAPTER_METHODS]
+        : Object.getPrototypeOf(ClassMethods.QUEUE_ADAPTER_METHODS) === Object.prototype
+          ? Object.entries(ClassMethods.QUEUE_ADAPTER_METHODS as object)
+          : (ClassMethods.QUEUE_ADAPTER_METHODS as unknown[])
+      ).every(
+        (meth) =>
+          ((s: string) => {
+            const c = s
+              .replace(/[?!]$/, "")
+              .replace(/_([a-z0-9])/g, (_m: string, x: string) => x.toUpperCase());
+            return s.endsWith("?") ? "is" + c[0].toUpperCase() + c.slice(1) : c;
+          })(String(meth)) in Object(object),
+      ) ?? null
+    );
   }
 }
-
-export class QueueAdapter {
-  static readonly [classModule] = true;
-  declare static ClassMethods: typeof ClassMethods;
-
-  declare queueAdapter: unknown;
-}
-extend(QueueAdapter, Concern);
-Object.defineProperty(QueueAdapter, "ClassMethods", { value: ClassMethods });
-(QueueAdapter as unknown as { included(base: null, block: (this: object) => void): void }).included(
-  null,
-  function (this: object) {
-    classAttribute.call(this, "_queueAdapterName", {
-      instanceAccessor: false,
-      instancePredicate: false,
-    });
-    classAttribute.call(this, "_queueAdapter", {
-      instanceAccessor: false,
-      instancePredicate: false,
-    });
-
-    delegate.call((this as { prototype: object }).prototype, "queueAdapter", { to: "class" });
-  },
-);
-
-rbModConstSet(ActiveJob, "QueueAdapter", QueueAdapter);
+Object.assign(QueueAdapter, { ClassMethods: ClassMethods });

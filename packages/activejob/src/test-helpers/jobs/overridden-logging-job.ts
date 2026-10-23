@@ -1,5 +1,5 @@
-import { Logger, TaggedLogging } from "@blazetrails/activesupport";
-import { rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
+import { TaggedLogging, Logger } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class OverriddenLoggingJob extends Base {
@@ -7,14 +7,14 @@ export class OverriddenLoggingJob extends Base {
     return "OverriddenLoggingJob";
   }
 
-  _logger?: Logger;
-
-  perform(dummy: unknown): void {
-    (this.logger as Logger).info(`Dummy, here is it: ${rbObjAsString(dummy)}`);
+  perform(dummy: unknown) {
+    return this.logger().info(`Dummy, here is it: ${dummy ?? ""}`);
   }
 
-  get logger(): unknown {
-    return (this._logger ??= TaggedLogging.new(new Logger(null)));
+  logger() {
+    if (!(this._logger != null && this._logger !== false))
+      this._logger = TaggedLogging.new(new Logger(null));
+    return this._logger;
   }
 }
 registerConstant("OverriddenLoggingJob", OverriddenLoggingJob);

@@ -1,28 +1,31 @@
-import { Range, valuesAt, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveJob, Serializers } from "../namespaces.js";
-import { ObjectSerializer } from "./object-serializer.js";
+import { Range, zip, valuesAt, registerConstant } from "@blazetrails/ruby-compat";
+import { Arguments } from "../arguments.js";
+import { ObjectSerializer } from "../serializers/object-serializer.js";
 
 export class RangeSerializer extends ObjectSerializer {
   static toString(): string {
     return "ActiveJob::Serializers::RangeSerializer";
   }
 
-  static readonly KEYS = Object.freeze(["begin", "end", "exclude_end"]);
+  static KEYS: unknown = Object.freeze(["begin", "end", "exclude_end"]);
 
   serialize(range: Range): Record<string, unknown> {
-    const args = ActiveJob.Arguments.serialize([range.begin, range.end, range.excludeEnd]);
-    return super.serialize(
-      Object.fromEntries(RangeSerializer.KEYS.map((key, i) => [key, args[i]])),
-    );
+    const args = Arguments.serialize([range.begin, range.end, range.excludeEnd]);
+    return super.serialize(Object.fromEntries(zip(RangeSerializer.KEYS as unknown[], args)));
   }
 
-  async deserialize(hash: Record<string, unknown> | Map<string, unknown>): Promise<Range> {
+  async deserialize(hash: Map<unknown, unknown>): Promise<Range> {
     return new (this.klass())(
-      ...((await ActiveJob.Arguments.deserialize(valuesAt(hash, ...RangeSerializer.KEYS))) as [
-        unknown,
-        unknown,
-        boolean,
-      ]),
+      ...(await Arguments.deserialize(
+        valuesAt(
+          hash,
+          ...(RangeSerializer.KEYS == null
+            ? []
+            : Array.isArray(RangeSerializer.KEYS)
+              ? (RangeSerializer.KEYS as unknown[])
+              : [RangeSerializer.KEYS]),
+        ),
+      )),
     );
   }
 
@@ -31,4 +34,4 @@ export class RangeSerializer extends ObjectSerializer {
     return Range;
   }
 }
-rbModConstSet(Serializers, "RangeSerializer", RangeSerializer);
+registerConstant("ActiveJob::Serializers::RangeSerializer", RangeSerializer);

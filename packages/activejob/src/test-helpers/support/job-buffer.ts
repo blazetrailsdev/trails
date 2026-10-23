@@ -1,25 +1,40 @@
+import { classModule, registerConstant } from "@blazetrails/ruby-compat";
 import { afterEach } from "vitest";
 
-let _values: unknown[] | undefined;
+export class JobBuffer {
+  declare static _values: unknown[];
 
-export const JobBuffer = {
-  clear(): void {
-    JobBuffer.values().length = 0;
-  },
+  static readonly [classModule] = true;
 
-  add(value: unknown): void {
-    JobBuffer.values().push(value);
-  },
+  static toString(): string {
+    return "JobBuffer";
+  }
 
-  values(): unknown[] {
-    return (_values ??= []);
-  },
+  static clear() {
+    return ((x) => (Array.isArray(x) ? (x.length = 0) : x.clear(), x))(this.values());
+  }
 
-  lastValue(): unknown {
-    return JobBuffer.values().at(-1);
-  },
-};
+  static add(value: unknown) {
+    return ((x) =>
+      typeof x === "string"
+        ? x + value
+        : Array.isArray(x)
+          ? (x.push(value), x)
+          : x instanceof globalThis.Set
+            ? x.add(value)
+            : x.append(value))(this.values());
+  }
 
-afterEach(() => {
+  static values() {
+    if (!(this._values != null && this._values !== false)) this._values = [];
+    return this._values;
+  }
+
+  static lastValue() {
+    return this.values().at(-1);
+  }
+}
+registerConstant("JobBuffer", JobBuffer);
+afterEach(async ({ testCase }) => {
   JobBuffer.clear();
 });

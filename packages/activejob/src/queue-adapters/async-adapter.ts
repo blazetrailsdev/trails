@@ -1,129 +1,126 @@
-import { getEnv } from "@blazetrails/activesupport";
-import { Time } from "@blazetrails/date";
+import { current as timeCurrent } from "@blazetrails/activesupport/core-ext/time/calculations";
+import { Time as RubyTime } from "@blazetrails/date";
 import {
-  ImmediateExecutor,
-  rbModConstSet,
-  ScheduledTask,
   SecureRandom,
+  fetch,
+  ImmediateExecutor,
   ThreadPoolExecutor,
-  toF,
-  toI,
+  block as rbBlock,
+  ScheduledTask,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob, QueueAdapters } from "../namespaces.js";
-import { AbstractAdapter } from "./abstract-adapter.js";
-
-interface AsyncAdapterJob {
-  queueName: unknown;
-  providerJobId: unknown;
-  serialize(): Record<string, unknown>;
-}
-
-type ExecutorOptions = Partial<ConstructorParameters<typeof ThreadPoolExecutor>[0]>;
+import { Base } from "../base.js";
+import { AbstractAdapter } from "../queue-adapters/abstract-adapter.js";
 
 export class AsyncAdapter extends AbstractAdapter {
+  declare _scheduler: Scheduler;
+
   static toString(): string {
     return "ActiveJob::QueueAdapters::AsyncAdapter";
   }
 
-  declare static JobWrapper: typeof JobWrapper;
-  declare static Scheduler: typeof Scheduler;
-
-  private _scheduler: Scheduler;
-
-  constructor(executorOptions: ExecutorOptions = {}) {
+  constructor({ ...executorOptions }: Record<string, unknown> = {}) {
     super();
-    this._scheduler = new Scheduler(executorOptions);
+    this._scheduler = new Scheduler({ ...executorOptions });
   }
 
-  override async enqueue(job: AsyncAdapterJob): Promise<unknown> {
-    return await this._scheduler.enqueue(new JobWrapper(job), { queueName: job.queueName });
+  async enqueue(job: Record<string, unknown>) {
+    return this._scheduler.enqueue(new JobWrapper(job), { queueName: job.queueName });
   }
 
-  override async enqueueAt(job: AsyncAdapterJob, timestamp: number): Promise<unknown> {
-    return await this._scheduler.enqueueAt(new JobWrapper(job), timestamp, {
-      queueName: job.queueName,
-    });
+  async enqueueAt(job: Record<string, unknown>, timestamp: number) {
+    return this._scheduler.enqueueAt(new JobWrapper(job), timestamp, { queueName: job.queueName });
   }
 
-  async shutdown({ wait = true }: { wait?: boolean } = {}): Promise<boolean | null> {
-    return await this._scheduler.shutdown({ wait });
+  async shutdown({ wait = true }: { wait?: unknown } = {}): Promise<boolean | null> {
+    return await this._scheduler.shutdown({ wait: wait });
   }
 
-  set immediate(immediate: boolean) {
-    this._scheduler.immediate = immediate;
+  set immediate(immediate: unknown) {
+    this._scheduler.immediate = immediate as boolean;
   }
 }
-
 export class JobWrapper {
+  declare _jobData: Record<string, unknown>;
+
   static toString(): string {
     return "ActiveJob::QueueAdapters::AsyncAdapter::JobWrapper";
   }
 
-  private _jobData: Record<string, unknown>;
-
-  constructor(job: AsyncAdapterJob) {
+  constructor(job: unknown) {
     job.providerJobId = SecureRandom.uuid();
     this._jobData = job.serialize();
   }
 
-  perform(): Promise<unknown> {
-    return ActiveJob.Base.execute(this._jobData);
+  async perform() {
+    return await Base.execute(this._jobData);
   }
 }
-
 export class Scheduler {
+  declare _immediateExecutor: ImmediateExecutor;
+  declare _asyncExecutor: ThreadPoolExecutor;
+  declare _immediate: boolean;
+
   static toString(): string {
     return "ActiveJob::QueueAdapters::AsyncAdapter::Scheduler";
   }
 
-  static readonly DEFAULT_EXECUTOR_OPTIONS = Object.freeze({
-    minThreads: 0,
-    maxThreads: Number(toI(getEnv("RAILS_MAX_THREADS", "5"))),
-    autoTerminate: true,
+  static DEFAULT_EXECUTOR_OPTIONS: unknown = Object.freeze({
+    min_threads: 0,
+    max_threads: parseInt(String(fetch(process.env, "RAILS_MAX_THREADS", 5)), 10) || 0,
+    auto_terminate: true,
     idletime: 60,
-    maxQueue: 0,
-    fallbackPolicy: "caller_runs" as const,
+    max_queue: 0,
+    fallback_policy: "caller_runs",
   });
 
-  immediate: boolean;
-  private _immediateExecutor: ImmediateExecutor;
-  private _asyncExecutor: ThreadPoolExecutor;
+  get immediate() {
+    return this._immediate ?? null;
+  }
 
-  constructor(options: ExecutorOptions = {}) {
+  set immediate(value) {
+    this._immediate = value;
+  }
+
+  constructor({ ...options }: Record<string, unknown> = {}) {
     this.immediate = false;
     this._immediateExecutor = new ImmediateExecutor();
     this._asyncExecutor = new ThreadPoolExecutor({
       ...Scheduler.DEFAULT_EXECUTOR_OPTIONS,
-      ...options,
+      ...(options instanceof Map ? Object.fromEntries(options) : options),
     });
   }
 
-  enqueue(job: JobWrapper, { queueName: _queueName }: { queueName: unknown }): unknown {
-    return this.executor().post(job, (job: JobWrapper) => job.perform());
+  enqueue(job: JobWrapper, { queueName }: { queueName: unknown } = {}) {
+    return this.executor().post(
+      job,
+      rbBlock((x) => x.perform()),
+    );
   }
 
-  enqueueAt(job: JobWrapper, timestamp: number, { queueName }: { queueName: unknown }): unknown {
-    const delay = timestamp - toF(Time.current());
-    if (!this.immediate && delay > 0) {
-      return ScheduledTask.execute(
-        delay,
-        { args: [job], executor: this.executor() },
-        (job: JobWrapper) => job.perform(),
+  enqueueAt(job: JobWrapper, timestamp: number, { queueName }: { queueName: unknown } = {}) {
+    const delay = timestamp - Number(timeCurrent());
+    if (!(this.immediate != null && this.immediate !== false) && delay > 0) {
+      return ScheduledTask.execute(delay, { args: [job], executor: this.executor() }, (x) =>
+        x.perform(),
       );
     } else {
-      return this.enqueue(job, { queueName });
+      return this.enqueue(job, { queueName: queueName });
     }
   }
 
-  async shutdown({ wait = true }: { wait?: boolean } = {}): Promise<boolean | null> {
+  async shutdown({ wait = true }: { wait?: unknown } = {}): Promise<boolean | null> {
     this._asyncExecutor.shutdown();
-    return wait ? await this._asyncExecutor.waitForTermination() : null;
+    if (wait) {
+      return await this._asyncExecutor.waitForTermination();
+    }
+    return null;
   }
 
-  executor(): ImmediateExecutor | ThreadPoolExecutor {
-    return this.immediate ? this._immediateExecutor : this._asyncExecutor;
+  executor() {
+    if (this.immediate) {
+      return this._immediateExecutor ?? null;
+    } else {
+      return this._asyncExecutor ?? null;
+    }
   }
 }
-rbModConstSet(AsyncAdapter, "JobWrapper", JobWrapper);
-rbModConstSet(AsyncAdapter, "Scheduler", Scheduler);
-rbModConstSet(QueueAdapters, "AsyncAdapter", AsyncAdapter);

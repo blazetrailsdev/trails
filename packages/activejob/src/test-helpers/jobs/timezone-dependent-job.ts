@@ -1,29 +1,34 @@
-import { inTimeZone, TimeWithZone, zone } from "@blazetrails/activesupport";
-import { Time } from "@blazetrails/date";
-import { cmp, registerConstant } from "@blazetrails/ruby-compat";
+import { zone } from "@blazetrails/activesupport";
+import { Time as RubyTime } from "@blazetrails/date";
+import { rbFSend, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { JobBuffer } from "../support/job-buffer.js";
+import { rbBinop } from "../../codegen-runtime.js";
+import { JobBuffer } from "../../test-helpers/support/job-buffer.js";
 
 export class TimezoneDependentJob extends Base {
   static toString(): string {
     return "TimezoneDependentJob";
   }
 
-  perform(now: string | TimeWithZone): void {
-    now = inTimeZone(now as string) as TimeWithZone;
+  perform(now: unknown) {
+    now = rbFSend(now, "inTimeZone");
     const newYear = this.localtime(2018, 1, 1);
-
-    if (cmp(now, newYear)! >= 0) {
-      JobBuffer.add("Happy New Year!");
+    if (rbBinop(now, ">=", newYear)) {
+      return JobBuffer.add("Happy New Year!");
     } else {
-      JobBuffer.add(`Just ${Math.floor((newYear as TimeWithZone).minus(now) / 3600)} hours to go`);
+      return JobBuffer.add(
+        `Just ${Math.floor(rbBinop(newYear, "-", now) / 3600) ?? ""} hours to go`,
+      );
     }
   }
 
   /** @internal */
-  private localtime(...args: [number, number, number]): TimeWithZone | Time {
-    const timeZone = zone();
-    return timeZone ? timeZone.local(...args) : Time.utc(...args);
+  protected localtime(...args: number[]) {
+    if (zone() != null) {
+      return zone()!.local(...args);
+    } else {
+      return RubyTime.utc(...args);
+    }
   }
 }
 registerConstant("TimezoneDependentJob", TimezoneDependentJob);

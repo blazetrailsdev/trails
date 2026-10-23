@@ -1,131 +1,116 @@
-import type { ConfiguredJob } from "./configured-job.js";
-import { constantize, I18n, seconds, zone } from "@blazetrails/activesupport";
-import { Time } from "@blazetrails/date";
-import { rbModName, rbObjClass, toF, toI } from "@blazetrails/ruby-compat";
+import { I18n, zone, Duration, Concern, constantize } from "@blazetrails/activesupport";
+import { Time as RubyTime } from "@blazetrails/date";
+import { rbInspect, rbFSend, extend, classModule, Extended } from "@blazetrails/ruby-compat";
 import { Arguments } from "./arguments.js";
-import { ActiveJob } from "./namespaces.js";
-
-type JobData = Record<string, unknown>;
-
-export interface SetOptions {
-  wait?: unknown;
-  waitUntil?: unknown;
-  queue?: unknown;
-  priority?: unknown;
-}
-
-interface CoreClass {
-  queueNameFromPart(partName: unknown): unknown;
-}
-
-interface UtcTime {
-  utc(): { iso8601(fractionDigits?: number): string };
-}
-
-export class ClassMethods {
-  static deserialize<T extends Core>(this: unknown, jobData: JobData): T {
-    const job = new (constantize(jobData["job_class"] as string) as new () => T)();
-    job.deserialize(jobData);
-    return job;
-  }
-
-  static set(this: unknown, options: SetOptions = {}): ConfiguredJob {
-    return new (
-      ActiveJob as unknown as {
-        ConfiguredJob: new (jobClass: unknown, options: SetOptions) => ConfiguredJob;
-      }
-    ).ConfiguredJob(this, options);
-  }
-}
+import { ConfiguredJob } from "./configured-job.js";
+import type { Base } from "./base.js";
+import type { TimeWithZone } from "@blazetrails/activesupport";
 
 export class Core {
   declare _arguments: unknown[];
-  declare _serializedArguments: unknown[] | null | undefined;
-  declare _scheduledAt: UtcTime | null | undefined;
-  declare _jobId: string | null | undefined;
-  declare _queueName: unknown;
-  declare _priority: unknown;
+  declare _jobId: string | null;
+  declare _queueName: string | ((...args: unknown[]) => unknown);
+  declare _scheduledAt: null;
+  declare _priority: (...args: unknown[]) => unknown;
+  declare _executions: number | null;
+  declare _exceptionExecutions: Record<string, unknown>;
+  declare _timezone: string | null;
+  declare _serializedArguments: unknown[] | null;
   declare _providerJobId: unknown;
-  declare _executions: number | null | undefined;
-  declare _exceptionExecutions: Record<string, number> | null | undefined;
   declare _locale: string | null | undefined;
-  declare _timezone: string | null | undefined;
-  declare _enqueuedAt: Time | null | undefined;
+  declare _enqueuedAt: RubyTime | null | undefined;
   declare _successfullyEnqueued: unknown;
   declare _enqueueError: unknown;
+  declare static included: Extended<typeof Concern>["included"];
+  declare static ClassMethods: typeof ClassMethods;
 
-  get arguments(): unknown[] {
+  static readonly [classModule] = true;
+
+  static toString(): string {
+    return "ActiveJob::Core";
+  }
+
+  get arguments() {
     return this._arguments;
   }
-  set arguments(value: unknown[]) {
+
+  set arguments(value) {
     this._arguments = value;
   }
 
-  set serializedArguments(value: unknown[] | null) {
-    this._serializedArguments = value;
+  set serializedArguments(value: unknown) {
+    this._serializedArguments = value as unknown[] | null;
   }
 
-  get scheduledAt(): UtcTime | null {
-    return this._scheduledAt ?? null;
+  get scheduledAt() {
+    return this._scheduledAt;
   }
-  set scheduledAt(value: UtcTime | null) {
+
+  set scheduledAt(value) {
     this._scheduledAt = value;
   }
 
-  get jobId(): string | null {
-    return this._jobId ?? null;
+  get jobId() {
+    return this._jobId;
   }
-  set jobId(value: string | null) {
+
+  set jobId(value) {
     this._jobId = value;
   }
 
   set queueName(value: unknown) {
-    this._queueName = value;
+    this._queueName = value as string | ((...args: unknown[]) => unknown);
   }
 
   set priority(value: unknown) {
-    this._priority = value;
+    this._priority = value as (...args: unknown[]) => unknown;
   }
 
-  get providerJobId(): unknown {
+  get providerJobId() {
     return this._providerJobId ?? null;
   }
-  set providerJobId(value: unknown) {
+
+  set providerJobId(value) {
     this._providerJobId = value;
   }
 
-  get executions(): number | null {
-    return this._executions ?? null;
+  get executions() {
+    return this._executions;
   }
-  set executions(value: number | null) {
+
+  set executions(value) {
     this._executions = value;
   }
 
-  get exceptionExecutions(): Record<string, number> | null {
-    return this._exceptionExecutions ?? null;
+  get exceptionExecutions() {
+    return this._exceptionExecutions;
   }
-  set exceptionExecutions(value: Record<string, number> | null) {
+
+  set exceptionExecutions(value) {
     this._exceptionExecutions = value;
   }
 
-  get locale(): string | null {
+  get locale() {
     return this._locale ?? null;
   }
-  set locale(value: string | null) {
+
+  set locale(value) {
     this._locale = value;
   }
 
-  get timezone(): string | null {
-    return this._timezone ?? null;
+  get timezone() {
+    return this._timezone;
   }
-  set timezone(value: string | null) {
+
+  set timezone(value) {
     this._timezone = value;
   }
 
-  get enqueuedAt(): Time | null {
+  get enqueuedAt() {
     return this._enqueuedAt ?? null;
   }
-  set enqueuedAt(value: Time | null) {
+
+  set enqueuedAt(value) {
     this._enqueuedAt = value;
   }
 
@@ -133,96 +118,133 @@ export class Core {
     this._successfullyEnqueued = value;
   }
 
-  isSuccessfullyEnqueued(): unknown {
-    return this._successfullyEnqueued;
+  isSuccessfullyEnqueued(this: Base) {
+    return this._successfullyEnqueued ?? null;
   }
 
-  get enqueueError(): unknown {
+  get enqueueError() {
     return this._enqueueError ?? null;
   }
-  set enqueueError(value: unknown) {
+
+  set enqueueError(value) {
     this._enqueueError = value;
   }
 
-  serialize(): JobData {
+  serialize(this: Base) {
     return {
-      job_class: rbModName(rbObjClass(this)),
+      job_class: Object.hasOwn(this.constructor, "toString")
+        ? String(this.constructor)
+        : this.constructor.name || null,
       job_id: this.jobId,
       provider_job_id: this.providerJobId,
-      queue_name: (this as { queueName?: unknown }).queueName,
-      priority: (this as { priority?: unknown }).priority,
+      queue_name: this.queueName,
+      priority: this.priority,
       arguments: this.serializeArgumentsIfNeeded(this.arguments),
       executions: this.executions,
       exception_executions: this.exceptionExecutions,
-      locale: String(I18n.locale()),
+      locale: ((x) => (Array.isArray(x) ? rbInspect(x) : String(x ?? "")))(I18n.locale()),
       timezone: this.timezone,
-      enqueued_at: Time.now().utc().iso8601(9),
-      scheduled_at: this.scheduledAt != null ? this.scheduledAt.utc().iso8601(9) : null,
+      enqueued_at: RubyTime.now().utc().iso8601(9),
+      scheduled_at:
+        this.scheduledAt != null ? rbFSend(this.scheduledAt!.utc(), "iso8601", 9) : null,
     };
   }
 
-  deserialize(jobData: JobData): void {
-    this.jobId = jobData["job_id"] as string;
-    this.providerJobId = jobData["provider_job_id"];
+  deserialize(this: Base, jobData: Record<string, unknown>) {
+    this.jobId = jobData["job_id"] as string | null;
+    this.providerJobId = jobData["provider_job_id"] as string;
     this.queueName = jobData["queue_name"];
-    this.priority = jobData["priority"];
-    this.serializedArguments = jobData["arguments"] as unknown[];
-    this.executions = jobData["executions"] as number;
-    this.exceptionExecutions = jobData["exception_executions"] as Record<string, number>;
-    this.locale = (jobData["locale"] as string | null | undefined) ?? String(I18n.locale());
-    this.timezone = (jobData["timezone"] as string | null | undefined) ?? zone()?.name ?? null;
-    if (jobData["enqueued_at"] != null && jobData["enqueued_at"] !== false)
-      this.enqueuedAt = Time.iso8601(jobData["enqueued_at"] as string);
-    if (jobData["scheduled_at"] != null && jobData["scheduled_at"] !== false)
-      this.scheduledAt = Time.iso8601(jobData["scheduled_at"] as string);
+    this.priority = jobData["priority"] as number;
+    this.serializedArguments = jobData["arguments"] as unknown[] | null;
+    this.executions = jobData["executions"] as number | null;
+    this.exceptionExecutions = jobData["exception_executions"] as null;
+    this.locale =
+      jobData["locale"] ??
+      ((x) => (Array.isArray(x) ? rbInspect(x) : String(x ?? "")))(I18n.locale());
+    this.timezone = jobData["timezone"] ?? zone()?.name ?? null;
+    if ((jobData["enqueued_at"] ?? false) !== false) {
+      this.enqueuedAt = RubyTime.iso8601(jobData["enqueued_at"] as string);
+    }
+    if ((jobData["scheduled_at"] ?? false) !== false) {
+      this.scheduledAt = RubyTime.iso8601(jobData["scheduled_at"] as string);
+      return this.scheduledAt;
+    }
+    return null;
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs seconds — PERMANENT
-   */
-  set(options: SetOptions = {}): this {
-    if (options.wait != null && options.wait !== false)
-      this.scheduledAt = seconds(toF(options.wait)).fromNow() as UtcTime;
-    if (options.waitUntil != null && options.waitUntil !== false)
-      this.scheduledAt = options.waitUntil as UtcTime;
-    if (options.queue != null && options.queue !== false)
-      this.queueName = (rbObjClass(this) as unknown as CoreClass).queueNameFromPart(options.queue);
-    if (options.priority != null && options.priority !== false)
-      this.priority = toI(options.priority);
-
+  set(this: Base, options: Record<string, unknown> = {}): Core {
+    if (options.wait != null && options.wait !== false) {
+      this.scheduledAt = Duration.seconds(
+        options.wait instanceof Duration ? options.wait.value : options.wait,
+      ).fromNow();
+    }
+    if (options.waitUntil != null && options.waitUntil !== false) {
+      this.scheduledAt = options.waitUntil;
+    }
+    if (options.queue != null && options.queue !== false) {
+      this.queueName = this.constructor.queueNameFromPart(options.queue);
+    }
+    if (options.priority != null && options.priority !== false) {
+      this.priority = parseInt(String(options.priority), 10) || 0;
+    }
     return this;
   }
 
   /** @internal */
-  serializeArgumentsIfNeeded(arguments_: unknown[]): unknown[] {
-    if (this.isArgumentsSerialized() != null) {
-      return this._serializedArguments as unknown[];
+  serializeArgumentsIfNeeded(this: Base, arguments_: unknown[]): unknown[] {
+    if (this.isArgumentsSerialized()) {
+      return this._serializedArguments ?? null;
     } else {
       return this.serializeArguments(arguments_);
     }
   }
 
   /** @internal */
-  async deserializeArgumentsIfNeeded(): Promise<void> {
-    if (this.isArgumentsSerialized() != null) {
-      this._arguments = await this.deserializeArguments(this._serializedArguments as unknown[]);
-      this._serializedArguments = null;
+  async deserializeArgumentsIfNeeded(this: Base) {
+    if (this.isArgumentsSerialized()) {
+      this._arguments = await this.deserializeArguments(this._serializedArguments!);
+      return (this._serializedArguments = null);
     }
+    return null;
   }
 
   /** @internal */
-  serializeArguments(arguments_: unknown[]): unknown[] {
+  serializeArguments(this: Base, arguments_: unknown[]): unknown[] {
     return Arguments.serialize(arguments_);
   }
 
   /** @internal */
-  deserializeArguments(serializedArgs: unknown[]): Promise<unknown[]> {
-    return Arguments.deserialize(serializedArgs);
+  async deserializeArguments(this: Base, serializedArgs: unknown[]): Promise<unknown[]> {
+    return await Arguments.deserialize(serializedArgs);
   }
 
   /** @internal */
-  isArgumentsSerialized(): unknown[] | null | undefined {
-    return this._serializedArguments;
+  isArgumentsSerialized(this: Base): unknown[] | null {
+    return this._serializedArguments ?? null;
   }
 }
+extend(Core, Concern);
+export class ClassMethods {
+  static toString(): string {
+    return "ActiveJob::Core::ClassMethods";
+  }
+
+  static deserialize(this: typeof Base, jobData: Record<string, unknown>) {
+    const job = new (constantize(jobData["job_class"] as string))();
+    job.deserialize(jobData);
+    return job;
+  }
+
+  static set(
+    this: typeof Base,
+    options:
+      | { waitUntil: RubyTime | TimeWithZone }
+      | { wait: Duration }
+      | { queue: string }
+      | { priority: number }
+      | { waitUntil: number | RubyTime } = {},
+  ): ConfiguredJob {
+    return new ConfiguredJob(this, options);
+  }
+}
+Object.assign(Core, { ClassMethods: ClassMethods });

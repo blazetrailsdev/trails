@@ -1,56 +1,52 @@
-import { Concern, classAttribute, extend, mattrAccessor } from "@blazetrails/activesupport";
-import { classModule, rbModConstSet, rbObjIsProc } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
-
-interface QueuePriorityClass {
-  defaultPriority: unknown;
-  priority: unknown;
-}
-
-interface QueuePriorityJob {
-  _priority: unknown;
-}
-
-export class ClassMethods {
-  declare static defaultPriority: unknown;
-
-  static queueWithPriority(
-    this: QueuePriorityClass,
-    priority: unknown = null,
-    block?: (this: QueuePriorityJob) => unknown,
-  ): void {
-    if (block !== undefined) {
-      this.priority = block;
-    } else {
-      this.priority = priority;
-    }
-  }
-}
-mattrAccessor.call(ClassMethods, "defaultPriority");
+import { Concern, classAttribute, mattrAccessor } from "@blazetrails/activesupport";
+import { extend, classModule, Extended } from "@blazetrails/ruby-compat";
+import type { Base } from "./base.js";
 
 export class QueuePriority {
-  static readonly [classModule] = true;
+  declare _priority: (...args: unknown[]) => unknown;
+  declare static included: Extended<typeof Concern>["included"];
   declare static ClassMethods: typeof ClassMethods;
-  declare _priority: unknown;
 
-  get priority(): unknown {
-    if (rbObjIsProc(this._priority)) {
-      this._priority = (this._priority as (this: QueuePriorityJob) => unknown).call(this);
+  static readonly [classModule] = true;
+
+  static toString(): string {
+    return "ActiveJob::QueuePriority";
+  }
+
+  get priority() {
+    if (
+      typeof this._priority === "function" &&
+      !Function.prototype.toString.call(this._priority).startsWith("class")
+    ) {
+      this._priority = this._priority.call(this) as (...args: unknown[]) => unknown;
     }
-    return this._priority;
+    return this._priority ?? null;
   }
 }
 extend(QueuePriority, Concern);
-Object.defineProperty(QueuePriority, "ClassMethods", { value: ClassMethods });
-(
-  QueuePriority as unknown as {
-    included(base: null, block: (this: QueuePriorityClass) => void): void;
-  }
-).included(null, function (this: QueuePriorityClass) {
-  classAttribute.call(this, "priority", {
-    instanceAccessor: false,
-    default: this.defaultPriority,
-  });
+QueuePriority.included(null, function (this: typeof Base): void {
+  classAttribute.call(this, "priority", { instanceAccessor: false, default: this.defaultPriority });
 });
+export class ClassMethods {
+  static toString(): string {
+    return "ActiveJob::QueuePriority::ClassMethods";
+  }
 
-rbModConstSet(ActiveJob, "QueuePriority", QueuePriority);
+  static queueWithPriority(
+    this: typeof Base,
+    priority: unknown = null,
+    block?: (...args: unknown[]) => unknown,
+  ) {
+    if (block != null) {
+      this.priority = block;
+      return this.priority;
+    } else {
+      this.priority = priority as (...args: unknown[]) => unknown;
+      return this.priority;
+    }
+  }
+}
+{
+  mattrAccessor.call(ClassMethods, "defaultPriority");
+}
+Object.assign(QueuePriority, { ClassMethods: ClassMethods });

@@ -1,7 +1,7 @@
 import { constantize } from "@blazetrails/activesupport";
-import { Module, hashAref, rbModConstSet, rbModName } from "@blazetrails/ruby-compat";
-import { ActiveJob, Serializers } from "../namespaces.js";
-import { ObjectSerializer } from "./object-serializer.js";
+import { hashAref, Module, registerConstant } from "@blazetrails/ruby-compat";
+import { SerializationError } from "../arguments.js";
+import { ObjectSerializer } from "../serializers/object-serializer.js";
 
 export class ModuleSerializer extends ObjectSerializer {
   static toString(): string {
@@ -9,12 +9,17 @@ export class ModuleSerializer extends ObjectSerializer {
   }
 
   serialize(constant: object): Record<string, unknown> {
-    if (rbModName(constant) == null)
-      throw new ActiveJob.SerializationError("Serializing an anonymous class is not supported");
-    return super.serialize({ value: rbModName(constant) });
+    if (
+      !((Object.hasOwn(constant, "toString") ? String(constant) : constant.name || null) != null)
+    ) {
+      throw new SerializationError("Serializing an anonymous class is not supported");
+    }
+    return super.serialize({
+      value: Object.hasOwn(constant, "toString") ? String(constant) : constant.name || null,
+    });
   }
 
-  deserialize(hash: Record<string, unknown> | Map<string, unknown>): unknown {
+  deserialize(hash: Map<unknown, unknown>) {
     return constantize(hashAref(hash, "value") as string);
   }
 
@@ -23,4 +28,4 @@ export class ModuleSerializer extends ObjectSerializer {
     return Module;
   }
 }
-rbModConstSet(Serializers, "ModuleSerializer", ModuleSerializer);
+registerConstant("ActiveJob::Serializers::ModuleSerializer", ModuleSerializer);

@@ -1,7 +1,7 @@
 import { Duration } from "@blazetrails/activesupport";
-import { hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveJob, Serializers } from "../namespaces.js";
-import { ObjectSerializer } from "./object-serializer.js";
+import { hashAref, registerConstant } from "@blazetrails/ruby-compat";
+import { Arguments } from "../arguments.js";
+import { ObjectSerializer } from "../serializers/object-serializer.js";
 
 export class DurationSerializer extends ObjectSerializer {
   static toString(): string {
@@ -9,16 +9,13 @@ export class DurationSerializer extends ObjectSerializer {
   }
 
   serialize(duration: Duration): Record<string, unknown> {
-    return super.serialize({
-      value: duration.value,
-      parts: ActiveJob.Arguments.serialize(duration.parts),
-    });
+    return super.serialize({ value: duration.value, parts: Arguments.serialize(duration.parts) });
   }
 
-  async deserialize(hash: Record<string, unknown> | Map<string, unknown>): Promise<Duration> {
-    const value = hashAref(hash, "value") as number;
-    const parts = await ActiveJob.Arguments.deserialize(hashAref(hash, "parts") as unknown[]);
-    return new (this.klass())(value, Object.fromEntries(parts as [string, number][]));
+  async deserialize(hash: Map<unknown, unknown>): Promise<Duration> {
+    const value = hashAref(hash, "value");
+    const parts = await Arguments.deserialize(hashAref(hash, "parts"));
+    return new (this.klass())(value as number, Object.fromEntries(parts));
   }
 
   /** @internal */
@@ -26,4 +23,4 @@ export class DurationSerializer extends ObjectSerializer {
     return Duration;
   }
 }
-rbModConstSet(Serializers, "DurationSerializer", DurationSerializer);
+registerConstant("ActiveJob::Serializers::DurationSerializer", DurationSerializer);

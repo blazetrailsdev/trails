@@ -1,103 +1,171 @@
-import { constantize, hours, ordinalize, seconds } from "@blazetrails/activesupport";
+import { ordinalize, constantize, Duration } from "@blazetrails/activesupport";
 import {
-  block,
-  rbModName,
-  rbObjClass,
-  registerConstant,
   StandardError,
-  toF,
+  registerConstant,
+  RuntimeError,
+  rbFSend,
+  rbObjClassname,
+  Enumerator,
 } from "@blazetrails/ruby-compat";
-import { Base } from "../../base.js";
 import { DeserializationError } from "../../arguments.js";
-import { JobBuffer } from "../support/job-buffer.js";
+import { Base } from "../../base.js";
+import { rbBinop } from "../../codegen-runtime.js";
+import { JobBuffer } from "../../test-helpers/support/job-buffer.js";
 
-export class DefaultsError extends StandardError {}
+export class DefaultsError extends StandardError {
+  static toString(): string {
+    return "DefaultsError";
+  }
+}
 registerConstant("DefaultsError", DefaultsError);
-export class DisabledJitterError extends StandardError {}
+export class DisabledJitterError extends StandardError {
+  static toString(): string {
+    return "DisabledJitterError";
+  }
+}
 registerConstant("DisabledJitterError", DisabledJitterError);
-export class ZeroJitterError extends StandardError {}
+export class ZeroJitterError extends StandardError {
+  static toString(): string {
+    return "ZeroJitterError";
+  }
+}
 registerConstant("ZeroJitterError", ZeroJitterError);
-export class FirstRetryableErrorOfTwo extends StandardError {}
+export class FirstRetryableErrorOfTwo extends StandardError {
+  static toString(): string {
+    return "FirstRetryableErrorOfTwo";
+  }
+}
 registerConstant("FirstRetryableErrorOfTwo", FirstRetryableErrorOfTwo);
-export class SecondRetryableErrorOfTwo extends StandardError {}
+export class SecondRetryableErrorOfTwo extends StandardError {
+  static toString(): string {
+    return "SecondRetryableErrorOfTwo";
+  }
+}
 registerConstant("SecondRetryableErrorOfTwo", SecondRetryableErrorOfTwo);
-export class LongWaitError extends StandardError {}
+export class LongWaitError extends StandardError {
+  static toString(): string {
+    return "LongWaitError";
+  }
+}
 registerConstant("LongWaitError", LongWaitError);
-export class ShortWaitTenAttemptsError extends StandardError {}
+export class ShortWaitTenAttemptsError extends StandardError {
+  static toString(): string {
+    return "ShortWaitTenAttemptsError";
+  }
+}
 registerConstant("ShortWaitTenAttemptsError", ShortWaitTenAttemptsError);
-export class PolynomialWaitTenAttemptsError extends StandardError {}
+export class PolynomialWaitTenAttemptsError extends StandardError {
+  static toString(): string {
+    return "PolynomialWaitTenAttemptsError";
+  }
+}
 registerConstant("PolynomialWaitTenAttemptsError", PolynomialWaitTenAttemptsError);
-export class CustomWaitTenAttemptsError extends StandardError {}
+export class CustomWaitTenAttemptsError extends StandardError {
+  static toString(): string {
+    return "CustomWaitTenAttemptsError";
+  }
+}
 registerConstant("CustomWaitTenAttemptsError", CustomWaitTenAttemptsError);
-export class CustomCatchError extends StandardError {}
+export class CustomCatchError extends StandardError {
+  static toString(): string {
+    return "CustomCatchError";
+  }
+}
 registerConstant("CustomCatchError", CustomCatchError);
-export class DiscardableError extends StandardError {}
+export class DiscardableError extends StandardError {
+  static toString(): string {
+    return "DiscardableError";
+  }
+}
 registerConstant("DiscardableError", DiscardableError);
-export class FirstDiscardableErrorOfTwo extends StandardError {}
+export class FirstDiscardableErrorOfTwo extends StandardError {
+  static toString(): string {
+    return "FirstDiscardableErrorOfTwo";
+  }
+}
 registerConstant("FirstDiscardableErrorOfTwo", FirstDiscardableErrorOfTwo);
-export class SecondDiscardableErrorOfTwo extends StandardError {}
+export class SecondDiscardableErrorOfTwo extends StandardError {
+  static toString(): string {
+    return "SecondDiscardableErrorOfTwo";
+  }
+}
 registerConstant("SecondDiscardableErrorOfTwo", SecondDiscardableErrorOfTwo);
-export class CustomDiscardableError extends StandardError {}
+export class CustomDiscardableError extends StandardError {
+  static toString(): string {
+    return "CustomDiscardableError";
+  }
+}
 registerConstant("CustomDiscardableError", CustomDiscardableError);
-export class UnlimitedRetryError extends StandardError {}
+export class UnlimitedRetryError extends StandardError {
+  static toString(): string {
+    return "UnlimitedRetryError";
+  }
+}
 registerConstant("UnlimitedRetryError", UnlimitedRetryError);
-
 export class RetryJob extends Base {
   static toString(): string {
     return "RetryJob";
   }
 
-  perform(raising: unknown, attempts: number, ..._rest: unknown[]): void {
-    if (Array.isArray(raising)) raising = raising.shift();
-    if (raising != null && raising !== false && this.executions! < attempts) {
-      JobBuffer.add(`Raised ${String(raising)} for the ${ordinalize(this.executions!)} time`);
-      const klass = constantize(raising as string) as new () => Error;
-      throw new klass();
+  perform(raising: unknown, attempts: number, ...rest: unknown[]) {
+    if (Array.isArray(raising)) {
+      raising = raising.shift();
+    }
+    if (raising != null && raising !== false && rbBinop(this.executions, "<", attempts)) {
+      JobBuffer.add(`Raised ${raising ?? ""} for the ${ordinalize(this.executions!) ?? ""} time`);
+      throw ((x) =>
+        typeof x === "string" ? new RuntimeError(x) : typeof x === "function" ? new x() : x)(
+        constantize(raising),
+      );
     } else {
-      JobBuffer.add("Successfully completed job");
+      return JobBuffer.add("Successfully completed job");
     }
   }
 }
 registerConstant("RetryJob", RetryJob);
-
-RetryJob.retryOn(DefaultsError);
-RetryJob.retryOn(DisabledJitterError, { jitter: null });
-RetryJob.retryOn(ZeroJitterError, { jitter: 0.0 });
-RetryJob.retryOn(FirstRetryableErrorOfTwo, SecondRetryableErrorOfTwo, { attempts: 4 });
-RetryJob.retryOn(LongWaitError, { wait: hours(1), attempts: 10 });
-RetryJob.retryOn(ShortWaitTenAttemptsError, { wait: seconds(1), attempts: 10 });
-RetryJob.retryOn(PolynomialWaitTenAttemptsError, { wait: ":polynomially_longer", attempts: 10 });
-RetryJob.retryOn(CustomWaitTenAttemptsError, {
-  wait: (executions: number) => executions * 2,
-  attempts: 10,
-});
-RetryJob.retryOn(
-  CustomCatchError,
-  block((job: RetryJob, error: Error) =>
+{
+  RetryJob.retryOn(DefaultsError);
+  RetryJob.retryOn(DisabledJitterError, { jitter: null });
+  RetryJob.retryOn(ZeroJitterError, { jitter: new Number(0.0) });
+  RetryJob.retryOn(FirstRetryableErrorOfTwo, SecondRetryableErrorOfTwo, { attempts: 4 });
+  RetryJob.retryOn(LongWaitError, { wait: Duration.hours(1), attempts: 10 });
+  RetryJob.retryOn(ShortWaitTenAttemptsError, { wait: Duration.seconds(1), attempts: 10 });
+  RetryJob.retryOn(PolynomialWaitTenAttemptsError, { wait: "polynomially_longer", attempts: 10 });
+  RetryJob.retryOn(CustomWaitTenAttemptsError, {
+    wait: (executions?: unknown) => rbBinop(executions, "*", 2),
+    attempts: 10,
+  });
+  RetryJob.retryOn(CustomCatchError, (job: unknown, error: unknown) =>
     JobBuffer.add(
-      `Dealt with a job that failed to retry in a custom way after ${String(job.arguments[1])} attempts. Message: ${error.message}`,
+      `Dealt with a job that failed to retry in a custom way after ${rbFSend(job.arguments, "second") ?? ""} attempts. Message: ${error.message ?? ""}`,
     ),
-  ),
-);
-RetryJob.retryOn(
-  DeserializationError,
-  block((job: RetryJob, error: Error) =>
-    JobBuffer.add(`Raised ${rbModName(rbObjClass(error))} for the ${job.executions} time`),
-  ),
-);
-RetryJob.retryOn(UnlimitedRetryError, { attempts: ":unlimited" });
-
-RetryJob.discardOn(DiscardableError);
-RetryJob.discardOn(FirstDiscardableErrorOfTwo, SecondDiscardableErrorOfTwo);
-RetryJob.discardOn(
-  CustomDiscardableError,
-  block((_job: RetryJob, error: Error) =>
-    JobBuffer.add(`Dealt with a job that was discarded in a custom way. Message: ${error.message}`),
-  ),
-);
-
-RetryJob.beforeEnqueue((job: RetryJob) => {
-  if (job.arguments.includes(":log_scheduled_at") && job.scheduledAt != null) {
-    JobBuffer.add(`Next execution scheduled at ${toF(job.scheduledAt)}`);
-  }
-});
+  );
+  RetryJob.retryOn(DeserializationError, (job: unknown, error: unknown) =>
+    JobBuffer.add(`Raised ${rbObjClassname(error)} for the ${job.executions ?? ""} time`),
+  );
+  RetryJob.retryOn(UnlimitedRetryError, { attempts: "unlimited" });
+  RetryJob.discardOn(DiscardableError);
+  RetryJob.discardOn(FirstDiscardableErrorOfTwo, SecondDiscardableErrorOfTwo);
+  RetryJob.discardOn(CustomDiscardableError, (job: unknown, error: unknown) =>
+    JobBuffer.add(
+      `Dealt with a job that was discarded in a custom way. Message: ${error.message ?? ""}`,
+    ),
+  );
+  RetryJob.beforeEnqueue(function (job: unknown) {
+    if (
+      (job.arguments instanceof globalThis.Set ||
+      job.arguments instanceof globalThis.Map ||
+      job.arguments instanceof Enumerator
+        ? [...job.arguments]
+        : Object.getPrototypeOf(job.arguments) === Object.prototype
+          ? Object.entries(job.arguments as object)
+          : (job.arguments as unknown[])
+      ).includes("log_scheduled_at") &&
+      job.scheduledAt != null &&
+      job.scheduledAt !== false
+    ) {
+      return JobBuffer.add(`Next execution scheduled at ${Number(job.scheduledAt)}`);
+    }
+    return null;
+  });
+}

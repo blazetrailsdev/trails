@@ -1,17 +1,15 @@
-import { NotImplementedError, rbModConstSet } from "@blazetrails/ruby-compat";
-import { QueueAdapters } from "../namespaces.js";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 
 export class AbstractAdapter {
   static toString(): string {
     return "ActiveJob::QueueAdapters::AbstractAdapter";
   }
 
-  enqueue(_job: unknown): Promise<unknown> | unknown {
+  enqueue(_job: unknown) {
     throw new NotImplementedError();
   }
 
-  enqueueAt(_job: unknown, _timestamp: unknown): Promise<unknown> | unknown {
+  enqueueAt(_job: unknown, _timestamp: unknown) {
     throw new NotImplementedError();
   }
 }
-rbModConstSet(QueueAdapters, "AbstractAdapter", AbstractAdapter);

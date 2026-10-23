@@ -1,44 +1,41 @@
 import { Identification } from "@blazetrails/globalid";
-import {
-  type Included,
-  include,
-  rbEqual,
-  rbModConstSet,
-  registerConstant,
-  StandardError,
-  toI,
-  toS,
-} from "@blazetrails/ruby-compat";
+import { include, rbInspect, registerConstant, StandardError } from "@blazetrails/ruby-compat";
 
-class RecordNotFound extends StandardError {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Person {
+  declare _id: unknown;
+
   static toString(): string {
     return "Person";
   }
 
-  declare static RecordNotFound: typeof RecordNotFound;
+  get id() {
+    return this._id;
+  }
 
-  readonly id: unknown;
-
-  static find(id: unknown): Person {
-    if (rbEqual(toI(id), 404)) {
+  static find(id: unknown) {
+    if ((parseInt(String(id), 10) || 0) === 404) {
       throw new RecordNotFound("Cannot find person with ID=404");
     }
     return new this(id);
   }
 
   constructor(id: unknown) {
-    this.id = id;
+    this._id = id;
   }
 
-  equals(otherPerson: unknown): boolean {
-    return otherPerson instanceof Person && rbEqual(toS(this.id), toS(otherPerson.id));
+  equals(otherPerson: unknown) {
+    return (
+      otherPerson instanceof Person &&
+      (Array.isArray(this.id) ? rbInspect(this.id) : String(this.id ?? "")) ===
+        (Array.isArray(otherPerson.id) ? rbInspect(otherPerson.id) : String(otherPerson.id ?? ""))
+    );
   }
 }
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
-export interface Person extends Included<typeof Identification> {}
-include(Person, Identification);
 registerConstant("Person", Person);
-rbModConstSet(Person, "RecordNotFound", RecordNotFound);
+include(Person, Identification);
+export class RecordNotFound extends StandardError {
+  static toString(): string {
+    return "Person::RecordNotFound";
+  }
+}
+registerConstant("Person::RecordNotFound", RecordNotFound);

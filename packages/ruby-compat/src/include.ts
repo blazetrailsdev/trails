@@ -1833,7 +1833,7 @@ export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unkn
   return (next as (...a: unknown[]) => unknown).apply(receiver, args);
 }
 
-export type Extended<M extends object> = CallableMethods<M>;
+export type Extended<M extends object> = CallableMethods<M extends Module<infer I> ? I : M>;
 
 /**
  * Mirrors: Ruby's Object#clone — vendor/ruby/v3.3.11/object.c:536 `rb_obj_clone`, via

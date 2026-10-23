@@ -1,118 +1,117 @@
-import { afterEach, beforeEach, describe, it } from "vitest";
-import { assert, assertEqual, assertNoDifference, assertRaises } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  rbInspect,
-  rbModConstSet,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
-import { ObjectSerializer } from "./serializers/object-serializer.js";
-import type { SerializerLike } from "./namespaces.js";
+import type {} from "@blazetrails/vitest-matchers";
 import "./test-helpers/helper.js";
+import { assertRaises, assertNoDifference } from "@blazetrails/activesupport";
+import { ArgumentError, rbInspect, registerConstant } from "@blazetrails/ruby-compat";
+import { SerializationError } from "./arguments.js";
+import { Serializers } from "./serializers.js";
+import { ObjectSerializer } from "./serializers/object-serializer.js";
+import { beforeEach, afterEach, expect, it, describe } from "vitest";
+import type { Set } from "@blazetrails/ruby-compat";
 
-class SerializersTest {
-  static toString(): string {
-    return "SerializersTest";
-  }
-}
-registerConstant("SerializersTest", SerializersTest);
-
-class DummyValueObject {
-  value: unknown;
-
-  constructor(value: unknown) {
-    this.value = value;
-  }
-
-  equals(other: DummyValueObject): boolean {
-    return this.value === other.value;
-  }
-}
-rbModConstSet(SerializersTest, "DummyValueObject", DummyValueObject);
-
-class DummySerializer extends ObjectSerializer {
-  serialize(object: DummyValueObject): Record<string, unknown> {
-    return super.serialize({ value: object.value });
-  }
-
-  deserialize(hash: Record<string, unknown>): DummyValueObject {
-    return new DummyValueObject(hash["value"]);
-  }
-
-  /** @internal */
-  protected klass(): typeof DummyValueObject {
-    return DummyValueObject;
-  }
-}
-rbModConstSet(SerializersTest, "DummySerializer", DummySerializer);
+class SerializersTest {}
 
 describe("SerializersTest", () => {
-  let valueObject: DummyValueObject;
-  let originalSerializers: Set<SerializerLike>;
+  let valueObject: unknown;
+  let originalSerializers: unknown;
 
   beforeEach(() => {
     valueObject = new DummyValueObject(123);
-    originalSerializers = ActiveJob.Serializers.serializers();
+    originalSerializers = Serializers.serializers();
   });
 
   afterEach(() => {
-    ActiveJob.Serializers._additionalSerializers = originalSerializers;
+    Serializers._additionalSerializers = originalSerializers as Set<unknown>;
   });
 
   it("can't serialize unknown object", async () => {
-    await assertRaises([ActiveJob.SerializationError], {}, () => {
-      ActiveJob.Serializers.serialize(valueObject);
-    });
+    await assertRaises([SerializationError], {}, () => Serializers.serialize(valueObject));
   });
 
   it("will serialize objects with serializers registered", () => {
-    ActiveJob.Serializers.addSerializers(DummySerializer);
-
-    assertEqual(
-      { _aj_serialized: "SerializersTest::DummySerializer", value: 123 },
-      ActiveJob.Serializers.serialize(valueObject),
-    );
+    Serializers.addSerializers(DummySerializer);
+    expect(Serializers.serialize(valueObject)).toEqualRuby({
+      _aj_serialized: "SerializersTest::DummySerializer",
+      value: 123,
+    });
   });
 
   it("won't deserialize unknown hash", async () => {
-    const hash = { _dummy_serializer: 123, _aj_symbol_keys: [] };
-    const error = await assertRaises([ArgumentError], {}, () => {
-      ActiveJob.Serializers.deserialize(hash);
-    });
-    assertEqual(
+    const hash: Record<string, unknown> = { _dummy_serializer: 123, _aj_symbol_keys: [] };
+    const error = await assertRaises([ArgumentError], {}, () => Serializers.deserialize(hash));
+    expect(await error.message).toEqualRuby(
       `Serializer name is not present in the argument: ${rbInspect({ _dummy_serializer: 123, _aj_symbol_keys: [] })}`,
-      error.message,
     );
   });
 
   it("won't deserialize unknown serializer", async () => {
-    const hash = { _aj_serialized: "DoNotExist", value: 123 };
-    const error = await assertRaises([ArgumentError], {}, () => {
-      ActiveJob.Serializers.deserialize(hash);
-    });
-    assertEqual("Serializer DoNotExist is not known", error.message);
+    const hash: Record<string, unknown> = { _aj_serialized: "DoNotExist", value: 123 };
+    const error = await assertRaises([ArgumentError], {}, () => Serializers.deserialize(hash));
+    expect(await error.message).toEqual("Serializer DoNotExist is not known");
   });
 
   it("will deserialize known serialized objects", () => {
-    ActiveJob.Serializers.addSerializers(DummySerializer);
-    const hash = { _aj_serialized: "SerializersTest::DummySerializer", value: 123 };
-    assertEqual(new DummyValueObject(123), ActiveJob.Serializers.deserialize(hash));
+    Serializers.addSerializers(DummySerializer);
+    const hash: Record<string, unknown> = {
+      _aj_serialized: "SerializersTest::DummySerializer",
+      value: 123,
+    };
+    expect(Serializers.deserialize(hash)).toEqualRuby(new DummyValueObject(123));
   });
 
-  it("adds new serializer", () => {
-    ActiveJob.Serializers.addSerializers(DummySerializer);
-    assert(ActiveJob.Serializers.serializers().has(DummySerializer));
+  it("adds new serializer", async () => {
+    Serializers.addSerializers(DummySerializer);
+    expect(await Serializers.serializers().isInclude(DummySerializer)).toBeRubyTruthy();
   });
 
   it("can't add serializer with the same key twice", async () => {
-    ActiveJob.Serializers.addSerializers(DummySerializer);
+    Serializers.addSerializers(DummySerializer);
     await assertNoDifference(
-      () => ActiveJob.Serializers.serializers().size,
-      null,
-      () => {
-        ActiveJob.Serializers.addSerializers(DummySerializer);
-      },
+      async () => await Serializers.serializers().size(),
+      undefined,
+      () => Serializers.addSerializers(DummySerializer),
     );
   });
 });
+export class DummyValueObject {
+  declare _value: number;
+
+  static toString(): string {
+    return "SerializersTest::DummyValueObject";
+  }
+
+  get value() {
+    return this._value;
+  }
+
+  set value(value) {
+    this._value = value;
+  }
+
+  constructor(value: number) {
+    this._value = value;
+  }
+
+  equals(other: Record<string, unknown>) {
+    return this.value === other.value;
+  }
+}
+registerConstant("SerializersTest::DummyValueObject", DummyValueObject);
+export class DummySerializer extends ObjectSerializer {
+  static toString(): string {
+    return "SerializersTest::DummySerializer";
+  }
+
+  serialize(object: Record<string, unknown>) {
+    return super.serialize({ value: object.value });
+  }
+
+  deserialize(hash: Record<string, unknown>) {
+    return new DummyValueObject(hash["value"] as number);
+  }
+
+  /** @internal */
+  protected klass() {
+    return DummyValueObject;
+  }
+}
+registerConstant("SerializersTest::DummySerializer", DummySerializer);

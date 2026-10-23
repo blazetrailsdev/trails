@@ -1,25 +1,19 @@
-import { Concern, extend } from "@blazetrails/activesupport";
-import { withLocale } from "@blazetrails/i18n";
-import { block as rbBlock, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
+import { Concern, I18n } from "@blazetrails/activesupport";
+import { extend, classModule, Extended } from "@blazetrails/ruby-compat";
+import type { Base } from "./base.js";
 
-interface TranslationJob {
-  locale: string | null;
+export class Translation {
+  declare static included: Extended<typeof Concern>["included"];
+
+  static readonly [classModule] = true;
+
+  static toString(): string {
+    return "ActiveJob::Translation";
+  }
 }
-
-interface TranslationClass {
-  aroundPerform(...filters: unknown[]): void;
-}
-
-export const Translation = {};
 extend(Translation, Concern);
-
-Concern.included.call(Translation as never, null, function (this: TranslationClass) {
-  this.aroundPerform(
-    rbBlock(function (job: TranslationJob, block: () => unknown) {
-      return withLocale(job.locale, block);
-    }),
-  );
+Translation.included(null, function (this: typeof Base): void {
+  this.aroundPerform(function (this: Base, job: unknown, block: unknown) {
+    return I18n.withLocale(job.locale, block as () => unknown);
+  });
 });
-
-rbModConstSet(ActiveJob, "Translation", Translation);

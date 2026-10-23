@@ -1,34 +1,17 @@
-import {
-  NotImplementedError,
-  rbModConstSet,
-  rbModName,
-  rbObjIsKindOf,
-  update,
-} from "@blazetrails/ruby-compat";
-import { ActiveJob, Serializers } from "../namespaces.js";
+import { rbObjIsKindOf, NotImplementedError, registerConstant } from "@blazetrails/ruby-compat";
 
 export class ObjectSerializer {
+  declare static _instance: unknown;
+
   static toString(): string {
     return "ActiveJob::Serializers::ObjectSerializer";
   }
 
-  static instance<T extends ObjectSerializer>(this: new () => T): T {
+  static instance(this: typeof ObjectSerializer): ObjectSerializer {
     if (!Object.hasOwn(this, "_instance")) {
       Object.defineProperty(this, "_instance", { value: new this() });
     }
-    return (this as unknown as { _instance: T })._instance;
-  }
-
-  static isSerialize(argument: unknown): boolean {
-    return this.instance().isSerialize(argument);
-  }
-
-  static serialize(argument: unknown): Record<string, unknown> {
-    return this.instance().serialize(argument);
-  }
-
-  static deserialize(argument: Record<string, unknown> | Map<string, unknown>): unknown {
-    return this.instance().deserialize(argument);
+    return this._instance;
   }
 
   isSerialize(argument: unknown): boolean {
@@ -36,19 +19,35 @@ export class ObjectSerializer {
   }
 
   serialize(hash: unknown): Record<string, unknown> {
-    return update(
-      { [ActiveJob.Arguments.OBJECT_SERIALIZER_KEY]: rbModName(this.constructor) },
-      hash as Record<string, unknown>,
+    return Object.assign(
+      {
+        ["_aj_serialized"]: ((x) => (Object.hasOwn(x, "toString") ? String(x) : x.name || null))(
+          this.constructor as typeof ObjectSerializer,
+        ),
+      },
+      hash instanceof Map ? Object.fromEntries(hash) : hash,
     );
   }
 
-  deserialize(_json: Record<string, unknown> | Map<string, unknown>): unknown {
+  deserialize(_json: Map<unknown, unknown>) {
     throw new NotImplementedError();
   }
 
   /** @internal */
-  protected klass(): unknown {
+  protected klass() {
     throw new NotImplementedError();
   }
+
+  static isSerialize(argument: unknown): boolean {
+    return this.instance().isSerialize(argument);
+  }
+
+  static serialize(hash: unknown): Record<string, unknown> {
+    return this.instance().serialize(hash);
+  }
+
+  static deserialize(json: unknown) {
+    return this.instance().deserialize(json as Map<unknown, unknown>);
+  }
 }
-rbModConstSet(Serializers, "ObjectSerializer", ObjectSerializer);
+registerConstant("ActiveJob::Serializers::ObjectSerializer", ObjectSerializer);

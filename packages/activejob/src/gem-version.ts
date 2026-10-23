@@ -1,18 +1,26 @@
-import { Gem } from "@blazetrails/ruby-compat";
+import { Gem, aryJoin, classModule } from "@blazetrails/ruby-compat";
 
-export function gemVersion(): InstanceType<typeof Gem.Version> {
-  return new Gem.Version(VERSION.STRING);
+export function gemVersion() {
+  return new Gem.Version(VERSION.STRING as string | number | null);
 }
 
-const MAJOR = 8;
-const MINOR = 0;
-const TINY = 2;
-const PRE: string | null = null;
+export class VERSION {
+  static readonly [classModule] = true;
 
-export const VERSION = {
-  MAJOR,
-  MINOR,
-  TINY,
-  PRE,
-  STRING: [MAJOR, MINOR, TINY, PRE].filter((p) => p != null).join("."),
-};
+  static toString(): string {
+    return "ActiveJob::VERSION";
+  }
+
+  static MAJOR: unknown = 8;
+
+  static MINOR: unknown = 0;
+
+  static TINY: unknown = 2;
+
+  static PRE: unknown = null;
+
+  static STRING: unknown = aryJoin(
+    [VERSION.MAJOR, VERSION.MINOR, VERSION.TINY, VERSION.PRE].filter((x) => x != null),
+    ".",
+  );
+}

@@ -1,21 +1,38 @@
-import { camelize } from "@blazetrails/activesupport";
-import { rbModConstGet, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveJob, QueueAdapters } from "./namespaces.js";
-import "./queue-adapters/abstract-adapter.js";
-import "./queue-adapters/async-adapter.js";
-import "./queue-adapters/inline-adapter.js";
-import "./queue-adapters/test-adapter.js";
+import { Autoload, camelize } from "@blazetrails/activesupport";
+import { extend, classModule } from "@blazetrails/ruby-compat";
+import { AbstractAdapter } from "./queue-adapters/abstract-adapter.js";
+import { AsyncAdapter } from "./queue-adapters/async-adapter.js";
+import { InlineAdapter } from "./queue-adapters/inline-adapter.js";
+import { TestAdapter } from "./queue-adapters/test-adapter.js";
 
-QueueAdapters.autoload("AbstractAdapter");
-QueueAdapters.autoload("AsyncAdapter");
-QueueAdapters.autoload("InlineAdapter");
-QueueAdapters.autoload("TestAdapter");
+export class QueueAdapters {
+  static readonly [classModule] = true;
 
-const ADAPTER = "Adapter";
+  static toString(): string {
+    return "ActiveJob::QueueAdapters";
+  }
 
-export function lookup(name: string): unknown {
-  return rbModConstGet(QueueAdapters, camelize(String(name)) + ADAPTER);
+  static ADAPTER: unknown = "Adapter";
+
+  static lookup(name: string) {
+    return (
+      {
+        AbstractAdapter: AbstractAdapter,
+        AsyncAdapter: AsyncAdapter,
+        InlineAdapter: InlineAdapter,
+        TestAdapter: TestAdapter,
+        ADAPTER: QueueAdapters.ADAPTER,
+      } as { [name: string]: unknown }
+    )[
+      ((x) =>
+        typeof x === "string"
+          ? x + QueueAdapters.ADAPTER
+          : Array.isArray(x)
+            ? (x.push(QueueAdapters.ADAPTER), x)
+            : x instanceof globalThis.Set
+              ? x.add(QueueAdapters.ADAPTER)
+              : x.append(QueueAdapters.ADAPTER))(camelize(String(name)))
+    ];
+  }
 }
-Object.assign(QueueAdapters, { lookup });
-
-rbModConstSet(ActiveJob, "QueueAdapters", QueueAdapters);
+extend(QueueAdapters, Autoload);
