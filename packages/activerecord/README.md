@@ -18,13 +18,13 @@ other differences below follow from that.
 
 ## Status
 
-As of 2026-10-14 (`main` at `bff6cb85f6`):
+As of 2026-10-23 (`main` at `4837c7ba7a`):
 
 | measure                                      | result              |
 | -------------------------------------------- | ------------------- |
-| Rails public methods with a TS counterpart   | 5010 / 5119 (97.9%) |
-| Rails methods, including private / protected | 6980 / 6980 (100%)  |
-| Rails ActiveRecord test cases ported         | 8883 / 8900 (99.8%) |
+| Rails public methods with a TS counterpart   | 5007 / 5125 (97.7%) |
+| Rails methods, including private / protected | 6985 / 6989 (99.9%) |
+| Rails ActiveRecord test cases ported         | 8898 / 8923 (99.7%) |
 
 Regenerate with `pnpm parity:api --package activerecord --public-only`,
 `pnpm parity:api --package activerecord`, and `pnpm parity:test`. CI runs the

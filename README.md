@@ -19,7 +19,7 @@ scaffold's functional tests, ported from Rails' templates, pass. The
 It is pre-release. Nothing is published to npm yet, so you run it from a
 checkout of this repository.
 
-- [Quickstart](#quickstart), verified end to end on 2026-10-14
+- [Quickstart](#quickstart), verified end to end on 2026-10-23
 - [Models: the ActiveRecord surface](#models-the-activerecord-surface)
 - [Typed models with `trails-tsc`](#typed-models-with-trails-tsc)
 - [Packages](#packages)
@@ -30,8 +30,8 @@ checkout of this repository.
 
 ## Quickstart
 
-Every command and every output block in this section was run on 2026-10-14
-against `main` at `b8bcadc150`, on Linux with Node 24.16.0 and SQLite, with
+Every command and every output block in this section was run on 2026-10-23
+against `main` at `4837c7ba7a`, on Linux with Node 24.16.0 and SQLite, with
 `TRAILS_ENV` and `NODE_ENV` unset. No step needs a workaround.
 
 ### 1. Build the framework from a checkout
@@ -94,7 +94,7 @@ bin/trails generate scaffold Post title:string body:text
 
 ```text
       invoke  active_record
-      create  db/migrate/20261014154434_create_posts.ts
+      create  db/migrate/20261023194933_create_posts.ts
       create  app/models/post.ts
       invoke  test_unit
       create  test/models/post.test.ts
@@ -120,10 +120,10 @@ pnpm db:migrate
 ```
 
 ```text
-== 20261014154434 CreatePosts: migrating ======================================
+== 20261023194933 CreatePosts: migrating ======================================
 -- createTable("posts")
    -> 0.0082s
-== 20261014154434 CreatePosts: migrated (0.0112s) =============================
+== 20261023194933 CreatePosts: migrated (0.0112s) =============================
 ```
 
 The migration subclasses `Migration.get(8.0)`, Rails' `ActiveRecord::Migration[8.0]`,
@@ -131,7 +131,7 @@ and the migrate writes
 `db/schema.ts` from the live database, as Rails writes `schema.rb`:
 
 ```ts
-// db/migrate/20261014154434_create_posts.ts
+// db/migrate/20261023194933_create_posts.ts
 import { Migration } from "@blazetrails/activerecord";
 
 export class CreatePosts extends Migration.get(8.0) {
@@ -147,14 +147,19 @@ export class CreatePosts extends Migration.get(8.0) {
 
 ### 4. Query from a script
 
-The model the generator wrote is a bare class. Its attributes come from the
-table.
+The model the generator wrote declares no attributes; they come from the
+table. Its `toString` makes the class render as `Post`, as Ruby's `Module#to_s`
+does.
 
 ```ts
 // app/models/post.ts (generated)
 import { ApplicationRecord } from "./application-record.js";
 
-export class Post extends ApplicationRecord {}
+export class Post extends ApplicationRecord {
+  static toString(): string {
+    return "Post";
+  }
+}
 ```
 
 ```ts
@@ -256,6 +261,8 @@ template comments and blank lines stripped:
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="csrf-param" content="authenticity_token" />
+<meta name="csrf-token" content="…" />
     <link rel="icon" href="/icon.png" type="image/png">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
@@ -570,7 +577,7 @@ The parity figures are in the [next section](#status-and-parity-snapshot).
 
 ## Status and parity snapshot
 
-**As of 2026-10-23, `main` at `9a59b3b073`.** To regenerate from a checkout:
+**As of 2026-10-23, `main` at `4837c7ba7a`.** To regenerate from a checkout:
 
 ```sh
 pnpm parity:api --public-only   # "Public API" column: Rails public methods with a TS counterpart
@@ -596,21 +603,21 @@ matched test passes in CI or is counted as skipped.
 | actionview                                         | 2335 / 2406 (97.0%)   | 3035 / 3039 (99.9%)   | 2489 / 2562 (97.2%)     |
 | actioncable                                        | 231 / 368 (62.8%)     | 310 / 447 (69.4%)     | 39 / 200 (19.5%)        |
 | activejob                                          | 267 / 269 (99.3%)     | 369 / 369 (100%)      | 395 / 395 (100%)        |
-| trailties (railties)                               | 611 / 1229 (49.7%)    | 838 / 1704 (49.2%)    | 223 / 2419 (9.2%)       |
+| trailties (railties)                               | 613 / 1229 (49.9%)    | 842 / 1704 (49.4%)    | 223 / 2419 (9.2%)       |
 | rack                                               | 512 / 517 (99.0%)     | 592 / 592 (100%)      | 866 / 872 (99.3%)       |
 | rack-session                                       | 60 / 60 (100%)        | 98 / 98 (100%)        | 123 / 124 (99.2%)       |
 | rack-test                                          | 62 / 87 (71.3%)       | 108 / 108 (100%)      | 233 / 234 (99.6%)       |
-| globalid                                           | 64 / 64 (100%)        | 93 / 93 (100%)        | 138 / 138 (100%)        |
+| globalid                                           | 64 / 64 (100%)        | 93 / 93 (100%)        | 148 / 148 (100%)        |
 | i18n                                               | 235 / 236 (99.6%)     | 329 / 329 (100%)      | 307 / 307 (100%)        |
 | did-you-mean                                       | 14 / 14 (100%)        | 16 / 16 (100%)        | 7 / 7 (100%)            |
 | date                                               | n/a (C extension)     | n/a                   | 137 / 137 (100%)        |
 | bcrypt                                             | 16 / 16 (100%)        | 18 / 18 (100%)        | 39 / 39 (100%)          |
 | msgpack                                            | 32 / 34 (94.1%)       | 35 / 35 (100%)        | 165 / 374 (44.1%)       |
 | marcel                                             | 25 / 25 (100%)        | 32 / 32 (100%)        | 19 / 20 (95.0%)         |
-| solid-queue                                        | 56 / 202 (27.7%)      | 127 / 376 (33.8%)     | n/a (no tests vendored) |
+| solid-queue                                        | 73 / 208 (35.1%)      | 155 / 385 (40.3%)     | n/a (no tests vendored) |
 | ruby-compat                                        | n/a (not a gem)       | n/a                   | 64 / 563 (11.4%)        |
 | **Data layer** (activerecord + activemodel + arel) | 6414 / 6536 (98.1%)   | 8857 / 8862 (99.9%)   | 10674 / 10699 (99.8%)   |
-| **Overall**                                        | 15231 / 16911 (90.1%) | 20504 / 22161 (92.5%) | 22868 / 26895 (85.0%)   |
+| **Overall**                                        | 15250 / 16917 (90.1%) | 20536 / 22170 (92.6%) | 22878 / 26905 (85.0%)   |
 
 The Overall row also counts the ported `thor`, `pg`, `mysql2` and `sqlite3`
 gem rows, which `parity:api` reports separately. The activerecord row also counts the ported `sqlite3` gem internals the SQLite
