@@ -149,7 +149,8 @@ export function rbObjMethod(obj: unknown, vid: unknown): Method {
 /**
  * `class_instance_method_list` (`vendor/ruby/v3.3.11/class.c:1818`) for an
  * object: its singleton methods, its class's, then every ancestor's while
- * `recur` is set. Every function-valued entry is listed (see {@link rbObjPrivateMethods}).
+ * `recur` is set. Every function-valued entry is listed: a JS entry carries no visibility
+ * (CLAUDE.md, "Method visibility is compile-time only").
  */
 function classInstanceMethodList(obj: unknown, recur: boolean): string[] {
   const list = new Set<string>();
@@ -166,44 +167,14 @@ function classInstanceMethodList(obj: unknown, recur: boolean): string[] {
 
 /**
  * `Object#methods` (`vendor/ruby/v3.3.11/class.c:1993` `rb_obj_methods`): the
- * names of the receiver's public and protected methods.
+ * names of the receiver's methods. A JS entry carries no visibility, so it is
+ * also `public_methods`, and a false `recur` lists the singleton's and its own
+ * class's alone, as `public_methods(false)` does (`class.c:2042`).
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbObjMethods(obj: unknown): string[] {
-  return classInstanceMethodList(obj, true);
-}
-
-/**
- * `Object#public_methods` (`vendor/ruby/v3.3.11/class.c:2042`
- * `rb_obj_public_methods`): the names of the receiver's public methods, its
- * singleton's and its own class's alone when `all` is false.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbObjPublicMethods(obj: unknown, all = true): string[] {
-  return classInstanceMethodList(obj, all);
-}
-
-/**
- * `Object#private_methods` (`vendor/ruby/v3.3.11/class.c:2027`
- * `rb_obj_private_methods`). A JS entry carries no visibility (CLAUDE.md,
- * "Method visibility is compile-time only"), so no method is private.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbObjPrivateMethods(_obj: unknown, _all = true): string[] {
-  return [];
-}
-
-/**
- * `Object#protected_methods` (`vendor/ruby/v3.3.11/class.c:2012`
- * `rb_obj_protected_methods`), empty as {@link rbObjPrivateMethods} is.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbObjProtectedMethods(_obj: unknown, _all = true): string[] {
-  return [];
+export function rbObjMethods(obj: unknown, recur = true): string[] {
+  return classInstanceMethodList(obj, recur);
 }
 
 /**

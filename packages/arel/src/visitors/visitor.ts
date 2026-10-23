@@ -69,9 +69,9 @@ export abstract class Visitor {
         }
       } catch (e) {
         if (!(e instanceof NoMethodError)) throw e;
-        if (rbObjRespondTo(this, dispatchMethod!, true)) throw e;
+        if (rbObjRespondTo(this, dispatchMethod!)) throw e;
         const superklass = rbModAncestors(rbObjClass(object)).find((klass) =>
-          rbObjRespondTo(this, this.dispatch.get(klass)!, true),
+          rbObjRespondTo(this, this.dispatch.get(klass)!),
         );
         if (superklass == null) throw new TypeError(`Cannot visit ${rbObjClassname(object)}`);
         this.dispatch.set(rbObjClass(object), this.dispatch.get(superklass)!);

@@ -1,10 +1,5 @@
 import { underscore } from "@blazetrails/activesupport";
-import {
-  NoMethodError,
-  RuntimeError,
-  rbFPublicSend,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { NoMethodError, RuntimeError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 import { Initializable } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";
@@ -114,7 +109,7 @@ export class Trailtie extends Initializable {
 
   static methodMissing(name: string, ...args: unknown[]): unknown {
     if (!this.isAbstractRailtie() && rbObjRespondTo(this.instance(), name)) {
-      return rbFPublicSend(this.instance(), name, ...args);
+      return rbFSend(this.instance(), name, ...args);
     } else {
       throw new NoMethodError(`undefined method '${name}' for class ${this.name}`, name);
     }

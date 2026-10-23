@@ -5,7 +5,7 @@ import {
   dup,
   fetch,
   include,
-  rbFPublicSend,
+  rbFSend,
   rbModConstSet,
   rtest,
 } from "@blazetrails/ruby-compat";
@@ -33,10 +33,7 @@ export class DateSelect extends Base {
   override render(): unknown {
     const selectType = this.selectType();
     const selector = this.datetimeSelector(this._options, this._htmlOptions);
-    const html = rbFPublicSend(
-      selector,
-      `select${selectType[0].toUpperCase()}${selectType.slice(1)}`,
-    );
+    const html = rbFSend(selector, `select${selectType[0].toUpperCase()}${selectType.slice(1)}`);
     return this.errorWrapping(htmlSafe(String(html)));
   }
 
@@ -96,7 +93,7 @@ export class DateSelect extends Base {
       const time = Time.current();
 
       for (const key of ["year", "month", "day", "hour", "min", "sec"]) {
-        if (!rtest(default_[key])) default_[key] = rbFPublicSend(time, key);
+        if (!rtest(default_[key])) default_[key] = rbFSend(time, key);
       }
 
       return Time.utc(

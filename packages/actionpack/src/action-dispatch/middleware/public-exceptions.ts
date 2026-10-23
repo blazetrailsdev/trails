@@ -1,5 +1,5 @@
 import { I18n, camelize } from "@blazetrails/activesupport";
-import { fetch, File, rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { fetch, File, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
@@ -45,7 +45,7 @@ export class PublicExceptions {
       ? camelize(`to_${contentType.toSym()?.slice(1) ?? ""}`, false)
       : null;
     if (format != null && rbObjRespondTo(body, format)) {
-      return this.renderFormat(status, contentType!, rbFPublicSend(body, format) as string);
+      return this.renderFormat(status, contentType!, rbFSend(body, format) as string);
     } else {
       return this.renderHtml(status);
     }

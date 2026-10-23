@@ -16,12 +16,11 @@ import {
   hashDelete,
   include,
   type Included,
-  rbFPublicSend,
+  rbFSend,
   rbInspect,
   rbObjRespondTo,
   Range,
   rbBlockGivenP,
-  rbFSend,
   rbModDefineMethod,
   rtest,
   type Block,
@@ -771,7 +770,7 @@ export class DateTimeSelector {
       if (type !== firstVisible) separator = this.separator(type as DateType);
       select =
         String(separator ?? "") +
-        String(rbFPublicSend(this, `select${type.charAt(0).toUpperCase()}${type.slice(1)}`) ?? "") +
+        String(rbFSend(this, `select${type.charAt(0).toUpperCase()}${type.slice(1)}`) ?? "") +
         select;
     }
     return htmlSafe(select);

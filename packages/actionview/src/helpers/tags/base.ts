@@ -7,7 +7,7 @@ import {
   hashDelete,
   include,
   type Included,
-  rbFPublicSend,
+  rbFSend,
   rbInspect,
   rbObjRespondTo,
   rbModConstSet,
@@ -76,10 +76,10 @@ export class Base {
       this._allowMethodNamesOutsideObject !== false
     ) {
       return rbObjRespondTo(this.object, this._methodName)
-        ? rbFPublicSend(this.object, this._methodName)
+        ? rbFSend(this.object, this._methodName)
         : null;
     } else {
-      return rbFPublicSend(this.object, this._methodName);
+      return rbFSend(this.object, this._methodName);
     }
   }
 
@@ -94,7 +94,7 @@ export class Base {
       cameFromUser !== false &&
       rbObjRespondTo(this.object, methodBeforeTypeCast)
     ) {
-      return rbFPublicSend(this.object, methodBeforeTypeCast);
+      return rbFSend(this.object, methodBeforeTypeCast);
     } else {
       return this.value();
     }
@@ -102,7 +102,7 @@ export class Base {
 
   protected isValueCameFromUser(): unknown {
     const methodName = `${this._methodName}CameFromUser`;
-    return !rbObjRespondTo(this.object, methodName) || rbFPublicSend(this.object, methodName);
+    return !rbObjRespondTo(this.object, methodName) || rbFSend(this.object, methodName);
   }
 
   protected retrieveObject(object: unknown): unknown {

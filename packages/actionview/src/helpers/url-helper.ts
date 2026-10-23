@@ -449,7 +449,7 @@ export function tokenTag(
 ): SafeBuffer | string {
   if (
     token !== false &&
-    rbObjRespondTo(this, "isProtectAgainstForgery", true) &&
+    rbObjRespondTo(this, "isProtectAgainstForgery") &&
     this.isProtectAgainstForgery!()
   ) {
     token =

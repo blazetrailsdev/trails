@@ -28,7 +28,7 @@ import {
   except,
   fetch,
   hashDelete,
-  rbFPublicSend,
+  rbFSend,
   rbInspect,
   rbObjRespondTo,
   slice,
@@ -1041,11 +1041,11 @@ export class FormBuilder {
     association = convertToModel(association);
 
     if (rbObjRespondTo(association, "isPersisted")) {
-      if (rbObjRespondTo(rbFPublicSend(this.object, associationName), "toAry")) {
+      if (rbObjRespondTo(rbFSend(this.object, associationName), "toAry")) {
         association = [association];
       }
     } else if (!rbObjRespondTo(association, "toAry")) {
-      association = rbFPublicSend(this.object, associationName);
+      association = rbFSend(this.object, associationName);
     }
 
     if (rbObjRespondTo(association, "toAry")) {

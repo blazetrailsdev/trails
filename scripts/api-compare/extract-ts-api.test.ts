@@ -2504,14 +2504,14 @@ describe("body call capture", () => {
     expect(calls("schedule")).not.toContain("@timer");
   });
 
-  it("records rbFSend / rbFPublicSend of a string-literal name as a call to that name", () => {
+  it("records rbFSend of a string-literal name as a call to that name", () => {
     const cls = extractFromSource(
       `class Foo {
         first(records: unknown[], limit: number) {
           return rbFSend(records, "limit", limit);
         }
         assign(record: object, k: string, v: unknown) {
-          return rbFPublicSend(record, "write", v);
+          return rbFSend(record, "write", v);
         }
         dispatch(record: object, name: string) {
           return rbFSend(record, name);
@@ -2520,7 +2520,7 @@ describe("body call capture", () => {
     );
     const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
     expect(calls("first")).toEqual(expect.arrayContaining(["rbFSend", "limit"]));
-    expect(calls("assign")).toEqual(expect.arrayContaining(["rbFPublicSend", "write"]));
+    expect(calls("assign")).toEqual(expect.arrayContaining(["rbFSend", "write"]));
     expect(calls("dispatch")).toEqual(["@invoked:rbFSend", "rbFSend"]);
   });
 

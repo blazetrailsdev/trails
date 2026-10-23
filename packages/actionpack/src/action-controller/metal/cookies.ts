@@ -9,7 +9,7 @@ export class Cookies {
   static [included](
     base: HelpersClassMethods & { helperMethod?: OmitThisParameter<typeof helperMethod> },
   ): void {
-    if (rbObjRespondTo(base, "helperMethod", true)) base.helperMethod!("cookies");
+    if (rbObjRespondTo(base, "helperMethod")) base.helperMethod!("cookies");
   }
 
   /** @internal */

@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { camelize, constantize, inquiry, singularize, tableize } from "@blazetrails/activesupport";
-import { hashDelete, rbFPublicSend } from "@blazetrails/ruby-compat";
+import { hashDelete, rbFSend } from "@blazetrails/ruby-compat";
 
 export interface DelegatedTypeOptions {
   types: string[];
@@ -50,7 +50,7 @@ export function defineDelegatedTypeMethods(
 
   Object.defineProperty(this.prototype, `${role}Class`, {
     get(this: Base) {
-      const type = rbFPublicSend(this, roleType) as string;
+      const type = rbFSend(this, roleType) as string;
       return constantize(type) as typeof Base;
     },
     configurable: true,
@@ -58,7 +58,7 @@ export function defineDelegatedTypeMethods(
 
   Object.defineProperty(this.prototype, `${role}Name`, {
     get(this: Base) {
-      return inquiry.call((rbFPublicSend(this, `${role}Class`) as typeof Base).modelName.singular);
+      return inquiry.call((rbFSend(this, `${role}Class`) as typeof Base).modelName.singular);
     },
     configurable: true,
   });
@@ -67,9 +67,9 @@ export function defineDelegatedTypeMethods(
     this.prototype,
     `build${camelize(role, true)}`,
     function (this: Base, ...params: unknown[]): Base {
-      const klass = rbFPublicSend(this, `${role}Class`) as new (...params: unknown[]) => Base;
+      const klass = rbFSend(this, `${role}Class`) as new (...params: unknown[]) => Base;
       const record = new klass(...params);
-      rbFPublicSend(this, `${role}=`, record);
+      rbFSend(this, `${role}=`, record);
       return record;
     },
   );
@@ -87,12 +87,12 @@ export function defineDelegatedTypeMethods(
 
     const query = `is${predicateSuffix}`;
     defineMethod(this.prototype, query, function (this: Base): boolean {
-      return rbFPublicSend(this, roleType) === typeName;
+      return rbFSend(this, roleType) === typeName;
     });
 
     Object.defineProperty(this.prototype, singularName, {
       get(this: Base) {
-        if (rbFPublicSend(this, query)) return rbFPublicSend(this, role);
+        if (rbFSend(this, query)) return rbFSend(this, role);
         return null;
       },
       configurable: true,
@@ -100,7 +100,7 @@ export function defineDelegatedTypeMethods(
 
     Object.defineProperty(this.prototype, camelize(`${singularSnake}_${primaryKey}`, false), {
       get(this: Base) {
-        if (rbFPublicSend(this, query)) return rbFPublicSend(this, roleId);
+        if (rbFSend(this, query)) return rbFSend(this, roleId);
         return null;
       },
       configurable: true,

@@ -13,7 +13,7 @@ import {
   include,
   isSymbol,
   Module,
-  rbFPublicSend,
+  rbFSend,
   rbModConstSet,
   rbModMethodDefined,
   rbObjRespondTo,
@@ -104,7 +104,7 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
 }
 
 export function routeFor(this: UrlForHost, name: string, ...args: unknown[]): string {
-  return rbFPublicSend(this, camelize(`${name}_url`, "lower"), ...args) as string;
+  return rbFSend(this, camelize(`${name}_url`, "lower"), ...args) as string;
 }
 
 /** @internal */

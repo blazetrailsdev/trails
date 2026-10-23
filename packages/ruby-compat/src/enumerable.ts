@@ -19,7 +19,7 @@ import {
   rbIntegerTypeP,
   rbPlus,
 } from "./numeric.js";
-import { rbFPublicSend, rbFSend } from "./object.js";
+import { rbFSend } from "./object.js";
 import { Rational } from "./rational.js";
 import { checkArity } from "./string/support.js";
 import { rbEqq, rbEqual } from "./rb-equal.js";
@@ -496,7 +496,7 @@ function injectOpI<T>(i: T, memo: InjectMemo<T>): void {
   if (memo.v1 === undef) {
     memo.v1 = i;
   } else if (isSymbol(name)) {
-    memo.v1 = rbFPublicSend(memo.v1, name, i);
+    memo.v1 = rbFSend(memo.v1, name, i);
   } else {
     memo.v1 = rbFSend(memo.v1, name, i);
   }
@@ -528,7 +528,7 @@ function aryInjectOp(ary: readonly unknown[], init: unknown, op: string): unknow
     }
   }
   for (; i < ary.length; i++) {
-    v = rbFPublicSend(v, op, ary[i]);
+    v = rbFSend(v, op, ary[i]);
   }
   return v;
 }

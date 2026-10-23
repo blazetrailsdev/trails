@@ -1064,17 +1064,18 @@ As a consequence:
   is recorded at run time, and `Module#private` / `Module#protected` /
   `private_constant` are not ported.
 - `respond_to?(m)` and `respond_to?(m, true)` answer the same for a defined
-  method. `basicObjRespondTo`'s `pub` and `rbObjRespondTo`'s `priv` stay, and
-  reach only `respondToMissing` / an overridden `isRespondTo`, so
-  `ActiveModel::AttributeMethods`' two `super` calls
-  (`attribute_methods.rb:528-533`) are still ported as two calls.
-- `rbFPublicSend` dispatches a defined method exactly as `rbFSend` does. It still
-  raises `NoMethodError` for an undefined name and still goes to `methodMissing`,
-  so a Rails `public_send` that survives § "A dispatch by name is spelled
-  directly" keeps its `rbFPublicSend` spelling and its rescue — visibility is
-  not what decides between the two spellings, and neither spelling is a reason
-  to keep a send where the name is a literal.
-  `rbModPublicMethodDefined` (`Module#public_method_defined?`) answers "defined".
+  method, so `rbObjRespondTo(obj, mid)` and `basicObjRespondTo(obj, mid)` take
+  no visibility argument. A Rails override keeps its include-private parameter
+  (`isRespondTo(name, includePrivate = false)`) and does not read it, and an
+  arm whose only difference is that flag is removed:
+  `ActiveModel::AttributeMethods#respond_to?`'s second `super(method, true)`
+  (`attribute_methods.rb:528-533`) cannot answer differently from its first.
+- A Rails `public_send` that survives § "A dispatch by name is spelled
+  directly" ports as `rbFSend`, which raises `NoMethodError` for an undefined
+  name and goes to `methodMissing`. `public_method_defined?` is
+  `rbModMethodDefined`, `public_instance_method` is `rbModInstanceMethod`, and
+  `public_methods` is `rbObjMethods`; `private_methods` and
+  `protected_methods` are always empty and are not ported.
 - A Rails test whose assertions turn on private / protected visibility at run
   time is permanently unportable for that arm: `assert_not_respond_to` on a
   private method, `assert_raise(NoMethodError)` on a private call, a `public_send`
@@ -1440,9 +1441,9 @@ the repo owner on 2026-10-21.
 
 ## A dispatch by name is spelled directly (`send`, `public_send`)
 
-`rbFSend` / `rbFPublicSend` are the ports of `Kernel#send` / `#public_send`
+`rbFSend` is the port of `Kernel#send` and `#public_send`
 (`rb_f_send`, `vendor/ruby/v3.3.11/vm_eval.c:1330`; `rb_f_public_send`,
-`:1350`), and they stay — but they are the last
+`:1350`), and it stays — but they are the last
 shape to reach for, not the first. A string-keyed send throws away everything
 the call site knew: no TS type checks the receiver or the target, the Ruby name
 has to be guessed into a TS spelling (`camelized`, `writerSpelling` and
@@ -1470,7 +1471,7 @@ Two fallbacks exist, and both are last resorts:
   nothing outside the file reads it — a table is extra surface like any other
   name, and a registry written where a direct call would have done is its own
   invented indirection (§ "Fidelity is the job").
-- **`rbFSend` / `rbFPublicSend`**, where the dispatched name is
+- **`rbFSend`**, where the dispatched name is
   caller-supplied and the set it comes from is open — extended by application
   code, so no table the framework writes can enumerate it. `Object#try`'s
   `public_send(*args, &block)`

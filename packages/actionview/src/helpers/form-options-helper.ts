@@ -15,9 +15,8 @@ import {
   first,
   last,
   rbModDefineMethod,
-  rbFPublicSend,
-  rbEql,
   rbFSend,
+  rbEql,
   rbObjAsString,
   rbObjRespondTo,
   rtest,
@@ -383,7 +382,7 @@ export function extractValuesFromCollection(
 ): unknown {
   if (typeof selected === "function") {
     return filterMap(globalThis.Array.from(collection), (element) => {
-      if (rtest(selected(element))) return rbFPublicSend(element, String(valueMethod));
+      if (rtest(selected(element))) return rbFSend(element, String(valueMethod));
     });
   } else {
     return selected;
@@ -392,7 +391,7 @@ export function extractValuesFromCollection(
 
 /** @internal */
 export function valueForCollection(item: unknown, value: unknown): unknown {
-  return typeof value === "function" ? value(item) : rbFPublicSend(item, String(value));
+  return typeof value === "function" ? value(item) : rbFSend(item, String(value));
 }
 
 /** @internal */

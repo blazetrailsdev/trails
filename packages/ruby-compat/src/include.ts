@@ -1391,7 +1391,7 @@ function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
  * recently included first, or the class the prototype belongs to.
  *
  * An `Object.prototype` member raises `NameError`: no Ruby class defines it,
- * the line `rbModPublicMethodDefined` draws for `Module#method_defined?`.
+ * the line {@link rbModMethodDefined} draws for `Module#method_defined?`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -1402,17 +1402,6 @@ export function rbModInstanceMethod(mod: { prototype: object }, mid: string): Un
     `undefined method '${mid}' for class '${rbModToS(mod as unknown as new () => unknown)}'`,
     mid,
   );
-}
-
-/**
- * `rb_mod_public_instance_method` (`vendor/ruby/v3.3.11/proc.c:2207`),
- * `Module#public_instance_method`. Visibility is compile-time only, so it answers
- * as {@link rbModInstanceMethod} does.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbModPublicInstanceMethod(mod: { prototype: object }, mid: string): UnboundMethod {
-  return rbModInstanceMethod(mod, mid);
 }
 
 /**

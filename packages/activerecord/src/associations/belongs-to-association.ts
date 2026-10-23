@@ -2,7 +2,7 @@ import {
   fetch,
   rbEqual,
   rbFCaller,
-  rbFPublicSend,
+  rbFSend,
   rbObjAsString,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
@@ -28,14 +28,14 @@ export class BelongsToAssociation extends SingularAssociation {
         const foreignKey = this.reflection.foreignKey();
         if (Array.isArray(foreignKey)) {
           primaryKeyColumn = this.reflection.activeRecordPrimaryKey;
-          id = foreignKey.map((col) => rbFPublicSend(this.owner, col));
+          id = foreignKey.map((col) => rbFSend(this.owner, col));
         } else {
           primaryKeyColumn = this.reflection.activeRecordPrimaryKey;
-          id = rbFPublicSend(this.owner, foreignKey);
+          id = rbFSend(this.owner, foreignKey);
         }
 
         const associationClass = this.reflection.isPolymorphic()
-          ? rbFPublicSend(this.owner, this.reflection.foreignType!)
+          ? rbFSend(this.owner, this.reflection.foreignType!)
           : this.reflection.klass;
 
         this.enqueueDestroyAssociation({
@@ -53,7 +53,7 @@ export class BelongsToAssociation extends SingularAssociation {
         break;
       }
       default:
-        await rbFPublicSend(this.target, this.options.dependent);
+        await rbFSend(this.target, this.options.dependent);
     }
   }
 

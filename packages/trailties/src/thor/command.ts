@@ -10,9 +10,6 @@ import {
   rbObjAsString,
   rbObjMethod,
   rbObjMethods,
-  rbObjPrivateMethods,
-  rbObjProtectedMethods,
-  rbObjPublicMethods,
   rbObjRespondTo,
   rbSetClassPathString,
   regexpEscape,
@@ -207,22 +204,20 @@ export class Command extends Struct.new(
 
   /** @internal */
   protected isPublicMethod(instance: Instance): boolean {
-    return rbObjPublicMethods(instance).includes(this.name);
+    return rbObjMethods(instance).includes(this.name);
   }
 
-  /** @internal */
-  protected isPrivateMethod(instance: Instance): boolean {
-    return rbObjPrivateMethods(instance).includes(this.name);
+  /**
+   * @internal
+   * @missingRailsCall privateMethods — PERMANENT
+   */
+  protected isPrivateMethod(_instance: Instance): boolean {
+    return false;
   }
 
   /** @internal */
   protected isLocalMethod(instance: Instance, name: string): boolean {
-    const methods = [
-      ...rbObjPublicMethods(instance, false),
-      ...rbObjPrivateMethods(instance, false),
-      ...rbObjProtectedMethods(instance, false),
-    ];
-    return methods.includes(name);
+    return rbObjMethods(instance, false).includes(name);
   }
 
   /** @internal */

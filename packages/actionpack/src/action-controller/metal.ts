@@ -347,7 +347,7 @@ function fireInherited(klass: object, metal: object): void {
   for (const k of chain) {
     if (fired.has(k)) continue;
     fired.add(k);
-    if (rbObjRespondTo(k, "_writeLayoutMethod", true)) {
+    if (rbObjRespondTo(k, "_writeLayoutMethod")) {
       (k as { _writeLayoutMethod(): void })._writeLayoutMethod();
     }
   }

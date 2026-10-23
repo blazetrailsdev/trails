@@ -1,4 +1,4 @@
-import { Dir, File, include, rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Dir, File, include, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
 import { Generators } from "../generators.js";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
@@ -140,7 +140,7 @@ export abstract class AppBase extends GeneratorBase {
 
   /** @internal */
   protected build(meth: string, ...args: unknown[]): unknown {
-    if (rbObjRespondTo(this.builder(), meth)) return rbFPublicSend(this.builder(), meth, ...args);
+    if (rbObjRespondTo(this.builder(), meth)) return rbFSend(this.builder(), meth, ...args);
     return undefined;
   }
 

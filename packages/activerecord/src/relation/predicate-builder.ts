@@ -2,7 +2,7 @@ import {
   ArgumentError,
   last,
   rbCBasicObject as BasicObject,
-  rbFPublicSend,
+  rbFSend,
   rbModConstSet,
   rbObjAsString as toS,
   rbObjIsKindOf,
@@ -120,7 +120,7 @@ export class PredicateBuilder {
         if (mapping.length === 1 || values.length === 0) {
           const [columnName, aggrAttr] = mapping[0];
           values = values.map((object) =>
-            rbObjRespondTo(object, aggrAttr) ? rbFPublicSend(object, aggrAttr) : object,
+            rbObjRespondTo(object, aggrAttr) ? rbFSend(object, aggrAttr) : object,
           );
           return this.get(columnName, values);
         } else {
@@ -148,7 +148,7 @@ export class PredicateBuilder {
     queries = queries as (Nodes.Node | Nodes.SqlLiteral)[][];
     if (queries.length === 1) return queries[0];
     queries = queries.map((query) =>
-      query.reduce((left, right) => rbFPublicSend(left, "and", right) as Nodes.Node),
+      query.reduce((left, right) => (left as Nodes.Node).and(right as Nodes.Node)),
     );
     queries = new Nodes.Or(queries);
     return [new Nodes.Grouping(queries)];
@@ -168,7 +168,7 @@ export class PredicateBuilder {
       )
     ) {
       const bind = this.buildBindAttribute(toS(attribute.name), value);
-      return rbFPublicSend(attribute, operator, bind) as Nodes.Node;
+      return rbFSend(attribute, operator, bind) as Nodes.Node;
     } else {
       return this.handlerFor(value).call(attribute, value);
     }

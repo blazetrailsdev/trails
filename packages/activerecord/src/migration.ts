@@ -26,7 +26,7 @@ import {
   puts,
   excToS,
   rbFLoad,
-  rbFPublicSend,
+  rbFSend,
   rbInspect,
   rbModRemoveConst,
   rbObjRespondTo,
@@ -46,7 +46,7 @@ import {
   StandardError,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NoMethodError, rbFSend, rbObjClassname, Struct, Zlib } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjClassname, Struct, Zlib } from "@blazetrails/ruby-compat";
 import { Temporal, Time } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -1710,7 +1710,7 @@ export class MigrationContext<
 
     const finish = migrator.migrations[startIndex + steps];
     const version = finish ? finish.version : 0;
-    return rbFPublicSend(this, direction, version) as Promise<MigrationProxy[]>;
+    return rbFSend(this, direction, version) as Promise<MigrationProxy[]>;
   }
 }
 

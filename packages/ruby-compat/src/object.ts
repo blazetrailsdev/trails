@@ -608,7 +608,7 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  * property, so the prototype-chain lookup is the whole `method_boundp` here,
  * and an own `undefined` value is its `2` (undefined method) case. An unbound
  * name falls through to the receiver's `respond_to_missing?`
- * (`basic_obj_respond_to_missing`, `vm_method.c:2850-2861`), handed `!pub`.
+ * (`basic_obj_respond_to_missing`, `vm_method.c:2850-2861`).
  * Like `callable_method_entry` there, the entry is found by descriptor lookup,
  * never by a property read a `methodMissingProxy` `get` trap would answer.
  * `isEmpty` is bound for the core receivers `ruby-empty.ts`'s `isEmpty` answers
@@ -643,14 +643,13 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  *
  * `method_boundp` (`vm_method.c:1788-1818`) answers `0` for a PRIVATE entry,
  * and under `BOUND_RESPONDS` a PROTECTED one, when `pub` is set. A JS entry
- * carries no visibility, so a defined name answers the same at both `pub`
- * values and `pub` reaches only `respond_to_missing?` (see CLAUDE.md, "Method
+ * carries no visibility, so there is no `pub` to pass (see CLAUDE.md, "Method
  * visibility is compile-time only").
  *
  * @noRailsEquivalent PERMANENT — Ruby core `basic_obj_respond_to`
  * (`vendor/ruby/v3.3.11/vm_method.c:2864`).
  */
-export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
+export function basicObjRespondTo(obj: unknown, mid: string): boolean {
   if (mid === "toYaml") return true;
   if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
   if (Array.isArray(obj) && mid === "toAry") return true;
@@ -733,7 +732,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     cme = Object.getOwnPropertyDescriptor(o, "respondToMissing");
   }
   if (typeof cme?.value !== "function") return false;
-  const ret = (cme.value as (mid: string, priv: boolean) => unknown).call(obj, mid, !pub);
+  const ret = (cme.value as (mid: string) => unknown).call(obj, mid);
   return ret != null && ret !== false;
 }
 
@@ -750,20 +749,20 @@ export function objRespondToMissing(_obj: unknown, _mid: string, _priv: boolean)
   return false;
 }
 
+const writerSpellings = new Map<string, string>();
+
 function writerSpelling(attr: string | undefined): string | undefined {
   if (attr === undefined || attr.startsWith("_")) return undefined;
-  return camelized(`set_${attr}`);
+  let writer = writerSpellings.get(attr);
+  if (writer === undefined) writerSpellings.set(attr, (writer = camelized(`set_${attr}`)));
+  return writer;
 }
 
 function camelized(name: string): string {
   return name.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase());
 }
 
-function checkDefinitionVisibility(
-  mod: { prototype: object },
-  mid: string,
-  inherit = true,
-): boolean {
+function checkDefinition(mod: { prototype: object }, mid: string, inherit = true): boolean {
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   const writer = writerSpelling(attr);
   for (
@@ -788,7 +787,7 @@ function checkDefinitionVisibility(
 /**
  * `Module#method_defined?` (`rb_mod_method_defined`,
  * `vendor/ruby/v3.3.11/vm_method.c:2055`). A JS entry carries no visibility, so
- * it answers as {@link rbModPublicMethodDefined} does. A writer `name=` is
+ * every defined entry answers. A writer `name=` is
  * answered by a JS accessor's setter or a `setName` method, the entries
  * {@link rbFSend} dispatches to. A false `inherit` answers for `mod`'s
  * own method table only (`check_definition_visibility`, `vm_method.c:2000-2013`).
@@ -805,7 +804,7 @@ export function rbModMethodDefined(
   inherit = true,
 ): boolean {
   if (!("prototype" in mod)) return mod.isMethodDefined(mid);
-  return checkDefinitionVisibility(mod, mid, inherit);
+  return checkDefinition(mod, mid, inherit);
 }
 
 /**
@@ -1015,37 +1014,6 @@ export function rbModAttrWriter(klass: { prototype: object }, ...argv: string[])
   for (const id of argv) {
     rbAttr(klass, id, false, true);
   }
-}
-
-/**
- * `Module#public_method_defined?` (`rb_mod_public_method_defined`,
- * `vendor/ruby/v3.3.11/vm_method.c:2098`, through `check_definition_visibility`,
- * `:1988`): whether `mod`'s instances have a method `mid`. A JS method entry
- * carries no visibility, so every defined one is PUBLIC (see CLAUDE.md, "Method
- * visibility is compile-time only"). A JS method or accessor is a method
- * entry; a data property is not, and neither is an `Object.prototype` member,
- * which no Ruby class defines.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Module#public_method_defined?`
- * (`vendor/ruby/v3.3.11/vm_method.c:2098`).
- */
-export function rbModPublicMethodDefined(mod: { prototype: object }, mid: string): boolean {
-  return checkDefinitionVisibility(mod, mid);
-}
-
-/**
- * `Kernel#public_send` (`rb_f_public_send`, `vendor/ruby/v3.3.11/vm_eval.c:1350`): `send`
- * restricted to public methods. A JS entry carries no visibility, so a defined
- * name dispatches exactly as {@link rbFSend} does (see CLAUDE.md, "Method
- * visibility is compile-time only"). The nearest entry answers: a writer
- * `name=` is a `name=` method, a JS accessor's `name` setter, or a `setName`
- * method. An
- * unbound name goes to the receiver's `method_missing`.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Kernel#public_send` (`vendor/ruby/v3.3.11/vm_eval.c:1350`).
- */
-export function rbFPublicSend(recv: unknown, mid: unknown, ...args: unknown[]): unknown {
-  return sendInternal(args.length, [mid, ...args], recv);
 }
 
 /**
@@ -1318,8 +1286,8 @@ type AnyFunction = (...args: unknown[]) => unknown;
  * `rb_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2934`) — the SEND of
  * `respond_to?`, which `vm_respond_to` (`vm_method.c:2882`) routes through an
  * overridden `respond_to?` when the receiver's class defines one (as
- * `ActiveModel::AttributeMethods` does) — passing the private-methods argument
- * only where `priv` asks for it (`vm_method.c:2896-2905`) — and otherwise
+ * `ActiveModel::AttributeMethods` does) — with no private-methods argument,
+ * since a JS entry carries no visibility (`vm_method.c:2896-2905`) — and otherwise
  * falls back to {@link basicObjRespondTo} (`vm_method.c:2945`). Like
  * `method_entry_get` there, `respond_to?` is found by descriptor lookup, never
  * by a property read a `method_missing` Proxy's `get` trap would answer. An
@@ -1329,7 +1297,7 @@ type AnyFunction = (...args: unknown[]) => unknown;
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_respond_to`
  * (`vendor/ruby/v3.3.11/vm_method.c:2934`).
  */
-export function rbObjRespondTo(obj: unknown, mid: string, priv: boolean = false): boolean {
+export function rbObjRespondTo(obj: unknown, mid: string): boolean {
   let me: PropertyDescriptor | undefined;
   for (
     let o: object | null = Object(obj);
@@ -1340,12 +1308,10 @@ export function rbObjRespondTo(obj: unknown, mid: string, priv: boolean = false)
   }
   const isRespondTo = me?.value;
   if (typeof isRespondTo === "function") {
-    const result = priv
-      ? (isRespondTo as (mid: string, priv: boolean) => unknown).call(obj, mid, true)
-      : (isRespondTo as (mid: string) => unknown).call(obj, mid);
+    const result = (isRespondTo as (mid: string) => unknown).call(obj, mid);
     return result != null && result !== false;
   }
-  return basicObjRespondTo(obj, mid, !priv);
+  return basicObjRespondTo(obj, mid);
 }
 
 /**

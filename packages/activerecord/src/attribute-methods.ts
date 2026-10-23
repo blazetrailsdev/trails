@@ -13,7 +13,7 @@ import {
   rbInspect as inspect,
   rbModConstSet,
   rbModMethodDefined,
-  rbModPublicInstanceMethod,
+  rbModInstanceMethod,
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjMethod,
@@ -104,7 +104,7 @@ export function methodMissing(
 
   let method: UnboundMethod | null;
   try {
-    method = rbModPublicInstanceMethod(klass, name);
+    method = rbModInstanceMethod(klass, name);
   } catch (e) {
     if (!(e instanceof NameError)) throw e;
     method = null;
@@ -481,8 +481,8 @@ export function isMethodDefinedWithin(
 export function isDangerousClassMethod(this: AttributeMethodsHost, methodName: string): boolean {
   if (RESTRICTED_CLASS_METHODS.has(methodName)) return true;
 
-  if (rbObjRespondTo(ActiveRecord.Base, methodName, true)) {
-    if (rbObjRespondTo(Object, methodName, true)) {
+  if (rbObjRespondTo(ActiveRecord.Base, methodName)) {
+    if (rbObjRespondTo(Object, methodName)) {
       return (
         rbObjMethod(ActiveRecord.Base, methodName).owner() !==
         rbObjMethod(Object, methodName).owner()

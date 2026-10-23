@@ -167,11 +167,11 @@ export class TimeWithZone {
 
   isRespondTo(sym: string, includePriv: boolean = false): boolean {
     if (sym === "toStr") return false;
-    return basicObjRespondTo(this, sym, !includePriv);
+    return basicObjRespondTo(this, sym);
   }
 
   respondToMissing(sym: string, includePriv: boolean): boolean {
-    if (!includePriv && sym.startsWith("_")) return false;
+    if (sym.startsWith("_")) return false;
     return typeof (this.time as unknown as Record<string, unknown>)[sym] === "function";
   }
 

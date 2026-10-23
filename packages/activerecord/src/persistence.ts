@@ -5,7 +5,7 @@ import {
   isEmpty,
   keys,
   rbEqual,
-  rbFPublicSend,
+  rbFSend,
   rbObjAsString,
   rbObjSingletonClass,
   rtest,
@@ -442,11 +442,11 @@ export async function incrementBang<T extends CounterBangRecord>(
     throw new ArgumentError("wrong number of arguments (given 0, expected 1..3)");
   }
   this.increment(attribute, by);
-  const inDatabase = rbFPublicSend(this, `${attribute}InDatabase`);
+  const inDatabase = rbFSend(this, `${attribute}InDatabase`);
   const change =
-    (rbFPublicSend(this, attribute) as number) - (rtest(inDatabase) ? (inDatabase as number) : 0);
+    (rbFSend(this, attribute) as number) - (rtest(inDatabase) ? (inDatabase as number) : 0);
   await this.constructor.updateCounters(this.id, { [attribute]: change, touch: options.touch });
-  rbFPublicSend(this, `clear${attribute.charAt(0).toUpperCase()}${attribute.slice(1)}Change`);
+  rbFSend(this, `clear${attribute.charAt(0).toUpperCase()}${attribute.slice(1)}Change`);
   return this;
 }
 
@@ -643,7 +643,7 @@ export async function reload<T extends ReloadRecord>(
     AttributeMethods.ClassMethods.undefineAttributeMethods.call(rbObjSingletonClass(this) as never);
   }
   for (const name of this._attributes.keys()) {
-    if (!basicObjRespondTo(this, name, false)) {
+    if (!basicObjRespondTo(this, name)) {
       (rbObjSingletonClass(this) as unknown as typeof Base).defineAttributeMethod(name);
     }
   }
@@ -973,7 +973,7 @@ export function instantiateInstanceOf(
   attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
   const record = klass.allocate();
   for (const name of names) {
-    if (!basicObjRespondTo(record, name, false)) {
+    if (!basicObjRespondTo(record, name)) {
       (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
     }
   }
