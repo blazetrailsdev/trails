@@ -21,6 +21,7 @@ import {
 import { rbFSend } from "./object.js";
 import { Rational } from "./rational.js";
 import { checkArity } from "./string/support.js";
+import { cmp, rbCmpint } from "./comparable.js";
 import { rbEqq, rbEqual } from "./rb-equal.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
 
@@ -323,6 +324,46 @@ export function drop<T, E = unknown>(obj: Iterable<T> | Each<T, E>, n: number): 
 }
 
 /**
+ * Mirrors: Ruby's Enumerable#each_with_object — `vendor/ruby/v3.3.11/enum.c:3285`
+ * `enum_each_with_object`, yielding each element with the memo
+ * (`each_with_object_i`) and answering the memo.
+ * @noRailsEquivalent PERMANENT
+ */
+export function eachWithObject<T, M, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  memo: M,
+  block: (i: T, memo: M) => unknown,
+): Enumerated<E, M> {
+  return rbBlockCall(
+    obj,
+    (i) => {
+      block(i, memo);
+    },
+    () => memo,
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#sort_by — `vendor/ruby/v3.3.11/enum.c:1651` `enum_sort_by`,
+ * which pairs each element with its block value (`sort_by_i`) and sorts the
+ * pairs by `<=>` on the values (`sort_by_cmp`, `:1379`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function sortBy<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T) => unknown,
+): Enumerated<E, T[]> {
+  const buf: [unknown, T][] = [];
+  return rbBlockCall(
+    obj,
+    (i) => {
+      buf.push([block(i), i]);
+    },
+    () => buf.sort(([a], [b]) => rbCmpint(cmp(a, b), a, b)).map(([, i]) => i),
+  );
+}
+
+/**
  * Mirrors: Ruby's Enumerable#each_slice — `vendor/ruby/v3.3.11/enum.c:3166` `enum_each_slice`,
  * yielding each full slice as it fills (`each_slice_i`, `:3102`) and the
  * remainder last, then answering the receiver. With no block it answers the
@@ -345,7 +386,7 @@ export function eachSlice<T, E = unknown>(
   n: number,
   block?: (slice: T[]) => unknown,
 ): unknown {
-  const size = n;
+  const size = Math.trunc(n);
 
   if (size <= 0) throw new ArgumentError("invalid slice size");
   const slices: T[][] = [];

@@ -4,6 +4,7 @@ import {
   AsyncEnumerable,
   Enumerable,
   eachSlice,
+  sortBy,
   filterMap,
   find,
   findAll,
@@ -402,6 +403,11 @@ describe("Enumerable free functions over any receiver", () => {
         [0, 3],
       );
       expect(eachSlice(build([1, 2, 3, 4, 5]), 2)).toEqual([[1, 2], [3, 4], [5]]);
+      expect(sortBy(build(["ccc", "a", "bb"]), (s) => (s as string).length)).toEqual([
+        "a",
+        "bb",
+        "ccc",
+      ]);
       expect(find(build([1, 2, 3]), (i: unknown) => (i as number) > 1)).toBe(2);
       expect(findAll(build([1, null, 2]), (i) => i)).toEqual([1, 2]);
       expect(first(build([1, 2, 3]), 2)).toEqual([1, 2]);
@@ -409,6 +415,10 @@ describe("Enumerable free functions over any receiver", () => {
       expect(sum(build([1, 2, 3]))).toBe(6);
     });
   }
+
+  it("sort_by raises when <=> answers nil", () => {
+    expect(() => sortBy([1, "a"], (i) => i)).toThrow(ArgumentError);
+  });
 
   it("iterate a Map as [key, value] pairs", () => {
     const map = new Map([

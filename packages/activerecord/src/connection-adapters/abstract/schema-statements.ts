@@ -15,6 +15,7 @@ import {
   hasKey,
   toS,
   coreHashMergeKwd,
+  eachWithObject,
 } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
 import { findJoinTableName, joinTableName } from "../../migration/join-table.js";
@@ -1231,10 +1232,9 @@ export class SchemaStatements {
     columnNames: string[],
     options: Record<string, unknown> = {},
   ): Promise<string> {
-    const quotedColumns = new Map<string, string>();
-    for (const name of columnNames) {
-      quotedColumns.set(name, this.quoteColumnName(name));
-    }
+    const quotedColumns = eachWithObject(columnNames, new Map<string, string>(), (name, result) => {
+      result.set(name, this.quoteColumnName(name));
+    });
     return Array.from(
       (
         await this.addOptionsForIndexColumns(

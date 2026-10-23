@@ -1,4 +1,4 @@
-import { ArgumentError, isSymbol, keys, symbolToS } from "@blazetrails/ruby-compat";
+import { ArgumentError, isSymbol, keys, sortBy, symbolToS } from "@blazetrails/ruby-compat";
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
@@ -104,9 +104,11 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
     } else {
       throw new ArgumentError(":units must be a Hash or String translation scope.");
     }
-    return keys(hash as Record<string, unknown> | Map<string, unknown>)
-      .map((eName) => INVERTED_DECIMAL_UNITS[isSymbol(eName) ? symbolToS(eName) : eName])
-      .filter((e) => e !== undefined)
-      .sort((a, b) => b - a);
+    return sortBy(
+      keys(hash as Record<string, unknown> | Map<string, unknown>)
+        .map((eName) => INVERTED_DECIMAL_UNITS[isSymbol(eName) ? symbolToS(eName) : eName])
+        .filter((e) => e !== undefined),
+      (e) => -e,
+    );
   }
 }

@@ -34,6 +34,7 @@ import {
   toD,
   toI,
   uniq,
+  eachWithObject,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
@@ -962,13 +963,12 @@ export async function executeGroupedCalculation(
         .indexBy((record) => record.id as string | number);
     }
 
-    const keyTypes: ColumnTypes = {};
-    for (const [aliaz, colName] of groupColumns) {
-      keyTypes[aliaz] = (typeCasterFor(colName) ??
+    const keyTypes = eachWithObject(groupColumns, {} as ColumnTypes, ([aliaz, colName], types) => {
+      types[aliaz] = (typeCasterFor(colName) ??
         typeFor.call(this, colName, () =>
           fetch(calculatedData.columnTypes, aliaz, defaultValue()),
         )) as ColumnType;
-    }
+    });
 
     const hashRows = (calculatedData.castValues(keyTypes) as unknown[][]).map((row) => {
       const hash: Record<string, unknown> = {};
@@ -987,15 +987,13 @@ export async function executeGroupedCalculation(
       if (type instanceof EnumType) type = type.subtype;
     }
 
-    const result = new Map<unknown, unknown>();
-    for (const row of hashRows) {
+    return eachWithObject(hashRows, new Map<unknown, unknown>(), (row, result) => {
       let key: unknown = groupAliases.map((aliaz) => row[aliaz]);
       if ((key as unknown[]).length === 1) key = (key as unknown[])[0];
       if (associated) key = hashAref(keyRecords!, key);
 
       result.set(key, typeCastCalculatedValue.call(this, row[columnAlias], fn, type));
-    }
-    return result;
+    });
   });
 }
 

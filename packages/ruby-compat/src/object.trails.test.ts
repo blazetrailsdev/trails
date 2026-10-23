@@ -45,6 +45,7 @@ import {
   rbModToS,
   rbObjClassname,
   rbSetClassPathString,
+  TEMPORAL_METHOD_TABLE,
 } from "./object.js";
 import {
   Kernel,
@@ -363,6 +364,77 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo([], "toHash")).toBe(false);
     expect(rbFSend(hash, "toHash")).toBe(hash);
     expect(rbFSend(map, "toHash")).toBe(map);
+  });
+
+  it("answers a class instance from its own chain only, never from a core receiver's table", () => {
+    class Record {
+      each() {}
+    }
+    const record = new Record();
+    for (const mid of ["toStr", "toAry", "eachPair", "toHash", "get", "isEmpty", "upcase"]) {
+      expect(basicObjRespondTo(record, mid)).toBe(false);
+    }
+    expect(basicObjRespondTo(record, "each")).toBe(true);
+    expect(basicObjRespondTo(record, "toYaml")).toBe(true);
+    expect(basicObjRespondTo(new Set([1]), "isInclude")).toBe(true);
+    expect(basicObjRespondTo(new Uint8Array(1), "bytesize")).toBe(true);
+    expect(basicObjRespondTo(1, "isFinite")).toBe(true);
+    expect(basicObjRespondTo(1n, "isInfinite")).toBe(true);
+    expect(basicObjRespondTo("abc", "toSym")).toBe(true);
+    expect(basicObjRespondTo([1], "toA")).toBe(true);
+    expect(basicObjRespondTo([1], "partition")).toBe(true);
+    expect(basicObjRespondTo(new Map(), "get")).toBe(true);
+    expect(basicObjRespondTo({ a: 1 }, "eachPair")).toBe(true);
+    expect(basicObjRespondTo({ a: 1 }, "toHash")).toBe(true);
+    expect(basicObjRespondTo({ a: 1 }, "get")).toBe(true);
+    expect(basicObjRespondTo(new Set([1]), "each")).toBe(true);
+    expect(basicObjRespondTo(new Set([1]), "isEmpty")).toBe(true);
+    class PlainDate {
+      get [Symbol.toStringTag]() {
+        return "Temporal.PlainDate";
+      }
+    }
+    expect(basicObjRespondTo(new PlainDate(), "toDate")).toBe(true);
+    const seated = "Date" in TEMPORAL_METHOD_TABLE;
+    const dateTable = (TEMPORAL_METHOD_TABLE.Date ??= {});
+    dateTable.probe = () => null;
+    TEMPORAL_METHOD_TABLE.rbCDate.probe = () => null;
+    try {
+      expect(basicObjRespondTo(new Date(), "probe")).toBe(true);
+      expect(basicObjRespondTo(new rbCDate(), "probe")).toBe(true);
+    } finally {
+      delete dateTable.probe;
+      if (!seated) delete TEMPORAL_METHOD_TABLE.Date;
+      delete TEMPORAL_METHOD_TABLE.rbCDate.probe;
+    }
+  });
+
+  it("answers a respond_to_missing? defined on the prototype after the first query", () => {
+    class Late {}
+    expect(basicObjRespondTo(new Late(), "dynamic")).toBe(false);
+    Object.defineProperty(Late.prototype, "respondToMissing", {
+      value: (mid: string) => mid === "dynamic",
+    });
+    expect(basicObjRespondTo(new Late(), "dynamic")).toBe(true);
+  });
+
+  it("reads respond_to_missing? and respond_to? off the receiver before its prototype", () => {
+    class Dynamic {
+      respondToMissing(mid: string) {
+        return mid === "dynamic";
+      }
+    }
+    expect(basicObjRespondTo(new Dynamic(), "dynamic")).toBe(true);
+    const own = Object.assign(new Dynamic(), { respondToMissing: () => true });
+    expect(basicObjRespondTo(own, "other")).toBe(true);
+    expect(basicObjRespondTo(new Dynamic(), "other")).toBe(false);
+    class Overriding {
+      isRespondTo(mid: string) {
+        return mid === "name";
+      }
+    }
+    expect(rbObjRespondTo(new Overriding(), "name")).toBe(true);
+    expect(rbObjRespondTo(new Overriding(), "isRespondTo")).toBe(false);
   });
 
   it("answers [] for an Array, a Hash and a String, whose JS values index without a method", () => {

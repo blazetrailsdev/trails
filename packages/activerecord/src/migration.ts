@@ -1,4 +1,4 @@
-import { rbModConstSet, groupBy, filterMap } from "@blazetrails/ruby-compat";
+import { rbModConstSet, groupBy, filterMap, sortBy } from "@blazetrails/ruby-compat";
 import {
   getEnv,
   camelize,
@@ -1461,10 +1461,6 @@ function toInteger(value: string): number {
   return Number(match[1]);
 }
 
-function byVersion(a: MigrationProxy, b: MigrationProxy): number {
-  return a.version - b.version;
-}
-
 /** @internal */
 type SeatedCollaborators<S, I> = [S] extends [SchemaMigration]
   ? [I] extends [InternalMetadata]
@@ -1582,8 +1578,8 @@ export class MigrationContext<
 
     dbList = dbList.map((version) => ["up", version as string, "********** NO FILE **********"]);
 
-    return ([...dbList, ...fileList] as Array<[string, string, string]>).sort(
-      ([, a], [, b]) => Number(toI(a)) - Number(toI(b)),
+    return sortBy([...dbList, ...fileList] as Array<[string, string, string]>, ([, version]) =>
+      toI(version),
     );
   }
 
@@ -1651,7 +1647,7 @@ export class MigrationContext<
       return new MigrationProxy(name, version, file, scope);
     });
 
-    return migrations.sort(byVersion);
+    return sortBy(migrations, (migration) => migration.version);
   }
 
   /** @internal */
@@ -1915,7 +1911,7 @@ export class Migrator {
   }
 
   private _sortMigrations(migrations: MigrationProxy[]): MigrationProxy[] {
-    return [...migrations].sort(byVersion);
+    return sortBy(migrations, (migration) => migration.version);
   }
 
   /** @internal */

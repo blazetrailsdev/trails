@@ -27,6 +27,7 @@ import {
   rtest,
   toI,
   transformValues,
+  sortBy,
   tally,
 } from "@blazetrails/ruby-compat";
 import { verboseEnqueueLogs } from "./active-job.js";
@@ -281,8 +282,9 @@ export class LogSubscriber extends BaseLogSubscriber {
   /** @internal */
   private enqueuedJobsMessage(adapter: unknown, enqueuedJobs: LoggedJob[]): string {
     const enqueuedCount = enqueuedJobs.length;
-    const jobClassesCounts = [...tally(enqueuedJobs.map((job) => rbObjClass(job)))].sort(
-      ([, a], [, b]) => b - a,
+    const jobClassesCounts = sortBy(
+      tally(enqueuedJobs.map((job) => rbObjClass(job))),
+      ([, v]) => -v,
     );
     return (
       `Enqueued ${enqueuedCount} ${pluralize("job", enqueuedCount)} to ${ActiveJob.adapterName(adapter)}` +
