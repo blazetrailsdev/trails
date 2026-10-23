@@ -1,6 +1,5 @@
 import { setFallbacks } from "../backend/fallbacks.js";
 import {
-  config,
   setAvailableLocales,
   setBackend,
   setDefaultLocale,
@@ -24,7 +23,4 @@ export async function teardown(): Promise<void> {
   setDefaultSeparator(null);
   setEnforceAvailableLocales(true);
   setFallbacks(null);
-  config().exceptionHandler = null;
-  config().missingInterpolationArgumentHandler = null;
-  config().interpolationPatterns = null;
 }

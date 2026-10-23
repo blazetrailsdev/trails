@@ -285,15 +285,25 @@ describe("I18nTest", () => {
   });
 
   it("can use a lambda as an exception handler", () => {
-    setExceptionHandler((_exception, _locale, key) => key);
-    expect(translate("test_proc_handler")).toBe("test_proc_handler");
+    const previousExceptionHandler = config().exceptionHandler;
+    try {
+      setExceptionHandler((_exception, _locale, key) => key);
+      expect(translate("test_proc_handler")).toBe("test_proc_handler");
+    } finally {
+      setExceptionHandler(previousExceptionHandler);
+    }
   });
 
   it("can use an object responding to #call as an exception handler", () => {
-    setExceptionHandler({
-      call: (_exception: Error, _locale: string, key: TranslationKey) => key,
-    });
-    expect(translate("test_proc_handler")).toBe("test_proc_handler");
+    const previousExceptionHandler = config().exceptionHandler;
+    try {
+      setExceptionHandler({
+        call: (_exception: Error, _locale: string, key: TranslationKey) => key,
+      });
+      expect(translate("test_proc_handler")).toBe("test_proc_handler");
+    } finally {
+      setExceptionHandler(previousExceptionHandler);
+    }
   });
 
   it("I18n.with_locale temporarily sets the given locale", () => {
@@ -319,23 +329,33 @@ describe("I18nTest", () => {
   });
 
   it("I18n.transliterate handles I18n::ArgumentError exception", () => {
-    storeTranslations("en", { i18n: { transliterate: { rule: "not a rule" } } });
-    const exceptionHandler = vi.fn(() => {
-      throw new ArgumentError();
-    });
-    setExceptionHandler(exceptionHandler);
+    const previousExceptionHandler = config().exceptionHandler;
+    try {
+      storeTranslations("en", { i18n: { transliterate: { rule: "not a rule" } } });
+      const exceptionHandler = vi.fn(() => {
+        throw new ArgumentError();
+      });
+      setExceptionHandler(exceptionHandler);
 
-    expect(() => transliterate("ąćó")).toThrow(ArgumentError);
-    expect(exceptionHandler).toHaveBeenCalled();
+      expect(() => transliterate("ąćó")).toThrow(ArgumentError);
+      expect(exceptionHandler).toHaveBeenCalled();
+    } finally {
+      setExceptionHandler(previousExceptionHandler);
+    }
   });
 
   it("I18n.transliterate raises I18n::ArgumentError exception", () => {
-    storeTranslations("en", { i18n: { transliterate: { rule: "not a rule" } } });
-    const exceptionHandler = vi.fn();
-    setExceptionHandler(exceptionHandler);
+    const previousExceptionHandler = config().exceptionHandler;
+    try {
+      storeTranslations("en", { i18n: { transliterate: { rule: "not a rule" } } });
+      const exceptionHandler = vi.fn();
+      setExceptionHandler(exceptionHandler);
 
-    expect(() => transliterate("ąćó", { raise: true })).toThrow(ArgumentError);
-    expect(exceptionHandler).not.toHaveBeenCalled();
+      expect(() => transliterate("ąćó", { raise: true })).toThrow(ArgumentError);
+      expect(exceptionHandler).not.toHaveBeenCalled();
+    } finally {
+      setExceptionHandler(previousExceptionHandler);
+    }
   });
 
   it("transliterate given an unavailable locale rases an I18n::InvalidLocale", () => {

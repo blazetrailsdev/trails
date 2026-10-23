@@ -86,9 +86,7 @@ export class GlobalID {
     }
     const { app: _a, verifier: _v, for: _f, ...rest } = opts;
     const params: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(rest)) {
-      if (v !== undefined) params[underscore(k)] = v;
-    }
+    for (const [k, v] of Object.entries(rest)) params[underscore(k)] = v;
     return new this(GID.create(app, model, params), options);
   }
 
