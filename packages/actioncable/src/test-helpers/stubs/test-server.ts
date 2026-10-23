@@ -15,7 +15,7 @@ class FakeConfiguration extends Configuration {
   declare filterParameters: unknown[];
   declare cable: Record<string, unknown>;
 
-  // @ts-expect-error TS2377 FakeConfiguration#initialize does not call super
+  // @ts-expect-error TS2377 test_server.rb:11-15 initialize omits super
   constructor({ subscriptionAdapter }: { subscriptionAdapter: AdapterClass }) {
     const self = Object.create(new.target.prototype) as FakeConfiguration;
     self.logTags = [];

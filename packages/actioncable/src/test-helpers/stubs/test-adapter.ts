@@ -1,4 +1,4 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, aryDelete } from "@blazetrails/ruby-compat";
 import { Base } from "../../subscription-adapter/base.js";
 
 type Callback = (message: unknown) => unknown;
@@ -27,9 +27,7 @@ export class SuccessAdapter extends Base {
   }
 
   override async unsubscribe(channel: string, callback: Callback): Promise<unknown> {
-    const callbacks = this.subscriberMap.get(channel)!;
-    for (let i = callbacks.length - 1; i >= 0; i--)
-      if (callbacks[i] === callback) callbacks.splice(i, 1);
+    aryDelete(this.subscriberMap.get(channel)!, callback);
     if (this.subscriberMap.get(channel)!.length === 0) this.subscriberMap.delete(channel);
     return (SuccessAdapter.unsubscribeCalled = { channel, callback });
   }
