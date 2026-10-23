@@ -831,7 +831,8 @@ export function spliceMethodMissing(proto: object): void {
           prop === "respondToMissing" ||
           prop === "methodMissing" ||
           !Object.hasOwn(receiver, "_integrationSession") ||
-          !receiver.respondToMissing(prop, false)
+          !receiver.respondToMissing(prop, false) ||
+          !rbObjRespondTo(receiver.integrationSession, prop)
         ) {
           return Reflect.get(target, prop, receiver);
         }
