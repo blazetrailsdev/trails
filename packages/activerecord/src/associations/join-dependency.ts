@@ -157,7 +157,7 @@ export class JoinDependency {
     this._joinedTables = new Hash();
     this._references = new Map();
 
-    if (!isEmpty(references)) {
+    if (references.length !== 0) {
       for (const tableName of references) {
         if (tableName instanceof Nodes.SqlLiteral) {
           this._references.set(tableName.toString(), tableName.toString());

@@ -102,7 +102,7 @@ export class Redirect<B = unknown> extends Endpoint {
 
   /** @internal */
   protected relativePath(path: string | null): boolean {
-    return path != null && !isEmpty(path) && !path.startsWith("/");
+    return path != null && path.length !== 0 && !path.startsWith("/");
   }
 
   /** @internal */

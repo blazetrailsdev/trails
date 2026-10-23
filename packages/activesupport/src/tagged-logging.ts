@@ -4,7 +4,6 @@ import {
   ArgumentError,
   extend,
   extended,
-  isEmpty,
   rbObjAsString,
   rbObjClone,
   rbObjId,
@@ -142,9 +141,8 @@ export class TagStack {
     return this._tags;
   }
 
-  /** @missingRailsName tags — PERMANENT */
   formatMessage(message: unknown): unknown {
-    if (isEmpty(this._tags)) {
+    if (this._tags.length === 0) {
       return message;
     } else if (this._tags.length === 1) {
       return `[${rbObjAsString(this._tags[0])}] ${rbObjAsString(message)}`;

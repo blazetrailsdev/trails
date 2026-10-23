@@ -6,7 +6,6 @@ import {
   NoMethodError,
   RuntimeError,
   StandardError,
-  isEmpty,
   isSymbol,
   rbEql,
   rbObjClassname,
@@ -367,7 +366,7 @@ async function loadFixtures(
 /** @internal */
 async function instantiateFixtures(this: TestFixtures): Promise<void> {
   if (this.preLoadedFixtures) {
-    if (isEmpty(FixtureSet.allLoadedFixtures))
+    if (Object.keys(FixtureSet.allLoadedFixtures).length === 0)
       throw new RuntimeError("Load fixtures before instantiating them.");
     await FixtureSet.instantiateAllLoadedFixtures(this, this.isLoadInstances());
   } else {

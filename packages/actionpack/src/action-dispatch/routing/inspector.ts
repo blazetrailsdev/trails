@@ -1,12 +1,6 @@
 import { underscore, type SafeBuffer } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
-import {
-  except,
-  isEmpty,
-  RFC2396_PARSER,
-  rbInspect,
-  SimpleDelegator,
-} from "@blazetrails/ruby-compat";
+import { RFC2396_PARSER, rbInspect, SimpleDelegator } from "@blazetrails/ruby-compat";
 import type { Endpoint } from "./endpoint.js";
 import type { Route } from "../journey/route.js";
 import { RouteSet } from "./route-set.js";
@@ -62,7 +56,8 @@ export class RouteWrapper extends SimpleDelegator {
   }
 
   get constraints(): Record<string, unknown> {
-    return except(this.requirements, "controller", "action");
+    const { controller, action, ...constraints } = this.requirements;
+    return constraints;
   }
 
   get rackApp(): unknown {
@@ -87,7 +82,7 @@ export class RouteWrapper extends SimpleDelegator {
   get reqs(): string {
     if (this._reqs !== undefined) return this._reqs;
     let reqs = this.endpoint;
-    if (!isEmpty(this.constraints)) reqs += ` ${rbInspect(this.constraints)}`;
+    if (Object.keys(this.constraints).length !== 0) reqs += ` ${rbInspect(this.constraints)}`;
     this._reqs = reqs;
     return reqs;
   }

@@ -4,7 +4,6 @@ import {
   first,
   format,
   Hash,
-  isEmpty,
   isInclude,
   lastMatchGetter,
   matchOperator,
@@ -98,7 +97,7 @@ export class Arguments {
 
   /** @internal */
   protected isLast(): boolean {
-    return isEmpty(this.pile);
+    return this.pile.length === 0;
   }
 
   /** @internal */
@@ -153,7 +152,7 @@ export class Arguments {
     while (rtest(this.isCurrentIsValue())) {
       const value = this.shift() as string;
 
-      if (!isEmpty(value)) {
+      if (value.length !== 0) {
         this.validateEnumValueBang(
           name,
           value,
@@ -223,7 +222,7 @@ export class Arguments {
 
   /** @internal */
   protected checkRequirementBang(): void {
-    if (isEmpty(this.nonAssignedRequired)) return;
+    if (this.nonAssignedRequired.length === 0) return;
     const names = this.nonAssignedRequired
       .map((o) => (rbObjRespondTo(o, "switchName") ? rbFSend(o, "switchName") : o.humanName))
       .join("', '");

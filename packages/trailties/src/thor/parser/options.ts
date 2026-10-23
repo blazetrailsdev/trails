@@ -1,7 +1,6 @@
 import {
   aryDelete,
   compact,
-  isEmpty,
   keys,
   matchOperator,
   rbFSend,
@@ -86,8 +85,10 @@ export class Options extends Arguments {
     const options = Object.values(hashOptions);
     super(options);
     this.stopOnUnknown = stopOnUnknown;
-    this.exclusives = (relations.exclusiveOptionNames ?? []).filter((array) => !isEmpty(array));
-    this.atLeastOnes = (relations.atLeastOneOptionNames ?? []).filter((array) => !isEmpty(array));
+    this.exclusives = (relations.exclusiveOptionNames ?? []).filter((array) => array.length !== 0);
+    this.atLeastOnes = (relations.atLeastOneOptionNames ?? []).filter(
+      (array) => array.length !== 0,
+    );
     this.disableRequiredCheck = disableRequiredCheck;
 
     for (const [key, value] of Object.entries(defaults)) {
@@ -242,7 +243,8 @@ export class Options extends Arguments {
     const unknown = toCheck.filter((str) =>
       rtest(matchOperator(str, /(?<![^\n])--?(?:(?!--)[^\n])*(?![^\n])/)),
     );
-    if (!isEmpty(unknown)) throw new UnknownArgumentError(keys(this.switches), unknown as string[]);
+    if (unknown.length !== 0)
+      throw new UnknownArgumentError(keys(this.switches), unknown as string[]);
   }
 
   /** @internal */

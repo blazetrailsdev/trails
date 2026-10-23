@@ -7,7 +7,6 @@ import {
   eachPair,
   first,
   include,
-  isEmpty,
   mergeBang,
   puts,
   Range,
@@ -184,7 +183,7 @@ export class Thor {
       this._map = this.fromSuperclass("map", {}) as Record<string, string>;
     }
 
-    if (rtest(mappings) && !isEmpty(kw)) {
+    if (rtest(mappings) && Object.keys(kw).length !== 0) {
       mappings = mergeBang(new Map(Object.entries(kw)), mappings as Map<string, string>);
     } else {
       mappings ||= kw;
@@ -451,7 +450,7 @@ export class Thor {
     let opts: string[][] = [];
     if (!(command == null)) opts = command.methodExclusiveOptionNames();
     opts = opts.concat(this.classExclusiveOptionNames());
-    if (!isEmpty(opts)) {
+    if (opts.length !== 0) {
       shell.say("Exclusive Options:");
       shell.printTable(
         opts.map((ex) => ex.map((e) => `--${e}`)),
@@ -470,7 +469,7 @@ export class Thor {
     let opts: string[][] = [];
     if (!(command == null)) opts = command.methodAtLeastOneOptionNames();
     opts = opts.concat(this.classAtLeastOneOptionNames());
-    if (!isEmpty(opts)) {
+    if (opts.length !== 0) {
       shell.say("Required At Least One:");
       shell.printTable(
         opts.map((ex) => ex.map((e) => `--${e}`)),
@@ -501,7 +500,7 @@ export class Thor {
     let opts: unknown[] | Record<string, unknown> | null;
     if (rtest(command)) {
       [args, opts] = Options.split(givenArgs);
-      if (rtest(this.isStopOnUnknownOption(command)) && !isEmpty(args)) {
+      if (rtest(this.isStopOnUnknownOption(command)) && args.length !== 0) {
         opts.forEach((opt) => args.push(opt));
         opts.length = 0;
       }
@@ -596,7 +595,7 @@ export class Thor {
 
   /** @internal */
   static retrieveCommandName(this: ThorClass, args: unknown[]): string | null | undefined {
-    const meth = !isEmpty(args) ? toS(first(args)) : null;
+    const meth = args.length !== 0 ? toS(first(args)) : null;
     if (rtest(meth) && (rtest(this.map()[meth]) || !/^-/m.test(meth))) {
       return args.shift() as string | null | undefined;
     }
@@ -616,7 +615,7 @@ export class Thor {
       );
     }
 
-    if (isEmpty(possibilities)) {
+    if (possibilities.length === 0) {
       meth ??= this.defaultCommand();
     } else if (rtest(this.map()[meth])) {
       meth = this.map()[meth];

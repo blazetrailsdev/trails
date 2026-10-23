@@ -37,7 +37,7 @@ import { rbInspect as inspect, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import { ArgumentError } from "./hash-utils.js";
 import { toSentence } from "./array-utils.js";
-import { isEmpty, rbHash } from "@blazetrails/ruby-compat";
+import { rbHash } from "@blazetrails/ruby-compat";
 import type { TimeWithZone } from "./time-with-zone.js";
 import { actsLike } from "./core-ext/object/acts-like.js";
 import { ISO8601Parser } from "./duration/iso8601-parser.js";
@@ -400,7 +400,7 @@ export class Duration {
   }
 
   inspect(): string {
-    if (isEmpty(this._parts())) return `${this.value} seconds`;
+    if (Object.keys(this._parts()).length === 0) return `${this.value} seconds`;
 
     return toSentence(
       (Object.entries(this._parts()) as [keyof DurationParts, number][])
@@ -464,7 +464,7 @@ export class Duration {
       throw new ArgumentError(`expected a time or date, got ${inspect(time)}`);
     }
 
-    if (isEmpty(this._parts())) {
+    if (Object.keys(this._parts()).length === 0) {
       if (time instanceof Temporal.PlainDate) return dateSince(time, sign * this.inSeconds());
       if (isDateTime(time)) return datetimeSince(time, sign * this.inSeconds());
       if (!(time instanceof Date || time instanceof Temporal.Instant))

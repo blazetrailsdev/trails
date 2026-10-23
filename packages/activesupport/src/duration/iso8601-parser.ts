@@ -1,6 +1,5 @@
 import type { DurationParts } from "../duration.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
-import { isEmpty } from "@blazetrails/ruby-compat";
 
 class StringScanner {
   matched: string | null = null;
@@ -148,7 +147,7 @@ export class ISO8601Parser {
 
   /** @missingRailsCall last — PERMANENT */
   private validateBang(): boolean {
-    if (isEmpty(this.parts)) this.raiseParsingError("is empty duration");
+    if (Object.keys(this.parts).length === 0) this.raiseParsingError("is empty duration");
 
     if ("weeks" in this.parts && DATE_COMPONENTS.some((component) => component in this.parts)) {
       this.raiseParsingError("mixing weeks with other date parts not allowed");
@@ -160,7 +159,9 @@ export class ISO8601Parser {
 
     const nonZero = Object.values(this.parts).filter((value) => value !== 0);
     const fractions = nonZero.filter((a) => a % 1 !== 0);
-    if (!(isEmpty(fractions) || (fractions.length === 1 && fractions.at(-1) === nonZero.at(-1)))) {
+    if (
+      !(fractions.length === 0 || (fractions.length === 1 && fractions.at(-1) === nonZero.at(-1)))
+    ) {
       this.raiseParsingError("(only last part can be fractional)");
     }
 

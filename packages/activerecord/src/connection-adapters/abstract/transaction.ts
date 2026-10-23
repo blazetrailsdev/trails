@@ -13,7 +13,7 @@ import {
   type MonitorMixin,
   type NotificationHandle,
 } from "@blazetrails/activesupport";
-import { Hash, isEmpty, rbObjId, Thread, throwDataP, uniq } from "@blazetrails/ruby-compat";
+import { Hash, rbObjId, Thread, throwDataP, uniq } from "@blazetrails/ruby-compat";
 import { beforeCommittedOnAllRecords } from "../../active-record.js";
 
 /** @internal */
@@ -758,10 +758,7 @@ export class TransactionManager {
     this._connection = connection;
   }
 
-  /**
-   * @missingRailsName connection — PERMANENT
-   * @missingRailsName stack — PERMANENT
-   */
+  /** @missingRailsName connection — PERMANENT */
   async beginTransaction(
     options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
   ): Promise<Transaction> {
@@ -769,7 +766,7 @@ export class TransactionManager {
     return await this._connection.lock.synchronize(async () => {
       const runCommitCallbacks = !this.currentTransaction.joinable;
       let transaction: Transaction;
-      if (isEmpty(this._stack)) {
+      if (this._stack.length === 0) {
         transaction = new RealTransaction(this._connection, {
           isolation,
           joinable,

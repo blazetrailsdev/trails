@@ -2,7 +2,6 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { type TouchArgs, type TouchOptions } from "./timestamp.js";
 import {
   basicObjRespondTo,
-  isEmpty,
   keys,
   rbEqual,
   rbFPublicSend,
@@ -295,7 +294,7 @@ export async function _insertRecord(
   const arelTable: ArelTable = this.arelTable;
   const im = new InsertManager(arelTable);
 
-  if (isEmpty(values)) {
+  if (Object.keys(values).length === 0) {
     im.insert(connection.emptyInsertStatementValue(primaryKey));
   } else {
     im.insert(transformKeys(values, (name) => arelTable.get(name)));

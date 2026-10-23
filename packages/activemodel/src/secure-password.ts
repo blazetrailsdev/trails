@@ -1,5 +1,5 @@
 import { camelize, include, isPresent, Module, TopLevel } from "@blazetrails/activesupport";
-import { isEmpty, LoadError, rbObjRespondTo, warn } from "@blazetrails/ruby-compat";
+import { LoadError, rbObjRespondTo, warn } from "@blazetrails/ruby-compat";
 import { Validations } from "./validations.js";
 import { Model } from "./model.js";
 
@@ -143,7 +143,7 @@ export class InstanceMethodsOnActivation extends Module {
           if (unencryptedPassword == null) {
             (this as unknown as Record<string, unknown>)[passwordIvar] = null;
             publicSendWriter(this, digestAttr, null);
-          } else if (!isEmpty(unencryptedPassword as string)) {
+          } else if ((unencryptedPassword as string).length !== 0) {
             (this as unknown as Record<string, unknown>)[passwordIvar] = unencryptedPassword;
             const cost = SecurePassword.minCost
               ? TopLevel.BCrypt!.Engine.MIN_COST

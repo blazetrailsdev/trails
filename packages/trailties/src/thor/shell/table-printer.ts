@@ -2,7 +2,6 @@ import {
   arySlice,
   cmp,
   format,
-  isEmpty,
   max,
   puts,
   rbCNumeric,
@@ -40,7 +39,7 @@ export class TablePrinter extends ColumnPrinter {
   }
 
   override print(array: unknown[]): void {
-    if (isEmpty(array)) return;
+    if (array.length === 0) return;
 
     this.prepare(array);
 

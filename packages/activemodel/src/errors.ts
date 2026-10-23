@@ -9,7 +9,6 @@ import {
   FrozenError,
   groupBy,
   type Hash,
-  isEmpty,
   rbEqual,
   rbInspect,
   rbDeclareIvar,
@@ -50,7 +49,7 @@ export class Errors<TBase extends object = object> {
   }
 
   isEmpty(): boolean {
-    return isEmpty(this._errors);
+    return this._errors.length === 0;
   }
 
   get size(): number {

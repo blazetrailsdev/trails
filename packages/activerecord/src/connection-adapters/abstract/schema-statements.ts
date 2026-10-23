@@ -712,7 +712,7 @@ export class SchemaStatements {
     ...columnNames: Array<string | ColumnOptions>
   ): Promise<void> {
     const { type = null, ...options } = extractOptionsBang(columnNames);
-    if (isEmpty(columnNames)) {
+    if (columnNames.length === 0) {
       throw new ArgumentError(
         "You must specify at least one column name. Example: remove_columns(:people, :first_name)",
       );

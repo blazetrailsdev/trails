@@ -2,7 +2,6 @@ import {
   type Hash,
   fetch,
   hashAref,
-  isEmpty,
   block as rbBlock,
   rbObjAsString,
   rbClassSuperclass,
@@ -275,9 +274,8 @@ export async function _returningColumnsForInsert(
     if (await connection.returnValueAfterInsert(c)) autoPopulatedColumns.push(c.name);
   }
 
-  return (this._returningColumnsForInsertCache = isEmpty(autoPopulatedColumns)
-    ? kernelArray(this.primaryKey)
-    : autoPopulatedColumns);
+  return (this._returningColumnsForInsertCache =
+    autoPopulatedColumns.length === 0 ? kernelArray(this.primaryKey) : autoPopulatedColumns);
 }
 
 /** @inventedArm if — PERMANENT */

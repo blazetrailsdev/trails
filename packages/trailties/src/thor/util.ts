@@ -1,7 +1,6 @@
 import {
   capitalize,
   File,
-  isEmpty,
   NotImplementedError,
   RbConfig,
   rbModConstants,
@@ -19,7 +18,7 @@ type ThorClass = BaseClass & { isCommandExists(commandName: string): boolean };
 let _rubyCommand: string | undefined;
 
 export function findByNamespace(namespace: string): ThorClass | null {
-  if (isEmpty(namespace) || /^:/m.test(namespace)) namespace = `default${namespace}`;
+  if (namespace.length === 0 || /^:/m.test(namespace)) namespace = `default${namespace}`;
   return (
     (Base.subclasses() as ThorClass[]).find((klass) => klass.namespace() === namespace) ?? null
   );
@@ -70,7 +69,7 @@ export function findClassAndCommandByNamespace(
     const pieces = stringSplit(namespace, ":");
     command = pieces.pop() ?? null;
     namespace = pieces.join(":");
-    if (isEmpty(namespace)) namespace = "default";
+    if (namespace.length === 0) namespace = "default";
     klass =
       (Base.subclasses() as ThorClass[]).find(
         (thor) => thor.namespace() === namespace && thor.isCommandExists(command!),

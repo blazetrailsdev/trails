@@ -1,6 +1,5 @@
 import {
   block,
-  except,
   fetch,
   include,
   included,
@@ -830,7 +829,8 @@ export class TableDefinition {
       const pk = primaryKey || (ActiveRecord.Base.getPrimaryKey(singularize(tableName)) as string);
 
       if (isPlainObject(id)) {
-        update(options, except(id as Record<string, unknown>, "type"));
+        const { type, ...idOptions } = id as Record<string, unknown>;
+        update(options, idOptions);
         id = fetch(id as Record<string, ColumnType>, "type", "primary_key");
       }
 

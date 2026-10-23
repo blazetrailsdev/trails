@@ -3,7 +3,6 @@ import {
   fetch,
   first,
   include,
-  isEmpty,
   kernelThrow,
   rbEqual,
   rbFPublicSend,
@@ -87,7 +86,7 @@ export class HasManyAssociation extends CollectionAssociation {
           t.destroyedByAssociation = this.reflection;
         }
 
-        if (!isEmpty(this.target)) {
+        if (this.target.length !== 0) {
           const associationClass = first(this.target)!.constructor;
           let primaryKeyColumn: string | string[];
           let ids: unknown[];
