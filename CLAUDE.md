@@ -988,7 +988,7 @@ the rest parameter exists ONLY to admit an override's wider list — never to le
 a caller pass arguments Rails has no parameter for — and it is spelled
 `..._rest: unknown[]`, so a grep finds every instance.
 
-## Call-time constant resolution (Ruby autoload → the zero-import slot)
+## Call-time constant resolution (Ruby autoload → ES imports)
 
 Ruby resolves a constant named inside a method body when the method **runs**,
 and Zeitwerk autoloads the file at that moment. So `contexts.rb:36` can name
@@ -1002,14 +1002,25 @@ inside a method is resolved at call time — what Zeitwerk's autoload buys Rails
 — and it stays correct when the two modules sit in a cycle, because the method
 runs long after both bodies have finished. Lean on ES imports and exports.
 
-The `import` _edge_ is eager even though the read is not, and that matters in
-one case: a read evaluated **while the module body runs** — an `extends`
-clause, a top-level call, a top-level `new`. When such an edge closes a cycle
-whose participants include a `class Sub extends Super`, entering the graph at
-`super.ts` evaluates `Sub` with `Super` still in TDZ and the module throws
-`Cannot access 'Super' before initialization`. A TypeScript type position
-(`T extends Nodes.X`, `: Nodes.X`) is erased and costs no edge, so it is an
-`import type`.
+The `import` _edge_ is eager even though the read is not, and that matters for
+a read evaluated **while the module body runs**. Four shapes do that, and a
+class body is two of them:
+
+- an `extends` clause;
+- a **static field initializer** (`static x = Other.y`), which runs when the
+  class definition is evaluated — so the `static x = x` of § "Module mixins"
+  is a module-eval read, not a deferred one;
+- a top-level call, `include(Base, ActiveRecord.Scoping)` among them;
+- a top-level `new` or `const`.
+
+When such an edge closes a cycle whose participants include a
+`class Sub extends Super`, entering the graph at `super.ts` evaluates `Sub`
+with `Super` still in TDZ and the module throws
+`Cannot access 'Super' before initialization`. An instance field initializer is
+not one of these: it runs per construction, so it is deferred.
+
+A TypeScript type position (`T extends Nodes.X`, `: Nodes.X`) is erased and
+costs no edge, so it is an `import type`.
 
 Measured on 2026-10-22, 631 of 686 namespace reads in the repo were inside a
 function or method body and 55 at module-eval time — of those, 8 erased type
@@ -1022,15 +1033,14 @@ For a module-eval read, two shapes are sanctioned, and only these:
 
 - **A namespace object extended with `ActiveSupport::Autoload`** (RFC 0151),
   mirroring Rails' `autoload` lists: each constant is seated by its defining
-  module with a plain `Namespace.Name = Klass` assignment, which is
-  type-checked against the namespace's declared property, and read at
-  module-eval time (`include(Base, ActiveRecord.Scoping)`). `rbModConstSet` is
+  module with a plain `Namespace.Name = Klass` assignment, which is type-checked
+  against the namespace's declared property, and is read where a module-eval
+  read needs it (`include(Base, ActiveRecord.Scoping)`). `rbModConstSet` is
   written only where the Rails body itself calls `const_set` — 18 sites in the
   vendored tree, tabled in the tasks repo's
-  `rfcs/0205-namespace-seats-are-plain-javascript/README.md` — never as the
-  seat spelling; a class's qualified Ruby path
-  comes from the table generated out of `rails-api.json`, not from the seat. A
-  constant Rails
+  `rfcs/0205-namespace-seats-are-plain-javascript/README.md` — and never as the
+  seat spelling. A class's qualified Ruby path comes from the table generated
+  out of `rails-api.json`, not from the seat. A constant Rails
   `require`s rather than autoloads is seated with no `autoload` call. Ruby's
   top-level `Object` is `TopLevel` in `activesupport/src/namespaces.ts`: the
   defining gem seats it (`TopLevel.Trails = Trails`) and a reader names it at

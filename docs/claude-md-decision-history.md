@@ -31,7 +31,7 @@ Every route around it was tried and each one loses more fidelity than it buys:
   module function, or as a class property) does not help: the check follows any
   inheritance path, `override` keyword or not.
 
-## Call-time constant resolution (Ruby autoload → the zero-import slot)
+## Call-time constant resolution (Ruby autoload → ES imports)
 
 **The "ESM has no equivalent" premise was corrected on 2026-10-22** (RFC 0205,
 ruled by the repo owner). The section had read "Every `import` is eager and
