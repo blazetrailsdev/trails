@@ -13,7 +13,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { aryJoin, b, fetch, first, isEmpty, rbRegMatchP } from "@blazetrails/ruby-compat";
+import { aryJoin, b, fetch, first, rbRegMatchP } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -348,7 +348,7 @@ export async function performQuery(
 
 /** @internal */
 export async function castResult(this: CastResultHost, result: PG.Result): Promise<Result> {
-  if (isEmpty(result.fields())) {
+  if (result.fields().length === 0) {
     result.clear();
     return Result.empty();
   }

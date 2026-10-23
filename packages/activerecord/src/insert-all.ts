@@ -181,7 +181,7 @@ export class InsertAll {
   }
 
   async execute(): Promise<Result> {
-    if (isEmpty(this.inserts)) return Result.empty();
+    if (this.inserts.length === 0) return Result.empty();
     let message = `${this.model.name} `;
     if (many(this.inserts)) message += "Bulk ";
     message += this.onDuplicate === ":update" ? "Upsert" : "Insert";

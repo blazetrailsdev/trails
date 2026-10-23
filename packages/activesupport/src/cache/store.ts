@@ -19,7 +19,6 @@ import { toParam } from "../hash-utils.js";
 import { currentErrorReporter } from "../error-reporter.js";
 import { cattrAccessor } from "../module-ext.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
-import { isEmpty } from "@blazetrails/ruby-compat";
 
 let _formatVersion = 7.0;
 
@@ -574,7 +573,7 @@ export abstract class Store {
       );
     }
 
-    if (isEmpty(this.options)) {
+    if (Object.keys(this.options).length === 0) {
       return callOptions;
     } else {
       return { ...this.options, ...callOptions };

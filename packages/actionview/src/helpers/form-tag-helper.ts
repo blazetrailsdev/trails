@@ -17,7 +17,6 @@ import {
   ArgumentError,
   Hash,
   type Range,
-  except,
   fetch,
   hashDelete,
   rbObjRespondTo,
@@ -151,7 +150,8 @@ export function selectTag(
 
   if ("includeBlank" in options) {
     let includeBlank = options["includeBlank"];
-    options = except(options, "includeBlank");
+    const { includeBlank: _includeBlank, ...rest } = options;
+    options = rest;
     const optionsForBlankOptionsTag: Record<string, unknown> = { value: "" };
 
     if (includeBlank === true) {

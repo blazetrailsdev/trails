@@ -193,7 +193,7 @@ export class AssociationScope {
 
         if (scopeChainItem === chainHead.scope) {
           scope.mergeBang(item.except("where", "includes", "unscope", "order"));
-        } else if (!isEmpty(item.referencesValues)) {
+        } else if (item.referencesValues.length !== 0) {
           scope.mergeBang(item.only("joins", "leftOuterJoins"));
 
           const associations = union(item.eagerLoadValues, item.includesValues);

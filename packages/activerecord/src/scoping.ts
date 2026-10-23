@@ -1,6 +1,6 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
-import { isEmpty, rbModConstSet, rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbModConstSet, rbCallSuper } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Scoping } from "./namespaces.js";
 import { isSchemaLoaded } from "./model-schema.js";
 
@@ -110,7 +110,7 @@ export function populateWithCurrentScopeAttributes(this: ScopingHost): void {
       Object.entries(attributes).filter(([name]) => klass.hasAttribute(name)),
     );
   }
-  if (!isEmpty(attributes)) {
+  if (Object.keys(attributes).length !== 0) {
     assertAssignedSynchronously(
       this._assignAttributes(attributes),
       "populateWithCurrentScopeAttributes",

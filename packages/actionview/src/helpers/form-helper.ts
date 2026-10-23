@@ -25,7 +25,6 @@ import {
   block as rbBlock,
   compact,
   Hash,
-  except,
   fetch,
   hashDelete,
   rbFPublicSend,
@@ -699,11 +698,9 @@ export class FormBuilder {
     this._defaultOptions = this.options
       ? slice(this.options, "index", "namespace", "skipDefaultIds", "allowMethodNamesOutsideObject")
       : {};
-    this._defaultHtmlOptions = except(
-      this._defaultOptions,
-      "skipDefaultIds",
-      "allowMethodNamesOutsideObject",
-    );
+    const { skipDefaultIds, allowMethodNamesOutsideObject, ...defaultHtmlOptions } =
+      this._defaultOptions;
+    this._defaultHtmlOptions = defaultHtmlOptions;
 
     this.convertToLegacyOptions(this.options);
 

@@ -3,7 +3,7 @@ import { I18n } from "./i18n.js";
 import { camelize, pluralize, singularize, underscore } from "./inflector.js";
 import * as XmlMini from "./xml-mini.js";
 import { rbInspect as inspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
-import { ARRAY_METHOD_TABLE, isEmpty } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { isSymbol, rbEqq, rbObjClassname, symbolToS } from "@blazetrails/ruby-compat";
 
 export function wrap<T>(object: T | T[] | null | undefined): T[] {
@@ -177,7 +177,7 @@ export function extractBang<T>(array: T[], predicate: (item: T) => boolean): T[]
 export function toFs(self: unknown[], format = "default"): string {
   switch (format) {
     case "db":
-      if (isEmpty(self)) {
+      if (self.length === 0) {
         return "null";
       } else {
         return self.map((e) => (e as { id: unknown }).id).join(",");
@@ -225,7 +225,7 @@ export function toXml(
   delete options.children;
   const attributes: Record<string, string> = options.skipTypes ? {} : { type: "array" };
 
-  if (isEmpty(self)) {
+  if (self.length === 0) {
     builder.tag(root, null, attributes);
   } else {
     builder.openTag(root, attributes);

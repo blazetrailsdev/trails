@@ -1,5 +1,5 @@
 import { SafeBuffer, htmlSafe } from "../string/output-safety.js";
-import { NotImplementedError, isEmpty } from "@blazetrails/ruby-compat";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { Unicode } from "../../multibyte/unicode.js";
 
 const HTML_ESCAPE: Record<string, string> = {
@@ -156,7 +156,7 @@ export function tokenize(source: string): [string, string][] {
       if (len > 0) tokens.push([":TEXT", scanner.string.slice(pos, pos + len)]);
       tokens.push([":OPEN", scanner.matched]);
       if (scanner.scan(CODE_RE) !== null) {
-        if (!isEmpty(scanner.matched)) tokens.push([":CODE", scanner.matched]);
+        if (scanner.matched.length !== 0) tokens.push([":CODE", scanner.matched]);
         if (!scanner.isEos()) tokens.push([":CLOSE", scanner.scan(FINISH_RE)!]);
       } else {
         // @nie disposition=TODO

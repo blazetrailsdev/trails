@@ -2,7 +2,7 @@ import type { Base } from "../../base.js";
 import type { Preloader } from "../preloader.js";
 import type { Association } from "./association.js";
 import type { Branch } from "./branch.js";
-import { groupBy, isEmpty, partition, uniq } from "@blazetrails/ruby-compat";
+import { groupBy, partition, uniq } from "@blazetrails/ruby-compat";
 import { ThroughAssociation } from "./through-association.js";
 
 export class Batch {
@@ -20,7 +20,7 @@ export class Batch {
     this._preloaders = this._preloaders.filter((_, i) => !empty[i]);
 
     let branches: Branch[] = this._preloaders.flatMap((p) => p.branches);
-    while (!isEmpty(branches)) {
+    while (branches.length !== 0) {
       const runnableLoaders: Association[][] = [];
       for (const branch of branches) runnableLoaders.push(await branch.runnableLoaders());
       const loaders = runnableLoaders.flat();
@@ -42,7 +42,7 @@ export class Batch {
         const futureTables = uniq(futureClasses.flat().map((k) => k.tableName));
 
         let targetLoaders = loaders.filter((l) => !futureTables.includes(l.tableName));
-        if (isEmpty(targetLoaders)) targetLoaders = loaders;
+        if (targetLoaders.length === 0) targetLoaders = loaders;
 
         await this.groupAndLoadSimilar(targetLoaders);
         for (const loader of targetLoaders) await loader.run();

@@ -1,7 +1,6 @@
 import { Attributes, Nodes, Visitors } from "../namespaces.js";
 import {
   aryDeleteIf,
-  isEmpty,
   isNil,
   NotImplementedError,
   rbObjClone,
@@ -676,11 +675,11 @@ export class ToSql extends Visitor {
     if (Array.isArray(values)) {
       collector.preparable = false;
 
-      if (!isEmpty(values)) {
+      if (values.length !== 0) {
         aryDeleteIf(values, (value) => this.isUnboundable(value));
       }
 
-      if (isEmpty(values)) return collector.append("1=0");
+      if (values.length === 0) return collector.append("1=0");
     }
 
     this.visit(attr, collector).append(" IN (");
@@ -694,11 +693,11 @@ export class ToSql extends Visitor {
     if (Array.isArray(values)) {
       collector.preparable = false;
 
-      if (!isEmpty(values)) {
+      if (values.length !== 0) {
         aryDeleteIf(values, (value) => this.isUnboundable(value));
       }
 
-      if (isEmpty(values)) return collector.append("1=1");
+      if (values.length === 0) return collector.append("1=1");
     }
 
     this.visit(attr, collector).append(" NOT IN (");

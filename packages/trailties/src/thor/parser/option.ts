@@ -117,7 +117,7 @@ export class Option extends Argument {
   }
 
   aliasesForUsage(): string {
-    if (isEmpty(this.aliases)) {
+    if (this.aliases.length === 0) {
       return "";
     } else {
       return `${this.aliases.join(", ")}, `;

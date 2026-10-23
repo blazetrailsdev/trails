@@ -209,7 +209,7 @@ export default defineConfig(
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": [
         "error",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },
       ],
       "@typescript-eslint/no-unused-vars": "off",
     },

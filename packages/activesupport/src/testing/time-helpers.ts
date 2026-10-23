@@ -163,7 +163,7 @@ export function travelTo(
   });
 
   stubs.stubObject(Time, "new", (...args: unknown[]) => {
-    if (isEmpty(args)) {
+    if (args.length === 0) {
       return Time.at(now);
     } else {
       const stub = stubs.stubbing(Time, "new")!;

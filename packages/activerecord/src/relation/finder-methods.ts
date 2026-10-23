@@ -543,7 +543,7 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
     ? Array.isArray(aryFirst(aryFirst(ids) as unknown[]))
     : Array.isArray(aryFirst(ids));
 
-  if (expectsArray && isEmpty(aryFirst(ids) as unknown[])) return [];
+  if (expectsArray && (aryFirst(ids) as unknown[]).length === 0) return [];
 
   if (expectsArray) ids = aryFirst(ids) as unknown[];
 

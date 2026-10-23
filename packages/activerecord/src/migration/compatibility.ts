@@ -1,7 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent, reverseMergeBang } from "@blazetrails/activesupport";
 import {
-  except,
   include,
   rbCallSuper,
   rbInspect,
@@ -424,12 +423,8 @@ export class V5_1 extends V5_2 {
   ): Promise<void> {
     const connection = await this.connection;
     if (connection.adapterName === "PostgreSQL") {
-      await super.changeColumn(
-        tableName,
-        columnName,
-        type,
-        except(options as Options, "default", "null", "comment"),
-      );
+      const { default: _default, null: _null, comment, ...rest } = options as Options;
+      await super.changeColumn(tableName, columnName, type, rest);
       if (Object.hasOwn(options, "default")) {
         await connection.changeColumnDefault(tableName, columnName, options.default);
       }
@@ -664,7 +659,7 @@ export class V4_2 extends V5_0 {
 
     if (!(await connection.indexNameExists(tableName, indexName))) {
       if (Object.hasOwn(options, "name")) {
-        const optionsWithoutColumn = except(options, "column");
+        const { column, ...optionsWithoutColumn } = options;
         const indexNameWithoutColumn = connection.indexName(tableName, optionsWithoutColumn);
 
         if (await connection.indexNameExists(tableName, indexNameWithoutColumn)) {

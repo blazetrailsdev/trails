@@ -10,7 +10,6 @@ import type { CachingClassMethods } from "../abstract-controller/caching.js";
 import { ExceptionWrapper } from "../action-dispatch/middleware/exception-wrapper.js";
 import {
   inspect,
-  isEmpty,
   isSymbol,
   rbInspect,
   rbObjAsString,
@@ -44,7 +43,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     if (format == null) format = "*/*";
 
     this.info(`Processing by ${payload.controller}#${payload.action} as ${format}`);
-    if (!isEmpty(params)) this.info(`  Parameters: ${inspect(params)}`);
+    if (Object.keys(params).length !== 0) this.info(`  Parameters: ${inspect(params)}`);
   }
 
   processAction(event: Event): void {

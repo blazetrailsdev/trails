@@ -609,7 +609,7 @@ export function buildWhereClause(
   let parts: (Nodes.Node | Nodes.SqlLiteral | string)[];
   if (typeof opts === "string" || opts instanceof Nodes.SqlLiteral) {
     opts = opts.toString();
-    if (isEmpty(rest)) {
+    if (rest.length === 0) {
       parts = [Arel.sql(opts as string)];
     } else if (isPlainObject(rest[0]) && /:\w+/.test(opts as string)) {
       parts = [buildNamedBoundSqlLiteral.call(this, opts as string, rest[0])];
@@ -617,7 +617,7 @@ export function buildWhereClause(
       parts = [buildBoundSqlLiteral.call(this, opts as string, rest)];
     } else {
       parts = [
-        this.model.sanitizeSql(isEmpty(rest) ? (opts as string) : [opts as string, ...rest])!,
+        this.model.sanitizeSql(rest.length === 0 ? (opts as string) : [opts as string, ...rest])!,
       ];
     }
   } else if (isHash(opts)) {
@@ -630,7 +630,7 @@ export function buildWhereClause(
       }
     });
     const references = PredicateBuilder.references(opts as Record<string, unknown>);
-    if (!isEmpty(references)) {
+    if (references.length !== 0) {
       this.referencesValues = unionReferences(this.referencesValues, references);
     }
 
@@ -1439,7 +1439,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   validateOrderArgs.call(this, orderArgs);
 
   const references = columnReferences(orderArgs);
-  if (!isEmpty(references)) {
+  if (references.length !== 0) {
     this.referencesValues = unionReferences(this.referencesValues, references);
   }
 

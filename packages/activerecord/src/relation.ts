@@ -1379,7 +1379,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         ...(names as string[]),
         options.time,
       );
-      if (!isEmpty(touchUpdates)) Object.assign(updates, touchUpdates);
+      if (Object.keys(touchUpdates).length !== 0) Object.assign(updates, touchUpdates);
     }
 
     return this.updateAll(updates);

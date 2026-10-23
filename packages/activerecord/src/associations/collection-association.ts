@@ -371,7 +371,7 @@ export abstract class CollectionAssociation extends Association {
       return this._associationIds.length;
     } else if (!isEmpty(this.associationScope().groupValues)) {
       return Promise.resolve(this.loadTarget()).then((target) => target.length);
-    } else if (!this.associationScope().distinctValue && !isEmpty(this.target)) {
+    } else if (!this.associationScope().distinctValue && this.target.length !== 0) {
       const unsavedRecords = this.target.filter((record) => record.isNewRecord());
       return this.countRecords().then((count) => unsavedRecords.length + count);
     } else {
