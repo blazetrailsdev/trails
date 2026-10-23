@@ -6,6 +6,9 @@
 #
 #   CODEGEN_GEM=activejob scripts/codegen/swap-tree.sh
 #   SWAP_TESTS=rescue CODEGEN_GEM=activejob scripts/codegen/swap-tree.sh   # one test file
+#   SWAP_GENERATED_TESTS=1 CODEGEN_GEM=activejob scripts/codegen/swap-tree.sh
+#     runs the generated tests (ported from the gem's own) instead of the hand
+#     port's, so the gate measures the generated tree on its own terms.
 #
 # Writes packages/$GEM/codegen-out/swap-tree-tsc.txt and swap-tree-vitest.txt.
 set -uo pipefail
@@ -25,13 +28,16 @@ mv "$PKG/src" "$PKG/src.hand"
 cp -r "$GEN/src" "$PKG/src"
 kept=()
 while IFS= read -r f; do
+  if [[ "$f" == *.test.ts ]] && [ -n "${SWAP_GENERATED_TESTS:-}" ]; then
+    continue
+  fi
   if [[ "$f" == *.test.ts ]] || [ ! -e "$PKG/src/$f" ]; then
     mkdir -p "$PKG/src/$(dirname "$f")"
     cp "$PKG/src.hand/$f" "$PKG/src/$f"
     [[ "$f" == *.test.ts ]] || kept+=("$f")
   fi
 done < <(cd "$PKG/src.hand" && find . -name '*.ts' | sed 's#^\./##' | sort)
-echo "AJ_ADAPTER=${SWAP_ADAPTER:-inline}"
+echo "AJ_ADAPTER=${SWAP_ADAPTER:-inline}  tests: ${SWAP_GENERATED_TESTS:+generated}${SWAP_GENERATED_TESTS:-hand}"
 echo "hand files kept (no generated twin): ${kept[*]:-none}"
 "$ROOT/node_modules/.bin/tsc" -p "$PKG/tsconfig.json" --noEmit > "$GEN/swap-tree-tsc.txt" 2>&1
 echo "tsc errors: $(grep -c 'error TS' "$GEN/swap-tree-tsc.txt")  in tests: $(grep 'error TS' "$GEN/swap-tree-tsc.txt" | grep -c '\.test\.ts')"

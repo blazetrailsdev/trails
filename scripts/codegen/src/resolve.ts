@@ -214,17 +214,16 @@ export class Resolver {
     if (fqn === "ActiveRecord::Promise" || fqn === "ActiveRecord::Promise::Complete")
       return "Promise";
     // An autoloaded constant named in a test (`ActiveJob::QueueAdapters::SidekiqAdapter`
-    // in a `case` arm) whose backend gem trails does not port is read off its
-    // module when reached; one the generator emits (image_processing's `Vips`,
-    // backed by wasm-vips) is an import like any other.
+    // in a `case` arm) whose backend gem trails does not port has no module to
+    // import: it is `undefined`, which matches no adapter. One the generator
+    // emits (image_processing's `Vips`, backed by wasm-vips) is an import.
     if (
       !(this.exportNames.get(fqn) && GEM.externals) &&
       this.index.autoloads.has(fqn) &&
       ctx.f.rubyFile.startsWith("test/") &&
       [...(this.index.scopes.get(fqn)?.files ?? [])].some((f) => this.index.externalFiles.has(f))
     ) {
-      const i = fqn.lastIndexOf("::");
-      return `${this.fqnRef(fqn.slice(0, i), ctx, lw)}.${fqn.slice(i + 2)}`;
+      return "undefined";
     }
     const exp = this.exportNames.get(fqn);
     if (exp) return this.importFrom(exp.tsFile, exp.name, ctx, lw);

@@ -805,6 +805,9 @@ export class Emitter {
               : `class ${short} extends ${host} {}`,
             // The test class is module-local: its merged interface is too.
             ...(mix.iface ? [mix.iface.replace(/^export interface /, "interface ")] : []),
+            // A test's top-level class is in the constant registry (isNamedClass),
+            // which is how the test context finds it.
+            `${this.lw.rc(hctx, "registerConstant")}(${JSON.stringify(short)}, ${short});`,
           ]),
       ...classLines,
       `${desc}(${JSON.stringify(short)}, () => {`,
@@ -1439,6 +1442,10 @@ export class Emitter {
       const r = u.kind === "class" ? this.emitClass(u, name, f) : this.emitModule(u, name, f);
       defs += r.defs;
       chunks.push(r.text);
+      if (u.kind === "module" && isNamedClass(this.index, u.fqn))
+        chunks.push(
+          `${this.lw.rc(this.baseCtx(u, f, {}), "registerConstant")}(${JSON.stringify(u.fqn)}, ${name});`,
+        );
     }
     // A test fixture's top-level statements (`adapters/inline.rb`'s
     // `ActiveJob::Base.queue_adapter = :inline`) run when it is loaded.

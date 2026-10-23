@@ -568,10 +568,11 @@ export class GemIndex {
 /** Whether a class is one GemConfig.namedClasses enters in the constant registry. */
 export function isNamedClass(index: GemIndex, fqn: string): boolean {
   const sc = index.scopes.get(fqn);
+  // A test's own classes and modules, which it names by String (a job's
+  // `"DiscardableError"`) or passes as job arguments that ModuleSerializer
+  // writes by name (`ArgumentSerializationTest::ClassArgument`), are resolved.
+  if (sc?.primaryFile?.startsWith("test/")) return true;
   if (sc?.kind !== "class") return false;
-  // A test's own top-level class, which its fixtures name by String (a job's
-  // `"DiscardableError"`), is a constant of `Object` the test resolves.
-  if (!fqn.includes("::") && sc.primaryFile?.startsWith("test/")) return true;
   const names = new Set(GEM.namedClasses ?? []);
   if (!names.size) return false;
   return rubyAncestors(index, fqn).some((a) => {
