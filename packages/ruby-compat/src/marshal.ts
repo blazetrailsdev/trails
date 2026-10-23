@@ -587,7 +587,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
       return;
     }
 
-    if (rbObjRespondTo(obj, "marshalDump", true)) {
+    if (rbObjRespondTo(obj, "marshalDump")) {
       wRemember(obj, arg);
 
       const v = dumpFuncall(obj as object, "marshalDump", "marshal_dump");
@@ -595,7 +595,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
       wObject(v, arg, limit);
       return;
     }
-    if (rbObjRespondTo(obj, "_dump", true)) {
+    if (rbObjRespondTo(obj, "_dump")) {
       let ivobj: object | undefined;
 
       if (arg.userdefs && arg.userdefs.has(obj as object)) {
@@ -1400,7 +1400,7 @@ function rObjectFor(
         const name = rUnique(arg);
         const klass = path2class(name);
 
-        if (!rbObjRespondTo(klass, "_load", true)) {
+        if (!rbObjRespondTo(klass, "_load")) {
           throw new TypeError(`class ${name} needs to have method \`_load'`);
         }
         let data: string | typeof String.prototype = rString(arg);
@@ -1428,7 +1428,7 @@ function rObjectFor(
         if (extmod !== null) {
           appendExtmod(v as object, extmod);
         }
-        if (!rbObjRespondTo(v, "marshalLoad", true)) {
+        if (!rbObjRespondTo(v, "marshalLoad")) {
           throw new TypeError(`instance of ${name} needs to have method \`marshal_load'`);
         }
         v = rEntry(v, arg);

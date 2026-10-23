@@ -206,7 +206,7 @@ export class DeprecatedConstantProxy extends Module {
   }
 
   isRespondTo(method: string, includeAll: boolean = false): boolean {
-    return rbObjRespondTo(this.target, method, includeAll);
+    return rbObjRespondTo(this.target, method);
   }
 
   class(): unknown {

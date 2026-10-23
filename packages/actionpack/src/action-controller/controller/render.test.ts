@@ -22,7 +22,7 @@ import { Time } from "@blazetrails/date";
 import {
   ArgumentError,
   File,
-  rbFPublicSend,
+  rbFSend,
   rbModConstSet,
   rbObjIvarGet,
   registerConstant,
@@ -223,8 +223,8 @@ class TestController extends Base {
     }
 
     maximum(attribute: string): unknown {
-      return rbFPublicSend(
-        maxBy(this.records, (record) => rbFPublicSend(record, attribute) as number),
+      return rbFSend(
+        maxBy(this.records, (record) => rbFSend(record, attribute) as number),
         attribute,
       );
     }

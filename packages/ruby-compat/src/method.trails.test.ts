@@ -8,9 +8,6 @@ import {
   rbIseqMinMaxArity,
   rbObjMethod,
   rbObjMethods,
-  rbObjPrivateMethods,
-  rbObjProtectedMethods,
-  rbObjPublicMethods,
 } from "./method.js";
 import { extend, rbObjClone, rbObjIsKindOf } from "./include.js";
 import { NameError } from "./name-error.js";
@@ -161,7 +158,7 @@ describe("Method#source_location", () => {
   });
 });
 
-describe("rbObjMethods / rbObjPublicMethods", () => {
+describe("rbObjMethods", () => {
   class Parent {
     inherited(): void {}
   }
@@ -177,9 +174,7 @@ describe("rbObjMethods / rbObjPublicMethods", () => {
     );
     expect(rbObjMethods(child)).not.toContain("constructor");
     expect(rbObjMethods(child)).not.toContain("title");
-    expect(rbObjPublicMethods(child)).toEqual(rbObjMethods(child));
-    expect(rbObjPublicMethods(child, false)).toEqual(["singleton", "own"]);
-    expect([rbObjPrivateMethods(child), rbObjProtectedMethods(child, false)]).toEqual([[], []]);
+    expect(rbObjMethods(child, false)).toEqual(["singleton", "own"]);
   });
 });
 

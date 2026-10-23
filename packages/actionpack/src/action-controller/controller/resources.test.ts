@@ -13,7 +13,6 @@ import {
 } from "@blazetrails/activesupport";
 import {
   hashDelete,
-  rbFPublicSend,
   rbFSend,
   rbInspect,
   rbObjClassname,
@@ -83,7 +82,7 @@ class ResourcesTest extends TestCase {
             if (collectionMethods != null) {
               this.collection(() => {
                 for (const [name, method] of Object.entries(collectionMethods)) {
-                  rbFPublicSend(this, method, `:${name}`);
+                  rbFSend(this, method, `:${name}`);
                 }
               });
             }
@@ -91,7 +90,7 @@ class ResourcesTest extends TestCase {
             if (memberMethods != null) {
               this.member(() => {
                 for (const [name, method] of Object.entries(memberMethods)) {
-                  rbFPublicSend(this, method, `:${name}`);
+                  rbFSend(this, method, `:${name}`);
                 }
               });
             }
@@ -429,7 +428,7 @@ class ResourcesTest extends TestCase {
   assertNamedRoute(expected: string, route: string, options: Options): void {
     let actual: unknown;
     try {
-      actual = rbFPublicSend(this.controller, camelize(route, false), options);
+      actual = rbFSend(this.controller, camelize(route, false), options);
     } catch (e) {
       actual = rbObjClassname(e);
     }

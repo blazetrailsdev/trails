@@ -6,7 +6,7 @@ import {
   fetch,
   hashDelete,
   isSymbol,
-  rbFPublicSend,
+  rbFSend,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 
@@ -263,9 +263,9 @@ export class HelperMethodBuilder {
     }
 
     if (Object.keys(options).length === 0) {
-      return rbFPublicSend(target, method, ...args) as string;
+      return rbFSend(target, method, ...args) as string;
     } else {
-      return rbFPublicSend(target, method, ...args, options) as string;
+      return rbFSend(target, method, ...args, options) as string;
     }
   }
 

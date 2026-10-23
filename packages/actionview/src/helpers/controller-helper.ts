@@ -53,11 +53,11 @@ export function logger(this: ControllerHelperHost): unknown {
 export function isRespondTo(
   this: ControllerHelperHost,
   methodName: string,
-  includePrivate: boolean = false,
+  _includePrivate: boolean = false,
 ): boolean {
   if ((CONTROLLER_DELEGATES as readonly string[]).includes(methodName))
     return rbObjRespondTo(this._controller, methodName);
-  return basicObjRespondTo(this, methodName, !includePrivate);
+  return basicObjRespondTo(this, methodName);
 }
 
 export class ControllerHelper {}

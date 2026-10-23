@@ -23,7 +23,7 @@ import { extractOptionsBang, include } from "@blazetrails/activesupport";
 import {
   NoMethodError,
   objRespondToMissing,
-  rbFPublicSend,
+  rbFSend,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Routing } from "../../namespaces.js";
@@ -131,7 +131,7 @@ export class RoutesProxy implements UrlForHost {
       }
 
       args.push(options);
-      return rbFPublicSend(this._helpers, method, ...args);
+      return rbFSend(this._helpers, method, ...args);
     } else {
       throw new NoMethodError(
         `undefined method '${method}' for an instance of RoutesProxy`,

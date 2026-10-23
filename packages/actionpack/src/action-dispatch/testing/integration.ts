@@ -8,12 +8,11 @@ import {
   RuntimeError,
   URI,
   include,
-  rbFPublicSend,
+  rbFSend,
   rbModConstSet,
   rbObjClassname,
   rbObjDup,
   Module,
-  rbFSend,
   rbObjRespondTo,
   stringSplit,
   type Generic,
@@ -118,7 +117,7 @@ export async function followRedirectBang(
     headers["HTTP_REFERER"] = this.request!.url;
   }
 
-  await rbFPublicSend(this, method, this.response!.location, { headers, ...args });
+  await rbFSend(this, method, this.response!.location, { headers, ...args });
   return this.status;
 }
 
@@ -529,7 +528,7 @@ function respondToMissing(this: RunnerHost, method: string, _: boolean): boolean
 
 function methodMissing(this: RunnerHost, method: string, ...args: unknown[]): unknown {
   if (rbObjRespondTo(this.integrationSession, method)) {
-    const result = rbFPublicSend(this.integrationSession, method, ...args);
+    const result = rbFSend(this.integrationSession, method, ...args);
     if (typeof (result as { then?: unknown } | null)?.then === "function") {
       return (result as Promise<unknown>).then((value) => {
         this.copySessionVariablesBang();
@@ -616,7 +615,7 @@ export const Runner = new Module((mod) => {
               }
             : {
                 value(this: RunnerHost, ...args: unknown[]) {
-                  const result = rbFPublicSend(this.integrationSession, method, ...args);
+                  const result = rbFSend(this.integrationSession, method, ...args);
                   this.copySessionVariablesBang();
                   return result;
                 },
@@ -629,7 +628,7 @@ export const Runner = new Module((mod) => {
       mod.defineMethod(method, async function (this: RunnerHost, ...args: unknown[]) {
         this._htmlDocument = null;
 
-        const result = await rbFPublicSend(this.integrationSession, method, ...args);
+        const result = await rbFSend(this.integrationSession, method, ...args);
         this.copySessionVariablesBang();
         return result;
       });
@@ -832,7 +831,8 @@ export function spliceMethodMissing(proto: object): void {
           prop === "respondToMissing" ||
           prop === "methodMissing" ||
           !Object.hasOwn(receiver, "_integrationSession") ||
-          !receiver.respondToMissing(prop, false)
+          !receiver.respondToMissing(prop, false) ||
+          !rbObjRespondTo(receiver.integrationSession, prop)
         ) {
           return Reflect.get(target, prop, receiver);
         }

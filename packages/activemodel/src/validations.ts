@@ -14,7 +14,6 @@ import {
   Hash,
   rbCallSuper,
   rbBlockGivenP,
-  rbFPublicSend,
   rbFSend,
   rbModConstSet,
   rbModMethodDefined,
@@ -339,7 +338,7 @@ export class ValidationError<TModel extends ModelWithErrors = ModelWithErrors>
   constructor(model: TModel) {
     const errors = model.errors.fullMessages.join(", ");
     const message = I18n.t(
-      `${rbFPublicSend(model.constructor, "i18nScope")}.errors.messages.model_invalid`,
+      `${rbFSend(model.constructor, "i18nScope")}.errors.messages.model_invalid`,
       {
         errors,
         default: ":errors.messages.model_invalid",

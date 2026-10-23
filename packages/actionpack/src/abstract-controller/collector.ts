@@ -4,7 +4,7 @@ import {
   NoMethodError,
   PROTOCOL_PROBES,
   included,
-  rbFPublicSend,
+  rbFSend,
   rbObjClassname,
   symbolToS,
 } from "@blazetrails/ruby-compat";
@@ -82,7 +82,7 @@ export function methodMissing(this: object, symbol: string, ...args: unknown[]):
 
   if (MimeType.SET.isInclude(mimeConstant)) {
     Collector.generateMethodForMime(mimeConstant);
-    return rbFPublicSend(this, camelize(symbol, false), ...args);
+    return rbFSend(this, camelize(symbol, false), ...args);
   } else {
     const super_ = Collector.superMethod(this, "methodMissing");
     if (super_ !== undefined) return super_(symbol, ...args);

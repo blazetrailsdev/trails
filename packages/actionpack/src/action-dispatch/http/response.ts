@@ -203,7 +203,7 @@ export class RackBody {
     if (Object.hasOwn(BODY_METHODS, method)) {
       return rbObjRespondTo(this._response.stream, method);
     } else {
-      return basicObjRespondTo(this, method, !includePrivate);
+      return basicObjRespondTo(this, method);
     }
   }
 

@@ -20,7 +20,7 @@ import {
   rbModAttrReader,
   rbModAttrWriter,
   rbModName,
-  rbModPublicMethodDefined,
+  rbModMethodDefined,
   rbObjAsString,
   rbObjClone,
   rbObjDup,
@@ -623,7 +623,7 @@ export const ClassMethods = {
       return;
     }
 
-    if (!rbModPublicMethodDefined(this, meth)) return;
+    if (!rbModMethodDefined(this, meth)) return;
 
     if (this.isNoCommands() || !rtest(this.createCommand(meth))) return;
 
@@ -726,7 +726,7 @@ export function fromSuperclass(
   defaultValue: unknown = null,
 ): unknown {
   const superclass = Object.getPrototypeOf(this) as Record<string, () => unknown>;
-  if (this === this.baseclass() || !rbObjRespondTo(superclass, method, true)) {
+  if (this === this.baseclass() || !rbObjRespondTo(superclass, method)) {
     return defaultValue;
   } else {
     const value = superclass[method]();

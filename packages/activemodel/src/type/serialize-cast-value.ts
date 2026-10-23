@@ -1,9 +1,5 @@
 import { Concern, extend, include, included } from "@blazetrails/activesupport";
-import {
-  rbModAncestors,
-  rbModInstanceMethod,
-  rbModPublicMethodDefined,
-} from "@blazetrails/ruby-compat";
+import { rbModAncestors, rbModInstanceMethod, rbModMethodDefined } from "@blazetrails/ruby-compat";
 
 interface SerializeCastValueHost {
   constructor: { serializeCastValueCompatible(): boolean };
@@ -54,7 +50,7 @@ SerializeCastValue.ClassMethods = ClassMethods;
 SerializeCastValue.DefaultImplementation = DefaultImplementation;
 
 SerializeCastValue[included] = function (klass: { prototype: object }): void {
-  if (!rbModPublicMethodDefined(klass, "serializeCastValue")) {
+  if (!rbModMethodDefined(klass, "serializeCastValue")) {
     include(klass, DefaultImplementation);
   }
 };

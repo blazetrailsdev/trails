@@ -512,10 +512,8 @@ describe("LoggingTest", () => {
     try {
       const stubbedInlineAdapter = new QueueAdapters.InlineAdapter();
       Object.assign(stubbedInlineAdapter, {
-        isRespondTo(methodName: string, includePrivate: boolean = false): boolean {
-          return (
-            methodName === "enqueueAll" || basicObjRespondTo(this, methodName, !includePrivate)
-          );
+        isRespondTo(methodName: string, _includePrivate: boolean = false): boolean {
+          return methodName === "enqueueAll" || basicObjRespondTo(this, methodName);
         },
         enqueueAll(..._args: unknown[]): null {
           return null;

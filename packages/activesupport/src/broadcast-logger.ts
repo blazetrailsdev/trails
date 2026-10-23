@@ -205,7 +205,7 @@ export class BroadcastLogger extends Logger {
   }
 
   private respondToMissing(method: string, includeAll: boolean): boolean {
-    return this.broadcasts.some((logger) => rbObjRespondTo(logger, method, includeAll));
+    return this.broadcasts.some((logger) => rbObjRespondTo(logger, method));
   }
 }
 

@@ -85,7 +85,6 @@ export {
   rbObjRespondTo,
   rbObjSingletonClass,
   rbSetClassPathString,
-  rbFPublicSend,
   rbFSend,
   toS,
   toSym,
@@ -95,7 +94,6 @@ export {
   isAbsentHalf,
   rbModDefineMethod,
   rbModMethodDefined,
-  rbModPublicMethodDefined,
   rtest,
   isNil,
   rbCBasicObject,
@@ -254,7 +252,6 @@ export {
   rbModGt,
   rbObjIsKindOf,
   rbModInstanceMethod,
-  rbModPublicInstanceMethod,
   type UnboundMethod,
   moduleVisibility,
   publicInstanceMethods,
@@ -343,16 +340,7 @@ export type {
   WriteStream,
 } from "./process-adapter.js";
 export type { ClassModule, PrependMethod, PrependModule } from "./prepend.js";
-export {
-  Method,
-  iseqLocationSetup,
-  rbCheckArity,
-  rbObjMethod,
-  rbObjMethods,
-  rbObjPrivateMethods,
-  rbObjProtectedMethods,
-  rbObjPublicMethods,
-} from "./method.js";
+export { Method, iseqLocationSetup, rbCheckArity, rbObjMethod, rbObjMethods } from "./method.js";
 export {
   rbRegEqual,
   rbRegInitStr,

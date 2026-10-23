@@ -94,7 +94,7 @@ export const Methods = new Module().include({
       .attributesBuilder()
       .buildFromDatabase(attributesFromDatabase);
     for (const name of keys(attributesFromDatabase)) {
-      if (!basicObjRespondTo(this, name, false)) {
+      if (!basicObjRespondTo(this, name)) {
         (
           rbObjSingletonClass(this) as unknown as { defineAttributeMethod(name: string): void }
         ).defineAttributeMethod(name);

@@ -4,7 +4,7 @@ import {
   isInclude,
   isSymbol,
   kernelFloat,
-  rbFPublicSend,
+  rbFSend,
   rtest,
   Range,
   toI,
@@ -87,16 +87,12 @@ export class NumericalityValidator extends EachValidator {
     )) {
       let optionValue = rawOptionValue as NumericValue | undefined;
       if (isInclude(NUMBER_CHECKS, option)) {
-        if (
-          !rtest(rbFPublicSend(toI(value), NUMBER_CHECKS[option as keyof typeof NUMBER_CHECKS]))
-        ) {
+        if (!rtest(rbFSend(toI(value), NUMBER_CHECKS[option as keyof typeof NUMBER_CHECKS]))) {
           record.errors.add(attrName, `:${option}`, this.filteredOptions(value));
         }
       } else if (isInclude(RANGE_CHECKS, option)) {
         const range = optionValue as unknown as Range<unknown>;
-        if (
-          !rtest(rbFPublicSend(value, RANGE_CHECKS[option as keyof typeof RANGE_CHECKS], range))
-        ) {
+        if (!rtest(rbFSend(value, RANGE_CHECKS[option as keyof typeof RANGE_CHECKS], range))) {
           record.errors.add(
             attrName,
             `:${option}`,
@@ -105,7 +101,7 @@ export class NumericalityValidator extends EachValidator {
         }
       } else if (isInclude(COMPARE_CHECKS, option)) {
         optionValue = this.optionAsNumber(record, optionValue, precision, scale);
-        if (!rtest(rbFPublicSend(value, COMPARE_CHECKS[option as CompareKey], optionValue))) {
+        if (!rtest(rbFSend(value, COMPARE_CHECKS[option as CompareKey], optionValue))) {
           record.errors.add(
             attrName,
             `:${underscore(option)}`,

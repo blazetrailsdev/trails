@@ -28,7 +28,7 @@ import {
   Hash,
   isEmpty,
   isModuleIncluded,
-  rbFPublicSend,
+  rbFSend,
   rbObjRespondTo,
   rtest,
   toD,
@@ -790,7 +790,7 @@ export function operationOverAggregateColumn(
   operation: string,
   distinct: boolean,
 ): unknown {
-  return operation === "count" ? column.count(distinct) : rbFPublicSend(column, operation);
+  return operation === "count" ? column.count(distinct) : rbFSend(column, operation);
 }
 
 /** @internal */

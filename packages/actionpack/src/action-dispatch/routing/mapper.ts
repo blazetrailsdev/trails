@@ -39,10 +39,9 @@ import {
   rbFArray,
   rbInspect,
   RuntimeError,
-  rbFPublicSend,
   rbFSend,
   slice,
-  rbModPublicMethodDefined,
+  rbModMethodDefined,
   rbObjRespondTo,
   rtest,
   stringSplit,
@@ -659,7 +658,7 @@ export class Mapping {
   ): Record<string, unknown> {
     const conditions = dup(currentConditions);
 
-    return keepIf(conditions, (k) => rbModPublicMethodDefined(requestClass, k));
+    return keepIf(conditions, (k) => rbModMethodDefined(requestClass, k));
   }
 
   /** @internal */
@@ -1646,7 +1645,7 @@ export class Mapper {
       }
 
       _route.segmentKeys.forEach((k) => delete options[k]);
-      return rbFPublicSend(_urlHelpers, camelize(`${name}_path`, "lower"), prefixOptions) as string;
+      return rbFSend(_urlHelpers, camelize(`${name}_path`, "lower"), prefixOptions) as string;
     };
 
     app.routes().defineMountedHelper(name, scriptNamer);

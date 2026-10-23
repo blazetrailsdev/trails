@@ -102,16 +102,15 @@ const OPTION_READER_FUNCTIONS = new Set([
   "deleteWithDefault",
 ]);
 /**
- * ruby-compat's `Kernel#send` / `Kernel#public_send` (`rb_f_send`,
- * vendor/ruby/v3.3.11/vm_eval.c:1330). Called with a string-literal name, each
+ * ruby-compat's `Kernel#send` (`rb_f_send`,
+ * vendor/ruby/v3.3.11/vm_eval.c:1330). Called with a string-literal name, it
  * is a call to that method; a computed name is Ruby's own `send(name)`. In
  * ARGUMENT position the same literal names the descriptor (`call:usec` for
  * `rbFSend(value, "usec")`), as `dispatchedCallName` does for `X.call`.
  */
-const SEND_CALLEES = new Set(["rbFSend", "rbFPublicSend"]);
+const SEND_CALLEES = new Set(["rbFSend"]);
 const SEND_CALLEES_RUBY_NAME: Record<string, string> = {
   rbFSend: "send",
-  rbFPublicSend: "publicSend",
 };
 /**
  * ruby-compat's `Kernel#load` (`rb_f_load`, vendor/ruby/v3.3.11/load.c:903),

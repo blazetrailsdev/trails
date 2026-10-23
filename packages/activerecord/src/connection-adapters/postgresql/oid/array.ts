@@ -1,6 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
 import { PG } from "../../../pg/pg.js";
-import { rbEqual, rbFPublicSend, rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
+import { rbEqual, rbFSend, rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
 
 export interface ArraySubtype {
   readonly type?: string | (() => string | undefined);
@@ -119,7 +119,7 @@ export class Array extends ValueType<unknown> {
       return value.map((item) => this.typeCastArray(item, method));
     }
 
-    return rbFPublicSend(this.subtype, method, value);
+    return rbFSend(this.subtype, method, value);
   }
 
   override isMutable(): boolean {

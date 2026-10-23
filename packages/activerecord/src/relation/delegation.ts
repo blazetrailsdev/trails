@@ -27,7 +27,7 @@ import {
   extend,
   fetch,
   include,
-  rbFPublicSend,
+  rbFSend,
   rbModConstSet,
   rbClassSuperclass,
   rbModName,
@@ -134,7 +134,7 @@ export class GeneratedRelationMethods extends Module {
         });
       } else {
         this.defineMethod(method, function (this: any, ...args: any[]) {
-          return this.scoping(() => rbFPublicSend(this._model, method, ...args));
+          return this.scoping(() => rbFSend(this._model, method, ...args));
         });
       }
     });
@@ -252,7 +252,7 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   toFs: (records, format?: string) => toFsArray(records, format),
   toXml: (records, options?: ToXmlOptions, block?: (builder: XmlBuilder) => void) =>
     toXmlArray(records, options, block),
-  encodeWith: (records, coder: Psych.Coder) => rbFPublicSend(records, "encodeWith", coder),
+  encodeWith: (records, coder: Psych.Coder) => rbFSend(records, "encodeWith", coder),
 };
 RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
 

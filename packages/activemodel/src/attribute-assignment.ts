@@ -7,7 +7,7 @@ import {
   TypeError,
   eachPair,
   isEmpty,
-  rbFPublicSend,
+  rbFSend,
   rbObjClassname,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
@@ -74,7 +74,7 @@ export function attributeWriterMissing(
 export function _assignAttribute(this: AttributeAssignment, k: string, v: unknown): unknown {
   const setter = `${k}=`;
   try {
-    return rbFPublicSend(this, setter, v);
+    return rbFSend(this, setter, v);
   } catch (error) {
     if (!(error instanceof NoMethodError)) throw error;
     if (rbObjRespondTo(this, setter)) {

@@ -11,7 +11,6 @@ import {
   include,
   NotImplementedError,
   rbEqual,
-  rbFPublicSend,
   rbFSend,
   rbDeclareIvar,
   rbModConstSet,
@@ -371,7 +370,7 @@ async function throughRecordsFor(this: HasManyThroughAssociation, record: Base):
   for (const c of candidates) {
     let all = true;
     for (const [key, value] of Object.entries(attributes)) {
-      if (!rbEqual(await rbFPublicSend(c, key), value)) {
+      if (!rbEqual(await rbFSend(c, key), value)) {
         all = false;
         break;
       }

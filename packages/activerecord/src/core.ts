@@ -18,7 +18,7 @@ import {
   rbModToS,
   rbObjHash,
   basicObjRespondTo,
-  rbFPublicSend,
+  rbFSend,
   rbObjSingletonClass,
   rbCallSuper,
   filterMap,
@@ -387,7 +387,7 @@ export function initWith(
   coder = LegacyYamlAdapter.convert(coder);
   const attributes = this.constructor.yamlEncoder().decode(coder);
   for (const name of attributes.keys()) {
-    if (!basicObjRespondTo(this, name, false)) {
+    if (!basicObjRespondTo(this, name)) {
       (
         rbObjSingletonClass(this) as unknown as { defineAttributeMethod(name: string): void }
       ).defineAttributeMethod(name);
@@ -946,13 +946,13 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
             if (attribute === "id") {
               return (value as any).id_value;
             } else {
-              return rbFPublicSend(value, attribute);
+              return rbFSend(value, attribute);
             }
           });
           compositePrimaryKey = true;
         }
       } else {
-        if (respondsTo(value, pkey)) value = rbFPublicSend(value, pkey);
+        if (respondsTo(value, pkey)) value = rbFSend(value, pkey);
       }
     }
 

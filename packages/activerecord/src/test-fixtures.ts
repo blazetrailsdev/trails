@@ -402,7 +402,7 @@ function respondToMissing(
   method: string,
   includePrivate: boolean = false,
 ): boolean {
-  if (includePrivate && Object.hasOwn(this.fixtureSets, method)) {
+  if (Object.hasOwn(this.fixtureSets, method)) {
     return true;
   } else {
     return false;
@@ -478,7 +478,7 @@ export const TestFixtures = new Module((mod) => {
             if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
               return value;
             }
-            if (receiver.respondToMissing(prop, true)) {
+            if (receiver.respondToMissing(prop)) {
               return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
             }
             return value;

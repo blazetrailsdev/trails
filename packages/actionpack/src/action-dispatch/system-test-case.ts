@@ -2,7 +2,7 @@ import type { Browser, BrowserContext, Locator, Page } from "playwright";
 import { classAttribute, reverseMerge, TopLevel } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Builder } from "@blazetrails/rack";
-import { include, NoMethodError, rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { include, NoMethodError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ActionDispatch } from "../namespaces.js";
 import type { RouteSet } from "./routing/route-set.js";
 import { Driver, type BrowserName } from "./system-testing/driver.js";
@@ -155,7 +155,7 @@ export class SystemTestCase extends TestCase {
   /** @internal */
   methodMissing(name: string, ...args: unknown[]): unknown {
     if (rbObjRespondTo(this.urlHelpers(), name)) {
-      return rbFPublicSend(this.urlHelpers(), name, ...args);
+      return rbFSend(this.urlHelpers(), name, ...args);
     } else {
       throw new NoMethodError(
         `undefined method '${name}' for an instance of ${this.constructor.name}`,

@@ -3,7 +3,7 @@ import {
   StandardError,
   max,
   rbBigNorm,
-  rbFPublicSend,
+  rbFSend,
   rbIntegerTypeP,
   rbPlus,
 } from "@blazetrails/ruby-compat";
@@ -21,7 +21,7 @@ export function maximum(
   key: string | null = null,
 ): unknown {
   const entries = Symbol.iterator in this ? [...this] : Object.entries(this);
-  return max(key === null ? entries : entries.map((element) => rbFPublicSend(element, key)));
+  return max(key === null ? entries : entries.map((element) => rbFSend(element, key)));
 }
 
 ENUMERABLE_METHOD_TABLE.maximum = (self: Iterable<unknown>, key?: string | null) =>

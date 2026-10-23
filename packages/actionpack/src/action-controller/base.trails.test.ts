@@ -105,10 +105,10 @@ describe("ActionController::Cookies#cookies", () => {
 
   it("skips helper_method on a controller without AbstractController::Helpers", () => {
     class CookiesMetal extends Metal {}
-    expect(rbObjRespondTo(CookiesMetal, "helperMethod", true)).toBe(false);
+    expect(rbObjRespondTo(CookiesMetal, "helperMethod")).toBe(false);
     include(CookiesMetal, Cookies);
     expect(Object.hasOwn(CookiesMetal, "_helperMethods")).toBe(false);
-    expect(rbObjRespondTo(Base, "helperMethod", true)).toBe(true);
+    expect(rbObjRespondTo(Base, "helperMethod")).toBe(true);
   });
 });
 
@@ -370,7 +370,7 @@ describe("ActionController::Helpers included into ActionController::API", () => 
     expect(subclass.helpers().myHelper()).toBe("helper");
     expect(subclass.helpersPath).toEqual([]);
     expect(rbObjRespondTo(new SubclassWithHelpersController(), "helpers")).toBe(true);
-    expect(rbObjRespondTo(API, "helper", true)).toBe(false);
+    expect(rbObjRespondTo(API, "helper")).toBe(false);
   });
 
   it("fires the inherited hook for a subclass: default helper module", () => {

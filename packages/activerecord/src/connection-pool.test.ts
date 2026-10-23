@@ -7,7 +7,6 @@ import {
   Timeout,
   block,
   rbObjSingletonClass,
-  rbFPublicSend,
   rbFSend,
   rbObjIvarSet,
   RuntimeError,
@@ -671,7 +670,7 @@ it("non bang disconnect and clear reloadable connections throw exception if thre
   for (const groupActionMethod of ["disconnect", "clearReloadableConnections"]) {
     await pool.withConnection(async () => {
       const error = await assertRaises([ExclusiveConnectionTimeoutError], {}, () =>
-        newThread(() => rbFPublicSend(pool, groupActionMethod)).join(),
+        newThread(() => rbFSend(pool, groupActionMethod)).join(),
       );
       expect(error.connectionPool).toBe(pool);
     });

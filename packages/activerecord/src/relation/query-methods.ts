@@ -11,7 +11,6 @@ import {
   merge,
   rbBlockGivenP,
   partition,
-  rbFPublicSend,
   rbFSend,
   rbInspect,
   rbObjAsString,
@@ -1454,7 +1453,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
           return (toA(arg) as [unknown, unknown][]).map(([key, value]) => {
             if (isHash(value)) {
               return (toA(value) as [unknown, unknown][]).map(([field, dir]) =>
-                rbFPublicSend(
+                rbFSend(
                   orderColumn.call(this, [toS(key), toS(field)].join(".")),
                   rbFSend(dir, "downcase"),
                 ),
@@ -1465,9 +1464,9 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
                 key instanceof Nodes.Node ||
                 key instanceof Arel.Attribute
               ) {
-                return rbFPublicSend(key, rbFSend(value, "downcase"));
+                return rbFSend(key, rbFSend(value, "downcase"));
               } else {
-                return rbFPublicSend(orderColumn.call(this, toS(key)), rbFSend(value, "downcase"));
+                return rbFSend(orderColumn.call(this, toS(key)), rbFSend(value, "downcase"));
               }
             }
           });

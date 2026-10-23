@@ -5,7 +5,7 @@ import {
   InvalidURIError,
   Module,
   NoMethodError,
-  rbFPublicSend,
+  rbFSend,
   rbObjClassname,
   rbObjClone,
   rbObjMethod,
@@ -264,7 +264,7 @@ export function methodMissing(
   ...args: unknown[]
 ): unknown {
   if (this.controller != null && this.routes?.namedRoutes?.isRouteDefined(selector)) {
-    return rbFPublicSend(this.controller, selector, ...args);
+    return rbFSend(this.controller, selector, ...args);
   } else {
     const super_ = RoutingAssertions.superMethod(this, "methodMissing");
     if (super_ !== undefined) return super_(selector, ...args);

@@ -51,7 +51,7 @@ export function isTypeIncompatibleWithSerialize(
 ): boolean {
   return (
     (castType instanceof Json && coder === globalThis.JSON) ||
-    (rbObjRespondTo(castType, "typeCastArray", true) && type === Array)
+    (rbObjRespondTo(castType, "typeCastArray") && type === Array)
   );
 }
 

@@ -9,7 +9,7 @@ interface CsrfHelperHost extends TagHelperHost {
 }
 
 export function csrfMetaTags(this: CsrfHelperHost): SafeBuffer | null {
-  if (rbObjRespondTo(this, "isProtectAgainstForgery", true) && this.isProtectAgainstForgery!()) {
+  if (rbObjRespondTo(this, "isProtectAgainstForgery") && this.isProtectAgainstForgery!()) {
     return htmlSafe(
       [
         tag.call(this, "meta", {

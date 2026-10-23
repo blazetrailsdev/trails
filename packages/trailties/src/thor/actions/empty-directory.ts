@@ -83,9 +83,7 @@ export class EmptyDirectory {
   protected convertEncodedInstructions(filename: string): string {
     return filename.replace(/%(.*?)%/g, (initialString: string, $1: string) => {
       const method = strip($1);
-      return rbObjRespondTo(this.base, method, true)
-        ? toS(rbFSend(this.base, method))
-        : initialString;
+      return rbObjRespondTo(this.base, method) ? toS(rbFSend(this.base, method)) : initialString;
     });
   }
 

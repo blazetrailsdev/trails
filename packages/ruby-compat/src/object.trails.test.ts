@@ -29,16 +29,14 @@ import {
   rbObjRespondTo,
   CLASS_METHOD_TABLE,
   OBJECT_METHOD_TABLE,
-  rbFPublicSend,
+  rbFSend,
   rbModAttrReader,
   rbModAttrWriter,
   rbModDefineMethod,
   rbModMethodDefined,
-  rbFSend,
   toS as toSSend,
   toSym,
   isNil,
-  rbModPublicMethodDefined,
   rbDeclareIvar,
   rbObjInstanceVariables,
   rbObjIvarGet,
@@ -55,7 +53,6 @@ import {
   rbClassInheritedP,
   rbModAncestors,
   rbModInstanceMethod,
-  rbModPublicInstanceMethod,
   rbObjIsKindOf,
 } from "./include.js";
 import { BigDecimal } from "./big-decimal.js";
@@ -471,14 +468,14 @@ class Req {
   }
 }
 
-describe("rbFPublicSend include?", () => {
+describe("rbFSend include?", () => {
   it("answers for the core receivers with no isInclude entry of their own", () => {
-    expect(rbFPublicSend("rubyist", "isInclude", "ruby")).toBe(true);
-    expect(rbFPublicSend([1, 2], "isInclude", 2)).toBe(true);
-    expect(rbFPublicSend(new Set([1]), "isInclude", 2)).toBe(false);
-    expect(rbFPublicSend(new Map([["a", 1]]), "isInclude", "a")).toBe(true);
-    expect(rbFPublicSend({ a: 1 }, "isInclude", "a")).toBe(true);
-    expect(rbFPublicSend({ a: 1 }, "isInclude", "toString")).toBe(false);
+    expect(rbFSend("rubyist", "isInclude", "ruby")).toBe(true);
+    expect(rbFSend([1, 2], "isInclude", 2)).toBe(true);
+    expect(rbFSend(new Set([1]), "isInclude", 2)).toBe(false);
+    expect(rbFSend(new Map([["a", 1]]), "isInclude", "a")).toBe(true);
+    expect(rbFSend({ a: 1 }, "isInclude", "a")).toBe(true);
+    expect(rbFSend({ a: 1 }, "isInclude", "toString")).toBe(false);
   });
 
   it("looks a Set or Hash member up by eql?", () => {
@@ -491,23 +488,23 @@ describe("rbFPublicSend include?", () => {
         return this.x;
       }
     }
-    expect(rbFPublicSend(new Set([new Point(1)]), "isInclude", new Point(1))).toBe(true);
-    expect(rbFPublicSend(new Set([new Point(1)]), "isInclude", new Point(2))).toBe(false);
-    expect(rbFPublicSend(new Map([[new Point(1), 1]]), "isInclude", new Point(1))).toBe(true);
+    expect(rbFSend(new Set([new Point(1)]), "isInclude", new Point(1))).toBe(true);
+    expect(rbFSend(new Set([new Point(1)]), "isInclude", new Point(2))).toBe(false);
+    expect(rbFSend(new Map([[new Point(1), 1]]), "isInclude", new Point(1))).toBe(true);
   });
 
   it("raises NoMethodError for nil", () => {
-    const send = (): unknown => rbFPublicSend(null, "isInclude", 1);
+    const send = (): unknown => rbFSend(null, "isInclude", 1);
     expect(send).toThrow(NoMethodError);
     expect(send).toThrow("undefined method 'include?' for nil");
   });
 
   it("raises NoMethodError for a receiver that does not define it", () => {
-    expect(() => rbFPublicSend(1, "isInclude", 1)).toThrow(NoMethodError);
+    expect(() => rbFSend(1, "isInclude", 1)).toThrow(NoMethodError);
   });
 
   it("raises TypeError for String#include? with a non-String", () => {
-    expect(() => rbFPublicSend("rubyist", "isInclude", 1)).toThrow(
+    expect(() => rbFSend("rubyist", "isInclude", 1)).toThrow(
       "no implicit conversion of Integer into String",
     );
   });
@@ -552,8 +549,8 @@ describe("rbFSend", () => {
       }
       _setReflections(): void {}
     }
-    expect(rbObjRespondTo(Host, "defineMethodAttribute=", true)).toBe(true);
-    expect(rbObjRespondTo(Host, "defineMethodMissing=", true)).toBe(false);
+    expect(rbObjRespondTo(Host, "defineMethodAttribute=")).toBe(true);
+    expect(rbObjRespondTo(Host, "defineMethodMissing=")).toBe(false);
     expect(rbFSend(Host, "defineMethodAttribute=", "title", { as: "title" })).toBe("title");
     expect(Host.log).toEqual([["title", { as: "title" }]]);
 
@@ -598,13 +595,13 @@ describe("rbFSend", () => {
 
   it("public_send dispatches a defined method as send does", () => {
     const req = new Req();
-    expect(rbFPublicSend(req, "subdomain")).toBe(rbFSend(req, "subdomain"));
-    expect(rbFPublicSend(req, ":subdomain")).toBe("clients");
-    expect(() => rbFPublicSend(req, null)).toThrow("nil is not a symbol nor a string");
-    expect(() => rbFPublicSend(req, { toStr: () => 1 })).toThrow(
+    expect(rbFSend(req, "subdomain")).toBe(rbFSend(req, "subdomain"));
+    expect(rbFSend(req, ":subdomain")).toBe("clients");
+    expect(() => rbFSend(req, null)).toThrow("nil is not a symbol nor a string");
+    expect(() => rbFSend(req, { toStr: () => 1 })).toThrow(
       "can't convert Hash to String (Hash#to_str gives Integer)",
     );
-    expect(() => rbFPublicSend(req, "nope")).toThrow(NoMethodError);
+    expect(() => rbFSend(req, "nope")).toThrow(NoMethodError);
   });
 
   it("raises NoMethodError for an unbound name", () => {
@@ -612,47 +609,47 @@ describe("rbFSend", () => {
   });
 
   it("sends an operator by its Ruby name", () => {
-    expect(rbFPublicSend(2, ">", 1)).toBe(true);
-    expect(rbFPublicSend(1, ">=", 1)).toBe(true);
-    expect(rbFPublicSend(2, "<", 1)).toBe(false);
-    expect(rbFPublicSend(1n, "<=", 2)).toBe(true);
-    expect(rbFPublicSend("b", ">", "a")).toBe(true);
-    expect(rbFPublicSend([1], "==", [1])).toBe(true);
-    expect(rbFPublicSend(1, "!=", "a")).toBe(true);
-    expect(rbFPublicSend(1, "==", "a")).toBe(false);
-    expect(rbFPublicSend(2, ":>", 1)).toBe(true);
-    expect(rbFPublicSend(1, ":!=", 1)).toBe(false);
+    expect(rbFSend(2, ">", 1)).toBe(true);
+    expect(rbFSend(1, ">=", 1)).toBe(true);
+    expect(rbFSend(2, "<", 1)).toBe(false);
+    expect(rbFSend(1n, "<=", 2)).toBe(true);
+    expect(rbFSend("b", ">", "a")).toBe(true);
+    expect(rbFSend([1], "==", [1])).toBe(true);
+    expect(rbFSend(1, "!=", "a")).toBe(true);
+    expect(rbFSend(1, "==", "a")).toBe(false);
+    expect(rbFSend(2, ":>", 1)).toBe(true);
+    expect(rbFSend(1, ":!=", 1)).toBe(false);
   });
 
   it("raises ArgumentError for an ordering operator <=> cannot place", () => {
-    expect(() => rbFPublicSend(1, ">", "a")).toThrow(ArgumentError);
-    expect(() => rbFPublicSend(1, ">", "a")).toThrow("comparison of Integer with String failed");
-    expect(() => rbFPublicSend("a", "<", 1)).toThrow(ArgumentError);
+    expect(() => rbFSend(1, ">", "a")).toThrow(ArgumentError);
+    expect(() => rbFSend(1, ">", "a")).toThrow("comparison of Integer with String failed");
+    expect(() => rbFSend("a", "<", 1)).toThrow(ArgumentError);
   });
 
   it("answers false for an ordering operator with a NaN operand, as Float does", () => {
     for (const op of [">", ">=", "<", "<="]) {
-      expect(rbFPublicSend(NaN, op, 1)).toBe(false);
-      expect(rbFPublicSend(1, op, NaN)).toBe(false);
+      expect(rbFSend(NaN, op, 1)).toBe(false);
+      expect(rbFSend(1, op, NaN)).toBe(false);
     }
   });
 
   it("sends == to the receiver's own ==", () => {
     const recv = { equals: (other: unknown) => other === "same" };
-    expect(rbFPublicSend(recv, "==", "same")).toBe(true);
-    expect(rbFPublicSend(recv, "!=", "same")).toBe(false);
+    expect(rbFSend(recv, "==", "same")).toBe(true);
+    expect(rbFSend(recv, "!=", "same")).toBe(false);
   });
 
   it("sends an ordering operator to the receiver's own method before its <=>", () => {
     const recv = { greaterThan: () => "own", compareTo: () => -1 };
-    expect(rbFPublicSend(recv, ">", 1)).toBe("own");
-    expect(rbFPublicSend(recv, "<", 1)).toBe(true);
+    expect(rbFSend(recv, ">", 1)).toBe("own");
+    expect(rbFSend(recv, "<", 1)).toBe(true);
   });
 
   it("raises NoMethodError for an ordering operator the receiver does not define", () => {
-    expect(() => rbFPublicSend(null, ">", 1)).toThrow(NoMethodError);
-    expect(() => rbFPublicSend([1], ">", [0])).toThrow(NoMethodError);
-    expect(() => rbFPublicSend(true, "<", false)).toThrow(NoMethodError);
+    expect(() => rbFSend(null, ">", 1)).toThrow(NoMethodError);
+    expect(() => rbFSend([1], ">", [0])).toThrow(NoMethodError);
+    expect(() => rbFSend(true, "<", false)).toThrow(NoMethodError);
   });
 
   it("answers infinite? for a Float and an Integer, whose JS values do not define it", () => {
@@ -669,23 +666,23 @@ describe("rbFSend", () => {
   });
 
   it("answers odd? and even? for an Integer alone", () => {
-    expect(rbFPublicSend(3, ":odd?")).toBe(true);
-    expect(rbFPublicSend(4, ":even?")).toBe(true);
-    expect(rbFPublicSend(-3, "isEven")).toBe(false);
-    expect(rbFPublicSend(4n, "isEven")).toBe(true);
-    expect(rbFPublicSend(4n, "isOdd")).toBe(false);
-    expect(() => rbFPublicSend(1.5, "isOdd")).toThrow(NoMethodError);
+    expect(rbFSend(3, ":odd?")).toBe(true);
+    expect(rbFSend(4, ":even?")).toBe(true);
+    expect(rbFSend(-3, "isEven")).toBe(false);
+    expect(rbFSend(4n, "isEven")).toBe(true);
+    expect(rbFSend(4n, "isOdd")).toBe(false);
+    expect(() => rbFSend(1.5, "isOdd")).toThrow(NoMethodError);
   });
 
   it("dispatches a method a package defines on Object, after the receiver's own", () => {
     OBJECT_METHOD_TABLE.isProbe = (self: unknown, other: unknown) => [self, other];
     try {
-      expect(rbFPublicSend(3, ":probe?", 4)).toEqual([3, 4]);
-      expect(rbFPublicSend({ "probe?": () => "own" }, ":probe?")).toBe("own");
+      expect(rbFSend(3, ":probe?", 4)).toEqual([3, 4]);
+      expect(rbFSend({ "probe?": () => "own" }, ":probe?")).toBe("own");
     } finally {
       delete OBJECT_METHOD_TABLE.isProbe;
     }
-    expect(() => rbFPublicSend(3, ":probe?", 4)).toThrow(NoMethodError);
+    expect(() => rbFSend(3, ":probe?", 4)).toThrow(NoMethodError);
   });
 });
 
@@ -704,18 +701,18 @@ describe("CLASS_METHOD_TABLE", () => {
   });
 });
 
-describe("rbModPublicMethodDefined", () => {
+describe("rbModMethodDefined", () => {
   it("answers a public method or accessor, inherited or own", () => {
     class SubReq extends Req {}
-    expect(rbModPublicMethodDefined(Req, "subdomain")).toBe(true);
-    expect(rbModPublicMethodDefined(Req, "host")).toBe(true);
-    expect(rbModPublicMethodDefined(SubReq, "subdomain")).toBe(true);
+    expect(rbModMethodDefined(Req, "subdomain")).toBe(true);
+    expect(rbModMethodDefined(Req, "host")).toBe(true);
+    expect(rbModMethodDefined(SubReq, "subdomain")).toBe(true);
   });
 
   it("does not answer a field, an Object.prototype member, or an unknown name", () => {
-    expect(rbModPublicMethodDefined(Req, "field")).toBe(false);
-    expect(rbModPublicMethodDefined(Req, "hasOwnProperty")).toBe(false);
-    expect(rbModPublicMethodDefined(Req, "nope")).toBe(false);
+    expect(rbModMethodDefined(Req, "field")).toBe(false);
+    expect(rbModMethodDefined(Req, "hasOwnProperty")).toBe(false);
+    expect(rbModMethodDefined(Req, "nope")).toBe(false);
   });
 });
 
@@ -918,13 +915,13 @@ describe("rbModAncestors / rbModInstanceMethod", () => {
     mod.appendFeatures(Sub);
     const sub = new Sub();
 
-    const cast = rbModPublicInstanceMethod(Sub, "cast");
+    const cast = rbModInstanceMethod(Sub, "cast");
     expect(cast.owner).toBe(Sub);
     expect(cast.bindCall(sub)).toBe("sub");
     expect(cast.superMethod()!.owner).toBe(Base);
     expect(cast.superMethod()!.bindCall(sub)).toBe("base");
     expect(cast.superMethod()!.superMethod()).toBeNull();
-    expect(rbModPublicInstanceMethod(Sub, "title").bindCall(sub)).toBe("generated");
+    expect(rbModInstanceMethod(Sub, "title").bindCall(sub)).toBe("generated");
   });
 
   it("names the module include() copied a method from, and the class for its own", () => {
@@ -948,7 +945,7 @@ describe("rbModAncestors / rbModInstanceMethod", () => {
 
   it("raises NameError for an Object.prototype member, which method_defined? does not answer", () => {
     class Type {}
-    expect(rbModPublicMethodDefined(Type, "hasOwnProperty")).toBe(false);
+    expect(rbModMethodDefined(Type, "hasOwnProperty")).toBe(false);
     expect(() => rbModInstanceMethod(Type, "hasOwnProperty")).toThrow(NameError);
   });
 });
@@ -1200,7 +1197,7 @@ describe("rb_class_inherited_p, rb_class_of and rb_absint_size", () => {
 describe("Kernel#send of +", () => {
   it("adds the core receivers vm_opt_plus knows", () => {
     expect(rbFSend(1, "+", 2)).toBe(3);
-    expect(rbFPublicSend(1.5, ":+", 1)).toBe(2.5);
+    expect(rbFSend(1.5, ":+", 1)).toBe(2.5);
     expect(rbFSend("a", "+", "b")).toBe("ab");
     expect(rbFSend([1], "+", [2])).toEqual([1, 2]);
   });

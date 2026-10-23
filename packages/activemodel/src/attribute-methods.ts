@@ -307,7 +307,7 @@ export const ClassMethods = {
 
     const generateMethod = camelize(`define_method_${pattern.proxyTarget}`, false);
 
-    if (rbObjRespondTo(this, generateMethod, true)) {
+    if (rbObjRespondTo(this, generateMethod)) {
       rbFSend(this, generateMethod, String(attrName), { owner, as });
     } else {
       this.defineProxyCall(
@@ -443,8 +443,7 @@ export const ClassMethods = {
     { namespace, as }: { namespace: string; as: string },
   ): void {
     const reader =
-      this.attributeAliases[name] === targetName &&
-      rbObjRespondTo(this, "defineMethodAttribute", true);
+      this.attributeAliases[name] === targetName && rbObjRespondTo(this, "defineMethodAttribute");
     type Body = (self: ReadWriteHost, args: unknown[]) => unknown;
     let descriptor: (body: Body) => PropertyDescriptor;
     let cachedName = mangledName;
@@ -534,7 +533,7 @@ export const AttributeMethods = {
     method: string,
     includePrivateMethods: boolean = false,
   ): boolean {
-    return basicObjRespondTo(this, method, !includePrivateMethods);
+    return basicObjRespondTo(this, method);
   },
 
   isRespondTo(
@@ -542,10 +541,8 @@ export const AttributeMethods = {
     method: string,
     includePrivateMethods: boolean = false,
   ): boolean {
-    if (basicObjRespondTo(this, method, !includePrivateMethods)) {
+    if (basicObjRespondTo(this, method)) {
       return true;
-    } else if (!includePrivateMethods && basicObjRespondTo(this, method, false)) {
-      return false;
     } else {
       return this.matchedAttributeMethod(String(method)) !== null;
     }

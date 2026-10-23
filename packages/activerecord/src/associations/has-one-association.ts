@@ -3,7 +3,7 @@ import {
   include,
   kernelThrow,
   rbEqual,
-  rbFPublicSend,
+  rbFSend,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
@@ -69,10 +69,10 @@ export class HasOneAssociation extends SingularAssociation {
           const klass = target.constructor;
           if (queryConstraintsList.call(klass)) {
             primaryKeyColumn = queryConstraintsList.call(klass)!;
-            id = primaryKeyColumn.map((col) => rbFPublicSend(target, col));
+            id = primaryKeyColumn.map((col) => rbFSend(target, col));
           } else {
             primaryKeyColumn = klass.primaryKey as string;
-            id = rbFPublicSend(target, primaryKeyColumn);
+            id = rbFSend(target, primaryKeyColumn);
           }
 
           this.enqueueDestroyAssociation({

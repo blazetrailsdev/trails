@@ -173,7 +173,7 @@ export class NamedBase extends GeneratorBase {
   static checkClassCollision(options: { prefix?: string; suffix?: string } = {}): void {
     Object.defineProperty(this.prototype, "checkClassCollision", {
       value: function (this: NamedBase & { controllerClassName(): string }): void {
-        const name = rbObjRespondTo(this, "controllerClassName", true)
+        const name = rbObjRespondTo(this, "controllerClassName")
           ? this.controllerClassName()
           : this.className();
 
