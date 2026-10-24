@@ -184,6 +184,8 @@ const pendingCheckouts = new WeakMap<
   { connection: Promise<DatabaseAdapter>; holders: number }
 >();
 
+const pendingLeases = new WeakMap<Lease, Promise<DatabaseAdapter>>();
+
 export class LeaseRegistry {
   private _map = new WeakMap<object, Lease>();
 
@@ -324,14 +326,12 @@ export class ConnectionPool implements ReapablePool {
     const lease = this.connectionLease();
     lease.sticky = true;
     if (lease.connection) return lease.connection;
-    const checkout = pendingCheckouts.get(lease) ?? { connection: this.checkout(), holders: 0 };
-    pendingCheckouts.set(lease, checkout);
+    const checkout = pendingLeases.get(lease) ?? this.checkout();
+    pendingLeases.set(lease, checkout);
     try {
-      return (lease.connection ||= await checkout.connection);
+      return (lease.connection ||= await checkout);
     } finally {
-      if (pendingCheckouts.get(lease) === checkout && checkout.holders === 0) {
-        pendingCheckouts.delete(lease);
-      }
+      if (pendingLeases.get(lease) === checkout) pendingLeases.delete(lease);
     }
   }
 

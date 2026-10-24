@@ -2,7 +2,7 @@ import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import ts from "typescript-5";
-import { Encoding, rbFLoad } from "@blazetrails/ruby-compat";
+import { Encoding, getPath, rbFLoad } from "@blazetrails/ruby-compat";
 import {
   Notifications,
   camelize,
@@ -47,6 +47,13 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const outViews = opts.inPlace ? viewsDir : path.join(outDir, "views");
   const { Base, PathParser, TemplateHandlers, TseHandler, UnboundTemplate, WrongEncodingError } =
     await import("@blazetrails/actionview");
+  for (const ext of ["ts", "js"]) {
+    const application = path.join(cwd, `config/application.${ext}`);
+    if (await exists(application)) {
+      await import(getPath().pathToFileURL!(application).href);
+      break;
+    }
+  }
   const initializersDir = path.join(cwd, "config/initializers");
   const existent = (await exists(initializersDir))
     ? (await fs.readdir(initializersDir, { recursive: true, encoding: "utf8" }))

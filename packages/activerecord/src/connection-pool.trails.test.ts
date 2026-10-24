@@ -184,18 +184,13 @@ it("withConnection overlapping on an empty lease checks out one connection", asy
   expect(pool.isActiveConnection()).toBeNull();
 });
 
-it("leaseConnection joins a withConnection checkout in flight", async () => {
+it("leaseConnection overlapping on an empty lease checks out one connection", async () => {
   const pool = makePool(2);
   const checkout = vi.spyOn(pool, "checkout");
-  let held!: DatabaseAdapter;
-  const inFlight = pool.withConnection((conn) => {
-    held = conn;
-  });
-  const leased = await pool.leaseConnection();
-  await inFlight;
+  const [first, second] = await Promise.all([pool.leaseConnection(), pool.leaseConnection()]);
   expect(checkout).toHaveBeenCalledTimes(1);
-  expect(leased).toBe(held);
-  expect(pool.isActiveConnection()).toBe(leased);
+  expect(second).toBe(first);
+  expect(pool.isActiveConnection()).toBe(first);
 });
 
 it("withConnection joining after the checkout resolved releases once both settle", async () => {
