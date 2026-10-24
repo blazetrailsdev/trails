@@ -1,6 +1,6 @@
 import { Migration } from "@blazetrails/activerecord";
 
-export class CreateLikes extends Migration {
+export class CreateLikes extends Migration.get(8.0) {
   async change() {
     await this.createTable("likes", (t) => {
       t.integer("user_id");

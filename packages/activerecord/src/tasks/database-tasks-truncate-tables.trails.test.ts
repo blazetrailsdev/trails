@@ -8,8 +8,10 @@ import "./sqlite-database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { resetRegisteredTasks } from "../test-helpers/registered-tasks.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("DatabaseTasksTruncateTablesTest", () => {
+  fixtures({}, { useTransactionalTests: false });
   const created: string[] = [];
 
   afterEach(async () => {
