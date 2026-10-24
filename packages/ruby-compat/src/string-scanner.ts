@@ -1,5 +1,6 @@
 const HEADONLY = new WeakMap<RegExp, RegExp>();
 const SEARCH = new WeakMap<RegExp, RegExp>();
+const REGS = new WeakMap<StringScanner, RegExpExecArray | null>();
 
 /**
  * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1667` `rb_define_class("StringScanner", rb_cObject)`.
@@ -9,7 +10,6 @@ const SEARCH = new WeakMap<RegExp, RegExp>();
 export class StringScanner {
   #str: string;
   #curr = 0;
-  #regs: RegExpExecArray | null = null;
 
   /**
    * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:233` `strscan_initialize`.
@@ -38,7 +38,7 @@ export class StringScanner {
   set string(str: string) {
     this.#str = str;
     this.#curr = 0;
-    this.#regs = null;
+    REGS.set(this, null);
   }
 
   /**
@@ -48,7 +48,7 @@ export class StringScanner {
    */
   reset(): this {
     this.#curr = 0;
-    this.#regs = null;
+    REGS.set(this, null);
     return this;
   }
 
@@ -77,7 +77,7 @@ export class StringScanner {
     }
     re.lastIndex = 0;
     const m = re.exec(this.#str.slice(this.#curr));
-    this.#regs = m;
+    REGS.set(this, m);
     if (m === null) return null;
     this.#curr += m[0].length;
     return m[0];
@@ -100,7 +100,7 @@ export class StringScanner {
     const rest = this.#str.slice(this.#curr);
     re.lastIndex = 0;
     const m = re.exec(rest);
-    this.#regs = m;
+    REGS.set(this, m);
     if (m === null) return null;
     const prev = this.#curr;
     this.#curr += m.index + m[0].length;
@@ -113,8 +113,9 @@ export class StringScanner {
    * @noRailsEquivalent PERMANENT
    */
   matchedSize(): number | null {
-    if (this.#regs === null) return null;
-    return this.#regs[0].length;
+    const regs = REGS.get(this) ?? null;
+    if (regs === null) return null;
+    return regs[0].length;
   }
 
   /**
@@ -124,7 +125,7 @@ export class StringScanner {
    * @noRailsEquivalent PERMANENT
    */
   get(idx: number): string | null {
-    const regs = this.#regs;
+    const regs = REGS.get(this) ?? null;
     if (regs === null) return null;
     let i = idx;
     if (i < 0) i += regs.length;

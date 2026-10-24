@@ -31,7 +31,7 @@ export class Token {
   }
 
   toString(): string {
-    return this.word + "(" + this.tags.join(", ") + ") ";
+    return (this.word = this.word + "(" + this.tags.join(", ") + ") ");
   }
 
   inspect(): string {

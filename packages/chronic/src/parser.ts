@@ -32,8 +32,6 @@ import type { Span } from "./span.js";
 import { TimeZone } from "./time-zone.js";
 import { Token } from "./token.js";
 
-let definitions: Record<string, Handler[]> | undefined;
-
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Handlers` (`chronic/parser.rb:5`); the class/interface merge is how the mixin surfaces on the type side. */
 export interface Parser extends Included<typeof Handlers> {}
 
@@ -48,6 +46,9 @@ export class Parser {
     endianPrecedence: ["middle", "little"],
     ambiguousYearFutureBias: 50,
   };
+
+  /** @internal */
+  private static definitions: Record<string, Handler[]> | undefined;
 
   now: RubyTime;
   readonly options: Record<string, unknown>;
@@ -123,7 +124,7 @@ export class Parser {
       options.endianPrecedence = ["middle", "little"];
     }
 
-    definitions ??= {
+    Parser.definitions ??= {
       time: [new Handler([":repeater_time", ":repeater_day_portion?"], null)],
 
       date: [
@@ -390,9 +391,9 @@ export class Parser {
     const endian = rbFArray(options.endianPrecedence)[0];
     switch (endian) {
       case "little":
-        return { ...definitions, endian: endians.reverse() };
+        return { ...Parser.definitions, endian: endians.reverse() };
       case "middle":
-        return { ...definitions, endian: endians };
+        return { ...Parser.definitions, endian: endians };
       default:
         throw new ArgumentError(`Unknown endian option '${String(endian)}'`);
     }

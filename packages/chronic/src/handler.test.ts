@@ -1,16 +1,11 @@
 import type {} from "@blazetrails/vitest-matchers";
-import { Time } from "@blazetrails/date";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Chronic } from "./chronic.js";
 import type { Handler } from "./handler.js";
 import type { Token } from "./token.js";
 
 describe("TestHandler", () => {
   let selfDefinitions: Record<string, Handler[]> | undefined;
-
-  beforeEach(() => {
-    Time.local(2006, 8, 16, 14, 0, 0, 0);
-  });
 
   function definitions(): Record<string, Handler[]> {
     return (selfDefinitions ??= new Chronic.Parser().definitions());

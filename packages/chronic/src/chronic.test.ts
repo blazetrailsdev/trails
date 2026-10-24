@@ -1,15 +1,11 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { Date as RubyDate, DateTime, Time } from "@blazetrails/date";
 import { ArgumentError, RuntimeError, stdout } from "@blazetrails/ruby-compat";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Chronic } from "./chronic.js";
 import type { TimeClass } from "./namespaces.js";
 
 describe("TestChronic", () => {
-  beforeEach(() => {
-    Time.local(2006, 8, 16, 14, 0, 0, 0);
-  });
-
   it("pre normalize", () => {
     expect(new Chronic.Parser().preNormalize("12.55 pm")).toEqual(
       new Chronic.Parser().preNormalize("12:55 pm"),

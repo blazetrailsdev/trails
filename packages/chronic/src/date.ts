@@ -1,3 +1,4 @@
+import { fixDiv } from "@blazetrails/ruby-compat";
 import { Chronic } from "./namespaces.js";
 import { Date as RubyDate } from "@blazetrails/date";
 
@@ -51,7 +52,7 @@ export class Date {
   static makeYear(year: number, bias: number): number {
     if (String(year).length > 2) return year;
     const startYear = Chronic.timeClass().now().year - bias;
-    const century = Math.floor(startYear / 100) * 100;
+    const century = fixDiv(startYear, 100) * 100;
     let fullYear = century + year;
     if (fullYear < startYear) fullYear += 100;
     return fullYear;

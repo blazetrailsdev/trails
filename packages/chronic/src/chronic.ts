@@ -47,6 +47,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Date } from "./date.js";
 import { Chronic, type TimeClass } from "./namespaces.js";
+import { Parser } from "./parser.js";
 import type { Span } from "./span.js";
 import { Time } from "./time.js";
 
@@ -75,7 +76,7 @@ setDebug(false);
 setTimeClass(RubyTime as unknown as TimeClass);
 
 export function parse(text: string, options: Record<string, unknown> = {}): RubyTime | Span | null {
-  return new Chronic.Parser(options).parse(text);
+  return new Parser(options).parse(text);
 }
 
 /** @inventedArm if — CONVERGEABLE date-datetime-new-spelling-converges-with-time-new */
@@ -124,21 +125,17 @@ export function construct(
       month = fixMod(month, 12);
     }
   }
-  if (Chronic.timeClass().name === "Date") {
-    return new (Chronic.timeClass() as unknown as typeof RubyDate)(
-      year,
-      month,
-      day,
-    ) as unknown as RubyTime;
+  if (timeClass().name === "Date") {
+    return new (timeClass() as unknown as typeof RubyDate)(year, month, day) as unknown as RubyTime;
   } else if (
-    !(rbObjRespondTo(Chronic.timeClass(), "new") || typeof Chronic.timeClass() === "function") ||
-    (toF(RUBY_VERSION) < 1.9 && Chronic.timeClass().name === "Time")
+    !(rbObjRespondTo(timeClass(), "new") || typeof timeClass() === "function") ||
+    (toF(RUBY_VERSION) < 1.9 && timeClass().name === "Time")
   ) {
-    return Chronic.timeClass().local(year, month, day, hour, minute, second);
+    return timeClass().local(year, month, day, hour, minute, second);
   } else {
-    if (Chronic.timeClass().name === "DateTime") offset = Time.normalizeOffset(offset);
-    if (!rbObjRespondTo(Chronic.timeClass(), "new")) {
-      return new (Chronic.timeClass() as unknown as new (...args: unknown[]) => RubyTime)(
+    if (timeClass().name === "DateTime") offset = Time.normalizeOffset(offset);
+    if (!rbObjRespondTo(timeClass(), "new")) {
+      return new (timeClass() as unknown as new (...args: unknown[]) => RubyTime)(
         year,
         month,
         day,
@@ -148,7 +145,7 @@ export function construct(
         offset,
       );
     }
-    return Chronic.timeClass().new!(year, month, day, hour, minute, second, offset);
+    return timeClass().new!(year, month, day, hour, minute, second, offset);
   }
 }
 

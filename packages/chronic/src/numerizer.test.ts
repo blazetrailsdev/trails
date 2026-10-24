@@ -1,3 +1,4 @@
+import { toI } from "@blazetrails/ruby-compat";
 import type {} from "@blazetrails/vitest-matchers";
 import { describe, expect, it } from "vitest";
 import { Chronic } from "./chronic.js";
@@ -46,7 +47,7 @@ describe("ParseNumbersTest", () => {
     };
 
     for (const [key, val] of Object.entries(strings)) {
-      expect(parseInt(Chronic.Numerizer.numerize(key), 10)).toEqual(val);
+      expect(toI(Chronic.Numerizer.numerize(key))).toEqual(val);
     }
   });
 
