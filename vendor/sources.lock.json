@@ -8,6 +8,10 @@
       "ref": "v3.3.0",
       "sha": "789896b306e36a5fe166388413b16e9323260601"
     },
+    "chronic": {
+      "ref": "v0.10.2",
+      "sha": "7d3d82d38c991955526d0a45bede462f3f598319"
+    },
     "crass": {
       "ref": "v1.0.6",
       "sha": "87f642e80670dc1093eddf4d3a93cbd40a9551c6"
@@ -19,6 +23,14 @@
     "did_you_mean": {
       "ref": "v1.6.3",
       "sha": "f7703add765054b6e63ef581818a0c307fdd4abf"
+    },
+    "et-orbi": {
+      "ref": "v1.2.11",
+      "sha": "037e2074b009186d2da43e0e948069d874abe10c"
+    },
+    "fugit": {
+      "ref": "v1.11.1",
+      "sha": "228b53ded4be3d86412b6dd62c831a7a459d9ef4"
     },
     "globalid": {
       "ref": "v1.3.0",
@@ -63,6 +75,10 @@
     "pg": {
       "ref": "v1.5.9",
       "sha": "afe2f208f7d5eacea1260ce1def10e1fb30b8241"
+    },
+    "raabro": {
+      "ref": "v1.4.0",
+      "sha": "aaf1aa27e7bfb86a63339f4ebf3938ff2e0c0258"
     },
     "racc": {
       "ref": "v1.8.0",
