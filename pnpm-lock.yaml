@@ -156,6 +156,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      pg:
+        specifier: '>=8.19.0'
+        version: 8.20.0
     devDependencies:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
