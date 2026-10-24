@@ -83,7 +83,6 @@ export class Connection {
     this.connParams = connParams;
     listen(this, this.client);
     if (typeof this.client.on === "function") {
-      this.client.on("error", () => {});
       this.client.on("notification", (notification: pg.Notification) => {
         this.notifies.push(notification);
         this.notifyWaiter?.();
