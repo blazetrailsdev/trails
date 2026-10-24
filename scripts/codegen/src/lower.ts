@@ -4659,7 +4659,7 @@ export class Lowerer {
             "uniq",
             "compact",
           ].includes(v.name)) ||
-        (v?.k === "call" && v.name === "reverse" && arrayCall(v.recv));
+        (v?.k === "call" && (v.name === "reverse" || v.name === "freeze") && arrayCall(v.recv));
       if (n.k === "casgn" && n.path && arrayCall(n.value))
         this.constArrays.add(n.path.filter((x: string) => x).at(-1));
     });
@@ -5302,6 +5302,18 @@ export class Lowerer {
       const t = this.typeOf(recvNode, ctx);
       return t?.k === "prim" && t.name === "string";
     };
+    // `Class#allocate` (object.c rb_class_alloc) on a gem class (`self.allocate`
+    // in a class method, `Cron.allocate`): an instance with no initializer run.
+    if (
+      name === "allocate" &&
+      !blk &&
+      n.args.length === 0 &&
+      !this.index.methodNames.get("allocate")?.def &&
+      ((recvNode.k === "self" && ctx.selfKind === "static") ||
+        (recvNode.k === "const" &&
+          this.index.resolveConst(recvNode.path, ctx.nesting)?.kind === "scope"))
+    )
+      return `Object.create(${R}.prototype)`;
     if (this.resolver.isGemReceiver(recvNode, ctx, this)) return null;
     // A block-less `each_pair` / `each_with_index` answers an Enumerator of
     // pairs (`[key, value]`, `[element, index]`); the pairs are an array here.

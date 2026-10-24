@@ -161,6 +161,27 @@ const objectRecv = (c: CoreSite) => {
   return !t && (c.lw.index.methodNames.get(c.name)?.def ?? 0) > 0;
 };
 
+/** An untyped receiver that is a gem object only because the gem defines the name. */
+const byNameOnly = (c: CoreSite) =>
+  !(c.recvType ?? c.lw.typeOf(c.recvNode, c.ctx)) &&
+  (c.lw.index.methodNames.get(c.name)?.def ?? 0) > 0;
+
+// string.c rb_str_index_m / array.c rb_ary_index: the position, else nil. An
+// untyped receiver (fugit's `t.string.index('&')`, `WEEKDS.index(s)`) or a
+// Regexp needle goes through ruby-compat's dispatch, which knows both.
+rule("index", (c) => {
+  if (c.blk || argc(c) < 1 || argc(c) > 2) return null;
+  const t = c.recvType ?? c.lw.typeOf(c.recvNode, c.ctx);
+  if (t?.k === "class" || t?.k === "gemClass" || t?.k === "fn") return null;
+  const native =
+    argc(c) === 1 &&
+    c.n.args[0]?.k !== "regex" &&
+    (t?.k === "array" || (t?.k === "prim" && t.name === "string"));
+  if (native)
+    return c.lw.withOnce(`${c.R}.indexOf(${c.args()[0]})`, (i) => `(${i} < 0 ? null : ${i})`);
+  return `${c.rc("rbFSend")}(${[c.r, '"index"', ...c.args()].join(", ")})`;
+});
+
 // enum.c enum_inject with a block: Array#reduce, which seeds with the first
 // element as Ruby does; an empty receiver with no seed is nil in Ruby, where
 // JS throws.
@@ -206,6 +227,13 @@ rule("size length", (c) => {
 
 // Native unless the type pass says the receiver is a Map-backed Hash.
 rule("empty?", (c) => {
+  // raabro's `Tree#empty?` beside a String or Array one.
+  if (byNameOnly(c) && argc(c) === 0)
+    return c.lw.withOnce(
+      c.r,
+      (x) =>
+        `(typeof ${x} === "string" || Array.isArray(${x}) ? ${x}.length === 0 : ${x}.isEmpty())`,
+    );
   if (objectRecv(c)) return null;
   if (argc(c) !== 0) return null;
   if (c.lw.mayBeMap(c.recvNode, c.ctx)) return `${c.rc("isEmpty")}(${c.r})`;
@@ -287,6 +315,12 @@ rule("merge! update", (c) => {
 rule("to_sym to_str", (c) => (argc(c) === 0 ? c.r : null));
 // string.c rb_str_to_i: the leading integer, else 0.
 rule("to_i", (c) => {
+  // fugit's `h.to_i`, a String here and a TimeCursor there.
+  if (byNameOnly(c) && argc(c) === 0)
+    return c.lw.withOnce(
+      c.r,
+      (x) => `(typeof ${x} === "string" ? parseInt(${x}, 10) || 0 : ${x}.toI())`,
+    );
   if (objectRecv(c)) return null;
   if (argc(c) !== 0) return null;
   if (c.recvType?.k === "prim" && c.recvType.name === "number") return `Math.trunc(${c.r})`;

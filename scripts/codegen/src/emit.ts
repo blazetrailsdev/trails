@@ -986,9 +986,13 @@ export class Emitter {
     // `RSpec.configure { config.include Helpers }` gives every example).
     // Only a module of instance methods, the ones an include hands every example;
     // one of singleton methods (activejob's `JobBuffer.add`) is called on itself.
+    // Or one a test file hands `RSpec.configure { |c| c.include(Helpers) }`
+    // (fugit's spec_helper.rb).
     if (
       sc?.kind === "module" &&
-      [...sc.files].every((x) => x.startsWith("test/support/")) &&
+      [...sc.files].every(
+        (x) => x.startsWith("test/support/") || (x.startsWith("test/") && this.configIncluded(fqn)),
+      ) &&
       sc.defs.size > 0 &&
       sc.sdefs.size === 0
     )
@@ -1003,6 +1007,25 @@ export class Emitter {
     if (!["Minitest::Test", "ActiveSupport::TestCase"].includes(sp)) return false;
     if ([...sc.defs.keys()].some((k) => k.startsWith("test_"))) return false;
     return [...this.index.scopes.values()].some((x) => x.superclassFqn === fqn);
+  }
+
+  private configIncludes?: Set<string>;
+
+  /** Whether a test file passes the module to an RSpec `config.include`. */
+  configIncluded(fqn: string): boolean {
+    if (!this.configIncludes) {
+      const out = new Set<string>();
+      for (const [name, file] of this.irByFile) {
+        if (!name.startsWith("test/")) continue;
+        walk(file.body, (n) => {
+          if (n.k === "call" && n.name === "include" && n.recv?.k === "lvar")
+            for (const a of n.args ?? [])
+              if (a.k === "const") out.add(a.path.filter((x: string) => x).join("::"));
+        });
+      }
+      this.configIncludes = out;
+    }
+    return this.configIncludes.has(fqn);
   }
 
   /**
@@ -1043,6 +1066,14 @@ export class Emitter {
     if (!u || !ruby) return null;
     const defs = this.supportDefs(u);
     const fns = new Map<string, boolean>([...defs.keys()].map((k) => [k, false]));
+    // A helper that runs its block (`in_zone`'s `block.call`) is handed an
+    // example's async body, so it awaits the block before its `ensure` runs.
+    for (const [name, d] of defs)
+      if (
+        (d.params ?? []).some((p: Param) => p.kind === "block") ||
+        /"k":"yield"/.test(JSON.stringify(d.body ?? null))
+      )
+        this.lw.resolver.asyncYielders.add(tsMethodName(name));
     const scratch: FileCtx = {
       rubyFile: ruby,
       tsFile: rubyFileToTsAr(ruby),

@@ -83,6 +83,19 @@ export class TypeOracle {
     return this.propertyMemo.get(tsName) ?? false;
   }
 
+  /**
+   * Whether the generated gems this one calls declare `tsName` only as a
+   * property (raabro's `Tree#name`): a closer answer for an untyped receiver
+   * than every dependency at once, where `Method#name` is a method.
+   */
+  onlyPropertyOnGenDeps(tsName: string, pkgs: string[]): boolean {
+    const kinds = Object.entries(this.o.classes)
+      .filter(([k]) => pkgs.some((p) => k.startsWith(`@${p}/`)))
+      .map(([, c]) => c.instance?.[tsName]?.kind)
+      .filter((x): x is string => !!x);
+    return kinds.length > 0 && kinds.every((x) => x === "get" || x === "prop" || x === "property");
+  }
+
   private kindsMemo?: Map<string, MemberInfo[]>;
   /** Every instance member named `tsName`, across the hand port and its dependencies. */
   private membersNamed(tsName: string): MemberInfo[] {

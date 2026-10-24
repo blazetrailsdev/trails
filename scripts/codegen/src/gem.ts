@@ -352,6 +352,18 @@ export interface DepGem {
   /** Whether its Ruby defines a `method_added` hook (Raabro's root-rule tracking). */
   methodAdded: boolean;
 }
+/** The generated gems (no hand port) this package depends on: raabro and et-orbi for fugit. */
+let depGemPkgsMemo: string[] | undefined;
+export function depGemPkgs(): string[] {
+  if (depGemPkgsMemo) return depGemPkgsMemo;
+  const pkg = JSON.parse(readFileSync(path.join(PKG_DIR, "package.json"), "utf8"));
+  const deps = new Set(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }));
+  const out = Object.values(GEMS)
+    .filter((g) => g !== GEM && g.vendor && g.hand === false)
+    .map((g) => g.pkg ?? g.gem.replace(/_/g, "-"))
+    .filter((p) => deps.has(`@blazetrails/${p}`));
+  return (depGemPkgsMemo = out);
+}
 const depGems = new Map<string, DepGem | null>();
 export function depGem(root: string): DepGem | null {
   if (depGems.has(root)) return depGems.get(root)!;

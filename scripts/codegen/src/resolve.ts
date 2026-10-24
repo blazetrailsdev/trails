@@ -10,7 +10,7 @@ import ts from "typescript-5";
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { GEM, PKG_DIR, ROOT, depGem, handNamespaceFqns } from "./gem.js";
+import { GEM, PKG_DIR, ROOT, depGem, depGemPkgs, handNamespaceFqns } from "./gem.js";
 import { walk } from "./ir.js";
 import { TS_CLASS_RENAMES, rubyFileToTs } from "../../parity/conventions.js";
 import { TS_CONSTANT_RENAMES, tsConstantRenameKey } from "./constant-renames.js";
@@ -856,7 +856,10 @@ export class Resolver {
   }
 
   isProperty(rubyName: string): boolean {
-    return this.types.onlyPropertyOnDeps(propName(rubyName));
+    return (
+      this.types.onlyPropertyOnGenDeps(propName(rubyName), depGemPkgs()) ||
+      this.types.onlyPropertyOnDeps(propName(rubyName))
+    );
   }
 
   /** The receiver is self or a gem constant, so Ruby-core lowering must not apply. */

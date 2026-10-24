@@ -12,9 +12,9 @@
  *   pnpm tsx scripts/codegen/src/hand-oracle.ts   → scripts/codegen/data/hand-oracle.json
  */
 import * as ts from "typescript-5";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { GEM, ORACLE_PATH, PKG_DIR } from "./gem.js";
+import { GEM, ORACLE_PATH, PKG_DIR, depGemPkgs } from "./gem.js";
 
 const SRC = path.join(PKG_DIR, "src");
 
@@ -80,6 +80,16 @@ function main(): void {
   for (const entry of ["trailties/dist/trailtie.d.ts", "trailties/dist/initializable.d.ts"]) {
     const f = path.join(PKG_DIR, "..", entry);
     if (existsSync(f)) roots.push(f);
+  }
+  // Generated gems this one calls (fugit's raabro, et-orbi): their built
+  // declarations, so an untyped `tree.name` reads their getter as a property.
+  const genDeps = depGemPkgs();
+  for (const dep of genDeps) {
+    const dist = path.join(PKG_DIR, "..", dep, "dist");
+    if (!existsSync(dist)) continue;
+    for (const f of readdirSync(dist, { recursive: true, encoding: "utf8" }))
+      if (f.endsWith(".d.ts") && !/\.test\.d\.ts$|test-helpers\//.test(f))
+        roots.push(path.join(dist, f));
   }
   const program = ts.createProgram(roots, {
     ...parsed.options,
@@ -292,7 +302,7 @@ function main(): void {
       /packages\/(arel|activemodel|activesupport|ruby-compat|globalid|i18n|date|trailties)\//.test(
         sf.fileName,
       );
-    if (!ours && !dep) continue;
+    if (!ours && !dep && !genDeps.some((d) => sf.fileName.includes(`/packages/${d}/`))) continue;
     const visit = (n: ts.Node) => {
       if ((ts.isClassDeclaration(n) || ts.isInterfaceDeclaration(n)) && n.name)
         addClass(n, n.name.text);
