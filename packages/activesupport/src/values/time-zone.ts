@@ -482,16 +482,48 @@ export function getLocalComponents(
 export class TimezonePeriod {
   readonly abbreviation: string;
   readonly observedUtcOffset: number;
+  readonly baseUtcOffset: number;
   private readonly _dst: boolean;
 
-  constructor(abbreviation: string, observedUtcOffset: number, dst: boolean) {
+  constructor(
+    abbreviation: string,
+    observedUtcOffset: number,
+    dst: boolean,
+    baseUtcOffset = observedUtcOffset,
+  ) {
     this.abbreviation = abbreviation;
     this.observedUtcOffset = observedUtcOffset;
+    this.baseUtcOffset = baseUtcOffset;
     this._dst = dst;
+  }
+
+  get abbr(): string {
+    return this.abbreviation;
+  }
+
+  get utcOffset(): number {
+    return this.baseUtcOffset;
+  }
+
+  get stdOffset(): number {
+    return this.observedUtcOffset - this.baseUtcOffset;
+  }
+
+  get utcTotalOffset(): number {
+    return this.observedUtcOffset;
   }
 
   isDst(): boolean {
     return this._dst;
+  }
+
+  equals(other: unknown): boolean {
+    return (
+      other instanceof TimezonePeriod &&
+      other.abbreviation === this.abbreviation &&
+      other.observedUtcOffset === this.observedUtcOffset &&
+      other.baseUtcOffset === this.baseUtcOffset
+    );
   }
 }
 
@@ -547,9 +579,22 @@ export class Timezone {
     return tzdataIsdst(this.identifier, Math.floor(toDate(time).getTime() / 1000));
   }
 
+  get canonicalIdentifier(): string {
+    return this.identifier;
+  }
+
   periodForUtc(time: Time): TimezonePeriod {
     const d = toDate(time);
-    return new TimezonePeriod(this.abbr(d), this.observedUtcOffset(d), this.isDst(d));
+    const observed = this.observedUtcOffset(d);
+    const dst = this.isDst(d);
+    let base = observed;
+    if (dst) {
+      const year = d.getUTCFullYear();
+      for (const probe of [new Date(Date.UTC(year, 0, 1)), new Date(Date.UTC(year, 6, 1))]) {
+        if (!this.isDst(probe)) base = this.observedUtcOffset(probe);
+      }
+    }
+    return new TimezonePeriod(this.abbr(d), observed, dst, base);
   }
 
   periodsForLocal(time: Time): TimezonePeriod[] {
@@ -596,8 +641,8 @@ export class Timezone {
     return this.periodForUtc(Time.now());
   }
 
-  utcToLocal(time: Time): Temporal.ZonedDateTime {
-    return time.toZonedDateTime().toInstant().toZonedDateTimeISO(this.identifier);
+  utcToLocal(time: Time): Time {
+    return time.getlocal(this.identifier);
   }
 
   localToUtc(time: Time, dst: boolean | null = true): Time {
@@ -814,19 +859,11 @@ export class TimeZone {
 
   equals = cmpEquals;
 
-  utcToLocal(time: Time): Temporal.ZonedDateTime | Time {
+  utcToLocal(time: Time): Time {
     const t = this.tzinfo.utcToLocal(time);
     return utcToLocalReturnsUtcOffsetTimes()
       ? t
-      : Time.utc(
-          t.year,
-          t.month,
-          t.day,
-          t.hour,
-          t.minute,
-          t.second,
-          t.millisecond * 1_000 + t.microsecond + t.nanosecond / 1_000,
-        );
+      : Time.utc(t.year, t.month, t.day, t.hour, t.min, t.sec, t.nsec / 1_000);
   }
 
   localToUtc(time: Time, dst: boolean | null = true): Time {
