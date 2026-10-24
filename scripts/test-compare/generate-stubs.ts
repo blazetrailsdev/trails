@@ -34,6 +34,7 @@ const PKG_DIRS: Record<string, string> = {
   bcrypt: "packages/bcrypt/src/",
   msgpack: "packages/msgpack/src/",
   marcel: "packages/marcel/src/",
+  chronic: "packages/chronic/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",

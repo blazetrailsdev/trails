@@ -40,6 +40,7 @@ export const GATED_PACKAGES = [
   "activesupport",
   "arel",
   "bcrypt",
+  "chronic",
   "did-you-mean",
   "globalid",
   "marcel",

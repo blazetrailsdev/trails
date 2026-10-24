@@ -177,6 +177,11 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
+  if (pkg === "chronic") {
+    const base = path.basename(rubyFile, ".rb").replace(/^test_/, "");
+    return base.replace(/_/g, "-") + ".test.ts";
+  }
+
   if (pkg === "rack" || pkg === "rack-session") {
     const dir = path.dirname(rubyFile);
     // rack-session's lib root is `lib/rack/session` while its test root is
@@ -1658,6 +1663,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   bcrypt: "packages/bcrypt/src/",
   msgpack: "packages/msgpack/src/",
   marcel: "packages/marcel/src/",
+  chronic: "packages/chronic/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",

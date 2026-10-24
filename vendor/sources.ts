@@ -836,7 +836,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/chronic",
         libEntryFile: "lib/chronic.rb",
         testPath: "test",
-        compareApi: false,
+        compareApi: true,
         compareTests: true,
       },
     ],

@@ -41,4 +41,30 @@ describe("StringScanner", () => {
     expect(s.scan(/^a/)).toBe("a");
     expect(s.scan(/^b/)).toBe("b");
   });
+
+  it("scanUntil searches the rest of the string and records the match", () => {
+    const s = new StringScanner("a <num>12 and <num>3 x");
+    expect(s.scanUntil(/<num>(\d+)( | and )<num>(\d+)/)).toBe("a <num>12 and <num>3");
+    expect(s.pos).toBe(20);
+    expect(s.matchedSize()).toBe(18);
+    expect(s.get(1)).toBe("12");
+    expect(s.get(2)).toBe(" and ");
+    expect(s.get(3)).toBe("3");
+    expect(s.get(4)).toBeNull();
+    expect(s.get(-1)).toBe("3");
+  });
+
+  it("string= and reset rewind the pointer and clear the match", () => {
+    const s = new StringScanner("abc");
+    s.scanUntil(/b/);
+    s.string = "xy";
+    expect(s.pos).toBe(0);
+    expect(s.get(0)).toBeNull();
+    s.scan(/x/);
+    s.reset();
+    expect(s.pos).toBe(0);
+    expect(s.get(0)).toBeNull();
+    expect(s.scanUntil(/z/)).toBeNull();
+    expect(s.matchedSize()).toBeNull();
+  });
 });

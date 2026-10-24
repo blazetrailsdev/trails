@@ -209,6 +209,7 @@ describe("vendor/sources.ts", () => {
       "thor",
       "i18n",
       "solid-queue",
+      "chronic",
     ]);
     expect(apiComparePackages()).toContain("i18n");
     expect(Object.keys(libPathsManifest())).toContain("i18n");
@@ -380,6 +381,7 @@ describe("vendor/sources.ts", () => {
         "activesupport",
         "arel",
         "bcrypt",
+        "chronic",
         "did-you-mean",
         "globalid",
         "i18n",
