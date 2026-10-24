@@ -186,13 +186,33 @@ const objectRecv = (c: CoreSite) => {
   if (t?.k === "class" || t?.k === "gemClass" || t?.k === "fn") return true;
   // An untyped receiver of a name the gem defines (`RecurringSchedule#empty?`)
   // may be that gem object.
-  return !t && (c.lw.index.methodNames.get(c.name)?.def ?? 0) > 0;
+  return !t && gemDefAccepts(c);
 };
+
+/**
+ * Whether some gem `def` of the call's name takes its argument count: fugit's
+ * two-argument module function `merge(h0, h1)` is not the `h.merge(sign: …)`
+ * a rewrite sends to a Hash.
+ */
+function gemDefAccepts(c: CoreSite): boolean {
+  if (!((c.lw.index.methodNames.get(c.name)?.def ?? 0) > 0)) return false;
+  const n = argc(c);
+  for (const sc of c.lw.index.scopes.values()) {
+    const d = sc.defs.get(c.name);
+    if (!d) continue;
+    const ps: { kind: string }[] = d.params ?? [];
+    const req = ps.filter((p) => p.kind === "req").length;
+    const opt = ps.filter((p) => p.kind === "opt").length;
+    const kw = ps.some((p) => p.kind === "key" || p.kind === "keyreq" || p.kind === "keyrest");
+    const rest = ps.some((p) => p.kind === "rest" || p.kind === "fwd");
+    if (n >= req && (rest || n <= req + opt + (kw ? 1 : 0))) return true;
+  }
+  return false;
+}
 
 /** An untyped receiver that is a gem object only because the gem defines the name. */
 const byNameOnly = (c: CoreSite) =>
-  !(c.recvType ?? c.lw.typeOf(c.recvNode, c.ctx)) &&
-  (c.lw.index.methodNames.get(c.name)?.def ?? 0) > 0;
+  !(c.recvType ?? c.lw.typeOf(c.recvNode, c.ctx)) && gemDefAccepts(c);
 
 // string.c rb_str_index_m / array.c rb_ary_index: the position, else nil. An
 // untyped receiver (fugit's `t.string.index('&')`, `WEEKDS.index(s)`) or a

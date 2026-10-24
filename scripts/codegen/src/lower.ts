@@ -1632,6 +1632,8 @@ export class Lowerer {
         name === "class" ||
         (!this.index.methodNames.has(name) &&
           (["size", "length", "strip", "upcase", "downcase", "to_i", "to_f"].includes(name) ||
+            // …or any other a core rule lowers (`collect(&:first)` on pairs).
+            CORE_METHODS[name] !== undefined ||
             (OBJECT_METHODS[name] !== undefined && name !== "send" && name !== "public_send")))
       ) {
         // A sync arrow: nothing in it is awaited, whatever the enclosing test awaits.
