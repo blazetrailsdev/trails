@@ -27,6 +27,8 @@ import { NameError } from "./name-error.js";
 import { NoMethodError } from "./no-method-error.js";
 import { isRegisteredConstant, registeredConstant } from "./variable.js";
 import { temporalTag } from "./temporal-tag.js";
+import { classModule } from "./class-module.js";
+export { classModule };
 import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
 import { TypeError } from "./type-error.js";
@@ -1629,9 +1631,6 @@ export type Initialized<K extends abstract new (...args: never[]) => object, M> 
 function isClass(klass: object): klass is AnyClass {
   return typeof klass === "function";
 }
-
-/** @noRailsEquivalent PERMANENT */
-export const classModule = Symbol.for("@blazetrails/ruby-compat:classModule");
 
 function isClassReceiver(klass: object): klass is AnyClass {
   return isClass(klass) && !Object.hasOwn(klass, classModule);

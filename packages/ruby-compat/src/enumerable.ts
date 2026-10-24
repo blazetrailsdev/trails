@@ -8,7 +8,7 @@
  * `Init_Enumerable` joins as a caller needs it.
  */
 
-import type { classModule as ClassModule } from "./include.js";
+import { classModule } from "./class-module.js";
 import { ArgumentError } from "./argument-error.js";
 import { Hash } from "./hash.js";
 import {
@@ -853,8 +853,6 @@ export function reduce<T, E = unknown>(
   );
 }
 
-const classModule = Symbol.for("@blazetrails/ruby-compat:classModule") as typeof ClassModule;
-
 /**
  * Ruby's `Enumerable` (`vendor/ruby/v3.3.11/enum.c:5047` `Init_Enumerable`) as
  * a class module: `include(Klass, Enumerable)` copies its prototype members
@@ -881,7 +879,7 @@ export class Enumerable<T = unknown, E = unknown> {
           return (obj as Each<T, E>).each(block);
         }
         for (const i of obj as Iterable<T>) block(i);
-        return this as unknown as E;
+        return obj as unknown as E;
       },
     });
   }
@@ -903,15 +901,15 @@ export class Enumerable<T = unknown, E = unknown> {
     return groupBy(this, block);
   }
 
-  partition<T, E = unknown>(this: Each<T, E>, block: (i: T) => unknown) {
-    return partition(this, block);
+  partition<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown) {
+    return block ? partition(this, block) : partition(this);
   }
 
   tally<T, E = unknown>(this: Each<T, E>) {
     return tally(this);
   }
 
-  reject<T, E = unknown>(this: Each<T, E>, block: (i: T) => unknown) {
+  reject<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown) {
     return reject(this, block);
   }
 

@@ -7049,7 +7049,8 @@ function recordCallSite(
 }
 
 /**
- * ruby-compat's `new Enumerable(x)` wrapper is Ruby's `x` itself:
+ * ruby-compat's `new Enumerable(x)` wrapper, imported from `@blazetrails/ruby-compat`,
+ * is Ruby's `x` itself:
  * `new Enumerable(xs).partition(fn)` is `xs.partition(&fn)`, so a member call
  * on it reads its one constructor argument as the receiver and the
  * construction makes no call of its own.
@@ -7057,7 +7058,7 @@ function recordCallSite(
 function enumerableWrapped(expr: ts.Expression): ts.Expression | undefined {
   while (ts.isParenthesizedExpression(expr)) expr = expr.expression;
   if (!ts.isNewExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
-  const name = currentImportAliases?.get(expr.expression.text) ?? expr.expression.text;
+  const name = rubyCompatBindingsFor(expr.getSourceFile()).get(expr.expression.text);
   return name === "Enumerable" && expr.arguments?.length === 1 ? expr.arguments[0] : undefined;
 }
 

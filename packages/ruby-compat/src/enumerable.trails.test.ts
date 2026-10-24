@@ -511,10 +511,15 @@ describe("new Enumerable(obj)", () => {
 
   it("wraps a Set", () => {
     const slices: number[][] = [];
-    const e = new Enumerable(new Set([1, 2, 3]));
+    const set = new Set([1, 2, 3]);
+    const e = new Enumerable(set);
     expect(e.eachSlice(2, (s) => slices.push(s))).toBe(e);
+    expect(e.each(() => {})).toBe(set);
     expect(slices).toEqual([[1, 2], [3]]);
     expect(e.isInclude(2)).toBe(true);
+    expect(e.reject((i) => i === 2)).toEqual([1, 3]);
+    expect(e.sortBy((i) => -i)).toEqual([3, 2, 1]);
+    expect(e.partition()).toEqual([1, 2, 3]);
   });
 
   it("wraps a Map as [key, value] pairs", () => {
@@ -540,6 +545,8 @@ describe("new Enumerable(obj)", () => {
     const tally = new Enumerable(gen()).tally();
     expect(tally).toBeInstanceOf(Hash);
     expect(tally.get(1)).toBe(2);
+    expect(new Enumerable(gen()).filterMap((i) => i > 1 && i * 10)).toEqual([20]);
+    expect(new Enumerable(gen()).eachSlice(2)).toEqual([[1, 2], [1]]);
   });
 
   it("wraps an each-answerer", () => {
