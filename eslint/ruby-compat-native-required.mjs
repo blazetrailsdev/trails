@@ -75,6 +75,20 @@ function receiverIsNative(services, node, member) {
   if (tsNode === undefined) return false;
   const type = checker.getTypeAtLocation(tsNode);
   const parts = type.isUnion() ? type.types : [type];
+  console.error(
+    "RCNR-DEBUG",
+    ts.version,
+    checker.typeToString(type),
+    type.flags,
+    ts.getObjectFlags(type),
+    type.getSymbol()?.getName(),
+    type.aliasSymbol?.getName(),
+    (type.getSymbol()?.getDeclarations() ?? []).map(
+      (d) =>
+        d.getSourceFile().fileName + ":" + program.isSourceFileDefaultLibrary(d.getSourceFile()),
+    ),
+    parts.map((p) => nativeKind(checker, program, p, member)),
+  );
   const kinds = parts.map((part) => nativeKind(checker, program, part, member));
   return kinds.every((k) => k !== undefined) && kinds.some((k) => k !== "null");
 }
