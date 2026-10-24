@@ -89,11 +89,11 @@ class ExpandedPayment {
 
 describe("EnumerableTests", () => {
   it("minimum with empty enumerable", () => {
-    expect(minimum([], () => 0)).toBeUndefined();
+    expect(minimum([], () => 0)).toBeNull();
   });
 
   it("maximum with empty enumerable", () => {
-    expect(maximum([], () => 0)).toBeUndefined();
+    expect(maximum([], () => 0)).toBeNull();
   });
 
   it("sums", async () => {
