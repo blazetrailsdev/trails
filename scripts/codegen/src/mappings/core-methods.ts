@@ -129,7 +129,35 @@ rule("any? all? none?", (c) => {
   return null;
 });
 
+/**
+ * A Range literal over Numerics iterated by `each` or `step(n)` (range.c
+ * range_each / range_step, fugit's `((a || 0)..(z || 6)).step(sl)`): ruby-compat's
+ * `numStep`, the Numeric#step loop those reach for Integer bounds.
+ */
+const rangeStep = (c: CoreSite, range: N, by: string): string | null => {
+  if (range?.k !== "range" || range.exclusive || !range.from || !range.to || !c.blk) return null;
+  if ([range.from, range.to].some((b: N) => b.k === "str" || b.k === "dstr")) return null;
+  const e = (x: N) => `(${c.lw.expr(x, c.ctx)}) as number`;
+  return `${c.rc("numStep")}(${e(range.from)}, ${e(range.to)}, ${by}, ${c.fn()})`;
+};
+
+rule("step", (c) =>
+  argc(c) === 1 ? rangeStep(c, c.recvNode, `(${c.args()[0]}) as number`) : null,
+);
+
 rule("each", (c) => {
+  if (c.recvNode?.k === "range") {
+    const out = rangeStep(c, c.recvNode, "1");
+    if (out) return out;
+  }
+  if (c.recvNode?.k === "call" && c.recvNode.name === "step" && c.recvNode.args.length === 1) {
+    const out = rangeStep(
+      c,
+      c.recvNode.recv,
+      `(${c.lw.expr(c.recvNode.args[0], c.ctx)}) as number`,
+    );
+    if (out) return out;
+  }
   // Ruby splats one yielded pair across a block's parameters (`|label, value|`),
   // and a Hash yields `[key, value]`; JS forEach would pass (element, index).
   const one = pairParams(c.blk);
@@ -285,6 +313,20 @@ rule("compact", (c) => {
   return null;
 });
 
+// array.c rb_ary_uniq_bang: in place, nil when nothing was removed.
+rule("uniq!", (c) => {
+  if (objectRecv(c) || c.blk || argc(c) !== 0) return null;
+  return c.lw.withOnce(
+    c.r,
+    (x) =>
+      `((n) => (${x}.splice(0, ${x}.length, ...new Set(${x})), ${x}.length === n ? null : ${x}))(${x}.length)`,
+  );
+});
+// array.c rb_ary_sort_bang: in place by <=>, answering the receiver.
+rule("sort!", (c) => {
+  if (objectRecv(c) || c.blk || argc(c) !== 0) return null;
+  return c.lw.withOnce(c.r, (x) => `(${x}.splice(0, ${x}.length, ...${c.rc("sort")}(${x})), ${x})`);
+});
 rule("uniq", (c) =>
   objectRecv(c) ? null : !c.blk && argc(c) === 0 ? `[...new Set(${c.r})]` : null,
 );
@@ -622,6 +664,13 @@ rule("remove_const", (c) => {
 rule("reverse", (c) => {
   if (argc(c) === 0 && !c.blk && c.recvNode && c.lw.typeOf(c.recvNode, c.ctx)?.k === "array")
     return `${needsParens(c.r) ? `(${c.r})` : c.r}.toReversed()`;
+  // String#reverse or Array#reverse on an untyped value (`@cron.seconds.reverse`).
+  if (argc(c) === 0 && !c.blk && !objectRecv(c))
+    return c.lw.withOnce(
+      c.r,
+      (x) =>
+        `(typeof ${x} === "string" ? [...${x}].reverse().join("") : (${x} as unknown[]).toReversed())`,
+    );
   return rubyCompatCall(c);
 });
 

@@ -676,9 +676,11 @@ export class Emitter {
           const inner: string[] = [];
           const mark = loopLocals.length;
           loopLocals.push(...loop.names);
+          const pre = this.loopLocalsOf(s, loopLocals);
+          if (pre.decl) inner.push(pre.decl);
           emitBody(this.lw.seqBody(s.block.body), inner, guard);
           loopLocals.length = mark;
-          out.push(`for (const ${loop.binding} of ${loop.list}) {`, ...indent(inner), "}");
+          out.push(`for (${pre.kw} ${loop.binding} of ${loop.list}) {`, ...indent(inner), "}");
         } else if (s.k === "class" || s.k === "module") {
           // A nested class is its own unit, emitted beside the test case.
           continue;
@@ -898,6 +900,45 @@ export class Emitter {
       s.block.params.length >= 1 &&
       s.block.params.every((p: any) => p.name || p.destructure)
     );
+  }
+
+  /**
+   * A table loop's block-scope locals. Those its body sets at its own level by a
+   * multiple or an `||=` assignment (fugit's `k, opts = k` then `opts ||= {}`)
+   * get one `let` ahead of them, and join `loopLocals`; the loop binding is a
+   * `let` where an example reassigns a block parameter (`now = Time.parse(now)`).
+   */
+  loopLocalsOf(s: N, loopLocals: string[]): { decl: string | null; kw: "let" | "const" } {
+    const params: string[] = s.block.params.flatMap((p: any) =>
+      (p.destructure ?? [p.name]).filter(Boolean),
+    );
+    const assigned = new Set<string>();
+    walk(s.block.body, (n) => {
+      if (n.k === "lasgn") assigned.add(n.name);
+      if (n.k === "masgn")
+        for (const t of n.targets ?? []) if (t?.k === "lvar") assigned.add(t.name);
+      if (n.k === "opasgn" && n.target?.k === "lvar") assigned.add(n.target.name);
+    });
+    const declared: string[] = [];
+    for (const st of this.lw.seqBody(s.block.body)) {
+      const names: string[] =
+        st.k === "masgn"
+          ? (st.targets ?? []).filter((t: N) => t?.k === "lvar").map((t: N) => t.name)
+          : st.k === "opasgn" && st.target?.k === "lvar"
+            ? [st.target.name]
+            : [];
+      for (const nm of names)
+        if (!loopLocals.includes(nm)) {
+          declared.push(nm);
+          loopLocals.push(nm);
+        }
+    }
+    return {
+      decl: declared.length
+        ? `let ${declared.map((x) => `${jsIdent(x)}: unknown`).join(", ")};`
+        : null,
+      kw: params.some((x) => assigned.has(x)) ? "let" : "const",
+    };
   }
 
   tableLoop(s: N, ctx: Ctx): { binding: string; list: string; names: string[] } {
@@ -1399,9 +1440,11 @@ export class Emitter {
           const inner: string[] = [];
           const mark = loopLocals.length;
           loopLocals.push(...loop.names);
+          const pre = this.loopLocalsOf(s, loopLocals);
+          if (pre.decl) inner.push(pre.decl);
           emitBody(this.lw.seqBody(s.block.body), inner, guard);
           loopLocals.length = mark;
-          out.push(`for (const ${loop.binding} of ${loop.list}) {`, ...indent(inner), "}");
+          out.push(`for (${pre.kw} ${loop.binding} of ${loop.list}) {`, ...indent(inner), "}");
         } else if (s.k === "def" || s.k === "sclass" || s.k === "class" || s.k === "module") {
           continue;
         } else if (
