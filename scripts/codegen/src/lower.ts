@@ -2413,8 +2413,11 @@ export class Lowerer {
     let names = memo.get(owner);
     if (!names) {
       names = new Set();
-      for (const a of rubyAncestors(this.index, owner))
+      for (const a of rubyAncestors(this.index, owner)) {
         for (const d of this.index.scopes.get(a)?.defs.keys() ?? []) names.add(this.callName(d));
+        // …or an accessor of that name (fugit's `attr_accessor :_data0`).
+        for (const at of this.index.scopes.get(a)?.attrs ?? []) names.add(this.attrName(at));
+      }
       memo.set(owner, names);
     }
     return names.has(field) ? `_${field}` : field;

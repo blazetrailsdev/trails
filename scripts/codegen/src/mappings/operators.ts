@@ -116,6 +116,15 @@ rule("[]", (o) => {
   // `Dir[pattern]` (dir.c dir_s_aref): one pattern is `Dir.glob(pattern)`.
   if (constName(n.recv) === "Dir" && a.length === 1) return `${r}.glob(${a[0]})`;
   if (a.length === 1 && lw.mayBeMap(n.recv, ctx)) return `${o.rc("hashAref")}(${r}, ${a[0]})`;
+  // A negative Integer index counts from the end (array.c rb_ary_entry,
+  // raabro's `r.children[-2]`); a Hash would be typed or Map-backed.
+  if (
+    a.length === 1 &&
+    n.args[0]?.k === "int" &&
+    Number(n.args[0].value) < 0 &&
+    lw.typeOf(n.recv, ctx)?.k !== "hash"
+  )
+    return `(${r}.at(${a[0]}) ?? null)`;
   // A Range index is a slice, which JS `[]` cannot express.
   if (a.length === 1 && !a[0].startsWith("...") && n.args[0]?.k !== "range")
     return `${o.lhs}[${a[0]}]`;
