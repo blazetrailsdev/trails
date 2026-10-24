@@ -97,8 +97,41 @@ function truthy(v: any): boolean {
   // Set (array.c rb_ary_plus / rb_ary_diff / rb_ary_and / rb_ary_or; set.rb's
   // `+` / `|` union, `-`, `&`), numbers and strings natively, else the
   // receiver's own operator method by name.
-  rbBinop: `export function rbBinop(a: any, op: string, ...rest: any[]): any {
+  rbBinop: `import {
+  numericPlus as RbBinopPlus,
+  numericMinus as RbBinopMinus,
+  numericMul as RbBinopMul,
+  numericModulo as RbBinopModulo,
+} from "@blazetrails/ruby-compat";
+export function rbBinop(a: any, op: string, ...rest: any[]): any {
   const b = rest[0];
+  // A boxed Number is ruby-compat's whole-valued Float (rbDbl2num): numeric.c's
+  // Float arithmetic keeps it a Float.
+  if (a instanceof Number || b instanceof Number) {
+    const num = (x: any) => typeof x === "number" || typeof x === "bigint" || x instanceof Number;
+    if (num(a) && num(b)) {
+      switch (op) {
+        case "+":
+          return RbBinopPlus(a, b);
+        case "-":
+          return RbBinopMinus(a, b);
+        case "*":
+          return RbBinopMul(a, b);
+        case "%":
+          return RbBinopModulo(a, b);
+        case "/":
+          return Number(a) / Number(b);
+        case "<":
+          return Number(a) < Number(b);
+        case ">":
+          return Number(a) > Number(b);
+        case "<=":
+          return Number(a) <= Number(b);
+        case ">=":
+          return Number(a) >= Number(b);
+      }
+    }
+  }
   const items = (x: any): any[] => (x instanceof Set ? [...x] : Array.isArray(x) ? x : [...x]);
   if (a instanceof Set) {
     switch (op) {

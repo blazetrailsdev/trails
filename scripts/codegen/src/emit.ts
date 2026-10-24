@@ -1738,6 +1738,14 @@ export class Emitter {
     for (const u of collectUnits(file)) {
       if (u.kind !== "module") continue;
       for (const s of [...u.body, ...u.sbody]) {
+        // `class << self; alias zone determine_local_tzone` (et-orbi zones.rb:87)
+        // exports `zone`, which an import must not take.
+        if (s.k === "alias" && u.sbody.includes(s) && typeof s.new === "string") {
+          const nm = tsMethodName(s.new, u.fqn, true);
+          sfnNames.add(nm);
+          f.usedLocalNames.add(nm);
+          continue;
+        }
         if (s.k !== "def") continue;
         const isS = s.singleton || u.sbody.includes(s);
         const nm = tsMethodName(s.name, u.fqn, isS);

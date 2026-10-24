@@ -296,6 +296,13 @@ function symColonHere(ctx: Ctx): boolean {
   return !!ctx.f.symbolColon && (!!GEM.symbolColon || ctx.f.rubyFile.startsWith("test/"));
 }
 
+/** Ruby's Time / Date component readers (time.c, date_core.c). */
+const TIME_ACCESSORS = new Set(
+  "year mon month mday day hour min sec usec nsec subsec wday yday zone utc_offset gmt_offset".split(
+    " ",
+  ),
+);
+
 export class Lowerer {
   constructor(
     readonly index: GemIndex,
@@ -550,12 +557,33 @@ export class Lowerer {
     return [n];
   }
 
+  /** Whether `n` holds a `next` / `break` / `redo` / `return` outside any block or def. */
+  jumps(n: N): boolean {
+    let hit = false;
+    walk([n], (x) => {
+      if (hit) return false;
+      if (["block", "lambda", "def", "class", "module", "sclass", "iexec"].includes(x.k))
+        return false;
+      if (["next", "break", "redo", "return", "retry"].includes(x.k)) hit = true;
+    });
+    return hit;
+  }
+
   stmt(n: N, ctx: Ctx, tail: boolean): string[] {
     const ret = (e: string) => (tail ? [`return ${e};`] : [`${e};`]);
     // An unset instance variable reads nil (`def priority; …; @priority; end`); a
     // JS property never set reads `undefined`, which a `fetch` treats as no key.
     if (tail && n.k === "ivar" && !ctx.inBlock)
       return [`return ${this.ivar(n.name, ctx)} ?? null;`];
+    // `month_match?(t) || (t.inc_month; next)` (fugit cron.rb:282): a jump on
+    // the right of `||` / `&&` leaves the enclosing loop or method, which an
+    // expression cannot do, so the statement is the `unless` / `if` it means.
+    if (!tail && (n.k === "or" || n.k === "and") && this.jumps(n.right)) {
+      if (n.k === "and")
+        return this.stmt({ k: "if", cond: n.left, then: n.right, else: null }, ctx, false);
+      const body = this.block(this.seqBody(n.right), this.nest(ctx), false);
+      return [`if (!(${this.cond(n.left, ctx)})) {`, ...indent(body), "}"];
+    }
     switch (n.k) {
       case "seq":
         return this.block(n.body, ctx, tail);
@@ -3648,6 +3676,31 @@ export class Lowerer {
   callInner(n0: N, ctx: Ctx): string {
     const n: N = this.columnHashArgs(this.dataHashArg(this.dataSubscript(n0, ctx), ctx));
     const name: string = n.name;
+    // A Ruby Time / Date accessor on an untyped receiver (et-orbi zone.rb:117's
+    // `t.year, t.month, …, t.min` over a Time): EoTime answers them as methods,
+    // the date package's Time as getters, and `min` would otherwise be
+    // Enumerable's. Ruby resolves the call on the value at run time, which is
+    // ruby-compat's `rbFSend`.
+    if (
+      GEM.hand === false &&
+      n.recv &&
+      n.recv.k !== "self" &&
+      n.recv.k !== "const" &&
+      !n.safe &&
+      n.args.length === 0 &&
+      !n.block &&
+      TIME_ACCESSORS.has(name) &&
+      !this.typeOf(n.recv, ctx)
+    ) {
+      // …and `min` of an Array is Enumerable's (fugit cron.rb:400's `deltas.min`).
+      if (name === "min")
+        return this.withOnce(
+          this.expr(n.recv, ctx),
+          (x) =>
+            `(Array.isArray(${x}) ? ${this.rc(ctx, "min")}(${x}) : ${this.rc(ctx, "rbFSend")}(${x}, "min"))`,
+        );
+      return `${this.rc(ctx, "rbFSend")}(${this.expr(n.recv, ctx)}, ${JSON.stringify(name)})`;
+    }
     // `klass.method_defined?(m)` (builder xchar.rb:14): Module#method_defined?.
     if (
       n.recv &&

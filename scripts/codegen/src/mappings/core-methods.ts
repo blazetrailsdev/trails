@@ -408,7 +408,7 @@ rule("to_i", (c) => {
     return c.lw.withOnce(
       c.r,
       (x) =>
-        `(typeof ${x} === "string" ? parseInt(${x}, 10) || 0 : typeof ${x} === "number" ? Math.trunc(${x}) : ${x}.toI())`,
+        `(typeof ${x} === "string" ? parseInt(${x}, 10) || 0 : typeof ${x} === "number" || ${x} instanceof Number ? Math.trunc(Number(${x})) : ${x}.toI())`,
     );
   if (objectRecv(c)) return null;
   if (argc(c) !== 0) return null;
@@ -420,7 +420,13 @@ rule("to_i", (c) => {
 rule("to_f", (c) => {
   if (argc(c) !== 0) return null;
   const t = c.lw.typeOf(c.recvNode, c.ctx);
-  return t?.k === "class" || t?.k === "gemClass" ? `${c.rc("toF")}(${c.r})` : `Number(${c.r})`;
+  if (t?.k === "prim" && t.name === "number") return c.r;
+  // Untyped (et-orbi time.rb:75's `@seconds = s.to_f` over a Time, a String, a
+  // Numeric): ruby-compat's `to_f` dispatch. `Number(time)` is NaN, and
+  // `Number("12abc")` is NaN where String#to_f is 12.0.
+  if (!t || t.k === "class" || t.k === "gemClass" || (t.k === "prim" && t.name === "string"))
+    return `${c.rc("toF")}(${c.r})`;
+  return `Number(${c.r})`;
 });
 
 rule("to_a", (c) => {

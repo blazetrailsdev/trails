@@ -392,14 +392,18 @@ const ETC_GMT_LINKS = new Set([
   "Greenwich",
 ]);
 
+const abbreviationFormatters = new Map<string, Intl.DateTimeFormat>();
+const localFormatters = new Map<string, Intl.DateTimeFormat>();
+
 function getZoneInfo(
   ianaName: string,
   date: Date,
 ): { abbreviation: string; utcOffsetSeconds: number } {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: ianaName,
-    timeZoneName: "short",
-  });
+  let formatter = abbreviationFormatters.get(ianaName);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", { timeZone: ianaName, timeZoneName: "short" });
+    abbreviationFormatters.set(ianaName, formatter);
+  }
   const parts = formatter.formatToParts(date);
   const tzPart = parts.find((p) => p.type === "timeZoneName");
   let abbreviation = tzPart?.value ?? ianaName;
@@ -407,17 +411,21 @@ function getZoneInfo(
 
   const roundedDate = new Date(Math.floor(date.getTime() / 60000) * 60000);
 
-  const localFormatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: ianaName,
-    era: "short",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
+  let localFormatter = localFormatters.get(ianaName);
+  if (!localFormatter) {
+    localFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: ianaName,
+      era: "short",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+    localFormatters.set(ianaName, localFormatter);
+  }
   const localParts = localFormatter.formatToParts(roundedDate);
   const get = (type: string) => parseInt(localParts.find((p) => p.type === type)?.value ?? "0", 10);
 
