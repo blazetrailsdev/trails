@@ -22,6 +22,10 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/date": "workspace:*",
+    "@blazetrails/et-orbi": "workspace:*",
+    "@blazetrails/raabro": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   },
   "engines": {

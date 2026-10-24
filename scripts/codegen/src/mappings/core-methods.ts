@@ -505,6 +505,13 @@ const rubyCompatCall: CoreRule = (c) => {
   return `${c.rc(rbCoreFn(c.name))}(${[c.r, ...c.args()].join(", ")})`;
 };
 
+// `Enumerable#partition` (enum.c enum_partition) on any Enumerable: ruby-compat's
+// takes an Array, so a Hash is its pairs, and `|k, v|` takes one apart.
+rule("partition", (c) => {
+  if (c.lw.index.methodNames.has(c.name) || !c.blk || argc(c) !== 0) return null;
+  return `${c.rc("partition")}(${c.E}, ${c.fn()})`;
+});
+
 // `ary.map.with_index { |x, i| }` (and each / select): the JS array method
 // already passes the index, so the enumerator chain is one call; otherwise
 // ruby-compat's `withIndex`.

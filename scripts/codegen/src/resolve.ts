@@ -10,7 +10,7 @@ import ts from "typescript-5";
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { GEM, PKG_DIR, ROOT } from "./gem.js";
+import { GEM, PKG_DIR, ROOT, depGem, handNamespaceFqns } from "./gem.js";
 import { walk } from "./ir.js";
 import { TS_CLASS_RENAMES, rubyFileToTs } from "../../parity/conventions.js";
 import { TS_CONSTANT_RENAMES, tsConstantRenameKey } from "./constant-renames.js";
@@ -129,6 +129,29 @@ export class Resolver {
    * into its own singleton class, and a namespace the hand port seats in
    * `namespaces.ts` keep the object of functions.
    */
+  /**
+   * A module function a reopening file defines (`Fugit.do_parse_at` in
+   * parse.rb) on a module that is a class another file declares: the reopening
+   * file seats it on that class, and a caller in a third file reads it there at
+   * call time, as Ruby looks the method up (CLAUDE.md, "Call-time constant
+   * resolution"). An import would be an eager edge that closes the gem's
+   * require cycles (fugit's cron.rb → parse.rb → nat.rb → cron.rb). A gem with
+   * a hand port keeps that port's shape, which imports them (activejob's
+   * `deprecator()`).
+   */
+  seatsReopeningFn(fqn: string, defFile: string, callerTsFile: string): boolean {
+    const exp = this.exportNames.get(fqn);
+    const defTs = this.tsFileOf(defFile);
+    return (
+      GEM.hand === false &&
+      !!exp &&
+      this.isClassModule(fqn) &&
+      handNamespaceFqns().get(fqn) === exp.name &&
+      defTs !== exp.tsFile &&
+      callerTsFile !== defTs
+    );
+  }
+
   isClassModule(fqn: string): boolean {
     const memo = (this.classModuleMemo ??= new Map<string, boolean>());
     const hit = memo.get(fqn);
@@ -353,6 +376,15 @@ export class Resolver {
     if (root === "TZInfo") {
       const t = lw.imp(ctx, "@blazetrails/activesupport", "TZInfo");
       return [t, ...rest].join(".");
+    }
+    // Another generated gem's namespace (fugit's `EtOrbi::EoTime`): the nested
+    // constant is that package's export, else the namespace's.
+    const dep = depGem(root);
+    if (dep) {
+      const spec = rest.length ? dep.exports.get(rest[0]) : undefined;
+      if (spec) return [lw.imp(ctx, spec, rest[0]), ...rest.slice(1)].join(".");
+      const rootSpec = dep.exports.get(root);
+      if (rootSpec) return [lw.imp(ctx, rootSpec, root), ...rest].join(".");
     }
     if (root === "Arel") {
       const a = lw.imp(ctx, "@blazetrails/arel", "*", "Arel");
@@ -834,6 +866,9 @@ export class Resolver {
       const hit = this.index.resolveConst(recvNode.path, ctx.nesting);
       // A constant holding a Hash / Array literal is data: core calls apply.
       if (hit && hit.kind !== "scope" && this.index.consts.get(hit.fqn)?.literal) return false;
+      // …and so does one the lowerer types as a Hash or Array (`oh.freeze`).
+      const t = hit && hit.kind !== "scope" ? _lw.typeOf(recvNode, ctx) : null;
+      if (t?.k === "hash" || t?.k === "array") return false;
       return !!hit;
     }
     return false;

@@ -457,6 +457,18 @@ importers:
 
   packages/fugit:
     dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
+      '@blazetrails/et-orbi':
+        specifier: workspace:*
+        version: link:../et-orbi
+      '@blazetrails/raabro':
+        specifier: workspace:*
+        version: link:../raabro
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -497,6 +509,9 @@ importers:
 
   packages/image-processing:
     dependencies:
+      '@blazetrails/mini-magick':
+        specifier: workspace:*
+        version: link:../mini-magick
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

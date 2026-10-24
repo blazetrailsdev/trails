@@ -6,7 +6,7 @@
  *   CODEGEN_GEM=activejob pnpm tsx scripts/codegen/src/cli.ts
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -339,4 +339,43 @@ export function coreExtSends(): Set<string> {
   });
   coreExtMemo = new Set(JSON.parse(out) as string[]);
   return coreExtMemo;
+}
+
+/**
+ * Another generated gem whose namespace a constant root names (fugit's `EtOrbi`,
+ * `Raabro`): its package, and each name its generated tree exports mapped to the
+ * module specifier that exports it.
+ */
+export interface DepGem {
+  pkg: string;
+  exports: Map<string, string>;
+}
+const depGems = new Map<string, DepGem | null>();
+export function depGem(root: string): DepGem | null {
+  if (depGems.has(root)) return depGems.get(root)!;
+  let found: DepGem | null = null;
+  const dep = Object.values(GEMS).find((g) => g.namespace === root && g !== GEM && g.vendor);
+  if (dep) {
+    const pkg = dep.pkg ?? dep.gem.replace(/_/g, "-");
+    const src = path.join(ROOT, "packages", pkg, "codegen-out", "src");
+    if (existsSync(src)) {
+      const exports = new Map<string, string>();
+      const entry = `${dep.rubyRoot}.ts`;
+      const files = readdirSync(src, { recursive: true, encoding: "utf8" })
+        .filter(
+          (f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.startsWith("test-helpers"),
+        )
+        .sort((a, b) => (a === entry ? -1 : b === entry ? 1 : a.localeCompare(b)));
+      for (const f of files) {
+        const spec = `@blazetrails/${pkg}${f === entry ? "" : `/${f.replace(/\.ts$/, "")}`}`;
+        for (const m of readFileSync(path.join(src, f), "utf8").matchAll(
+          /^export (?:abstract )?(?:class|function|const|let) (\w+)/gm,
+        ))
+          if (!exports.has(m[1])) exports.set(m[1], spec);
+      }
+      found = { pkg, exports };
+    }
+  }
+  depGems.set(root, found);
+  return found;
 }

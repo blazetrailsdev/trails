@@ -50,7 +50,7 @@ import {
   rubyAncestors,
   type ScopeInfo,
 } from "./gem-index.js";
-import { GEM, PKG_DIR, ROOT, coreExtSends } from "./gem.js";
+import { GEM, PKG_DIR, ROOT, coreExtSends, depGem } from "./gem.js";
 import type { Resolver } from "./resolve.js";
 import { isBool, isObjectLike, type TypeRef } from "./types.js";
 
@@ -1118,6 +1118,21 @@ export class Lowerer {
       } else if (n.name === "each_key") {
         params.forEach((p) => p.name && inner.scope.locals.add(p.name));
         head = `for (const ${jsIdent(params[0]?.name ?? "_")} of Object.keys(${recv}))`;
+      } else if (
+        n.name === "each" &&
+        n.recv.k === "range" &&
+        n.recv.from?.k === "int" &&
+        (n.recv.to?.k === "int" || n.recv.to?.k === "lvar") &&
+        params.length === 1 &&
+        params[0].kind === "req" &&
+        params[0].name
+      ) {
+        // `(4..30).each { |i| }` (range.c range_each over Integers): a counted loop.
+        inner.scope.locals.add(params[0].name);
+        (inner.scope.types ??= new Map()).set(params[0].name, { k: "prim", name: "number" });
+        const i = jsIdent(params[0].name);
+        const to = this.expr(n.recv.to, ctx);
+        head = `for (let ${i} = ${this.expr(n.recv.from, ctx)}; ${i} ${n.recv.exclusive ? "<" : "<="} ${to}; ${i}++)`;
       } else if (params.length === 1 && params[0].kind === "req" && params[0].name) {
         inner.scope.locals.add(params[0].name);
         const rt = this.typeOf(n.recv, ctx);
@@ -1615,8 +1630,9 @@ export class Lowerer {
         name === "to_s" ||
         name === "to_sym" ||
         name === "class" ||
-        (["size", "length", "strip", "upcase", "downcase", "to_i", "to_f"].includes(name) &&
-          !this.index.methodNames.has(name))
+        (!this.index.methodNames.has(name) &&
+          (["size", "length", "strip", "upcase", "downcase", "to_i", "to_f"].includes(name) ||
+            (OBJECT_METHODS[name] !== undefined && name !== "send" && name !== "public_send")))
       ) {
         // A sync arrow: nothing in it is awaited, whatever the enclosing test awaits.
         const inner = this.child(ctx, {
@@ -3690,6 +3706,15 @@ export class Lowerer {
       !!sd &&
       this.resolver.tsFileOf(sd.file) === ctx.f.tsFile &&
       this.resolver.exportNames.get(selfMod!.fqn)?.tsFile !== ctx.f.tsFile;
+    if (
+      sd &&
+      !/=$/.test(name) &&
+      this.resolver.seatsReopeningFn(selfMod!.fqn, sd.file, ctx.f.tsFile)
+    ) {
+      this.stat(ctx, "module-seat-call");
+      const mod = this.resolver.fqnRef(selfMod!.fqn, ctx, this);
+      return `${mod}.${tsMethodName(name, selfMod!.fqn, true)}(${argList()})`;
+    }
     if (sd && !/=$/.test(name) && (this.resolver.tsFileOf(sd.file) !== ctx.f.tsFile || reopening)) {
       this.stat(ctx, "module-function-call");
       const fn = this.resolver.importFrom(
@@ -3702,6 +3727,16 @@ export class Lowerer {
     }
     if (recvNode?.k === "const") {
       const hit = this.index.resolveConst(recvNode.path, ctx.nesting);
+      // Another generated gem's module function (`EtOrbi.make_time`, defined in
+      // et-orbi's reopening make.rb) is that package's exported function.
+      const depPath = recvNode.path[0] === "" ? recvNode.path.slice(1) : recvNode.path;
+      const dep = !hit && depPath.length === 1 && !/=$/.test(name) ? depGem(depPath[0]) : null;
+      const depFn = dep ? tsMethodName(name, depPath[0], true) : undefined;
+      const depSpec = depFn ? dep!.exports.get(depFn) : undefined;
+      if (depFn && depSpec && depFn !== depPath[0]) {
+        this.stat(ctx, "dep-gem-function-call");
+        return `${this.imp(ctx, depSpec, depFn)}(${argList()})`;
+      }
       const s = hit?.kind === "scope" ? this.index.scopes.get(hit.fqn) : undefined;
       const exp = s ? this.resolver.exportNames.get(s.fqn) : undefined;
       // `singleton_class.attr_accessor :x` on a module that is a class: a static
@@ -3733,6 +3768,10 @@ export class Lowerer {
         // (`ActiveJob.deprecator`, active_job/deprecator.rb).
         const tsFile = this.resolver.tsFileOf(s.sdefs.get(name)!.file);
         const tsName = tsMethodName(name, s.fqn, true);
+        if (this.resolver.seatsReopeningFn(s.fqn, s.sdefs.get(name)!.file, ctx.f.tsFile)) {
+          this.stat(ctx, "module-seat-call");
+          return `${r}.${tsName}(${argList()})`;
+        }
         const fn = this.resolver.importFrom(tsFile, tsName, ctx, this);
         // A local of the same name (`adapter_name = ActiveJob.adapter_name(x)`)
         // shadows the function: it is imported under another name.
@@ -4573,10 +4612,33 @@ export class Lowerer {
   /** A constant the gem assigns an Array literal (`MAGIC = [ … ]`), by name. */
   constArrays = new Set<string>();
 
+  /**
+   * A constant that is a Hash however it was built (`OMONTHDAYS = oh.freeze`,
+   * `oh` a local assigned `{}`), by name.
+   */
+  constObjects = new Set<string>();
+
   noteRanges(body: N): void {
+    const hashLocals = new Set<string>();
+    walk([body], (n) => {
+      if (n.k === "lasgn" && n.value?.k === "hash") hashLocals.add(n.name);
+    });
+    const isHash = (v: N): boolean =>
+      v?.k === "hash" ||
+      v?.k === "kwargs" ||
+      (v?.k === "lvar" && hashLocals.has(v.name)) ||
+      (v?.k === "call" && v.name === "freeze" && !v.args.length && isHash(v.recv)) ||
+      // `….merge!(…)` answers its receiver, `….inject({}) { … }` its memo.
+      (v?.k === "call" && (v.name === "merge" || v.name === "merge!") && isHash(v.args[0])) ||
+      (v?.k === "call" &&
+        (v.name === "inject" || v.name === "reduce" || v.name === "each_with_object") &&
+        v.args[0]?.k === "hash") ||
+      (v?.k === "call" && v.name === "to_h" && !!v.recv);
     walk([body], (n) => {
       if (n.k === "casgn" && n.path && n.value?.k === "hash")
         this.constHashes.set(n.path.filter((x: string) => x).at(-1), n.value);
+      if (n.k === "casgn" && n.path && isHash(n.value))
+        this.constObjects.add(n.path.filter((x: string) => x).at(-1));
       // …or a chain ending in an Array-answering Enumerable call (`(…).sort_by(&:size).reverse`).
       const arrayCall = (v: N): boolean =>
         v?.k === "array" ||
@@ -4624,6 +4686,13 @@ export class Lowerer {
     const T = this.resolver.types;
     if (n.k === "const" && this.constArrays.has(n.path.filter((x: string) => x).at(-1)))
       return { k: "array", el: null };
+    // A constant the gem assigns a Hash literal is a plain object (`OMONTHDAYS.keys`).
+    if (
+      n.k === "const" &&
+      this.constObjects.has(n.path.filter((x: string) => x).at(-1)) &&
+      this.index.resolveConst(n.path, ctx.nesting)?.kind === "const"
+    )
+      return { k: "hash" };
     // `CONST[key]` on a constant assigned a Hash literal whose values are all
     // Strings, or all Arrays of Strings (marcel's `TYPE_PARENTS`).
     if (n.k === "call" && n.name === "[]" && n.recv?.k === "const" && n.args.length === 1) {
@@ -5271,13 +5340,15 @@ export class Lowerer {
       (e ??=
         recvType?.k === "array"
           ? R
-          : // `x.each_object(File)` and its kin without a block answer an
-            // Enumerator (enumerator.c rb_enumeratorize): its elements.
-            recvNode?.k === "call" && /^each(_|$)/.test(recvNode.name) && !recvNode.block
-            ? `[...(${r} as Iterable<unknown>)]`
-            : /^[\w$]+(\.[\w$]+)*$/.test(r)
-              ? `(${enumOf(r)})`
-              : `((x) => ${enumOf("x")})(${r})`);
+          : recvType?.k === "hash" && !recvType.map
+            ? `Object.entries(${r})`
+            : // `x.each_object(File)` and its kin without a block answer an
+              // Enumerator (enumerator.c rb_enumeratorize): its elements.
+              recvNode?.k === "call" && /^each(_|$)/.test(recvNode.name) && !recvNode.block
+              ? `[...(${r} as Iterable<unknown>)]`
+              : /^[\w$]+(\.[\w$]+)*$/.test(r)
+                ? `(${enumOf(r)})`
+                : `((x) => ${enumOf("x")})(${r})`);
     const rule = CORE_METHODS[name];
     if (!rule) return null;
     return rule({

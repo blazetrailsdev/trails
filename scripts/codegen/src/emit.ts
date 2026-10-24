@@ -263,6 +263,22 @@ function spaceBlocks(lines: string[]): string[] {
   return out;
 }
 
+/** The name a table loop's receiver or assignment binds (`CASES`, `cron_s`). */
+function tableName(n: N): string {
+  return n.k === "casgn" ? n.path[0] : n.k === "const" ? n.path.at(-1) : n.name;
+}
+
+/** A block that defines examples (`it` / `test` calls), at any depth. */
+function definesExamples(b: N): boolean {
+  let found = false;
+  walk(b.body, (n) => {
+    if (found) return false;
+    if (n.k === "call" && n.recv === null && (n.name === "it" || n.name === "test") && n.block)
+      found = true;
+  });
+  return found;
+}
+
 export class Emitter {
   /** Nested constants with no seat on their parent (see `emitFile`). */
   unseated: string[] = [];
@@ -869,11 +885,15 @@ export class Emitter {
    * order whatever the key type, as `Hash#each` does.
    */
   isTableLoop(s: N): boolean {
+    const table = (v: N | undefined) =>
+      v?.k === "array" || (v?.k === "hash" && !v.pairs.some((p: any) => p.splat));
     return (
       s.k === "call" &&
       s.name === "each" &&
-      (s.recv?.k === "array" ||
-        (s.recv?.k === "hash" && !s.recv.pairs.some((p: any) => p.splat))) &&
+      (table(s.recv) ||
+        ((s.recv?.k === "const" || s.recv?.k === "lvar") &&
+          table(this.tableConsts.get(tableName(s.recv)))) ||
+        (s.recv != null && definesExamples(s.block))) &&
       s.block?.k === "block" &&
       s.block.params.length >= 1 &&
       s.block.params.every((p: any) => p.name || p.destructure)
@@ -889,15 +909,27 @@ export class Emitter {
     const binding = params.length === 1 ? one(params[0]) : `[${params.map(one).join(", ")}]`;
     const names = params.flatMap((p) => (p.destructure ?? [p.name!]).filter(Boolean));
     const list =
-      s.recv.k === "array"
-        ? this.lw.expr(s.recv, ctx)
-        : `[${s.recv.pairs
-            .map(
-              (p: any) =>
-                `[${p.key.k === "sym" ? JSON.stringify(p.key.value) : this.lw.expr(p.key, ctx)}, ${this.lw.expr(p.value, ctx)}]`,
-            )
-            .join(", ")}]`;
+      s.recv.k === "const" || (s.recv.k === "lvar" && this.tableConsts.has(s.recv.name))
+        ? jsIdent(tableName(s.recv))
+        : s.recv.k !== "hash"
+          ? this.lw.expr(s.recv, ctx)
+          : this.pairList(s.recv, ctx);
     return { binding, list, names };
+  }
+
+  /**
+   * A spec's table constants (`NEXT_TIMES = [ … ]`, `CASES = { … }`) that an
+   * `each` defines examples from, by name, with their literal values.
+   */
+  tableConsts = new Map<string, N>();
+
+  pairList(h: N, ctx: Ctx): string {
+    return `[${h.pairs
+      .map(
+        (p: any) =>
+          `[${p.key.k === "sym" ? JSON.stringify(p.key.value) : this.lw.expr(p.key, ctx)}, ${this.lw.expr(p.value, ctx)}]`,
+      )
+      .join(", ")}]`;
   }
 
   permanentSkip(u: Unit, stmts: N[]): string | null {
@@ -1370,7 +1402,13 @@ export class Emitter {
         } else if (u.rspec && s.k === "casgn" && s.path?.length === 1) {
           // A constant set in a `describe` block lands on Object in Ruby; every
           // example the file defines after it reads it, so a block-scoped const.
-          out.push(`const ${s.path[0]} = ${this.lw.expr(s.value, nameCtx())};`);
+          // A Hash an `each` reads as a table is the list of its pairs: its keys
+          // can be Arrays (fugit's `CASES`), which a JS object cannot hold.
+          const value =
+            s.value.k === "hash" && this.tableConsts.get(s.path[0]) === s.value
+              ? this.pairList(s.value, nameCtx())
+              : this.lw.expr(s.value, nameCtx());
+          out.push(`const ${s.path[0]} = ${value};`);
           if (!loopLocals.includes(s.path[0])) loopLocals.push(s.path[0]);
         } else if (
           s.k === "lasgn" ||
@@ -1378,7 +1416,10 @@ export class Emitter {
           s.k === "masgn" ||
           (s.k === "call" && !s.block)
         ) {
-          const lines = this.lw.stmt(s, nameCtx(), false);
+          const lines =
+            s.k === "lasgn" && s.value.k === "hash" && this.tableConsts.get(s.name) === s.value
+              ? [`const ${jsIdent(s.name)} = ${this.pairList(s.value, nameCtx())};`]
+              : this.lw.stmt(s, nameCtx(), false);
           out.push(...(guard ? [`if (${guard}) {`, ...indent(lines), "}"] : lines));
           if (s.k === "lasgn" && !loopLocals.includes(s.name)) loopLocals.push(s.name);
         } else {
@@ -1389,6 +1430,26 @@ export class Emitter {
       }
       handScope = outerHand;
     };
+    this.tableConsts.clear();
+    if (u.rspec) {
+      const values = new Map<string, N>();
+      const iterated = new Set<string>();
+      walk(u.body, (n) => {
+        if (
+          (n.k === "casgn" && n.path?.length === 1) ||
+          (n.k === "lasgn" && (n.value?.k === "array" || n.value?.k === "hash"))
+        )
+          values.set(tableName(n), n.value);
+        if (
+          n.k === "call" &&
+          n.name === "each" &&
+          (n.recv?.k === "const" || n.recv?.k === "lvar") &&
+          n.block?.k === "block"
+        )
+          iterated.add(tableName(n.recv));
+      });
+      for (const [k, v] of values) if (iterated.has(k)) this.tableConsts.set(k, v);
+    }
     emitBody(u.body, out, null);
     const lets = [...ivarLocals.values(), ...specLets].map((x) => `let ${x}: unknown;`);
     // rspec-mocks' doubles are reset after each example.
@@ -1666,9 +1727,13 @@ export class Emitter {
       const hctx = this.baseCtx({ nesting: [] } as unknown as Unit, f, {});
       this.lw.imp(hctx, "@root/test-helpers/spec-helper.js", "", "");
     }
-    // A library file's `require`s of other gem files: side-effect imports in
-    // Ruby's order, each followed by the files it requires at its end.
-    if (!file.file.startsWith("test/")) {
+    // A file's `require`s of other gem files: side-effect imports in Ruby's
+    // order, each followed by the files it requires at its end. A spec helper's
+    // `require 'fugit'` loads the whole gem so (fugit.rb requires its files last).
+    if (
+      !file.file.startsWith("test/") ||
+      /(^|\/)(spec_helper|test_helper|helper)\.rb$/.test(file.file)
+    ) {
       const rctx = this.baseCtx({ nesting: [] } as unknown as Unit, f, {});
       const order: string[] = (f.requireOrder ??= []);
       const add = (rb: string, seen: Set<string>) => {
@@ -1679,7 +1744,9 @@ export class Emitter {
         if (!order.includes(spec)) order.push(spec);
         for (const t of this.gemRequires(rb).trail) add(t, seen);
       };
-      for (const rb of this.gemRequires(file.file).lead) add(rb, new Set([file.file]));
+      const own = this.gemRequires(file.file);
+      for (const rb of file.file.startsWith("test/") ? [...own.lead, ...own.trail] : own.lead)
+        add(rb, new Set([file.file]));
     }
     // A library file's top-level statements (marcel's mime_type/definitions.rb,
     // `Marcel::MimeType.extend "text/plain", …`) run when it is loaded.
@@ -2381,6 +2448,7 @@ export class Emitter {
     const members: string[] = [];
     const after: string[] = [];
     const bodyLocals: string[] = [];
+    const classLocals = new Set<string>();
     const staticStmts: N[] = [];
     let defs = 0;
     const body = this.flattenDefs(u.body);
@@ -2488,6 +2556,7 @@ export class Emitter {
         // A local of the class body (marcel tables.rb:2391 `b = Hash.new { … }`),
         // read by the constants after it: a module-scope binding ahead of the class.
         this.bodyLocal(s, name, ctxStatic, bodyLocals, members);
+        classLocals.add(s.name);
       } else if (s.k === "casgn" && s.path?.length === 1) {
         members.push(`static ${s.path[0]}: any = ${this.lw.expr(s.value, ctxStatic)};`);
       } else if (
@@ -2575,6 +2644,8 @@ export class Emitter {
         defs++;
       } else if (s.k === "call" && s.recv === null && s.name === "delegate") {
         members.push(...this.delegate(s, u, f, false));
+      } else if (this.readsLocals(s, classLocals)) {
+        members.push(this.inPlaceStatic(s, u, f, name, classLocals));
       } else {
         staticStmts.push(s);
       }
@@ -3220,6 +3291,29 @@ export class Emitter {
    * ahead and assigned in a `static {}` block where Ruby's statement stands, so
    * the static fields before it are set first.
    */
+  /** Whether a class-body statement reads or writes one of the body's locals. */
+  readsLocals(s: N, locals: Set<string>): boolean {
+    if (!locals.size) return false;
+    let hit = false;
+    walk([s], (n) => {
+      if (hit) return false;
+      if ((n.k === "lvar" || n.k === "lasgn") && locals.has(n.name)) hit = true;
+    });
+    return hit;
+  }
+
+  /**
+   * A class-body statement over the body's locals (nat.rb's `(4..30).each { |i|
+   * oh["#{i}th"] = i }`) runs where Ruby has it, among the static fields: the
+   * constants after it (`OMONTHDAYS = oh.freeze`) read what it did.
+   */
+  inPlaceStatic(s: N, u: Unit, f: FileCtx, name: string, locals: Set<string>): string {
+    const sc = this.baseCtx(u, f, { selfKind: "static", selfExpr: name });
+    for (const l of locals) sc.scope.locals.add(l);
+    const lines = this.lw.block([s], sc, false);
+    return `static {\n${indent(lines).join("\n")}\n}`;
+  }
+
   bodyLocal(s: N, name: string, ctx: Ctx, bodyLocals: string[], members: string[]): void {
     const lines = this.lw.stmt(s, ctx, false);
     const m =
@@ -3471,6 +3565,7 @@ export class Emitter {
     const members: string[] = [];
     const after: string[] = [];
     const bodyLocals: string[] = [];
+    const classLocals = new Set<string>();
     const staticStmts: N[] = [];
     const sclassStmts: N[] = [];
     let defs = 0;
@@ -3478,6 +3573,17 @@ export class Emitter {
     const vis = this.visibilityOf(body);
     this.ivarTypes(u, f, body);
     const ctxStatic = this.baseCtx(u, f, { selfKind: "static", selfExpr: name });
+    // The functions its reopening files seat on it (Resolver.seatsReopeningFn),
+    // typed through a type-only import, which adds no runtime edge.
+    if (this.resolver.exportNames.get(u.fqn)?.tsFile === f.tsFile) {
+      const up = "../".repeat(f.tsFile.split("/").length - 1) || "./";
+      for (const [rb, d] of this.index.scopes.get(u.fqn)?.sdefs ?? []) {
+        if (/=$/.test(rb) || !this.resolver.seatsReopeningFn(u.fqn, d.file, "")) continue;
+        const js = tsMethodName(rb, u.fqn, true);
+        const mod = up + this.resolver.tsFileOf(d.file).replace(/\.ts$/, ".js");
+        members.push(`declare static ${js}: typeof import(${JSON.stringify(mod)}).${js};`);
+      }
+    }
     const parentFqn = u.fqn.endsWith("::ClassMethods")
       ? u.fqn.slice(0, -"::ClassMethods".length)
       : "";
@@ -3520,6 +3626,7 @@ export class Emitter {
         // A local of the class body (marcel tables.rb:2391 `b = Hash.new { … }`),
         // read by the constants after it: a module-scope binding ahead of the class.
         this.bodyLocal(s, name, ctxStatic, bodyLocals, members);
+        classLocals.add(s.name);
       } else if (s.k === "casgn" && s.path?.length === 1) {
         members.push(`static ${s.path[0]}: any = ${this.lw.expr(s.value, ctxStatic)};`);
       } else if (
@@ -3585,6 +3692,8 @@ export class Emitter {
           `${allStatic ? "static " : ""}${propKey(tsMethodName(nw, u.fqn, allStatic))}(${ps}): any {\n  return this.${tsMethodName(old, u.fqn, allStatic)}(${as});\n}`,
         );
         defs++;
+      } else if (this.readsLocals(s, classLocals)) {
+        members.push(this.inPlaceStatic(s, u, f, name, classLocals));
       } else staticStmts.push(s);
     }
     for (const s of this.flattenDefs(u.sbody)) {
@@ -4131,7 +4240,13 @@ export class Emitter {
       // Its functions' `self` (`@deprecator` on `ActiveJob`) is that class, read
       // at call time.
       if (this.resolver.isClassModule(u.fqn) && primary && primary.tsFile !== f.tsFile) {
-        const text = [...out, ...after].join("\n");
+        // Its functions are seated on the class for callers in other files
+        // (Resolver.seatsReopeningFn), which the class declares.
+        const seat =
+          seatNames.length && GEM.hand === false
+            ? [`Object.assign(${primary.name}, { ${seatNames.join(", ")} });`]
+            : [];
+        const text = [...out, ...after, ...seat].join("\n");
         if (new RegExp(`\\b${name}\\b`).test(text))
           this.resolver.importFrom(primary.tsFile, primary.name, this.baseCtx(u, f, {}), this.lw);
         return { text, defs };

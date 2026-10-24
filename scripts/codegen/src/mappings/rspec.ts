@@ -70,8 +70,13 @@ export function rspec(lw: Lowerer, n: N, ctx: Ctx): string | null {
       if (k.k === "str" || k.k === "regex") return `await ${ex}(${run}).rejects.toThrow(${ma(0)})`;
       if (!msg) return `await ${ex}(${run}).rejects.toBeInstanceOf(${ma(0)})`;
       const m = lw.expr(msg, ctx);
-      const check = msg.k === "regex" ? `${m}.test(e.message)` : `e.message === ${m}`;
-      return `await ${ex}(${run}).rejects.toSatisfy((e: Error) => e instanceof ${ma(0)} && ${check})`;
+      // A message that awaits (an interpolated `inspect`) is computed in the
+      // example's async body, outside the predicate it is compared in.
+      const late = m.includes("await ");
+      const mv = late ? "message" : m;
+      const check = msg.k === "regex" ? `${mv}.test(e.message)` : `e.message === ${mv}`;
+      const pred = `(e: Error) => e instanceof ${ma(0)} && ${check}`;
+      return `await ${ex}(${run}).rejects.toSatisfy(${late ? `((message) => ${pred})(${m})` : pred})`;
     }
     const blockMatcher = rspecBlockMatcher(lw, matcher, target, ctx, ex, not);
     if (blockMatcher) return blockMatcher;
