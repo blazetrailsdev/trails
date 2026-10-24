@@ -6,6 +6,7 @@ import {
   RuntimeError,
   TypeError,
   eachPair,
+  isAbsentHalf,
   isEmpty,
   rbFSend,
   rbObjClassname,
@@ -74,6 +75,16 @@ export function attributeWriterMissing(
 export function _assignAttribute(this: AttributeAssignment, k: string, v: unknown): unknown {
   const setter = `${k}=`;
   try {
+    for (
+      let o: object | null = Object(this) as object;
+      o;
+      o = Object.getPrototypeOf(o) as object | null
+    ) {
+      const set = Object.getOwnPropertyDescriptor(o, k)?.set;
+      if (set !== undefined && !isAbsentHalf(set)) {
+        return set.call(this, v);
+      }
+    }
     return rbFSend(this, setter, v);
   } catch (error) {
     if (!(error instanceof NoMethodError)) throw error;

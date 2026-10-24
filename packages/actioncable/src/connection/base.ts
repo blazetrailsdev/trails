@@ -216,7 +216,7 @@ export class Base {
   private async handleOpen(): Promise<unknown> {
     try {
       this._protocol = this.websocket.protocol;
-      if (rbObjRespondTo(this, "connect"))
+      if (typeof (this as unknown as { connect?: unknown }).connect === "function")
         await (this as unknown as { connect(): unknown }).connect();
       this.subscribeToInternalChannel();
       this.sendWelcomeMessage();
@@ -249,7 +249,7 @@ export class Base {
     await this.subscriptions.unsubscribeFromAll();
     this.unsubscribeFromInternalChannel();
 
-    if (rbObjRespondTo(this, "disconnect"))
+    if (typeof (this as unknown as { disconnect?: unknown }).disconnect === "function")
       return await (this as unknown as { disconnect(): unknown }).disconnect();
     return null;
   }
