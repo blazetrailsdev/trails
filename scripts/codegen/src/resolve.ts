@@ -173,6 +173,8 @@ export class Resolver {
       !!exp &&
       this.isClassModule(GEM.namespace) &&
       this.index.scopes.get(fqn)?.kind === "class" &&
+      // A test support class (builder's `Builder::Test`) is no library constant.
+      ![...(this.index.scopes.get(fqn)?.files ?? [])].some((f) => f.startsWith("test/")) &&
       !callerTsFile.endsWith(".test.ts") &&
       !callerTsFile.startsWith("test-helpers/") &&
       exp.tsFile !== callerTsFile &&

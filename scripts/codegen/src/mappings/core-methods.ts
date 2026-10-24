@@ -628,6 +628,9 @@ export const RUBY_COMPAT_CORE_FNS: ReadonlySet<string> = new Set(
     .filter(Boolean),
 );
 
+/** The rule of a name ruby-compat implements and nothing lowers natively. */
+export const RUBY_COMPAT_FALLBACK: CoreRule = (c) => rubyCompatCall(c);
+
 const rubyCompatCall: CoreRule = (c) => {
   if (c.lw.index.methodNames.has(c.name)) return null;
   return `${c.rc(rbCoreFn(c.name))}(${[c.r, ...c.args()].join(", ")})`;
@@ -698,7 +701,7 @@ rule("reverse", (c) => {
   return rubyCompatCall(c);
 });
 
-for (const k of RUBY_COMPAT_CORE_FNS) rules[k] ??= rubyCompatCall;
+for (const k of RUBY_COMPAT_CORE_FNS) rules[k] ??= RUBY_COMPAT_FALLBACK;
 
 /** Ruby method name → its rule. */
 export const CORE_METHODS: Readonly<Record<string, CoreRule>> = rules;

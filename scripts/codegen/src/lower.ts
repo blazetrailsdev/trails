@@ -25,6 +25,7 @@ import { walk } from "./ir.js";
 import {
   ASYNC_ENUM,
   CORE_METHODS,
+  RUBY_COMPAT_FALLBACK,
   SPLAT_YIELD_ONE,
   asyncEnumBody,
 } from "./mappings/core-methods.js";
@@ -1318,7 +1319,15 @@ export class Lowerer {
         ? `${recv}.${ok} = ${args[args.length - 1]}`
         : args.length === 2 && this.mayBeMap(n.recv, ctx)
           ? `${this.rc(ctx, "hashAset")}(${recv}, ${args[0]}, ${args[1]})`
-          : `${recv}[${args[0]}] = ${args[args.length - 1]}`;
+          : // A negative Integer index counts from the end (array.c rb_ary_store,
+            // mini_magick's `args[-1] = …`).
+            n.args.length === 2 &&
+              n.args[0]?.k === "int" &&
+              Number(n.args[0].value) < 0 &&
+              this.typeOf(n.recv, ctx)?.k !== "hash" &&
+              /^[\w$.]+$/.test(recv)
+            ? `${recv}[${recv}.length - ${-Number(n.args[0].value)}] = ${args[1]}`
+            : `${recv}[${args[0]}] = ${args[args.length - 1]}`;
       return [tail ? `return (${asg});` : `${asg};`];
     }
     return null;
@@ -1632,7 +1641,7 @@ export class Lowerer {
         name === "class" ||
         // …and any a core rule lowers (`collect(&:first)` on pairs), which
         // itself defers to a gem method of the name (`reject(&:empty?)`).
-        CORE_METHODS[name] !== undefined ||
+        (CORE_METHODS[name] !== undefined && CORE_METHODS[name] !== RUBY_COMPAT_FALLBACK) ||
         (!this.index.methodNames.has(name) &&
           (["size", "length", "strip", "upcase", "downcase", "to_i", "to_f"].includes(name) ||
             (OBJECT_METHODS[name] !== undefined && name !== "send" && name !== "public_send")))
