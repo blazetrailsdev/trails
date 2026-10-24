@@ -34,7 +34,7 @@ export class TestConnection {
     } = {},
   ) {
     this._coder = coder;
-    this.identifiers = ["current_user"];
+    this.identifiers = ["currentUser"];
 
     this.currentUser = user;
     this.logger = TaggedLogging.new(new Logger(new StringIO()));
