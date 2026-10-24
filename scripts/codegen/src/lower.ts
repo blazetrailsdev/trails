@@ -296,9 +296,12 @@ function symColonHere(ctx: Ctx): boolean {
   return !!ctx.f.symbolColon && (!!GEM.symbolColon || ctx.f.rubyFile.startsWith("test/"));
 }
 
-/** Ruby's Time / Date component readers (time.c, date_core.c). */
+/**
+ * Ruby's Time / Date component readers (time.c, date_core.c), and Range#begin /
+ * #end: a property on ruby-compat's Range, a method on chronic's Span.
+ */
 const TIME_ACCESSORS = new Set(
-  "year mon month mday day hour min sec usec nsec subsec wday yday zone utc_offset gmt_offset".split(
+  "year mon month mday day hour min sec usec nsec subsec wday yday zone utc_offset gmt_offset begin end".split(
     " ",
   ),
 );
@@ -1704,10 +1707,13 @@ export class Lowerer {
   /** `camelKeys`: an option hash, whose Symbol keys are camelCase (CLAUDE.md, the option-key rule). */
   hashLit(pairs: any[], ctx: Ctx, camelKeys = false, colonKeys = false): string {
     if (!pairs.length) return "{}";
-    // An Integer key (`{ 1 => 2 }`) does not survive as a JS object key, which
-    // is always a string: the literal is a ruby-compat `Hash` (a Map).
+    // An Integer or Regexp key (`{ 1 => 2 }`, chronic's `{ /last/ => :last }`)
+    // does not survive as a JS object key, which is always a string: the
+    // literal is a ruby-compat `Hash` (a Map).
     if (
-      pairs.some((p) => p.key && (p.key.k === "int" || p.key.k === "float")) &&
+      pairs.some(
+        (p) => p.key && (p.key.k === "int" || p.key.k === "float" || p.key.k === "regex"),
+      ) &&
       !pairs.some((p) => p.splat)
     )
       return `new ${this.rc(ctx, "Hash")}()${pairs.map((p) => `.set(${p.key.k === "sym" ? JSON.stringify(p.key.value) : this.expr(p.key, ctx)}, ${this.expr(p.value, ctx)})`).join("")}`;

@@ -1069,6 +1069,18 @@ export class Emitter {
     return [...this.index.scopes.values()].some((x) => x.superclassFqn === fqn);
   }
 
+  /** Whether a gem class below `fqn` redefines its instance method `name`. */
+  private overriddenBelow(fqn: string, name: string): boolean {
+    for (const sc of this.index.scopes.values()) {
+      if (!sc.defs.has(name)) continue;
+      for (let up = sc.superclassFqn, i = 0; up && i < 20; i++) {
+        if (up === fqn) return true;
+        up = this.index.scopes.get(up)?.superclassFqn;
+      }
+    }
+    return false;
+  }
+
   private configIncludes?: Set<string>;
 
   /** Whether a test file passes the module to an RSpec `config.include`. */
@@ -2542,7 +2554,18 @@ export class Emitter {
     const thisParam = opts.module ? (ps ? `this: ${host}, ` : `this: ${host}`) : "";
     // The hand twin's declared return type where there is one; otherwise none,
     // so TypeScript infers it from the body rather than reading `any`.
-    const retType = twin?.info.ret ? this.lw.tsType(twin.info.ret, ctx) : null;
+    let retType = twin?.info.ret ? this.lw.tsType(twin.info.ret, ctx) : null;
+    // A generated-only gem's method a subclass overrides (chronic's raising
+    // `Repeater#next`, a `Span` below) is not typed by its own body alone.
+    if (
+      GEM.hand === false &&
+      !isCtor &&
+      !opts.static &&
+      !opts.module &&
+      (!retType || /^(null|unknown|void)$/.test(retType)) &&
+      this.overriddenBelow(u.fqn, d.name)
+    )
+      retType = "/* overridden */ any";
     const ret = isCtor || !retType ? "" : asy ? `: Promise<${retType}>` : `: ${retType}`;
     if (/^[a-z_]\w*=$/.test(d.name) && opts.asFunction) {
       const fnName = tsName.startsWith("set")

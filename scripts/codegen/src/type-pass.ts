@@ -411,7 +411,7 @@ export class TypePass {
           // Nothing reaches it: typed by how its body uses it (usageType).
           if (t === "unknown" && !isThis) t = this.usageType(checker, node) ?? t;
           // A generated-only gem's parameter nothing types stays `any` (sweepAny).
-          if (t === "unknown" && !isThis && GEM.hand === false) {
+          if (GEM.hand === false && !isThis && /\bunknown\b/.test(t) && !got.length) {
             ts.forEachChild(node, (c) => decls(c, sf));
             return;
           }
@@ -620,9 +620,11 @@ export class TypePass {
             ts.isIdentifier(t.typeName) &&
             t.typeName.text === "Promise" &&
             isAnyNode(t.typeArguments?.[0]);
-          if (isAnyNode(t) || promiseAny) {
+          const colon0 = sf.text.lastIndexOf(":", t.getStart(sf));
+          const kept = sf.text.slice(colon0, t.getStart(sf)).includes("/* overridden */");
+          if ((isAnyNode(t) || promiseAny) && !kept) {
             // The `: ` before the type goes too.
-            const colon = sf.text.lastIndexOf(":", t.getStart(sf));
+            const colon = colon0;
             edits.push({ pos: colon, end: t.getEnd(), text: "" });
           }
         }
@@ -756,7 +758,10 @@ export class TypePass {
           )
             continue;
           const name = target.name;
-          edits.push({ pos: name.getEnd(), end: name.getEnd(), text: ": unknown" });
+          // A generated-only gem's block parameter over an untyped receiver
+          // (chronic's `tokens.each { |token| }`) stays `any`, as its receiver is.
+          const t = GEM.hand === false && ts.isParameter(target) ? "any" : "unknown";
+          edits.push({ pos: name.getEnd(), end: name.getEnd(), text: `: ${t}` });
         } else if (ts.isFunctionLike(target) && !target.type) {
           const close = sf.text.indexOf(")", target.parameters.end);
           const asy =
@@ -788,6 +793,16 @@ export class TypePass {
       if (!sf) continue;
       const edits: Edit[] = [];
       const visit = (node: ts.Node): void => {
+        // A generated-only gem's field no round could type (chronic's
+        // `@time_class`, set through its writer) is `any` for the port's author.
+        if (
+          GEM.hand === false &&
+          ts.isPropertyDeclaration(node) &&
+          node.type?.kind === ts.SyntaxKind.UnknownKeyword
+        ) {
+          edits.push({ pos: node.type.getStart(sf), end: node.type.getEnd(), text: "any" });
+          return;
+        }
         if (ts.isAsExpression(node) && isAnyNode(node.type)) {
           const inner = node.expression;
           edits.push({
@@ -801,7 +816,20 @@ export class TypePass {
         if (node.kind === ts.SyntaxKind.AnyKeyword) {
           // A generated-only gem's parameter no round could type stays `any`
           // for the port's author to type: `unknown` errors at every use.
-          if (GEM.hand === false && ts.isParameter(node.parent)) return;
+          if (
+            GEM.hand === false &&
+            (ts.isParameter(node.parent) || ts.isPropertyDeclaration(node.parent))
+          )
+            return;
+          // A return emit.ts marked `/* overridden */ any`: kept, unmarked.
+          if (ts.isMethodDeclaration(node.parent) && node.parent.type === node) {
+            const colon = sf.text.lastIndexOf(":", node.getStart(sf));
+            const lead = sf.text.slice(colon + 1, node.getStart(sf));
+            if (lead.includes("/* overridden */")) {
+              edits.push({ pos: colon + 1, end: node.getStart(sf), text: " " });
+              return;
+            }
+          }
           edits.push({ pos: node.getStart(sf), end: node.getEnd(), text: "unknown" });
           return;
         }

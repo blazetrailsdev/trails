@@ -158,14 +158,18 @@ rule("<<", (o) => {
   // rb_str_concat) append in place and answer the receiver; any other receiver
   // answers its own `<<` (trails spells it `append`). A JS string cannot be
   // appended to in place (CLAUDE.md "Ruby Strings are JS string primitives").
-  const t = lw.typeOf(n.recv, ctx);
+  // `super << '-day-'` in a `to_s` (chronic ordinal.rb:33): Object#to_s answers a String.
+  const superStr = (x: { k?: string; name?: string; recv?: unknown } | null): boolean =>
+    (x?.k === "super" && ["to_s", "inspect", "to_str"].includes(ctx.defName ?? "")) ||
+    (x?.k === "call" && x.name === "<<" && superStr(x.recv as typeof x));
+  const t = superStr(n.recv) ? ({ k: "prim", name: "string" } as const) : lw.typeOf(n.recv, ctx);
   const b = needsParens(a[0]) ? `(${a[0]})` : a[0];
   const app = (x: string) =>
     t?.k === "array"
       ? `(${x}.push(${b}), ${x})`
       : t?.k === "prim" && t.name === "string"
         ? `${x} + ${b}`
-        : `(typeof ${x} === "string" ? ${x} + ${b} : Array.isArray(${x}) ? ((${x} as unknown[]).push(${b}), ${x}) : ${x} instanceof globalThis.Set ? (${x} as Set<unknown>).add(${b}) : (${x} as { append(v: unknown): unknown }).append(${b}))`;
+        : `(typeof ${x} === "string" ? ${x} + ${b} : Array.isArray(${x}) ? ((${x} as unknown[]).push(${b}), ${x}) : (${x} as object) instanceof globalThis.Set ? (${x} as Set<unknown>).add(${b}) : (${x} as { append(v: unknown): unknown }).append(${b}))`;
   // A local known to hold a String is reassigned the result; one of unknown
   // type (a yielded `Tool`) is not, as nothing would read it.
   if (n.recv.k === "lvar" && t?.k === "prim" && t.name === "string") return `(${r} = ${app(r)})`;
@@ -175,7 +179,7 @@ rule("<<", (o) => {
   if (n.recv.k === "ivar") {
     if (t?.k === "prim" && t.name === "string") return `(${r} = ${r} + ${b})`;
     if (!t)
-      return `(typeof ${r} === "string" ? (${r} = ${r} + ${b}) : Array.isArray(${r}) ? ((${r} as unknown[]).push(${b}), ${r}) : ${r} instanceof globalThis.Set ? (${r} as Set<unknown>).add(${b}) : (${r} as { append(v: unknown): unknown }).append(${b}))`;
+      return `(typeof ${r} === "string" ? (${r} = ${r} + ${b}) : Array.isArray(${r}) ? ((${r} as unknown[]).push(${b}), ${r}) : (${r} as object) instanceof globalThis.Set ? (${r} as Set<unknown>).add(${b}) : (${r} as { append(v: unknown): unknown }).append(${b}))`;
   }
   return lw.withOnce(r, app);
 });
