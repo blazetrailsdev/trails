@@ -264,7 +264,7 @@ describe("EnumerableTests", () => {
   it("pick", () => {
     const payments = [pay(5), pay(15), pay(10)];
     expect(pick(payments, "price")).toBe(5);
-    expect(pick([], "price")).toBeUndefined();
+    expect(pick([], "price")).toBeNull();
   });
 
   it("compact blank", () => {

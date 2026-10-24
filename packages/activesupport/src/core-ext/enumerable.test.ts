@@ -381,8 +381,8 @@ describe("EnumerableTests", () => {
     ];
     expect(pick(expanded, "dollars", "cents")).toEqual([5, 99]);
 
-    expect(pick([] as Payment[], "price")).toBeUndefined();
-    expect(pick([] as ExpandedPayment[], "dollars", "cents")).toBeUndefined();
+    expect(pick([] as Payment[], "price")).toBeNull();
+    expect(pick([] as ExpandedPayment[], "dollars", "cents")).toBeNull();
   });
 
   it("compact blank", () => {

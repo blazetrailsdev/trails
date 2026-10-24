@@ -43,7 +43,7 @@ const iterBreak = Symbol("rb_iter_break");
  */
 function rbBlockCall<T, E, R>(
   obj: Iterable<T> | Each<T, E>,
-  block: (i: T) => void,
+  block: (i: T) => unknown,
   result: () => R,
 ): Enumerated<E, R> {
   const rescue = (e: unknown): R => {
@@ -673,7 +673,9 @@ export function sum<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...args: unkn
   return rbBlockCall(
     obj,
     (i) => {
-      sumIter(memo.blockGiven ? block!(i) : i, memo);
+      const v = memo.blockGiven ? block!(i) : i;
+      if (v instanceof Promise) return v.then((v) => sumIter(v, memo));
+      sumIter(v, memo);
     },
     () => enumSumValue(memo),
   );
@@ -872,11 +874,7 @@ export const AsyncEnumerable = {
    * @noRailsEquivalent PERMANENT
    */
   async sum<T>(this: AsyncEach<T>, ...args: unknown[]): Promise<unknown> {
-    const [memo, block] = enumSumMemo<T>(args);
-    await this.each(async (i) => {
-      sumIter(memo.blockGiven ? await block!(i) : i, memo);
-    });
-    return enumSumValue(memo);
+    return sum(this as unknown as Each<T, Promise<unknown>>, ...args) as Promise<unknown>;
   },
 
   first: Enumerable.first,
