@@ -770,6 +770,89 @@ export const SOURCES: readonly UpstreamSource[] = [
       },
     ],
   },
+  {
+    name: "raabro",
+    origin: {
+      type: "git",
+      url: "https://github.com/floraison/raabro.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:431 resolves raabro (1.4.0), fugit's parser.
+      ref: "v1.4.0",
+    },
+    packages: [
+      {
+        // compareApi waits for the package story (RFC 0207): extract-ts-api.ts
+        // refuses a package with no built dist.
+        name: "raabro",
+        libPath: "lib",
+        testPath: "spec",
+        compareApi: false,
+        compareTests: true,
+      },
+    ],
+  },
+  {
+    name: "et-orbi",
+    origin: {
+      type: "git",
+      url: "https://github.com/floraison/et-orbi.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:202 resolves et-orbi (1.2.11), fugit's time type.
+      ref: "v1.2.11",
+    },
+    packages: [
+      {
+        // compareApi waits for the package story (RFC 0207): extract-ts-api.ts
+        // refuses a package with no built dist.
+        name: "et-orbi",
+        libPath: "lib/et-orbi",
+        libEntryFile: "lib/et-orbi.rb",
+        testPath: "spec",
+        compareApi: false,
+        compareTests: true,
+      },
+    ],
+  },
+  {
+    name: "fugit",
+    origin: {
+      type: "git",
+      url: "https://github.com/floraison/fugit.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:234-236 resolves fugit (1.11.1); solid_queue 1.1.3 needs ~> 1.11.0.
+      ref: "v1.11.1",
+    },
+    packages: [
+      {
+        // compareApi waits for the package story (RFC 0207): extract-ts-api.ts
+        // refuses a package with no built dist.
+        name: "fugit",
+        libPath: "lib/fugit",
+        libEntryFile: "lib/fugit.rb",
+        testPath: "spec",
+        compareApi: false,
+        compareTests: true,
+      },
+    ],
+  },
+  {
+    name: "chronic",
+    origin: {
+      type: "git",
+      url: "https://github.com/mojombo/chronic.git",
+      // Not in Gemfile.lock: fugit and et-orbi call it when `defined?(::Chronic)`.
+      ref: "v0.10.2",
+    },
+    packages: [
+      {
+        // compareApi waits for the package story (RFC 0207): extract-ts-api.ts
+        // refuses a package with no built dist.
+        name: "chronic",
+        libPath: "lib/chronic",
+        libEntryFile: "lib/chronic.rb",
+        testPath: "test",
+        compareApi: false,
+        compareTests: true,
+      },
+    ],
+  },
 ];
 
 /**
