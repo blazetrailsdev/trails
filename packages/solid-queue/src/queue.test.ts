@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import "./test-helpers/dummy-application.js";
 import {
   assertChanges,
   assertDifference,
@@ -14,14 +15,12 @@ import type { Time } from "@blazetrails/date";
 import { Job, Pause, Queue, ReadyExecution, SolidQueueAdapter } from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { AddToBufferJob } from "./test-helpers/add-to-buffer-job.js";
-import { loadQueueSchema } from "./test-helpers/queue-schema.js";
 
 describe("QueueTest", () => {
   let backgroundQueue: Queue;
   let defaultQueue: Queue;
 
   beforeAll(async () => {
-    await loadQueueSchema();
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
   });
 

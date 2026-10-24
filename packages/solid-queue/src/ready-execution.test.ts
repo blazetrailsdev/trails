@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import "./test-helpers/dummy-application.js";
 import { assertDifference, assertNoDifference } from "@blazetrails/activesupport";
 import type { Relation } from "@blazetrails/activerecord";
 import {
@@ -11,14 +12,12 @@ import {
 } from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { AddToBufferJob } from "./test-helpers/add-to-buffer-job.js";
-import { loadQueueSchema } from "./test-helpers/queue-schema.js";
 import { Pause } from "./pause.js";
 
 describe("SolidQueue::ReadyExecutionTest", () => {
   let jobs: Relation<Job>;
 
   beforeAll(async () => {
-    await loadQueueSchema();
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
   });
 

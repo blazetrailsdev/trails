@@ -1,12 +1,11 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import "./test-helpers/dummy-application.js";
 import { BlockedExecution, Job, ScheduledExecution, SolidQueueAdapter } from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { AddToBufferJob } from "./test-helpers/add-to-buffer-job.js";
-import { loadQueueSchema } from "./test-helpers/queue-schema.js";
 
 describe("SolidQueue::Job#execution (trails)", () => {
   beforeAll(async () => {
-    await loadQueueSchema();
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
   });
 

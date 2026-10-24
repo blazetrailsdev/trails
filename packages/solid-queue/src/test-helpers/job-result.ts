@@ -1,11 +1,12 @@
-import { Base, registerModel } from "@blazetrails/activerecord";
+import { registerModel } from "@blazetrails/activerecord";
 import { include, type Included } from "@blazetrails/activesupport";
 import { GlobalID, Identification } from "@blazetrails/globalid";
 import { registerConstant } from "@blazetrails/ruby-compat";
+import { ApplicationRecord } from "./application-record.js";
 import { ApplicationJob } from "./application-job.js";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below. */
-export class JobResult extends Base {
+export class JobResult extends ApplicationRecord {
   declare queue_name: string | null;
   declare status: string | null;
   declare value: string | null;

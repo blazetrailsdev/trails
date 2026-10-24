@@ -1,13 +1,15 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import "./test-helpers/dummy-application.js";
 import {
   assertChanges,
   assertDifference,
   assertNoChanges,
+  assertNoDifference,
   minutes,
   travelBack,
   travelTo,
 } from "@blazetrails/activesupport";
-import { Deadlocked } from "@blazetrails/activerecord";
+import { Deadlocked, Rollback } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { performAllLater } from "@blazetrails/activejob";
 import { registerConstant } from "@blazetrails/ruby-compat";
@@ -24,7 +26,9 @@ import {
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { AddToBufferJob } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
-import { loadAppSchema, loadQueueSchema } from "./test-helpers/queue-schema.js";
+import { ShardedJobResult } from "./test-helpers/sharded-job-result.js";
+import { ShardedRecord } from "./test-helpers/sharded-record.js";
+import { loadAppSchema } from "./test-helpers/queue-schema.js";
 
 class NonOverlappingJob extends ApplicationJob {
   static {
@@ -54,7 +58,6 @@ describe("SolidQueue::JobTest", () => {
   let result: JobResult;
 
   beforeAll(async () => {
-    await loadQueueSchema();
     await loadAppSchema();
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
   });
@@ -153,6 +156,16 @@ describe("SolidQueue::JobTest", () => {
     expect(execution.queue_name).toBe("test");
     expect(execution.priority).toBe(8);
     expect(execution.scheduled_at!.compare(solidQueueJob.scheduled_at)).toBe(0);
+  });
+
+  it("enqueue jobs within a connected_to block for the primary DB", async () => {
+    await ShardedRecord.connectedTo({ role: "writing", shard: "shard_two" }, async () => {
+      await ShardedJobResult.createBang({ value: "in shard two" });
+      await AddToBufferJob.performLater("enqueued within block");
+    });
+
+    const job = (await Job.last()) as Job;
+    expect((job.arguments["arguments"] as unknown[])[0]).toBe("enqueued within block");
   });
 
   it("enqueue jobs without concurrency controls", async () => {
@@ -316,6 +329,35 @@ describe("SolidQueue::JobTest", () => {
     );
 
     await assertJobCounts({ blocked: -2 }, () => BlockedExecution.discardAllFromJobs(Job.all()));
+  });
+
+  it("enqueue successfully inside a rolled-back transaction in the app DB", async () => {
+    await assertDifference(
+      () => Job.count(),
+      1,
+      null,
+      async () => {
+        await assertNoDifference(
+          () => JobResult.count(),
+          null,
+          async () => {
+            await JobResult.transaction(async () => {
+              await JobResult.createBang({
+                queue_name: "default",
+                value: "this will be rolled back",
+              });
+              await StoreResultJob.performLater("enqueued inside a rolled back transaction");
+              throw new Rollback();
+            });
+          },
+        );
+      },
+    );
+
+    const job = (await Job.last()) as Job;
+    expect((job.arguments["arguments"] as unknown[])[0]).toBe(
+      "enqueued inside a rolled back transaction",
+    );
   });
 
   it("raise EnqueueError when there's an ActiveRecordError", async () => {
