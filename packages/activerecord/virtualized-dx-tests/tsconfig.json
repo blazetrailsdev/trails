@@ -17,6 +17,7 @@
       "@blazetrails/ruby-compat/psych": ["../../ruby-compat/src/psych.ts"],
       "@blazetrails/ruby-compat/psych-adapter": ["../../ruby-compat/src/psych-adapter.ts"],
       "@blazetrails/ruby-compat/yaml": ["../../ruby-compat/src/yaml.ts"],
+      "@blazetrails/ruby-compat/enumerable": ["../../ruby-compat/src/enumerable.ts"],
       "@blazetrails/ruby-compat/range": ["../../ruby-compat/src/range.ts"],
       "@blazetrails/ruby-compat": ["../../ruby-compat/src/index.ts"],
       "@blazetrails/builder": ["../../builder/src/builder.ts"],

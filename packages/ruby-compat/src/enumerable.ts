@@ -70,8 +70,9 @@ function rbBlockCall<T, E, R>(
 /**
  * `enum_to_a` (`vendor/ruby/v3.3.11/enum.c:711`): the elements `each` yields,
  * which is what a block-less member's enumerator (`RETURN_ENUMERATOR`) holds.
+ * @noRailsEquivalent PERMANENT
  */
-function enumToA<T, E>(obj: Iterable<T> | Each<T, E>): Enumerated<E, T[]> {
+function enumToA<T, E = unknown>(obj: Iterable<T> | Each<T, E>): Enumerated<E, T[]> {
   const ary: T[] = [];
   return rbBlockCall(
     obj,
@@ -185,6 +186,68 @@ function enumFindAll<T, E = unknown>(
   );
 }
 export { enumFindAll as findAll };
+export { enumToA as toA };
+
+/**
+ * Mirrors: Ruby's Enumerable#reject — `vendor/ruby/v3.3.11/enum.c:593` `enum_reject`,
+ * pushing each element whose block result does not `RTEST` (`reject_i`, `:564`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function reject<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block?: (i: T) => unknown,
+): Enumerated<E, T[]> {
+  if (!block) return enumToA(obj);
+  const ary: T[] = [];
+  return rbBlockCall(
+    obj,
+    (i) => {
+      const result = block(i);
+      if (result == null || result === false) ary.push(i);
+    },
+    () => ary,
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#count — `vendor/ruby/v3.3.11/enum.c:298` `enum_count`:
+ * every element (`count_all_i`, `:263`), those `rb_equal` to the argument
+ * (`count_i`, `:239`), or those whose block result `RTEST`s (`count_iter_i`,
+ * `:252`). The block is the trailing function argument.
+ * @noRailsEquivalent PERMANENT
+ */
+export function count<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  ...argv: unknown[]
+): Enumerated<E, number> {
+  const block =
+    argv.length === 1 && typeof argv[0] === "function"
+      ? (argv.pop() as (i: T) => unknown)
+      : undefined;
+  checkArity(argv.length, 0, 1);
+  const item = argv[0];
+  let func: (i: T) => boolean;
+  if (argv.length === 0) {
+    if (block !== undefined) {
+      func = (i) => {
+        const result = block(i);
+        return result != null && result !== false;
+      };
+    } else {
+      func = () => true;
+    }
+  } else {
+    func = (i) => rbEqual(i, item);
+  }
+  let n = 0;
+  return rbBlockCall(
+    obj,
+    (i) => {
+      if (func(i)) n++;
+    },
+    () => n,
+  );
+}
 
 /**
  * The mixin member over `self`, bound as `find_all` and `select`
@@ -673,9 +736,7 @@ export function sum<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...args: unkn
   return rbBlockCall(
     obj,
     (i) => {
-      const v = memo.blockGiven ? block!(i) : i;
-      if (v instanceof Promise) return v.then((v) => sumIter(v, memo));
-      sumIter(v, memo);
+      sumIter(memo.blockGiven ? block!(i) : i, memo);
     },
     () => enumSumValue(memo),
   );
@@ -874,7 +935,11 @@ export const AsyncEnumerable = {
    * @noRailsEquivalent PERMANENT
    */
   async sum<T>(this: AsyncEach<T>, ...args: unknown[]): Promise<unknown> {
-    return sum(this as unknown as Each<T, Promise<unknown>>, ...args) as Promise<unknown>;
+    const [memo, block] = enumSumMemo<T>(args);
+    await this.each(async (i) => {
+      sumIter(memo.blockGiven ? await block!(i) : i, memo);
+    });
+    return enumSumValue(memo);
   },
 
   first: Enumerable.first,

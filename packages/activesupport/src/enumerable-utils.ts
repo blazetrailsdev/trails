@@ -1,7 +1,6 @@
 import {
   type Each,
   Enumerable,
-  findAll,
   groupBy as enumGroupBy,
   Hash,
   hashAref,
@@ -18,6 +17,7 @@ import {
   rbIntegerTypeP,
   sortBy,
 } from "@blazetrails/ruby-compat";
+import { count, first, reject, toA } from "@blazetrails/ruby-compat/enumerable";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { SoleItemExpectedError } from "./core-ext/enumerable.js";
 import { isPlainObject, valuesAt } from "./hash-utils.js";
@@ -54,22 +54,19 @@ export function sum<T>(collection: Iterable<T> | Range<T>, ...args: unknown[]): 
   return Enumerable.sum.call({ each }, ...args);
 }
 
-function each<T>(collection: Iterable<T> | Each<T>, block: (elem: T) => void): void {
-  if (typeof (collection as Partial<Each<T>>).each === "function") {
-    (collection as Each<T>).each(block);
-  } else {
-    for (const elem of collection as Iterable<T>) block(elem);
-  }
-}
-
 export function indexBy<T, K extends string | number>(
   collection: Iterable<T> | Each<T>,
   fn: (item: T) => K,
 ): Record<K, T> {
   const result = Object.create(null) as Record<K, T>;
-  each(collection, (elem) => {
+  const block = (elem: T): void => {
     result[fn(elem)] = elem;
-  });
+  };
+  if (typeof (collection as Partial<Each<T>>).each === "function") {
+    (collection as Each<T>).each(block);
+  } else {
+    for (const elem of collection as Iterable<T>) block(elem);
+  }
   return result;
 }
 
@@ -124,7 +121,7 @@ export function minimum<T, R>(collection: Iterable<T> | Each<T>, key: (item: T) 
 }
 
 export function compactBlank<T>(collection: Iterable<T> | Each<T>): T[] {
-  return findAll(collection, (item) => !isBlank(item));
+  return reject(collection, (item) => isBlank(item));
 }
 
 export function any<T>(collection: readonly T[], fn?: (item: T) => unknown): boolean {
@@ -160,18 +157,13 @@ export function excluding(collection: unknown, ...elements: unknown[]): unknown 
       Object.entries(collection).filter(([element]) => !elements.some((e) => rbEqual(e, element))),
     );
   }
-  return findAll(
-    collection as Iterable<unknown> | Each<unknown>,
-    (element) => !elements.some((e) => rbEqual(e, element)),
+  return reject(collection as Iterable<unknown> | Each<unknown>, (element) =>
+    elements.some((e) => rbEqual(e, element)),
   );
 }
 
 export function including<T>(collection: Iterable<T> | Each<T>, ...elements: T[]): T[] {
-  const ary: T[] = [];
-  each(collection, (elem) => {
-    ary.push(elem);
-  });
-  return [...ary, ...elements];
+  return [...toA(collection), ...elements];
 }
 
 export function minBy<T>(collection: T[], fn: (item: T) => number): T | undefined {
@@ -230,19 +222,17 @@ export function pick<T, K extends keyof T>(
 ): T[K] | T[K][] | null {
   if (isNone(collection)) return null;
 
-  const first = Enumerable.first.call(collection as Each<T>) as T;
   if (many(keys)) {
-    return keys.map((key) => hashAref(first as object, key) as T[K]);
+    return keys.map((key) => hashAref(first(collection) as object, key) as T[K]);
   } else {
-    return hashAref(first as object, keys[0]) as T[K];
+    return hashAref(first(collection) as object, keys[0]) as T[K];
   }
 }
 
 export function sole<T>(collection: Iterable<T> | Each<T>): T {
-  const ary = including(collection);
-  switch (ary.length) {
+  switch (count(collection)) {
     case 1:
-      return ary[0];
+      return first(collection) as T;
     case 0:
       throw new SoleItemExpectedError("no item found");
     default:
