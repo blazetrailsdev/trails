@@ -1,4 +1,5 @@
-import { conndefaultsHash, connect } from "./connection.js";
+import { TopLevel } from "@blazetrails/activesupport";
+import { Connection, connect } from "./connection.js";
 import {
   ConnectionBad,
   Error as PGError,
@@ -13,7 +14,9 @@ import { Array as TextEncoderArray } from "./text-encoder/array.js";
 
 export const PG = {
   Result: PGResult,
-  Connection: { conndefaultsHash },
+  get Connection(): typeof Connection {
+    return Connection;
+  },
   connect,
   Error: PGError,
   ConnectionBad,
@@ -24,6 +27,8 @@ export const PG = {
   TextEncoder: { Array: TextEncoderArray },
   TextDecoder: { Array: TextDecoderArray },
 };
+TopLevel.PG = PG;
+
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace PG {
   export type Result = PGResult;

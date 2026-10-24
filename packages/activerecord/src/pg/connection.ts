@@ -17,6 +17,12 @@ export interface PGConnection extends pg.Client {
   sendQuery(sql: string): void;
   getLastResult(): Promise<PG.Result | null>;
   execParams(sql: string | null, params: unknown[]): Promise<PG.Result>;
+  exec(sql: string | null): Promise<PG.Result>;
+  escapeString(str: string): string;
+  waitForNotify(
+    timeout?: number | null,
+    block?: (relname: string, bePid: number, extra: string | undefined) => unknown,
+  ): Promise<string | null>;
   unescapeBytea(value: string | Uint8Array): Buffer;
   transactionStatus(): number;
   status(): number;
@@ -66,12 +72,20 @@ export class Connection {
   pendingResult: Promise<PG.Result> | null = null;
   pendingResultTaken = false;
   typeMapForResults = new PGTypeMapByOid();
+  notifies: pg.Notification[] = [];
+
+  static conndefaultsHash = conndefaultsHash;
 
   constructor(client: object, connParams?: pg.ClientConfig) {
     this.client = client as Client;
     this.connParams = connParams;
     listen(this, this.client);
-    if (typeof this.client.on === "function") this.client.on("error", () => {});
+    if (typeof this.client.on === "function") {
+      this.client.on("error", () => {});
+      this.client.on("notification", (notification: pg.Notification) =>
+        this.notifies.push(notification),
+      );
+    }
   }
 
   query(...args: unknown[]): unknown {
@@ -170,6 +184,35 @@ export class Connection {
         sql != null ? { text: sql, rowMode: "array", types: types(this) } : sql,
       ).catch((error: unknown) => raise(this, error)),
     );
+  }
+
+  exec(sql: string | null): Promise<PG.Result> {
+    return this.asyncExec(sql);
+  }
+
+  escapeString(str: string): string {
+    return str.replace(/'/g, "''");
+  }
+
+  async waitForNotify(
+    timeout: number | null = null,
+    block?: (relname: string, bePid: number, extra: string | undefined) => unknown,
+  ): Promise<string | null> {
+    if (this.notifies.length === 0) {
+      await new Promise<void>((resolve) => {
+        const done = (): void => {
+          clearTimeout(timer);
+          this.client.off("notification", done);
+          resolve();
+        };
+        const timer = timeout == null ? undefined : setTimeout(done, timeout * 1000);
+        this.client.on("notification", done);
+      });
+    }
+    const notification = this.notifies.shift();
+    if (notification === undefined) return null;
+    block?.(notification.channel, notification.processId, notification.payload);
+    return notification.channel;
   }
 
   sendQuery(sql: string): void {
