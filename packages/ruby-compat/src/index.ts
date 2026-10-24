@@ -94,6 +94,7 @@ export {
   rbModAttrWriter,
   defineAccessorHalf,
   isAbsentHalf,
+  writerSpelling,
   rbModDefineMethod,
   rbModMethodDefined,
   rtest,

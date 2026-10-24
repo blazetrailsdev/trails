@@ -761,7 +761,14 @@ export function objRespondToMissing(_obj: unknown, _mid: string, _priv: boolean)
 
 const writerSpellings = new Map<string, string>();
 
-function writerSpelling(attr: string | undefined): string | undefined {
+/**
+ * The `setName` method that answers a Ruby writer `name=` (`rb_id_attrset`,
+ * `vendor/ruby/v3.3.11/vm_method.c:1895`) when it is not a JS accessor's
+ * setter, as {@link rbFSend} and {@link rbObjRespondTo} look it up.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function writerSpelling(attr: string | undefined): string | undefined {
   if (attr === undefined || attr.startsWith("_")) return undefined;
   let writer = writerSpellings.get(attr);
   if (writer === undefined) writerSpellings.set(attr, (writer = camelized(`set_${attr}`)));

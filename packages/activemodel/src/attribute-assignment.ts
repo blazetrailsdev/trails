@@ -11,6 +11,7 @@ import {
   rbFSend,
   rbObjClassname,
   rbObjRespondTo,
+  writerSpelling,
 } from "@blazetrails/ruby-compat";
 import { UnknownAttributeError } from "./errors.js";
 
@@ -71,21 +72,15 @@ export function attributeWriterMissing(
   throw new UnknownAttributeError(this, name);
 }
 
-const writerSpellings = new Map<string, string>();
-
 /**
  * @internal
- * @inventedArm loop — PERMANENT
- * @inventedArm if — PERMANENT
+ * @inventedArm loop — CONVERGEABLE assign-attribute-writer-resolution-cache
+ * @inventedArm if — CONVERGEABLE assign-attribute-writer-resolution-cache
  */
 export function _assignAttribute(this: AttributeAssignment, k: string, v: unknown): unknown {
   const setter = `${k}=`;
   try {
-    let writer = writerSpellings.get(k);
-    if (writer === undefined && !k.startsWith("_")) {
-      writer = `set_${k}`.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase());
-      writerSpellings.set(k, writer);
-    }
+    const writer = writerSpelling(k);
     for (let o: object | null = Object(this) as object; o; o = Object.getPrototypeOf(o)) {
       if (Object.hasOwn(o, setter)) {
         const write = (o as Record<string, unknown>)[setter];
