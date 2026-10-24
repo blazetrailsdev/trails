@@ -67,7 +67,10 @@ export class Base {
     return this.connection.logger;
   }
 
-  /** @missingRailsArgs public_instance_methods — PERMANENT */
+  /**
+   * @missingRailsArgs public_instance_methods — PERMANENT
+   * @inventedArm startsWith — PERMANENT
+   */
   static actionMethods(): Set<string> {
     if (!Object.hasOwn(this, "_actionMethods") || this._actionMethods == null) {
       const internal = new Set(publicInstanceMethods(ActionCable.Channel.Base, true));
