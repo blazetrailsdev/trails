@@ -50,7 +50,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const initializersDir = path.join(cwd, "config/initializers");
   const existent = (await exists(initializersDir))
     ? (await fs.readdir(initializersDir, { recursive: true, encoding: "utf8" }))
-        .filter((file) => /\.(?:ts|js)$/u.test(file) && !file.endsWith(".d.ts"))
+        .filter((file) => /\.(?:ts|js)$/u.test(file))
         .map((file) => path.join(initializersDir, file))
     : [];
   for (const initializer of existent.sort()) await loadConfigInitializer(initializer);
