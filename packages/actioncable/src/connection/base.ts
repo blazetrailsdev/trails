@@ -177,12 +177,12 @@ export class Base {
   }
 
   /** @internal */
-  protected get websocket(): WebSocket {
+  private get websocket(): WebSocket {
     return this._websocket;
   }
 
   /** @internal */
-  protected get messageBuffer(): MessageBuffer {
+  private get messageBuffer(): MessageBuffer {
     return this._messageBuffer;
   }
 

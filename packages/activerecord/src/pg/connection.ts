@@ -73,6 +73,8 @@ export class Connection {
   pendingResultTaken = false;
   typeMapForResults = new PGTypeMapByOid();
   notifies: pg.Notification[] = [];
+  notifyWaiter: ((error?: unknown) => void) | null = null;
+  parameterStatuses: Record<string, string> = {};
 
   static conndefaultsHash = conndefaultsHash;
 
@@ -82,9 +84,12 @@ export class Connection {
     listen(this, this.client);
     if (typeof this.client.on === "function") {
       this.client.on("error", () => {});
-      this.client.on("notification", (notification: pg.Notification) =>
-        this.notifies.push(notification),
-      );
+      this.client.on("notification", (notification: pg.Notification) => {
+        this.notifies.push(notification);
+        this.notifyWaiter?.();
+      });
+      this.client.on("error", (error: unknown) => this.notifyWaiter?.(error));
+      this.client.on("end", () => this.notifyWaiter?.(new ConnectionBad("connection closed")));
     }
   }
 
@@ -191,7 +196,10 @@ export class Connection {
   }
 
   escapeString(str: string): string {
-    return str.replace(/'/g, "''");
+    const escaped = str.replace(/'/g, "''");
+    return this.parameterStatuses["standard_conforming_strings"] === "off"
+      ? escaped.replace(/\\/g, "\\\\")
+      : escaped;
   }
 
   async waitForNotify(
@@ -199,14 +207,15 @@ export class Connection {
     block?: (relname: string, bePid: number, extra: string | undefined) => unknown,
   ): Promise<string | null> {
     if (this.notifies.length === 0) {
-      await new Promise<void>((resolve) => {
-        const done = (): void => {
+      await new Promise<void>((resolve, reject) => {
+        const timer = timeout == null ? undefined : setTimeout(() => done(), timeout * 1000);
+        const done = (error?: unknown): void => {
           clearTimeout(timer);
-          this.client.off("notification", done);
-          resolve();
+          this.notifyWaiter = null;
+          if (error === undefined) resolve();
+          else reject(error);
         };
-        const timer = timeout == null ? undefined : setTimeout(done, timeout * 1000);
-        this.client.on("notification", done);
+        this.notifyWaiter = done;
       });
     }
     const notification = this.notifies.shift();
@@ -326,6 +335,12 @@ function listen(conn: Connection, client: Client): void {
     connection.on("readyForQuery", (message: { status?: string }) => {
       if (typeof message?.status === "string") conn.readyForQuery = message.status;
     });
+    connection.on(
+      "parameterStatus",
+      (message: { parameterName: string; parameterValue: string }) => {
+        conn.parameterStatuses[message.parameterName] = message.parameterValue;
+      },
+    );
     connection.on("errorMessage", () => {
       if (conn.readyForQuery === "T") conn.readyForQuery = "E";
     });

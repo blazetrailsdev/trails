@@ -7,7 +7,6 @@ import {
   Thread,
   kernelCatch,
   kernelThrow,
-  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import type { StreamEventLoop } from "../connection/stream-event-loop.js";
 import { SubscriptionAdapter } from "../namespaces.js";
@@ -40,11 +39,6 @@ interface ConnectionPool {
 
 export interface PostgreSQLServer extends InlineServer {
   eventLoop: StreamEventLoop;
-}
-
-function connectionPool(): ConnectionPool {
-  return (TopLevel.ActiveRecord!.Base as unknown as { connectionPool: ConnectionPool })
-    .connectionPool;
 }
 
 export class PostgreSQL extends Base {
@@ -86,7 +80,9 @@ export class PostgreSQL extends Base {
   async withSubscriptionsConnection<T>(block: (pgConn: PGConn) => Promise<T>): Promise<T> {
     let arConn: ArConn | undefined;
     try {
-      arConn = await connectionPool().newConnection();
+      arConn = await (
+        TopLevel.ActiveRecord!.Base as unknown as { connectionPool: ConnectionPool }
+      ).connectionPool.newConnection();
       const pgConn = (await arConn.rawConnection()) as PGConn;
 
       this.verifyBang(pgConn);
@@ -100,7 +96,9 @@ export class PostgreSQL extends Base {
   }
 
   async withBroadcastConnection<T>(block: (pgConn: PGConn) => Promise<T>): Promise<T> {
-    return await connectionPool().withConnection(async (arConn) => {
+    return await (
+      TopLevel.ActiveRecord!.Base as unknown as { connectionPool: ConnectionPool }
+    ).connectionPool.withConnection(async (arConn) => {
       const pgConn = (await arConn.rawConnection()) as PGConn;
       this.verifyBang(pgConn);
       return await block(pgConn);
@@ -140,35 +138,35 @@ type Command = [
 ];
 
 export class Listener extends SubscriberMap {
-  private adapter: PostgreSQL;
-  private eventLoop: StreamEventLoop;
-  private queue: Queue<Command>;
-  private thread: Thread<Promise<unknown>>;
+  private _adapter: PostgreSQL;
+  private _eventLoop: StreamEventLoop;
+  private _queue: Queue<Command>;
+  private _thread: Thread<Promise<unknown>>;
 
   constructor(adapter: PostgreSQL, eventLoop: StreamEventLoop) {
     super();
 
-    this.adapter = adapter;
-    this.eventLoop = eventLoop;
-    this.queue = new Queue();
+    this._adapter = adapter;
+    this._eventLoop = eventLoop;
+    this._queue = new Queue();
 
-    this.thread = new Thread(() => {
+    this._thread = new Thread(() => {
       Thread.current().abortOnException = true;
       return this.listen();
     });
   }
 
   async listen(): Promise<unknown> {
-    return await this.adapter.withSubscriptionsConnection(async (pgConn) => {
+    return await this._adapter.withSubscriptionsConnection(async (pgConn) => {
       return await kernelCatch("shutdown", async () => {
         for (;;) {
-          while (!this.queue.isEmpty()) {
-            const [action, channel, callback] = this.queue.pop(true);
+          while (!this._queue.isEmpty()) {
+            const [action, channel, callback] = this._queue.pop(true);
 
             switch (action) {
               case "listen":
                 await pgConn.exec(`LISTEN ${pgConn.escapeIdentifier(channel!)}`);
-                if (callback != null) this.eventLoop.post(null, callback);
+                if (callback != null) this._eventLoop.post(null, callback);
                 break;
               case "unlisten":
                 await pgConn.exec(`UNLISTEN ${pgConn.escapeIdentifier(channel!)}`);
@@ -186,22 +184,22 @@ export class Listener extends SubscriberMap {
     });
   }
 
-  async shutdown(): Promise<unknown> {
-    await this.queue.push(["shutdown"]);
-    return await this.thread.value();
+  async shutdown(): Promise<void> {
+    await this._queue.push(["shutdown"]);
+    while (this._thread.isAlive()) await Thread.pass();
   }
 
   override addChannel(channel: string, onSuccess: (() => unknown) | null): void {
-    void this.queue.push(["listen", channel, onSuccess ?? undefined]);
+    void this._queue.push(["listen", channel, onSuccess ?? undefined]);
   }
 
   override removeChannel(channel: string): void {
-    void this.queue.push(["unlisten", channel]);
+    void this._queue.push(["unlisten", channel]);
   }
 
   override invokeCallback(callback: Callback, message: unknown): void {
-    this.eventLoop.post(null, () => super.invokeCallback(callback, message));
+    this._eventLoop.post(null, () => super.invokeCallback(callback, message));
   }
 }
 
-rbModConstSet(SubscriptionAdapter, "PostgreSQL", PostgreSQL);
+SubscriptionAdapter.PostgreSQL = PostgreSQL;

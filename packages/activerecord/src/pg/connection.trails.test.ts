@@ -319,3 +319,52 @@ describe("cancel_any_running_query", () => {
     await expect(cancelAnyRunningQuery.call(host(() => Promise.reject(error)))).rejects.toBe(error);
   });
 });
+
+describe("PG::Connection#wait_for_notify", () => {
+  function emitter() {
+    const handlers: Record<string, ((arg?: unknown) => void)[]> = {};
+    return {
+      on: (event: string, fn: (arg?: unknown) => void) => (handlers[event] ??= []).push(fn),
+      emit: (event: string, arg?: unknown) => handlers[event]?.forEach((fn) => fn(arg)),
+    };
+  }
+
+  it("yields a queued notification and answers its channel", async () => {
+    const client = emitter();
+    const conn = pgConnection(client);
+    client.emit("notification", { channel: "chat", processId: 7, payload: "hi" });
+    const yielded: unknown[] = [];
+    expect(await conn.waitForNotify(1, (...args) => yielded.push(args))).toBe("chat");
+    expect(yielded).toEqual([["chat", 7, "hi"]]);
+  });
+
+  it("answers nil on timeout and raises when the connection ends", async () => {
+    const client = emitter();
+    const conn = pgConnection(client);
+    expect(await conn.waitForNotify(0.01)).toBeNull();
+    const waiting = conn.waitForNotify(null);
+    client.emit("end");
+    await expect(waiting).rejects.toBeInstanceOf(PG.ConnectionBad);
+  });
+});
+
+describe("PG::Connection#escape_string", () => {
+  it("doubles backslashes only when standard_conforming_strings is off", () => {
+    const connection = emitter2();
+    const conn = pgConnection({ on: () => {}, connection });
+    expect(conn.escapeString("a'\\b")).toBe("a''\\b");
+    connection.emit("parameterStatus", {
+      parameterName: "standard_conforming_strings",
+      parameterValue: "off",
+    });
+    expect(conn.escapeString("a'\\b")).toBe("a''\\\\b");
+  });
+
+  function emitter2() {
+    const handlers: Record<string, ((arg: unknown) => void)[]> = {};
+    return {
+      on: (event: string, fn: (arg: unknown) => void) => (handlers[event] ??= []).push(fn),
+      emit: (event: string, arg: unknown) => handlers[event]?.forEach((fn) => fn(arg)),
+    };
+  }
+});

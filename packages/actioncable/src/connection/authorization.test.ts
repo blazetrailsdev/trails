@@ -5,12 +5,9 @@ import { TestCase } from "../test-helpers/test-helper.js";
 import { TestServer } from "../test-helpers/stubs/test-server.js";
 import type { Base as ServerBase } from "../server/base.js";
 import { Base } from "./base.js";
+import type { WebSocket } from "./web-socket.js";
 
 class Connection extends Base {
-  override get websocket() {
-    return super.websocket;
-  }
-
   connect(): void {
     this.rejectUnauthorizedConnection();
   }
@@ -38,7 +35,7 @@ describe("ActionCable::Connection::AuthorizationTest", () => {
       const connection = new Connection(server as unknown as ServerBase, env);
 
       await tc.assertCalledWith(
-        connection.websocket,
+        (connection as unknown as { websocket: WebSocket }).websocket,
         "transmit",
         [
           ActiveSupportJSON.encode({
@@ -49,10 +46,16 @@ describe("ActionCable::Connection::AuthorizationTest", () => {
         ],
         {},
         async () => {
-          await tc.assertCalled(connection.websocket, "close", null, {}, async () => {
-            connection.process();
-            await tc.waitForAsync();
-          });
+          await tc.assertCalled(
+            (connection as unknown as { websocket: WebSocket }).websocket,
+            "close",
+            null,
+            {},
+            async () => {
+              connection.process();
+              await tc.waitForAsync();
+            },
+          );
         },
       );
     });

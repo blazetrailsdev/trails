@@ -7,17 +7,11 @@ import { TestCase } from "../test-helpers/test-helper.js";
 import { TestServer } from "../test-helpers/stubs/test-server.js";
 import type { Base as ServerBase } from "../server/base.js";
 import { Base } from "./base.js";
+import type { WebSocket } from "./web-socket.js";
+import type { MessageBuffer } from "./message-buffer.js";
 
 class Connection extends Base {
   connected?: boolean;
-
-  override get websocket() {
-    return super.websocket;
-  }
-
-  override get messageBuffer() {
-    return super.messageBuffer;
-  }
 
   connect(): void {
     this.connected = true;
@@ -66,10 +60,12 @@ describe("ActionCable::Connection::BaseTest", () => {
       const connection = openConnection();
       connection.process();
 
-      expect(connection.websocket.isPossible()).toBeRubyTruthy();
+      expect(
+        (connection as unknown as { websocket: WebSocket }).websocket.isPossible(),
+      ).toBeRubyTruthy();
 
       await tc.waitForAsync();
-      expect(connection.websocket.isAlive()).toBeTruthy();
+      expect((connection as unknown as { websocket: WebSocket }).websocket.isAlive()).toBeTruthy();
     });
   });
 
@@ -87,15 +83,21 @@ describe("ActionCable::Connection::BaseTest", () => {
       const connection = openConnection();
 
       await tc.assertCalledWith(
-        connection.websocket,
+        (connection as unknown as { websocket: WebSocket }).websocket,
         "transmit",
         [ActiveSupportJSON.encode({ type: "welcome" })],
         {},
         async () => {
-          await tc.assertCalled(connection.messageBuffer, "processBang", null, {}, async () => {
-            connection.process();
-            await tc.waitForAsync();
-          });
+          await tc.assertCalled(
+            (connection as unknown as { messageBuffer: MessageBuffer }).messageBuffer,
+            "processBang",
+            null,
+            {},
+            async () => {
+              connection.process();
+              await tc.waitForAsync();
+            },
+          );
         },
       );
 
@@ -139,9 +141,15 @@ describe("ActionCable::Connection::BaseTest", () => {
       const connection = openConnection();
       connection.process();
 
-      await tc.assertCalled(connection.websocket, "close", null, {}, () => {
-        connection.close({ reason: "testing" });
-      });
+      await tc.assertCalled(
+        (connection as unknown as { websocket: WebSocket }).websocket,
+        "close",
+        null,
+        {},
+        () => {
+          connection.close({ reason: "testing" });
+        },
+      );
     });
   });
 
