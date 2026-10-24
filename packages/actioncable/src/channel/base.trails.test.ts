@@ -1,3 +1,4 @@
+import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { describe, expect, it } from "vitest";
 import "../test-helpers/test-helper.js";
 import { TestConnection } from "../test-helpers/stubs/test-connection.js";
@@ -16,7 +17,6 @@ class ChatChannel extends BasicChannel {
   isSubscribed(): boolean {
     return true;
   }
-  _hidden(): void {}
   override subscribed(): Promise<void> {
     return new Promise((resolve) =>
       setTimeout(() => {
@@ -40,7 +40,7 @@ class ChatChannel extends BasicChannel {
 }
 
 describe("ActionCable::Channel::Base", () => {
-  it("counts subclass members, getters and predicates, not Base or _-prefixed ones", () => {
+  it("counts subclass members, getters and predicates, not Base or #private ones", () => {
     expect([...ChatChannel.actionMethods()].sort()).toEqual(
       [
         "chatters",
@@ -94,5 +94,26 @@ describe("ActionCable::Channel::Base", () => {
       connection.currentUser,
     );
     expect(ChatChannel.actionMethods().has("currentUser")).toBe(false);
+  });
+
+  it("closes the perform_action event after an async action settles", async () => {
+    class SlowChannel extends Base {
+      done = false;
+      async slow(): Promise<void> {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        this.done = true;
+      }
+    }
+    const channel = new SlowChannel(new TestConnection() as never, "{id: 1}");
+    const events: NotificationEvent[] = [];
+    Notifications.subscribe("perform_action.action_cable", (event) => events.push(event));
+    try {
+      await channel.performAction({ action: "slow" });
+    } finally {
+      Notifications.unsubscribe("perform_action.action_cable");
+    }
+    expect(channel.done).toBe(true);
+    expect(events.length).toBe(1);
+    expect(events[0].duration).toBeGreaterThanOrEqual(15);
   });
 });

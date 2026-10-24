@@ -67,10 +67,7 @@ export class Base {
     return this.connection.logger;
   }
 
-  /**
-   * @missingRailsArgs public_instance_methods — PERMANENT
-   * @inventedArm startsWith — PERMANENT
-   */
+  /** @missingRailsArgs public_instance_methods — PERMANENT */
   static actionMethods(): Set<string> {
     if (!Object.hasOwn(this, "_actionMethods") || this._actionMethods == null) {
       const internal = new Set(publicInstanceMethods(ActionCable.Channel.Base, true));
@@ -78,7 +75,7 @@ export class Base {
         ...publicInstanceMethods(this, true).filter((name) => !internal.has(name)),
         ...publicInstanceMethods(this, false),
       ];
-      this._actionMethods = new Set(methods.filter((name) => !name.startsWith("_")));
+      this._actionMethods = new Set(methods);
     }
     return this._actionMethods;
   }
@@ -194,7 +191,7 @@ export class Base {
   private delegateConnectionIdentifiers(): void {
     for (const identifier of this.connection.identifiers) {
       Object.defineProperty(this, identifier, {
-        value: () => (this.connection as unknown as Record<string, unknown>)[identifier],
+        value: () => rbFSend(this.connection, identifier),
         configurable: true,
         writable: true,
       });
@@ -215,9 +212,9 @@ export class Base {
 
   /** @internal */
   private async dispatchAction(action: string, data: Data): Promise<unknown> {
-    this.logger.debug(this.actionSignature(action, data));
-
     try {
+      this.logger.debug(this.actionSignature(action, data));
+
       if (rbObjMethod(this, action).arity() === 1) {
         return await rbFSend(this, action, data);
       } else {
