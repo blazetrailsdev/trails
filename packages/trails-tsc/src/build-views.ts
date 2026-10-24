@@ -2,7 +2,7 @@ import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import ts from "typescript-5";
-import { Encoding } from "@blazetrails/ruby-compat";
+import { Encoding, rbFLoad } from "@blazetrails/ruby-compat";
 import {
   Notifications,
   camelize,
@@ -187,7 +187,7 @@ async function deepestExisting(p: string): Promise<string> {
 
 async function loadConfigInitializer(initializer: string): Promise<void> {
   await Notifications.instrument("load_config_initializer.railties", { initializer }, async () => {
-    await import(initializer);
+    await rbFLoad(initializer);
   });
 }
 
