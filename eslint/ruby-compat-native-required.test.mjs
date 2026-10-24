@@ -49,7 +49,9 @@ tester.run("ruby-compat-native-required", rule, {
   ],
   invalid: [
     // plain objects
-    invalid("declare const h: Record<string, number>; hashDelete(h, 'a');"),
+    invalid(
+      "type Record<K extends keyof any, T> = { [P in K]: T }; declare const h: Record<string, number>; hashDelete(h, 'a');",
+    ),
     invalid("declare const h: { [k: string]: number }; hashDelete(h, 'a');"),
     invalid("declare const h: { a?: number }; hashDelete(h, 'a');"),
     invalid("declare const h: { a: number } | undefined; hashDelete(h!, 'a');"),
