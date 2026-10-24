@@ -559,6 +559,14 @@ export class Timezone {
     this.identifier = name;
   }
 
+  equals(tz: unknown): boolean {
+    return tz instanceof Timezone && this.identifier === tz.identifier;
+  }
+
+  eql(tz: unknown): boolean {
+    return this.equals(tz);
+  }
+
   get name(): string {
     return this.identifier;
   }
