@@ -3135,15 +3135,17 @@ class ApiExtractor
   # Hash forms (`in`, `delete`, `Object.assign`, a spread, an `Object.entries`
   # loop) for the Hash calls each one ports.
   RECEIVER_NAMED_CALLS = %w[
-    size length call key? has_key? include? member? delete merge! update merge each_pair
+    size length call key? has_key? include? member? delete merge! update merge each_pair fetch
   ].freeze
 
   # The Hash calls whose block arm no native form ports: the miss block of
   # `delete` and the conflict block of `merge` / `merge!` / `update`. A site
   # passing one, literal or `&blk`, records its receiver as unnamed, so no form
   # credits it. Neither does a `delete` whose removed value is used: JS
-  # `delete` answers a boolean.
-  BLOCK_ARM_HASH_CALLS = %w[delete merge merge! update].freeze
+  # `delete` answers a boolean. `fetch` keeps only its two-argument arm
+  # (`vendor/ruby/v3.3.11/hash.c:2176`): the KeyError arm and the miss block
+  # have no native form.
+  BLOCK_ARM_HASH_CALLS = %w[delete merge merge! update fetch].freeze
 
   FORM_ARMS = {
     "uniq" => ->(has_block, _args) { !has_block },
@@ -4514,7 +4516,8 @@ class ApiExtractor
       (@call_receivers[name] ||= Set.new) << kind
       if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
         formless = ((has_block || block_pass?(args)) && BLOCK_ARM_HASH_CALLS.include?(name)) ||
-                   (value_used && name == "delete")
+                   (value_used && name == "delete") ||
+                   (name == "fetch" && positional_arg_count(args) != 2)
         recv_name = name == "merge" ? merge_receiver_name(recv) : receiver_tail_name(recv)
         (@call_receiver_names[name] ||= Set.new) << ((!formless && recv_name) || "?")
       end

@@ -215,6 +215,7 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
   ["assign", "Object.assign(h, other)"],
   ["spread", "{ ...h, ...other }"],
   ["entries", "for (const [k, v] of Object.entries(h))"],
+  ["fetch", 'Object.hasOwn(h, "k") ? h.k : d'],
 ]);
 
 /**
@@ -298,9 +299,14 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   that `merge` gives to its argument. What follows the leading spread is not
  *   paired with the Ruby argument.
  *   `each` on a hash has no row: {@link NO_JS_CALL_FORM} (compare.ts) already
- *   drops it for every receiver. `fetch` has none either, because JS has no
- *   form for it: `h.k ?? d` substitutes the default for a stored `nil`, which
- *   `h.fetch(:k, d)` does not, and marks nothing.
+ *   drops it for every receiver. `fetch` (`hash.c:2176`) credits on its
+ *   two-argument arm only, as `Object.hasOwn(h, "k") ? h.k : d` with a literal
+ *   key read back off the same receiver: a stored `nil` / `false` answers the
+ *   stored value and a miss the default. `h.k ?? d` substitutes the default
+ *   for a stored `nil` and marks nothing. The one-argument KeyError arm and
+ *   the block arm leave the receiver unnamed (extract-ruby-api.rb), so only
+ *   the helper satisfies them, and the row takes a proven `hash` receiver
+ *   only, since `Cache::Store#fetch` is the same name.
  * - The value rows (RFC 0194). Each credits only where every site of the name
  *   has the one proven kind its form ports, and records no receiver name:
  *   `extract-ts-api.ts#nativeValueForms` marks the form wherever it appears.
@@ -412,6 +418,7 @@ export const NATIVE_FORM_ANALOGUES = new Map<
     "member?",
     { form: "in", receivers: "explicit", creditedKinds: new Set(["hash"]), named: true, key: true },
   ],
+  ["fetch", { form: "fetch", receivers: "explicit", creditedKinds: HASH, named: true, key: true }],
   [
     "delete",
     { form: "delete", receivers: "explicit", uncreditedKinds: NOT_A_HASH, named: true, key: true },

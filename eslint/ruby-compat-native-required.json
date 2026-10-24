@@ -1,0 +1,8 @@
+{
+  "hashDelete": {
+    "member": "delete",
+    "native": "delete h[k]",
+    "maxArgs": 2,
+    "void": true
+  }
+}

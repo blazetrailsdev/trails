@@ -12,7 +12,9 @@
  * a `for…of` over `Object.entries(h)` credit `key?`, `delete`, `merge!`,
  * `merge` and `each_pair` through `NATIVE_FORM_ANALOGUES`
  * (`scripts/api-compare/enumerable-idioms.ts`), so the reverse reading does not
- * send such a body to the helper. `Hash#fetch` has no native form.
+ * send such a body to the helper. Two-argument `Hash#fetch` on a proven Hash is
+ * credited by `Object.hasOwn(h, "k") ? h.k : d`; its other arms have no
+ * native form.
  *
  * ── Keyed by the MRI SPELLING, and why that is not enough on its own ────────
  * Rows are keyed `Receiver#method` / `Receiver.method`, because the bare name is
@@ -48,6 +50,11 @@
  * crediting it cannot silence a dropped call of one. ONE name per row, never a
  * list of the spellings in the tree: an alias list would ratify the divergence
  * the row exists to make visible.
+ *
+ * `Kernel#send` has no row: `send` / `public_send` are not scored call names
+ * (`NO_JS_CALL_FORM`'s note, `scripts/api-compare/compare.ts`), their faithful
+ * port is a direct or computed member access, and the reverse reading would
+ * otherwise demand `rbFSend` there.
  */
 export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Comparable#<=>", "cmp"],
@@ -63,7 +70,6 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Kernel#inspect", "rbInspect"],
   ["Kernel#method", "rbObjMethod"],
   ["Kernel#object_id", "rbObjId"],
-  ["Kernel#send", "rbFSend"],
   ["Kernel#throw", "kernelThrow"],
   ["Kernel#Rational", "rational"],
   ["Module#define_method", "rbModDefineMethod"],

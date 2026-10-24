@@ -120,21 +120,23 @@ port a body:
 - **`fetch` vs `??`.** `h.fetch(:k, default)` returns the _stored_ value
   whenever the key exists — including a stored `nil` or `false`. `h.k ?? default`
   substitutes the default for `null`/`undefined`. They differ, and Rails
-  relation readers depend on the difference. `fetch` has no native form, so it
-  is always ruby-compat's `fetch` (see the next bullet).
+  relation readers depend on the difference. Its two-argument arm on a plain
+  object with a literal key is `Object.hasOwn(h, "k") ? h.k : default`; every
+  other `fetch` is ruby-compat's `fetch` (see the next bullet).
 - **Hash calls on a plain object.** Where the receiver is a plain object, write
   the JS form and not the ruby-compat helper. The call gates credit the form on
   the receiver Rails names, and `parity:api:calls:args` checks a literal key.
 
-  | Ruby                                       | Native form                               | Keeps the helper where                                                                                                    |
-  | ------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-  | `h.key?(:k)` / `has_key?`                  | `"k" in h`; `Object.hasOwn(h, k)`         | the object can hold `{ k: undefined }` for an absent keyword                                                              |
-  | `h[k]` / `h[k] = v`                        | `h[k]` / `h[k] = v`                       | a miss must read `null`; `k` is caller-supplied (`"__proto__"`, an `Object.prototype` name); a test asserts `FrozenError` |
-  | `h.delete(:k)`                             | `delete h.k`                              | the removed value is used, or a block is passed                                                                           |
-  | `h.merge!(other)` / `update`               | `Object.assign(h, other)`                 | a conflict block is passed                                                                                                |
-  | `h.merge(other)`                           | `{ ...h, ...other }`                      | a conflict block is passed; the result must have no prototype                                                             |
-  | `h.each_pair { \|k, v\| }`                 | `for (const [k, v] of Object.entries(h))` | the call's return value is used                                                                                           |
-  | `fetch`, `delete_if`, `keep_if`, `replace` | none                                      | always                                                                                                                    |
+  | Ruby                              | Native form                               | Keeps the helper where                                                                                                    |
+  | --------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+  | `h.key?(:k)` / `has_key?`         | `"k" in h`; `Object.hasOwn(h, k)`         | the object can hold `{ k: undefined }` for an absent keyword                                                              |
+  | `h[k]` / `h[k] = v`               | `h[k]` / `h[k] = v`                       | a miss must read `null`; `k` is caller-supplied (`"__proto__"`, an `Object.prototype` name); a test asserts `FrozenError` |
+  | `h.delete(:k)`                    | `delete h.k`                              | the removed value is used, or a block is passed                                                                           |
+  | `h.merge!(other)` / `update`      | `Object.assign(h, other)`                 | a conflict block is passed                                                                                                |
+  | `h.merge(other)`                  | `{ ...h, ...other }`                      | a conflict block is passed; the result must have no prototype                                                             |
+  | `h.each_pair { \|k, v\| }`        | `for (const [k, v] of Object.entries(h))` | the call's return value is used                                                                                           |
+  | `h.fetch(:k, default)`            | `Object.hasOwn(h, "k") ? h.k : default`   | the key is computed; one argument (`KeyError`) or a block is passed                                                       |
+  | `delete_if`, `keep_if`, `replace` | none                                      | always                                                                                                                    |
 
   `in` is for a literal key that is not an `Object.prototype` member name;
   a computed or caller-supplied key is `Object.hasOwn(h, k)`, since `in` walks
