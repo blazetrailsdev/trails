@@ -1,4 +1,5 @@
 import { afterAll } from "vitest";
+import { getEnv } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/activerecord";
 import { SolidQueue } from "../solid-queue.js";
 import { loadQueueSchema, loadShardSchemas } from "./queue-schema.js";
@@ -9,7 +10,10 @@ const envName = String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
 
 function databaseNameFrom(name: string): string {
   const database = String(primary.database);
-  if (database === ":memory:") return database;
+  if (database === ":memory:") {
+    const worker = getEnv("VITEST_POOL_ID") ?? "1";
+    return `${import.meta.dirname}/../../tmp/test_${name}_${worker}.sqlite3`;
+  }
   const dot = database.lastIndexOf(".");
   if (primary.adapter !== "sqlite3" || dot < database.lastIndexOf("/")) {
     return `${database}_${name}`;
