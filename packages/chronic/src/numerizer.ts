@@ -1,4 +1,4 @@
-import { StringScanner } from "@blazetrails/ruby-compat";
+import { StringScanner, toI, toF, rbObjDup } from "@blazetrails/ruby-compat";
 import { Chronic } from "./namespaces.js";
 
 export class Numerizer {
@@ -69,6 +69,8 @@ export class Numerizer {
   ];
 
   static numerize(string: string): string {
+    string = rbObjDup(string);
+
     string = string.replace(/ +|([^\d])-([^\d])/g, (_m, a = "", b = "") => `${a} ${b}`);
     string = string.replace(/a half/g, "haAlf");
 
@@ -83,8 +85,7 @@ export class Numerizer {
     for (const tp of Numerizer.TEN_PREFIXES) {
       string = string.replace(
         new RegExp(`(?:${tp[0]}) *<num>(\\d(?=[^\\d]|$))*`, "gim"),
-        (_m, d1: string | undefined) =>
-          "<num>" + String(tp[1] + (d1 == null ? 0 : parseInt(d1, 10))),
+        (_m, d1: string | undefined) => "<num>" + String(tp[1] + (toI(d1) as number)),
       );
     }
 
@@ -94,13 +95,13 @@ export class Numerizer {
 
     for (const bp of Numerizer.BIG_PREFIXES) {
       string = string.replace(new RegExp(`(?:<num>)?(\\d*) *${bp[0]}`, "gim"), (_m, d1: string) =>
-        d1.length === 0 ? String(bp[1]) : "<num>" + String(bp[1] * parseInt(d1, 10)),
+        d1.length === 0 ? String(bp[1]) : "<num>" + String(bp[1] * (toI(d1) as number)),
       );
       string = Numerizer.andition(string);
     }
 
     string = string.replace(/(\d+)(?: | and |-)*haAlf/gi, (_m, d1: string) =>
-      String(parseFloat(d1) + 0.5),
+      String(toF(d1) + 0.5),
     );
 
     return string.replace(/<num>/g, "");
@@ -116,7 +117,7 @@ export class Numerizer {
         string =
           string.slice(0, from) +
           "<num>" +
-          String(parseInt(sc.get(1)!, 10) + parseInt(sc.get(3)!, 10)) +
+          String((toI(sc.get(1)) as number) + (toI(sc.get(3)) as number)) +
           string.slice(sc.pos);
         sc.string = string;
         sc.reset();

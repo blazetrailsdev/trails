@@ -43,6 +43,7 @@ import {
   rbObjRespondTo,
   RUBY_VERSION,
   RuntimeError,
+  toF,
 } from "@blazetrails/ruby-compat";
 import { Date } from "./date.js";
 import { Chronic, type TimeClass } from "./namespaces.js";
@@ -131,7 +132,7 @@ export function construct(
     ) as unknown as RubyTime;
   } else if (
     !(rbObjRespondTo(Chronic.timeClass(), "new") || typeof Chronic.timeClass() === "function") ||
-    (parseFloat(RUBY_VERSION) < 1.9 && Chronic.timeClass().name === "Time")
+    (toF(RUBY_VERSION) < 1.9 && Chronic.timeClass().name === "Time")
   ) {
     return Chronic.timeClass().local(year, month, day, hour, minute, second);
   } else {

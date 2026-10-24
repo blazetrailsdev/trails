@@ -9,7 +9,7 @@ export class Ordinal extends Tag<number> {
     for (let i = 0; i < tokens.length; i++) {
       const m = /^(\d+)(st|nd|rd|th|\.)$/m.exec(tokens[i].word);
       if (m) {
-        const ordinal = parseInt(m[1], 10);
+        const ordinal = toI(m[1]) as number;
         tokens[i].tag(new Ordinal(ordinal));
         if (Date.isCouldBeDay(ordinal)) tokens[i].tag(new OrdinalDay(ordinal));
         if (Date.isCouldBeMonth(ordinal)) tokens[i].tag(new OrdinalMonth(ordinal));

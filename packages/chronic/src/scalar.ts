@@ -13,7 +13,7 @@ export class Scalar extends Tag<number> {
       const token = tokens[i];
       const postToken = tokens[i + 1];
       if (/^\d+$/m.test(token.word)) {
-        const scalar = parseInt(token.word, 10);
+        const scalar = toI(token.word) as number;
         token.tag(new Scalar(scalar));
         if (Time.isCouldBeSubsecond(scalar)) token.tag(new ScalarSubsecond(scalar));
         if (Time.isCouldBeSecond(scalar)) token.tag(new ScalarSecond(scalar));

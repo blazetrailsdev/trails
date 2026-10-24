@@ -5,6 +5,8 @@ import {
   kernelCatch,
   kernelThrow,
   stringSplit,
+  toI,
+  toF,
 } from "@blazetrails/ruby-compat";
 import { Chronic } from "../namespaces.js";
 import { Repeater } from "../repeater.js";
@@ -64,7 +66,7 @@ export class RepeaterTime extends Repeater<Tick> {
     }
 
     let ambiguous = false;
-    let hours = parseInt(timeParts[0], 10) || 0;
+    let hours = toI(timeParts[0]) as number;
 
     if (
       this.options.hours24 == null ||
@@ -85,10 +87,10 @@ export class RepeaterTime extends Repeater<Tick> {
     let seconds = 0;
     let subseconds = 0;
 
-    if (timeParts.length > 1) minutes = (parseInt(timeParts[1], 10) || 0) * 60;
-    if (timeParts.length > 2) seconds = parseInt(timeParts[2], 10) || 0;
+    if (timeParts.length > 1) minutes = (toI(timeParts[1]) as number) * 60;
+    if (timeParts.length > 2) seconds = toI(timeParts[2]) as number;
     if (timeParts.length > 3) {
-      subseconds = (parseFloat(timeParts[3]) || 0) / 10 ** timeParts[3].length;
+      subseconds = toF(timeParts[3]) / 10 ** timeParts[3].length;
     }
 
     this.type = new Tick(hours + minutes + seconds + subseconds, ambiguous);

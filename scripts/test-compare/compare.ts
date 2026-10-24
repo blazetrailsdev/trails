@@ -178,9 +178,6 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   }
 
   if (pkg === "chronic") {
-    // chronic names each test `test_<x>.rb` (vendor/chronic/v0.10.2/test),
-    // the prefix rack spells `spec_`; drop it so both sides land on
-    // `packages/chronic/src/<x>.test.ts`.
     const base = path.basename(rubyFile, ".rb").replace(/^test_/, "");
     return base.replace(/_/g, "-") + ".test.ts";
   }

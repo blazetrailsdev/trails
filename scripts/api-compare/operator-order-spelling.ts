@@ -45,10 +45,7 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
     ">>": ["bitwiseShiftRight"],
     "~@": ["bitwiseNot"],
   },
-  // chronic/repeater.rb:123 `def <=>(other)` → repeater.ts `Repeater#compareTo`.
   "Chronic::Repeater": { "<=>": ["compareTo"] },
-  // chronic/repeaters/repeater_time.rb:15 Tick `def *(other)` → repeater-time.ts
-  // `Tick#multiply`.
   "Chronic::RepeaterTime::Tick": { "*": ["multiply"] },
   // connection_pool.rb WeakThreadKeyMap `def [](key)` → connection-pool.ts
   // `WeakThreadKeyMap#get`, and `def []=(key, value)` → `set`.
