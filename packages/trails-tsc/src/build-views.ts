@@ -3,7 +3,14 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import ts from "typescript-5";
 import { Encoding } from "@blazetrails/ruby-compat";
-import { camelize, chomp, dasherize, pluralize, underscore } from "@blazetrails/activesupport";
+import {
+  Notifications,
+  camelize,
+  chomp,
+  dasherize,
+  pluralize,
+  underscore,
+} from "@blazetrails/activesupport";
 import {
   decodeLineMappings,
   generateSourceMap,
@@ -40,7 +47,13 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const outViews = opts.inPlace ? viewsDir : path.join(outDir, "views");
   const { Base, PathParser, TemplateHandlers, TseHandler, UnboundTemplate, WrongEncodingError } =
     await import("@blazetrails/actionview");
-  await loadConfigInitializers(path.join(cwd, "config/initializers"));
+  const initializersDir = path.join(cwd, "config/initializers");
+  const existent = (await exists(initializersDir))
+    ? (await fs.readdir(initializersDir, { recursive: true, encoding: "utf8" }))
+        .filter((file) => /\.(?:ts|js)$/u.test(file) && !file.endsWith(".d.ts"))
+        .map((file) => path.join(initializersDir, file))
+    : [];
+  for (const initializer of existent.sort()) await loadConfigInitializer(initializer);
   const pathParser = new PathParser();
   const { files, skipped } = await walkTemplates(
     viewsDir,
@@ -172,12 +185,10 @@ async function deepestExisting(p: string): Promise<string> {
   return cur;
 }
 
-async function loadConfigInitializers(dir: string): Promise<void> {
-  if (!(await exists(dir))) return;
-  const existent = (await fs.readdir(dir, { recursive: true, encoding: "utf8" }))
-    .filter((file) => /\.(?:ts|js)$/u.test(file) && !file.endsWith(".d.ts"))
-    .map((file) => path.join(dir, file));
-  for (const initializer of existent.sort()) await import(initializer);
+async function loadConfigInitializer(initializer: string): Promise<void> {
+  await Notifications.instrument("load_config_initializer.railties", { initializer }, async () => {
+    await import(initializer);
+  });
 }
 
 async function walkTemplates(
