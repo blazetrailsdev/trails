@@ -60,10 +60,10 @@ function nativeKind(checker, program, type, member) {
   if (type.getProperty(member) !== undefined) return undefined;
   const symbol = type.aliasSymbol === undefined ? type.getSymbol() : undefined;
   if (symbol !== undefined && DISPATCHING.has(symbol.getName())) return undefined;
-  const mapped = (ts.getObjectFlags(type) & ts.ObjectFlags.Mapped) !== 0;
+  const anonymous = symbol === undefined || symbol.getName().startsWith("__");
   for (const decl of symbol?.getDeclarations() ?? []) {
     if (ts.isClassLike(decl)) return undefined;
-    if (!mapped && program.isSourceFileDefaultLibrary(decl.getSourceFile())) return undefined;
+    if (!anonymous && program.isSourceFileDefaultLibrary(decl.getSourceFile())) return undefined;
   }
   return "object";
 }
