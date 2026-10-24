@@ -311,7 +311,7 @@ export function rbNumDuration(x: any, unit: string): any {
   // (snake_case → camelCase, \`x?\` → \`isX\`), as conventions.ts translates it.
   rbTsName: `export function rbTsName(name: any): string {
   const s = String(name);
-  const camel = s.replace(/[?!]$/, "").replace(/_([a-z0-9])/g, (_m, c) => c.toUpperCase());
+  const camel = s.replace(/[?!]$/, "").replace(/(?<=.)_([a-z0-9])/g, (_m, c) => c.toUpperCase());
   return s.endsWith("?") ? "is" + camel[0].toUpperCase() + camel.slice(1) : camel;
 }`,
   // Enumerable#count with a block (enum.c count_iter_i).

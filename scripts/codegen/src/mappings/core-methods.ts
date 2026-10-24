@@ -381,6 +381,30 @@ rule("match?", (c) => {
   return `${c.rc("isMatch")}(${c.r}, ${c.args().join(", ")})`;
 });
 
+// `String#match` / `Regexp#match` (string.c rb_str_match_m, re.c rb_reg_match_m)
+// answer a MatchData, which a JS `String#match` array is not: ruby-compat's
+// String method table's `match`, a Regexp receiver swapping the operands.
+rule("match", (c) => {
+  if (c.blk || argc(c) < 1 || argc(c) > 2) return null;
+  // A gem's own `match` (raabro's `Input#match`) keeps it, unless the receiver is a
+  // String: typed one, or a slice of one (`@string[@offset..-1].match(re)`).
+  const stringy =
+    (c.recvType?.k === "prim" && c.recvType.name === "string") ||
+    (c.recvNode?.k === "call" && c.recvNode.name === "[]");
+  if (c.lw.index.methodNames.has(c.name) && !stringy) return null;
+  const [pat, ...pos] = c.args();
+  const re =
+    c.recvNode?.k === "regex" || (c.recvType?.k === "prim" && c.recvType.name === "RegExp");
+  const [str, p] = re ? [pat, c.r] : [c.r, pat];
+  return `${c.rc("rbStrSend")}(${[str, '"match"', p, ...pos].join(", ")})[0]`;
+});
+
+// `Class#allocate` (object.c rb_class_alloc): an instance with no initializer run.
+rule("allocate", (c) => {
+  if (c.lw.index.methodNames.get("allocate")?.def || argc(c) !== 0 || c.blk) return null;
+  return `Object.create(${c.R}.prototype)`;
+});
+
 rule("zero?", (c) => `(${c.r} === 0)`);
 rule("push unshift", (c) => `${c.R}${c.nav}${c.name}(${c.args().join(", ")})`);
 rule("pop shift", (c) => (argc(c) === 0 ? `${c.R}${c.nav}${c.name}()` : null));
@@ -398,6 +422,10 @@ rule("call", (c) => {
     ctx.asyncBox.awaits = true;
     return `(await ${c.R}${c.nav === "?." ? "?." : ""}(${c.args().join(", ")}))`;
   }
+  // `Method#call` (proc.c rb_method_call) is ruby-compat's `Method.call`.
+  const t = c.recvType;
+  if (t?.k === "class" && t.key === "@ruby-compat/method.ts#Method")
+    return `${c.R}${c.nav}call(${c.args().join(", ")})`;
   if (recvNode.k !== "self") return `${c.R}${c.nav === "?." ? "?." : ""}(${c.args().join(", ")})`;
   return null;
 });

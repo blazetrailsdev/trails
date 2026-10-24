@@ -48,7 +48,7 @@ import { FLAT_ASSERTION_MODULES } from "./mappings/kernel.js";
 
 /** A JS class's own statics, which a `declare static` may not redeclare. */
 const FUNCTION_OWN = new Set(["prototype", "name", "length", "caller", "arguments"]);
-import { CITE_PREFIX, GEM, PKG_DIR, handNamespaceFqns } from "./gem.js";
+import { CITE_PREFIX, GEM, PKG_DIR, depGem, handNamespaceFqns } from "./gem.js";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -909,11 +909,13 @@ export class Emitter {
     const binding = params.length === 1 ? one(params[0]) : `[${params.map(one).join(", ")}]`;
     const names = params.flatMap((p) => (p.destructure ?? [p.name!]).filter(Boolean));
     const list =
-      s.recv.k === "const" || (s.recv.k === "lvar" && this.tableConsts.has(s.recv.name))
-        ? jsIdent(tableName(s.recv))
-        : s.recv.k !== "hash"
-          ? this.lw.expr(s.recv, ctx)
-          : this.pairList(s.recv, ctx);
+      s.recv.k === "const"
+        ? tableName(s.recv)
+        : s.recv.k === "lvar" && this.tableConsts.has(s.recv.name)
+          ? jsIdent(tableName(s.recv))
+          : s.recv.k !== "hash"
+            ? this.lw.expr(s.recv, ctx)
+            : this.pairList(s.recv, ctx);
     return { binding, list, names };
   }
 
@@ -1935,7 +1937,11 @@ export class Emitter {
     // meet the gem's cycles half-evaluated.
     const req = f.requireOrder ?? [];
     const first = (x: string) =>
-      x === "@root/test-helpers/helper.js" ? -1 : req.includes(x) ? req.indexOf(x) : req.length;
+      x === "@root/test-helpers/helper.js" || x === "@root/test-helpers/spec-helper.js"
+        ? -1
+        : req.includes(x)
+          ? req.indexOf(x)
+          : req.length;
     const specs = [...f.imports.keys()].sort(
       (a, b) => first(a) - first(b) || (a < b ? -1 : a > b ? 1 : 0),
     );
@@ -3291,6 +3297,32 @@ export class Emitter {
    * ahead and assigned in a `static {}` block where Ruby's statement stands, so
    * the static fields before it are set first.
    */
+  /**
+   * Ruby's `method_added` hook fires as each method after an `include` is
+   * defined; JS has no such hook, so a module mixing in one that defines it
+   * (raabro's `ModuleMethods#method_added`, which records the root rule) calls
+   * it explicitly in definition order, as trails' Thor port registers commands.
+   */
+  methodAddedLines(a: N, u: Unit, name: string, rest: N[]): string[] {
+    if (a.k !== "const") return [];
+    const hit = this.index.resolveConst(a.path, u.nesting);
+    const local =
+      hit?.kind === "scope" &&
+      [...this.index.scopes.values()].some(
+        (sc) =>
+          (sc.fqn === hit.fqn || sc.fqn.startsWith(`${hit.fqn}::`)) && sc.defs.has("method_added"),
+      );
+    const root = a.path.filter((x: string) => x)[0];
+    if (!local && !(!hit && depGem(root)?.methodAdded)) return [];
+    const names = rest
+      .filter((d) => d.k === "def" && !d.singleton)
+      .map((d) => JSON.stringify(d.name));
+    if (!names.length) return [];
+    return [
+      `for (const m of [${names.join(", ")}]) (${name} as unknown as { methodAdded(m: string): unknown }).methodAdded(m);`,
+    ];
+  }
+
   /** Whether a class-body statement reads or writes one of the body's locals. */
   readsLocals(s: N, locals: Set<string>): boolean {
     if (!locals.size) return false;
@@ -3573,16 +3605,25 @@ export class Emitter {
     const vis = this.visibilityOf(body);
     this.ivarTypes(u, f, body);
     const ctxStatic = this.baseCtx(u, f, { selfKind: "static", selfExpr: name });
-    // The functions its reopening files seat on it (Resolver.seatsReopeningFn),
-    // typed through a type-only import, which adds no runtime edge.
+    // The functions its reopening files define (Resolver.seatsReopeningFn) are
+    // seated on it here, after the class: a function declaration is bound when
+    // its module links, so the import is safe inside the gem's require cycles,
+    // where a seat in the reopening file could run before the class exists.
+    const seated: string[] = [];
     if (this.resolver.exportNames.get(u.fqn)?.tsFile === f.tsFile) {
-      const up = "../".repeat(f.tsFile.split("/").length - 1) || "./";
       for (const [rb, d] of this.index.scopes.get(u.fqn)?.sdefs ?? []) {
         if (/=$/.test(rb) || !this.resolver.seatsReopeningFn(u.fqn, d.file, "")) continue;
         const js = tsMethodName(rb, u.fqn, true);
-        const mod = up + this.resolver.tsFileOf(d.file).replace(/\.ts$/, ".js");
-        members.push(`declare static ${js}: typeof import(${JSON.stringify(mod)}).${js};`);
+        const local = this.resolver.importFrom(
+          this.resolver.tsFileOf(d.file),
+          js,
+          ctxStatic,
+          this.lw,
+        );
+        members.push(`declare static ${js}: typeof ${local};`);
+        seated.push(local === js ? js : `${js}: ${local}`);
       }
+      if (seated.length) after.push(`Object.assign(${name}, { ${seated.join(", ")} });`);
     }
     const parentFqn = u.fqn.endsWith("::ClassMethods")
       ? u.fqn.slice(0, -"::ClassMethods".length)
@@ -3662,6 +3703,7 @@ export class Emitter {
           )
             continue;
           after.push(`${this.lw.rc(ctxStatic, s.name)}(${name}, ${this.lw.expr(a, ctxStatic)});`);
+          after.push(...this.methodAddedLines(a, u, name, body.slice(body.indexOf(s) + 1)));
         }
       } else if (
         s.k === "call" &&
@@ -4240,13 +4282,7 @@ export class Emitter {
       // Its functions' `self` (`@deprecator` on `ActiveJob`) is that class, read
       // at call time.
       if (this.resolver.isClassModule(u.fqn) && primary && primary.tsFile !== f.tsFile) {
-        // Its functions are seated on the class for callers in other files
-        // (Resolver.seatsReopeningFn), which the class declares.
-        const seat =
-          seatNames.length && GEM.hand === false
-            ? [`Object.assign(${primary.name}, { ${seatNames.join(", ")} });`]
-            : [];
-        const text = [...out, ...after, ...seat].join("\n");
+        const text = [...out, ...after].join("\n");
         if (new RegExp(`\\b${name}\\b`).test(text))
           this.resolver.importFrom(primary.tsFile, primary.name, this.baseCtx(u, f, {}), this.lw);
         return { text, defs };

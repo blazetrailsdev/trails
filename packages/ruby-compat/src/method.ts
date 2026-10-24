@@ -82,6 +82,21 @@ export class Method {
   }
 
   /**
+   * `Method#parameters` (`vendor/ruby/v3.3.11/proc.c:3103` `rb_method_parameters`,
+   * over `rb_iseq_parameters` at `iseq.c:3334`): each parameter's kind (`req`,
+   * `opt`, `rest`) and name, a destructured one unnamed.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  parameters(): ([string] | [string, string])[] {
+    return paramList(this.#func).map((p) => {
+      const kind = p.text.startsWith("...") ? "rest" : p.optional ? "opt" : "req";
+      const name = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)/.exec(p.text)?.[1];
+      return name ? [kind, name] : [kind];
+    });
+  }
+
+  /**
    * `Method#source_location` (`vendor/ruby/v3.3.11/proc.c:3015` `rb_method_location`):
    * `[path, first_lineno]`, or `nil` for a body no {@link iseqLocationSetup} located.
    *
@@ -216,18 +231,23 @@ export function rbObjProtectedMethods(_obj: unknown, _all = true): string[] {
  * @noRailsEquivalent PERMANENT
  */
 export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number, number] {
+  const params = paramList(func);
+  const rest = params.some((p) => p.text.startsWith("..."));
+  const min = params.filter((p) => !p.optional && !p.text.startsWith("...")).length;
+  const max = rest ? Infinity : params.length;
+  return [min, max];
+}
+
+function paramList(func: (...args: never[]) => unknown): { text: string; optional: boolean }[] {
   const src = Function.prototype.toString.call(func);
   const open = src.indexOf("(");
   const arrow = src.indexOf("=>");
   if (arrow !== -1 && (open === -1 || arrow < open)) {
-    const lead =
-      src
-        .slice(0, arrow)
-        .replace(/^async\s+/, "")
-        .trim() === ""
-        ? 0
-        : 1;
-    return [lead, lead];
+    const lead = src
+      .slice(0, arrow)
+      .replace(/^async\s+/, "")
+      .trim();
+    return lead === "" ? [] : [{ text: lead.replace(/^\(|\)$/g, ""), optional: false }];
   }
   let depth = 0;
   let current = "";
@@ -259,10 +279,7 @@ export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number,
     current += ch;
   }
   if (current.trim() !== "") params.push({ text: current.trim(), optional });
-  const rest = params.some((p) => p.text.startsWith("..."));
-  const min = params.filter((p) => !p.optional && !p.text.startsWith("...")).length;
-  const max = rest ? Infinity : params.length;
-  return [min, max];
+  return params;
 }
 
 /**

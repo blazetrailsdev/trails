@@ -349,6 +349,8 @@ export function coreExtSends(): Set<string> {
 export interface DepGem {
   pkg: string;
   exports: Map<string, string>;
+  /** Whether its Ruby defines a `method_added` hook (Raabro's root-rule tracking). */
+  methodAdded: boolean;
 }
 const depGems = new Map<string, DepGem | null>();
 export function depGem(root: string): DepGem | null {
@@ -373,7 +375,15 @@ export function depGem(root: string): DepGem | null {
         ))
           if (!exports.has(m[1])) exports.set(m[1], spec);
       }
-      found = { pkg, exports };
+      const lib = path.join(ROOT, "vendor", dep.vendor!, "lib");
+      const methodAdded =
+        existsSync(lib) &&
+        readdirSync(lib, { recursive: true, encoding: "utf8" }).some(
+          (f) =>
+            f.endsWith(".rb") &&
+            /^\s*def method_added\b/m.test(readFileSync(path.join(lib, f), "utf8")),
+        );
+      found = { pkg, exports, methodAdded };
     }
   }
   depGems.set(root, found);

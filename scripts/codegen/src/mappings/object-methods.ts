@@ -125,7 +125,7 @@ rule("respond_to?", (c) => {
   // A Ruby method name known only at run time (`QUEUE_ADAPTER_METHODS`'s
   // `:enqueue_at`) is translated to the TS member name when asked.
   // docs/ruby-ts-conventions.md: snake_case is camelCase, `x?` is `isX`.
-  const tsName = `((s: string) => { const c = s.replace(/[?!]$/, "").replace(/_([a-z0-9])/g, (_m: string, x: string) => x.toUpperCase()); return s.endsWith("?") ? "is" + c[0].toUpperCase() + c.slice(1) : c; })(String(${lw.argExpr(n.args[0], ctx)}))`;
+  const tsName = `((s: string) => { const c = s.replace(/[?!]$/, "").replace(/(?<=.)_([a-z0-9])/g, (_m: string, x: string) => x.toUpperCase()); return s.endsWith("?") ? "is" + c[0].toUpperCase() + c.slice(1) : c; })(String(${lw.argExpr(n.args[0], ctx)}))`;
   return `(${tsName} in Object(${R}))`;
 });
 
@@ -219,7 +219,7 @@ rule("send __send__", (c) => {
  * names (docs/ruby-ts-conventions.md: snake_case is camelCase, `x?` is `isX`).
  */
 export function tsNameAtRunTime(arg: string): string {
-  return `((s: string) => { const c = s.replace(/[?!]$/, "").replace(/_([a-z0-9])/g, (_m: string, x: string) => x.toUpperCase()); return s.endsWith("?") ? "is" + c[0].toUpperCase() + c.slice(1) : c; })(String(${arg}))`;
+  return `((s: string) => { const c = s.replace(/[?!]$/, "").replace(/(?<=.)_([a-z0-9])/g, (_m: string, x: string) => x.toUpperCase()); return s.endsWith("?") ? "is" + c[0].toUpperCase() + c.slice(1) : c; })(String(${arg}))`;
 }
 
 /**

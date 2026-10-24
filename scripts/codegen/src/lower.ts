@@ -3216,6 +3216,10 @@ export class Lowerer {
       !this.index.methodNames.get("arity")?.def
     ) {
       const r = this.expr(n.recv, ctx);
+      const rt = this.typeOf(n.recv, ctx);
+      // `Method#arity` is ruby-compat's method_arity port.
+      if (rt?.k === "class" && rt.key === "@ruby-compat/method.ts#Method")
+        return `${needsParens(r) ? `(${r})` : r}.arity()`;
       return `${needsParens(r) ? `(${r})` : r}.length`;
     }
     // `s.split(sep, …).first`: the text before the first separator, nil for an
@@ -4919,6 +4923,52 @@ export class Lowerer {
           if (lt?.k === "prim" && lt.name === "number") return lt;
           if (lt?.k === "prim" && lt.name === "string" && name === "+") return lt;
         }
+        // A self call to a gem method whose body ends in `method(:x)` (raabro's
+        // `_narrow`) answers that `Method` too.
+        if (
+          (!n.recv || n.recv.k === "self") &&
+          ctx.owner &&
+          T.cls("@ruby-compat/method.ts#Method")
+        ) {
+          const sc = this.index.scopes.get(ctx.owner);
+          const d =
+            (ctx.selfKind === "static" ? sc?.sdefs : sc?.defs)?.get(name) ?? sc?.defs.get(name);
+          const tail = d?.node ? this.seqBody(d.node.body).at(-1) : undefined;
+          if (
+            tail?.k === "call" &&
+            tail.name === "method" &&
+            !tail.recv &&
+            tail.args.length === 1 &&
+            !this.index.methodNames.get("method")?.def
+          )
+            return { k: "class", key: "@ruby-compat/method.ts#Method" };
+        }
+        // `str.match(re)` (core-methods' `match` rule) is ruby-compat's `MatchData`.
+        if (
+          name === "match" &&
+          n.recv &&
+          !n.block &&
+          (n.args.length === 1 || n.args.length === 2) &&
+          T.cls("@ruby-compat/match-data.ts#MatchData")
+        ) {
+          const rt = this.typeOf(n.recv, ctx);
+          if (
+            n.recv.k === "regex" ||
+            (rt?.k === "prim" && rt.name === "string") ||
+            (n.recv.k === "call" && n.recv.name === "[]") ||
+            !this.index.methodNames.has("match")
+          )
+            return { k: "class", key: "@ruby-compat/match-data.ts#MatchData" };
+        }
+        // `method(:x)` (proc.c rb_obj_method) is ruby-compat's `Method`.
+        if (
+          name === "method" &&
+          n.args.length === 1 &&
+          (!n.recv || n.recv.k === "self") &&
+          !this.index.methodNames.get("method")?.def &&
+          T.cls("@ruby-compat/method.ts#Method")
+        )
+          return { k: "class", key: "@ruby-compat/method.ts#Method" };
         if (name === "class" && n.args.length === 0) {
           const t = !n.recv || n.recv.k === "self" ? this.selfType(ctx) : this.typeOf(n.recv, ctx);
           return t?.k === "class" && !t.static ? { k: "class", key: t.key, static: true } : null;
