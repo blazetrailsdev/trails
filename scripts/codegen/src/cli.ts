@@ -104,6 +104,12 @@ function decodeBytes(n: unknown): void {
       o.value = decodeRubyBytes(o.bytes as number[]);
       delete o.bytes;
     }
+    // Minitest 5's `MiniTest = Minitest` alias (minitest.rb), which chronic's
+    // test helper subclasses: one constant.
+    if (o.k === "const" && Array.isArray(o.path)) {
+      const i = o.path[0] === "" ? 1 : 0;
+      if (o.path[i] === "MiniTest") (o.path as string[])[i] = "Minitest";
+    }
     for (const v of Object.values(o)) decodeBytes(v);
   }
 }

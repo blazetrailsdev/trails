@@ -428,6 +428,18 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
 
+  packages/chronic:
+    dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/date:
     dependencies:
       '@blazetrails/ruby-compat':

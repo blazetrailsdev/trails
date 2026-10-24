@@ -317,6 +317,12 @@ export class Emitter {
           seenBody = true;
           continue;
         }
+        // chronic's test/helper.rb: `unless defined? Chronic; require 'chronic'`,
+        // taken on a fresh load.
+        if (s.k === "if") {
+          for (const b of [s.then, s.else]) visit(b?.k === "seq" ? b.body : b ? [b] : []);
+          continue;
+        }
         if (
           s.k === "call" &&
           s.recv === null &&
@@ -1199,16 +1205,21 @@ export class Emitter {
     // Ivars: one `let` each, named for the ivar unless a local of the class has that name.
     const lvars = new Set<string>();
     const ivars = new Set<string>();
+    // …or a helper function (chronic's `def definitions; @definitions ||= …`).
+    const fnNames = new Set<string>();
     walk(u.body, (n) => {
       if (n.k === "lasgn" || n.k === "lvar") lvars.add(n.name);
       if (n.k === "ivar" || n.k === "iasgn") ivars.add(n.name);
+      if (n.k === "def") fnNames.add(tsMethodName(n.name));
     });
     const ivarLocals = new Map<string, string>();
     for (const iv of ivars) {
       const base = propName(iv.slice(1)).replace(/^_/, "");
       ivarLocals.set(
         iv,
-        lvars.has(iv.slice(1)) ? `self${base[0].toUpperCase()}${base.slice(1)}` : base,
+        lvars.has(iv.slice(1)) || fnNames.has(base)
+          ? `self${base[0].toUpperCase()}${base.slice(1)}`
+          : base,
       );
     }
     // RSpec `subject` / `let(:x)` / `let!(:x)` (at any depth) and
@@ -3697,6 +3708,17 @@ export class Emitter {
         members.push(`declare static ${js}: typeof ${local};`);
         seated.push(local === js ? js : `${js}: ${local}`);
       }
+      // …and so are the classes directly under it that library methods read at
+      // call time (Resolver.seatsNestedClass).
+      if (u.fqn === GEM.namespace)
+        for (const [fqn, sc] of this.index.scopes) {
+          if (sc.kind !== "class" || !this.resolver.seatsNestedClass(fqn, "")) continue;
+          const exp = this.resolver.exportNames.get(fqn)!;
+          const js = fqn.slice(u.fqn.length + 2);
+          const local = this.resolver.importFrom(exp.tsFile, exp.name, ctxStatic, this.lw);
+          members.push(`declare static ${js}: typeof ${local};`);
+          seated.push(local === js ? js : `${js}: ${local}`);
+        }
       if (seated.length) after.push(`Object.assign(${name}, { ${seated.join(", ")} });`);
     }
     const parentFqn = u.fqn.endsWith("::ClassMethods")

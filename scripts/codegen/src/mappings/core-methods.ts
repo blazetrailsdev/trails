@@ -245,6 +245,8 @@ rule("inject reduce", (c) => {
 });
 
 rule("include? member?", (c) => {
+  // range.c range_include: over Numeric bounds it is `cover?` (`(1..12).include?(month)`).
+  if (c.recvNode?.k === "range" && argc(c) === 1 && !c.blk) return `${c.R}.cover(${c.args()[0]})`;
   if (objectRecv(c)) return null;
   if (argc(c) === 1 && !c.blk && hashNamed(c.recvNode))
     return c.lw.hasKeyForm(c.recvNode, c.r, c.args()[0], c.ctx);

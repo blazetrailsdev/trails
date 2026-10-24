@@ -175,6 +175,17 @@ GEMS.builder = {
   pkg: "builder",
 };
 
+// chronic (mojombo/chronic v0.10.2): et-orbi's and fugit's natural-language
+// times (`EtOrbi.chronic_parse`, the specs' `Khronic.parse`).
+GEMS.chronic = {
+  gem: "chronic",
+  rubyRoot: "chronic",
+  namespace: "Chronic",
+  vendor: "chronic/v0.10.2",
+  hand: false,
+  pkg: "chronic",
+};
+
 // fugit (floraison/fugit v1.11.1, vendor/rails/v8.0.2/Gemfile.lock:234): solid_queue's
 // recurring-task schedules (`Fugit.parse`, `Fugit::Cron`), on raabro's parser
 // combinators and et-orbi's zoned times, each a generator target of its own.

@@ -152,6 +152,35 @@ export class Resolver {
     );
   }
 
+  /**
+   * A class directly under the gem's root module, defined in a file of its own
+   * (chronic's `Chronic::RepeaterDayName`), as a library method body names it:
+   * read off the root at call time, where the root file seats it, as Ruby
+   * resolves the constant when the method runs (CLAUDE.md, "Call-time constant
+   * resolution"). An import would be an eager edge, and chronic's handler.rb →
+   * repeater_day_name.rb → repeater.rb → handler.rb closes a cycle in which a
+   * subclass meets its superclass before it exists. A class-body reference
+   * (a superclass, a constant) keeps its import, as Ruby needs it at load.
+   */
+  seatsNestedClass(fqn: string, callerTsFile: string): boolean {
+    if (GEM.hand !== false || !GEM.namespace) return false;
+    if (!fqn.startsWith(`${GEM.namespace}::`) || fqn.slice(GEM.namespace.length + 2).includes("::"))
+      return false;
+    const root = this.exportNames.get(GEM.namespace);
+    const exp = this.exportNames.get(fqn);
+    return (
+      !!root &&
+      !!exp &&
+      this.isClassModule(GEM.namespace) &&
+      this.index.scopes.get(fqn)?.kind === "class" &&
+      !callerTsFile.endsWith(".test.ts") &&
+      !callerTsFile.startsWith("test-helpers/") &&
+      exp.tsFile !== callerTsFile &&
+      exp.tsFile !== root.tsFile &&
+      root.tsFile !== callerTsFile
+    );
+  }
+
   isClassModule(fqn: string): boolean {
     const memo = (this.classModuleMemo ??= new Map<string, boolean>());
     const hit = memo.get(fqn);
@@ -249,6 +278,10 @@ export class Resolver {
       return "undefined";
     }
     const exp = this.exportNames.get(fqn);
+    if (exp && ctx.defName != null && this.seatsNestedClass(fqn, ctx.f.tsFile)) {
+      const root = this.exportNames.get(GEM.namespace)!;
+      return `${this.importFrom(root.tsFile, root.name, ctx, lw)}.${fqn.slice(GEM.namespace.length + 2)}`;
+    }
     if (exp) return this.importFrom(exp.tsFile, exp.name, ctx, lw);
     const c = this.index.consts.get(fqn);
     // A scalar constant read from another file is its value: no import edge,
