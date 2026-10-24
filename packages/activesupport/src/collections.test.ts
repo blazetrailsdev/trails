@@ -470,7 +470,7 @@ describe("maximum", () => {
   });
 
   it("returns undefined for empty", () => {
-    expect(maximum([], (x: any) => x)).toBeUndefined();
+    expect(maximum([], (x: any) => x)).toBeNull();
   });
 });
 
@@ -480,7 +480,7 @@ describe("minimum", () => {
   });
 
   it("returns undefined for empty", () => {
-    expect(minimum([], (x: any) => x)).toBeUndefined();
+    expect(minimum([], (x: any) => x)).toBeNull();
   });
 });
 

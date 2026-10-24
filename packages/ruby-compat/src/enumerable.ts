@@ -43,7 +43,7 @@ const iterBreak = Symbol("rb_iter_break");
  */
 function rbBlockCall<T, E, R>(
   obj: Iterable<T> | Each<T, E>,
-  block: (i: T) => void,
+  block: (i: T) => unknown,
   result: () => R,
 ): Enumerated<E, R> {
   const rescue = (e: unknown): R => {
@@ -61,14 +61,18 @@ function rbBlockCall<T, E, R>(
     return rescue(e) as Enumerated<E, R>;
   }
   if (each instanceof Promise) return each.then(result, rescue) as Enumerated<E, R>;
+  if (each != null && typeof (each as PromiseLike<unknown>).then === "function") {
+    return Promise.resolve(each as PromiseLike<unknown>).then(result, rescue) as Enumerated<E, R>;
+  }
   return result() as Enumerated<E, R>;
 }
 
 /**
  * `enum_to_a` (`vendor/ruby/v3.3.11/enum.c:711`): the elements `each` yields,
  * which is what a block-less member's enumerator (`RETURN_ENUMERATOR`) holds.
+ * @noRailsEquivalent PERMANENT
  */
-function enumToA<T, E>(obj: Iterable<T> | Each<T, E>): Enumerated<E, T[]> {
+function enumToA<T, E = unknown>(obj: Iterable<T> | Each<T, E>): Enumerated<E, T[]> {
   const ary: T[] = [];
   return rbBlockCall(
     obj,
@@ -182,6 +186,68 @@ function enumFindAll<T, E = unknown>(
   );
 }
 export { enumFindAll as findAll };
+export { enumToA as toA };
+
+/**
+ * Mirrors: Ruby's Enumerable#reject — `vendor/ruby/v3.3.11/enum.c:593` `enum_reject`,
+ * pushing each element whose block result does not `RTEST` (`reject_i`, `:564`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function reject<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block?: (i: T) => unknown,
+): Enumerated<E, T[]> {
+  if (!block) return enumToA(obj);
+  const ary: T[] = [];
+  return rbBlockCall(
+    obj,
+    (i) => {
+      const result = block(i);
+      if (result == null || result === false) ary.push(i);
+    },
+    () => ary,
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#count — `vendor/ruby/v3.3.11/enum.c:298` `enum_count`:
+ * every element (`count_all_i`, `:263`), those `rb_equal` to the argument
+ * (`count_i`, `:239`), or those whose block result `RTEST`s (`count_iter_i`,
+ * `:252`). The block is the trailing function argument.
+ * @noRailsEquivalent PERMANENT
+ */
+export function count<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  ...argv: unknown[]
+): Enumerated<E, number> {
+  const block =
+    argv.length === 1 && typeof argv[0] === "function"
+      ? (argv.pop() as (i: T) => unknown)
+      : undefined;
+  checkArity(argv.length, 0, 1);
+  const item = argv[0];
+  let func: (i: T) => boolean;
+  if (argv.length === 0) {
+    if (block !== undefined) {
+      func = (i) => {
+        const result = block(i);
+        return result != null && result !== false;
+      };
+    } else {
+      func = () => true;
+    }
+  } else {
+    func = (i) => rbEqual(i, item);
+  }
+  let n = 0;
+  return rbBlockCall(
+    obj,
+    (i) => {
+      if (func(i)) n++;
+    },
+    () => n,
+  );
+}
 
 /**
  * The mixin member over `self`, bound as `find_all` and `select`
@@ -248,11 +314,14 @@ export function find<T, E = unknown>(
  * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`.
  * @noRailsEquivalent PERMANENT
  */
-function map<T, R, E = unknown>(this: Each<T, E>, block?: (i: T) => R): Enumerated<E, R[] | T[]> {
-  if (!block) return enumToA(this);
+export function map<T, R, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block?: (i: T) => R,
+): Enumerated<E, R[] | T[]> {
+  if (!block) return enumToA(obj);
   const ary: R[] = [];
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       ary.push(block(i));
     },
@@ -418,11 +487,14 @@ function enumfunc<T>(args: unknown[]): (i: T) => unknown {
  * `RTEST`ing `pattern === element`, or the element itself with no argument.
  * @noRailsEquivalent PERMANENT
  */
-function isAny<T, E = unknown>(this: Each<T, E>, ...args: unknown[]): Enumerated<E, boolean> {
+export function isAny<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  ...args: unknown[]
+): Enumerated<E, boolean> {
   const func = enumfunc<T>(args);
   let memo = false;
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       const result = func(i);
       if (result != null && result !== false) {
@@ -439,11 +511,14 @@ function isAny<T, E = unknown>(this: Each<T, E>, ...args: unknown[]): Enumerated
  * breaks on the second match (`:1869`).
  * @noRailsEquivalent PERMANENT
  */
-function isOne<T, E = unknown>(this: Each<T, E>, ...args: unknown[]): Enumerated<E, boolean> {
+export function isOne<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  ...args: unknown[]
+): Enumerated<E, boolean> {
   const func = enumfunc<T>(args);
   let memo: boolean | undefined = undefined;
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       const result = func(i);
       if (result != null && result !== false) {
@@ -464,11 +539,14 @@ function isOne<T, E = unknown>(this: Each<T, E>, ...args: unknown[]): Enumerated
  * (`:2160`).
  * @noRailsEquivalent PERMANENT
  */
-function isNone<T, E = unknown>(this: Each<T, E>, ...args: unknown[]): Enumerated<E, boolean> {
+export function isNone<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  ...args: unknown[]
+): Enumerated<E, boolean> {
   const func = enumfunc<T>(args);
   let memo = true;
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       const result = func(i);
       if (result != null && result !== false) {
@@ -485,10 +563,13 @@ function isNone<T, E = unknown>(this: Each<T, E>, ...args: unknown[]): Enumerate
  * whose `member_i` (`:2892`) asks `rb_equal(element, val)` and breaks on the first hit.
  * @noRailsEquivalent PERMANENT
  */
-function isInclude<T, E = unknown>(this: Each<T, E>, val: unknown): Enumerated<E, boolean> {
+export function isInclude<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  val: unknown,
+): Enumerated<E, boolean> {
   let memo = false;
   return rbBlockCall(
-    this,
+    obj,
     (i) => {
       if (rbEqual(i, val)) {
         memo = true;
@@ -506,19 +587,12 @@ function isInclude<T, E = unknown>(this: Each<T, E>, val: unknown): Enumerated<E
  * @noRailsEquivalent PERMANENT
  */
 function iterator<T, E = unknown>(this: Each<T, E>): IterableIterator<T> {
-  const ary: T[] = [];
-  const each: unknown = rbBlockCall(
-    this,
-    (i) => {
-      ary.push(i);
-    },
-    () => ary,
-  );
-  if (each instanceof Promise) {
-    each.catch(() => {});
+  const ary: unknown = enumToA(this);
+  if (ary instanceof Promise) {
+    ary.catch(() => {});
     throw new TypeError("each is asynchronous: await it before iterating");
   }
-  return ary[Symbol.iterator]();
+  return (ary as T[])[Symbol.iterator]();
 }
 
 interface EnumSumMemo {
@@ -797,7 +871,9 @@ export const Enumerable = {
   },
   findAll,
   select: findAll,
-  map,
+  map<T, R, E = unknown>(this: Each<T, E>, block?: (i: T) => R) {
+    return map(this, block);
+  },
   groupBy<T, K, E = unknown>(this: Each<T, E>, block?: (i: T) => K) {
     return groupBy(this, block);
   },
@@ -807,10 +883,18 @@ export const Enumerable = {
   drop<T, E = unknown>(this: Each<T, E>, n: number) {
     return drop(this, n);
   },
-  isAny,
-  isOne,
-  isNone,
-  isInclude,
+  isAny<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
+    return isAny(this, ...args);
+  },
+  isOne<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
+    return isOne(this, ...args);
+  },
+  isNone<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
+    return isNone(this, ...args);
+  },
+  isInclude<T, E = unknown>(this: Each<T, E>, val: unknown) {
+    return isInclude(this, val);
+  },
   sum<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
     return sum(this, ...args);
   },
@@ -841,12 +925,8 @@ export const AsyncEnumerable = {
    * Mirrors: Ruby's Enumerable#to_a — `vendor/ruby/v3.3.11/enum.c:711` `enum_to_a`.
    * @noRailsEquivalent PERMANENT
    */
-  async toA<T>(this: AsyncEach<T>): Promise<T[]> {
-    const ary: T[] = [];
-    await this.each((i) => {
-      ary.push(i);
-    });
-    return ary;
+  toA<T>(this: AsyncEach<T>): Promise<T[]> {
+    return enumToA(this as unknown as Each<T, Promise<unknown>>);
   },
 
   /**

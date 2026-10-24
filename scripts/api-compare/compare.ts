@@ -330,9 +330,10 @@ function idiomSurplus(skeleton: readonly string[], counterpart: readonly string[
 // `.first`/`.size` into indexing a preloaded array (dropping the query trigger)
 // permanently invisible to the gate — exactly the fidelity gap it exists to
 // catch. `delete`, `merge`, `merge!` and `fetch` stay in the comparison too.
-// `fetch` is satisfied by a call only. The other three are also satisfied by a
-// marked native form on the receiver the Ruby site names (`delete h[k]`,
-// `{ ...h, ...other }`, `Object.assign(h, other)`; RFC 0190): unlike `.length`
+// Each is also satisfied by a marked native form on the receiver the Ruby site
+// names (`delete h[k]`, `{ ...h, ...other }`, `Object.assign(h, other)`, and
+// for a two-argument `fetch` on a proven Hash `Object.hasOwn(h, "k") ? h.k : d`;
+// RFC 0190, RFC 0194): unlike `.length`
 // and `[0]`, none of those forms is a spelling anyone gives a Relation call.
 //
 // MEASURED, 2026-08-08 (RFC 0092 `positional-idiom-analogues`): the question

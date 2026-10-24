@@ -7600,6 +7600,21 @@ function nativeHashForms(
     if (n.properties.length < 2 || !ts.isSpreadAssignment(first)) return [];
     return [["spread", first.expression]];
   }
+  if (ts.isConditionalExpression(n)) {
+    const test = unwrapped(n.condition);
+    if (!ts.isCallExpression(test) || test.expression.getText() !== "Object.hasOwn") return [];
+    const [receiver, key] = test.arguments;
+    const read = unwrapped(n.whenTrue);
+    if (receiver === undefined || key === undefined || !ts.isStringLiteralLike(key)) return [];
+    if (!ts.isPropertyAccessExpression(read) && !ts.isElementAccessExpression(read)) return [];
+    const readKey = ts.isPropertyAccessExpression(read)
+      ? read.name.text
+      : ts.isStringLiteralLike(read.argumentExpression)
+        ? read.argumentExpression.text
+        : undefined;
+    if (readKey !== key.text || read.expression.getText() !== receiver.getText()) return [];
+    return [["fetch", receiver, describeArg(key, [])]];
+  }
   if (ts.isForOfStatement(n)) {
     const iterated = n.expression;
     if (ts.isCallExpression(iterated) && iterated.expression.getText() === "Object.entries") {

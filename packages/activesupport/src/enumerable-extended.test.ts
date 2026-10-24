@@ -27,11 +27,11 @@ const pay = (price: number): Payment => ({ price });
 
 describe("EnumerableTests", () => {
   it("minimum with empty", () => {
-    expect(minimum([], (p: Payment) => p.price)).toBeUndefined();
+    expect(minimum([], (p: Payment) => p.price)).toBeNull();
   });
 
   it("maximum with empty", () => {
-    expect(maximum([], (p: Payment) => p.price)).toBeUndefined();
+    expect(maximum([], (p: Payment) => p.price)).toBeNull();
   });
 
   it("sums numbers", () => {
@@ -190,11 +190,11 @@ describe("EnumerableTests", () => {
 
 describe("EnumerableTests", () => {
   it("minimum with empty enumerable", () => {
-    expect(minimum([], (n: number) => n)).toBeUndefined();
+    expect(minimum([], (n: number) => n)).toBeNull();
   });
 
   it("maximum with empty enumerable", () => {
-    expect(maximum([], (n: number) => n)).toBeUndefined();
+    expect(maximum([], (n: number) => n)).toBeNull();
   });
 
   it("sums", () => {
@@ -264,7 +264,7 @@ describe("EnumerableTests", () => {
   it("pick", () => {
     const payments = [pay(5), pay(15), pay(10)];
     expect(pick(payments, "price")).toBe(5);
-    expect(pick([], "price")).toBeUndefined();
+    expect(pick([], "price")).toBeNull();
   });
 
   it("compact blank", () => {

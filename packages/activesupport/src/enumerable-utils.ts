@@ -1,15 +1,23 @@
 import {
+  type Each,
   Enumerable,
   groupBy as enumGroupBy,
   Hash,
   hashAref,
   hashAset,
+  isAny,
+  isNone,
+  map,
+  max,
+  min,
   numericPlus,
   rbBigNorm,
   rbEqual,
   rbFloatTypeP,
   rbIntegerTypeP,
+  sortBy,
 } from "@blazetrails/ruby-compat";
+import { count, first, isInclude, reject, toA } from "@blazetrails/ruby-compat/enumerable";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { SoleItemExpectedError } from "./core-ext/enumerable.js";
 import { isPlainObject, valuesAt } from "./hash-utils.js";
@@ -47,12 +55,17 @@ export function sum<T>(collection: Iterable<T> | Range<T>, ...args: unknown[]): 
 }
 
 export function indexBy<T, K extends string | number>(
-  collection: T[],
+  collection: Iterable<T> | Each<T>,
   fn: (item: T) => K,
 ): Record<K, T> {
   const result = Object.create(null) as Record<K, T>;
-  for (const item of collection) {
-    result[fn(item)] = item;
+  const block = (elem: T): void => {
+    result[fn(elem)] = elem;
+  };
+  if (typeof (collection as Partial<Each<T>>).each === "function") {
+    (collection as Each<T>).each(block);
+  } else {
+    for (const elem of collection as Iterable<T>) block(elem);
   }
   return result;
 }
@@ -85,27 +98,30 @@ export function indexWith<T, V>(
   return result;
 }
 
-export function pluck<T, K extends keyof T>(collection: T[], ...keys: K[]): T[K][] | T[K][][] {
-  if (keys.length > 1) {
-    return collection.map((element) => keys.map((key) => hashAref(element as object, key) as T[K]));
+export function pluck<T, K extends keyof T>(
+  collection: Iterable<T> | Each<T>,
+  ...keys: K[]
+): T[K][] | T[K][][] {
+  if (many(keys)) {
+    return map(collection, (element) =>
+      keys.map((key) => hashAref(element as object, key) as T[K]),
+    ) as T[K][][];
   } else {
     const key = keys[0];
-    return collection.map((element) => hashAref(element as object, key) as T[K]);
+    return map(collection, (element) => hashAref(element as object, key) as T[K]) as T[K][];
   }
 }
 
-export function maximum<T>(collection: T[], key: (item: T) => number): number | undefined {
-  if (collection.length === 0) return undefined;
-  return Math.max(...collection.map(key));
+export function maximum<T, R>(collection: Iterable<T> | Each<T>, key: (item: T) => R): R | null {
+  return max(map(collection, key) as R[]);
 }
 
-export function minimum<T>(collection: T[], key: (item: T) => number): number | undefined {
-  if (collection.length === 0) return undefined;
-  return Math.min(...collection.map(key));
+export function minimum<T, R>(collection: Iterable<T> | Each<T>, key: (item: T) => R): R | null {
+  return min(map(collection, key) as R[]);
 }
 
-export function compactBlank<T>(collection: T[]): T[] {
-  return collection.filter((item) => !isBlank(item));
+export function compactBlank<T>(collection: Iterable<T> | Each<T>): T[] {
+  return reject(collection, (item) => isBlank(item));
 }
 
 export function any<T>(collection: readonly T[], fn?: (item: T) => unknown): boolean {
@@ -116,23 +132,24 @@ export function any<T>(collection: readonly T[], fn?: (item: T) => unknown): boo
   return false;
 }
 
-export function many<T>(collection: T[], fn?: (item: T) => boolean): boolean {
-  if (!fn) return collection.length > 1;
-  let count = 0;
-  for (const item of collection) {
-    if (fn(item)) {
-      count++;
-      if (count > 1) return true;
-    }
+export function many<T>(collection: Iterable<T> | Each<T>, fn?: (item: T) => unknown): boolean {
+  let cnt = 0;
+  if (fn) {
+    return isAny(collection, (elem: T) => {
+      const result = fn(elem);
+      if (result != null && result !== false) cnt += 1;
+      return cnt > 1;
+    });
+  } else {
+    return isAny(collection, () => (cnt += 1) > 1);
   }
-  return false;
 }
 
 export function excluding<T extends Record<string, unknown>>(
   collection: T,
   ...elements: unknown[]
 ): Partial<T>;
-export function excluding<T>(collection: Iterable<T>, ...elements: unknown[]): T[];
+export function excluding<T>(collection: Iterable<T> | Each<T>, ...elements: unknown[]): T[];
 export function excluding(collection: unknown, ...elements: unknown[]): unknown {
   elements = elements.flat(1);
   if (isPlainObject(collection)) {
@@ -140,13 +157,13 @@ export function excluding(collection: unknown, ...elements: unknown[]): unknown 
       Object.entries(collection).filter(([element]) => !elements.some((e) => rbEqual(e, element))),
     );
   }
-  return [...(collection as Iterable<unknown>)].filter(
-    (element) => !elements.some((e) => rbEqual(e, element)),
+  return reject(collection as Iterable<unknown> | Each<unknown>, (element) =>
+    elements.some((e) => rbEqual(e, element)),
   );
 }
 
-export function including<T>(collection: T[], ...elements: T[]): T[] {
-  return [...collection, ...elements];
+export function including<T>(collection: Iterable<T> | Each<T>, ...elements: T[]): T[] {
+  return [...toA(collection), ...elements];
 }
 
 export function minBy<T>(collection: T[], fn: (item: T) => number): T | undefined {
@@ -172,7 +189,7 @@ export function eachCons<T>(collection: T[], n: number, block?: (slice: T[]) => 
 }
 
 export function inOrderOf<T>(
-  collection: T[],
+  collection: Iterable<T> | Each<T>,
   key: (item: T) => unknown,
   series: unknown[],
   options: { filter?: boolean } = {},
@@ -187,12 +204,12 @@ export function inOrderOf<T>(
       const index = series.findIndex((s) => rbEqual(s, key(v)));
       return index === -1 ? series.length : index;
     };
-    return [...collection].sort((a, b) => position(a) - position(b)).filter((v) => v != null);
+    return sortBy(collection, position).filter((v) => v != null);
   }
 }
 
-export function exclude<T>(collection: T[], object: T): boolean {
-  return !collection.includes(object);
+export function exclude<T>(collection: Iterable<T> | Each<T>, object: T): boolean {
+  return !isInclude(collection, object);
 }
 
 export function without<T>(collection: T[], ...elements: T[]): T[] {
@@ -200,21 +217,25 @@ export function without<T>(collection: T[], ...elements: T[]): T[] {
 }
 
 export function pick<T, K extends keyof T>(
-  collection: T[],
+  collection: Iterable<T> | Each<T>,
   ...keys: K[]
-): T[K] | T[K][] | undefined {
-  if (collection.length === 0) return undefined;
+): T[K] | T[K][] | null {
+  if (isNone(collection)) return null;
 
-  if (keys.length > 1) {
-    return keys.map((key) => hashAref(collection[0] as object, key) as T[K]);
+  if (many(keys)) {
+    return keys.map((key) => hashAref(first(collection) as object, key) as T[K]);
   } else {
-    return hashAref(collection[0] as object, keys[0]) as T[K];
+    return hashAref(first(collection) as object, keys[0]) as T[K];
   }
 }
 
-export function sole<T>(collection: T[], fn?: (item: T) => boolean): T {
-  const filtered = fn ? collection.filter(fn) : collection;
-  if (filtered.length === 0) throw new SoleItemExpectedError("no item found");
-  if (filtered.length > 1) throw new SoleItemExpectedError("multiple items found");
-  return filtered[0];
+export function sole<T>(collection: Iterable<T> | Each<T>): T {
+  switch (count(collection)) {
+    case 1:
+      return first(collection) as T;
+    case 0:
+      throw new SoleItemExpectedError("no item found");
+    default:
+      throw new SoleItemExpectedError("multiple items found");
+  }
 }

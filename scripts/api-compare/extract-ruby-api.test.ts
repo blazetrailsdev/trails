@@ -3791,6 +3791,32 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
   });
 
+  it("names a Hash#fetch receiver on its two-argument arm only", () => {
+    const names = rubyCallReceivers(
+      {
+        "lib/active_support/core.rb": `
+        class Core
+          def defaulted(options)
+            options.fetch(:a, nil)
+          end
+
+          def raising(options)
+            options.fetch(:a)
+          end
+
+          def blocked(options)
+            options.fetch(:a) { 1 }
+          end
+        end
+      `,
+      },
+      "callReceiverNames",
+    );
+    expect(names["Core#defaulted"]).toEqual({ fetch: ["options"] });
+    expect(names["Core#raising"]).toEqual({ fetch: ["?"] });
+    expect(names["Core#blocked"]).toEqual({ fetch: ["?"] });
+  });
+
   it("records a site on an arm no native form ports as formless", () => {
     const c = rubyCallReceivers({
       "lib/active_support/core.rb": `
@@ -4358,6 +4384,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
       update: ["options"],
       merge: ["DEFAULTS"],
       each_pair: ["@options"],
+      fetch: ["options"],
     });
     expect(rubyCallReceivers(fixture)["Hashes#call"]).toMatchObject({
       "member?": ["hash"],
