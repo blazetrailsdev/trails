@@ -48,5 +48,43 @@ mapfile -t tests < <(cd "$ROOT" && find "${PKG#$ROOT/}/src" -name "${SWAP_TESTS:
   { if [ "$GEM" = activejob ]; then grep -v -e "$( [ "$AJ_ADAPTER" = async ] && echo '^$' || echo async)" -e "$( [ "$AJ_ADAPTER" = delayed_job ] && echo '^$' || echo delayed-job)"; else cat; fi; })
 # An empty list would hand vitest no paths, and it would run every project.
 [ "${#tests[@]}" -gt 0 ] || { echo "no test files match ${SWAP_TESTS:-*}.test.ts" >&2; exit 1; }
-(cd "$ROOT" && NO_COLOR=1 timeout 90 pnpm vitest run --testTimeout 5000 ${SWAP_FILTER:+-t "$SWAP_FILTER"} "${tests[@]}") 2>&1 | sed 's/\x1b\[[0-9;]*m//g' > "$GEN/swap-tree-vitest.txt"
+run_vitest() { # <timeout> <test files…>
+  local t="$1"
+  shift
+  (cd "$ROOT" && NO_COLOR=1 timeout "$t" pnpm vitest run --testTimeout 5000 ${SWAP_FILTER:+-t "$SWAP_FILTER"} "$@") 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
+  return "${PIPESTATUS[0]}"
+}
+run_vitest 90 "${tests[@]}" > "$GEN/swap-tree-vitest.txt"
+if [ "$?" -eq 124 ]; then
+  # A synchronous loop no testTimeout can interrupt (fugit's brute_frequency
+  # walks a year of minutes; Ruby takes a minute) stalls the whole run: run each
+  # file under its own limit, name those that time out, and sum the rest.
+  : > "$GEN/swap-tree-vitest.txt"
+  timed_out=()
+  for t in "${tests[@]}"; do
+    out="$(run_vitest "${SWAP_FILE_TIMEOUT:-120}" "$t")"
+    if [ "$?" -ne 124 ]; then
+      printf '%s\n' "$out" >> "$GEN/swap-tree-vitest.txt"
+      continue
+    fi
+    # …and a file that times out, one second-level `describe` at a time.
+    outer="$(grep -m1 -oP '^describe\("\K[^"]+' "$ROOT/$t")"
+    while IFS= read -r inner; do
+      pat="$(printf '%s %s ' "$outer" "$inner" | sed 's/[][\.*^$?+(){}|]/\\&/g')"
+      out="$(SWAP_FILTER="$pat" run_vitest "${SWAP_FILE_TIMEOUT:-120}" "$t")"
+      [ "$?" -eq 124 ] && timed_out+=("$t > $inner")
+      printf '%s\n' "$out" | grep -v "skipped (" >> "$GEN/swap-tree-vitest.txt"
+      printf '%s\n' "$out" | grep -E "^ *Tests  " | sed -E 's/(\| )?[0-9]+ skipped//' >> "$GEN/swap-tree-vitest.txt"
+    done < <(grep -oP '^  describe\("\K[^"]+' "$ROOT/$t")
+  done
+  awk -v to="${#timed_out[@]}" '
+    /^ *Tests  / { for (i = 1; i <= NF; i++) { if ($(i+1) ~ /^(failed|passed|skipped)/) c[$(i+1)] += $i } }
+    END {
+      n = c["failed"] + c["passed"] + c["skipped"]
+      printf "      Tests  %d failed | %d passed | %d skipped (%d)  (%d file(s) timed out)\n", c["failed"], c["passed"], c["skipped"], n, to
+    }' "$GEN/swap-tree-vitest.txt" >> "$GEN/swap-tree-vitest.txt"
+  grep -E "Tests  .*timed out" "$GEN/swap-tree-vitest.txt" | tail -1
+  [ "${#timed_out[@]}" -gt 0 ] && echo "timed out: ${timed_out[*]}" | tee -a "$GEN/swap-tree-vitest.txt"
+  exit 0
+fi
 grep -E "Test Files|Tests  " "$GEN/swap-tree-vitest.txt"
