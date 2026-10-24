@@ -2257,7 +2257,15 @@ export class Emitter {
     // and returns nothing.
     const twin = this.handTwin(u, d.name, opts);
     if (twin?.info.async && !isCtor) ctx.defAsync = true;
-    if (twin?.info.params) ctx.paramTypes = twin.info.params.map((t) => this.lw.tsType(t, ctx));
+    // A generated-only gem's twin is its own previous output: an `unknown` there
+    // is the type pass's fallback, so it goes back through the pass as `any`.
+    if (twin?.info.params)
+      ctx.paramTypes = twin.info.params.map((t) => {
+        const ts = this.lw.tsType(t, ctx);
+        return GEM.hand === false && /^unknown(\[\])?$/.test(ts)
+          ? ts.replace("unknown", "any")
+          : ts;
+      });
     let ps = this.lw.paramList(params, ctx, false);
     // Seed parameter types from the hand twin's declared parameter types.
     if (twin?.info.params) {

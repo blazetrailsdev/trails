@@ -26,5 +26,8 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*"
   }
 }

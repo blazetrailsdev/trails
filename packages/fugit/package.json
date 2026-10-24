@@ -32,6 +32,7 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@blazetrails/chronic": "workspace:*"
+    "@blazetrails/chronic": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*"
   }
 }

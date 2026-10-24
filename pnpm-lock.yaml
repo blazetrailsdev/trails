@@ -439,6 +439,10 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/date:
     dependencies:
@@ -470,6 +474,9 @@ importers:
       '@blazetrails/chronic':
         specifier: workspace:*
         version: link:../chronic
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/fugit:
     dependencies:
@@ -492,6 +499,9 @@ importers:
       '@blazetrails/chronic':
         specifier: workspace:*
         version: link:../chronic
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/globalid:
     dependencies:
@@ -581,6 +591,10 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/rack:
     dependencies:

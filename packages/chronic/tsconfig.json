@@ -9,6 +9,9 @@
   "references": [
     {
       "path": "../ruby-compat"
+    },
+    {
+      "path": "../vitest-matchers"
     }
   ]
 }

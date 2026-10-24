@@ -165,7 +165,7 @@ rule("<<", (o) => {
       ? `(${x}.push(${b}), ${x})`
       : t?.k === "prim" && t.name === "string"
         ? `${x} + ${b}`
-        : `(typeof ${x} === "string" ? ${x} + ${b} : Array.isArray(${x}) ? (${x}.push(${b}), ${x}) : ${x} instanceof globalThis.Set ? ${x}.add(${b}) : ${x}.append(${b}))`;
+        : `(typeof ${x} === "string" ? ${x} + ${b} : Array.isArray(${x}) ? ((${x} as unknown[]).push(${b}), ${x}) : ${x} instanceof globalThis.Set ? (${x} as Set<unknown>).add(${b}) : (${x} as { append(v: unknown): unknown }).append(${b}))`;
   // A local known to hold a String is reassigned the result; one of unknown
   // type (a yielded `Tool`) is not, as nothing would read it.
   if (n.recv.k === "lvar" && t?.k === "prim" && t.name === "string") return `(${r} = ${app(r)})`;
@@ -175,7 +175,7 @@ rule("<<", (o) => {
   if (n.recv.k === "ivar") {
     if (t?.k === "prim" && t.name === "string") return `(${r} = ${r} + ${b})`;
     if (!t)
-      return `(typeof ${r} === "string" ? (${r} = ${r} + ${b}) : Array.isArray(${r}) ? (${r}.push(${b}), ${r}) : ${r} instanceof globalThis.Set ? ${r}.add(${b}) : ${r}.append(${b}))`;
+      return `(typeof ${r} === "string" ? (${r} = ${r} + ${b}) : Array.isArray(${r}) ? ((${r} as unknown[]).push(${b}), ${r}) : ${r} instanceof globalThis.Set ? (${r} as Set<unknown>).add(${b}) : (${r} as { append(v: unknown): unknown }).append(${b}))`;
   }
   return lw.withOnce(r, app);
 });

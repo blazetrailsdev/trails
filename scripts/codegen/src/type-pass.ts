@@ -21,7 +21,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript-5";
-import { ROOT } from "./gem.js";
+import { GEM, ROOT } from "./gem.js";
 
 interface Edit {
   pos: number;
@@ -410,6 +410,11 @@ export class TypePass {
           let t = TypePass.union(got);
           // Nothing reaches it: typed by how its body uses it (usageType).
           if (t === "unknown" && !isThis) t = this.usageType(checker, node) ?? t;
+          // A generated-only gem's parameter nothing types stays `any` (sweepAny).
+          if (t === "unknown" && !isThis && GEM.hand === false) {
+            ts.forEachChild(node, (c) => decls(c, sf));
+            return;
+          }
           if (!isThis && node.initializer) {
             const it = this.typeText(
               checker,
@@ -794,6 +799,9 @@ export class TypePass {
           return;
         }
         if (node.kind === ts.SyntaxKind.AnyKeyword) {
+          // A generated-only gem's parameter no round could type stays `any`
+          // for the port's author to type: `unknown` errors at every use.
+          if (GEM.hand === false && ts.isParameter(node.parent)) return;
           edits.push({ pos: node.getStart(sf), end: node.getEnd(), text: "unknown" });
           return;
         }
