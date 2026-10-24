@@ -29,13 +29,13 @@ describe("TestRepeaterDayName", () => {
 
     let span = mondays.next("future");
 
-    expect(span.begin).toEqualRuby(Time.local(2006, 8, 21));
-    expect(span.end).toEqualRuby(Time.local(2006, 8, 22));
+    expect(span.begin!).toEqualRuby(Time.local(2006, 8, 21));
+    expect(span.end!).toEqualRuby(Time.local(2006, 8, 22));
 
     span = mondays.next("future")!;
 
-    expect(span.begin).toEqualRuby(Time.local(2006, 8, 28));
-    expect(span.end).toEqualRuby(Time.local(2006, 8, 29));
+    expect(span.begin!).toEqualRuby(Time.local(2006, 8, 28));
+    expect(span.end!).toEqualRuby(Time.local(2006, 8, 29));
   });
 
   it("next past", () => {
@@ -44,12 +44,12 @@ describe("TestRepeaterDayName", () => {
 
     let span = mondays.next("past");
 
-    expect(span.begin).toEqualRuby(Time.local(2006, 8, 14));
-    expect(span.end).toEqualRuby(Time.local(2006, 8, 15));
+    expect(span.begin!).toEqualRuby(Time.local(2006, 8, 14));
+    expect(span.end!).toEqualRuby(Time.local(2006, 8, 15));
 
     span = mondays.next("past")!;
 
-    expect(span.begin).toEqualRuby(Time.local(2006, 8, 7));
-    expect(span.end).toEqualRuby(Time.local(2006, 8, 8));
+    expect(span.begin!).toEqualRuby(Time.local(2006, 8, 7));
+    expect(span.end!).toEqualRuby(Time.local(2006, 8, 8));
   });
 });

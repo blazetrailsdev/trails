@@ -1,11 +1,10 @@
+import { toI } from "@blazetrails/ruby-compat";
 import { Chronic } from "./namespaces.js";
 import { Date } from "./date.js";
 import { Tag } from "./tag.js";
 import type { Token } from "./token.js";
 
-export class Ordinal extends Tag {
-  declare type: number;
-
+export class Ordinal extends Tag<number> {
   static scan(tokens: Token[], options: Record<string, unknown>): Token[] {
     for (let i = 0; i < tokens.length; i++) {
       const m = /^(\d+)(st|nd|rd|th|\.)$/m.exec(tokens[i].word);
@@ -16,7 +15,7 @@ export class Ordinal extends Tag {
         if (Date.isCouldBeMonth(ordinal)) tokens[i].tag(new OrdinalMonth(ordinal));
         if (Date.isCouldBeYear(ordinal)) {
           const year = Date.makeYear(ordinal, options.ambiguousYearFutureBias as number);
-          tokens[i].tag(new OrdinalYear(Math.trunc(year)));
+          tokens[i].tag(new OrdinalYear(toI(year) as number));
         }
       }
     }

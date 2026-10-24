@@ -26,14 +26,14 @@ export class RepeaterWeekend extends Repeater {
           const saturdayRepeater = new RepeaterDayName("saturday");
           saturdayRepeater.start = this.now!;
           const nextSaturdaySpan = saturdayRepeater.next("future");
-          this.currentWeekStart = nextSaturdaySpan.begin;
+          this.currentWeekStart = nextSaturdaySpan.begin!;
           break;
         }
         case "past": {
           const saturdayRepeater = new RepeaterDayName("saturday");
           saturdayRepeater.start = this.now!.plus(RepeaterDay.DAY_SECONDS);
           const lastSaturdaySpan = saturdayRepeater.next("past");
-          this.currentWeekStart = lastSaturdaySpan.begin;
+          this.currentWeekStart = lastSaturdaySpan.begin!;
           break;
         }
       }
@@ -59,7 +59,7 @@ export class RepeaterWeekend extends Repeater {
         const thisSaturdaySpan = saturdayRepeater.this("future");
         return new Span(
           thisSaturdaySpan.begin,
-          thisSaturdaySpan.begin.plus(RepeaterWeekend.WEEKEND_SECONDS),
+          thisSaturdaySpan.begin!.plus(RepeaterWeekend.WEEKEND_SECONDS),
         );
       }
       case "past": {
@@ -68,7 +68,7 @@ export class RepeaterWeekend extends Repeater {
         const lastSaturdaySpan = saturdayRepeater.this("past");
         return new Span(
           lastSaturdaySpan.begin,
-          lastSaturdaySpan.begin.plus(RepeaterWeekend.WEEKEND_SECONDS),
+          lastSaturdaySpan.begin!.plus(RepeaterWeekend.WEEKEND_SECONDS),
         );
       }
     }
@@ -78,11 +78,11 @@ export class RepeaterWeekend extends Repeater {
   offset(span: Span, amount: number, pointer: string): Span {
     const direction = pointer === "future" ? 1 : -1;
     const weekend = new RepeaterWeekend("weekend");
-    weekend.start = span.begin;
+    weekend.start = span.begin!;
     const start = weekend
       .next(pointer)
-      .begin.plus((amount - 1) * direction * RepeaterWeek.WEEK_SECONDS);
-    return new Span(start, start.plus(span.end.minus(span.begin) as number));
+      .begin!.plus((amount - 1) * direction * RepeaterWeek.WEEK_SECONDS);
+    return new Span(start, start.plus(span.end!.minus(span.begin!) as number));
   }
 
   width(): number {

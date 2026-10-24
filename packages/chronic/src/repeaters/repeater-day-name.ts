@@ -4,15 +4,13 @@ import { Chronic } from "../namespaces.js";
 import { Repeater } from "../repeater.js";
 import { Span } from "../span.js";
 
-export class RepeaterDayName extends Repeater {
-  declare type: string;
-
+export class RepeaterDayName extends Repeater<string> {
   static DAY_SECONDS = 86400;
 
   /** @internal */
   currentDate: RubyDate | null;
 
-  constructor(type: unknown, options: Record<string, unknown> = {}) {
+  constructor(type: string, options: Record<string, unknown> = {}) {
     super(type, options);
     this.currentDate = null;
   }

@@ -4,9 +4,7 @@ import { Chronic } from "../namespaces.js";
 import { Repeater } from "../repeater.js";
 import { Span } from "../span.js";
 
-export class RepeaterMonthName extends Repeater {
-  declare type: string;
-
+export class RepeaterMonthName extends Repeater<string> {
   static MONTH_SECONDS = 2_592_000;
   static MONTHS: Record<string, number> = {
     january: 1,
@@ -27,7 +25,7 @@ export class RepeaterMonthName extends Repeater {
   currentMonthBegin: RubyTime | null;
   #index: number | undefined;
 
-  constructor(type: unknown, options: Record<string, unknown> = {}) {
+  constructor(type: string, options: Record<string, unknown> = {}) {
     super(type, options);
     this.currentMonthBegin = null;
   }

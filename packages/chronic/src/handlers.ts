@@ -39,9 +39,9 @@ export const Handlers = {
   ): Span | null {
     (month as Repeater).start = this.now;
     const span = (month as Repeater).this(options.context as string)!;
-    const year = span.begin.year;
-    month = span.begin.month;
-    const dayStart = Chronic.timeClass.local(year, month, day);
+    const year = span.begin!.year;
+    month = span.begin!.month;
+    const dayStart = Chronic.timeClass().local(year, month, day);
 
     return this.dayOrTime(dayStart, timeTokens, options);
   },
@@ -105,7 +105,7 @@ export const Handlers = {
     if (this.isMonthOverflow(year, month, day)) return null;
 
     try {
-      const dayStart = Chronic.timeClass.local(year, month, day);
+      const dayStart = Chronic.timeClass().local(year, month, day);
       return this.dayOrTime(dayStart, timeTokens, options);
     } catch (e) {
       if (e instanceof ArgumentError) return null;
@@ -153,8 +153,8 @@ export const Handlers = {
     }
 
     try {
-      const endTime = Chronic.timeClass.local(nextMonthYear, nextMonthMonth);
-      return new Span(Chronic.timeClass.local(year, month), endTime);
+      const endTime = Chronic.timeClass().local(nextMonthYear, nextMonthMonth);
+      return new Span(Chronic.timeClass().local(year, month), endTime);
     } catch (e) {
       if (e instanceof ArgumentError) return null;
       throw e;
@@ -163,7 +163,7 @@ export const Handlers = {
 
   handleGeneric(this: Parser, _tokens: Token[], options: Options): Span | null {
     try {
-      const t = Chronic.timeClass.parse(options.text as string);
+      const t = Chronic.timeClass().parse(options.text as string);
       return new Span(t, t.plus(1));
     } catch (e) {
       if (!(e instanceof ArgumentError)) throw e;
@@ -181,7 +181,7 @@ export const Handlers = {
     if (this.isMonthOverflow(year, month, day)) return null;
 
     try {
-      const dayStart = Chronic.timeClass.local(year, month, day);
+      const dayStart = Chronic.timeClass().local(year, month, day);
       return this.dayOrTime(dayStart, timeTokens, options);
     } catch (e) {
       if (e instanceof ArgumentError) return null;
@@ -198,7 +198,7 @@ export const Handlers = {
     if (this.isMonthOverflow(year, month, day)) return null;
 
     try {
-      const dayStart = Chronic.timeClass.local(year, month, day);
+      const dayStart = Chronic.timeClass().local(year, month, day);
       return this.dayOrTime(dayStart, timeTokens, options);
     } catch (e) {
       if (e instanceof ArgumentError) return null;
@@ -215,7 +215,7 @@ export const Handlers = {
     if (this.isMonthOverflow(year, month, day)) return null;
 
     try {
-      const dayStart = Chronic.timeClass.local(year, month, day);
+      const dayStart = Chronic.timeClass().local(year, month, day);
       return this.dayOrTime(dayStart, timeTokens, options);
     } catch (e) {
       if (e instanceof ArgumentError) return null;
@@ -238,7 +238,7 @@ export const Handlers = {
     if (this.isMonthOverflow(year, month, day)) return null;
 
     try {
-      const dayStart = Chronic.timeClass.local(year, month, day);
+      const dayStart = Chronic.timeClass().local(year, month, day);
       return this.dayOrTime(dayStart, timeTokens, options);
     } catch (e) {
       if (e instanceof ArgumentError) return null;
@@ -267,9 +267,9 @@ export const Handlers = {
     if (this.isMonthOverflow(year, month, day)) return null;
 
     try {
-      let dayStart = Chronic.timeClass.local(year, month, day);
+      let dayStart = Chronic.timeClass().local(year, month, day);
       if (options.context === "future" && dayStart.compare(this.now)! < 0) {
-        dayStart = Chronic.timeClass.local(year + 1, month, day);
+        dayStart = Chronic.timeClass().local(year + 1, month, day);
       }
       return this.dayOrTime(dayStart, timeTokens, options);
     } catch (e) {
@@ -295,8 +295,8 @@ export const Handlers = {
     }
 
     try {
-      const endTime = Chronic.timeClass.local(nextMonthYear, nextMonthMonth);
-      return new Span(Chronic.timeClass.local(year, month), endTime);
+      const endTime = Chronic.timeClass().local(nextMonthYear, nextMonthMonth);
+      return new Span(Chronic.timeClass().local(year, month), endTime);
     } catch (e) {
       if (e instanceof ArgumentError) return null;
       throw e;
@@ -325,11 +325,11 @@ export const Handlers = {
 
     try {
       if (timeTokens.length === 0) {
-        const startTime = Chronic.timeClass.local(year, month.index(), day);
+        const startTime = Chronic.timeClass().local(year, month.index(), day);
         const endTime = this.timeWithRollover(year, month.index(), day + 1);
         return new Span(startTime, endTime);
       } else {
-        const dayStart = Chronic.timeClass.local(year, month.index(), day);
+        const dayStart = Chronic.timeClass().local(year, month.index(), day);
         return this.dayOrTime(dayStart, timeTokens, options);
       }
     } catch (e) {
@@ -346,7 +346,7 @@ export const Handlers = {
     if (this.isMonthOverflow(year, month.index(), day)) return null;
 
     try {
-      const startTime = Chronic.timeClass.local(year, month.index(), day);
+      const startTime = Chronic.timeClass().local(year, month.index(), day);
       const endTime = this.timeWithRollover(year, month.index(), day + 1);
       return new Span(startTime, endTime);
     } catch (e) {
@@ -368,11 +368,11 @@ export const Handlers = {
 
     try {
       if (timeTokens.length === 0) {
-        const startTime = Chronic.timeClass.local(year, month, day);
+        const startTime = Chronic.timeClass().local(year, month, day);
         const endTime = this.timeWithRollover(year, month, day + 1);
         return new Span(startTime, endTime);
       } else {
-        const dayStart = Chronic.timeClass.local(year, month, day);
+        const dayStart = Chronic.timeClass().local(year, month, day);
         return this.dayOrTime(dayStart, timeTokens, options);
       }
     } catch (e) {
@@ -391,11 +391,11 @@ export const Handlers = {
 
     try {
       if (timeTokens.length === 0) {
-        const startTime = Chronic.timeClass.local(year, month.index(), day);
+        const startTime = Chronic.timeClass().local(year, month.index(), day);
         const endTime = this.timeWithRollover(year, month.index(), day + 1);
         return new Span(startTime, endTime);
       } else {
-        const dayStart = Chronic.timeClass.local(year, month.index(), day);
+        const dayStart = Chronic.timeClass().local(year, month.index(), day);
         return this.dayOrTime(dayStart, timeTokens, options);
       }
     } catch (e) {
@@ -412,7 +412,7 @@ export const Handlers = {
     if (this.isMonthOverflow(year, month.index(), day)) return null;
 
     try {
-      const startTime = Chronic.timeClass.local(year, month.index(), day);
+      const startTime = Chronic.timeClass().local(year, month.index(), day);
       const endTime = this.timeWithRollover(year, month.index(), day + 1);
       return new Span(startTime, endTime);
     } catch (e) {
@@ -427,16 +427,16 @@ export const Handlers = {
     const year = tokens[2].getTag(ScalarYear)!.type;
     let time: RubyTime, endTime: RubyTime;
     if (tokens.length > 3) {
-      time = this.getAnchor([last(tokens)!], options)!.begin;
+      time = this.getAnchor([last(tokens)!], options)!.begin!;
       const h = time.hour,
         m = time.min,
         s = time.sec;
-      time = Chronic.timeClass.local(year, month, day, h, m, s);
-      endTime = Chronic.timeClass.local(year, month, day + 1, h, m, s);
+      time = Chronic.timeClass().local(year, month, day, h, m, s);
+      endTime = Chronic.timeClass().local(year, month, day + 1, h, m, s);
     } else {
-      time = Chronic.timeClass.local(year, month, day);
+      time = Chronic.timeClass().local(year, month, day);
       if (!(day >= 31)) day += 1;
-      endTime = Chronic.timeClass.local(year, month, day);
+      endTime = Chronic.timeClass().local(year, month, day);
     }
     return new Span(time, endTime);
   },
@@ -457,7 +457,7 @@ export const Handlers = {
     const pointer = tokens[2].getTag(Pointer)!.type;
 
     if (rbObjRespondTo(repeater, "offset")) {
-      return (repeater as OffsetRepeater).offset(span, distance, pointer);
+      return (repeater as unknown as OffsetRepeater).offset(span, distance, pointer);
     }
     return null;
   },
@@ -491,14 +491,14 @@ export const Handlers = {
 
   handleOrr(this: Parser, tokens: Token[], outerSpan: Span, _options: Options): Span | null {
     const repeater = tokens[1].getTag(Repeater)!;
-    repeater.start = outerSpan.begin.minus(1) as RubyTime;
+    repeater.start = outerSpan.begin!.minus(1) as RubyTime;
     const ordinal = tokens[0].getTag(Ordinal)!.type;
     let span: Span | null = null;
 
     for (let i = 0; i < ordinal; i++) {
       span = repeater.next("future");
 
-      if (span!.begin.compare(outerSpan.end)! >= 0) {
+      if (span!.begin!.compare(outerSpan.end!)! >= 0) {
         span = null;
         break;
       }
@@ -521,7 +521,7 @@ export const Handlers = {
     const outerSpan = new Span(dayStart, dayStart.plus(24 * 60 * 60));
 
     if (!(timeTokens.length === 0)) {
-      this.now = outerSpan.begin;
+      this.now = outerSpan.begin!;
       return this.getAnchor(this.dealiasAndDisambiguateTimes(timeTokens, options), {
         ...options,
         context: "future",
@@ -563,7 +563,7 @@ export const Handlers = {
         throw new RuntimeError("Invalid grabber");
     }
 
-    if (Chronic.debug) {
+    if (Chronic.debug()) {
       STDOUT.puts(`Handler-class: ${rbObjClassname(head)}`);
       STDOUT.puts(`--${String(outerSpan)}`);
     }
@@ -589,14 +589,14 @@ export const Handlers = {
   },
 
   findWithin(this: Parser, tags: Repeater[], span: Span, pointer: string): Span | null {
-    if (Chronic.debug) STDOUT.puts(`--${String(span)}`);
+    if (Chronic.debug()) STDOUT.puts(`--${String(span)}`);
     if (tags.length === 0) return span;
 
     const head = tags.shift()!;
-    head.start = pointer === "future" ? span.begin : span.end;
+    head.start = pointer === "future" ? span.begin! : span.end!;
     const h = head.this("none")!;
 
-    if (span.cover(h.begin) || span.cover(h.end)) {
+    if (span.cover(h.begin!) || span.cover(h.end!)) {
       return this.findWithin(tags, h, pointer);
     }
     return null;
@@ -608,7 +608,7 @@ export const Handlers = {
         ? [year + 1, 1, 1]
         : [year, month + 1, 1]
       : [year, month, day];
-    return Chronic.timeClass.local(...dateParts);
+    return Chronic.timeClass().local(...dateParts);
   },
 
   dealiasAndDisambiguateTimes(this: unknown, tokens: Token[], options: Options): Token[] {
@@ -634,14 +634,14 @@ export const Handlers = {
 
       switch (t1tag.type) {
         case "morning":
-          if (Chronic.debug) STDOUT.puts("--morning->am");
+          if (Chronic.debug()) STDOUT.puts("--morning->am");
           t1.untag(RepeaterDayPortion);
           t1.tag(new RepeaterDayPortion("am"));
           break;
         case "afternoon":
         case "evening":
         case "night":
-          if (Chronic.debug) STDOUT.puts(`--${String(t1tag.type)}->pm`);
+          if (Chronic.debug()) STDOUT.puts(`--${String(t1tag.type)}->pm`);
           t1.untag(RepeaterDayPortion);
           t1.tag(new RepeaterDayPortion("pm"));
           break;
@@ -662,7 +662,7 @@ export const Handlers = {
         ) {
           const distoken = new Token("disambiguator");
 
-          distoken.tag(new RepeaterDayPortion(options.ambiguousTimeRange));
+          distoken.tag(new RepeaterDayPortion(options.ambiguousTimeRange as string | number));
           ambiguousTokens.push(distoken);
         }
       }

@@ -24,7 +24,7 @@ export class Time {
 
   static normalizeOffset(offset: number | string | null): string {
     if (typeof offset === "string") return offset;
-    if (offset == null) offset = Chronic.timeClass.now().toTime().utcOffset;
+    if (offset == null) offset = Chronic.timeClass().now().toTime().utcOffset;
     let sign = "+";
     if (offset < 0) sign = "-";
     const hours = String(Math.trunc(Math.abs(offset) / 3600)).padStart(2, "0");

@@ -15,12 +15,12 @@ describe("TestRepeaterFortnight", () => {
     fortnights.start = now;
 
     const nextFortnight = fortnights.next("future");
-    expect(nextFortnight.begin).toEqualRuby(Time.local(2006, 8, 20));
-    expect(nextFortnight.end).toEqualRuby(Time.local(2006, 9, 3));
+    expect(nextFortnight.begin!).toEqualRuby(Time.local(2006, 8, 20));
+    expect(nextFortnight.end!).toEqualRuby(Time.local(2006, 9, 3));
 
     const nextNextFortnight = fortnights.next("future");
-    expect(nextNextFortnight.begin).toEqualRuby(Time.local(2006, 9, 3));
-    expect(nextNextFortnight.end).toEqualRuby(Time.local(2006, 9, 17));
+    expect(nextNextFortnight.begin!).toEqualRuby(Time.local(2006, 9, 3));
+    expect(nextNextFortnight.end!).toEqualRuby(Time.local(2006, 9, 17));
   });
 
   it("next past", () => {
@@ -28,12 +28,12 @@ describe("TestRepeaterFortnight", () => {
     fortnights.start = now;
 
     const lastFortnight = fortnights.next("past");
-    expect(lastFortnight.begin).toEqualRuby(Time.local(2006, 7, 30));
-    expect(lastFortnight.end).toEqualRuby(Time.local(2006, 8, 13));
+    expect(lastFortnight.begin!).toEqualRuby(Time.local(2006, 7, 30));
+    expect(lastFortnight.end!).toEqualRuby(Time.local(2006, 8, 13));
 
     const lastLastFortnight = fortnights.next("past");
-    expect(lastLastFortnight.begin).toEqualRuby(Time.local(2006, 7, 16));
-    expect(lastLastFortnight.end).toEqualRuby(Time.local(2006, 7, 30));
+    expect(lastLastFortnight.begin!).toEqualRuby(Time.local(2006, 7, 16));
+    expect(lastLastFortnight.end!).toEqualRuby(Time.local(2006, 7, 30));
   });
 
   it("this future", () => {
@@ -41,8 +41,8 @@ describe("TestRepeaterFortnight", () => {
     fortnights.start = now;
 
     const thisFortnight = fortnights.this("future")!;
-    expect(thisFortnight.begin).toEqualRuby(Time.local(2006, 8, 16, 15));
-    expect(thisFortnight.end).toEqualRuby(Time.local(2006, 8, 27));
+    expect(thisFortnight.begin!).toEqualRuby(Time.local(2006, 8, 16, 15));
+    expect(thisFortnight.end!).toEqualRuby(Time.local(2006, 8, 27));
   });
 
   it("this past", () => {
@@ -50,8 +50,8 @@ describe("TestRepeaterFortnight", () => {
     fortnights.start = now;
 
     const thisFortnight = fortnights.this("past")!;
-    expect(thisFortnight.begin).toEqualRuby(Time.local(2006, 8, 13, 0));
-    expect(thisFortnight.end).toEqualRuby(Time.local(2006, 8, 16, 14));
+    expect(thisFortnight.begin!).toEqualRuby(Time.local(2006, 8, 13, 0));
+    expect(thisFortnight.end!).toEqualRuby(Time.local(2006, 8, 16, 14));
   });
 
   it("offset", () => {
@@ -59,7 +59,7 @@ describe("TestRepeaterFortnight", () => {
 
     const offsetSpan = new Chronic.RepeaterWeek("week").offset(span, 3, "future");
 
-    expect(offsetSpan.begin).toEqualRuby(Time.local(2006, 9, 6, 14));
-    expect(offsetSpan.end).toEqualRuby(Time.local(2006, 9, 6, 14, 0, 1));
+    expect(offsetSpan.begin!).toEqualRuby(Time.local(2006, 9, 6, 14));
+    expect(offsetSpan.end!).toEqualRuby(Time.local(2006, 9, 6, 14, 0, 1));
   });
 });

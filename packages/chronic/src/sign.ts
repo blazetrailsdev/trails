@@ -3,9 +3,7 @@ import { Chronic } from "./namespaces.js";
 import { Tag } from "./tag.js";
 import type { Token } from "./token.js";
 
-export class Sign extends Tag {
-  declare type: string;
-
+export class Sign extends Tag<string> {
   static scan(tokens: Token[], _options: Record<string, unknown>): Token[] {
     for (const token of tokens) {
       let t;

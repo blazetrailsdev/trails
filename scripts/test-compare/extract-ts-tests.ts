@@ -34,6 +34,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "bcrypt",
     "msgpack",
     "marcel",
+    "chronic",
     "actionview",
     "actioncable",
     "activejob",

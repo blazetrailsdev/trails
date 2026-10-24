@@ -15,8 +15,8 @@ describe("TestRepeaterSeason", () => {
     seasons.start = now;
 
     const nextSeason = seasons.next("future");
-    expect(nextSeason.begin).toEqualRuby(Time.local(2006, 9, 23));
-    expect(nextSeason.end).toEqualRuby(Time.local(2006, 12, 21));
+    expect(nextSeason.begin!).toEqualRuby(Time.local(2006, 9, 23));
+    expect(nextSeason.end!).toEqualRuby(Time.local(2006, 12, 21));
   });
 
   it("next past", () => {
@@ -24,8 +24,8 @@ describe("TestRepeaterSeason", () => {
     seasons.start = now;
 
     const lastSeason = seasons.next("past");
-    expect(lastSeason.begin).toEqualRuby(Time.local(2006, 3, 20));
-    expect(lastSeason.end).toEqualRuby(Time.local(2006, 6, 20));
+    expect(lastSeason.begin!).toEqualRuby(Time.local(2006, 3, 20));
+    expect(lastSeason.end!).toEqualRuby(Time.local(2006, 6, 20));
   });
 
   it("this", () => {
@@ -33,11 +33,11 @@ describe("TestRepeaterSeason", () => {
     seasons.start = now;
 
     let thisSeason = seasons.this("future");
-    expect(thisSeason.begin).toEqualRuby(Time.local(2006, 8, 17));
-    expect(thisSeason.end).toEqualRuby(Time.local(2006, 9, 22));
+    expect(thisSeason.begin!).toEqualRuby(Time.local(2006, 8, 17));
+    expect(thisSeason.end!).toEqualRuby(Time.local(2006, 9, 22));
 
     thisSeason = seasons.this("past")!;
-    expect(thisSeason.begin).toEqualRuby(Time.local(2006, 6, 21));
-    expect(thisSeason.end).toEqualRuby(Time.local(2006, 8, 16));
+    expect(thisSeason.begin!).toEqualRuby(Time.local(2006, 6, 21));
+    expect(thisSeason.end!).toEqualRuby(Time.local(2006, 8, 16));
   });
 });

@@ -59,8 +59,8 @@ export class RepeaterYear extends Repeater {
 
   offset(span: Span, amount: number, pointer: string): Span {
     const direction = pointer === "future" ? 1 : -1;
-    const newBegin = this.buildOffsetTime(span.begin, amount, direction);
-    const newEnd = this.buildOffsetTime(span.end, amount, direction);
+    const newBegin = this.buildOffsetTime(span.begin!, amount, direction);
+    const newEnd = this.buildOffsetTime(span.end!, amount, direction);
     return new Span(newBegin, newEnd);
   }
 

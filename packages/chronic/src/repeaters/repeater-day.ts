@@ -18,7 +18,7 @@ export class RepeaterDay extends Repeater {
     super.next(pointer);
 
     if (!this.currentDayStart) {
-      this.currentDayStart = Chronic.timeClass.local(
+      this.currentDayStart = Chronic.timeClass().local(
         this.now!.year,
         this.now!.month,
         this.now!.day,

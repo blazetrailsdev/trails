@@ -24,7 +24,7 @@ export class Tick {
     return this.ambiguous;
   }
 
-  times(other: number): Tick {
+  multiply(other: number): Tick {
     return new Tick(this.time * other, this.ambiguous);
   }
 
@@ -37,16 +37,14 @@ export class Tick {
   }
 }
 
-export class RepeaterTime extends Repeater {
-  declare type: Tick;
-
+export class RepeaterTime extends Repeater<Tick> {
   static Tick = Tick;
 
   /** @internal */
   currentTime: RubyTime | null;
 
   constructor(time: string, options: Record<string, unknown> = {}) {
-    super(time, options);
+    super(time as never, options);
     this.currentTime = null;
     this.options = options;
     const timeParts = stringSplit(time, ":");
@@ -106,7 +104,7 @@ export class RepeaterTime extends Repeater {
 
     if (!this.currentTime) {
       first = true;
-      const midnight = Chronic.timeClass.local(this.now!.year, this.now!.month, this.now!.day);
+      const midnight = Chronic.timeClass().local(this.now!.year, this.now!.month, this.now!.day);
 
       const yesterdayMidnight = midnight.minus(fullDay) as RubyTime;
       let tomorrowMidnight = midnight.plus(fullDay);

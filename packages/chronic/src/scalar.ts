@@ -1,12 +1,11 @@
+import { toI } from "@blazetrails/ruby-compat";
 import { Chronic } from "./namespaces.js";
 import { Date } from "./date.js";
 import { Time } from "./time.js";
 import { Tag } from "./tag.js";
 import type { Token } from "./token.js";
 
-export class Scalar extends Tag {
-  declare type: number;
-
+export class Scalar extends Tag<number> {
   static DAY_PORTIONS = ["am", "pm", "morning", "afternoon", "evening", "night"];
 
   static scan(tokens: Token[], options: Record<string, unknown>): Token[] {
@@ -25,7 +24,7 @@ export class Scalar extends Tag {
           if (Date.isCouldBeMonth(scalar)) token.tag(new ScalarMonth(scalar));
           if (Date.isCouldBeYear(scalar)) {
             const year = Date.makeYear(scalar, options.ambiguousYearFutureBias as number);
-            token.tag(new ScalarYear(Math.trunc(year)));
+            token.tag(new ScalarYear(toI(year) as number));
           }
         }
       }

@@ -43,8 +43,8 @@ export class RepeaterSeasonName extends RepeaterSeason {
 
   offset(span: Span, amount: number, pointer: string): Span {
     return new Span(
-      this.offsetBy(span.begin, amount, pointer),
-      this.offsetBy(span.end, amount, pointer),
+      this.offsetBy(span.begin!, amount, pointer),
+      this.offsetBy(span.end!, amount, pointer),
     );
   }
 

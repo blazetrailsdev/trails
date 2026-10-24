@@ -15,12 +15,12 @@ describe("TestRepeaterHour", () => {
     hours.start = now;
 
     const nextHour = hours.next("future");
-    expect(nextHour.begin).toEqualRuby(Time.local(2006, 8, 16, 15));
-    expect(nextHour.end).toEqualRuby(Time.local(2006, 8, 16, 16));
+    expect(nextHour.begin!).toEqualRuby(Time.local(2006, 8, 16, 15));
+    expect(nextHour.end!).toEqualRuby(Time.local(2006, 8, 16, 16));
 
     const nextNextHour = hours.next("future");
-    expect(nextNextHour.begin).toEqualRuby(Time.local(2006, 8, 16, 16));
-    expect(nextNextHour.end).toEqualRuby(Time.local(2006, 8, 16, 17));
+    expect(nextNextHour.begin!).toEqualRuby(Time.local(2006, 8, 16, 16));
+    expect(nextNextHour.end!).toEqualRuby(Time.local(2006, 8, 16, 17));
   });
 
   it("next past", () => {
@@ -28,12 +28,12 @@ describe("TestRepeaterHour", () => {
     hours.start = now;
 
     const pastHour = hours.next("past");
-    expect(pastHour.begin).toEqualRuby(Time.local(2006, 8, 16, 13));
-    expect(pastHour.end).toEqualRuby(Time.local(2006, 8, 16, 14));
+    expect(pastHour.begin!).toEqualRuby(Time.local(2006, 8, 16, 13));
+    expect(pastHour.end!).toEqualRuby(Time.local(2006, 8, 16, 14));
 
     const pastPastHour = hours.next("past");
-    expect(pastPastHour.begin).toEqualRuby(Time.local(2006, 8, 16, 12));
-    expect(pastPastHour.end).toEqualRuby(Time.local(2006, 8, 16, 13));
+    expect(pastPastHour.begin!).toEqualRuby(Time.local(2006, 8, 16, 12));
+    expect(pastPastHour.end!).toEqualRuby(Time.local(2006, 8, 16, 13));
   });
 
   it("this", () => {
@@ -43,16 +43,16 @@ describe("TestRepeaterHour", () => {
     hours.start = now;
 
     let thisHour = hours.this("future");
-    expect(thisHour.begin).toEqualRuby(Time.local(2006, 8, 16, 14, 31));
-    expect(thisHour.end).toEqualRuby(Time.local(2006, 8, 16, 15));
+    expect(thisHour.begin!).toEqualRuby(Time.local(2006, 8, 16, 14, 31));
+    expect(thisHour.end!).toEqualRuby(Time.local(2006, 8, 16, 15));
 
     thisHour = hours.this("past")!;
-    expect(thisHour.begin).toEqualRuby(Time.local(2006, 8, 16, 14));
-    expect(thisHour.end).toEqualRuby(Time.local(2006, 8, 16, 14, 30));
+    expect(thisHour.begin!).toEqualRuby(Time.local(2006, 8, 16, 14));
+    expect(thisHour.end!).toEqualRuby(Time.local(2006, 8, 16, 14, 30));
 
     thisHour = hours.this("none")!;
-    expect(thisHour.begin).toEqualRuby(Time.local(2006, 8, 16, 14));
-    expect(thisHour.end).toEqualRuby(Time.local(2006, 8, 16, 15));
+    expect(thisHour.begin!).toEqualRuby(Time.local(2006, 8, 16, 14));
+    expect(thisHour.end!).toEqualRuby(Time.local(2006, 8, 16, 15));
   });
 
   it("offset", () => {
@@ -60,12 +60,12 @@ describe("TestRepeaterHour", () => {
 
     let offsetSpan = new Chronic.RepeaterHour("hour").offset(span, 3, "future");
 
-    expect(offsetSpan.begin).toEqualRuby(Time.local(2006, 8, 16, 17));
-    expect(offsetSpan.end).toEqualRuby(Time.local(2006, 8, 16, 17, 0, 1));
+    expect(offsetSpan.begin!).toEqualRuby(Time.local(2006, 8, 16, 17));
+    expect(offsetSpan.end!).toEqualRuby(Time.local(2006, 8, 16, 17, 0, 1));
 
     offsetSpan = new Chronic.RepeaterHour("hour").offset(span, 24, "past");
 
-    expect(offsetSpan.begin).toEqualRuby(Time.local(2006, 8, 15, 14));
-    expect(offsetSpan.end).toEqualRuby(Time.local(2006, 8, 15, 14, 0, 1));
+    expect(offsetSpan.begin!).toEqualRuby(Time.local(2006, 8, 15, 14));
+    expect(offsetSpan.end!).toEqualRuby(Time.local(2006, 8, 15, 14, 0, 1));
   });
 });

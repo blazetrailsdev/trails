@@ -6,9 +6,7 @@ import { Season } from "../season.js";
 import { Span } from "../span.js";
 import { RepeaterDay } from "./repeater-day.js";
 
-export class RepeaterSeason extends Repeater {
-  declare type: string;
-
+export class RepeaterSeason extends Repeater<string> {
   static SEASON_SECONDS = 7_862_400;
   static SEASONS: Record<string, Season> = {
     spring: new Season(new MiniDate(3, 20), new MiniDate(6, 20)),
@@ -22,7 +20,7 @@ export class RepeaterSeason extends Repeater {
   /** @internal */
   nextSeasonEnd: RubyTime | null;
 
-  constructor(type: unknown, options: Record<string, unknown> = {}) {
+  constructor(type: string, options: Record<string, unknown> = {}) {
     super(type, options);
     this.nextSeasonStart = null;
     this.nextSeasonEnd = null;
@@ -68,8 +66,8 @@ export class RepeaterSeason extends Repeater {
 
   offset(span: Span, amount: number, pointer: string): Span {
     return new Span(
-      this.offsetBy(span.begin, amount, pointer),
-      this.offsetBy(span.end, amount, pointer),
+      this.offsetBy(span.begin!, amount, pointer),
+      this.offsetBy(span.end!, amount, pointer),
     );
   }
 

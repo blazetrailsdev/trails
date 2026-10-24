@@ -55,14 +55,14 @@ export class Parser {
   constructor(options: Record<string, unknown> = {}) {
     this.options = { ...Parser.DEFAULT_OPTIONS, ...options };
     const now = hashDelete(options, "now") as RubyTime | null;
-    this.now = now != null && (now as unknown) !== false ? now : Chronic.timeClass.now();
+    this.now = now != null && (now as unknown) !== false ? now : Chronic.timeClass().now();
   }
 
   parse(text: string): RubyTime | Span | null {
     const tokens = this.tokenize(text, this.options);
     const span = this.tokensToSpan(tokens, { ...this.options, text: text });
 
-    if (Chronic.debug) {
+    if (Chronic.debug()) {
       STDOUT.puts(`+${"-".repeat(51)}\n| ${rbInspect(tokens)}\n+${"-".repeat(51)}`);
     }
 
@@ -112,10 +112,10 @@ export class Parser {
   guess(span: Span, mode: unknown = "middle"): RubyTime | Span {
     if (!(mode != null && mode !== false)) return span;
     if (span.width() > 1 && (mode === true || mode === "middle")) {
-      return span.begin.plus(fixDiv(span.width(), 2));
+      return span.begin!.plus(fixDiv(span.width(), 2));
     }
-    if (mode === "end") return span.end;
-    return span.begin;
+    if (mode === "end") return span.end!;
+    return span.begin!;
   }
 
   definitions(options: Record<string, unknown> = {}): Record<string, Handler[]> {
@@ -448,7 +448,7 @@ export class Parser {
       }
     }
 
-    if (Chronic.debug) STDOUT.puts("-none");
+    if (Chronic.debug()) STDOUT.puts("-none");
     return null;
   }
 }

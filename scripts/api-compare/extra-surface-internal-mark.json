@@ -9,6 +9,7 @@
   "activerecord": 2189,
   "arel": 288,
   "bcrypt": 2,
+  "chronic": 40,
   "did-you-mean": 8,
   "globalid": 35,
   "i18n": 97,
@@ -16,6 +17,6 @@
   "rack": 214,
   "rack-session": 60,
   "rack-test": 45,
-  "ruby-compat": 926,
+  "ruby-compat": 927,
   "thor": 175
 }

@@ -467,7 +467,7 @@ describe("TestParsing", () => {
     expect(time).toEqualRuby(Time.local(2007, 1, 30, 12));
 
     time = parseNow("5th tuesday in february");
-    expect(time).toBeNull();
+    expect(time).toEqual(null);
 
     for (const [index, month] of [
       "jan",
@@ -497,7 +497,7 @@ describe("TestParsing", () => {
     expect(time).toEqualRuby(Time.local(2006, 11, 15, 12));
 
     time = parseNow("10th wednesday in november");
-    expect(time).toBeNull();
+    expect(time).toEqual(null);
   });
 
   it("handle o r g r", () => {
@@ -978,10 +978,10 @@ describe("TestParsing", () => {
 
   it("parse guess nonsense", () => {
     let time = parseNow("some stupid nonsense");
-    expect(time).toBeNull();
+    expect(time).toEqual(null);
 
     time = parseNow("Ham Sandwich");
-    expect(time).toBeNull();
+    expect(time).toEqual(null);
   });
 
   it("parse span", () => {

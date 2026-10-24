@@ -92,6 +92,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "activesupport",
   "arel",
   "bcrypt",
+  "chronic",
   "did-you-mean",
   "globalid",
   "i18n",

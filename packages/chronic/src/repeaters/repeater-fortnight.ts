@@ -26,7 +26,7 @@ export class RepeaterFortnight extends Repeater {
           const sundayRepeater = new RepeaterDayName("sunday");
           sundayRepeater.start = this.now!;
           const nextSundaySpan = sundayRepeater.next("future");
-          this.currentFortnightStart = nextSundaySpan.begin;
+          this.currentFortnightStart = nextSundaySpan.begin!;
           break;
         }
         case "past": {
@@ -34,7 +34,7 @@ export class RepeaterFortnight extends Repeater {
           sundayRepeater.start = this.now!.plus(RepeaterDay.DAY_SECONDS);
           for (let i = 0; i < 2; i++) sundayRepeater.next("past");
           const lastSundaySpan = sundayRepeater.next("past");
-          this.currentFortnightStart = lastSundaySpan.begin;
+          this.currentFortnightStart = lastSundaySpan.begin!;
           break;
         }
       }
@@ -68,7 +68,7 @@ export class RepeaterFortnight extends Repeater {
         sundayRepeater.start = this.now!;
         sundayRepeater.this("future");
         const thisSundaySpan = sundayRepeater.this("future");
-        const thisFortnightEnd = thisSundaySpan.begin;
+        const thisFortnightEnd = thisSundaySpan.begin!;
         return new Span(thisFortnightStart, thisFortnightEnd);
       }
       case "past": {
@@ -81,7 +81,7 @@ export class RepeaterFortnight extends Repeater {
         const sundayRepeater = new RepeaterDayName("sunday");
         sundayRepeater.start = this.now!;
         const lastSundaySpan = sundayRepeater.next("past");
-        const thisFortnightStart = lastSundaySpan.begin;
+        const thisFortnightStart = lastSundaySpan.begin!;
         return new Span(thisFortnightStart, thisFortnightEnd);
       }
     }

@@ -3,11 +3,8 @@ import { Range, rbPlus } from "@blazetrails/ruby-compat";
 import { Chronic } from "./namespaces.js";
 
 export class Span extends Range<RubyTime> {
-  declare readonly begin: RubyTime;
-  declare readonly end: RubyTime;
-
   width(): number {
-    return Math.trunc(this.end.minus(this.begin) as number);
+    return Math.trunc(this.end!.minus(this.begin!) as number);
   }
 
   plus(seconds: number): Span {
@@ -19,7 +16,7 @@ export class Span extends Range<RubyTime> {
   }
 
   toString(): string {
-    return "(" + this.begin.toS() + ".." + this.end.toS() + ")";
+    return "(" + this.begin!.toS() + ".." + this.end!.toS() + ")";
   }
 }
 

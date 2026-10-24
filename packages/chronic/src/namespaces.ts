@@ -48,8 +48,10 @@ export interface TimeClass {
 export const Chronic = { name: "Chronic" } as {
   name: string;
   VERSION: string;
-  debug: boolean;
-  timeClass: TimeClass;
+  debug: typeof ChronicModule.debug;
+  setDebug: typeof ChronicModule.setDebug;
+  timeClass: typeof ChronicModule.timeClass;
+  setTimeClass: typeof ChronicModule.setTimeClass;
   parse: typeof ChronicModule.parse;
   construct: typeof ChronicModule.construct;
   Date: typeof DateModule.Date;

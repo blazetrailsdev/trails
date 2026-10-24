@@ -4,7 +4,7 @@ import type { Span } from "./span.js";
 import { Tag } from "./tag.js";
 import type { Token } from "./token.js";
 
-export class Repeater extends Tag {
+export class Repeater<T = unknown> extends Tag<T> {
   static scan(tokens: Token[], options: Record<string, unknown>): Token[] {
     for (const token of tokens) {
       let t;

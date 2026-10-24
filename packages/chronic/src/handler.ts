@@ -74,7 +74,7 @@ export class Handler {
   }
 
   invoke(type: string, tokens: Token[], parser: Parser, options: Record<string, unknown>): unknown {
-    if (Chronic.debug) {
+    if (Chronic.debug()) {
       STDOUT.puts(`-${type}`);
       STDOUT.puts(`Handler: ${String(this.handlerMethod)}`);
     }

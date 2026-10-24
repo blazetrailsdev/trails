@@ -15,19 +15,19 @@ describe("TestRepeaterMonthName", () => {
     mays.start = now;
 
     const nextMay = mays.next("future");
-    expect(nextMay.begin).toEqualRuby(Time.local(2007, 5));
-    expect(nextMay.end).toEqualRuby(Time.local(2007, 6));
+    expect(nextMay.begin!).toEqualRuby(Time.local(2007, 5));
+    expect(nextMay.end!).toEqualRuby(Time.local(2007, 6));
 
     const nextNextMay = mays.next("future");
-    expect(nextNextMay.begin).toEqualRuby(Time.local(2008, 5));
-    expect(nextNextMay.end).toEqualRuby(Time.local(2008, 6));
+    expect(nextNextMay.begin!).toEqualRuby(Time.local(2008, 5));
+    expect(nextNextMay.end!).toEqualRuby(Time.local(2008, 6));
 
     const decembers = new Chronic.RepeaterMonthName("december");
     decembers.start = now;
 
     const nextDecember = decembers.next("future");
-    expect(nextDecember.begin).toEqualRuby(Time.local(2006, 12));
-    expect(nextDecember.end).toEqualRuby(Time.local(2007, 1));
+    expect(nextDecember.begin!).toEqualRuby(Time.local(2006, 12));
+    expect(nextDecember.end!).toEqualRuby(Time.local(2007, 1));
 
     mays = new Chronic.RepeaterMonthName("may");
     mays.start = now;
@@ -41,14 +41,14 @@ describe("TestRepeaterMonthName", () => {
     octobers.start = now;
 
     const thisOctober = octobers.this("future")!;
-    expect(thisOctober.begin).toEqualRuby(Time.local(2006, 10, 1));
-    expect(thisOctober.end).toEqualRuby(Time.local(2006, 11, 1));
+    expect(thisOctober.begin!).toEqualRuby(Time.local(2006, 10, 1));
+    expect(thisOctober.end!).toEqualRuby(Time.local(2006, 11, 1));
 
     const aprils = new Chronic.RepeaterMonthName("april");
     aprils.start = now;
 
     const thisApril = aprils.this("past")!;
-    expect(thisApril.begin).toEqualRuby(Time.local(2006, 4, 1));
-    expect(thisApril.end).toEqualRuby(Time.local(2006, 5, 1));
+    expect(thisApril.begin!).toEqualRuby(Time.local(2006, 4, 1));
+    expect(thisApril.end!).toEqualRuby(Time.local(2006, 5, 1));
   });
 });

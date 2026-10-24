@@ -15,12 +15,12 @@ describe("TestRepeaterMinute", () => {
     minutes.start = now;
 
     const nextMinute = minutes.next("future");
-    expect(nextMinute.begin).toEqualRuby(Time.local(2008, 6, 25, 7, 16));
-    expect(nextMinute.end).toEqualRuby(Time.local(2008, 6, 25, 7, 17));
+    expect(nextMinute.begin!).toEqualRuby(Time.local(2008, 6, 25, 7, 16));
+    expect(nextMinute.end!).toEqualRuby(Time.local(2008, 6, 25, 7, 17));
 
     const nextNextMinute = minutes.next("future");
-    expect(nextNextMinute.begin).toEqualRuby(Time.local(2008, 6, 25, 7, 17));
-    expect(nextNextMinute.end).toEqualRuby(Time.local(2008, 6, 25, 7, 18));
+    expect(nextNextMinute.begin!).toEqualRuby(Time.local(2008, 6, 25, 7, 17));
+    expect(nextNextMinute.end!).toEqualRuby(Time.local(2008, 6, 25, 7, 18));
   });
 
   it("next past", () => {
@@ -28,11 +28,11 @@ describe("TestRepeaterMinute", () => {
     minutes.start = now;
 
     const prevMinute = minutes.next("past");
-    expect(prevMinute.begin).toEqualRuby(Time.local(2008, 6, 25, 7, 14));
-    expect(prevMinute.end).toEqualRuby(Time.local(2008, 6, 25, 7, 15));
+    expect(prevMinute.begin!).toEqualRuby(Time.local(2008, 6, 25, 7, 14));
+    expect(prevMinute.end!).toEqualRuby(Time.local(2008, 6, 25, 7, 15));
 
     const prevPrevMinute = minutes.next("past");
-    expect(prevPrevMinute.begin).toEqualRuby(Time.local(2008, 6, 25, 7, 13));
-    expect(prevPrevMinute.end).toEqualRuby(Time.local(2008, 6, 25, 7, 14));
+    expect(prevPrevMinute.begin!).toEqualRuby(Time.local(2008, 6, 25, 7, 13));
+    expect(prevPrevMinute.end!).toEqualRuby(Time.local(2008, 6, 25, 7, 14));
   });
 });

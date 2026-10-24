@@ -124,13 +124,13 @@ describe("TestChronic", () => {
       string += chunk;
       return true;
     };
-    Chronic.debug = true;
+    Chronic.setDebug(true);
     try {
       Chronic.parse("now");
       expect(string.includes("this(grabber-this)")).toBeTruthy();
     } finally {
       stdout.write = write;
-      Chronic.debug = false;
+      Chronic.setDebug(false);
     }
   });
 
@@ -171,9 +171,9 @@ describe("TestChronic", () => {
   });
 
   it("time", () => {
-    const org = Chronic.timeClass;
+    const org = Chronic.timeClass();
     try {
-      Chronic.timeClass = Time as unknown as TimeClass;
+      Chronic.setTimeClass(Time as unknown as TimeClass);
       expect(Chronic.construct(2013, 8, 27, 20, 30, 40, "+05:30")).toEqualRuby(
         Time.new(2013, 8, 27, 20, 30, 40, "+05:30"),
       );
@@ -181,24 +181,24 @@ describe("TestChronic", () => {
         Time.new(2013, 8, 27, 20, 30, 40, "-08:00"),
       );
     } finally {
-      Chronic.timeClass = org;
+      Chronic.setTimeClass(org);
     }
   });
 
   it("date", () => {
-    const org = Chronic.timeClass;
+    const org = Chronic.timeClass();
     try {
-      Chronic.timeClass = RubyDate as unknown as TimeClass;
+      Chronic.setTimeClass(RubyDate as unknown as TimeClass);
       expect(Chronic.construct(2013, 8, 27)).toEqualRuby(new RubyDate(2013, 8, 27));
     } finally {
-      Chronic.timeClass = org;
+      Chronic.setTimeClass(org);
     }
   });
 
   it("datetime", () => {
-    const org = Chronic.timeClass;
+    const org = Chronic.timeClass();
     try {
-      Chronic.timeClass = DateTime as unknown as TimeClass;
+      Chronic.setTimeClass(DateTime as unknown as TimeClass);
       expect(Chronic.construct(2013, 8, 27, 20, 30, 40, "+05:30")).toEqualRuby(
         new DateTime(2013, 8, 27, 20, 30, 40, "+05:30"),
       );
@@ -206,7 +206,7 @@ describe("TestChronic", () => {
         new DateTime(2013, 8, 27, 20, 30, 40, "-08:00"),
       );
     } finally {
-      Chronic.timeClass = org;
+      Chronic.setTimeClass(org);
     }
   });
 

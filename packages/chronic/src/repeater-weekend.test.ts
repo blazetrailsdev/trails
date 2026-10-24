@@ -15,8 +15,8 @@ describe("TestRepeaterWeekend", () => {
     weekend.start = now;
 
     const nextWeekend = weekend.next("future");
-    expect(nextWeekend.begin).toEqualRuby(Time.local(2006, 8, 19));
-    expect(nextWeekend.end).toEqualRuby(Time.local(2006, 8, 21));
+    expect(nextWeekend.begin!).toEqualRuby(Time.local(2006, 8, 19));
+    expect(nextWeekend.end!).toEqualRuby(Time.local(2006, 8, 21));
   });
 
   it("next past", () => {
@@ -24,8 +24,8 @@ describe("TestRepeaterWeekend", () => {
     weekend.start = now;
 
     const nextWeekend = weekend.next("past");
-    expect(nextWeekend.begin).toEqualRuby(Time.local(2006, 8, 12));
-    expect(nextWeekend.end).toEqualRuby(Time.local(2006, 8, 14));
+    expect(nextWeekend.begin!).toEqualRuby(Time.local(2006, 8, 12));
+    expect(nextWeekend.end!).toEqualRuby(Time.local(2006, 8, 14));
   });
 
   it("this future", () => {
@@ -33,8 +33,8 @@ describe("TestRepeaterWeekend", () => {
     weekend.start = now;
 
     const nextWeekend = weekend.this("future")!;
-    expect(nextWeekend.begin).toEqualRuby(Time.local(2006, 8, 19));
-    expect(nextWeekend.end).toEqualRuby(Time.local(2006, 8, 21));
+    expect(nextWeekend.begin!).toEqualRuby(Time.local(2006, 8, 19));
+    expect(nextWeekend.end!).toEqualRuby(Time.local(2006, 8, 21));
   });
 
   it("this past", () => {
@@ -42,8 +42,8 @@ describe("TestRepeaterWeekend", () => {
     weekend.start = now;
 
     const nextWeekend = weekend.this("past")!;
-    expect(nextWeekend.begin).toEqualRuby(Time.local(2006, 8, 12));
-    expect(nextWeekend.end).toEqualRuby(Time.local(2006, 8, 14));
+    expect(nextWeekend.begin!).toEqualRuby(Time.local(2006, 8, 12));
+    expect(nextWeekend.end!).toEqualRuby(Time.local(2006, 8, 14));
   });
 
   it("this none", () => {
@@ -51,8 +51,8 @@ describe("TestRepeaterWeekend", () => {
     weekend.start = now;
 
     const nextWeekend = weekend.this("future")!;
-    expect(nextWeekend.begin).toEqualRuby(Time.local(2006, 8, 19));
-    expect(nextWeekend.end).toEqualRuby(Time.local(2006, 8, 21));
+    expect(nextWeekend.begin!).toEqualRuby(Time.local(2006, 8, 19));
+    expect(nextWeekend.end!).toEqualRuby(Time.local(2006, 8, 21));
   });
 
   it("offset", () => {
@@ -60,17 +60,17 @@ describe("TestRepeaterWeekend", () => {
 
     let offsetSpan = new Chronic.RepeaterWeekend("weekend").offset(span, 3, "future");
 
-    expect(offsetSpan.begin).toEqualRuby(Time.local(2006, 9, 2));
-    expect(offsetSpan.end).toEqualRuby(Time.local(2006, 9, 2, 0, 0, 1));
+    expect(offsetSpan.begin!).toEqualRuby(Time.local(2006, 9, 2));
+    expect(offsetSpan.end!).toEqualRuby(Time.local(2006, 9, 2, 0, 0, 1));
 
     offsetSpan = new Chronic.RepeaterWeekend("weekend").offset(span, 1, "past");
 
-    expect(offsetSpan.begin).toEqualRuby(Time.local(2006, 8, 12));
-    expect(offsetSpan.end).toEqualRuby(Time.local(2006, 8, 12, 0, 0, 1));
+    expect(offsetSpan.begin!).toEqualRuby(Time.local(2006, 8, 12));
+    expect(offsetSpan.end!).toEqualRuby(Time.local(2006, 8, 12, 0, 0, 1));
 
     offsetSpan = new Chronic.RepeaterWeekend("weekend").offset(span, 0, "future");
 
-    expect(offsetSpan.begin).toEqualRuby(Time.local(2006, 8, 12));
-    expect(offsetSpan.end).toEqualRuby(Time.local(2006, 8, 12, 0, 0, 1));
+    expect(offsetSpan.begin!).toEqualRuby(Time.local(2006, 8, 12));
+    expect(offsetSpan.end!).toEqualRuby(Time.local(2006, 8, 12, 0, 0, 1));
   });
 });

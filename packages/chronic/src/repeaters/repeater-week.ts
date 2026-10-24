@@ -26,7 +26,7 @@ export class RepeaterWeek extends Repeater {
           const sundayRepeater = new RepeaterDayName("sunday");
           sundayRepeater.start = this.now!;
           const nextSundaySpan = sundayRepeater.next("future");
-          this.currentWeekStart = nextSundaySpan.begin;
+          this.currentWeekStart = nextSundaySpan.begin!;
           break;
         }
         case "past": {
@@ -34,7 +34,7 @@ export class RepeaterWeek extends Repeater {
           sundayRepeater.start = this.now!.plus(RepeaterDay.DAY_SECONDS);
           sundayRepeater.next("past");
           const lastSundaySpan = sundayRepeater.next("past");
-          this.currentWeekStart = lastSundaySpan.begin;
+          this.currentWeekStart = lastSundaySpan.begin!;
           break;
         }
       }
@@ -51,17 +51,17 @@ export class RepeaterWeek extends Repeater {
 
     switch (pointer) {
       case "future": {
-        const thisWeekStart = Chronic.timeClass
+        const thisWeekStart = Chronic.timeClass()
           .local(this.now!.year, this.now!.month, this.now!.day, this.now!.hour)
           .plus(RepeaterHour.HOUR_SECONDS);
         const sundayRepeater = new RepeaterDayName("sunday");
         sundayRepeater.start = this.now!;
         const thisSundaySpan = sundayRepeater.this("future");
-        const thisWeekEnd = thisSundaySpan.begin;
+        const thisWeekEnd = thisSundaySpan.begin!;
         return new Span(thisWeekStart, thisWeekEnd);
       }
       case "past": {
-        const thisWeekEnd = Chronic.timeClass.local(
+        const thisWeekEnd = Chronic.timeClass().local(
           this.now!.year,
           this.now!.month,
           this.now!.day,
@@ -70,14 +70,14 @@ export class RepeaterWeek extends Repeater {
         const sundayRepeater = new RepeaterDayName("sunday");
         sundayRepeater.start = this.now!;
         const lastSundaySpan = sundayRepeater.next("past");
-        const thisWeekStart = lastSundaySpan.begin;
+        const thisWeekStart = lastSundaySpan.begin!;
         return new Span(thisWeekStart, thisWeekEnd);
       }
       case "none": {
         const sundayRepeater = new RepeaterDayName("sunday");
         sundayRepeater.start = this.now!;
         const lastSundaySpan = sundayRepeater.next("past");
-        const thisWeekStart = lastSundaySpan.begin;
+        const thisWeekStart = lastSundaySpan.begin!;
         return new Span(thisWeekStart, thisWeekStart.plus(RepeaterWeek.WEEK_SECONDS));
       }
     }

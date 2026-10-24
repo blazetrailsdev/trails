@@ -32,13 +32,13 @@ describe("TestRepeaterMonth", () => {
     let span = new Chronic.Span(now, now.plus(60));
     let offsetSpan = new Chronic.RepeaterMonth("month").offset(span, 1, "future");
 
-    expect(offsetSpan.begin).toEqualRuby(Time.local(2006, 9, 16, 14));
-    expect(offsetSpan.end).toEqualRuby(Time.local(2006, 9, 16, 14, 1));
+    expect(offsetSpan.begin!).toEqualRuby(Time.local(2006, 9, 16, 14));
+    expect(offsetSpan.end!).toEqualRuby(Time.local(2006, 9, 16, 14, 1));
 
     span = new Chronic.Span(now, now.plus(60));
     offsetSpan = new Chronic.RepeaterMonth("month").offset(span, 1, "past");
 
-    expect(offsetSpan.begin).toEqualRuby(Time.local(2006, 7, 16, 14));
-    expect(offsetSpan.end).toEqualRuby(Time.local(2006, 7, 16, 14, 1));
+    expect(offsetSpan.begin!).toEqualRuby(Time.local(2006, 7, 16, 14));
+    expect(offsetSpan.end!).toEqualRuby(Time.local(2006, 7, 16, 14, 1));
   });
 });

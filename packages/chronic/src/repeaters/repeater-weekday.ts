@@ -75,7 +75,7 @@ export class RepeaterWeekday extends Repeater {
     let offset = 0;
     while (numWeekdaysPassed !== amount) {
       offset += direction * RepeaterWeekday.DAY_SECONDS;
-      if (this.isWeekday(span.begin.plus(offset).wday)) numWeekdaysPassed += 1;
+      if (this.isWeekday(span.begin!.plus(offset).wday)) numWeekdaysPassed += 1;
     }
 
     return span.plus(offset);

@@ -5,9 +5,7 @@ import { Repeater } from "../repeater.js";
 import { Span } from "../span.js";
 import { RepeaterDay } from "./repeater-day.js";
 
-export class RepeaterDayPortion extends Repeater {
-  declare type: string | number;
-
+export class RepeaterDayPortion extends Repeater<string | number> {
   static PORTIONS: Record<string, Range<number>> = {
     am: new Range(0, 12 * 60 * 60 - 1),
     pm: new Range(12 * 60 * 60, 24 * 60 * 60 - 1),
@@ -22,7 +20,7 @@ export class RepeaterDayPortion extends Repeater {
   /** @internal */
   range: Range<number> | undefined;
 
-  constructor(type: unknown, options: Record<string, unknown> = {}) {
+  constructor(type: string | number, options: Record<string, unknown> = {}) {
     super(type, options);
     this.currentSpan = null;
 
@@ -91,20 +89,20 @@ export class RepeaterDayPortion extends Repeater {
       }
 
       const newBegin = Chronic.construct(
-        this.currentSpan.begin.year,
-        this.currentSpan.begin.month,
-        this.currentSpan.begin.day + daysToShiftWindow!,
-        this.currentSpan.begin.hour,
-        this.currentSpan.begin.min,
-        this.currentSpan.begin.sec,
+        this.currentSpan.begin!.year,
+        this.currentSpan.begin!.month,
+        this.currentSpan.begin!.day + daysToShiftWindow!,
+        this.currentSpan.begin!.hour,
+        this.currentSpan.begin!.min,
+        this.currentSpan.begin!.sec,
       );
       const newEnd = Chronic.construct(
-        this.currentSpan.end.year,
-        this.currentSpan.end.month,
-        this.currentSpan.end.day + daysToShiftWindow!,
-        this.currentSpan.end.hour,
-        this.currentSpan.end.min,
-        this.currentSpan.end.sec,
+        this.currentSpan.end!.year,
+        this.currentSpan.end!.month,
+        this.currentSpan.end!.day + daysToShiftWindow!,
+        this.currentSpan.end!.hour,
+        this.currentSpan.end!.min,
+        this.currentSpan.end!.sec,
       );
       return (this.currentSpan = new Span(newBegin, newEnd));
     }
@@ -121,7 +119,7 @@ export class RepeaterDayPortion extends Repeater {
   }
 
   offset(span: Span, amount: number, pointer: string): Span {
-    this.now = span.begin;
+    this.now = span.begin!;
     const portionSpan = this.next(pointer);
     const direction = pointer === "future" ? 1 : -1;
     return portionSpan.plus(direction * (amount - 1) * RepeaterDay.DAY_SECONDS);

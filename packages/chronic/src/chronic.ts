@@ -51,8 +51,27 @@ import { Time } from "./time.js";
 
 export const VERSION = "0.10.2";
 
-Chronic.debug = false;
-Chronic.timeClass = RubyTime as unknown as TimeClass;
+let _debug: boolean;
+let _timeClass: TimeClass;
+
+export function debug(): boolean {
+  return _debug;
+}
+
+export function setDebug(value: boolean): void {
+  _debug = value;
+}
+
+export function timeClass(): TimeClass {
+  return _timeClass;
+}
+
+export function setTimeClass(value: TimeClass): void {
+  _timeClass = value;
+}
+
+setDebug(false);
+setTimeClass(RubyTime as unknown as TimeClass);
 
 export function parse(text: string, options: Record<string, unknown> = {}): RubyTime | Span | null {
   return new Chronic.Parser(options).parse(text);
@@ -104,21 +123,21 @@ export function construct(
       month = fixMod(month, 12);
     }
   }
-  if (Chronic.timeClass.name === "Date") {
-    return new (Chronic.timeClass as unknown as typeof RubyDate)(
+  if (Chronic.timeClass().name === "Date") {
+    return new (Chronic.timeClass() as unknown as typeof RubyDate)(
       year,
       month,
       day,
     ) as unknown as RubyTime;
   } else if (
-    !(rbObjRespondTo(Chronic.timeClass, "new") || typeof Chronic.timeClass === "function") ||
-    (parseFloat(RUBY_VERSION) < 1.9 && Chronic.timeClass.name === "Time")
+    !(rbObjRespondTo(Chronic.timeClass(), "new") || typeof Chronic.timeClass() === "function") ||
+    (parseFloat(RUBY_VERSION) < 1.9 && Chronic.timeClass().name === "Time")
   ) {
-    return Chronic.timeClass.local(year, month, day, hour, minute, second);
+    return Chronic.timeClass().local(year, month, day, hour, minute, second);
   } else {
-    if (Chronic.timeClass.name === "DateTime") offset = Time.normalizeOffset(offset);
-    if (!rbObjRespondTo(Chronic.timeClass, "new")) {
-      return new (Chronic.timeClass as unknown as new (...args: unknown[]) => RubyTime)(
+    if (Chronic.timeClass().name === "DateTime") offset = Time.normalizeOffset(offset);
+    if (!rbObjRespondTo(Chronic.timeClass(), "new")) {
+      return new (Chronic.timeClass() as unknown as new (...args: unknown[]) => RubyTime)(
         year,
         month,
         day,
@@ -128,11 +147,15 @@ export function construct(
         offset,
       );
     }
-    return Chronic.timeClass.new!(year, month, day, hour, minute, second, offset);
+    return Chronic.timeClass().new!(year, month, day, hour, minute, second, offset);
   }
 }
 
 Chronic.VERSION = VERSION;
+Chronic.debug = debug;
+Chronic.setDebug = setDebug;
+Chronic.timeClass = timeClass;
+Chronic.setTimeClass = setTimeClass;
 Chronic.parse = parse;
 Chronic.construct = construct;
 
