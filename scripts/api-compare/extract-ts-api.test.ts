@@ -2233,6 +2233,35 @@ describe("body call capture", () => {
     expect(marks("eachPair")).toEqual(["@entries", "@entries:options"]);
   });
 
+  it("marks an Object.hasOwn ternary reading its own literal key as a two-argument fetch", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        options: Record<string, unknown> = {};
+        read(options: Record<string, unknown>) {
+          return Object.hasOwn(options, "a") ? options.a : null;
+        }
+        indexed() {
+          return Object.hasOwn(this.options, "a") ? this.options["a"] : 1;
+        }
+        other(options: Record<string, unknown>, name: string) {
+          return [
+            Object.hasOwn(options, "a") ? options.b : null,
+            Object.hasOwn(options, name) ? options[name] : null,
+            options.a ?? null,
+          ];
+        }
+      }`,
+    );
+    const marks = (name: string): string[] =>
+      cls.instanceMethods
+        .find((m) => m.name === name)!
+        .calls!.filter((c) => c.startsWith("@fetch"))
+        .sort();
+    expect(marks("read")).toEqual(["@fetch", "@fetch:options"]);
+    expect(marks("indexed")).toEqual(["@fetch", "@fetch:options"]);
+    expect(marks("other")).toEqual([]);
+  });
+
   it("names a leading spread through super, superFn, `x || {}`, a string-keyed index and a conditional", () => {
     const cls = extractFromSource(
       `class Foo extends Bar {

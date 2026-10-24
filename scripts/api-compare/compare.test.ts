@@ -461,6 +461,31 @@ describe("significantMissingCalls", () => {
     expect(unnamed.has("size")).toBe(true);
   });
 
+  it("significantCallsForReceivers credits two-argument fetch on a proven hash only", () => {
+    const sig = (kinds: string[], names: string[], forms = ["fetch", "fetch:options"]) =>
+      significantCallsForReceivers({ fetch: kinds }, undefined, new Set(forms), {
+        fetch: names,
+      }).has("fetch");
+    expect(sig(["hash"], ["options"])).toBe(false);
+    expect(sig(["hash"], ["options"], [])).toBe(true);
+    expect(sig(["local"], ["options"])).toBe(true);
+    expect(sig(["hash"], ["other"])).toBe(true);
+  });
+
+  it("significantCallsForReceivers keeps the KeyError and block arms of fetch helper-only", () => {
+    const forms = new Set(["fetch", "fetch:options"]);
+    expect(
+      significantCallsForReceivers({ fetch: ["hash"] }, undefined, forms, { fetch: ["?"] }).has(
+        "fetch",
+      ),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers({ fetch: ["hash"] }, undefined, forms, {
+        fetch: ["options", "?"],
+      }).has("fetch"),
+    ).toBe(true);
+  });
+
   it("significantCallsForReceivers drops key? off a SCREAMING_CASE constant only for that constant's in form", () => {
     const credited = significantCallsForReceivers(
       { "key?": ["const"] },

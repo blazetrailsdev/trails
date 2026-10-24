@@ -42,6 +42,7 @@ import {
 } from "./eslint/test-infra-scope.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
 import noRubyCompatReimplementation from "./eslint/no-ruby-compat-reimplementation.mjs";
+import rubyCompatNativeRequired from "./eslint/ruby-compat-native-required.mjs";
 import {
   noRubyCompatReimplementationFiles,
   noRubyCompatReimplementationIgnores,
@@ -310,6 +311,7 @@ export default defineConfig(
           "no-raw-sql": noRawSql,
           "no-standalone-associations": noStandaloneAssociations,
           "no-ruby-compat-reimplementation": noRubyCompatReimplementation,
+          "ruby-compat-native-required": rubyCompatNativeRequired,
           "ruby-compat-needs-mri-citation": rubyCompatNeedsMriCitation,
           "no-internal-canonical-loaders": noInternalCanonicalLoaders,
           "no-load-schema-with-stubbed-ddl": noLoadSchemaWithStubbedDdl,
@@ -896,6 +898,15 @@ export default defineConfig(
       // (autofixable via `--fix`) lets the codebase converge to direct awaits
       // without breaking lint or forcing a mass rewrite in one PR.
       "blazetrails/prefer-await-relation": "error",
+    },
+  },
+
+  // ── ruby-compat-native-required: the native form where it is the same operation (RFC 0194) ──
+  // Type-aware; types come from the projectService block below.
+  {
+    files: ["packages/*/src/**/*.ts"],
+    rules: {
+      "blazetrails/ruby-compat-native-required": "error",
     },
   },
 

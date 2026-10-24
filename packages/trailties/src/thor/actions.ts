@@ -380,6 +380,7 @@ function _cleanupOptionsAndSet(
     for (const i of ["--force", "-f", "--skip", "-s"]) aryDelete(options, i);
     options.push(`--${key}`);
   } else if (rbObjIsKindOf(options, Hash)) {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options is a Hash here, which hashDelete dispatches on
     for (const i of ["force", "skip"]) hashDelete(options, i);
     mergeBang(options, { [key]: true });
   }
