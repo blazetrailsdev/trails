@@ -902,7 +902,6 @@ export default defineConfig(
   },
 
   // ── ruby-compat-native-required: the native form where it is the same operation (RFC 0194) ──
-  // Type-aware; types come from the projectService block below.
   {
     files: ["packages/*/src/**/*.ts"],
     rules: {
