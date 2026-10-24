@@ -441,6 +441,19 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
 
+  packages/chronic:
+    dependencies:
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
+
   packages/date:
     dependencies:
       '@blazetrails/ruby-compat':

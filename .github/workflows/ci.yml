@@ -916,6 +916,7 @@ jobs:
           packages/activesupport
           packages/bcrypt
           packages/builder
+          packages/chronic
           packages/date
           packages/did-you-mean
           packages/globalid
@@ -1145,6 +1146,7 @@ jobs:
           packages/activesupport
           packages/bcrypt
           packages/builder
+          packages/chronic
           packages/date
           packages/did-you-mean
           packages/globalid
