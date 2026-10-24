@@ -71,19 +71,34 @@ export function attributeWriterMissing(
   throw new UnknownAttributeError(this, name);
 }
 
-/** @internal */
+const writerSpellings = new Map<string, string>();
+
+/**
+ * @internal
+ * @inventedArm loop — PERMANENT
+ * @inventedArm if — PERMANENT
+ */
 export function _assignAttribute(this: AttributeAssignment, k: string, v: unknown): unknown {
   const setter = `${k}=`;
   try {
-    for (
-      let o: object | null = Object(this) as object;
-      o;
-      o = Object.getPrototypeOf(o) as object | null
-    ) {
-      const set = Object.getOwnPropertyDescriptor(o, k)?.set;
-      if (set !== undefined && !isAbsentHalf(set)) {
-        return set.call(this, v);
+    let writer = writerSpellings.get(k);
+    if (writer === undefined && !k.startsWith("_")) {
+      writer = `set_${k}`.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase());
+      writerSpellings.set(k, writer);
+    }
+    for (let o: object | null = Object(this) as object; o; o = Object.getPrototypeOf(o)) {
+      if (Object.hasOwn(o, setter)) {
+        const write = (o as Record<string, unknown>)[setter];
+        if (typeof write === "function") return write.call(this, v) as unknown;
+        break;
       }
+      if (Object.hasOwn(o, k)) {
+        const set = Object.getOwnPropertyDescriptor(o, k)!.set;
+        if (set === undefined || isAbsentHalf(set)) break;
+        (this as unknown as Record<string, unknown>)[k] = v;
+        return v;
+      }
+      if (writer !== undefined && Object.hasOwn(o, writer)) break;
     }
     return rbFSend(this, setter, v);
   } catch (error) {
