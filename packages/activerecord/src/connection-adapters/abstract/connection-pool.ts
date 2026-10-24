@@ -319,10 +319,20 @@ export class ConnectionPool implements ReapablePool {
     return new InternalMetadata(this);
   }
 
+  /** @inventedArm if — CONVERGEABLE with-connection-pending-checkout-join-needs-ruling */
   async leaseConnection(): Promise<DatabaseAdapter> {
     const lease = this.connectionLease();
     lease.sticky = true;
-    return (lease.connection ||= await this.checkout());
+    if (lease.connection) return lease.connection;
+    const checkout = pendingCheckouts.get(lease) ?? { connection: this.checkout(), holders: 0 };
+    pendingCheckouts.set(lease, checkout);
+    try {
+      return (lease.connection ||= await checkout.connection);
+    } finally {
+      if (pendingCheckouts.get(lease) === checkout && checkout.holders === 0) {
+        pendingCheckouts.delete(lease);
+      }
+    }
   }
 
   isPermanentLease(): boolean {

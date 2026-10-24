@@ -208,8 +208,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         );
       });
     });
-    // BLOCKED: transactional-fixtures-deferred-pin-races-test-lease
-    it.skip("passing flags by array to adapter", async () => {
+    it("passing flags by array to adapter", async () => {
       await runWithoutConnection(async (origConnection) => {
         await Base.establishConnection({ ...origConnection, flags: ["COMPRESS"] });
         const connection = (await Base.leaseConnection()) as unknown as Mysql2Adapter;

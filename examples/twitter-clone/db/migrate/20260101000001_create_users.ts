@@ -1,6 +1,6 @@
 import { Migration } from "@blazetrails/activerecord";
 
-export class CreateUsers extends Migration {
+export class CreateUsers extends Migration.get(8.0) {
   async change() {
     await this.createTable("users", (t) => {
       t.string("handle");

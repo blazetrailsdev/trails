@@ -1233,6 +1233,9 @@ jobs:
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run packages/activerecord-cli
+      # The README promises `pnpm smoke` ends with "Smoke test passed".
+      - if: ${{ matrix.shard == 1 }}
+        run: pnpm --filter @blazetrails/example-twitter-clone smoke
 
   # `ARCONN=sqlite3_mem` is the only lane where `in_memory_db?` is true, so
   # without it every `skipIf(inMemoryDb())` guard is dead code (RFC 0029).

@@ -25,7 +25,6 @@ export interface BuildViewsOptions {
   viewsDir?: string;
   outDir?: string;
   inPlace?: boolean;
-  handlers?: readonly string[];
 }
 
 export interface BuildViewsResult {
@@ -41,7 +40,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const outViews = opts.inPlace ? viewsDir : path.join(outDir, "views");
   const { Base, PathParser, TemplateHandlers, TseHandler, UnboundTemplate, WrongEncodingError } =
     await import("@blazetrails/actionview");
-  for (const handlers of opts.handlers ?? []) await import(path.resolve(cwd, handlers));
+  await loadConfigInitializers(path.join(cwd, "config/initializers"));
   const pathParser = new PathParser();
   const { files, skipped } = await walkTemplates(
     viewsDir,
@@ -171,6 +170,14 @@ async function deepestExisting(p: string): Promise<string> {
     cur = parent;
   }
   return cur;
+}
+
+async function loadConfigInitializers(dir: string): Promise<void> {
+  if (!(await exists(dir))) return;
+  const existent = (await fs.readdir(dir, { recursive: true, encoding: "utf8" }))
+    .filter((file) => /\.(?:ts|js)$/u.test(file) && !file.endsWith(".d.ts"))
+    .map((file) => path.join(dir, file));
+  for (const initializer of existent.sort()) await import(initializer);
 }
 
 async function walkTemplates(
