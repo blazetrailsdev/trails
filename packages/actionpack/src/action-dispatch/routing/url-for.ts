@@ -16,7 +16,6 @@ import {
   rbFSend,
   rbModConstSet,
   rbModMethodDefined,
-  rbObjRespondTo,
   symbolToS,
   toH,
 } from "@blazetrails/ruby-compat";
@@ -184,7 +183,7 @@ export const UrlFor = new Module((mod) => {
       this.defaultUrlOptions = {};
     }
 
-    if (rbObjRespondTo(this, "_urlForModules")) include(this, this._urlForModules!());
+    if (typeof this._urlForModules === "function") include(this, this._urlForModules());
   });
 
   mod.moduleEval((m) => {

@@ -65,7 +65,7 @@ extend(Fragments, Concern);
 
   this.fragmentCacheKeys = [];
 
-  if (rbObjRespondTo(this, "helperMethod")) {
+  if (typeof this.helperMethod === "function") {
     this.helperMethod("combinedFragmentCacheKey");
   }
 });

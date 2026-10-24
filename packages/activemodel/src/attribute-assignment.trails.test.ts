@@ -3,7 +3,8 @@
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { NoMethodError, isEmpty } from "@blazetrails/ruby-compat";
+import { UnknownAttributeError } from "./errors.js";
 import { Model } from "./index.js";
 import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
@@ -228,5 +229,66 @@ describe("AttributeAssignmentTest", () => {
     expect(seen).toContainEqual(["name", "Eve"]);
     expect(seen).toContainEqual(["age", 5]);
     expect(p._readAttribute("name")).toBe("Eve");
+  });
+
+  it("assigns through an accessor setter defined on an ancestor prototype", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("name", "string");
+      }
+    }
+    interface Person extends Attributes {}
+    class Admin extends Person {}
+    class SuperAdmin extends Admin {}
+
+    const p = new SuperAdmin({});
+    void p.assignAttributes({ name: "bob" });
+    expect(p.attribute("name")).toBe("bob");
+  });
+
+  it("raises UnknownAttributeError for a getter-only property", () => {
+    class Person extends Model {
+      get nickname(): string {
+        return "n";
+      }
+    }
+    const p = new Person({});
+    expect(() => p.assignAttributes({ nickname: "bob" })).toThrow(UnknownAttributeError);
+  });
+
+  it("prefers a nearer setX writer over an ancestor accessor setter", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("name", "string");
+      }
+    }
+    interface Person extends Attributes {}
+    const seen: unknown[] = [];
+    class Admin extends Person {
+      setName(v: string): void {
+        seen.push(v);
+      }
+    }
+
+    const p = new Admin({});
+    void p.assignAttributes({ name: "bob" });
+    expect(seen).toEqual(["bob"]);
+    expect(p.attribute("name")).toBeNull();
+  });
+
+  it("re-raises a NoMethodError raised inside a defined setter", () => {
+    class Person extends Model {
+      set name(_v: string) {
+        throw new NoMethodError("undefined method 'boom'");
+      }
+    }
+    const p = new Person({});
+    expect(() => p.assignAttributes({ name: "bob" })).toThrow(NoMethodError);
   });
 });
