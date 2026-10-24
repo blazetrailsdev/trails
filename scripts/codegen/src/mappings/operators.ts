@@ -190,6 +190,18 @@ rule("+ - * / % < > <= >= & | ^ **", (o) => {
     const argv = n.args[0]?.k === "array" ? `...${a[0]}` : `...[${a[0]}].flat(1)`;
     return `${lw.rc(ctx, "format")}(${lhs}, ${argv})`;
   }
+  // Integer#/ floors and Integer#% takes the divisor's sign (numeric.c
+  // fix_divide, fix_mod); a boxed Number is a Float. Hand ports type these.
+  if ((name === "/" || name === "%") && GEM.hand === false && lt0?.k !== "class") {
+    const fn = o.rc(name === "/" ? "numericDiv" : "numericModulo");
+    if (lt0?.k === "prim" && lt0.name === "number") return `${fn}(${lhs}, ${a[0]})`;
+    if (!lt0)
+      return lw.withOnce(
+        lhs,
+        (x) =>
+          `(typeof ${x} === "number" || typeof ${x} === "bigint" || ${x} instanceof Number ? ${fn}(${x}, ${a[0]}) : ${x} ${name} ${needsParens(a[0]) ? `(${a[0]})` : a[0]})`,
+      );
+  }
   if (lt0?.k === "prim" && (lt0.name === "number" || lt0.name === "string"))
     return `(${lhs} ${name} ${needsParens(a[0]) ? `(${a[0]})` : a[0]})`;
   // A class the hand port types answers the operator itself, under its trails

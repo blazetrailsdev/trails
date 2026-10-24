@@ -292,6 +292,7 @@ export {
   intXor,
   numericMinus,
   numericUminus,
+  numericDiv,
   numericModulo,
   numericMul,
   numericPlus,

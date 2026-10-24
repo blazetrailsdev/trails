@@ -2657,6 +2657,25 @@ export class Emitter {
         `toA(): any[] {\n  return [${ms.map((m) => `this._${m.replace(/^_/, "")}`).join(", ")}];\n}`,
       );
     }
+    // A class's own `self.new` (fugit's `Duration.new(s)` is `parse(s)`) is what
+    // `new Klass(...)` runs (CLAUDE.md "A record is built with `new Klass`
+    // only"): with no `initialize` and no `super` to reach Class#new, the
+    // constructor answers it.
+    {
+      const selfNew = [
+        ...(u.sbody ?? []).filter((s) => s.k === "def" && s.name === "new"),
+        ...body.filter((s) => s.k === "def" && s.singleton && s.name === "new"),
+      ][0];
+      if (
+        selfNew &&
+        !u.struct &&
+        !body.some((s) => s.k === "def" && !s.singleton && s.name === "initialize") &&
+        !/"k":"z?super"/.test(JSON.stringify(selfNew.body ?? null))
+      )
+        members.push(
+          `constructor(...args: any[]) {\n${u.superclass ? "  // @ts-ignore\n" : ""}  return (new.target as any).new(...args);\n}`,
+        );
+    }
     // No `initialize` of its own, but an included module has one: Ruby's
     // `Class#new` runs that body, so it is this class's constructor.
     if (!u.struct && !body.some((s) => s.k === "def" && s.name === "initialize" && !s.singleton)) {

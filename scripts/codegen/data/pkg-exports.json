@@ -310,6 +310,7 @@
     "newCond",
     "numStep",
     "numericMinus",
+    "numericDiv",
     "numericModulo",
     "numericMul",
     "numericPlus",

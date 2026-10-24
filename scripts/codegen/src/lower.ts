@@ -5127,7 +5127,14 @@ export class Lowerer {
             "zip",
             "flatten",
           ].includes(name) &&
-          n.recv
+          n.recv &&
+          // Hash#select / reject / filter with a `|k, v|` block answer a Hash.
+          !(
+            ["select", "reject", "filter"].includes(name) &&
+            n.block?.k === "block" &&
+            n.block.params.length >= 2 &&
+            this.typeOf(n.recv, ctx)?.k !== "array"
+          )
         )
           return { k: "array", el: null };
         if (["+", "-", "*", "/", "%", "**"].includes(name)) {

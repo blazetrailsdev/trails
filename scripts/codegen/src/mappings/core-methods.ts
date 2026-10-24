@@ -100,6 +100,20 @@ rule("reject", (c) => {
     const m = c.lw.callName(c.blk.name);
     return `${c.E}${c.nav}filter((x) => !x.${m}())`;
   }
+  // `h.reject { |k, v| }` on a Hash answers a Hash (hash.c rb_hash_reject), not
+  // the Array of pairs Enumerable#reject would; an Array of pairs keeps Array's.
+  const one = pairParams(c.blk);
+  if (one && c.recvType?.k !== "array" && c.nav === ".") {
+    const pred = `((${c.lw.arrow(one, c.blk!.body, c.ctx)}) as (...a: any[]) => unknown)`;
+    const names = c.blk!.params.map((p: Param) => p.name).join(", ");
+    const hash = `((${c.blk!.params.map((p: Param) => `${p.name}: any`).join(", ")}) => ${pred}([${names}]))`;
+    if (c.recvType?.k === "hash" && !c.recvType.map) return `${c.rc("reject")}(${c.r}, ${hash})`;
+    return c.lw.withOnce(
+      c.r,
+      (x) =>
+        `(Array.isArray(${x}) ? ${x}.filter((p: any) => !${c.lw.truthy(`${pred}(p)`, true)}) : ${c.rc("reject")}(${x}, ${hash}))`,
+    );
+  }
   // Typed variadic so forwarding `...xs` into a one-parameter block type-checks.
   if (c.blk)
     return `${c.E}${c.nav}filter((...xs: any[]) => !${c.lw.truthy(`((${c.fn()}) as (...a: any[]) => unknown)(...xs)`, true)})`;
@@ -169,7 +183,13 @@ rule("each", (c) => {
   return null;
 });
 
-rule("each_with_index", (c) => (c.blk ? `${c.R}${c.nav}forEach(${c.fn()})` : null));
+rule("each_with_index", (c) => {
+  if (!c.blk) return null;
+  // A Hash yields `[key, value]` pairs with their index (`|(k, v), i|`).
+  if (c.recvType?.k !== "array" && c.recvType?.k !== "class" && c.nav === ".")
+    return `${c.lw.entries(c.r, c.ctx, c.recvNode)}.forEach(${c.fn()})`;
+  return `${c.R}${c.nav}forEach(${c.fn()})`;
+});
 
 // enum.c enum_each_with_object: yields each element with the memo, answers the memo.
 rule("each_with_object", (c) => {
@@ -430,8 +450,15 @@ rule("to_f", (c) => {
 });
 
 rule("to_a", (c) => {
-  if (objectRecv(c)) return null;
   if (argc(c) !== 0) return null;
+  // An untyped value may be the gem object defining `to_a`, or a Hash / Array.
+  if (!c.recvType && !c.lw.typeOf(c.recvNode, c.ctx) && gemDefAccepts(c) && c.nav === ".")
+    return c.lw.withOnce(
+      c.r,
+      (x) =>
+        `(typeof ${x}?.toA === "function" ? ${x}.toA() : Array.isArray(${x}) ? ${x} : ${x} instanceof globalThis.Map ? [...${x}] : Object.entries(${x}))`,
+    );
+  if (objectRecv(c)) return null;
   if (c.recvType?.k === "array") return c.r;
   if (c.lw.mayBeMap(c.recvNode, c.ctx)) return `[...${c.r}]`;
   if (c.recvType?.k === "hash" || hashNamed(c.recvNode)) return `Object.entries(${c.r})`;
