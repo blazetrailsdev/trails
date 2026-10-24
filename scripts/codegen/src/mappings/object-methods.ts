@@ -238,6 +238,18 @@ export function methodObject(c: Parameters<CallRule>[0], self: string): string {
 
 function dynamicSend(c: Parameters<CallRule>[0]): string {
   const { n, R, ctx, lw } = c;
+  // A value from outside the gem (et-orbi time.rb:218's `to_time.send(m)`, a
+  // Ruby Time whose `month` is a getter): ruby-compat's `rbFSend`, which
+  // dispatches the Ruby name to a method or an accessor.
+  const t = c.recvNode ? lw.typeOf(c.recvNode, ctx) : null;
+  if (
+    GEM.hand === false &&
+    !n.block &&
+    c.recvNode &&
+    c.recvNode.k !== "self" &&
+    t?.k !== "gemClass"
+  )
+    return `${c.rc("rbFSend")}(${[R, ...n.args.map((x: N) => lw.argExpr(x, ctx))].join(", ")})`;
   const name = tsNameAtRunTime(lw.argExpr(n.args[0], ctx));
   const rest = n.args.slice(1).map((x: N) => lw.argExpr(x, ctx));
   if (n.block) rest.push(lw.blockArg(n.block, ctx));

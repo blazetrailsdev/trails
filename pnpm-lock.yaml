@@ -466,6 +466,10 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/chronic':
+        specifier: workspace:*
+        version: link:../chronic
 
   packages/fugit:
     dependencies:
@@ -484,6 +488,10 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/chronic':
+        specifier: workspace:*
+        version: link:../chronic
 
   packages/globalid:
     dependencies:

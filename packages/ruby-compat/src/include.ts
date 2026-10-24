@@ -25,7 +25,7 @@ import type { abort } from "./process-adapter.js";
 import type { kernelRand } from "./kernel-rand.js";
 import { NameError } from "./name-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { isRegisteredConstant, registeredConstant } from "./variable.js";
+import { isRegisteredConstant, registerConstant, registeredConstant } from "./variable.js";
 import { temporalTag } from "./temporal-tag.js";
 import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
@@ -104,6 +104,10 @@ export function rbModConstSet<T>(
 ): T {
   if (!/^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(id)) {
     throw new NameError(`wrong constant name ${id}`, id);
+  }
+  if (mod === (Object as unknown)) {
+    registerConstant(id, value);
+    return value;
   }
   Object.defineProperty(mod, id, { value, writable: true, enumerable: true, configurable: true });
   if (

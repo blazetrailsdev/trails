@@ -653,7 +653,9 @@ export class Timezone {
     return time.getlocal(this.identifier);
   }
 
-  localToUtc(time: Time, dst: boolean | null = true): Time {
+  localToUtc(time: Time | Temporal.PlainDateTime, dst: boolean | null = true): Time {
+    if (time instanceof Temporal.PlainDateTime)
+      time = Time.utc(time.year, time.month, time.day, time.hour, time.minute, time.second);
     const local = Time.at(new Rational(ignoringOffset(time).getTime(), 1000)).getutc();
     const localMs = toDate(local).getTime();
     const period = this.periodForLocal(local, dst);

@@ -96,6 +96,17 @@ export class TypeOracle {
     return kinds.length > 0 && kinds.every((x) => x === "get" || x === "prop" || x === "property");
   }
 
+  /** Whether the dependencies declare `tsName` as a property on one class and a method on another. */
+  ambiguousOnDeps(tsName: string): boolean {
+    const kinds = new Set<string>();
+    for (const [k, c] of Object.entries(this.o.classes)) {
+      if (!k.startsWith("@") || !depKey(k)) continue;
+      const kind = c.instance?.[tsName]?.kind;
+      if (kind) kinds.add(kind === "get" || kind === "prop" || kind === "property" ? "p" : kind);
+    }
+    return kinds.has("p") && kinds.has("method");
+  }
+
   private kindsMemo?: Map<string, MemberInfo[]>;
   /** Every instance member named `tsName`, across the hand port and its dependencies. */
   private membersNamed(tsName: string): MemberInfo[] {

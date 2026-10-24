@@ -302,6 +302,8 @@ rule("first", (c) => {
   if (c.recvIsString()) return `${c.lw.as(c.ctx, "first")}(${[c.r, ...c.args()].join(", ")})`;
   if (c.lw.mayBeMap(c.recvNode, c.ctx)) return `${c.rc("first")}(${[c.r, ...c.args()].join(", ")})`;
   if (argc(c) === 1) return `${c.R}${c.nav}slice(0, ${c.args()[0]})`;
+  if (untypedMayBeRange(c))
+    return c.lw.withOnce(c.r, (x) => `(${x} instanceof ${c.rc("Range")} ? ${x}.first() : ${x}[0])`);
   return `${c.R}${c.nav === "?." ? "?." : ""}[0]`;
 });
 
@@ -311,8 +313,28 @@ rule("last", (c) => {
   if (c.recvIsString()) return `${c.lw.as(c.ctx, "last")}(${[c.r, ...c.args()].join(", ")})`;
   if (c.lw.mayBeMap(c.recvNode, c.ctx)) return `${c.rc("last")}(${[c.r, ...c.args()].join(", ")})`;
   if (argc(c) === 1) return `${c.R}${c.nav}slice(-${c.args()[0]})`;
+  if (untypedMayBeRange(c))
+    return c.lw.withOnce(
+      c.r,
+      (x) => `(${x} instanceof ${c.rc("Range")} ? ${x}.last() : ${x}.at(-1))`,
+    );
   return `${c.R}${c.nav}at(-1)`;
 });
+
+/**
+ * An untyped `first` / `last` receiver in a gem that builds Ranges (builder
+ * xchar.rb:115's `item.first` over `VALID`'s Integers and Ranges): ruby-compat
+ * Range answers them itself (range.c range_first / range_last).
+ */
+function untypedMayBeRange(c: CoreSite): boolean {
+  return (
+    GEM.hand === false &&
+    argc(c) === 0 &&
+    c.nav === "." &&
+    !(c.recvType ?? c.lw.typeOf(c.recvNode, c.ctx)) &&
+    c.lw.buildsRanges
+  );
+}
 
 // Array#join (array.c rb_ary_join) converts each element by its Ruby `to_s`
 // (a Hash's is `inspect`); JS join gives `[object Object]` (activejob).
@@ -385,7 +407,8 @@ rule("to_i", (c) => {
   if (byNameOnly(c) && argc(c) === 0)
     return c.lw.withOnce(
       c.r,
-      (x) => `(typeof ${x} === "string" ? parseInt(${x}, 10) || 0 : ${x}.toI())`,
+      (x) =>
+        `(typeof ${x} === "string" ? parseInt(${x}, 10) || 0 : typeof ${x} === "number" ? Math.trunc(${x}) : ${x}.toI())`,
     );
   if (objectRecv(c)) return null;
   if (argc(c) !== 0) return null;

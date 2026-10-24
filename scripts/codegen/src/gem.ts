@@ -199,8 +199,6 @@ GEMS.raabro = {
   testDir: "spec",
 };
 GEMS.et_orbi = {
-  // The specs' natural-language times (`Khronic.parse`), a development dependency.
-  handPortGems: { chronic: ["Chronic", "Khronic"] },
   gem: "et_orbi",
   rubyRoot: "et-orbi",
   namespace: "EtOrbi",
@@ -210,8 +208,6 @@ GEMS.et_orbi = {
   testDir: "spec",
 };
 GEMS.fugit = {
-  // The specs' natural-language times (`Khronic.parse`), a development dependency.
-  handPortGems: { chronic: ["Chronic", "Khronic"] },
   gem: "fugit",
   rubyRoot: "fugit",
   namespace: "Fugit",
@@ -364,6 +360,13 @@ export interface DepGem {
   methodAdded: boolean;
 }
 /** The generated gems (no hand port) this package depends on: raabro and et-orbi for fugit. */
+/** The generated dependency package a `require 'chronic'` loads, by the gem's require name. */
+export function depGemForRequire(name: string): string | null {
+  const g = Object.values(GEMS).find((x) => x !== GEM && x.vendor && x.rubyRoot === name);
+  const pkg = g ? (g.pkg ?? g.gem.replace(/_/g, "-")) : null;
+  return pkg && depGemPkgs().includes(pkg) ? pkg : null;
+}
+
 let depGemPkgsMemo: string[] | undefined;
 export function depGemPkgs(): string[] {
   if (depGemPkgsMemo) return depGemPkgsMemo;

@@ -48,7 +48,7 @@ import { FLAT_ASSERTION_MODULES } from "./mappings/kernel.js";
 
 /** A JS class's own statics, which a `declare static` may not redeclare. */
 const FUNCTION_OWN = new Set(["prototype", "name", "length", "caller", "arguments"]);
-import { CITE_PREFIX, GEM, PKG_DIR, depGem, handNamespaceFqns } from "./gem.js";
+import { CITE_PREFIX, GEM, PKG_DIR, depGem, depGemForRequire, handNamespaceFqns } from "./gem.js";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -344,6 +344,19 @@ export class Emitter {
 
   register(file: IrFile): void {
     this.irByFile.set(file.file, file);
+    // A test file's reopening of a core class: the names it gives the class,
+    // ahead of any method of the file whose ivars land on it (Lowerer.reopenedNames).
+    if (file.file.startsWith("test/"))
+      for (const u of collectUnits(file)) {
+        if (!CORE_REOPEN[u.fqn]) continue;
+        const own = this.lw.reopenedNames.get(u.fqn) ?? new Set<string>();
+        for (const s of this.flattenDefs([...u.body, ...u.sbody])) {
+          if (s.k === "def") own.add(tsMethodName(s.name));
+          if (s.k === "call" && s.recv === null && /^attr_(reader|writer|accessor)$/.test(s.name))
+            for (const a of s.args) if (a.k === "sym") own.add(propName(a.value));
+        }
+        this.lw.reopenedNames.set(u.fqn, own);
+      }
     this.lw.noteRanges(file.body);
     this.lw.noteKwargs(file.body);
     this.lw.notePositionalSyms(file.body);
@@ -1568,6 +1581,7 @@ export class Emitter {
     const ctx = this.baseCtx(u, f, {});
     const [spec, exp, local] = CORE_REOPEN[u.fqn];
     const K = this.lw.imp(ctx, spec, exp, local);
+
     const def = this.lw.rc(ctx, "rbModDefineMethod");
     const out: string[] = [];
     const seat = (target: string, member0: string) => {
@@ -1624,9 +1638,10 @@ export class Emitter {
       else if (s.k === "call" && s.recv === null && /^attr_(reader|writer|accessor)$/.test(s.name))
         for (const a of s.args.filter((x: N) => x.k === "sym")) {
           const js = propName(a.value);
+          const fld = this.lw.ivarField(`@${a.value}`, u.fqn);
           const acc = [
-            s.name !== "attr_writer" ? `get(this: any) { return this._${js} ?? null; }` : "",
-            s.name !== "attr_reader" ? `set(this: any, v: unknown) { this._${js} = v; }` : "",
+            s.name !== "attr_writer" ? `get(this: any) { return this.${fld} ?? null; }` : "",
+            s.name !== "attr_reader" ? `set(this: any, v: unknown) { this.${fld} = v; }` : "",
           ].filter(Boolean);
           out.push(`${def}(${statics}, ${JSON.stringify(js)}, { ${acc.join(", ")} });`);
         }
@@ -1691,7 +1706,17 @@ export class Emitter {
     return false;
   }
 
+  private rootRequiresSet = false;
+
   emitFile(file: IrFile): FileResult {
+    if (!this.rootRequiresSet && GEM.namespace) {
+      this.rootRequiresSet = true;
+      const rootRb = this.index.scopes.get(GEM.namespace)?.primaryFile;
+      if (rootRb) {
+        const r = this.gemRequires(rootRb);
+        this.resolver.rootRequires = new Set([...r.lead, ...r.trail]);
+      }
+    }
     const tsFile = rubyFileToTsAr(file.file);
     const f: FileCtx = {
       rubyFile: file.file,
@@ -1834,6 +1859,22 @@ export class Emitter {
       const own = this.gemRequires(file.file);
       for (const rb of file.file.startsWith("test/") ? [...own.lead, ...own.trail] : own.lead)
         add(rb, new Set([file.file]));
+      // A test helper's `require 'chronic'` of another generated gem loads its
+      // package, which seats `Object::Chronic`.
+      if (file.file.startsWith("test/"))
+        for (const s of file.body?.k === "seq" ? file.body.body : file.body ? [file.body] : [])
+          if (
+            s?.k === "call" &&
+            s.recv === null &&
+            s.name === "require" &&
+            s.args[0]?.k === "str"
+          ) {
+            const pkg = depGemForRequire(s.args[0].value);
+            if (pkg) {
+              this.lw.imp(rctx, `@blazetrails/${pkg}`, "", "");
+              if (!order.includes(`@blazetrails/${pkg}`)) order.push(`@blazetrails/${pkg}`);
+            }
+          }
     }
     // A library file's top-level statements (marcel's mime_type/definitions.rb,
     // `Marcel::MimeType.extend "text/plain", …`) run when it is loaded.
@@ -1848,17 +1889,25 @@ export class Emitter {
     if (file.file.startsWith("test/")) {
       const top = (file.body?.k === "seq" ? file.body.body : file.body ? [file.body] : []).filter(
         (s: N) =>
-          s.k === "call" &&
-          !["require", "require_relative"].includes(s.name) &&
-          rootConst(s.recv)?.path.filter((x: string) => x)[0] !== undefined &&
-          rootConst(s.recv)!.path.filter((x: string) => x)[0] !== "ENV" &&
-          // RSpec's own configuration and DSL (`RSpec.configure`, `RSpec.describe`,
-          // `RSpec::Matchers.define`): vitest's describe / it / setupFiles replace it.
-          rootConst(s.recv)!.path.filter((x: string) => x)[0] !== "RSpec" &&
-          // An RSpec suite's helper is ported to vitest, not run: it keeps the
-          // configuration it writes (`X.y = …`, `X.configure do`), not its
-          // bootstrap output (et-orbi spec_helper.rb:24 `EtOrbi._make_info`).
-          (GEM.testDir !== "spec" || /=$/.test(s.name) || !!s.block),
+          // The top-level constant table a helper writes (`::Khronic = ::Chronic`,
+          // `Object.send(:remove_const, :Chronic)`), which its examples read.
+          (s.k === "casgn" && s.path?.[0] === "") ||
+          (s.k === "call" &&
+            rootConst(s.recv)
+              ?.path.filter((x: string) => x)
+              .join("::") === "Object" &&
+            ["send", "const_set", "remove_const"].includes(s.name)) ||
+          (s.k === "call" &&
+            !["require", "require_relative"].includes(s.name) &&
+            rootConst(s.recv)?.path.filter((x: string) => x)[0] !== undefined &&
+            rootConst(s.recv)!.path.filter((x: string) => x)[0] !== "ENV" &&
+            // RSpec's own configuration and DSL (`RSpec.configure`, `RSpec.describe`,
+            // `RSpec::Matchers.define`): vitest's describe / it / setupFiles replace it.
+            rootConst(s.recv)!.path.filter((x: string) => x)[0] !== "RSpec" &&
+            // An RSpec suite's helper is ported to vitest, not run: it keeps the
+            // configuration it writes (`X.y = …`, `X.configure do`), not its
+            // bootstrap output (et-orbi spec_helper.rb:24 `EtOrbi._make_info`).
+            (GEM.testDir !== "spec" || /=$/.test(s.name) || !!s.block)),
       );
       const stmts = file.body?.k === "seq" ? file.body.body : file.body ? [file.body] : [];
       const fake = { nesting: [], fqn: undefined, body: [], sbody: [] } as unknown as Unit;
@@ -1956,7 +2005,20 @@ export class Emitter {
         );
         chunks.push(`${reg}(/(?:)/, ${host});`);
       }
-      for (const s of top) chunks.push(...this.lw.stmt(s, tctx, false));
+      for (const s of top) {
+        if (s.k === "casgn") {
+          chunks.push(
+            `${this.lw.rc(tctx, "rbModConstSet")}(Object, ${JSON.stringify(s.path[1])}, ${this.lw.expr(s.value, tctx)});`,
+          );
+          continue;
+        }
+        // `Object.send(:remove_const, :Chronic)`: the private method, called.
+        const st =
+          s.name === "send" && s.args[0]?.k === "sym"
+            ? { ...s, name: s.args[0].value, args: s.args.slice(1) }
+            : s;
+        chunks.push(...this.lw.stmt(st, tctx, false));
+      }
       // A top-level `def` (helper.rb's `adapter_is?`) is a method on Ruby's main
       // object, which every test can call bare: an exported function here.
       for (const s of stmts) {
@@ -3720,6 +3782,13 @@ export class Emitter {
           seated.push(local === js ? js : `${js}: ${local}`);
         }
       if (seated.length) after.push(`Object.assign(${name}, { ${seated.join(", ")} });`);
+      // A generated gem's root module is a top-level constant, `Object::Chronic`
+      // (rb_const_set on rb_cObject), which a dependent's `defined?(::Chronic)`
+      // and a spec's `remove_const(:Chronic)` reach.
+      if (GEM.hand === false && u.fqn === GEM.namespace && !isNamedClass(this.index, u.fqn))
+        after.push(
+          `${this.lw.rc(ctxStatic, "registerConstant")}(${JSON.stringify(u.fqn)}, ${name});`,
+        );
     }
     const parentFqn = u.fqn.endsWith("::ClassMethods")
       ? u.fqn.slice(0, -"::ClassMethods".length)
@@ -4129,6 +4198,22 @@ export class Emitter {
         ["private", "protected", "public"].includes(s.name)
       )
         continue;
+      // `alias make make_time` in `class << self` (et-orbi make.rb:69): the
+      // module function under its second name.
+      else if (
+        (s.k === "alias" && typeof s.new === "string" && typeof s.old === "string") ||
+        (s.k === "call" &&
+          s.recv === null &&
+          s.name === "alias_method" &&
+          s.args.length === 2 &&
+          s.args.every((a: N) => a.k === "sym"))
+      ) {
+        const [nw, old] = s.k === "alias" ? [s.new, s.old] : [s.args[0].value, s.args[1].value];
+        defs++;
+        fns.push(
+          `export const ${tsMethodName(nw, u.fqn, true)} = ${tsMethodName(old, u.fqn, true)};`,
+        );
+      }
       // `delegate :m, to: :t` in `class << self` defines singleton methods:
       // each is `def m(*args, &block) = t.m(*args, &block)`, a module function.
       else if (s.k === "call" && s.recv === null && s.name === "delegate") {

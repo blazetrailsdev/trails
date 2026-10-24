@@ -162,15 +162,24 @@ export class Resolver {
    * subclass meets its superclass before it exists. A class-body reference
    * (a superclass, a constant) keeps its import, as Ruby needs it at load.
    */
+  /** Ruby files the gem root's own file requires (Emitter.gemRequires). */
+  rootRequires = new Set<string>();
+
   seatsNestedClass(fqn: string, callerTsFile: string): boolean {
     if (GEM.hand !== false || !GEM.namespace) return false;
     if (!fqn.startsWith(`${GEM.namespace}::`) || fqn.slice(GEM.namespace.length + 2).includes("::"))
       return false;
     const root = this.exportNames.get(GEM.namespace);
     const exp = this.exportNames.get(fqn);
+    const sc = this.index.scopes.get(fqn);
     return (
       !!root &&
       !!exp &&
+      // …only a class the root's file requires (chronic.rb's `require
+      // 'chronic/repeaters/repeater_day_name'`), so the seat adds no load edge
+      // Ruby lacks (builder's root is version.rb, which requires nothing).
+      !!sc?.primaryFile &&
+      this.rootRequires.has(sc.primaryFile) &&
       this.isClassModule(GEM.namespace) &&
       this.index.scopes.get(fqn)?.kind === "class" &&
       // A test support class (builder's `Builder::Test`) is no library constant.

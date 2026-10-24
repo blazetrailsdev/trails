@@ -712,6 +712,30 @@ export class Lowerer {
           return defs.flatMap((d: N) =>
             this.stmt({ ...d, singleton: true, receiver: n.target }, ctx, false),
           );
+        // `Time.module_eval { class << self; def zone; …; end }` and its
+        // `undef_method :zone` (fugit spec_helper.rb:42-56): methods on the
+        // class itself, added and removed.
+        if (
+          n.target?.k === "self" &&
+          ctx.selfKind === "static" &&
+          defs.length &&
+          defs.every(
+            (d: N) =>
+              (d.k === "def" && !d.singleton) ||
+              (d.k === "call" &&
+                d.recv === null &&
+                d.name === "undef_method" &&
+                d.args.every((a: N) => a.k === "sym")),
+          )
+        )
+          return defs.flatMap((d: N) =>
+            d.k === "def"
+              ? this.stmt({ ...d, singleton: true, receiver: n.target }, ctx, false)
+              : d.args.map(
+                  (a: N) =>
+                    `Reflect.deleteProperty(${ctx.selfExpr}, ${JSON.stringify(tsMethodName(a.value))});`,
+                ),
+          );
         return ret(this.decline(ctx, "unhandled-node", n, `nested ${n.k} in body`));
       }
       case "class":
@@ -909,6 +933,22 @@ export class Lowerer {
               : `${err} instanceof ${this.expr(c, ctx)}`,
           )
           .join(" || ");
+        // Calling a method a value lacks raises NoMethodError, a StandardError, in
+        // Ruby (et-orbi info.rb:62's `nil.version` under `rescue => err`); in JS it
+        // is a native TypeError (CLAUDE.md, "Ruby protocol methods with a different
+        // JS mechanism").
+        const catchesNoMethod =
+          GEM.hand === false &&
+          classes.some(
+            (c: N) =>
+              c.k === "const" &&
+              ["StandardError", "Exception", "NoMethodError", "NameError"].includes(
+                c.path.filter((x: string) => x).join("::"),
+              ),
+          );
+        const fullTest = catchesNoMethod
+          ? `${test} || ${err} instanceof globalThis.TypeError`
+          : test;
         const lines: string[] = [];
         if (r.var?.k === "lvar" && jsIdent(r.var.name) !== err)
           lines.push(`${this.decl(ctx, r.var.name, err)} = ${err};`);
@@ -922,7 +962,7 @@ export class Lowerer {
         }
         // A bare `raise` in the arm re-raises the exception being handled (`$!`).
         lines.push(...this.block(this.seqBody(r.body), this.child(ctx, { rescued: err }), tail));
-        arms.push(`${i === 0 ? "if" : "} else if"} (${test}) {`, ...indent(lines));
+        arms.push(`${i === 0 ? "if" : "} else if"} (${fullTest}) {`, ...indent(lines));
       });
       arms.push(`} else {`, `  throw ${err};`, `}`);
       out.push(`} catch (${err}: any) {`, ...indent(arms));
@@ -1307,11 +1347,36 @@ export class Lowerer {
       n.recv?.k === "const" &&
       n.recv.path.filter((x: string) => x).join("::") === "ENV" &&
       n.args.length === 2
-    )
-      return [`${this.rc(ctx, "setEnv")}(${n.args.map((a: N) => this.expr(a, ctx)).join(", ")});`];
+    ) {
+      // `ENV[k] = nil` deletes the variable (hash.c env_aset): ruby-compat's
+      // `setEnv(k, undefined)`.
+      const [k, v] = n.args;
+      const val =
+        v?.k === "nil"
+          ? "undefined"
+          : this.withOnce(this.expr(v, ctx), (x) => `(${x} == null ? undefined : String(${x}))`);
+      return [`${this.rc(ctx, "setEnv")}(${this.expr(k, ctx)}, ${val});`];
+    }
     if (n.name === "[]=" && n.recv) {
       const recv = this.expr(n.recv, ctx);
       const args = n.args.map((a: N) => this.expr(a, ctx));
+      // `s[i, len] = ''` on a local String (et-orbi zones.rb:43): String#[]=
+      // (string.c rb_str_aset_m) through the String method table, the local
+      // rebound to the receiver's new contents.
+      const rt = this.typeOf(n.recv, ctx);
+      if (
+        n.recv.k === "lvar" &&
+        (n.args.length === 3 || (rt?.k === "prim" && rt.name === "string")) &&
+        rt?.k !== "array" &&
+        rt?.k !== "hash"
+      ) {
+        const str = `([, ${recv}] = ${this.rc(ctx, "rbStrSend")}(${recv}, "set", ${args.join(", ")}))`;
+        const asg =
+          rt?.k === "prim"
+            ? str
+            : `(typeof ${recv} === "string" ? ${str} : ${this.rc(ctx, "rbFSend")}(${recv}, "[]=", ${args.join(", ")}))`;
+        return [tail ? `return ${asg};` : `${asg};`];
+      }
       const ok = this.optionKey(n, this.typeOf(n.recv, ctx), ctx);
       // Ruby's `h[k] = v` answers v; as the tail it is the JS assignment's value,
       // not v evaluated a second time.
@@ -2430,7 +2495,7 @@ export class Lowerer {
     const memo = (this.ivarClash ??= new Map<string, Set<string>>());
     let names = memo.get(owner);
     if (!names) {
-      names = new Set();
+      names = new Set(this.reopenedNames.get(owner) ?? []);
       for (const a of rubyAncestors(this.index, owner)) {
         for (const d of this.index.scopes.get(a)?.defs.keys() ?? []) names.add(this.callName(d));
         // …or an accessor of that name (fugit's `attr_accessor :_data0`).
@@ -2438,10 +2503,19 @@ export class Lowerer {
       }
       memo.set(owner, names);
     }
-    return names.has(field) ? `_${field}` : field;
+    // `@_zone` beside `@zone`, both stepping past a `_zone` accessor, stay apart.
+    if (!names.has(field)) return field;
+    return name.replace(/^@/, "").startsWith("_") ? `__${field}` : `_${field}`;
   }
 
   private ivarClash?: Map<string, Set<string>>;
+
+  /**
+   * Member names a test file's reopening of a core class gives it (fugit's
+   * spec_helper.rb `class Time; class << self; attr_reader :_zone`), which no
+   * gem scope records, so an ivar field steps past them too.
+   */
+  reopenedNames = new Map<string, Set<string>>();
 
   cvar(name: string, ctx: Ctx): string {
     this.stat(ctx, "cvar");
@@ -2577,6 +2651,10 @@ export class Lowerer {
     // A reader `def x` whose writer a gem scope declares (`attr_writer :priority`)
     // is one accessor (the module getter half), read as a property.
     if (this.index.instanceWriters.has(name)) return true;
+    // A gem with no hand port answers by its own `def`s first: fugit's
+    // `TimeCursor#time` is a method, whatever dependency classes call `time`.
+    const own = GEM.hand === false ? this.index.methodNames.get(name) : undefined;
+    if (own && own.attr === 0) return false;
     // The hand port reads the name as a property wherever it declares it
     // (`SqlTypeMetadata#sql_type`, `Persistence#id_in_database`).
     if (this.resolver.types.onlyProperty(propName(name))) return true;
@@ -3554,6 +3632,14 @@ export class Lowerer {
         selfExpr: k,
         selfKind: "static",
         methodSelf: n.recv?.k === "sclass" ? this.expr(n.recv.target, ctx) : undefined,
+        // Its ivars are the evaluated class's (`Time.module_eval`'s `@zone`).
+        ...(n.recv?.k === "const"
+          ? {
+              owner:
+                this.index.resolveConst(n.recv.path, ctx.nesting)?.fqn ??
+                n.recv.path.filter((x: string) => x).join("::"),
+            }
+          : {}),
       }),
     );
     return `(${f})(${mod})`;
@@ -3576,6 +3662,17 @@ export class Lowerer {
       n.block?.k === "block"
     )
       return this.classEvalBlock(this.expr(n.recv, ctx), n, ctx);
+    // stdlib `OpenStruct.new(tzinfo: …)` (ostruct.rb, a Hash-backed struct
+    // answering each key as a reader): a plain object of those keys.
+    if (
+      name === "new" &&
+      n.recv?.k === "const" &&
+      n.recv.path.filter((x: string) => x).join("::") === "OpenStruct" &&
+      !this.index.resolveConst(n.recv.path, ctx.nesting) &&
+      n.args.length <= 1 &&
+      !n.block
+    )
+      return n.args.length ? `({ ...${this.argExpr(n.args[0], ctx)} })` : "({})";
     // `Class.new(Super) { … }` is a class expression; its receiver is never read.
     const classNew =
       n.recv?.k === "const" &&
@@ -4308,6 +4405,23 @@ export class Lowerer {
       this.isAttrLike(name, recvNode != null && recvNode.k !== "self")
     )
       return `${recv}${nav}${this.attrProp(name)}`;
+    // An untyped receiver of a name the dependencies declare both ways (TZInfo's
+    // `Timezone#name` a getter in the stand-in, `Method#name` a method), which
+    // the gem does not define (et-orbi's `@zone.name`): Ruby's call, dispatched
+    // to whichever the value has.
+    if (
+      !resolved &&
+      GEM.hand === false &&
+      n.args.length === 0 &&
+      !n.block &&
+      nav !== "?." &&
+      recvNode?.k === "ivar" &&
+      !ctx.f.rubyFile.startsWith("test/") &&
+      !this.typeOf(recvNode, ctx) &&
+      !this.index.methodNames.has(name) &&
+      this.resolver.types.ambiguousOnDeps(propName(name.replace(/[?!]$/, "")))
+    )
+      return `${this.rc(ctx, "rbFSend")}(${recv}, ${JSON.stringify(name)})`;
     // A block passed to a gem method whose optional positionals the call skips
     // (`instrument(:enqueue, &block)` against `instrument(operation, payload = {}, &block)`):
     // each skipped slot is `undefined`, so the block lands in its own slot
@@ -4650,10 +4764,15 @@ export class Lowerer {
    */
   runtimeTopConsts = new Set<string>();
 
+  /** Whether the gem's code builds a Range value anywhere (`32..0xD7FF`, `Range.new`). */
+  buildsRanges = false;
+
   noteRanges(body: N): void {
     walk([body], (n) => {
+      if (n.k === "range") this.buildsRanges = true;
       if (n.k === "defined" && n.value?.k === "const" && n.value.path[0] === "")
         this.runtimeTopConsts.add(n.value.path[1]);
+      if (n.k === "casgn" && n.path?.[0] === "") this.runtimeTopConsts.add(n.path[1]);
       if (
         n.k === "call" &&
         n.name === "const_set" &&
