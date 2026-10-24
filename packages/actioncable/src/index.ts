@@ -30,3 +30,4 @@ import "./server/base.js";
 import "./channel/broadcasting.js";
 import "./connection/base.js";
 import "./channel/streams.js";
+import "./channel/base.js";
