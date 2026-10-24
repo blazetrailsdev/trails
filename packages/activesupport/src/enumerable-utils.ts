@@ -17,7 +17,7 @@ import {
   rbIntegerTypeP,
   sortBy,
 } from "@blazetrails/ruby-compat";
-import { count, first, reject, toA } from "@blazetrails/ruby-compat/enumerable";
+import { count, first, isInclude, reject, toA } from "@blazetrails/ruby-compat/enumerable";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { SoleItemExpectedError } from "./core-ext/enumerable.js";
 import { isPlainObject, valuesAt } from "./hash-utils.js";
@@ -209,7 +209,7 @@ export function inOrderOf<T>(
 }
 
 export function exclude<T>(collection: Iterable<T> | Each<T>, object: T): boolean {
-  return !Enumerable.isInclude.call(collection as Each<T>, object);
+  return !isInclude(collection, object);
 }
 
 export function without<T>(collection: T[], ...elements: T[]): T[] {
