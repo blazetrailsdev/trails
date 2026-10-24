@@ -66,10 +66,10 @@ describe("ActionCable::Connection::BaseTest", () => {
       const connection = openConnection();
       connection.process();
 
-      expect(connection.websocket.isPossible()).toBeTruthy();
+      expect(connection.websocket.isPossible()).toBeRubyTruthy();
 
       await tc.waitForAsync();
-      expect(connection.websocket.isAlive()).toBe(true);
+      expect(connection.websocket.isAlive()).toBeTruthy();
     });
   });
 
@@ -100,7 +100,7 @@ describe("ActionCable::Connection::BaseTest", () => {
       );
 
       expect(server.connections).toEqual([connection]);
-      expect(connection.connected).toBe(true);
+      expect(connection.connected).toBeTruthy();
     });
   });
 
@@ -110,13 +110,13 @@ describe("ActionCable::Connection::BaseTest", () => {
       connection.process();
 
       await (connection as unknown as { handleOpen(): Promise<unknown> }).handleOpen();
-      expect(connection.connected).toBe(true);
+      expect(connection.connected).toBeTruthy();
 
       await tc.assertCalled(connection.subscriptions, "unsubscribeFromAll", null, {}, async () => {
         await (connection as unknown as { handleClose(): Promise<unknown> }).handleClose();
       });
 
-      expect(connection.connected).toBe(false);
+      expect(connection.connected).toBeFalsy();
       expect(server.connections).toEqual([]);
     });
   });
@@ -128,7 +128,7 @@ describe("ActionCable::Connection::BaseTest", () => {
 
       const statistics = connection.statistics;
 
-      expect(isBlank(statistics.identifier)).toBe(true);
+      expect(isBlank(statistics.identifier)).toBeTruthy();
       expect(statistics.startedAt).toBeInstanceOf(Time);
       expect(statistics.subscriptions).toEqual([]);
     });
