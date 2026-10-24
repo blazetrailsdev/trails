@@ -51,7 +51,7 @@ export function sum<T>(collection: Iterable<T> | Range<T>, ...args: unknown[]): 
   const each = (block: (element: T) => void): void => {
     for (const element of elements) block(element);
   };
-  return Enumerable.sum.call({ each }, ...args);
+  return Enumerable.prototype.sum.call({ each }, ...args);
 }
 
 export function indexBy<T, K extends string | number>(

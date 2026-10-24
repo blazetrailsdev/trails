@@ -97,68 +97,74 @@ describe("Enumerable over an each that answers a promise", () => {
 
 describe("Enumerable", () => {
   it("findAll keeps each element whose block result RTESTs", () => {
-    expect(Enumerable.findAll.call(new Bag([1, null, 0, false, ""]), (i) => i)).toEqual([1, 0, ""]);
+    expect(Enumerable.prototype.findAll.call(new Bag([1, null, 0, false, ""]), (i) => i)).toEqual([
+      1,
+      0,
+      "",
+    ]);
   });
 
   it("map collects the block's result for each element", () => {
-    expect(Enumerable.map.call(new Bag([1, 2, 3]), (i) => (i as number) * 2)).toEqual([2, 4, 6]);
+    expect(Enumerable.prototype.map.call(new Bag([1, 2, 3]), (i) => (i as number) * 2)).toEqual([
+      2, 4, 6,
+    ]);
   });
 
   it("first stops each after the first element and answers nil when empty", () => {
     const bag = new Bag([1, 2, 3]);
-    expect(Reflect.apply(Enumerable.first, bag, [])).toBe(1);
+    expect(Reflect.apply(Enumerable.prototype.first, bag, [])).toBe(1);
     expect(bag.yielded).toBe(1);
-    expect(Reflect.apply(Enumerable.first, new Bag([]), [])).toBeNull();
+    expect(Reflect.apply(Enumerable.prototype.first, new Bag([]), [])).toBeNull();
   });
 
   it("first(n) takes n elements and rejects a negative size", () => {
     const bag = new Bag([1, 2, 3]);
-    expect(Enumerable.first.call(bag, 2)).toEqual([1, 2]);
+    expect(Enumerable.prototype.first.call(bag, 2)).toEqual([1, 2]);
     expect(bag.yielded).toBe(2);
-    expect(Enumerable.first.call(bag, 0)).toEqual([]);
-    expect(() => Enumerable.first.call(bag, -1)).toThrow(ArgumentError);
+    expect(Enumerable.prototype.first.call(bag, 0)).toEqual([]);
+    expect(() => Enumerable.prototype.first.call(bag, -1)).toThrow(ArgumentError);
   });
 
   it("drop skips n elements and rejects a negative size", () => {
     const bag = new Bag([1, 2, 3]);
-    expect(Enumerable.drop.call(bag, 1)).toEqual([2, 3]);
-    expect(Enumerable.drop.call(bag, 0)).toEqual([1, 2, 3]);
-    expect(Enumerable.drop.call(bag, 50)).toEqual([]);
-    expect(() => Enumerable.drop.call(bag, -1)).toThrow(ArgumentError);
+    expect(Enumerable.prototype.drop.call(bag, 1)).toEqual([2, 3]);
+    expect(Enumerable.prototype.drop.call(bag, 0)).toEqual([1, 2, 3]);
+    expect(Enumerable.prototype.drop.call(bag, 50)).toEqual([]);
+    expect(() => Enumerable.prototype.drop.call(bag, -1)).toThrow(ArgumentError);
   });
 
   it("any? / one? / none? test pattern === element for an argument", () => {
     class Klass {}
     const bag = new Bag([new Klass(), 1, new Klass()]);
-    expect(Enumerable.isAny.call(bag, Klass)).toBe(true);
-    expect(Enumerable.isAny.call(bag, String)).toBe(false);
-    expect(Enumerable.isOne.call(bag, Klass)).toBe(false);
-    expect(Enumerable.isOne.call(bag, (i: unknown) => i === 1)).toBe(true);
-    expect(Enumerable.isOne.call(new Bag([null, 1]))).toBe(true);
-    expect(Enumerable.isNone.call(bag, String)).toBe(true);
-    expect(Enumerable.isNone.call(bag, Klass)).toBe(false);
-    expect(Enumerable.isNone.call(new Bag([null, false]))).toBe(true);
-    expect(() => Enumerable.isOne.call(bag, Klass, Klass)).toThrow(ArgumentError);
+    expect(Enumerable.prototype.isAny.call(bag, Klass)).toBe(true);
+    expect(Enumerable.prototype.isAny.call(bag, String)).toBe(false);
+    expect(Enumerable.prototype.isOne.call(bag, Klass)).toBe(false);
+    expect(Enumerable.prototype.isOne.call(bag, (i: unknown) => i === 1)).toBe(true);
+    expect(Enumerable.prototype.isOne.call(new Bag([null, 1]))).toBe(true);
+    expect(Enumerable.prototype.isNone.call(bag, String)).toBe(true);
+    expect(Enumerable.prototype.isNone.call(bag, Klass)).toBe(false);
+    expect(Enumerable.prototype.isNone.call(new Bag([null, false]))).toBe(true);
+    expect(() => Enumerable.prototype.isOne.call(bag, Klass, Klass)).toThrow(ArgumentError);
   });
 
   it("isAny? RTESTs the element, or the block's result", () => {
-    expect(Enumerable.isAny.call(new Bag([null, false, 0]))).toBe(true);
-    expect(Enumerable.isAny.call(new Bag([null, false]))).toBe(false);
+    expect(Enumerable.prototype.isAny.call(new Bag([null, false, 0]))).toBe(true);
+    expect(Enumerable.prototype.isAny.call(new Bag([null, false]))).toBe(false);
     const bag = new Bag([1, 2, 3]);
-    expect(Enumerable.isAny.call(bag, (i: unknown) => i === 1)).toBe(true);
+    expect(Enumerable.prototype.isAny.call(bag, (i: unknown) => i === 1)).toBe(true);
     expect(bag.yielded).toBe(1);
   });
 
   it("select is findAll", () => {
-    expect(Enumerable.select).toBe(Enumerable.findAll);
+    expect(Enumerable.prototype.select).toBe(Enumerable.prototype.findAll);
   });
 
   it("isInclude asks rb_equal of each element and stops at the first hit", () => {
     const eq = { equals: (other: unknown) => other === "x" };
     const bag = new Bag([1, eq, 3]);
-    expect(Enumerable.isInclude.call(bag, "x")).toBe(true);
+    expect(Enumerable.prototype.isInclude.call(bag, "x")).toBe(true);
     expect(bag.yielded).toBe(2);
-    expect(Enumerable.isInclude.call(new Bag([1, 2]), "1")).toBe(false);
+    expect(Enumerable.prototype.isInclude.call(new Bag([1, 2]), "1")).toBe(false);
   });
 
   it("Symbol.iterator iterates what each yields, on an includer", () => {
@@ -259,8 +265,10 @@ describe("AsyncEnumerable", () => {
     await expect(AsyncEnumerable.sum.call(new AsyncBag([1]), 1, 2)).rejects.toThrow(
       "wrong number of arguments (given 2, expected 0..1)",
     );
-    expect(() => Enumerable.sum.call(new Bag([1]), 1, 2)).toThrow(ArgumentError);
-    expect(Enumerable.sum.call(new Bag([1, 2]), (i: unknown) => (i as number) * 2)).toBe(6);
+    expect(() => Enumerable.prototype.sum.call(new Bag([1]), 1, 2)).toThrow(ArgumentError);
+    expect(Enumerable.prototype.sum.call(new Bag([1, 2]), (i: unknown) => (i as number) * 2)).toBe(
+      6,
+    );
   });
 
   it("sum awaits the block before each yields the next element", async () => {
@@ -340,7 +348,8 @@ describe("Enumerable#reduce", () => {
 });
 
 describe("Enumerable#find", () => {
-  const find = (bag: object, ...argv: unknown[]) => Enumerable.find.call(bag as Bag, ...argv);
+  const find = (bag: object, ...argv: unknown[]) =>
+    Enumerable.prototype.find.call(bag as Bag, ...argv);
 
   it("breaks out of each at the first element the block accepts", () => {
     const bag = new Bag([1, 2, 3, 4]);
@@ -485,5 +494,68 @@ describe("Enumerable free functions over any receiver", () => {
     expect(eachSlice(ary, 2, (slice) => seen.push(slice))).toBe(ary);
     expect(seen).toEqual([[1, 2], [3]]);
     expect(() => eachSlice(ary, 0)).toThrow(ArgumentError);
+  });
+});
+
+describe("new Enumerable(obj)", () => {
+  it("wraps an Array", () => {
+    const e = new Enumerable([1, 2, 3, 4]);
+    expect(e.partition((i) => i % 2 === 0)).toEqual([
+      [2, 4],
+      [1, 3],
+    ]);
+    expect(e.eachSlice(3)).toEqual([[1, 2, 3], [4]]);
+    expect([...e]).toEqual([1, 2, 3, 4]);
+    expect(e.map((i) => i * 2)).toBeInstanceOf(Array);
+  });
+
+  it("wraps a Set", () => {
+    const slices: number[][] = [];
+    const e = new Enumerable(new Set([1, 2, 3]));
+    expect(e.eachSlice(2, (s) => slices.push(s))).toBe(e);
+    expect(slices).toEqual([[1, 2], [3]]);
+    expect(e.isInclude(2)).toBe(true);
+  });
+
+  it("wraps a Map as [key, value] pairs", () => {
+    const e = new Enumerable(
+      new Map([
+        ["a", 1],
+        ["b", 2],
+      ]),
+    );
+    expect(e.first()).toEqual(["a", 1]);
+    expect([...e]).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
+  });
+
+  it("wraps a generator", () => {
+    function* gen() {
+      yield 1;
+      yield 2;
+      yield 1;
+    }
+    const tally = new Enumerable(gen()).tally();
+    expect(tally).toBeInstanceOf(Hash);
+    expect(tally.get(1)).toBe(2);
+  });
+
+  it("wraps an each-answerer", () => {
+    const bag = new Bag([3, 1, 2]);
+    const e = new Enumerable(bag);
+    expect(e.sortBy((i) => i)).toEqual([1, 2, 3]);
+    expect(e.sum()).toBe(6);
+    expect(bag.yielded).toBe(6);
+  });
+
+  it("answers a promise over an async each-answerer", async () => {
+    const e = new Enumerable<number, Promise<unknown>>({
+      each: async (block) => {
+        for (const i of [1, 2]) block(i);
+      },
+    });
+    expect(await e.map((i) => i + 1)).toEqual([2, 3]);
   });
 });

@@ -7011,16 +7011,22 @@ function recordCallSite(
   visit: (n: ts.Node) => void,
 ): void {
   const callee = call.expression;
-  if (!ts.isIdentifier(callee) && callee.kind !== ts.SyntaxKind.SuperKeyword) visit(callee);
+  const wrapped = ts.isPropertyAccessExpression(callee)
+    ? enumerableWrapped(callee.expression)
+    : undefined;
+  if (wrapped !== undefined) visit(wrapped);
+  else if (!ts.isIdentifier(callee) && callee.kind !== ts.SyntaxKind.SuperKeyword) visit(callee);
 
   const name = callSiteName(call);
   if (name !== undefined && !(ts.isNewExpression(call) && isThrownConstruction(call))) {
     const flags: string[] = [];
     const args = describeArgs(call.arguments, flags);
     const recv =
-      ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
-        ? describeArg(callee.expression, [])
-        : undefined;
+      wrapped !== undefined
+        ? describeArg(wrapped, [])
+        : ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
+          ? describeArg(callee.expression, [])
+          : undefined;
     const rubyCompat = ts.isIdentifier(callee)
       ? rubyCompatBindingsFor(call.getSourceFile()).get(callee.text)
       : undefined;
@@ -7040,6 +7046,19 @@ function recordCallSite(
   }
 
   call.arguments?.forEach(visit);
+}
+
+/**
+ * ruby-compat's `new Enumerable(x)` wrapper is Ruby's `x` itself:
+ * `new Enumerable(xs).partition(fn)` is `xs.partition(&fn)`, so a member call
+ * on it reads its one constructor argument as the receiver and the
+ * construction makes no call of its own.
+ */
+function enumerableWrapped(expr: ts.Expression): ts.Expression | undefined {
+  while (ts.isParenthesizedExpression(expr)) expr = expr.expression;
+  if (!ts.isNewExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
+  const name = currentImportAliases?.get(expr.expression.text) ?? expr.expression.text;
+  return name === "Enumerable" && expr.arguments?.length === 1 ? expr.arguments[0] : undefined;
 }
 
 /**
@@ -7426,7 +7445,7 @@ function collectCalls(
           names.add(`${NATIVE_FORM_PREFIX}timer`);
         }
       } else if (ts.isPropertyAccessExpression(callee)) {
-        visit(callee.expression);
+        visit(enumerableWrapped(callee.expression) ?? callee.expression);
         const prop = memberNameText(callee.name);
         if (!(skipHoistedClosures && isOperatorIndexRead(n))) called.push(prop);
         negated.push(prop);

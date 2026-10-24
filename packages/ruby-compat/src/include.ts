@@ -1733,12 +1733,23 @@ export function rbModAppendFeatures(
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
   if (isClassModule) {
     const proto = (mod as AnyClass).prototype;
-    for (const key of Object.getOwnPropertyNames(proto)) {
+    for (const key of [
+      ...Object.getOwnPropertyNames(proto),
+      Symbol.iterator,
+      Symbol.asyncIterator,
+    ] as const) {
       if (key === "constructor") continue;
       const modDesc = Object.getOwnPropertyDescriptor(proto, key);
       if (!modDesc) continue;
       const existing = Object.getOwnPropertyDescriptor(klass.prototype, key);
       const existingIsMixin = installed.has(key);
+      if (typeof key === "symbol") {
+        if (!existing || existingIsMixin) {
+          descriptors[key] = modDesc;
+          installed.add(key);
+        }
+        continue;
+      }
       if (!existing || existingIsMixin) {
         rbSeatSuper(klass.prototype, key, modDesc.value, descriptors);
       }

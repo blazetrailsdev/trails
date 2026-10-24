@@ -525,7 +525,7 @@ function enumerableMethod(
  * `ARRAY_METHOD_TABLE` entry of that name.
  */
 const enumerableModule = (): Record<string, AnyFunction> =>
-  Enumerable as unknown as Record<string, AnyFunction>;
+  Enumerable.prototype as unknown as Record<string, AnyFunction>;
 
 /**
  * `rb_obj_is_proc` (`vendor/ruby/v3.3.11/proc.c:120`): a function that is not

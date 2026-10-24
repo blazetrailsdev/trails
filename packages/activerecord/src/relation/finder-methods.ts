@@ -141,7 +141,10 @@ export function find(this: FinderRelation, block: (record: any) => unknown): Pro
 export function find(this: FinderRelation, ...args: unknown[]): Promise<any>;
 export async function find(this: FinderRelation, ...args: unknown[]): Promise<any> {
   if (typeof args[args.length - 1] === "function") {
-    return Enumerable.find.call(this as unknown as Each<unknown, Promise<unknown>>, ...args);
+    return Enumerable.prototype.find.call(
+      this as unknown as Each<unknown, Promise<unknown>>,
+      ...args,
+    );
   }
   return findWithIds.call(this, ...args);
 }

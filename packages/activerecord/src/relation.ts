@@ -590,7 +590,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     if (this.isNullRelation()) return false;
 
     if (isPresent(args))
-      return Enumerable.isAny.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+      return Enumerable.prototype.isAny.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
         this,
         ...args,
       );
@@ -609,7 +609,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     if (this.isNullRelation()) return false;
 
     if (isPresent(args))
-      return Enumerable.isOne.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+      return Enumerable.prototype.isOne.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
         this,
         ...args,
       );
@@ -1454,7 +1454,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     if (this.isNullRelation()) return true;
 
     if (isPresent(args))
-      return Enumerable.isNone.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+      return Enumerable.prototype.isNone.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
         this,
         ...args,
       );
