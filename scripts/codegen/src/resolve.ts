@@ -270,6 +270,8 @@ export class Resolver {
       this.unresolvedConsts.set(fqn, (this.unresolvedConsts.get(fqn) ?? 0) + 1);
       return lw.decline(ctx, "const-unresolved", { k: "const" } as N, fqn);
     }
+    if (lw.runtimeTopConsts.has(fqn.split("::")[0]))
+      return `${lw.rc(ctx, "rbModConstGet")}(Object, ${JSON.stringify(fqn)})`;
     return lw.decline(ctx, "const-unresolved", { k: "const" } as N, fqn);
   }
 
@@ -539,6 +541,9 @@ export class Resolver {
         ...rest,
       ].join(".");
     const key = segs.join("::");
+    // A top-level constant set or probed at run time (`defined?(::Chronic)`).
+    if (lw.runtimeTopConsts.has(root))
+      return `${lw.rc(ctx, "rbModConstGet")}(Object, ${JSON.stringify(key)})`;
     this.unresolvedConsts.set(key, (this.unresolvedConsts.get(key) ?? 0) + 1);
     return lw.decline(ctx, "const-unresolved", { k: "const", l: undefined } as N, key);
   }

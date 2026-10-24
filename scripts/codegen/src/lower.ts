@@ -1630,10 +1630,11 @@ export class Lowerer {
         name === "to_s" ||
         name === "to_sym" ||
         name === "class" ||
+        // …and any a core rule lowers (`collect(&:first)` on pairs), which
+        // itself defers to a gem method of the name (`reject(&:empty?)`).
+        CORE_METHODS[name] !== undefined ||
         (!this.index.methodNames.has(name) &&
           (["size", "length", "strip", "upcase", "downcase", "to_i", "to_f"].includes(name) ||
-            // …or any other a core rule lowers (`collect(&:first)` on pairs).
-            CORE_METHODS[name] !== undefined ||
             (OBJECT_METHODS[name] !== undefined && name !== "send" && name !== "public_send")))
       ) {
         // A sync arrow: nothing in it is awaited, whatever the enclosing test awaits.
@@ -2375,6 +2376,12 @@ export class Lowerer {
   definedExpr(n: N, ctx: Ctx): string {
     const v: N = n.value;
     if (v.k === "const") {
+      const path = v.path.filter((x: string) => x).join("::");
+      if (
+        this.runtimeTopConsts.has(v.path.filter((x: string) => x)[0]) &&
+        !this.index.resolveConst(v.path, ctx.nesting)
+      )
+        return `(${this.rc(ctx, "rbModConstDefined")}(Object, ${JSON.stringify(path)}) ? "constant" : null)`;
       // `defined?(A::B::C)` is false where any step is missing, not a raise.
       const ref = this.constRef(v, ctx);
       const safe = /^[\w$]+(\.[\w$]+)+$/.test(ref) ? ref.replace(/\./g, "?.") : ref;
@@ -4627,7 +4634,26 @@ export class Lowerer {
    */
   constObjects = new Set<string>();
 
+  /**
+   * Top-level constants the code probes at run time rather than requires
+   * (et-orbi's `defined?(::Chronic)`, a spec's `Object.const_set(:Chronic, …)`):
+   * read off `Object` when the gem cannot resolve them.
+   */
+  runtimeTopConsts = new Set<string>();
+
   noteRanges(body: N): void {
+    walk([body], (n) => {
+      if (n.k === "defined" && n.value?.k === "const" && n.value.path[0] === "")
+        this.runtimeTopConsts.add(n.value.path[1]);
+      if (
+        n.k === "call" &&
+        n.name === "const_set" &&
+        n.recv?.k === "const" &&
+        n.recv.path.filter((x: string) => x).join("::") === "Object" &&
+        n.args[0]?.k === "sym"
+      )
+        this.runtimeTopConsts.add(n.args[0].value);
+    });
     const hashLocals = new Set<string>();
     walk([body], (n) => {
       if (n.k === "lasgn" && n.value?.k === "hash") hashLocals.add(n.name);

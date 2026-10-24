@@ -95,6 +95,8 @@ rule("reject", (c) => {
   // `reject(&:closed?)`: the predicate sent to each element; a Ruby
   // predicate's value is a boolean in practice, as `cond` treats it.
   if (c.blk?.k === "symproc" && /\?$/.test(c.blk.name)) {
+    // A core predicate (`reject(&:empty?)` on split Strings) through its rule.
+    if (rules[c.blk.name]) return `${c.E}${c.nav}filter((y) => !(${c.fn()})(y))`;
     const m = c.lw.callName(c.blk.name);
     return `${c.E}${c.nav}filter((x) => !x.${m}())`;
   }
