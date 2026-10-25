@@ -249,6 +249,7 @@ export {
   rbDefineAllocFunc,
   rbObjDup,
   include,
+  prepend,
   rbCallSuper,
   included,
   prepended,
@@ -316,7 +317,6 @@ export {
 } from "./numeric.js";
 export { Complex, complex } from "./complex.js";
 export { NotImplementedError } from "./not-implemented-error.js";
-export { prepend } from "./prepend.js";
 export { Open3 } from "./open3.js";
 export { Process } from "./process.js";
 export {
@@ -352,7 +352,6 @@ export type {
   StdStream,
   WriteStream,
 } from "./process-adapter.js";
-export type { ClassModule, PrependMethod, PrependModule } from "./prepend.js";
 export { Method, iseqLocationSetup, rbCheckArity, rbObjMethod, rbObjMethods } from "./method.js";
 export {
   rbRegEqual,

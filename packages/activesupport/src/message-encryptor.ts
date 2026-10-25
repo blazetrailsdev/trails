@@ -254,4 +254,4 @@ export class MessageEncryptor extends Codec {
 }
 
 Object.assign(MessageEncryptor.prototype, { rotate, onRotation, fallBackTo });
-prepend(MessageEncryptor.prototype, { readMessage: readMessageWithRotations });
+prepend(MessageEncryptor, { readMessage: readMessageWithRotations });

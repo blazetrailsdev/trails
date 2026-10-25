@@ -167,4 +167,4 @@ export class MessageVerifier extends Codec {
 }
 
 Object.assign(MessageVerifier.prototype, { rotate, onRotation, fallBackTo });
-prepend(MessageVerifier.prototype, { readMessage: readMessageWithRotations });
+prepend(MessageVerifier, { readMessage: readMessageWithRotations });

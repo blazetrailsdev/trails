@@ -1,4 +1,4 @@
-import { Mutex, prepend, Thread, ThreadError, type PrependMethod } from "@blazetrails/ruby-compat";
+import { Mutex, prepend, rbCallSuper, Thread, ThreadError } from "@blazetrails/ruby-compat";
 import { Dependencies } from "../dependencies.js";
 import { Monitor, synchronize } from "./monitor.js";
 
@@ -12,15 +12,16 @@ const EXCEPTION_NEVER = Object.freeze({ Exception: ":never" });
 const EXCEPTION_IMMEDIATE = Object.freeze({ Exception: ":immediate" });
 
 export const LoadInterlockAwareMonitorMixin = {
-  monEnter(this: LoadInterlockAwareMonitorHost, super_: () => unknown): unknown {
-    return this.monTryEnter() || Dependencies.interlock.permitConcurrentLoads(() => super_());
+  monEnter(this: LoadInterlockAwareMonitorHost): unknown {
+    return (
+      this.monTryEnter() ||
+      Dependencies.interlock.permitConcurrentLoads(() =>
+        rbCallSuper(this, LoadInterlockAwareMonitorMixin.monEnter),
+      )
+    );
   },
 
-  synchronize<T>(
-    this: LoadInterlockAwareMonitorHost,
-    super_: () => unknown,
-    block: () => T | Promise<T>,
-  ): Promise<T> {
+  synchronize<T>(this: LoadInterlockAwareMonitorHost, block: () => T | Promise<T>): Promise<T> {
     return Thread.handleInterrupt(EXCEPTION_NEVER, async () => {
       const entered = this.monEnter();
       if (entered instanceof Promise) await entered;
@@ -88,7 +89,4 @@ export class ThreadLoadInterlockAwareMonitor {
   }
 }
 
-prepend(ThreadLoadInterlockAwareMonitor.prototype, {
-  monEnter: LoadInterlockAwareMonitorMixin.monEnter as PrependMethod,
-  synchronize: LoadInterlockAwareMonitorMixin.synchronize as PrependMethod,
-});
+prepend(ThreadLoadInterlockAwareMonitor, LoadInterlockAwareMonitorMixin);

@@ -1,5 +1,5 @@
 import { formatter, SpellChecker as DidYouMeanSpellChecker } from "@blazetrails/did-you-mean";
-import { prepend, rbInspect, StandardError } from "@blazetrails/ruby-compat";
+import { prepend, rbCallSuper, rbInspect, StandardError } from "@blazetrails/ruby-compat";
 
 interface Corrected {
   _corrections?: string[];
@@ -7,8 +7,11 @@ interface Corrected {
 }
 
 export const Correctable = {
-  toString(this: Corrected, super_: () => unknown): string {
-    return (super_() as string) + formatter().messageFor(this.corrections());
+  toString(this: Corrected): string {
+    return (
+      (rbCallSuper(this, Correctable.toString) as string) +
+      formatter().messageFor(this.corrections())
+    );
   },
 
   corrections(this: Corrected): string[] {
@@ -75,7 +78,7 @@ export namespace UndefinedCommandError {
     }
   }
 }
-prepend(UndefinedCommandError.prototype, Correctable);
+prepend(UndefinedCommandError, Correctable);
 export const UndefinedTaskError = UndefinedCommandError;
 
 export class AmbiguousCommandError extends Error {}
@@ -120,7 +123,7 @@ export namespace UnknownArgumentError {
     }
   }
 }
-prepend(UnknownArgumentError.prototype, Correctable);
+prepend(UnknownArgumentError, Correctable);
 
 export class RequiredArgumentMissingError extends InvocationError {}
 
