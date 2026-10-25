@@ -527,7 +527,8 @@
     "zlibAdapterConfig",
     "rbStdout",
     "rbStdoutSet",
-    "rbFPuts"
+    "rbFPuts",
+    "rbDefineToplevelMethod"
   ],
   "@blazetrails/activesupport": [
     "ActionableError",

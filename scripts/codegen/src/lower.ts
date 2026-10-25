@@ -2270,6 +2270,15 @@ export class Lowerer {
         return `(${jsIdent(n.name)} = ${this.expr(n.value, ctx)})`;
       }
       case "ivar":
+        // An ivar the gem reads and never sets (raabro's `@note` in
+        // `Tree#to_a`) is always nil in Ruby.
+        if (
+          GEM.hand === false &&
+          !this.index.dynamicIvars &&
+          !this.index.ivarAssignKinds.has(n.name) &&
+          ![...this.index.scopes.values()].some((sc) => sc.attrs.has(n.name.replace(/^@/, "")))
+        )
+          return "null";
         return this.ivar(n.name, ctx);
       case "iasgn": {
         return `(${this.ivar(n.name, ctx)} = ${this.heldNil(n.value, this.expr(n.value, ctx))})`;

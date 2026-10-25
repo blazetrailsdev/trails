@@ -2052,6 +2052,19 @@ export class Emitter {
         });
         chunks.push(fn);
         this.index.topDefs.set(s.name, tsFile);
+        // …and, as Ruby defines it on `Object`, reachable by `send` on any
+        // receiver (raabro's `Raabro.rep(:tos, input, :to, 1)` sends `:to`).
+        const js = fn.match(/export (?:async )?function ([\w$]+)\(/)?.[1];
+        if (
+          js &&
+          GEM.hand === false &&
+          this.resolver.pkgExports("@blazetrails/ruby-compat").has("rbDefineToplevelMethod")
+        )
+          // Under its Ruby name, and its TS one where a send spells it so (`:to_plus`).
+          for (const nm of new Set([s.name, this.lw.callName(s.name)]))
+            chunks.push(
+              `${this.lw.rc(tctx, "rbDefineToplevelMethod")}(${JSON.stringify(nm)}, ${js} as (...args: unknown[]) => unknown);`,
+            );
       }
     }
     // A Concern's nested `ClassMethods` is what `append_features` extends the

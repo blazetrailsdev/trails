@@ -181,6 +181,8 @@ export class GemIndex {
   ivarReads = new Map<string, Set<string>>();
   /** Method names whose results are assigned to each ivar (`@start = Chronic.construct(...)`). */
   ivarAssignCalls = new Map<string, Set<string>>();
+  /** Whether the gem reaches ivars by name (`instance_variable_set`): none is provably unset. */
+  dynamicIvars = false;
   /** Node kinds assigned to each ivar anywhere in the gem. */
   ivarAssignKinds = new Map<string, Set<string>>();
   add(file: IrFile): void {
@@ -193,6 +195,18 @@ export class GemIndex {
         s.add(x.name);
         this.ivarReads.set(x.recv.name, s);
       }
+      // `@x ||= v` / `@x += v` / `@a, @b = …`: assigned, of a kind not known here.
+      if ((x.k === "opasgn" && x.target?.k === "ivar") || (x.k === "iasgn" && !x.value)) {
+        const nm = x.k === "opasgn" ? x.target.name : x.name;
+        const s = this.ivarAssignKinds.get(nm) ?? new Set<string>();
+        s.add("opasgn");
+        this.ivarAssignKinds.set(nm, s);
+      }
+      if (
+        x.k === "call" &&
+        (x.name === "instance_variable_set" || x.name === "instance_variable_get")
+      )
+        this.dynamicIvars = true;
       if (x.k === "iasgn" && x.value) {
         const s = this.ivarAssignKinds.get(x.name) ?? new Set<string>();
         s.add(x.value.k);

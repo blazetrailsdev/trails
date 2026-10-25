@@ -2,7 +2,14 @@ import { NameError } from "./name-error.js";
 import { checkArity, rbCheckStringType } from "./string/support.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import { TypeError } from "./type-error.js";
-import { FL_SINGLETON, rbCClass, rbInspect, rbObjClass, rbObjClassname } from "./object.js";
+import {
+  FL_SINGLETON,
+  rbCClass,
+  rbInspect,
+  rbObjClass,
+  rbObjClassname,
+  toplevelMethodEntry,
+} from "./object.js";
 import { methodOwner } from "./include.js";
 
 /**
@@ -144,6 +151,8 @@ export function rbObjMethod(obj: unknown, vid: unknown): Method {
     }
     if (entry) break;
   }
+  const toplevel = toplevelMethodEntry(id);
+  if (toplevel !== undefined) return new Method(obj, id, toplevel);
   if (id === "new" && rbObjClass(obj) === rbCClass) {
     const klass = obj as new (...args: unknown[]) => unknown;
     return new Method(obj, id, (...args) => new klass(...args));

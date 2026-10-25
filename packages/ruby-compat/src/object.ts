@@ -1305,6 +1305,8 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   }
   const seated = reopenedSeatMethod(recv, mid);
   if (seated !== undefined) return seated.apply(recv, args);
+  const toplevel = TOPLEVEL_METHODS.get(mid);
+  if (toplevel !== undefined) return toplevel.apply(recv, args);
   if (typeof obj.methodMissing === "function") {
     return (obj.methodMissing as AnyFunction).call(recv, mid, ...args);
   }
@@ -1322,6 +1324,33 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
 }
 
 type AnyFunction = (...args: unknown[]) => unknown;
+
+const TOPLEVEL_METHODS = new Map<string, AnyFunction>();
+
+/**
+ * A top-level `def` (`vm_define_method`, `vendor/ruby/v3.3.11/vm_insnhelper.c:5508-5527`):
+ * the cref's class at the top level is `Object`, and the default visibility
+ * there is private, so every receiver answers the method through `send` with
+ * itself as `self` (raabro's spec helper `def ta(i)`, sent as `:ta`). Looked up
+ * after the receiver's own methods, as `Object` sits at the end of its
+ * ancestors.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby top-level `def` (`vendor/ruby/v3.3.11/vm_insnhelper.c:5508`).
+ */
+export function rbDefineToplevelMethod(name: string, fn: AnyFunction): void {
+  TOPLEVEL_METHODS.set(name, fn);
+}
+
+/**
+ * The top-level method of that name, for `Kernel#method` (method.ts), which
+ * finds it as `rb_obj_method` finds any private `Object` method
+ * (`vendor/ruby/v3.3.11/proc.c:2079`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby top-level `def` (`vendor/ruby/v3.3.11/vm_insnhelper.c:5508`).
+ */
+export function toplevelMethodEntry(name: string): AnyFunction | undefined {
+  return TOPLEVEL_METHODS.get(name);
+}
 
 /**
  * `rb_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2934`) — the SEND of

@@ -78,6 +78,7 @@ export {
   rbSetClassPathString,
   rbFPublicSend,
   rbFSend,
+  rbDefineToplevelMethod,
   toS,
   toSym,
   rbModAttrReader,
