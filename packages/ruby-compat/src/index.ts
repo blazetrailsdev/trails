@@ -84,6 +84,7 @@ export {
   rbObjClass,
   rbClassOf,
   rbObjIsProc,
+  rbProcCall,
   rbModName,
   rbModSingletonP,
   rbClassAttachedObject,

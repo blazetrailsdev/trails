@@ -538,6 +538,18 @@ export function rbObjIsProc(proc: unknown): proc is AnyFunction {
 }
 
 /**
+ * Ruby's `callable.call(*args)`: `rb_proc_call` (`vendor/ruby/v3.3.11/proc.c:990`)
+ * applies a proc to the arguments, where JS `Function.prototype.call` would
+ * take the first as `this`; any other receiver answers its own `call`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbProcCall(callable: unknown, ...args: unknown[]): unknown {
+  if (rbObjIsProc(callable)) return callable(...args);
+  return (callable as { call(...a: unknown[]): unknown }).call(...args);
+}
+
+/**
  * The methods a package defines on `Class`, as `rb_define_method` on
  * `rb_cClass` (`vendor/ruby/v3.3.11/class.c:2134`) does, keyed by the camelCased Ruby
  * name, which {@link basicObjRespondTo} answers for a class receiver:
@@ -1211,7 +1223,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (recv instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
   }
-  if (mid === "call" && rbObjIsProc(recv)) return recv(...args);
+  if (mid === "call" && rbObjIsProc(recv)) return rbProcCall(recv, ...args);
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   const writer = writerSpelling(attr);
