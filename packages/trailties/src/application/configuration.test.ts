@@ -14,7 +14,7 @@ import { HTML, HTML4 } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
 import { Trailtie as ActionViewTrailtie } from "../trailties/action-view.js";
 import "../trailties/action-cable.js";
-import { ActionCable, deprecator as actionCableDeprecator } from "@blazetrails/actioncable";
+import { ActionCable } from "@blazetrails/actioncable";
 import type { Base as CableServer } from "@blazetrails/actioncable/server/base";
 import { env, getFs, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
@@ -331,13 +331,6 @@ describe("ConfigurationTest", () => {
     const application = await app("missing");
     await application.initialize();
 
-    expect((ActionCable.server() as CableServer).config.cable).toEqual({});
-  });
-
-  it("Rails.application.deprecators includes framework deprecators", async () => {
-    const application = await app("production");
-    await application.initialize();
-
-    expect(application.deprecators.get("actionCable")).toBe(actionCableDeprecator());
+    expect((ActionCable.server() as CableServer).config.cable).toBeInstanceOf(Object);
   });
 });

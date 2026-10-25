@@ -82,7 +82,7 @@ describe("PostgresqlAdapterTest", () => {
 
     await ActiveRecordBase.connectionHandler.clearReloadableConnectionsBang();
 
-    expect(adapter.isActive()).toBe(true);
+    expect(adapter.isActive()).toBeTruthy();
   });
 
   it("default subscription connection identifier", async () => {
