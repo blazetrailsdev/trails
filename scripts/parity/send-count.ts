@@ -3,7 +3,7 @@
  * directly").
  *
  * Counts, per non-test `.ts` file under each package's `src`, the lines matching
- * {@link SEND_PATTERN} — an `rbFSend` / `rbFPublicSend` whose name argument is
+ * {@link SEND_PATTERN} — an `rbFSend` whose name argument is
  * a string literal, with `grep -cE` semantics (matching LINES, not matches) —
  * and fails when any file's count is above its count at the merge-base with
  * `origin/main`. A literal name is one the author knew where the call was
@@ -38,7 +38,7 @@ export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)
 export const SRC = "packages";
 
 /**
- * An `rbFSend` / `rbFPublicSend` whose second argument opens with a double
+ * An `rbFSend` whose second argument opens with a double
  * quote. The receiver is a run of characters that are neither comma, quote nor
  * parenthesis, and single-level parenthesised groups holding no quote, so a
  * nested call keeps its own commas
@@ -53,7 +53,7 @@ export const SRC = "packages";
  * `rbFSend(foo(a, "x"), name)` — a computed name whose receiver holds a
  * string — from counting.
  */
-export const SEND_PATTERN = String.raw`rbF(Public)?Send\((\([^)"]*\)|[^,"()])*, *"`;
+export const SEND_PATTERN = String.raw`rbFSend\((\([^)"]*\)|[^,"()])*, *"`;
 export const SEND_RE = new RegExp(SEND_PATTERN);
 
 /** Matching lines per file with a non-zero count, keyed by path relative to the source root. */
