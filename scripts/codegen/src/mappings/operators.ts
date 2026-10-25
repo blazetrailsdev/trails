@@ -226,6 +226,9 @@ rule("+ - * / % < > <= >= & | ^ **", (o) => {
     const argv = n.args[0]?.k === "array" ? `...${a[0]}` : `...[${a[0]}].flat(1)`;
     return `${lw.rc(ctx, "format")}(${lhs}, ${argv})`;
   }
+  // `String#*` (string.c rb_str_times): `" " * n` repeats.
+  if (name === "*" && (n.recv.k === "str" || (lt0?.k === "prim" && lt0.name === "string")))
+    return `${needsParens(lhs) ? `(${lhs})` : lhs}.repeat(${a[0]})`;
   // Integer#/ floors and Integer#% takes the divisor's sign (numeric.c
   // fix_divide, fix_mod); a boxed Number is a Float. Hand ports type these.
   if ((name === "/" || name === "%") && GEM.hand === false && lt0?.k !== "class") {

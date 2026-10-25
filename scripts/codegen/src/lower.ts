@@ -4869,8 +4869,32 @@ export class Lowerer {
       !this.typeOf(recvNode, ctx) &&
       (this.index.methodNames.get(name)?.def ?? 0) > 0 &&
       ((this.index.methodNames.get(name)?.attr ?? 0) > 0 || this.index.instanceWriters.has(name))
-    )
-      return `${this.rc(ctx, "rbFSend")}(${recv}, ${JSON.stringify(name)})`;
+    ) {
+      // A receiver named for a gem class (`image` → `Image`) keeps the
+      // ordinary reading below.
+      const nm =
+        recvNode.k === "lvar" || recvNode.k === "ivar" || recvNode.k === "call"
+          ? recvNode.name
+          : "";
+      const cls = nm
+        ? this.index.resolveConst(
+            [snakeToCamel(nm.replace(/^@/, "")).replace(/^./, (c: string) => c.toUpperCase())],
+            ctx.nesting,
+          )
+        : null;
+      const short = nm
+        ? snakeToCamel(nm.replace(/^@/, "")).replace(/^./, (c: string) => c.toUpperCase())
+        : "";
+      const sc =
+        cls?.kind === "scope"
+          ? this.index.scopes.get(cls.fqn)
+          : short
+            ? [...this.index.scopes.values()].find(
+                (x) => x.kind === "class" && x.fqn.endsWith(`::${short}`),
+              )
+            : undefined;
+      if (!sc) return `${this.rc(ctx, "rbFSend")}(${recv}, ${JSON.stringify(name)})`;
+    }
     if (
       !resolved &&
       n.args.length === 0 &&
