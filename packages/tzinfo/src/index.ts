@@ -506,7 +506,7 @@ export class Timezone {
         time.hour,
         time.minute,
         time.second,
-        time.millisecond * 1_000 + time.microsecond,
+        time.millisecond * 1_000 + time.microsecond + time.nanosecond / 1_000,
       );
     const local = Time.at(new Rational(ignoringOffset(time).getTime(), 1000)).getutc();
     const localMs = toDate(local).getTime();
