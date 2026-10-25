@@ -1,3 +1,4 @@
+import { include } from "@blazetrails/ruby-compat/include";
 import { SecurityUtils } from "./security-utils.js";
 
 export class InvalidMatch extends Error {
@@ -7,6 +8,10 @@ export class InvalidMatch extends Error {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include SecurityUtils` (secure_compare_rotator.rb:33)
+export interface SecureCompareRotator extends SecurityUtils {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include SecurityUtils` (secure_compare_rotator.rb:33)
 export class SecureCompareRotator {
   static toString(): string {
     return "ActiveSupport::SecureCompareRotator";
@@ -32,9 +37,9 @@ export class SecureCompareRotator {
   ): boolean {
     const onRotation = "onRotation" in options ? options.onRotation : this.onRotation;
 
-    if (SecurityUtils.secureCompare(this.value, otherValue)) {
+    if (this.secureCompare(this.value, otherValue)) {
       return true;
-    } else if (this.rotateValues.some((value) => SecurityUtils.secureCompare(value, otherValue))) {
+    } else if (this.rotateValues.some((value) => this.secureCompare(value, otherValue))) {
       onRotation?.();
       return true;
     } else {
@@ -42,3 +47,5 @@ export class SecureCompareRotator {
     }
   }
 }
+
+include(SecureCompareRotator, SecurityUtils);
