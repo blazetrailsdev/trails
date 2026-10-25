@@ -10,27 +10,23 @@ type PubSubLike = { broadcast(channel: string, payload: unknown): unknown };
 
 interface BroadcastingServer {
   logger: { debug(progname: unknown, block: () => unknown): unknown };
-  pubsub: PromiseLike<PubSubLike> | PubSubLike;
+  pubsub: PubSubLike;
 }
 
 interface CoderOptions {
   coder?: Coder | null;
 }
 
-export const Broadcasting = defineModule({
-  broadcast(
-    this: BroadcastingServer & { broadcasterFor: typeof broadcasterFor },
-    broadcasting: unknown,
-    message: unknown,
-    options: CoderOptions = {},
-  ): Promise<unknown> {
-    return this.broadcasterFor(broadcasting, options).broadcast(message);
-  },
+export function broadcast(
+  this: BroadcastingServer,
+  broadcasting: unknown,
+  message: unknown,
+  options: CoderOptions = {},
+): Promise<unknown> {
+  return broadcasterFor.call(this, broadcasting, options).broadcast(message);
+}
 
-  broadcasterFor,
-});
-
-function broadcasterFor(
+export function broadcasterFor(
   this: BroadcastingServer,
   broadcasting: unknown,
   options: CoderOptions = {},
@@ -38,6 +34,8 @@ function broadcasterFor(
   const coder = Object.hasOwn(options, "coder") ? (options.coder ?? null) : ActiveSupportJSON;
   return new Broadcaster(this, String(broadcasting), { coder });
 }
+
+export const Broadcasting = defineModule({ broadcast, broadcasterFor });
 
 /** @internal */
 export class Broadcaster {
@@ -65,7 +63,7 @@ export class Broadcaster {
     const payload = { broadcasting: this.broadcasting, message, coder: this.coder };
     return Notifications.instrument("broadcast.action_cable", payload, async () => {
       const encoded = this.coder != null ? this.coder.encode(message) : message;
-      return await (await this.server.pubsub).broadcast(this.broadcasting, encoded);
+      return await this.server.pubsub.broadcast(this.broadcasting, encoded);
     });
   }
 }

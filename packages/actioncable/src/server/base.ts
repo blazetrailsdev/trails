@@ -93,15 +93,10 @@ export class Base {
     return (this._workerPool ??= new Worker({ maxSize: this.config.workerPoolSize }));
   }
 
-  get pubsub(): PubSub | Promise<PubSub> {
-    return (
-      this._pubsub ||
-      this.mutex.synchronize(async () => {
-        return (this._pubsub ??= new ((await this.config.pubsubAdapter()) as new (
-          server: Base,
-        ) => PubSub)(this));
-      })
-    );
+  get pubsub(): PubSub {
+    return (this._pubsub ??= new (this.config.pubsubAdapter() as new (server: Base) => PubSub)(
+      this,
+    ));
   }
 
   get connectionIdentifiers(): unknown {

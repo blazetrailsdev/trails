@@ -1,6 +1,6 @@
 import { Time } from "@blazetrails/date";
 import { Module, isPlainObject } from "@blazetrails/activesupport";
-import { rtest } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rtest } from "@blazetrails/ruby-compat";
 
 export interface InstanceMethods<T = unknown> {
   serialize(value: unknown): unknown;
@@ -8,22 +8,6 @@ export interface InstanceMethods<T = unknown> {
   cast(value: unknown): T | null;
   assertValidValue(value: unknown): void;
   isValueConstructedByMassAssignment(value: unknown): boolean;
-}
-
-function superOf(
-  receiver: object,
-  name: string,
-  self: unknown,
-): (this: unknown, ...args: unknown[]) => unknown {
-  let owner: object | null = null;
-  for (
-    let link: object | null = Object.getPrototypeOf(receiver);
-    link;
-    link = Object.getPrototypeOf(link)
-  ) {
-    if (Object.getOwnPropertyDescriptor(link, name)?.value === self) owner = link;
-  }
-  return (Object.getPrototypeOf(owner!) as Record<string, (...args: unknown[]) => unknown>)[name];
 }
 
 type Receiver = InstanceMethods & { valueFromMultiparameterAssignment(value: unknown): unknown };
@@ -41,7 +25,7 @@ export const InstanceMethods = {
     if (isPlainObject(value)) {
       return this.valueFromMultiparameterAssignment(value);
     } else {
-      return superOf(this, "cast", InstanceMethods.cast).call(this, value);
+      return rbCallSuper(this, InstanceMethods.cast, value);
     }
   },
 
@@ -49,7 +33,7 @@ export const InstanceMethods = {
     if (isPlainObject(value)) {
       return this.valueFromMultiparameterAssignment(value);
     } else {
-      return superOf(this, "assertValidValue", InstanceMethods.assertValidValue).call(this, value);
+      return rbCallSuper(this, InstanceMethods.assertValidValue, value);
     }
   },
 

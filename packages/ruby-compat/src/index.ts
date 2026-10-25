@@ -249,6 +249,7 @@ export {
   rbDefineAllocFunc,
   rbObjDup,
   include,
+  prepend,
   rbCallSuper,
   included,
   prepended,
@@ -284,7 +285,7 @@ export { RangeError } from "./range-error.js";
 export { KeyError } from "./key-error.js";
 export { LocalJumpError } from "./local-jump-error.js";
 export { LoadError } from "./load-error.js";
-export { rbFLoad } from "./load.js";
+export { rbFLoad, rbFRequire, rbRequireLoaded } from "./load.js";
 export { IPAddr } from "./ipaddr.js";
 export { KERNEL_METHODS, PROTOCOL_PROBES, methodMissingProxy } from "./method-missing-proxy.js";
 export { NameError } from "./name-error.js";
@@ -316,7 +317,6 @@ export {
 } from "./numeric.js";
 export { Complex, complex } from "./complex.js";
 export { NotImplementedError } from "./not-implemented-error.js";
-export { prepend } from "./prepend.js";
 export { Open3 } from "./open3.js";
 export { Process } from "./process.js";
 export {
@@ -352,7 +352,6 @@ export type {
   StdStream,
   WriteStream,
 } from "./process-adapter.js";
-export type { ClassModule, PrependMethod, PrependModule } from "./prepend.js";
 export { Method, iseqLocationSetup, rbCheckArity, rbObjMethod, rbObjMethods } from "./method.js";
 export {
   rbRegEqual,

@@ -7,7 +7,7 @@ import {
   included,
   kernelArray as Array,
 } from "@blazetrails/activesupport";
-import { Module, include, filterMap } from "@blazetrails/ruby-compat";
+import { Module, include, filterMap, rbCallSuper } from "@blazetrails/ruby-compat";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Encryption } from "../encryption.js";
 import type { Base } from "../base.js";
@@ -47,8 +47,8 @@ export class EncryptableRecord {
     });
   }
 
-  static loadSchemaBang(this: typeof Base, superFn: () => void): void {
-    superFn();
+  static loadSchemaBang(this: typeof Base): void {
+    rbCallSuper(this, EncryptableRecord.loadSchemaBang);
 
     if (Encryption.config.validateColumnSize) {
       addLengthValidationForEncryptedColumns.call(this);

@@ -8,7 +8,15 @@ import {
   kernelArray,
   wrap,
 } from "@blazetrails/activesupport";
-import { rbEqual, rbFSend, rtest, toSym, union, filterMap } from "@blazetrails/ruby-compat";
+import {
+  rbCallSuper,
+  rbEqual,
+  rbFSend,
+  rtest,
+  toSym,
+  union,
+  filterMap,
+} from "@blazetrails/ruby-compat";
 import { ThroughReflection } from "./reflection.js";
 import { type CounterCacheTouchOption, type TouchAllOptions } from "./timestamp.js";
 
@@ -118,8 +126,8 @@ export function isCounterCacheColumn(this: typeof Base, name: string): boolean {
   return this._counterCacheColumns.includes(name);
 }
 
-export function loadSchemaBang(this: typeof Base, superFn: () => void): void {
-  superFn();
+export function loadSchemaBang(this: typeof Base): void {
+  rbCallSuper(this, loadSchemaBang);
 
   const associationNames = filterMap(Object.entries(this._reflections), ([name, reflection]) => {
     if (!(reflection.isBelongsTo() && rtest(reflection.counterCacheColumn()))) return;

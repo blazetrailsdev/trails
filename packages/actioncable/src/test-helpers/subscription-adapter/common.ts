@@ -30,7 +30,8 @@ export function commonSubscriptionAdapterTest(host: CommonSubscriptionAdapterTes
     server.config.cable = { ...host.cableConfig() };
     server.config.logger = Object.assign(new Logger(new StringIO()), { level: Logger.UNKNOWN });
 
-    const adapterKlass = (await server.config.pubsubAdapter()) as new (
+    await server.config.loadPubsubAdapter();
+    const adapterKlass = server.config.pubsubAdapter() as new (
       server: Server,
     ) => SubscriptionAdapter;
 

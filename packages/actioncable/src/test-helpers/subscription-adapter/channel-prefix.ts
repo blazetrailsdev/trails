@@ -15,7 +15,8 @@ export function channelPrefixTest(host: CommonSubscriptionAdapterTestHost): void
     server2.config.cable = { ...altCableConfig(host) };
     server2.config.logger = Object.assign(new Logger(new StringIO()), { level: Logger.UNKNOWN });
 
-    const adapterKlass = (await server2.config.pubsubAdapter()) as new (
+    await server2.config.loadPubsubAdapter();
+    const adapterKlass = server2.config.pubsubAdapter() as new (
       server: Server,
     ) => SubscriptionAdapter;
 

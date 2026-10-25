@@ -1,6 +1,12 @@
 import { Callbacks } from "../callbacks.js";
 import type { FilterListEntry } from "../callbacks.js";
-import { extend, include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
+import {
+  extend,
+  include,
+  rbCallSuper,
+  type Extended,
+  type Included,
+} from "@blazetrails/ruby-compat/include";
 import { Assertion, UnexpectedError } from "./assertions.js";
 import type { Test } from "./assertions.js";
 
@@ -30,14 +36,14 @@ export const ClassMethods = {
   },
 };
 
-export function beforeSetup(this: CallbacksInstance, super_: () => unknown): unknown {
-  const result = super_();
+export function beforeSetup(this: CallbacksInstance): unknown {
+  const result = rbCallSuper(this, beforeSetup);
   return result instanceof Promise
     ? result.then(() => this.runCallbacks("setup"))
     : this.runCallbacks("setup");
 }
 
-export function afterTeardown(this: Test & CallbacksInstance, super_: () => unknown): unknown {
+export function afterTeardown(this: Test & CallbacksInstance): unknown {
   const rescue = (e: unknown): void => {
     if (e instanceof Assertion) {
       this.failures.push(e);
@@ -47,10 +53,11 @@ export function afterTeardown(this: Test & CallbacksInstance, super_: () => unkn
   };
   try {
     const result = this.runCallbacks("teardown");
-    if (result instanceof Promise) return result.then(() => {}, rescue).then(() => super_());
+    if (result instanceof Promise)
+      return result.then(() => {}, rescue).then(() => rbCallSuper(this, afterTeardown));
   } catch (e) {
     rescue(e);
   }
 
-  return super_();
+  return rbCallSuper(this, afterTeardown);
 }

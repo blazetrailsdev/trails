@@ -66,7 +66,6 @@ import {
   superSlots,
 } from "./object.js";
 import { isSymbol } from "./symbol.js";
-import { prependOriginLink } from "./prepend.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -1807,18 +1806,13 @@ export function rbModAppendFeatures(
         if (Object.hasOwn(descriptors, key)) continue;
         const origin =
           typeof key === "string" && typeof modDesc.value === "function"
-            ? prependOriginLink(Object.getOwnPropertyDescriptor(klass.prototype, key)?.value)
+            ? prependOrigin(klass.prototype, key)
             : undefined;
         if (origin) {
-          let entry = superSlots.get(modDesc.value);
-          if (entry === undefined) {
-            superSlots.set(
-              modDesc.value,
-              (entry = { slot: Symbol(`super:${String(key)}`), key: String(key) }),
-            );
-          }
-          descriptors[entry.slot] = { value: origin.original, configurable: true };
-          origin.original = modDesc.value;
+          const entry = superSlotFor(modDesc.value, String(key));
+          const below = Reflect.get(klass.prototype, origin.slot) as unknown;
+          if (below !== undefined) descriptors[entry.slot] = { value: below, configurable: true };
+          descriptors[origin.slot] = { value: modDesc.value, configurable: true };
           installed.add(key);
           continue;
         }
@@ -1833,6 +1827,32 @@ export function rbModAppendFeatures(
     }
   }
   Object.defineProperties(klass.prototype, descriptors);
+}
+
+const prependedMethods = new WeakMap<object, Set<unknown>>();
+
+function superSlotFor(method: AnyFunction, key: string): { slot: symbol; key: string } {
+  let entry = superSlots.get(method);
+  if (entry === undefined) superSlots.set(method, (entry = { slot: Symbol(`super:${key}`), key }));
+  return entry;
+}
+
+/**
+ * The super slot of the lowest method prepended over `key` on `proto`, where
+ * Ruby's `include` inserts a module (`include_modules_at`,
+ * vendor/ruby/v3.3.11/class.c:1253, starts at the class's origin, below its
+ * prepended modules). Undefined when no module is prepended over it.
+ */
+function prependOrigin(proto: object, key: string): { slot: symbol } | undefined {
+  const methods = prependedMethods.get(proto);
+  let method = Object.getOwnPropertyDescriptor(proto, key)?.value as unknown;
+  if (!methods?.has(method)) return undefined;
+  for (;;) {
+    const entry = superSlotFor(method as AnyFunction, key);
+    const below = Reflect.get(proto, entry.slot) as unknown;
+    if (!methods.has(below)) return entry;
+    method = below;
+  }
 }
 
 /**
@@ -2098,11 +2118,8 @@ function initCopyHook(
  * one behavioural difference from `include`, which loses to it. Here that is a
  * plain assignment onto the class prototype.
  *
- * Distinct from `prepend.ts`'s same-named helper, which wraps existing methods
- * so the module's version receives the original as an explicit `super_`. This
- * one is the ancestry splice that pairs with `include()` and is what a module's
- * `prepend_features` hook installs; it is not re-exported from the package
- * index, where `prepend.ts`'s helper owns the name.
+ * The method it replaces is seated under the module method's super slot, so
+ * the module reaches it with {@link rbCallSuper}, as Ruby's `super` does.
  *
  * A prepended module carries the same per-instance `initialize` an included one
  * does, since Ruby reaches both through the same `super` chain — but it sits
@@ -2118,7 +2135,7 @@ function initCopyHook(
  * uses but does not define.
  */
 export function prepend(
-  target: AnyClass | (abstract new (...args: never) => object),
+  target: AnyClass | (abstract new (...args: never) => object) | { prototype: object },
   mod: ModuleObject | AnyClass | Module,
 ): void {
   const klass = target as AnyClass;
@@ -2170,6 +2187,11 @@ export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyCla
     if (descriptor && (typeof mod === "function" || descriptor.enumerable)) {
       rbSeatSuper(klass.prototype, key, descriptor.value, seated);
       Object.defineProperty(klass.prototype, key, descriptor);
+      if (typeof descriptor.value === "function") {
+        let methods = prependedMethods.get(klass.prototype);
+        if (!methods) prependedMethods.set(klass.prototype, (methods = new Set()));
+        methods.add(descriptor.value);
+      }
     }
   }
   Object.defineProperties(klass.prototype, seated);

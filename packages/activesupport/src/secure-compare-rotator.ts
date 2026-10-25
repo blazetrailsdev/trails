@@ -1,3 +1,4 @@
+import { include } from "@blazetrails/ruby-compat/include";
 import { SecurityUtils } from "./security-utils.js";
 
 export class InvalidMatch extends Error {
@@ -11,6 +12,9 @@ export class SecureCompareRotator {
   static toString(): string {
     return "ActiveSupport::SecureCompareRotator";
   }
+
+  declare secureCompare: SecurityUtils["secureCompare"];
+  declare fixedLengthSecureCompare: SecurityUtils["fixedLengthSecureCompare"];
 
   private value: string;
   private rotateValues: string[];
@@ -32,9 +36,9 @@ export class SecureCompareRotator {
   ): boolean {
     const onRotation = "onRotation" in options ? options.onRotation : this.onRotation;
 
-    if (SecurityUtils.secureCompare(this.value, otherValue)) {
+    if (this.secureCompare(this.value, otherValue)) {
       return true;
-    } else if (this.rotateValues.some((value) => SecurityUtils.secureCompare(value, otherValue))) {
+    } else if (this.rotateValues.some((value) => this.secureCompare(value, otherValue))) {
       onRotation?.();
       return true;
     } else {
@@ -42,3 +46,5 @@ export class SecureCompareRotator {
     }
   }
 }
+
+include(SecureCompareRotator, SecurityUtils);

@@ -9,6 +9,13 @@ import { Exception } from "./exception.js";
  * @noRailsEquivalent PERMANENT — Ruby core `LoadError`, which Rails inherits
  * rather than defines.
  */
-export class LoadError extends Exception {}
+export class LoadError extends Exception {
+  /**
+   * Mirrors: Ruby's `LoadError#path` — vendor/ruby/v3.3.11/error.c:3344 `rb_attr(rb_eLoadError, path, ...)`, the feature `require` could not load.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  path: string | null = null;
+}
 
 LoadError.prototype.name = "LoadError";

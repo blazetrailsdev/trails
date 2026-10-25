@@ -562,7 +562,6 @@ export { CodeGenerator, MethodSet } from "./code-generator.js";
 export type { MethodSource } from "./code-generator.js";
 export { methodMissingProxy } from "@blazetrails/ruby-compat/method-missing-proxy";
 export { prepend } from "@blazetrails/ruby-compat";
-export type { PrependMethod, PrependModule } from "@blazetrails/ruby-compat";
 export { ClassAttribute } from "./class-attribute.js";
 
 export {

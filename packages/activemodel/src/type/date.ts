@@ -6,7 +6,13 @@ import {
   type DateParts,
 } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
-import { rbFSend, rbObjRespondTo, StandardError, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  rbFSend,
+  rbModInstanceMethod,
+  rbObjRespondTo,
+  StandardError,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import {
   AcceptsMultiparameterTime,
@@ -93,12 +99,10 @@ export class DateType extends ValueType<DateCastResult> {
   protected valueFromMultiparameterAssignment(
     values: Record<number, unknown>,
   ): Temporal.PlainDate | null {
-    const time = (
-      acceptsMultiparameterTime.instanceMethod("valueFromMultiparameterAssignment")!.value as (
-        this: unknown,
-        valuesHash: Record<string, unknown>,
-      ) => RubyTime | null
-    ).call(this, values as Record<string, unknown>);
+    const time = rbModInstanceMethod(
+      { prototype: Object.getPrototypeOf(DateType.prototype) as object },
+      "valueFromMultiparameterAssignment",
+    ).bindCall(this, values) as RubyTime | null;
     return time && this.newDate(time.year, time.mon, time.mday);
   }
 }

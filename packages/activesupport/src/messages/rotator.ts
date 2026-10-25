@@ -1,3 +1,4 @@
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import { Thrown } from "./serializer-with-fallback.js";
 
 export type OnRotation = () => void;
@@ -70,7 +71,6 @@ function catchRotationError<T>(block: () => T): { value?: T; error?: Thrown } {
 
 export function readMessage(
   this: RotatorHost,
-  super_: (...superArgs: unknown[]) => unknown,
   message: string,
   options: Record<string, unknown> = {},
 ): unknown {
@@ -78,10 +78,10 @@ export function readMessage(
   const callback = perCall === undefined ? this._onRotation : perCall;
 
   if (this.rotations.length === 0) {
-    return super_.call(this, message, rest);
+    return rbCallSuper(this, readMessage, message, rest);
   }
 
-  const first = catchRotationError(() => super_.call(this, message, rest));
+  const first = catchRotationError(() => rbCallSuper(this, readMessage, message, rest));
   if (!first.error) return first.value;
 
   for (const rotation of this.rotations) {

@@ -160,7 +160,6 @@ import {
   benchmark as benchmarkable,
   type BenchmarkLogger,
   runLoadHooks,
-  type PrependMethod,
   type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
 import {
@@ -2252,8 +2251,18 @@ include(Base, _TouchLater.TouchLater);
 include(Base, _NoTouching.NoTouching);
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
-prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
-prepend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang as PrependMethod });
+prepend(
+  { prototype: Base },
+  {
+    loadSchemaBang: CounterCache.loadSchemaBang,
+  },
+);
+prepend(
+  { prototype: Base },
+  {
+    loadSchemaBang: _EncryptableRecord.loadSchemaBang,
+  },
+);
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
 include(Base, _NestedAttributes.NestedAttributes);
 include(Base, { association: _association });
