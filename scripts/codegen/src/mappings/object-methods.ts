@@ -285,6 +285,12 @@ rule("class", (c) => {
     const ref = lw.resolver.fqnRef(ctx.owner!, ctx, lw);
     return `(${R}.constructor as typeof ${ref})`;
   }
+  // A value that may be a String / Integer / nil (a gem with no hand port):
+  // `rbObjClass` answers Ruby's class (`rbCString`), as the hand port writes it.
+  if (GEM.hand === false && recvNode && recvNode.k !== "self") {
+    const t = lw.typeOf(recvNode, ctx);
+    if (!t || t.k === "prim") return `${c.rc("rbObjClass")}(${R})`;
+  }
   return `${R}.constructor`;
 });
 

@@ -2332,7 +2332,23 @@ export class Emitter {
     }
     const hoisted: Set<string> | undefined = ctx.scope.hoisted;
     if (hoisted?.size)
-      body = [`let ${[...hoisted].map((h) => `${jsIdent(h)}: any`).join(", ")};`, ...body];
+      body = [
+        `let ${[...hoisted]
+          .map((h) => {
+            // A gem with no hand port: a local whose assignments typed it as
+            // a class instance (`midnight`, a Time) is declared so.
+            const t = GEM.hand === false ? ctx.scope.types?.get(h) : null;
+            const ts =
+              t &&
+              ((t.k === "class" && !t.static) ||
+                (t.k === "prim" && (t.name === "number" || t.name === "string")))
+                ? this.lw.tsType({ ...t, nullable: false } as typeof t, ctx)
+                : null;
+            return `${jsIdent(h)}: ${ts && ts !== "unknown" ? ts : "any"}`;
+          })
+          .join(", ")};`,
+        ...body,
+      ];
     if (isCtor && u.superclass && !body.some((l) => /\bsuper\(/.test(l))) {
       // Ruby's `initialize` never calls `super`, so the parent's never runs;
       // JS must call it. Pass `undefined` (Ruby's unset ivars read `nil`) for

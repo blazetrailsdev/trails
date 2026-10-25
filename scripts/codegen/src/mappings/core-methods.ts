@@ -740,6 +740,15 @@ const rubyCompatCall: CoreRule = (c) => {
   return `${c.rc(rbCoreFn(c.name))}(${[c.r, ...c.args()].join(", ")})`;
 };
 
+// `Array#delete_if` (array.c rb_ary_delete_if) on an Array — ruby-compat's
+// `deleteIf` is Hash#delete_if.
+rule("delete_if", (c) => {
+  if (!c.blk || c.lw.index.methodNames.has("delete_if")) return null;
+  const t = c.recvType;
+  if (t?.k !== "array" && !(GEM.hand === false && !t && c.recvNode.k === "ivar")) return null;
+  return `${c.rc("aryDeleteIf")}(${c.r} as unknown[], ${c.fn()})`;
+});
+
 // `Enumerable#partition` (enum.c enum_partition) on any Enumerable: ruby-compat's
 // takes an Array, so a Hash is its pairs, and `|k, v|` takes one apart.
 rule("partition", (c) => {

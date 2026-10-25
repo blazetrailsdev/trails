@@ -222,6 +222,14 @@ rule("+ - * / % < > <= >= & | ^ **", (o) => {
       return `(await ${call})`;
     }
   }
+  // Ruby Time's Comparable operators: `@blazetrails/date`'s `compare` (`<=>`).
+  if (
+    lt0?.k === "class" &&
+    lt0.key === "@date/time.ts#Time" &&
+    !lt0.static &&
+    ["<", ">", "<=", ">="].includes(name)
+  )
+    return `${needsParens(lhs) ? `(${lhs})` : lhs}.compare(${a[0]})! ${name} 0`;
   if (lt0?.k === "array" && name === "+") {
     const rt0 = lw.typeOf(n.args[0], ctx);
     if (rt0?.k === "array") return `[...${lhs}, ...${needsParens(a[0]) ? `(${a[0]})` : a[0]}]`;

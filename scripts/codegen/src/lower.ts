@@ -91,6 +91,27 @@ export const RESERVED = new Set(
   ).split(" "),
 );
 
+/** Calls whose class argument is a type test, lowered natively (`typeof x === "string"`). */
+const TYPE_TEST_CALLS = new Set([
+  "is_a?",
+  "kind_of?",
+  "instance_of?",
+  "===",
+  "include",
+  "extend",
+  "prepend",
+  "raise",
+  "assert_kind_of",
+  "assert_instance_of",
+  "refute_kind_of",
+  "refute_instance_of",
+  "be_a",
+  "be_kind_of",
+  "be_an_instance_of",
+  "rescue",
+  "new",
+]);
+
 /** Names a bare ivar field must not take: they are JS / Object members. */
 const RESERVED_FIELDS = new Set([
   "constructor",
@@ -2056,7 +2077,16 @@ export class Lowerer {
     const kwType: string[] = [];
     let kwRest = false;
     let position = 0;
-    const positionalType = () => (isBlock ? null : ctx.paramTypes?.[position++]) ?? "any";
+    const positionalType = (name?: string) => {
+      const t = (isBlock ? null : ctx.paramTypes?.[position++]) ?? "any";
+      // A gem with no hand port: a parameter its body uses as an Integer or a
+      // Time (`duckLocalTime`) is declared so, ahead of the type pass.
+      if (t === "any" && !isBlock && name && GEM.hand === false) {
+        const d = this.duckLocalTime(ctx, name);
+        if (d?.k === "prim" && d.name === "number") return "number";
+      }
+      return t;
+    };
     for (const p of params) {
       const nm = p.name ? jsIdent(p.name) : null;
       if (p.name) ctx.scope.locals.add(p.name);
@@ -2065,10 +2095,10 @@ export class Lowerer {
           if (p.destructure) {
             p.destructure.forEach((d) => d && ctx.scope.locals.add(d));
             out.push(`[${p.destructure.map((d) => (d ? jsIdent(d) : "")).join(", ")}]: any`);
-          } else out.push(`${nm}${isBlock ? "?" : ""}: ${positionalType()}`);
+          } else out.push(`${nm}${isBlock ? "?" : ""}: ${positionalType(p.name)}`);
           break;
         case "opt":
-          out.push(`${nm}: ${positionalType()} = ${this.expr(p.default!, ctx)}`);
+          out.push(`${nm}: ${positionalType(p.name)} = ${this.expr(p.default!, ctx)}`);
           this.noteParamType(ctx, p.name!, p.default!);
           break;
         case "rest":
@@ -2327,6 +2357,8 @@ export class Lowerer {
             ctx,
           );
         return this.call(n, ctx);
+      case "rbcRef":
+        return this.rc(ctx, n.name);
       case "symColonArray":
         return this.expr(n.inner, this.child(ctx, { symColonArray: true }));
       case "super":
@@ -2632,6 +2664,27 @@ export class Lowerer {
   }
 
   private ivarClash?: Map<string, Set<string>>;
+
+  /** `String` / `Integer` / … as a bare constant: its ruby-compat class (`rbCString`). */
+  rbCoreClassName(x: N): string | null {
+    if (x?.k !== "const") return null;
+    const p = x.path.filter((s: string) => s);
+    if (p.length !== 1) return null;
+    const core = [
+      "String",
+      "Integer",
+      "Float",
+      "Symbol",
+      "Array",
+      "NilClass",
+      "TrueClass",
+      "FalseClass",
+      "Numeric",
+    ];
+    if (!core.includes(p[0]) || this.index.resolveConst(x.path, [])) return null;
+    const name = `rbC${p[0]}`;
+    return this.resolver.pkgExports("@blazetrails/ruby-compat").has(name) ? name : null;
+  }
 
   /** Whether the class being lowered is a `symbolTester`: its Symbols carry the colon. */
   ownerTestsSymbol(ctx: Ctx): boolean {
@@ -3386,6 +3439,21 @@ export class Lowerer {
 
   call(n0: N, ctx0: Ctx): string {
     let n = callbackFilterSymbols(n0);
+    // A gem with no hand port: Ruby's core class handed as an argument
+    // (`token.get_tag(String)`, `assert_equal String, x.class`) is ruby-compat's
+    // (`rbCString`), which `rbObjClass` answers, as the hand chronic port writes.
+    if (
+      GEM.hand === false &&
+      !TYPE_TEST_CALLS.has(n.name) &&
+      n.args?.some((x: N) => this.rbCoreClassName(x))
+    )
+      n = {
+        ...n,
+        args: n.args.map((x: N) => {
+          const c = this.rbCoreClassName(x);
+          return c ? { k: "rbcRef", name: c } : x;
+        }),
+      };
     let ctx =
       n.name === "new" &&
       n.block?.k === "block" &&
@@ -5184,8 +5252,15 @@ export class Lowerer {
       case "int":
       case "float":
         return { k: "prim", name: "number" };
-      case "array":
-        return { k: "array", el: null };
+      case "array": {
+        // Every element of one type (`[midnight + t, tomorrow + t]`): its element type.
+        const ts = (n.elems ?? []).map((e: N) => (e.k === "splat" ? null : this.typeOf(e, ctx)));
+        const el =
+          ts.length && ts.every((t: TypeRef) => t && JSON.stringify(t) === JSON.stringify(ts[0]))
+            ? ts[0]
+            : null;
+        return { k: "array", el };
+      }
       case "hash":
         return { k: "hash" };
       case "lasgn":
@@ -5212,6 +5287,14 @@ export class Lowerer {
           GEM.hand === false &&
           this.index.methodNames.has(name) &&
           this.timeFlow().methods.has(name)
+        )
+          return this.timeRef();
+        // `Chronic.time_class.local(…)`: Ruby Time's constructors.
+        if (
+          GEM.hand === false &&
+          ["local", "now", "at", "mktime", "utc", "gm"].includes(name) &&
+          n.recv?.k === "call" &&
+          /(^|_)time_class$/.test(n.recv.name)
         )
           return this.timeRef();
         // `Array.wrap(x)` / `Array(x)` answer an Array; so do these Enumerable
