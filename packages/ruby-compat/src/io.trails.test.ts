@@ -348,6 +348,21 @@ describe("STDOUT", () => {
   });
 });
 
+describe("IO#tty?", () => {
+  it("answers whether the standard stream is a terminal", () => {
+    const isTTY = vi
+      .spyOn(stdout, "isTTY", "get")
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
+    try {
+      expect(STDOUT.isTty()).toBe(true);
+      expect(STDOUT.isTty()).toBe(false);
+    } finally {
+      isTTY.mockRestore();
+    }
+  });
+});
+
 describe("printf", () => {
   it("writes the formatted String to the receiver and answers nil", () => {
     const written: string[] = [];

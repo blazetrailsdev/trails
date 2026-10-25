@@ -36,6 +36,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "marcel",
     "chronic",
     "et-orbi",
+    "raabro",
     "actionview",
     "actioncable",
     "activejob",

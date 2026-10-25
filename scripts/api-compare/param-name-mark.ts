@@ -43,6 +43,7 @@ export const GATED_PACKAGES = [
   "chronic",
   "did-you-mean",
   "et-orbi",
+  "raabro",
   "globalid",
   "marcel",
   "rack",

@@ -927,6 +927,7 @@ jobs:
           packages/mini-magick
           packages/msgpack
           packages/nokogiri
+          packages/raabro
           packages/ruby-compat
           packages/vitest-matchers
           scripts/guides-typecheck
@@ -1159,6 +1160,7 @@ jobs:
           packages/msgpack
           packages/nokogiri
           packages/html-sanitizer
+          packages/raabro
           packages/rack
           packages/rack-session
           packages/rack-test

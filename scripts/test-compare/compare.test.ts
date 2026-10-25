@@ -197,6 +197,10 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("test_chronic.rb", "chronic")).toBe("chronic.test.ts");
   });
 
+  it("strips raabro's _spec suffix", () => {
+    expect(rubyToConventionTs("sample_xel_spec.rb", "raabro")).toBe("sample-xel.test.ts");
+  });
+
   it("strips et-orbi's _spec suffix", () => {
     expect(rubyToConventionTs("eo_time_spec.rb", "et-orbi")).toBe("eo-time.test.ts");
     expect(rubyToConventionTs("module_spec.rb", "et-orbi")).toBe("module.test.ts");
