@@ -22,11 +22,11 @@ import {
 } from "@blazetrails/ruby-compat";
 import "../action-cable.js";
 import { ActionCable, Channel } from "../namespaces.js";
-import { Broadcasting } from "./broadcasting.js";
+import { Broadcasting, type ClassMethods as BroadcastingClassMethods } from "./broadcasting.js";
 import { Callbacks } from "./callbacks.js";
 import { Naming } from "./naming.js";
 import { PeriodicTimers } from "./periodic-timers.js";
-import { Streams } from "./streams.js";
+import { Streams, type Handler, type StreamOptions } from "./streams.js";
 
 type Data = Record<string, unknown>;
 
@@ -44,9 +44,33 @@ interface ChannelConnection {
   transmit(cableMessage: unknown): unknown;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Base {
+  streamFrom(
+    broadcasting: unknown,
+    callback?: Handler | StreamOptions | null,
+    options?: StreamOptions,
+    block?: Handler,
+  ): void;
+  streamFor(
+    model: unknown,
+    callback?: Handler | StreamOptions | null,
+    options?: StreamOptions,
+    block?: Handler,
+  ): void;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
   declare runCallbacks: (kind: string, block?: () => unknown) => unknown;
   declare rescueWithHandler: Included<typeof Rescuable>["rescueWithHandler"];
+  declare static readonly channelName: string;
+  declare static broadcastingFor: (typeof BroadcastingClassMethods)["broadcastingFor"];
+  declare static broadcastTo: (typeof BroadcastingClassMethods)["broadcastTo"];
+  declare stopStreamFrom: Included<typeof Streams>["stopStreamFrom"];
+  declare stopStreamFor: Included<typeof Streams>["stopStreamFor"];
+  declare stopAllStreams: Included<typeof Streams>["stopAllStreams"];
+  declare streamOrRejectFor: Included<typeof Streams>["streamOrRejectFor"];
 
   /** @internal */
   protected static _actionMethods?: Set<string> | null;
@@ -248,7 +272,7 @@ export class Base {
    * @internal
    * @missingRailsName name — PERMANENT
    */
-  private transmitSubscriptionConfirmation(): unknown {
+  protected transmitSubscriptionConfirmation(): unknown {
     if (!this.isSubscriptionConfirmationSent()) {
       this.logger.debug(`${rbObjClassname(this)} is transmitting the subscription confirmation`);
 
