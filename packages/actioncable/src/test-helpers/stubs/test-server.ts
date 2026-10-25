@@ -24,7 +24,7 @@ class FakeConfiguration extends Configuration {
     return self;
   }
 
-  override async pubsubAdapter(): Promise<unknown> {
+  override pubsubAdapter(): unknown {
     return this.subscriptionAdapter;
   }
 }

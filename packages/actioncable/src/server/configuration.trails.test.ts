@@ -43,26 +43,35 @@ describe("ActionCable::Server::Configuration", () => {
     loaded.length = 0;
     const config = new Configuration();
     config.cable = { adapter: "async" };
-    expect(await config.pubsubAdapter()).toBe(Async);
+    await config.loadPubsubAdapter();
+    expect(config.pubsubAdapter()).toBe(Async);
     expect(loaded).toEqual(["async"]);
   });
 
   it("resolves a built-in adapter with nothing registered", async () => {
     const config = new Configuration();
     config.cable = { adapter: "inline" };
-    expect(await config.pubsubAdapter()).toBe(Inline);
+    await config.loadPubsubAdapter();
+    expect(config.pubsubAdapter()).toBe(Inline);
   });
 
   it("fixes up PostgreSQL", async () => {
     const config = new Configuration();
     config.cable = { adapter: "postgresql" };
-    expect(await config.pubsubAdapter()).toBe(PostgreSQL);
+    await config.loadPubsubAdapter();
+    expect(config.pubsubAdapter()).toBe(PostgreSQL);
   });
 
   it("defaults to redis and reports its missing dependency", async () => {
     const config = new Configuration();
     config.cable = {};
-    const error = await config.pubsubAdapter().catch((e: unknown) => e);
+    await config.loadPubsubAdapter();
+    let error: unknown;
+    try {
+      config.pubsubAdapter();
+    } catch (e) {
+      error = e;
+    }
     expect(error).toBeInstanceOf(LoadError);
     expect((error as Error).message).toBe(
       "Error loading the 'redis' Action Cable pubsub adapter. Missing a gem it depends on? Cannot find package 'redis'",
@@ -72,7 +81,8 @@ describe("ActionCable::Server::Configuration", () => {
   it("reports a misspelled adapter", async () => {
     const config = new Configuration();
     config.cable = { adapter: "bogus" };
-    await expect(config.pubsubAdapter()).rejects.toThrow(
+    await config.loadPubsubAdapter();
+    expect(() => config.pubsubAdapter()).toThrow(
       "Could not load the 'bogus' Action Cable pubsub adapter. Ensure that the adapter is spelled correctly in config/cable.yml and that you've added the necessary adapter gem to your Gemfile.",
     );
   });
