@@ -175,3 +175,21 @@ describe("TimeWithZone built with a TZInfo Timezone", () => {
     expect(new TimeWithZone(Time.utc(2000), Timezone.get("Etc/UTC")).isUtc()).toBe(true);
   });
 });
+
+describe("TZInfo periods read tzdata transitions", () => {
+  it("equates two instants of one period by its transitions", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    const july = eastern.periodForUtc(Time.utc(2006, 7, 1));
+    expect(july.equals(eastern.periodForUtc(Time.utc(2006, 8, 1)))).toBe(true);
+    expect(july.equals(eastern.periodForUtc(Time.utc(2007, 7, 1)))).toBe(false);
+    expect(july.startTransition!.timestampValue).toBe(Date.UTC(2006, 3, 2, 7) / 1000);
+    expect(july.endTransition!.timestampValue).toBe(Date.UTC(2006, 9, 29, 6) / 1000);
+  });
+
+  it("reads a year-round DST period's base offset from the standard period before it", () => {
+    const period = TimeZone.find("Eastern Time (US & Canada)")!.periodForUtc(Time.utc(1943, 1, 15));
+    expect(period.isDst()).toBe(true);
+    expect(period.utcOffset).toBe(-18000);
+    expect(period.stdOffset).toBe(3600);
+  });
+});

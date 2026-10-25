@@ -7,7 +7,13 @@
  *   for the `local`-to-UTC ambiguity search.
  */
 
-import { Temporal, Time, Timezone as DateTimezone, tzdataIsdst } from "@blazetrails/date";
+import {
+  Temporal,
+  Time,
+  Timezone as DateTimezone,
+  tzdataIsdst,
+  tzdataIsdstFlips,
+} from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
@@ -106,6 +112,46 @@ function getZoneInfo(
 }
 
 /** @noRailsEquivalent PERMANENT */
+export class TimezoneTransition {
+  readonly offset: number;
+  readonly previousOffset: number;
+  readonly timestampValue: number;
+
+  constructor(offset: number, previousOffset: number, timestampValue: number) {
+    this.offset = offset;
+    this.previousOffset = previousOffset;
+    this.timestampValue = timestampValue;
+  }
+
+  equals(other: unknown): boolean {
+    return (
+      other instanceof TimezoneTransition &&
+      other.offset === this.offset &&
+      other.previousOffset === this.previousOffset &&
+      other.timestampValue === this.timestampValue
+    );
+  }
+}
+
+function transitionEquals(a: TimezoneTransition | null, b: TimezoneTransition | null): boolean {
+  return a === null ? b === null : a.equals(b);
+}
+
+const periodTransitions = new WeakMap<
+  TimezonePeriod,
+  (() => (TimezoneTransition | null)[]) | (TimezoneTransition | null)[]
+>();
+
+function boundaries(period: TimezonePeriod): (TimezoneTransition | null)[] {
+  let transitions = periodTransitions.get(period)!;
+  if (typeof transitions === "function") {
+    transitions = transitions();
+    periodTransitions.set(period, transitions);
+  }
+  return transitions;
+}
+
+/** @noRailsEquivalent PERMANENT */
 export class TimezonePeriod {
   readonly abbreviation: string;
   readonly observedUtcOffset: number;
@@ -117,11 +163,21 @@ export class TimezonePeriod {
     observedUtcOffset: number,
     dst: boolean,
     baseUtcOffset = observedUtcOffset,
+    transitions: () => (TimezoneTransition | null)[] = () => [null, null],
   ) {
     this.abbreviation = abbreviation;
     this.observedUtcOffset = observedUtcOffset;
     this.baseUtcOffset = baseUtcOffset;
     this._dst = dst;
+    periodTransitions.set(this, transitions);
+  }
+
+  get startTransition(): TimezoneTransition | null {
+    return boundaries(this)[0];
+  }
+
+  get endTransition(): TimezoneTransition | null {
+    return boundaries(this)[1];
   }
 
   get abbr(): string {
@@ -147,9 +203,8 @@ export class TimezonePeriod {
   equals(other: unknown): boolean {
     return (
       other instanceof TimezonePeriod &&
-      other.abbreviation === this.abbreviation &&
-      other.observedUtcOffset === this.observedUtcOffset &&
-      other.baseUtcOffset === this.baseUtcOffset
+      transitionEquals(other.startTransition, this.startTransition) &&
+      transitionEquals(other.endTransition, this.endTransition)
     );
   }
 }
@@ -433,14 +488,30 @@ export class Timezone {
     const d = toDate(time);
     const observed = this.observedUtcOffset(d);
     const dst = this.isDst(d);
-    let base = observed;
-    if (dst) {
-      const year = d.getUTCFullYear();
-      for (const probe of [new Date(Date.UTC(year, 0, 1)), new Date(Date.UTC(year, 6, 1))]) {
-        if (!this.isDst(probe)) base = this.observedUtcOffset(probe);
-      }
-    }
-    return new TimezonePeriod(this.abbr(d), observed, dst, base);
+    if (this.info) return new TimezonePeriod(this.abbr(d), observed, dst);
+    const at = Math.floor(d.getTime() / 1000);
+    const flips = tzdataIsdstFlips(this.identifier);
+    let flipIndex = 0;
+    while (flipIndex < flips.length && flips[flipIndex] <= at) flipIndex++;
+    const offsetAt = (seconds: number) => this.observedUtcOffset(new Date(seconds * 1000));
+    const base = dst && flipIndex > 0 ? offsetAt(flips[flipIndex - 1] - 1) : observed;
+    return new TimezonePeriod(this.abbr(d), observed, dst, base, () => {
+      const zoned = Temporal.Instant.fromEpochMilliseconds(at * 1000 + 1).toZonedDateTimeISO(
+        this.identifier,
+      );
+      const previous = zoned.getTimeZoneTransition("previous");
+      const next = zoned.getTimeZoneTransition("next");
+      const starts = [flips[flipIndex - 1], previous && previous.epochMilliseconds / 1000];
+      const ends = [flips[flipIndex], next && next.epochMilliseconds / 1000];
+      const start = Math.max(...starts.filter((s): s is number => s != null));
+      const end = Math.min(...ends.filter((e): e is number => e != null));
+      return [
+        Number.isFinite(start)
+          ? new TimezoneTransition(observed, offsetAt(start - 1), start)
+          : null,
+        Number.isFinite(end) ? new TimezoneTransition(offsetAt(end), observed, end) : null,
+      ];
+    });
   }
 
   periodsForLocal(time: Time): TimezonePeriod[] {

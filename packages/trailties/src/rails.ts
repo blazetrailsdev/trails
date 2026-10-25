@@ -3,6 +3,7 @@ import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
 import { getEnv } from "@blazetrails/activesupport";
 import { ActiveSupport, TopLevel } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { ErrorReporter } from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
@@ -13,7 +14,7 @@ import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
 import type { ActionMethods } from "./generators/app-generator.js";
-import { VERSION } from "./version.js";
+import { VERSION } from "./gem-version.js";
 import "./info-controller.js";
 import "./welcome-controller.js";
 import "./health-controller.js";
@@ -63,8 +64,10 @@ export class Trails {
 
   static logger: Logger | null = null;
 
+  static VERSION = VERSION;
+
   static get version(): string {
-    return VERSION;
+    return VERSION.STRING;
   }
 
   static get configuration(): Configuration | null {
@@ -143,3 +146,4 @@ export function _resetTrailsEnv(): void {
 }
 
 TopLevel.Trails = Trails;
+registerConstant("Trails", Trails);
