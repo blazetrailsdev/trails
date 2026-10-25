@@ -83,7 +83,6 @@ describe("PostgresqlAdapterTest", () => {
     await ActiveRecordBase.connectionHandler.clearReloadableConnectionsBang();
 
     expect(adapter.isActive()).toBe(true);
-    await adapter.shutdown();
   });
 
   it("default subscription connection identifier", async () => {
@@ -105,6 +104,5 @@ describe("PostgresqlAdapterTest", () => {
 
     const identifiers = await applicationNames();
     expect(identifiers).toContainEqual(["hello-world-42"]);
-    await adapter.shutdown();
   });
 });

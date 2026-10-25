@@ -572,7 +572,6 @@ export default defineConfig({
             "packages/trailties/**",
             "packages/et-orbi/**",
             "packages/raabro/**",
-            // Needs the PostgreSQL service; actioncable-postgres-tests runs it.
             ...(ARCONN === "postgresql"
               ? []
               : ["packages/actioncable/src/subscription-adapter/postgresql.test.ts"]),

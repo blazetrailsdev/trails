@@ -6,7 +6,6 @@ import {
 import { Worker } from "@blazetrails/actioncable/server/worker";
 import type { Base as Server } from "@blazetrails/actioncable/server/base";
 import type { Configuration } from "@blazetrails/actioncable/server/configuration";
-import type { FilterListEntry } from "@blazetrails/activesupport";
 import type { RackApp } from "@blazetrails/actionpack";
 import {
   OrderedOptions,
@@ -20,10 +19,6 @@ import { Engine as BaseEngine } from "../engine.js";
 import { HealthController } from "../health-controller.js";
 
 type Options = OrderedOptions & Record<string, unknown>;
-
-const server = (): Server => ActionCable.server() as Server;
-const ChannelBase = (): { setCallback(name: string, ...filterList: FilterListEntry[]): void } =>
-  ActionCable.Channel.Base as never;
 
 export class Engine extends BaseEngine {
   static {
@@ -93,8 +88,8 @@ export class Engine extends BaseEngine {
         for (const [k, v] of options.entries()) (this as unknown as Record<string, unknown>)[k] = v;
       });
 
-      if (server().config.cable != null) {
-        await server().config.loadPubsubAdapter();
+      if ((ActionCable.server() as Server).config.cable != null) {
+        await (ActionCable.server() as Server).config.loadPubsubAdapter();
       }
     });
 
@@ -105,7 +100,7 @@ export class Engine extends BaseEngine {
           app.routes().prepend(function () {
             this.mount(
               new Map<unknown, unknown>([
-                [server(), (config.get("actionCable") as Options).mountPath],
+                [ActionCable.server(), (config.get("actionCable") as Options).mountPath],
                 ["internal", true],
                 ["anchor", true],
               ]),
@@ -135,12 +130,22 @@ export class Engine extends BaseEngine {
 
         const wrap = (_: unknown, inner: () => unknown) =>
           app.executor.wrap(inner, { source: "application.action_cable" });
-        ChannelBase().setCallback("subscribe", "around", { prepend: true }, block(wrap));
-        ChannelBase().setCallback("unsubscribe", "around", { prepend: true }, block(wrap));
+        (ActionCable.Channel.Base as unknown as typeof Worker).setCallback(
+          "subscribe",
+          "around",
+          { prepend: true },
+          block(wrap),
+        );
+        (ActionCable.Channel.Base as unknown as typeof Worker).setCallback(
+          "unsubscribe",
+          "around",
+          { prepend: true },
+          block(wrap),
+        );
 
         app.reloader.beforeClassUnload(
           block(async () => {
-            await server().restart();
+            await (ActionCable.server() as Server).restart();
           }),
         );
       });
