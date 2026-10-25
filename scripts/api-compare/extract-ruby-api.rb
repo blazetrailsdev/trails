@@ -688,8 +688,6 @@ class ApiExtractor
     when :sclass
       process_sclass(node)
     when :massign
-      # `CP1252_DIFFERENCES, UNICODE_EQUIVALENT = …` (builder/xchar.rb:100-103)
-      # declares each constant it names.
       record_massign_constants(node[1])
       node.each { |child| walk(child) if child.is_a?(Array) }
     when :assign

@@ -27,7 +27,6 @@ import { OPERATORS } from "@blazetrails/parity/conventions";
 // `rubyMethodToTs`'s multi-name shape: the rule filters to spellings actually
 // present in the container, so listing more than one is a safe no-op.
 export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> = {
-  // builder xmlbase.rb:116 — `<<` appends unescaped text to the target.
   "Builder::XmlBase": {
     "<<": ["append"],
   },
