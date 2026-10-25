@@ -44,14 +44,29 @@ interface ChannelConnection {
   transmit(cableMessage: unknown): unknown;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Base {
+  streamFrom(
+    broadcasting: unknown,
+    callback?: ((message: unknown) => unknown) | { coder?: unknown } | null,
+    options?: { coder?: unknown },
+    block?: (message: unknown) => unknown,
+  ): void;
+  streamFor(
+    model: unknown,
+    callback?: ((message: unknown) => unknown) | { coder?: unknown } | null,
+    options?: { coder?: unknown },
+    block?: (message: unknown) => unknown,
+  ): void;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
   declare runCallbacks: (kind: string, block?: () => unknown) => unknown;
   declare rescueWithHandler: Included<typeof Rescuable>["rescueWithHandler"];
   declare static readonly channelName: string;
   declare static broadcastingFor: (typeof BroadcastingClassMethods)["broadcastingFor"];
   declare static broadcastTo: (typeof BroadcastingClassMethods)["broadcastTo"];
-  declare streamFrom: Included<typeof Streams>["streamFrom"];
-  declare streamFor: Included<typeof Streams>["streamFor"];
   declare stopStreamFrom: Included<typeof Streams>["stopStreamFrom"];
   declare stopStreamFor: Included<typeof Streams>["stopStreamFor"];
   declare stopAllStreams: Included<typeof Streams>["stopAllStreams"];
