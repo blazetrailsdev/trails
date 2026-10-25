@@ -444,6 +444,10 @@ rule("to_i", (c) => {
   if (objectRecv(c)) return null;
   if (argc(c) !== 0) return null;
   if (c.recvType?.k === "prim" && c.recvType.name === "number") return `Math.trunc(${c.r})`;
+  // A gem with no hand port: a value of unknown class (a Time, chronic's
+  // `time.to_i`) answers its own `to_i`, which ruby-compat's `toI` dispatches.
+  if (GEM.hand === false && !(c.recvType?.k === "prim" && c.recvType.name === "string"))
+    return `(${c.rc("toI")}(${c.r}) as number)`;
   return `(parseInt(String(${c.r}), 10) || 0)`;
 });
 
