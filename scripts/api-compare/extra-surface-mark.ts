@@ -163,6 +163,7 @@ export const ROWLESS_PACKAGES = [
   "activerecord",
   "arel",
   "bcrypt",
+  "builder",
   "chronic",
   "did-you-mean",
   "et-orbi",

@@ -1722,6 +1722,11 @@ reaches public API; `parity:api:blocks` credits a non-public generator's
 `yield` as its block and still flags a public one. Ruled by the repo owner on
 trails#9053.
 
+The builder gem is the one exception to `block()`: a `.builder` template's
+blocks (`xml.p(() => …)`, `tag!`, `declare!`, `XmlEvents`) are plain trailing
+functions, read off the end of the argument list by `typeof`, because a tag's
+`*args` hold no other function. Ruled by the repo owner on 2026-10-22.
+
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 
 § "Module mixins" says only `inherited` has no JS equivalent. JS has no hook

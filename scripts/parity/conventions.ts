@@ -713,6 +713,15 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "`Integer#xchr` and `String#to_xs` (builder xchar.rb:161-198) are the " +
+      "`else` arm of `if String.method_defined?(:encode)` (:97), a Ruby 1.8 " +
+      "fallback that no Ruby since 1.9 loads. Scoped to builder's xchar.rb.",
+    names: ["xchr", "to_xs"],
+    rubyFiles: ["xchar.rb"],
+    packages: ["builder"],
+  },
+  {
+    reason:
       "Node's event loop stands in for Action Cable's `NIO::Selector` and its " +
       "thread (CLAUDE.md, \"Node's event loop stands in for Action Cable's nio4r " +
       'selector"). `spawn`, `run` and `wakeup` own and interrupt the selector ' +

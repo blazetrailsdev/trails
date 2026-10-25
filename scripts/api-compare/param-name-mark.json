@@ -39,6 +39,10 @@
     "total": 0,
     "byFile": {}
   },
+  "builder": {
+    "total": 0,
+    "byFile": {}
+  },
   "chronic": {
     "total": 0,
     "byFile": {}

@@ -133,7 +133,7 @@ export abstract class XmlBase {
   /**
    * @internal
    * @inventedArm decode — PERMANENT
-   * @missingRailsCall force_encoding — PERMANENT
+   * @missingRailsName encoding — PERMANENT
    */
   protected _escape(text: string): string {
     const result = XChar.encode(text);
