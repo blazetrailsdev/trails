@@ -166,28 +166,6 @@ export function including<T>(collection: Iterable<T> | Each<T>, ...elements: T[]
   return [...toA(collection), ...elements];
 }
 
-export function minBy<T>(collection: T[], fn: (item: T) => number): T | undefined {
-  if (collection.length === 0) return undefined;
-  return collection.reduce((best, item) => (fn(item) < fn(best) ? item : best));
-}
-
-export function maxBy<T>(collection: T[], fn: (item: T) => number): T | undefined {
-  if (collection.length === 0) return undefined;
-  return collection.reduce((best, item) => (fn(item) > fn(best) ? item : best));
-}
-
-export function eachCons<T>(collection: T[], n: number): T[][];
-export function eachCons<T>(collection: T[], n: number, block: (slice: T[]) => void): T[];
-export function eachCons<T>(collection: T[], n: number, block?: (slice: T[]) => void): T[][] | T[] {
-  const result: T[][] = [];
-  for (let i = 0; i <= collection.length - n; i++) {
-    result.push(collection.slice(i, i + n));
-  }
-  if (!block) return result;
-  result.forEach(block);
-  return collection;
-}
-
 export function inOrderOf<T>(
   collection: Iterable<T> | Each<T>,
   key: (item: T) => unknown,

@@ -9,9 +9,6 @@ import {
   many,
   excluding,
   including,
-  minBy,
-  maxBy,
-  eachCons,
   inOrderOf,
   exclude,
   without,
@@ -116,24 +113,6 @@ describe("EnumerableTests", () => {
     expect(including([1, 2, 3], 4, 5)).toEqual([1, 2, 3, 4, 5]);
   });
 
-  it("minBy — finds element with minimum mapped value", () => {
-    const payments = [pay(5), pay(15), pay(10)];
-    expect(minBy(payments, (p) => p.price)).toEqual(pay(5));
-  });
-
-  it("minBy — undefined for empty", () => {
-    expect(minBy([], (p: Payment) => p.price)).toBeUndefined();
-  });
-
-  it("maxBy — finds element with maximum mapped value", () => {
-    const payments = [pay(5), pay(15), pay(10)];
-    expect(maxBy(payments, (p) => p.price)).toEqual(pay(15));
-  });
-
-  it("maxBy — undefined for empty", () => {
-    expect(maxBy([], (p: Payment) => p.price)).toBeUndefined();
-  });
-
   it("compact_blank — removes blank values", () => {
     const values = [1, "", null, 2, " ", [], false, true] as unknown[];
     const result = compactBlank(values as string[]);
@@ -142,19 +121,6 @@ describe("EnumerableTests", () => {
     expect(result).toContain(true);
     expect(result).not.toContain("");
     expect(result).not.toContain(null);
-  });
-
-  it("eachCons — sliding window", () => {
-    expect(eachCons([1, 2, 3, 4], 2)).toEqual([
-      [1, 2],
-      [2, 3],
-      [3, 4],
-    ]);
-    expect(eachCons([1, 2, 3], 3)).toEqual([[1, 2, 3]]);
-  });
-
-  it("eachCons — window larger than array returns empty", () => {
-    expect(eachCons([1, 2], 3)).toEqual([]);
   });
 
   it("in_order_of — reorders by series", () => {

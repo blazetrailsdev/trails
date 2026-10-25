@@ -469,6 +469,159 @@ export function eachSlice<T, E = unknown>(
   );
 }
 
+/**
+ * Mirrors: Ruby's Enumerable#min_by — `vendor/ruby/v3.3.11/enum.c:2686` `enum_min_by`,
+ * keeping the first element whose block value compares lowest (`min_by_i`,
+ * `:2630`) and answering `nil` for an empty receiver. With `n` it answers the
+ * `n` elements with the lowest block values, in order (`rb_nmin_run`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function minBy<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T) => unknown,
+): Enumerated<E, T | null>;
+/** @noRailsEquivalent PERMANENT */
+export function minBy<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  n: number | null,
+  block: (i: T) => unknown,
+): Enumerated<E, T[] | T | null>;
+/** @noRailsEquivalent PERMANENT */
+export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: unknown[]): unknown {
+  const block = argv.pop() as (i: T) => unknown;
+  checkArity(argv.length, 0, 1);
+  const num = argv[0] as number | null | undefined;
+  if (argv.length > 0 && num != null) {
+    if (num < 0) throw new ArgumentError(`negative size (${num})`);
+    const buf: [unknown, T][] = [];
+    return rbBlockCall(
+      obj,
+      (i) => {
+        buf.push([block(i), i]);
+      },
+      () =>
+        buf
+          .sort(([a], [b]) => rbCmpint(cmp(a, b), a, b))
+          .slice(0, Math.trunc(num))
+          .map(([, i]) => i),
+    );
+  }
+  let v1: unknown;
+  let v2: T | null = null;
+  let seen = false;
+  return rbBlockCall(
+    obj,
+    (i) => {
+      const v = block(i);
+      if (!seen) {
+        seen = true;
+        v1 = v;
+        v2 = i;
+      } else if (rbCmpint(cmp(v, v1), v, v1) < 0) {
+        v1 = v;
+        v2 = i;
+      }
+    },
+    () => v2,
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#max_by — `vendor/ruby/v3.3.11/enum.c:2760` `enum_max_by`,
+ * the `max_by_i` (`:2704`) twin of {@link minBy}.
+ * @noRailsEquivalent PERMANENT
+ */
+export function maxBy<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T) => unknown,
+): Enumerated<E, T | null>;
+/** @noRailsEquivalent PERMANENT */
+export function maxBy<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  n: number | null,
+  block: (i: T) => unknown,
+): Enumerated<E, T[] | T | null>;
+/** @noRailsEquivalent PERMANENT */
+export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: unknown[]): unknown {
+  const block = argv.pop() as (i: T) => unknown;
+  checkArity(argv.length, 0, 1);
+  const num = argv[0] as number | null | undefined;
+  if (argv.length > 0 && num != null) {
+    if (num < 0) throw new ArgumentError(`negative size (${num})`);
+    const buf: [unknown, T][] = [];
+    return rbBlockCall(
+      obj,
+      (i) => {
+        buf.push([block(i), i]);
+      },
+      () =>
+        buf
+          .sort(([a], [b]) => rbCmpint(cmp(b, a), b, a))
+          .slice(0, Math.trunc(num))
+          .map(([, i]) => i),
+    );
+  }
+  let v1: unknown;
+  let v2: T | null = null;
+  let seen = false;
+  return rbBlockCall(
+    obj,
+    (i) => {
+      const v = block(i);
+      if (!seen) {
+        seen = true;
+        v1 = v;
+        v2 = i;
+      } else if (rbCmpint(cmp(v, v1), v, v1) > 0) {
+        v1 = v;
+        v2 = i;
+      }
+    },
+    () => v2,
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#each_cons — `vendor/ruby/v3.3.11/enum.c:3244` `enum_each_cons`,
+ * which raises `ArgumentError "invalid size"` for a size that is not positive
+ * and yields each window of `n` consecutive elements as it fills
+ * (`each_cons_i`, `:3187`), answering the receiver. With no block it answers
+ * the windows, the elements of its `RETURN_SIZED_ENUMERATOR`.
+ * @noRailsEquivalent PERMANENT
+ */
+export function eachCons<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  n: number,
+): Enumerated<E, T[][]>;
+/** @noRailsEquivalent PERMANENT */
+export function eachCons<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  n: number,
+  block: (cons: T[]) => unknown,
+): Enumerated<E, Iterable<T> | Each<T, E>>;
+/** @noRailsEquivalent PERMANENT */
+export function eachCons<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  n: number,
+  block?: (cons: T[]) => unknown,
+): unknown {
+  const size = Math.trunc(n);
+
+  if (size <= 0) throw new ArgumentError("invalid size");
+  const windows: T[][] = [];
+  const yieldCons = block ?? ((cons: T[]) => windows.push(cons));
+  const ary: T[] = [];
+  return rbBlockCall(
+    obj,
+    (i) => {
+      if (ary.length === size) ary.shift();
+      ary.push(i);
+      if (ary.length === size) yieldCons([...ary]);
+    },
+    () => (block ? obj : windows),
+  );
+}
+
 function enumfunc<T>(args: unknown[]): (i: T) => unknown {
   checkArity(args.length, 0, 1);
   return args.length > 0 ? (i) => rbEqq(args[0], i) : (i) => i;

@@ -14,7 +14,6 @@ import {
   include,
   isBlank,
   isPresent,
-  maxBy,
 } from "@blazetrails/activesupport";
 import { FormBuilder } from "@blazetrails/actionview";
 import { Utils } from "@blazetrails/rack";
@@ -22,6 +21,7 @@ import { Time } from "@blazetrails/date";
 import {
   ArgumentError,
   File,
+  maxBy,
   rbFSend,
   rbModConstSet,
   rbObjIvarGet,
