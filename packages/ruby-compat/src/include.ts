@@ -297,6 +297,7 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   include(mod: ModuleObject): this {
+    rbClearMethodCache();
     const appendFeatures = featureHook(mod, "appendFeatures");
     if (appendFeatures) {
       appendFeatures(this);
@@ -516,6 +517,7 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   appendFeatures(base: AnyClass | Module): void {
+    rbClearMethodCache();
     if (base instanceof Module) {
       const carrier = carrierOf(base);
       if (isModuleMethodTablePresent({ prototype: carrier }, this)) return;
@@ -574,6 +576,7 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   prependFeatures(base: AnyClass): void {
+    rbClearMethodCache();
     trackIncludedModule(base.prototype, this);
     const instanceInitializer = (this as ModuleHooks)[initialize];
     if (typeof instanceInitializer === "function") {
@@ -885,6 +888,7 @@ function linksOf(mod: Module): object[] {
 }
 
 function relinkIncluders(mod: Module): void {
+  rbClearMethodCache();
   const table = carrierOf(mod);
   for (const link of linksOf(mod)) {
     for (const name of Object.getOwnPropertyNames(link)) {
@@ -893,6 +897,21 @@ function relinkIncluders(mod: Module): void {
     }
     Object.defineProperties(link, Object.getOwnPropertyDescriptors(table));
   }
+}
+
+/**
+ * Mirrors: MRI's `rb_clear_method_cache` — vendor/ruby/v3.3.11/vm_method.c:295,
+ * which every method-table or ancestry change calls so a call cache keyed on
+ * the old table misses. trails keeps one serial for every class: a cache reads
+ * {@link methodCacheSerial} and is stale once it differs.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export let methodCacheSerial = 0;
+
+/** @noRailsEquivalent PERMANENT */
+export function rbClearMethodCache(): void {
+  methodCacheSerial++;
 }
 
 /**
@@ -1703,6 +1722,7 @@ export function rbModAppendFeatures(
   klass: AnyClass | object,
   mod: ModuleObject | AnyClass | Module,
 ): void {
+  rbClearMethodCache();
   if (!isClassReceiver(klass) && !(klass instanceof Module)) {
     return trackIncludedModule(klass, mod, moduleIncludesKey);
   }
@@ -2130,6 +2150,7 @@ export function prepend(
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
 export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
+  rbClearMethodCache();
   if (mod instanceof Module) return Module.prototype.prependFeatures.call(mod, klass);
   if (Object.hasOwn(mod, moduleIncludesKey)) {
     for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
@@ -2194,6 +2215,7 @@ export function extend<T extends AnyClass | object>(
   if (argc < 1) {
     throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1+)`);
   }
+  rbClearMethodCache();
   while (argc--) {
     extendObject(klass, argv[argc]);
   }

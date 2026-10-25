@@ -263,6 +263,8 @@ export {
   moduleVisibility,
   publicInstanceMethods,
   classModule,
+  methodCacheSerial,
+  rbClearMethodCache,
 } from "./include.js";
 export type { Extended, Included, Initialized, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";
