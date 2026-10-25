@@ -47,6 +47,12 @@ interface ChannelConnection {
 export class Base {
   declare runCallbacks: (kind: string, block?: () => unknown) => unknown;
   declare rescueWithHandler: Included<typeof Rescuable>["rescueWithHandler"];
+  declare streamFrom: Included<typeof Streams>["streamFrom"];
+  declare streamFor: Included<typeof Streams>["streamFor"];
+  declare stopStreamFrom: Included<typeof Streams>["stopStreamFrom"];
+  declare stopStreamFor: Included<typeof Streams>["stopStreamFor"];
+  declare stopAllStreams: Included<typeof Streams>["stopAllStreams"];
+  declare streamOrRejectFor: Included<typeof Streams>["streamOrRejectFor"];
 
   /** @internal */
   protected static _actionMethods?: Set<string> | null;
@@ -248,7 +254,7 @@ export class Base {
    * @internal
    * @missingRailsName name — PERMANENT
    */
-  private transmitSubscriptionConfirmation(): unknown {
+  protected transmitSubscriptionConfirmation(): unknown {
     if (!this.isSubscriptionConfirmationSent()) {
       this.logger.debug(`${rbObjClassname(this)} is transmitting the subscription confirmation`);
 

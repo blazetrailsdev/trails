@@ -17,16 +17,6 @@ import { Base } from "./base.js";
 
 type Handler = (message: unknown) => unknown;
 
-interface StreamsHost {
-  streamFrom(broadcasting: unknown, callback?: unknown, options?: unknown, block?: Handler): void;
-  streamFor(model: unknown): void;
-  streamOrRejectFor(model: unknown): unknown;
-  stopStreamFrom(broadcasting: string): Promise<void>;
-  stopStreamFor(model: unknown): Promise<void>;
-  stopAllStreams(): Promise<void>;
-  pubsub: SuccessAdapter;
-}
-
 const StreamTests = { name: "ActionCable::StreamTests" };
 rbModConstSet(ActionCable, "StreamTests", StreamTests);
 
@@ -43,7 +33,7 @@ class ChatChannel extends Base {
   override subscribed(): unknown {
     if (hashAref(this.params, "id") != null) {
       this._room = new Room(hashAref(this.params, "id"));
-      (this as unknown as StreamsHost).streamFrom(`test_room_${this._room.id}`, {
+      this.streamFrom(`test_room_${this._room.id}`, {
         coder: this.pickCoder(hashAref(this.params, "coder")),
       });
     }
@@ -51,15 +41,12 @@ class ChatChannel extends Base {
   }
 
   sendConfirmation(): unknown {
-    return (
-      this as unknown as { transmitSubscriptionConfirmation(): unknown }
-    ).transmitSubscriptionConfirmation();
+    return this.transmitSubscriptionConfirmation();
   }
 
-  private pickCoder(coder: unknown): unknown {
+  private pickCoder(coder: unknown): { decode(message: unknown): unknown } | null {
     switch (coder) {
       case null:
-      case undefined:
       case "json":
         return ActiveSupportJSON;
       case "custom":
@@ -84,15 +71,11 @@ rbModConstSet(StreamTests, "DummyEncoder", DummyEncoder);
 
 class SymbolChannel extends Base {
   override subscribed(): unknown {
-    (this as unknown as StreamsHost).streamFrom("channel");
+    this.streamFrom("channel");
     return null;
   }
 }
 rbModConstSet(StreamTests, "SymbolChannel", SymbolChannel);
-
-function host(channel: Base): StreamsHost {
-  return channel as unknown as StreamsHost;
-}
 
 function mockPubsub(): [{ subscribe: Handler; unsubscribe: Handler }, Mock, Mock] {
   const subscribe = new Mock();
@@ -165,11 +148,10 @@ describe("StreamTest", () => {
 
       const channel = new ChatChannel(connection as never, "");
       await channel.subscribeToChannel();
-      host(channel).streamFor(new Room(1));
+      channel.streamFor(new Room(1));
       await tc.waitForAsync();
 
-      const pubsubCall = (rbObjClass(host(channel).pubsub) as typeof SuccessAdapter)
-        .subscribeCalled;
+      const pubsubCall = (rbObjClass(connection.pubsub) as typeof SuccessAdapter).subscribeCalled;
 
       expect(pubsubCall.channel).toBe("action_cable:stream_tests:chat:Room#1-Campfire");
       expect(pubsubCall.callback).toBeInstanceOf(Function);
@@ -183,11 +165,10 @@ describe("StreamTest", () => {
 
       const channel = new ChatChannel(connection as never, "");
       await channel.subscribeToChannel();
-      host(channel).streamOrRejectFor(new Room(1));
+      channel.streamOrRejectFor(new Room(1));
       await tc.waitForAsync();
 
-      const pubsubCall = (rbObjClass(host(channel).pubsub) as typeof SuccessAdapter)
-        .subscribeCalled;
+      const pubsubCall = (rbObjClass(connection.pubsub) as typeof SuccessAdapter).subscribeCalled;
 
       expect(pubsubCall.channel).toBe("action_cable:stream_tests:chat:Room#1-Campfire");
       expect(pubsubCall.callback).toBeInstanceOf(Function);
@@ -200,7 +181,7 @@ describe("StreamTest", () => {
       const connection = new TestConnection();
       const channel = new ChatChannel(connection as never, "{id: 1}", { id: 1 });
       await channel.subscribeToChannel();
-      host(channel).streamOrRejectFor(null);
+      channel.streamOrRejectFor(null);
       expect(connection.lastTransmission).toBeNull();
 
       await tc.waitForAsync();
@@ -260,8 +241,8 @@ describe("StreamTest", () => {
 
       expect(subscribersOf(connection).size).toBe(0);
 
-      host(channel).streamFrom("room_one");
-      host(channel).streamFrom("room_two");
+      channel.streamFrom("room_one");
+      channel.streamFrom("room_two");
 
       await tc.waitForAsync();
       expect(subscribersOf(connection).size).toBe(2);
@@ -269,7 +250,7 @@ describe("StreamTest", () => {
       const channel2 = new ChatChannel(connection as never, "{id: 3}");
       await channel2.subscribeToChannel();
 
-      host(channel2).streamFrom("room_one");
+      channel2.streamFrom("room_one");
       await tc.waitForAsync();
 
       let subscribers = subscribersOf(connection);
@@ -278,7 +259,7 @@ describe("StreamTest", () => {
       expect(subscribers.get("room_one")!.length).toBe(2);
       expect(subscribers.get("room_two")!.length).toBe(1);
 
-      await host(channel).stopAllStreams();
+      await channel.stopAllStreams();
 
       subscribers = subscribersOf(connection);
       expect(subscribers.size).toBe(1);
@@ -293,13 +274,13 @@ describe("StreamTest", () => {
       const channel = new ChatChannel(connection as never, "{id: 3}");
       await channel.subscribeToChannel();
 
-      host(channel).streamFrom("room_one");
-      host(channel).streamFrom("room_two");
+      channel.streamFrom("room_one");
+      channel.streamFrom("room_two");
 
       const channel2 = new ChatChannel(connection as never, "{id: 3}");
       await channel2.subscribeToChannel();
 
-      host(channel2).streamFrom("room_one");
+      channel2.streamFrom("room_one");
 
       let subscribers = subscribersOf(connection);
 
@@ -309,7 +290,7 @@ describe("StreamTest", () => {
       expect(subscribers.get("room_one")!.length).toBe(2);
       expect(subscribers.get("room_two")!.length).toBe(1);
 
-      await host(channel).stopStreamFrom("room_one");
+      await channel.stopStreamFrom("room_one");
 
       subscribers = subscribersOf(connection);
 
@@ -327,13 +308,13 @@ describe("StreamTest", () => {
       const channel = new ChatChannel(connection as never, "{id: 3}");
       await channel.subscribeToChannel();
 
-      host(channel).streamFor(new Room(1));
-      host(channel).streamFor(new Room(2));
+      channel.streamFor(new Room(1));
+      channel.streamFor(new Room(2));
 
       const channel2 = new ChatChannel(connection as never, "{id: 3}");
       await channel2.subscribeToChannel();
 
-      host(channel2).streamFor(new Room(1));
+      channel2.streamFor(new Room(1));
 
       let subscribers = subscribersOf(connection);
 
@@ -344,7 +325,7 @@ describe("StreamTest", () => {
       expect(subscribers.get(Chat.broadcastingFor(new Room(1)))!.length).toBe(2);
       expect(subscribers.get(Chat.broadcastingFor(new Room(2)))!.length).toBe(1);
 
-      await host(channel).stopStreamFor(new Room(1));
+      await channel.stopStreamFor(new Room(1));
 
       subscribers = subscribersOf(connection);
 
@@ -357,7 +338,7 @@ describe("StreamTest", () => {
 
 class UserCallbackChannel extends Base {
   override subscribed(): unknown {
-    (this as unknown as StreamsHost).streamFrom("channel", null, {}, () => {
+    this.streamFrom("channel", null, {}, () => {
       Thread.current().set("ran_callback", true);
       return null;
     });
@@ -368,8 +349,8 @@ rbModConstSet(StreamTests, "UserCallbackChannel", UserCallbackChannel);
 
 class MultiChatChannel extends Base {
   override subscribed(): unknown {
-    (this as unknown as StreamsHost).streamFrom("main_room");
-    (this as unknown as StreamsHost).streamFrom("test_all_rooms");
+    this.streamFrom("main_room");
+    this.streamFrom("test_all_rooms");
     return null;
   }
 }
@@ -418,7 +399,7 @@ describe("StreamFromTest", () => {
       expect(
         Thread.current().get("ran_callback"),
         "User callback was not run through the worker pool",
-      ).toBeFalsy();
+      ).toBeRubyFalsy();
     });
   });
 
