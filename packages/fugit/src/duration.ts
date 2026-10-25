@@ -15,6 +15,8 @@ import {
   rbEqual,
   rbHash,
   rbObjClassname,
+  rbSetClassPathString,
+  strip,
   round,
   toF,
   toI,
@@ -56,10 +58,6 @@ export class Duration {
   declare h: DurationH;
   declare options: DurationOptions;
 
-  static toString(): string {
-    return "Fugit::Duration";
-  }
-
   constructor(s: unknown) {
     return Duration.parse(s) as this;
   }
@@ -73,19 +71,22 @@ export class Duration {
 
     if (typeof s !== "string") return null;
 
-    s = s.trim();
-    const str = s as string;
+    s = strip(s);
 
     const h =
       opts.iso != null && opts.iso !== false
         ? Duration.IsoParser.parse(
-            opts.stricter != null && opts.stricter !== false ? str : str.toUpperCase(),
+            opts.stricter != null && opts.stricter !== false
+              ? (s as string)
+              : (s as string).toUpperCase(),
           )
         : opts.plain != null && opts.plain !== false
-          ? Duration.Parser.parse(str)
-          : (Duration.Parser.parse(str) ??
+          ? Duration.Parser.parse(s as string)
+          : (Duration.Parser.parse(s as string) ??
             Duration.IsoParser.parse(
-              opts.stricter != null && opts.stricter !== false ? str : str.toUpperCase(),
+              opts.stricter != null && opts.stricter !== false
+                ? (s as string)
+                : (s as string).toUpperCase(),
             ));
 
     return h != null && h !== false
@@ -296,7 +297,7 @@ export class Duration {
     return (Object.create(Object.getPrototypeOf(this)) as Duration).init(null, {}, params);
   }
 
-  uminus(): Duration {
+  negate(): Duration {
     return this.opposite();
   }
 
@@ -375,9 +376,9 @@ export class Duration {
     if (typeof a === "number" || a instanceof Number || typeof a === "bigint") {
       return this.addNumeric(numericUminus(a));
     } else if (a instanceof Duration) {
-      return this.addDuration(a.uminus());
+      return this.addDuration(a.negate());
     } else if (typeof a === "string") {
-      return this.addDuration(Duration.parse(a)!.uminus());
+      return this.addDuration(Duration.parse(a)!.negate());
     } else if (a instanceof Time || a instanceof EoTime) {
       return this.opposite().addToTime(a);
     } else {
@@ -434,10 +435,6 @@ export class Duration {
 export class Parser {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
-
-  static toString(): string {
-    return "Fugit::Duration::Parser";
-  }
 
   sep(this: ModuleMethods, i: Input): Tree {
     return this.rex(null, i, /([ \t,]+|and)*/i);
@@ -523,10 +520,6 @@ export class IsoParser {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
-  static toString(): string {
-    return "Fugit::Duration::IsoParser";
-  }
-
   p(this: ModuleMethods, i: Input): Tree {
     return this.rex(null, i, /P/);
   }
@@ -592,3 +585,6 @@ export class IsoParser {
 Duration.Parser = Parser as typeof Duration.Parser;
 Duration.IsoParser = IsoParser as typeof Duration.IsoParser;
 Fugit.Duration = Duration;
+rbSetClassPathString(Duration, Fugit, "Duration");
+rbSetClassPathString(Parser, Duration, "Parser");
+rbSetClassPathString(IsoParser, Duration, "IsoParser");

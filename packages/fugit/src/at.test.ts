@@ -1,6 +1,6 @@
 import "./test-helpers/spec-helper.js";
 import { EoTime } from "@blazetrails/et-orbi";
-import { rbInspect, rbObjClass } from "@blazetrails/ruby-compat";
+import { rbObjClass } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Fugit } from "./fugit.js";
 
@@ -37,7 +37,7 @@ describe("Fugit", () => {
         ["\n2018-09-04 06:41:34 +11:00", "2018-09-04 06:41:34 +11:00 +1100"],
         [" \n 2018-09-04 06:41:34  Etc/GMT-11", "2018-09-04 06:41:34 +11 +1100"],
       ]) {
-        it(`parses ${rbInspect(string)}`, () => {
+        it(`parses ${JSON.stringify(string)}`, () => {
           const t = Fugit.parseAt(string)!;
 
           expect(rbObjClass(t)).toEqual(EoTime);

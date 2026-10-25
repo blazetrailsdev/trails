@@ -2,7 +2,7 @@ import type {} from "@blazetrails/vitest-matchers";
 import "./test-helpers/spec-helper.js";
 import { Time } from "@blazetrails/date";
 import { EoTime } from "@blazetrails/et-orbi";
-import { ArgumentError, rbInspect, rbObjClass } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbObjClass } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Duration } from "./duration.js";
 import { Fugit } from "./fugit.js";
@@ -22,7 +22,7 @@ describe("Fugit::Duration", () => {
       [1000, "1000s"],
       [1001.05, "1001.05s"],
     ] as const) {
-      it(`turns numeric ${rbInspect(source)} into ${rbInspect(target)}`, () => {
+      it(`turns numeric ${JSON.stringify(source)} into ${JSON.stringify(target)}`, () => {
         expect(Duration.parse(source)!.toPlainS()).toEqual(target);
       });
     }
@@ -32,7 +32,7 @@ describe("Fugit::Duration", () => {
       [1000, "PT1000S"],
       [1001.05, "PT1001.05S"],
     ] as const) {
-      it(`turns numeric ${rbInspect(source)} into ISO ${rbInspect(target)}`, () => {
+      it(`turns numeric ${JSON.stringify(source)} into ISO ${JSON.stringify(target)}`, () => {
         expect(Duration.parse(source)!.toIsoS()).toEqual(target);
       });
     }
@@ -117,7 +117,7 @@ describe("Fugit::Duration", () => {
       ["0.3", "0.3s", "0.3s", "PT0.3S", 0.3],
       ["0.1s0.3", "0.4s", "0.4s", "PT0.4S", 0.4],
     ] as const) {
-      it(`parses ${rbInspect(source)}`, () => {
+      it(`parses ${JSON.stringify(source)}`, () => {
         const d = Duration.parse(source)!;
 
         expect(rbObjClass(d)).toEqual(Duration);
@@ -133,7 +133,7 @@ describe("Fugit::Duration", () => {
       [" 7d7\n \n", 7 * 24 * 3600 + 7],
       [" 7d 7\n \n", 7 * 24 * 3600 + 7],
     ] as const) {
-      it(`strips and parses ${rbInspect(src)}`, () => {
+      it(`strips and parses ${JSON.stringify(src)}`, () => {
         const d = Duration.parse(src)!;
 
         expect(d.original).toEqual(src);
@@ -176,7 +176,7 @@ describe("Fugit::Duration", () => {
 
       [61.127, "61.127s", "1m1.127s"],
     ] as const) {
-      it(`deflates ${rbInspect(source)} via ${rbInspect(step)} into ${rbInspect(target)}`, () => {
+      it(`deflates ${JSON.stringify(source)} via ${JSON.stringify(step)} into ${JSON.stringify(target)}`, () => {
         const d = new Duration(source);
 
         const id = d.inflate();
@@ -214,7 +214,7 @@ describe("Fugit::Duration", () => {
         [`${30 * 24 * 3600}s`, "1M"],
         [`${1 + 30 * 24 * 3600}s`, "1M1s"],
       ]) {
-        it(`deflates ${rbInspect(source)} into ${rbInspect(target)}`, () => {
+        it(`deflates ${JSON.stringify(source)} into ${JSON.stringify(target)}`, () => {
           const d = new Duration(source).deflate({ month: 30 });
 
           expect(d.toPlainS()).toEqual(target);
@@ -228,7 +228,7 @@ describe("Fugit::Duration", () => {
         [`${30 * 24 * 3600}s`, "1M1D"],
         [`${1 + 30 * 24 * 3600}s`, "1M1D1s"],
       ]) {
-        it(`deflates ${rbInspect(source)} into ${rbInspect(target)}`, () => {
+        it(`deflates ${JSON.stringify(source)} into ${JSON.stringify(target)}`, () => {
           const d = new Duration(source).deflate({ month: "29d" });
 
           expect(d.toPlainS()).toEqual(target);
@@ -242,7 +242,7 @@ describe("Fugit::Duration", () => {
         ["366d", "1Y1D"],
         ["53w", "1Y6D"],
       ]) {
-        it(`deflates ${rbInspect(source)} into ${rbInspect(target)}`, () => {
+        it(`deflates ${JSON.stringify(source)} into ${JSON.stringify(target)}`, () => {
           const d = new Duration(source).deflate({ year: 365 });
 
           expect(d.toPlainS()).toEqual(target);
@@ -256,7 +256,7 @@ describe("Fugit::Duration", () => {
         ["366d", "1Y2D"],
         ["53w", "1Y1W"],
       ]) {
-        it(`deflates ${rbInspect(source)} into ${rbInspect(target)}`, () => {
+        it(`deflates ${JSON.stringify(source)} into ${JSON.stringify(target)}`, () => {
           const d = new Duration(source).deflate({ year: "52w" });
 
           expect(d.toPlainS()).toEqual(target);
@@ -278,7 +278,7 @@ describe("Fugit::Duration", () => {
   describe("#-@", () => {
     it("returns the additive inverse", () => {
       const d = new Duration("1y2m-3h");
-      const od = d.uminus();
+      const od = d.negate();
 
       expect(od.toPlainS()).toEqual("-1Y+3h-2m");
       expect(od.toIsoS()).toEqual("P-1YT3H-2M");
@@ -333,7 +333,7 @@ describe("Fugit::Duration", () => {
       ["-10M0m0s", "2016-12-30 17:00:00", "2016-03-01 17:00:00"],
       ["-10M11m12s", "2016-12-30 17:00:00", "2016-03-01 16:48:48"],
     ]) {
-      it(`adding ${rbInspect(t)} to ${rbInspect(d)} yields ${rbInspect(tt)}`, () => {
+      it(`adding ${JSON.stringify(t)} to ${JSON.stringify(d)} yields ${JSON.stringify(tt)}`, () => {
         const dd = dur(d);
         const td = Fugit.parse(t);
 
@@ -392,7 +392,7 @@ describe("Fugit::Duration", () => {
       const d1 = dur("1Y2h1s");
 
       expect((d0.subtract(d1) as Duration).toPlainS()).toEqual("-1s");
-      expect((d0.plus(d1.uminus()) as Duration).toPlainS()).toEqual("-1s");
+      expect((d0.plus(d1.negate()) as Duration).toPlainS()).toEqual("-1s");
       expect((d0.minus(d1) as Duration).toPlainS()).toEqual("-1s");
     });
 
@@ -454,7 +454,7 @@ describe("Fugit::Duration", () => {
       ["1M1Y1M3h", "2 months, 1 year, and 3 hours"],
       ["1Y1M3h", "1 year, 1 month, and 3 hours"],
     ]) {
-      it(`renders ${rbInspect(duration)} as ${rbInspect(long)}`, () => {
+      it(`renders ${JSON.stringify(duration)} as ${JSON.stringify(long)}`, () => {
         expect(Duration.parse(duration)!.toLongS()).toEqual(long);
       });
     }
@@ -508,7 +508,7 @@ describe("Fugit::Duration", () => {
       ["0.3", { s: 0.3 }],
       ["0.1s0.3", { s: 0.4 }],
     ] as const) {
-      it(`renders ${rbInspect(d)} as ${rbInspect(h)}`, () => {
+      it(`renders ${JSON.stringify(d)} as ${JSON.stringify(h)}`, () => {
         expect(Duration.parse(d)!.toRufusH()).toEqualRuby(h);
       });
     }

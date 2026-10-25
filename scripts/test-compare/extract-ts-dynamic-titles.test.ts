@@ -230,6 +230,19 @@ describe("statically expanded loop-generated it() titles", () => {
     ).toEqual([["<expr> serializer logs unrecognized payloads", true]]);
   });
 
+  it("names a class constant in a table row, as the Ruby extractor renders it", () => {
+    expect(
+      titles(`
+        for (const [k, v] of [["nada", ArgumentError], ["x", \`\${1 + 1}s\`]]) {
+          it(\`parses \${JSON.stringify(k)} to \${JSON.stringify(v)}\`, () => {});
+        }
+      `),
+    ).toEqual([
+      ['parses "nada" to "ArgumentError"', false],
+      ['parses "x" to "s"', false],
+    ]);
+  });
+
   it("leaves a span naming something other than the loop variable dynamic", () => {
     expect(
       titles(`

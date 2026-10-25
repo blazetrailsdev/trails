@@ -118,6 +118,7 @@ export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
   "did-you-mean",
   "et-orbi",
   "raabro",
+  "fugit",
   "globalid",
   "i18n",
   "marcel",

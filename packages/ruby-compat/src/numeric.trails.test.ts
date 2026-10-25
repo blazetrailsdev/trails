@@ -12,10 +12,14 @@ import {
   isFinite,
   isNan,
   numStep,
+  numericAbs,
+  numericDiv,
   numericMinus,
   numericModulo,
   numericMul,
   numericPow,
+  numericUminus,
+  rbFloatTypeP,
   round,
   toF,
   toI,
@@ -102,6 +106,29 @@ describe("Numeric#-", () => {
     expect(numericMinus(7, new Rational(1, 2))).toEqual(new Rational(13, 2));
     expect(numericMinus(123456789, 127960.2534332159)).toBe(123328828.74656679);
     expect(() => numericMinus(1, "a")).toThrow("String can't be coerced into Integer");
+  });
+});
+
+describe("Numeric#/", () => {
+  it("floors two Integers and divides as doubles once a Float is involved", () => {
+    expect(numericDiv(7, 2)).toBe(3);
+    expect(numericDiv(-7, 2)).toBe(-4);
+    expect(numericDiv(2n ** 64n, 2)).toBe(2n ** 63n);
+    expect(numericDiv(7, 2.0 + 0.5)).toBe(2.8);
+    expect(() => numericDiv(1, 0)).toThrow(ZeroDivisionError);
+  });
+});
+
+describe("Numeric#-@ and #abs", () => {
+  it("keeps a whole Float a Float", () => {
+    expect(numericUminus(5)).toBe(-5);
+    expect(numericUminus(0)).toBe(0);
+    expect(numericUminus(2n ** 60n)).toBe(-(2n ** 60n));
+    expect(rbFloatTypeP(numericUminus(toF(5)))).toBe(true);
+    expect(numericAbs(-5)).toBe(5);
+    expect(rbFloatTypeP(numericAbs(numericUminus(toF(5))))).toBe(true);
+    expect(Number(numericAbs(toF(-5)))).toBe(5);
+    expect(() => numericAbs("a")).toThrow(NoMethodError);
   });
 });
 

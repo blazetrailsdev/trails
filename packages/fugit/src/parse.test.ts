@@ -68,7 +68,7 @@ describe("Fugit", () => {
       const t = rbInspect(k) + (opts0 ? " " + rbInspect(opts0) : "");
       const opts = opts0 ?? {};
 
-      it(`parses ${t} into ${c0 ? rbModToS(c0) : ""} / ${rbInspect(s)}`, () => {
+      it(`parses ${t} into ${c0 ? rbModToS(c0) : ""} / ${JSON.stringify(s)}`, () => {
         const c = c0 ?? rbCNilClass;
         const x = inZone("UTC", () => Fugit.parse(k, opts));
 
@@ -87,7 +87,7 @@ describe("Fugit", () => {
 
       const opts = opts0 ?? {};
 
-      it(`parses ${rbInspect(t)} into ${c0 ? rbModToS(c0) : ""} / ${rbInspect(s)}`, () => {
+      it(`parses ${JSON.stringify(t)} into ${c0 ? rbModToS(c0) : ""} / ${JSON.stringify(s)}`, () => {
         const c = c0 ?? rbCNilClass;
         const x = inZone("UTC", () => Fugit.parse(k, opts));
 
@@ -103,7 +103,7 @@ describe("Fugit", () => {
       "every 30 minutes",
       "every 40 minutes",
     ]) {
-      it(`uses #parse_nat for ${rbInspect(s)}`, () => {
+      it(`uses #parse_nat for ${JSON.stringify(s)}`, () => {
         const o = Fugit.parse(s);
         const n = Fugit.parseNat(s);
 
@@ -115,7 +115,7 @@ describe("Fugit", () => {
       const [o, d] = doTime(() => Fugit.parse("0 0" + " 0".repeat(10_000) + " 1 jan * UTC"));
 
       expect(d).toBeLessThan(0.1);
-      expect(o).toBe(null);
+      expect(o).toBeNull();
     });
   });
 
@@ -128,7 +128,7 @@ describe("Fugit", () => {
     });
 
     for (const k of ["I have a pen, I have an apple, pineapple!"]) {
-      it(`fails when attempting to parse ${rbInspect(k)}`, () => {
+      it(`fails when attempting to parse ${JSON.stringify(k)}`, () => {
         expect(() => Fugit.doParse(k)).toThrow(ArgumentError);
       });
     }
@@ -161,35 +161,41 @@ describe("Fugit", () => {
   ];
 
   describe(".parse_cronish", () => {
-    for (const [k, v] of CRONISHES.filter(([, v]) => typeof v === "string")) {
-      it(`parses ${rbInspect(k)} to ${rbInspect(v)}`, () => {
-        const r = Fugit.parseCronish(k)!;
+    /* eslint-disable vitest/no-conditional-tests -- mirrors parse_spec.rb:178-196 */
+    for (const [k, v] of CRONISHES) {
+      if (typeof v === "string") {
+        it(`parses ${JSON.stringify(k)} to ${JSON.stringify(v)}`, () => {
+          const r = Fugit.parseCronish(k)!;
 
-        expect(rbObjClass(r)).toEqual(Cron);
-        expect(r.original).toEqual(v);
-      });
+          expect(rbObjClass(r)).toEqual(Cron);
+          expect(r.original).toEqual(v);
+        });
+      } else {
+        it(`returns nil for ${JSON.stringify(k)}`, () => {
+          expect(Fugit.parseCronish(k)).toEqual(null);
+        });
+      }
     }
-    for (const [k] of CRONISHES.filter(([, v]) => typeof v !== "string")) {
-      it(`returns nil for ${rbInspect(k)}`, () => {
-        expect(Fugit.parseCronish(k)).toEqual(null);
-      });
-    }
+    /* eslint-enable vitest/no-conditional-tests */
   });
 
   describe(".do_parse_cronish", () => {
-    for (const [k, v] of CRONISHES.filter(([, v]) => typeof v === "string")) {
-      it(`parses ${rbInspect(k)} to ${rbInspect(v)}`, () => {
-        const r = Fugit.doParseCronish(k);
+    /* eslint-disable vitest/no-conditional-tests -- mirrors parse_spec.rb:201-219 */
+    for (const [k, v] of CRONISHES) {
+      if (typeof v === "string") {
+        it(`parses ${JSON.stringify(k)} to ${JSON.stringify(v)}`, () => {
+          const r = Fugit.doParseCronish(k);
 
-        expect(rbObjClass(r)).toEqual(Cron);
-        expect(r.original).toEqual(v);
-      });
+          expect(rbObjClass(r)).toEqual(Cron);
+          expect(r.original).toEqual(v);
+        });
+      } else {
+        it(`fails on ${JSON.stringify(k)}`, () => {
+          expect(() => Fugit.doParseCronish(k)).toThrow(v);
+        });
+      }
     }
-    for (const [k, v] of CRONISHES.filter(([, v]) => typeof v !== "string")) {
-      it(`fails on ${rbInspect(k)}`, () => {
-        expect(() => Fugit.doParseCronish(k)).toThrow(v as typeof ArgumentError);
-      });
-    }
+    /* eslint-enable vitest/no-conditional-tests */
   });
 
   describe(".determine_type", () => {

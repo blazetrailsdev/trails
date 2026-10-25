@@ -1,14 +1,10 @@
-import { StandardError, classModule } from "@blazetrails/ruby-compat";
+import { StandardError, classModule, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { EtOrbi, type EoTime } from "@blazetrails/et-orbi";
 import { Fugit } from "./namespaces.js";
 
 export class At {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
-
-  static toString(): string {
-    return "Fugit::At";
-  }
 
   static parse(s: unknown): EoTime | null {
     try {
@@ -25,3 +21,4 @@ export class At {
 }
 
 Fugit.At = At;
+rbSetClassPathString(At, Fugit, "At");

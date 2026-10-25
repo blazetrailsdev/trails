@@ -8,9 +8,11 @@ import {
   classModule,
   eachCons,
   fixMod,
+  first,
   flatten,
   hashAref,
   include,
+  isAny,
   isSymbol,
   max,
   min,
@@ -19,8 +21,11 @@ import {
   rbEqual,
   rbHash,
   rbInspect,
+  rbModDefineMethod,
   rbObjDup,
+  rbSetClassPathString,
   sort,
+  strip,
   toF,
   toI,
   toS,
@@ -98,10 +103,6 @@ export class Cron {
   /** @internal */
   declare protected _dayAnd: boolean | undefined;
 
-  static toString(): string {
-    return "Fugit::Cron";
-  }
-
   constructor(original: unknown) {
     return Cron.parse(original) as this;
   }
@@ -113,7 +114,7 @@ export class Cron {
 
     if (typeof s !== "string" || isSymbol(s as unknown)) return null;
 
-    const h = Cron.Parser.parse(s.trim()) as CronHash | null;
+    const h = Cron.Parser.parse(strip(s)) as CronHash | null;
 
     return (Object.create(this.prototype) as Cron).init(s, h);
   }
@@ -218,14 +219,14 @@ export class Cron {
   }
 
   isMatch(t: unknown): boolean {
-    const nt = Fugit.doParseAt(t).translate(this.timezone);
+    t = Fugit.doParseAt(t).translate(this.timezone);
 
     return (
-      this.isMonthMatch(nt) &&
-      this.isDayMatch(nt) &&
-      this.isHourMatch(nt) &&
-      this.isMinMatch(nt) &&
-      this.isSecMatch(nt)
+      this.isMonthMatch(t as EoTime) &&
+      this.isDayMatch(t as EoTime) &&
+      this.isHourMatch(t as EoTime) &&
+      this.isMinMatch(t as EoTime) &&
+      this.isSecMatch(t as EoTime)
     );
   }
 
@@ -465,7 +466,7 @@ export class Cron {
     this.months = uniq(ms);
     this.monthdays = uniq(ds);
 
-    return this.months.length > 0 && this.monthdays.length > 0;
+    return isAny(this.months) && isAny(this.monthdays);
   }
 
   /** @internal */
@@ -702,14 +703,20 @@ export class Cron {
 }
 
 export class TimeCursor {
+  declare year: () => number;
+  declare month: () => number;
+  declare day: () => number;
+  declare wday: () => number;
+  declare hour: () => number;
+  declare min: () => number;
+  declare sec: () => number;
+  declare wdayInMonth: () => [number, number];
+  declare rweek: () => number;
+  declare rday: () => number;
   /** @internal */
   declare protected _cron: Cron;
   /** @internal */
   declare protected _t: EoTime;
-
-  static toString(): string {
-    return "Fugit::Cron::TimeCursor";
-  }
 
   constructor(cron: Cron, t: EoTime | TimeCursor) {
     this._cron = cron;
@@ -725,37 +732,6 @@ export class TimeCursor {
   }
   toI(): number {
     return this._t.toI();
-  }
-
-  year(): number {
-    return this._t.year();
-  }
-  month(): number {
-    return this._t.month();
-  }
-  day(): number {
-    return this._t.day();
-  }
-  wday(): number {
-    return this._t.wday();
-  }
-  hour(): number {
-    return this._t.hour();
-  }
-  min(): number {
-    return this._t.min();
-  }
-  sec(): number {
-    return this._t.sec();
-  }
-  wdayInMonth(): [number, number] {
-    return this._t.wdayInMonth();
-  }
-  rweek(): number {
-    return this._t.rweek();
-  }
-  rday(): number {
-    return this._t.rday();
   }
 
   inc(i: number): this {
@@ -809,7 +785,7 @@ export class TimeCursor {
     if (sec != null) {
       return this.inc(sec - this._t.sec());
     } else {
-      return this.inc(60 - this._t.sec() + this._cron.seconds![0]);
+      return this.inc(60 - this._t.sec() + first(this._cron.seconds!)!);
     }
   }
 
@@ -837,16 +813,20 @@ export class TimeCursor {
   }
 }
 
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ::Enumerable` (`fugit/lib/fugit/cron.rb:342`); the class/interface merge is how a mixin surfaces on the type side. */
+(
+  ["year", "month", "day", "wday", "hour", "min", "sec", "wdayInMonth", "rweek", "rday"] as const
+).forEach((k) => {
+  rbModDefineMethod(TimeCursor, k, function (this: TimeCursor) {
+    return (this as unknown as { _t: EoTime })._t[k]();
+  });
+});
+
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ::Enumerable` (`fugit/lib/fugit/cron.rb:341`); the class/interface merge is how a mixin surfaces on the type side. */
 export class CronIterator {
   declare cron: Cron;
   declare start: unknown;
   declare current: unknown;
   declare direction: ":nextTime" | ":previousTime";
-
-  static toString(): string {
-    return "Fugit::Cron::CronIterator";
-  }
 
   constructor(cron: Cron, direction: ":nextTime" | ":previousTime", start: unknown) {
     this.cron = cron;
@@ -878,10 +858,6 @@ export class Frequency {
   declare spanYears: number;
   declare yearlyOccurrences: number;
 
-  static toString(): string {
-    return "Fugit::Cron::Frequency";
-  }
-
   constructor(deltas: number[], span: number) {
     this.span = span;
 
@@ -909,10 +885,6 @@ export class Frequency {
 export class Parser {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
-
-  static toString(): string {
-    return "Fugit::Cron::Parser";
-  }
 
   static WEEKDAYS = Object.freeze([
     "sunday",
@@ -1257,3 +1229,8 @@ export class Parser {
 
 Cron.Parser = Parser as typeof Cron.Parser;
 Fugit.Cron = Cron;
+rbSetClassPathString(Cron, Fugit, "Cron");
+rbSetClassPathString(TimeCursor, Cron, "TimeCursor");
+rbSetClassPathString(CronIterator, Cron, "CronIterator");
+rbSetClassPathString(Frequency, Cron, "Frequency");
+rbSetClassPathString(Parser, Cron, "Parser");

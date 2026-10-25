@@ -11,6 +11,8 @@ import {
   rbEqual,
   rbFArray,
   rbInspect,
+  rbSetClassPathString,
+  strip,
   sort,
   sortBy,
   stringToSym,
@@ -44,31 +46,26 @@ export class Nat {
 
   static MAX_INPUT_LENGTH = 256;
 
-  static toString(): string {
-    return "Fugit::Nat";
-  }
-
   static parse(s: unknown, opts: NatOptions = {}): Cron | Cron[] | Duration | null {
     if (s instanceof Cron || s instanceof Duration) return s;
 
     if (typeof s !== "string") return null;
 
-    s = s.trim();
-    const str = s as string;
+    s = strip(s);
 
-    if (str.length > Nat.MAX_INPUT_LENGTH) {
+    if ((s as string).length > Nat.MAX_INPUT_LENGTH) {
       if (opts.doParse != null && opts.doParse !== false) {
         throw new ArgumentError(
-          "input too long for a nat string, " + `${str.length} > ${Nat.MAX_INPUT_LENGTH}`,
+          "input too long for a nat string, " + `${(s as string).length} > ${Nat.MAX_INPUT_LENGTH}`,
         );
       }
 
       return null;
     }
 
-    const slots = Nat.Parser.parse(str) as SlotGroup | null;
+    const slots = Nat.Parser.parse(s as string) as SlotGroup | null;
     if (slots) {
-      return slots.toCrons({ ...opts, _s: str });
+      return slots.toCrons({ ...opts, _s: s as string });
     } else {
       return null;
     }
@@ -154,10 +151,6 @@ for (let i = 4; i <= 30; i++) oh[`${i}th`] = i;
 export class Parser {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
-
-  static toString(): string {
-    return "Fugit::Nat::Parser";
-  }
 
   static NHOURS: Readonly<Record<string, number>> = Object.freeze({
     ...sixties.slice(0, 13).reduce((h: Record<string, number>, n, i) => {
@@ -719,10 +712,6 @@ export class Slot {
   /** @internal */
   declare protected _data1Memo: unknown[] | undefined;
 
-  static toString(): string {
-    return "Fugit::Nat::Slot";
-  }
-
   constructor(key: string, d0: unknown, d1: unknown = null, opts: unknown = null) {
     [d1, opts] = isSymbol(d1) ? [null, d1] : [d1, opts];
     [this.key, this._data0, this._data1] = [key, d0, d1];
@@ -799,10 +788,6 @@ export class SlotGroup {
   declare protected _slots: Record<string, Slot>;
   /** @internal */
   declare protected _hms: Slot[];
-
-  static toString(): string {
-    return "Fugit::Nat::SlotGroup";
-  }
 
   constructor(slots: Slot[]) {
     this._slots = {};
@@ -943,3 +928,7 @@ Nat.Parser = Parser as typeof Nat.Parser;
 Nat.Slot = Slot;
 Nat.SlotGroup = SlotGroup;
 Fugit.Nat = Nat;
+rbSetClassPathString(Nat, Fugit, "Nat");
+rbSetClassPathString(Parser, Nat, "Parser");
+rbSetClassPathString(Slot, Nat, "Slot");
+rbSetClassPathString(SlotGroup, Nat, "SlotGroup");

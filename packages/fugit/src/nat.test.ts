@@ -9,7 +9,7 @@ import { Nat, type NatOptions } from "./nat.js";
 describe("Fugit::Nat", () => {
   describe(".parse", () => {
     describe("(simple crons)", () => {
-      for (const [nat, cron] of new Map([
+      for (const [nat, cron] of [
         ["every day at five", "0 5 * * *"],
         ["every weekday", "0 0 * * 1-5"],
         ["every weekday at five", "0 5 * * 1-5"],
@@ -155,8 +155,8 @@ describe("Fugit::Nat", () => {
         ["at 12 midday", "0 12 * * *"],
         ["at 12 midnight", "0 24 * * *"],
         ["every 17 hours", "0 */17 * * *"],
-      ])) {
-        it(`parses ${rbInspect(nat)} into ${rbInspect(cron)}`, () => {
+      ]) {
+        it(`parses ${JSON.stringify(nat)} into ${JSON.stringify(cron)}`, () => {
           const c = Nat.parse(nat) as Cron;
 
           expect(rbObjClass(c)).toEqual(Cron);
@@ -187,77 +187,78 @@ describe("Fugit::Nat", () => {
         [["every 1 hour", { multi: ":fail" }], "0 * * * *"],
       ];
 
-      for (const [[nat, opts], result] of cases.filter(
-        ([, result]) => Array.isArray(result) && typeof result[0] === "function",
-      )) {
-        it(`fails for ${rbInspect(nat)} (${rbInspect(opts)})`, () => {
-          const [klass, message] = result as [typeof ArgumentError, RegExp];
-          expect(() => Nat.parse(nat, opts)).toThrow(klass);
-          expect(() => Nat.parse(nat, opts)).toThrow(message);
-        });
+      /* eslint-disable vitest/no-conditional-tests, vitest/no-conditional-in-test, vitest/no-conditional-expect -- mirrors nat_spec.rb:262-293 */
+      for (const [[nat, opts], result] of cases) {
+        if (Array.isArray(result) && typeof result[0] === "function") {
+          it(`fails for ${JSON.stringify(nat)} (${rbInspect(opts)})`, () => {
+            const [klass, message] = result as [typeof ArgumentError, RegExp];
+            expect(() => Nat.parse(nat, opts)).toThrow(
+              expect.objectContaining({
+                constructor: klass,
+                message: expect.stringMatching(message),
+              }),
+            );
+          });
+        } else {
+          it(`parses ${JSON.stringify(nat)} (${rbInspect(opts)}) into ${rbInspect(result)}`, () => {
+            const r = Nat.parse(nat, opts);
+            if (opts.multi === true) {
+              expect(uniq((r as Cron[]).map((e) => rbObjClass(e)))).toEqual([Cron]);
+              expect((r as Cron[]).map((e) => e.original)).toEqual(result);
+            } else {
+              expect(rbObjClass(r)).toEqual(Cron);
+              expect((r as Cron).original).toEqual(result);
+            }
+          });
+        }
       }
-
-      for (const [[nat, opts], result] of cases.filter(
-        ([[, opts], result]) =>
-          !(Array.isArray(result) && typeof result[0] === "function") && opts.multi === true,
-      )) {
-        it(`parses ${rbInspect(nat)} (${rbInspect(opts)}) into ${rbInspect(result)}`, () => {
-          const r = Nat.parse(nat, opts) as Cron[];
-
-          expect(uniq(r.map((e) => rbObjClass(e)))).toEqual([Cron]);
-          expect(r.map((e) => e.original)).toEqual(result);
-        });
-      }
-
-      for (const [[nat, opts], result] of cases.filter(
-        ([[, opts], result]) =>
-          !(Array.isArray(result) && typeof result[0] === "function") && opts.multi !== true,
-      )) {
-        it(`parses ${rbInspect(nat)} (${rbInspect(opts)}) into ${rbInspect(result)}`, () => {
-          const r = Nat.parse(nat, opts) as Cron;
-
-          expect(rbObjClass(r)).toEqual(Cron);
-          expect(r.original).toEqual(result);
-        });
-      }
+      /* eslint-enable vitest/no-conditional-tests, vitest/no-conditional-in-test, vitest/no-conditional-expect */
     });
 
     for (const input of [true, "nada", "every 2 years", "every 2 weeks"]) {
-      it(`rejects (returns nil) for ${rbInspect(input)}`, () => {
+      it(`rejects (returns nil) for ${JSON.stringify(input)}`, () => {
         expect(Nat.parse(input)).toEqual(null);
       });
     }
 
     describe("strict: true", () => {
       for (const input of ["every 17 hours", "every 27 hours", "every 2 years", "every 2 weeks"]) {
-        it(`rejects (returns nil) for ${rbInspect(input)}`, () => {
+        it(`rejects (returns nil) for ${JSON.stringify(input)}`, () => {
           expect(Nat.parse(input, { strict: true })).toEqual(null);
         });
       }
     });
 
     it("rejects (returns nil) if input length > 256", () => {
-      expect(Nat.parse("a".repeat(5000))).toBe(null);
+      expect(Nat.parse("a".repeat(5000))).toBeNull();
     });
   });
 
   describe(".do_parse", () => {
     for (const input of ["at noon", "at midnight"]) {
-      it(`parses as a Fugit::Cron ${rbInspect(input)}`, () => {
+      it(`parses as a Fugit::Cron ${JSON.stringify(input)}`, () => {
         expect(rbObjClass(Fugit.doParse(input))).toEqual(Cron);
       });
     }
 
     for (const input of [true, "nada", "every 2 years", "every 2 weeks"]) {
-      it(`fails with an ArgumentError for ${rbInspect(input)}`, () => {
-        expect(() => Nat.doParse(input)).toThrow(ArgumentError);
-        expect(() => Nat.doParse(input)).toThrow(/could not parse a nat/);
+      it(`fails with an ArgumentError for ${JSON.stringify(input)}`, () => {
+        expect(() => Nat.doParse(input)).toThrow(
+          expect.objectContaining({
+            constructor: ArgumentError,
+            message: expect.stringMatching(/could not parse a nat/),
+          }),
+        );
       });
     }
 
     it("fails with an ArgumentError if input length > 256", () => {
-      expect(() => Nat.doParse("a".repeat(5000))).toThrow(ArgumentError);
-      expect(() => Nat.doParse("a".repeat(5000))).toThrow(/too long .+ 5000 > 256/);
+      expect(() => Nat.doParse("a".repeat(5000))).toThrow(
+        expect.objectContaining({
+          constructor: ArgumentError,
+          message: expect.stringMatching(/too long .+ 5000 > 256/),
+        }),
+      );
     });
   });
 });
@@ -270,7 +271,7 @@ describe("Fugit", () => {
       [" \nevery day at five \n", "0 5 * * *"],
       ["\n every day at 5 pm  in Asia/Tokyo\n", "0 17 * * * Asia/Tokyo"],
     ]) {
-      it(`strips and parses ${rbInspect(src)}`, () => {
+      it(`strips and parses ${JSON.stringify(src)}`, () => {
         const r = Fugit.parseNat(src) as Cron;
 
         expect(rbObjClass(r)).toEqual(Cron);
