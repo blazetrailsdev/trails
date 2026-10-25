@@ -12,10 +12,10 @@ import {
   hashAref,
   include,
   isSymbol,
-  lessThan,
   max,
   min,
   product,
+  rbCmpint,
   rbEqual,
   rbHash,
   rbInspect,
@@ -344,8 +344,8 @@ export class Cron {
         ? [timeRange.begin, timeRange.end]
         : [EtOrbi.makeTime(timeRange), EtOrbi.makeTime(timeEnd)];
 
-    return new CronIterator(this, ":nextTime", sta).takeWhile((eot: EoTime) =>
-      lessThan.call(eot.toT() as never, ned),
+    return new CronIterator(this, ":nextTime", sta).takeWhile(
+      (eot: EoTime) => rbCmpint(eot.toT().compare(ned), eot.toT(), ned) < 0,
     );
   }
 
@@ -855,7 +855,7 @@ export class CronIterator {
     this.direction = direction;
   }
 
-  each(block: (t: EoTime) => void): never {
+  each(block: (t: EoTime) => void): void {
     for (;;) {
       block(
         (this.current = this.cron[this.direction.slice(1) as "nextTime" | "previousTime"](
@@ -866,7 +866,7 @@ export class CronIterator {
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface CronIterator extends Enumerable<EoTime, never> {}
+export interface CronIterator extends Enumerable<EoTime> {}
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 include(CronIterator, Enumerable);
 
