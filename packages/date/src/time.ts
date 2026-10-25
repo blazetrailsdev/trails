@@ -333,22 +333,20 @@ interface Vtm {
   yday: number;
 }
 
-const DAY_MS = 86_400_000;
-
 function vtmFromDate(d: globalThis.Date, nsec: number): Vtm {
   const year = d.getUTCFullYear();
-  const jan1 = new globalThis.Date(0);
-  jan1.setUTCFullYear(year, 0, 1);
+  const mon = d.getUTCMonth() + 1;
+  const mday = d.getUTCDate();
   return {
     year,
-    mon: d.getUTCMonth() + 1,
-    mday: d.getUTCDate(),
+    mon,
+    mday,
     hour: d.getUTCHours(),
     min: d.getUTCMinutes(),
     sec: d.getUTCSeconds(),
     nsec,
     wday: d.getUTCDay(),
-    yday: Math.floor((d.getTime() - jan1.getTime()) / DAY_MS) + 1,
+    yday: cCivilToJd(year, mon, mday, Date.GREGORIAN) - cCivilToJd(year, 1, 1, Date.GREGORIAN) + 1,
   };
 }
 
