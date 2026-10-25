@@ -1411,9 +1411,10 @@ thread.** The `connection/` port, when it lands, follows these rules:
   `@map` where Rails holds the NIO monitor and reads the io as `run` does
   (`:111-129`): it awaits `io.wait_readable` where `run` waits in `select`,
   then calls `io.read_nonblock(4096, exception: false)` and hands the result
-  to `stream.receive`, or calls `stream.close` at end of file or on a raise.
-  `detach` (`:38-45`) deletes the map entry, which ends that read, and calls
-  `io.close`.
+  to `stream.receive`, or calls `stream.close` at end of file or on a raise,
+  and keeps reading. The read ends when the io leaves `@map`: `detach`
+  (`:38-45`) deletes the entry and calls `io.close`, and `Stream#close`
+  reaches `detach`; a `stream.close` that raises deletes it as `run` does.
 - `timer`, `post` and `stop` (`:19-28`, `:56-59`) port as ordinary methods over
   ruby-compat's `TimerTask` and `ThreadPoolExecutor`.
 - `Stream#write` calls the socket's `write` and keeps its `@stream_send` arm

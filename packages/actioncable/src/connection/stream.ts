@@ -1,10 +1,18 @@
 import { EOFError, Errno, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Connection } from "../namespaces.js";
-import type { StreamEventLoop } from "./stream-event-loop.js";
 
 type Data = string | Uint8Array;
 
-type Io = Parameters<StreamEventLoop["attach"]>[0] & { write(data: Data): unknown };
+interface Io {
+  write(data: Data): unknown;
+  close(): unknown;
+  waitReadable(): Promise<unknown>;
+  readNonblock(
+    len: number,
+    buf: null,
+    options: { exception: false },
+  ): Uint8Array | "wait_readable" | null;
+}
 
 interface EventLoop {
   attach(io: Io, stream: Stream): unknown;

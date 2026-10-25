@@ -4,7 +4,7 @@ import { StreamEventLoop } from "./stream-event-loop.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-function stream(closeRaises = false) {
+function stream(closeRaises = false, shutdown: () => void = () => {}) {
   return {
     received: [] as unknown[],
     closes: 0,
@@ -13,6 +13,7 @@ function stream(closeRaises = false) {
     },
     close() {
       this.closes++;
+      shutdown();
       if (closeRaises) throw new Error("boom");
     },
   };
@@ -22,7 +23,7 @@ describe("ActionCable::Connection::StreamEventLoop", () => {
   it("hands incoming bytes to the stream and closes it on EOF", async () => {
     const loop = new StreamEventLoop();
     const [io, peer] = socketPair();
-    const s = stream();
+    const s = stream(false, () => loop.detach(io, s));
     loop.attach(io, s);
     peer.write("hello");
     await tick();

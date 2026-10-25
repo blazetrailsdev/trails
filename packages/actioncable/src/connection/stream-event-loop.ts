@@ -47,16 +47,15 @@ export class StreamEventLoop {
     this._map.set(io, stream);
     void (async () => {
       while (!this._stopping && this._map.get(io) === stream) {
-        await io.waitReadable();
-        if (this._map.get(io) !== stream) break;
-
         try {
+          await io.waitReadable();
+          if (this._map.get(io) !== stream) break;
+
           const incoming = io.readNonblock(4096, null, { exception: false });
           if (incoming === "wait_readable") {
             continue;
           } else if (incoming == null) {
             stream.close();
-            break;
           } else {
             stream.receive(incoming);
           }
@@ -66,7 +65,6 @@ export class StreamEventLoop {
           } catch {
             this._map.delete(io);
           }
-          break;
         }
       }
     })();
