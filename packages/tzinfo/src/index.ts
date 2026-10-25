@@ -113,11 +113,11 @@ function getZoneInfo(
 
 /** @noRailsEquivalent PERMANENT */
 export class TimezoneTransition {
-  readonly offset: number;
-  readonly previousOffset: number;
+  readonly offset: TimezoneOffset;
+  readonly previousOffset: TimezoneOffset;
   readonly timestampValue: number;
 
-  constructor(offset: number, previousOffset: number, timestampValue: number) {
+  constructor(offset: TimezoneOffset, previousOffset: TimezoneOffset, timestampValue: number) {
     this.offset = offset;
     this.previousOffset = previousOffset;
     this.timestampValue = timestampValue;
@@ -126,8 +126,8 @@ export class TimezoneTransition {
   equals(other: unknown): boolean {
     return (
       other instanceof TimezoneTransition &&
-      other.offset === this.offset &&
-      other.previousOffset === this.previousOffset &&
+      other.offset.equals(this.offset) &&
+      other.previousOffset.equals(this.previousOffset) &&
       other.timestampValue === this.timestampValue
     );
   }
@@ -176,6 +176,10 @@ export class TimezonePeriod {
     return boundaries(this)[1];
   }
 
+  get offset(): TimezoneOffset {
+    return new TimezoneOffset(this.baseUtcOffset, this.stdOffset, this.abbreviation);
+  }
+
   get abbr(): string {
     return this.abbreviation;
   }
@@ -197,8 +201,15 @@ export class TimezonePeriod {
   }
 
   equals(other: unknown): boolean {
+    if (!(other instanceof TimezonePeriod)) return false;
+    if (this.startTransition === null && this.endTransition === null) {
+      return (
+        other.startTransition === null &&
+        other.endTransition === null &&
+        other.offset.equals(this.offset)
+      );
+    }
     return (
-      other instanceof TimezonePeriod &&
       (other.startTransition?.equals(this.startTransition) ?? this.startTransition === null) &&
       (other.endTransition?.equals(this.endTransition) ?? this.endTransition === null)
     );
@@ -484,30 +495,48 @@ export class Timezone {
     const d = toDate(time);
     const observed = this.observedUtcOffset(d);
     const dst = this.isDst(d);
-    if (this.info) return new TimezonePeriod(this.abbr(d), observed, dst);
+    if (this.info) {
+      const offset = this.info.constantOffset;
+      return new TimezonePeriod(offset.abbreviation, observed, dst, offset.baseUtcOffset);
+    }
     const at = Math.floor(d.getTime() / 1000);
     const flips = tzdataIsdstFlips(this.identifier);
     let flipIndex = 0;
     while (flipIndex < flips.length && flips[flipIndex] <= at) flipIndex++;
-    const offsetAt = (seconds: number) => this.observedUtcOffset(new Date(seconds * 1000));
-    const base = dst && flipIndex > 0 ? offsetAt(flips[flipIndex - 1] - 1) : observed;
-    return new TimezonePeriod(this.abbr(d), observed, dst, base, () => {
-      const zoned = Temporal.Instant.fromEpochMilliseconds(at * 1000 + 1).toZonedDateTimeISO(
-        this.identifier,
-      );
-      const previous = zoned.getTimeZoneTransition("previous");
-      const next = zoned.getTimeZoneTransition("next");
-      const starts = [flips[flipIndex - 1], previous && previous.epochMilliseconds / 1000];
+    const lastFlip = flips[flipIndex - 1];
+    const periodAt = (seconds: number) =>
+      this.periodForUtc(Time.at(new Rational(seconds * 1000, 1000)).getutc());
+    const zoned = () =>
+      Temporal.Instant.fromEpochMilliseconds(at * 1000 + 1).toZonedDateTimeISO(this.identifier);
+    const startAt = () => {
+      const previous = zoned().getTimeZoneTransition("previous");
+      const starts = [lastFlip, previous && previous.epochMilliseconds / 1000];
+      return Math.max(...starts.filter((s): s is number => s != null));
+    };
+    let base = observed;
+    if (dst && lastFlip !== undefined) {
+      if (this.observedUtcOffset(new Date(lastFlip * 1000)) === observed) {
+        base = this.observedUtcOffset(new Date((lastFlip - 1) * 1000));
+      } else {
+        const previous = periodAt(startAt() - 1);
+        base = previous.isDst() ? observed - previous.stdOffset : previous.observedUtcOffset;
+      }
+    }
+    const period: TimezonePeriod = new TimezonePeriod(this.abbr(d), observed, dst, base, () => {
+      const next = zoned().getTimeZoneTransition("next");
       const ends = [flips[flipIndex], next && next.epochMilliseconds / 1000];
-      const start = Math.max(...starts.filter((s): s is number => s != null));
+      const start = startAt();
       const end = Math.min(...ends.filter((e): e is number => e != null));
       return [
         Number.isFinite(start)
-          ? new TimezoneTransition(observed, offsetAt(start - 1), start)
+          ? new TimezoneTransition(period.offset, periodAt(start - 1).offset, start)
           : null,
-        Number.isFinite(end) ? new TimezoneTransition(offsetAt(end), observed, end) : null,
+        Number.isFinite(end)
+          ? new TimezoneTransition(periodAt(end).offset, period.offset, end)
+          : null,
       ];
     });
+    return period;
   }
 
   periodsForLocal(time: Time): TimezonePeriod[] {
@@ -596,6 +625,15 @@ export class TimezoneOffset {
 
   get observedUtcOffset(): number {
     return this.baseUtcOffset + this.stdOffset;
+  }
+
+  equals(other: unknown): boolean {
+    return (
+      other instanceof TimezoneOffset &&
+      other.baseUtcOffset === this.baseUtcOffset &&
+      other.stdOffset === this.stdOffset &&
+      other.abbreviation === this.abbreviation
+    );
   }
 }
 

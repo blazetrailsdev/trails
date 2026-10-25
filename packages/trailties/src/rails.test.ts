@@ -27,7 +27,7 @@ afterEach(() => {
 
 describe("Trails", () => {
   it("Trails.version returns the trailties package version", () => {
-    expect(Trails.version).toBe(VERSION.STRING);
+    expect(Trails.version()).toBe(VERSION.STRING);
   });
 
   it("Trails.application returns null when no app is registered", () => {

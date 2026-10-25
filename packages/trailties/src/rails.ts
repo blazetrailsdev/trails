@@ -14,7 +14,8 @@ import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
 import type { ActionMethods } from "./generators/app-generator.js";
-import { VERSION } from "./gem-version.js";
+import { VERSION, gemVersion } from "./gem-version.js";
+import { version } from "./version.js";
 import "./info-controller.js";
 import "./welcome-controller.js";
 import "./health-controller.js";
@@ -65,10 +66,8 @@ export class Trails {
   static logger: Logger | null = null;
 
   static VERSION = VERSION;
-
-  static get version(): string {
-    return VERSION.STRING;
-  }
+  static gemVersion = gemVersion;
+  static version = version;
 
   static get configuration(): Configuration | null {
     return Trails.application?.config ?? null;

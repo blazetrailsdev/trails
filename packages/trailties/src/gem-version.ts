@@ -1,3 +1,9 @@
+import { Gem } from "@blazetrails/ruby-compat";
+
+export function gemVersion(): InstanceType<typeof Gem.Version> {
+  return new Gem.Version(VERSION.STRING);
+}
+
 const MAJOR = 0;
 const MINOR = 1;
 const TINY = 0;
