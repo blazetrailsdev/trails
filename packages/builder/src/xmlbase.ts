@@ -47,7 +47,10 @@ export abstract class XmlBase {
     return this._explicitNilHandling;
   }
 
-  tagBang(sym: string, ...args: unknown[]): Target | Promise<Target> {
+  tagBang(
+    sym: string,
+    ...args: unknown[] | [...unknown[], (xml: XmlBase) => unknown]
+  ): Target | Promise<Target> {
     const block =
       typeof args.at(-1) === "function" ? (args.pop() as (xml: XmlBase) => unknown) : null;
     let text: string | null = null;
@@ -105,7 +108,10 @@ export abstract class XmlBase {
     return this._target;
   }
 
-  methodMissing(sym: string, ...args: unknown[]): Target | Promise<Target> {
+  methodMissing(
+    sym: string,
+    ...args: unknown[] | [...unknown[], (xml: XmlBase) => unknown]
+  ): Target | Promise<Target> {
     if (XmlBase.cacheMethodCalls) this.cacheMethodCall(sym);
     return this.tagBang(sym, ...args);
   }
