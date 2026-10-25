@@ -9,6 +9,7 @@
   "references": [
     { "path": "../ruby-compat" },
     { "path": "../date" },
+    { "path": "../tzinfo" },
     { "path": "../i18n" },
     { "path": "../msgpack" },
     { "path": "../nokogiri" },

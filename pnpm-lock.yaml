@@ -394,6 +394,9 @@ importers:
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
+      '@blazetrails/tzinfo':
+        specifier: workspace:*
+        version: link:../tzinfo
       tinyglobby:
         specifier: ^0.2.16
         version: 0.2.16
@@ -707,6 +710,15 @@ importers:
 
   packages/tse-compiler: {}
 
+  packages/tzinfo:
+    dependencies:
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/vitest-matchers:
     dependencies:
       '@blazetrails/ruby-compat':
@@ -865,6 +877,9 @@ importers:
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../../packages/tse-compiler
+      '@blazetrails/tzinfo':
+        specifier: workspace:*
+        version: link:../../packages/tzinfo
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../../packages/vitest-matchers

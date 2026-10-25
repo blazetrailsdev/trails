@@ -30,7 +30,8 @@ import { Duration, type DurationParts } from "../duration.js";
 import { compact, valuesAt } from "../hash-utils.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { atWithoutCoercion } from "../core-ext/time/calculations.js";
-import { TimeZone, type Timezone } from "../values/time-zone.js";
+import { TimeZone } from "../values/time-zone.js";
+import type { Timezone } from "@blazetrails/tzinfo";
 
 const JD_UNIX_EPOCH = 2440588;
 

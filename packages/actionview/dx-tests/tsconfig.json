@@ -23,6 +23,7 @@
       "@blazetrails/ruby-compat": ["../../ruby-compat/src/index.ts"],
       "@blazetrails/bcrypt": ["../../bcrypt/src/index.ts"],
       "@blazetrails/date": ["../../date/src/index.ts"],
+      "@blazetrails/tzinfo": ["../../tzinfo/src/index.ts"],
       "@blazetrails/did-you-mean": ["../../did-you-mean/src/index.ts"],
       "@blazetrails/tse-compiler": ["../../tse-compiler/src/index.ts"],
       "@blazetrails/builder": ["../../builder/src/builder.ts"],

@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  TimeZone,
-  Timezone,
-  InvalidTimezoneIdentifier,
-  TimezonePeriod,
-  ZONES_MAP,
-} from "./values/time-zone.js";
+import { TimeZone, ZONES_MAP } from "./values/time-zone.js";
+import { Timezone, InvalidTimezoneIdentifier, TimezonePeriod } from "@blazetrails/tzinfo";
 import {
   utcToLocalReturnsUtcOffsetTimes,
   setUtcToLocalReturnsUtcOffsetTimes,

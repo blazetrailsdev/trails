@@ -337,6 +337,7 @@ const alias = {
   "@blazetrails/builder": path.resolve(__dirname, "packages/builder/src/builder.ts"),
   "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/src/marcel.ts"),
   "@blazetrails/chronic": path.resolve(__dirname, "packages/chronic/src/chronic.ts"),
+  "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/src/index.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
   "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/src/index.ts"),
 };

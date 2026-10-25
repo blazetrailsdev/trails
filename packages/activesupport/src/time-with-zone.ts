@@ -1,4 +1,5 @@
-import { PeriodNotFound, TimeZone, Timezone, TimezonePeriod } from "./values/time-zone.js";
+import { TimeZone } from "./values/time-zone.js";
+import { PeriodNotFound, Timezone, TimezonePeriod } from "@blazetrails/tzinfo";
 import {
   Range,
   basicObjRespondTo,
