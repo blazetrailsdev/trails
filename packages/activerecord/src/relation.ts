@@ -2,7 +2,6 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { isBlank, isPresent, stripThenable } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import {
-  except,
   hashDelete,
   isModuleIncluded,
   Range,
@@ -1489,7 +1488,8 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   /** @missingRailsName values — PERMANENT */
   valuesForQueries(): Record<string, unknown> {
-    return except(this._values, "extending", "skipQueryCache", "strictLoading");
+    const { extending, skipQueryCache, strictLoading, ...values } = this._values;
+    return values;
   }
 
   get isEmptyScope(): boolean {
@@ -1606,7 +1606,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         let arel: unknown;
         if (collection.hasLimitOrOffset) {
           const query = collection.select(sql(`${column} AS collection_cache_key_timestamp`));
-          if (this.distinctValue && isEmpty(collection.selectValues)) {
+          if (this.distinctValue && collection.selectValues.length === 0) {
             query.selectValues = [...query.selectValues, this.table.get(star())];
           }
           const subqueryAlias = "subquery_for_cache_key";

@@ -1,5 +1,5 @@
 import { selectBang } from "@blazetrails/activesupport";
-import { Mutex, Thread, isEmpty } from "@blazetrails/ruby-compat";
+import { Mutex, Thread } from "@blazetrails/ruby-compat";
 
 export interface ReapablePool {
   reap(): Promise<void>;
@@ -65,7 +65,7 @@ export class Reaper {
             await pool.flush();
           }
 
-          if (isEmpty(Reaper.pools.get(frequency)!)) {
+          if (Reaper.pools.get(frequency)!.length === 0) {
             Reaper.pools.delete(frequency);
             Reaper.threads.delete(frequency);
             running = false;

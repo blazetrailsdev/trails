@@ -416,6 +416,16 @@ describe("significantMissingCalls", () => {
     expect(local.has("empty?")).toBe(true);
   });
 
+  it("significantCallsForReceivers credits empty?/except on an unproven receiver the TS checker typed", () => {
+    const receivers = { "empty?": ["ivar"], except: ["expr"], size: ["self"] };
+    const typed = new Set(["length@typed", "except@typed"]);
+    const sig = significantCallsForReceivers(receivers, undefined, typed);
+    expect(sig.has("empty?")).toBe(false);
+    expect(sig.has("except")).toBe(false);
+    expect(sig.has("size")).toBe(true);
+    expect(significantCallsForReceivers(receivers).has("empty?")).toBe(true);
+  });
+
   it("significantCallsForReceivers still flags a positional-array name with no receiver proof at all", () => {
     const sig = significantCallsForReceivers({});
     expect(sig.has("first")).toBe(true);

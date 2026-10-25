@@ -166,6 +166,7 @@ import {
   EVAL_CALLBACK_PREFIX,
   LENGTH_READ_UNCREDITED_RECEIVER_KINDS,
   NATIVE_FORM_ANALOGUES,
+  TYPED_NATIVE_FORM,
   NEGATED_ALIASES,
   partitionNegatedCalls,
   requiresNegatedAlias,
@@ -805,12 +806,28 @@ export function significantCallsForReceivers(
         return false;
       }
       if (value === "with_indifferent_access" && tsNativeForms.has("object")) return false;
-      if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
       const kinds = receivers?.[value];
+      if (isTypedNativeForm(value, kinds, tsNativeForms)) return false;
+      if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
       const proven = SIZE_ANALOGUES.has(value) ? SIZED_RECEIVER_KINDS : ARRAY_RECEIVER_KIND;
       return !(kinds && kinds.length > 0 && kinds.every((k) => proven.has(k)));
     },
   };
+}
+
+/**
+ * Whether the paired TS body writes `value`'s native form on a receiver the TS
+ * checker proved ({@link TYPED_NATIVE_FORM}). An implicit-self Ruby site is
+ * never credited: a bare `empty?` in `Relation` is `Relation#empty?`.
+ */
+function isTypedNativeForm(
+  value: string,
+  kinds: readonly string[] | undefined,
+  tsNativeForms: ReadonlySet<string>,
+): boolean {
+  if (kinds === undefined || kinds.length === 0 || kinds.includes("self")) return false;
+  if (SIZE_ANALOGUES.has(value)) return tsNativeForms.has(TYPED_NATIVE_FORM.length);
+  return value === "except" && tsNativeForms.has(TYPED_NATIVE_FORM.except);
 }
 
 /**
@@ -900,7 +917,10 @@ function hasNativeFormAnalogue(
         (analogue.key === true &&
           /^[A-Z][A-Z0-9_]*$/.test(bare) &&
           tsNativeForms.has(`${analogue.form}:${bare}`)) ||
-        (analogue.form === "invoke" && tsNativeForms.has(`invoke:${bare}`))
+        (analogue.form === "invoke" && tsNativeForms.has(`invoke:${bare}`)) ||
+        // `h.except(:k).merge!(…)`'s receiver is the rest local a typed
+        // destructure binds, which carries no Ruby name to match.
+        (bare === "except" && tsNativeForms.has(TYPED_NATIVE_FORM.except))
       );
     }),
   );

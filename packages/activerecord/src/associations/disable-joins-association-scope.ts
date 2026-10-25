@@ -1,6 +1,6 @@
 import { any } from "@blazetrails/activesupport";
 import type { Table, Nodes } from "@blazetrails/arel";
-import { isEmpty, union } from "@blazetrails/ruby-compat";
+import { union } from "@blazetrails/ruby-compat";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { DeferredPluck } from "../relation/predicate-builder/deferred-distinct-pk-in.js";
@@ -90,7 +90,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       return scope;
     }, scope);
 
-    if (isEmpty(scope.orderValues) && ordered) {
+    if (scope.orderValues.length === 0 && ordered) {
       const splitScope = DisableJoinsAssociationRelation.create(scope.model, key, joinIds);
       splitScope.whereClause = splitScope.whereClause.plus(scope.whereClause);
       return splitScope;

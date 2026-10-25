@@ -1,7 +1,6 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { include } from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 import {
   checkValidityBang,
@@ -19,11 +18,8 @@ export interface InclusionValidator extends Clusivity {}
 export class InclusionValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     if (!this.isInclude(record, value)) {
-      record.errors.add(
-        attribute,
-        ":inclusion",
-        Object.assign(except(this.options, "in", "within"), { value }),
-      );
+      const { in: _in, within, ...options } = this.options;
+      record.errors.add(attribute, ":inclusion", Object.assign(options, { value }));
     }
   }
 }

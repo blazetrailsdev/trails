@@ -246,7 +246,7 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
     return records[records.length - index] ?? null;
   }
   const relation: any = orderedRelation.call(this);
-  if (isEmpty(relation.orderValues) || relation.hasLimitOrOffset) {
+  if (relation.orderValues.length === 0 || relation.hasLimitOrOffset) {
     const records = await relation.records();
     return records[records.length - index] ?? null;
   }
@@ -680,7 +680,7 @@ export async function findLast(this: FinderRelation, limit?: number): Promise<an
 /** @internal */
 export function orderedRelation(this: FinderRelation): any {
   if (
-    isEmpty(this.orderValues) &&
+    this.orderValues.length === 0 &&
     (rtest(this.model.implicitOrderColumn) ||
       this.model.queryConstraintsList() != null ||
       rtest(this.primaryKey))

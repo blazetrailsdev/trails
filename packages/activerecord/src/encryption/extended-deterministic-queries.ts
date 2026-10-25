@@ -6,14 +6,7 @@ import {
   kernelArray,
   transformKeys,
 } from "@blazetrails/activesupport";
-import {
-  extend,
-  hashAref,
-  hashAset,
-  include,
-  isEmpty,
-  rbCallSuper,
-} from "@blazetrails/ruby-compat";
+import { extend, hashAref, hashAset, include, rbCallSuper } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Relation } from "../relation.js";
 import type { Base } from "../base.js";
@@ -63,7 +56,7 @@ export class EncryptedQuery {
         const type = owner.typeForAttribute(attributeName) as EncryptedAttributeType;
         let value: unknown;
         if (
-          !isEmpty(type.previousTypes) &&
+          type.previousTypes.length > 0 &&
           (value = hashAref(options, attributeName)) != null &&
           value !== false
         ) {

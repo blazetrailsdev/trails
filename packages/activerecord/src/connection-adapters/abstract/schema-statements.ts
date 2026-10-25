@@ -1,10 +1,8 @@
 import { extractBang } from "@blazetrails/activesupport/core-ext/hash/slice";
 import {
   block,
-  except,
   fetch,
   hashDelete,
-  isEmpty,
   OpenSSL,
   partition,
   slice,
@@ -1712,7 +1710,8 @@ export class SchemaStatements {
     columnName: string | string[] | undefined | null,
     options: Record<string, unknown>,
   ): boolean {
-    return columnName == null && "name" in options && isEmpty(except(options, "name", "algorithm"));
+    const { name, algorithm, ...rest } = options;
+    return columnName == null && "name" in options && Object.keys(rest).length === 0;
   }
 
   /** @internal */
