@@ -85,8 +85,8 @@ export function _assignAttribute(this: AttributeAssignment, k: string, v: unknow
       Object.hasOwn(this, setter) ||
       Object.hasOwn(this, k) ||
       (writer !== undefined && Object.hasOwn(this, writer))
-        ? resolveWriter(this, k, setter)
-        : cachedWriter(Object.getPrototypeOf(this) as object | null, k, setter);
+        ? _resolveWriter(this, k, setter)
+        : _cachedWriter(Object.getPrototypeOf(this) as object | null, k, setter);
     if (typeof write === "function") return write.call(this, v);
     if (write) {
       (this as unknown as Record<string, unknown>)[k] = v;
@@ -108,7 +108,7 @@ type Writer = ((v: unknown) => unknown) | boolean;
 let writerCache = new WeakMap<object, Map<string, Writer>>();
 let writerCacheSerial = methodCacheSerial;
 
-function cachedWriter(proto: object | null, k: string, setter: string): Writer {
+function _cachedWriter(proto: object | null, k: string, setter: string): Writer {
   if (proto === null) return false;
   if (writerCacheSerial !== methodCacheSerial) {
     writerCache = new WeakMap();
@@ -117,11 +117,11 @@ function cachedWriter(proto: object | null, k: string, setter: string): Writer {
   let writers = writerCache.get(proto);
   if (writers === undefined) writerCache.set(proto, (writers = new Map()));
   let write = writers.get(k);
-  if (write === undefined) writers.set(k, (write = resolveWriter(proto, k, setter)));
+  if (write === undefined) writers.set(k, (write = _resolveWriter(proto, k, setter)));
   return write;
 }
 
-function resolveWriter(start: object, k: string, setter: string): Writer {
+function _resolveWriter(start: object, k: string, setter: string): Writer {
   const writer = writerSpelling(k);
   for (let o: object | null = start; o; o = Object.getPrototypeOf(o)) {
     if (Object.hasOwn(o, setter)) {
