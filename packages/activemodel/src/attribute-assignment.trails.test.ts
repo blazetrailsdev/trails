@@ -8,7 +8,8 @@ import { UnknownAttributeError } from "./errors.js";
 import { Model } from "./index.js";
 import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { AttributeMethods } from "./attribute-methods.js";
+import { include, removePossibleMethod } from "@blazetrails/activesupport";
 
 class ProtectedParams {
   private parameters: Record<string, unknown>;
@@ -290,5 +291,92 @@ describe("AttributeAssignmentTest", () => {
     }
     const p = new Person({});
     expect(() => p.assignAttributes({ name: "bob" })).toThrow(NoMethodError);
+  });
+
+  describe("writer resolution cache", () => {
+    class Proxied extends Model {
+      declare static attributeMethodSuffix: (...suffixes: string[]) => void;
+      declare static defineAttributeMethods: (...names: string[]) => void;
+      declare static undefineAttributeMethods: () => void;
+      declare static generatedAttributeMethods: () => { prototype: object };
+      written: [string, unknown][] = [];
+
+      static {
+        include(this, AttributeMethods);
+        this.attributeMethodSuffix("=");
+      }
+
+      "attribute="(name: string, value: unknown): void {
+        this.written.push([name, value]);
+      }
+    }
+
+    it("sees attribute methods defined after the first assignment", () => {
+      class Person extends Proxied {}
+      const p = new Person();
+      expect(() => p.assignAttributes({ foo: 1 })).toThrow(UnknownAttributeError);
+      Person.defineAttributeMethods("foo");
+      p.assignAttributes({ foo: 2 });
+      expect(p.written).toEqual([["foo", 2]]);
+    });
+
+    it("sees attribute methods undefined after the first assignment", () => {
+      class Person extends Proxied {}
+      Person.defineAttributeMethods("foo");
+      const p = new Person();
+      p.assignAttributes({ foo: 1 });
+      expect(p.written).toEqual([["foo", 1]]);
+      Person.undefineAttributeMethods();
+      expect(() => p.assignAttributes({ foo: 2 })).toThrow(UnknownAttributeError);
+      expect(p.written).toEqual([["foo", 1]]);
+    });
+
+    it("sees a writer removed after the first assignment", () => {
+      class Person extends Proxied {}
+      Person.defineAttributeMethods("foo");
+      const p = new Person();
+      p.assignAttributes({ foo: 1 });
+      removePossibleMethod.call(Person.generatedAttributeMethods(), "foo=");
+      expect(() => p.assignAttributes({ foo: 2 })).toThrow(UnknownAttributeError);
+      class Plain extends Model {
+        "bar="(_: unknown): void {}
+      }
+      const q = new Plain();
+      q.assignAttributes({ bar: 1 });
+      removePossibleMethod.call(Plain, "bar=");
+      expect(() => q.assignAttributes({ bar: 2 })).toThrow(UnknownAttributeError);
+    });
+
+    it("an instance-own setK writer outranks a prototype k= writer", () => {
+      class Person extends Proxied {}
+      Person.defineAttributeMethods("foo");
+      const p = new Person();
+      p.assignAttributes({ foo: 1 });
+      const q = new Person() as Person & { setFoo?: (v: unknown) => void };
+      const seen: unknown[] = [];
+      q.setFoo = (v) => seen.push(v);
+      q.assignAttributes({ foo: 2 });
+      expect(seen).toEqual([2]);
+      expect(q.written).toEqual([]);
+    });
+
+    it("sees an attribute declared after the first assignment", () => {
+      class Person extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          this.attribute("name", "string");
+        }
+      }
+      interface Person extends Attributes {}
+      const p = new Person();
+      p.assignAttributes({ name: "a" });
+      expect(() => p.assignAttributes({ age: "3" })).toThrow(UnknownAttributeError);
+      Person.attribute("age", "integer");
+      const q = new Person();
+      q.assignAttributes({ age: "3" });
+      expect(q.attribute("age")).toBe(3);
+    });
   });
 });

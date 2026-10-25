@@ -2,7 +2,13 @@ import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
 import { assertValidKeys, camelize, constantize, isPlainObject } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { include, isModuleIncluded, NoMethodError, rbCallSuper } from "@blazetrails/ruby-compat";
+import {
+  include,
+  isModuleIncluded,
+  NoMethodError,
+  rbCallSuper,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 
 export const Aggregations = {};
 
@@ -81,6 +87,7 @@ function readerMethod(
     },
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 /** @internal */
@@ -135,6 +142,7 @@ function writerMethod(
     },
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };

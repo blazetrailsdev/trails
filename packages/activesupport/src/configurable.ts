@@ -1,4 +1,4 @@
-import { extend, included } from "@blazetrails/ruby-compat/include";
+import { extend, included, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
 import { NameError } from "./core-ext/name-error.js";
 import { InheritableOptions } from "./ordered-options.js";
 
@@ -83,6 +83,7 @@ export namespace Configurable {
               get: reader,
               configurable: true,
             });
+            rbClearMethodCache();
           }
           if (instanceWriter) {
             Object.defineProperty(this.prototype, name, {
@@ -90,6 +91,7 @@ export namespace Configurable {
               set: writer,
               configurable: true,
             });
+            rbClearMethodCache();
           }
         }
 
