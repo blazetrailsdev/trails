@@ -303,7 +303,6 @@ describe("StreamTest", () => {
   it("stop_stream_for", async () => {
     await tc.runInEventmachine(async () => {
       const connection = new TestConnection();
-      const Chat = ChatChannel as unknown as { broadcastingFor(model: unknown): string };
 
       const channel = new ChatChannel(connection as never, "{id: 3}");
       await channel.subscribeToChannel();
@@ -322,16 +321,16 @@ describe("StreamTest", () => {
 
       expect(subscribers.size).toBe(2);
 
-      expect(subscribers.get(Chat.broadcastingFor(new Room(1)))!.length).toBe(2);
-      expect(subscribers.get(Chat.broadcastingFor(new Room(2)))!.length).toBe(1);
+      expect(subscribers.get(ChatChannel.broadcastingFor(new Room(1)))!.length).toBe(2);
+      expect(subscribers.get(ChatChannel.broadcastingFor(new Room(2)))!.length).toBe(1);
 
       await channel.stopStreamFor(new Room(1));
 
       subscribers = subscribersOf(connection);
 
       expect(subscribers.size).toBe(2);
-      expect(subscribers.get(Chat.broadcastingFor(new Room(1)))!.length).toBe(1);
-      expect(subscribers.get(Chat.broadcastingFor(new Room(2)))!.length).toBe(1);
+      expect(subscribers.get(ChatChannel.broadcastingFor(new Room(1)))!.length).toBe(1);
+      expect(subscribers.get(ChatChannel.broadcastingFor(new Room(2)))!.length).toBe(1);
     });
   });
 });

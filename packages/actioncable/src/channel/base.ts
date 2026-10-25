@@ -22,7 +22,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import "../action-cable.js";
 import { ActionCable, Channel } from "../namespaces.js";
-import { Broadcasting } from "./broadcasting.js";
+import { Broadcasting, type ClassMethods as BroadcastingClassMethods } from "./broadcasting.js";
 import { Callbacks } from "./callbacks.js";
 import { Naming } from "./naming.js";
 import { PeriodicTimers } from "./periodic-timers.js";
@@ -47,6 +47,9 @@ interface ChannelConnection {
 export class Base {
   declare runCallbacks: (kind: string, block?: () => unknown) => unknown;
   declare rescueWithHandler: Included<typeof Rescuable>["rescueWithHandler"];
+  declare static readonly channelName: string;
+  declare static broadcastingFor: (typeof BroadcastingClassMethods)["broadcastingFor"];
+  declare static broadcastTo: (typeof BroadcastingClassMethods)["broadcastTo"];
   declare streamFrom: Included<typeof Streams>["streamFrom"];
   declare streamFor: Included<typeof Streams>["streamFor"];
   declare stopStreamFrom: Included<typeof Streams>["stopStreamFrom"];
