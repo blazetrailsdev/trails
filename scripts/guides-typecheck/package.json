@@ -17,6 +17,7 @@
     "@blazetrails/chronic": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/et-orbi": "workspace:*",
+    "@blazetrails/raabro": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/rack-session": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
