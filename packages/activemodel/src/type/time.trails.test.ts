@@ -25,12 +25,15 @@ describe("TimeType assert_valid_value", () => {
   });
 
   it("sends a non-hash value to super", () => {
-    const spy = vi.spyOn(ValueType.prototype, "assertValidValue").mockImplementation(() => {
-      throw new Error("from super");
-    });
     const type = new Types.TimeType();
-    expect(() => type.assertValidValue("2020-07-04T12:30:00Z")).toThrow("from super");
-    expect(spy).toHaveBeenCalledWith("2020-07-04T12:30:00Z");
+    const multiparameter = vi.spyOn(
+      type as unknown as { valueFromMultiparameterAssignment(v: unknown): unknown },
+      "valueFromMultiparameterAssignment",
+    );
+    expect(type.assertValidValue("2020-07-04T12:30:00Z")).toBe(
+      ValueType.prototype.assertValidValue.call(type, "2020-07-04T12:30:00Z"),
+    );
+    expect(multiparameter).not.toHaveBeenCalled();
   });
 
   it("does not send a multiparameter hash to super", () => {

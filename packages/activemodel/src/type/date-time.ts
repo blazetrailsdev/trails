@@ -4,7 +4,13 @@ import {
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { numericMul, rbObjAsString as toS, registerConstant, toI } from "@blazetrails/ruby-compat";
+import {
+  numericMul,
+  rbModInstanceMethod,
+  rbObjAsString as toS,
+  registerConstant,
+  toI,
+} from "@blazetrails/ruby-compat";
 import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
@@ -83,12 +89,10 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
         `Provided hash ${toS(valuesHash)} doesn't contain necessary keys: ${toS(missing)}`,
       );
     }
-    const time = (
-      acceptsMultiparameterTime.instanceMethod("valueFromMultiparameterAssignment")!.value as (
-        this: unknown,
-        valuesHash: Record<string, unknown>,
-      ) => RubyTime | null
-    ).call(this, valuesHash as Record<string, unknown>);
+    const time = rbModInstanceMethod(
+      { prototype: Object.getPrototypeOf(DateTimeType.prototype) as object },
+      "valueFromMultiparameterAssignment",
+    ).bindCall(this, valuesHash) as RubyTime | null;
     return time;
   }
 }
