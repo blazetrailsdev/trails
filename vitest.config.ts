@@ -339,6 +339,7 @@ const alias = {
   "@blazetrails/chronic": path.resolve(__dirname, "packages/chronic/src/chronic.ts"),
   "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/src/index.ts"),
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/src/et-orbi.ts"),
+  "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/src/raabro.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
   "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/src/index.ts"),
 };
@@ -566,6 +567,7 @@ export default defineConfig({
             "packages/solid-queue/**",
             "packages/trailties/**",
             "packages/et-orbi/**",
+            "packages/raabro/**",
             ...SHARED_EXCLUDE,
           ],
           globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],
@@ -606,6 +608,16 @@ export default defineConfig({
           include: ["packages/et-orbi/src/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
           setupFiles: ["./packages/vitest-matchers/src/setup.ts"],
+        },
+      },
+      {
+        // The spec helper's top-level parsers are seated on Object.prototype.
+        resolve: otherResolve,
+        test: {
+          name: "raabro",
+          globals: true,
+          include: ["packages/raabro/src/**/*.test.ts"],
+          exclude: SHARED_EXCLUDE,
         },
       },
     ],

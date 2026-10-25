@@ -892,6 +892,16 @@ export class IO {
   }
 
   /**
+   * `IO#tty?` (`vendor/ruby/v3.3.11/io.c:5270` `rb_io_isatty`): whether the
+   * descriptor is a terminal. Only a standard stream's adapter can tell.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#tty?` (`vendor/ruby/v3.3.11/io.c:5270`).
+   */
+  isTty(): boolean {
+    return this.stdioFile?.isTTY ?? false;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/io.c:2075` `rb_io_stat` — `fstat(2)` of the descriptor, where
    * `File.stat` names a path. It raises on a closed stream, and on an adapter
    * with no `fstat` there is no descriptor identity to answer with.

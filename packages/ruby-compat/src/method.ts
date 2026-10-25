@@ -82,6 +82,22 @@ export class Method {
   }
 
   /**
+   * `Method#parameters` (`vendor/ruby/v3.3.11/proc.c:3103` `rb_method_parameters`,
+   * over `rb_iseq_parameters` at `iseq.c:3334`): a `[type, name]` pair per
+   * parameter, `:req`, `:opt` or `:rest`, each a Symbol. A destructured
+   * parameter has no name and answers its type alone.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  parameters(): ([string] | [string, string])[] {
+    return iseqParams(this.#func).map((p) => {
+      const type = p.text.startsWith("...") ? ":rest" : p.optional ? ":opt" : ":req";
+      const name = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)/.exec(p.text)?.[1];
+      return name === undefined ? [type] : [type, `:${name}`];
+    });
+  }
+
+  /**
    * `Method#source_location` (`vendor/ruby/v3.3.11/proc.c:3015` `rb_method_location`):
    * `[path, first_lineno]`, or `nil` for a body no {@link iseqLocationSetup} located.
    *
@@ -187,18 +203,27 @@ export function rbObjMethods(obj: unknown, recur = true): string[] {
  * @noRailsEquivalent PERMANENT
  */
 export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number, number] {
+  const params = iseqParams(func);
+  const rest = params.some((p) => p.text.startsWith("..."));
+  const min = params.filter((p) => !p.optional && !p.text.startsWith("...")).length;
+  const max = rest ? Infinity : params.length;
+  return [min, max];
+}
+
+/**
+ * The parameter list `rb_iseq_parameters` (`vendor/ruby/v3.3.11/iseq.c:3334`)
+ * reads off a body's iseq, read here from the function's source.
+ */
+function iseqParams(func: (...args: never[]) => unknown): { text: string; optional: boolean }[] {
   const src = Function.prototype.toString.call(func);
   const open = src.indexOf("(");
   const arrow = src.indexOf("=>");
   if (arrow !== -1 && (open === -1 || arrow < open)) {
-    const lead =
-      src
-        .slice(0, arrow)
-        .replace(/^async\s+/, "")
-        .trim() === ""
-        ? 0
-        : 1;
-    return [lead, lead];
+    const lead = src
+      .slice(0, arrow)
+      .replace(/^async\s+/, "")
+      .trim();
+    return lead === "" ? [] : [{ text: lead, optional: false }];
   }
   let depth = 0;
   let current = "";
@@ -230,10 +255,7 @@ export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number,
     current += ch;
   }
   if (current.trim() !== "") params.push({ text: current.trim(), optional });
-  const rest = params.some((p) => p.text.startsWith("..."));
-  const min = params.filter((p) => !p.optional && !p.text.startsWith("...")).length;
-  const max = rest ? Infinity : params.length;
-  return [min, max];
+  return params;
 }
 
 /**

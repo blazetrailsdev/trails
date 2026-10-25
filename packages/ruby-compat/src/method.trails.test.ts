@@ -255,3 +255,22 @@ describe("Method#owner", () => {
     expect(rbObjIsKindOf(clone, M)).toBe(true);
   });
 });
+
+describe("Method#parameters", () => {
+  class Parsers {
+    sp(i: unknown): unknown {
+      return i;
+    }
+    to_a(opts: unknown = {}, ...rest: unknown[]): unknown {
+      return [opts, rest];
+    }
+  }
+
+  it("answers a [type, name] pair per parameter, each a Symbol", () => {
+    expect(rbObjMethod(new Parsers(), "sp").parameters()).toEqual([[":req", ":i"]]);
+    expect(rbObjMethod(new Parsers(), "to_a").parameters()).toEqual([
+      [":opt", ":opts"],
+      [":rest", ":rest"],
+    ]);
+  });
+});
