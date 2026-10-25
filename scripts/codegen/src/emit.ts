@@ -2252,6 +2252,7 @@ export class Emitter {
       selfKind: opts.static ? "static" : opts.module ? "module" : "instance",
       defName: d.name,
       defParams: params,
+      defBody: d.body,
       singleton: opts.static,
       isModule: opts.module,
       isCtor,

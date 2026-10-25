@@ -466,6 +466,22 @@ rule("to_s", (c) => {
   );
 });
 
+// `Module#name` on a value named for a class (`Chronic.time_class.name`,
+// `klass.name`): a JS class's `name` is a property. `x.class.name` has its own
+// form, which reads a namespaced class's `toString`.
+rule("name", (c) => {
+  const { n, recvNode } = c;
+  if (argc(n) !== 0 || c.r === null || !recvNode) return null;
+  const nm: string | undefined =
+    (recvNode.k === "call" && recvNode.name !== "class") ||
+    recvNode.k === "lvar" ||
+    recvNode.k === "ivar"
+      ? recvNode.name
+      : undefined;
+  if (!nm || !/(^@?|_)(class|klass)$/.test(nm)) return null;
+  return `${c.r}.name`;
+});
+
 rule("fetch", (c) => (c.r !== null ? `${c.rc("fetch")}(${c.R}, ${c.argList()})` : null));
 
 /** Ruby method every object answers → its rule. */

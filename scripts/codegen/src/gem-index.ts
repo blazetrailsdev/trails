@@ -177,8 +177,35 @@ export class GemIndex {
       m.testZero = (m.testZero ?? 0) + 1;
   }
 
+  /** Method names called on each ivar anywhere in the gem (`@now.hour`), for duck typing. */
+  ivarReads = new Map<string, Set<string>>();
+  /** Method names whose results are assigned to each ivar (`@start = Chronic.construct(...)`). */
+  ivarAssignCalls = new Map<string, Set<string>>();
+  /** Node kinds assigned to each ivar anywhere in the gem. */
+  ivarAssignKinds = new Map<string, Set<string>>();
   add(file: IrFile): void {
     this.visit(file.body, [], file.file, false);
+    const duck = (x: any): void => {
+      if (Array.isArray(x)) return x.forEach(duck);
+      if (!x || typeof x !== "object") return;
+      if (x.k === "call" && x.recv?.k === "ivar") {
+        const s = this.ivarReads.get(x.recv.name) ?? new Set<string>();
+        s.add(x.name);
+        this.ivarReads.set(x.recv.name, s);
+      }
+      if (x.k === "iasgn" && x.value) {
+        const s = this.ivarAssignKinds.get(x.name) ?? new Set<string>();
+        s.add(x.value.k);
+        this.ivarAssignKinds.set(x.name, s);
+        if (x.value.k === "call") {
+          const c = this.ivarAssignCalls.get(x.name) ?? new Set<string>();
+          c.add(x.value.name);
+          this.ivarAssignCalls.set(x.name, c);
+        }
+      }
+      for (const v of Object.values(x)) if (v && typeof v === "object") duck(v);
+    };
+    duck(file.body);
     const walk = (x: any, nesting: string[], inDef: boolean, objSclass: boolean): void => {
       if (Array.isArray(x)) return x.forEach((y) => walk(y, nesting, inDef, objSclass));
       if (!x || typeof x !== "object") return;

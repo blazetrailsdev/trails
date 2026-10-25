@@ -211,6 +211,8 @@ interface Ctx {
   inLoop: boolean;
   defName?: string;
   defParams?: Param[];
+  /** The Ruby `def`'s body (duck typing of its locals, `duckTime`). */
+  defBody?: N;
   /** The hand twin's TS types for the method's positional parameters, by position. */
   paramTypes?: (string | null)[];
   /** Lowering `Hash.new { |h, k| … }`: the block's first parameter is that Hash. */
@@ -3705,7 +3707,10 @@ export class Lowerer {
           (x) =>
             `(Array.isArray(${x}) ? ${this.rc(ctx, "min")}(${x}) : ${this.rc(ctx, "rbFSend")}(${x}, "min"))`,
         );
-      return `${this.rc(ctx, "rbFSend")}(${this.expr(n.recv, ctx)}, ${JSON.stringify(name)})`;
+      // `Time#gmt_offset` is an alias of `utc_offset` (time.c), which
+      // `@blazetrails/date` defines alone.
+      const sent = snakeToCamel(name === "gmt_offset" ? "utc_offset" : name);
+      return `${this.rc(ctx, "rbFSend")}(${this.expr(n.recv, ctx)}, ${JSON.stringify(sent)})`;
     }
     // `klass.method_defined?(m)` (builder xchar.rb:14): Module#method_defined?.
     if (
@@ -5020,14 +5025,20 @@ export class Lowerer {
         const inferred = ctx.owner ? ctx.f.ivarTypes?.get(ctx.owner)?.get(n.name) : undefined;
         if (inferred) return inferred;
         const k = this.ownerKey(ctx);
-        return k ? T.ivar(k, n.name) : null;
+        return (k ? T.ivar(k, n.name) : null) ?? this.duckTime(n.name);
       }
       case "lvar":
-        return this.localType(ctx, n.name);
+        return this.localType(ctx, n.name) ?? this.duckLocalTime(ctx, n.name);
       case "const":
         return this.resolver.constType(n.path, ctx.nesting);
       case "call": {
         const name: string = n.name;
+        if (
+          GEM.hand === false &&
+          this.index.methodNames.has(name) &&
+          this.timeFlow().methods.has(name)
+        )
+          return this.timeRef();
         // `Array.wrap(x)` / `Array(x)` answer an Array; so do these Enumerable
         // calls on one, and `Hash#keys` / `#values` / `String#split`.
         if (
@@ -5477,6 +5488,214 @@ export class Lowerer {
     )
       return `(${r} as string)`;
     return null;
+  }
+
+  /**
+   * Whether these reads (method names called on a value) and assigned node
+   * kinds describe a Ruby Time: every read a `@blazetrails/date` Time member
+   * or an operator, at least one Time-only (`hour`) or two of year/month/day.
+   */
+  isTimeish(reads: Set<string> | undefined, assigns: Set<string>): boolean {
+    if (GEM.hand !== false || !reads?.size) return false;
+    if (
+      [...assigns].some((k) =>
+        ["str", "dstr", "int", "float", "array", "hash", "sym", "regexp"].includes(k),
+      )
+    )
+      return false;
+    const timeOnly = ["hour", "min", "sec", "wday", "yday", "usec", "utc_offset", "utc", "to_time"];
+    const ymd = ["year", "month", "day"].filter((x) => reads.has(x)).length;
+    if (![...reads].some((r) => timeOnly.includes(r)) && ymd < 2) return false;
+    const ops = new Set([
+      "+",
+      "-",
+      "<",
+      ">",
+      "<=",
+      ">=",
+      "==",
+      "<=>",
+      "!=",
+      "to_s",
+      "inspect",
+      "nil?",
+      "dup",
+      "class",
+      "is_a?",
+      "kind_of?",
+    ]);
+    const members = dateMembers();
+    return [...reads].every((r) => ops.has(r) || members.has(snakeToCamel(r)));
+  }
+
+  /**
+   * A local or parameter that holds an Integer: compared with or assigned an
+   * Integer literal, or given one as its default, and read only by numeric
+   * operators. Ruby `x == 12` / `x > 12` does not prove it, but no gem value
+   * of another class is compared with a bare Integer.
+   */
+  isNumberish(body: N, name: string, assigns: Set<string>, reads: Set<string>, ctx: Ctx): boolean {
+    const numOps = new Set([
+      "+",
+      "-",
+      "*",
+      "/",
+      "%",
+      "<",
+      ">",
+      "<=",
+      ">=",
+      "==",
+      "!=",
+      "<=>",
+      "to_s",
+      "to_i",
+      "zero?",
+      "abs",
+      "times",
+      "succ",
+      "pred",
+      "between?",
+    ]);
+    if (![...reads].every((r) => numOps.has(r))) return false;
+    if ([...assigns].some((k) => !["int", "lvar", "call", "send", "op_asgn", "if"].includes(k)))
+      return false;
+    const p = ctx.defParams?.find((q) => q.name === name);
+    if ((p as { default?: N } | undefined)?.default?.k === "int") return true;
+    if (assigns.has("int")) return true;
+    let cmp = false;
+    walk(body, (x) => {
+      if (x.k === "def") return false;
+      if (
+        x.k === "call" &&
+        ["==", "<", ">", "<=", ">=", "%"].includes(x.name) &&
+        x.recv?.k === "lvar" &&
+        x.recv.name === name &&
+        x.args?.[0]?.k === "int"
+      )
+        cmp = true;
+    });
+    return cmp;
+  }
+
+  private timeRef(): TypeRef {
+    const key = "@date/time.ts#Time";
+    return this.resolver.types.cls(key) ? ({ k: "class", key, nullable: true } as TypeRef) : null;
+  }
+
+  private timeIvarsMemo?: { ivars: Set<string>; methods: Set<string> };
+  /**
+   * Ivars that hold a Time, and gem methods that answer one: an ivar whose
+   * reads describe a Time seeds the methods assigned to it, and an ivar
+   * assigned a seeded method's result (reads only operators) is a Time too.
+   */
+  timeFlow(): { ivars: Set<string>; methods: Set<string> } {
+    if (this.timeIvarsMemo) return this.timeIvarsMemo;
+    const ivars = new Set<string>();
+    const methods = new Set<string>();
+    const { ivarReads, ivarAssignKinds, ivarAssignCalls } = this.index;
+    for (const [iv, reads] of ivarReads)
+      if (this.isTimeish(reads, ivarAssignKinds.get(iv) ?? new Set())) ivars.add(iv);
+    const opOnly = new Set([
+      "+",
+      "-",
+      "<",
+      ">",
+      "<=",
+      ">=",
+      "==",
+      "<=>",
+      "!=",
+      "to_s",
+      "nil?",
+      "dup",
+    ]);
+    const bad = ["str", "dstr", "int", "float", "array", "hash", "sym", "regexp"];
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const iv of ivars)
+        for (const m of ivarAssignCalls.get(iv) ?? [])
+          if (!opOnly.has(m) && this.index.methodNames?.has(m) !== false && !methods.has(m)) {
+            methods.add(m);
+            changed = true;
+          }
+      for (const [iv, calls] of ivarAssignCalls) {
+        if (ivars.has(iv) || ![...calls].some((m) => methods.has(m))) continue;
+        if ([...(ivarAssignKinds.get(iv) ?? [])].some((k) => bad.includes(k))) continue;
+        if (
+          ![...(ivarReads.get(iv) ?? [])].every(
+            (r) => opOnly.has(r) || dateMembers().has(snakeToCamel(r)),
+          )
+        )
+          continue;
+        ivars.add(iv);
+        changed = true;
+      }
+    }
+    return (this.timeIvarsMemo = { ivars, methods });
+  }
+
+  /** An untyped ivar that holds a Time (`timeFlow`). */
+  duckTime(ivar: string): TypeRef {
+    return GEM.hand === false && this.timeFlow().ivars.has(ivar) ? this.timeRef() : null;
+  }
+
+  private duckLocalMemo = new WeakMap<object, Map<string, TypeRef>>();
+  /** An untyped local or parameter whose reads in its `def` describe a Time. */
+  duckLocalTime(ctx: Ctx, name: string): TypeRef {
+    const body = ctx.defBody;
+    if (!body || typeof body !== "object" || GEM.hand !== false) return null;
+    if (process.env.DUCKDBG && name === "span")
+      console.error(
+        "DUCK",
+        ctx.defName,
+        ctx.defParams?.map((p) => p.name),
+        this.index.resolveConst(["Span"], ctx.nesting),
+      );
+    // A parameter named for a gem class (`span` → `Chronic::Span`) holds one.
+    if (ctx.defParams?.some((p) => p.name === name)) {
+      const hit = this.index.resolveConst(
+        [snakeToCamel(name).replace(/^./, (c) => c.toUpperCase())],
+        ctx.nesting,
+      );
+      const key = hit?.kind === "scope" ? this.resolver.oracleKey(hit.fqn) : null;
+      if (key) return { k: "class", key } as TypeRef;
+    }
+    let memo = this.duckLocalMemo.get(body);
+    if (!memo) this.duckLocalMemo.set(body, (memo = new Map()));
+    if (memo.has(name)) return memo.get(name)!;
+    const reads = new Set<string>();
+    const assigns = new Set<string>();
+    let fromTime = false;
+    const { methods, ivars } = this.timeFlow();
+    walk(body, (x) => {
+      if (x.k === "def") return false;
+      if (x.k === "call" && x.recv?.k === "lvar" && x.recv.name === name) reads.add(x.name);
+      if (x.k === "lasgn" && x.name === name && x.value) {
+        assigns.add(x.value.k);
+        if (x.value.k === "call" && methods.has(x.value.name)) fromTime = true;
+        if (x.value.k === "ivar" && ivars.has(x.value.name)) fromTime = true;
+      }
+    });
+    const bad = ["str", "dstr", "int", "float", "array", "hash", "sym", "regexp"];
+    if (!fromTime && this.isNumberish(body, name, assigns, reads, ctx)) {
+      const n: TypeRef = { k: "prim", name: "number" } as TypeRef;
+      memo.set(name, n);
+      return n;
+    }
+    const t =
+      this.isTimeish(reads, assigns) ||
+      (fromTime &&
+        ![...assigns].some((k) => bad.includes(k)) &&
+        [...reads].every(
+          (r) =>
+            ["+", "-", "<", ">", "<=", ">=", "==", "<=>", "to_s"].includes(r) ||
+            dateMembers().has(snakeToCamel(r)),
+        ))
+        ? this.timeRef()
+        : null;
+    memo.set(name, t);
+    return t;
   }
 
   mayBeArray(n: N): boolean {

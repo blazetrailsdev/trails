@@ -65,9 +65,12 @@ function main(): void {
   // src/ is the generator's own output, which must not type the generator.
   const roots =
     GEM.hand === false
-      ? ["ruby-compat", "activesupport"]
-          .map((dep) => path.join(PKG_DIR, "..", dep, "dist/index.d.ts"))
-          .filter((f) => existsSync(f))
+      ? [
+          ...["ruby-compat", "activesupport"]
+            .map((dep) => path.join(PKG_DIR, "..", dep, "dist/index.d.ts"))
+            .filter((f) => existsSync(f)),
+          ...parsed.fileNames.filter((f) => !/\.test\.ts$|test-helpers\/|\/support\//.test(f)),
+        ]
       : parsed.fileNames.filter((f) => !/\.test\.ts$|test-helpers\/|\/support\//.test(f));
   // Dependencies the generated code may call that the hand port never imports
   // (`GlobalID::Locator.locate`, async in trails): read their entry points too.
@@ -297,7 +300,9 @@ function main(): void {
 
   for (const sf of program.getSourceFiles()) {
     const fk = fileKey(sf);
-    const ours = GEM.hand !== false && sf.fileName.startsWith(SRC + "/");
+    // A gem with no hand port reads its previous generated tree: its classes
+    // and member kinds type a gem instance (`span + n` is `span.plus(n)`).
+    const ours = sf.fileName.startsWith(SRC + "/");
     const dep =
       /packages\/(arel|activemodel|activesupport|ruby-compat|globalid|i18n|date|trailties)\//.test(
         sf.fileName,
@@ -341,6 +346,13 @@ function main(): void {
     };
     visit(sf);
   }
+  // The previous generated tree's parameter types are the type pass's own
+  // guesses: fed back, they compound (`(string | string[])[][]`). Only its
+  // classes, member kinds and returns are read.
+  if (GEM.hand === false)
+    for (const c of Object.values(oracle.classes))
+      if (!c.key.startsWith("@"))
+        for (const m of [...Object.values(c.instance), ...Object.values(c.static)]) delete m.params;
   const out = ORACLE_PATH;
   writeFileSync(out, JSON.stringify(oracle));
   const nAsync = Object.values(oracle.classes).reduce(

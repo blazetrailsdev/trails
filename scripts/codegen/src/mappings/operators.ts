@@ -161,6 +161,8 @@ rule("<<", (o) => {
   // `super << '-day-'` in a `to_s` (chronic ordinal.rb:33): Object#to_s answers a String.
   const superStr = (x: { k?: string; name?: string; recv?: unknown } | null): boolean =>
     (x?.k === "super" && ["to_s", "inspect", "to_str"].includes(ctx.defName ?? "")) ||
+    x?.k === "str" ||
+    x?.k === "dstr" ||
     (x?.k === "call" && x.name === "<<" && superStr(x.recv as typeof x));
   const t = superStr(n.recv) ? ({ k: "prim", name: "string" } as const) : lw.typeOf(n.recv, ctx);
   const b = needsParens(a[0]) ? `(${a[0]})` : a[0];
@@ -181,6 +183,7 @@ rule("<<", (o) => {
     if (!t)
       return `(typeof ${r} === "string" ? (${r} = ${r} + ${b}) : Array.isArray(${r}) ? ((${r} as unknown[]).push(${b}), ${r}) : (${r} as object) instanceof globalThis.Set ? (${r} as Set<unknown>).add(${b}) : (${r} as { append(v: unknown): unknown }).append(${b}))`;
   }
+  if (t?.k === "prim" && t.name === "string") return `(${app(r)})`;
   return lw.withOnce(r, app);
 });
 
