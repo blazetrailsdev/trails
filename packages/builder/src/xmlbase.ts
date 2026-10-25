@@ -86,7 +86,10 @@ export abstract class XmlBase {
         ensure();
         throw e;
       }
-      if (result instanceof Promise) return result.finally(ensure).then(() => this._target);
+      if (typeof (result as PromiseLike<unknown> | null)?.then === "function")
+        return Promise.resolve(result)
+          .finally(ensure)
+          .then(() => this._target);
       ensure();
     } else if (text == null) {
       this._indent();
@@ -180,7 +183,8 @@ export abstract class XmlBase {
       this._level -= 1;
       throw e;
     }
-    if (result instanceof Promise) return result.finally(() => (this._level -= 1));
+    if (typeof (result as PromiseLike<unknown> | null)?.then === "function")
+      return Promise.resolve(result).finally(() => (this._level -= 1));
     this._level -= 1;
     return result;
   }
