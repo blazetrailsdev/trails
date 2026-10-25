@@ -26,7 +26,7 @@ import { Broadcasting, type ClassMethods as BroadcastingClassMethods } from "./b
 import { Callbacks } from "./callbacks.js";
 import { Naming } from "./naming.js";
 import { PeriodicTimers } from "./periodic-timers.js";
-import { Streams } from "./streams.js";
+import { Streams, type Handler, type StreamOptions } from "./streams.js";
 
 type Data = Record<string, unknown>;
 
@@ -48,15 +48,15 @@ interface ChannelConnection {
 export interface Base {
   streamFrom(
     broadcasting: unknown,
-    callback?: ((message: unknown) => unknown) | { coder?: unknown } | null,
-    options?: { coder?: unknown },
-    block?: (message: unknown) => unknown,
+    callback?: Handler | StreamOptions | null,
+    options?: StreamOptions,
+    block?: Handler,
   ): void;
   streamFor(
     model: unknown,
-    callback?: ((message: unknown) => unknown) | { coder?: unknown } | null,
-    options?: { coder?: unknown },
-    block?: (message: unknown) => unknown,
+    callback?: Handler | StreamOptions | null,
+    options?: StreamOptions,
+    block?: Handler,
   ): void;
 }
 

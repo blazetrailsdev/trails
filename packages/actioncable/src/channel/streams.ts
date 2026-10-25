@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Channel } from "../namespaces.js";
 
-type Handler = (message: unknown) => unknown;
+export type Handler = (message: unknown) => unknown;
 
 interface Coder {
   decode(message: unknown): unknown;
@@ -48,7 +48,7 @@ interface StreamsChannel {
   identityHandler: typeof identityHandler;
 }
 
-type StreamOptions = { coder?: Coder | null };
+export type StreamOptions = { coder?: Coder | null };
 
 /** @missingRailsArgs subscribe — PERMANENT */
 function streamFrom(
