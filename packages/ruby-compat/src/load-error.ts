@@ -10,7 +10,11 @@ import { Exception } from "./exception.js";
  * rather than defines.
  */
 export class LoadError extends Exception {
-  /** Mirrors: Ruby's `LoadError#path` — vendor/ruby/v3.3.11/error.c:3344 `rb_attr(rb_eLoadError, path, ...)`, the feature `require` could not load. */
+  /**
+   * Mirrors: Ruby's `LoadError#path` — vendor/ruby/v3.3.11/error.c:3344 `rb_attr(rb_eLoadError, path, ...)`, the feature `require` could not load.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   path: string | null = null;
 }
 

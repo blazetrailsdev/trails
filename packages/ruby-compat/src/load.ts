@@ -29,12 +29,6 @@ export async function rbFLoad(fname: string): Promise<true> {
 const loadedFeatures = new Map<string, Record<string, unknown>>();
 const loadFailures = new Map<string, LoadError>();
 
-function loadFail(message: string, path: string | null, cause?: unknown): LoadError {
-  const error = new LoadError(message, cause === undefined ? undefined : { cause });
-  error.path = path;
-  return error;
-}
-
 /**
  * `rb_f_require` (`vendor/ruby/v3.3.11/load.c:1022`), `Kernel#require`,
  * over a namespace `loadPath` table. ESM has no synchronous load, so this is
@@ -53,12 +47,18 @@ export async function rbFRequire(
   if (loadedFeatures.has(feature)) return false;
   const load = loadPath[feature];
   try {
-    if (load === undefined) throw loadFail(`cannot load such file -- ${feature}`, feature);
+    if (load === undefined) {
+      const error = new LoadError(`cannot load such file -- ${feature}`);
+      error.path = feature;
+      throw error;
+    }
     try {
       loadedFeatures.set(feature, (await load()) as Record<string, unknown>);
     } catch (e) {
       if ((e as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND") throw e;
-      throw loadFail((e as Error).message, (e as { url?: string }).url ?? null, e);
+      const error = new LoadError((e as Error).message, { cause: e });
+      error.path = (e as { url?: string }).url ?? null;
+      throw error;
     }
   } catch (e) {
     if (e instanceof LoadError) loadFailures.set(feature, e);
@@ -79,5 +79,9 @@ export async function rbFRequire(
 export function rbRequireLoaded(feature: string): Record<string, unknown> {
   const exports = loadedFeatures.get(feature);
   if (exports !== undefined) return exports;
-  throw loadFailures.get(feature) ?? loadFail(`cannot load such file -- ${feature}`, feature);
+  const failure = loadFailures.get(feature);
+  if (failure !== undefined) throw failure;
+  const error = new LoadError(`cannot load such file -- ${feature}`);
+  error.path = feature;
+  throw error;
 }
