@@ -75,13 +75,16 @@ export function attributeWriterMissing(
 
 /**
  * @internal
- * @inventedArm if — CONVERGEABLE delete-send-name-guessing-arms
+ * @inventedArm if — CONVERGEABLE rbfsend-per-prototype-writer-cache
  */
 export function _assignAttribute(this: AttributeAssignment, k: string, v: unknown): unknown {
   const setter = `${k}=`;
   try {
+    const writer = writerSpelling(k);
     const write =
-      Object.hasOwn(this, setter) || Object.hasOwn(this, k)
+      Object.hasOwn(this, setter) ||
+      Object.hasOwn(this, k) ||
+      (writer !== undefined && Object.hasOwn(this, writer))
         ? resolveWriter(this, k, setter)
         : cachedWriter(Object.getPrototypeOf(this) as object | null, k, setter);
     if (typeof write === "function") return write.call(this, v);

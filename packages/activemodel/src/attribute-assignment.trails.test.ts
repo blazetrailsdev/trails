@@ -9,7 +9,7 @@ import { Model } from "./index.js";
 import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { AttributeMethods } from "./attribute-methods.js";
-import { include } from "@blazetrails/activesupport";
+import { include, removePossibleMethod } from "@blazetrails/activesupport";
 
 class ProtectedParams {
   private parameters: Record<string, unknown>;
@@ -328,6 +328,35 @@ describe("AttributeAssignmentTest", () => {
       Person.undefineAttributeMethods();
       expect(() => p.assignAttributes({ foo: 2 })).toThrow(UnknownAttributeError);
       expect(p.written).toEqual([["foo", 1]]);
+    });
+
+    it("sees a writer removed after the first assignment", () => {
+      class Person extends Proxied {}
+      Person.defineAttributeMethods("foo");
+      const p = new Person();
+      p.assignAttributes({ foo: 1 });
+      removePossibleMethod.call(Person.generatedAttributeMethods(), "foo=");
+      expect(() => p.assignAttributes({ foo: 2 })).toThrow(UnknownAttributeError);
+      class Plain extends Model {
+        "bar="(_: unknown): void {}
+      }
+      const q = new Plain();
+      q.assignAttributes({ bar: 1 });
+      removePossibleMethod.call(Plain, "bar=");
+      expect(() => q.assignAttributes({ bar: 2 })).toThrow(UnknownAttributeError);
+    });
+
+    it("an instance-own setK writer outranks a prototype k= writer", () => {
+      class Person extends Proxied {}
+      Person.defineAttributeMethods("foo");
+      const p = new Person();
+      p.assignAttributes({ foo: 1 });
+      const q = new Person() as Person & { setFoo?: (v: unknown) => void };
+      const seen: unknown[] = [];
+      q.setFoo = (v) => seen.push(v);
+      q.assignAttributes({ foo: 2 });
+      expect(seen).toEqual([2]);
+      expect(q.written).toEqual([]);
     });
 
     it("sees an attribute declared after the first assignment", () => {

@@ -1,4 +1,4 @@
-import { Module as RbModule } from "@blazetrails/ruby-compat";
+import { Module as RbModule, rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type Module = { prototype: object };
 
@@ -15,6 +15,7 @@ export function removePossibleMethod(this: Module | RbModule, method: string): v
       configurable: true,
       enumerable: false,
     });
+    rbClearMethodCache();
   }
 }
 

@@ -5,6 +5,7 @@ import {
   rbClassAttachedObject,
   rbObjIsKindOf,
   rbModSingletonP,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 export interface ClassAttributeOptions {
@@ -112,6 +113,7 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
       };
     }
     if (methods.get || methods.set) Object.defineProperty(this.prototype, name, methods);
+    rbClearMethodCache();
 
     if (instancePredicate) {
       const lead = /^_*/.exec(name)![0];
