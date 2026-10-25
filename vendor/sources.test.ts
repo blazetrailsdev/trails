@@ -391,6 +391,7 @@ describe("vendor/sources.ts", () => {
         "msgpack",
         "mysql2",
         "pg",
+        "raabro",
         "rack",
         "rack-session",
         "rack-test",

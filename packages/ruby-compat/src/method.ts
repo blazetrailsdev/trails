@@ -90,11 +90,7 @@ export class Method {
    * @noRailsEquivalent PERMANENT
    */
   parameters(): ([string] | [string, string])[] {
-    return iseqParams(this.#func).map((p) => {
-      const type = p.text.startsWith("...") ? ":rest" : p.optional ? ":opt" : ":req";
-      const name = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)/.exec(p.text)?.[1];
-      return name === undefined ? [type] : [type, `:${name}`];
-    });
+    return rbIseqParameters(this.#func);
   }
 
   /**
@@ -203,19 +199,25 @@ export function rbObjMethods(obj: unknown, recur = true): string[] {
  * @noRailsEquivalent PERMANENT
  */
 export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number, number] {
-  const params = iseqParams(func);
-  const rest = params.some((p) => p.text.startsWith("..."));
-  const min = params.filter((p) => !p.optional && !p.text.startsWith("...")).length;
+  const params = rbIseqParameters(func);
+  const rest = params.some(([type]) => type === ":rest");
+  const min = params.filter(([type]) => type === ":req").length;
   const max = rest ? Infinity : params.length;
   return [min, max];
 }
 
 /**
- * The parameter list `rb_iseq_parameters` (`vendor/ruby/v3.3.11/iseq.c:3334`)
- * reads off a body's iseq, read here from the function's source.
+ * `rb_iseq_parameters` (`vendor/ruby/v3.3.11/iseq.c:3334`): a `[type, name]`
+ * pair per parameter, `:req`, `:opt` or `:rest`, each a Symbol, read here from
+ * the function's source. A destructured parameter has no name and answers its
+ * type alone.
+ *
+ * @noRailsEquivalent PERMANENT
  */
-function iseqParams(func: (...args: never[]) => unknown): { text: string; optional: boolean }[] {
-  const src = Function.prototype.toString.call(func);
+export function rbIseqParameters(
+  iseq: (...args: never[]) => unknown,
+): ([string] | [string, string])[] {
+  const src = Function.prototype.toString.call(iseq);
   const open = src.indexOf("(");
   const arrow = src.indexOf("=>");
   if (arrow !== -1 && (open === -1 || arrow < open)) {
@@ -223,7 +225,7 @@ function iseqParams(func: (...args: never[]) => unknown): { text: string; option
       .slice(0, arrow)
       .replace(/^async\s+/, "")
       .trim();
-    return lead === "" ? [] : [{ text: lead, optional: false }];
+    return lead === "" ? [] : /^[A-Za-z_$][\w$]*$/.test(lead) ? [[":req", `:${lead}`]] : [[":req"]];
   }
   let depth = 0;
   let current = "";
@@ -255,7 +257,11 @@ function iseqParams(func: (...args: never[]) => unknown): { text: string; option
     current += ch;
   }
   if (current.trim() !== "") params.push({ text: current.trim(), optional });
-  return params;
+  return params.map((p) => {
+    const type = p.text.startsWith("...") ? ":rest" : p.optional ? ":opt" : ":req";
+    const name = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)/.exec(p.text)?.[1];
+    return name === undefined ? [type] : [type, `:${name}`];
+  });
 }
 
 /**

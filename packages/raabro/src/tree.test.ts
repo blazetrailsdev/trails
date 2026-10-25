@@ -17,7 +17,7 @@ describe("Raabro::Tree", () => {
       ]);
     });
 
-    it("returns the first named node if the given name is null", () => {
+    it("returns the first named node if the given name is nil", () => {
       const t = Sample.Cal.parse("4 5 6 + 1 2 3 * +", { rewrite: false }) as Tree;
 
       expect(t.lookup()!.toA(":leaves")).toEqual([
@@ -52,7 +52,7 @@ describe("Raabro::Tree", () => {
       ]);
     });
 
-    it("returns all the nodes with a name if the given name is null", () => {
+    it("returns all the nodes with a name if the given name is nil", () => {
       const t = Sample.Cal.parse("4 5 6 + 1 2 3 * +", { rewrite: false }) as Tree;
 
       expect(t.gather().map((n) => n.toA(":leaves"))).toEqual([

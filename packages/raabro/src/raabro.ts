@@ -31,6 +31,7 @@ export interface ParseOptions {
 }
 
 export class Raabro {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
   static VERSION = "1.4.0";
@@ -398,6 +399,7 @@ export class Tree {
 type ParsingMethod = (input: Input) => Tree;
 
 export class ModuleMethods {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
   declare _last: string | null | undefined;
@@ -727,7 +729,7 @@ export class ModuleMethods {
   parse(input: string, opts: ParseOptions = {}): unknown {
     const d = toI(opts.debug) as number;
     if (d > 0) opts.rewrite = false;
-    if (d > 1) opts.all = false;
+    if (d > 1) opts["all"] = false;
     if (d > 2) opts.prune = false;
 
     if (!("prune" in opts)) opts.prune = true;
@@ -735,7 +737,7 @@ export class ModuleMethods {
     const root = rbObjRespondTo(this, "root") ? ":root" : this.last!;
 
     let t =
-      opts.all === false
+      opts["all"] === false
         ? this._parse(root, new Input(input, opts))
         : this.all(null, new Input(input, opts), root);
 
@@ -778,8 +780,10 @@ export class ModuleMethods {
 
   makeIncludable(): void {
     (this as { [included]?: (target: object) => void })[included] = function (target: object) {
-      extend(target, ModuleMethods);
-      extend(target, target as typeof ModuleMethods);
+      (function (this: object) {
+        extend(this, ModuleMethods);
+        extend(this, this as typeof ModuleMethods);
+      }).call(target);
     };
   }
 }

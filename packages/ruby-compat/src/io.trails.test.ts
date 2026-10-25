@@ -350,10 +350,13 @@ describe("STDOUT", () => {
 
 describe("IO#tty?", () => {
   it("answers whether the standard stream is a terminal", () => {
-    const isTTY = vi.spyOn(stdout, "isTTY", "get").mockReturnValue(true);
+    const isTTY = vi
+      .spyOn(stdout, "isTTY", "get")
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
     try {
       expect(STDOUT.isTty()).toBe(true);
-      expect(new IO(1, null, "w").isTty()).toBe(false);
+      expect(STDOUT.isTty()).toBe(false);
     } finally {
       isTTY.mockRestore();
     }

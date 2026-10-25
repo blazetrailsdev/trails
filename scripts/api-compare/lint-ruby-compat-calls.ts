@@ -95,6 +95,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "chronic",
   "did-you-mean",
   "et-orbi",
+  "raabro",
   "globalid",
   "i18n",
   "marcel",

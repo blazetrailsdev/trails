@@ -782,7 +782,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "raabro",
         libPath: "lib",
         testPath: "spec",
-        compareApi: false,
+        compareApi: true,
         compareTests: true,
       },
     ],
