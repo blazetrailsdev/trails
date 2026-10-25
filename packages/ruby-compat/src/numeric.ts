@@ -309,6 +309,51 @@ export function numericMinus(x: unknown, y: unknown): unknown {
 }
 
 /**
+ * `Integer#/` (`vendor/ruby/v3.3.11/numeric.c:4220` `rb_int_div`, `fix_divide`
+ * at `:4164`) and `Float#/` (`numeric.c:1292` `rb_float_div`): two Integers
+ * floor (`rb_fix_div_fix`, a Bignum through `rb_big_div`), and a Float on either
+ * side divides as doubles (`rb_flo_div_flo`), answering a Float.
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericDiv(x: unknown, y: unknown): unknown {
+  if (rbIntegerTypeP(x) && rbIntegerTypeP(y)) {
+    if (typeof x === "number" && typeof y === "number") return fixDiv(x, y);
+    const a = BigInt(x);
+    const b = BigInt(y);
+    if (b === 0n) throw new ZeroDivisionError("divided by 0");
+    const q = a / b;
+    return rbBigNorm(a % b !== 0n && a < 0n !== b < 0n ? q - 1n : q);
+  }
+  if ((rbIntegerTypeP(x) || rbFloatTypeP(x)) && (rbIntegerTypeP(y) || rbFloatTypeP(y)))
+    return rbDbl2num(Number(x.valueOf()) / Number(y.valueOf()));
+  throw new NoMethodError(`undefined method '/' for an instance of ${rbObjClassname(x)}`);
+}
+
+/**
+ * `Integer#-@` (`vendor/ruby/v3.3.11/numeric.c:3833` `rb_int_uminus`) and
+ * `Float#-@` (`numeric.c:1156` `rb_float_uminus`): a Float stays a Float.
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericUminus(x: unknown): unknown {
+  if (rbFloatTypeP(x)) return rbDbl2num(-x.valueOf());
+  if (typeof x === "bigint") return rbBigNorm(-x);
+  if (rbIntegerTypeP(x)) return x === 0 ? 0 : -x;
+  throw new NoMethodError(`undefined method '-@' for an instance of ${rbObjClassname(x)}`);
+}
+
+/**
+ * `Integer#abs` (`vendor/ruby/v3.3.11/numeric.c:5384` `rb_int_abs`) and
+ * `Float#abs` (`numeric.c:1942` `rb_float_abs`): a Float stays a Float.
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericAbs(x: unknown): unknown {
+  if (rbFloatTypeP(x)) return rbDbl2num(Math.abs(x.valueOf()));
+  if (typeof x === "bigint") return x < 0n ? -x : x;
+  if (rbIntegerTypeP(x)) return Math.abs(x as number);
+  throw new NoMethodError(`undefined method 'abs' for an instance of ${rbObjClassname(x)}`);
+}
+
+/**
  * `fix_mod` (`vendor/ruby/v3.3.11/numeric.c:4268`), `flo_mod` (`numeric.c:1416`),
  * `num_modulo` (`numeric.c:700`) for a Rational: the result takes the divisor's sign.
  * @noRailsEquivalent PERMANENT

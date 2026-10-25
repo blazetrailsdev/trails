@@ -18,6 +18,8 @@ import {
   sum,
   tally,
   drop,
+  take,
+  takeWhile,
 } from "./enumerable.js";
 import { Hash } from "./hash.js";
 import { include } from "./include.js";
@@ -604,5 +606,26 @@ describe("minBy / maxBy / eachCons", () => {
     const seen: unknown[] = [];
     expect(eachCons(ary, 3, (w) => seen.push(w))).toBe(ary);
     expect(seen).toEqual([]);
+  });
+});
+
+describe("Enumerable#take and #take_while", () => {
+  const endless = {
+    each(block: (i: number) => void): void {
+      for (let i = 0; ; i++) block(i);
+    },
+  };
+
+  it("stops an endless each once enough elements are taken", () => {
+    expect(take(endless, 3)).toEqual([0, 1, 2]);
+    expect(take(endless, 0)).toEqual([]);
+    expect(() => take(endless, -1)).toThrow(ArgumentError);
+    expect(new Enumerable(endless).take(2)).toEqual([0, 1]);
+  });
+
+  it("stops at the first element the block answers falsy for", () => {
+    expect(takeWhile(endless, (i) => i < 4)).toEqual([0, 1, 2, 3]);
+    expect(takeWhile([1, 2, null, 4], (i) => i)).toEqual([1, 2]);
+    expect(new Enumerable([0, 1, 2]).takeWhile((i) => i === 0)).toEqual([0]);
   });
 });

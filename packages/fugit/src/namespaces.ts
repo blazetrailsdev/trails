@@ -1,0 +1,38 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
+import type * as AtModule from "./at.js";
+import type * as CronModule from "./cron.js";
+import type * as DurationModule from "./duration.js";
+import type * as MiscModule from "./misc.js";
+import type * as NatModule from "./nat.js";
+import type * as ParseModule from "./parse.js";
+
+export const Fugit = { name: "Fugit" } as {
+  name: string;
+  VERSION: string;
+  DAY_S: number;
+  YEAR_S: number;
+  isostamp: typeof MiscModule.isostamp;
+  timeToS: typeof MiscModule.timeToS;
+  timeToPlainS: typeof MiscModule.timeToPlainS;
+  timeToZoneS: typeof MiscModule.timeToZoneS;
+  parseCron: typeof ParseModule.parseCron;
+  parseDuration: typeof ParseModule.parseDuration;
+  parseNat: typeof ParseModule.parseNat;
+  parseAt: typeof ParseModule.parseAt;
+  parseIn: typeof ParseModule.parseIn;
+  doParseCron: typeof ParseModule.doParseCron;
+  doParseDuration: typeof ParseModule.doParseDuration;
+  doParseNat: typeof ParseModule.doParseNat;
+  doParseAt: typeof ParseModule.doParseAt;
+  doParseIn: typeof ParseModule.doParseIn;
+  parse: typeof ParseModule.parse;
+  doParse: typeof ParseModule.doParse;
+  parseCronish: typeof ParseModule.parseCronish;
+  doParseCronish: typeof ParseModule.doParseCronish;
+  determineType: typeof ParseModule.determineType;
+  At: typeof AtModule.At;
+  Cron: typeof CronModule.Cron;
+  Duration: typeof DurationModule.Duration;
+  Nat: typeof NatModule.Nat;
+};
+registerConstant("Fugit", Fugit);

@@ -1157,6 +1157,23 @@ function unwrapExpression(expr: ts.Expression): ts.Expression {
   return e;
 }
 
+/**
+ * A table-row member's value as the Ruby extractor records the same member
+ * (`array_element_value`, extract-ruby-tests.rb): a literal; a class constant
+ * by its name (`[ "nada", ArgumentError ]`); or a template literal with every
+ * `${...}` dropped, as `extract_string_content` drops a `#{...}`.
+ */
+function memberValue(expr: ts.Expression): string | null {
+  const literal = literalValue(expr);
+  if (literal !== null) return literal;
+  const e = unwrapExpression(expr);
+  if (ts.isIdentifier(e) && /^[A-Z][A-Za-z0-9]*[a-z][A-Za-z0-9]*$/.test(e.text)) return e.text;
+  if (ts.isTemplateExpression(e)) {
+    return e.head.text + e.templateSpans.map((span) => span.literal.text).join("");
+  }
+  return null;
+}
+
 /** A string/number literal's value, or null when the expression is not one. */
 function literalValue(expr: ts.Expression): string | null {
   const e = unwrapExpression(expr);
@@ -1264,7 +1281,7 @@ function staticIterableElements(
   for (const element of e.elements) {
     const inner = unwrapExpression(element);
     if (ts.isArrayLiteralExpression(inner)) {
-      const tuple = inner.elements.map((value) => literalValue(value) ?? arrayLiteralLength(value));
+      const tuple = inner.elements.map((value) => memberValue(value) ?? arrayLiteralLength(value));
       if (tuple.every((value) => value === null)) return null;
       out.push({ scalar: null, tuple });
     } else {

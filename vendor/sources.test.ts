@@ -211,6 +211,7 @@ describe("vendor/sources.ts", () => {
       "i18n",
       "solid-queue",
       "et-orbi",
+      "fugit",
       "chronic",
     ]);
     expect(apiComparePackages()).toContain("i18n");
@@ -387,6 +388,7 @@ describe("vendor/sources.ts", () => {
         "chronic",
         "did-you-mean",
         "et-orbi",
+        "fugit",
         "globalid",
         "i18n",
         "marcel",

@@ -2454,9 +2454,22 @@ class ApiExtractor
   # receiver kind and template kind (`define_method` vs `class_eval`)
   # independent instead of a hard-wired pair.
   def each_loop_members(node)
+    node = name_preserving_map_receiver(node) || node
     literal_array_members(node) ||
       resolve_const_symbol_array(const_name(node)) ||
       resolve_const_symbol_hash_keys(const_name(node))
+  end
+
+  def name_preserving_map_receiver(node)
+    return nil unless node.is_a?(Array) && node[0] == :method_add_arg
+    call = node[1]
+    return nil unless call.is_a?(Array) && call[0] == :call
+    return nil unless %w[collect map].include?(ident_name(call[3]))
+    paren = node[2]
+    return nil unless paren.is_a?(Array) && paren[0] == :arg_paren
+    block_arg = paren[1].is_a?(Array) && paren[1][0] == :args_add_block ? paren[1][2] : nil
+    return nil unless %w[to_sym to_s].include?(literal_method_name(block_arg))
+    call[1]
   end
 
   # Members of a literal `[:a, :b]` / `%w[a b]` receiver, as strings. Any

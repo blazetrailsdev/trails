@@ -818,7 +818,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/fugit",
         libEntryFile: "lib/fugit.rb",
         testPath: "spec",
-        compareApi: false,
+        compareApi: true,
         compareTests: true,
       },
     ],

@@ -177,7 +177,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
-  if (pkg === "et-orbi" || pkg === "raabro") {
+  if (pkg === "et-orbi" || pkg === "raabro" || pkg === "fugit") {
     return (
       path
         .basename(rubyFile, ".rb")
@@ -1676,6 +1676,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   builder: "packages/builder/src/",
   "et-orbi": "packages/et-orbi/src/",
   raabro: "packages/raabro/src/",
+  fugit: "packages/fugit/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",

@@ -222,6 +222,7 @@ export {
   toH,
   zip,
   isIntersect,
+  product,
   union,
   uniq,
   unpack,
@@ -302,6 +303,9 @@ export {
 } from "./numeric.js";
 export {
   numericMinus,
+  numericAbs,
+  numericDiv,
+  numericUminus,
   numericModulo,
   numericMul,
   numericPlus,

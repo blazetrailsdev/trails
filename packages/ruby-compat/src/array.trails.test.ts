@@ -20,6 +20,7 @@ import {
   isIntersect,
   last,
   pack,
+  product,
   each,
   sort,
   toA,
@@ -724,5 +725,19 @@ describe("ARRAY_METHOD_TABLE", () => {
     expect(rbFSend(a, "collect")).not.toBe(a);
     expect(rbFSend(a, "eachCons", 3)).toHaveLength(2);
     expect([...(rbFSend(a, "shuffle") as number[])].sort()).toEqual([1, 1, 2, 3]);
+  });
+});
+
+describe("Array#product", () => {
+  it("combines one element of each array, the last varying fastest", () => {
+    expect(product([1, 2], [3, 4])).toEqual([
+      [1, 3],
+      [1, 4],
+      [2, 3],
+      [2, 4],
+    ]);
+    expect(product([1, 2])).toEqual([[1], [2]]);
+    expect(product([1, 2], [])).toEqual([]);
+    expect(product([], [1])).toEqual([]);
   });
 });

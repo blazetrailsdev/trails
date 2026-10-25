@@ -1019,6 +1019,20 @@ export function union<T>(ary1: readonly T[], ary2: readonly T[]): T[] {
 }
 
 /**
+ * Ruby `Array#product` (`vendor/ruby/v3.3.11/array.c:7426` `rb_ary_product`), the
+ * block-less form: every combination taking one element from `ary` and one from
+ * each of `args`, the last array varying fastest.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#product`.
+ */
+export function product<T>(ary: readonly T[], ...args: (readonly T[])[]): T[][] {
+  let result: T[][] = ary.map((e) => [e]);
+  for (const other of args) {
+    result = result.flatMap((combo) => other.map((e) => [...combo, e]));
+  }
+  return result;
+}
+
+/**
  * Ruby `Array#intersect?` (`vendor/ruby/v3.3.11/array.c:5680` `rb_ary_intersect_p`):
  * whether the two arrays share an element, compared by `eql?` as
  * `rb_ary_includes_by_eql` does. An empty array on either side answers false.

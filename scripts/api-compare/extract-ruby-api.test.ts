@@ -2510,6 +2510,16 @@ describe(
       expect(urlHelpers.params.map((p) => p.kind)).toEqual(["optional"]);
     });
 
+    it("unrolls an each over a %w list mapped through collect(&:to_sym)", () => {
+      const m = metaMethods(`
+      class TimeCursor
+        %w[ year wday_in_month ]
+          .collect(&:to_sym).each { |k| define_method(k) { @t.send(k) } }
+      end
+    `);
+      expect(m["TimeCursor"].map((x) => x.name)).toEqual(["year", "wday_in_month"]);
+    });
+
     it("hosts a `CONST = Class.new do … end` body on the anonymous class", () => {
       const m = metaMethods(`
       class TestRequest
