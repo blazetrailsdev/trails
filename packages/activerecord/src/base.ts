@@ -2251,12 +2251,18 @@ include(Base, _TouchLater.TouchLater);
 include(Base, _NoTouching.NoTouching);
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
-prepend({ prototype: Base } as unknown as typeof Base, {
-  loadSchemaBang: CounterCache.loadSchemaBang,
-});
-prepend({ prototype: Base } as unknown as typeof Base, {
-  loadSchemaBang: _EncryptableRecord.loadSchemaBang,
-});
+prepend(
+  { prototype: Base },
+  {
+    loadSchemaBang: CounterCache.loadSchemaBang,
+  },
+);
+prepend(
+  { prototype: Base },
+  {
+    loadSchemaBang: _EncryptableRecord.loadSchemaBang,
+  },
+);
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
 include(Base, _NestedAttributes.NestedAttributes);
 include(Base, { association: _association });

@@ -2135,7 +2135,7 @@ function initCopyHook(
  * uses but does not define.
  */
 export function prepend(
-  target: AnyClass | (abstract new (...args: never) => object),
+  target: AnyClass | (abstract new (...args: never) => object) | { prototype: object },
   mod: ModuleObject | AnyClass | Module,
 ): void {
   const klass = target as AnyClass;
