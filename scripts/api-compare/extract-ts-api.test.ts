@@ -2533,6 +2533,28 @@ describe("body call capture", () => {
     expect(calls("schedule")).not.toContain("@timer");
   });
 
+  it("credits new Enumerable(x).m(...) as the call m, with no construction", () => {
+    const cls = extractFromSource(
+      `import { Enumerable } from "@blazetrails/ruby-compat";
+      class Foo {
+        split(xs: unknown[]) {
+          return new Enumerable(xs).partition((x) => x);
+        }
+      }`,
+    );
+    const calls = cls.instanceMethods.find((m) => m.name === "split")!.calls;
+    expect(calls).toContain("partition");
+    expect(calls).not.toContain("constructor");
+    const local = extractFromSource(
+      `class Foo {
+        split(xs: unknown[]) {
+          return new Enumerable(xs).partition((x) => x);
+        }
+      }`,
+    );
+    expect(local.instanceMethods.find((m) => m.name === "split")!.calls).toContain("constructor");
+  });
+
   it("records rbFSend of a string-literal name as a call to that name", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -6890,6 +6912,19 @@ describe("callArgs", () => {
         }`,
       ),
     ).toEqual([{ name: "constructor", args: ["const:CIPHER_TYPE"], flags: [] }]);
+  });
+
+  it("reads new Enumerable(x).m(...) as a site on receiver x", () => {
+    expect(
+      site(
+        `import { Enumerable } from "@blazetrails/ruby-compat";
+        class Foo {
+          create() {
+            return new Enumerable(xs).eachSlice(2, fn);
+          }
+        }`,
+      ),
+    ).toEqual([{ name: "eachSlice", args: ["num:2", "id:fn"], flags: [], recv: "id:xs" }]);
   });
 
   it("names an rbFSend argument by the method it sends", () => {

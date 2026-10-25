@@ -8,6 +8,7 @@
  * `Init_Enumerable` joins as a caller needs it.
  */
 
+import { classModule } from "./class-module.js";
 import { ArgumentError } from "./argument-error.js";
 import { Hash } from "./hash.js";
 import {
@@ -247,15 +248,6 @@ export function count<T, E = unknown>(
     },
     () => n,
   );
-}
-
-/**
- * The mixin member over `self`, bound as `find_all` and `select`
- * (`vendor/ruby/v3.3.11/enum.c:5075-5076`).
- * @noRailsEquivalent PERMANENT
- */
-function findAll<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown): Enumerated<E, T[]> {
-  return enumFindAll(this, block);
 }
 
 /**
@@ -862,44 +854,117 @@ export function reduce<T, E = unknown>(
 }
 
 /**
- * `select` is `enum_find_all` under a second name (`vendor/ruby/v3.3.11/enum.c:5076`).
+ * Ruby's `Enumerable` (`vendor/ruby/v3.3.11/enum.c:5047` `Init_Enumerable`) as
+ * a class module: `include(Klass, Enumerable)` copies its prototype members
+ * onto `Klass`, and `new Enumerable(xs)` wraps any Array, Set, Map, generator
+ * or `each`-answerer, so `new Enumerable(xs).partition(fn)` is Ruby's
+ * `xs.partition(&fn)`. Every member is the free function of the same name over
+ * `this`, and one answering a collection answers an Array or `Hash`.
  * @noRailsEquivalent PERMANENT
  */
-export const Enumerable = {
+export class Enumerable<T = unknown, E = unknown> {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+
+  declare each: (block: (i: T) => void) => E;
+
+  /** @noRailsEquivalent PERMANENT */
+  declare select: Enumerable["findAll"];
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(obj: Iterable<T> | Each<T, E>) {
+    Object.defineProperty(this, "each", {
+      value: (block: (i: T) => void): E => {
+        if (typeof (obj as Partial<Each<T, E>>).each === "function") {
+          return (obj as Each<T, E>).each(block);
+        }
+        for (const i of obj as Iterable<T>) block(i);
+        return obj as unknown as E;
+      },
+    });
+  }
+
   find<T, E = unknown>(this: Each<T, E>, ...argv: unknown[]) {
     return find(this, ...argv);
-  },
-  findAll,
-  select: findAll,
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  findAll<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown): Enumerated<E, T[]> {
+    return enumFindAll(this, block);
+  }
+
   map<T, R, E = unknown>(this: Each<T, E>, block?: (i: T) => R) {
     return map(this, block);
-  },
+  }
+
   groupBy<T, K, E = unknown>(this: Each<T, E>, block?: (i: T) => K) {
     return groupBy(this, block);
-  },
+  }
+
+  partition<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown) {
+    return block ? partition(this, block) : partition(this);
+  }
+
+  tally<T, E = unknown>(this: Each<T, E>) {
+    return tally(this);
+  }
+
+  reject<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown) {
+    return reject(this, block);
+  }
+
+  filterMap<T, R, E = unknown>(this: Each<T, E>, block: (i: T) => R | false | null | undefined) {
+    return filterMap(this, block);
+  }
+
   first<T, E = unknown>(this: Each<T, E>, n?: number): Enumerated<E, T | null | T[]> {
     return n === undefined ? first(this) : first(this, n);
-  },
+  }
+
   drop<T, E = unknown>(this: Each<T, E>, n: number) {
     return drop(this, n);
-  },
+  }
+
+  eachSlice<T, E = unknown>(this: Each<T, E>, n: number, block?: (slice: T[]) => unknown) {
+    return block ? eachSlice(this, n, block) : eachSlice(this, n);
+  }
+
+  sortBy<T, E = unknown>(this: Each<T, E>, block: (i: T) => unknown) {
+    return sortBy(this, block);
+  }
+
   isAny<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
     return isAny(this, ...args);
-  },
+  }
+
   isOne<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
     return isOne(this, ...args);
-  },
+  }
+
   isNone<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
     return isNone(this, ...args);
-  },
+  }
+
   isInclude<T, E = unknown>(this: Each<T, E>, val: unknown) {
     return isInclude(this, val);
-  },
+  }
+
   sum<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
     return sum(this, ...args);
-  },
-  [Symbol.iterator]: iterator,
-};
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  [Symbol.iterator](this: Each<T, E>): IterableIterator<T> {
+    return iterator.call(this) as IterableIterator<T>;
+  }
+}
+
+/** `select` is `enum_find_all` under a second name (`vendor/ruby/v3.3.11/enum.c:5076`). */
+Object.defineProperty(Enumerable.prototype, "select", {
+  value: Enumerable.prototype.findAll,
+  writable: true,
+  configurable: true,
+});
 
 /** @noRailsEquivalent PERMANENT */
 export interface AsyncEach<T> {
@@ -942,7 +1007,7 @@ export const AsyncEnumerable = {
     return enumSumValue(memo);
   },
 
-  first: Enumerable.first,
+  first: Enumerable.prototype.first,
 
   /**
    * Mirrors: Ruby's Enumerable#reverse_each — `vendor/ruby/v3.3.11/enum.c:3006`
