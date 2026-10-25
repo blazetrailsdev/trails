@@ -8,14 +8,13 @@ export class InvalidMatch extends Error {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include SecurityUtils` (secure_compare_rotator.rb:33)
-export interface SecureCompareRotator extends SecurityUtils {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include SecurityUtils` (secure_compare_rotator.rb:33)
 export class SecureCompareRotator {
   static toString(): string {
     return "ActiveSupport::SecureCompareRotator";
   }
+
+  declare secureCompare: SecurityUtils["secureCompare"];
+  declare fixedLengthSecureCompare: SecurityUtils["fixedLengthSecureCompare"];
 
   private value: string;
   private rotateValues: string[];
