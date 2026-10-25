@@ -18,10 +18,6 @@ if [ -z "$pkg_lib" ]; then
   echo "::error::$pkg has no vendored lib path, so it is not enrolled in the compare tooling and cannot be compared alone"
   exit 1
 fi
-# A Rails class whose `include` / `extend` / `prepend` names another gem's
-# module resolves it only when that gem's lib is loaded too, so the lib key of
-# every top-level namespace those lines name (ActiveSupport -> activesupport,
-# AbstractController -> abstractcontroller) is loaded beside $pkg's.
 mixin_keys=$(
   { grep -rhoE '^\s*(include|extend|prepend)\s+(::)?[A-Z][A-Za-z0-9]*' "$pkg_lib" --include='*.rb' || true; } |
     sed -E 's/.*[[:space:]](::)?//' | tr '[:upper:]' '[:lower:]' | sort -u | jq -R . | jq -sc .

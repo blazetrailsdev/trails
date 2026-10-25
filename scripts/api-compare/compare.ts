@@ -918,8 +918,6 @@ function hasNativeFormAnalogue(
           /^[A-Z][A-Z0-9_]*$/.test(bare) &&
           tsNativeForms.has(`${analogue.form}:${bare}`)) ||
         (analogue.form === "invoke" && tsNativeForms.has(`invoke:${bare}`)) ||
-        // `h.except(:k).merge!(…)`'s receiver is the rest local a typed
-        // destructure binds, which carries no Ruby name to match.
         (bare === "except" && tsNativeForms.has(TYPED_NATIVE_FORM.except))
       );
     }),
