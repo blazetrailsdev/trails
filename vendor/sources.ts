@@ -800,7 +800,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/et-orbi",
         libEntryFile: "lib/et-orbi.rb",
         testPath: "spec",
-        compareApi: false,
+        compareApi: true,
         compareTests: true,
       },
     ],

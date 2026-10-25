@@ -47,6 +47,16 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   },
   "Chronic::Repeater": { "<=>": ["compareTo"] },
   "Chronic::RepeaterTime::Tick": { "*": ["multiply"] },
+  "EtOrbi::EoTime": {
+    "==": ["equals"],
+    ">": ["gt"],
+    ">=": ["gteq"],
+    "<": ["lt"],
+    "<=": ["lteq"],
+    "<=>": ["compareTo"],
+    "+": ["plus"],
+    "-": ["minus"],
+  },
   // connection_pool.rb WeakThreadKeyMap `def [](key)` → connection-pool.ts
   // `WeakThreadKeyMap#get`, and `def []=(key, value)` → `set`.
   "ActiveRecord::ConnectionAdapters::ConnectionPool::WeakThreadKeyMap": {

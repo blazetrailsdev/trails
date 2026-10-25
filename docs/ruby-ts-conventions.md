@@ -107,7 +107,7 @@ function source. Write `await collection.length()`, or
 These Ruby operator methods have no parity:api counterpart (map them to named
 methods like `get()`/`set()` as the surrounding code does):
 
-`[]`, `[]=`, `==`, `===`, `!=`, `<=>`, `+`, `-`, `*`, `/`, `%`, `&`, `|`, `^`, `~`, `!`, `!~`, `=~`, `>>`, `<<`, `~@`
+`[]`, `[]=`, `==`, `===`, `!=`, `<=>`, `<`, `<=`, `>`, `>=`, `+`, `-`, `*`, `/`, `%`, `&`, `|`, `^`, `~`, `!`, `!~`, `=~`, `>>`, `<<`, `~@`
 
 The named spelling a given class picked is pinned per Ruby fqn in
 `OPERATOR_SPELLING_BY_FQN` (`scripts/api-compare/operator-order-spelling.ts`) —

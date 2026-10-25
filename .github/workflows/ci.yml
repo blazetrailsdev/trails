@@ -919,6 +919,7 @@ jobs:
           packages/chronic
           packages/date
           packages/did-you-mean
+          packages/et-orbi
           packages/globalid
           packages/html-sanitizer
           packages/i18n
@@ -1149,6 +1150,7 @@ jobs:
           packages/chronic
           packages/date
           packages/did-you-mean
+          packages/et-orbi
           packages/globalid
           packages/i18n
           packages/marcel

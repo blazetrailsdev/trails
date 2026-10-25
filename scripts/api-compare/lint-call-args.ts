@@ -115,6 +115,7 @@ export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
   "bcrypt",
   "chronic",
   "did-you-mean",
+  "et-orbi",
   "globalid",
   "i18n",
   "marcel",

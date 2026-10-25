@@ -165,6 +165,7 @@ export const ROWLESS_PACKAGES = [
   "bcrypt",
   "chronic",
   "did-you-mean",
+  "et-orbi",
   "globalid",
   "marcel",
   "rack",

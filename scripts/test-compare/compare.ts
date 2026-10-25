@@ -177,6 +177,15 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
+  if (pkg === "et-orbi") {
+    return (
+      path
+        .basename(rubyFile, ".rb")
+        .replace(/_spec$/, "")
+        .replace(/_/g, "-") + ".test.ts"
+    );
+  }
+
   if (pkg === "chronic") {
     const base = path.basename(rubyFile, ".rb").replace(/^test_/, "");
     return base.replace(/_/g, "-") + ".test.ts";
@@ -1664,6 +1673,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   msgpack: "packages/msgpack/src/",
   marcel: "packages/marcel/src/",
   chronic: "packages/chronic/src/",
+  "et-orbi": "packages/et-orbi/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",

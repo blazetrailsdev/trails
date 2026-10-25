@@ -552,19 +552,11 @@ export class TimeZone {
 
   equals = cmpEquals;
 
-  utcToLocal(time: Time): Temporal.ZonedDateTime | Time {
+  utcToLocal(time: Time): Time {
     const t = this.tzinfo.utcToLocal(time);
     return utcToLocalReturnsUtcOffsetTimes()
       ? t
-      : Time.utc(
-          t.year,
-          t.month,
-          t.day,
-          t.hour,
-          t.minute,
-          t.second,
-          t.millisecond * 1_000 + t.microsecond + t.nanosecond / 1_000,
-        );
+      : Time.utc(t.year, t.month, t.day, t.hour, t.min, t.sec, t.nsec / 1_000);
   }
 
   localToUtc(time: Time, dst: boolean | null = true): Time {
