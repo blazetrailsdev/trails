@@ -1,6 +1,6 @@
 import { ArgumentError, Exception } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
-import { IllegalBlockError } from "./xmlbase.js";
+import { IllegalBlockError, XmlBase } from "./xmlbase.js";
 import { XmlEvents } from "./xmlevents.js";
 import { XmlMarkup } from "./xmlmarkup.js";
 
@@ -414,10 +414,10 @@ describe("TestSpecialMarkup", () => {
   });
 
   it("no blocks", () => {
-    expect(() => xml.instructBang(undefined, undefined, (x: XmlMarkup) => x.hi())).toThrow(
+    expect(() => xml.instructBang(undefined, undefined, (x: XmlBase) => x.hi())).toThrow(
       IllegalBlockError,
     );
-    expect(() => xml.commentBang(":element", (x: XmlMarkup) => x.hi())).toThrow(IllegalBlockError);
+    expect(() => xml.commentBang(":element", (x: XmlBase) => x.hi())).toThrow(IllegalBlockError);
   });
 
   it("cdata", () => {
