@@ -644,8 +644,8 @@ step — `parity:*` is the only name to write.
 ## Module mixins (Ruby `include` → TypeScript)
 
 Rails uses `include`/`extend` to mix module methods into a class. TS has no
-language-level equivalent, so `@blazetrails/ruby-compat` (re-exported by
-`@blazetrails/activesupport`) supplies one for each Ruby construct. **Pick by
+language-level equivalent, so `@blazetrails/ruby-compat` and
+`@blazetrails/activesupport` supply one for each Ruby construct. **Pick by
 what the Ruby does**, so the TS reads back as the same mixin:
 
 | Ruby                                | TypeScript                           |

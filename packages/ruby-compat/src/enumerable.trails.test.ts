@@ -592,6 +592,7 @@ describe("minBy / maxBy / eachCons", () => {
 
   it("raises for a negative n", () => {
     expect(() => minBy([1], -1, (i) => i)).toThrow(new ArgumentError("negative size (-1)"));
+    expect(minBy([1], -0.5, (i) => i)).toEqual([]);
   });
 
   it("raises invalid size for a size that is not positive", () => {

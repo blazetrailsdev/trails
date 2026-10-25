@@ -492,7 +492,8 @@ export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
   checkArity(argv.length, 0, 1);
   const num = argv[0] as number | null | undefined;
   if (argv.length > 0 && num != null) {
-    if (num < 0) throw new ArgumentError(`negative size (${num})`);
+    const size = Math.trunc(num);
+    if (size < 0) throw new ArgumentError(`negative size (${size})`);
     const buf: [unknown, T][] = [];
     return rbBlockCall(
       obj,
@@ -502,7 +503,7 @@ export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
       () =>
         buf
           .sort(([a], [b]) => rbCmpint(cmp(a, b), a, b))
-          .slice(0, Math.trunc(num))
+          .slice(0, size)
           .map(([, i]) => i),
     );
   }
@@ -547,7 +548,8 @@ export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
   checkArity(argv.length, 0, 1);
   const num = argv[0] as number | null | undefined;
   if (argv.length > 0 && num != null) {
-    if (num < 0) throw new ArgumentError(`negative size (${num})`);
+    const size = Math.trunc(num);
+    if (size < 0) throw new ArgumentError(`negative size (${size})`);
     const buf: [unknown, T][] = [];
     return rbBlockCall(
       obj,
@@ -557,7 +559,7 @@ export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
       () =>
         buf
           .sort(([a], [b]) => rbCmpint(cmp(b, a), b, a))
-          .slice(0, Math.trunc(num))
+          .slice(0, size)
           .map(([, i]) => i),
     );
   }
