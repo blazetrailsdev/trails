@@ -1552,6 +1552,8 @@ export class Lowerer {
     const t = node ? this.typeOf(node, ctx) : null;
     if (t?.k === "array") return recv;
     if (t?.k === "hash" && !t.map) return `Object.entries(${recv})`;
+    // A ruby-compat `Hash` (a Map) iterates its pairs itself.
+    if (t?.k === "hash" && t.map && node?.k === "hash") return recv;
     return this.withOnce(
       recv,
       (x) =>
@@ -5380,6 +5382,14 @@ export class Lowerer {
         return { k: "array", el };
       }
       case "hash":
+        // A literal with an Integer / Regexp key is a ruby-compat `Hash` (`hashLit`).
+        if (
+          (n.pairs ?? []).some(
+            (p: any) => p.key && (p.key.k === "int" || p.key.k === "float" || p.key.k === "regex"),
+          ) &&
+          !(n.pairs ?? []).some((p: any) => p.splat)
+        )
+          return { k: "hash", map: true } as TypeRef;
         return { k: "hash" };
       case "lasgn":
         return this.typeOf(n.value, ctx);
