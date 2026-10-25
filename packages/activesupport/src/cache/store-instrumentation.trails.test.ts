@@ -24,9 +24,9 @@ describe("Cache::Store instrumentation", () => {
     }
   }
 
-  const normalizedKey = (key: string, options?: StoreOptions): string =>
+  const normalizedKey = (key: string, options?: StoreOptions): Promise<string> =>
     (
-      cache as unknown as { normalizeKey(key: string, options?: StoreOptions): string }
+      cache as unknown as { normalizeKey(key: string, options?: StoreOptions): Promise<string> }
     ).normalizeKey(key, options);
 
   it("fetchMulti extracts a trailing options hash before instrumenting", async () => {
@@ -34,7 +34,10 @@ describe("Cache::Store instrumentation", () => {
       await cache.fetchMulti("a", "b", { namespace: "foo" }, (key) => `${key}${key}`);
     });
     const opts = { namespace: "foo" };
-    expect(events[0].payload.key).toEqual([normalizedKey("a", opts), normalizedKey("b", opts)]);
+    expect(events[0].payload.key).toEqual([
+      await normalizedKey("a", opts),
+      await normalizedKey("b", opts),
+    ]);
     expect(events[0].payload.namespace).toBe("foo");
     expect(await cache.read("a", opts)).toBe("aa");
     expect(await cache.read("[object Object]")).toBeNull();
@@ -51,7 +54,7 @@ describe("Cache::Store instrumentation", () => {
       await cache.fetch("2", () => "bbbbbbbbbb");
     });
     expect(generate.map((e) => e.name)).toEqual(["cache_generate.active_support"]);
-    expect(generate[0].payload.key).toBe(normalizedKey("2"));
+    expect(generate[0].payload.key).toBe(await normalizedKey("2"));
   });
 
   it("fetch hit fires cache_fetch_hit.active_support with the raw name", async () => {
@@ -69,7 +72,7 @@ describe("Cache::Store instrumentation", () => {
       await cache.exist("1");
     });
     expect(events.map((e) => e.name)).toEqual(["cache_exist?.active_support"]);
-    expect(events[0].payload.key).toBe(normalizedKey("1"));
+    expect(events[0].payload.key).toBe(await normalizedKey("1"));
   });
 
   it("fetch with block receiving write options", async () => {

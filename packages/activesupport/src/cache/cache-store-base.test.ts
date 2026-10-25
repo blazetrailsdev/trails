@@ -27,7 +27,7 @@ class TestStore extends Store {
     }
   }
   override async increment(name: string, amount = 1): Promise<number | null> {
-    const key = this.normalizeKey(name, {});
+    const key = await this.normalizeKey(name, {});
     const entry = await this.readEntry(key, {});
     if (!entry) return null;
     const n = Number(entry.value);

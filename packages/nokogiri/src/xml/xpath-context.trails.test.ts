@@ -134,4 +134,28 @@ describe("XPathContext", () => {
     expect(set.map((n) => (n as unknown as Namespace).prefix)).toEqual(["xml"]);
     expect(context.evaluate("name(//p/namespace::xml)")).toBe("xml");
   });
+
+  it("unions namespace nodes by owning element and prefix", () => {
+    const doc = XmlDocument.parse('<root xmlns:a="urn:a"><b/><c/></root>');
+    const [b, c] = doc.root.children;
+    const fromB = new XPathContext(b as never).evaluate("namespace::*") as NodeSet;
+    const fromC = new XPathContext(c as never).evaluate("namespace::*") as NodeSet;
+    const again = new XPathContext(b as never).evaluate("namespace::*") as NodeSet;
+    expect(fromB.plus(again).length).toBe(fromB.length);
+    expect(fromB.plus(fromC).length).toBe(fromB.length + fromC.length);
+    doc.dispose();
+  });
+
+  it("unions HTML5 node sets by integer pointer id", () => {
+    const doc = Document.parse(html, null, null, {});
+    const context = new XPathContext(doc);
+    const lis = context.evaluate("//li") as NodeSet;
+    const tail = context.evaluate("//li[position()>1] | //p | //p/@data-n") as NodeSet;
+    expect(Number.isInteger(lis.first()!.pointerId)).toBe(true);
+    expect(lis.first()!.pointerId).toBe((context.evaluate("//li") as NodeSet).first()!.pointerId);
+    const union = lis.plus(tail);
+    expect(union.length).toBe(5);
+    expect(names(union).slice(0, 4)).toEqual(["one", "two", "three", "para"]);
+    expect(([...union].at(-1) as unknown as Attr).value).toBe("4");
+  });
 });

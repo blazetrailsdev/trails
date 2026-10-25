@@ -53,10 +53,13 @@ export class NodeSet implements Iterable<Node> {
 
   plus(nodeSet: NodeSet): NodeSet {
     const list = [...this._list];
-    for (const node of nodeSet) {
-      if (!list.some((x) => (x.pointerId ?? x._node) === (node.pointerId ?? node._node))) {
-        list.push(node);
-      }
+    for (const n2 of nodeSet) {
+      const skip = this._list.some((n1) =>
+        n1 instanceof XML.Namespace && n2 instanceof XML.Namespace
+          ? n1._node.owner === n2._node.owner && n1.prefix === n2.prefix
+          : n1.pointerId === n2.pointerId,
+      );
+      if (!skip) list.push(n2);
     }
     return new NodeSet(this.document, list);
   }
