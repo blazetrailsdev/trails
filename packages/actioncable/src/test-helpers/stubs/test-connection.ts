@@ -14,9 +14,13 @@ export class TestConnection {
   readonly logger: ReturnType<typeof TaggedLogging.new<Logger>>;
   readonly currentUser: User;
   readonly server: TestServer;
-  declare readonly subscriptions: unknown;
   readonly transmissions: unknown[];
   private _coder: Coder;
+  private _subscriptions?: unknown;
+
+  get subscriptions(): unknown {
+    return this._subscriptions;
+  }
 
   get pubsub(): unknown {
     return this.server.pubsub;
