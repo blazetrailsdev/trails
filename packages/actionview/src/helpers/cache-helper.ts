@@ -42,10 +42,6 @@ export interface CacheFragmentNameOptions {
   digestPath?: string | null;
 }
 
-/**
- * @inventedArm if — CONVERGEABLE cache-fragment-name-awaits-nested-relation-keys
- * @inventedArm cacheKeyWithVersion — CONVERGEABLE cache-fragment-name-awaits-nested-relation-keys
- */
 export async function cache(
   this: CacheHelperHost,
   name: unknown = {},
@@ -55,9 +51,6 @@ export async function cache(
   if ("performCaching" in this.controller && this.controller.performCaching) {
     await CachingRegistry.trackCaching(async () => {
       const nameOptions = slice(options, "skipDigest");
-      const keyed = name as { cacheKeyWithVersion?: () => unknown } | null;
-      if (typeof keyed?.cacheKeyWithVersion === "function")
-        name = await keyed.cacheKeyWithVersion();
       this.safeConcat(
         await fragmentFor.call(this, this.cacheFragmentName(name, nameOptions), options, block),
       );

@@ -25,8 +25,11 @@ import { cacheStoreCoderBehavior } from "../behaviors/cache-store-coder-behavior
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
 import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
 import type { StoreOptions } from "../store.js";
-function pathFor(store: FileStore, key: string): string {
-  return (store as unknown as { normalizeKey(k: string, o: object): string }).normalizeKey(key, {});
+function pathFor(store: FileStore, key: string): Promise<string> {
+  return (store as unknown as { normalizeKey(k: string, o: object): Promise<string> }).normalizeKey(
+    key,
+    {},
+  );
 }
 
 function filePathKey(store: FileStore, path: string): string {
@@ -57,14 +60,14 @@ describe("FileStoreTest", () => {
   });
 
   it("key transformation", async () => {
-    const key = pathFor(store, "views/index?id=1");
+    const key = await pathFor(store, "views/index?id=1");
     expect(filePathKey(store, key)).toEqual("views/index?id=1");
   });
 
   it("key transformation with pathname", async () => {
     writeFileSync(join(cacheDir, "foo"), "");
     const cacheWithPathname = new FileStore(cacheDir, { expiresIn: 60 });
-    const key = pathFor(cacheWithPathname, "views/index?id=1");
+    const key = await pathFor(cacheWithPathname, "views/index?id=1");
     expect(filePathKey(cacheWithPathname, key)).toEqual("views/index?id=1");
   });
 
@@ -86,7 +89,7 @@ describe("FileStoreTest", () => {
 
   it("key transformation max filename size", async () => {
     const key = `${"A".repeat(FILENAME_MAX_SIZE)}B`;
-    const path = pathFor(store, key);
+    const path = await pathFor(store, key);
     assert(path.split("/").every((dirName) => dirName.length <= FILENAME_MAX_SIZE));
     expect(basename(path)).toEqual("B");
   });
@@ -123,7 +126,7 @@ describe("FileStoreTest", () => {
   });
 
   it("delete prunes empty parent directories", async () => {
-    const entryDir = dirname(pathFor(store, "a/b"));
+    const entryDir = dirname(await pathFor(store, "a/b"));
     await store.write("a/b", "val");
     expect(existsSync(entryDir)).toBe(true);
     await store.delete("a/b");
@@ -137,7 +140,7 @@ describe("FileStoreTest", () => {
     symlinkSync(realRoot, linkRoot, "dir");
     try {
       const linkStore = new FileStore(linkRoot, { expiresIn: 60 });
-      const entryDir = dirname(pathFor(linkStore, "a/b"));
+      const entryDir = dirname(await pathFor(linkStore, "a/b"));
       await linkStore.write("a/b", "val");
       expect(existsSync(entryDir)).toBe(true);
       await linkStore.delete("a/b");
@@ -187,7 +190,7 @@ describe("FileStoreTest", () => {
   });
 
   it("cleanup when non active support cache file exists", async () => {
-    const cacheFilePath = pathFor(store, "foo");
+    const cacheFilePath = await pathFor(store, "foo");
     mkdirSync(dirname(cacheFilePath), { recursive: true });
     writeFileSync(cacheFilePath, cacheDir);
     await expect(store.cleanup()).resolves.not.toThrow();

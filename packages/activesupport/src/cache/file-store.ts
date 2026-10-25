@@ -87,7 +87,7 @@ export class FileStore extends Store implements CacheStore {
     options?: StoreOptions,
   ): Promise<number | null> {
     options = this.mergedOptions(options);
-    const key = this.normalizeKey(name, options);
+    const key = await this.normalizeKey(name, options);
     return await this.instrument("increment", key, { amount }, () =>
       this.modifyValue(name, amount, options),
     );
@@ -99,7 +99,7 @@ export class FileStore extends Store implements CacheStore {
     options?: StoreOptions,
   ): Promise<number | null> {
     options = this.mergedOptions(options);
-    const key = this.normalizeKey(name, options);
+    const key = await this.normalizeKey(name, options);
     return await this.instrument("decrement", key, { amount }, () =>
       this.modifyValue(name, -amount, options),
     );
@@ -198,8 +198,8 @@ export class FileStore extends Store implements CacheStore {
     }
   }
 
-  protected override normalizeKey(key: unknown, options?: StoreOptions): string {
-    key = super.normalizeKey(key, options);
+  protected override async normalizeKey(key: unknown, options?: StoreOptions): Promise<string> {
+    key = await super.normalizeKey(key, options);
     let fname = encodeWwwFormComponent(key as string);
 
     if (fname.length > FILEPATH_MAX_SIZE) {
@@ -261,8 +261,8 @@ export class FileStore extends Store implements CacheStore {
 
   private async modifyValue(name: string, amount: number, options: StoreOptions): Promise<number> {
     options = this.mergedOptions(options);
-    const key = this.normalizeKey(name, options);
-    const version = this.normalizeVersion(name, options) ?? null;
+    const key = await this.normalizeKey(name, options);
+    const version = (await this.normalizeVersion(name, options)) ?? null;
     amount = kernelInteger(amount);
 
     return await this.lockFile(key, async () => {

@@ -11,6 +11,16 @@ type Parse5Node = DefaultTreeAdapterMap["childNode"];
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 type Parse5Attr = DefaultTreeAdapterMap["element"]["attrs"][number];
 
+const pointerIds = new WeakMap<object, number>();
+let lastPointerId = 0;
+
+/** @noRailsEquivalent PERMANENT */
+export function parse5PointerId(node: object): number {
+  let id = pointerIds.get(node);
+  if (id === undefined) pointerIds.set(node, (id = ++lastPointerId));
+  return id;
+}
+
 export class Node {
   declare css: (...args: unknown[]) => NodeSet;
   declare atCss: (...args: unknown[]) => Node | undefined;
@@ -30,8 +40,8 @@ export class Node {
     readonly document: unknown = null,
   ) {}
 
-  get pointerId(): Parse5Node {
-    return this._node;
+  get pointerId(): number {
+    return parse5PointerId(this._node);
   }
 
   get type(): number {
