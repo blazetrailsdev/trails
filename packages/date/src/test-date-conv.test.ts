@@ -10,12 +10,8 @@ describe("TestDateConv", () => {
       new (...args: never[]) => object,
     ][] = [
       [new Time(2004, 9, 19, 1, 2, 3, "+03:00"), Time, Temporal.ZonedDateTime],
-      [new Date(2004, 9, 19), Temporal.ZonedDateTime, Temporal.PlainDateTime],
-      [
-        new DateTime(2004, 9, 19, 1, 2, 3, new Rational(8, 24)),
-        Temporal.ZonedDateTime,
-        Temporal.ZonedDateTime,
-      ],
+      [new Date(2004, 9, 19), Time, Temporal.PlainDateTime],
+      [new DateTime(2004, 9, 19, 1, 2, 3, new Rational(8, 24)), Time, Temporal.ZonedDateTime],
     ];
     for (const [o, timeClass, datetimeClass] of subjects) {
       expect(o.toTime()).toBeInstanceOf(timeClass);
@@ -46,7 +42,7 @@ describe("TestDateConv", () => {
   it("to time  from date", () => {
     const d = new Date(2004, 9, 19);
     const t = d.toTime();
-    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, usec(t)]).toEqual([
+    expect([t.year, t.mon, t.mday, t.hour, t.min, t.sec, t.usec]).toEqual([
       2004, 9, 19, 0, 0, 0, 0,
     ]);
   });
@@ -54,7 +50,7 @@ describe("TestDateConv", () => {
   it("to time to date roundtrip  from gregorian date", () => {
     const d = new Date(1582, 10, 15);
     const t = d.toTime();
-    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, usec(t)]).toEqual([
+    expect([t.year, t.mon, t.mday, t.hour, t.min, t.sec, t.usec]).toEqual([
       1582, 10, 15, 0, 0, 0, 0,
     ]);
     expect(timeToDate(t).toDate().equals(d.toDate())).toBe(true);
@@ -64,7 +60,7 @@ describe("TestDateConv", () => {
   it("to time to date roundtrip  from julian date", () => {
     const d = new Date(1582, 10, 4);
     const t = d.toTime();
-    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, usec(t)]).toEqual([
+    expect([t.year, t.mon, t.mday, t.hour, t.min, t.sec, t.usec]).toEqual([
       1582, 10, 14, 0, 0, 0, 0,
     ]);
     expect(timeToDate(t).toDate().equals(d.toDate())).toBe(true);
@@ -76,41 +72,47 @@ describe("TestDateConv", () => {
       new Rational(456789, 86400000000),
     );
     let t = d.toTime();
-    expect([
-      t.year,
-      t.month,
-      t.day,
-      t.hour,
-      t.minute,
-      t.second,
-      usec(t),
-      t.offsetNanoseconds / 1_000_000_000,
-    ]).toEqual([2004, 9, 19, 1, 2, 3, 456789, 8 * 60 * 60]);
+    expect([t.year, t.mon, t.mday, t.hour, t.min, t.sec, t.usec, t.utcOffset]).toEqual([
+      2004,
+      9,
+      19,
+      1,
+      2,
+      3,
+      456789,
+      8 * 60 * 60,
+    ]);
 
     d = new DateTime(2004, 9, 19, 1, 2, 3, 0).plus(new Rational(456789, 86400000000));
-    t = d.toTime().withTimeZone("UTC");
-    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, usec(t)]).toEqual([
+    t = d.toTime().utc();
+    expect([t.year, t.mon, t.mday, t.hour, t.min, t.sec, t.usec]).toEqual([
       2004, 9, 19, 1, 2, 3, 456789,
     ]);
 
     d = new DateTime(1582, 10, 3, 1, 2, 3, 0).plus(new Rational(456789, 86400000000));
-    t = d.toTime().withTimeZone("UTC");
-    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, usec(t)]).toEqual([
+    t = d.toTime().utc();
+    expect([t.year, t.mon, t.mday, t.hour, t.min, t.sec, t.usec]).toEqual([
       1582, 10, 13, 1, 2, 3, 456789,
     ]);
 
     d = new DateTime(2004, 9, 19, 1, 2, 3, 0).plus(new Rational(456789123, 86400000000000));
-    t = d.toTime().withTimeZone("UTC");
-    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, nsec(t)]).toEqual([
+    t = d.toTime().utc();
+    expect([t.year, t.mon, t.mday, t.hour, t.min, t.sec, t.nsec]).toEqual([
       2004, 9, 19, 1, 2, 3, 456789123,
     ]);
 
     d = new DateTime(2004, 9, 19, 1, 2, 3, 0).plus(
       new Rational(456789123456789123n, 86400000000000000000000n),
     );
-    t = d.toTime().withTimeZone("UTC");
-    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, nsec(t)]).toEqual([
-      2004, 9, 19, 1, 2, 3, 456789123,
+    t = d.toTime().utc();
+    expect([t.year, t.mon, t.mday, t.hour, t.min, t.sec, t.subsec]).toEqual([
+      2004,
+      9,
+      19,
+      1,
+      2,
+      3,
+      new Rational(456789123456789123n, 1000000000000000000n),
     ]);
   });
 
@@ -220,10 +222,6 @@ function usec(t: Temporal.ZonedDateTime | Temporal.PlainDateTime): number {
   return t.millisecond * 1000 + t.microsecond;
 }
 
-function nsec(t: Temporal.ZonedDateTime | Temporal.PlainDateTime): number {
-  return t.millisecond * 1_000_000 + t.microsecond * 1_000 + t.nanosecond;
-}
-
 function iso8601(
   d: Temporal.ZonedDateTime | Temporal.PlainDateTime,
   fractionDigits: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9,
@@ -237,7 +235,6 @@ function offsetSeconds(d: Temporal.ZonedDateTime | Temporal.PlainDateTime): numb
   return d instanceof Temporal.ZonedDateTime ? d.offsetNanoseconds / 1_000_000_000 : 0;
 }
 
-function timeToDate(t: Temporal.ZonedDateTime): Date {
-  const time = new Time(t.year, t.month, t.day, t.hour, t.minute, t.second);
-  return new Date(time.year, time.mon, time.day, Date.GREGORIAN).newStart();
+function timeToDate(t: Time): Date {
+  return new Date(t.year, t.mon, t.day, Date.GREGORIAN).newStart();
 }

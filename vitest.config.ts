@@ -565,6 +565,7 @@ export default defineConfig({
             "packages/activerecord/**",
             "packages/solid-queue/**",
             "packages/trailties/**",
+            "packages/et-orbi/**",
             ...SHARED_EXCLUDE,
           ],
           globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],
@@ -595,6 +596,19 @@ export default defineConfig({
           include: ["packages/trailties/src/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
           setupFiles: otherSetupFiles,
+        },
+      },
+      {
+        // et-orbi does not load ActiveSupport, so its specs run without the
+        // core extensions `otherSetupFiles` installs (`Time#<=>`'s
+        // `compare_with_coercion` among them).
+        resolve: otherResolve,
+        test: {
+          name: "et-orbi",
+          globals: true,
+          include: ["packages/et-orbi/src/**/*.test.ts"],
+          exclude: SHARED_EXCLUDE,
+          setupFiles: ["./packages/vitest-matchers/src/setup.ts"],
         },
       },
     ],

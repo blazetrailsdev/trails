@@ -1,4 +1,3 @@
-import { TopLevel } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import {
   Gem,
@@ -6,6 +5,7 @@ import {
   RUBY_VERSION,
   env,
   numericModulo,
+  registeredConstant,
   rbInspect,
   rbObjClass,
   toF,
@@ -27,7 +27,7 @@ export function platformInfo(): string {
     win: Gem.isWinPlatform(),
     rorv: (() => {
       try {
-        return (TopLevel.Trails as unknown as { VERSION: { STRING: string } }).VERSION.STRING;
+        return (registeredConstant("Trails") as { VERSION: { STRING: string } }).VERSION.STRING;
       } catch {
         return null;
       }

@@ -1,11 +1,20 @@
 import type {} from "@blazetrails/vitest-matchers";
-import { Time } from "@blazetrails/date";
-import { beforeEach, describe, expect, it } from "vitest";
+import { Time, resetLocalTimeZoneId } from "@blazetrails/date";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Chronic } from "./chronic.js";
 
 describe("TestDaylightSavings", () => {
   let beginDaylightSavings: Time;
   let endDaylightSavings: Time;
+  let previousTimeZoneId: string | null;
+
+  beforeAll(() => {
+    previousTimeZoneId = resetLocalTimeZoneId("America/New_York");
+  });
+
+  afterAll(() => {
+    resetLocalTimeZoneId(previousTimeZoneId);
+  });
 
   beforeEach(() => {
     beginDaylightSavings = Time.local(2008, 3, 9, 5, 0, 0, 0);

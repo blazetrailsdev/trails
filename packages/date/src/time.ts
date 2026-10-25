@@ -1,4 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
+import { tzdataAbbreviation } from "./tzdata-abbreviations.js";
 import { tzdataIsdst } from "./tzdata-isdst.js";
 import {
   ArgumentError,
@@ -19,6 +20,8 @@ import {
 import {
   Rational,
   TEMPORAL_METHOD_TABLE,
+  cmp,
+  rbCmpint,
   isRubyTzUptodate,
   kernelInteger,
   rbCTime,
@@ -99,81 +102,12 @@ function utcOffsetArgument(zone: string | number | Rational): "UTC" | number {
   );
 }
 
-const ZONE_ABBREVIATIONS: Record<string, readonly [string] | readonly [string, string]> = {
-  "Africa/Cairo": ["EET", "EEST"],
-  "Africa/Harare": ["CAT"],
-  "Africa/Johannesburg": ["SAST"],
-  "Africa/Lagos": ["WAT"],
-  "Africa/Nairobi": ["EAT"],
-  "America/St_Johns": ["NST", "NDT"],
-  "Asia/Hong_Kong": ["HKT"],
-  "Asia/Jakarta": ["WIB"],
-  "Asia/Jayapura": ["WIT"],
-  "Asia/Jerusalem": ["IST", "IDT"],
-  "Asia/Karachi": ["PKT"],
-  "Asia/Kolkata": ["IST"],
-  "Asia/Makassar": ["WITA"],
-  "Asia/Manila": ["PST"],
-  "Asia/Seoul": ["KST"],
-  "Asia/Shanghai": ["CST"],
-  "Asia/Taipei": ["CST"],
-  "Asia/Tokyo": ["JST"],
-  "Asia/Yangon": ["MMT"],
-  "Australia/Adelaide": ["ACST", "ACDT"],
-  "Australia/Brisbane": ["AEST"],
-  "Australia/Darwin": ["ACST"],
-  "Australia/Perth": ["AWST"],
-  "Australia/Sydney": ["AEST", "AEDT"],
-  "Europe/Athens": ["EET", "EEST"],
-  "Europe/Berlin": ["CET", "CEST"],
-  "Europe/Dublin": ["GMT", "IST"],
-  "Europe/Lisbon": ["WET", "WEST"],
-  "Europe/London": ["GMT", "BST"],
-  "Europe/Moscow": ["MSK"],
-  "Europe/Paris": ["CET", "CEST"],
-  "Pacific/Auckland": ["NZST", "NZDT"],
-  "Pacific/Guam": ["ChST"],
-};
-
-function primaryZoneId(timeZoneId: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: timeZoneId }).resolvedOptions().timeZone;
-}
-
-let abbreviationsByPrimaryZoneId: Map<string, readonly [string] | readonly [string, string]>;
-
-function zoneAbbreviations(
-  timeZoneId: string,
-): readonly [string] | readonly [string, string] | undefined {
-  const abbreviations = ZONE_ABBREVIATIONS[timeZoneId];
-  if (abbreviations !== undefined) return abbreviations;
-  abbreviationsByPrimaryZoneId ??= new Map(
-    Object.entries(ZONE_ABBREVIATIONS).map(([id, entry]) => [primaryZoneId(id), entry]),
+function zoneAbbreviation(zoned: Temporal.ZonedDateTime): string {
+  const abbreviation = tzdataAbbreviation(
+    zoned.timeZoneId,
+    Math.floor(zoned.epochMilliseconds / 1000),
   );
-  return abbreviationsByPrimaryZoneId.get(primaryZoneId(timeZoneId));
-}
-
-/** @noRailsEquivalent CONVERGEABLE date-zone-abbreviations-read-tzdata-not-intl-locale */
-function tzdataAbbreviation(zoned: Temporal.ZonedDateTime): string {
-  const abbreviations = zoneAbbreviations(zoned.timeZoneId);
-  if (abbreviations !== undefined) {
-    if (abbreviations.length === 1) return abbreviations[0];
-    return tzdataIsdst(zoned.timeZoneId, Math.floor(zoned.epochMilliseconds / 1000))
-      ? abbreviations[1]
-      : abbreviations[0];
-  }
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: zoned.timeZoneId,
-    timeZoneName: "short",
-  }).formatToParts(new globalThis.Date(zoned.epochMilliseconds));
-  const short = parts.find((part) => part.type === "timeZoneName")!.value;
-  if (short === "GMT" || !short.startsWith("GMT")) return short;
-  const british = new Intl.DateTimeFormat("en-GB", {
-    timeZone: zoned.timeZoneId,
-    timeZoneName: "short",
-  })
-    .formatToParts(new globalThis.Date(zoned.epochMilliseconds))
-    .find((part) => part.type === "timeZoneName")!.value;
-  if (zoned.timeZoneId.startsWith("Europe/") && !/^(GMT|UTC)/.test(british)) return british;
+  if (abbreviation !== undefined) return abbreviation;
   const offset = zoned.offset;
   return offset.endsWith(":00") ? offset.slice(0, 3) : offset.replace(":", "");
 }
@@ -416,7 +350,7 @@ export class Timezone {
   }
 
   abbr(time: Time): string {
-    return tzdataAbbreviation(time.toZonedDateTime().withTimeZone(this.identifier));
+    return zoneAbbreviation(time.toZonedDateTime().withTimeZone(this.identifier));
   }
 }
 
@@ -1107,7 +1041,7 @@ export class Time extends rbCTime {
         (d.cwyear != null && year == null) ||
         ((d.cwday != null || d.cweek != null) && !(d.mon != null && d.mday != null))
       ) {
-        return Time.#atInstant(dNewByFrags(Date._strptime(date, format)).toTime().toInstant());
+        return dNewByFrags(Date._strptime(date, format)).toTime();
       }
       if (
         (d.wnum0 != null || d.wnum1 != null) &&
@@ -1425,7 +1359,7 @@ export class Time extends rbCTime {
     if (this.#tzmodeUtc) return "UTC";
     if (this.#timeZoneId == null) return this.#zoneObject;
     if (!this.#localZone) return (this.#zoneObject ??= new Timezone(this.#timeZoneId));
-    return tzdataAbbreviation(this.#instant.toZonedDateTimeISO(this.#timeZoneId));
+    return zoneAbbreviation(this.#instant.toZonedDateTimeISO(this.#timeZoneId));
   }
 
   /** @internal */
@@ -1549,11 +1483,25 @@ export class Time extends rbCTime {
     );
   }
 
+  /** `time_cmp` (`vendor/ruby/v3.3.11/time.c:3951`). */
   compare(other: unknown): number | null {
-    if (!(other instanceof Time)) return null;
+    if (!(other instanceof Time)) {
+      // `rb_invcmp` (`vendor/ruby/v3.3.11/compar.c:50`).
+      const invcmp = cmp(other, this);
+      if (invcmp === null) return null;
+      return -rbCmpint(invcmp, this, other);
+    }
     const n = this.#instant.epochNanoseconds - other.#instant.epochNanoseconds;
     if (n === 0n) return this.#subnano.cmp(other.#subnano);
     return n > 0n ? 1 : -1;
+  }
+
+  /** `Comparable#==` (`cmp_equal`, `vendor/ruby/v3.3.11/compar.c:79`). */
+  equals(other: unknown): boolean {
+    if ((this as unknown) === other) return true;
+    const c = this.compare(other);
+    if (c === null) return false;
+    return rbCmpint(c, this, other) === 0;
   }
 
   /** `time_init_copy` (`vendor/ruby/v3.3.11/time.c:4046`), whose `MEMCPY` copies the whole `time_object`. */

@@ -629,8 +629,7 @@ describe("EtOrbi::EoTime", () => {
     });
 
     describe("Time == EoTime", () => {
-      // BLOCKED: et-orbi-drops-activesupport-for-tzinfo
-      it.skip("returns true when same sec", () => {
+      it("returns true when same sec", () => {
         const eo = EtOrbi.parse("2018-11-04 02:30:00 Europe/Berlin");
         const t = Time.at(eo.toI());
 
