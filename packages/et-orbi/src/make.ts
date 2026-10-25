@@ -111,15 +111,10 @@ export function makeFromTime(t: Time, zone: Timezone | null): EoTime {
   return new EoTime(t, z);
 }
 
-/**
- * @internal
- * @inventedArm at — CONVERGEABLE date-to-time-returns-a-ruby-time
- */
+/** @internal */
 export function makeFromDate(d: Date, zone: Timezone | null): EoTime {
   return makeFromTime(
-    rbObjRespondTo(d, "toTime")
-      ? Time.at(d.toTime().epochMilliseconds / 1000)
-      : Time.parse(d.strftime("%Y-%m-%d %H:%M:%S")),
+    rbObjRespondTo(d, "toTime") ? d.toTime() : Time.parse(d.strftime("%Y-%m-%d %H:%M:%S")),
     zone,
   );
 }

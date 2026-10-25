@@ -79,7 +79,6 @@ export function parse(text: string, options: Record<string, unknown> = {}): Ruby
   return new Parser(options).parse(text);
 }
 
-/** @inventedArm if — CONVERGEABLE date-datetime-new-spelling-converges-with-time-new */
 export function construct(
   year: number,
   month = 1,
@@ -126,25 +125,14 @@ export function construct(
     }
   }
   if (timeClass().name === "Date") {
-    return new (timeClass() as unknown as typeof RubyDate)(year, month, day) as unknown as RubyTime;
+    return timeClass().new!(year, month, day);
   } else if (
-    !(rbObjRespondTo(timeClass(), "new") || typeof timeClass() === "function") ||
+    !rbObjRespondTo(timeClass(), "new") ||
     (toF(RUBY_VERSION) < 1.9 && timeClass().name === "Time")
   ) {
     return timeClass().local(year, month, day, hour, minute, second);
   } else {
     if (timeClass().name === "DateTime") offset = Time.normalizeOffset(offset);
-    if (!rbObjRespondTo(timeClass(), "new")) {
-      return new (timeClass() as unknown as new (...args: unknown[]) => RubyTime)(
-        year,
-        month,
-        day,
-        hour,
-        minute,
-        second,
-        offset,
-      );
-    }
     return timeClass().new!(year, month, day, hour, minute, second, offset);
   }
 }
