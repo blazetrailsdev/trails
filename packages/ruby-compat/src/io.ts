@@ -895,7 +895,7 @@ export class IO {
    * `IO#tty?` (`vendor/ruby/v3.3.11/io.c:5270` `rb_io_isatty`): whether the
    * descriptor is a terminal. Only a standard stream's adapter can tell.
    *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#tty?` (`vendor/ruby/v3.3.11/io.c:5270`).
+   * @noRailsEquivalent PERMANENT
    */
   isTty(): boolean {
     return this.stdioFile?.isTTY ?? false;

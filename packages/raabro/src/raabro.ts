@@ -401,7 +401,7 @@ export class ModuleMethods {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
-  declare _last: string | null | undefined;
+  declare private _last: string | null | undefined;
 
   static toString(): string {
     return "Raabro::ModuleMethods";
