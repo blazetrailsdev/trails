@@ -414,7 +414,6 @@ export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
 export { strCount, trTrans } from "./string/tr.js";
 export {
-  deleteSuffix,
   lastMatchGetter,
   matchOperator,
   rbDefineMethod,

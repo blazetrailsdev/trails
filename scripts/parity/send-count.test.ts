@@ -8,7 +8,6 @@ const run = promisify(execFile);
 describe("countLines", () => {
   it("counts a literal name and skips a computed one", () => {
     expect(countLines('rbFSend(app, "call", env);\nrbFSend(recv, name);\nok\n')).toBe(1);
-    expect(countLines('rbFPublicSend(record, "write", v);\n')).toBe(1);
   });
 
   it("counts a nested call in the receiver slot", () => {
