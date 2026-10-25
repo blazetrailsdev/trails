@@ -854,6 +854,9 @@ importers:
       '@blazetrails/did-you-mean':
         specifier: workspace:*
         version: link:../../packages/did-you-mean
+      '@blazetrails/et-orbi':
+        specifier: workspace:*
+        version: link:../../packages/et-orbi
       '@blazetrails/globalid':
         specifier: workspace:*
         version: link:../../packages/globalid
