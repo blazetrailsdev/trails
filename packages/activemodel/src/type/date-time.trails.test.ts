@@ -4,6 +4,8 @@ import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import { plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import * as Types from "../index.js";
 import { ValueType } from "../index.js";
+import { include } from "@blazetrails/ruby-compat";
+import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
 
 describe("DateTimeType fallback string parsing", () => {
   const type = new Types.DateTimeType();
@@ -130,15 +132,16 @@ describe("DateTimeType assert_valid_value", () => {
   });
 
   it("sends a non-hash value to super", () => {
-    const type = new Types.DateTimeType();
-    const multiparameter = vi.spyOn(
-      type as unknown as { valueFromMultiparameterAssignment(v: unknown): unknown },
-      "valueFromMultiparameterAssignment",
+    class Parent extends ValueType {
+      override assertValidValue(value: unknown): void {
+        throw new Error(`from super: ${String(value)}`);
+      }
+    }
+    class Host extends Parent {}
+    include(Host, new AcceptsMultiparameterTime({ defaults: { "4": 0, "5": 0 } }));
+    expect(() => new Host().assertValidValue("2020-07-04T12:30:00Z")).toThrow(
+      `from super: ${"2020-07-04T12:30:00Z"}`,
     );
-    expect(type.assertValidValue("2020-07-04T12:30:00Z")).toBe(
-      ValueType.prototype.assertValidValue.call(type, "2020-07-04T12:30:00Z"),
-    );
-    expect(multiparameter).not.toHaveBeenCalled();
   });
 
   it("does not send a multiparameter hash to super", () => {

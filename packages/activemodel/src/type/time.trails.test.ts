@@ -3,6 +3,8 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone, useZone } from "@blazetrails/activesupport";
 import * as Types from "../index.js";
 import { ValueType } from "../index.js";
+import { include } from "@blazetrails/ruby-compat";
+import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
 
 function timeUtc(year: number, mon: number, mday: number, hour = 0, min = 0, sec = 0): RubyTime {
   return RubyTime.utc(year, mon, mday, hour, min, sec);
@@ -25,15 +27,19 @@ describe("TimeType assert_valid_value", () => {
   });
 
   it("sends a non-hash value to super", () => {
-    const type = new Types.TimeType();
-    const multiparameter = vi.spyOn(
-      type as unknown as { valueFromMultiparameterAssignment(v: unknown): unknown },
-      "valueFromMultiparameterAssignment",
+    class Parent extends ValueType {
+      override assertValidValue(value: unknown): void {
+        throw new Error(`from super: ${String(value)}`);
+      }
+    }
+    class Host extends Parent {}
+    include(
+      Host,
+      new AcceptsMultiparameterTime({ defaults: { "1": 2000, "2": 1, "3": 1, "4": 0, "5": 0 } }),
     );
-    expect(type.assertValidValue("2020-07-04T12:30:00Z")).toBe(
-      ValueType.prototype.assertValidValue.call(type, "2020-07-04T12:30:00Z"),
+    expect(() => new Host().assertValidValue("2020-07-04T12:30:00Z")).toThrow(
+      `from super: ${"2020-07-04T12:30:00Z"}`,
     );
-    expect(multiparameter).not.toHaveBeenCalled();
   });
 
   it("does not send a multiparameter hash to super", () => {

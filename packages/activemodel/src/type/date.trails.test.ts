@@ -3,6 +3,8 @@ import { Date as RubyDate, Temporal } from "@blazetrails/date";
 import { plainDate } from "@blazetrails/activesupport/testing/temporal-helpers";
 import * as Types from "../index.js";
 import { ValueType } from "../index.js";
+import { include } from "@blazetrails/ruby-compat";
+import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
 
 describe("DateType assert_valid_value", () => {
   afterEach(() => {
@@ -10,15 +12,14 @@ describe("DateType assert_valid_value", () => {
   });
 
   it("sends a non-hash value to super", () => {
-    const type = new Types.DateType();
-    const multiparameter = vi.spyOn(
-      type as unknown as { valueFromMultiparameterAssignment(v: unknown): unknown },
-      "valueFromMultiparameterAssignment",
-    );
-    expect(type.assertValidValue("2020-07-04")).toBe(
-      ValueType.prototype.assertValidValue.call(type, "2020-07-04"),
-    );
-    expect(multiparameter).not.toHaveBeenCalled();
+    class Parent extends ValueType {
+      override assertValidValue(value: unknown): void {
+        throw new Error(`from super: ${String(value)}`);
+      }
+    }
+    class Host extends Parent {}
+    include(Host, new AcceptsMultiparameterTime());
+    expect(() => new Host().assertValidValue("2020-07-04")).toThrow(`from super: ${"2020-07-04"}`);
   });
 
   it("does not send a multiparameter hash to super", () => {
