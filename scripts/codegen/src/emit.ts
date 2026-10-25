@@ -2344,7 +2344,8 @@ export class Emitter {
                 (t.k === "prim" && (t.name === "number" || t.name === "string")))
                 ? this.lw.tsType({ ...t, nullable: false } as typeof t, ctx)
                 : null;
-            return `${jsIdent(h)}: ${ts && ts !== "unknown" ? ts : "any"}`;
+            // `!`: a branch Ruby leaves it nil in reads nil, which TS cannot follow.
+            return ts && ts !== "unknown" ? `${jsIdent(h)}!: ${ts}` : `${jsIdent(h)}: any`;
           })
           .join(", ")};`,
         ...body,

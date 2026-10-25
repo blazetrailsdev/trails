@@ -2094,9 +2094,14 @@ export class Lowerer {
       const t = (isBlock ? null : ctx.paramTypes?.[position++]) ?? "any";
       // A gem with no hand port: a parameter its body uses as an Integer or a
       // Time (`duckLocalTime`) is declared so, ahead of the type pass.
-      if (t === "any" && !isBlock && name && GEM.hand === false) {
+      const loose = t === "any" || t === "unknown" || t === "Record<string, unknown>";
+      if (loose && !isBlock && name && GEM.hand === false) {
         const d = this.duckLocalTime(ctx, name);
         if (d?.k === "prim" && d.name === "number") return "number";
+        if (d?.k === "class" && d.key === "@date/time.ts#Time") {
+          (ctx.scope.types ??= new Map()).set(name, { ...d, nullable: false } as TypeRef);
+          return this.tsType({ ...d, nullable: false } as TypeRef, ctx);
+        }
       }
       return t;
     };
@@ -6045,13 +6050,6 @@ export class Lowerer {
   duckLocalTime(ctx: Ctx, name: string): TypeRef {
     const body = ctx.defBody;
     if (!body || typeof body !== "object" || GEM.hand !== false) return null;
-    if (process.env.DUCKDBG && name === "span")
-      console.error(
-        "DUCK",
-        ctx.defName,
-        ctx.defParams?.map((p) => p.name),
-        this.index.resolveConst(["Span"], ctx.nesting),
-      );
     // A parameter named for a gem class (`span` → `Chronic::Span`) holds one.
     if (ctx.defParams?.some((p) => p.name === name)) {
       // …or by suffix (`outer_span`).
@@ -6061,7 +6059,12 @@ export class Lowerer {
           [snakeToCamel(name).replace(/^./, (c) => c.toUpperCase())],
           ctx.nesting,
         ) ?? this.index.resolveConst([base.replace(/^./, (c) => c.toUpperCase())], ctx.nesting);
-      const key = hit?.kind === "scope" ? this.resolver.oracleKey(hit.fqn) : null;
+      // Only a class with instances (instance methods): `Chronic::Time`, all
+      // `self.` methods, does not name what a `time` parameter holds.
+      const key =
+        hit?.kind === "scope" && (this.index.scopes.get(hit.fqn)?.defs.size ?? 0) > 0
+          ? this.resolver.oracleKey(hit.fqn)
+          : null;
       if (key) return { k: "class", key } as TypeRef;
     }
     let memo = this.duckLocalMemo.get(body);
