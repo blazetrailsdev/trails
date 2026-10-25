@@ -38,7 +38,6 @@ class EchoChannel extends ChannelBase {
 }
 rbModConstSet(PublishedClientTest, "EchoChannel", EchoChannel);
 
-// global "visibilitychange" listener, which Node's globalThis does not have.
 const visibilityShim = globalThis as unknown as Record<string, unknown>;
 
 function waitFor(condition: () => boolean, timeout = 5000): Promise<void> {
@@ -54,14 +53,17 @@ function waitFor(condition: () => boolean, timeout = 5000): Promise<void> {
 }
 
 describe("published client", () => {
+  let staleThreshold: number;
+
   beforeAll(() => {
+    staleThreshold = Client.ConnectionMonitor.staleThreshold;
     visibilityShim["addEventListener"] ??= () => {};
     visibilityShim["removeEventListener"] ??= () => {};
     Client.adapters.WebSocket = globalThis.WebSocket;
   });
 
   afterAll(() => {
-    Client.ConnectionMonitor.staleThreshold = 6;
+    Client.ConnectionMonitor.staleThreshold = staleThreshold;
   });
 
   beforeEach(async () => {
@@ -126,13 +128,14 @@ describe("published client", () => {
       await waitFor(() => events.includes("reconnected"));
       expect(connection.monitor.isRunning()).toBe(true);
       expect(app.connections.length).toBe(1);
-      Client.ConnectionMonitor.staleThreshold = 6;
+      Client.ConnectionMonitor.staleThreshold = staleThreshold;
 
       await app.remoteConnections.where({ id: "1" }).disconnect({ reconnect: false });
       await waitFor(() => !connection.isOpen() && events.at(-1) === "disconnected");
       expect(connection.monitor.isRunning()).toBe(false);
       await waitFor(() => app.connections.length === 0);
     } finally {
+      Client.ConnectionMonitor.staleThreshold = staleThreshold;
       consumer.disconnect();
       await Handler.Node.shutdown();
     }
