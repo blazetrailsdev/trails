@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import "../index.js";
 import { Base as ServerBase } from "../server/base.js";
 import { Configuration } from "../server/configuration.js";
+import { socketPair } from "../test-helpers/socket-pair.js";
 import { StreamEventLoop } from "./stream-event-loop.js";
 import { Base } from "./base.js";
 
 const noop = () => {};
-const io = { on: noop, off: noop, write: () => true, destroy: noop };
+const [io] = socketPair();
 
 function env(): Record<string, unknown> {
   return {

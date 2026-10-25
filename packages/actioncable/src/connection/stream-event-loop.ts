@@ -7,9 +7,13 @@ import {
 import { Connection } from "../namespaces.js";
 
 interface Io {
-  on(event: string, listener: (...args: unknown[]) => void): unknown;
-  off(event: string, listener: (...args: unknown[]) => void): unknown;
-  destroy(): unknown;
+  waitReadable(): Promise<unknown>;
+  readNonblock(
+    len: number,
+    buf: null,
+    options: { exception: false },
+  ): Uint8Array | "wait_readable" | null;
+  close(): unknown;
 }
 
 interface Stream {
@@ -17,11 +21,9 @@ interface Stream {
   close(): unknown;
 }
 
-type Monitor = Record<"data" | "end" | "error", (...args: unknown[]) => void>;
-
 export class StreamEventLoop {
   private _executor: ThreadPoolExecutor | null;
-  private _map: Map<Io, Monitor>;
+  private _map: Map<Io, Stream>;
   private _stopping: boolean;
 
   constructor() {
@@ -42,40 +44,35 @@ export class StreamEventLoop {
   }
 
   attach(io: Io, stream: Stream): void {
-    const handle =
-      (read: (incoming?: unknown) => void) =>
-      (incoming?: unknown): void => {
+    this._map.set(io, stream);
+    void (async () => {
+      while (!this._stopping && this._map.get(io) === stream) {
         try {
-          read(incoming);
+          await io.waitReadable();
+          if (this._map.get(io) !== stream) break;
+
+          const incoming = io.readNonblock(4096, null, { exception: false });
+          if (incoming === "wait_readable") {
+            continue;
+          } else if (incoming == null) {
+            stream.close();
+          } else {
+            stream.receive(incoming);
+          }
         } catch {
           try {
             stream.close();
           } catch {
-            for (const [event, listener] of Object.entries(monitor)) io.off(event, listener);
             this._map.delete(io);
           }
         }
-      };
-    const monitor: Monitor = {
-      data: handle((incoming) => {
-        stream.receive(incoming);
-      }),
-      end: handle(() => {
-        stream.close();
-      }),
-      error: handle((error) => {
-        throw error;
-      }),
-    };
-    this._map.set(io, monitor);
-    for (const [event, listener] of Object.entries(monitor)) io.on(event, listener);
+      }
+    })();
   }
 
   detach(io: Io, _stream: Stream): void {
-    const monitor = this._map.get(io);
-    if (monitor) for (const [event, listener] of Object.entries(monitor)) io.off(event, listener);
     this._map.delete(io);
-    io.destroy();
+    io.close();
   }
 
   /** @missingRailsCall wakeup — PERMANENT */

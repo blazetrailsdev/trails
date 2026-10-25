@@ -5,9 +5,13 @@ type Data = string | Uint8Array;
 
 interface Io {
   write(data: Data): unknown;
-  on(event: string, listener: (...args: unknown[]) => void): unknown;
-  off(event: string, listener: (...args: unknown[]) => void): unknown;
-  destroy(): unknown;
+  close(): unknown;
+  waitReadable(): Promise<unknown>;
+  readNonblock(
+    len: number,
+    buf: null,
+    options: { exception: false },
+  ): Uint8Array | "wait_readable" | null;
 }
 
 interface EventLoop {
