@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { XmlEvents } from "./xmlevents.js";
 
+function expectEvent(target: { events: unknown[][] }, value: unknown[]): void {
+  expect(target.events.shift()).toEqual(value);
+}
+
 describe("TestEvents", () => {
   class Target {
     events: unknown[][] = [];
@@ -25,54 +29,51 @@ describe("TestEvents", () => {
     xml = new XmlEvents({ target: target as never });
   });
 
-  const expectEvent = (value: unknown[]) => expect(target.events.shift()).toEqual(value);
-  const expectDone = () => expect(target.events.shift()).toBeUndefined();
-
   it("simple", () => {
     xml.one();
-    expectEvent([":start_tag", ":one", null]);
-    expectEvent([":end_tag", ":one"]);
-    expectDone();
+    expectEvent(target, [":start_tag", ":one", null]);
+    expectEvent(target, [":end_tag", ":one"]);
+    expect(target.events.shift()).toBeUndefined();
   });
 
   it("nested", () => {
     xml.one(() => xml.two());
-    expectEvent([":start_tag", ":one", null]);
-    expectEvent([":start_tag", ":two", null]);
-    expectEvent([":end_tag", ":two"]);
-    expectEvent([":end_tag", ":one"]);
-    expectDone();
+    expectEvent(target, [":start_tag", ":one", null]);
+    expectEvent(target, [":start_tag", ":two", null]);
+    expectEvent(target, [":end_tag", ":two"]);
+    expectEvent(target, [":end_tag", ":one"]);
+    expect(target.events.shift()).toBeUndefined();
   });
 
   it("text", () => {
     xml.one("a");
-    expectEvent([":start_tag", ":one", null]);
-    expectEvent([":text", "a"]);
-    expectEvent([":end_tag", ":one"]);
-    expectDone();
+    expectEvent(target, [":start_tag", ":one", null]);
+    expectEvent(target, [":text", "a"]);
+    expectEvent(target, [":end_tag", ":one"]);
+    expect(target.events.shift()).toBeUndefined();
   });
 
   it("special text", () => {
     xml.one("H&R");
-    expectEvent([":start_tag", ":one", null]);
-    expectEvent([":text", "H&R"]);
-    expectEvent([":end_tag", ":one"]);
-    expectDone();
+    expectEvent(target, [":start_tag", ":one", null]);
+    expectEvent(target, [":text", "H&R"]);
+    expectEvent(target, [":end_tag", ":one"]);
+    expect(target.events.shift()).toBeUndefined();
   });
 
   it("text with entity", () => {
     xml.one("H&amp;R");
-    expectEvent([":start_tag", ":one", null]);
-    expectEvent([":text", "H&amp;R"]);
-    expectEvent([":end_tag", ":one"]);
-    expectDone();
+    expectEvent(target, [":start_tag", ":one", null]);
+    expectEvent(target, [":text", "H&amp;R"]);
+    expectEvent(target, [":end_tag", ":one"]);
+    expect(target.events.shift()).toBeUndefined();
   });
 
   it("attributes", () => {
     xml.a({ b: "c", x: "y" });
-    expectEvent([":start_tag", ":a", { x: "y", b: "c" }]);
-    expectEvent([":end_tag", ":a"]);
-    expectDone();
+    expectEvent(target, [":start_tag", ":a", { x: "y", b: "c" }]);
+    expectEvent(target, [":end_tag", ":a"]);
+    expect(target.events.shift()).toBeUndefined();
   });
 
   it("moderately complex", () => {
@@ -92,34 +93,34 @@ describe("TestEvents", () => {
         x.address("Columbus");
       });
     });
-    expectEvent([":start_tag", ":address-book", null]);
-    expectEvent([":start_tag", ":entry", { id: "1" }]);
-    expectEvent([":start_tag", ":name", null]);
-    expectEvent([":start_tag", ":first", null]);
-    expectEvent([":text", "Bill"]);
-    expectEvent([":end_tag", ":first"]);
-    expectEvent([":start_tag", ":last", null]);
-    expectEvent([":text", "Smith"]);
-    expectEvent([":end_tag", ":last"]);
-    expectEvent([":end_tag", ":name"]);
-    expectEvent([":start_tag", ":address", null]);
-    expectEvent([":text", "Cincinnati"]);
-    expectEvent([":end_tag", ":address"]);
-    expectEvent([":end_tag", ":entry"]);
-    expectEvent([":start_tag", ":entry", { id: "2" }]);
-    expectEvent([":start_tag", ":name", null]);
-    expectEvent([":start_tag", ":first", null]);
-    expectEvent([":text", "John"]);
-    expectEvent([":end_tag", ":first"]);
-    expectEvent([":start_tag", ":last", null]);
-    expectEvent([":text", "Doe"]);
-    expectEvent([":end_tag", ":last"]);
-    expectEvent([":end_tag", ":name"]);
-    expectEvent([":start_tag", ":address", null]);
-    expectEvent([":text", "Columbus"]);
-    expectEvent([":end_tag", ":address"]);
-    expectEvent([":end_tag", ":entry"]);
-    expectEvent([":end_tag", ":address-book"]);
-    expectDone();
+    expectEvent(target, [":start_tag", ":address-book", null]);
+    expectEvent(target, [":start_tag", ":entry", { id: "1" }]);
+    expectEvent(target, [":start_tag", ":name", null]);
+    expectEvent(target, [":start_tag", ":first", null]);
+    expectEvent(target, [":text", "Bill"]);
+    expectEvent(target, [":end_tag", ":first"]);
+    expectEvent(target, [":start_tag", ":last", null]);
+    expectEvent(target, [":text", "Smith"]);
+    expectEvent(target, [":end_tag", ":last"]);
+    expectEvent(target, [":end_tag", ":name"]);
+    expectEvent(target, [":start_tag", ":address", null]);
+    expectEvent(target, [":text", "Cincinnati"]);
+    expectEvent(target, [":end_tag", ":address"]);
+    expectEvent(target, [":end_tag", ":entry"]);
+    expectEvent(target, [":start_tag", ":entry", { id: "2" }]);
+    expectEvent(target, [":start_tag", ":name", null]);
+    expectEvent(target, [":start_tag", ":first", null]);
+    expectEvent(target, [":text", "John"]);
+    expectEvent(target, [":end_tag", ":first"]);
+    expectEvent(target, [":start_tag", ":last", null]);
+    expectEvent(target, [":text", "Doe"]);
+    expectEvent(target, [":end_tag", ":last"]);
+    expectEvent(target, [":end_tag", ":name"]);
+    expectEvent(target, [":start_tag", ":address", null]);
+    expectEvent(target, [":text", "Columbus"]);
+    expectEvent(target, [":end_tag", ":address"]);
+    expectEvent(target, [":end_tag", ":entry"]);
+    expectEvent(target, [":end_tag", ":address-book"]);
+    expect(target.events.shift()).toBeUndefined();
   });
 });

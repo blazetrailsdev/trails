@@ -472,14 +472,14 @@ describe("TestIndentedXmlMarkup", () => {
     it("use entities if no encoding is given and kcode is none", () => {
       const xml = new XmlMarkup();
       xml.p("\u2019");
-      expect(xml.targetBang()).toContain("<p>\u2019</p>");
+      expect(xml.targetBang()).toMatch("<p>\u2019</p>");
     });
 
     it("use entities if encoding is utf but kcode is not", () => {
       const xml = new XmlMarkup();
       xml.instructBang(":xml", { encoding: "UTF-8" });
       xml.p("\u2019");
-      expect(xml.targetBang()).toContain("<p>\u2019</p>");
+      expect(xml.targetBang()).toMatch("<p>\u2019</p>");
     });
 
     it("use entities if kcode is utf but encoding is dummy encoding", () => {
@@ -506,14 +506,14 @@ describe("TestIndentedXmlMarkup", () => {
       const xml = new XmlMarkup();
       xml.instructBang(":xml", { encoding: "UTF-8" });
       xml.p("\u2019");
-      expect(xml.targetBang()).toContain("<p>\u2019</p>");
+      expect(xml.targetBang()).toMatch("<p>\u2019</p>");
     });
 
     it("use utf8 if both encoding and kcode are utf8 with lowercase", () => {
       const xml = new XmlMarkup();
       xml.instructBang(":xml", { encoding: "utf-8" });
       xml.p("\u2019");
-      expect(xml.targetBang()).toContain("<p>\u2019</p>");
+      expect(xml.targetBang()).toMatch("<p>\u2019</p>");
     });
   });
 
