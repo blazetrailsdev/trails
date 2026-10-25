@@ -152,6 +152,7 @@ function zoneAbbreviations(
   return abbreviationsByPrimaryZoneId.get(primaryZoneId(timeZoneId));
 }
 
+/** @noRailsEquivalent CONVERGEABLE date-zone-abbreviations-read-tzdata-not-intl-locale */
 function tzdataAbbreviation(zoned: Temporal.ZonedDateTime): string {
   const abbreviations = zoneAbbreviations(zoned.timeZoneId);
   if (abbreviations !== undefined) {
