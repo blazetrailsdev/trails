@@ -7,6 +7,7 @@ import { Worker } from "@blazetrails/actioncable/server/worker";
 import type { Base as Server } from "@blazetrails/actioncable/server/base";
 import type { Configuration } from "@blazetrails/actioncable/server/configuration";
 import type { RackApp } from "@blazetrails/actionpack";
+import type { RackEnv } from "@blazetrails/rack";
 import {
   OrderedOptions,
   include,
@@ -47,7 +48,7 @@ export class Engine extends BaseEngine {
     this.initializer("action_cable.health_check_application", () => {
       onLoad("action_cable", function (this: Configuration) {
         this.healthCheckApplication = (env) =>
-          (HealthController.action("show") as RackApp)(env as never) as never;
+          (HealthController.action("show") as RackApp)(env as RackEnv) as never;
       });
     });
 
@@ -71,26 +72,26 @@ export class Engine extends BaseEngine {
 
       app.paths().add("config/cable", { with: "config/cable.ts" });
 
-      const configPath = await app.config.paths().get("config/cable")!.first();
-      const cable =
-        configPath !== undefined && (await File.isExist(configPath))
-          ? { ...((await app.configFor("cable")) as OrderedOptions | null)?.toH() }
-          : null;
-
+      let hook: Promise<void> | undefined;
       onLoad("action_cable", function (this: Configuration) {
-        if (cable !== null) this.cable = cable;
+        hook = (async () => {
+          const configPath = (await app.config.paths().get("config/cable")!.first())!;
+          if (await File.isExist(configPath)) {
+            this.cable = { ...((await app.configFor(configPath)) as OrderedOptions | null)?.toH() };
+            await this.loadPubsubAdapter();
+          }
 
-        const previousConnectionClass = this.connectionClass;
-        this.connectionClass = () =>
-          safeConstantize("ApplicationCable::Connection") ?? previousConnectionClass();
-        this.filterParameters = [...this.filterParameters, ...app.config.filterParameters];
+          const previousConnectionClass = this.connectionClass;
+          this.connectionClass = () =>
+            safeConstantize("ApplicationCable::Connection") ?? previousConnectionClass();
+          this.filterParameters = [...this.filterParameters, ...app.config.filterParameters];
 
-        for (const [k, v] of options.entries()) (this as unknown as Record<string, unknown>)[k] = v;
+          for (const [k, v] of options.entries()) {
+            (this as unknown as Record<string, unknown>)[k] = v;
+          }
+        })();
       });
-
-      if ((ActionCable.server() as Server).config.cable != null) {
-        await (ActionCable.server() as Server).config.loadPubsubAdapter();
-      }
+      await hook;
     });
 
     this.initializer("action_cable.routes", () => {
@@ -130,13 +131,8 @@ export class Engine extends BaseEngine {
 
         const wrap = (_: unknown, inner: () => unknown) =>
           app.executor.wrap(inner, { source: "application.action_cable" });
-        (ActionCable.Channel.Base as unknown as typeof Worker).setCallback(
-          "subscribe",
-          "around",
-          { prepend: true },
-          block(wrap),
-        );
-        (ActionCable.Channel.Base as unknown as typeof Worker).setCallback(
+        ActionCable.Channel.Base.setCallback("subscribe", "around", { prepend: true }, block(wrap));
+        ActionCable.Channel.Base.setCallback(
           "unsubscribe",
           "around",
           { prepend: true },
