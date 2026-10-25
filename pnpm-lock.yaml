@@ -500,6 +500,31 @@ importers:
         specifier: workspace:*
         version: link:../vitest-matchers
 
+  packages/fugit:
+    dependencies:
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
+      '@blazetrails/et-orbi':
+        specifier: workspace:*
+        version: link:../et-orbi
+      '@blazetrails/raabro':
+        specifier: workspace:*
+        version: link:../raabro
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+      '@blazetrails/tzinfo':
+        specifier: workspace:*
+        version: link:../tzinfo
+    devDependencies:
+      '@blazetrails/chronic':
+        specifier: workspace:*
+        version: link:../chronic
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
+
   packages/globalid:
     dependencies:
       '@blazetrails/activesupport':
@@ -876,6 +901,9 @@ importers:
       '@blazetrails/et-orbi':
         specifier: workspace:*
         version: link:../../packages/et-orbi
+      '@blazetrails/fugit':
+        specifier: workspace:*
+        version: link:../../packages/fugit
       '@blazetrails/globalid':
         specifier: workspace:*
         version: link:../../packages/globalid

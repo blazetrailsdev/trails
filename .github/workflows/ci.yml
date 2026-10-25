@@ -920,6 +920,7 @@ jobs:
           packages/date
           packages/did-you-mean
           packages/et-orbi
+          packages/fugit
           packages/globalid
           packages/html-sanitizer
           packages/i18n
@@ -1153,6 +1154,7 @@ jobs:
           packages/date
           packages/did-you-mean
           packages/et-orbi
+          packages/fugit
           packages/globalid
           packages/i18n
           packages/marcel

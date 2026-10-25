@@ -197,6 +197,10 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("test_chronic.rb", "chronic")).toBe("chronic.test.ts");
   });
 
+  it("strips fugit's _spec suffix", () => {
+    expect(rubyToConventionTs("cron_spec.rb", "fugit")).toBe("cron.test.ts");
+  });
+
   it("strips raabro's _spec suffix", () => {
     expect(rubyToConventionTs("sample_xel_spec.rb", "raabro")).toBe("sample-xel.test.ts");
   });

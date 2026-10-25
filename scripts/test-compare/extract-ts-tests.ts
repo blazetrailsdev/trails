@@ -38,6 +38,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "builder",
     "et-orbi",
     "raabro",
+    "fugit",
     "actionview",
     "actioncable",
     "activejob",

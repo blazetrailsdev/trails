@@ -344,6 +344,7 @@ const alias = {
   "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/src/index.ts"),
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/src/et-orbi.ts"),
   "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/src/raabro.ts"),
+  "@blazetrails/fugit": path.resolve(__dirname, "packages/fugit/src/fugit.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
   "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/src/index.ts"),
 };
@@ -572,6 +573,7 @@ export default defineConfig({
             "packages/trailties/**",
             "packages/et-orbi/**",
             "packages/raabro/**",
+            "packages/fugit/**",
             ...(ARCONN === "postgresql"
               ? []
               : ["packages/actioncable/src/subscription-adapter/postgresql.test.ts"]),
@@ -624,6 +626,16 @@ export default defineConfig({
           globals: true,
           include: ["packages/raabro/src/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
+        },
+      },
+      {
+        resolve: otherResolve,
+        test: {
+          name: "fugit",
+          globals: true,
+          include: ["packages/fugit/src/**/*.test.ts"],
+          exclude: SHARED_EXCLUDE,
+          setupFiles: ["./packages/vitest-matchers/src/setup.ts"],
         },
       },
     ],

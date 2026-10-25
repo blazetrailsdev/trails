@@ -359,6 +359,46 @@ export function first<T, E = unknown>(
 }
 
 /**
+ * Mirrors: Ruby's Enumerable#take — `vendor/ruby/v3.3.11/enum.c:3514` `enum_take`, whose
+ * `take_i` (`:3490`) breaks once `n` elements are pushed, so an endless `each` stops.
+ * @noRailsEquivalent PERMANENT
+ */
+export function take<T, E = unknown>(obj: Iterable<T> | Each<T, E>, n: number): Enumerated<E, T[]> {
+  if (n < 0) throw new ArgumentError("attempt to take negative size");
+  const result: T[] = [];
+  if (n === 0) return result as Enumerated<E, T[]>;
+  return rbBlockCall(
+    obj,
+    (i) => {
+      result.push(i);
+      if (result.length >= n) throw iterBreak;
+    },
+    () => result,
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#take_while — `vendor/ruby/v3.3.11/enum.c:3560` `enum_take_while`,
+ * whose `take_while_i` (`:3533`) breaks at the first element the block answers falsy for.
+ * @noRailsEquivalent PERMANENT
+ */
+export function takeWhile<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T) => unknown,
+): Enumerated<E, T[]> {
+  const ary: T[] = [];
+  return rbBlockCall(
+    obj,
+    (i) => {
+      const r = block(i);
+      if (r == null || r === false) throw iterBreak;
+      ary.push(i);
+    },
+    () => ary,
+  );
+}
+
+/**
  * Mirrors: Ruby's Enumerable#drop — `vendor/ruby/v3.3.11/enum.c:3603` `enum_drop`, whose
  * `drop_i` (`:3571`) counts `n` elements down before it pushes.
  * @noRailsEquivalent PERMANENT
@@ -1078,6 +1118,14 @@ export class Enumerable<T = unknown, E = unknown> {
 
   drop<T, E = unknown>(this: Each<T, E>, n: number) {
     return drop(this, n);
+  }
+
+  take<T, E = unknown>(this: Each<T, E>, n: number) {
+    return take(this, n);
+  }
+
+  takeWhile<T, E = unknown>(this: Each<T, E>, block: (i: T) => unknown) {
+    return takeWhile(this, block);
   }
 
   eachSlice<T, E = unknown>(this: Each<T, E>, n: number, block?: (slice: T[]) => unknown) {

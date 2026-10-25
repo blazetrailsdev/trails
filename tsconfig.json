@@ -51,6 +51,7 @@
     { "path": "packages/tzinfo" },
     { "path": "packages/et-orbi" },
     { "path": "packages/raabro" },
+    { "path": "packages/fugit" },
     { "path": "packages/mini-magick" },
     { "path": "packages/html-sanitizer" },
     { "path": "packages/nokogiri" },
