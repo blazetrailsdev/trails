@@ -106,7 +106,6 @@ const ROWS: readonly [name: string, decoderLabel: string | null, aliases: string
   ["SJIS-SoftBank", null, []],
 ];
 
-// (`vendor/ruby/v3.3.11/encoding.c:112`), read off `Encoding.list.select(&:dummy?)`.
 const DUMMY_NAMES = new Set([
   "UTF-16",
   "UTF-32",
