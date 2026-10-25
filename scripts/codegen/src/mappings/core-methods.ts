@@ -333,7 +333,16 @@ rule("last", (c) => {
   if (c.blk) return null;
   if (c.recvIsString()) return `${c.lw.as(c.ctx, "last")}(${[c.r, ...c.args()].join(", ")})`;
   if (c.lw.mayBeMap(c.recvNode, c.ctx)) return `${c.rc("last")}(${[c.r, ...c.args()].join(", ")})`;
-  if (argc(c) === 1) return `${c.R}${c.nav}slice(-${c.args()[0]})`;
+  // `Array#last(n)` (array.c rb_ary_last): `slice(-n)` only for a positive
+  // literal; `slice(-0)` is the whole array where Ruby's `last(0)` is empty.
+  if (argc(c) === 1) {
+    const a0 = c.n.args[0];
+    if (a0.k === "int" && Number(a0.value) > 0) return `${c.R}${c.nav}slice(-${c.args()[0]})`;
+    return c.lw.withOnce(
+      c.R,
+      (x) => `${x}${c.nav}slice(Math.max(${x}.length - ${c.args()[0]}, 0))`,
+    );
+  }
   if (untypedMayBeRange(c))
     return c.lw.withOnce(
       c.r,

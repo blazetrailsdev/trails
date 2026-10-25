@@ -4666,6 +4666,16 @@ export class Lowerer {
     )
       return n.args.map((a: N) => `${rc(name)}(${r}, ${this.expr(a, ctx)})`).join(", ");
 
+    // `Chronic.time_class.now` (a gem setting naming Ruby's `Time`): a static
+    // method of `@blazetrails/date`'s class, called even with no arguments.
+    if (
+      GEM.hand === false &&
+      r !== null &&
+      recvNode?.k === "call" &&
+      /(^|_)time_class$/.test(recvNode.name) &&
+      dateStatics().has(tsMethodName(name))
+    )
+      return `${r}.${tsMethodName(name)}(${args().join(", ")})`;
     // ── `Date.tomorrow` / `Time.current`: an ActiveSupport class-level core_ext
     // method `@blazetrails/date`'s class does not define is activesupport's flat
     // export, and a method chained on its value (`Date.tomorrow.noon`) is too.
