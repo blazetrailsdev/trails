@@ -522,6 +522,66 @@ rule("sub", (c) => (!c.blk ? `${c.R}${c.nav}replace(${c.args().join(", ")})` : n
  * `s.gsub(re) { … $1 … }` with a one-expression block reading only `$1`..`$9`:
  * a global `replace` whose callback takes the groups (`(_m, d1) => …`).
  */
+/**
+ * Ruby's `sub`/`gsub` replacement string (re.c rb_reg_regsub) as JS's
+ * `String#replace` pattern: `\\1` → `$1`, `\\0` / `\\&` → `$&`, `\\k<n>` →
+ * `$<n>`, a literal `$` → `$$`. Null where the two syntaxes cannot agree.
+ */
+export function jsReplacement(rb: string): string | null {
+  let out = "";
+  for (let i = 0; i < rb.length; i++) {
+    const ch = rb[i];
+    if (ch === "$") {
+      out += "$$";
+      continue;
+    }
+    if (ch !== "\\") {
+      out += ch;
+      continue;
+    }
+    const nx = rb[i + 1];
+    if (nx === undefined) return null;
+    i++;
+    if (/[0-9]/.test(nx)) out += nx === "0" ? "$&" : `$${nx}`;
+    else if (nx === "&") out += "$&";
+    else if (nx === "`") out += "$`";
+    else if (nx === "'") out += "$'";
+    else if (nx === "\\") out += "\\";
+    else if (nx === "k") {
+      const m = /^<(\w+)>/.exec(rb.slice(i + 1));
+      if (!m) return null;
+      out += `$<${m[1]}>`;
+      i += m[0].length;
+    } else out += "\\" + nx;
+  }
+  return out;
+}
+
+/** `s.gsub(/re/, "\\1…")` with a literal replacement: a global JS `replace`. */
+export function gsubString(
+  c: { lw: Lowerer; ctx: Ctx; n: N; R: string; blk: N | null; args(): string[] },
+  global: boolean,
+): string | null {
+  if (c.blk || c.n.args.length !== 2) return null;
+  const [pat, rep] = c.n.args;
+  if (rep.k !== "str") return null;
+  const js = jsReplacement(rep.value);
+  if (js === null) return null;
+  if (pat.k === "str")
+    return `${c.R}.${global ? "replaceAll" : "replace"}(${c.args()[0]}, ${JSON.stringify(js)})`;
+  if (pat.k !== "regex" && pat.k !== "dregex") return null;
+  const re = c.args()[0];
+  const g = !global
+    ? re
+    : /\/[a-z]*$/.test(re)
+      ? re.replace(/\/([a-z]*)$/, (_m, f: string) => `/${f.includes("g") ? f : f + "g"}`)
+      : re.replace(
+          /^new RegExp\((.*?)(?:, "([a-z]*)")?\)$/s,
+          (_m, src: string, f = "") => `new RegExp(${src}, "${f.includes("g") ? f : f + "g"}")`,
+        );
+  return `${c.R}.replace(${g}, ${JSON.stringify(js)})`;
+}
+
 export function gsubBlock(c: {
   lw: Lowerer;
   ctx: Ctx;

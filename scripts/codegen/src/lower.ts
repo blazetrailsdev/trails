@@ -29,6 +29,7 @@ import {
   SPLAT_YIELD_ONE,
   asyncEnumBody,
   gsubBlock,
+  gsubString,
 } from "./mappings/core-methods.js";
 import type { CallSite } from "./mappings/call-site.js";
 import { ATTR_MACROS, CORE_EXT_CALC, TIME_HELPERS } from "./mappings/activesupport.js";
@@ -1620,6 +1621,11 @@ export class Lowerer {
 
   cond(n: N, ctx: Ctx): string {
     if (this.isBoolean(n)) return this.expr(n, ctx);
+    // `x =~ re` answers the match index or nil: 0 is a match.
+    if (n.k === "call" && n.name === "=~" && n.args?.length === 1) {
+      const e = this.expr(n, ctx);
+      return `${needsParens(e) ? `(${e})` : e} != null`;
+    }
     // A Ruby predicate (`foo?`) in a condition: its value is a boolean in
     // practice, and as a condition JS truthiness only differs for 0 / "".
     if (n.k === "call" && /\?$/.test(n.name)) {
@@ -4328,6 +4334,22 @@ export class Lowerer {
           args: () => n.args.map((x: N) => this.expr(x, ctx)),
         });
         if (rep && name === "gsub") return rep;
+        if (rep && (recvNode.k === "lvar" || recvNode.k === "ivar")) return `(${r} = ${rep})`;
+      }
+      // `s.gsub!(/re/, "\\1")` / `sub!` on a String variable: the variable is
+      // rebound to the replaced copy (CLAUDE.md "Ruby Strings are JS string
+      // primitives"), as the hand port writes it.
+      if (stringish && GEM.hand === false && ["gsub", "gsub!", "sub", "sub!"].includes(name)) {
+        const site = {
+          lw: this,
+          ctx,
+          n,
+          R: needsParens(r) ? `(${r})` : r,
+          blk: n.block ?? null,
+          args: () => n.args.map((x: N) => this.expr(x, ctx)),
+        };
+        const rep = gsubString(site, name.startsWith("g"));
+        if (rep && !name.endsWith("!")) return rep;
         if (rep && (recvNode.k === "lvar" || recvNode.k === "ivar")) return `(${r} = ${rep})`;
       }
       if (
