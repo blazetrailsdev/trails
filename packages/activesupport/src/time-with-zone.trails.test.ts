@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { TimeWithZone } from "./time-with-zone.js";
-import { TimeZone, Timezone } from "./values/time-zone.js";
+import { TimeZone } from "./values/time-zone.js";
+import { Timezone } from "@blazetrails/tzinfo";
 import { Temporal, Time } from "@blazetrails/date";
 import { DATE_FORMATS } from "./core-ext/time/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";

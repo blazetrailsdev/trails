@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { TimeZone, AmbiguousTime, PeriodNotFound } from "./values/time-zone.js";
+import { TimeZone } from "./values/time-zone.js";
+import { AmbiguousTime, PeriodNotFound } from "@blazetrails/tzinfo";
 import { ArgumentError } from "./hash-utils.js";
 import { Time } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";

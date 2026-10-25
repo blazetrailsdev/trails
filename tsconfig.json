@@ -48,6 +48,7 @@
     { "path": "packages/builder" },
     { "path": "packages/marcel" },
     { "path": "packages/chronic" },
+    { "path": "packages/tzinfo" },
     { "path": "packages/mini-magick" },
     { "path": "packages/html-sanitizer" },
     { "path": "packages/nokogiri" },
