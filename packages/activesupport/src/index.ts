@@ -383,7 +383,6 @@ export { Duration, seconds, minutes, hours, days, weeks, months, years } from ".
 export type { DurationParts } from "./duration.js";
 
 export { TimeZone, ZONES_MAP } from "./values/time-zone.js";
-export { InvalidTimezoneIdentifier } from "@blazetrails/tzinfo";
 export { TimeWithZone } from "./time-with-zone.js";
 export type { ChangeOptions, AdvanceOptions } from "./time-with-zone.js";
 export {

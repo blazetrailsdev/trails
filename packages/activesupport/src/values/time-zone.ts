@@ -14,12 +14,10 @@ import { Duration } from "../duration.js";
 import { ArgumentError } from "../hash-utils.js";
 import { Temporal, Date as RubyDate, Time } from "@blazetrails/date";
 import {
-  getZoneInfo,
   InvalidTimezoneIdentifier,
   PeriodNotFound,
   Timezone,
   TimezonePeriod,
-  toDate,
 } from "@blazetrails/tzinfo";
 import {
   equals as cmpEquals,
@@ -467,11 +465,15 @@ export class TimeZone {
         break;
       } catch (error) {
         if (!(error instanceof PeriodNotFound)) throw error;
-        time = Time.at(new Rational(toDate(time).getTime() + 3_600_000, 1000)).getutc();
+        time = Time.at(
+          new Rational(time.toZonedDateTime().epochMilliseconds + 3_600_000, 1000),
+        ).getutc();
       }
     }
     return new TimeWithZone(
-      instantFrom(new Date(toDate(time).getTime() - period.observedUtcOffset * 1000)),
+      instantFrom(
+        new Date(time.toZonedDateTime().epochMilliseconds - period.observedUtcOffset * 1000),
+      ),
       this,
     );
   }
@@ -522,21 +524,15 @@ export class TimeZone {
   get utcOffset(): number {
     if (this._utcOffset !== null) return this._utcOffset;
     const now = currentTime();
-    const observed = getZoneInfo(this.tzinfo.identifier, now).utcOffsetSeconds;
+    const observed = this.tzinfo.observedUtcOffset(now);
     if (!this.tzinfo.isDst(now)) return observed;
-    const jan = getZoneInfo(
-      this.tzinfo.identifier,
-      new Date(Date.UTC(now.getUTCFullYear(), 0, 1)),
-    ).utcOffsetSeconds;
-    const jul = getZoneInfo(
-      this.tzinfo.identifier,
-      new Date(Date.UTC(now.getUTCFullYear(), 6, 1)),
-    ).utcOffsetSeconds;
+    const jan = this.tzinfo.observedUtcOffset(new Date(Date.UTC(now.getUTCFullYear(), 0, 1)));
+    const jul = this.tzinfo.observedUtcOffset(new Date(Date.UTC(now.getUTCFullYear(), 6, 1)));
     return observed - Math.abs(jul - jan);
   }
 
   utcOffsetAt(date: Date | Temporal.Instant): number {
-    return getZoneInfo(this.tzinfo.identifier, toDate(date)).utcOffsetSeconds;
+    return this.tzinfo.observedUtcOffset(date);
   }
 
   formattedOffset(colon = true, alternateUtcString: string | null = null): string {

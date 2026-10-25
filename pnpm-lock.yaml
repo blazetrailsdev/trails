@@ -877,6 +877,9 @@ importers:
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../../packages/tse-compiler
+      '@blazetrails/tzinfo':
+        specifier: workspace:*
+        version: link:../../packages/tzinfo
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../../packages/vitest-matchers

@@ -15,7 +15,7 @@ export class InvalidTimezoneIdentifier extends Error {
   override name = "InvalidTimezoneIdentifier";
 }
 
-export function toDate(at: Date | Temporal.Instant | Time): Date {
+function toDate(at: Date | Temporal.Instant | Time): Date {
   if (at instanceof Date) return at;
   if (at instanceof Time) return new Date(at.toZonedDateTime().toInstant().epochMilliseconds);
   return new Date(at.epochMilliseconds);
@@ -51,7 +51,7 @@ const ETC_GMT_LINKS = new Set([
   "Greenwich",
 ]);
 
-export function getZoneInfo(
+function getZoneInfo(
   ianaName: string,
   date: Date,
 ): { abbreviation: string; utcOffsetSeconds: number } {
@@ -95,46 +95,6 @@ export function getZoneInfo(
   const utcOffsetSeconds = Math.round((localAsUtc - roundedDate.getTime()) / 1000) || 0;
 
   return { abbreviation, utcOffsetSeconds };
-}
-
-export function getLocalComponents(
-  ianaName: string,
-  utcDate: Date,
-): {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  second: number;
-  millisecond: number;
-} {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: ianaName,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    fractionalSecondDigits: 3,
-    hour12: false,
-  } as Intl.DateTimeFormatOptions);
-  const parts = formatter.formatToParts(utcDate);
-  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? "0", 10);
-
-  let hour = get("hour");
-  if (hour === 24) hour = 0;
-
-  return {
-    year: get("year"),
-    month: get("month"),
-    day: get("day"),
-    hour,
-    minute: get("minute"),
-    second: get("second"),
-    millisecond: utcDate.getMilliseconds(),
-  };
 }
 
 /** @noRailsEquivalent PERMANENT */

@@ -23,6 +23,7 @@
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
+    "@blazetrails/tzinfo": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
