@@ -1,5 +1,6 @@
 import {
   ArgumentError,
+  type Method,
   STDOUT,
   StringIO,
   classModule,
@@ -396,8 +397,6 @@ export class Tree {
   }
 }
 
-type ParsingMethod = (input: Input) => Tree;
-
 export class ModuleMethods {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
@@ -452,17 +451,16 @@ export class ModuleMethods {
     }
   }
 
-  _narrow(parser: Parser): ParsingMethod {
+  _narrow(parser: Parser): Method {
     if (this._quantify(parser) != null) {
       throw new ArgumentError(`lone quantifier ${toS(parser)}`);
     }
 
-    const m = rbObjMethod(this, toSym(parser));
-    return (input) => m.call(input) as Tree;
+    return rbObjMethod(this, toSym(parser));
   }
 
   _parse(parser: Parser, input: Input): Tree {
-    return this._narrow(parser)(input);
+    return this._narrow(parser).call(input) as Tree;
   }
 
   seq(name: string | null, input: Input, ...parsers: Parser[]): Tree {

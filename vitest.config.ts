@@ -611,7 +611,6 @@ export default defineConfig({
         },
       },
       {
-        // The spec helper's top-level parsers are seated on Object.prototype.
         resolve: otherResolve,
         test: {
           name: "raabro",
