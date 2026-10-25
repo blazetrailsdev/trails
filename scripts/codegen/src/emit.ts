@@ -1776,7 +1776,10 @@ export class Emitter {
     let defs = 0;
     {
       const twin = path.join(PKG_DIR, "src", tsFile);
-      f.symbolColon = existsSync(twin) && /\bisSymbol\b/.test(readFileSync(twin, "utf8"));
+      // A gem with no hand port: its twin is the generator's own output, which
+      // says nothing about how a hand port would spell its Symbols.
+      f.symbolColon =
+        GEM.hand !== false && existsSync(twin) && /\bisSymbol\b/.test(readFileSync(twin, "utf8"));
       // A ported test exercising `ActiveJob::Arguments` (whose port tells a
       // Symbol by its colon) writes its Symbols that way too.
       if (file.file.startsWith("test/") && /"Arguments"/.test(JSON.stringify(file.body)))

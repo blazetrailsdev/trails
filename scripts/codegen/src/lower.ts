@@ -2786,7 +2786,9 @@ export class Lowerer {
     const hit = this.index.resolveConst(c.path, ctx.nesting);
     if (hit?.kind !== "scope") return false;
     const sc = this.index.scopes.get(hit.fqn);
-    if (!sc) return false;
+    // A class only: its Symbols arrive through `new` (`symColonArray`). A
+    // module's arrive as plain arguments, which keep no colon.
+    if (!sc || sc.kind !== "class") return false;
     let y = false;
     const isSym = (x: N | undefined) =>
       x?.k === "const" && x.path.filter((p: string) => p).join("::") === "Symbol";
