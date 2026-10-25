@@ -42,6 +42,7 @@ export const GATED_PACKAGES = [
   "bcrypt",
   "chronic",
   "did-you-mean",
+  "et-orbi",
   "globalid",
   "marcel",
   "rack",

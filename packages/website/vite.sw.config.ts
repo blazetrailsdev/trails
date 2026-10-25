@@ -61,6 +61,7 @@ export default defineConfig({
       pkgAlias("@blazetrails/marcel", "../marcel/src/marcel.ts"),
       pkgAlias("@blazetrails/chronic", "../chronic/src/chronic.ts"),
       pkgAlias("@blazetrails/tzinfo", "../tzinfo/src/index.ts"),
+      pkgAlias("@blazetrails/et-orbi", "../et-orbi/src/et-orbi.ts"),
       pkgAlias("@blazetrails/msgpack", "../msgpack/src/index.ts"),
       pkgAlias("@blazetrails/nokogiri", "src/stubs/nokogiri-stub.ts"),
     ],

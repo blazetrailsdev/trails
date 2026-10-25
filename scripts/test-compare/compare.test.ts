@@ -197,6 +197,11 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("test_chronic.rb", "chronic")).toBe("chronic.test.ts");
   });
 
+  it("strips et-orbi's _spec suffix", () => {
+    expect(rubyToConventionTs("eo_time_spec.rb", "et-orbi")).toBe("eo-time.test.ts");
+    expect(rubyToConventionTs("module_spec.rb", "et-orbi")).toBe("module.test.ts");
+  });
+
   it("strips thor's _spec suffix and keeps its lib-relative spec path", () => {
     expect(rubyToConventionTs("actions/create_file_spec.rb", "thor")).toBe(
       "actions/create-file.test.ts",

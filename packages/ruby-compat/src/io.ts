@@ -1020,6 +1020,20 @@ export class IO {
   }
 
   /**
+   * `IO#readline` (`vendor/ruby/v3.3.11/io.rb:133`) with the default separator:
+   * `io_readline` (`vendor/ruby/v3.3.11/io.c:4414`) is {@link gets} that raises
+   * `EOFError` through `rb_eof_error` where `gets` answers `nil`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#readline`
+   * (`vendor/ruby/v3.3.11/io.rb:133`).
+   */
+  readline(): string | Uint8Array {
+    const line = this.gets();
+    if (line === null) throw new EOFError("end of file reached");
+    return line;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/io.c:3317` `read_all`, which `io_read` (`io.c:3774`) takes
    * when `length` is `nil`: the rest of the stream, and `""` rather than `nil`
    * at EOF. Ruby sizes the read from `remain_size(fptr)`, an `fstat` the

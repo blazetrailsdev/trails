@@ -152,6 +152,7 @@ function zoneAbbreviations(
   return abbreviationsByPrimaryZoneId.get(primaryZoneId(timeZoneId));
 }
 
+/** @noRailsEquivalent CONVERGEABLE date-zone-abbreviations-read-tzdata-not-intl-locale */
 function tzdataAbbreviation(zoned: Temporal.ZonedDateTime): string {
   const abbreviations = zoneAbbreviations(zoned.timeZoneId);
   if (abbreviations !== undefined) {
@@ -166,6 +167,13 @@ function tzdataAbbreviation(zoned: Temporal.ZonedDateTime): string {
   }).formatToParts(new globalThis.Date(zoned.epochMilliseconds));
   const short = parts.find((part) => part.type === "timeZoneName")!.value;
   if (short === "GMT" || !short.startsWith("GMT")) return short;
+  const british = new Intl.DateTimeFormat("en-GB", {
+    timeZone: zoned.timeZoneId,
+    timeZoneName: "short",
+  })
+    .formatToParts(new globalThis.Date(zoned.epochMilliseconds))
+    .find((part) => part.type === "timeZoneName")!.value;
+  if (zoned.timeZoneId.startsWith("Europe/") && !/^(GMT|UTC)/.test(british)) return british;
   const offset = zoned.offset;
   return offset.endsWith(":00") ? offset.slice(0, 3) : offset.replace(":", "");
 }

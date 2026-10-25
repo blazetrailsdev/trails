@@ -41,6 +41,7 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/marcel", "../marcel/src/marcel.ts"],
   ["@blazetrails/chronic", "../chronic/src/chronic.ts"],
   ["@blazetrails/tzinfo", "../tzinfo/src/index.ts"],
+  ["@blazetrails/et-orbi", "../et-orbi/src/et-orbi.ts"],
   ["@blazetrails/msgpack", "../msgpack/src/index.ts"],
   ["@blazetrails/nokogiri", "../nokogiri/src/index.ts"],
 ];

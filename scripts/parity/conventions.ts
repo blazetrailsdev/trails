@@ -210,6 +210,7 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "i18n:../i18n.rb": "i18n.ts",
   "msgpack:../msgpack.rb": "msgpack.ts",
   "chronic:../chronic.rb": "chronic.ts",
+  "et-orbi:../et-orbi.rb": "et-orbi.ts",
   // `interpolate/ruby.rb` reopens `module I18n`, which `backend/cache.rb`
   // defines first — so without an entry here its `interpolate` /
   // `interpolate_hash` are measured against `backend/cache.ts` and, since
@@ -440,6 +441,10 @@ export const OPERATORS = new Set([
   "===",
   "!=",
   "<=>",
+  "<",
+  "<=",
+  ">",
+  ">=",
   "+",
   "-",
   "*",
