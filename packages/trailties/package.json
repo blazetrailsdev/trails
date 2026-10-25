@@ -56,10 +56,11 @@
     "bin"
   ],
   "dependencies": {
+    "@blazetrails/actioncable": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
-    "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",

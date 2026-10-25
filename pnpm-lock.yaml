@@ -160,6 +160,9 @@ importers:
         specifier: '>=8.19.0'
         version: 8.20.0
     devDependencies:
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
@@ -684,6 +687,9 @@ importers:
 
   packages/trailties:
     dependencies:
+      '@blazetrails/actioncable':
+        specifier: workspace:*
+        version: link:../actioncable
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../actionpack
