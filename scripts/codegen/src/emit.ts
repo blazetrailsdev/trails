@@ -2786,7 +2786,13 @@ export class Emitter {
         this.bodyLocal(s, name, ctxStatic, bodyLocals, members);
         classLocals.add(s.name);
       } else if (s.k === "casgn" && s.path?.length === 1) {
-        members.push(`static ${s.path[0]}: any = ${this.lw.expr(s.value, ctxStatic)};`);
+        // An option-defaults constant (`DEFAULT_OPTIONS = { :ambiguous_time_range => 6 }`)
+        // is bare-keyed by camelCase, as its readers read it (RFC 0149).
+        const value =
+          s.value.k === "hash" && /OPTIONS$/.test(s.path[0])
+            ? this.lw.hashLit(s.value.pairs, ctxStatic, true)
+            : this.lw.expr(s.value, ctxStatic);
+        members.push(`static ${s.path[0]}: any = ${value};`);
       } else if (
         s.k === "call" &&
         s.recv === null &&
@@ -4154,7 +4160,14 @@ export class Emitter {
         continue;
       if (s.k === "def") {
         defs++;
-        if (s.singleton || isModuleFunction || extendSelf)
+        // A `module_function` module a gem class includes (chronic's `Handlers`
+        // in `Parser`) runs its methods with `self` the includer: the mixin form.
+        const mixedIn =
+          GEM.hand === false &&
+          isModuleFunction &&
+          !s.singleton &&
+          this.resolver.includers(u.fqn).length > 0;
+        if (s.singleton || ((isModuleFunction || extendSelf) && !mixedIn))
           fns.push(
             this.emitMethod(s, u, f, {
               static: true,
