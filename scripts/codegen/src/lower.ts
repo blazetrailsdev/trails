@@ -635,6 +635,8 @@ export class Lowerer {
       case "seq":
         return this.block(n.body, ctx, tail);
       case "if": {
+        const md = this.matchIf(n, ctx, tail);
+        if (md) return md;
         const cond = this.cond(n.cond, ctx);
         const restore = this.narrow(n.cond, ctx);
         const t = this.block(this.seqBody(n.then), this.nest(ctx), tail);
@@ -1212,7 +1214,9 @@ export class Lowerer {
         n.name === "each_key" ||
         n.name === "each_pair") &&
       n.args.length === 0 &&
-      !tail
+      // In tail position the loop is followed by Ruby's answer, the receiver
+      // (array.c rb_ary_each), when that reads without side effects.
+      (!tail || /^(this\.)?[\w$]+!?$/.test(this.expr(n.recv, ctx)))
     ) {
       const params: Param[] = n.block.params;
       const inner = this.child(ctx, {
@@ -1307,6 +1311,7 @@ export class Lowerer {
         ...indent(this.block(this.seqBody(n.block.body), inner, false)),
         `}`,
       ];
+      if (tail) loop.push(`return ${recv};`);
       return pre.length ? ["{", ...indent([...pre, ...loop]), "}"] : loop;
     }
     // `ary.each_slice(n) { |slice| … }` → `for (const slice of eachSlice(ary, n))`,
@@ -2164,6 +2169,9 @@ export class Lowerer {
    */
   noteParamType(ctx: Ctx, name: string, def: N): void {
     const t = this.typeOf(def, ctx);
+    // A gem with no hand port may pass a ruby-compat `Hash` where the default
+    // is `{}` (chronic's Regexp-keyed tables): the default does not type it.
+    if (t?.k === "hash" && GEM.hand === false) return;
     if (t?.k === "prim" || t?.k === "array" || t?.k === "hash")
       (ctx.scope.types ??= new Map()).set(name, t);
   }
@@ -2665,6 +2673,58 @@ export class Lowerer {
 
   private ivarClash?: Map<string, Set<string>>;
 
+  /**
+   * `if s =~ /re/` whose branch reads `$1`..`$9` (chronic ordinal.rb:14): the
+   * match is a named `exec` result and each group its index, as a hand port
+   * writes it. Only where nothing else in the branch matches again.
+   */
+  matchIf(n: N, ctx: Ctx, tail: boolean): string[] | null {
+    {
+      if (GEM.hand !== false) return null;
+      const c = n.cond;
+      if (c?.k !== "call" || c.name !== "=~" || c.args?.length !== 1) return null;
+      const [str, re] =
+        c.args[0].k === "regex"
+          ? [c.recv, c.args[0]]
+          : c.recv?.k === "regex"
+            ? [c.args[0], c.recv]
+            : [null, null];
+      if (!str || !re) return null;
+      let reads = false;
+      let again = false;
+      walk(n.then, (x) => {
+        if (x.k === "nthref") reads = true;
+        if (
+          x.k === "call" &&
+          ["=~", "match", "match?", "sub", "gsub", "sub!", "gsub!", "scan", "===", "!~"].includes(
+            x.name,
+          )
+        )
+          again = true;
+        if (x.k === "gvar" || x.k === "backref") again = true;
+      });
+      if (!reads || again || (n.else && JSON.stringify(n.else).includes('"nthref"'))) return null;
+      const m = this.tmp(ctx, "m");
+      const inner = this.child(this.nest(ctx), { nthref: (i: number) => `${m}[${i}]` });
+      const t = this.block(this.seqBody(n.then), inner, tail);
+      const e = n.else ? this.block(this.seqBody(n.else), this.nest(ctx), tail) : [];
+      const s =
+        this.typeOf(str, ctx)?.k === "prim"
+          ? this.expr(str, ctx)
+          : `String(${this.expr(str, ctx)})`;
+      const out = [
+        `const ${m} = ${this.expr(re, ctx)}.exec(${s});`,
+        `if (${m} != null) {`,
+        ...indent(t),
+        `}`,
+      ];
+      if (e.length) out.push("else {", ...indent(e), "}");
+      else if (tail) out.push("return null;");
+      return out;
+    }
+    return null;
+  }
+
   /** `String` / `Integer` / … as a bare constant: its ruby-compat class (`rbCString`). */
   rbCoreClassName(x: N): string | null {
     if (x?.k !== "const") return null;
@@ -2719,6 +2779,17 @@ export class Lowerer {
         if (x.k === "call" && x.name === "===" && isSym(x.recv)) y = true;
       });
     return y;
+  }
+
+  private gemDefsOnly?: Set<string>;
+  /** Every instance or singleton `def` name in the gem's library (not its tests). */
+  gemDefNames(): Set<string> {
+    if (this.gemDefsOnly) return this.gemDefsOnly;
+    const d = new Set<string>();
+    for (const sc of this.index.scopes.values())
+      for (const m of [...sc.defs.values(), ...sc.sdefs.values()])
+        if (!m.file.startsWith("test/") && !m.file.startsWith("spec/")) d.add(m.name);
+    return (this.gemDefsOnly = d);
   }
 
   private gemDefNamesMemo?: Set<string>;
@@ -2919,6 +2990,14 @@ export class Lowerer {
   constRef(n: N, ctx: Ctx): string {
     // A spec's `describe`-body constant, declared as a block-scoped const.
     if (n.path.length === 1 && this.isLocal(ctx, n.path[0])) return n.path[0];
+    // A test class's own constant (`TestParsing::TIME_…`) is a const in the
+    // test's `describe` body, which a helper function there reads by name.
+    if (n.path.length === 1 && ctx.f.rubyFile.startsWith("test/")) {
+      const hit = this.index.resolveConst(n.path, ctx.nesting);
+      const owner = hit?.kind === "const" ? hit.fqn.split("::").slice(0, -1).join("::") : "";
+      const sc = owner ? this.index.scopes.get(owner) : undefined;
+      if (sc?.hasSuperclass && [...sc.files].every((f) => f.startsWith("test/"))) return n.path[0];
+    }
     return this.resolver.constRef(n.path, ctx.nesting, ctx, this);
   }
 
@@ -3439,6 +3518,23 @@ export class Lowerer {
 
   call(n0: N, ctx0: Ctx): string {
     let n = callbackFilterSymbols(n0);
+    // A gem with no hand port: a Symbol naming one of the gem's own methods,
+    // handed to a gem class's constructor, is dispatched later by `send`
+    // (chronic `Handler.new(…, :handle_generic)`): the method's TS name.
+    if (
+      GEM.hand === false &&
+      n.name === "new" &&
+      n.recv?.k === "const" &&
+      this.index.resolveConst(n.recv.path, ctx0.nesting)?.kind === "scope"
+    )
+      n = {
+        ...n,
+        args: n.args.map((x: N) =>
+          x.k === "sym" && x.value.includes("_") && this.gemDefNames().has(x.value)
+            ? { k: "str", value: this.callName(x.value) }
+            : x,
+        ),
+      };
     // A gem with no hand port: Ruby's core class handed as an argument
     // (`token.get_tag(String)`, `assert_equal String, x.class`) is ruby-compat's
     // (`rbCString`), which `rbObjClass` answers, as the hand chronic port writes.

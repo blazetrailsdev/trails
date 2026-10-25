@@ -90,6 +90,20 @@ rule("===", (o) => {
 rule("=~", (o) => {
   if (o.n.recv.k === "regex" || o.n.recv.k === "dregex")
     return `${o.rc("rbStrMatch")}(${o.a[0]}, ${o.r})`;
+  // `Regexp#=~` (re.c rb_reg_match) is not `matchOperator`'s, which answers a
+  // String's and an object's own: a value that may be a Regexp (a pattern
+  // table's key, chronic tag.rb:19) takes the Regexp arm.
+  if (
+    GEM.hand === false &&
+    o.lw.typeOf(o.n.recv, o.ctx)?.k !== "prim" &&
+    o.n.args[0]?.k !== "regex" &&
+    o.n.args[0]?.k !== "dregex"
+  )
+    return o.lw.withOnce(
+      o.r,
+      (x) =>
+        `(${x} instanceof RegExp ? ${o.rc("rbStrMatch")}(${o.a[0]}, ${x}) : ${o.rc("matchOperator")}(${x}, ${o.a[0]}))`,
+    );
   return `${o.rc("matchOperator")}(${o.r}, ${o.a[0]})`;
 });
 

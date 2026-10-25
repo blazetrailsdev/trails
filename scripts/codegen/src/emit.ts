@@ -1511,7 +1511,7 @@ export class Emitter {
             ...indent(inner),
             "});",
           );
-        } else if (u.rspec && s.k === "casgn" && s.path?.length === 1) {
+        } else if (s.k === "casgn" && s.path?.length === 1) {
           // A constant set in a `describe` block lands on Object in Ruby; every
           // example the file defines after it reads it, so a block-scoped const.
           // A Hash an `each` reads as a table is the list of its pairs: its keys
