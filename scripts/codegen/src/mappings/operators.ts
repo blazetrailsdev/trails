@@ -139,9 +139,24 @@ rule("[]", (o) => {
     lw.typeOf(n.recv, ctx)?.k !== "hash"
   )
     return `(${r}.at(${a[0]}) ?? null)`;
-  // A Range index is a slice, which JS `[]` cannot express.
-  if (a.length === 1 && !a[0].startsWith("...") && n.args[0]?.k !== "range")
-    return `${o.lhs}[${a[0]}]`;
+  // A class `@blazetrails/date` or ruby-compat ports, whose `[]` has a TS
+  // spelling (`StringScanner#[]` is `get`).
+  {
+    const rt = lw.typeOf(n.recv, ctx);
+    if (rt?.k === "class" && !rt.static) {
+      const m = lw.resolver.types.member(rt.key, "[]", false);
+      if (m?.info.kind === "method")
+        return `${needsParens(r) ? `(${r})` : r}.${m.tsName}(${a.join(", ")})`;
+    }
+  }
+  // A Range index is a slice, which JS `[]` cannot express; so is a local
+  // holding one (`tokens[token_range]`, chronic handlers.rb:84).
+  const rangeArg =
+    n.args[0]?.k === "range" ||
+    (GEM.hand === false &&
+      n.args[0]?.k === "lvar" &&
+      /(^|[#/])Range$/.test((lw.typeOf(n.args[0], ctx) as { key?: string } | null)?.key ?? ""));
+  if (a.length === 1 && !a[0].startsWith("...") && !rangeArg) return `${o.lhs}[${a[0]}]`;
   // `str[1..-1]` / `ary[0, 2]`: `String#[]` (string.c rb_str_aref_m) through
   // the String method table's `get`, or `Array#[]` (array.c rb_ary_aref).
   const t = lw.typeOf(n.recv, ctx);

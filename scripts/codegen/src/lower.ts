@@ -5391,6 +5391,10 @@ export class Lowerer {
             : null;
         return { k: "array", el };
       }
+      case "range": {
+        const key = "@ruby-compat/range.ts#Range";
+        return T.cls(key) ? ({ k: "class", key } as TypeRef) : null;
+      }
       case "hash":
         // A literal with an Integer / Regexp key is a ruby-compat `Hash` (`hashLit`).
         if (
