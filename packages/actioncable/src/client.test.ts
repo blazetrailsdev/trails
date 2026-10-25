@@ -1,4 +1,4 @@
-import { Logger } from "@blazetrails/activesupport";
+import { Logger, assertCalled } from "@blazetrails/activesupport";
 import { Handler } from "@blazetrails/rack";
 import {
   AtomicFixnum,
@@ -360,4 +360,95 @@ describe("ClientTest", () => {
       await c.close();
     });
   }, 20_000);
+
+  it("unsubscribe client", async () => {
+    await withPumaServer(async (port) => {
+      const app = ActionCable.server() as ServerBase;
+      const identifier = JSON.stringify({ channel: "ClientTest::EchoChannel" });
+
+      const c = await websocketClient(port);
+      expect(await c.readMessage()).toEqual({ type: "welcome" });
+      c.sendMessage({ command: "subscribe", identifier });
+      expect(await c.readMessage()).toEqual({
+        identifier: '{"channel":"ClientTest::EchoChannel"}',
+        type: "confirm_subscription",
+      });
+      expect(app.connections.length).toBe(1);
+
+      const subscriptions = (
+        app.connections[0] as unknown as {
+          subscriptions: { subscriptions: Record<string, EchoChannel> };
+        }
+      ).subscriptions.subscriptions;
+      expect(Object.keys(subscriptions).length, "Missing EchoChannel subscription").not.toBe(0);
+      const channel = Object.values(subscriptions)[0];
+      await assertCalled(channel, "unsubscribed" as never, null, {}, async () => {
+        await c.close();
+        await sleep(0.1);
+      });
+
+      expect(app.connections.length).toBe(0);
+    });
+  });
+
+  it("remote disconnect client", async () => {
+    await withPumaServer(async (port) => {
+      const app = ActionCable.server() as ServerBase;
+
+      const c = await websocketClient(port, "/?id=1");
+      expect(await c.readMessage()).toEqual({ type: "welcome" });
+
+      await sleep(0.1);
+      await app.remoteConnections.where({ id: "1" }).disconnect();
+
+      expect(await c.readMessage()).toEqual({
+        type: "disconnect",
+        reason: "remote",
+        reconnect: true,
+      });
+
+      await c.waitForClose();
+      expect(c.isClosed()).toBeTruthy();
+    });
+  });
+
+  it("remote disconnect client with reconnect", async () => {
+    await withPumaServer(async (port) => {
+      const app = ActionCable.server() as ServerBase;
+
+      const c = await websocketClient(port, "/?id=2");
+      expect(await c.readMessage()).toEqual({ type: "welcome" });
+
+      await sleep(0.1);
+      await app.remoteConnections.where({ id: "2" }).disconnect({ reconnect: false });
+
+      expect(await c.readMessage()).toEqual({
+        type: "disconnect",
+        reason: "remote",
+        reconnect: false,
+      });
+
+      await c.waitForClose();
+      expect(c.isClosed()).toBeTruthy();
+    });
+  });
+
+  it("server restart", async () => {
+    await withPumaServer(async (port) => {
+      const c = await websocketClient(port);
+      expect(await c.readMessage()).toEqual({ type: "welcome" });
+      c.sendMessage({
+        command: "subscribe",
+        identifier: JSON.stringify({ channel: "ClientTest::EchoChannel" }),
+      });
+      expect(await c.readMessage()).toEqual({
+        identifier: '{"channel":"ClientTest::EchoChannel"}',
+        type: "confirm_subscription",
+      });
+
+      await (ActionCable.server() as ServerBase).restart();
+      await c.waitForClose();
+      expect(c.isClosed()).toBeTruthy();
+    });
+  });
 });
