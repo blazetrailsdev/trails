@@ -6670,7 +6670,7 @@ export class DateTime extends DateWithoutParseStatics {
       self.day,
       self.hour,
       self.min,
-      self.#sf.quo(1_000_000_000).add(self.sec),
+      new Rational(self.sec, 1).add(self.#sf.quo(1_000_000_000)),
       self.#of,
     );
   }
