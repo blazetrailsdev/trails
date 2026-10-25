@@ -14,7 +14,9 @@ import {
   rbIntegerTypeP,
   rbEqual,
   rbHash,
+  rbCNumeric,
   rbObjClassname,
+  rbObjIsKindOf,
   rbSetClassPathString,
   strip,
   round,
@@ -67,7 +69,7 @@ export class Duration {
 
     const original = s;
 
-    if (typeof s === "number" || s instanceof Number || typeof s === "bigint") s = `${toS(s)}s`;
+    if (rbObjIsKindOf(s, rbCNumeric)) s = `${toS(s)}s`;
 
     if (typeof s !== "string") return null;
 

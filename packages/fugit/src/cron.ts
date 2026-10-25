@@ -1,3 +1,4 @@
+import type { Time } from "@blazetrails/date";
 import { EtOrbi, EoTime } from "@blazetrails/et-orbi";
 import { Raabro, type Input, type ModuleMethods, type Tree } from "@blazetrails/raabro";
 import {
@@ -19,6 +20,7 @@ import {
   product,
   rbCmpint,
   rbEqual,
+  rbFArray,
   rbHash,
   rbInspect,
   rbModDefineMethod,
@@ -232,13 +234,13 @@ export class Cron {
 
   static MAX_ITERATION_COUNT = 2048;
 
-  nextTime(from: unknown = EoTime.now()): EoTime {
-    let efrom = EtOrbi.makeTime(from);
-    let sfrom = efrom.strftime("%F|%T");
-    let ifrom = efrom.toI();
+  nextTime(from: EoTime | Time | Date | string | number | unknown[] = EoTime.now()): EoTime {
+    from = EtOrbi.makeTime(from);
+    let sfrom = from.strftime("%F|%T");
+    let ifrom = from.toI();
 
     let i = 0;
-    const t = new TimeCursor(this, efrom.translate(this.timezone));
+    const t = new TimeCursor(this, from.translate(this.timezone));
 
     let zfrom = t.time().strftime("%z|%Z");
 
@@ -280,21 +282,21 @@ export class Cron {
       const st = tt.strftime("%F|%T");
       const zt = tt.strftime("%z|%Z");
       if (st === sfrom && zt !== zfrom) {
-        [efrom, sfrom, zfrom, ifrom] = [tt, st, zt, t.toI()];
+        [from, sfrom, zfrom, ifrom] = [tt, st, zt, t.toI()];
         continue;
       }
 
       break;
     }
 
-    return t.time().translate(efrom.zone);
+    return t.time().translate(from.zone);
   }
 
-  previousTime(from: unknown = EoTime.now()): EoTime {
-    const efrom = EtOrbi.makeTime(from);
+  previousTime(from: EoTime | Time | Date | string | number | unknown[] = EoTime.now()): EoTime {
+    from = EtOrbi.makeTime(from);
 
     let i = 0;
-    const t = new TimeCursor(this, efrom.minus(1).translate(this.timezone));
+    const t = new TimeCursor(this, from.minus(1).translate(this.timezone));
 
     for (;;) {
       if ((i += 1) > Cron.MAX_ITERATION_COUNT) {
@@ -328,7 +330,7 @@ export class Cron {
       break;
     }
 
-    return t.time().translate(efrom.zone);
+    return t.time().translate(from.zone);
   }
 
   next(from: unknown = EoTime.now()): CronIterator {
@@ -516,8 +518,12 @@ export class Cron {
   }
 
   /** @internal */
-  protected expand(min: number, max: number, r: CronElt): number | (number | null)[] | null {
-    let [sta, edn, sla] = r;
+  protected expand(
+    min: number,
+    max: number,
+    r: CronElt | number,
+  ): number | (number | null)[] | null {
+    let [sta, edn, sla] = rbFArray(r) as CronElt;
 
     if (sla != null && edn == null) edn = max;
 
@@ -585,14 +591,14 @@ export class Cron {
   /** @internal */
   protected doDetermine(
     key: string,
-    arr: CronElt[] | undefined,
+    arr: (CronElt | number)[] | undefined,
     min: number,
     max: number,
   ): number[] | null | false {
     let nul = false;
 
     const r: number[] = [];
-    for (const e of flatten(arr!.map((v) => [this.expand(min, max, v)])) as (
+    for (const e of arr!.map((v) => this.expand(min, max, v)).flat(1) as (
       | number
       | null
       | false
@@ -609,9 +615,8 @@ export class Cron {
   /** @internal */
   protected determineSeconds(arr: CronElt[] | undefined): boolean {
     return (
-      (this.seconds = this.doDetermine(":seconds", arr ?? [[0, null, null, null, null]], 0, 59) as
-        | number[]
-        | null) !== (false as unknown)
+      (this.seconds = this.doDetermine(":seconds", arr ?? [0], 0, 59) as number[] | null) !==
+      (false as unknown)
     );
   }
 
@@ -838,9 +843,10 @@ export class CronIterator {
   each(block: (t: EoTime) => void): void {
     for (;;) {
       block(
-        (this.current = this.cron[this.direction.slice(1) as "nextTime" | "previousTime"](
-          this.current,
-        )),
+        (this.current =
+          this.direction === ":nextTime"
+            ? this.cron.nextTime(this.current as EoTime)
+            : this.cron.previousTime(this.current as EoTime)),
       );
     }
   }

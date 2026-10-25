@@ -338,7 +338,6 @@ export function numericUminus(x: unknown): unknown {
   if (rbFloatTypeP(x)) return rbDbl2num(-x.valueOf());
   if (typeof x === "bigint") return rbBigNorm(-x);
   if (rbIntegerTypeP(x)) return x === 0 ? 0 : -x;
-  if (x instanceof Rational) return new Rational(-x.numerator, x.denominator);
   throw new NoMethodError(`undefined method '-@' for an instance of ${rbObjClassname(x)}`);
 }
 

@@ -99,7 +99,8 @@ export function parseCronish(s: unknown, opts: NatOptions = {}): Cron | null {
   return r instanceof Cron ? r : null;
 }
 
-export function doParseCronish(s: unknown, _opts: NatOptions = {}): Cron {
+// eslint-disable-next-line unused-imports/no-unused-vars -- parse.rb:60 takes opts and never reads it
+export function doParseCronish(s: unknown, opts: NatOptions = {}): Cron {
   const r = parseCronish(s);
   if (r != null) return r;
   throw new ArgumentError(`not cron or 'natural' cron string: ${rbInspect(s)}`);
