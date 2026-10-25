@@ -7714,7 +7714,8 @@ function setRoundTripForms(operand: ts.Expression | undefined): string[] {
  * What the TS checker proves an expression's type is: `sized` for a string,
  * array or tuple, which `.length` counts, and `object` for a plain object
  * type (an object literal, a type literal, a mapped `Record`, an interface),
- * which a rest-destructure copies. A class instance, a callable or anything
+ * which a rest-destructure copies. A class instance, an interface with a value
+ * declaration (`Map`, `Set`, `Date`), a callable or anything
  * `any` / `unknown` proves neither, since a trails `Relation` answers `size` /
  * `except` itself. Every member of a union has to agree.
  */
@@ -7730,7 +7731,9 @@ function checkerProvenKind(expr: ts.Expression): "sized" | "object" | undefined 
       if (!(t.flags & ts.TypeFlags.Object) || t.getCallSignatures().length > 0) return undefined;
       const sym = t.getSymbol();
       if (sym === undefined) return "object";
-      if (sym.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Function)) return undefined;
+      if (sym.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Function | ts.SymbolFlags.Variable)) {
+        return undefined;
+      }
       return sym.flags &
         (ts.SymbolFlags.TypeLiteral | ts.SymbolFlags.ObjectLiteral | ts.SymbolFlags.Interface)
         ? "object"
