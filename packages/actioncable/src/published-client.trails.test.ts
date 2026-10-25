@@ -124,6 +124,7 @@ describe("published client", () => {
       expect(connection.monitor.pingedAt).toBeGreaterThan(0);
 
       Client.ConnectionMonitor.staleThreshold = 0.3;
+      connection.monitor.startPolling();
       await app.remoteConnections.where({ id: "1" }).disconnect();
       await waitFor(() => events.includes("reconnected"));
       expect(connection.monitor.isRunning()).toBe(true);
