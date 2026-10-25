@@ -23,6 +23,7 @@
       "@blazetrails/bcrypt": ["../../bcrypt/src/index.ts"],
       "@blazetrails/msgpack": ["../../msgpack/src/index.ts"],
       "@blazetrails/date": ["../../date/src/index.ts"],
+      "@blazetrails/tzinfo": ["../../tzinfo/src/index.ts"],
       "@blazetrails/activesupport/message-verifier": [
         "../../activesupport/src/message-verifier.ts"
       ],

@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "description": "Time zone lookups for Trails, standing in for the tzinfo gem",
   "type": "module",
-  "main": "dist/tzinfo.js",
-  "types": "dist/tzinfo.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/tzinfo.d.ts",
-      "default": "./dist/tzinfo.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
   "files": [
