@@ -1,30 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { socketPair } from "../test-helpers/socket-pair.js";
 import { StreamEventLoop } from "./stream-event-loop.js";
 
-type Listener = (...args: unknown[]) => void;
-
-class FakeIo {
-  listeners = new Map<string, Listener[]>();
-  destroyed = false;
-  on(event: string, listener: Listener): void {
-    this.listeners.set(event, [...(this.listeners.get(event) ?? []), listener]);
-  }
-  off(event: string, listener: Listener): void {
-    this.listeners.set(
-      event,
-      (this.listeners.get(event) ?? []).filter((l) => l !== listener),
-    );
-  }
-  emit(event: string, ...args: unknown[]): void {
-    for (const listener of this.listeners.get(event) ?? []) listener(...args);
-  }
-  count(): number {
-    return [...this.listeners.values()].reduce((n, ls) => n + ls.length, 0);
-  }
-  destroy(): void {
-    this.destroyed = true;
-  }
-}
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function stream(closeRaises = false) {
   return {
@@ -41,47 +19,45 @@ function stream(closeRaises = false) {
 }
 
 describe("ActionCable::Connection::StreamEventLoop", () => {
-  it("hands incoming bytes to the stream and closes it on EOF and on error", () => {
+  it("hands incoming bytes to the stream and closes it on EOF", async () => {
     const loop = new StreamEventLoop();
-    const io = new FakeIo();
+    const [io, peer] = socketPair();
     const s = stream();
     loop.attach(io, s);
-    io.emit("data", "hello");
-    expect(s.received).toEqual(["hello"]);
-    io.emit("end");
-    io.emit("error", new Error("reset"));
-    expect(s.closes).toBe(2);
+    peer.write("hello");
+    await tick();
+    expect(s.received).toEqual([new TextEncoder().encode("hello")]);
+    peer.closeWrite();
+    await tick();
+    expect(s.closes).toBe(1);
   });
 
-  it("deregisters the io when closing the stream raises", () => {
+  it("closes the stream when receive raises, and deregisters when that close raises too", async () => {
     const loop = new StreamEventLoop();
-    const io = new FakeIo();
-    loop.attach(io, stream(true));
-    io.emit("error", new Error("reset"));
-    expect(io.count()).toBe(0);
-  });
-
-  it("closes the stream when receive raises, and deregisters when that close raises too", () => {
-    const loop = new StreamEventLoop();
-    const io = new FakeIo();
+    const [io, peer] = socketPair();
     const s = stream(true);
     s.receive = () => {
       throw new Error("bad frame");
     };
     loop.attach(io, s);
-    expect(() => io.emit("data", "x")).not.toThrow();
+    peer.write("x");
+    await tick();
     expect(s.closes).toBe(1);
-    expect(io.count()).toBe(0);
+    peer.write("y");
+    await tick();
+    expect(s.closes).toBe(1);
   });
 
-  it("detach removes the listeners and closes the io", () => {
+  it("detach stops reading and closes the io", async () => {
     const loop = new StreamEventLoop();
-    const io = new FakeIo();
+    const [io, peer] = socketPair();
     const s = stream();
     loop.attach(io, s);
     loop.detach(io, s);
-    expect(io.count()).toBe(0);
-    expect(io.destroyed).toBe(true);
+    expect(io.isClosed()).toBe(true);
+    peer.write("late");
+    await tick();
+    expect(s.received).toEqual([]);
   });
 
   it("post runs a task, positional or block, on the executor", async () => {

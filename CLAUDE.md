@@ -1405,12 +1405,15 @@ thread.** The `connection/` port, when it lands, follows these rules:
   partial-write arms (`stream.rb:54,65`) and `run`
   (`stream_event_loop.rb:105`), none of which exists here, so a body would be
   an empty stub.
-- `attach` and `detach` keep their Rails names and callers. `attach(io, stream)`
-  (`stream_event_loop.rb:30-36`) registers the socket's `data` / `end` /
-  `error` listeners, held in `@map` where Rails holds the NIO monitor, and they
-  call `stream.receive` and `stream.close` exactly where `run` does
-  (`:111-129`). `detach` (`:38-45`) removes them, deletes the map entry and
-  closes the socket.
+- `attach` and `detach` keep their Rails names and callers. The hijacked io
+  is the ruby-compat `TCPSocket` the Rack handler hands out, a Ruby IO, so
+  `attach(io, stream)` (`stream_event_loop.rb:30-36`) holds the stream in
+  `@map` where Rails holds the NIO monitor and reads the io as `run` does
+  (`:111-129`): it awaits `io.wait_readable` where `run` waits in `select`,
+  then calls `io.read_nonblock(4096, exception: false)` and hands the result
+  to `stream.receive`, or calls `stream.close` at end of file or on a raise.
+  `detach` (`:38-45`) deletes the map entry, which ends that read, and calls
+  `io.close`.
 - `timer`, `post` and `stop` (`:19-28`, `:56-59`) port as ordinary methods over
   ruby-compat's `TimerTask` and `ThreadPoolExecutor`.
 - `Stream#write` calls the socket's `write` and keeps its `@stream_send` arm

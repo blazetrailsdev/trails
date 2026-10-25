@@ -15,6 +15,7 @@ server.config.logger = new Logger(null);
 
 export class TestCase extends ActiveSupportTestCase {
   declare assertCalled: Included<typeof MethodCallAssertions>["assertCalled"];
+  declare assertNotCalled: Included<typeof MethodCallAssertions>["assertNotCalled"];
   declare assertCalledWith: Included<typeof MethodCallAssertions>["assertCalledWith"];
 
   static {
