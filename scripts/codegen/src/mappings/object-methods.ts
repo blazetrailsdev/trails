@@ -448,7 +448,7 @@ rule("to_s", (c) => {
   const { n, ctx, R, r, lw, recvNode } = c;
   if (argc(n) !== 0) return null;
   // `Symbol#to_s` drops the colon (`rb_sym2str`) where the file keeps it.
-  if (ctx.f.symbolColon) {
+  if (ctx.f.symbolColon || lw.ownerTestsSymbol(ctx)) {
     const v = /^[A-Za-z_$][\w$]*$/.test(R) ? R : null;
     const body = (x: string) =>
       `${c.rc("isSymbol")}(${x}) ? ${c.rc("symbolToS")}(${x}) : ${c.rc("rbObjAsString")}(${x})`;

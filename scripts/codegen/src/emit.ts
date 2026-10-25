@@ -2780,6 +2780,11 @@ export class Emitter {
           if (a.k !== "sym" || attrNames.has(a.value)) continue;
           attrNames.add(a.value);
           const js = propName(a.value);
+          // A plain accessor of a gem with no hand port is the field itself.
+          if (this.lw.isPlainAttrField(a.value)) {
+            defs++;
+            continue;
+          }
           if (s.name !== "attr_writer")
             members.push(
               `get ${js}(): any {\n  return this._${js.replace(/^_/, "")}${this.unsetNil(u.fqn, a.value)};\n}`,

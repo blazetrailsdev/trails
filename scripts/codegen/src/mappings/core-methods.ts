@@ -10,6 +10,7 @@
  * and looks the name up here.
  */
 import type { N, Param } from "../ir.js";
+import { walk } from "../ir.js";
 import type { TypeRef } from "../types.js";
 import { GEM } from "../gem.js";
 import { hashNamed, jsIdent, needsParens, rbCoreFn, type Ctx, type Lowerer } from "../lower.js";
@@ -517,7 +518,54 @@ rule("split", (c) => {
 rule("sub", (c) => (!c.blk ? `${c.R}${c.nav}replace(${c.args().join(", ")})` : null));
 // A String pattern is `replaceAll`; a Regexp one a global replace. A
 // replacement naming groups (`"\\1"`) keeps the helper, which reads Ruby's syntax.
+/**
+ * `s.gsub(re) { … $1 … }` with a one-expression block reading only `$1`..`$9`:
+ * a global `replace` whose callback takes the groups (`(_m, d1) => …`).
+ */
+export function gsubBlock(c: {
+  lw: Lowerer;
+  ctx: Ctx;
+  n: N;
+  R: string;
+  blk: N | null;
+  args(): string[];
+}): string | null {
+  const blk = c.blk;
+  if (!blk || blk.k !== "block" || (blk.params ?? []).length || c.n.args.length !== 1) return null;
+  const pat = c.n.args[0];
+  if (pat.k !== "regex" && pat.k !== "dregx" && pat.k !== "dregex") return null;
+  const body = c.lw.seqBody(blk.body);
+  if (body.length !== 1) return null;
+  let max = 0;
+  let other = false;
+  walk(body[0], (x) => {
+    if (x.k === "nthref") max = Math.max(max, Number(x.n));
+    if (x.k === "gvar" || x.k === "backref" || x.k === "block" || x.k === "def") other = true;
+  });
+  if (other) return null;
+  const groups = Array.from({ length: max }, (_, i) => `d${i + 1}`);
+  const inner = c.lw.child(c.ctx, { nthref: (i: number) => `d${i}` });
+  const v = c.lw.expr(body[0], inner);
+  const re = c.args()[0];
+  const g = /\/[a-z]*$/.test(re)
+    ? re.replace(/\/([a-z]*)$/, (_m, f: string) => `/${f.includes("g") ? f : f + "g"}`)
+    : re.replace(
+        /^new RegExp\((.*?)(?:, "([a-z]*)")?\)$/s,
+        (_m, src: string, f = "") => `new RegExp(${src}, "${f.includes("g") ? f : f + "g"}")`,
+      );
+  const params = ["_m", ...groups.map((d) => `${d}: string`)].join(", ");
+  return `${c.R}.replace(${g}, (${params}) => String(${v}))`;
+}
+
+rule("gsub!", (c) => {
+  const rep = gsubBlock(c);
+  if (!rep || (c.recvNode.k !== "lvar" && c.recvNode.k !== "ivar")) return null;
+  return `(${c.r} = ${rep})`;
+});
+
 rule("gsub", (c) => {
+  const blk = gsubBlock(c);
+  if (blk) return blk;
   if (c.blk || argc(c) !== 2) return null;
   const [pat, rep] = c.n.args;
   if (rep.k === "str" && !rep.value.includes("\\")) {

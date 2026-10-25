@@ -28,6 +28,7 @@ import {
   RUBY_COMPAT_FALLBACK,
   SPLAT_YIELD_ONE,
   asyncEnumBody,
+  gsubBlock,
 } from "./mappings/core-methods.js";
 import type { CallSite } from "./mappings/call-site.js";
 import { ATTR_MACROS, CORE_EXT_CALC, TIME_HELPERS } from "./mappings/activesupport.js";
@@ -89,6 +90,18 @@ export const RESERVED = new Set(
     "yield let static implements interface package private protected public await arguments eval undefined"
   ).split(" "),
 );
+
+/** Names a bare ivar field must not take: they are JS / Object members. */
+const RESERVED_FIELDS = new Set([
+  "constructor",
+  "prototype",
+  "length",
+  "name",
+  "toString",
+  "valueOf",
+  "caller",
+  "arguments",
+]);
 
 export function jsIdent(rubyName: string): string {
   let n =
@@ -211,6 +224,14 @@ interface Ctx {
   inLoop: boolean;
   defName?: string;
   defParams?: Param[];
+  /**
+   * Lowering an Array literal handed to a class that tells a Symbol from a
+   * String (chronic `Handler#match`'s `when Symbol`): its Symbols keep the colon
+   * (CLAUDE.md "A Ruby Symbol is a JS string, never a JS `Symbol`").
+   */
+  symColonArray?: boolean;
+  /** Inside a `gsub` block lowered as a `replace` callback: `$1` is its `d1`. */
+  nthref?: (i: number) => string;
   /** The Ruby `def`'s body (duck typing of its locals, `duckTime`). */
   defBody?: N;
   /** The hand twin's TS types for the method's positional parameters, by position. */
@@ -856,11 +877,12 @@ export class Lowerer {
     const name = c.path.filter((s: string) => s !== "").join("::");
     switch (name) {
       case "String":
-        if (ctx.f.symbolColon)
+        if (ctx.f.symbolColon || this.ownerTestsSymbol(ctx))
           return `(typeof ${subj} === "string" && !${this.rc(ctx, "isSymbol")}(${subj}))`;
         return `typeof ${subj} === "string"`;
       case "Symbol":
-        if (ctx.f.symbolColon) return `${this.rc(ctx, "isSymbol")}(${subj})`;
+        if (ctx.f.symbolColon || this.ownerTestsSymbol(ctx))
+          return `${this.rc(ctx, "isSymbol")}(${subj})`;
         return `typeof ${subj} === "string"`;
       // Ruby's Integer includes a bigint, and a Float may be a boxed integral
       // Number (`1.0`): ruby-compat's classes answer both (`rbObjClass`).
@@ -1136,6 +1158,11 @@ export class Lowerer {
       case "const":
         return this.constRef(t, ctx);
       case "call":
+        if (t.name === "[]") {
+          // `options[:endian_precedence] ||= …` writes the key its reads read.
+          const ok = this.optionKey(t, this.typeOf(t.recv, ctx), ctx);
+          if (ok) return `${this.expr(t.recv, ctx)}.${ok}`;
+        }
         if (t.name === "[]")
           return `${this.expr(t.recv, ctx)}[${this.dataSubscript(t, ctx)
             .args.map((a: N) => this.expr(a, ctx))
@@ -1156,6 +1183,10 @@ export class Lowerer {
       n.recv &&
       n.block?.k === "block" &&
       (n.name === "each" ||
+        n.name === "each_index" ||
+        (n.name === "each_with_index" &&
+          this.typeOf(n.recv, ctx)?.k !== "hash" &&
+          n.recv.k !== "range") ||
         n.name === "each_value" ||
         n.name === "each_key" ||
         n.name === "each_pair") &&
@@ -1183,7 +1214,36 @@ export class Lowerer {
         pre.push(`const ${t} = ${recv};`);
         recv = t;
       }
-      if (n.name === "each_pair" || (n.name === "each" && params.length === 2)) {
+      // A block parameter the body reassigns (`elements = [elements]`,
+      // chronic handler.rb:27) is a `let` binding.
+      const reassigned = (nm?: string) => {
+        let y = false;
+        if (nm)
+          walk(n.block.body, (x) => {
+            if (x.k === "lasgn" && x.name === nm) y = true;
+          });
+        return y;
+      };
+      const bind = (nm?: string) => (reassigned(nm) ? "let" : "const");
+      if (n.name === "each_index" && params.length === 1 && params[0].name) {
+        // `ary.each_index { |i| }` (array.c rb_ary_each_index): a counted loop.
+        inner.scope.locals.add(params[0].name);
+        (inner.scope.types ??= new Map()).set(params[0].name, { k: "prim", name: "number" });
+        const i = jsIdent(params[0].name);
+        head = `for (let ${i} = 0; ${i} < ${recv}.length; ${i}++)`;
+      } else if (n.name === "each_index") return null;
+      else if (n.name === "each_with_index") {
+        if (
+          params.length !== 2 ||
+          !params[0].name ||
+          !params[1].name ||
+          params.some((p) => p.kind !== "req")
+        )
+          return null;
+        params.forEach((p) => p.name && inner.scope.locals.add(p.name));
+        (inner.scope.types ??= new Map()).set(params[1].name, { k: "prim", name: "number" });
+        head = `for (${bind(params[0].name) === "let" || reassigned(params[1].name) ? "let" : "const"} [${jsIdent(params[1].name)}, ${jsIdent(params[0].name)}] of ${this.typeOf(n.recv, ctx)?.k === "array" ? this.iter(n.recv, ctx, recv) : `Array.from(${this.iter(n.recv, ctx, recv)} as Iterable<unknown>)`}.entries())`;
+      } else if (n.name === "each_pair" || (n.name === "each" && params.length === 2)) {
         params.forEach((p) => p.name && inner.scope.locals.add(p.name));
         head = `for (const [${params.map((p) => jsIdent(p.name ?? "_")).join(", ")}] of ${this.entries(recv, ctx, n.recv)})`;
       } else if (n.name === "each_value") {
@@ -1212,7 +1272,7 @@ export class Lowerer {
         const rt = this.typeOf(n.recv, ctx);
         if (rt?.k === "array" && rt.el)
           (inner.scope.types ??= new Map()).set(params[0].name, rt.el);
-        head = `for (const ${jsIdent(params[0].name)} of ${this.iter(n.recv, ctx, recv)})`;
+        head = `for (${bind(params[0].name)} ${jsIdent(params[0].name)} of ${this.iter(n.recv, ctx, recv)})`;
       } else if (params.length === 1 && params[0].destructure) {
         const names = params[0].destructure.map((d) => (d ? jsIdent(d) : ""));
         params[0].destructure.forEach((d) => d && inner.scope.locals.add(d));
@@ -2102,7 +2162,7 @@ export class Lowerer {
       case "str":
         return JSON.stringify(n.value);
       case "sym":
-        return JSON.stringify(symColonHere(ctx) ? ":" + n.value : n.value);
+        return JSON.stringify(symColonHere(ctx) || ctx.symColonArray ? ":" + n.value : n.value);
       case "dstr":
       case "dsym":
         return (
@@ -2168,6 +2228,7 @@ export class Lowerer {
       case "cvasgn":
         return `(${this.cvar(n.name, ctx)} = ${this.expr(n.value, ctx)})`;
       case "nthref":
+        if (ctx.nthref) return ctx.nthref(Number(n.n));
         return `${this.rc(ctx, "rbBackrefNth")}(${n.n})`;
       case "gvar":
         if (n.name === "$&") return `${this.rc(ctx, "lastMatchGetter")}()`;
@@ -2255,7 +2316,19 @@ export class Lowerer {
         if (n.k === "opasgn" && n.target.k !== "lvar") return this.opasgnExpr(n, ctx);
         return this.iife(n, ctx);
       case "call":
+        if (n.name === "new" && n.recv?.k === "const" && this.symbolTester(n.recv, ctx))
+          return this.call(
+            {
+              ...n,
+              args: n.args.map((a: N) =>
+                a.k === "array" ? { ...a, k: "symColonArray", inner: a } : a,
+              ),
+            },
+            ctx,
+          );
         return this.call(n, ctx);
+      case "symColonArray":
+        return this.expr(n.inner, this.child(ctx, { symColonArray: true }));
       case "super":
         return this.superCall(n, ctx);
       case "yield": {
@@ -2539,12 +2612,102 @@ export class Lowerer {
       }
       memo.set(owner, names);
     }
+    // A gem with no hand port names the field as the hand port does, bare
+    // (`@current_hour_start` is `currentHourStart`), where no method or accessor
+    // anywhere in the gem takes the name (a subclass's method would be shadowed).
+    const bare = propName(name.replace(/^@/, ""));
+    if (
+      GEM.hand === false &&
+      !name.replace(/^@/, "").startsWith("_") &&
+      !RESERVED_FIELDS.has(bare)
+    ) {
+      if (!this.gemMemberNames().has(bare)) return bare;
+      // `attr_reader :pattern` over `@pattern`, with no method of that name
+      // anywhere in the gem: one public field, as the hand port writes it.
+      if (this.isPlainAttrField(name.replace(/^@/, ""))) return bare;
+    }
     // `@_zone` beside `@zone`, both stepping past a `_zone` accessor, stay apart.
     if (!names.has(field)) return field;
     return name.replace(/^@/, "").startsWith("_") ? `__${field}` : `_${field}`;
   }
 
   private ivarClash?: Map<string, Set<string>>;
+
+  /** Whether the class being lowered is a `symbolTester`: its Symbols carry the colon. */
+  ownerTestsSymbol(ctx: Ctx): boolean {
+    if (!ctx.owner || GEM.hand !== false) return false;
+    const path = ctx.owner.split("::");
+    return this.symbolTester({ k: "const", path: ["", ...path] } as N, ctx);
+  }
+
+  /** Whether a gem class's own methods branch on Symbol (`when Symbol`, `is_a?(Symbol)`, `Symbol === x`). */
+  symbolTester(c: N, ctx: Ctx): boolean {
+    if (GEM.hand !== false) return false;
+    const hit = this.index.resolveConst(c.path, ctx.nesting);
+    if (hit?.kind !== "scope") return false;
+    const sc = this.index.scopes.get(hit.fqn);
+    if (!sc) return false;
+    let y = false;
+    const isSym = (x: N | undefined) =>
+      x?.k === "const" && x.path.filter((p: string) => p).join("::") === "Symbol";
+    for (const d of sc.defs.values())
+      walk(d.node, (x) => {
+        if (
+          x.k === "case" &&
+          (x.whens ?? []).some((w: { conds?: N[] }) => (w.conds ?? []).some(isSym))
+        )
+          y = true;
+        if (
+          x.k === "call" &&
+          ["is_a?", "kind_of?", "instance_of?"].includes(x.name) &&
+          isSym(x.args?.[0])
+        )
+          y = true;
+        if (x.k === "call" && x.name === "===" && isSym(x.recv)) y = true;
+      });
+    return y;
+  }
+
+  private gemDefNamesMemo?: Set<string>;
+  /**
+   * Whether an instance `attr_reader` / `attr_accessor :x` is a plain public
+   * field: a gem with no hand port, no `def x` / `def x=` anywhere in the gem,
+   * and no class-level accessor of that name.
+   */
+  isPlainAttrField(rb: string): boolean {
+    if (GEM.hand !== false) return false;
+    if (!this.gemDefNamesMemo) {
+      const d = new Set<string>();
+      for (const sc of this.index.scopes.values()) {
+        for (const k of sc.defs.keys()) d.add(k);
+        for (const k of sc.sdefs.keys()) d.add(k);
+        for (const k of sc.sattrs) d.add(k);
+      }
+      this.gemDefNamesMemo = d;
+    }
+    const js = propName(rb);
+    return (
+      !this.gemDefNamesMemo.has(rb) &&
+      !this.gemDefNamesMemo.has(rb + "=") &&
+      !RESERVED_FIELDS.has(js) &&
+      !rb.startsWith("_") &&
+      [...this.index.scopes.values()].some((sc) => sc.attrs.has(rb))
+    );
+  }
+
+  private gemMemberNamesMemo?: Set<string>;
+  /** Every method and accessor name any gem scope defines, in its TS spelling. */
+  gemMemberNames(): Set<string> {
+    if (this.gemMemberNamesMemo) return this.gemMemberNamesMemo;
+    const s = new Set<string>();
+    for (const sc of this.index.scopes.values()) {
+      for (const d of sc.defs.keys()) s.add(this.callName(d));
+      for (const d of sc.sdefs.keys()) s.add(this.callName(d));
+      for (const at of sc.attrs) s.add(this.attrName(at));
+      for (const at of sc.sattrs) s.add(this.attrName(at));
+    }
+    return (this.gemMemberNamesMemo = s);
+  }
 
   /**
    * Member names a test file's reopening of a core class gives it (fugit's
@@ -3990,6 +4153,18 @@ export class Lowerer {
       if (stringish && (name === "downcase" || name === "upcase") && !n.args.length) {
         const s = rt ? (needsParens(r) ? `(${r})` : r) : `(${r} as string)`;
         return `${s}.${name === "downcase" ? "toLowerCase" : "toUpperCase"}()`;
+      }
+      if (stringish && (name === "gsub" || name === "gsub!")) {
+        const rep = gsubBlock({
+          lw: this,
+          ctx,
+          n,
+          R: needsParens(r) ? `(${r})` : r,
+          blk: n.block ?? null,
+          args: () => n.args.map((x: N) => this.expr(x, ctx)),
+        });
+        if (rep && name === "gsub") return rep;
+        if (rep && (recvNode.k === "lvar" || recvNode.k === "ivar")) return `(${r} = ${rep})`;
       }
       if (
         stringish &&
