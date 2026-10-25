@@ -723,6 +723,9 @@ importers:
       '@blazetrails/activerecord-cli':
         specifier: workspace:*
         version: link:../activerecord-cli
+      '@blazetrails/et-orbi':
+        specifier: workspace:*
+        version: link:../et-orbi
       typescript:
         specifier: 7.1.0-dev.20260920.1
         version: 7.1.0-dev.20260920.1

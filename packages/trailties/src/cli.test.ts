@@ -1,6 +1,6 @@
 import { beforeAll, describe, it, expect } from "vitest";
 import { createProgram } from "./cli.js";
-import { VERSION } from "./version.js";
+import { VERSION } from "./gem-version.js";
 import { Generators } from "./generators.js";
 import { lookupBang } from "./command/behavior.js";
 
@@ -25,7 +25,7 @@ describe("CLI", () => {
     } catch (e: any) {
       /** @empty */
     }
-    expect(output.trim()).toBe(VERSION);
+    expect(output.trim()).toBe(VERSION.STRING);
   });
 
   it("has all expected commands registered", () => {

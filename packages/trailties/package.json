@@ -75,6 +75,7 @@
   },
   "devDependencies": {
     "@blazetrails/activerecord-cli": "workspace:*",
+    "@blazetrails/et-orbi": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependencies": {

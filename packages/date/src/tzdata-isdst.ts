@@ -332,6 +332,12 @@ function zoneRow(timeZoneId: string): string | undefined {
 }
 
 /** @noRailsEquivalent PERMANENT */
+export function tzdataIsdstFlips(timeZoneId: string): number[] {
+  const row = zoneRow(timeZoneId);
+  return row === undefined ? [] : zoneFlipInstants(row);
+}
+
+/** @noRailsEquivalent PERMANENT */
 export function tzdataIsdst(timeZoneId: string, epochSeconds: number): boolean {
   const row = zoneRow(timeZoneId);
   if (row === undefined) return false;
