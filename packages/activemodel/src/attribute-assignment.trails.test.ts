@@ -3,7 +3,7 @@
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { Module, NoMethodError, isEmpty } from "@blazetrails/ruby-compat";
+import { NoMethodError, isEmpty } from "@blazetrails/ruby-compat";
 import { UnknownAttributeError } from "./errors.js";
 import { Model } from "./index.js";
 import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
@@ -298,7 +298,7 @@ describe("AttributeAssignmentTest", () => {
       declare static attributeMethodSuffix: (...suffixes: string[]) => void;
       declare static defineAttributeMethods: (...names: string[]) => void;
       declare static undefineAttributeMethods: () => void;
-      declare static generatedAttributeMethods: () => Module;
+      declare static generatedAttributeMethods: () => { prototype: object };
       written: [string, unknown][] = [];
 
       static {
