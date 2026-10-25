@@ -811,6 +811,9 @@ importers:
       '@blazetrails/builder':
         specifier: workspace:*
         version: link:../../packages/builder
+      '@blazetrails/chronic':
+        specifier: workspace:*
+        version: link:../../packages/chronic
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../../packages/date
