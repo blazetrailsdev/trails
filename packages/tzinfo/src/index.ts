@@ -133,10 +133,6 @@ export class TimezoneTransition {
   }
 }
 
-function transitionEquals(a: TimezoneTransition | null, b: TimezoneTransition | null): boolean {
-  return a === null ? b === null : a.equals(b);
-}
-
 const periodTransitions = new WeakMap<
   TimezonePeriod,
   (() => (TimezoneTransition | null)[]) | (TimezoneTransition | null)[]
@@ -203,8 +199,8 @@ export class TimezonePeriod {
   equals(other: unknown): boolean {
     return (
       other instanceof TimezonePeriod &&
-      transitionEquals(other.startTransition, this.startTransition) &&
-      transitionEquals(other.endTransition, this.endTransition)
+      (other.startTransition?.equals(this.startTransition) ?? this.startTransition === null) &&
+      (other.endTransition?.equals(this.endTransition) ?? this.endTransition === null)
     );
   }
 }

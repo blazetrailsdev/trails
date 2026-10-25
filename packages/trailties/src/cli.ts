@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { VERSION } from "./version.js";
+import { VERSION } from "./gem-version.js";
 import { hiddenCommands } from "./command.js";
 import { subclasses } from "./command/behavior.js";
 
@@ -24,7 +24,7 @@ export function createProgram(): Command {
     .name("trails")
     .description("TypeScript framework inspired by Ruby on Rails")
     .enablePositionalOptions()
-    .version(VERSION, "-v, --version");
+    .version(VERSION.STRING, "-v, --version");
 
   for (const factory of subclasses()) {
     const command = factory();
