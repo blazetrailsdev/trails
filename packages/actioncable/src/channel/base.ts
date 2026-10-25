@@ -1,4 +1,5 @@
 import {
+  Callbacks as ASCallbacks,
   Notifications,
   ParameterFilter,
   Rescuable,
@@ -6,6 +7,7 @@ import {
   presence,
   runLoadHooks,
   truncate,
+  type Extended,
   type Included,
 } from "@blazetrails/activesupport";
 import {
@@ -62,6 +64,7 @@ export interface Base {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
+  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
   declare runCallbacks: (kind: string, block?: () => unknown) => unknown;
   declare rescueWithHandler: Included<typeof Rescuable>["rescueWithHandler"];
   declare static readonly channelName: string;

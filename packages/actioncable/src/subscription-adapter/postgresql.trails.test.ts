@@ -59,7 +59,7 @@ beforeEach(() => {
   TopLevel.ActiveRecord = {
     Base: {
       logger: null,
-      connectionPool: {
+      connectionPool: () => ({
         newConnection: () => {
           log.push("new_connection");
           return arConn;
@@ -68,7 +68,7 @@ beforeEach(() => {
           log.push("with_connection");
           return await block(arConn);
         },
-      },
+      }),
     },
   } as never;
 });

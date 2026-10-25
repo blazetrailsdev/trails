@@ -248,6 +248,10 @@ const alias = {
     __dirname,
     "packages/activerecord/src/adapters/mysql2-adapter.ts",
   ),
+  "@blazetrails/activerecord/support/config": path.resolve(
+    __dirname,
+    "packages/activerecord/src/support/config.ts",
+  ),
   "@blazetrails/activerecord/fixtures": path.resolve(
     __dirname,
     "packages/activerecord/src/fixtures.ts",
@@ -568,6 +572,9 @@ export default defineConfig({
             "packages/trailties/**",
             "packages/et-orbi/**",
             "packages/raabro/**",
+            ...(ARCONN === "postgresql"
+              ? []
+              : ["packages/actioncable/src/subscription-adapter/postgresql.test.ts"]),
             ...SHARED_EXCLUDE,
           ],
           globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],

@@ -81,8 +81,10 @@ export class PostgreSQL extends Base {
     let arConn: ArConn | undefined;
     try {
       arConn = await (
-        TopLevel.ActiveRecord!.Base as unknown as { connectionPool: ConnectionPool }
-      ).connectionPool.newConnection();
+        TopLevel.ActiveRecord!.Base as unknown as { connectionPool(): ConnectionPool }
+      )
+        .connectionPool()
+        .newConnection();
       const pgConn = (await arConn.rawConnection()) as PGConn;
 
       this.verifyBang(pgConn);
@@ -96,13 +98,13 @@ export class PostgreSQL extends Base {
   }
 
   async withBroadcastConnection<T>(block: (pgConn: PGConn) => Promise<T>): Promise<T> {
-    return await (
-      TopLevel.ActiveRecord!.Base as unknown as { connectionPool: ConnectionPool }
-    ).connectionPool.withConnection(async (arConn) => {
-      const pgConn = (await arConn.rawConnection()) as PGConn;
-      this.verifyBang(pgConn);
-      return await block(pgConn);
-    });
+    return await (TopLevel.ActiveRecord!.Base as unknown as { connectionPool(): ConnectionPool })
+      .connectionPool()
+      .withConnection(async (arConn) => {
+        const pgConn = (await arConn.rawConnection()) as PGConn;
+        this.verifyBang(pgConn);
+        return await block(pgConn);
+      });
   }
 
   /** @internal */
