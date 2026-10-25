@@ -252,7 +252,7 @@ rule("+ - * / % < > <= >= & | ^ **", (o) => {
     n.recv.k === "array" ||
     (["+", "-", "|", "&", "*"].includes(name) && lw.mayBeArray(n.recv)) ||
     // An untyped comparison may be between Ruby Times (activejob).
-    (GEM.gem === "activejob" &&
+    ((GEM.gem === "activejob" || GEM.hand === false) &&
       ["<", ">", "<=", ">="].includes(name) &&
       lw.mayBeArray(n.recv) &&
       lw.typeOf(n.recv, ctx)?.k !== "prim")

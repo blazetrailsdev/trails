@@ -6050,10 +6050,13 @@ export class Lowerer {
       );
     // A parameter named for a gem class (`span` → `Chronic::Span`) holds one.
     if (ctx.defParams?.some((p) => p.name === name)) {
-      const hit = this.index.resolveConst(
-        [snakeToCamel(name).replace(/^./, (c) => c.toUpperCase())],
-        ctx.nesting,
-      );
+      // …or by suffix (`outer_span`).
+      const base = name.includes("_") ? name.slice(name.lastIndexOf("_") + 1) : name;
+      const hit =
+        this.index.resolveConst(
+          [snakeToCamel(name).replace(/^./, (c) => c.toUpperCase())],
+          ctx.nesting,
+        ) ?? this.index.resolveConst([base.replace(/^./, (c) => c.toUpperCase())], ctx.nesting);
       const key = hit?.kind === "scope" ? this.resolver.oracleKey(hit.fqn) : null;
       if (key) return { k: "class", key } as TypeRef;
     }

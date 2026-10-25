@@ -338,6 +338,7 @@ rule("last", (c) => {
   if (argc(c) === 1) {
     const a0 = c.n.args[0];
     if (a0.k === "int" && Number(a0.value) > 0) return `${c.R}${c.nav}slice(-${c.args()[0]})`;
+    if (a0.k === "str" || a0.k === "dstr" || a0.k === "sym") return null;
     return c.lw.withOnce(
       c.R,
       (x) => `${x}${c.nav}slice(Math.max(${x}.length - ${c.args()[0]}, 0))`,
