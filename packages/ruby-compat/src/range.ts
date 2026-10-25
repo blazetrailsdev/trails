@@ -301,7 +301,7 @@ export class Range<T = unknown> {
     checkStepDomain(n);
     const values = function* (this: Range<T>): Generator<T> {
       if (typeof this.begin !== "number" && this.begin !== null) {
-        /* `step_i_iter` (`vendor/ruby/v3.3.11/this.c:312-325`) counts DOWN from `iter[0]`,
+        /* `step_i_iter` (`vendor/ruby/v3.3.11/range.c:312-325`) counts DOWN from `iter[0]`,
            which `range_step` seeds at 1 (`:465`), and reseeds it to `step` on each
            yield. So the first element always yields, and a fractional step never
            lands on 0 again — which is exactly what MRI does here. */
