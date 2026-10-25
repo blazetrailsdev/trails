@@ -2460,9 +2460,6 @@ class ApiExtractor
       resolve_const_symbol_hash_keys(const_name(node))
   end
 
-  # The receiver of a `.collect(&:to_sym)` / `.map(&:to_s)` link, which turns
-  # a `%w[]` into `%i[]` (or back) and leaves every member's name unchanged
-  # (`fugit/cron.rb:92-93`). Nil for any other call.
   def name_preserving_map_receiver(node)
     return nil unless node.is_a?(Array) && node[0] == :method_add_arg
     call = node[1]

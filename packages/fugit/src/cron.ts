@@ -649,28 +649,28 @@ export class Cron {
 
   /** @internal */
   protected determineWeekdays(arr: CronElt[]): boolean {
-    let weekdays: CronWeekday[] = [];
+    this.weekdays = [];
 
     for (const elt of arr) {
       const [a, , sl, ha, mo] = elt;
       let z = elt[1];
       if (ha != null || mo != null) {
-        weekdays.push([a!, (ha ?? mo)!] as CronWeekday);
+        this.weekdays.push([a!, (ha ?? mo)!] as CronWeekday);
       } else if (sl != null) {
         for (let i = a ?? 0; i <= (z ?? (a != null ? a : 6)); i += sl < 1 ? 1 : sl) {
-          weekdays.push([i]);
+          this.weekdays.push([i]);
         }
       } else if (z != null) {
         if (a! > z) z = z + 7;
-        for (let i = a!; i <= z; i++) weekdays.push([i > 6 ? i - 7 : i]);
+        for (let i = a!; i <= z; i++) this.weekdays.push([i > 6 ? i - 7 : i]);
       } else if (a != null) {
-        weekdays.push([a]);
+        this.weekdays.push([a]);
       }
     }
 
-    for (const wd of weekdays) if (wd[0] === 7) wd[0] = 0;
-    weekdays = sort(uniq(weekdays));
-    this.weekdays = weekdays.length === 0 ? null : weekdays;
+    for (const wd of this.weekdays) if (wd[0] === 7) wd[0] = 0;
+    this.weekdays = sort(uniq(this.weekdays));
+    if (this.weekdays.length === 0) this.weekdays = null;
 
     return true;
   }
