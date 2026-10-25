@@ -703,7 +703,6 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     typeof obj === "function" &&
     Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false;
   if (typeof obj === "function" && !klass && (mid === "length" || mid === "name")) return false;
-  if (klass && mid === "caseEquals") return true;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   const writer = writerSpelling(attr);
   for (

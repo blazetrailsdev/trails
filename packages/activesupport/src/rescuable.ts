@@ -7,7 +7,6 @@ import {
   rbInspect,
   rbModName,
   rbObjMethod,
-  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Module, extend, rbObjIsKindOf, type Included } from "@blazetrails/ruby-compat/include";
 import { classAttribute } from "./class-attribute.js";
@@ -53,7 +52,7 @@ export const ClassMethods = {
 
     for (const klass of klasses as unknown[]) {
       let key: string | ExceptionClass;
-      if (rbObjIsKindOf(klass, Module) && rbObjRespondTo(klass, "caseEquals")) {
+      if (rbObjIsKindOf(klass, Module)) {
         const name = rbModName(klass as object);
         key = name != null && safeConstantize(name) === klass ? name : (klass as ExceptionClass);
       } else if (typeof klass === "string") {
