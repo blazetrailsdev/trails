@@ -113,6 +113,7 @@ export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
   "activerecord-test-support",
   "arel",
   "bcrypt",
+  "builder",
   "chronic",
   "did-you-mean",
   "et-orbi",

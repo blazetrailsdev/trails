@@ -1,5 +1,5 @@
 import { LocalJumpError } from "./local-jump-error.js";
-import { classpaths } from "./classpath.js";
+import { classpaths, isModuleObject } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
 import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
@@ -50,7 +50,9 @@ type Klass = abstract new (...args: never) => unknown;
  *  `Date` and a `Temporal.PlainTime`. A function is a `Class` when its
  *  `prototype` is non-writable and a `Proc` otherwise. `Temporal.PlainDate` and
  *  `Temporal.PlainDateTime` are the seats of `Date` and `DateTime`, and a
- *  record whose prototype chain holds no class is a `Hash`. `-0` is a whole
+ *  record whose prototype chain holds no class is a `Hash`, or a `Module` when
+ *  `const_set` or `defineModule` marked it (`rb_obj_class`,
+ *  `vendor/ruby/v3.3.11/object.c:296`). `-0` is a whole
  *  `number` and so an `Integer`, though Ruby has no negative Integer zero: JS
  *  integer arithmetic answers `-0` (`Math.round(-0.4)`, `0 * -1`) where Ruby
  *  answers `0`, so reading it as `-0.0` would turn those into Floats. The
@@ -88,7 +90,8 @@ export function rbObjClass(obj: unknown): Klass {
   if (tag === "Temporal.PlainDate") return reopened(rbCDate) as Klass;
   if (tag === "Temporal.PlainDateTime") return reopened(rbCDateTime) as Klass;
   if (tag === "Temporal.PlainTime") return reopened(rbCTime) as Klass;
-  if (isPlainHash(obj)) return Hash;
+  if (isPlainHash(obj))
+    return isModuleObject(obj) ? (Object.getPrototypeOf(rbCClass) as Klass) : Hash;
   const klass = (obj as object).constructor as Klass | undefined;
   if (klass === Date) return reopened(rbCTime) as Klass;
   return typeof klass === "function" ? klass : Object;

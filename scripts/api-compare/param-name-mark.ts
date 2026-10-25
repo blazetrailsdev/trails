@@ -40,6 +40,7 @@ export const GATED_PACKAGES = [
   "activesupport",
   "arel",
   "bcrypt",
+  "builder",
   "chronic",
   "did-you-mean",
   "et-orbi",

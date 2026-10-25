@@ -35,6 +35,7 @@ const PKG_DIRS: Record<string, string> = {
   msgpack: "packages/msgpack/src/",
   marcel: "packages/marcel/src/",
   chronic: "packages/chronic/src/",
+  builder: "packages/builder/src/",
   "et-orbi": "packages/et-orbi/src/",
   raabro: "packages/raabro/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",

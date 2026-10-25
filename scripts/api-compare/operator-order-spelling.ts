@@ -27,6 +27,9 @@ import { OPERATORS } from "@blazetrails/parity/conventions";
 // `rubyMethodToTs`'s multi-name shape: the rule filters to spellings actually
 // present in the container, so listing more than one is a safe no-op.
 export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> = {
+  "Builder::XmlBase": {
+    "<<": ["append"],
+  },
   // arel/math.rb:5-41 — the arithmetic/bitwise mixin. Every operator has a
   // named counterpart on math.ts's `Math` mixin object, one per Ruby `def`:
   // `*`:5 `+`:9 `-`:13 `/`:17 `&`:21 `|`:25 `^`:29 `<<`:33 `>>`:37 `~@`:41.

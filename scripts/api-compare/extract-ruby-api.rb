@@ -687,6 +687,9 @@ class ApiExtractor
       end
     when :sclass
       process_sclass(node)
+    when :massign
+      record_massign_constants(node[1])
+      node.each { |child| walk(child) if child.is_a?(Array) }
     when :assign
       # Handle `CONST = Struct.new(...) do ... end` — methods defined in the
       # block belong to the struct, not to the enclosing module.
@@ -3964,6 +3967,15 @@ class ApiExtractor
   # assignment like any other — it just reaches Ripper as a `const_path_field`
   # rather than a `var_field`, which used to drop it from the allow-set and
   # leave its faithful TS port scoring as novel surface.
+  def record_massign_constants(targets)
+    return unless targets.is_a?(Array)
+    if targets[0] == :var_field && targets[1].is_a?(Array) && targets[1][0] == :@const
+      (@file_constants[@current_file] ||= {})[targets[1][1]] ||= { kind: "expr" }
+      return
+    end
+    targets.each { |child| record_massign_constants(child) if child.is_a?(Array) }
+  end
+
   def maybe_record_constant(lhs, rhs)
     const =
       if lhs.is_a?(Array) && lhs[0] == :var_field

@@ -1,6 +1,7 @@
 import {
   ArgumentError,
   Encoding,
+  NameError,
   PROTOCOL_PROBES,
   RuntimeError,
   StandardError,
@@ -46,7 +47,10 @@ export abstract class XmlBase {
     return this._explicitNilHandling;
   }
 
-  tagBang(sym: string, ...args: unknown[]): Target {
+  tagBang(
+    sym: string,
+    ...args: unknown[] | [...unknown[], (xml: XmlBase) => unknown]
+  ): Target | Promise<Target> {
     const block =
       typeof args.at(-1) === "function" ? (args.pop() as (xml: XmlBase) => unknown) : null;
     let text: string | null = null;
@@ -73,13 +77,23 @@ export abstract class XmlBase {
       this._indent();
       this._startTag(sym, attrs);
       this._newline();
-      try {
-        this._nestedStructures(block);
-      } finally {
+      const ensure = (): void => {
         this._indent();
         this._endTag(sym);
         this._newline();
+      };
+      let result: unknown;
+      try {
+        result = this._nestedStructures(block);
+      } catch (e) {
+        ensure();
+        throw e;
       }
+      if (typeof (result as PromiseLike<unknown> | null)?.then === "function")
+        return Promise.resolve(result)
+          .finally(ensure)
+          .then(() => this._target);
+      ensure();
     } else if (text == null) {
       this._indent();
       this._startTag(sym, attrs, true);
@@ -94,7 +108,10 @@ export abstract class XmlBase {
     return this._target;
   }
 
-  methodMissing(sym: string, ...args: unknown[]): Target {
+  methodMissing(
+    sym: string,
+    ...args: unknown[] | [...unknown[], (xml: XmlBase) => unknown]
+  ): Target | Promise<Target> {
     if (XmlBase.cacheMethodCalls) this.cacheMethodCall(sym);
     return this.tagBang(sym, ...args);
   }
@@ -124,14 +141,15 @@ export abstract class XmlBase {
 
   /**
    * @internal
-   * @missingRailsCall dummy? — CONVERGEABLE port-builder-xml-events-and-remaining-tests
    * @inventedArm decode — PERMANENT
-   * @missingRailsCall force_encoding — PERMANENT
+   * @missingRailsName encoding — PERMANENT
    */
   protected _escape(text: string): string {
     const result = XChar.encode(text);
     try {
       const encoding = Encoding.find(this._encoding)!;
+      if (encoding.isDummy())
+        throw new NameError("uninitialized constant Builder::XmlBase::Exception");
       const encoded = encode(result, encoding);
       return typeof encoded === "string" ? encoded : new TextDecoder("latin1").decode(encoded);
     } catch (e) {
@@ -162,13 +180,19 @@ export abstract class XmlBase {
   }
 
   /** @internal */
-  protected _nestedStructures(block: (xml: XmlBase) => unknown): void {
+  protected _nestedStructures(block: (xml: XmlBase) => unknown): unknown {
     this._level += 1;
+    let result: unknown;
     try {
-      block(this);
-    } finally {
+      result = block(this);
+    } catch (e) {
       this._level -= 1;
+      throw e;
     }
+    if (typeof (result as PromiseLike<unknown> | null)?.then === "function")
+      return Promise.resolve(result).finally(() => (this._level -= 1));
+    this._level -= 1;
+    return result;
   }
 
   /** @internal */

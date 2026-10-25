@@ -35,6 +35,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "msgpack",
     "marcel",
     "chronic",
+    "builder",
     "et-orbi",
     "raabro",
     "actionview",

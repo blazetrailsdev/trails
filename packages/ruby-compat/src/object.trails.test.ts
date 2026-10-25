@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbCallSuper, rbClassNewInstance } from "./include.js";
+import { defineModule, rbCModule, rbCallSuper, rbClassNewInstance } from "./include.js";
 import {
   rbCArray,
   rbCBasicObject,
@@ -1371,6 +1371,13 @@ describe("rbClassAttachedObject", () => {
 });
 
 describe("a JS String object as a Ruby String", () => {
+  it("classes a defineModule object as Module, as rbObjIsKindOf does", () => {
+    const mod = defineModule({});
+    expect(rbObjClass(mod)).toBe(rbCModule);
+    expect(rbObjIsKindOf(mod, rbCModule)).toBe(true);
+    expect(rbObjClass({})).toBe(Hash);
+  });
+
   class MyString extends String {}
 
   it("classes a bare String object as String and a subclass as itself", () => {

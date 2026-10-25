@@ -937,8 +937,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("test");
   });
 
-  // BLOCKED: port-builder-template-handler
-  test.skip("render xml", async () => {
+  test("render xml", async () => {
     await testCase.get("renderXmlHello");
     expect(testCase.response.body).toBe(
       "<html>\n  <p>Hello David</p>\n<p>This is grand!</p>\n</html>\n",
@@ -946,8 +945,7 @@ describe("RenderTest", () => {
     expect(testCase.response.mediaType).toBe("application/xml");
   });
 
-  // BLOCKED: port-builder-template-handler
-  test.skip("render xml as string template", async () => {
+  test("render xml as string template", async () => {
     await testCase.get("renderXmlHelloAsStringTemplate");
     expect(testCase.response.body).toBe(
       "<html>\n  <p>Hello David</p>\n<p>This is grand!</p>\n</html>\n",
@@ -960,8 +958,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<p>This is grand!</p>\n");
   });
 
-  // BLOCKED: port-builder-template-handler
-  test.skip("render xml with partial", async () => {
+  test("render xml with partial", async () => {
     await testCase.get("builderPartialTest");
     expect(testCase.response.body).toBe("<test>\n  <hello/>\n</test>\n");
   });
@@ -971,8 +968,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
-  // BLOCKED: port-builder-template-handler
-  test.skip("render xml with layouts", async () => {
+  test("render xml with layouts", async () => {
     await testCase.get("builderLayoutTest");
     expect(testCase.response.body).toBe(
       "<wrapper>\n<html>\n  <p>Hello </p>\n<p>This is grand!</p>\n</html>\n</wrapper>\n",
