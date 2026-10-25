@@ -2288,12 +2288,17 @@ export class Lowerer {
           return ctx.rescued ?? ctx.errinfoParam ?? `${this.rc(ctx, "rbErrinfo")}()`;
         // `$stdout` / `$stderr`: ruby-compat's process streams, under the Ruby
         // names as the hand ports import them (trailties thor/shell/basic.ts).
+        // A gem with no hand port reads Ruby's reassignable `$stdout` (io.c
+        // stdout_getter), which a test swaps for a StringIO.
+        if (n.name === "$stdout" && GEM.hand === false) return `${this.rc(ctx, "rbStdout")}()`;
         if (n.name === "$stdout" || n.name === "$stderr")
           return this.imp(ctx, "@blazetrails/ruby-compat", n.name.slice(1), n.name);
         // `$KCODE` was removed in Ruby 1.9 (NEWS-1.9.1): an unset global reads nil.
         if (n.name === "$KCODE") return "null";
         return this.decline(ctx, "gvar", n, n.name);
       case "gasgn":
+        if (n.name === "$stdout" && GEM.hand === false)
+          return `${this.rc(ctx, "rbStdoutSet")}(${this.expr(n.value, ctx)})`;
         return this.decline(ctx, "gvar", n, n.name ?? `$${n.n}`);
       case "const":
         // In a colon-Symbol file, the class `Symbol` / `String` as a value (a

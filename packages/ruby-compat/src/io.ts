@@ -10,6 +10,8 @@ import { stderr, stdout, type WriteStream } from "./process-adapter.js";
 import { verbose } from "./verbose.js";
 import { Errno } from "./errno.js";
 import { format } from "./kernel-format.js";
+import { TypeError } from "./type-error.js";
+import { rbObjClassname, rbFSend } from "./object.js";
 
 /** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/v3.3.11/io.c:8880`) is called through. */
 const putsAryInFlight = new Set<unknown[]>();
@@ -1264,3 +1266,37 @@ function prepStdio(f: WriteStream, fd: number, fmode: string, klass: typeof IO, 
  * @noRailsEquivalent PERMANENT — Ruby core `STDOUT` (`vendor/ruby/v3.3.11/io.c:15586`).
  */
 export const STDOUT: IO = prepStdio(stdout, 1, "w", IO, "<STDOUT>");
+
+let stdoutVar: unknown = STDOUT;
+
+/**
+ * Ruby `$stdout`'s getter, `stdout_getter` (`vendor/ruby/v3.3.11/io.c:9209-9213`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `$stdout` (`vendor/ruby/v3.3.11/io.c:15564`).
+ */
+export function rbStdout(): unknown {
+  return stdoutVar;
+}
+
+/**
+ * `$stdout = val`, `stdout_setter` (`vendor/ruby/v3.3.11/io.c:9202-9207`): a value
+ * that does not answer `write` is refused by `must_respond_to` (`io.c:9181-9188`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `$stdout` (`vendor/ruby/v3.3.11/io.c:15564`).
+ */
+export function rbStdoutSet(val: unknown): unknown {
+  if (typeof (val as { write?: unknown } | null)?.write !== "function")
+    throw new TypeError(`$stdout must have write method, ${rbObjClassname(val)} given`);
+  stdoutVar = val;
+  return val;
+}
+
+/**
+ * `Kernel#puts`, `rb_f_puts` (`vendor/ruby/v3.3.11/io.c:8996-9003`): `$stdout.puts`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#puts` (`vendor/ruby/v3.3.11/io.c:8996`).
+ */
+export function rbFPuts(...args: unknown[]): unknown {
+  if (stdoutVar === STDOUT) return STDOUT.puts(...args);
+  return rbFSend(stdoutVar, "puts", ...args);
+}

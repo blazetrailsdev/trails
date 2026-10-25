@@ -524,7 +524,10 @@
     "verbose",
     "warn",
     "zip",
-    "zlibAdapterConfig"
+    "zlibAdapterConfig",
+    "rbStdout",
+    "rbStdoutSet",
+    "rbFPuts"
   ],
   "@blazetrails/activesupport": [
     "ActionableError",

@@ -1,3 +1,4 @@
+import { GEM } from "../gem.js";
 /**
  * Implicit-self calls to Kernel and Module functions (`raise`, `format`,
  * `Integer(x)`, `require`, `include M`, `define_method`): one rule per Ruby
@@ -104,7 +105,23 @@ rule(
 rule("method", (c) =>
   c.n.args.length === 1 && !c.n.block ? methodObject(c, c.ctx.selfExpr) : null,
 );
-rule("puts warn", (c) => `console.warn(${c.argList()})`);
+// `Kernel#puts` is `$stdout.puts` (io.c rb_f_puts), for a gem with no hand port.
+rule("puts", (c) =>
+  GEM.hand === false ? `${c.rc("rbFPuts")}(${c.argList()})` : `console.warn(${c.argList()})`,
+);
+rule("warn", (c) => `console.warn(${c.argList()})`);
+// `Kernel#sleep(secs)` in a test: an awaited timer (the hand chronic port's
+// `await new Promise((resolve) => setTimeout(resolve, 100))`).
+rule("sleep", (c) => {
+  if (c.n.args.length !== 1 || !c.ctx.f.rubyFile.startsWith("test/")) return null;
+  const a0 = c.n.args[0];
+  const ms =
+    a0.k === "int" || a0.k === "float"
+      ? String(Math.round(Number(a0.value) * 1000))
+      : `${c.lw.expr(a0, c.ctx)} * 1000`;
+  if (c.ctx.asyncBox) c.ctx.asyncBox.awaits = true;
+  return `(await new Promise((resolve) => setTimeout(resolve, ${ms})))`;
+});
 rule("format sprintf", (c) => `${c.rc("rbFormat")}(${c.argList()})`);
 rule("Array", (c) => c.lw.aryEnsure(c.argList()));
 rule("Integer", (c) => `${c.rc("rbInteger")}(${c.argList()})`);
