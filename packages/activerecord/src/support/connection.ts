@@ -214,17 +214,16 @@ const ADAPTER_SPECIFIC_PROBE_TABLE = "defaults";
 
 export async function restoreWorkerConnection(): Promise<void> {
   await Base.establishConnection(":arunit");
-  const connection = (await Base.leaseConnection()) as unknown as {
-    tableExists(name: string): Promise<boolean>;
-  };
-  if (!(await connection.tableExists(CANONICAL_PROBE_TABLE))) {
-    const adapter = await Base.leaseConnection();
-    await loadSchema(adapter);
-    await Base.connectionPool().schemaMigration.createTable();
-    await stampCanonicalSchema(adapter);
-  } else if (!(await connection.tableExists(ADAPTER_SPECIFIC_PROBE_TABLE))) {
-    await loadAdapterSpecificSchema(await Base.leaseConnection());
-  }
+  const adapter = await Base.leaseConnection();
+  await adapter.lock.synchronize(async () => {
+    if (!(await adapter.tableExists(CANONICAL_PROBE_TABLE))) {
+      await loadSchema(adapter);
+      await Base.connectionPool().schemaMigration.createTable();
+      await stampCanonicalSchema(adapter);
+    } else if (!(await adapter.tableExists(ADAPTER_SPECIFIC_PROBE_TABLE))) {
+      await loadAdapterSpecificSchema(adapter);
+    }
+  });
   await restoreSecondWorkerConnection();
 }
 
