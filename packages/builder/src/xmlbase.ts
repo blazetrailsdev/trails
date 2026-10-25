@@ -46,7 +46,7 @@ export abstract class XmlBase {
     return this._explicitNilHandling;
   }
 
-  tagBang(sym: string, ...args: unknown[]): Target {
+  tagBang(sym: string, ...args: unknown[]): Target | Promise<Target> {
     const block =
       typeof args.at(-1) === "function" ? (args.pop() as (xml: XmlBase) => unknown) : null;
     let text: string | null = null;
@@ -73,13 +73,20 @@ export abstract class XmlBase {
       this._indent();
       this._startTag(sym, attrs);
       this._newline();
-      try {
-        this._nestedStructures(block);
-      } finally {
+      const ensure = (): void => {
         this._indent();
         this._endTag(sym);
         this._newline();
+      };
+      let result: unknown;
+      try {
+        result = this._nestedStructures(block);
+      } catch (e) {
+        ensure();
+        throw e;
       }
+      if (result instanceof Promise) return result.finally(ensure).then(() => this._target);
+      ensure();
     } else if (text == null) {
       this._indent();
       this._startTag(sym, attrs, true);
@@ -94,7 +101,7 @@ export abstract class XmlBase {
     return this._target;
   }
 
-  methodMissing(sym: string, ...args: unknown[]): Target {
+  methodMissing(sym: string, ...args: unknown[]): Target | Promise<Target> {
     if (XmlBase.cacheMethodCalls) this.cacheMethodCall(sym);
     return this.tagBang(sym, ...args);
   }
@@ -162,13 +169,18 @@ export abstract class XmlBase {
   }
 
   /** @internal */
-  protected _nestedStructures(block: (xml: XmlBase) => unknown): void {
+  protected _nestedStructures(block: (xml: XmlBase) => unknown): unknown {
     this._level += 1;
+    let result: unknown;
     try {
-      block(this);
-    } finally {
+      result = block(this);
+    } catch (e) {
       this._level -= 1;
+      throw e;
     }
+    if (result instanceof Promise) return result.finally(() => (this._level -= 1));
+    this._level -= 1;
+    return result;
   }
 
   /** @internal */
