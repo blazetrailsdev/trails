@@ -697,7 +697,7 @@ under `systemd-run MemoryMax=20G`, peak read from the scope's cgroup
 | 04-activesupport     | 429     | **MEM**          | 3.76 GiB | links; wall 7                             |
 | 05-model             | ~700    | **MEM** (12GB)   | 8.14 GiB | runs; `[05] Trail function`               |
 | 06b-crud             | 891     | **MEM** @ 61/891 | 8.63 GiB | wall 8 cleared; now `establishConnection` |
-| 06d-adapter-read     | 1133    | never run        | 8.91 GiB | wall 8 cleared; now `setQuery`            |
+| 06d-adapter-read     | 1133    | never run        | 8.91 GiB | wall 8 cleared; now wall 9 (N-API)        |
 
 **Nothing fails to compile any more.** Peak is linear at roughly 8 MiB per
 module, and parallelism is nearly free: 04b costs 2.87 GiB serial and 3.37 GiB
@@ -930,6 +930,116 @@ collision in a shape the fix does not cover (two _transitively_-reached
 same-named classes, neither explicitly imported, where the first/last-writer
 disagreement survives) is unexamined. `Base` is declared in at least nine
 trails packages.
+
+## Wall 9: a sqlite handle is an integer, so every property read is `undefined`
+
+06d-adapter-read is **not** blocked by another instance of wall 8. It is
+blocked in a different subsystem, and three wrong guesses of mine were
+needed to find it, all of them from reading class names instead of a stack.
+
+**It is not N-API interop.** My first write-up of this said it was, and that
+was wrong. Perry ships its **own** `crates/perry-ext-better-sqlite3`, so
+`import Database from "better-sqlite3"` never reaches the real addon at all.
+`#10755` keeps native-addon _packages_ out of scope, which is why the addon
+path is irrelevant here.
+
+**The failure.** `packages/activerecord/src/sqlite/better-sqlite3.ts:29`:
+
+```ts
+const limit = args.length + (source.split("?").length - 1);
+```
+
+reached from `BetterSqlite3Statement.bind` as
+`withNullBinds(this.stmt.source, args, call)`. `this.stmt` is better-sqlite3's
+**native N-API `Statement`**, and `.source` reads `undefined` under Perry, so
+`.split` throws. Stack, from an instrumented `abstract-adapter.ts` catch:
+
+```
+TypeError: Cannot read properties of undefined (reading 'split')
+    at withNullBinds | at BetterSqlite3Statement.bind | .run | .step
+```
+
+**Dispatch works; reflection returns nothing.** `perry/probe/db-read/napi2.ts`,
+Perry against Node on identical source:
+
+| expression                                | Node              | Perry           |
+| ----------------------------------------- | ----------------- | --------------- |
+| `typeof db.prepare`                       | `function`        | **`undefined`** |
+| `db.prepare(sql)` called                  | works             | **works**       |
+| `typeof stmt.run`                         | `function`        | **`undefined`** |
+| `stmt.run()` called                       | `{changes:0,...}` | **same**        |
+| `db.open` (native getter)                 | `true`            | `undefined`     |
+| `stmt.source`                             | the SQL string    | `undefined`     |
+| `'source' in stmt`                        | `true`            | `false`         |
+| `Object.keys(stmt)`                       | 5 keys            | `[]`            |
+| `Object.getOwnPropertyNames(proto)`       | 11 methods        | `[]`            |
+| `getOwnPropertyDescriptor(stmt,'source')` | descriptor        | `null`          |
+
+**Why, exactly.** `crates/perry-ext-better-sqlite3/src/lib.rs:209`:
+
+```rust
+/// `db.prepare(sql)` -- prepare a statement. Returns a Handle to
+/// the statement, or `-1` on error.
+pub unsafe extern "C" fn js_sqlite_prepare(...) -> Handle {
+    ...
+    return register_handle(SqliteStmtHandle { sql, db_handle, raw_mode });
+}
+```
+
+A `Database` and a `Statement` are **integer handles**. Method calls work
+because `crates/perry-codegen/src/lower_call/native_table/databases.rs` lowers
+them statically at compile time -- and that table lives under `lower_call`,
+with no getter or property support anywhere in it. Property reads therefore
+cannot be expressed through it _by construction_. That is the whole of
+"dispatch works, reflection returns nothing".
+
+The extension's own source documents the same shape for a missing _method_:
+
+> Without this method, `stmt.raw` is undefined and `stmt.raw().all(...)`
+> surfaces as `(number).all is not a function`
+
+`(number)`. That also explains the earlier probe where a `betterSqlite3Driver`
+import appeared to be a **boolean** -- handles are primitives, so that
+observation was real after all, and my note calling it "not evidence" was too
+cautious.
+
+**Every documented data property is missing**, not just `source`: `stmt.source`,
+`.reader`, `.readonly`, `.busy`, `.database`, and `db.name`, `.open`,
+`.inTransaction`, `.readonly`, `.memory`. Grepping the ext for any of those
+names returns nothing.
+
+`stmt.source` specifically is a **narrow fix**: `SqliteStmtHandle` already
+stores `sql`. The general case needs the #11919 conversion to real objects.
+
+**Not fixable in trails.** `this.stmt.source` is the documented better-sqlite3
+API, read exactly as intended. Nothing about the trails source is unusual here.
+
+**Prior art, none of it a duplicate.** #11919 (open tracker, "every native
+handle becomes an ordinary GC object that owns its payload") is the structural
+parent and would fix this; its item 7 reaches sqlite but cites only
+`close()` being a no-op, and item 5a notes `new Headers()` "is a number today",
+the same shape. #10461/#9266/#10456-8 are real N-API _host_ issues, all closed
+and all unrelated. #10290 is `bun:sqlite`, closed. Searches for `stmt.source`,
+"sqlite statement property", "db.open sqlite" and "sqlite handle number
+property" return nothing.
+
+**What I got wrong, recorded because the wrong path cost the most time.** I
+attributed this failure to a `Version` name collision between
+`abstract-adapter.ts`'s `Version` and ruby-compat's `Gem::Version`, reasoning
+from `getDatabaseVersion` calling `new Version(await this.queryValue(...))`.
+Two things disproved it. Renaming the ruby-compat class left the error
+**byte-identical**. Then instrumenting all four candidate sites showed
+`[diag:Version]`, `[diag:gdv]` and `[diag:qv]` never fire at all — no version
+query happens on this path, so the premise was wrong, not just the mechanism.
+The stack settled it in one run. Instrument before theorising.
+
+**Still open: the mask.** The `.split` TypeError is translated to
+`StatementInvalid`, and `abstract-adapter.ts:1857` then calls `ex.setQuery`,
+which is `undefined` on an object whose `instanceof StatementInvalid` is
+`true` — right class, missing method. That is the wall-8 signature
+(`defineMethod is not a function` on a correctly-identified `Module`) and is a
+third, independent defect. It is what every 06b/06d run reports, so the real
+error is invisible without patching that catch.
 
 ### Upstream filings from this round
 
