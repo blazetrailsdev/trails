@@ -1296,12 +1296,7 @@ export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
   ) {
     return true;
   }
-  const isModuleObject =
-    isPlainHash(obj) && (classpaths.has(obj) || Object.hasOwn(obj, moduleVisibility));
-  if (c === Module && isModuleObject) {
-    return true;
-  }
-  const cl = (isModuleObject ? Module : rbObjClass(obj)) as { prototype: object };
+  const cl = rbObjClass(obj) as { prototype: object };
 
   if (cl === c) return true;
 
