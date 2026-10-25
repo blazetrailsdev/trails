@@ -1486,7 +1486,6 @@ export class Time extends rbCTime {
   /** `time_cmp` (`vendor/ruby/v3.3.11/time.c:3951`). */
   compare(other: unknown): number | null {
     if (!(other instanceof Time)) {
-      // `rb_invcmp` (`vendor/ruby/v3.3.11/compar.c:50`).
       const invcmp = cmp(other, this);
       if (invcmp === null) return null;
       return -rbCmpint(invcmp, this, other);

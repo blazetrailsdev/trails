@@ -599,9 +599,6 @@ export default defineConfig({
         },
       },
       {
-        // et-orbi does not load ActiveSupport, so its specs run without the
-        // core extensions `otherSetupFiles` installs (`Time#<=>`'s
-        // `compare_with_coercion` among them).
         resolve: otherResolve,
         test: {
           name: "et-orbi",
