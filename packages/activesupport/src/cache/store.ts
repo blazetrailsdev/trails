@@ -282,12 +282,13 @@ export abstract class Store {
     if (names.length === 0) return new Map();
     let options = extractOptions(names);
     options = this.mergedOptions(options);
-    const keys = await Promise.all(names.map((name) => this.normalizeKey(name, options)));
+    const keys: string[] = [];
+    for (const name of names) keys.push(await this.normalizeKey(name, options));
     return await this.instrumentMulti("read_multi", keys, options, async (payload) => {
       const results = await this.readMultiEntries(names, options);
-      payload.hits = await Promise.all(
-        [...results.keys()].map((name) => this.normalizeKey(name, options)),
-      );
+      const hits: string[] = [];
+      for (const name of results.keys()) hits.push(await this.normalizeKey(name, options));
+      payload.hits = hits;
       return results;
     });
   }
@@ -326,9 +327,8 @@ export abstract class Store {
     if (names.length === 0) return new Map();
     let options = extractOptions(names as unknown[]);
     options = this.mergedOptions(options);
-    const keys = await Promise.all(
-      (names as unknown[]).map((name) => this.normalizeKey(name, options)),
-    );
+    const keys: string[] = [];
+    for (const name of names as unknown[]) keys.push(await this.normalizeKey(name, options));
     const writes = new Map<unknown, unknown>();
     const ordered = await this.instrumentMulti("read_multi", keys, options, async (payload) => {
       const reads = options.force
@@ -344,9 +344,9 @@ export abstract class Store {
           if (v == null) writes.delete(k);
         }
       }
-      payload.hits = await Promise.all(
-        [...reads.keys()].map((name) => this.normalizeKey(name, options)),
-      );
+      const hits: string[] = [];
+      for (const name of reads.keys()) hits.push(await this.normalizeKey(name, options));
+      payload.hits = hits;
       payload.super_operation = "fetch_multi";
       return result;
     });
@@ -378,7 +378,9 @@ export abstract class Store {
   async deleteMulti(names: string[], options?: StoreOptions): Promise<number> {
     if (names.length === 0) return 0;
     options = this.mergedOptions(options);
-    names = await Promise.all(names.map((key) => this.normalizeKey(key, options)));
+    const keys: string[] = [];
+    for (const key of names) keys.push(await this.normalizeKey(key, options));
+    names = keys;
     return await this.instrumentMulti("delete_multi", names, options, () =>
       this.deleteMultiEntries(names, options),
     );
@@ -665,10 +667,13 @@ export abstract class Store {
 
     let expanded: unknown;
     if (Array.isArray(key)) {
-      expanded =
-        key.length > 1
-          ? await Promise.all(key.map((element) => this.expandedKey(element)))
-          : await this.expandedKey(key[0]);
+      if (key.length > 1) {
+        const collected: string[] = [];
+        for (const element of key) collected.push(await this.expandedKey(element));
+        expanded = collected;
+      } else {
+        expanded = await this.expandedKey(key[0]);
+      }
     } else if (key != null && typeof key === "object") {
       expanded = Object.entries(key as Record<string, unknown>)
         .map(([k, v]) => `${k}=${v}`)
@@ -696,9 +701,11 @@ export abstract class Store {
         return version == null ? undefined : String(version);
       }
       if (Array.isArray(key)) {
-        const versions = (
-          await Promise.all(key.map((element) => this.expandedVersion(element)))
-        ).filter((version) => version != null);
+        const versions: string[] = [];
+        for (const element of key) {
+          const version = await this.expandedVersion(element);
+          if (version != null) versions.push(version);
+        }
         const param = toParam(versions);
         return param == null ? undefined : String(param);
       }
