@@ -76,6 +76,7 @@ import {
   EVAL_CALLBACK_PREFIX,
   FOREIGN_READ_PREFIX,
   NATIVE_FORM_PREFIX,
+  TYPED_NATIVE_FORM,
   NEGATED_CALL_PREFIX,
 } from "./enumerable-idioms.js";
 import {
@@ -7549,6 +7550,9 @@ function collectCalls(
           names.add(`${NATIVE_FORM_PREFIX}length`);
           const tail = receiverTailName(n.expression);
           if (tail !== undefined) names.add(`${NATIVE_FORM_PREFIX}length:${tail}`);
+          if (checkerProvenKind(n.expression) === "sized") {
+            names.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.length}`);
+          }
         }
       }
     }
@@ -7706,6 +7710,39 @@ function setRoundTripForms(operand: ts.Expression | undefined): string[] {
   return union ? ["union"] : ["uniq"];
 }
 
+/**
+ * What the TS checker proves an expression's type is: `sized` for a string,
+ * array or tuple, which `.length` counts, and `object` for a plain object
+ * type (an object literal, a type literal, a mapped `Record`, an interface),
+ * which a rest-destructure copies. A class instance, an interface with a value
+ * declaration (`Map`, `Set`, `Date`), a callable or anything
+ * `any` / `unknown` proves neither, since a trails `Relation` answers `size` /
+ * `except` itself. Every member of a union has to agree.
+ */
+function checkerProvenKind(expr: ts.Expression): "sized" | "object" | undefined {
+  const checker = currentChecker;
+  if (checker === undefined) return undefined;
+  const type = checker.getTypeAtLocation(expr);
+  const parts = type.isUnion() ? type.types : [type];
+  const kinds = new Set(
+    parts.map((t): "sized" | "object" | undefined => {
+      if (t.flags & ts.TypeFlags.StringLike) return "sized";
+      if (checker.isArrayType(t) || checker.isTupleType(t)) return "sized";
+      if (!(t.flags & ts.TypeFlags.Object) || t.getCallSignatures().length > 0) return undefined;
+      const sym = t.getSymbol();
+      if (sym === undefined) return "object";
+      if (sym.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Function | ts.SymbolFlags.Variable)) {
+        return undefined;
+      }
+      return sym.flags &
+        (ts.SymbolFlags.TypeLiteral | ts.SymbolFlags.ObjectLiteral | ts.SymbolFlags.Interface)
+        ? "object"
+        : undefined;
+    }),
+  );
+  return kinds.size === 1 ? [...kinds][0] : undefined;
+}
+
 function nativeValueForms(n: ts.Node): string[] {
   if (ts.isArrayLiteralExpression(n)) {
     const [only] = n.elements;
@@ -7731,7 +7768,11 @@ function nativeValueForms(n: ts.Node): string[] {
             ts.isIdentifier(el.propertyName) ||
             ts.isStringLiteral(el.propertyName)),
       );
-    return literal ? ["except"] : [];
+    if (!literal) return [];
+    const source = ts.isVariableDeclaration(n.parent) ? n.parent.initializer : undefined;
+    return source !== undefined && checkerProvenKind(source) === "object"
+      ? ["except", TYPED_NATIVE_FORM.except]
+      : ["except"];
   }
   if (ts.isForOfStatement(n)) {
     const iterated = unwrapped(n.expression);

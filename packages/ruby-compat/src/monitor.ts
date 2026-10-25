@@ -110,34 +110,6 @@ export function isMonOwned(this: object): boolean {
 }
 
 /**
- * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_enter`
- * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:169`, `monitor_enter`, `ext/monitor/monitor.c:96`).
- */
-export async function monEnter(this: object): Promise<void> {
-  const data = monData(this);
-  const owner = currentOwner(data);
-  const top = data.entries.at(-1);
-  if (top?.owner === owner) {
-    top.count += 1;
-    return;
-  }
-  await acquire(data, parentFor(data, owner), { owner, count: 1, thread: Thread.current() });
-}
-
-/**
- * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_exit`
- * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:176`, `monitor_exit`, `ext/monitor/monitor.c:134`).
- */
-export function monExit(this: object): void {
-  const data = monData(this);
-  const owner = currentOwner(data);
-  const top = data.entries.at(-1);
-  if (top?.owner !== owner) throw new ThreadError("current thread not owner");
-  top.count -= 1;
-  if (top.count === 0) release(data, owner);
-}
-
-/**
  * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200` `mon_synchronize`
  * (`monitor_synchronize`, `ext/monitor/monitor.c:236`), aliased `synchronize`
  * at `:203`.

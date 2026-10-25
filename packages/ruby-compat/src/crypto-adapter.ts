@@ -53,23 +53,6 @@ export interface CryptoAdapter {
   getCipherInfo?(name: string): { keyLength: number; ivLength: number; mode: string } | undefined;
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function pbkdf2Async(
-  adapter: CryptoAdapter,
-  password: string | Uint8Array,
-  salt: string | Uint8Array,
-  iterations: number,
-  keylen: number,
-  digest: string,
-): Promise<Bytes> {
-  if (typeof adapter.pbkdf2 === "function") {
-    return adapter.pbkdf2(password, salt, iterations, keylen, digest);
-  }
-  return Promise.resolve().then(() =>
-    adapter.pbkdf2Sync(password, salt, iterations, keylen, digest),
-  );
-}
-
 export interface HashAdapter {
   update(data: string | Uint8Array): HashAdapter;
   digest(): Bytes;

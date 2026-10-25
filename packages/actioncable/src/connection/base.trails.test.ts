@@ -78,4 +78,11 @@ describe("ActionCable::Connection::Base", () => {
     ]);
     expect(s.connections).toEqual([]);
   });
+
+  it("tags the logger with a lambda log tag's value for the request", () => {
+    const s = server();
+    s.config.logTags = [(request: { requestMethod: string }) => request.requestMethod, "my_tag"];
+    const connection = new Connection(s, env());
+    expect(connection.logger.tags).toEqual(["GET", "MyTag"]);
+  });
 });

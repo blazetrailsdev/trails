@@ -1,4 +1,4 @@
-import { isEmpty, rbFSend, rbObjRespondTo, toH, zip } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo, toH, zip } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import { ActiveRecord } from "../../namespaces.js";
 import type { Relation } from "../../relation.js";
@@ -88,7 +88,7 @@ export class AssociationQueryValue {
 
   /** @internal */
   private isSelectClause(): boolean {
-    return isEmpty((this.value as Relation<Base, boolean>).selectValues);
+    return (this.value as Relation<Base, boolean>).selectValues.length === 0;
   }
 
   private convertToId(value: unknown): unknown {

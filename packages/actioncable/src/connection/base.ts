@@ -18,6 +18,7 @@ import {
   rbModName,
   rbObjId,
   rbObjRespondTo,
+  rbProcCall,
   sprintf,
   toS,
 } from "@blazetrails/ruby-compat";
@@ -301,11 +302,7 @@ export class Base {
   private newTaggedLogger(): TaggedLoggerProxy {
     return new TaggedLoggerProxy(this.server.logger, {
       tags: this.server.config.logTags.map((tag) =>
-        rbObjRespondTo(tag, "call")
-          ? typeof tag === "function"
-            ? (tag as (request: Request) => unknown)(this.request)
-            : (tag as { call(request: Request): unknown }).call(this.request)
-          : camelize(toS(tag)),
+        rbObjRespondTo(tag, "call") ? rbProcCall(tag, this.request) : camelize(toS(tag)),
       ),
     });
   }

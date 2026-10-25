@@ -9,7 +9,6 @@ import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
 import {
-  isEmpty,
   isSymbol,
   rbEqual,
   rbFArray,
@@ -154,7 +153,7 @@ export class InsertAll {
           : options.returning;
     }
 
-    if (isEmpty(this.inserts)) {
+    if (this.inserts.length === 0) {
       this.keys = new Set();
     } else {
       this.resolveSti();
@@ -266,7 +265,7 @@ export class InsertAll {
     } else if (this.isCustomUpdateSqlProvided()) {
       this.updateSql = onDuplicate as Nodes.SqlLiteral;
       this.onDuplicate = ":update";
-    } else if (onDuplicate === ":update" && isEmpty(this.updatableColumns())) {
+    } else if (onDuplicate === ":update" && this.updatableColumns().length === 0) {
       this.onDuplicate = ":skip";
     }
   }

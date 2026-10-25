@@ -14,7 +14,6 @@ export { IO, STDERR, STDOUT, print, printf, puts } from "./io.js";
 export { IOError } from "./io-error.js";
 export {
   cmp,
-  cmpint,
   equals,
   greaterThan,
   greaterThanOrEqual,
@@ -37,7 +36,6 @@ export {
   eachWithObject,
   sortBy,
   filterMap,
-  findAll,
   groupBy,
   isAny,
   isNone,
@@ -86,6 +84,7 @@ export {
   rbObjClass,
   rbClassOf,
   rbObjIsProc,
+  rbProcCall,
   rbModName,
   rbModSingletonP,
   rbClassAttachedObject,
@@ -148,7 +147,6 @@ export {
   cryptoAdapterConfig,
   getCrypto,
   getCryptoAsync,
-  pbkdf2Async,
   registerCryptoAdapter,
 } from "./crypto-adapter.js";
 export type {
@@ -259,7 +257,6 @@ export {
   isModuleIncluded,
   rbModAncestors,
   rbClassInheritedP,
-  rbModGe,
   rbModGt,
   rbObjIsKindOf,
   rbModInstanceMethod,
@@ -379,7 +376,6 @@ export {
   rbModDeprecateConstant,
   rbConstMissing,
   rbModConstMissing,
-  rbPathToClass,
   rbFBinding,
   registerConstant,
   registeredConstant,
@@ -390,7 +386,6 @@ export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
 export { Exception, excSetupMessage } from "./exception.js";
 export { excToS } from "./exc-to-s.js";
-export { excDetailedMessage, rbDecorateMessage } from "./exc-detailed-message.js";
 export { StandardError } from "./standard-error.js";
 export { Interrupt, SignalException } from "./signal-exception.js";
 export { ObjectSpace } from "./object-space.js";
@@ -403,7 +398,8 @@ export type { PrettyPrintOutput } from "./pretty-print.js";
 export { PP } from "./pp.js";
 export { b } from "./string/b.js";
 export { bytes, strNew } from "./string/bytes.js";
-export { byteslice, rbStrByteslice, rbStrGetbyte } from "./string/byte-methods.js";
+import "./exc-detailed-message.js";
+export { byteslice, rbStrGetbyte } from "./string/byte-methods.js";
 export { scrub } from "./string/scrub.js";
 export { capitalize, casecmp, upcase } from "./string/case-mapping.js";
 export { chomp } from "./string/chomp.js";
@@ -428,7 +424,7 @@ export {
   type StringReceiver,
   type StringInstance,
 } from "./string/method-table.js";
-export { Struct, isStruct, rbStructInitialize, rstructGet, type StructInstance } from "./struct.js";
+export { Struct, isStruct, type StructInstance } from "./struct.js";
 export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
@@ -444,8 +440,6 @@ export {
   Monitor,
   MonitorConditionVariable,
   isMonOwned,
-  monEnter,
-  monExit,
   monSynchronize,
   newCond,
   synchronize,
@@ -487,7 +481,6 @@ export type { MonitorMixin } from "./monitor.js";
 
 export { Tempfile } from "./tempfile.js";
 export type { TempfileBasename } from "./tempfile.js";
-export { temporalTag } from "./temporal-tag.js";
 export { TypeError } from "./type-error.js";
 export { setVerbose, verbose } from "./verbose.js";
 export { Marshal } from "./marshal.js";

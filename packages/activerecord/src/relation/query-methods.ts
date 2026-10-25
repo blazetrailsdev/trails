@@ -5,7 +5,6 @@ import {
   first,
   flatten,
   Hash,
-  isEmpty,
   isModuleIncluded,
   isSymbol,
   merge,
@@ -1326,7 +1325,7 @@ export function buildSubquery(
   const subquery = this.except("optimizerHints").arel().as(subqueryAlias);
 
   const arel = new SelectManager(subquery).project(selectValue as ArelNode);
-  if (!isEmpty(this.optimizerHintsValues)) arel.optimizerHints(...this.optimizerHintsValues);
+  if (this.optimizerHintsValues.length > 0) arel.optimizerHints(...this.optimizerHintsValues);
   return arel;
 }
 
@@ -1808,7 +1807,7 @@ export function arelColumnsFromHash(
 /** @internal */
 export function orderColumn(this: QueryMethodsHost, field: string): unknown {
   return arelColumn.call(this, field, (attrName: string) => {
-    if (attrName === "count" && !isEmpty(this.groupValues)) {
+    if (attrName === "count" && this.groupValues.length > 0) {
       return this.table.get(attrName);
     } else {
       return Arel.sql(this.model.adapterClass().quoteTableName(attrName), {
@@ -1948,8 +1947,8 @@ export function eachJoinDependencies(
 /** @internal */
 export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
   let joins = union(this.joinsValues as AssociationSpec[], this.leftOuterJoinsValues);
-  if (!isEmpty(this.eagerLoadValues)) joins = union(joins, this.eagerLoadValues);
-  if (!isEmpty(this.includesValues)) joins = union(joins, this.includesValues);
+  if (this.eagerLoadValues.length > 0) joins = union(joins, this.eagerLoadValues);
+  if (this.includesValues.length > 0) joins = union(joins, this.includesValues);
 
   const joinDependencies: JoinDependency[] = [];
   joinDependencies.unshift(
@@ -2058,7 +2057,7 @@ export function buildJoinBuckets(
   });
 
   let stashedLeftJoins: JoinDependency[] | undefined;
-  if (!isEmpty(this.leftOuterJoinsValues)) {
+  if (this.leftOuterJoinsValues.length > 0) {
     stashedLeftJoins = [];
     const leftJoins = selectNamedJoins.call(
       this,
@@ -2075,7 +2074,7 @@ export function buildJoinBuckets(
       },
     );
 
-    if (isEmpty(this.joinsValues)) {
+    if (this.joinsValues.length === 0) {
       buckets.set("named_join", leftJoins);
       buckets.set("stashed_join", stashedLeftJoins);
       return [buckets, Nodes.OuterJoin];
@@ -2134,7 +2133,7 @@ export function buildJoins(
   joinSources: any[],
   aliases?: AliasTracker,
 ): any[] {
-  if (isEmpty(this.joinsValues) && isEmpty(this.leftOuterJoinsValues)) return joinSources;
+  if (this.joinsValues.length === 0 && this.leftOuterJoinsValues.length === 0) return joinSources;
 
   const [buckets, joinType] = buildJoinBuckets.call(this);
 
@@ -2143,9 +2142,9 @@ export function buildJoins(
   const leadingJoins = buckets.get("leading_join")! as Nodes.Join[];
   const joinNodes = buckets.get("join_node")! as Nodes.Join[];
 
-  if (!isEmpty(leadingJoins)) joinSources.push(...leadingJoins);
+  if (leadingJoins.length > 0) joinSources.push(...leadingJoins);
 
-  if (!(isEmpty(namedJoins) && isEmpty(stashedJoins))) {
+  if (!(namedJoins.length === 0 && stashedJoins.length === 0)) {
     const aliasTracker = this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
     const joinDependency = constructJoinDependency.call(this, namedJoins, joinType);
     joinSources.push(
@@ -2153,13 +2152,13 @@ export function buildJoins(
     );
   }
 
-  if (!isEmpty(joinNodes)) joinSources.push(...joinNodes);
+  if (joinNodes.length > 0) joinSources.push(...joinNodes);
   return joinSources;
 }
 
 /** @internal */
 export function buildWith(this: QueryMethodsHost, arel: SelectManager): SelectManager | undefined {
-  if (isEmpty(this.withValues)) return;
+  if (this.withValues.length === 0) return;
 
   const withStatements = this.withValues.map((withValue) =>
     buildWithValueFromHash.call(this, withValue),

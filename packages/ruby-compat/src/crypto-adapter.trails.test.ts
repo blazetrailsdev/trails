@@ -118,13 +118,12 @@ describe("getCrypto in a browser", () => {
     );
     const source =
       `delete globalThis.process;\n` +
-      `const { getCrypto, pbkdf2Async } = await import(${module});\n` +
+      `const { getCrypto } = await import(${module});\n` +
       `const crypto = getCrypto();\n` +
       `console.log(crypto.randomBytes(10).toString("hex").length);\n` +
       `console.log(crypto.timingSafeEqual(new Uint8Array([1, 2]), new Uint8Array([1, 2])));\n` +
       `console.log(crypto.timingSafeEqual(new Uint8Array([1, 2]), new Uint8Array([1, 3])));\n` +
       `try { crypto.timingSafeEqual(new Uint8Array(1), new Uint8Array(2)); } catch (e) { console.log(e.constructor.name + ": " + e.message + " [" + e.code + "]"); }\n` +
-      `console.log((await pbkdf2Async(crypto, "password", "salt", 2, 16, "sha256")).length);\n` +
       `console.log(crypto.createHash("md5").update("abc").digest("hex"));\n` +
       `console.log(crypto.createHash("sha1").update("abc").digest("hex"));\n` +
       `console.log(crypto.createHash("sha256").update("a").update("bc").digest("hex"));\n` +
@@ -145,7 +144,6 @@ describe("getCrypto in a browser", () => {
       "true",
       "false",
       "RangeError: Input buffers must have the same byte length [ERR_CRYPTO_TIMING_SAFE_EQUAL_LENGTH]",
-      "16",
       "900150983cd24fb0d6963f7d28e17f72",
       "a9993e364706816aba3e25717850c26c9cd0d89d",
       "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
