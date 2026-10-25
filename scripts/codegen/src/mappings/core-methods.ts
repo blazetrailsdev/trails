@@ -684,7 +684,34 @@ rule("allocate", (c) => {
 });
 
 rule("zero?", (c) => `(${c.r} === 0)`);
-rule("push unshift", (c) => `${c.R}${c.nav}${c.name}(${c.args().join(", ")})`);
+rule("push unshift", (c) => {
+  // `ary.dup.push(x)` answers the copy (array.c rb_ary_push returns self):
+  // a spread, where JS `push` would answer the length.
+  if (
+    c.name === "push" &&
+    c.recvNode.k === "call" &&
+    c.recvNode.name === "dup" &&
+    c.recvNode.recv &&
+    !c.recvNode.args?.length &&
+    GEM.hand === false
+  ) {
+    const inner = c.lw.expr(c.recvNode.recv, c.ctx);
+    return `[...(${inner} as unknown[]), ${c.args().join(", ")}]`;
+  }
+  return `${c.R}${c.nav}${c.name}(${c.args().join(", ")})`;
+});
+
+// `Integer#odd?` / `#even?` (numeric.c int_odd_p): native on a number; else the
+// value answers it (`rbFSend` reads an Integer's).
+rule("odd? even?", (c) => {
+  if (c.args().length || c.blk) return null;
+  const t = c.recvType;
+  if (t?.k === "prim" && t.name === "number")
+    return `${needsParens(c.r) ? `(${c.r})` : c.r} % 2 ${c.name === "odd?" ? "!==" : "==="} 0`;
+  if (GEM.hand === false)
+    return `${c.rc("rbFSend")}(${c.r}, ${JSON.stringify(c.name === "odd?" ? "isOdd" : "isEven")})`;
+  return null;
+});
 rule("pop shift", (c) => (argc(c) === 0 ? `${c.R}${c.nav}${c.name}()` : null));
 rule("concat", (c) => (argc(c) === 1 ? `${c.R}${c.nav}push(...${c.args()[0]})` : null));
 

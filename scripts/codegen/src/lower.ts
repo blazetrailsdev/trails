@@ -4853,6 +4853,22 @@ export class Lowerer {
       this.selfColumn(name, ctx)
     )
       return `${recv}${nav}${name}`;
+    // A gem with no hand port that defines the name both ways (raabro's
+    // `Input#string` an accessor, `Tree#string` a `def`), on a receiver of
+    // unknown class: Ruby's call, dispatched to whichever the value has.
+    if (
+      !resolved &&
+      GEM.hand === false &&
+      n.args.length === 0 &&
+      !n.block &&
+      nav !== "?." &&
+      recvNode &&
+      recvNode.k !== "self" &&
+      !this.typeOf(recvNode, ctx) &&
+      (this.index.methodNames.get(name)?.def ?? 0) > 0 &&
+      ((this.index.methodNames.get(name)?.attr ?? 0) > 0 || this.index.instanceWriters.has(name))
+    )
+      return `${this.rc(ctx, "rbFSend")}(${recv}, ${JSON.stringify(name)})`;
     if (
       !resolved &&
       n.args.length === 0 &&
