@@ -116,10 +116,16 @@ export function assertion(lw: Lowerer, n: N, ctx: Ctx): string | null {
       return n.args.length >= 2 ? `expect(${a(1)}).toBeExactInstanceOf(${a(0)})` : null;
     case "assert_respond_to":
       return n.args.length >= 2 ? `expect(${a(0)}).toRespondTo(${a(1)})` : null;
-    case "assert_in_delta":
-      return n.args.length >= 2
-        ? `expect(${a(1)}).toBeWithinDelta(${a(0)}${n.args.length >= 3 ? `, ${a(2)}` : ""})`
-        : null;
+    case "assert_in_delta": {
+      if (n.args.length < 2) return null;
+      // Minitest's `(exp - act).abs <= delta` on values of any Numeric-ish class
+      // (two Times, chronic test_parsing.rb:23): compared as Floats (`to_f`).
+      const f = (i: number) => {
+        const t = lw.typeOf(n.args[i], ctx);
+        return t?.k === "prim" && t.name === "number" ? a(i) : `${lw.rc(ctx, "toF")}(${a(i)})`;
+      };
+      return `expect(${f(1)}).toBeWithinDelta(${f(0)}${n.args.length >= 3 ? `, ${a(2)}` : ""})`;
+    }
     case "flunk":
       return `expect.unreachable(${n.args.length ? a(0) : ""})`;
     // Minitest::Assertions#pass: an assertion that passes.
