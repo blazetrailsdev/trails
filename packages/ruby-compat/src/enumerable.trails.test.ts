@@ -3,7 +3,10 @@ import { ArgumentError } from "./argument-error.js";
 import {
   AsyncEnumerable,
   Enumerable,
+  eachCons,
   eachSlice,
+  maxBy,
+  minBy,
   sortBy,
   filterMap,
   find,
@@ -412,6 +415,15 @@ describe("Enumerable free functions over any receiver", () => {
         [0, 3],
       );
       expect(eachSlice(build([1, 2, 3, 4, 5]), 2)).toEqual([[1, 2], [3, 4], [5]]);
+      expect(eachCons(build([1, 2, 3, 4]), 2)).toEqual([
+        [1, 2],
+        [2, 3],
+        [3, 4],
+      ]);
+      expect(minBy(build([5, 15, 10]), (i) => -(i as number))).toBe(15);
+      expect(maxBy(build([5, 15, 10]), (i) => -(i as number))).toBe(5);
+      expect(minBy(build([4, 1, 3]), 2, (i) => i)).toEqual([1, 3]);
+      expect(maxBy(build([4, 1, 3]), 2, (i) => i)).toEqual([4, 3]);
       expect(sortBy(build(["ccc", "a", "bb"]), (s) => (s as string).length)).toEqual([
         "a",
         "bb",
@@ -564,5 +576,33 @@ describe("new Enumerable(obj)", () => {
       },
     });
     expect(await e.map((i) => i + 1)).toEqual([2, 3]);
+  });
+});
+
+describe("minBy / maxBy / eachCons", () => {
+  it("answers nil for an empty receiver", () => {
+    expect(minBy([], (i) => i)).toBeNull();
+    expect(maxBy(new Set(), (i) => i)).toBeNull();
+  });
+
+  it("keeps the first of equal block values", () => {
+    expect(minBy(["a", "b"], () => 0)).toBe("a");
+    expect(maxBy(["a", "b"], () => 0)).toBe("a");
+  });
+
+  it("raises for a negative n", () => {
+    expect(() => minBy([1], -1, (i) => i)).toThrow(new ArgumentError("negative size (-1)"));
+    expect(minBy([1], -0.5, (i) => i)).toEqual([]);
+  });
+
+  it("raises invalid size for a size that is not positive", () => {
+    expect(() => eachCons([1, 2], 0)).toThrow(new ArgumentError("invalid size"));
+  });
+
+  it("yields no window when the size exceeds the receiver, and answers the receiver", () => {
+    const ary = [1, 2];
+    const seen: unknown[] = [];
+    expect(eachCons(ary, 3, (w) => seen.push(w))).toBe(ary);
+    expect(seen).toEqual([]);
   });
 });

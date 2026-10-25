@@ -4,7 +4,7 @@ import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
 import { Hash } from "./hash.js";
 import { IndexError } from "./index-error.js";
-import { find, partition } from "./enumerable.js";
+import { eachCons, find, partition } from "./enumerable.js";
 import { rbBigNorm, rbPlus } from "./numeric.js";
 import { NoMethodError } from "./no-method-error.js";
 import {
@@ -1196,13 +1196,8 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
     return self;
   },
   /** `enum_each_cons` (`vendor/ruby/v3.3.11/enum.c:3244`). */
-  eachCons: (self, n: number, block?: Block) => {
-    if (n <= 0) throw new ArgumentError("invalid size");
-    const ary = self.slice(n - 1).map((_, i) => self.slice(i, i + n));
-    if (!block) return ary;
-    ary.forEach((v) => block(v));
-    return self;
-  },
+  eachCons: (self, n: number, block?: Block) =>
+    block ? eachCons(self, n, (cons) => block(cons)) : eachCons(self, n),
   /** `Enumerable#to_set` (`vendor/ruby/v3.3.11/prelude.rb:28`). */
   toSet: (self) => new Set(self),
 } satisfies Record<string, ArrayMethod>);
