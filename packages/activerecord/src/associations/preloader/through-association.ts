@@ -3,15 +3,7 @@ import type { AssociationReflection, ThroughReflection } from "../../reflection.
 import { Association } from "./association.js";
 import { Associations } from "../../namespaces.js";
 import { any } from "@blazetrails/activesupport";
-import {
-  Hash,
-  first,
-  isEmpty,
-  rbObjRespondTo,
-  reduce,
-  union,
-  uniq,
-} from "@blazetrails/ruby-compat";
+import { Hash, first, isEmpty, reduce, union, uniq } from "@blazetrails/ruby-compat";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
@@ -98,7 +90,7 @@ export class ThroughAssociation extends Association {
       const sourceClasses = this.sourceReflection.chain
         .filter(
           (reflection) =>
-            !(rbObjRespondTo(reflection, "isPolymorphic") && reflection.isPolymorphic()),
+            !(typeof reflection.isPolymorphic === "function" && reflection.isPolymorphic()),
         )
         .map((reflection) => reflection.klass);
       return uniq([...throughClasses, ...sourceClasses]);
