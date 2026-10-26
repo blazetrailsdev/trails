@@ -697,7 +697,7 @@ under `systemd-run MemoryMax=20G`, peak read from the scope's cgroup
 | 04-activesupport     | 429     | **MEM**          | 3.76 GiB | links; wall 7                             |
 | 05-model             | ~700    | **MEM** (12GB)   | 8.14 GiB | runs; `[05] Trail function`               |
 | 06b-crud             | 891     | **MEM** @ 61/891 | 8.63 GiB | wall 8 cleared; now `establishConnection` |
-| 06d-adapter-read     | 1133    | never run        | 8.91 GiB | wall 8 cleared; now wall 9 (N-API)        |
+| 06d-adapter-read     | 1133    | never run        | 8.91 GiB | wall 8 cleared; walls 9-11 (sqlite ext)   |
 
 **Nothing fails to compile any more.** Peak is linear at roughly 8 MiB per
 module, and parallelism is nearly free: 04b costs 2.87 GiB serial and 3.37 GiB
@@ -931,115 +931,161 @@ same-named classes, neither explicitly imported, where the first/last-writer
 disagreement survives) is unexamined. `Base` is declared in at least nine
 trails packages.
 
-## Wall 9: a sqlite handle is an integer, so every property read is `undefined`
+## Walls 9-11: three sqlite-ext defects, and the mask that hid them
 
-06d-adapter-read is **not** blocked by another instance of wall 8. It is
-blocked in a different subsystem, and three wrong guesses of mine were
-needed to find it, all of them from reading class names instead of a stack.
+06d-adapter-read is not blocked by another instance of wall 8. It is blocked by
+three independent defects in Perry's **own** better-sqlite3 extension, plus a
+fourth bug that made all of them illegible. Finding them took eleven refuted
+hypotheses, every one of them mine and every one from reading source instead of
+running a probe; every confirmed fact below came from a probe with a Node
+control on identical source. The ratio is the lesson.
 
-**It is not N-API interop.** My first write-up of this said it was, and that
-was wrong. Perry ships its **own** `crates/perry-ext-better-sqlite3`, so
-`import Database from "better-sqlite3"` never reaches the real addon at all.
-`#10755` keeps native-addon _packages_ out of scope, which is why the addon
-path is irrelevant here.
+**It is not N-API interop.** Perry ships `crates/perry-ext-better-sqlite3`, so
+`import Database from "better-sqlite3"` never reaches the real addon. The
+native-addon issues (#10456-#10461, #9266) are a different subsystem.
 
-**The failure.** `packages/activerecord/src/sqlite/better-sqlite3.ts:29`:
-
-```ts
-const limit = args.length + (source.split("?").length - 1);
-```
-
-reached from `BetterSqlite3Statement.bind` as
-`withNullBinds(this.stmt.source, args, call)`. `this.stmt` is better-sqlite3's
-**native N-API `Statement`**, and `.source` reads `undefined` under Perry, so
-`.split` throws. Stack, from an instrumented `abstract-adapter.ts` catch:
+### Wall 9 - every property on a Database/Statement reads `undefined`
 
 ```
-TypeError: Cannot read properties of undefined (reading 'split')
-    at withNullBinds | at BetterSqlite3Statement.bind | .run | .step
+                        node                        perry
+stmt.source             "select 1 as one"           undefined
+stmt.reader/.readonly   true / true                 undefined
+db.name/.open/.memory   ":memory:" / true / true    undefined
+typeof stmt.get         "function"                  undefined
+Object.keys(stmt)       5 keys                      []
+"source" in stmt        true                        false
+JSON.stringify(stmt)    full object                 null
 ```
 
-**Dispatch works; reflection returns nothing.** `perry/probe/db-read/napi2.ts`,
-Perry against Node on identical source:
+Repro: `perry/probe/db-read/repro-a.ts` (33 lines, no trails code).
 
-| expression                                | Node              | Perry           |
-| ----------------------------------------- | ----------------- | --------------- |
-| `typeof db.prepare`                       | `function`        | **`undefined`** |
-| `db.prepare(sql)` called                  | works             | **works**       |
-| `typeof stmt.run`                         | `function`        | **`undefined`** |
-| `stmt.run()` called                       | `{changes:0,...}` | **same**        |
-| `db.open` (native getter)                 | `true`            | `undefined`     |
-| `stmt.source`                             | the SQL string    | `undefined`     |
-| `'source' in stmt`                        | `true`            | `false`         |
-| `Object.keys(stmt)`                       | 5 keys            | `[]`            |
-| `Object.getOwnPropertyNames(proto)`       | 11 methods        | `[]`            |
-| `getOwnPropertyDescriptor(stmt,'source')` | descriptor        | `null`          |
+**Cause, and the fix.** `crates/perry-ext-better-sqlite3/src/dispatch_ext.rs:34`
+registers `js_register_handle_method_dispatch_extension` and **never the
+property counterpart**. Its own module doc states the architecture:
 
-**Why, exactly.** `crates/perry-ext-better-sqlite3/src/lib.rs:209`:
+> A call on a statically typed receiver is lowered through the native table
+> (`native_table/databases.rs`). A call whose receiver type was erased (`any`,
+> an object field, a Map value) reaches the runtime's handle-method dispatch.
+
+So methods have two working paths and properties have none. The runtime already
+defines `HandlePropertyDispatchFn`, `HandlePropertySetDispatchFn` and
+`HandleOwnPropertyNamesDispatchFn` (`crates/perry-runtime/src/object/class_handles.rs`),
+and `perry-ext-ws` registers the property one for its handles (#9324,
+`crates/perry-ext-ws/src/lib.rs:256`). `SqliteStmtHandle` already stores `sql`,
+which is exactly `source`. This does **not** need the #11919 handle-to-object
+conversion.
+
+Note it also breaks method _capture_: `const f = stmt.run` yields `undefined`,
+so `typeof x.run === "function"` feature detection fails even though
+`stmt.run()` works.
+
+A fourth, smaller gap: the dynamic dispatch claims only `prepare`, `exec`,
+`close`, `raw`, `run`, `get`, `all` - so `iterate`, `pluck`, `expand`,
+`columns`, `bind` and `safeIntegers` fail on an erased receiver.
+
+### Wall 10 - `stmt.run()` on a row-returning statement returns `undefined`
+
+```
+const s = db.prepare("select 1 as one");
+s.run();   // node: {changes:0,lastInsertRowid:0}   perry: undefined
+```
+
+INSERT and DDL are correct (`{changes:1,...}`); only row-returning statements
+fail. This is what actually blocks the rung: the adapter's `step()` calls
+`run()`, and the statement it runs is **`SELECT sqlite_version(*)`**.
+
+**Cause, and the fix.** `crates/perry-ext-better-sqlite3/src/lib.rs:280`:
 
 ```rust
-/// `db.prepare(sql)` -- prepare a statement. Returns a Handle to
-/// the statement, or `-1` on error.
-pub unsafe extern "C" fn js_sqlite_prepare(...) -> Handle {
-    ...
-    return register_handle(SqliteStmtHandle { sql, db_handle, raw_mode });
+if let Ok(changes) = conn.execute(&stmt.sql, param_refs.as_slice()) {
+    ... return result;
 }
+std::ptr::null_mut()      // swallows the error
 ```
 
-A `Database` and a `Statement` are **integer handles**. Method calls work
-because `crates/perry-codegen/src/lower_call/native_table/databases.rs` lowers
-them statically at compile time -- and that table lives under `lower_call`,
-with no getter or property support anywhere in it. Property reads therefore
-cannot be expressed through it _by construction_. That is the whole of
-"dispatch works, reflection returns nothing".
+rusqlite's `Connection::execute` returns `Err(ExecuteReturnedResults)` for a
+statement that yields rows. The `if let Ok` discards it and falls through to
+`null_mut()`, which arrives in JS as `undefined`. better-sqlite3's `run()`
+accepts any statement. The fix is to drain the rows and report
+`changes()`/`last_insert_rowid()` instead of treating rows as failure - and,
+more generally, not to turn an error into a silent `undefined`. The same
+swallow-to-sentinel pattern is everywhere in this ext: `js_sqlite_open` and
+`js_sqlite_prepare` return `-1` on failure, `js_sqlite_exec` returns `0`, and
+`nanbox_handle_inline` maps only `0` to `null` - so a failed open or prepare
+produces a valid-looking, unusable handle.
 
-The extension's own source documents the same shape for a missing _method_:
+### Wall 11 (the mask) - a leaf class loses its own method, silently
 
-> Without this method, `stmt.raw` is undefined and `stmt.raw().all(...)`
-> surfaces as `(number).all is not a function`
+Every failure above reported `TypeError: setQuery is not a function`, with the
+real error destroyed. `abstract-adapter.ts:1857` calls `ex.setQuery` after
+`ex instanceof StatementInvalid` passes, and the method is absent.
 
-`(number)`. That also explains the earlier probe where a `betterSqlite3Driver`
-import appeared to be a **boolean** -- handles are primitives, so that
-observation was real after all, and my note calling it "not evidence" was too
-cautious.
+Instrumented at four points, the method is missing **at construction**; the
+later `activeRecordError.stack = ...` write is innocent:
 
-**Every documented data property is missing**, not just `source`: `stmt.source`,
-`.reader`, `.readonly`, `.busy`, `.database`, and `db.name`, `.open`,
-`.inTransaction`, `.readonly`, `.memory`. Grepping the ext for any of those
-names returns nothing.
+```
+[m1] in ctor: typeof this.setQuery=undefined proto-has=false
+[m3] before stack write: undefined     [m4] after: undefined
+```
 
-`stmt.source` specifically is a **narrow fix**: `SqliteStmtHandle` already
-stores `sql`. The general case needs the #11919 conversion to real objects.
+The prototype chain shows only the leaf affected:
 
-**Not fixable in trails.** `this.stmt.source` is the documented better-sqlite3
-API, read exactly as intended. Nothing about the trails source is unusual here.
+```
+node:  StatementInvalid:[constructor,setQuery] -> AdapterError:[constructor,connectionPool] -> ...
+perry: StatementInvalid:[constructor]          -> AdapterError:[constructor,connectionPool] -> ...
+```
 
-**Prior art, none of it a duplicate.** #11919 (open tracker, "every native
-handle becomes an ordinary GC object that owns its payload") is the structural
-parent and would fix this; its item 7 reaches sqlite but cites only
-`close()` being a no-op, and item 5a notes `new Headers()` "is a number today",
-the same shape. #10461/#9266/#10456-8 are real N-API _host_ issues, all closed
-and all unrelated. #10290 is `bun:sqlite`, closed. Searches for `stmt.source`,
-"sqlite statement property", "db.open sqlite" and "sqlite handle number
-property" return nothing.
+`Object.getPrototypeOf(si) === StatementInvalid.prototype` is `true`, so this is
+not a duplicate class and **not** a wall-8 name collision - there is exactly one
+`StatementInvalid` in the monorepo. Every other class in the five-deep chain
+kept its members. `QueryAborted`, its subclass, inherits the hole.
 
-**What I got wrong, recorded because the wrong path cost the most time.** I
-attributed this failure to a `Version` name collision between
-`abstract-adapter.ts`'s `Version` and ruby-compat's `Gem::Version`, reasoning
-from `getDatabaseVersion` calling `new Version(await this.queryValue(...))`.
-Two things disproved it. Renaming the ruby-compat class left the error
-**byte-identical**. Then instrumenting all four candidate sites showed
-`[diag:Version]`, `[diag:gdv]` and `[diag:qv]` never fire at all — no version
-query happens on this path, so the premise was wrong, not just the mechanism.
-The stack settled it in one run. Instrument before theorising.
+A minimal five-deep `Error` chain with a `prototype.name` mutation does **not**
+reproduce it (`probe/db-read/errchain.ts` matches Node), so chain depth is not
+the trigger. The open hypothesis, under test in `probe/db-read/prune.ts`, is
+dead-method pruning: `setQuery`'s only call site is a `catch (ex)` receiver
+narrowed by `instanceof`, never a statically-typed one.
 
-**Still open: the mask.** The `.split` TypeError is translated to
-`StatementInvalid`, and `abstract-adapter.ts:1857` then calls `ex.setQuery`,
-which is `undefined` on an object whose `instanceof StatementInvalid` is
-`true` — right class, missing method. That is the wall-8 signature
-(`defineMethod is not a function` on a correctly-identified `Module`) and is a
-third, independent defect. It is what every 06b/06d run reports, so the real
-error is invisible without patching that catch.
+Nothing upstream matches, across eight search phrasings.
+
+### Corrections to earlier entries in this file
+
+- The `Version`/`Gem::Version` collision was **not** the cause. Renaming the
+  ruby-compat class left the error byte-identical.
+- But my follow-up claim that "no version query happens on this path" was also
+  wrong: `[z0]` shows the failing statement is `SELECT sqlite_version(*)`. The
+  version query _is_ the path; the collision just is not why it fails. Markers
+  placed inside `getDatabaseVersion`/`queryValue` never fired even so - those
+  are mixin functions spliced onto the prototype
+  (`abstract/database-statements.ts:1014`), which may be the same
+  member-attachment family as wall 11.
+- A sqlite handle is **not** a primitive. `typeof` is `object`, and a property
+  write persists per-instance across a function boundary and an array
+  round-trip, so `ReceiverKind::Number`/`can_own_properties` is irrelevant. The
+  writes land in the handle's property bag
+  (`crates/perry-runtime/src/object/handle_expando.rs`).
+- A narrow fix **does** exist for wall 9; my earlier "only #11919 can fix this"
+  was wrong twice over.
+
+### Refuted hypotheses, recorded so no one re-walks them
+
+`Version` name collision; N-API addon interop; handle-is-a-primitive;
+`can_own_properties`; spread-into-native-table; deep `Error` chain +
+`prototype.name` mutation; class-field receiver; field x spread crossed;
+large-graph scale; `.stack` write forcing a shape transition; static-vs-dynamic
+dispatch path. All eleven match Node exactly.
+
+### Separate bug - `in` disagrees with `Object.keys` on a handle
+
+```
+stmt[k] = 42;            // k computed, write persists
+Object.keys(stmt)        // ["probeField"]
+k in stmt                // false   <- node: true
+```
+
+Plain objects and class instances are correct in Perry, so this is specific to
+handle-backed objects: the own-property-names path consults the handle property
+bag and the `in` operator does not.
 
 ### Upstream filings from this round
 
