@@ -5156,6 +5156,28 @@ function extractInterface(
                     : {}),
                   ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
                 });
+              } else if (
+                propDecl !== undefined &&
+                (ts.isGetAccessorDeclaration(propDecl) || ts.isSetAccessorDeclaration(propDecl)) &&
+                propDecl.getSourceFile().fileName === node.getSourceFile().fileName
+              ) {
+                for (const decl of prop.declarations ?? []) {
+                  if (!ts.isGetAccessorDeclaration(decl) && !ts.isSetAccessorDeclaration(decl)) {
+                    continue;
+                  }
+                  instanceMethods.push({
+                    name: propName,
+                    visibility: propVisibility,
+                    params: ts.isSetAccessorDeclaration(decl)
+                      ? extractParameters(decl.parameters)
+                      : [],
+                    line: 0,
+                    file,
+                    bodyless: true,
+                    ...(ts.isSetAccessorDeclaration(decl) ? { writer: true } : {}),
+                    ...(internalJsDocTagApplies(decl) ? { internal: true } : {}),
+                  });
+                }
               }
             }
           } catch {

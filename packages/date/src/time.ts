@@ -33,7 +33,8 @@ import {
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
-  rbFSend,
+  rbCheckFuncall,
+  rbCheckToInt,
   registerConstant,
   setRubyTzUptodate,
   stringInspect,
@@ -130,8 +131,8 @@ function numExact(v: unknown): Rational {
   if (v instanceof Number) return fToR(v.valueOf());
   if (typeof v === "number") return fToR(v);
   if (v != null && typeof v !== "string") {
-    if (rbObjRespondTo(v, "toR")) {
-      const tmp = rbFSend(v, "toR");
+    let tmp = rbCheckFuncall(v, "toR");
+    if (tmp !== undefined) {
       if (rbObjRespondTo(v, "toInt")) {
         if (typeof tmp === "bigint" || Number.isInteger(tmp)) {
           return new Rational(tmp as number | bigint, 1);
@@ -139,11 +140,8 @@ function numExact(v: unknown): Rational {
           return tmp;
         }
       }
-    } else if (rbObjRespondTo(v, "toInt")) {
-      const tmp = rbFSend(v, "toInt");
-      if (typeof tmp === "bigint" || Number.isInteger(tmp)) {
-        return new Rational(tmp as number | bigint, 1);
-      }
+    } else if ((tmp = rbCheckToInt(v)) != null) {
+      return new Rational(tmp as number, 1);
     }
   }
   throw new TypeError(

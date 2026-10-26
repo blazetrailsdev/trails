@@ -2435,19 +2435,31 @@ for (const klass of [Rational, Complex, BigDecimal]) {
   Object.setPrototypeOf(klass.prototype, rbCNumeric.prototype);
 }
 
-/** `Integer#to_r` (`vendor/ruby/v3.3.11/rational.c:2148`). */
+/**
+ * `Integer#to_r` (`vendor/ruby/v3.3.11/rational.c:2148`).
+ * @noRailsEquivalent PERMANENT
+ */
 rbModDefineMethod(rbCInteger, "toR", function (this: number | bigint) {
   return new Rational(this, 1);
 });
-/** `Integer#to_int` (`vendor/ruby/v3.3.11/numeric.rb:255`). */
+/**
+ * `Integer#to_int` (`vendor/ruby/v3.3.11/numeric.rb:255`).
+ * @noRailsEquivalent PERMANENT
+ */
 rbModDefineMethod(rbCInteger, "toInt", function (this: number | bigint) {
   return this;
 });
-/** `Float#to_r` (`vendor/ruby/v3.3.11/rational.c:2199`). */
+/**
+ * `Float#to_r` (`vendor/ruby/v3.3.11/rational.c:2199`).
+ * @noRailsEquivalent PERMANENT
+ */
 rbModDefineMethod(rbCFloat, "toR", function (this: number) {
   return new Rational(this, 1);
 });
-/** `Float#to_int` (`vendor/ruby/v3.3.11/numeric.c:2597`). */
+/**
+ * `Float#to_int` (`vendor/ruby/v3.3.11/numeric.c:2597`).
+ * @noRailsEquivalent PERMANENT
+ */
 rbModDefineMethod(rbCFloat, "toInt", function (this: number) {
   return toI(this);
 });

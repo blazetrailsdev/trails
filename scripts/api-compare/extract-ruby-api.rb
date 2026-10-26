@@ -1241,6 +1241,8 @@ class ApiExtractor
         process_def_delegators(node[2])
       when "module_function"
         process_module_function(node[2])
+      when "register_detail"
+        process_register_detail(node[2])
       when "define_method"
         # Block-less parenthesized form, `define_method(:foo, some_proc)` —
         # the counterpart of process_command's bare-command arm. The far
@@ -2193,6 +2195,32 @@ class ApiExtractor
       }
     end
     maybe_update_module_file(fqn, target)
+  end
+
+  # `LookupContext.register_detail(:x) { … }`
+  # (actionview/lib/action_view/lookup_context.rb:21-34) defines `default_x`
+  # with `Accessors.define_method` and `x` / `x=` through `Accessors.module_eval`,
+  # so the three methods exist only once each call runs.
+  def process_register_detail(args)
+    return unless current_fqn == "ActionView::LookupContext"
+
+    target = @modules["ActionView::LookupContext::Accessors"]
+    return unless target
+
+    extract_symbol_args(args).each do |name|
+      target[:instanceMethods] << {
+        name: "default_#{name}", visibility: "public", params: [],
+        file: @current_file, line: @current_line, notes: "register_detail",
+      }
+      target[:instanceMethods] << {
+        name: name, visibility: "public", params: [],
+        file: @current_file, line: @current_line, notes: "register_detail",
+      }
+      target[:instanceMethods] << {
+        name: "#{name}=", visibility: "public", params: [{ name: "value", kind: "required" }],
+        file: @current_file, line: @current_line, notes: "register_detail",
+      }
+    end
   end
 
   # `define_method "<name>" do … end` / `define_method(:name) { … }` with a name
