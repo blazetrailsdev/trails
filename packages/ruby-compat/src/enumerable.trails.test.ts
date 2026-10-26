@@ -145,6 +145,22 @@ describe("Enumerable", () => {
     expect(seen).toEqual(["start a", "end a", "start b", "end b"]);
   });
 
+  it("eachWithObject streams through each when the block answers no promise", () => {
+    const seen: string[] = [];
+    const receiver = {
+      each(block: (i: number) => void) {
+        for (const i of [1, 2]) {
+          seen.push(`yield ${i}`);
+          block(i);
+        }
+      },
+    };
+    expect(
+      eachWithObject(receiver, [] as number[], (i, m) => seen.push(`block ${i}`) && m.push(i)),
+    ).toEqual([1, 2]);
+    expect(seen).toEqual(["yield 1", "block 1", "yield 2", "block 2"]);
+  });
+
   it("isAll breaks on the first element that fails RTEST", () => {
     const seen: number[] = [];
     expect(isAll([1, 2, 3], (i: number) => (seen.push(i), i < 2))).toBe(false);

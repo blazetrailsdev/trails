@@ -53,11 +53,26 @@ function rbBlockCall<T, E, R>(
     return result();
   };
   if (awaiting && typeof (obj as Partial<Each<T, E>>).each === "function") {
-    const ary = enumToA(obj) as T[] | Promise<T[]>;
-    return (
-      ary instanceof Promise
-        ? ary.then((ary) => rbBlockCall(ary, block, result, true))
-        : rbBlockCall(ary, block, result, true)
+    let pending: PromiseLike<unknown> | null = null;
+    const rest: T[] = [];
+    return rbBlockCall(
+      obj,
+      (i) => {
+        if (pending) return void rest.push(i);
+        const r = block(i);
+        if (r != null && typeof (r as PromiseLike<unknown>).then === "function") {
+          pending = r as PromiseLike<unknown>;
+        }
+      },
+      () => {
+        if (!pending) return result();
+        const awaited = pending;
+        return (async () => {
+          await awaited;
+          for (const i of rest) await block(i);
+          return result();
+        })();
+      },
     ) as Enumerated<E, R>;
   }
   let each: unknown;
