@@ -38,6 +38,7 @@ export {
   sortBy,
   filterMap,
   groupBy,
+  isAll,
   isAny,
   isNone,
   isOne,

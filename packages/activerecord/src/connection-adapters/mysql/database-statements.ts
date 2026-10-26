@@ -1,6 +1,15 @@
 import { sql as arelSql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { aryJoin, b, cmp, first, rbCmpint, rbRegMatchP } from "@blazetrails/ruby-compat";
+import {
+  aryJoin,
+  b,
+  cmp,
+  eachWithObject,
+  first,
+  last,
+  rbCmpint,
+  rbRegMatchP,
+} from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "../../errors.js";
 import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
@@ -119,23 +128,21 @@ export async function combineMultiStatements(
   this: MaxAllowedPacketHost,
   totalSql: string[],
 ): Promise<string[]> {
-  const chunks: string[] = [];
-  for (const sql of totalSql) {
-    const previousPacket = chunks[chunks.length - 1];
+  return eachWithObject(totalSql, [] as string[], async (sql, totalSqlChunks) => {
+    const previousPacket = last(totalSqlChunks);
     if (await isMaxAllowedPacketReached.call(this, sql, previousPacket)) {
-      chunks.push(sql);
+      totalSqlChunks.push(sql);
     } else {
-      chunks[chunks.length - 1] = `${previousPacket};\n${sql}`;
+      totalSqlChunks[totalSqlChunks.length - 1] = `${previousPacket};\n${sql}`;
     }
-  }
-  return chunks;
+  });
 }
 
 /** @internal */
 export async function isMaxAllowedPacketReached(
   this: MaxAllowedPacketHost,
   currentPacket: string,
-  previousPacket: string | undefined,
+  previousPacket: string | null | undefined,
 ): Promise<boolean> {
   const bytesize = Buffer.byteLength(currentPacket, "utf8");
   const maxPacket = await this.maxAllowedPacket();

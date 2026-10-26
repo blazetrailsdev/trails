@@ -13,7 +13,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { aryJoin, b, fetch, first, rbRegMatchP } from "@blazetrails/ruby-compat";
+import { aryJoin, b, eachWithIndex, fetch, first, rbRegMatchP } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -355,12 +355,11 @@ export async function castResult(this: CastResultHost, result: PG.Result): Promi
 
   const types: Record<string | number, ValueType> = {};
   const fields = result.fields();
-  for (let i = 0; i < fields.length; i++) {
-    const fname = fields[i];
+  await eachWithIndex(fields, async (fname, i) => {
     const ftype = result.ftype(i);
     const fmod = result.fmod(i);
     types[fname] = types[i] = await this.getOidType(ftype, fmod, fname);
-  }
+  });
   const arResult = new Result(
     fields,
     result.values(),

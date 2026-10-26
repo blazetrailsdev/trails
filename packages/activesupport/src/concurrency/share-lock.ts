@@ -1,4 +1,6 @@
 import {
+  isAll,
+  isAny,
   monSynchronize,
   newCond,
   RuntimeError,
@@ -233,16 +235,24 @@ export class ShareLock {
   private isBusyForSharing(purpose: Purpose | false): boolean {
     return (
       (this.exclusiveThread != null && this.exclusiveThread !== Thread.current()) ||
-      [...this.waiting].some(([t, [, c]]) => t !== Thread.current() && !c.includes(purpose))
+      isAny(
+        this.waiting,
+        ([t, [, c]]: [Thread, [Purpose, Compatible]]) =>
+          t !== Thread.current() && !c.includes(purpose),
+      )
     );
   }
 
   /** @internal */
   private hasEligibleWaiters(compatible: Compatible): boolean {
-    return [...this.waiting].some(
-      ([t, [p]]) =>
+    return isAny(
+      this.waiting,
+      ([t, [p]]: [Thread, [Purpose, Compatible]]) =>
         compatible.includes(p) &&
-        [...this.waiting].every(([t2, [, c2]]) => t === t2 || c2.includes(p)),
+        isAll(
+          this.waiting,
+          ([t2, [, c2]]: [Thread, [Purpose, Compatible]]) => t === t2 || c2.includes(p),
+        ),
     );
   }
 

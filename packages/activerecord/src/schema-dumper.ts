@@ -2,6 +2,7 @@ import {
   STDOUT,
   StandardError,
   StringIO,
+  eachWithIndex,
   partition,
   rbEqq,
   rbInspect,
@@ -222,10 +223,10 @@ export abstract class SchemaDumper {
 
     const notIgnoredTables = sortedTables.filter((tableName) => !this.isIgnored(tableName));
 
-    for (const [index, tableName] of notIgnoredTables.entries()) {
+    await eachWithIndex(notIgnoredTables, async (tableName, index) => {
       await this.table(tableName, stream);
       if (index < notIgnoredTables.length - 1) stream.puts("");
-    }
+    });
 
     if (this.connection.supportsForeignKeys()) {
       const foreignKeysStream = new StringIO();
