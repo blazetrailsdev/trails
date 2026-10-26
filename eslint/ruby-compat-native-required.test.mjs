@@ -17,7 +17,11 @@ const tester = new RuleTester({
     ecmaVersion: 2022,
     sourceType: "module",
     parser,
-    parserOptions: { project: "./tsconfig.json", tsconfigRootDir: fixtureDir },
+    parserOptions: {
+      project: "./tsconfig.json",
+      tsconfigRootDir: fixtureDir,
+      disallowAutomaticSingleRunInference: true,
+    },
   },
 });
 
@@ -26,6 +30,7 @@ function parseFixture(code) {
     filePath: filename,
     project: "./tsconfig.json",
     tsconfigRootDir: fixtureDir,
+    disallowAutomaticSingleRunInference: true,
   });
   return { ast, services };
 }
