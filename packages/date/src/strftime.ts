@@ -450,7 +450,9 @@ function rbStrftimeWithTimespec(
             n *= 1000000000n;
             ww -= 9;
           }
-          n *= 10n ** BigInt(ww);
+          let m = 1n;
+          for (; 0 < ww; ww--) m *= 10n;
+          if (m !== 1n) n *= m;
           const q = n / subsec.denominator;
           ftime.s += String(q).padStart(precision, "0");
           break again;
@@ -549,8 +551,9 @@ function rbStrftimeWithTimespec(
 
 /** `strftime_size_limit` (`vendor/ruby/v3.3.11/strftime.c:919-926`). */
 function strftimeSizeLimit(formatLen: number): number {
-  const limit = formatLen * (1 * 1024 * 1024);
-  if (limit < 1024) return 1024;
+  let limit = formatLen * (1 * 1024 * 1024);
+  if (limit < formatLen) limit = formatLen;
+  else if (limit < 1024) limit = 1024;
   return limit;
 }
 
