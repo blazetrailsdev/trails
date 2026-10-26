@@ -20,6 +20,7 @@ tester.run("thor-import-boundary", rule, {
     { filename: TOP, code: 'import { File } from "@blazetrails/ruby-compat";' },
     { filename: TOP, code: 'import { getFs } from "@blazetrails/ruby-compat/fs-adapter";' },
     { filename: TOP, code: 'import { SpellChecker } from "@blazetrails/did-you-mean";' },
+    { filename: TOP, code: 'import { compileJs } from "@blazetrails/tse-compiler";' },
     {
       filename: "packages/trailties/src/generators/base.ts",
       code: 'import { camelize } from "@blazetrails/activesupport";',

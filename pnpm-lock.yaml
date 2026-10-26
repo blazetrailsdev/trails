@@ -706,6 +706,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/tse-compiler':
+        specifier: workspace:*
+        version: link:../tse-compiler
     devDependencies:
       '@blazetrails/activesupport':
         specifier: workspace:*

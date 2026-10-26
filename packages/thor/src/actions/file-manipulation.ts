@@ -1,20 +1,121 @@
 import {
+  ArgumentError,
   bytes,
   fetch,
   File,
   FileUtils,
   getFs,
   Hash,
+  hashDelete,
   last,
+  rbFBinding,
   rbObjIsKindOf,
   rbObjRespondTo,
   rbStrSend,
   rtest,
   strNew,
+  StringIO,
   toS,
 } from "@blazetrails/ruby-compat";
+import { compileJs, type EmitJsOptions } from "@blazetrails/tse-compiler";
 import type { ActionsHost } from "../actions.js";
+import { TEMPLATE_EXTNAME } from "../base.js";
+import type { createFile } from "./create-file.js";
+import type { createLink } from "./create-link.js";
 import type { insertIntoFile } from "./inject-into-file.js";
+
+type ContentBlock = (content: string | Uint8Array) => unknown;
+type FileHost = ActionsHost & {
+  createFile: typeof createFile;
+  createLink: typeof createLink;
+  chmod: typeof chmod;
+};
+type ERBCompiler = EmitJsOptions & { preCmd?: string; postCmd?: string };
+type BufferHost = { outputBuffer: StringIO | null; _outputBuffer?: StringIO | null };
+
+export async function copyFile(this: FileHost, source: string, ...args: unknown[]): Promise<void> {
+  const block = (typeof last(args) === "function" ? args.pop() : undefined) as
+    | ContentBlock
+    | undefined;
+  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const destination = (args[0] as string | undefined) || source;
+  source = File.expandPath(await this.findInSourcePaths(toS(source)));
+
+  const resultingDestination = (await this.createFile(destination, null, config, async () => {
+    let content: unknown = await getFs().readFile(source);
+    if (block) content = await block(content as Uint8Array);
+    return content;
+  })) as string;
+  if (config["mode"] === "preserve") {
+    const mode = (await getFs().stat!(source)).mode;
+    await this.chmod(resultingDestination, mode, config);
+  }
+}
+
+export async function linkFile(
+  this: FileHost,
+  source: string,
+  ...args: unknown[]
+): Promise<unknown> {
+  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const destination = (args[0] as string | undefined) || source;
+  source = File.expandPath(await this.findInSourcePaths(toS(source)));
+
+  return this.createLink(destination, source, config);
+}
+
+export async function get(this: FileHost, source: string, ...args: unknown[]): Promise<unknown> {
+  const block = (typeof last(args) === "function" ? args.pop() : undefined) as
+    | ((render?: Uint8Array) => unknown)
+    | undefined;
+  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  let destination = args[0] as string | undefined;
+
+  let render: Uint8Array;
+  if (/^https?:\/\//.test(source)) {
+    const input = await globalThis.fetch(source, {
+      headers: fetch(config, "httpHeaders", {}) as Record<string, string>,
+    });
+    render = await input.bytes();
+  } else {
+    source = File.expandPath(await this.findInSourcePaths(toS(source)));
+    render = await getFs().readFile(source);
+  }
+
+  destination ||= (
+    block ? (block.length === 1 ? await block(render) : await block()) : File.basename(source)
+  ) as string;
+
+  return this.createFile(destination, render, config);
+}
+
+/** @missingRailsArgs new — PERMANENT */
+export async function template(
+  this: FileHost,
+  source: string,
+  ...args: unknown[]
+): Promise<unknown> {
+  const block = (typeof last(args) === "function" ? args.pop() : undefined) as
+    | ContentBlock
+    | undefined;
+  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const destination =
+    (args[0] as string | undefined) || source.replace(RegExp(`${TEMPLATE_EXTNAME}$`), "");
+
+  source = File.expandPath(await this.findInSourcePaths(toS(source)));
+  const context = (hashDelete(config, "context") || rbFBinding(this)) as object;
+
+  return this.createFile(destination, null, config, async () => {
+    const capturableErb = new CapturableERB(strNew(Array.from(await getFs().readFile(source))), {
+      trimMode: "-",
+      eoutvar: "outputBuffer",
+    });
+    capturableErb.filename = source;
+    let content: unknown = capturableErb.result(context);
+    if (block) content = await block(content as string);
+    return content;
+  });
+}
 
 type GsubHost = ActionsHost & { gsubFile: typeof gsubFile };
 type InsertHost = ActionsHost & { insertIntoFile: typeof insertIntoFile };
@@ -149,3 +250,70 @@ export async function removeFile(
   }
 }
 export const removeDir = removeFile;
+
+export function outputBuffer(this: BufferHost): StringIO | null {
+  return this._outputBuffer ?? null;
+}
+
+export function setOutputBuffer(this: BufferHost, outputBuffer: StringIO | null): void {
+  this._outputBuffer = outputBuffer;
+}
+
+export function concat(this: BufferHost, string: string): void {
+  this.outputBuffer!.append(string);
+}
+
+export function capture(this: BufferHost, ...args: unknown[]): string {
+  const block = args.pop() as (...args: unknown[]) => unknown;
+  return withOutputBuffer.call(this, undefined, () => block(...args));
+}
+
+export function withOutputBuffer(
+  this: BufferHost,
+  buf: StringIO = new StringIO(),
+  block: () => unknown,
+): string {
+  const oldBuffer = this.outputBuffer;
+  try {
+    if (Object.isFrozen(buf)) throw new ArgumentError("Buffer can not be a frozen object");
+    this.outputBuffer = buf;
+    block();
+    return this.outputBuffer.string();
+  } finally {
+    this.outputBuffer = oldBuffer;
+  }
+}
+
+export class CapturableERB {
+  #src: string;
+  /** @noRailsEquivalent PERMANENT */
+  filename: string | null = null;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(
+    str: string,
+    { trimMode = null, eoutvar = "_erbout" }: { trimMode?: string | null; eoutvar?: string } = {},
+  ) {
+    const compiler: ERBCompiler = { trim: trimMode === "-" };
+    this.setEoutvar(compiler, eoutvar);
+    const render = compileJs(str, compiler).code.replace(/^export default /u, "");
+    this.#src = `${compiler.preCmd} return (${render}).call(this)${compiler.postCmd};`;
+  }
+
+  setEoutvar(compiler: ERBCompiler, eoutvar: string = "_erbout"): void {
+    compiler.bufvar = eoutvar;
+    compiler.putCmd = `${eoutvar}.append`;
+    compiler.insertCmd = `((value) => ${eoutvar}.append(toS(value)))`;
+    compiler.preCmd = `${eoutvar} = new StringIO();`;
+    compiler.postCmd = ".string()";
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  result(b: object): string {
+    return new Function("StringIO", "toS", `with (this) { ${this.#src} }`).call(
+      b,
+      StringIO,
+      toS,
+    ) as string;
+  }
+}

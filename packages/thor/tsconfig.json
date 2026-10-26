@@ -9,6 +9,7 @@
   "references": [
     { "path": "../ruby-compat" },
     { "path": "../did-you-mean" },
+    { "path": "../tse-compiler" },
     { "path": "../activesupport" }
   ]
 }

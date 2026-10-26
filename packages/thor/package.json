@@ -24,7 +24,8 @@
   },
   "dependencies": {
     "@blazetrails/did-you-mean": "workspace:*",
-    "@blazetrails/ruby-compat": "workspace:*"
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/tse-compiler": "workspace:*"
   },
   "devDependencies": {
     "@blazetrails/activesupport": "workspace:*"

@@ -1,7 +1,11 @@
 import path from "path";
 
 const THOR_ROOT = "packages/thor/src/";
-const ALLOWED_PACKAGES = ["@blazetrails/ruby-compat", "@blazetrails/did-you-mean"];
+const ALLOWED_PACKAGES = [
+  "@blazetrails/ruby-compat",
+  "@blazetrails/did-you-mean",
+  "@blazetrails/tse-compiler",
+];
 
 /** `filename`'s path below the thor root, or null when it is not a thor file. */
 export function thorRel(filename) {
@@ -27,8 +31,9 @@ export function violation(rel, source) {
  *
  * `packages/thor/src/` is the port of the thor gem, `@blazetrails/thor`. Thor depends on
  * nothing but Ruby's standard library (`vendor/thor/v1.3.2/thor.gemspec`), so
- * its port may reach only what stands in for that: `@blazetrails/ruby-compat`
- * and `@blazetrails/did-you-mean`. A relative import that leaves `thor/` would
+ * its port may reach only what stands in for that: `@blazetrails/ruby-compat`,
+ * `@blazetrails/did-you-mean`, and `@blazetrails/tse-compiler` for the `erb`
+ * stdlib `Thor::Actions#template` requires (`lib/thor/actions/file_manipulation.rb:1`). A relative import that leaves `thor/` would
  * make Thor depend on railties, the reverse of the gems' real edge.
  *
  * @type {import("eslint").Rule.RuleModule}
@@ -38,8 +43,8 @@ export default {
     type: "problem",
     docs: {
       description:
-        "The thor port imports nothing outside thor/ but @blazetrails/ruby-compat and " +
-        "@blazetrails/did-you-mean.",
+        "The thor port imports nothing outside thor/ but @blazetrails/ruby-compat, " +
+        "@blazetrails/did-you-mean and @blazetrails/tse-compiler.",
     },
     schema: [],
     messages: {
@@ -48,7 +53,7 @@ export default {
         "railties depends on Thor.",
       package:
         "'{{source}}' is not a Thor dependency. The thor port may import only " +
-        "@blazetrails/ruby-compat and @blazetrails/did-you-mean.",
+        "@blazetrails/ruby-compat, @blazetrails/did-you-mean and @blazetrails/tse-compiler.",
     },
   },
 
