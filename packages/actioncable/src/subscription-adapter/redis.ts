@@ -1,6 +1,6 @@
 import { cattrAccessor } from "@blazetrails/activesupport";
 import { prepend } from "@blazetrails/ruby-compat/include";
-import { Mutex, Thread, except } from "@blazetrails/ruby-compat";
+import { Mutex, StandardError, Thread, except } from "@blazetrails/ruby-compat";
 import { Redis as IORedis, type RedisOptions } from "ioredis";
 import type { StreamEventLoop } from "../connection/stream-event-loop.js";
 import { SubscriptionAdapter } from "../namespaces.js";
@@ -152,10 +152,11 @@ export class Listener extends SubscriberMap {
   }
 
   listen(conn: RedisConnection): Promise<void> {
+    const retryStrategy = conn.options.retryStrategy;
     conn.options.retryStrategy = () => null;
     const originalClient = this.extractSubscribedClient(conn);
 
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       conn.on("subscribe", (chan: string, count: number) => {
         this._subscriptionLock.synchronize(() => {
           if (count === 1) {
@@ -190,7 +191,9 @@ export class Listener extends SubscriberMap {
       });
 
       conn.on("end", () => reject(new ConnectionError("Connection lost")));
-      void originalClient.subscribe("_action_cable_internal");
+      originalClient.subscribe("_action_cable_internal").catch(reject);
+    }).finally(() => {
+      conn.options.retryStrategy = retryStrategy;
     });
   }
 
@@ -292,6 +295,6 @@ export class Listener extends SubscriberMap {
 }
 
 /** @internal */
-export class ConnectionError extends Error {}
+export class ConnectionError extends StandardError {}
 
 SubscriptionAdapter.Redis = Redis;
