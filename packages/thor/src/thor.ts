@@ -13,6 +13,7 @@ import {
   rbCmpint,
   rbFArray,
   rbFCaller,
+  isPlainHash,
   rbFSend,
   rbInspect,
   rbObjAsString,
@@ -174,6 +175,7 @@ export class Thor {
     }
   }
 
+  /** @inventedArm if — PERMANENT */
   static map(
     this: ThorClass,
     mappings: Mappings | null = null,
@@ -191,7 +193,8 @@ export class Thor {
     if (rtest(mappings)) {
       eachPair(mappings as Map<string, string>, (key: unknown, value) => {
         if (rbObjRespondTo(key, "each")) {
-          rbFSend(key, "each", (subkey: string) => (this._map![subkey] = value));
+          for (const subkey of (isPlainHash(key) ? Object.entries(key) : key) as Iterable<string>)
+            this._map![subkey] = value;
         } else {
           this._map![key as string] = value;
         }

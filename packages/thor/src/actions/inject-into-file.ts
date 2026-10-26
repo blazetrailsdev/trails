@@ -5,7 +5,7 @@ import {
   hashDelete,
   last,
   rbEqual,
-  rbFSend,
+  rbPlus,
   rbStrSend,
   regexpEscape,
   rtest,
@@ -66,8 +66,8 @@ export class InjectIntoFile extends EmptyDirectory {
   override async invokeBang(): Promise<void> {
     const content = (
       this.behavior === "after"
-        ? rbFSend("\\0", "plus", await this.replacement)
-        : rbFSend(await this.replacement, "plus", "\\0")
+        ? rbPlus("\\0", await this.replacement)
+        : rbPlus(await this.replacement, "\\0")
     ) as string;
 
     if (await this.isExists()) {
