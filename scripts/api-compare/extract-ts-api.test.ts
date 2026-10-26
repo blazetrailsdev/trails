@@ -2491,6 +2491,22 @@ describe("body call capture", () => {
     expect(prepended.calls).not.toContain("@unshift");
   });
 
+  it("marks a splice() that removes nothing as a native form", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        move(xs: unknown[], i: number, x: unknown) {
+          xs.splice(i, 0, x);
+        }
+        remove(xs: unknown[], i: number) {
+          xs.splice(i, 1);
+        }
+      }`,
+    );
+    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
+    expect(calls("move")).toContain("@splice");
+    expect(calls("remove")).not.toContain("@splice");
+  });
+
   it("marks a dynamic import() of a computed specifier as a native form, not a literal one", () => {
     const cls = extractFromSource(
       `class Foo {
