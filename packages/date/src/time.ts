@@ -401,6 +401,40 @@ export class Timezone {
   }
 }
 
+interface ZoneOffsetInterval {
+  start: bigint;
+  end: bigint;
+  offset: number;
+}
+
+const zoneOffsetIntervals = new Map<string, ZoneOffsetInterval[]>();
+
+/** @internal */
+function zoneOffsetAt(timeZoneId: string, ns: bigint): number {
+  let intervals = zoneOffsetIntervals.get(timeZoneId);
+  if (!intervals) zoneOffsetIntervals.set(timeZoneId, (intervals = []));
+  let lo = 0;
+  let hi = intervals.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (intervals[mid].end <= ns) lo = mid + 1;
+    else hi = mid;
+  }
+  const hit = intervals[lo];
+  if (hit && hit.start <= ns) return hit.offset;
+  const zoned = Temporal.Instant.fromEpochNanoseconds(ns).toZonedDateTimeISO(timeZoneId);
+  const offset = Number(zoned.offsetNanoseconds) / 1_000_000_000;
+  const previous = zoned.add({ nanoseconds: 1 }).getTimeZoneTransition("previous");
+  const next = zoned.getTimeZoneTransition("next");
+  if (previous === null || next === null) return offset;
+  intervals.splice(lo, 0, {
+    start: previous.epochNanoseconds,
+    end: next.epochNanoseconds,
+    offset,
+  });
+  return offset;
+}
+
 /** `rb_time_zone_abbreviation` (`vendor/ruby/v3.3.11/time.c:5746-5775`). */
 function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
   if (typeof zone === "string") return zone;
@@ -451,13 +485,6 @@ export class Time extends rbCTime {
   }
 
   /** @internal */
-  get #zoned(): Temporal.ZonedDateTime | null {
-    if (this.#zonedMemo === null && this.#timeZoneId != null)
-      this.#zonedMemo = this.#instant.toZonedDateTimeISO(this.#timeZoneId);
-    return this.#zonedMemo;
-  }
-
-  /** @internal */
   get #vtm(): Vtm {
     return (this.#vtmMemo ??= localVtm(this.#epochNs, this.#utcOffset));
   }
@@ -481,7 +508,7 @@ export class Time extends rbCTime {
   /** @internal */
   get #utcOffset(): number {
     return (this.#utcOffsetMemo ??=
-      this.#timeZoneId === "UTC" ? 0 : Number(this.#zoned!.offsetNanoseconds) / 1_000_000_000);
+      this.#timeZoneId === "UTC" ? 0 : zoneOffsetAt(this.#timeZoneId!, this.#epochNs));
   }
 
   static now({ in: inZone = null }: { in?: string | number | Timezone | null } = {}): Time {
