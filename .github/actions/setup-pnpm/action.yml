@@ -26,7 +26,7 @@ inputs:
   node-version:
     description: Node.js version for setup-node.
     required: false
-    default: "24"
+    default: "24.21.0"
   store-dir:
     description: pnpm store-dir on self-hosted runners (defaults to $HOME/.local/share/pnpm/store). Must be inside the runner's persistent storage.
     required: false
