@@ -3,6 +3,7 @@ import { ZeroDivisionError } from "@blazetrails/ruby-compat";
 import { EoTime, EtOrbi } from "@blazetrails/et-orbi";
 import { Fugit } from "./fugit.js";
 import { isostamp } from "./misc.js";
+import { requireChronic, unrequireChronic } from "./test-helpers/spec-helper.js";
 
 describe("differential fuzz against fugit 1.11.1", () => {
   it("keeps a Float remainder a Float when deflating", () => {
@@ -26,5 +27,15 @@ describe("differential fuzz against fugit 1.11.1", () => {
 
   it("raises ZeroDivisionError for a zero step", () => {
     expect(() => Fugit.parseCron("0 0 * 5/0 *")).toThrow(ZeroDivisionError);
+  });
+
+  it("answers nil where Chronic or nat raises NoMethodError", () => {
+    requireChronic();
+    try {
+      expect(Fugit.parse("each 7nd of the month")).toBeNull();
+      expect(Fugit.parse("each t\thu")).toBeNull();
+    } finally {
+      unrequireChronic();
+    }
   });
 });

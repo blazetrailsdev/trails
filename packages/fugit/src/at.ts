@@ -10,7 +10,7 @@ export class At {
     try {
       return EtOrbi.makeTime(s);
     } catch (e) {
-      if (e instanceof StandardError) return null;
+      if (e instanceof StandardError || e instanceof TypeError) return null;
       throw e;
     }
   }
