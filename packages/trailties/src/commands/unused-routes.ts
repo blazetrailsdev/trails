@@ -6,7 +6,7 @@ import {
   type RoutesFilter,
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
-import { underscore, dasherize } from "@blazetrails/activesupport";
+import { camelize, dasherize, safeConstantize, underscore } from "@blazetrails/activesupport";
 import { getPath } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
@@ -41,9 +41,11 @@ export class RouteInfo {
     const requirements = route.requirements;
     this.controllerName = requirements["controller"] as string | undefined;
     this.actionName = requirements["action"] as string | undefined;
-    this.controllerClass = controllerConstants.get(
+    this.controllerClass = (controllerConstants.get(
       underscore(String(this.controllerName ?? "")),
-    ) as ControllerClass | undefined;
+    ) ?? safeConstantize(camelize(String(this.controllerName ?? "")) + "Controller")) as
+      | ControllerClass
+      | undefined;
   }
 
   async unused(): Promise<boolean> {
