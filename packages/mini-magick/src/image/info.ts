@@ -8,7 +8,6 @@ import {
   ArgumentError,
   TypeError,
   excSetupMessage,
-  last,
   JSON,
 } from "@blazetrails/ruby-compat";
 import { rbBinop } from "../codegen-runtime.js";
@@ -152,7 +151,7 @@ export class Info {
                   ? (x.push(`\n${line ?? ""}`), x)
                   : x instanceof globalThis.Set
                     ? x.add(`\n${line ?? ""}`)
-                    : x.append(`\n${line ?? ""}`))(hash[last(Object.keys(hash))]);
+                    : x.append(`\n${line ?? ""}`))(hash[Object.keys(hash).at(-1) ?? null]);
           }
         });
         return hash;

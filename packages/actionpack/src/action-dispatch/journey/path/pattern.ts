@@ -1,4 +1,4 @@
-import { regexpEscape, transformValues } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { Ast } from "../nodes/node.js";
 import { Cat, Group } from "../nodes/node.js";
 import type { Dot, Literal, Node, Or, Slash, Star } from "../nodes/node.js";
@@ -258,9 +258,11 @@ export class Pattern {
 
   get requirementsForMissingKeysCheck(): Record<string, RegExp> {
     if (this._requirementsAnchoredCache) return this._requirementsAnchoredCache;
-    this._requirementsAnchoredCache = transformValues(
-      this.requirements,
-      (regex) => new RegExp(`^(?:${regexUnion(regex)})$`, combinedFlagsFor([regex])),
+    this._requirementsAnchoredCache = Object.fromEntries(
+      Object.entries(this.requirements).map(([key, regex]) => [
+        key,
+        new RegExp(`^(?:${regexUnion(regex)})$`, combinedFlagsFor([regex])),
+      ]),
     );
     return this._requirementsAnchoredCache;
   }

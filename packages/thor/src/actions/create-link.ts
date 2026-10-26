@@ -1,9 +1,12 @@
-import { File, FileUtils, Hash, last, rbObjIsKindOf, rtest } from "@blazetrails/ruby-compat";
+import { File, FileUtils, Hash, rbObjIsKindOf, rtest } from "@blazetrails/ruby-compat";
 import type { ActionsHost } from "../actions.js";
 import { CreateFile } from "./create-file.js";
 
 export function createLink(this: ActionsHost, destination: string, ...args: unknown[]): unknown {
-  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
   const source = args[0] as string;
   return this.action(new CreateLink(this, destination, source, config));
 }

@@ -38,7 +38,7 @@ export class InsertManager extends TreeManager<InsertStatement> {
     if (typeof fields === "string") {
       this.ast.values = new SqlLiteral(fields);
     } else {
-      this.ast.relation ||= (first(first(fields)!) as Attribute).relation as Table | ArelNode;
+      this.ast.relation ||= ((first(fields)![0] ?? null) as Attribute).relation as Table | ArelNode;
 
       const values: unknown[] = [];
 

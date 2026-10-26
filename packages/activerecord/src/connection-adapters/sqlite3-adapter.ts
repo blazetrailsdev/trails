@@ -3,7 +3,6 @@ import {
   sortByBang,
   anybits,
   fetch,
-  last,
   rbRegMatchP,
   registerConstant,
   rbObjAsString,
@@ -991,7 +990,8 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     const partition = match
       ? [result.slice(0, match.index), match[0], result.slice(match.index + match[0].length)]
       : [result, "", ""];
-    return last(partition)!
+    return partition
+      .at(-1)!
       .replace(SQLite3Adapter.FINAL_CLOSE_PARENS_REGEX, "")
       .split(new RegExp(`,(?=\\s(?:CONSTRAINT|"(?:${rbRegSUnion(columnNames).source})"))`, "i"))
       .map((columnString) => columnString.trim());

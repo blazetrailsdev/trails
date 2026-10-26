@@ -3,7 +3,6 @@ import {
   File,
   getFs,
   hashDelete,
-  last,
   rbEqual,
   rbPlus,
   rbStrSend,
@@ -28,7 +27,7 @@ export function insertIntoFile(
   destination: string,
   ...args: unknown[]
 ): unknown {
-  const block = typeof last(args) === "function" ? args.pop() : undefined;
+  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
   const data = block ? block : args.shift();
 
   const config = (args.shift() || {}) as Record<string, unknown>;

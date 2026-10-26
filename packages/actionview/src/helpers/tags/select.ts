@@ -2,7 +2,6 @@ import { isBlank, isPlainObject } from "@blazetrails/activesupport";
 import {
   block as rbBlock,
   fetch,
-  first,
   include,
   Range,
   rbFSend,
@@ -73,9 +72,10 @@ export class Select extends Base {
   /** @internal */
   private isGroupedChoices(): boolean {
     if (isBlank(this._choices)) return false;
-    const head = first(
-      isPlainObject(this._choices) ? Object.entries(this._choices) : (this._choices as unknown[]),
-    );
+    const head =
+      (isPlainObject(this._choices)
+        ? Object.entries(this._choices)
+        : (this._choices as unknown[]))[0] ?? null;
     return rbObjRespondTo(head, "second") && Array.isArray(rbFSend(head, "second"));
   }
 }

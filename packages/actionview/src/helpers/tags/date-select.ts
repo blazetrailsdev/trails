@@ -1,14 +1,6 @@
 import { htmlSafe } from "@blazetrails/activesupport";
 import { Date as RubyDate, Time } from "@blazetrails/date";
-import {
-  block,
-  dup,
-  fetch,
-  include,
-  rbFSend,
-  rbModConstSet,
-  rtest,
-} from "@blazetrails/ruby-compat";
+import { block, fetch, include, rbFSend, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
 
 import { Tags } from "../../namespaces.js";
 import { DateTimeSelector } from "../date-helper.js";
@@ -64,7 +56,7 @@ export class DateSelect extends Base {
     );
     this._autoIndex ??= null;
 
-    options = dup(options);
+    options = { ...options };
     options["fieldName"] = this._methodName;
     options["includePosition"] = true;
     if (!rtest(options["prefix"])) options["prefix"] = this._objectName;
@@ -85,7 +77,7 @@ export class DateSelect extends Base {
     } else if (optionsDefault instanceof RubyDate || optionsDefault instanceof Time) {
       return optionsDefault;
     } else {
-      const default_ = dup(optionsDefault as Record<string, unknown>);
+      const default_ = { ...(optionsDefault as Record<string, unknown>) };
 
       if (!rtest(default_["min"])) default_["min"] = default_["minute"];
       if (!rtest(default_["sec"])) default_["sec"] = default_["second"];

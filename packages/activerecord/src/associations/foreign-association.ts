@@ -1,5 +1,4 @@
 import { isPresent, kernelArray as Array } from "@blazetrails/activesupport";
-import { zip } from "@blazetrails/ruby-compat";
 import type { AssociationReflection } from "../reflection.js";
 import type { Base } from "../base.js";
 
@@ -31,11 +30,14 @@ export function setOwnerAttributes(this: ForeignAssociationHost, record: Base): 
   const primaryKeyAttributeNames = Array(this.reflection.joinPrimaryKey());
   const foreignKeyAttributeNames = Array(this.reflection.joinForeignKey);
 
-  const primaryKeyForeignKeyPairs = zip(primaryKeyAttributeNames, foreignKeyAttributeNames);
+  const primaryKeyForeignKeyPairs = primaryKeyAttributeNames.map((primaryKey, i) => [
+    primaryKey,
+    foreignKeyAttributeNames[i] ?? null,
+  ]);
 
   for (const [primaryKey, foreignKey] of primaryKeyForeignKeyPairs) {
-    const value = this.owner._readAttribute(foreignKey!);
-    record._writeAttribute(primaryKey!, value);
+    const value = this.owner._readAttribute(foreignKey);
+    record._writeAttribute(primaryKey, value);
   }
 
   if (this.reflection.type != null) {

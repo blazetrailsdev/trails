@@ -1,7 +1,6 @@
 import { Nodes, arelNode, sql as arelSql, type ArelNode } from "@blazetrails/arel";
 import { actsLike, isBlank } from "@blazetrails/activesupport";
 import {
-  first,
   format,
   isSymbol,
   rbInspect,
@@ -115,13 +114,13 @@ export function sanitizeSqlForOrder(
   },
   condition: string | ArelNode | [string | ArelNode, ...unknown[]],
 ): string | ArelNode | [string | ArelNode, ...unknown[]] {
-  if (Array.isArray(condition) && rbObjAsString(first(condition)).includes("?")) {
-    this.disallowRawSqlBang([first(condition)], {
+  if (Array.isArray(condition) && rbObjAsString(condition[0] ?? null).includes("?")) {
+    this.disallowRawSqlBang([condition[0] ?? null], {
       permit: this.adapterClass().columnNameWithOrderMatcher(),
     });
 
-    if (first(condition) instanceof Nodes.SqlLiteral) {
-      condition = [String(first(condition)), ...condition.slice(1)];
+    if ((condition[0] ?? null) instanceof Nodes.SqlLiteral) {
+      condition = [String(condition[0] ?? null), ...condition.slice(1)];
     }
 
     return arelSql(this.sanitizeSqlArray(condition as [string, ...unknown[]]));

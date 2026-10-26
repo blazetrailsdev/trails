@@ -1,5 +1,5 @@
 import { kernelArray } from "@blazetrails/activesupport";
-import { groupBy, last, rtest, type Hash } from "@blazetrails/ruby-compat";
+import { groupBy, rtest, type Hash } from "@blazetrails/ruby-compat";
 import { Key } from "./key.js";
 import { Encryption } from "../namespaces.js";
 import type { Message } from "./message.js";
@@ -18,7 +18,7 @@ export class KeyProvider {
     this._encryptionKey ||= ((key) => {
       if (Encryption.config.storeKeyReferences) key.publicTags.encryptedDataKeyId = key.id;
       return key;
-    })(last(this._keys)!);
+    })(this._keys.at(-1)!);
 
     return this._encryptionKey;
   }

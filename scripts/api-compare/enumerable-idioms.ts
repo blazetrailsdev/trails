@@ -187,12 +187,24 @@ export const NATIVE_FORM_PREFIX = "@";
  * The native forms the extractor marks a second time when the TS checker
  * proves the receiver (`checkerProvenKind`, extract-ts-api.ts): a `.length`
  * read of a string, array or tuple, and a literal-key rest-destructure of a
- * plain object. `significantCallsForReceivers` (compare.ts) credits `empty?` /
- * `size` / `length` and `except` from these even where Ripper left the Ruby
+ * plain object; an `xs[0]`, `xs.at(-1)`, `xs.slice(…)` or `[xs.at(i), xs.at(j)]`
+ * on an array or tuple; an `Object.fromEntries` over a plain object's mapped
+ * `Object.entries`. `significantCallsForReceivers` (compare.ts) credits `empty?` /
+ * `size` / `length`, `except`, `first` / `last` / `take` / `drop`,
+ * `values_at` and `transform_values` from these even where Ripper left the Ruby
  * receiver unproven (an ivar, a method call), since the TS type already rules
  * out the Relation homonym.
  */
-export const TYPED_NATIVE_FORM = { length: "length@typed", except: "except@typed" } as const;
+export const TYPED_NATIVE_FORM = {
+  length: "length@typed",
+  except: "except@typed",
+  first: "first@typed",
+  last: "last@typed",
+  take: "take@typed",
+  drop: "drop@typed",
+  valuesAt: "values_at@typed",
+  transformValues: "transform_values@typed",
+} as const;
 
 /**
  * Prefix the TS extractor gives, in the ORDER stream only, to a call first made

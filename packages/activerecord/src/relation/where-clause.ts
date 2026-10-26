@@ -2,7 +2,6 @@ import { extractBang, rbEqual } from "@blazetrails/activesupport";
 import {
   Hash,
   eachWithObject,
-  first,
   isEmpty,
   isModuleIncluded,
   rbHash,
@@ -62,7 +61,7 @@ export class WhereClause {
   invert(): WhereClause {
     let invertedPredicates: (Nodes.Node | Nodes.SqlLiteral | string)[];
     if (this.predicates.length === 1) {
-      invertedPredicates = [invertPredicate(first(this.predicates))];
+      invertedPredicates = [invertPredicate(this.predicates[0] ?? null)];
     } else {
       invertedPredicates = [new Nodes.Not(this.ast)];
     }

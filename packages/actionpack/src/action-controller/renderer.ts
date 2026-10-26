@@ -1,6 +1,6 @@
 import { isBlank } from "@blazetrails/activesupport";
 import type { RackEnv } from "@blazetrails/rack";
-import { dup, hashAref, hashAset, rbEqual } from "@blazetrails/ruby-compat";
+import { hashAref, hashAset, rbEqual } from "@blazetrails/ruby-compat";
 
 import { Request } from "../action-dispatch/http/request.js";
 import type { Response } from "../action-dispatch/http/response.js";
@@ -92,7 +92,7 @@ export class Renderer {
 
   /** @missingRailsName defaults — PERMANENT */
   get defaults(): Env {
-    if (Object.isFrozen(this._defaults)) this._defaults = dup(this._defaults);
+    if (Object.isFrozen(this._defaults)) this._defaults = { ...this._defaults };
     return this._defaults;
   }
 
@@ -122,10 +122,9 @@ export class Renderer {
     return (this.constructor as typeof Renderer).normalizeEnv(env);
   }
 
-  /** @missingRailsName env — PERMANENT */
   private envForRequest(): Env {
     if ("HTTP_HOST" in this._env || this.controller._routes == null) {
-      return dup(this._env);
+      return { ...this._env };
     } else {
       return { ...this.controller._routes.defaultEnv(), ...this._env };
     }

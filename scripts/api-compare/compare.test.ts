@@ -426,6 +426,33 @@ describe("significantMissingCalls", () => {
     expect(significantCallsForReceivers(receivers).has("empty?")).toBe(true);
   });
 
+  it("significantCallsForReceivers credits first/last/take/drop/values_at/transform_values the TS checker typed", () => {
+    const receivers = {
+      first: ["ivar"],
+      last: ["expr"],
+      take: ["local"],
+      drop: ["self"],
+      values_at: ["expr"],
+      transform_values: ["ivar"],
+    };
+    const typed = new Set([
+      "first@typed",
+      "last@typed",
+      "take@typed",
+      "drop@typed",
+      "values_at@typed",
+      "transform_values@typed",
+    ]);
+    const sig = significantCallsForReceivers(receivers, undefined, typed);
+    expect(sig.has("first")).toBe(false);
+    expect(sig.has("last")).toBe(false);
+    expect(sig.has("take")).toBe(false);
+    expect(sig.has("drop")).toBe(true);
+    expect(sig.has("values_at")).toBe(false);
+    expect(sig.has("transform_values")).toBe(false);
+    expect(significantCallsForReceivers(receivers).has("first")).toBe(true);
+  });
+
   it("significantCallsForReceivers still flags a positional-array name with no receiver proof at all", () => {
     const sig = significantCallsForReceivers({});
     expect(sig.has("first")).toBe(true);

@@ -2,7 +2,6 @@ import { dasherize, isBlank, isPresent } from "@blazetrails/activesupport";
 import {
   block,
   deleteIf,
-  dup,
   fetch,
   isSymbol,
   rbEqq,
@@ -291,7 +290,7 @@ export class Route {
   get requiredDefaults(): Record<string, unknown> {
     if (this._requiredDefaultsCache) return this._requiredDefaultsCache;
     this._requiredDefaultsCache = deleteIf(
-      dup(this.defaults),
+      { ...this.defaults },
       (k) => this.parts.includes(k) || !this.isRequiredDefault(k),
     );
     return this._requiredDefaultsCache;

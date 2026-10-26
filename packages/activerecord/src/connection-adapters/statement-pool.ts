@@ -1,10 +1,8 @@
 import {
-  eachValue,
   Hash,
   hashAref,
   hashAset,
   hashDelete,
-  last,
   NotImplementedError,
   Process,
   rtest,
@@ -46,16 +44,16 @@ export class StatementPool<T = unknown> {
     while (this._statementLimit <= size(this.cache)) {
       const shifted = Object.entries(this.cache)[0];
       delete this.cache[shifted[0]];
-      void this.dealloc(last(shifted) as T);
+      void this.dealloc((shifted.at(-1) ?? null) as T);
     }
     hashAset(this.cache, sql, stmt);
     return stmt;
   }
 
   clear(): void {
-    eachValue(this.cache, (stmt) => {
+    for (const stmt of Object.values(this.cache)) {
       void this.dealloc(stmt);
-    });
+    }
     for (const key of Object.keys(this.cache)) delete this.cache[key];
   }
 

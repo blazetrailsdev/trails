@@ -2,7 +2,6 @@ import { mattrAccessor, threadMattrAccessor } from "@blazetrails/activesupport";
 import {
   getAsyncContext,
   included,
-  last,
   rbEnsure,
   rbFSend,
   rbObjDup,
@@ -102,7 +101,7 @@ export class Contexts {
   }
 
   static get currentCustomContext(): Context | null | undefined {
-    return this.customContexts && last(this.customContexts);
+    return this.customContexts && (this.customContexts.at(-1) ?? null);
   }
 
   static resetDefaultContext(): void {

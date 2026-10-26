@@ -1,13 +1,11 @@
 import {
   block,
   fetch,
-  first,
   hashDelete,
   rbEqual,
   rbInspect,
   rbModName,
   rbModToS,
-  zip,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
@@ -207,11 +205,14 @@ export abstract class AbstractReflection {
     const primaryKeyColumnNames = kernelArray(this._concrete().joinPrimaryKey!());
     const foreignKeyColumnNames = kernelArray(this._concrete().joinForeignKey);
 
-    const primaryForeignKeyPairs = zip(primaryKeyColumnNames, foreignKeyColumnNames);
+    const primaryForeignKeyPairs = primaryKeyColumnNames.map((pk, i) => [
+      pk,
+      foreignKeyColumnNames[i] ?? null,
+    ]);
 
     for (const [primaryKeyColumnName, foreignKeyColumnName] of primaryForeignKeyPairs) {
       klassScope.whereBang(
-        table.get(primaryKeyColumnName!).eq(foreignTable.get(foreignKeyColumnName!)),
+        table.get(primaryKeyColumnName).eq(foreignTable.get(foreignKeyColumnName)),
       );
     }
 
@@ -496,7 +497,7 @@ export class AggregateReflection extends MacroReflection {
 
   mapping(): [string, string][] {
     const mapping = (this.options.mapping as unknown[]) || [this.name, this.name];
-    return (Array.isArray(first(mapping)) ? mapping : [mapping]) as [string, string][];
+    return (Array.isArray(mapping[0] ?? null) ? mapping : [mapping]) as [string, string][];
   }
 }
 
@@ -1326,7 +1327,7 @@ export class ThroughReflection extends AbstractReflection {
           this.sourceReflectionNames(),
         );
       }
-      return first(names) ?? null;
+      return names[0] ?? null;
     })());
   }
 

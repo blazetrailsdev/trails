@@ -52,7 +52,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
-  dup,
   fetch,
   File,
   groupBy,
@@ -656,7 +655,7 @@ export class Mapping {
     currentConditions: Record<string, unknown>,
     requestClass: { prototype: object },
   ): Record<string, unknown> {
-    const conditions = dup(currentConditions);
+    const conditions = { ...currentConditions };
 
     return keepIf(conditions, (k) => rbModMethodDefined(requestClass, k));
   }
@@ -1145,7 +1144,7 @@ export class Mapper {
     const block = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
       | MapperCallback
       | undefined;
-    let options: RouteOptions = dup(extractOptionsBang(resources));
+    let options: RouteOptions = { ...extractOptionsBang(resources) };
 
     if (this.applyCommonBehaviorFor("resources", resources as string[], options, block)) {
       return this;
@@ -1188,7 +1187,7 @@ export class Mapper {
     const block = (typeof resources.at(-1) === "function" ? resources.pop() : undefined) as
       | MapperCallback
       | undefined;
-    let options: RouteOptions = dup(extractOptionsBang(resources));
+    let options: RouteOptions = { ...extractOptionsBang(resources) };
 
     if (this.applyCommonBehaviorFor("resource", resources as string[], options, block)) {
       return this;
@@ -1257,7 +1256,7 @@ export class Mapper {
 
   scope(...args: Array<string | string[] | ScopeOptions | MapperCallback>): void {
     const cb = args.pop() as MapperCallback;
-    const options: ScopeOptions = dup(extractOptionsBang(args)) as ScopeOptions;
+    const options: ScopeOptions = { ...extractOptionsBang(args) } as ScopeOptions;
     const scope: ScopeFrameHash = {};
 
     if (args.length > 0) options.path = (args as Array<string | string[]>).flat(Infinity).join("/");

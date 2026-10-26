@@ -22,7 +22,7 @@ import {
   kernelArray as Array,
   wrap,
 } from "@blazetrails/activesupport";
-import { eachWithObject, zip } from "@blazetrails/ruby-compat";
+import { eachWithObject } from "@blazetrails/ruby-compat";
 import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
 import type { Association } from "./association.js";
@@ -155,11 +155,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
         const target = this.throughAssociation().target;
 
         if (inverse != null && target != null && !globalThis.Array.isArray(target)) {
-          zip(Array(target.id), Array(inverse.foreignKey())).map(
-            ([primaryKeyValue, foreignKeyColumn]) => {
+          Array(target.id)
+            .map((id, i) => [id, Array(inverse.foreignKey())[i] ?? null])
+            .map(([primaryKeyValue, foreignKeyColumn]) => {
               (attributes as Record<string, unknown>)[foreignKeyColumn as string] = primaryKeyValue;
-            },
-          );
+            });
         }
       }
 

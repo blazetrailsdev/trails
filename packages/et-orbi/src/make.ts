@@ -5,7 +5,6 @@ import {
   fetch,
   block,
   isRegisteredConstant,
-  last,
   Rational,
   rbEqual,
   rbInspect,
@@ -60,7 +59,7 @@ export function parse(str: string, opts: Record<string, unknown> = {}): EoTime {
 }
 
 export function makeTime(...a: unknown[]): EoTime {
-  const zone = a.length > 1 ? getTzone(last(a)) : null;
+  const zone = a.length > 1 ? getTzone(a.at(-1) ?? null) : null;
   if (zone != null) a.pop();
 
   const o = a.length > 1 ? a : a[0];

@@ -93,7 +93,6 @@ function nodeToHash(node: XmlNode): XmlHash {
   return hash;
 }
 
-/** @missingRailsCall first — PERMANENT */
 export function parse(data: string | StringIO | null | undefined): XmlHash {
   if (!(data instanceof StringIO)) {
     data = new StringIO(data ?? "");

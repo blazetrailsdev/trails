@@ -3,7 +3,6 @@ import {
   bytes,
   compactBang,
   eachPair,
-  eachValue,
   forceEncoding,
   Hash,
   hasKey,
@@ -178,7 +177,7 @@ export class Utils {
     if (Array.isArray(params)) {
       params.forEach((element) => Utils.checkParamEncoding(element));
     } else if (params !== null && typeof params === "object") {
-      eachValue(params as ParamHash, (value) => Utils.checkParamEncoding(value));
+      for (const value of Object.values(params as ParamHash)) Utils.checkParamEncoding(value);
     } else if (typeof params === "string") {
       if (/\p{Cs}/u.test(params)) {
         throw new InvalidParameterError(`Invalid encoding for parameter: ${scrub(params)}`);

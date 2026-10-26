@@ -38,7 +38,7 @@ export class PoolManager {
       return eachValue(this._roleToShardMapping[role], block);
     } else {
       return eachValue(this._roleToShardMapping, (shardMap) => {
-        eachValue(shardMap, block!);
+        for (const pool of Object.values(shardMap)) block!(pool);
       });
     }
   }

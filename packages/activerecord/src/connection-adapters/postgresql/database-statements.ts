@@ -13,7 +13,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { aryJoin, b, eachWithIndex, fetch, first, rbRegMatchP } from "@blazetrails/ruby-compat";
+import { aryJoin, b, eachWithIndex, fetch, rbRegMatchP } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -444,7 +444,7 @@ export async function lastInsertIdResult(
 
 /** @internal */
 export function returningColumnValues(result: Result): unknown[] | null {
-  return first(result.rows);
+  return result.rows[0] ?? null;
 }
 
 /** @internal */

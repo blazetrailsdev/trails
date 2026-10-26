@@ -6,7 +6,6 @@ import {
   StringIO,
   block,
   fetch,
-  last,
   mergeBang,
   rbInspect,
   type Tempfile,
@@ -295,7 +294,7 @@ describe("ParametersPermitTest", () => {
 
     const permitted = params.permit({ users: ["id"] });
     (permitted.get("users") as unknown[]).push({ injected: 1 });
-    assertNotPredicate(last(permitted.get("users") as Parameters[])!, (p) => p.isPermitted());
+    assertNotPredicate((permitted.get("users") as Parameters[]).at(-1)!, (p) => p.isPermitted());
   });
 
   it("grow until set rehashes", () => {
@@ -308,7 +307,7 @@ describe("ParametersPermitTest", () => {
       permitted.set("xx", list);
       assertEqual(permitted.get("xx"), list);
     }
-    assertNotPredicate(last(permitted.get("users") as Parameters[])!, (p) => p.isPermitted());
+    assertNotPredicate((permitted.get("users") as Parameters[]).at(-1)!, (p) => p.isPermitted());
   });
 
   it("fetch doesn't raise ParameterMissing exception if there is a default", () => {
