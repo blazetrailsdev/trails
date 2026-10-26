@@ -1,6 +1,6 @@
-import { rbInspect, rbObjClassname, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjClassname, rbSetClassPathString, toSym } from "@blazetrails/ruby-compat";
 import { InvalidLocale, Disabled } from "../exceptions.js";
-import { toSym, type Locale } from "../i18n.js";
+import { type Locale } from "../i18n.js";
 import { tag as tagFor } from "./tag.js";
 
 export type FallbackMappings = Record<Locale, Locale | Locale[]>;

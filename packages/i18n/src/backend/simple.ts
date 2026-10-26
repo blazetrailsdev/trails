@@ -4,11 +4,10 @@ import {
   config,
   localeAvailable,
   normalizeKeys,
-  toSym,
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
-import { Hash, fetch, hashAref, isSymbol } from "@blazetrails/ruby-compat";
+import { Hash, fetch, hashAref, isSymbol, toSym } from "@blazetrails/ruby-compat";
 import { deepMergeBang, deepSymbolizeKeys, except, type TranslationData } from "../utils.js";
 import { Base, type TranslateOptions } from "./base.js";
 
