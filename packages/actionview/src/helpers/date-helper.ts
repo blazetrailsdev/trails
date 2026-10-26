@@ -18,6 +18,7 @@ import {
   type Included,
   rbFSend,
   rbInspect,
+  rbCNumeric,
   rbObjRespondTo,
   Range,
   rbBlockGivenP,
@@ -108,7 +109,7 @@ export function distanceOfTimeInWords(
 
 /** @internal */
 function normalizeDistanceOfTimeArgumentToTime(value: DistanceOfTimeInput): Time {
-  if (typeof value === "number") {
+  if (value instanceof rbCNumeric) {
     return Time.at(value);
   } else if (rbObjRespondTo(value, "toTime")) {
     return rbFSend(value, "toTime") as Time;

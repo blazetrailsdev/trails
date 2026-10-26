@@ -313,11 +313,14 @@ export class LoaderQuery {
         (hsh, key) => hsh.set(key, new Set()).get(key)!,
       );
 
-      for (const valuesSet of keys) {
-        for (const [keyName, value] of zip(this.associationKeyName, valuesSet as unknown[])) {
-          queryConstraints.get(keyName as string)!.add(value);
+      eachWithObject(keys, queryConstraints, (valuesSet, constraints) => {
+        for (const [keyName, value] of zip(
+          this.associationKeyName as string[],
+          valuesSet as unknown[],
+        )) {
+          constraints.get(keyName as string)!.add(value);
         }
-      }
+      });
 
       return (await this.scope.where(Object.fromEntries(queryConstraints)).load(block)).toArray();
     } else {
