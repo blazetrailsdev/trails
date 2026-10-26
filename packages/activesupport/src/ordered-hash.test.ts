@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { inspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { OrderedHash } from "./ordered-hash.js";
@@ -224,7 +224,7 @@ describe("OrderedHashTest", () => {
   });
 
   it("inspect", () => {
-    expect(orderedHash.inspect()).toContain(inspect(hash));
+    expect(orderedHash.inspect()).toContain(rbInspect(hash));
   });
 
   it("json", () => {
