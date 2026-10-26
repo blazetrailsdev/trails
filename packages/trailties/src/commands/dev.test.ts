@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Dir, File, FileUtils, chdir, stdout } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, stdout } from "@blazetrails/ruby-compat";
 import { invoke } from "../command.js";
 
 let appPath: string;
@@ -8,11 +8,11 @@ let originalCwd: string;
 beforeEach(() => {
   appPath = Dir.mktmpdir("trails-dev-");
   originalCwd = Dir.pwd();
-  chdir(appPath);
+  Dir.chdir(appPath);
 });
 
 afterEach(() => {
-  chdir(originalCwd);
+  Dir.chdir(originalCwd);
   FileUtils.rmRf(appPath);
 });
 

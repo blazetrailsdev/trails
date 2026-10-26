@@ -1568,10 +1568,9 @@ export class Mapper {
       path = hashDelete(options, "at") as string | null;
     } else if (app instanceof Map) {
       options = app;
-      [app, path] = ([...options].find(([k, _]) => rbObjRespondTo(k, "call")) ?? []) as [
-        MountableApp,
-        string,
-      ];
+      [app, path] = (new Enumerable(options).find(([k, _]: [unknown, unknown]) =>
+        rbObjRespondTo(k, "call"),
+      ) ?? []) as [MountableApp, string];
       if (app) hashDelete(options, app);
     }
 

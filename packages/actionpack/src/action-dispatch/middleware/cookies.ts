@@ -12,6 +12,7 @@
 
 import {
   fetch,
+  Enumerable,
   include,
   isSymbol,
   rbEqual,
@@ -236,14 +237,18 @@ export class CookieJar implements Iterable<[string, string]> {
   updateCookiesFromJar(): void {
     const requestJar = cookieJar.call(this.request)._cookies;
     const setCookies = Object.fromEntries(
-      [...requestJar].filter(([k]) => !(this._deletedCookies.has(k) || this._setCookies.has(k))),
+      new Enumerable(requestJar).reject(
+        ([k]: [string, unknown]) => this._deletedCookies.has(k) || this._setCookies.has(k),
+      ),
     );
 
     if (setCookies) this.update(setCookies);
   }
 
   toHeader(): string {
-    return [...this._cookies].map(([k, v]) => `${this.escape(k)}=${this.escape(v)}`).join("; ");
+    return new Enumerable(this._cookies)
+      .map(([k, v]: [string, string]) => `${this.escape(k)}=${this.escape(v)}`)
+      .join("; ");
   }
 
   set(name: string, options: string | SetCookieOptions | null): string | undefined {

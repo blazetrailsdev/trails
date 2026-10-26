@@ -29,7 +29,7 @@ import {
   transformKeys,
 } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
-import { aryJoin, first } from "@blazetrails/ruby-compat";
+import { Enumerable, aryJoin, first } from "@blazetrails/ruby-compat";
 import { withConnection } from "./connection-handling.js";
 
 type ModelClass = typeof Base;
@@ -219,7 +219,9 @@ export class InsertAll {
 
       this.verifyAttributes(attributes);
 
-      return [...this.keysIncludingTimestamps()].map((key) => block(key, attributes[key]));
+      return new Enumerable(this.keysIncludingTimestamps()).map<string, T>((key) =>
+        block(key, attributes[key]),
+      ) as T[];
     });
   }
 
@@ -459,7 +461,7 @@ export class Builder implements InsertBuilder {
 
   /** @internal */
   private quoteColumns(columns: Iterable<string>): string[] {
-    return [...columns].map((column) => this.quoteColumn(column));
+    return new Enumerable(columns).map((column: string) => this.quoteColumn(column));
   }
 
   /** @internal */

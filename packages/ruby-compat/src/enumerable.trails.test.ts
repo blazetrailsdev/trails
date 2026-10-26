@@ -536,6 +536,11 @@ describe("new Enumerable(obj)", () => {
     expect(e.partition()).toEqual([1, 2, 3]);
   });
 
+  it("sortBy without a block answers the elements, as enum_sort_by's RETURN_SIZED_ENUMERATOR", () => {
+    expect(sortBy(new Set([3, 1, 2]))).toEqual([3, 1, 2]);
+    expect(new Enumerable(new Set([3, 1, 2])).sortBy()).toEqual([3, 1, 2]);
+  });
+
   it("wraps a Map as [key, value] pairs", () => {
     const e = new Enumerable(
       new Map([
