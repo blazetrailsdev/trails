@@ -6,7 +6,8 @@
  * from the host's `/usr/share/zoneinfo` mixes two releases, and two ways of
  * building links: the host may keep `CET` / `EST` as fixed zones where the
  * release's `backward` file links them to `Europe/Brussels` / `America/Panama`.
- * The release is fetched once and compiled from its rearguard form, which ICU
+ * The release is fetched once, its signature checked against the tz
+ * release key, and compiled from its rearguard form, which ICU
  * builds from too (no negative DST, so `Europe/Dublin`'s summer is the DST
  * period), with `zic`'s default (slim) output, into
  * `node_modules/.cache/tzdata/zoneinfo-rearguard-<release>/`.
@@ -38,6 +39,34 @@ async function exists(file: string): Promise<boolean> {
   }
 }
 
+/** The tz release-signing key, Paul Eggert's (https://www.iana.org/time-zones). */
+const TZ_RELEASE_KEY = "7E3792A9D8ACF7D633BC1588ED97E90E62AA7E34";
+
+async function verify(src: string, tarball: string, url: string): Promise<void> {
+  const home = path.join(src, "gnupg");
+  await mkdir(home, { mode: 0o700 });
+  const key = path.join(src, "key.asc");
+  const sig = `${tarball}.asc`;
+  const keyUrl = `https://keys.openpgp.org/vks/v1/by-fingerprint/${TZ_RELEASE_KEY}`;
+  await execFileAsync("curl", ["-fsSL", "-o", key, keyUrl]);
+  await execFileAsync("curl", ["-fsSL", "-o", sig, `${url}.asc`]);
+  await execFileAsync("gpg", ["--homedir", home, "--batch", "--quiet", "--import", key]);
+  const { stdout } = await execFileAsync("gpg", [
+    "--homedir",
+    home,
+    "--batch",
+    "--status-fd",
+    "1",
+    "--verify",
+    sig,
+    tarball,
+  ]).catch(() => ({ stdout: "" }));
+  const valid = stdout
+    .split("\n")
+    .some((l) => l.startsWith("[GNUPG:] VALIDSIG ") && l.trimEnd().endsWith(` ${TZ_RELEASE_KEY}`));
+  if (!valid) throw new Error(`${url} is not signed by the tz release key ${TZ_RELEASE_KEY}`);
+}
+
 /** The compiled zoneinfo directory for `tzdataVersion()`, building it on first use. */
 export async function zoneinfo(): Promise<string> {
   const version = tzdataVersion();
@@ -56,6 +85,7 @@ export async function zoneinfo(): Promise<string> {
     const tarball = path.join(src, "tzdata.tar.gz");
     const url = `https://data.iana.org/time-zones/releases/tzdata${version}.tar.gz`;
     await execFileAsync("curl", ["-fsSL", "-o", tarball, url]);
+    await verify(src, tarball, url);
     await execFileAsync("tar", ["xzf", tarball, "-C", src]);
     await execFileAsync("make", ["rearguard.zi"], { cwd: src });
     await execFileAsync("zic", ["-d", build, "rearguard.zi"], { cwd: src });

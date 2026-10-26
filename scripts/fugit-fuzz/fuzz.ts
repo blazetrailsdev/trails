@@ -12,18 +12,14 @@
  *   TZ=UTC pnpm tsx scripts/fugit-fuzz/fuzz.ts --surface cron --count 500
  *   TZ=UTC pnpm tsx scripts/fugit-fuzz/fuzz.ts --pp cron "0 0 L * mon"
  *
- * The Ruby side reads a zoneinfo compiled from the IANA release Node's ICU
- * carries (`process.versions.tz`), not the host's `/usr/share/zoneinfo`, so
- * both sides see the same zone database. It is downloaded and built with
- * `zic` on first run, into `node_modules/.cache/fugit-fuzz/`, after its
- * signature is checked against the tz release key.
+ * The Ruby side reads the zoneinfo `scripts/tzdata-zoneinfo.ts` compiles from
+ * the IANA release Node's ICU carries, the one the tzdata generators read, not
+ * the host's `/usr/share/zoneinfo`.
  *
  * Not wired into CI.
  */
-import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Fugit } from "../../packages/fugit/dist/fugit.js";
@@ -31,6 +27,7 @@ import { EoTime, EtOrbi } from "../../packages/et-orbi/dist/et-orbi.js";
 import { Chronic } from "../../packages/chronic/dist/chronic.js";
 import { Raabro, Tree } from "../../packages/raabro/dist/raabro.js";
 import { Time } from "../../packages/date/dist/index.js";
+import { zoneinfoEnv } from "../tzdata-zoneinfo.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const VENDOR = path.resolve(HERE, "../../vendor");
@@ -371,79 +368,13 @@ function runTs(c: Case): unknown {
   });
 }
 
-/** The tz release-signing key, Paul Eggert's (https://www.iana.org/time-zones). */
-const TZ_RELEASE_KEY = "7E3792A9D8ACF7D633BC1588ED97E90E62AA7E34";
+let env: Promise<NodeJS.ProcessEnv> | undefined;
 
-function verifyTzdata(src: string, tarball: string, url: string): void {
-  const home = path.join(src, "gnupg");
-  mkdirSync(home, { mode: 0o700 });
-  const key = path.join(src, "key.asc");
-  const sig = `${tarball}.asc`;
-  execFileSync("curl", [
-    "-fsSL",
-    "-o",
-    key,
-    `https://keys.openpgp.org/vks/v1/by-fingerprint/${TZ_RELEASE_KEY}`,
-  ]);
-  execFileSync("curl", ["-fsSL", "-o", sig, `${url}.asc`]);
-  execFileSync("gpg", ["--homedir", home, "--batch", "--quiet", "--import", key], {
-    stdio: "ignore",
-  });
-  const status = spawnSync(
-    "gpg",
-    ["--homedir", home, "--batch", "--status-fd", "1", "--verify", sig, tarball],
-    { encoding: "utf8" },
-  );
-  if (status.status !== 0 || !status.stdout.includes(`[GNUPG:] VALIDSIG ${TZ_RELEASE_KEY} `))
-    throw new Error(`${url} is not signed by the tz release key ${TZ_RELEASE_KEY}`);
-}
-
-function zoneinfo(): string {
-  const version = process.versions.tz;
-  if (!version) throw new Error("this Node carries no ICU tz version");
-  const dir = path.resolve(HERE, "../../node_modules/.cache/fugit-fuzz", `zoneinfo-${version}`);
-  if (existsSync(dir)) return dir;
-  const src = mkdtempSync(path.join(os.tmpdir(), "fugit-fuzz-tzdata-"));
-  mkdirSync(path.dirname(dir), { recursive: true });
-  const build = mkdtempSync(`${dir}.partial-`);
-  try {
-    const tarball = path.join(src, "tzdata.tar.gz");
-    const url = `https://data.iana.org/time-zones/releases/tzdata${version}.tar.gz`;
-    execFileSync("curl", ["-fsSL", "-o", tarball, url]);
-    verifyTzdata(src, tarball, url);
-    execFileSync("tar", ["xzf", tarball, "-C", src]);
-    const sources =
-      "africa antarctica asia australasia europe northamerica southamerica etcetera backward factory";
-    const zic = spawnSync("zic", ["-d", build, ...sources.split(" ")], {
-      cwd: src,
-      encoding: "utf8",
-    });
-    const warnings = zic.stderr
-      .split("\n")
-      .filter((l) => l !== "" && !l.includes("symbolic link used because hard link failed"));
-    if (warnings.length > 0) process.stderr.write(`${warnings.join("\n")}\n`);
-    if (zic.status !== 0) throw new Error(`zic exited ${zic.status}`);
-    for (const tab of ["iso3166.tab", "zone.tab", "zone1970.tab"])
-      copyFileSync(path.join(src, tab), path.join(build, tab));
-    try {
-      renameSync(build, dir);
-    } catch (e) {
-      if (!existsSync(dir)) throw e;
-    }
-  } finally {
-    rmSync(src, { recursive: true, force: true });
-    rmSync(build, { recursive: true, force: true });
-  }
-  return dir;
-}
-
-let zoneinfoDir: string | undefined;
-
-function runRuby(script: string[], input: string): Promise<string> {
+async function runRuby(script: string[], input: string): Promise<string> {
   const args = GEMS.flatMap((gem) => ["-I", path.join(VENDOR, gem, "lib")]);
-  const env = { ...process.env, TZ: "UTC", FUGIT_FUZZ_ZONEINFO: (zoneinfoDir ??= zoneinfo()) };
+  const childEnv = { ...(await (env ??= zoneinfoEnv())), TZ: "UTC" };
   return new Promise((resolve, reject) => {
-    const child = spawn("ruby", [...args, ...script], { env });
+    const child = spawn("ruby", [...args, ...script], { env: childEnv });
     let out = "";
     child.stdout.on("data", (d: Buffer) => (out += d.toString()));
     child.stderr.on("data", (d: Buffer) => process.stderr.write(d));
