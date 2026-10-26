@@ -9,6 +9,7 @@ export { BlockedExecution } from "./blocked-execution.js";
 export { ClaimedExecution, Result } from "./claimed-execution.js";
 export { FailedExecution } from "./failed-execution.js";
 export { RecurringExecution, AlreadyRecorded } from "./recurring-execution.js";
+export { RecurringJob } from "./recurring-job.js";
 export { RecurringTask } from "./recurring-task.js";
 export { Semaphore } from "./semaphore.js";
 export { Pause } from "./pause.js";

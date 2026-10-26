@@ -21,6 +21,7 @@ import { EnqueueError, Job } from "./job.js";
 import { Record } from "./record.js";
 import { AlreadyRecorded, RecurringExecution } from "./recurring-execution.js";
 import { Arguments } from "./recurring-task/arguments.js";
+import { RecurringJob } from "./recurring-job.js";
 import { SolidQueue } from "./solid-queue.js";
 
 type JobClass = (new (...args: unknown[]) => ActiveJobBase) & { queueAdapterName: string };
@@ -59,6 +60,7 @@ export class RecurringTask extends Record {
     this.hasMany("recurringExecutions", { foreignKey: "task_key", primaryKey: "key" });
 
     mattrAccessor.call(this, "defaultJobClass");
+    this.defaultJobClass = RecurringJob;
   }
 
   static wrap(args: RecurringTask | [string, { [key: string]: unknown }]): RecurringTask {

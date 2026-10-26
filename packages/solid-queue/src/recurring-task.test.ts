@@ -5,7 +5,7 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
-import { EnqueueError } from "@blazetrails/activejob";
+import { Base, EnqueueError } from "@blazetrails/activejob";
 import { AsyncAdapter } from "@blazetrails/activejob/queue-adapters/async-adapter";
 import { isPresent } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
@@ -104,6 +104,7 @@ async function waitWhileWithTimeout(timeout: number, block: () => boolean) {
 }
 
 describe("SolidQueue::RecurringTaskTest", () => {
+  let oldQueueAdapter: unknown;
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
 
   beforeAll(async () => {
@@ -111,6 +112,8 @@ describe("SolidQueue::RecurringTaskTest", () => {
     const pool = RecurringTask.connectionPool();
     await pool.schemaReflection.loadAllBang(pool);
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    oldQueueAdapter = Base.queueAdapter;
+    Base.setQueueAdapter(new SolidQueueAdapter());
     oldPermanentConnectionCheckout = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
   });
@@ -125,6 +128,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
 
   afterAll(() => {
     setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
+    Base.setQueueAdapter(oldQueueAdapter);
   });
 
   async function enqueueAndAssertPerformedWithResult(task: RecurringTask, result: unknown) {
@@ -310,8 +314,10 @@ describe("SolidQueue::RecurringTaskTest", () => {
     expect(job.priority).toBe(4);
   });
 
-  it.skip("task configured with a command", async () => {
-    const task = recurringTaskWith({ command: "JobBuffer.add('from_a_command')" });
+  it("task configured with a command", async () => {
+    const task = recurringTaskWith({
+      command: `${import.meta.dirname}/test-helpers/dummy/lib/from-a-command.ts`,
+    });
     await enqueueAndAssertPerformedWithResult(task, "from_a_command");
 
     expect(((await Job.last()) as Job).class_name).toBe("SolidQueue::RecurringJob");
