@@ -15,7 +15,7 @@ import {
   type Extended,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { rtest, rbCallSuper } from "@blazetrails/ruby-compat";
+import { mergeBang, rtest, rbCallSuper } from "@blazetrails/ruby-compat";
 import type { TouchArgs } from "./timestamp.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
@@ -447,7 +447,8 @@ export function setOptionsForCallbacksBang(
   args: unknown[],
   enforcedOptions: Record<string, unknown> = {},
 ): void {
-  const options = Object.assign(extractOptionsBang(args), enforcedOptions);
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- the receiver is extract_options!'s return, which the call gate cannot prove a Hash
+  const options = mergeBang<unknown>(extractOptionsBang(args), enforcedOptions);
   args.push(options);
 
   if (rtest(options.on)) {
