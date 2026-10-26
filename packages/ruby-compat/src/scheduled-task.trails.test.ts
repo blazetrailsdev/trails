@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { ImmediateExecutor } from "./immediate-executor.js";
-import { ScheduledTask } from "./scheduled-task.js";
+import { CancelledOperationError, ScheduledTask } from "./scheduled-task.js";
 import { ThreadPoolExecutor } from "./thread-pool-executor.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -77,6 +77,21 @@ describe("ScheduledTask", () => {
     await sleep(40);
     expect(ran).toBe(false);
     expect(task.cancel()).toBe(false);
+  });
+
+  it("notifies observers with the task's error, or a CancelledOperationError on cancel", async () => {
+    const reasons: unknown[] = [];
+    const failing = new ScheduledTask(0, { executor: new ImmediateExecutor() }, () => {
+      throw new ArgumentError("boom");
+    });
+    failing.addObserver((_time, _value, reason) => void reasons.push(reason));
+    failing.execute();
+    await sleep(5);
+    const cancelled = new ScheduledTask(1, { executor: new ImmediateExecutor() }, () => {});
+    cancelled.addObserver((_time, _value, reason) => void reasons.push(reason));
+    cancelled.execute().cancel();
+    expect(reasons[0]).toBeInstanceOf(ArgumentError);
+    expect(reasons[1]).toBeInstanceOf(CancelledOperationError);
   });
 
   it("raises on a negative delay", () => {

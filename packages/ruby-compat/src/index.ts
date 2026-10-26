@@ -473,7 +473,7 @@ export {
 } from "./thread-pool-executor.js";
 export { BasicSocket, Socket, TCPSocket } from "./socket.js";
 export { ImmediateExecutor } from "./immediate-executor.js";
-export { ScheduledTask } from "./scheduled-task.js";
+export { CancelledOperationError, ScheduledTask } from "./scheduled-task.js";
 export { Concurrent } from "./concurrent/map.js";
 import "./concurrent/count-down-latch.js";
 import "./concurrent/cyclic-barrier.js";
