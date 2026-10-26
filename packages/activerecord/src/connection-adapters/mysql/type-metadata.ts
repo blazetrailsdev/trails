@@ -5,7 +5,6 @@ import {
   rbEqual,
   rbHash,
   registerConstant,
-  strUminus,
 } from "@blazetrails/ruby-compat";
 import { Deduplicable } from "../deduplicable.js";
 import type { ClassMethods } from "../deduplicable.js";
@@ -52,7 +51,6 @@ export class TypeMetadata extends DelegateClass(SqlTypeMetadata) {
    */
   deduplicated(): this {
     this.__setobj__(this.__getobj__().deduplicate());
-    if (this.extra != null) this.extra = strUminus(this.extra);
     return Object.freeze(this);
   }
 }

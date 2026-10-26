@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Concern, extend, include, initializeIncludedModules } from "@blazetrails/activesupport";
+import { Concern, extend, include } from "@blazetrails/activesupport";
 import { ControllerRuntime, logProcessAction } from "./controller-runtime.js";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
@@ -30,10 +30,6 @@ class FakeController {
   declare processAction: (action: string, ...args: unknown[]) => unknown;
   declare cleanupViewRuntime: <T>(block: () => T) => T;
   declare appendInfoToPayload: (payload: Record<string, unknown>) => void;
-
-  constructor() {
-    initializeIncludedModules(this);
-  }
 }
 include(FakeController as never, FakeInstrumentation);
 include(FakeController as never, ControllerRuntime);
