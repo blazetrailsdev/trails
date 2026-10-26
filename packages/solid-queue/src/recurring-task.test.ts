@@ -5,20 +5,12 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
-import { EnqueueError } from "@blazetrails/activejob";
+import { Base, EnqueueError } from "@blazetrails/activejob";
 import { AsyncAdapter } from "@blazetrails/activejob/queue-adapters/async-adapter";
 import { isPresent } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { registerConstant } from "@blazetrails/ruby-compat";
-import {
-  Job,
-  Process,
-  ReadyExecution,
-  RecurringJob,
-  RecurringTask,
-  SolidQueueAdapter,
-  Worker,
-} from "./index.js";
+import { Job, Process, ReadyExecution, RecurringTask, SolidQueueAdapter, Worker } from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { JobBuffer } from "./test-helpers/add-to-buffer-job.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
@@ -119,7 +111,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
     const pool = RecurringTask.connectionPool();
     await pool.schemaReflection.loadAllBang(pool);
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
-    RecurringJob.setQueueAdapter(new SolidQueueAdapter());
+    Base.setQueueAdapter(new SolidQueueAdapter());
     oldPermanentConnectionCheckout = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
   });

@@ -60,7 +60,7 @@ export class RecurringTask extends Record {
     this.hasMany("recurringExecutions", { foreignKey: "task_key", primaryKey: "key" });
 
     mattrAccessor.call(this, "defaultJobClass");
-    this.defaultJobClass = RecurringJob as unknown as JobClass;
+    this.defaultJobClass = RecurringJob;
   }
 
   static wrap(args: RecurringTask | [string, { [key: string]: unknown }]): RecurringTask {
