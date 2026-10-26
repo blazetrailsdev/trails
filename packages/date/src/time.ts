@@ -1593,9 +1593,10 @@ export class Time extends rbCTime {
     return strftime(
       {
         year: this.year,
-        jd: cCivilToJd(this.year, this.mon, this.day),
+        jd: cCivilToJd(this.year, this.mon, this.day, Date.GREGORIAN),
         nth: 0n,
         gregorianP: true,
+        sg: Date.GREGORIAN,
         mon: this.mon,
         day: this.day,
         wday: this.wday,
