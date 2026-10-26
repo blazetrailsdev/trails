@@ -15,11 +15,12 @@
  * The Ruby side reads a zoneinfo compiled from the IANA release Node's ICU
  * carries (`process.versions.tz`), not the host's `/usr/share/zoneinfo`, so
  * both sides see the same zone database. It is downloaded and built with
- * `zic` on first run, into `node_modules/.cache/fugit-fuzz/`.
+ * `zic` on first run, into `node_modules/.cache/fugit-fuzz/`, after its
+ * signature is checked against the tz release key.
  *
  * Not wired into CI.
  */
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import os from "node:os";
@@ -370,6 +371,33 @@ function runTs(c: Case): unknown {
   });
 }
 
+/** The tz release-signing key, Paul Eggert's (https://www.iana.org/time-zones). */
+const TZ_RELEASE_KEY = "7E3792A9D8ACF7D633BC1588ED97E90E62AA7E34";
+
+function verifyTzdata(src: string, tarball: string, url: string): void {
+  const home = path.join(src, "gnupg");
+  mkdirSync(home, { mode: 0o700 });
+  const key = path.join(src, "key.asc");
+  const sig = `${tarball}.asc`;
+  execFileSync("curl", [
+    "-fsSL",
+    "-o",
+    key,
+    `https://keys.openpgp.org/vks/v1/by-fingerprint/${TZ_RELEASE_KEY}`,
+  ]);
+  execFileSync("curl", ["-fsSL", "-o", sig, `${url}.asc`]);
+  execFileSync("gpg", ["--homedir", home, "--batch", "--quiet", "--import", key], {
+    stdio: "ignore",
+  });
+  const status = spawnSync(
+    "gpg",
+    ["--homedir", home, "--batch", "--status-fd", "1", "--verify", sig, tarball],
+    { encoding: "utf8" },
+  );
+  if (status.status !== 0 || !status.stdout.includes(`[GNUPG:] VALIDSIG ${TZ_RELEASE_KEY} `))
+    throw new Error(`${url} is not signed by the tz release key ${TZ_RELEASE_KEY}`);
+}
+
 function zoneinfo(): string {
   const version = process.versions.tz;
   if (!version) throw new Error("this Node carries no ICU tz version");
@@ -381,14 +409,20 @@ function zoneinfo(): string {
   try {
     const tarball = path.join(src, "tzdata.tar.gz");
     const url = `https://data.iana.org/time-zones/releases/tzdata${version}.tar.gz`;
-    execFileSync("curl", ["-fsSL", "-o", tarball, url], { stdio: "inherit" });
+    execFileSync("curl", ["-fsSL", "-o", tarball, url]);
+    verifyTzdata(src, tarball, url);
     execFileSync("tar", ["xzf", tarball, "-C", src]);
     const sources =
       "africa antarctica asia australasia europe northamerica southamerica etcetera backward factory";
-    execFileSync("zic", ["-d", build, ...sources.split(" ")], {
+    const zic = spawnSync("zic", ["-d", build, ...sources.split(" ")], {
       cwd: src,
-      stdio: "inherit",
+      encoding: "utf8",
     });
+    const warnings = zic.stderr
+      .split("\n")
+      .filter((l) => l !== "" && !l.includes("symbolic link used because hard link failed"));
+    if (warnings.length > 0) process.stderr.write(`${warnings.join("\n")}\n`);
+    if (zic.status !== 0) throw new Error(`zic exited ${zic.status}`);
     for (const tab of ["iso3166.tab", "zone.tab", "zone1970.tab"])
       copyFileSync(path.join(src, tab), path.join(build, tab));
     try {
