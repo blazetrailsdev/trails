@@ -713,6 +713,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
 
   packages/trails-tsc:
     dependencies:

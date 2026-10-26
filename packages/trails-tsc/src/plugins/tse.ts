@@ -408,7 +408,7 @@ const UNDECLARABLE = new Set([
   "__sink",
 ]);
 
-function freeIdentifiers(body: readonly string[]): string[] {
+export function freeIdentifiers(body: readonly string[]): string[] {
   const sf = ts.createSourceFile(
     "body.ts",
     `async function __tse() {\n${body.join("\n")}\n}`,
