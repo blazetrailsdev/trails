@@ -13,6 +13,7 @@
     { "path": "../activesupport" },
     { "path": "../arel" },
     { "path": "../date" },
+    { "path": "../fugit" },
     { "path": "../globalid" },
     { "path": "../ruby-compat" },
     { "path": "../trailties" }

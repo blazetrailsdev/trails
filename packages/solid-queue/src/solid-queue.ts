@@ -32,6 +32,14 @@ export const SolidQueue = {
     SolidQueue.Dispatcher!.onStop(block);
   },
 
+  onSchedulerStart(block: () => unknown): void {
+    SolidQueue.Scheduler!.onStart(block);
+  },
+
+  onSchedulerStop(block: () => unknown): void {
+    SolidQueue.Scheduler!.onStop(block);
+  },
+
   isSilencePolling(): boolean {
     return SolidQueue.silencePolling;
   },
@@ -66,6 +74,9 @@ export const SolidQueue = {
   onWorkerStart(block: () => unknown): void;
   onWorkerStop(block: () => unknown): void;
   Dispatcher?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
+  Scheduler?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
+  onSchedulerStart(block: () => unknown): void;
+  onSchedulerStop(block: () => unknown): void;
   onDispatcherStart(block: () => unknown): void;
   onDispatcherStop(block: () => unknown): void;
   isSilencePolling(): boolean;
