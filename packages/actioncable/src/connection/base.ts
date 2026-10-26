@@ -10,6 +10,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { CONTENT_TYPE, Request as RackRequest } from "@blazetrails/rack";
+import type { Set as RubySet } from "@blazetrails/ruby-compat";
 import {
   rbEqq,
   rbFArray,
@@ -30,7 +31,10 @@ import { ActionCable, Connection } from "../namespaces.js";
 import type { Base as ServerBase } from "../server/base.js";
 import { Authorization } from "./authorization.js";
 import { Callbacks } from "./callbacks.js";
-import { Identification } from "./identification.js";
+import {
+  Identification,
+  type ClassMethods as IdentificationClassMethods,
+} from "./identification.js";
 import { InternalChannel } from "./internal-channel.js";
 import { MessageBuffer } from "./message-buffer.js";
 import { Subscriptions } from "./subscriptions.js";
@@ -45,6 +49,10 @@ interface Coder {
 type Env = Record<string, unknown>;
 
 export class Base {
+  declare static identifiedBy: (typeof IdentificationClassMethods)["identifiedBy"];
+  declare static identifiers: RubySet<string>;
+  declare static rescueHandlers: unknown[][];
+  declare static rescueFrom: (typeof Rescuable.ClassMethods)["rescueFrom"];
   declare connectionIdentifier: string;
   /** @internal */
   declare subscribeToInternalChannel: () => void;
@@ -181,7 +189,7 @@ export class Base {
   }
 
   /** @internal */
-  private get websocket(): WebSocket {
+  protected get websocket(): WebSocket {
     return this._websocket;
   }
 
