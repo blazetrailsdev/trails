@@ -1,4 +1,3 @@
-import type { WebSocket } from "./web-socket.js";
 import { assertCalled, assertNotCalled } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
 import { describe, expect, it } from "vitest";
@@ -7,6 +6,7 @@ import { SuccessAdapter } from "../test-helpers/stubs/test-adapter.js";
 import { TestServer } from "../test-helpers/stubs/test-server.js";
 import { User } from "../test-helpers/stubs/user.js";
 import { Base } from "./base.js";
+import type { WebSocket } from "./web-socket.js";
 
 class Connection extends Base {
   override get websocket(): WebSocket {
