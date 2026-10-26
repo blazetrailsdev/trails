@@ -1,7 +1,7 @@
 # trailties — Claude guide
 
-Rules that bind only inside `packages/trailties` (the Rails railties port and the
-Thor port under `src/thor/`). The repo-wide rules are in the root
+Rules that bind only inside `packages/trailties` (the Rails railties port) and
+`packages/thor` (the Thor port, `@blazetrails/thor`, whose rules stay here). The repo-wide rules are in the root
 [CLAUDE.md](../../CLAUDE.md), which keeps every heading below as a pointer so
 code citations of the form `CLAUDE.md, "Section title"` resolve. The
 alternatives tried for each decision are in

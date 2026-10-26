@@ -336,6 +336,7 @@ export default defineConfig(
   {
     files: [
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/arel/src/**/*.ts",
@@ -365,6 +366,7 @@ export default defineConfig(
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
       "packages/website/src/**/*.ts",
     ],
     ignores: [
@@ -431,6 +433,7 @@ export default defineConfig(
       "packages/did-you-mean/src/**/*.ts",
       "packages/bcrypt/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -447,6 +450,7 @@ export default defineConfig(
   {
     files: [
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/globalid/src/**/*.ts",
@@ -510,6 +514,7 @@ export default defineConfig(
       "packages/actionview/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
       "packages/activejob/src/**/*.ts",
       "packages/bcrypt/src/**/*.ts",
       "packages/date/src/**/*.ts",
@@ -821,22 +826,22 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/trailties/src/thor/**/*.ts"],
+    files: ["packages/thor/src/**/*.ts"],
     ignores: [
-      "packages/trailties/src/thor/actions.trails.test.ts",
-      "packages/trailties/src/thor/actions/create-file.trails.test.ts",
-      "packages/trailties/src/thor/actions/file-manipulation.trails.test.ts",
-      "packages/trailties/src/thor/line-editor/basic.test.ts",
-      "packages/trailties/src/thor/nested-context.test.ts",
-      "packages/trailties/src/thor/parser/argument.test.ts",
-      "packages/trailties/src/thor/parser/arguments.test.ts",
-      "packages/trailties/src/thor/parser/option.test.ts",
-      "packages/trailties/src/thor/parser/options.test.ts",
-      "packages/trailties/src/thor/shell.test.ts",
-      "packages/trailties/src/thor/shell.trails.test.ts",
-      "packages/trailties/src/thor/shell/color.test.ts",
-      "packages/trailties/src/thor/shell/table-printer.trails.test.ts",
-      "packages/trailties/src/thor/util.test.ts",
+      "packages/thor/src/actions.trails.test.ts",
+      "packages/thor/src/actions/create-file.trails.test.ts",
+      "packages/thor/src/actions/file-manipulation.trails.test.ts",
+      "packages/thor/src/line-editor/basic.test.ts",
+      "packages/thor/src/nested-context.test.ts",
+      "packages/thor/src/parser/argument.test.ts",
+      "packages/thor/src/parser/arguments.test.ts",
+      "packages/thor/src/parser/option.test.ts",
+      "packages/thor/src/parser/options.test.ts",
+      "packages/thor/src/shell.test.ts",
+      "packages/thor/src/shell.trails.test.ts",
+      "packages/thor/src/shell/color.test.ts",
+      "packages/thor/src/shell/table-printer.trails.test.ts",
+      "packages/thor/src/util.test.ts",
     ],
     rules: {
       "blazetrails/thor-import-boundary": "error",
@@ -844,7 +849,7 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/trailties/src/**/*.ts"],
+    files: ["packages/thor/src/**/*.ts", "packages/trailties/src/**/*.ts"],
     rules: {
       "blazetrails/thor-command-registration": "error",
     },
@@ -1124,7 +1129,11 @@ export default defineConfig(
 
   // ── actionpack + trailties ──
   {
-    files: ["packages/actionpack/src/**/*.ts", "packages/trailties/src/**/*.ts"],
+    files: [
+      "packages/actionpack/src/**/*.ts",
+      "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
+    ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "unused-imports/no-unused-vars": "off",

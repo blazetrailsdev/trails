@@ -14,10 +14,6 @@
     },
     "./all": "./dist/all.js",
     "./generators": "./dist/generators/index.js",
-    "./thor": {
-      "types": "./dist/thor/thor.d.ts",
-      "default": "./dist/thor/thor.js"
-    },
     "./engine": {
       "types": "./dist/engine.d.ts",
       "default": "./dist/engine.js"
@@ -73,6 +69,7 @@
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/thor": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
     "commander": "^14.0.0",

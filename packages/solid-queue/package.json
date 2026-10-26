@@ -31,6 +31,7 @@
     "@blazetrails/fugit": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/thor": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
   },
   "engines": {

@@ -119,7 +119,7 @@ jobs:
           DB_ADAPTER_RE='^(packages/activerecord/src/(adapters/(postgresql|abstract-mysql-adapter)|connection-adapters/(postgresql|mysql|mysql2|abstract-mysql-adapter|abstract/|abstract-adapter\.ts|column\.ts|adapter-args\.ts|sql-classification\.ts|pool))|packages/arel/src/visitors/(postgres|mysql)|packages/activerecord-cli/src/__e2e__/(postgres|mysql))'
           AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|bcrypt|activesupport|rack|rack-test|date|did-you-mean|vitest-matchers)/'
           AV_PKGS_RE='^packages/(actionview|activesupport|date|vitest-matchers)/'
-          TRAILTIES_PKGS_RE='^packages/(trailties|actioncable|actionpack|actionview|activerecord|arel|activejob|activemodel|bcrypt|activesupport|globalid|rack|date|did-you-mean|trails-tsc|vitest-matchers)/'
+          TRAILTIES_PKGS_RE='^packages/(trailties|actioncable|actionpack|actionview|activerecord|arel|activejob|activemodel|bcrypt|activesupport|globalid|rack|date|did-you-mean|thor|trails-tsc|vitest-matchers)/'
           TRAILS_TSC_PKGS_RE='^packages/trails-tsc/'
           TSE_COMPILER_PKGS_RE='^packages/tse-compiler/'
           RACK_PKGS_RE='^packages/(rack|rack-session|rack-test|activesupport|date|vitest-matchers)/'
@@ -1102,15 +1102,17 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm build
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
-        run: pnpm vitest run packages/trailties
+        run: pnpm vitest run packages/trailties packages/thor
       - if: needs.changes.outputs.actioncable_only == 'true'
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
           $(git ls-files 'packages/actioncable/src/*.ts')
       - if: needs.changes.outputs.thor_only == 'true'
+        run: pnpm vitest run packages/thor
+      - if: needs.changes.outputs.thor_only == 'true'
         run: >
-          pnpm vitest related --run --project trailties
-          packages/trailties/src/thor/*.ts
+          pnpm vitest related --run --passWithNoTests --project trailties
+          $(git ls-files 'packages/thor/src/*.ts')
 
   # Reporting-only code coverage. Runs the light (non-AR) packages together
   # with v8 coverage and `--coverage.all` so untested files count toward the
@@ -1169,6 +1171,7 @@ jobs:
           packages/actionpack
           packages/actionview
           packages/trailties
+          packages/thor
           packages/tse-compiler
           packages/vitest-matchers
           --coverage --coverage.all

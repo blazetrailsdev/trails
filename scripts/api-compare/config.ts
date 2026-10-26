@@ -46,7 +46,6 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   mysql2: "activerecord",
   pg: "activerecord",
   sqlite3: "activerecord",
-  thor: "trailties",
 };
 
 /**
@@ -112,7 +111,6 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   mysql2: "mysql2",
   pg: "pg",
   sqlite3: "sqlite",
-  thor: "thor",
 };
 
 /**

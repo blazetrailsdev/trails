@@ -435,17 +435,17 @@ function gateRegex(yml: string, name: string): RegExp {
  *
  *  thor_only (scripts/ci/scoped-only.sh)
  *  True only on a pull_request whose EVERY changed path is in the thor-only
- *  set: packages/trailties/src/thor/, vendor/thor/, and thor's parity-register
+ *  set: packages/thor/, vendor/thor/, and thor's parity-register
  *  rows (scripts/parity/unported-files/thor.ts and the thor/ shards of
  *  scripts/api-compare/call-mismatches-{exclude,unreviewed}/). Any other path
  *  — INFRA_RE included — leaves it false, and the push/schedule/
  *  workflow_dispatch arm never runs the script, so the flag is unset there.
- *  Thor imports nothing outside src/thor/, but trailties imports Thor
+ *  Thor imports nothing outside packages/thor/, but trailties imports Thor
  *  (generators/base.ts includes Thor::Actions), so the flag narrows rather
  *  than skips:
- *  - trailties-tests runs `vitest related` over the thor sources, on the
- *    root config's `trailties` project (related mode crawls the whole
- *    include list of the project it runs).
+ *  - trailties-tests runs packages/thor whole, then
+ *    `vitest related` over the thor sources on the `trailties` project
+ *    (related mode crawls the whole include list of the project it runs).
  *  - virtualized-dx-type-tests and leaf-tests' DX type step skip: thor has
  *    no DX-type surface. The ci aggregate accepts those skips only when
  *    thor_only is true.
@@ -1313,8 +1313,8 @@ describe("CI runs every tooling test suite", () => {
 
     const thorOnly = await runGate(
       [
-        "packages/trailties/src/thor/actions.ts",
-        "packages/trailties/src/thor/actions.test.ts",
+        "packages/thor/src/actions.ts",
+        "packages/thor/src/actions.test.ts",
         "scripts/parity/unported-files/thor.ts",
         "scripts/api-compare/call-mismatches-exclude/thor/actions.json",
         "scripts/api-compare/call-mismatches-unreviewed/thor/actions.json",
@@ -1326,20 +1326,20 @@ describe("CI runs every tooling test suite", () => {
     expect(thorOnly.activerecord_affected).toBe("false");
 
     const withTrailties = await runGate(
-      "packages/trailties/src/thor/actions.ts\npackages/trailties/src/generators/base.ts",
+      "packages/thor/src/actions.ts\npackages/trailties/src/generators/base.ts",
     );
     expect(withTrailties.thor_only).toBe("false");
     expect(withTrailties.trailties_affected).toBe("true");
 
     const withLockfile = await runGate(
-      "packages/trailties/src/thor/actions.ts\npnpm-lock.yaml",
+      "packages/thor/src/actions.ts\npnpm-lock.yaml",
       await diffRepo({ "pnpm-lock.yaml": "packages: {}\n" }),
     );
     expect(withLockfile.thor_only).toBe("false");
     expect(withLockfile.activerecord_affected).toBe("true");
     expect(withLockfile.actionpack_affected).toBe("true");
 
-    expect((await runGate("packages/trailties/src/thorough.ts")).thor_only).toBe("false");
+    expect((await runGate("packages/thorough/src/x.ts")).thor_only).toBe("false");
   });
 
   it("sets actioncable_only only when every changed path is in the actioncable-only set", async () => {
@@ -1374,7 +1374,7 @@ describe("CI runs every tooling test suite", () => {
     expect(withLockfile.actioncable_only).toBe("false");
     expect(withLockfile.activerecord_affected).toBe("true");
 
-    const withThor = await runGate(`${cable}\npackages/trailties/src/thor/actions.ts`);
+    const withThor = await runGate(`${cable}\npackages/thor/src/actions.ts`);
     expect(withThor.actioncable_only).toBe("false");
     expect(withThor.thor_only).toBe("false");
 

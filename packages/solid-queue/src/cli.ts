@@ -1,5 +1,5 @@
 import { camelize, transformKeys } from "@blazetrails/activesupport";
-import { Thor, type ThorClass } from "@blazetrails/trailties/thor";
+import { Thor, type ThorClass } from "@blazetrails/thor";
 import { Configuration } from "./configuration.js";
 import { Supervisor } from "./supervisor.js";
 
