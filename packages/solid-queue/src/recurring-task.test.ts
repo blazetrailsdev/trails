@@ -10,7 +10,15 @@ import { AsyncAdapter } from "@blazetrails/activejob/queue-adapters/async-adapte
 import { isPresent } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { registerConstant } from "@blazetrails/ruby-compat";
-import { Job, Process, ReadyExecution, RecurringTask, SolidQueueAdapter, Worker } from "./index.js";
+import {
+  Job,
+  Process,
+  ReadyExecution,
+  RecurringJob,
+  RecurringTask,
+  SolidQueueAdapter,
+  Worker,
+} from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { JobBuffer } from "./test-helpers/add-to-buffer-job.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
@@ -111,6 +119,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
     const pool = RecurringTask.connectionPool();
     await pool.schemaReflection.loadAllBang(pool);
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    RecurringJob.setQueueAdapter(new SolidQueueAdapter());
     oldPermanentConnectionCheckout = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
   });
@@ -310,8 +319,10 @@ describe("SolidQueue::RecurringTaskTest", () => {
     expect(job.priority).toBe(4);
   });
 
-  it.skip("task configured with a command", async () => {
-    const task = recurringTaskWith({ command: "JobBuffer.add('from_a_command')" });
+  it("task configured with a command", async () => {
+    const task = recurringTaskWith({
+      command: `${import.meta.dirname}/test-helpers/dummy/lib/from-a-command.ts`,
+    });
     await enqueueAndAssertPerformedWithResult(task, "from_a_command");
 
     expect(((await Job.last()) as Job).class_name).toBe("SolidQueue::RecurringJob");
