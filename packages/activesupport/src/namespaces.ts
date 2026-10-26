@@ -100,7 +100,13 @@ export const TopLevel: {
     afterAllTransactionsCommit(block: () => unknown): unknown;
   };
   PG?: { Connection: abstract new (...args: never[]) => object };
-  ActionCable?: { name?: string; Engine?: unknown; server?(): unknown };
+  ActionCable?: {
+    name?: string;
+    Engine?: unknown;
+    server?(): unknown;
+    Channel?: { Base: abstract new (...args: never[]) => unknown };
+    Connection?: { Base: abstract new (...args: never[]) => unknown };
+  };
   BCrypt?: {
     Engine: { readonly MIN_COST: number; readonly cost: number };
     Password: {

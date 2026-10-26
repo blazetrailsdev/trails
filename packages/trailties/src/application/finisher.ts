@@ -1,4 +1,10 @@
-import { camelize, DescendantsTracker, runLoadHooks, underscore } from "@blazetrails/activesupport";
+import {
+  camelize,
+  DescendantsTracker,
+  runLoadHooks,
+  TopLevel,
+  underscore,
+} from "@blazetrails/activesupport";
 import { Base as JobBase } from "@blazetrails/activejob";
 import { getFs, getPath, registerConstant } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
@@ -78,6 +84,7 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   for (const klass of controllerConstants.values()) await defineController(klass);
   registerModel(await loadModels(this.paths()));
   await loadJobs(this.paths());
+  await loadChannels(this.paths());
 });
 
 Finisher.initializer(
@@ -220,37 +227,15 @@ async function loadControllers(paths: Root): Promise<Map<string, DispatchableCon
   if (!node) return out;
 
   for (const dir of await node.existentDirectories()) {
-    await collectControllers(dir, "", out);
+    await collectConstants(
+      dir,
+      "",
+      (value) => typeof value === "function" && value.name.endsWith("Controller"),
+      (name, value) =>
+        out.set(underscore(name).replace(/_controller$/, ""), value as DispatchableControllerClass),
+    );
   }
   return out;
-}
-
-/** @internal */
-async function collectControllers(
-  dir: string,
-  prefix: string,
-  out: Map<string, DispatchableControllerClass>,
-): Promise<void> {
-  const fs = getFs();
-  const p = getPath();
-  if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
-
-  for (const entry of await fs.readdir(dir)) {
-    const full = p.join(dir, entry);
-    if ((await fs.stat(full)).isDirectory()) {
-      await collectControllers(full, `${prefix}${underscore(entry.replace(/-/g, "_"))}/`, out);
-      continue;
-    }
-    const match = entry.match(/^(.+)[-_]controller\.(?:ts|js)$/);
-    if (!match) continue;
-    const mod = (await import(p.pathToFileURL(full).href)) as Record<string, unknown>;
-    for (const value of Object.values(mod)) {
-      if (typeof value === "function" && value.name.endsWith("Controller")) {
-        const name = `${prefix}${underscore(match[1].replace(/-/g, "_"))}`;
-        out.set(name, value as DispatchableControllerClass);
-      }
-    }
-  }
 }
 
 const definedControllers = new WeakSet<object>();
@@ -272,23 +257,64 @@ async function defineController(klass: object): Promise<void> {
 
 /** @noRailsEquivalent PERMANENT */
 async function loadJobs(paths: Root): Promise<void> {
+  await loadAppConstants(
+    paths,
+    "jobs",
+    (value) => typeof value === "function" && value.prototype instanceof JobBase,
+    registerConstant,
+  );
+}
+
+/** @noRailsEquivalent PERMANENT */
+async function loadChannels(paths: Root): Promise<void> {
+  const cable = TopLevel.ActionCable;
+  if (cable?.Engine == null) return;
+
+  await loadAppConstants(
+    paths,
+    "channels",
+    (value) =>
+      typeof value === "function" &&
+      (value.prototype instanceof cable.Channel!.Base ||
+        value.prototype instanceof cable.Connection!.Base),
+    registerConstant,
+  );
+}
+
+/** @internal */
+async function loadAppConstants(
+  paths: Root,
+  root: string,
+  isConstant: (value: unknown) => boolean,
+  register: (name: string, value: unknown) => void,
+): Promise<void> {
   const node = paths.get("app");
   if (!node) return;
 
   const p = getPath();
   for (const dir of await node.existentDirectories()) {
-    if (p.basename(dir) === "jobs") await collectJobs(dir, "");
+    if (p.basename(dir) === root) await collectConstants(dir, "", isConstant, register);
   }
 }
 
 /** @internal */
-async function collectJobs(dir: string, prefix: string): Promise<void> {
+async function collectConstants(
+  dir: string,
+  prefix: string,
+  isConstant: (value: unknown) => boolean,
+  register: (name: string, value: unknown) => void,
+): Promise<void> {
   const fs = getFs();
   const p = getPath();
   for (const entry of await fs.readdir!(dir)) {
     const full = p.join(dir, entry);
     if ((await fs.stat!(full)).isDirectory()) {
-      await collectJobs(full, `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}::`);
+      await collectConstants(
+        full,
+        `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}::`,
+        isConstant,
+        register,
+      );
       continue;
     }
     const match = entry.match(/^(.+)\.(?:ts|js)$/);
@@ -296,9 +322,7 @@ async function collectJobs(dir: string, prefix: string): Promise<void> {
     const mod = (await import(p.pathToFileURL!(full).href)) as Record<string, unknown>;
     const cname = camelize(underscore(match[1].replace(/-/g, "_")));
     const value = mod[cname];
-    if (typeof value === "function" && value.prototype instanceof JobBase) {
-      registerConstant(`${prefix}${cname}`, value);
-    }
+    if (isConstant(value)) register(`${prefix}${cname}`, value);
   }
 }
 
