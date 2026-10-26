@@ -1,5 +1,5 @@
 import { Base } from "@blazetrails/activejob";
-import { rbFLoad, registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 
 export class RecurringJob extends Base {
   static toString(): string {
@@ -10,9 +10,8 @@ export class RecurringJob extends Base {
     this.queueAs("solid_queue_recurring");
   }
 
-  /** @inventedArm rbFLoad — PERMANENT */
   async perform(command: string): Promise<void> {
-    await rbFLoad(command);
+    await import(command);
   }
 }
 registerConstant("SolidQueue::RecurringJob", RecurringJob);
