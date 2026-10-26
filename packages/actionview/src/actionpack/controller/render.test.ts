@@ -747,8 +747,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
-  // BLOCKED: render-hashlike-locals-and-view-ivars — view instance_variables list
-  test.skip("controller does not leak instance variables", async () => {
+  test("controller does not leak instance variables", async () => {
     const expected = [
       "_assigns",
       "_config",
@@ -1270,8 +1269,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello: david");
   });
 
-  // BLOCKED: render-hashlike-locals-and-view-ivars — Parameters not read as partial locals
-  test.skip("partial with hashlike locals", async () => {
+  test("partial with hashlike locals", async () => {
     await testCase.get("partialWithHashlikeLocals");
     expect(testCase.response.body).toBe("Hello: david");
   });

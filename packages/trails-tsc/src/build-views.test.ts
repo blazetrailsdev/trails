@@ -317,6 +317,16 @@ describe("buildViews", () => {
     const cwd = mkScratch();
     write(
       cwd,
+      "node_modules/@blazetrails/ruby-compat/package.json",
+      '{ "name": "@blazetrails/ruby-compat", "types": "index.d.ts" }',
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/ruby-compat/index.d.ts",
+      "export declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
+    );
+    write(
+      cwd,
       "node_modules/@blazetrails/actionview/package.json",
       '{ "name": "@blazetrails/actionview", "types": "index.d.ts" }',
     );
@@ -687,6 +697,16 @@ describe("runCli", () => {
     );
     write(
       cwd,
+      "node_modules/@blazetrails/ruby-compat/package.json",
+      '{ "name": "@blazetrails/ruby-compat", "types": "index.d.ts" }',
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/ruby-compat/index.d.ts",
+      "export declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
+    );
+    write(
+      cwd,
       "node_modules/@blazetrails/actionview/package.json",
       '{ "name": "@blazetrails/actionview", "types": "index.d.ts" }',
     );
@@ -803,6 +823,16 @@ describe("runCli", () => {
 
   it("types the locals an object render and a helper module pass", async () => {
     const cwd = mkScratch();
+    write(
+      cwd,
+      "node_modules/@blazetrails/ruby-compat/package.json",
+      '{ "name": "@blazetrails/ruby-compat", "types": "index.d.ts" }',
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/ruby-compat/index.d.ts",
+      "export declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
+    );
     write(
       cwd,
       "node_modules/@blazetrails/actionview/package.json",

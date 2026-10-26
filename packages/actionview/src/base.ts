@@ -173,16 +173,8 @@ export class Base {
     return new this(context, assigns, controller) as InstanceType<T>;
   }
 
-  private _viewRenderer: Renderer;
-  private _lookupContext: LookupContext | null;
-
-  get viewRenderer(): Renderer {
-    return this._viewRenderer;
-  }
-
-  get lookupContext(): LookupContext | null {
-    return this._lookupContext;
-  }
+  viewRenderer: Renderer;
+  lookupContext: LookupContext | null;
 
   get formats(): LookupContext["formats"] | undefined {
     return this.lookupContext?.formats;
@@ -247,8 +239,8 @@ export class Base {
       this._routes = null;
     }
     this._config = new InheritableOptions();
-    this._lookupContext = lookupContext;
-    this._viewRenderer = new Renderer(this._lookupContext!);
+    this.lookupContext = lookupContext;
+    this.viewRenderer = new Renderer(this.lookupContext!);
     this.currentTemplate = null;
     this.assignController(controller as Parameters<typeof assignController>[0]);
     this._prepareContext();
@@ -361,25 +353,25 @@ export class Base {
   }
 
   inRenderingContext<T>(options: RenderOptions, block: (renderer: Renderer) => T): T {
-    const oldViewRenderer = this._viewRenderer;
-    const oldLookupContext = this._lookupContext;
+    const oldViewRenderer = this.viewRenderer;
+    const oldLookupContext = this.lookupContext;
 
     if (!this.lookupContext?.htmlFallbackForJs && options.formats) {
       const formats = Array.isArray(options.formats) ? [...options.formats] : [options.formats];
       if (formats.length === 1 && formats[0] === ":js") {
         formats.push(":html");
       }
-      this._lookupContext = this.lookupContext!.withPrependedFormats(formats);
-      this._viewRenderer = new Renderer(this._lookupContext);
+      this.lookupContext = this.lookupContext!.withPrependedFormats(formats);
+      this.viewRenderer = new Renderer(this.lookupContext);
     }
 
     const restore = (): void => {
-      this._viewRenderer = oldViewRenderer;
-      this._lookupContext = oldLookupContext;
+      this.viewRenderer = oldViewRenderer;
+      this.lookupContext = oldLookupContext;
     };
     let result: T;
     try {
-      result = block(this._viewRenderer);
+      result = block(this.viewRenderer);
     } catch (error) {
       restore();
       throw error;
