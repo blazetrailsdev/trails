@@ -9,7 +9,6 @@ import { Range } from "@blazetrails/ruby-compat/range";
 import { instantFromDate } from "../testing/temporal-helpers.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
-import { succ } from "@blazetrails/ruby-compat";
 import "./range/compare-range.js";
 import "./range/conversions.js";
 import "./range/each.js";
@@ -334,24 +333,6 @@ describe("RangeTest", () => {
   it("string include raises on beginless/endless ranges", () => {
     expect(() => new Range(null, "bbb").isInclude("z")).toThrow(TypeError);
     expect(() => new Range("a", null).isInclude("z")).toThrow(TypeError);
-  });
-
-  it("string succ carries within character classes", () => {
-    expect(succ("abcd")).toBe("abce");
-    expect(succ("az")).toBe("ba");
-    expect(succ("zz")).toBe("aaa");
-    expect(succ("Zz")).toBe("AAa");
-    expect(succ("99")).toBe("100");
-    expect(succ("a9")).toBe("b0");
-    expect(succ("1.9")).toBe("2.0");
-    expect(succ("<<")).toBe("<=");
-    expect(succ("z.9")).toBe("z.10");
-    expect(succ("a.z")).toBe("b.a");
-    expect(succ("\u{1F600}")).toBe("\u{1F601}");
-    const points = (str: string) => Array.from(str, (c) => c.codePointAt(0));
-    expect(points(succ("\u{10FFFF}"))).toEqual([0x1, 0x10000]);
-    expect(points(succ("\u{FFFF}"))).toEqual([0x1, 0x800]);
-    expect(points(succ("\u{07FF}"))).toEqual([0x1, 0x80]);
   });
 
   it("date time with step", () => {

@@ -979,7 +979,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   scopeForCreate(): Record<string, unknown> {
     const hash = this.whereClause.toH(this.model.tableName, { equalityOnly: true });
-    if (!isEmpty(this.createWithValue)) {
+    if (Object.keys(this.createWithValue).length > 0) {
       for (const [k, v] of Object.entries(this.createWithValue)) hash[k] = v;
     }
     return hash;

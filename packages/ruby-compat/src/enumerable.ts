@@ -472,8 +472,9 @@ export function eachWithObject<T, M, E = unknown>(
  */
 export function sortBy<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
-  block: (i: T) => unknown,
+  block?: (i: T) => unknown,
 ): Enumerated<E, T[]> {
+  if (!block) return enumToA(obj);
   const buf: [unknown, T][] = [];
   return rbBlockCall(
     obj,
@@ -1152,7 +1153,7 @@ export class Enumerable<T = unknown, E = unknown> {
     return block ? eachSlice(this, n, block) : eachSlice(this, n);
   }
 
-  sortBy<T, E = unknown>(this: Each<T, E>, block: (i: T) => unknown) {
+  sortBy<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown) {
     return sortBy(this, block);
   }
 
