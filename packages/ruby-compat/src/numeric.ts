@@ -742,3 +742,27 @@ function rubyFloatStep(
     }
   }
 }
+
+/**
+ * `ruby_num_interval_step_size` (`vendor/ruby/v3.3.11/numeric.c:2798`) with a step of 1.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rubyNumIntervalStepSize(
+  from: number | bigint,
+  to: number | bigint,
+  excl: boolean,
+): number | bigint {
+  if (
+    typeof from === "bigint" ||
+    typeof to === "bigint" ||
+    (Number.isInteger(from) && Number.isInteger(to))
+  ) {
+    let delta = BigInt(to) - BigInt(from);
+    if (excl) delta--;
+    if (delta < 0n) return 0;
+    const n = delta + 1n;
+    return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n) : n;
+  }
+  return rubyFloatStepSize(Number(from), Number(to), 1, excl);
+}

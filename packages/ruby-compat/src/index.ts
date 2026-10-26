@@ -124,7 +124,6 @@ export {
   hashAset,
   hashDelete,
   hashReplace,
-  inspect,
   isInclude,
   keys,
   merge,
@@ -253,9 +252,7 @@ export {
   rbCallSuper,
   included,
   prepended,
-  initialize,
   includedModules,
-  initializeIncludedModules,
   isModuleIncluded,
   rbModAncestors,
   rbClassInheritedP,
@@ -269,7 +266,7 @@ export {
   methodCacheSerial,
   rbClearMethodCache,
 } from "./include.js";
-export type { Extended, Included, Initialized, ModuleVisibility } from "./include.js";
+export type { Extended, Included, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";
 export { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "./kernel-catch.js";
 export { kernelFloat } from "./kernel-float.js";
@@ -434,7 +431,7 @@ export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
 export { rbStrRpartition, rbStrScanSubexpCall, rbStrStartWith, rbStrSub } from "./string/sub.js";
-export { rbCheckStringType, stringValue, strlen, strUminus } from "./string/support.js";
+export { rbCheckStringType, stringValue, strlen } from "./string/support.js";
 export { forceEncoding, isValidEncoding, rbObjEncoding } from "./string/force-encoding.js";
 export { encode } from "./string/encode.js";
 export { Encoding } from "./encoding.js";

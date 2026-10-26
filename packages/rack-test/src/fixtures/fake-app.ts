@@ -7,7 +7,7 @@ import {
   type RackEnv,
   type RackResponse,
 } from "@blazetrails/rack";
-import { inspect, rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend, rbInspect } from "@blazetrails/ruby-compat";
 
 /** @internal */
 type FakeResponse = [number, Record<string, string | string[]>, string[]];
@@ -46,7 +46,7 @@ export class FakeApp {
         case "OPTIONS":
           return [200, {}, []];
         default:
-          return [200, {}, [`Hello, ${method}: ${inspect(params)}`]];
+          return [200, {}, [`Hello, ${method}: ${rbInspect(params)}`]];
       }
     }
 
@@ -81,8 +81,8 @@ export class FakeApp {
     if (path === "/redirected") {
       const additionalInfo =
         method === "GET"
-          ? `, session ${inspect(session as Record<string, unknown>)} with options ${inspect(env["rack.session.options"] as Record<string, unknown>)}`
-          : ` using ${method.toLowerCase()} with ${inspect(params as Record<string, unknown>)}`;
+          ? `, session ${rbInspect(session as Record<string, unknown>)} with options ${rbInspect(env["rack.session.options"] as Record<string, unknown>)}`
+          : ` using ${method.toLowerCase()} with ${rbInspect(params as Record<string, unknown>)}`;
       return [200, {}, [`You've been redirected${additionalInfo}`]];
     }
 
@@ -100,7 +100,7 @@ export class FakeApp {
       ].includes(path) &&
       method === "GET"
     ) {
-      return [200, {}, [inspect(req.cookies)]];
+      return [200, {}, [rbInspect(req.cookies)]];
     }
 
     if (path === "/cookies/set-secure" && method === "GET") {

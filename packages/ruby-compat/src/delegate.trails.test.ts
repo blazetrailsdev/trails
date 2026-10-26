@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DelegateClass } from "./delegate.js";
-import { include, initialize, initializeIncludedModules, rbGetAllocFunc } from "./include.js";
+import { include, rbGetAllocFunc } from "./include.js";
 
 describe("DelegateClass (trails)", () => {
   it("builds a subclass with no constructor of its own from the object to delegate to", () => {
@@ -36,28 +36,17 @@ describe("DelegateClass (trails)", () => {
   });
 
   it("includes a module its delegated superclass already includes", () => {
-    let initialized = 0;
     class Greeting {
-      static [initialize](): void {
-        initialized++;
-      }
       greet(): string {
         return "module";
       }
     }
     class Target {}
     include(Target, Greeting);
-    class Wrapper extends DelegateClass(Target) {
-      constructor(target: Target) {
-        super(target);
-        initializeIncludedModules(this);
-      }
-    }
+    class Wrapper extends DelegateClass(Target) {}
     const before = Object.hasOwn(Wrapper.prototype, "greet");
     include(Wrapper, Greeting);
     expect([before, Object.hasOwn(Wrapper.prototype, "greet")]).toEqual([false, true]);
-    new Wrapper(new Target());
-    expect(initialized).toBe(1);
   });
 
   it("answers toString from the delegate, as Delegator#to_s reaches method_missing", () => {
