@@ -10,10 +10,7 @@ export class RecurringJob extends Base {
     this.queueAs("solid_queue_recurring");
   }
 
-  /**
-   * @missingRailsCall eval — PERMANENT
-   * @inventedArm rbFLoad — PERMANENT
-   */
+  /** @inventedArm rbFLoad — PERMANENT */
   async perform(command: string): Promise<void> {
     await rbFLoad(command);
   }
