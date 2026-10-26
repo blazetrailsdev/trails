@@ -1,6 +1,5 @@
 import {
   aryDelete,
-  compact,
   keys,
   matchOperator,
   rbFSend,
@@ -56,8 +55,8 @@ export class Options extends Arguments {
   protected parsingOptions: boolean | null = null;
 
   static toSwitches(options: Record<string, unknown>): string {
-    return compact(
-      Object.entries(options).map(([key, value]) => {
+    return Object.entries(options)
+      .map(([key, value]) => {
         if (value === true) {
           return `--${key}`;
         } else if (Array.isArray(value)) {
@@ -71,8 +70,9 @@ export class Options extends Arguments {
         } else {
           return `--${key} ${rbInspect(value)}`;
         }
-      }),
-    ).join(" ");
+      })
+      .filter((x) => x != null)
+      .join(" ");
   }
 
   constructor(
@@ -249,15 +249,15 @@ export class Options extends Arguments {
 
   /** @internal */
   protected namesToSwitchNames(names: string[] = []): string[] {
-    return compact(
-      Object.values(this.switches).map((o) => {
+    return Object.values(this.switches)
+      .map((o) => {
         if (names.includes(o.name)) {
           return rbObjRespondTo(o, "switchName") ? o.switchName : o.humanName;
         } else {
           return null;
         }
-      }),
-    );
+      })
+      .filter((x) => x != null);
   }
 
   /** @internal */

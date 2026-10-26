@@ -4,7 +4,7 @@ import {
   NotificationEvent as Event,
   TopLevel,
 } from "@blazetrails/activesupport";
-import { rbObjAsString, round } from "@blazetrails/ruby-compat";
+import { rbObjAsString } from "@blazetrails/ruby-compat";
 
 export class LogSubscriber extends BaseLogSubscriber {
   redirect(event: Event): void {
@@ -15,7 +15,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     this.info(undefined, () => {
       const status = payload.status as number;
 
-      let message = `Completed ${rbObjAsString(status)} ${rbObjAsString(HTTP_STATUS_CODES[status])} in ${round(event.duration)}ms`;
+      let message = `Completed ${rbObjAsString(status)} ${rbObjAsString(HTTP_STATUS_CODES[status])} in ${Math.round(event.duration)}ms`;
       if (TopLevel.Trails !== undefined && TopLevel.Trails.env["development?"]()) message += "\n\n";
 
       return message;

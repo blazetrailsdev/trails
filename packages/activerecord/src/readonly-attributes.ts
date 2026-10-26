@@ -3,7 +3,7 @@ import { ActiveRecord } from "./namespaces.js";
 import type { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
 import { classAttribute, include, included } from "@blazetrails/activesupport";
-import { union } from "@blazetrails/ruby-compat";
+
 import { writeAttribute as _writeAttributeSuper } from "./attribute-methods/write.js";
 import { raiseOnAssignToAttrReadonly } from "./active-record.js";
 
@@ -18,7 +18,7 @@ export const ReadonlyAttributes = {
 };
 
 export function attrReadonly(this: typeof Base, ...attributes: string[]): void {
-  this._attrReadonly = union(this._attrReadonly, attributes.map(String));
+  this._attrReadonly = [...new Set([...this._attrReadonly, ...attributes.map(String)])];
   if (raiseOnAssignToAttrReadonly()) {
     include(this as unknown as new (...args: any[]) => any, HasReadonlyAttributes);
   }

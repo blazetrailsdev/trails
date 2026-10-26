@@ -8,7 +8,6 @@ import {
 import {
   aryJoin,
   classModule,
-  compact,
   rbModConstSet,
   rbObjClass,
   rbObjIsProc,
@@ -46,7 +45,10 @@ export class ClassMethods {
   static queueNameFromPart(this: QueueNameClass, partName: unknown): string {
     const queueName = partName != null && partName !== false ? partName : this.defaultQueueName;
     const nameParts = [presence(this.queueNamePrefix), queueName];
-    return aryJoin(compact(nameParts), this.queueNameDelimiter);
+    return aryJoin(
+      nameParts.filter((x) => x != null),
+      this.queueNameDelimiter,
+    );
   }
 }
 mattrAccessor.call(ClassMethods, "defaultQueueName", { default: "default" });

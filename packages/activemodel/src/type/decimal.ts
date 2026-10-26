@@ -8,7 +8,6 @@ import {
   rbObjRespondTo,
   registerConstant,
   round,
-  toI,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { applyNumericMixin } from "./helpers/numeric.js";
@@ -66,10 +65,10 @@ export class DecimalType extends NumericValueType {
 
   /** @internal */
   protected floatPrecision(): number {
-    if (Number(toI(this.precision)) > FLOAT_DIG + 1) {
+    if (Math.trunc(this.precision ?? 0) > FLOAT_DIG + 1) {
       return FLOAT_DIG + 1;
     } else {
-      return Number(toI(this.precision));
+      return Math.trunc(this.precision ?? 0);
     }
   }
 

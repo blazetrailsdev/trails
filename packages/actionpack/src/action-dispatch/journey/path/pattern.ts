@@ -1,4 +1,4 @@
-import { regexpEscape, transformValues, uniq } from "@blazetrails/ruby-compat";
+import { regexpEscape, transformValues } from "@blazetrails/ruby-compat";
 import { Ast } from "../nodes/node.js";
 import { Cat, Group } from "../nodes/node.js";
 import type { Dot, Literal, Node, Or, Slash, Star } from "../nodes/node.js";
@@ -225,12 +225,14 @@ export class Pattern {
   }
 
   get optionalNames(): readonly string[] {
-    return (this._optionalNames ??= uniq(
-      this.spec
-        .findAll((node) => node.isGroup())
-        .flatMap((group) => group.findAll((node) => node.isSymbol()))
-        .map((node) => node.name),
-    ));
+    return (this._optionalNames ??= [
+      ...new Set(
+        this.spec
+          .findAll((node) => node.isGroup())
+          .flatMap((group) => group.findAll((node) => node.isSymbol()))
+          .map((node) => node.name),
+      ),
+    ]);
   }
 
   match(other: string): MatchData | undefined {

@@ -3,7 +3,6 @@ import {
   aryDelete,
   arySlice,
   cmp,
-  compact,
   eachPair,
   first,
   include,
@@ -24,8 +23,6 @@ import {
   stringSplit,
   toS,
   STDOUT,
-  union,
-  uniq,
   rbGvGet,
   rbGvSet,
   Hash,
@@ -292,8 +289,8 @@ export class Thor {
     all: unknown = true,
     subcommand: unknown = false,
   ): string[][] {
-    return compact(
-      Object.entries(rtest(all) ? this.allCommands() : this.commands()).map(([_, command]) => {
+    return Object.entries(rtest(all) ? this.allCommands() : this.commands())
+      .map(([_, command]) => {
         if (command.isHidden()) return null;
         const item: string[] = [];
         item.push(this.banner(command, false, subcommand));
@@ -303,8 +300,8 @@ export class Thor {
             : "",
         );
         return item;
-      }),
-    );
+      })
+      .filter((x) => x != null);
   }
   declare static printableTasks: typeof Thor.printableCommands;
 
@@ -387,7 +384,9 @@ export class Thor {
   }
 
   static stopOnUnknownOptionBang(this: ThorClass, ...commandNames: string[]): string[] {
-    return (this._stopOnUnknownOption = union(this.stopOnUnknownOption(), commandNames));
+    return (this._stopOnUnknownOption = [
+      ...new Set([...this.stopOnUnknownOption(), ...commandNames]),
+    ]);
   }
 
   static isStopOnUnknownOption(this: ThorClass, command: Command | null): boolean {
@@ -395,7 +394,9 @@ export class Thor {
   }
 
   static disableRequiredCheckBang(this: ThorClass, ...commandNames: string[]): string[] {
-    return (this._disableRequiredCheck = union(this.disableRequiredCheck(), commandNames));
+    return (this._disableRequiredCheck = [
+      ...new Set([...this.disableRequiredCheck(), ...commandNames]),
+    ]);
   }
 
   static isDisableRequiredCheck(this: ThorClass, command: Command | null): boolean {
@@ -637,9 +638,9 @@ export class Thor {
     const possibilities = sort(
       Object.keys({ ...this.allCommands(), ...this.map() }).filter((n) => meth === n.slice(0, len)),
     );
-    const uniquePossibilities = uniq(
-      possibilities.map((k) => (rtest(this.map()[k]) ? this.map()[k] : k)),
-    );
+    const uniquePossibilities = [
+      ...new Set(possibilities.map((k) => (rtest(this.map()[k]) ? this.map()[k] : k))),
+    ];
 
     if (possibilities.includes(meth)) {
       return [meth];

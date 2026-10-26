@@ -1,6 +1,6 @@
 import { assertEqual, assertPredicate, Duration, isBlank } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { toI } from "@blazetrails/ruby-compat";
+
 import { beforeEach, describe, it } from "vitest";
 import { Request as CacheRequest } from "../../../action-dispatch/http/cache.js";
 import { EtagHelper } from "../../../test-helpers/support/etag-helper.js";
@@ -92,7 +92,7 @@ describe("ConditionalGetApiTest", () => {
   it("request not modified", async () => {
     tc.request.setIfModifiedSince(tc.lastModified);
     await tc.get("one");
-    assertEqual(304, toI(tc.response.status));
+    assertEqual(304, Math.trunc(tc.response.status));
     assertPredicate(tc.response.body, isBlank);
     assertEqual(tc.lastModified, tc.response.headers.get("Last-Modified"));
   });

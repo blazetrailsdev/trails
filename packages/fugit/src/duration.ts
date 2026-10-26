@@ -196,6 +196,7 @@ export class Duration {
     while ((kv = a.shift())) {
       const [k, v] = kv;
       const aa = Duration.KEYS[k];
+      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- Float#to_i of a negative fraction is 0; Math.trunc answers -0
       s.append(toS(toI(v)));
       s.append(" ");
       s.append(aa.l);
@@ -278,6 +279,7 @@ export class Duration {
       const vs = v.s;
       if (s < vs) continue;
 
+      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- Float#to_i of a negative fraction is 0; Math.trunc answers -0
       h[k] = numericPlus(h[k] ?? 0, numericDiv(toI(s), vs)) as number;
       s = numericModulo(s, vs) as number;
     }

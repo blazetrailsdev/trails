@@ -1,7 +1,6 @@
 import { Date as RubyDate, type Time as RubyTime } from "@blazetrails/date";
 import {
   ArgumentError,
-  compact,
   last,
   rbObjClassname,
   rbObjRespondTo,
@@ -572,7 +571,7 @@ export const Handlers = {
   },
 
   getRepeaters(this: Parser, tokens: Token[]): Repeater[] {
-    return sort(compact(tokens.map((token) => token.getTag(Repeater)))).reverse();
+    return sort(tokens.map((token) => token.getTag(Repeater)).filter((x) => x != null)).reverse();
   },
 
   isMonthOverflow(this: Parser, year: number, month: number, day: number): boolean {

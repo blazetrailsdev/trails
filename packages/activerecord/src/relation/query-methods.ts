@@ -1027,7 +1027,7 @@ function optimizerHints(this: QueryMethodsHost, ...args: string[]): any {
 }
 
 function optimizerHintsBang(this: QueryMethodsHost, ...args: string[]): any {
-  this.optimizerHintsValues = union(this.optimizerHintsValues, args);
+  this.optimizerHintsValues = [...new Set([...this.optimizerHintsValues, ...args])];
   return this;
 }
 
@@ -1996,7 +1996,7 @@ export function buildArel(
 
   if (this.annotateValues.length > 0) {
     const annotates =
-      this.annotateValues.length > 1 ? uniq(this.annotateValues) : this.annotateValues;
+      this.annotateValues.length > 1 ? [...new Set(this.annotateValues)] : this.annotateValues;
     arel.comment?.(...annotates);
   }
 

@@ -74,9 +74,9 @@ export class TablePrinter extends ColumnPrinter {
     const colcount = max(array as unknown[][], (a, b) => cmp(a.length, b.length))!.length;
 
     for (let index = start; index <= colcount - 1; index++) {
-      const maxima = max(
-        (array as unknown[][]).map((row) => (rtest(row[index]) ? strlen(toS(row[index])) : 0)),
-      )!;
+      const maxima = Math.max(
+        ...(array as unknown[][]).map((row) => (rtest(row[index]) ? strlen(toS(row[index])) : 0)),
+      );
 
       this._maximas.push(maxima);
       if (rtest(this.options.borders)) {

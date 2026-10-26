@@ -687,7 +687,7 @@ describe("LastModifiedRenderTest", () => {
   it("request not modified", async () => {
     tc.request.setIfModifiedSince(lastModified);
     await tc.get("conditionalHello");
-    expect(toI(tc.response.status)).toBe(304);
+    expect(Math.trunc(tc.response.status)).toBe(304);
     assert(isBlank(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
@@ -702,7 +702,7 @@ describe("LastModifiedRenderTest", () => {
   it("request modified", async () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
     await tc.get("conditionalHello");
-    expect(toI(tc.response.status)).toBe(200);
+    expect(Math.trunc(tc.response.status)).toBe(200);
     assert(isPresent(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
@@ -720,7 +720,7 @@ describe("LastModifiedRenderTest", () => {
   it("request not modified with record", async () => {
     tc.request.setIfModifiedSince(lastModified);
     await tc.get("conditionalHelloWithRecord");
-    expect(toI(tc.response.status)).toBe(304);
+    expect(Math.trunc(tc.response.status)).toBe(304);
     assert(isBlank(tc.response.body));
     expect(tc.response.etag).not.toBeNull();
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
@@ -736,7 +736,7 @@ describe("LastModifiedRenderTest", () => {
   it("request modified with record", async () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
     await tc.get("conditionalHelloWithRecord");
-    expect(toI(tc.response.status)).toBe(200);
+    expect(Math.trunc(tc.response.status)).toBe(200);
     assert(isPresent(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
@@ -749,7 +749,7 @@ describe("LastModifiedRenderTest", () => {
   it("request not modified with array of records", async () => {
     tc.request.setIfModifiedSince(lastModified);
     await tc.get("conditionalHelloWithArrayOfRecords");
-    expect(toI(tc.response.status)).toBe(304);
+    expect(Math.trunc(tc.response.status)).toBe(304);
     assert(isBlank(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
@@ -764,7 +764,7 @@ describe("LastModifiedRenderTest", () => {
   it("request modified with array of records", async () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
     await tc.get("conditionalHelloWithArrayOfRecords");
-    expect(toI(tc.response.status)).toBe(200);
+    expect(Math.trunc(tc.response.status)).toBe(200);
     assert(isPresent(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
@@ -777,7 +777,7 @@ describe("LastModifiedRenderTest", () => {
   it("request not modified with collection of records", async () => {
     tc.request.setIfModifiedSince(lastModified);
     await tc.get("conditionalHelloWithCollectionOfRecords");
-    expect(toI(tc.response.status)).toBe(304);
+    expect(Math.trunc(tc.response.status)).toBe(304);
     assert(isBlank(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
@@ -792,7 +792,7 @@ describe("LastModifiedRenderTest", () => {
   it("request modified with collection of records", async () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
     await tc.get("conditionalHelloWithCollectionOfRecords");
-    expect(toI(tc.response.status)).toBe(200);
+    expect(Math.trunc(tc.response.status)).toBe(200);
     assert(isPresent(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });

@@ -24,6 +24,7 @@ export class Scalar extends Tag<number> {
           if (Date.isCouldBeMonth(scalar)) token.tag(new ScalarMonth(scalar));
           if (Date.isCouldBeYear(scalar)) {
             const year = Date.makeYear(scalar, options.ambiguousYearFutureBias as number);
+            // eslint-disable-next-line blazetrails/ruby-compat-native-required -- parity:api:calls:args pairs this argument by the Ruby call name
             token.tag(new ScalarYear(toI(year) as number));
           }
         }

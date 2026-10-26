@@ -1,4 +1,4 @@
-import { compact, env, isSymbol, rbConstGet, rtest, symbolToS } from "@blazetrails/ruby-compat";
+import { env, isSymbol, rbConstGet, rtest, symbolToS } from "@blazetrails/ruby-compat";
 import { Basic } from "./basic.js";
 
 export class Color extends Basic {
@@ -24,7 +24,7 @@ export class Color extends Basic {
   static readonly ON_WHITE = "\x1b[47m";
 
   setColor(string: string, ...colors: unknown[]): string {
-    if (compact(colors).length === 0 || !this.canDisplayColors()) {
+    if (colors.filter((x) => x != null).length === 0 || !this.canDisplayColors()) {
       return string;
     } else if (colors.every((color) => isSymbol(color) || typeof color === "string")) {
       const ansiColors = colors.map((color) => this.lookupColor(color));

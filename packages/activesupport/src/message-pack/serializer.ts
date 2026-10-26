@@ -69,6 +69,7 @@ export const Serializer = {
         this.messagePackFactory.freeze();
       }
       this._messagePackPool = this.messagePackFactory.pool(
+        // eslint-disable-next-line blazetrails/ruby-compat-native-required -- parity:api:calls:args pairs this argument by the Ruby call name
         Number(toI(fetch(ENV, "RAILS_MAX_THREADS", 5))),
       );
     }

@@ -15,7 +15,12 @@
  *
  * A row's `maxArgs` keeps a call passing more (a conflict or miss block) on
  * the helper, and `void` reports only a call whose value nothing reads, since
- * `delete` answers a boolean and a `for…of` answers nothing.
+ * `delete` answers a boolean and a `for…of` answers nothing. `kinds` narrows
+ * the receiver kinds the row reports on (`["array"]` for an Array method, so
+ * `compact` on a Hash is left alone), and `elements` narrows an Array
+ * receiver to the element kinds the native form agrees on: `Set` / `includes`
+ * identity is `eql?` / `==` only for a `string`, `number`, `boolean` or `null`
+ * element (`array.c:5342` `ary_make_hash`, `object.c:147` `rb_equal`).
  *
  * The listed set is `ruby-compat-native-required.json`, only-grow: a
  * substitution sweep adds its helpers in the same PR. A site that must keep
@@ -68,15 +73,44 @@ function nativeKind(checker, program, type, member) {
   return "object";
 }
 
-function receiverIsNative(services, node, member) {
+/** "string" | "number" | "boolean" | "null", or undefined for any other
+ *  element constituent. */
+function elementKind(type) {
+  const f = type.flags;
+  if (f & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)) return "null";
+  if (f & ts.TypeFlags.StringLike) return "string";
+  if (f & ts.TypeFlags.NumberLike) return "number";
+  if (f & ts.TypeFlags.BooleanLike) return "boolean";
+  return undefined;
+}
+
+function elementsAre(checker, type, allowed) {
+  const element = checker.isTupleType(type)
+    ? checker.getTypeArguments(type)
+    : [checker.getIndexTypeOfType(type, ts.IndexKind.Number)];
+  return element.every((t) => {
+    if (t === undefined) return false;
+    const parts = t.isUnion() ? t.types : [t];
+    return parts.every((part) => allowed.includes(elementKind(part)));
+  });
+}
+
+function receiverIsNative(services, node, entry) {
   const program = services.program;
   const checker = program.getTypeChecker();
   const tsNode = services.esTreeNodeToTSNodeMap.get(node);
   if (tsNode === undefined) return false;
   const type = checker.getTypeAtLocation(tsNode);
   const parts = type.isUnion() ? type.types : [type];
-  const kinds = parts.map((part) => nativeKind(checker, program, part, member));
-  return kinds.every((k) => k !== undefined) && kinds.some((k) => k !== "null");
+  const kinds = parts.map((part) => nativeKind(checker, program, part, entry.member));
+  if (!kinds.every((k) => k !== undefined) || !kinds.some((k) => k !== "null")) return false;
+  if (entry.kinds !== undefined && !kinds.every((k) => k === "null" || entry.kinds.includes(k))) {
+    return false;
+  }
+  if (entry.elements === undefined) return true;
+  return parts.every(
+    (part, i) => kinds[i] !== "array" || elementsAre(checker, part, entry.elements),
+  );
 }
 
 const rule = {
@@ -116,7 +150,7 @@ const rule = {
         const entry = NATIVE_REQUIRED[helper];
         if (node.arguments.length > entry.maxArgs) return;
         if (entry.void === true && node.parent.type !== "ExpressionStatement") return;
-        if (!receiverIsNative(services, receiver, entry.member)) return;
+        if (!receiverIsNative(services, receiver, entry)) return;
         context.report({
           node,
           messageId: "nativeRequired",

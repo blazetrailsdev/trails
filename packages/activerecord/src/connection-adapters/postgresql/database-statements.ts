@@ -225,6 +225,7 @@ interface SetConstraintsHost {
 
 export async function buildExplainClause(options: ExplainOption[] = []): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- the options are Symbols (":analyze"); Symbol#to_s drops the colon, Array#join does not
   return `EXPLAIN (${aryJoin(options, ", ").toUpperCase()})`;
 }
 

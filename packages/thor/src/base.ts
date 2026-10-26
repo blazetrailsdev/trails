@@ -1,7 +1,6 @@
 import {
   ArgumentError,
   aryDeleteIf,
-  compact,
   env,
   Errno,
   exit,
@@ -12,7 +11,6 @@ import {
   include,
   included,
   last,
-  max,
   NotImplementedError,
   rbArgv,
   rbFSend,
@@ -30,7 +28,6 @@ import {
   rtest,
   RuntimeError,
   stringSplit,
-  toI,
   TypeError,
   warn,
   rbGvGet,
@@ -510,7 +507,7 @@ export const ClassMethods = {
     args: unknown[],
     arity: unknown,
   ): never {
-    const name = compact([command.ancestorName, command.name]).join(" ");
+    const name = [command.ancestorName, command.name].filter((x) => x != null).join(" ");
     let msg = `ERROR: "${this.basename() ?? ""} ${name}" was called with `;
     if (args.length === 0) msg += "no arguments";
     if (!(args.length === 0)) msg += "arguments " + rbInspect(args);
@@ -550,7 +547,7 @@ export const ClassMethods = {
     if (options.length === 0) return;
 
     const list: string[][] = [];
-    const padding = toI(max(options.map((o) => o.aliasesForUsage().length))) as number;
+    const padding = Math.max(0, ...options.map((o) => o.aliasesForUsage().length));
     options.forEach((option) => {
       if (rtest(option.hide)) return;
       const item = [option.usage(padding)];

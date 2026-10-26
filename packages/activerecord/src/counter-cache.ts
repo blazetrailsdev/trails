@@ -8,15 +8,7 @@ import {
   kernelArray,
   wrap,
 } from "@blazetrails/activesupport";
-import {
-  rbCallSuper,
-  rbEqual,
-  rbFSend,
-  rtest,
-  toSym,
-  union,
-  filterMap,
-} from "@blazetrails/ruby-compat";
+import { rbCallSuper, rbEqual, rbFSend, rtest, toSym, filterMap } from "@blazetrails/ruby-compat";
 import { ThroughReflection } from "./reflection.js";
 import { type CounterCacheTouchOption, type TouchAllOptions } from "./timestamp.js";
 
@@ -135,7 +127,9 @@ export function loadSchemaBang(this: typeof Base): void {
     return name;
   });
 
-  this.counterCachedAssociationNames = union(this.counterCachedAssociationNames, associationNames);
+  this.counterCachedAssociationNames = [
+    ...new Set([...this.counterCachedAssociationNames, ...associationNames]),
+  ];
 }
 
 export const ClassMethods = {

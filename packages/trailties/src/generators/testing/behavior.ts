@@ -1,4 +1,4 @@
-import { Dir, File, compact } from "@blazetrails/ruby-compat";
+import { Dir, File } from "@blazetrails/ruby-compat";
 import { GeneratedAttribute } from "../generated-attribute.js";
 
 export interface BehaviorHost {
@@ -10,7 +10,7 @@ export function createGeneratedAttribute(
   name: string = "test",
   index: string | null = null,
 ): GeneratedAttribute {
-  return GeneratedAttribute.parse(compact([name, attributeType, index]).join(":"));
+  return GeneratedAttribute.parse([name, attributeType, index].filter((x) => x != null).join(":"));
 }
 
 /** @internal */

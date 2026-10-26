@@ -27,7 +27,7 @@ import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotUnique } from "./errors.js";
-import { compact, groupBy, max, min, take } from "@blazetrails/ruby-compat";
+import { groupBy, max, min, take } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { PermittedAttributes, SerializeOptions } from "@blazetrails/activemodel";
 
@@ -395,9 +395,10 @@ export class Relation<T extends Base, G extends boolean = false> {
         : this._records
       : this.annotate("loading for inspect");
     const inspectEntries = (records: T[]): string => {
-      const entries = take(records, min(compact([this.limitValue, 11])) as number).map((record) =>
-        record.inspect(),
-      );
+      const entries = take(
+        records,
+        min([this.limitValue, 11].filter((x) => x != null)) as number,
+      ).map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
       return `#<${(this.constructor as typeof Relation).name} [${entries.join(", ")}]>`;
     };
@@ -405,7 +406,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return (
       subject instanceof Promise
         ? subject
-        : subject.take(min(compact([this.limitValue, 11])) as number)
+        : subject.take(min([this.limitValue, 11].filter((x) => x != null)) as number)
     ).then(inspectEntries);
   }
 
@@ -413,8 +414,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     const subject = this.isLoaded ? await this.records() : this.annotate("loading for pp");
     const entries = (
       Array.isArray(subject)
-        ? subject.slice(0, min(compact([this.limitValue, 11])) as number)
-        : await subject.take(min(compact([this.limitValue, 11])) as number)
+        ? subject.slice(0, min([this.limitValue, 11].filter((x) => x != null)) as number)
+        : await subject.take(min([this.limitValue, 11].filter((x) => x != null)) as number)
     ) as (T | string)[];
     if (entries.length === 11) entries[10] = "...";
     await pp.pp(entries);

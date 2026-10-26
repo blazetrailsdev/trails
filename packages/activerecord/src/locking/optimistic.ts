@@ -1,4 +1,4 @@
-import { DelegateClass, rtest, union, rbCallSuper } from "@blazetrails/ruby-compat";
+import { DelegateClass, rtest, rbCallSuper } from "@blazetrails/ruby-compat";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
@@ -135,7 +135,7 @@ export function _createRecord(
 ): unknown {
   const ctor = this.constructor;
   if (ctor.lockingEnabled) {
-    attributeNames = union(attributeNames, [ctor.lockingColumn]);
+    attributeNames = [...new Set([...attributeNames, ctor.lockingColumn])];
   }
   return superFn(attributeNames);
 }
