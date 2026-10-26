@@ -67,7 +67,7 @@ describe("anybits", () => {
 describe("Float#round past the double's own digits", () => {
   it("answers the receiver once ndigits overflows it, and zero once it underflows", () => {
     expect(round(1.5, 400)).toBe(1.5);
-    expect(round(1.0e-320, 3)).toBe(0);
+    expect(round(1.0e-320, 3)).toEqual(new Number(0));
   });
 
   it("rounds the exact Rational past 14 digits, and half up below them", () => {

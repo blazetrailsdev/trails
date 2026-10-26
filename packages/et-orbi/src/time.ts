@@ -8,7 +8,9 @@ import {
   rbEqual,
   rbInspect,
   rbObjClassname,
+  rbCNumeric,
   rbObjDup,
+  rbObjIsKindOf,
   rbObjRespondTo,
   rbSetClassPathString,
   strip,
@@ -194,39 +196,39 @@ export class EoTime {
     return this.zone.periodForUtc(this.utc()).utcTotalOffset;
   }
 
-  year(): number {
+  get year(): number {
     return this.toTime().year;
   }
 
-  month(): number {
+  get month(): number {
     return this.toTime().month;
   }
 
-  day(): number {
+  get day(): number {
     return this.toTime().day;
   }
 
-  wday(): number {
+  get wday(): number {
     return this.toTime().wday;
   }
 
-  yday(): number {
+  get yday(): number {
     return this.toTime().yday;
   }
 
-  hour(): number {
+  get hour(): number {
     return this.toTime().hour;
   }
 
-  min(): number {
+  get min(): number {
     return this.toTime().min;
   }
 
-  sec(): number {
+  get sec(): number {
     return this.toTime().sec;
   }
 
-  usec(): number {
+  get usec(): number {
     return this.toTime().usec;
   }
 
@@ -300,7 +302,7 @@ export class EoTime {
 
     while (true) {
       d.add(-EoTime.WEEK_S);
-      if (d.month() !== date.month) break;
+      if (d.month !== date.month) break;
       pos = pos + 1;
     }
 
@@ -309,7 +311,7 @@ export class EoTime {
 
     while (true) {
       d.add(EoTime.WEEK_S);
-      if (d.month() !== date.month) break;
+      if (d.month !== date.month) break;
       neg = neg - 1;
     }
 
@@ -345,7 +347,7 @@ export class EoTime {
 
   inc(t: unknown, dir = 1): EoTime | number {
     let r: EoTime | number;
-    if (typeof t === "number") {
+    if (rbObjIsKindOf(t, rbCNumeric)) {
       const nt = rbObjDup(this);
       nt.seconds += dir * toF(t);
       r = nt;
@@ -375,14 +377,14 @@ export class EoTime {
     return this.localtime(zone);
   }
 
-  wdayInMonth(): [number, number] {
+  get wdayInMonth(): [number, number] {
     return [
       this.countWeeks(makeTime(this.strftime("%F 12:00:00 %/Z")), -1),
       -this.countWeeks(makeTime(this.strftime("%F 12:00:00 %/Z")), 1),
     ];
   }
 
-  rweek(): number {
+  get rweek(): number {
     return (this._rweek ??= (() => {
       const ref = makeTime("2019-01-01 12:00:00", this.zone);
       const noon = makeTime(this.strftime("%F 12:00:00"), this.zone);
@@ -390,7 +392,7 @@ export class EoTime {
     })());
   }
 
-  rday(): number {
+  get rday(): number {
     return (this._rday ??= (() => {
       const ref = makeTime("2019-01-01 12:00:00", this.zone);
       const noon = makeTime(this.strftime("%F 12:00:00"), this.zone);
@@ -412,18 +414,18 @@ export class EoTime {
 
     if (s == null && m == null) {
       step = 60 * 60;
-      t = t.minus(t.sec());
-      t = t.minus(t.min() * 60);
+      t = t.minus(t.sec);
+      t = t.minus(t.min * 60);
     } else if (s == null) {
       step = 60;
-      t = t.minus(t.sec());
+      t = t.minus(t.sec);
     }
 
     while (true) {
       t = t.plus(step);
-      if (s != null && t.sec() !== s) continue;
-      if (m != null && t.min() !== m) continue;
-      if (h != null && t.hour() !== h) continue;
+      if (s != null && t.sec !== s) continue;
+      if (m != null && t.min !== m) continue;
+      if (h != null && t.hour !== h) continue;
       break;
     }
 
@@ -444,7 +446,7 @@ export class EoTime {
     let c = 0;
     let t = start;
 
-    while (!(t.month() !== this.month())) {
+    while (!(t.month !== this.month)) {
       c += 1;
       t = t.plus(dir * (7 * 24 * 3600));
     }

@@ -211,3 +211,34 @@ describe("TZInfo periods across an offset-only transition", () => {
     expect(utc.equals(Timezone.get("Etc/UTC").periodForUtc(Time.utc(2021, 1, 1)))).toBe(true);
   });
 });
+
+describe("TZInfo periods read base offsets from tzdata", () => {
+  it("reads a negative DST amount across Hong Kong's 1941 war-time transition", () => {
+    const period = Timezone.get("Asia/Hong_Kong").periodForUtc(Time.utc(1941, 12, 20));
+    expect([period.utcOffset, period.stdOffset, period.isDst()]).toEqual([32400, -1800, true]);
+    expect(period.startTransition!.timestampValue).toBe(-891579600);
+    expect(period.endTransition!.timestampValue).toBe(-884248200);
+  });
+
+  it("reads Cancun's 1998 base offset on both sides of its offset-only transition", () => {
+    const cancun = Timezone.get("America/Cancun");
+    const before = cancun.periodForUtc(Time.utc(1998, 7, 1));
+    const after = cancun.periodForUtc(Time.utc(1998, 9, 1));
+    expect([before.utcOffset, before.stdOffset, before.endTransition!.timestampValue]).toEqual([
+      -18000, 3600, 902037600,
+    ]);
+    expect([after.utcOffset, after.stdOffset, after.startTransition!.timestampValue]).toEqual([
+      -21600, 3600, 902037600,
+    ]);
+  });
+
+  it("tells apart the periods around Windhoek's 1990 abbreviation-only transition", () => {
+    const windhoek = Timezone.get("Africa/Windhoek");
+    const before = windhoek.periodForUtc(Time.utc(1990, 3, 1));
+    const after = windhoek.periodForUtc(Time.utc(1990, 4, 1));
+    expect(before.endTransition!.timestampValue).toBe(637970400);
+    expect(after.startTransition!.timestampValue).toBe(637970400);
+    expect(after.endTransition!.timestampValue).toBe(764200800);
+    expect(before.equals(after)).toBe(false);
+  });
+});

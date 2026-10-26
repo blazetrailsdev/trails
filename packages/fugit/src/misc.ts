@@ -18,7 +18,7 @@ export function isostamp(
   if (showDate != null && showDate !== false) s.append(t.strftime("%Y-%m-%d"));
   if (showTime != null && showTime !== false) s.append(t.strftime("T%H:%M:%S"));
   if (showTime != null && showTime !== false && showUsec != null && showUsec !== false) {
-    s.append(format(".%06d", t instanceof Time ? t.usec : t.usec()));
+    s.append(format(".%06d", t.usec));
   }
   if (showTime != null && showTime !== false && time!.isUtc()) s.append("Z");
 

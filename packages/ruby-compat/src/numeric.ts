@@ -38,18 +38,19 @@ export function round<T extends { round(ndigits?: number): T }>(
 export function round(x: number | { round(ndigits?: number): unknown }, ndigits = 0): unknown {
   if (typeof x !== "number" && !(x instanceof Number)) return x.round(ndigits);
   const number = x.valueOf();
-  if (number === 0) return ndigits > 0 ? number : 0;
+  if (number === 0) return ndigits > 0 ? x : 0;
   if (ndigits < 0) return intRound(Number(toI(number)), ndigits);
   if (ndigits === 0) return roundHalfUp(number, 1);
+  if (!rbFloatTypeP(x)) return number;
   if (Number.isFinite(number)) {
     const binexp = frexp(number);
-    if (floatRoundOverflow(ndigits, binexp)) return number;
-    if (floatRoundUnderflow(ndigits, binexp)) return 0;
-    if (ndigits > 14) return floRoundByRational(number, ndigits);
+    if (floatRoundOverflow(ndigits, binexp)) return x;
+    if (floatRoundUnderflow(ndigits, binexp)) return rbDbl2num(0);
+    if (ndigits > 14) return rbDbl2num(floRoundByRational(number, ndigits));
     const f = 10 ** ndigits;
-    return roundHalfUp(number, f) / f;
+    return rbDbl2num(roundHalfUp(number, f) / f);
   }
-  return number;
+  return x;
 }
 
 function roundHalfUp(x: number, s: number): number {
@@ -155,7 +156,7 @@ export function toI(obj: unknown): number | bigint {
   if (typeof obj === "bigint") return obj;
   if (typeof obj === "number" || obj instanceof Number) {
     if (!Number.isFinite(obj.valueOf())) throw new FloatDomainError(String(obj));
-    const f = Math.trunc(obj.valueOf());
+    const f = Math.trunc(obj.valueOf()) + 0;
     return Number.isSafeInteger(f) ? f : BigInt(f);
   }
   if (isSymbol(obj)) throw new NoMethodError("undefined method 'to_i' for an instance of Symbol");
