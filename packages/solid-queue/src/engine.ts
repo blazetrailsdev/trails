@@ -23,7 +23,7 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
 
 /**
  * @missingRailsCall rake_tasks — CONVERGEABLE port-solid-queue-tasks
- * @inventedArm onLoad — PERMANENT
+ * @inventedArm onLoad — CONVERGEABLE solid-queue-record-class-body-reads-config-after-initializers
  */
 export class Engine extends TrailsEngine {
   static toString(): string {
