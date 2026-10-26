@@ -1,4 +1,5 @@
 import type { PostgreSQL } from "./subscription-adapter/postgresql.js";
+import type { Redis } from "./subscription-adapter/redis.js";
 import { Autoload, extend, type Extended, TopLevel } from "@blazetrails/activesupport";
 import type { INTERNAL, server } from "./action-cable.js";
 import type { Base as ChannelBase } from "./channel/base.js";
@@ -25,7 +26,7 @@ extend(Channel, Autoload);
 export const SubscriptionAdapter = {
   name: "ActionCable::SubscriptionAdapter",
   loadPath: {},
-} as AutoloadModule & { PostgreSQL?: typeof PostgreSQL };
+} as AutoloadModule & { PostgreSQL?: typeof PostgreSQL; Redis?: typeof Redis };
 extend(SubscriptionAdapter, Autoload);
 
 export const Helpers = { name: "ActionCable::Helpers" } as AutoloadModule;
