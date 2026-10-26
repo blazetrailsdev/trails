@@ -8,6 +8,7 @@
  */
 
 import {
+  DateTime,
   Temporal,
   Time,
   Timezone as DateTimezone,
@@ -620,9 +621,10 @@ export class Timezone {
   }
 
   localToUtc(
-    time: Time | Temporal.PlainDateTime | Temporal.ZonedDateTime,
+    time: Time | DateTime | Temporal.PlainDateTime | Temporal.ZonedDateTime,
     dst: boolean | null = null,
   ): Time {
+    if (time instanceof DateTime) time = time.toTime();
     if (time instanceof Temporal.ZonedDateTime) time = time.toPlainDateTime();
     if (time instanceof Temporal.PlainDateTime)
       time = Time.utc(

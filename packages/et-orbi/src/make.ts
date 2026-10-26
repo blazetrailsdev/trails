@@ -1,5 +1,5 @@
 import type { Timezone } from "@blazetrails/tzinfo";
-import { Date, DateTime, Time } from "@blazetrails/date";
+import { Date, Time, dtNewByFrags } from "@blazetrails/date";
 import {
   ArgumentError,
   fetch,
@@ -47,7 +47,7 @@ export function parse(str: string, opts: Record<string, unknown> = {}): EoTime {
 
   let dt;
   try {
-    dt = DateTime.parse(str);
+    dt = dtNewByFrags(Date._parse(str), Date.ITALY);
   } catch {
     throw new ArgumentError(`No time information in ${rbInspect(str)}`);
   }
