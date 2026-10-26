@@ -126,6 +126,42 @@ describe("buildViews", () => {
     expect(fs.existsSync(path.join(cwd, ".trails"))).toBe(false);
   });
 
+  it("runs neither config/application nor config/initializers", async () => {
+    const root = mkScratch();
+    write(root, "app/views/home/index.html.tse", "<p>hi</p>\n");
+    write(root, "config/application.js", 'throw new Error("config/application ran");\n');
+    write(root, "config/initializers/database.js", 'throw new Error("an initializer ran");\n');
+    write(root, "config/initializers/imports.ts", 'import "./missing.js";\n');
+
+    const { files } = await buildViews({ cwd: root });
+
+    expect(files).toContain("home/index.html.tse");
+  });
+
+  it("imports each --handlers module, relative to cwd", async () => {
+    const root = mkScratch();
+    write(
+      root,
+      "lib/handlers.mjs",
+      "globalThis.__trailsTscHandlersLoaded = (globalThis.__trailsTscHandlersLoaded ?? 0) + 1;\n",
+    );
+
+    expect(await runCli(["build", "--cwd", root, "--handlers", "lib/handlers.mjs"])).toBe(0);
+
+    expect((globalThis as { __trailsTscHandlersLoaded?: number }).__trailsTscHandlersLoaded).toBe(
+      1,
+    );
+  });
+
+  it("refuses a TypeScript handlers module, which would need a compiler", async () => {
+    const root = mkScratch();
+    write(root, "lib/handlers.ts", "export {};\n");
+
+    await expect(buildViews({ cwd: root, handlers: ["lib/handlers.ts"] })).rejects.toThrow(
+      "a handlers module is imported without a compiler",
+    );
+  });
+
   it("is a no-op when the views dir is absent", async () => {
     const cwd = mkScratch();
     const { count } = await buildViews({ cwd });
