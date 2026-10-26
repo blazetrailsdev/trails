@@ -9,14 +9,25 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixtureDir = path.join(__dirname, "fixtures", "ruby-compat-native-required");
 const filename = path.join(fixtureDir, "file.ts");
 
+const parser = (await import("typescript-eslint")).parser;
+
 const tester = new RuleTester({
   languageOptions: {
     ecmaVersion: 2022,
     sourceType: "module",
-    parser: (await import("typescript-eslint")).parser,
+    parser,
     parserOptions: { project: "./tsconfig.json", tsconfigRootDir: fixtureDir },
   },
 });
+
+function parseFixture(code) {
+  const { ast, services } = parser.parseForESLint(code, {
+    filePath: filename,
+    project: "./tsconfig.json",
+    tsconfigRootDir: fixtureDir,
+  });
+  return { ast, services };
+}
 
 const head = 'import { hashDelete, Hash } from "@blazetrails/ruby-compat";\n';
 const valid = (code) => ({ code: head + code, filename });
@@ -63,9 +74,7 @@ tester.run("ruby-compat-native-required", rule, {
   ],
   invalid: [
     // plain objects
-    invalid(
-      "type Record<K extends keyof any, T> = { [P in K]: T }; declare const h: Record<string, number>; hashDelete(h, 'a');",
-    ),
+    invalid("declare const h: Record<string, number>; hashDelete(h, 'a');"),
     invalid("declare const h: { [k: string]: number }; hashDelete(h, 'a');"),
     invalid("declare const h: { a?: number }; hashDelete(h, 'a');"),
     invalid("declare const h: { a: number } | undefined; hashDelete(h!, 'a');"),
@@ -91,6 +100,27 @@ const LISTED_FLOOR = [
   "union",
   "uniq",
 ];
+
+describe("ruby-compat-native-required fixture project", () => {
+  it("resolves its lib, so the dispatching-receiver cases are not vacuous", () => {
+    const ts = parseFixture(
+      "declare const m: Map<string, number>; declare const r: Record<string, number>; declare const xs: string[]; m; r; xs;",
+    );
+    const checker = ts.services.program.getTypeChecker();
+    const types = ts.ast.body
+      .slice(-3)
+      .map((stmt) =>
+        checker.getTypeAtLocation(ts.services.esTreeNodeToTSNodeMap.get(stmt.expression)),
+      );
+    expect(types.map((t) => checker.typeToString(t))).toEqual([
+      "Map<string, number>",
+      "Record<string, number>",
+      "string[]",
+    ]);
+    expect(types.every((t) => (t.flags & 1) === 0)).toBe(true);
+    expect(checker.isArrayType(types[2])).toBe(true);
+  });
+});
 
 describe("ruby-compat-native-required.json", () => {
   it("never drops a helper while ruby-compat still exports it", async () => {
