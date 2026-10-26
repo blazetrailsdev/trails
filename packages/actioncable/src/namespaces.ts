@@ -2,6 +2,7 @@ import type { PostgreSQL } from "./subscription-adapter/postgresql.js";
 import { Autoload, extend, type Extended, TopLevel } from "@blazetrails/activesupport";
 import type { INTERNAL, server } from "./action-cable.js";
 import type { Base as ChannelBase } from "./channel/base.js";
+import type { Base as ConnectionBase } from "./connection/base.js";
 import { rbDeclareIvar, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
@@ -11,7 +12,9 @@ export const Server = { name: "ActionCable::Server" } as AutoloadModule & {
 };
 extend(Server, Autoload);
 
-export const Connection = { name: "ActionCable::Connection" } as AutoloadModule;
+export const Connection = { name: "ActionCable::Connection" } as AutoloadModule & {
+  Base: typeof ConnectionBase;
+};
 extend(Connection, Autoload);
 
 export const Channel = { name: "ActionCable::Channel" } as AutoloadModule & {

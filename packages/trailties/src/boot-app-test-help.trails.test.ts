@@ -1,7 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
 import { ActiveJob } from "@blazetrails/activejob";
-import { constantize } from "@blazetrails/activesupport";
+import { ActionCable } from "@blazetrails/actioncable";
+import { Base as Connection } from "@blazetrails/actioncable/connection/base";
+import { Subscriptions } from "@blazetrails/actioncable/connection/subscriptions";
+import type { Base as Server } from "@blazetrails/actioncable/server/base";
+import { TestServer } from "@blazetrails/actioncable/test-helpers/stubs/test-server";
+import { ActiveSupportJSON, constantize, safeConstantize } from "@blazetrails/activesupport";
+import { MockRequest } from "@blazetrails/rack";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
@@ -179,5 +185,29 @@ describe("test_help wires a booted app into the test case classes", () => {
     const { CleanupJob } = await import("./__fixtures__/boot-app/app/jobs/admin/cleanup-job.js");
     expect(rbModName(CleanupJob)).toBe("Admin::CleanupJob");
     expect(constantize("Admin::CleanupJob")).toBe(CleanupJob);
+  });
+
+  it("subscribes to app/channels channels by their Ruby names", async () => {
+    const { ChatChannel } = await import("./__fixtures__/boot-app/app/channels/chat-channel.js");
+    const { AppearancesChannel } =
+      await import("./__fixtures__/boot-app/app/channels/chat/appearances-channel.js");
+    expect(constantize("ChatChannel")).toBe(ChatChannel);
+    expect(constantize("Chat::AppearancesChannel")).toBe(AppearancesChannel);
+    expect(safeConstantize("Chat::Helpers")).toBeUndefined();
+
+    const connection = new Connection(new TestServer() as never, MockRequest.envFor("/cable"));
+    const subscriptions = new Subscriptions(connection as never);
+    for (const channel of ["ChatChannel", "Chat::AppearancesChannel"]) {
+      const identifier = ActiveSupportJSON.encode({ channel });
+      await subscriptions.executeCommand({ command: "subscribe", identifier });
+    }
+    expect(subscriptions.identifiers).toHaveLength(2);
+  });
+
+  it("uses app/channels/application_cable/connection as the connection class", async () => {
+    const { Connection: AppConnection } =
+      await import("./__fixtures__/boot-app/app/channels/application-cable/connection.js");
+    expect(rbModName(AppConnection)).toBe("ApplicationCable::Connection");
+    expect((ActionCable.server() as Server).config.connectionClass()).toBe(AppConnection);
   });
 });

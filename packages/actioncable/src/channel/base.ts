@@ -16,7 +16,11 @@ import {
   publicInstanceMethods,
   rbFSend,
   rbInspect,
+  ArgumentError,
+  rbClassInheritedP,
   rbModConstSet,
+  registerConstant,
+  rbModName,
   rbObjClass,
   rbObjClassname,
   rbObjMethod,
@@ -326,5 +330,34 @@ include(Base, Broadcasting);
 include(Base, Rescuable);
 
 rbModConstSet(Channel, "Base", Base);
+
+/** @noRailsEquivalent PERMANENT */
+export function registerChannel(channel: typeof Base): void;
+export function registerChannel(name: string, channel: typeof Base): void;
+export function registerChannel(channels: (typeof Base)[]): void;
+export function registerChannel(
+  nameOrChannel: string | typeof Base | (typeof Base)[],
+  channel?: typeof Base,
+): void {
+  if (Array.isArray(nameOrChannel)) {
+    for (const k of nameOrChannel) registerChannel(k);
+    return;
+  }
+  if (typeof nameOrChannel === "string") {
+    if (!channel)
+      throw new ArgumentError("registerChannel(name, channel) requires a channel class");
+  } else {
+    channel = nameOrChannel;
+  }
+  if (typeof channel !== "function" || rbClassInheritedP(channel, Base) !== true) {
+    throw new ArgumentError(
+      `registerChannel expects an ActionCable::Channel::Base subclass, got ${String(channel?.name ?? channel)}`,
+    );
+  }
+  if (typeof nameOrChannel === "string") return registerConstant(nameOrChannel, channel);
+  registerConstant(channel.name, channel);
+  const qualified = rbModName(channel)!;
+  if (qualified !== channel.name) registerConstant(qualified, channel);
+}
 
 runLoadHooks("action_cable_channel", Base);
