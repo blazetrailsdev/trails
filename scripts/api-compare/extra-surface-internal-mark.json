@@ -13,14 +13,14 @@
   "chronic": 41,
   "did-you-mean": 8,
   "et-orbi": 42,
-  "raabro": 0,
   "fugit": 24,
   "globalid": 35,
   "i18n": 97,
   "marcel": 0,
+  "raabro": 0,
   "rack": 214,
   "rack-session": 60,
   "rack-test": 45,
-  "ruby-compat": 917,
+  "ruby-compat": 915,
   "thor": 175
 }

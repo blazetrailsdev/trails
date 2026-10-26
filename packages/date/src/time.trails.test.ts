@@ -918,3 +918,9 @@ describe("Time.at with a boxed Float", () => {
     expect(Time.at(toF(946684800)).toI()).toBe(946684800);
   });
 });
+
+describe("Time.at num_exact_fail", () => {
+  it("names the operand's class", () => {
+    expect(() => Time.at(null as never)).toThrow("can't convert NilClass into an exact number");
+  });
+});

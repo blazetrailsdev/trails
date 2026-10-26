@@ -23,6 +23,8 @@ import {
   rbEql,
   rbEqual,
   rbObjIsKindOf,
+  rbObjRespondTo,
+  rbFSend,
   rbObjClassname,
   rubyClass,
 } from "@blazetrails/ruby-compat";
@@ -447,7 +449,7 @@ export class Duration {
   }
 
   isA(klass: unknown): boolean {
-    return Duration === klass || Object(this.value) instanceof (klass as any);
+    return Duration === klass || rbObjIsKindOf(this.value, klass);
   }
   declare isKindOf: (klass: unknown) => boolean;
 
@@ -489,6 +491,14 @@ export class Duration {
       return [new Scalar(other.value), this];
     }
     return [new Scalar(other as number), this];
+  }
+
+  private respondToMissing(method: string, _includePrivate = false): boolean {
+    return rbObjRespondTo(this.value, method);
+  }
+
+  private methodMissing(...args: [string, ...unknown[]]): unknown {
+    return rbFSend(this.value, ...args);
   }
 
   /** @internal */
@@ -859,3 +869,12 @@ export class Scalar {
 }
 
 rbModConstSet(ActiveSupport, "Duration", Duration);
+
+Object.defineProperty(rbCNumeric, Symbol.hasInstance, {
+  value(this: typeof rbCNumeric, other: unknown): boolean {
+    return (
+      Function.prototype[Symbol.hasInstance].call(this, other) ||
+      (other instanceof Duration && other.isA(this))
+    );
+  },
+});

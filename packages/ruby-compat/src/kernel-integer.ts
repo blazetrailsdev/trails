@@ -108,8 +108,10 @@ function rbCheckStringType(val: unknown): string | null {
  * `rb_check_to_int` (`vendor/ruby/v3.3.11/object.c:3239`): `to_int` counts only when it
  * answers an Integer, so a receiver whose `to_int` answers anything else falls
  * through to the `to_str` and `to_i` arms rather than being accepted.
+ *
+ * @noRailsEquivalent PERMANENT
  */
-function rbCheckToInt(val: unknown): number | null {
+export function rbCheckToInt(val: unknown): number | null {
   const toInt = (val as { toInt?: unknown }).toInt;
   if (typeof toInt !== "function") return null;
   const tmp = (toInt as () => unknown).call(val);

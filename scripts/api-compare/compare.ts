@@ -2437,6 +2437,11 @@ export function misplacedClusterVerdict(
  * real declaration from silently retiring its method's call-parity rows; an
  * alias entry has no calls to retire, so the faithful alias IS the port. See
  * `MethodInfo.aliasOf`.
+ *
+ * A `register_detail` entry (`actionview/lib/action_view/lookup_context.rb:21-34`)
+ * is defined at run time on both sides — `Accessors.module_eval` in Ruby,
+ * `Object.defineProperty` in `registerDetail` — so the only static TS form it
+ * can have is the declaration typing it on the merged interface.
  */
 export function declarationOnlyInFile(
   tsFile: string,
@@ -2448,6 +2453,7 @@ export function declarationOnlyInFile(
 ): boolean {
   if (bodylessOwnersByFile.get(tsFile)?.has(name) !== true) return false;
   if (rubyNotes === "alias" && aliasNamesByFile?.get(tsFile)?.has(name) === true) return false;
+  if (rubyNotes === "register_detail") return false;
   return bodiedOwnersByFile.get(tsFile)?.has(name) !== true;
 }
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, rbCInteger, rbCNumeric } from "@blazetrails/ruby-compat";
 import { Scalar, days, hours, seconds } from "./duration.js";
 
 describe("Scalar", () => {
@@ -118,5 +118,18 @@ describe("Duration#-@", () => {
     expect(new Scalar((2n ** 60n) as never).negate().value).toBe(-(2n ** 60n));
     expect(new Scalar(1.5).negate().value).toBe(-1.5);
     expect(seconds(3).negate().value).toBe(-3);
+  });
+});
+
+describe("Time.at with a Duration", () => {
+  it("num_exact_check reads a Duration through to_r and to_int", () => {
+    expect(Time.at(seconds(30)).toI()).toBe(30);
+    expect(Time.at(seconds(1.5)).toR().equals(new Rational(3, 2))).toBe(true);
+  });
+
+  it("a Duration is kind of Numeric", () => {
+    expect(seconds(30)).toBeInstanceOf(rbCNumeric);
+    expect(days(1)).toBeInstanceOf(rbCInteger);
+    expect(seconds(1.5)).not.toBeInstanceOf(rbCInteger);
   });
 });
