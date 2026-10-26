@@ -1,7 +1,6 @@
 import { LocalJumpError } from "./local-jump-error.js";
 import { classpaths, isModuleObject } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
-import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, rbErrorArity, stringValue } from "./string/support.js";
@@ -522,15 +521,6 @@ function enumerableMethod(
 }
 
 /**
- * `rb_include_module(rb_cArray, rb_mEnumerable)` (`vendor/ruby/v3.3.11/array.c:8606`):
- * the ported `Enumerable` module, which {@link rbFSend} dispatches and
- * {@link basicObjRespondTo} answers for on an Array that has no member or
- * `ARRAY_METHOD_TABLE` entry of that name.
- */
-const enumerableModule = (): Record<string, AnyFunction> =>
-  Enumerable.prototype as unknown as Record<string, AnyFunction>;
-
-/**
  * `rb_obj_is_proc` (`vendor/ruby/v3.3.11/proc.c:120`): a function that is not
  * a class, which is what a block or a lambda is.
  *
@@ -686,7 +676,6 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
     if (obj instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) return true;
     if (Array.isArray(obj) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) return true;
-    if (Array.isArray(obj) && Object.hasOwn(enumerableModule(), mid)) return true;
     if (temporalMethod(obj, mid) !== undefined) return true;
     if (enumerableMethod(obj, mid) !== undefined) return true;
     if (
@@ -1116,9 +1105,7 @@ export function toS(obj: unknown): string | Uint8Array {
  * operators answer for the receivers that define them in Ruby: between two
  * numbers they are `Integer`'s and `Float`'s own (`rb_int_gt`,
  * `vendor/ruby/v3.3.11/numeric.c:4743`, and `rb_float_gt`, `:1753`), false for
- * a NaN operand and never raising;
- * a receiver defining the operator itself (`greaterThan` and its siblings, the
- * spelling `Date` and `TimeWithZone` give them) answers it; a number against
+ * a NaN operand and never raising; a number against
  * anything else, and any other `Comparable` receiver (a String, a Time or
  * Date, or an object defining `<=>`), go through `cmpint`
  * (`vendor/ruby/v3.3.11/compar.c:105-147`) and raise `ArgumentError` for a pair
@@ -1153,11 +1140,11 @@ export function conversionMismatch(
   );
 }
 
-const RELOPS = new Map<string, [string, (c: number) => boolean]>([
-  [">", ["greaterThan", (c) => c > 0]],
-  [">=", ["greaterThanOrEqual", (c) => c >= 0]],
-  ["<", ["lessThan", (c) => c < 0]],
-  ["<=", ["lessThanOrEqual", (c) => c <= 0]],
+const RELOPS = new Map<string, (c: number) => boolean>([
+  [">", (c) => c > 0],
+  [">=", (c) => c >= 0],
+  ["<", (c) => c < 0],
+  ["<=", (c) => c <= 0],
 ]);
 
 function isNumeric(value: unknown): value is number | bigint {
@@ -1195,12 +1182,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (mid === "+" && (isNumeric(recv) || typeof recv === "string" || Array.isArray(recv))) {
       return rbPlus(recv, other);
     }
-    const [spelling, relop] = RELOPS.get(mid) ?? [];
+    const relop = RELOPS.get(mid);
     if (relop !== undefined && isNumeric(recv) && isNumeric(other)) {
       return relop(recv < other ? -1 : recv > other ? 1 : recv == other ? 0 : NaN);
-    }
-    if (spelling !== undefined && rbObjRespondTo(recv, spelling)) {
-      return sendInternal(argc, [spelling, other], recv);
     }
     if (relop !== undefined && (isNumeric(recv) || isComparable(recv))) {
       return relop(rbCmpint(cmp(recv, other), recv, other));
@@ -1284,10 +1268,6 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (mid === "toHash" && (recv instanceof Map || isPlainHash(recv))) return recv;
   if (Array.isArray(recv) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) {
     return (ARRAY_METHOD_TABLE[mid] as AnyFunction)(recv, ...args);
-  }
-  if (Array.isArray(recv) && Object.hasOwn(enumerableModule(), mid)) {
-    const each = (block: (i: unknown) => void): void => recv.forEach((i) => block(i));
-    return enumerableModule()[mid].call({ each }, ...args);
   }
   const enumerable = enumerableMethod(recv, mid);
   if (enumerable !== undefined) return enumerable(recv, ...args);
