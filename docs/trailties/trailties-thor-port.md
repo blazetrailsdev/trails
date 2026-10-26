@@ -1,10 +1,10 @@
 # trailties: the Thor port
 
-Thor `v1.3.2` is ported in full under `packages/trailties/src/thor/`, mirroring
-`vendor/thor/v1.3.2/lib/thor/`. It is not a package of its own: api-compare's
-`PACKAGE_DIR_OVERRIDES.thor` maps the `thor` parity package onto that directory,
-and `eslint/thor-import-boundary.mjs` keeps the rest of trailties from reaching
-into it except through its entry points.
+Thor `v1.3.2` is ported in full as the `@blazetrails/thor` package, under
+`packages/thor/src/`, mirroring `vendor/thor/v1.3.2/lib/thor/`. Trailties
+depends on it by package name, and `eslint/thor-import-boundary.mjs` keeps Thor
+from importing anything but `@blazetrails/ruby-compat` and
+`@blazetrails/did-you-mean`.
 
 The plan this file used to hold predates the port and is superseded by
 RFC `0171-thor-port` in the tasks repo, which owns the remaining work
