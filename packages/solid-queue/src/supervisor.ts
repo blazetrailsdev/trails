@@ -15,7 +15,7 @@ import { Timer } from "./timer.js";
 interface Supervisee {
   name: string;
   mode: unknown;
-  _thread?: { isAlive(): boolean; kill(): unknown };
+  _thread: { isAlive(): boolean; kill(): unknown };
   supervisedBy(process: unknown): void;
   start(): Promise<void>;
   stop(): Promise<void>;
@@ -23,7 +23,7 @@ interface Supervisee {
 }
 
 interface Status {
-  pid: number;
+  pid: string;
   exitstatus: number | null;
   isExited(): boolean;
   isSignaled(): boolean;
@@ -285,13 +285,13 @@ export class Supervisor extends Base {
   /** @internal */
   private waitpid2(): [string, Status] | null {
     for (const [pid, instance] of Object.entries(this.forks)) {
-      if (instance._thread?.isAlive() !== false) continue;
+      if (instance._thread.isAlive()) continue;
 
       const exited = instance.isStopped();
       return [
         pid,
         {
-          pid: Process.pid,
+          pid: pid,
           exitstatus: exited ? 0 : null,
           isExited: () => exited,
           isSignaled: () => false,

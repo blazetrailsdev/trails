@@ -264,7 +264,7 @@ export class Configuration extends Model {
     }: { keys?: string[]; fallback?: Options; env?: string } = {},
   ): Promise<Options> {
     let config = await this.loadConfigFrom(fileOrHash);
-    config = config[env] ? (config[env] as Options) : config;
+    config = config[env] != null && config[env] !== false ? (config[env] as Options) : config;
     if (keys.length > 0 && isPresent(config)) config = slice(config, ...keys);
 
     if (Object.keys(config).length === 0) {

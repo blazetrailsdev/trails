@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./test-helpers/dummy-application.js";
 import { TopLevel } from "@blazetrails/activesupport";
-import { Configuration, RecurringTask } from "./index.js";
+import { Configuration, RecurringTask, type Scheduler } from "./index.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
 import "./test-helpers/job-result.js";
 
@@ -26,6 +26,18 @@ async function assertProcesses(
 
     if (expectedValue == null) expect(value ?? null).toBeNull();
     else expect(value).toEqual(expectedValue);
+  }
+}
+
+function assertHasRecurringTask(
+  scheduler: Scheduler,
+  { key, ...attributes }: { key: string; [attr: string]: unknown },
+) {
+  expect(scheduler.recurringSchedule.configuredTasks.length).toBe(1);
+  const task = scheduler.recurringSchedule.configuredTasks.find((t) => t.key === key)!;
+
+  for (const [attr, value] of Object.entries(attributes)) {
+    expect((task as unknown as Record<string, unknown>)[attr]).toEqual(value);
   }
 }
 
@@ -124,10 +136,31 @@ describe("ConfigurationTest", () => {
     });
   });
 
+  it("recurring tasks configuration with one dispatcher", async () => {
+    const configuration = new Configuration({ dispatchers: [{ polling_interval: 0.1 }] });
+
+    await assertProcesses(configuration, "dispatcher", 1, { pollingInterval: 0.1 });
+    await assertProcesses(configuration, "scheduler", 1);
+
+    const scheduler = (await configuration.configuredProcesses())[1].instantiate() as Scheduler;
+    assertHasRecurringTask(scheduler, {
+      key: "periodic_store_result",
+      class_name: "StoreResultJob",
+      schedule: "every second",
+    });
+  });
+
   it("recurring tasks configuration adds a scheduler", async () => {
     const configuration = new Configuration({ dispatchers: [] });
 
     await assertProcesses(configuration, "scheduler", 1);
+
+    const scheduler = (await configuration.configuredProcesses())[0].instantiate() as Scheduler;
+    assertHasRecurringTask(scheduler, {
+      key: "periodic_store_result",
+      class_name: "StoreResultJob",
+      schedule: "every second",
+    });
   });
 
   it("no recurring tasks configuration when explicitly excluded", async () => {

@@ -2,7 +2,7 @@ import { isPresent } from "@blazetrails/activesupport";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 
 interface Status {
-  pid: number | null;
+  pid: number | string | null;
   exitstatus: number | null;
   isSignaled(): boolean;
   termsig: number | null;

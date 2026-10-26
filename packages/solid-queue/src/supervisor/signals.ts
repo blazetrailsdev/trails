@@ -20,6 +20,7 @@ interface SignalsHost {
   terminateImmediately(): Promise<void>;
   handleSignal(signal: Signal): Promise<void>;
   signalProcess(pid: string, signal: Signal): void;
+  handleThreadError(error: unknown): void;
 }
 
 const SIGNALS: Signal[] = ["QUIT", "INT", "TERM"];
@@ -83,7 +84,7 @@ export class Signals {
     if (supervisee == null) return;
 
     if (signal === "QUIT") supervisee._thread?.kill();
-    else void supervisee.stop();
+    else supervisee.stop().catch((error: unknown) => this.handleThreadError(error));
   }
 
   /** @internal */
