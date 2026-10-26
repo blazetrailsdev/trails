@@ -463,7 +463,7 @@ describe("EnumerableTests", () => {
     expect(indexBy(payments).constructor).toBe(Enumerator);
     expect(indexBy(payments).size()).toBeNull();
     expect(indexBy(new Range(1, 42)).size()).toBe(42);
-    expect(indexBy([...payments]).each((p: Payment) => p.price)).toEqual(expected);
+    expect(indexBy(payments).each((p: Payment) => p.price)).toEqual(expected);
   });
 
   it("index with", () => {
@@ -484,7 +484,7 @@ describe("EnumerableTests", () => {
     expect(indexWith(payments).size()).toBeNull();
     expect(indexWith(new Range(1, 42)).size()).toBe(42);
     expect([
-      ...(indexWith([...payments]).each((p: Payment) => p.price) as Hash<Payment, unknown>),
+      ...(indexWith(payments).each((p: Payment) => p.price) as Hash<Payment, unknown>),
     ]).toEqual(expected);
   });
 

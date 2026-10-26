@@ -1,3 +1,4 @@
+import { runLoadHooks } from "@blazetrails/activesupport";
 import { Base, registerModel, type Relation } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
 import { SolidQueue } from "./solid-queue.js";
@@ -6,8 +7,6 @@ export class Record extends Base {
   static {
     this.abstractClass = true;
     this.tableNamePrefix = SolidQueue.tableNamePrefix;
-
-    if (SolidQueue.connectsTo) this.connectsTo(SolidQueue.connectsTo);
   }
 
   static nonBlockingLock<T extends typeof Record>(this: T): Relation<InstanceType<T>> {
@@ -20,3 +19,5 @@ export class Record extends Base {
 }
 
 registerModel(Record);
+
+runLoadHooks("solid_queue_record", Record);

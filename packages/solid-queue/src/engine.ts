@@ -1,4 +1,5 @@
 import { include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
+import type { Record } from "./record.js";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
@@ -36,6 +37,10 @@ export class Engine extends TrailsEngine {
     this.initializer("solid_queue.config", () => {
       this.config.solidQueue.each((name, value) => {
         rbFSend(SolidQueue, `${name}=`, value);
+      });
+
+      onLoad("solid_queue_record", function (this: typeof Record) {
+        if (SolidQueue.connectsTo) this.connectsTo(SolidQueue.connectsTo);
       });
     });
 
