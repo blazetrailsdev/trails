@@ -153,20 +153,6 @@ export class TimezoneTransition {
   }
 }
 
-const periodTransitions = new WeakMap<
-  TimezonePeriod,
-  (() => (TimezoneTransition | null)[]) | (TimezoneTransition | null)[]
->();
-
-function boundaries(period: TimezonePeriod): (TimezoneTransition | null)[] {
-  let transitions = periodTransitions.get(period)!;
-  if (typeof transitions === "function") {
-    transitions = transitions();
-    periodTransitions.set(period, transitions);
-  }
-  return transitions;
-}
-
 /** @noRailsEquivalent PERMANENT */
 export class TimezonePeriod {
   readonly abbreviation: string;
@@ -185,15 +171,22 @@ export class TimezonePeriod {
     this.observedUtcOffset = observedUtcOffset;
     this.baseUtcOffset = baseUtcOffset;
     this._dst = dst;
-    periodTransitions.set(this, transitions);
+    this.#transitions = transitions;
+  }
+
+  #transitions: (() => (TimezoneTransition | null)[]) | (TimezoneTransition | null)[];
+
+  #boundaries(): (TimezoneTransition | null)[] {
+    if (typeof this.#transitions === "function") this.#transitions = this.#transitions();
+    return this.#transitions;
   }
 
   get startTransition(): TimezoneTransition | null {
-    return boundaries(this)[0];
+    return this.#boundaries()[0];
   }
 
   get endTransition(): TimezoneTransition | null {
-    return boundaries(this)[1];
+    return this.#boundaries()[1];
   }
 
   get offset(): TimezoneOffset {
@@ -503,7 +496,8 @@ export class Timezone {
     );
     const result =
       abbreviation === "UTC" && ETC_GMT_LINKS.has(this.identifier) ? "GMT" : abbreviation;
-    if (getZoneInfo(this.identifier, toDate(time)) === fixedZoneInfos.get(this.identifier))
+    getZoneInfo(this.identifier, toDate(time));
+    if (fixedZoneInfos.get(this.identifier) != null)
       fixedZoneAbbreviations.set(this.identifier, result);
     return result;
   }

@@ -333,6 +333,8 @@ interface Vtm {
   yday: number;
 }
 
+const NO_SUBNANO = new Rational(0, 1);
+
 function vtmFromDate(d: globalThis.Date, nsec: number): Vtm {
   const year = d.getUTCFullYear();
   const mon = d.getUTCMonth() + 1;
@@ -537,7 +539,7 @@ export class Time extends rbCTime {
     at: Temporal.Instant | bigint,
     zone: string | number | object | null = null,
     tzmodeUtc?: boolean,
-    subnano: Rational = new Rational(0, 1),
+    subnano: Rational = NO_SUBNANO,
   ): Time {
     if (zone instanceof Timezone) zone = zone.identifier;
     if (maybeTzobjP(zone))
@@ -1332,9 +1334,7 @@ export class Time extends rbCTime {
     else if (typeof sec === "string") sec = obj2vint(sec);
     const integralSec = typeof sec === "number" && Number.isSafeInteger(sec);
     const nsec = integralSec ? 0 : subsecNanoseconds(sec);
-    this.#subnano = integralSec
-      ? new Rational(0, 1)
-      : numExact(sec).mod(1).mul(1_000_000_000).add(-nsec);
+    this.#subnano = integralSec ? NO_SUBNANO : numExact(sec).mod(1).mul(1_000_000_000).add(-nsec);
     const wholeSec = sec instanceof Rational ? sec.div(1) : Math.floor(sec);
     obj2ubits(month, 4);
     obj2ubits(day, 5);
@@ -1562,7 +1562,9 @@ export class Time extends rbCTime {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        nsec: new Rational(this.nsec, 1).add(this.#subnano),
+        nsec: this.#subnano.isZero()
+          ? new Rational(this.nsec, 1)
+          : new Rational(this.nsec, 1).add(this.#subnano),
         get zone(): string {
           const zone = self.zone;
           return zone == null ? "" : rbTimeZoneAbbreviation(zone, self);
