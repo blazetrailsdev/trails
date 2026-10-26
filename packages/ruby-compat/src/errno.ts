@@ -232,6 +232,30 @@ class ESRCH extends SystemCallError {
 }
 
 /**
+ * `Errno::EPERM`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: the error `kill(2)` raises for a process the caller may not
+ * signal. The host's own error carrying `code: "EPERM"` is this class to
+ * `rescue Errno::EPERM`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EPERM`, which Solid Queue
+ * rescues without defining.
+ */
+class EPERM extends SystemCallError {
+  static readonly Errno = 1;
+  readonly code = "EPERM";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Operation not permitted" : `Operation not permitted - ${mesg}`);
+    this.name = "Errno::EPERM";
+    this.errno = EPERM.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "EPERM";
+  }
+}
+
+/**
  * `Errno::EMFILE`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
  * {@link ENOTTY} is. The fs layer's own error carrying `code: "EMFILE"` is this
  * class to `rescue Errno::EMFILE`; a subclass answers the ordinary prototype test.
@@ -297,6 +321,7 @@ export const Errno = {
   ENOENT,
   ENOTDIR,
   ENOTTY,
+  EPERM,
   EPIPE,
   ESPIPE,
   ESRCH,

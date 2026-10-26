@@ -541,6 +541,16 @@ export class File extends IO {
   }
 
   /**
+   * {@link File.read} over the backend's async `readFile`, as UTF-8 text.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.read` (`IO.read`,
+   * `vendor/ruby/v3.3.11/io.c:12200`).
+   */
+  static async readAsync(name: string): Promise<string> {
+    return await getFs().readFile(name, "utf8");
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/io.c:12063` `rb_io_s_foreach` in its block form: the stream
    * opens through `open_key_args` (`io.c:12163`), `rb_io_each_line`
    * (`io.c:4159`) yields each line with its separator retained, and
@@ -606,7 +616,9 @@ export class File extends IO {
   /**
    * {@link File.write} over the backend's async `writeFile`, falling back to its
    * `writeFileSync`. `perm` is `IO.write`'s `perm:` option
-   * (`vendor/ruby/v3.3.11/io.c:6953`), the mode a created file is opened with.
+   * (`vendor/ruby/v3.3.11/io.c:6953`), the mode a created file is opened with,
+   * and `mode` its `mode:` open-mode string (`"wx"` is
+   * `CREAT | EXCL | WRONLY`, raising `Errno::EEXIST` on an existing file).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.write` (`IO.write`,
    * `vendor/ruby/v3.3.11/io.c:12377`).
@@ -614,12 +626,11 @@ export class File extends IO {
   static async writeAsync(
     name: string,
     string: string | Uint8Array,
-    { perm }: { perm?: number } = {},
+    { perm, mode }: { perm?: number; mode?: string } = {},
   ): Promise<number> {
     const fs = getFs();
-    const options = perm == null ? undefined : { mode: perm };
-    if (fs.writeFile) await fs.writeFile(name, string, options);
-    else fs.writeFileSync(name, string, options);
+    if (fs.writeFile) await fs.writeFile(name, string, { mode: perm, flag: mode });
+    else fs.writeFileSync(name, string, perm == null ? undefined : { mode: perm });
     return typeof string === "string" ? new TextEncoder().encode(string).length : string.length;
   }
 

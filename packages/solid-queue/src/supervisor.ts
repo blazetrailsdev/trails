@@ -9,6 +9,7 @@ import { Base } from "./processes/base.js";
 import { ProcessExitError } from "./processes/process-exit-error.js";
 import { SolidQueue } from "./solid-queue.js";
 import { Maintenance } from "./supervisor/maintenance.js";
+import { Pidfiled } from "./supervisor/pidfiled.js";
 import { Signals } from "./supervisor/signals.js";
 import { Timer } from "./timer.js";
 
@@ -45,6 +46,7 @@ export class Supervisor extends Base {
     include(this, LifecycleHooks);
     include(this, Maintenance);
     include(this, Signals);
+    include(this, Pidfiled);
   }
 
   static async start(options: { [key: string]: unknown } = {}): Promise<Supervisor> {
@@ -303,7 +305,7 @@ export class Supervisor extends Base {
   }
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LifecycleHooks`, `include Maintenance, Signals` (`supervisor.rb:5-6`). */
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LifecycleHooks`, `include Maintenance, Signals, Pidfiled` (`supervisor.rb:5-6`). */
 export interface Supervisor {
   runStartHooks(): Promise<void>;
   runStopHooks(): Promise<void>;

@@ -100,7 +100,7 @@ export interface FsAdapter {
   writeFile?(
     path: string,
     content: string | Uint8Array,
-    options?: { mode?: number },
+    options?: { mode?: number; flag?: string },
   ): Promise<void>;
   unlink?(path: string): Promise<void>;
   rm?(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
@@ -325,7 +325,7 @@ function tryAutoRegisterNode(): boolean {
       lstat: (p: string) => fsPromises.lstat(p).then(withExecutable),
       readFile: (p: string, enc?: string) =>
         enc ? fsPromises.readFile(p, enc) : fsPromises.readFile(p),
-      writeFile: (p: string, c: string | Uint8Array, opts?: { mode?: number }) =>
+      writeFile: (p: string, c: string | Uint8Array, opts?: { mode?: number; flag?: string }) =>
         fsPromises.writeFile(p, c, opts),
       unlink: (p: string) => fsPromises.unlink(p),
       rm: (p: string, opts?: { recursive?: boolean; force?: boolean }) => fsPromises.rm(p, opts),

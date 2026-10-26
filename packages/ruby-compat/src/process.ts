@@ -138,6 +138,20 @@ export class Process {
   }
 
   /**
+   * `rb_f_kill` (`vendor/ruby/v3.3.11/signal.c:431`) for a non-negative
+   * signal: `kill(2)` each pid in turn, raising the failing call's `Errno`
+   * (`rb_sys_fail`), and answering the number of pids signalled. Signal `0`
+   * only checks that the process exists and may be signalled.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process.kill`
+   * (`vendor/ruby/v3.3.11/process.c:9155`).
+   */
+  static kill(signal: number | string, ...pids: number[]): number {
+    for (const pid of pids) getProcessAdapter().kill!(pid, signal);
+    return pids.length;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/process.c:8283` `rb_clock_gettime`, which reads the tick for
    * `clockId` and then hands it to `make_clock_result` for `unit`.
    *
