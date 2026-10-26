@@ -22,7 +22,7 @@ export class JobGenerator extends NamedBase {
         ...this.classPathParts,
         `${dasherize(this.fileName)}-job.test${this.ext()}`,
       ),
-      TEMPLATES.unit_test.call(this),
+      TEMPLATES.unit_test.call(this, this.ext()),
     );
   }
 }

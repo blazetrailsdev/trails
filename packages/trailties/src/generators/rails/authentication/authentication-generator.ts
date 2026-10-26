@@ -151,7 +151,7 @@ export class AuthenticationGenerator extends GeneratorBase {
 
 const BCRYPT_IMPORT = `import "@blazetrails/bcrypt";\n`;
 const INCLUDE_IMPORT = `import { include, type Extended, type Included } from "@blazetrails/activesupport";\n`;
-const AUTH_IMPORT = `import { Authentication, type ClassMethods } from "./concerns/authentication.js";\n`;
+const AUTH_IMPORT = `import { Authentication, type ClassMethods } from "./concerns/authentication.ts";\n`;
 const INCLUDED_SURFACE = `export interface ApplicationController extends Included<typeof Authentication> {}\n\n`;
 const STATIC_INIT =
   `\n  declare static allowUnauthenticatedAccess: Extended<typeof ClassMethods>["allowUnauthenticatedAccess"];\n` +

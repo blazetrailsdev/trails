@@ -82,13 +82,13 @@ describe("controllerPathHelpers", () => {
 
 describe("emitControllerClass (direct helper surface)", () => {
   it("emits a relative parent import when parent ref is provided", async () => {
-    const parent = parentRefForRelative("admin_controller", 0);
+    const parent = parentRefForRelative("admin_controller", 0, ".ts");
     const src = emitControllerClass({
       className: "PostsController",
       parent,
       methods: [actionMethod("show", false)],
     });
-    expect(src).toContain('import { AdminController } from "./admin-controller.js";');
+    expect(src).toContain('import { AdminController } from "./admin-controller.ts";');
     expect(src).toContain("extends AdminController");
     expect(src).not.toContain("ActionController");
     expect(parseTs(src).diagnostics).toEqual([]);

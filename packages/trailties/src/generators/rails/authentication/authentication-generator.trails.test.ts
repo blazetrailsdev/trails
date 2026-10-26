@@ -20,7 +20,14 @@ afterEach(() => {
 });
 
 const PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
-const compilerOptions = { strict: true, module: "nodenext", noEmit: true, skipLibCheck: true };
+const compilerOptions = {
+  strict: true,
+  module: "nodenext",
+  noEmit: true,
+  skipLibCheck: true,
+  rewriteRelativeImportExtensions: true,
+  erasableSyntaxOnly: true,
+};
 const APP_FILES: Record<string, string> = {
   "package.json": `{ "type": "module" }`,
   "tsconfig.json": JSON.stringify({ compilerOptions, include: ["app/**/*.ts"] }),

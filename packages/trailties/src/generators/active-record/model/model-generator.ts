@@ -62,7 +62,7 @@ export class ModelGenerator extends NamedBase {
     const parentClassName = this.parentClassName();
     const parentClass = classify(parentClassName.replace(/::/g, "_").replace(/\//g, "_"));
     const parentPath = dasherize(parentClassName.replace(/::/g, "/"));
-    const importPath = `import { ${parentClass} } from "${relativeRoot || "./"}${parentPath}.js";`;
+    const importPath = `import { ${parentClass} } from "${relativeRoot || "./"}${parentPath}${this.ext()}";`;
 
     const bodyLines: string[] = [];
 

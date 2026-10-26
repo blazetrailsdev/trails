@@ -13,6 +13,7 @@
       "default": "./dist/server/index.js"
     },
     "./all": "./dist/all.js",
+    "./commands": "./dist/bin.js",
     "./generators": "./dist/generators/index.js",
     "./engine": {
       "types": "./dist/engine.d.ts",

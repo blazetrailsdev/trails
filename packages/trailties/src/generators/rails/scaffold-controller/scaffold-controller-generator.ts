@@ -90,9 +90,16 @@ export class ScaffoldControllerGenerator extends NamedBase {
       `app/controllers/${controllerFileName}${ext}`,
       emitControllerClass({
         className: controllerClassName,
-        parent: parentRefForRelative("ApplicationController", this.controllerClassPath().length),
+        parent: parentRefForRelative(
+          "ApplicationController",
+          this.controllerClassPath().length,
+          this.ext(),
+        ),
         imports: [
-          { from: `${modelPath}${this.filePath()}.js`, named: { [modelClassName]: "named" } },
+          {
+            from: `${modelPath}${this.filePath()}${this.ext()}`,
+            named: { [modelClassName]: "named" },
+          },
         ],
         staticBlock: api
           ? tsBody`this.beforeAction("set${camelize(singular)}", { only: ["show", "update", "destroy"] });`

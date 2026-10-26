@@ -33,9 +33,7 @@ export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "
   sqliteDriver?: SqliteDriver;
 }
 
-const TRAILS_LOADER = "tsx";
-const TRAILS_CLI = "node_modules/@blazetrails/trailties/bin/trails.js";
-const TRAILS = `${TRAILS_LOADER} ${TRAILS_CLI}`;
+const TRAILS = "trails";
 
 export class ActionMethods {
   declare readonly options: AppBaseOptions;
@@ -250,8 +248,7 @@ export class AppGenerator extends AppBase {
               "@blazetrails/trails-tsc",
             ]),
             "@types/node": "^22.0.0",
-            tsx: "^4.20.0",
-            typescript: "^5.7.0",
+            typescript: "^5.8.0",
             vite: "^7.0.0",
             vitest: "^3.0.0",
             ...(this.skip("Eslint")
@@ -300,6 +297,8 @@ export class AppGenerator extends AppBase {
             esModuleInterop: true,
             skipLibCheck: true,
             allowArbitraryExtensions: true,
+            rewriteRelativeImportExtensions: true,
+            erasableSyntaxOnly: true,
             types: ["node"],
             rootDir: ".",
             outDir: "dist",
@@ -368,14 +367,7 @@ This application was generated with [trails](https://github.com/blazetrailsdev/b
     ${this.pmRun()} db:setup
     ${this.pmRun()} dev
 
-Every command below that executes application code — anything that imports a
-model, \`config/database.ts\`, or \`config/routes.ts\` — must run through the
-\`tsx\` loader, because the app's sources are TypeScript and \`Node16\`
-resolution spells its imports with a \`.js\` extension that has no file behind
-it until the loader transforms them. The generated \`package.json\` scripts and
-the \`bin/\` binstubs already do this, so every command below is loader-backed.
-To reach a CLI command with no script of its own, use the \`bin/trails\`
-binstub:
+To reach a CLI command with no script of its own, use the \`bin/trails\` binstub:
 
     bin/trails routes
     bin/trails console
@@ -414,7 +406,7 @@ built module raises \`LoadError\`.
       `// This file is used by Rack-based servers to start the application.
 import { Trails } from "@blazetrails/trailties";
 
-import "./config/environment.js";
+import "./config/environment.ts";
 
 export default Trails.application;
 
@@ -485,17 +477,7 @@ ${
     this.createFile(
       "bin/trails",
       `#!/usr/bin/env node
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const { status } = spawnSync(
-  join(root, "node_modules", ".bin", "${TRAILS_LOADER}"),
-  [join(root, "${TRAILS_CLI}"), ...process.argv.slice(2)],
-  { stdio: "inherit" },
-);
-process.exit(status ?? 1);
+import "@blazetrails/trailties/commands";
 `,
       { mode: 0o755 },
     );
@@ -604,7 +586,7 @@ Application.register(${this.appConstBase()}, import.meta.dirname);
       `import { Trails } from "@blazetrails/trailties";
 
 // Load the trails application.
-import "./application.js";
+import "./application.ts";
 
 // Initialize the trails application.
 export default await Trails.initialize();
@@ -1184,7 +1166,7 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
       "db/seeds.ts",
       `// Seed your database here.
 // Example:
-//   import { User } from "../app/models/user.js";
+//   import { User } from "../app/models/user.ts";
 //   await User.create({ name: "Admin", email: "admin@example.com" });
 `,
     );
@@ -1196,7 +1178,7 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
 
     this.createFile(
       "test/application-system-test-case.ts",
-      `import "./test-helper.js";
+      `import "./test-helper.ts";
 import { SystemTestCase } from "@blazetrails/actionpack";
 
 export class ApplicationSystemTestCase extends SystemTestCase {
@@ -1215,7 +1197,7 @@ export class ApplicationSystemTestCase extends SystemTestCase {
 import { env, setEnv } from "@blazetrails/ruby-compat";
 
 if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
-await import("../config/environment.js");
+await import("../config/environment.ts");
 await import("@blazetrails/trailties/test-help");
 
 // Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
@@ -1232,7 +1214,7 @@ import { env, setEnv } from "@blazetrails/ruby-compat";
 
 export async function setup(): Promise<void> {
   if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
-  await import("../config/environment.js");
+  await import("../config/environment.ts");
   await import("@blazetrails/trailties/testing/maintain-test-schema");
 }
 

@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Dir, File, FileUtils, SecureRandom } from "@blazetrails/ruby-compat";
+import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
+import { Dir, File, FileUtils, SecureRandom, getProcessAdapter } from "@blazetrails/ruby-compat";
 import { AppBuilder, AppGenerator } from "./app-generator.js";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Generators } from "../generators.js";
@@ -15,6 +19,41 @@ describe("AppGenerator (trails-only)", () => {
   afterEach(() => {
     FileUtils.rmRf(tmpDir);
   });
+
+  it("boots and builds its views under plain node, with no loader", async () => {
+    const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+    const root = fs.mkdtempSync(path.join(packageDir, "tmp-plain-node-"));
+    try {
+      await new AppGenerator({
+        cwd: root,
+        output: () => {},
+        appPath: "my-app",
+        database: "sqlite",
+      }).run();
+      const app = path.join(root, "my-app");
+      const node = (args: string[]) =>
+        spawnSync(getProcessAdapter().execPath!(), args, {
+          cwd: app,
+          encoding: "utf8",
+          env: { PATH: "", NODE_ENV: "test" },
+        });
+
+      const routes = node([path.join(app, "bin", "trails"), "routes"]);
+      expect(routes.stderr).toBe("");
+      expect(routes.status).toBe(0);
+
+      const views = node([
+        path.join(packageDir, "node_modules/@blazetrails/trails-tsc/bin/trails-tsc-views.js"),
+        "build",
+        "--views",
+        "app/views",
+      ]);
+      expect(views.stderr).toBe("");
+      expect(views.status).toBe(0);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
 
   it("builds with trails-tsc against db/schema.ts so models need no declares", async () => {
     await new AppGenerator({

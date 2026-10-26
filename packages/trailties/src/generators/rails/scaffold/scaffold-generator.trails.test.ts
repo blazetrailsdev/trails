@@ -43,9 +43,9 @@ describe("ScaffoldGenerator (namespaced)", () => {
     expect(read(migration)).toContain('this.createTable("admin_accounts"');
     const controller = read("app/controllers/admin/accounts-controller.ts");
     const model = read("app/models/admin/account.ts");
-    expect(model).toContain('import { ApplicationRecord } from "../application-record.js";');
+    expect(model).toContain('import { ApplicationRecord } from "../application-record.ts";');
     expect(model).toContain("export class AdminAccount extends ApplicationRecord");
-    expect(controller).toContain('import { AdminAccount } from "../../models/admin/account.js";');
+    expect(controller).toContain('import { AdminAccount } from "../../models/admin/account.ts";');
     for (const source of [model, controller, read("app/models/admin.ts")])
       expect(parseTs(source).diagnostics).toEqual([]);
     expect(controller).toContain("this.redirectTo(this.adminAccountsPath(),");

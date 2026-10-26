@@ -1,8 +1,8 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ScaffoldGenerator emit > matches snapshot for the controller and validates as TS without Ruby 1`] = `
-"import { Post } from "../models/post.js";
-import { ApplicationController } from "./application-controller.js";
+"import { Post } from "../models/post.ts";
+import { ApplicationController } from "./application-controller.ts";
 
 export class PostsController extends ApplicationController {
   static {
