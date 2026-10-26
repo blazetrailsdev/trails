@@ -99,6 +99,13 @@ describe("render() and renderToString()", () => {
 });
 
 describe("viewAssigns()", () => {
+  it("returns a non-protected underscore-prefixed own property", () => {
+    const host: Record<string, unknown> = Object.create({ _protectedIvars });
+    host._ivars = ["title"];
+    host._actionName = "show";
+    expect(viewAssigns.call(host)).toEqual({ _ivars: ["title"] });
+  });
+
   it("excludes all DEFAULT_PROTECTED_INSTANCE_VARIABLES", () => {
     const host: Record<string, unknown> = Object.create({ _protectedIvars });
     host.title = "ok";
