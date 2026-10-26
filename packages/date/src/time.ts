@@ -429,8 +429,8 @@ export class Timezone {
 }
 
 interface ZoneOffsetInterval {
-  start: bigint;
-  end: bigint;
+  start: bigint | number;
+  end: bigint | number;
   offset: number;
 }
 
@@ -453,10 +453,9 @@ function zoneOffsetAt(timeZoneId: string, ns: bigint): number {
   const offset = Number(zoned.offsetNanoseconds) / 1_000_000_000;
   const previous = zoned.add({ nanoseconds: 1 }).getTimeZoneTransition("previous");
   const next = zoned.getTimeZoneTransition("next");
-  if (previous === null || next === null) return offset;
   intervals.splice(lo, 0, {
-    start: previous.epochNanoseconds,
-    end: next.epochNanoseconds,
+    start: previous ? previous.epochNanoseconds : -Infinity,
+    end: next ? next.epochNanoseconds : Infinity,
     offset,
   });
   return offset;
