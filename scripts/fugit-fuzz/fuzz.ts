@@ -12,10 +12,17 @@
  *   TZ=UTC pnpm tsx scripts/fugit-fuzz/fuzz.ts --surface cron --count 500
  *   TZ=UTC pnpm tsx scripts/fugit-fuzz/fuzz.ts --pp cron "0 0 L * mon"
  *
+ * The Ruby side reads a zoneinfo compiled from the IANA release Node's ICU
+ * carries (`process.versions.tz`), not the host's `/usr/share/zoneinfo`, so
+ * both sides see the same zone database. It is downloaded and built with
+ * `zic` on first run, into `node_modules/.cache/fugit-fuzz/`.
+ *
  * Not wired into CI.
  */
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Fugit } from "../../packages/fugit/dist/fugit.js";
@@ -363,10 +370,46 @@ function runTs(c: Case): unknown {
   });
 }
 
+function zoneinfo(): string {
+  const version = process.versions.tz;
+  if (!version) throw new Error("this Node carries no ICU tz version");
+  const dir = path.resolve(HERE, "../../node_modules/.cache/fugit-fuzz", `zoneinfo-${version}`);
+  if (existsSync(dir)) return dir;
+  const src = mkdtempSync(path.join(os.tmpdir(), "fugit-fuzz-tzdata-"));
+  mkdirSync(path.dirname(dir), { recursive: true });
+  const build = mkdtempSync(`${dir}.partial-`);
+  try {
+    const tarball = path.join(src, "tzdata.tar.gz");
+    const url = `https://data.iana.org/time-zones/releases/tzdata${version}.tar.gz`;
+    execFileSync("curl", ["-fsSL", "-o", tarball, url], { stdio: "inherit" });
+    execFileSync("tar", ["xzf", tarball, "-C", src]);
+    const sources =
+      "africa antarctica asia australasia europe northamerica southamerica etcetera backward factory";
+    execFileSync("zic", ["-d", build, ...sources.split(" ")], {
+      cwd: src,
+      stdio: "inherit",
+    });
+    for (const tab of ["iso3166.tab", "zone.tab", "zone1970.tab"])
+      copyFileSync(path.join(src, tab), path.join(build, tab));
+    try {
+      renameSync(build, dir);
+    } catch (e) {
+      if (!existsSync(dir)) throw e;
+    }
+  } finally {
+    rmSync(src, { recursive: true, force: true });
+    rmSync(build, { recursive: true, force: true });
+  }
+  return dir;
+}
+
+let zoneinfoDir: string | undefined;
+
 function runRuby(script: string[], input: string): Promise<string> {
   const args = GEMS.flatMap((gem) => ["-I", path.join(VENDOR, gem, "lib")]);
+  const env = { ...process.env, TZ: "UTC", FUGIT_FUZZ_ZONEINFO: (zoneinfoDir ??= zoneinfo()) };
   return new Promise((resolve, reject) => {
-    const child = spawn("ruby", [...args, ...script], { env: { ...process.env, TZ: "UTC" } });
+    const child = spawn("ruby", [...args, ...script], { env });
     let out = "";
     child.stdout.on("data", (d: Buffer) => (out += d.toString()));
     child.stderr.on("data", (d: Buffer) => process.stderr.write(d));

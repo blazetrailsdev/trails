@@ -1,4 +1,7 @@
 require "json"
+require "tzinfo"
+
+TZInfo::DataSource.set(:zoneinfo, ENV.fetch("FUGIT_FUZZ_ZONEINFO"))
 require "fugit"
 require "chronic"
 
