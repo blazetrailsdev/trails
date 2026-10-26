@@ -2,7 +2,6 @@ import { Concern, extend, isPresent } from "@blazetrails/activesupport";
 import {
   defineModule,
   excBacktrace,
-  fetch,
   rbFArray,
   rbModConstSet,
   rbObjAsString,
@@ -59,7 +58,7 @@ function processInternalMessage(
         this.logger.info(`Removing connection (${this.connectionIdentifier})`);
         this.close({
           reason: ActionCable.INTERNAL.disconnectReasons.remote,
-          reconnect: fetch(message, "reconnect", true),
+          reconnect: Object.hasOwn(message, "reconnect") ? message.reconnect : true,
         });
     }
   } catch (e) {

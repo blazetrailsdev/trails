@@ -22,7 +22,6 @@ import {
   rbModConstSet,
   rbObjRespondTo,
   slice,
-  update,
   valuesAt,
   isModuleIncluded,
 } from "@blazetrails/ruby-compat";
@@ -98,7 +97,7 @@ export class FixtureSet {
     connectionPool: ConnectionPool,
     fixturesMap: Record<string, FixtureSet>,
   ): void {
-    update(this.cacheForConnectionPool(connectionPool), fixturesMap);
+    Object.assign(this.cacheForConnectionPool(connectionPool), fixturesMap);
   }
 
   static async instantiateFixtures(
@@ -263,7 +262,7 @@ export class FixtureSet {
   }
 
   private static updateAllLoadedFixtures(fixturesMap: Record<string, FixtureSet>): void {
-    update(this.allLoadedFixtures, fixturesMap);
+    Object.assign(this.allLoadedFixtures, fixturesMap);
   }
 
   readonly tableName: string;

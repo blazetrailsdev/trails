@@ -1080,6 +1080,7 @@ export class SchemaStatements {
     tableName: string,
     options: { name?: string; expression?: string; validate?: boolean } = {},
   ): Promise<boolean> {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options can hold { k: undefined } for an absent keyword, which hasKey reads as absent
     if (!hasKey(options, "name") && !hasKey(options, "expression")) {
       throw new ArgumentError("At least one of :name or :expression must be supplied");
     }

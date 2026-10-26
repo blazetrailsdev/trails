@@ -56,7 +56,10 @@ export const SelectRenderer = {
       htmlOptions,
     );
 
-    if (rtest(htmlOptions["multiple"]) && rtest(fetch<unknown>(options, "includeHidden", true))) {
+    if (
+      rtest(htmlOptions["multiple"]) &&
+      rtest(Object.hasOwn(options, "includeHidden") ? options.includeHidden : true)
+    ) {
       return (
         this.tag("input", {
           disabled: htmlOptions["disabled"],
@@ -76,7 +79,7 @@ export const SelectRenderer = {
     return (
       rtest(htmlOptions["required"]) &&
       !rtest(htmlOptions["multiple"]) &&
-      toI(fetch<unknown>(htmlOptions, "size", 1)) === 1
+      toI(Object.hasOwn(htmlOptions, "size") ? htmlOptions.size : 1) === 1
     );
   },
 

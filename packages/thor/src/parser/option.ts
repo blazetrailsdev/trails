@@ -1,7 +1,6 @@
 import {
   ArgumentError,
   capitalize,
-  fetch,
   hasKey,
   isEmpty,
   isSymbol,
@@ -41,8 +40,9 @@ export class Option extends Argument {
 
   protected override initialize(name: string | null, options: OptionOptions = {}): void {
     this.checkDefaultType = options.checkDefaultType ?? null;
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options can hold { k: undefined } for an absent keyword, which hasKey reads as absent
     if (!hasKey(options, "required")) options.required = false;
-    this.repeatable = fetch(options, "repeatable", false);
+    this.repeatable = Object.hasOwn(options, "repeatable") ? options.repeatable : false;
     super.initialize(name, options);
     this.lazyDefault = options.lazyDefault ?? null;
     this.group = rtest(options.group) ? capitalize(rbObjAsString(options.group), []) : null;

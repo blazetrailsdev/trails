@@ -223,7 +223,7 @@ export async function inside<T>(
   config: { verbose?: unknown } = {},
   block: InsideBlock<T>,
 ): Promise<T> {
-  const verbose = fetch(config, "verbose", false);
+  const verbose = Object.hasOwn(config, "verbose") ? config.verbose : false;
   const pretend = this.options["pretend"];
 
   this.sayStatus("inside", dir, verbose);
@@ -299,7 +299,7 @@ export async function run(
     command = `${toS(config.with)} ${toS(command)}`;
   }
 
-  this.sayStatus("run", desc, fetch(config, "verbose", true));
+  this.sayStatus("run", desc, Object.hasOwn(config, "verbose") ? config.verbose : true);
 
   if (rtest(this.options["pretend"])) return;
 
@@ -324,11 +324,9 @@ export async function run(
   if (
     !rtest(success) &&
     rtest(
-      fetch(
-        config,
-        "abortOnFailure",
-        (this.constructor as unknown as { isExitOnFailure(): boolean }).isExitOnFailure(),
-      ),
+      Object.hasOwn(config, "abortOnFailure")
+        ? config.abortOnFailure
+        : (this.constructor as unknown as { isExitOnFailure(): boolean }).isExitOnFailure(),
     )
   ) {
     abort();
@@ -382,6 +380,7 @@ function _cleanupOptionsAndSet(
   } else if (rbObjIsKindOf(options, Hash)) {
     // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options is a Hash here, which hashDelete dispatches on
     for (const i of ["force", "skip"]) hashDelete(options, i);
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options is a Hash here, which mergeBang dispatches on
     mergeBang(options, { [key]: true });
   }
 }

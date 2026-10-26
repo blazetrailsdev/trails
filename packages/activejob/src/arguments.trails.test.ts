@@ -137,6 +137,7 @@ describe("ActiveJob::Arguments", () => {
     expect(await deserialize([asMap])).toEqual([new Money(7)]);
     const withProto = MoneySerializer.instance().serialize(new Money(1));
     expect(
+      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- the argument is a Hash, which update converts through to_hash
       Object.keys(update(withProto, new Hash<string, unknown>().set("__proto__", 2))),
     ).toContain("__proto__");
     expect(MoneySerializer.instance()).toBe(MoneySerializer.instance());

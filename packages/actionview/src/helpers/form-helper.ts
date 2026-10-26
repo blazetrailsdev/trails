@@ -158,7 +158,9 @@ export function formFor(
   options["scope"] = objectName;
   options["local"] = !(remote != null && remote !== false);
   options["skipDefaultIds"] = false;
-  options["allowMethodNamesOutsideObject"] = fetch(options, "allowMethodNamesOutsideObject", false);
+  options["allowMethodNamesOutsideObject"] = Object.hasOwn(options, "allowMethodNamesOutsideObject")
+    ? options.allowMethodNamesOutsideObject
+    : false;
 
   return formWith.call(this, options, block);
 }
@@ -749,7 +751,7 @@ export class FormBuilder {
 
   fieldName(method: unknown, ...methods: unknown[]): string {
     const kwargs = extractOptionsBang(methods);
-    const multiple = fetch(kwargs, "multiple", false);
+    const multiple = Object.hasOwn(kwargs, "multiple") ? kwargs.multiple : false;
     const index = fetch(
       kwargs,
       "index",
@@ -1095,7 +1097,9 @@ export class FormBuilder {
         ? fetch(
             fieldsOptions,
             "includeId",
-            rbBlock(() => fetch(this.options, "includeId", true)),
+            rbBlock(() =>
+              Object.hasOwn(this.options, "includeId") ? this.options.includeId : true,
+            ),
           )
         : persisted;
 

@@ -289,6 +289,7 @@ export class SessionHash implements PersistedSession {
       typeof candidate?.toHash === "function"
         ? candidate.toHash()
         : (other as Record<string, unknown>);
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- source may be a Hash from to_hash, which eachPair dispatches on
     eachPair(source, (key, value) => {
       hash[String(key)] = value;
     });

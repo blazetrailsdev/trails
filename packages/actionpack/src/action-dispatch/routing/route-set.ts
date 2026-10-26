@@ -496,7 +496,7 @@ export class OptimizedUrlHelper extends UrlHelper {
     const params = this.parameterizeArgs(args, (missingKey) => {
       missingKeys.push(missingKey);
     });
-    const merged = merge(this.route.requirements, params);
+    const merged = { ...this.route.requirements, ...params };
     const constraints = Object.fromEntries(
       Object.entries(merged).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
     );
@@ -1105,6 +1105,7 @@ export class RouteSet {
     methodName: string | null = null,
     reserved: readonly string[] = RESERVED_OPTIONS,
   ): string {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options may be a Hash, which merge converts through to_hash
     options = merge(this.defaultUrlOptions, options) as Record<string, unknown>;
 
     let user: unknown = null;
@@ -1158,6 +1159,7 @@ export class RouteSet {
     if (Object.hasOwn(options, "params")) {
       const optParams = options["params"];
       if (rbObjRespondTo(optParams, "toHash")) {
+        // eslint-disable-next-line blazetrails/ruby-compat-native-required -- optParams answers to_hash, which update converts through
         update(params, optParams as Record<string, unknown>);
       } else {
         params["params"] = optParams;

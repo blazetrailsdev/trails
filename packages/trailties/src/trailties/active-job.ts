@@ -107,6 +107,7 @@ export class Trailtie extends BaseTrailtie {
       }
 
       this.config.afterInitialize(() => {
+        // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options is the activeJob OrderedOptions, which eachPair dispatches on
         eachPair(options, (k, v) => {
           k = `${k}=`;
           if (rbObjRespondTo(ActiveJob, k)) {
@@ -123,6 +124,7 @@ export class Trailtie extends BaseTrailtie {
           "enqueueAfterTransactionCommit",
         );
 
+        // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options is the activeJob OrderedOptions, which eachPair dispatches on
         eachPair(options, (k, v) => {
           k = `${k}=`;
           if (rbObjRespondTo(ActiveJob, k)) {

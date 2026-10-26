@@ -81,6 +81,11 @@ tester.run("ruby-compat-native-required", rule, {
  *  helpers here and to the JSON in the same PR. */
 const LISTED_FLOOR = [
   "hashDelete",
+  "eachPair",
+  "hasKey",
+  "merge",
+  "mergeBang",
+  "update",
   "aryIncludes",
   "aryJoin",
   "compact",

@@ -7,7 +7,7 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
-import { Hash, fetch, hashAref, isSymbol, toSym } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, isSymbol, toSym } from "@blazetrails/ruby-compat";
 import { deepMergeBang, deepSymbolizeKeys, except, type TranslationData } from "../utils.js";
 import { Base, type TranslateOptions } from "./base.js";
 
@@ -43,7 +43,8 @@ export class Simple {
     const translations = this.translations();
     const existing = hashAref(translations, locale);
     if (existing == null || existing === false) translations.set(locale, new Hash());
-    if (!fetch(options, "skipSymbolizeKeys", false)) data = deepSymbolizeKeys(data);
+    if (!(Object.hasOwn(options, "skipSymbolizeKeys") ? options.skipSymbolizeKeys : false))
+      data = deepSymbolizeKeys(data);
     return deepMergeBang(translations.get(locale) as TranslationData, data as TranslationData);
   }
 

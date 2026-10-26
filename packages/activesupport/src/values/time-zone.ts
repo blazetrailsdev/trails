@@ -609,7 +609,7 @@ export class TimeZone {
     if (str == null) throw new ArgumentError("invalid date");
 
     try {
-      const parts = RubyDate._iso8601(str) as Record<string, unknown>;
+      const parts = RubyDate._iso8601(str) as Record<string, number>;
 
       const year = Number(fetch<number | bigint>(parts, "year"));
 
@@ -628,10 +628,12 @@ export class TimeZone {
         year,
         month,
         day,
-        fetch(parts, "hour", 0),
-        fetch(parts, "min", 0),
-        new Rational(fetch<number>(parts, "sec", 0), 1).add(fetch(parts, "secFraction", 0)),
-        fetch(parts, "offset", 0),
+        Object.hasOwn(parts, "hour") ? parts.hour : 0,
+        Object.hasOwn(parts, "min") ? parts.min : 0,
+        new Rational(Object.hasOwn(parts, "sec") ? parts.sec : 0, 1).add(
+          Object.hasOwn(parts, "secFraction") ? parts.secFraction : 0,
+        ),
+        Object.hasOwn(parts, "offset") ? parts.offset : 0,
       );
 
       if (parts.offset != null) {
@@ -658,7 +660,9 @@ export class TimeZone {
       fetch(parts, "mday"),
       fetch(parts, "hour"),
       fetch(parts, "min"),
-      new Rational(fetch<number>(parts, "sec"), 1).add(fetch(parts, "secFraction", 0)),
+      new Rational(fetch<number>(parts, "sec"), 1).add(
+        (Object.hasOwn(parts, "secFraction") ? parts.secFraction : 0) as number,
+      ),
       fetch(parts, "offset"),
     );
 
@@ -741,15 +745,21 @@ export class TimeZone {
     if (parts.seconds != null) {
       time = Time.at(parts.seconds);
     } else {
-      const hash = parts as Record<string, unknown>;
+      const hash = parts as Record<string, number>;
       time = Time.new(
-        Number(fetch<number | bigint>(hash, "year", now.year)),
-        fetch(hash, "mon", now.month),
-        fetch(hash, "mday", parts.year != null || parts.mon != null ? 1 : now.day),
-        fetch(hash, "hour", 0),
-        fetch(hash, "min", 0),
-        new Rational(fetch<number>(hash, "sec", 0), 1).add(fetch(hash, "secFraction", 0)),
-        fetch(hash, "offset", 0),
+        Number((Object.hasOwn(hash, "year") ? hash.year : now.year) as number | bigint),
+        Object.hasOwn(hash, "mon") ? hash.mon : now.month,
+        Object.hasOwn(hash, "mday")
+          ? hash.mday
+          : parts.year != null || parts.mon != null
+            ? 1
+            : now.day,
+        Object.hasOwn(hash, "hour") ? hash.hour : 0,
+        Object.hasOwn(hash, "min") ? hash.min : 0,
+        new Rational(Object.hasOwn(hash, "sec") ? hash.sec : 0, 1).add(
+          Object.hasOwn(hash, "secFraction") ? hash.secFraction : 0,
+        ),
+        Object.hasOwn(hash, "offset") ? hash.offset : 0,
       );
     }
 

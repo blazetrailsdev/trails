@@ -3,7 +3,6 @@ import {
   fetch,
   rbStrSend,
   matchOperator,
-  update,
   kernelInteger,
   File,
   ArgumentError,
@@ -76,7 +75,7 @@ export class Info {
       if ((matchOperator(path, /\[\d+\]$/m) ?? false) !== false) {
         path = path.match(/\[\d+\]$/m).preMatch();
       }
-      update(this._info, {
+      Object.assign(this._info, {
         format: format,
         width: kernelInteger(width),
         height: kernelInteger(height),

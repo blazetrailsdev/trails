@@ -368,9 +368,11 @@ function setupRequest(
   flash: Record<string, string> | undefined,
   xhr: boolean,
 ): void {
-  const generatedExtras = this.routes!.generateExtras(
-    merge(parameters, { controller: controllerClassName, action }),
-  );
+  const generatedExtras = this.routes!.generateExtras({
+    ...parameters,
+    controller: controllerClassName,
+    action,
+  });
   const generatedPath = this.generatedPath(generatedExtras);
   const queryStringKeys = this.queryParameterNames(generatedExtras);
 
@@ -733,6 +735,7 @@ export class TestRequest extends AbstractTestRequest {
    */
   override paramsParsers(): ParameterParsers {
     const base = super.paramsParsers();
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- the receiver is super's return, which the call gate cannot prove a Hash
     return merge<unknown>(base, this._customParamParsers) as ParameterParsers;
   }
 }

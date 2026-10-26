@@ -92,6 +92,7 @@ export class Headers {
   }
 
   mergeBang(headersOrEnv: Record<string, unknown> | Headers): Record<string, unknown> | Headers {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- headersOrEnv may be a Headers, which eachPair dispatches on
     eachPair(headersOrEnv as Record<string, unknown>, (key, value) => {
       this._req.setHeader(envName(String(key)), value);
     });
