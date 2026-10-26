@@ -1,7 +1,7 @@
 import { RecordNotFound } from "@blazetrails/activerecord";
 import { compact, included, isPresent } from "@blazetrails/activesupport";
 import { TimerTask, classModule, rbModAttrReader, rbModAttrWriter } from "@blazetrails/ruby-compat";
-import { Process } from "../process.js";
+import type { Process } from "../process.js";
 import { SolidQueue } from "../solid-queue.js";
 
 interface RegistrableHost {
@@ -44,7 +44,7 @@ export class Registrable {
 
   /** @internal */
   async register(this: RegistrableHost): Promise<void> {
-    this.process = await Process.register({
+    this.process = await SolidQueue.Process!.register({
       kind: this.kind,
       name: this.name,
       pid: this.pid,

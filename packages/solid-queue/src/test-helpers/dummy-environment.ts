@@ -1,7 +1,7 @@
 import { afterAll } from "vitest";
 import { getEnv } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/activerecord";
-import { SolidQueue } from "../solid-queue.js";
+import { Engine } from "../engine.js";
 import { loadQueueSchema, loadShardSchemas } from "./queue-schema.js";
 
 const configurations = Base.configurations();
@@ -36,7 +36,7 @@ await loadShardSchemas();
 await loadQueueSchema();
 await Base.establishConnection(primary);
 
-SolidQueue.connectsTo = { database: { writing: ":queue" } };
+Engine.config.solidQueue.connectsTo = { database: { writing: ":queue" } };
 
 afterAll(async () => {
   const { Record } = await import("../record.js");

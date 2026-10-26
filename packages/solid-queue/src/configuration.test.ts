@@ -100,6 +100,21 @@ describe("ConfigurationTest", () => {
     await assertProcesses(configuration, "dispatcher", 1);
   });
 
+  it("read configuration from provided file", async () => {
+    const configuration = new Configuration({
+      configFile: configFilePath("alternative_configuration"),
+      onlyWork: true,
+    });
+
+    expect((await configuration.configuredProcesses()).length).toBeTruthy();
+    await assertProcesses(configuration, "worker", 3, {
+      processes: 1,
+      pollingInterval: 0.1,
+      queues: ["queue_1", "queue_2", "queue_3"],
+      threads: [1, 2, 3],
+    });
+  });
+
   it("provide configuration as a hash and fill defaults", async () => {
     const backgroundWorker = { queues: "background", polling_interval: 10 };
     const dispatcher = { batch_size: 100 };

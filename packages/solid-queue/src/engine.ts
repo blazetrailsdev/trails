@@ -4,6 +4,7 @@ import { rbFSend } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ConcurrencyControls } from "./active-job/concurrency-controls.js";
 import { Base } from "./processes/base.js";
+import { LogSubscriber } from "./log-subscriber.js";
 import { Interruptible } from "./processes/interruptible.js";
 import { SolidQueue } from "./solid-queue.js";
 
@@ -19,10 +20,7 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
   }
 }
 
-/**
- * @missingRailsCall rake_tasks — CONVERGEABLE port-solid-queue-tasks
- * @missingRailsCall attach_to — CONVERGEABLE port-solid-queue-log-subscriber
- */
+/** @missingRailsCall rake_tasks — CONVERGEABLE port-solid-queue-tasks */
 export class Engine extends TrailsEngine {
   static toString(): string {
     return "SolidQueue::Engine";
@@ -58,6 +56,8 @@ export class Engine extends TrailsEngine {
       onLoad("solid_queue", function (this: typeof SolidQueue) {
         if (this.logger === SolidQueue.DEFAULT_LOGGER) this.logger = TopLevel.Trails!.logger!;
       });
+
+      LogSubscriber.attachTo("solid_queue");
     });
 
     this.initializer("solid_queue.active_job.extensions", () => {

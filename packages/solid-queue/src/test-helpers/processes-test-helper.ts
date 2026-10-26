@@ -18,6 +18,7 @@ export function runSupervisor(options: { [key: string]: unknown } = {}) {
     return this.start();
   });
   const running = Supervisor.start({ skipRecurring: true, ...options });
+  running.catch(() => {});
   return {
     get supervisor() {
       return supervisors[0];

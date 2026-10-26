@@ -23,4 +23,5 @@ export { Dispatcher } from "./dispatcher.js";
 export { Scheduler } from "./scheduler.js";
 export { Supervisor } from "./supervisor.js";
 export { Configuration } from "./configuration.js";
+export { LogSubscriber } from "./log-subscriber.js";
 export { Engine } from "./engine.js";
