@@ -7,12 +7,12 @@ import {
   Hash,
   hashDelete,
   last,
+  OpenURI,
   rbFBinding,
   rbObjIsKindOf,
   rbObjRespondTo,
   rbStrSend,
   rtest,
-  StandardError,
   strNew,
   StringIO,
   toS,
@@ -80,7 +80,7 @@ export async function get(this: FileHost, source: string, ...args: unknown[]): P
     const input = await globalThis.fetch(source, {
       headers: fetch(config, "httpHeaders", {}) as Record<string, string>,
     });
-    if (!input.ok) throw new StandardError(`${input.status} ${input.statusText}`);
+    if (!input.ok) throw new OpenURI.HTTPError(`${input.status} ${input.statusText}`, input);
     render = await input.bytes();
   } else {
     source = File.expandPath(await this.findInSourcePaths(toS(source)));

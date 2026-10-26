@@ -13,7 +13,10 @@ type Compiled = { default: (this: object) => string };
 let loads = 0;
 
 /**
- * Ruby's `ERB` (`vendor/ruby/v3.3.11/lib/erb.rb:335`).
+ * Ruby's `ERB` (`vendor/ruby/v3.3.11/lib/erb.rb:335`). `@src` is compiled at build
+ * time by `trails-tsc-views build-templates`, not by `ERB::Compiler`, because
+ * trails has no eval pipeline (CLAUDE.md § "Templates are precompiled"); the
+ * commands `setEoutvar` writes are therefore not read back.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -51,7 +54,8 @@ export class TSE {
    * @noRailsEquivalent PERMANENT
    */
   async result(b: object): Promise<string> {
-    const compiled = `${this.filename ?? "(erb)"}.js`;
+    if (this.filename == null) throw new LoadError("cannot load such file -- (erb)");
+    const compiled = `${this.filename}.js`;
     const url = new URL(compiled, "file:///");
     url.search = `?${(loads += 1)}`;
     let mod: Compiled;
