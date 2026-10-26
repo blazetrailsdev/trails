@@ -8,7 +8,7 @@ import {
   rbPlus,
 } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
-import { exclude, sum as enumerableSum } from "../enumerable-utils.js";
+import { exclude, indexBy, indexWith, sum as enumerableSum } from "../enumerable-utils.js";
 
 export class SoleItemExpectedError extends StandardError {
   static toString(): string {
@@ -26,6 +26,12 @@ export function maximum(
 
 ENUMERABLE_METHOD_TABLE.maximum = (self: Iterable<unknown>, key?: string | null) =>
   maximum.call(self, key);
+
+ENUMERABLE_METHOD_TABLE.indexBy = (self: Iterable<unknown>, block?: (elem: unknown) => string) =>
+  block === undefined ? indexBy(self) : indexBy(self, block);
+
+ENUMERABLE_METHOD_TABLE.indexWith = (self: unknown[], ...args: unknown[]) =>
+  args.length === 0 ? indexWith(self) : indexWith(self, args[0]);
 
 ENUMERABLE_METHOD_TABLE.isExclude = (self: Iterable<unknown>, object: unknown) =>
   exclude([...self], object);

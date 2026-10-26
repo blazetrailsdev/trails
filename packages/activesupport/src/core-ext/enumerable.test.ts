@@ -4,6 +4,7 @@ import {
   excluding,
   without,
   sum,
+  indexBy,
   indexWith,
   many,
   pluck,
@@ -17,6 +18,8 @@ import {
 import { compactBlank as hashCompactBlank, compactBlankBang } from "../hash-utils.js";
 import {
   Complex,
+  Enumerator,
+  type Hash,
   TypeError,
   complex,
   rational,
@@ -453,21 +456,32 @@ describe("EnumerableTests", () => {
     expect(() => sole([1, null])).toThrow();
   });
 
-  it.skip("index with", () => {
-    // BLOCKED: port-a-minimal-enumerator-for-to-enum-arms
+  it("index by", () => {
     const payments = [new Payment(5), new Payment(15), new Payment(10)];
+    const expected = { 5: new Payment(5), 15: new Payment(15), 10: new Payment(10) };
+    expect(indexBy(payments, (p) => p.price!)).toEqual(expected);
+    expect(indexBy(payments)).toBeInstanceOf(Enumerator);
+    expect(indexBy(payments).each((p: Payment) => p.price)).toEqual(expected);
+  });
 
-    expect(indexWith(payments, (p) => p.price)).toEqual(
-      new Map([
-        [payments[0], 5],
-        [payments[1], 15],
-        [payments[2], 10],
-      ]),
-    );
+  it("index with", () => {
+    const payments = [new Payment(5), new Payment(15), new Payment(10)];
+    const expected = [
+      [payments[0], 5],
+      [payments[1], 15],
+      [payments[2], 10],
+    ];
+
+    expect([...(indexWith(payments, (p) => p.price) as Hash<Payment, unknown>)]).toEqual(expected);
 
     expect(indexWith(["title", "body"], null)).toEqual({ title: null, body: null });
     expect(indexWith(["title", "body"], [])).toEqual({ title: [], body: [] });
     expect(indexWith(["title", "body"], {})).toEqual({ title: {}, body: {} });
+
+    expect(indexWith(payments)).toBeInstanceOf(Enumerator);
+    expect([
+      ...(indexWith(payments).each((p: Payment) => p.price) as Hash<Payment, unknown>),
+    ]).toEqual(expected);
   });
 
   it.skip("doesnt bust constant cache", () => {

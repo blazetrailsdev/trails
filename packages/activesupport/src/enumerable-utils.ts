@@ -16,6 +16,8 @@ import {
   rbFloatTypeP,
   rbIntegerTypeP,
   sortBy,
+  toEnum,
+  type Enumerator,
 } from "@blazetrails/ruby-compat";
 import { count, first, isInclude, reject, toA } from "@blazetrails/ruby-compat/enumerable";
 import { Range } from "@blazetrails/ruby-compat/range";
@@ -57,17 +59,26 @@ export function sum<T>(collection: Iterable<T> | Range<T>, ...args: unknown[]): 
 export function indexBy<T, K extends string | number>(
   collection: Iterable<T> | Each<T>,
   fn: (item: T) => K,
-): Record<K, T> {
-  const result = Object.create(null) as Record<K, T>;
-  const block = (elem: T): void => {
-    result[fn(elem)] = elem;
-  };
-  if (typeof (collection as Partial<Each<T>>).each === "function") {
-    (collection as Each<T>).each(block);
+): Record<K, T>;
+export function indexBy<T>(collection: Iterable<T> | Each<T>): Enumerator<T>;
+export function indexBy<T, K extends string | number>(
+  collection: Iterable<T> | Each<T>,
+  fn?: (item: T) => K,
+): Record<K, T> | Enumerator<T> {
+  if (fn !== undefined) {
+    const result = Object.create(null) as Record<K, T>;
+    const block = (elem: T): void => {
+      result[fn(elem)] = elem;
+    };
+    if (typeof (collection as Partial<Each<T>>).each === "function") {
+      (collection as Each<T>).each(block);
+    } else {
+      for (const elem of collection as Iterable<T>) block(elem);
+    }
+    return result;
   } else {
-    for (const elem of collection as Iterable<T>) block(elem);
+    return toEnum<T>(collection as object, "indexBy");
   }
-  return result;
 }
 
 export function indexWith<V>(
@@ -78,24 +89,28 @@ export function indexWith<T, V>(
   collection: readonly T[],
   defaultOrBlock: V | ((elem: T) => V),
 ): Hash<T, V> | Record<string, V>;
+export function indexWith<T>(collection: readonly T[]): Enumerator<T>;
 export function indexWith<T, V>(
   collection: readonly T[],
-  defaultOrBlock: V | ((elem: T) => V),
-): Hash<T, V> | Record<string, V> {
-  const result: Hash<T, V> | Record<string, V> = collection.every(
-    (elem) => typeof elem === "string",
-  )
-    ? {}
-    : new Hash<T, V>();
-  const aset = (elem: T, value: V): unknown =>
+  defaultOrBlock?: V | ((elem: T) => V),
+): Hash<T, V> | Record<string, V> | Enumerator<T> {
+  const noDefault = arguments.length < 2;
+  const newResult = (): Hash<T, V> | Record<string, V> =>
+    collection.every((elem) => typeof elem === "string") ? {} : new Hash<T, V>();
+  const aset = (result: Hash<T, V> | Record<string, V>, elem: T, value: V): unknown =>
     result instanceof Hash ? result.set(elem, value) : hashAset(result, elem as string, value);
   if (typeof defaultOrBlock === "function") {
+    const result = newResult();
     const block = defaultOrBlock as (elem: T) => V;
-    for (const elem of collection) aset(elem, block(elem));
+    for (const elem of collection) aset(result, elem, block(elem));
+    return result;
+  } else if (noDefault) {
+    return toEnum<T>(collection, "indexWith");
   } else {
-    for (const elem of collection) aset(elem, defaultOrBlock);
+    const result = newResult();
+    for (const elem of collection) aset(result, elem, defaultOrBlock as V);
+    return result;
   }
-  return result;
 }
 
 export function pluck<T, K extends keyof T>(

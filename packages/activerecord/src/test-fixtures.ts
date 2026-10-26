@@ -9,7 +9,6 @@ import {
   isSymbol,
   rbEql,
   rbObjClassname,
-  strUminus,
   symbolToS,
   toS,
 } from "@blazetrails/ruby-compat";
@@ -95,9 +94,9 @@ export const ClassMethods = {
       this.fixtureSets = { ...this.fixtureSets };
       for (let fsName of fixtureSetNames) {
         const name = isSymbol(fsName) ? symbolToS(fsName) : fsName;
-        let key = name.includes("/") ? strUminus(name.replaceAll("/", "_")) : fsName;
-        if (isSymbol(key)) key = strUminus(symbolToS(key));
-        if (isSymbol(fsName)) fsName = strUminus(symbolToS(fsName));
+        let key = name.includes("/") ? name.replaceAll("/", "_") : fsName;
+        if (isSymbol(key)) key = symbolToS(key);
+        if (isSymbol(fsName)) fsName = symbolToS(fsName);
         this.fixtureSets[key] = fsName;
       }
     }

@@ -3,7 +3,6 @@ import { capture } from "@blazetrails/activesupport";
 import {
   childProcessAdapterConfig,
   include,
-  initializeIncludedModules,
   registerChildProcessAdapter,
   setEnv,
   stdin as $stdin,
@@ -14,10 +13,6 @@ import { DEFAULT_TERMINAL_WIDTH, terminalWidth } from "./shell/terminal.js";
 
 class Counter {
   options: Record<string, unknown> = {};
-
-  constructor(config: object = {}) {
-    initializeIncludedModules(this, [], {}, config);
-  }
 }
 include(Counter, Shell);
 const Host = Counter as unknown as new (config?: object) => Counter & Shell;

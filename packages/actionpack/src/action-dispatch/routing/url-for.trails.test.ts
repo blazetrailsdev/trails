@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { initializeIncludedModules, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 import { include, isModuleIncluded, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 
 import { RouteSet } from "./route-set.js";
@@ -45,9 +45,6 @@ describe("ActionDispatch::Routing::UrlFor included", () => {
   it("reads the route set of url_helpers included into the singleton class after initialize", () => {
     class Host {
       declare _routes: RouteSet;
-      constructor() {
-        initializeIncludedModules(this);
-      }
     }
     include(Host, UrlFor);
     const host = new Host();
@@ -62,9 +59,6 @@ describe("ActionDispatch::Routing::UrlFor included", () => {
     const routes = new RouteSet();
     class Host {
       declare _routes: RouteSet | null;
-      constructor() {
-        initializeIncludedModules(this);
-      }
     }
     include(Host, routes.urlHelpers());
     include(Host, UrlFor);

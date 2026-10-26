@@ -14,7 +14,7 @@ import {
   File,
   FileUtils,
   include,
-  inspect,
+  rbInspect,
   kernelCatch,
   kernelThrow,
   type Included,
@@ -242,7 +242,7 @@ describe("ACLogSubscriberTest", () => {
     tc.wait();
 
     assertEqual(3, tc.logs().length);
-    assertEqual(`Parameters: ${inspect({ id: "10" })}`, tc.logs()[1]);
+    assertEqual(`Parameters: ${rbInspect({ id: "10" })}`, tc.logs()[1]);
   });
 
   it("multiple process with parameters", async () => {
@@ -252,8 +252,8 @@ describe("ACLogSubscriberTest", () => {
     tc.wait();
 
     assertEqual(6, tc.logs().length);
-    assertEqual(`Parameters: ${inspect({ id: "10" })}`, tc.logs()[1]);
-    assertEqual(`Parameters: ${inspect({ id: "20" })}`, tc.logs()[4]);
+    assertEqual(`Parameters: ${rbInspect({ id: "10" })}`, tc.logs()[1]);
+    assertEqual(`Parameters: ${rbInspect({ id: "20" })}`, tc.logs()[4]);
   });
 
   it("process action with wrapped parameters", async () => {
@@ -262,7 +262,7 @@ describe("ACLogSubscriberTest", () => {
     tc.wait();
 
     assertEqual(3, tc.logs().length);
-    assertMatch(inspect({ person: { name: "jose" } }).slice(1, -1), tc.logs()[1]);
+    assertMatch(rbInspect({ person: { name: "jose" } }).slice(1, -1), tc.logs()[1]);
   });
 
   it("process action with view runtime", async () => {
@@ -312,9 +312,9 @@ describe("ACLogSubscriberTest", () => {
     tc.wait();
 
     const params = tc.logs()[1];
-    assertMatch(inspect({ amount: "[FILTERED]" }).slice(1, -1), params);
-    assertMatch(inspect({ lifo: "[FILTERED]" }).slice(1, -1), params);
-    assertMatch(inspect({ step: "1" }).slice(1, -1), params);
+    assertMatch(rbInspect({ amount: "[FILTERED]" }).slice(1, -1), params);
+    assertMatch(rbInspect({ lifo: "[FILTERED]" }).slice(1, -1), params);
+    assertMatch(rbInspect({ step: "1" }).slice(1, -1), params);
   });
 
   it("redirect to", async () => {
