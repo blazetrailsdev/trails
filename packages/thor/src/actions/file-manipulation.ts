@@ -10,6 +10,7 @@ import {
   last,
   rbFBinding,
   rbObjIsKindOf,
+  StandardError,
   rbObjRespondTo,
   rbStrSend,
   rtest,
@@ -64,6 +65,10 @@ export async function linkFile(
   return this.createLink(destination, source, config);
 }
 
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm throw — PERMANENT
+ */
 export async function get(this: FileHost, source: string, ...args: unknown[]): Promise<unknown> {
   const block = (typeof last(args) === "function" ? args.pop() : undefined) as
     | ((render?: Uint8Array) => unknown)
@@ -76,6 +81,7 @@ export async function get(this: FileHost, source: string, ...args: unknown[]): P
     const input = await globalThis.fetch(source, {
       headers: fetch(config, "httpHeaders", {}) as Record<string, string>,
     });
+    if (!input.ok) throw new StandardError(`${input.status} ${input.statusText}`);
     render = await input.bytes();
   } else {
     source = File.expandPath(await this.findInSourcePaths(toS(source)));
