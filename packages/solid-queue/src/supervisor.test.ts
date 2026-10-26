@@ -1,44 +1,14 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "./test-helpers/dummy-application.js";
 import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
-import { TopLevel, minutes } from "@blazetrails/activesupport";
+import { minutes } from "@blazetrails/activesupport";
 import { Job, Process, Supervisor, SolidQueueAdapter } from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
-
-const dummyRoot = `${import.meta.dirname}/../../../vendor/solid_queue/v1.1.3/test/dummy`;
-const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
-
-async function waitForRegisteredProcesses(count: number, { timeout = 1 } = {}) {
-  const end = Date.now() + timeout * 1000;
-  while (Date.now() < end && (await Process.count()) !== count) await sleep(0.05);
-}
-
-function runSupervisor(options: { [key: string]: unknown } = {}) {
-  const supervisors: Supervisor[] = [];
-  const started = vi.spyOn(Supervisor.prototype, "start").mockImplementationOnce(function (
-    this: Supervisor,
-  ) {
-    supervisors.push(this);
-    started.mockRestore();
-    return this.start();
-  });
-  const running = Supervisor.start({ skipRecurring: true, ...options });
-  return {
-    get supervisor() {
-      return supervisors[0];
-    },
-    async terminate(signal: "TERM" | "QUIT" = "TERM") {
-      const supervisor = supervisors[0];
-      (supervisor as unknown as { signalQueue(): string[] }).signalQueue().push(signal);
-      await (supervisor as unknown as { interrupt(): Promise<void> }).interrupt();
-      await running;
-    },
-  };
-}
+import { runSupervisor, waitForRegisteredProcesses } from "./test-helpers/processes-test-helper.js";
 
 async function assertRegisteredProcesses(kind: string, count: number, supervisor?: Supervisor) {
   const processes = await Process.where({ kind }).toArray();
@@ -56,10 +26,6 @@ describe("SupervisorTest", () => {
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
     oldPermanentConnectionCheckout = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
-  });
-
-  beforeEach(() => {
-    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(dummyRoot);
   });
 
   afterEach(async () => {

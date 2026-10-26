@@ -282,10 +282,7 @@ export class Supervisor extends Base {
     return Object.keys(this.forks).length === 0;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @internal */
   private waitpid2(): [string, Status] | null {
     for (const [pid, instance] of Object.entries(this.forks)) {
       if (instance._thread?.isAlive() !== false) continue;

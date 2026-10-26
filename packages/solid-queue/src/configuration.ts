@@ -2,6 +2,7 @@ import { Model } from "@blazetrails/activemodel";
 import {
   TopLevel,
   camelize,
+  isPlainObject,
   isPresent,
   presence,
   reverseMerge,
@@ -275,12 +276,12 @@ export class Configuration extends Model {
 
   /** @internal */
   private async loadConfigFrom(fileOrHash: unknown): Promise<Options> {
-    if (fileOrHash instanceof Pathname || typeof fileOrHash === "string") {
+    if (isPlainObject(fileOrHash)) {
+      return { ...(fileOrHash as Options) };
+    } else if (fileOrHash instanceof Pathname || typeof fileOrHash === "string") {
       return await this.loadConfigFromFile(new Pathname(String(fileOrHash)));
     } else if (fileOrHash == null) {
       return {};
-    } else if (typeof fileOrHash === "object") {
-      return { ...(fileOrHash as Options) };
     } else {
       throw new RuntimeError(`Solid Queue cannot be initialized with ${rbInspect(fileOrHash)}`);
     }
