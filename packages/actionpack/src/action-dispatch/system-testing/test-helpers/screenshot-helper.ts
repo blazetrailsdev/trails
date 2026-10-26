@@ -1,5 +1,12 @@
 import { Minitest, presence, TopLevel } from "@blazetrails/activesupport";
-import { Encoding, File, getFs, Pathname, rbModMethodDefined } from "@blazetrails/ruby-compat";
+import {
+  defineModule,
+  Encoding,
+  File,
+  getFs,
+  Pathname,
+  rbModMethodDefined,
+} from "@blazetrails/ruby-compat";
 import { vite } from "../server.js";
 
 declare module "vitest" {
@@ -22,7 +29,7 @@ export interface ScreenshotHelperHost {
   metadata: Record<string, unknown>;
 }
 
-export const ScreenshotHelper = { takeScreenshot, takeFailedScreenshot } as {
+export const ScreenshotHelper = defineModule({ takeScreenshot, takeFailedScreenshot }) as {
   takeScreenshot: typeof takeScreenshot;
   takeFailedScreenshot: typeof takeFailedScreenshot;
   /** @noRailsEquivalent PERMANENT */
