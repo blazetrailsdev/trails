@@ -1,5 +1,5 @@
 import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
-import { ActionController, controllerConstants } from "@blazetrails/actionpack";
+import { ActionController, registerController } from "@blazetrails/actionpack";
 
 export class HealthController extends ActionController.Base {
   static override controllerPath(): string {
@@ -32,4 +32,4 @@ HealthController.rescueFrom(Error, {
   },
 });
 
-controllerConstants.set("rails/health", HealthController);
+registerController("Rails::HealthController", HealthController);

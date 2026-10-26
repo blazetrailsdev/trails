@@ -1,7 +1,6 @@
 import {
   ConsoleFormatter,
   RoutesInspector,
-  controllerConstants,
   type Journey,
   type RoutesFilter,
   type RoutesFormatter,
@@ -41,11 +40,9 @@ export class RouteInfo {
     const requirements = route.requirements;
     this.controllerName = requirements["controller"] as string | undefined;
     this.actionName = requirements["action"] as string | undefined;
-    this.controllerClass = (controllerConstants.get(
-      underscore(String(this.controllerName ?? "")),
-    ) ?? safeConstantize(camelize(String(this.controllerName ?? "")) + "Controller")) as
-      | ControllerClass
-      | undefined;
+    this.controllerClass = safeConstantize(
+      camelize(String(this.controllerName ?? "")) + "Controller",
+    ) as ControllerClass | undefined;
   }
 
   async unused(): Promise<boolean> {

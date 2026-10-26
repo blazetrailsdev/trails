@@ -10,4 +10,5 @@ Trails.application!.routes().draw(function () {
   this.get("/posts/canonical", { to: "posts#canonical" });
   this.get("/boom", { to: "posts#boom" });
   this.get("up", { to: "rails/health#show", as: "rails_health_check" });
+  this.get("/legacy", { to: "legacy#index", as: "legacy" });
 });
