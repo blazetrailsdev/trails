@@ -2,7 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { tzdataAbbreviation } from "./tzdata-abbreviations.js";
 import { tzdataIsdst, tzdataOffsetInstant } from "./tzdata-isdst.js";
 import { rbWarning } from "./rb-warning.js";
-import { rbStrftime } from "./strftime.js";
+import { rbStrftime, type StrftimeVtm } from "./strftime.js";
 import {
   ArgumentError,
   Date,
@@ -437,7 +437,10 @@ interface ZoneOffsetInterval {
 
 const zoneOffsetIntervals = new Map<string, ZoneOffsetInterval[]>();
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
 function zoneOffsetAt(timeZoneId: string, ns: bigint, localZone = true): number {
   if (!localZone) {
     const seconds = ns / 1_000_000_000n - (ns % 1_000_000_000n < 0n ? 1n : 0n);
@@ -465,6 +468,21 @@ function zoneOffsetAt(timeZoneId: string, ns: bigint, localZone = true): number 
     offset,
   });
   return offset;
+}
+
+/**
+ * `rb_strftime_alloc` (`vendor/ruby/v3.3.11/time.c:5194-5210`).
+ *
+ * @missingRailsCall rb_strftime_timespec — PERMANENT
+ */
+function rbStrftimeAlloc(
+  format: string,
+  time: Time,
+  vtm: StrftimeVtm,
+  timev: Rational,
+  gmt: boolean,
+): string | null {
+  return rbStrftime(format, time, vtm, timev, gmt);
 }
 
 /**
@@ -1616,7 +1634,7 @@ export class Time extends rbCTime {
     }
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
-    const str = rbStrftime(
+    const str = rbStrftimeAlloc(
       format,
       this,
       {
