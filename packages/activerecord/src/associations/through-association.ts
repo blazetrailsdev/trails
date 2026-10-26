@@ -1,3 +1,4 @@
+import type { ThroughReflection } from "../reflection.js";
 import type { Base } from "../base.js";
 import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
@@ -12,7 +13,7 @@ import { delegate, kernelArray as Array, presence } from "@blazetrails/activesup
 /** @internal */
 export interface ThroughAssociationHost {
   owner: Base;
-  reflection: any;
+  reflection: ThroughReflection;
   options: any;
   /** @internal */
   _throughReflection?: any;
@@ -40,10 +41,10 @@ export function transaction<R>(
 /** @internal */
 export function throughReflection(this: ThroughAssociationHost): any {
   return (this._throughReflection ??= (() => {
-    let refl = this.reflection.throughReflection;
+    let refl = this.reflection.throughReflection!;
 
     while (refl.isThroughReflection()) {
-      refl = refl.throughReflection;
+      refl = refl.throughReflection!;
     }
 
     return refl;
@@ -58,7 +59,7 @@ export function throughAssociation(this: ThroughAssociationHost): any {
 /** @internal */
 export function targetScope(this: ThroughAssociationHost): any {
   const scope = rbCallSuper(this, targetScope) as any;
-  for (const reflection of (this.reflection.chain as any[]).slice(1)) {
+  for (const reflection of this.reflection.chain.slice(1)) {
     const relation = reflection.klass.scopeForAssociation();
     scope.mergeBang(
       relation.except(
