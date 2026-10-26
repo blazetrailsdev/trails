@@ -514,16 +514,11 @@ export function eachSlice<T, E = unknown>(
 
   if (size <= 0) throw new ArgumentError("invalid slice size");
   if (!block) {
-    // `RETURN_SIZED_ENUMERATOR`, sized by `enum_each_slice_size` (`vendor/ruby/v3.3.11/enum.c:3127`).
     return new Enumerator<T[]>(
       blockPass((y: { yield(i: T[]): unknown }) => eachSlice(obj, n, (i: T[]) => y.yield(i))),
       "each",
       [],
-      () => {
-        const enumSize = Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null);
-        if (enumSize == null || enumSize === Infinity) return enumSize;
-        return Math.floor(((enumSize as number) + size - 1) / size);
-      },
+      () => enumEachSliceSize(obj, size),
     );
   }
   let ary: T[] = [];
@@ -568,14 +563,13 @@ export function minBy<T, E = unknown>(
 /** @noRailsEquivalent PERMANENT */
 export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: unknown[]): unknown {
   if (typeof argv.at(-1) !== "function") {
-    // `RETURN_SIZED_ENUMERATOR`, sized by `enum_size` (`vendor/ruby/v3.3.11/enum.c:467`).
     return new Enumerator<T>(
       blockPass((y: { yield(i: T): unknown }) =>
         minBy(obj, ...(argv as [number | null]), (i) => y.yield(i)),
       ),
       "each",
       [],
-      () => (Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null)),
+      () => enumSize(obj),
     );
   }
   const block = argv.pop() as (i: T) => unknown;
@@ -640,14 +634,13 @@ export function maxBy<T, E = unknown>(
 /** @noRailsEquivalent PERMANENT */
 export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: unknown[]): unknown {
   if (typeof argv.at(-1) !== "function") {
-    // `RETURN_SIZED_ENUMERATOR`, sized by `enum_size` (`vendor/ruby/v3.3.11/enum.c:467`).
     return new Enumerator<T>(
       blockPass((y: { yield(i: T): unknown }) =>
         maxBy(obj, ...(argv as [number | null]), (i) => y.yield(i)),
       ),
       "each",
       [],
-      () => (Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null)),
+      () => enumSize(obj),
     );
   }
   const block = argv.pop() as (i: T) => unknown;
@@ -714,16 +707,11 @@ export function eachCons<T, E = unknown>(
 
   if (size <= 0) throw new ArgumentError("invalid size");
   if (!block) {
-    // `RETURN_SIZED_ENUMERATOR`, sized by `enum_each_cons_size` (`vendor/ruby/v3.3.11/enum.c:3209`).
     return new Enumerator<T[]>(
       blockPass((y: { yield(i: T[]): unknown }) => eachCons(obj, n, (i) => y.yield(i))),
       "each",
       [],
-      () => {
-        const enumSize = Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null);
-        if (enumSize == null) return null;
-        return Math.max((enumSize as number) + 1 - size, 0);
-      },
+      () => enumEachConsSize(obj, size),
     );
   }
   const ary: T[] = [];
@@ -736,6 +724,27 @@ export function eachCons<T, E = unknown>(
     },
     () => obj,
   );
+}
+
+/** `enum_size` (`vendor/ruby/v3.3.11/enum.c:467`): `self.size`, else `nil`. */
+function enumSize(self: object): unknown {
+  return Array.isArray(self) ? self.length : (rbCheckFuncall(self, "size") ?? null);
+}
+
+/** `enum_each_slice_size` (`vendor/ruby/v3.3.11/enum.c:3127`). */
+function enumEachSliceSize(obj: object, sliceSize: number): unknown {
+  const size = enumSize(obj);
+  if (size == null) return null;
+  if (size === Infinity) return size;
+  return Math.floor(((size as number) + sliceSize - 1) / sliceSize);
+}
+
+/** `enum_each_cons_size` (`vendor/ruby/v3.3.11/enum.c:3209`). */
+function enumEachConsSize(obj: object, consSize: number): unknown {
+  const size = enumSize(obj);
+  if (size == null) return null;
+  const n = (size as number) + 1 - consSize;
+  return n < 0 ? 0 : n;
 }
 
 function enumfunc<T>(args: unknown[]): (i: T) => unknown {
