@@ -75,6 +75,7 @@ export interface StrftimeSubject {
   jd: number;
   nth: bigint;
   gregorianP: boolean;
+  sg: number;
   mon: number;
   day: number;
   wday: number;
@@ -107,6 +108,7 @@ function temporalSubject(
     jd: cCivilToJd(plain.year, plain.month, plain.day),
     nth: 0n,
     gregorianP: true,
+    sg: DEFAULT_SG,
     mon: plain.month,
     day: plain.day,
     wday: cJdToWday(cCivilToJd(plain.year, plain.month, plain.day)),
@@ -143,20 +145,20 @@ function msecs(subject: StrftimeSubject): number {
 
 /** @internal */
 function cwyear(subject: StrftimeSubject): number | bigint {
-  const [ry] = cJdToCommercial(subject.jd);
+  const [ry] = cJdToCommercial(subject.jd, subject.sg);
   if (subject.nth === 0n) return ry;
   return encodeYear(subject.nth, ry, subject.gregorianP ? -1 : +1);
 }
 
 /** @internal */
 function cweek(subject: StrftimeSubject): number {
-  const [, rw] = cJdToCommercial(subject.jd);
+  const [, rw] = cJdToCommercial(subject.jd, subject.sg);
   return rw;
 }
 
 /** @internal */
 function wnumx(subject: StrftimeSubject, f: number): number {
-  const [, rw] = cJdToWeeknum(subject.jd, f);
+  const [, rw] = cJdToWeeknum(subject.jd, f, subject.sg);
   return rw;
 }
 
@@ -5827,6 +5829,7 @@ export class Date extends rbCDate {
         jd: this.mLocalJd(),
         nth: this.nth,
         gregorianP: this.isGregorian,
+        sg: DEFAULT_SG,
         mon: this.mon,
         day: this.day,
         wday: this.wday,
@@ -6774,6 +6777,7 @@ export class DateTime extends DateWithoutParseStatics {
         jd: this.mLocalJd(),
         nth: this.nth,
         gregorianP: this.isGregorian,
+        sg: DEFAULT_SG,
         mon: this.mon,
         day: this.day,
         wday: this.wday,

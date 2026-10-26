@@ -952,3 +952,21 @@ describe("Time#utc_offset in a named zone, from the cached offset interval", () 
     expect(Time.at(0, { in: "utc" }).isUtc()).toBe(true);
   });
 });
+
+describe("Time#strftime week numbers before the 1582 reform", () => {
+  it("computes %U %W %V %G on the proleptic Gregorian calendar", () => {
+    const cases: [number, number, number, string][] = [
+      [12, 7, 9, "28 28 28 0012"],
+      [14, 6, 2, "22 22 23 0014"],
+      [1581, 3, 15, "11 10 11 1581"],
+      [1583, 3, 15, "11 11 11 1583"],
+    ];
+    for (const [y, m, d, expected] of cases) {
+      expect(Time.utc(y, m, d).strftime("%U %W %V %G")).toBe(expected);
+    }
+  });
+
+  it("leaves Date#strftime on its own start", () => {
+    expect(new RbDate(12, 7, 9).strftime("%U %W %V %G")).toBe("27 27 27 0012");
+  });
+});
