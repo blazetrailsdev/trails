@@ -1,5 +1,6 @@
 import mysql from "mysql2/promise";
 import {
+  hasKey,
   kernelInteger,
   Rational,
   rbProgname,
@@ -557,14 +558,16 @@ export async function initialize(this: Wrapper, opts: Options = {}): Promise<Mys
   this.queryOptions = { ...defaultQueryOptions() };
   Object.assign(this.queryOptions, opts);
 
-  if (!("connectTimeout" in opts)) opts.connectTimeout = 120;
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- opts can hold { k: undefined } for an absent keyword, which hasKey reads as absent
+  if (!hasKey(opts, "connectTimeout")) opts.connectTimeout = 120;
 
   for (const key of [
     ...["reconnect", "connectTimeout", "localInfile", "readTimeout", "writeTimeout"],
     ...["defaultFile", "defaultGroup", "secureAuth", "initCommand", "automaticClose"],
     ...["enableCleartextPlugin", "defaultAuth"],
   ]) {
-    if (!Object.hasOwn(opts, key)) continue;
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- opts can hold { k: undefined } for an absent keyword, which hasKey reads as absent
+    if (!hasKey(opts, key)) continue;
 
     switch (key) {
       case "reconnect":
@@ -598,9 +601,8 @@ export async function initialize(this: Wrapper, opts: Options = {}): Promise<Mys
   if (rtest(opts.sslverify)) flags |= CLIENT_FLAGS.SSL_VERIFY_SERVER_CERT;
 
   if (
-    ["user", "pass", "hostname", "dbname", "db", "sock"].some((k) =>
-      Object.hasOwn(this.queryOptions, k),
-    )
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- queryOptions can hold { k: undefined } for an absent keyword, which hasKey reads as absent
+    ["user", "pass", "hostname", "dbname", "db", "sock"].some((k) => hasKey(this.queryOptions, k))
   ) {
     warn("============= WARNING FROM mysql2 =============");
     warn(

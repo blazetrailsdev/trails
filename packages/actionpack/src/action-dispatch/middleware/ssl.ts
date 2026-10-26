@@ -1,6 +1,6 @@
 import type { RackEnv, RackHeaders, RackResponse } from "@blazetrails/rack";
 import { CONTENT_TYPE, RELEASE, SET_COOKIE } from "@blazetrails/rack";
-import { fetch, Gem, merge, rbFSend, toI } from "@blazetrails/ruby-compat";
+import { fetch, Gem, rbFSend, toI } from "@blazetrails/ruby-compat";
 import { LOCATION, STRICT_TRANSPORT_SECURITY } from "../constants.js";
 import { Request } from "../http/request.js";
 
@@ -95,16 +95,13 @@ export class SSL {
   private normalizeHstsOptions(options: SSLOptions["hsts"]): Required<HSTSOptions> {
     switch (options) {
       case false:
-        return merge<unknown>(SSL.defaultHstsOptions(), { expires: 0 }) as Required<HSTSOptions>;
+        return { ...SSL.defaultHstsOptions(), expires: 0 } as Required<HSTSOptions>;
       case null:
       case undefined:
       case true:
         return SSL.defaultHstsOptions();
       default:
-        return merge<unknown>(
-          SSL.defaultHstsOptions(),
-          options as Record<string, unknown>,
-        ) as Required<HSTSOptions>;
+        return { ...SSL.defaultHstsOptions(), ...options } as Required<HSTSOptions>;
     }
   }
 

@@ -16,7 +16,6 @@ import {
   ThreadError,
   excBacktrace,
   isSymbol,
-  merge,
   rbObjClassname,
   rbObjRespondTo,
   stringDelete,
@@ -177,9 +176,10 @@ export class SSE {
     json: string,
     options: { retry?: number | string; event?: string; id?: number | string },
   ): void {
-    const currentOptions: Record<string, string | number | undefined> = merge<
-      string | number | undefined
-    >(this._options, options);
+    const currentOptions: Record<string, string | number | undefined> = {
+      ...this._options,
+      ...options,
+    };
 
     for (const name of SSE.PERMITTED_OPTIONS) {
       const optionValue = currentOptions[name];

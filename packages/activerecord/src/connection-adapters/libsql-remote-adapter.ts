@@ -1,5 +1,5 @@
 /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
-import { extend, include, rbModConstSet, rbObjAsString } from "@blazetrails/ruby-compat";
+import { extend, hasKey, include, rbModConstSet, rbObjAsString } from "@blazetrails/ruby-compat";
 import { ConnectionAdapters } from "../namespaces.js";
 import type { SqliteDriver } from "../sqlite-adapter.js";
 import { libsqlRemoteDriver } from "../sqlite/libsql.js";
@@ -18,7 +18,8 @@ export class LibSQLRemoteAdapter extends AbstractAdapter {
     this._memoryDatabase = false;
     this._lastAffectedRows = 0;
     this._previousReadUncommitted = null;
-    if (!("strict" in this._config)) {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- _config can hold { k: undefined } for an absent keyword, which hasKey reads as absent
+    if (!hasKey(this._config, "strict")) {
       this._config.strict = SQLite3Adapter.strictStringsByDefault;
     }
     this._connectionParameters = {

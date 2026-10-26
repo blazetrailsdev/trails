@@ -29,6 +29,7 @@ export class FormatValidator extends EachValidator {
   }
 
   override checkValidityBang(): void {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options can hold { k: undefined } for an absent keyword, which hasKey reads as absent
     if (isInclude(this.options, "with") === isInclude(this.options, "without")) {
       throw new ArgumentError("Either :with or :without must be supplied (but not both)");
     }
