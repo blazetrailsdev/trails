@@ -25,10 +25,13 @@ import {
 import "../action-cable.js";
 import { ActionCable, Channel } from "../namespaces.js";
 import { Broadcasting, type ClassMethods as BroadcastingClassMethods } from "./broadcasting.js";
-import { Callbacks } from "./callbacks.js";
+import { Callbacks, type ClassMethods as CallbacksClassMethods } from "./callbacks.js";
 import { Naming } from "./naming.js";
-import { PeriodicTimers } from "./periodic-timers.js";
-import { Streams, type Handler, type StreamOptions } from "./streams.js";
+import {
+  PeriodicTimers,
+  type ClassMethods as PeriodicTimersClassMethods,
+} from "./periodic-timers.js";
+import { Streams, type Handler, type StreamsChannel, type StreamOptions } from "./streams.js";
 
 type Data = Record<string, unknown>;
 
@@ -65,11 +68,21 @@ export interface Base {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare static beforeSubscribe: (typeof CallbacksClassMethods)["beforeSubscribe"];
+  declare static afterSubscribe: (typeof CallbacksClassMethods)["afterSubscribe"];
+  declare static onSubscribe: (typeof CallbacksClassMethods)["onSubscribe"];
+  declare static beforeUnsubscribe: (typeof CallbacksClassMethods)["beforeUnsubscribe"];
+  declare static afterUnsubscribe: (typeof CallbacksClassMethods)["afterUnsubscribe"];
+  declare static onUnsubscribe: (typeof CallbacksClassMethods)["onUnsubscribe"];
+  declare static periodically: (typeof PeriodicTimersClassMethods)["periodically"];
+  declare static rescueHandlers: unknown[][];
+  declare static rescueFrom: (typeof Rescuable.ClassMethods)["rescueFrom"];
   declare runCallbacks: (kind: string, block?: () => unknown) => unknown;
   declare rescueWithHandler: Included<typeof Rescuable>["rescueWithHandler"];
   declare static readonly channelName: string;
   declare static broadcastingFor: (typeof BroadcastingClassMethods)["broadcastingFor"];
   declare static broadcastTo: (typeof BroadcastingClassMethods)["broadcastTo"];
+  declare pubsub: StreamsChannel["pubsub"];
   declare stopStreamFrom: Included<typeof Streams>["stopStreamFrom"];
   declare stopStreamFor: Included<typeof Streams>["stopStreamFor"];
   declare stopAllStreams: Included<typeof Streams>["stopAllStreams"];

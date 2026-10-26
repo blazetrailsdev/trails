@@ -1,3 +1,4 @@
+import type { WebSocket } from "./web-socket.js";
 import { assertCalled, assertNotCalled } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
 import { describe, expect, it } from "vitest";
@@ -8,6 +9,10 @@ import { User } from "../test-helpers/stubs/user.js";
 import { Base } from "./base.js";
 
 class Connection extends Base {
+  override get websocket(): WebSocket {
+    return super.websocket;
+  }
+
   declare currentUser: User;
 
   declare processInternalMessage: (message: Record<string, unknown>) => void;
@@ -16,7 +21,7 @@ class Connection extends Base {
     this.currentUser = new User("lifo");
   }
 }
-(Connection as unknown as { identifiedBy(...ids: string[]): void }).identifiedBy("currentUser");
+Connection.identifiedBy("currentUser");
 
 describe("ActionCable::Connection::IdentifierTest", () => {
   const t = new TestCase("identifier");
@@ -70,15 +75,9 @@ describe("ActionCable::Connection::IdentifierTest", () => {
     await t.runInEventmachine(async () => {
       await openConnection();
 
-      await assertCalled(
-        (connection as unknown as { websocket: { close(): unknown } }).websocket,
-        "close",
-        null,
-        {},
-        () => {
-          connection.processInternalMessage({ type: "disconnect" });
-        },
-      );
+      await assertCalled(connection.websocket, "close", null, {}, () => {
+        connection.processInternalMessage({ type: "disconnect" });
+      });
     });
   });
 
@@ -86,14 +85,9 @@ describe("ActionCable::Connection::IdentifierTest", () => {
     await t.runInEventmachine(async () => {
       await openConnection();
 
-      await assertNotCalled(
-        (connection as unknown as { websocket: { close(): unknown } }).websocket,
-        "close",
-        null,
-        () => {
-          connection.processInternalMessage({ type: "unknown" });
-        },
-      );
+      await assertNotCalled(connection.websocket, "close", null, () => {
+        connection.processInternalMessage({ type: "unknown" });
+      });
     });
   });
 });
