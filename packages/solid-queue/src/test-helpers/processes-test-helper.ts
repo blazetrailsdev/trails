@@ -5,7 +5,7 @@ import { Supervisor } from "../supervisor.js";
 
 export const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
-const dummyRoot = `${import.meta.dirname}/../../../../vendor/solid_queue/v1.1.3/test/dummy`;
+const dummyRoot = `${import.meta.dirname}/dummy`;
 
 export function runSupervisor(options: { [key: string]: unknown } = {}) {
   vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(dummyRoot);
