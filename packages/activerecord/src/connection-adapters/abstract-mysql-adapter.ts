@@ -12,6 +12,7 @@ import {
 } from "./mysql/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import {
+  sortByBang,
   fetch,
   first,
   isEmpty,
@@ -693,9 +694,7 @@ WHERE fk.referenced_column_name IS NOT NULL
       fkInfo.toArray(),
       (row) => row["name"],
     ).values();
-    for (const group of groupedFk) {
-      group.sort((a, b) => (a["position"] as number) - (b["position"] as number));
-    }
+    for (const group of groupedFk) sortByBang(group, (row) => row["position"]);
     return groupedFk.map((group) => {
       const row = group[0];
       const options: Partial<AddForeignKeyOptions> = {

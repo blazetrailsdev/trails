@@ -18,7 +18,7 @@ import {
   rbCDateTime,
   rbCInteger,
   rbCSymbol,
-  rbRegEqual,
+  rbEqual,
   setEnv,
 } from "@blazetrails/ruby-compat";
 import { Duration, days, hours, minutes, months, seconds, weeks, years } from "../duration.js";
@@ -237,7 +237,7 @@ describe("MessagePackSerializerTest", () => {
   it("roundtrips Regexp", () => {
     const deserialized = roundtrip(/.*/s) as RegExp;
     expect(deserialized).toBeInstanceOf(RegExp);
-    expect(rbRegEqual(/.*/s, deserialized)).toBe(true);
+    expect(rbEqual(/.*/s, deserialized)).toBe(true);
   });
 
   it("roundtrips ActiveSupport::HashWithIndifferentAccess", () => {

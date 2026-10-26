@@ -34,6 +34,7 @@ export {
   minBy,
   maxBy,
   eachWithObject,
+  eachWithIndex,
   sortBy,
   filterMap,
   groupBy,
@@ -227,6 +228,7 @@ export {
   uniq,
   unpack,
   unpack1,
+  sortByBang,
   ARRAY_METHOD_TABLE,
 } from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";
@@ -323,7 +325,6 @@ export {
   __INTERNAL_resetProcessAdapter_TEST_ONLY,
   abort,
   argv,
-  chdir,
   env,
   exec,
   exit,
@@ -352,14 +353,7 @@ export type {
   WriteStream,
 } from "./process-adapter.js";
 export { Method, iseqLocationSetup, rbCheckArity, rbObjMethod, rbObjMethods } from "./method.js";
-export {
-  rbRegEqual,
-  rbRegInitStr,
-  rbRegMatchP,
-  rbRegSUnion,
-  rbRegToS,
-  regexpEscape,
-} from "./regexp.js";
+export { rbRegInitStr, rbRegMatchP, rbRegSUnion, rbRegToS, regexpEscape } from "./regexp.js";
 export { Pathname } from "./pathname.js";
 export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";
@@ -436,7 +430,6 @@ export { forceEncoding, isValidEncoding, rbObjEncoding } from "./string/force-en
 export { encode } from "./string/encode.js";
 export { Encoding } from "./encoding.js";
 export { stringInspect } from "./string/inspect.js";
-export { succ } from "./string/succ.js";
 export { isSymbol, rbMethodName, stringToSym, symbolToS } from "./symbol.js";
 export {
   Monitor,

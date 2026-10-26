@@ -441,8 +441,7 @@ describe("DateHelperTest", () => {
     expect(distanceOfTimeInWords(0, 10 ** 8)).toBe("about 3 years");
   });
 
-  // BLOCKED: date-helper-normalize-distance-admits-duration-as-numeric
-  it.skip("distance in words with times", () => {
+  it("distance in words with times", () => {
     expect(distanceOfTimeInWords(Duration.seconds(30) as any)).toBe("1 minute");
     expect(distanceOfTimeInWords(Duration.seconds(59) as any)).toBe("1 minute");
     expect(distanceOfTimeInWords(Duration.seconds(119) as any)).toBe("2 minutes");

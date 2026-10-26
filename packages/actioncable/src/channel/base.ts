@@ -16,7 +16,11 @@ import {
   publicInstanceMethods,
   rbFSend,
   rbInspect,
+  ArgumentError,
+  rbClassInheritedP,
   rbModConstSet,
+  registerConstant,
+  rbModName,
   rbObjClass,
   rbObjClassname,
   rbObjMethod,
@@ -25,10 +29,13 @@ import {
 import "../action-cable.js";
 import { ActionCable, Channel } from "../namespaces.js";
 import { Broadcasting, type ClassMethods as BroadcastingClassMethods } from "./broadcasting.js";
-import { Callbacks } from "./callbacks.js";
+import { Callbacks, type ClassMethods as CallbacksClassMethods } from "./callbacks.js";
 import { Naming } from "./naming.js";
-import { PeriodicTimers } from "./periodic-timers.js";
-import { Streams, type Handler, type StreamOptions } from "./streams.js";
+import {
+  PeriodicTimers,
+  type ClassMethods as PeriodicTimersClassMethods,
+} from "./periodic-timers.js";
+import { Streams, type Handler, type StreamsChannel, type StreamOptions } from "./streams.js";
 
 type Data = Record<string, unknown>;
 
@@ -65,11 +72,21 @@ export interface Base {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare static beforeSubscribe: (typeof CallbacksClassMethods)["beforeSubscribe"];
+  declare static afterSubscribe: (typeof CallbacksClassMethods)["afterSubscribe"];
+  declare static onSubscribe: (typeof CallbacksClassMethods)["onSubscribe"];
+  declare static beforeUnsubscribe: (typeof CallbacksClassMethods)["beforeUnsubscribe"];
+  declare static afterUnsubscribe: (typeof CallbacksClassMethods)["afterUnsubscribe"];
+  declare static onUnsubscribe: (typeof CallbacksClassMethods)["onUnsubscribe"];
+  declare static periodically: (typeof PeriodicTimersClassMethods)["periodically"];
+  declare static rescueHandlers: unknown[][];
+  declare static rescueFrom: (typeof Rescuable.ClassMethods)["rescueFrom"];
   declare runCallbacks: (kind: string, block?: () => unknown) => unknown;
   declare rescueWithHandler: Included<typeof Rescuable>["rescueWithHandler"];
   declare static readonly channelName: string;
   declare static broadcastingFor: (typeof BroadcastingClassMethods)["broadcastingFor"];
   declare static broadcastTo: (typeof BroadcastingClassMethods)["broadcastTo"];
+  declare pubsub: StreamsChannel["pubsub"];
   declare stopStreamFrom: Included<typeof Streams>["stopStreamFrom"];
   declare stopStreamFor: Included<typeof Streams>["stopStreamFor"];
   declare stopAllStreams: Included<typeof Streams>["stopAllStreams"];
@@ -326,5 +343,34 @@ include(Base, Broadcasting);
 include(Base, Rescuable);
 
 rbModConstSet(Channel, "Base", Base);
+
+/** @noRailsEquivalent PERMANENT */
+export function registerChannel(channel: typeof Base): void;
+export function registerChannel(name: string, channel: typeof Base): void;
+export function registerChannel(channels: (typeof Base)[]): void;
+export function registerChannel(
+  nameOrChannel: string | typeof Base | (typeof Base)[],
+  channel?: typeof Base,
+): void {
+  if (Array.isArray(nameOrChannel)) {
+    for (const k of nameOrChannel) registerChannel(k);
+    return;
+  }
+  if (typeof nameOrChannel === "string") {
+    if (!channel)
+      throw new ArgumentError("registerChannel(name, channel) requires a channel class");
+  } else {
+    channel = nameOrChannel;
+  }
+  if (typeof channel !== "function" || rbClassInheritedP(channel, Base) !== true) {
+    throw new ArgumentError(
+      `registerChannel expects an ActionCable::Channel::Base subclass, got ${String(channel?.name ?? channel)}`,
+    );
+  }
+  if (typeof nameOrChannel === "string") return registerConstant(nameOrChannel, channel);
+  registerConstant(channel.name, channel);
+  const qualified = rbModName(channel)!;
+  if (qualified !== channel.name) registerConstant(qualified, channel);
+}
 
 runLoadHooks("action_cable_channel", Base);

@@ -1,0 +1,3 @@
+import { ActionCable } from "@blazetrails/actioncable";
+
+export class Channel extends ActionCable.Channel.Base {}

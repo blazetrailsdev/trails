@@ -4,6 +4,7 @@ import {
   AsyncEnumerable,
   Enumerable,
   eachCons,
+  eachWithIndex,
   eachSlice,
   maxBy,
   minBy,
@@ -101,6 +102,17 @@ describe("Enumerable over an each that answers a promise", () => {
 });
 
 describe("Enumerable", () => {
+  it("eachWithIndex yields each element with its count and answers the receiver", () => {
+    const seen: [string, number][] = [];
+    const ary = ["a", "b", "c"];
+    expect(eachWithIndex(ary, (i, n) => seen.push([i, n]))).toBe(ary);
+    expect(seen).toEqual([
+      ["a", 0],
+      ["b", 1],
+      ["c", 2],
+    ]);
+  });
+
   it("findAll keeps each element whose block result RTESTs", () => {
     expect(Enumerable.prototype.findAll.call(new Bag([1, null, 0, false, ""]), (i) => i)).toEqual([
       1,
@@ -534,6 +546,11 @@ describe("new Enumerable(obj)", () => {
     expect(e.reject((i) => i === 2)).toEqual([1, 3]);
     expect(e.sortBy((i) => -i)).toEqual([3, 2, 1]);
     expect(e.partition()).toEqual([1, 2, 3]);
+  });
+
+  it("sortBy without a block answers the elements unsorted, as the blockless partition and reject do", () => {
+    expect(sortBy(new Set([3, 1, 2]))).toEqual([3, 1, 2]);
+    expect(new Enumerable(new Set([3, 1, 2])).sortBy()).toEqual([3, 1, 2]);
   });
 
   it("wraps a Map as [key, value] pairs", () => {

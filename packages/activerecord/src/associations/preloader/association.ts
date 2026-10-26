@@ -1,5 +1,6 @@
 import { isPresent, wrap } from "@blazetrails/activesupport";
 import {
+  eachWithIndex,
   first,
   Hash,
   rbEqual,
@@ -179,14 +180,15 @@ export class Association {
       isPresent(r.readAttribute(associationKeyName)),
     )) {
       const owners = this.ownersByKey.get(this.deriveKey(record, this.associationKeyName));
-      owners?.forEach((owner, i) => {
-        const association = owner.association(this.reflection.name);
-        association.target = record;
+      if (owners)
+        eachWithIndex(owners, (owner, i) => {
+          const association = owner.association(this.reflection.name);
+          association.target = record;
 
-        if (i === 0) {
-          association.setInverseInstance(record);
-        }
-      });
+          if (i === 0) {
+            association.setInverseInstance(record);
+          }
+        });
     }
   }
 
@@ -313,11 +315,14 @@ export class LoaderQuery {
         (hsh, key) => hsh.set(key, new Set()).get(key)!,
       );
 
-      for (const valuesSet of keys) {
-        for (const [keyName, value] of zip(this.associationKeyName, valuesSet as unknown[])) {
-          queryConstraints.get(keyName as string)!.add(value);
+      eachWithObject(keys, queryConstraints, (valuesSet, constraints) => {
+        for (const [keyName, value] of zip(
+          this.associationKeyName as string[],
+          valuesSet as unknown[],
+        )) {
+          constraints.get(keyName as string)!.add(value);
         }
-      }
+      });
 
       return (await this.scope.where(Object.fromEntries(queryConstraints)).load(block)).toArray();
     } else {

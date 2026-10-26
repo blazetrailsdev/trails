@@ -8,7 +8,13 @@ import {
   NotificationEvent as Event,
   type Logger,
 } from "@blazetrails/activesupport";
-import { first, rbObjAsString, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
+import {
+  eachWithIndex,
+  first,
+  rbObjAsString,
+  rbObjRespondTo,
+  rtest,
+} from "@blazetrails/ruby-compat";
 import { verboseQueryLogs } from "./active-record.js";
 import { ActiveRecord } from "./namespaces.js";
 
@@ -86,7 +92,7 @@ export class LogSubscriber extends BaseLogSubscriber {
       );
       const bindPairs: [string | null, unknown][] = [];
 
-      for (const [i, attr] of payload.binds.entries()) {
+      eachWithIndex(payload.binds, (attr, i) => {
         const attributeName: string | null = rbObjRespondTo(attr, "name")
           ? attr.name
           : rbObjRespondTo(attr, "get") && rbObjRespondTo(attr[i], "name")
@@ -96,7 +102,7 @@ export class LogSubscriber extends BaseLogSubscriber {
         const filteredParams = this.filter(attributeName, castedParams?.[i]);
 
         bindPairs.push(this.renderBind(attr, filteredParams));
-      }
+      });
 
       binds = `  ${safeJsonStringify(bindPairs)}`;
     }

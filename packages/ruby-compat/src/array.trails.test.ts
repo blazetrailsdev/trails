@@ -29,12 +29,21 @@ import {
   flatten,
   unpack,
   unpack1,
+  sortByBang,
 } from "./array.js";
 import { Range } from "./range.js";
 import { rbFSend, rbObjId, rbObjRespondTo } from "./object.js";
 import { byteslice } from "./string/byte-methods.js";
 
 const bin = (str: string): Uint8Array => Uint8Array.from(str, (c) => c.charCodeAt(0));
+
+describe("Array#sort_by!", () => {
+  it("sorts the receiver in place by the block value and answers it", () => {
+    const ary = [{ seq: 2 }, { seq: 0 }, { seq: 1 }];
+    expect(sortByBang(ary, (row) => row.seq)).toBe(ary);
+    expect(ary.map((row) => row.seq)).toEqual([0, 1, 2]);
+  });
+});
 
 describe("Array#pack", () => {
   const long = "a".repeat(100);

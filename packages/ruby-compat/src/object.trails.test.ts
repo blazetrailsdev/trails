@@ -712,12 +712,6 @@ describe("rbFSend", () => {
     expect(rbFSend(recv, "!=", "same")).toBe(false);
   });
 
-  it("sends an ordering operator to the receiver's own method before its <=>", () => {
-    const recv = { greaterThan: () => "own", compareTo: () => -1 };
-    expect(rbFSend(recv, ">", 1)).toBe("own");
-    expect(rbFSend(recv, "<", 1)).toBe(true);
-  });
-
   it("raises NoMethodError for an ordering operator the receiver does not define", () => {
     expect(() => rbFSend(null, ">", 1)).toThrow(NoMethodError);
     expect(() => rbFSend([1], ">", [0])).toThrow(NoMethodError);

@@ -7,7 +7,6 @@ import {
   rtest,
   compact,
   first as aryFirst,
-  isEmpty,
   last as aryLast,
   take as aryTake,
   uniq,
@@ -471,8 +470,8 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
       .limitBang(1);
   }
 
-  if (Array.isArray(conditions) || isPlainObject(conditions) || conditions instanceof Map) {
-    if (!isEmpty(conditions)) relation.whereBang(conditions);
+  if (Array.isArray(conditions) || isPlainObject(conditions)) {
+    if (Object.keys(conditions).length > 0) relation.whereBang(conditions);
   } else {
     if (conditions !== ":none") relation.whereBang(new Map([[this.primaryKey, conditions]]));
   }
