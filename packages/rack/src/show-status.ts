@@ -28,10 +28,10 @@ export class ShowStatus {
     const [status, headers, body] = response;
     const empty = Number(toI(headers[CONTENT_LENGTH])) <= 0;
 
-    if ((Number(toI(status)) >= 400 && empty) || env[RACK_SHOWSTATUS_DETAIL]) {
+    if ((Math.trunc(status) >= 400 && empty) || env[RACK_SHOWSTATUS_DETAIL]) {
       const req = new Request(env);
 
-      const message = HTTP_STATUS_CODES[Number(toI(status))] || String(status);
+      const message = HTTP_STATUS_CODES[Math.trunc(status)] || String(status);
 
       const detail = env[RACK_SHOWSTATUS_DETAIL] || message;
 

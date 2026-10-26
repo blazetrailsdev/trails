@@ -42,6 +42,20 @@ tester.run("ruby-compat-native-required", rule, {
     valid("declare const h: Record<string, number>; const v = hashDelete(h, 'a');"),
     valid("declare const h: Record<string, number>; hashDelete(h, 'a', () => 1);"),
     // not the ruby-compat export
+    // `kinds`: an Array method on a plain object dispatches
+    {
+      code: 'import { compact } from "@blazetrails/ruby-compat";\ndeclare const h: { a?: number }; compact(h as never);',
+      filename,
+    },
+    // `elements`: object elements compare by eql?, not identity
+    {
+      code: 'import { uniq } from "@blazetrails/ruby-compat";\ndeclare const xs: { a: number }[]; uniq(xs);',
+      filename,
+    },
+    {
+      code: 'import { uniq } from "@blazetrails/ruby-compat";\ndeclare const xs: (string | number[])[]; uniq(xs);',
+      filename,
+    },
     {
       code: 'import { hashDelete } from "./elsewhere";\ndeclare const h: Record<string, number>; hashDelete(h, "a");',
       filename,
@@ -60,12 +74,33 @@ tester.run("ruby-compat-native-required", rule, {
     invalid("declare const t: [number, string]; hashDelete(t, 0);"),
     invalid("hashDelete('abc' as unknown as string, 'length');"),
     invalid("hashDelete(1 as unknown as number, 'a');"),
+    {
+      code: 'import { compact } from "@blazetrails/ruby-compat";\ndeclare const xs: ({ a: 1 } | null)[]; compact(xs);',
+      filename,
+      errors: [{ messageId: "nativeRequired" }],
+    },
+    {
+      code: 'import { uniq } from "@blazetrails/ruby-compat";\ndeclare const xs: (string | null)[]; uniq(xs);',
+      filename,
+      errors: [{ messageId: "nativeRequired" }],
+    },
   ],
 });
 
 /** Every helper the list has ever held. Only-grow: a sweep appends its
  *  helpers here and to the JSON in the same PR. */
-const LISTED_FLOOR = ["hashDelete"];
+const LISTED_FLOOR = [
+  "hashDelete",
+  "aryIncludes",
+  "aryJoin",
+  "compact",
+  "max",
+  "min",
+  "round",
+  "toI",
+  "union",
+  "uniq",
+];
 
 describe("ruby-compat-native-required.json", () => {
   it("never drops a helper while ruby-compat still exports it", async () => {

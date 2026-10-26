@@ -13,7 +13,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { aryJoin, b, eachWithIndex, fetch, first, rbRegMatchP } from "@blazetrails/ruby-compat";
+import { b, eachWithIndex, fetch, first, rbRegMatchP } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -225,7 +225,7 @@ interface SetConstraintsHost {
 
 export async function buildExplainClause(options: ExplainOption[] = []): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
-  return `EXPLAIN (${aryJoin(options, ", ").toUpperCase()})`;
+  return `EXPLAIN (${options.join(", ").toUpperCase()})`;
 }
 
 /** @internal */

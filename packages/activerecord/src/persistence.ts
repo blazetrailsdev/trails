@@ -8,7 +8,6 @@ import {
   rbObjAsString,
   rbObjSingletonClass,
   rtest,
-  union,
   zip,
   eachPair,
   eachWithIndex,
@@ -790,7 +789,7 @@ export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
   if (this.isReadonly()) this._raiseReadonlyRecordError();
 
   let attributeNames: readonly string[] = this.timestampAttributesForUpdateInModel();
-  attributeNames = union(attributeNames, names as string[]).map((name) => {
+  attributeNames = [...new Set([...attributeNames, ...(names as string[])])].map((name) => {
     name = String(name);
     name = this.constructor.attributeAliases[name] || name;
     this.verifyReadonlyAttribute(name);

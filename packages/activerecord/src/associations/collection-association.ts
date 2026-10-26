@@ -1,6 +1,5 @@
 import {
   aryDelete,
-  compact,
   kernelCatch,
   rbEqual,
   rbFSend,
@@ -118,7 +117,7 @@ export abstract class CollectionAssociation extends Association {
         (record) => String(record._readAttribute(primaryKey as string)),
       );
     }
-    const records = compact(valuesAt(indexed, ...ids.map(String)));
+    const records = valuesAt(indexed, ...ids.map(String)).filter((x) => x != null);
 
     if (records.length !== ids.length) {
       const foundIds = records.map((record) => String(record._readAttribute(primaryKey as string)));

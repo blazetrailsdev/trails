@@ -5,7 +5,6 @@ import {
   type Each,
   rbObjAsString,
   rtest,
-  compact,
   first as aryFirst,
   last as aryLast,
   take as aryTake,
@@ -549,7 +548,7 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
 
   if (expectsArray) ids = aryFirst(ids) as unknown[];
 
-  ids = uniq(compact(ids));
+  ids = uniq(ids.filter((x) => x != null));
 
   const modelName = this.model.name;
 
@@ -701,5 +700,5 @@ export function _orderColumns(this: FinderRelation): string[] {
     oc.push(this.model.primaryKey);
   }
 
-  return compact(uniq(oc.flat()));
+  return [...new Set(oc.flat())].filter((x) => x != null);
 }

@@ -1,13 +1,5 @@
 import { any } from "@blazetrails/activesupport";
-import {
-  aryDelete,
-  compact,
-  File,
-  FileUtils,
-  flatten,
-  Hash,
-  hashDelete,
-} from "@blazetrails/ruby-compat";
+import { aryDelete, File, FileUtils, flatten, Hash, hashDelete } from "@blazetrails/ruby-compat";
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
@@ -214,12 +206,10 @@ export class ChangeGenerator extends GeneratorBase {
         .get("rails-app")
         .set(
           "depends_on",
-          compact(
-            flatten([
-              this.database.name,
-              composeConfig.get("services").get("rails-app").get("depends_on"),
-            ]),
-          ),
+          flatten([
+            this.database.name,
+            composeConfig.get("services").get("rails-app").get("depends_on"),
+          ]).filter((x) => x != null),
         );
     }
 

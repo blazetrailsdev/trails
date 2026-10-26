@@ -1,11 +1,4 @@
-import {
-  rbFArray,
-  uniq,
-  Pathname,
-  block as rbBlock,
-  compact,
-  rbModConstSet,
-} from "@blazetrails/ruby-compat";
+import { rbFArray, Pathname, block as rbBlock, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Magic, type MagicMatch } from "./magic.js";
 import { Marcel as MarcelSeat } from "./namespaces.js";
 import { TYPE_EXTS, TYPE_PARENTS } from "./tables.js";
@@ -25,8 +18,8 @@ export class MimeType {
       magic?: MagicMatch[] | null;
     } = {},
   ) {
-    extensions = uniq([...rbFArray(extensions), ...rbFArray(TYPE_EXTS[type])] as string[]);
-    parents = uniq([...rbFArray(parents), ...rbFArray(TYPE_PARENTS[type])] as string[]);
+    extensions = [...new Set([...rbFArray(extensions), ...rbFArray(TYPE_EXTS[type])] as string[])];
+    parents = [...new Set([...rbFArray(parents), ...rbFArray(TYPE_PARENTS[type])] as string[])];
     return Magic.add(type, { extensions: extensions, magic: magic, parents: parents });
   }
 
@@ -111,7 +104,7 @@ export class MimeType {
   }
 
   static mostSpecificType(...candidates: (string | null)[]) {
-    const x = uniq(compact(candidates));
+    const x = [...new Set(candidates.filter((x) => x != null))];
     return x.length === 0
       ? null
       : x.reduce((type, candidate) => (Magic.isChild(candidate, type) ? candidate : type));

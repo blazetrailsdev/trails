@@ -23,7 +23,6 @@ import {
 import {
   ArgumentError,
   block as rbBlock,
-  compact,
   Hash,
   fetch,
   hashDelete,
@@ -182,9 +181,9 @@ export function applyFormForOptionsBang(
     class: as != null && as !== false ? `${action}_${as}` : domClass(object, action),
     id:
       presence(
-        compact(
-          as != null && as !== false ? [namespace, action, as] : [namespace, domId(object, action)],
-        ).join("_"),
+        (as != null && as !== false ? [namespace, action, as] : [namespace, domId(object, action)])
+          .filter((x) => x != null)
+          .join("_"),
       ) ?? null,
   });
 }

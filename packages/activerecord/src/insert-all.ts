@@ -545,6 +545,7 @@ export class Builder implements InsertBuilder {
     if (!this._insertAll.updateDuplicates() || !this._insertAll.recordTimestamps()) {
       return "";
     }
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- Ruby's separator-less join is "", JS's is ","
     return aryJoin(
       filterMap(this.model.timestampAttributesForUpdateInModel(), (columnName) => {
         if (this.touchTimestampAttribute(columnName)) {

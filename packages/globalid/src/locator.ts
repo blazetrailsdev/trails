@@ -200,6 +200,7 @@ export class Locator {
     options: LocateSignedOptions = {},
   ): Promise<unknown[]> {
     return Locator.locateMany(
+      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- parity:api:calls:args pairs this argument by the Ruby call name
       compact(sgids.map((sgid) => SignedGlobalID.parse(String(sgid), slice(options, "for")))),
       options,
     );
@@ -242,9 +243,10 @@ export class Locator {
 
   /** @internal */
   static parseAllowed(gids: Array<string | GlobalID>, only?: LocateOptions["only"]): GlobalID[] {
-    return compact(gids.map((gid) => GlobalID.parse(gid))).filter((gid) =>
-      Locator.findAllowed(gid.modelClass, only),
-    );
+    return gids
+      .map((gid) => GlobalID.parse(gid))
+      .filter((x) => x != null)
+      .filter((gid) => Locator.findAllowed(gid.modelClass, only));
   }
 
   /** @internal */

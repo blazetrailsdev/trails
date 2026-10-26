@@ -52,7 +52,7 @@ export class Engine {
   }
 
   static generateSalt(cost: number = this.cost): string | null {
-    cost = toI(cost) as number;
+    cost = Math.trunc(cost);
     if (cost > 0) {
       if (cost < this.MIN_COST) {
         cost = this.MIN_COST;

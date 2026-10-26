@@ -1,7 +1,6 @@
 import {
   fixDiv,
   fixMod,
-  max,
   printf,
   puts,
   rbObjAsString as toS,
@@ -32,7 +31,7 @@ export class ColumnPrinter {
 
   print(array: unknown[]): void {
     if (array.length === 0) return;
-    const colwidth = (max(array.map((el) => strlen(toS(el)))) ?? 0) + 2;
+    const colwidth = Math.max(...array.map((el) => strlen(toS(el)))) + 2;
     array.forEach((value, index) => {
       if (
         (fixMod(index + 1, fixDiv(Terminal.terminalWidth(), colwidth)) === 0 && index !== 0) ||

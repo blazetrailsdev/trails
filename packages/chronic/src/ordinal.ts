@@ -15,6 +15,7 @@ export class Ordinal extends Tag<number> {
         if (Date.isCouldBeMonth(ordinal)) tokens[i].tag(new OrdinalMonth(ordinal));
         if (Date.isCouldBeYear(ordinal)) {
           const year = Date.makeYear(ordinal, options.ambiguousYearFutureBias as number);
+          // eslint-disable-next-line blazetrails/ruby-compat-native-required -- parity:api:calls:args pairs this argument by the Ruby call name
           tokens[i].tag(new OrdinalYear(toI(year) as number));
         }
       }

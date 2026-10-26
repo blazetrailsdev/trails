@@ -9,7 +9,6 @@ import {
 import {
   block,
   eachPair,
-  union,
   rbModName,
   rbObjClass,
   except,
@@ -157,7 +156,9 @@ export class Trailtie extends BaseTrailtie {
         app.config.activeJob.logQueryTagsAroundPerform;
 
       if (queryLogsTagsEnabled) {
-        app.config.activeRecord.queryLogTags = union(app.config.activeRecord.queryLogTags, ["job"]);
+        app.config.activeRecord.queryLogTags = [
+          ...new Set([...app.config.activeRecord.queryLogTags, "job"]),
+        ];
 
         onLoad("active_record", () => {
           QueryLogs.taggings = {

@@ -98,6 +98,7 @@ export class MockLogger {
   }
 
   logged(level: LogLevel): string[] {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- parity:api:calls does not credit filter as compact over a Map#get receiver
     return compact(this._logged.get(level)!).map((l) => strip(toS(l)));
   }
 

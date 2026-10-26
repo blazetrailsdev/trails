@@ -362,7 +362,7 @@ export class Cron {
 
       for (;;) {
         t1 = this.nextTime(t);
-        if (t0) deltas.push(toI(t1.minus(t)) as number);
+        if (t0) deltas.push(Math.trunc(t1.minus(t)));
         t0 ??= t1;
         if (deltas.length > 0 && t1.year > year) break;
         if (t1.year - t0.year > 7) break;
@@ -395,12 +395,12 @@ export class Cron {
     for (const [_k, v0, v1, a] of slots) {
       if (!(a && a.length > 1)) continue;
       return (
-        min(
-          eachCons([...a, a[0] + v1], 2)
+        Math.min(
+          ...eachCons([...a, a[0] + v1], 2)
             .toA()
             .map(([a0, a1]) => a1 - a0)
             .filter((d) => d > 0),
-        )! * v0
+        ) * v0
       );
     }
 
@@ -466,8 +466,8 @@ export class Cron {
       },
       [[], []],
     );
-    this.months = uniq(ms);
-    this.monthdays = uniq(ds);
+    this.months = [...new Set(ms)];
+    this.monthdays = [...new Set(ds)];
 
     return isAny(this.months) && isAny(this.monthdays);
   }
@@ -581,12 +581,14 @@ export class Cron {
       }
     }
 
-    return uniq(
-      a
-        .map((e, i) => [e, i] as const)
-        .filter(([_e, i]) => numericModulo(i, sla) === 0)
-        .map(([e]) => e),
-    );
+    return [
+      ...new Set(
+        a
+          .map((e, i) => [e, i] as const)
+          .filter(([_e, i]) => numericModulo(i, sla) === 0)
+          .map(([e]) => e),
+      ),
+    ];
   }
 
   /** @internal */
@@ -610,7 +612,7 @@ export class Cron {
     }
 
     if (nul) return null;
-    return sort(uniq(r));
+    return sort([...new Set(r)]);
   }
 
   /** @internal */
@@ -727,7 +729,7 @@ export class TimeCursor {
   constructor(cron: Cron, t: EoTime | TimeCursor) {
     this._cron = cron;
     this._t = t instanceof TimeCursor ? t.time() : t;
-    this._t.seconds = toI(this._t.seconds) as number;
+    this._t.seconds = Math.trunc(this._t.seconds);
   }
 
   time(): EoTime {
@@ -870,7 +872,9 @@ export class Frequency {
   constructor(deltas: number[], span: number) {
     this.span = span;
 
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- a year of minutes overflows a Math.min spread
     this.deltaMin = min(deltas);
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- a year of minutes overflows a Math.max spread
     this.deltaMax = max(deltas);
     this.occurrences = deltas.length;
     this.spanYears = span / YEAR_S;
@@ -882,9 +886,10 @@ export class Frequency {
       dmin: new Duration(this.deltaMin).deflate().toPlainS(),
       dmax: new Duration(this.deltaMax).deflate().toPlainS(),
       ocs: this.occurrences,
-      spn: new Duration(toI(this.span)).deflate().toPlainS(),
-      spnys: toI(this.spanYears),
-      yocs: toI(this.yearlyOccurrences),
+      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- parity:api:calls:args pairs this argument by the Ruby call name
+      spn: new Duration(toI(this.span) as number).deflate().toPlainS(),
+      spnys: Math.trunc(this.spanYears),
+      yocs: Math.trunc(this.yearlyOccurrences),
     })
       .map(([k, v]) => `${k}: ${toS(v)}`)
       .join(", ");

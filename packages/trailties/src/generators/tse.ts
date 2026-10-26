@@ -1,4 +1,3 @@
-import { compact } from "@blazetrails/ruby-compat";
 import { NamedBase } from "./named-base.js";
 
 export class Base extends NamedBase {
@@ -15,6 +14,6 @@ export class Base extends NamedBase {
   }
 
   protected filenameWithExtensions(name: string, fileFormat: string = this.format()): string {
-    return compact([name, fileFormat, this.handler()]).join(".");
+    return [name, fileFormat, this.handler()].filter((x) => x != null).join(".");
   }
 }

@@ -25,7 +25,6 @@ import {
   rational,
   rbEqual,
   rbObjClassname,
-  toI,
 } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { assertEqual, assertRaise, assertRaises } from "../testing/assertions.js";
@@ -187,7 +186,7 @@ describe("EnumerableTests", () => {
     ]);
     await assertRaise([expectedRaise], {}, () => sum(payments, (p) => p.price));
 
-    expect(sum(payments, (p) => (toI(p.price) as number) * 2)).toEqual(60);
+    expect(sum(payments, (p) => Math.trunc(p.price ?? 0) * 2)).toEqual(60);
   });
 
   it("empty sums", () => {

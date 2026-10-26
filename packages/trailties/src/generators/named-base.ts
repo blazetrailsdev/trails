@@ -6,7 +6,7 @@ import {
   humanize,
   upcaseFirst,
 } from "@blazetrails/activesupport";
-import { compact } from "@blazetrails/ruby-compat";
+
 import { ActiveRecord } from "@blazetrails/activerecord";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
@@ -48,7 +48,9 @@ export class NamedBase extends GeneratorBase {
     { type = null }: { type?: string | null } = {},
   ): string {
     return camelize(
-      compact([this.pluralRouteName(), this.uncountable() ? "index" : null, type]).join("_"),
+      [this.pluralRouteName(), this.uncountable() ? "index" : null, type]
+        .filter((x) => x != null)
+        .join("_"),
       "lower",
     );
   }

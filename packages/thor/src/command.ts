@@ -1,6 +1,5 @@
 import {
   ArgumentError,
-  compact,
   dup,
   excBacktraceLocations,
   NoMethodError,
@@ -200,7 +199,9 @@ export class Command extends Struct.new(
   /** @internal */
   protected requiredOptions(): string {
     return (this._requiredOptions ??= sort(
-      compact(Object.values(this.options).map((o) => (rtest(o.isRequired()) ? o.usage() : null))),
+      Object.values(this.options)
+        .map((o) => (rtest(o.isRequired()) ? o.usage() : null))
+        .filter((x) => x != null),
     ).join(" "));
   }
 

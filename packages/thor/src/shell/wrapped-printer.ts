@@ -1,4 +1,4 @@
-import { compact, puts, stringSplit, strlen } from "@blazetrails/ruby-compat";
+import { puts, stringSplit, strlen } from "@blazetrails/ruby-compat";
 import { ColumnPrinter } from "./column-printer.js";
 import * as Terminal from "./terminal.js";
 
@@ -7,8 +7,8 @@ export class WrappedPrinter extends ColumnPrinter {
     const width = Terminal.terminalWidth() - this._indent;
     let paras = stringSplit(message as string, "\n\n");
 
-    paras = compact(
-      paras.map((unwrapped) => {
+    paras = paras
+      .map((unwrapped) => {
         const words = stringSplit(unwrapped, " ");
         let counter = strlen(words[0]);
         return words.reduce((memo, word) => {
@@ -23,8 +23,8 @@ export class WrappedPrinter extends ColumnPrinter {
           }
           return memo;
         });
-      }),
-    );
+      })
+      .filter((x) => x != null);
 
     paras.forEach((para) => {
       stringSplit(para, "\n").forEach((line) => {

@@ -14,7 +14,6 @@ import {
   rbInspect,
   rbObjClass,
   rbObjDup,
-  toI,
   toS,
 } from "@blazetrails/ruby-compat";
 import { TZInfo } from "@blazetrails/tzinfo";
@@ -541,7 +540,7 @@ describe("Fugit::Cron", () => {
       const c = Cron.parse("* * * * *")!;
       const nt = c.nextTime();
 
-      expect(toS(nt.seconds)).toEqual(toS(toI(nt.seconds)) + ".0");
+      expect(toS(nt.seconds)).toEqual(toS(Math.trunc(nt.seconds)) + ".0");
     });
 
     describe("explicit timezone", () => {
@@ -802,7 +801,7 @@ describe("Fugit::Cron", () => {
       const c = Fugit.parse("10 * * * * *") as Cron;
       const t = c.previousTime().toF();
 
-      expect(c.previousTime(Time.at(t)).toI()).toEqual((toI(t) as number) - 60);
+      expect(c.previousTime(Time.at(t)).toI()).toEqual(Math.trunc(t) - 60);
     });
 
     describe("(defective et-orbi)", () => {

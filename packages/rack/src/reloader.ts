@@ -11,7 +11,6 @@ import {
   rbFLoad,
   rbGvGet,
   stderr as $stderr,
-  uniq,
   type FsStatResult,
 } from "@blazetrails/ruby-compat";
 
@@ -28,11 +27,10 @@ export const Stat = {
     this: StatHost,
     block: (found: string, mtime: Date) => unknown,
   ): Promise<unknown[]> {
-    const files = uniq([
-      rbGvGet("$0") as string,
-      ...((rbGvGet("$LOADED_FEATURES") as string[]) ?? []),
-    ]);
-    const paths = uniq(["./", ...((rbGvGet("$LOAD_PATH") as string[]) ?? [])]);
+    const files = [
+      ...new Set([rbGvGet("$0") as string, ...((rbGvGet("$LOADED_FEATURES") as string[]) ?? [])]),
+    ];
+    const paths = [...new Set(["./", ...((rbGvGet("$LOAD_PATH") as string[]) ?? [])])];
 
     const results: unknown[] = [];
     for (const file of files) {
