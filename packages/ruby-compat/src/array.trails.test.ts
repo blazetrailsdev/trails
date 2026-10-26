@@ -32,6 +32,7 @@ import {
   sortByBang,
 } from "./array.js";
 import { Range } from "./range.js";
+import type { Enumerator } from "./enumerator.js";
 import { rbFSend, rbObjId, rbObjRespondTo } from "./object.js";
 import { byteslice } from "./string/byte-methods.js";
 
@@ -732,7 +733,7 @@ describe("ARRAY_METHOD_TABLE", () => {
     expect(rbFSend(a, "isAll", Number)).toBe(true);
     expect(rbFSend([Number, String], "index", String)).toBe(1);
     expect(rbFSend(a, "collect")).not.toBe(a);
-    expect(rbFSend(a, "eachCons", 3)).toHaveLength(2);
+    expect((rbFSend(a, "eachCons", 3) as Enumerator<number[]>).toA()).toHaveLength(2);
     expect([...(rbFSend(a, "shuffle") as number[])].sort()).toEqual([1, 1, 2, 3]);
   });
 });

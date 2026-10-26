@@ -397,6 +397,7 @@ export class Cron {
       return (
         min(
           eachCons([...a, a[0] + v1], 2)
+            .toA()
             .map(([a0, a1]) => a1 - a0)
             .filter((d) => d > 0),
         )! * v0
