@@ -20,8 +20,12 @@ configured `SolidQueue`. `Record` carries `@missingRailsCall connectsTo —
 PERMANENT` and `Engine` carries `@inventedArm onLoad — PERMANENT` against this
 section. Ruled by the repo owner on 2026-10-26.
 
-The same hook seats `Record.tableNamePrefix` from `SolidQueue.tableNamePrefix`,
-so a prefix set in `config.solidQueue` is honoured. Rails gets the prefix from
-`isolate_namespace`'s `SolidQueue.table_name_prefix` through
-`full_table_name_prefix`'s `module_parents` walk; that walk needs the models
-named `SolidQueue::…`, filed as `solid-queue-models-named-under-solid-queue-namespace`.
+`record.ts`'s `this.tableNamePrefix = SolidQueue.tableNamePrefix` has no line
+in `record.rb`. Rails gets the prefix from the reader `isolate_namespace`
+defines on `SolidQueue`
+(`vendor/rails/v8.0.2/railties/lib/rails/engine.rb:396-398`) through
+`full_table_name_prefix`'s `module_parents` walk. Rails defines no
+`table_name_prefix=` writer, so a `config.solid_queue.table_name_prefix` raises
+`NoMethodError` in the `solid_queue.config` initializer, and there is no
+configured prefix to honour. The walk needs the models named `SolidQueue::…`,
+filed as `solid-queue-models-named-under-solid-queue-namespace`.

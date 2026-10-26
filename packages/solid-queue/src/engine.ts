@@ -37,8 +37,7 @@ export class Engine extends TrailsEngine {
 
     this.config.set("solidQueue", new OrderedOptions());
 
-    const connectsTo = function (this: typeof Record): void {
-      this.tableNamePrefix = SolidQueue.tableNamePrefix;
+    const solidQueueRecord = function (this: typeof Record): void {
       if (SolidQueue.connectsTo) this.connectsTo(SolidQueue.connectsTo);
     };
 
@@ -47,7 +46,7 @@ export class Engine extends TrailsEngine {
         rbFSend(SolidQueue, `${name}=`, value);
       });
 
-      onLoad("solid_queue_record", { runOnce: true }, connectsTo);
+      onLoad("solid_queue_record", { runOnce: true }, solidQueueRecord);
     });
 
     this.initializer(
