@@ -4,6 +4,7 @@ import { Time } from "@blazetrails/date";
 import { Record } from "./record.js";
 import { SolidQueue } from "./solid-queue.js";
 import { Executor } from "./process/executor.js";
+import { Prunable, type ClassMethods as PrunableClassMethods } from "./process/prunable.js";
 
 export class Process extends Record {
   declare kind: string;
@@ -14,13 +15,17 @@ export class Process extends Record {
   declare last_heartbeat_at: Time;
   declare supervisor_id: unknown;
   declare supervisees: Relation<Process>;
-  declare failAllClaimedExecutionsWith: typeof Executor.prototype.failAllClaimedExecutionsWith;
+  declare failAllClaimedExecutionsWith: (error: Error) => Promise<unknown>;
   declare releaseAllClaimedExecutions: typeof Executor.prototype.releaseAllClaimedExecutions;
+  declare prune: typeof Prunable.prototype.prune;
+  declare static prunable: () => Relation<Process>;
+  declare static prune: typeof PrunableClassMethods.prune;
 
   static {
     registerModel(this);
 
     include(this, Executor);
+    include(this, Prunable);
 
     this.belongsTo("supervisor", {
       className: "Process",

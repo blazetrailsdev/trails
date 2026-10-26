@@ -14,6 +14,10 @@
     },
     "./all": "./dist/all.js",
     "./generators": "./dist/generators/index.js",
+    "./thor": {
+      "types": "./dist/thor/thor.d.ts",
+      "default": "./dist/thor/thor.js"
+    },
     "./engine": {
       "types": "./dist/engine.d.ts",
       "default": "./dist/engine.js"

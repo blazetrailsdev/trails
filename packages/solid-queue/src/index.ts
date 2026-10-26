@@ -21,4 +21,6 @@ export { Pool } from "./pool.js";
 export { Worker } from "./worker.js";
 export { Dispatcher } from "./dispatcher.js";
 export { Scheduler } from "./scheduler.js";
+export { Supervisor } from "./supervisor.js";
+export { Configuration } from "./configuration.js";
 export { Engine } from "./engine.js";

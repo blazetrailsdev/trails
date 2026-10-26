@@ -26,7 +26,7 @@ export class ClaimedExecution extends Execution {
     this.belongsTo("process");
 
     this.scope("orphaned", function () {
-      return this.where().missing("process");
+      return this.where().missing(":process");
     });
   }
 

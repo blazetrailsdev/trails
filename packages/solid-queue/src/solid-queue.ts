@@ -8,7 +8,7 @@ import {
   seconds,
   type Duration,
 } from "@blazetrails/activesupport";
-import { STDOUT } from "@blazetrails/ruby-compat";
+import { STDOUT, registerConstant } from "@blazetrails/ruby-compat";
 
 export const SolidQueue = {
   name: "SolidQueue",
@@ -40,6 +40,10 @@ export const SolidQueue = {
     SolidQueue.Scheduler!.onStop(block);
   },
 
+  isSupervisor(): boolean {
+    return SolidQueue.supervisor;
+  },
+
   isSilencePolling(): boolean {
     return SolidQueue.silencePolling;
   },
@@ -65,8 +69,11 @@ export const SolidQueue = {
   connectsTo: Record<string, unknown> | null;
   useSkipLocked: boolean;
   processHeartbeatInterval: Duration;
+  processAliveThreshold: Duration;
   shutdownTimeout: Duration;
   silencePolling: boolean;
+  supervisorPidfile: unknown;
+  supervisor: boolean;
   preserveFinishedJobs: boolean;
   clearFinishedJobsAfter: Duration;
   defaultConcurrencyControlPeriod: Duration;
@@ -75,10 +82,12 @@ export const SolidQueue = {
   onWorkerStop(block: () => unknown): void;
   Dispatcher?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
   Scheduler?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
+  Supervisor?: unknown;
   onSchedulerStart(block: () => unknown): void;
   onSchedulerStop(block: () => unknown): void;
   onDispatcherStart(block: () => unknown): void;
   onDispatcherStop(block: () => unknown): void;
+  isSupervisor(): boolean;
   isSilencePolling(): boolean;
   isPreserveFinishedJobs(): boolean;
   instrument<T>(
@@ -92,10 +101,17 @@ mattrAccessor.call(SolidQueue, "logger", { default: SolidQueue.DEFAULT_LOGGER })
 mattrAccessor.call(SolidQueue, "appExecutor", "onThreadError", "connectsTo");
 mattrAccessor.call(SolidQueue, "useSkipLocked", { default: true });
 mattrAccessor.call(SolidQueue, "processHeartbeatInterval", { default: seconds(60) });
+mattrAccessor.call(SolidQueue, "processAliveThreshold", { default: minutes(5) });
+
 mattrAccessor.call(SolidQueue, "shutdownTimeout", { default: seconds(5) });
 mattrAccessor.call(SolidQueue, "silencePolling", { default: true });
+mattrAccessor.call(SolidQueue, "supervisorPidfile");
+mattrAccessor.call(SolidQueue, "supervisor", { default: false });
+
 mattrAccessor.call(SolidQueue, "preserveFinishedJobs", { default: true });
 mattrAccessor.call(SolidQueue, "clearFinishedJobsAfter", { default: days(1) });
 mattrAccessor.call(SolidQueue, "defaultConcurrencyControlPeriod", { default: minutes(3) });
+
+registerConstant("SolidQueue", SolidQueue);
 
 runLoadHooks("solid_queue", SolidQueue);
