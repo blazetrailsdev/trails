@@ -3,7 +3,7 @@ import type { AssociationReflection, ThroughReflection } from "../../reflection.
 import { Association } from "./association.js";
 import { Associations } from "../../namespaces.js";
 import { any } from "@blazetrails/activesupport";
-import { Hash, first, isEmpty, reduce, union, uniq } from "@blazetrails/ruby-compat";
+import { sortByBang, Hash, first, isEmpty, reduce, union, uniq } from "@blazetrails/ruby-compat";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
@@ -51,7 +51,7 @@ export class ThroughAssociation extends Association {
       records = records.filter((record) => record != null);
       if (any(this.scope.orderValues)) {
         const preloadIndex = await this.preloadIndex();
-        records.sort((a, b) => (preloadIndex.get(a) ?? 0) - (preloadIndex.get(b) ?? 0));
+        sortByBang(records, (rhs) => preloadIndex.get(rhs));
       }
       if (this.scope.distinctValue) records = uniq(records);
       result.set(owner, records);

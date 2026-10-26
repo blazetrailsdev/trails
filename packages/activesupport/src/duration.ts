@@ -872,9 +872,6 @@ rbModConstSet(ActiveSupport, "Duration", Duration);
 
 Object.defineProperty(rbCNumeric, Symbol.hasInstance, {
   value(this: typeof rbCNumeric, other: unknown): boolean {
-    return (
-      Function.prototype[Symbol.hasInstance].call(this, other) ||
-      (other instanceof Duration && other.isA(this))
-    );
+    return rbObjIsKindOf(other, this) || (other instanceof Duration && other.isA(this));
   },
 });

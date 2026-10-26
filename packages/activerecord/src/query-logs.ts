@@ -6,7 +6,7 @@ import {
   isPresent,
   threadMattrAccessor,
 } from "@blazetrails/activesupport";
-import { cmp } from "@blazetrails/ruby-compat";
+import { sortByBang, toS } from "@blazetrails/ruby-compat";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import { LogSubscriber } from "./log-subscriber.js";
 import type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
@@ -144,7 +144,7 @@ export class QueryLogs {
         handlers.push([i, this.buildHandler(i)]);
       }
     }
-    return handlers.sort(([a], [b]) => cmp(a, b)!);
+    return sortByBang(handlers, ([key]) => toS(key));
   }
 
   private static buildHandler(name: string, handler?: TagValue | TagHandler): Handler {

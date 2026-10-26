@@ -154,7 +154,6 @@ import * as Querying from "./querying.js";
 import * as QueryCacheClassMethods from "./query-cache.js";
 import {
   include,
-  prepend,
   extend,
   classAttribute,
   benchmark as benchmarkable,
@@ -2251,18 +2250,8 @@ include(Base, _TouchLater.TouchLater);
 include(Base, _NoTouching.NoTouching);
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
-prepend(
-  { prototype: Base },
-  {
-    loadSchemaBang: CounterCache.loadSchemaBang,
-  },
-);
-prepend(
-  { prototype: Base },
-  {
-    loadSchemaBang: _EncryptableRecord.loadSchemaBang,
-  },
-);
+extend(Base, { loadSchemaBang: CounterCache.loadSchemaBang });
+extend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
 include(Base, _NestedAttributes.NestedAttributes);
 include(Base, { association: _association });

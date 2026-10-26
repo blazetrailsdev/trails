@@ -1,4 +1,5 @@
 import {
+  eachWithIndex,
   fetch,
   rbEqual,
   rbFCaller,
@@ -188,7 +189,7 @@ export class BelongsToAssociation extends SingularAssociation {
           targetKeyValues,
         )
       ) {
-        reflectionFk.forEach((key, index) => {
+        eachWithIndex(reflectionFk, (key, index) => {
           this.owner.set(key, targetKeyValues[index]);
         });
       }

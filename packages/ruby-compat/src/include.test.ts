@@ -1041,6 +1041,33 @@ describe("rbCallSuper", () => {
     expect((new Host() as { chain(): string[] }).chain()).toEqual(["second", "first"]);
   });
 
+  it("reaches the superclass static an extended module's copy shadows", () => {
+    class Parent {
+      static loadSchemaBang(): string[] {
+        return ["parent"];
+      }
+    }
+    class Child extends Parent {}
+    function loadSchemaBang(this: typeof Child): string[] {
+      return ["mod", ...(rbCallSuper(this, loadSchemaBang) as string[])];
+    }
+    extend(Child, { loadSchemaBang });
+    expect(Child.loadSchemaBang()).toEqual(["mod", "parent"]);
+  });
+
+  it("reaches the module extended before, as a later extend sits above it", () => {
+    class Host {}
+    function first(this: typeof Host): string[] {
+      return ["first"];
+    }
+    function second(this: typeof Host): string[] {
+      return ["second", ...(rbCallSuper(this, second) as string[])];
+    }
+    extend(Host, { chain: first });
+    extend(Host, { chain: second });
+    expect((Host as unknown as { chain(): string[] }).chain()).toEqual(["second", "first"]);
+  });
+
   it("binds each includer's super separately", () => {
     class A {
       tag(): string {
