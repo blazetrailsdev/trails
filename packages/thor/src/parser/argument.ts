@@ -1,9 +1,10 @@
 import {
   ArgumentError,
+  first,
+  last,
   hasKey,
   isEmpty,
   Range,
-  rbFSend,
   rbModName,
   rbObjAsString,
   rbObjClassname,
@@ -96,7 +97,7 @@ export class Argument {
     if (rbObjRespondTo(this.enum, "join") || this.enum instanceof Set) {
       return [...(this.enum as Iterable<unknown>)].flat(Infinity).join(", ");
     } else {
-      return `${rbFSend(this.enum, "first")}..${rbFSend(this.enum, "last")}`;
+      return `${first(this.enum as Iterable<unknown>)}..${last(this.enum as { readonly last: unknown })}`;
     }
   }
 

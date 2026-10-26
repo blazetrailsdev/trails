@@ -3,7 +3,6 @@ import {
   NoMethodError,
   puts,
   rbCheckArity,
-  rbFSend,
   rbModConstSet,
   rbObjClassname,
   RuntimeError,
@@ -145,11 +144,11 @@ export class MyScript extends Thor {
 
   call_myself_with_wrong_arity(): unknown {
     rbCheckArity(this.call_myself_with_wrong_arity, 1);
-    return rbFSend(this, "call_myself_with_wrong_arity", 4);
+    return (this.call_myself_with_wrong_arity as (n: number) => unknown).call(this, 4);
   }
 
   call_unexistent_method() {
-    return rbFSend(this, "boom!");
+    return this.methodMissing("boom!");
   }
 
   long_description() {}

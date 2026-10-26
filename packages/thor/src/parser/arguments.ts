@@ -23,6 +23,7 @@ import {
   stringSplit,
   toI,
 } from "@blazetrails/ruby-compat";
+import type { Option } from "./option.js";
 import { MalformattedArgumentError, RequiredArgumentMissingError } from "../error.js";
 import type { Argument } from "./argument.js";
 
@@ -224,7 +225,7 @@ export class Arguments {
   protected checkRequirementBang(): void {
     if (this.nonAssignedRequired.length === 0) return;
     const names = this.nonAssignedRequired
-      .map((o) => (rbObjRespondTo(o, "switchName") ? rbFSend(o, "switchName") : o.humanName))
+      .map((o) => (rbObjRespondTo(o, "switchName") ? (o as Option).switchName : o.humanName))
       .join("', '");
     const className = rbModName(this.constructor as typeof Arguments)!
       .split("::")

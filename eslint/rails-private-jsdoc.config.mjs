@@ -54,6 +54,7 @@ export default [
       "packages/did-you-mean/src/**/*.ts",
       "packages/bcrypt/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     languageOptions: {
@@ -74,6 +75,7 @@ export default [
   {
     files: [
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/globalid/src/**/*.ts",

@@ -691,9 +691,25 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/thor':
+        specifier: workspace:*
+        version: link:../thor
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../trailties
+
+  packages/thor:
+    dependencies:
+      '@blazetrails/did-you-mean':
+        specifier: workspace:*
+        version: link:../did-you-mean
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
 
   packages/trails-tsc:
     dependencies:
@@ -754,6 +770,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/thor':
+        specifier: workspace:*
+        version: link:../thor
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../trails-tsc
@@ -946,6 +965,9 @@ importers:
       '@blazetrails/solid-queue':
         specifier: workspace:*
         version: link:../../packages/solid-queue
+      '@blazetrails/thor':
+        specifier: workspace:*
+        version: link:../../packages/thor
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../../packages/trails-tsc

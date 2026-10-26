@@ -45,7 +45,7 @@ const PKG_DIRS: Record<string, string> = {
   actionview: "packages/actionview/src/",
   actioncable: "packages/actioncable/src/",
   activejob: "packages/activejob/src/",
-  thor: PKG_SRC_DIRS.thor,
+  thor: "packages/thor/src/",
 };
 
 interface ConventionFile {

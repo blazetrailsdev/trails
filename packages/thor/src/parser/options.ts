@@ -252,9 +252,7 @@ export class Options extends Arguments {
     return compact(
       Object.values(this.switches).map((o) => {
         if (names.includes(o.name)) {
-          return rbObjRespondTo(o, "switchName")
-            ? (rbFSend(o, "switchName") as string)
-            : o.humanName;
+          return rbObjRespondTo(o, "switchName") ? o.switchName : o.humanName;
         } else {
           return null;
         }

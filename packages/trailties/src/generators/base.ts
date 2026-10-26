@@ -26,8 +26,8 @@ import { GeneratorError } from "./generated-attribute.js";
 import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
-import * as ThorActions from "../thor/actions.js";
-import { fromSuperclass } from "../thor/base.js";
+import * as ThorActions from "@blazetrails/thor/actions";
+import { fromSuperclass } from "@blazetrails/thor/base";
 
 export interface GeneratorOptions {
   cwd: string;

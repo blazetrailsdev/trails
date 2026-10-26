@@ -109,7 +109,9 @@ export class Command extends Struct.new(
         );
         return await rbFSend(instance, this.name, ...args);
       } else if (this.isLocalMethod(instance, "methodMissing")) {
-        return await rbFSend(instance, "methodMissing", this.name, ...args);
+        return await (
+          instance as unknown as { methodMissing(meth: string, ...args: unknown[]): unknown }
+        ).methodMissing(this.name, ...args);
       } else {
         return instance.constructor.handleNoCommandError(this.name);
       }

@@ -25,6 +25,7 @@
     "@blazetrails/solid-queue": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/thor": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
     "@blazetrails/tzinfo": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",

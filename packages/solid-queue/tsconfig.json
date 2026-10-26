@@ -16,6 +16,7 @@
     { "path": "../fugit" },
     { "path": "../globalid" },
     { "path": "../ruby-compat" },
+    { "path": "../thor" },
     { "path": "../trailties" }
   ]
 }
