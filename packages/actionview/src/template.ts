@@ -11,6 +11,7 @@ import {
   forceEncoding,
   isValidEncoding,
   Exception,
+  extend,
   LoadError,
   NotImplementedError,
   rbModConstSet,
@@ -19,7 +20,6 @@ import {
   rbObjRespondTo,
   rbStrEnumerateLines,
   StandardError,
-  extend,
 } from "@blazetrails/ruby-compat";
 import { ENCODING_FLAG } from "./action-view.js";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
