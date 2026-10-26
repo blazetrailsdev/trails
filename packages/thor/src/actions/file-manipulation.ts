@@ -78,7 +78,10 @@ export async function get(this: FileHost, source: string, ...args: unknown[]): P
   let render: Uint8Array;
   if (/^https?:\/\//.test(source)) {
     const input = await globalThis.fetch(source, {
-      headers: fetch(config, "httpHeaders", {}) as Record<string, string>,
+      headers: (Object.hasOwn(config, "httpHeaders") ? config["httpHeaders"] : {}) as Record<
+        string,
+        string
+      >,
     });
     if (!input.ok) throw new OpenURI.HTTPError(`${input.status} ${input.statusText}`, input);
     render = await input.bytes();
