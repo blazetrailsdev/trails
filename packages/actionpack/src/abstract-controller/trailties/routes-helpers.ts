@@ -1,7 +1,6 @@
 /** @internal */
 
 import {
-  defineModule,
   include,
   includedModules,
   isModuleIncluded,
@@ -24,7 +23,7 @@ export interface RoutesHelpersClassMethods extends HelpersClassMethods {
   _routes?: unknown;
 }
 
-export const RoutesHelpers = defineModule({
+export const RoutesHelpers = {
   with(
     routes: UrlHelpersRouteSet,
     includePathHelpers = true,
@@ -72,7 +71,7 @@ export const RoutesHelpers = defineModule({
       cls._routes = (urlHelpersModule() as { _routes?: unknown })._routes ?? routes;
     };
   },
-});
+};
 
 export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods {
   prototype: object;
