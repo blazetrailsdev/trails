@@ -16,6 +16,7 @@ import {
   rbInspect,
   symbolToS,
   include,
+  defineModule,
 } from "@blazetrails/ruby-compat";
 import { ActionView } from "../namespaces.js";
 import { contentTag, TagHelper, type TagHelperHost } from "./tag-helper.js";
@@ -159,7 +160,7 @@ function missingTranslation(
   }
 }
 
-export const TranslationHelper = { translate, t, localize, l } as {
+export const TranslationHelper = defineModule({ translate, t, localize, l }) as {
   translate: typeof translate;
   t: typeof t;
   localize: typeof localize;

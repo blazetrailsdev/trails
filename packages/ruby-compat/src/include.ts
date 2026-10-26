@@ -28,6 +28,7 @@ import { NoMethodError } from "./no-method-error.js";
 import { isRegisteredConstant, registeredConstant } from "./variable.js";
 import { temporalTag } from "./temporal-tag.js";
 import { classModule } from "./class-module.js";
+import { markModuleObject } from "./classpath.js";
 export { classModule };
 import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
@@ -1489,6 +1490,8 @@ function featureHook(mod: unknown, name: string): ((base: unknown) => void) | un
  * uses but does not define.
  */
 export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
+  if (!isClassReceiver(klass)) markModuleObject(klass);
+  markModuleObject(mod);
   const appendFeatures = featureHook(mod, "appendFeatures");
   if (appendFeatures) {
     appendFeatures(klass);
@@ -1938,6 +1941,8 @@ export function prepend(
   mod: ModuleObject | AnyClass | Module,
 ): void {
   const klass = target as AnyClass;
+  if (!isClassReceiver(klass)) markModuleObject(klass);
+  markModuleObject(mod);
   const prependFeatures = featureHook(mod, "prependFeatures");
   if (prependFeatures) {
     prependFeatures(klass);
@@ -2040,6 +2045,7 @@ export function extend<T extends AnyClass | object>(
 }
 
 function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
+  markModuleObject(mod);
   const extendedHook = featureHook(mod, "extended");
   if (extendedHook) {
     extendedHook(klass);
