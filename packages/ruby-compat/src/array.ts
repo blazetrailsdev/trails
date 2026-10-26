@@ -795,6 +795,16 @@ export function toA<T>(ary: T[]): T[] {
 }
 
 /**
+ * Ruby `Array#take` (`vendor/ruby/v3.3.11/array.c:7532` `rb_ary_take`): the first `n` elements.
+ * @noRailsEquivalent PERMANENT
+ */
+export function take<T>(ary: readonly T[], n: number): T[] {
+  const len = num2long(n);
+  if (len < 0) throw new ArgumentError("attempt to take negative size");
+  return ary.slice(0, len);
+}
+
+/**
  * Ruby `Array#compact` (`vendor/ruby/v3.3.11/array.c:6240` `rb_ary_compact`): a new
  * array with every `nil` element removed.
  * @noRailsEquivalent PERMANENT — Ruby core `Array#compact`

@@ -1,6 +1,6 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { ActiveRecord } from "./namespaces.js";
-import { groupBy, rbFSend, rbModConstSet, uniq } from "@blazetrails/ruby-compat";
+import { groupBy, rbFSend, rbModConstSet, take, uniq } from "@blazetrails/ruby-compat";
 import { stripThenable } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
@@ -23,7 +23,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
   // @ts-expect-error — Rails' override returns an Array, not a Relation (activerecord/lib/active_record/disable_joins_association_relation.rb:13-15)
   override async limit(value: number | null): Promise<T[]> {
     const records = await this.toArray();
-    return records.slice(0, value as number);
+    return take(records, value as number);
   }
 
   override first(): Promise<T | null>;

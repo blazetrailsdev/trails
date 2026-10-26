@@ -7,6 +7,7 @@ import {
   rtest,
   first as aryFirst,
   last as aryLast,
+  take as aryTake,
   uniq,
   arySlice,
   cmp,
@@ -658,7 +659,7 @@ export async function findTake(this: FinderRelation): Promise<any | null> {
 
 /** @internal */
 export async function findTakeWithLimit(this: FinderRelation, limit: number): Promise<any[]> {
-  if (this.isLoaded) return (await this.records()).slice(0, limit);
+  if (this.isLoaded) return aryTake(await this.records(), limit);
   return this.limit(limit).toArray();
 }
 

@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { Hash, keys } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
 const attributeNamesOf = (klass: unknown): string[] =>
-  Object.keys((klass as { attributeTypes(): Record<string, unknown> }).attributeTypes());
+  keys((klass as { attributeTypes(): Hash<string, unknown> }).attributeTypes());
 
 describe("STI subclass attribute() registration", () => {
   fixtures({}, { useTransactionalTests: false });

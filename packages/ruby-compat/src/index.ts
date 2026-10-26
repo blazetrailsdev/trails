@@ -217,6 +217,7 @@ export {
   pack,
   aryReject,
   sort,
+  take,
   toA,
   toH,
   isIntersect,
