@@ -286,6 +286,7 @@ export function _normalizeArgs(
 /**
  * @inventedArm underscore — PERMANENT
  * @inventedArm dasherize — PERMANENT
+ * @inventedArm if — PERMANENT
  * @internal
  */
 export function _processRenderTemplateOptions(

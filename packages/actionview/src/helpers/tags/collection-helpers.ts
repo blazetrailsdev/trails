@@ -124,137 +124,147 @@ interface CollectionHelpersHost {
   hiddenFieldName(): string;
 }
 
-export const CollectionHelpers = defineModule({
-  /** @internal */
-  instantiateBuilder(
-    this: CollectionHelpersHost,
-    builderClass: typeof Builder,
-    item: unknown,
-    value: unknown,
-    text: unknown,
-    htmlOptions: Record<string, unknown>,
-  ): Builder {
-    return new builderClass(
-      this._templateObject,
-      this._objectName,
-      this._methodName,
-      item,
-      this.sanitizeAttributeName(value),
-      text,
-      value,
-      htmlOptions,
-    );
-  },
-
-  /** @internal */
-  defaultHtmlOptionsForCollection(
-    this: CollectionHelpersHost,
-    item: unknown,
-    value: unknown,
-  ): Record<string, unknown> {
-    const htmlOptions = { ...this._htmlOptions };
-
-    for (const option of ["checked", "selected", "disabled", "readonly"]) {
-      const currentValue = this._options[option];
-      if (currentValue == null) continue;
-
-      const accept = rbObjRespondTo(currentValue, "call")
-        ? (currentValue as (item: unknown) => unknown)(item)
-        : Array(currentValue)
-            .map((v) => rbObjAsString(v))
-            .includes(rbObjAsString(value));
-
-      if (rtest(accept)) {
-        htmlOptions[option] = true;
-      } else if (option === "checked") {
-        htmlOptions[option] = false;
-      }
-    }
-
-    htmlOptions["object"] = this.object;
-    return htmlOptions;
-  },
-
-  /** @internal */
-  sanitizeAttributeName(this: CollectionHelpersHost, value: unknown): string {
-    return `${this.sanitizedMethodName()}_${this.sanitizedValue(value)}`;
-  },
-
-  /**
-   * @internal
-   * @missingRailsArgs join — PERMANENT
-   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
-   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
-   */
-  renderCollection(
-    this: CollectionHelpersHost,
-    block: (
+export const CollectionHelpers = defineModule(
+  {},
+  {},
+  {
+    /** @internal */
+    instantiateBuilder(
+      this: CollectionHelpersHost,
+      builderClass: typeof Builder,
       item: unknown,
       value: unknown,
       text: unknown,
-      defaultHtmlOptions: Record<string, unknown>,
-    ) => unknown,
-  ): SafeBuffer | Promise<SafeBuffer> {
-    const rendered = globalThis.Array.from(this._collection, (item) => {
-      const value = this.valueForCollection(item, this._valueMethod);
-      const text = this.valueForCollection(item, this._textMethod);
-      const defaultHtmlOptions = this.defaultHtmlOptionsForCollection(item, value);
-      const additionalHtmlOptions = this.optionHtmlAttributes(item);
-
-      return block(item, value, text, { ...defaultHtmlOptions, ...additionalHtmlOptions });
-    });
-    if (rendered.some((part) => part instanceof Promise)) {
-      return Promise.all(rendered).then((parts) => htmlSafe(parts.join("")));
-    }
-    return htmlSafe(rendered.join(""));
-  },
-
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
-   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
-   */
-  renderCollectionFor(
-    this: CollectionHelpersHost,
-    builderClass: typeof Builder,
-    block?: (builder: Builder) => unknown,
-  ): SafeBuffer | Promise<SafeBuffer> {
-    const options = stringifyKeys(this._options);
-    const renderedCollection = this.renderCollection((item, value, text, defaultHtmlOptions) => {
-      const builder = this.instantiateBuilder(builderClass, item, value, text, defaultHtmlOptions);
-
-      if (block) {
-        return this._templateObject.capture(block, builder);
-      } else {
-        return this.renderComponent(builder);
-      }
-    });
-
-    if (renderedCollection instanceof Promise) {
-      return renderedCollection.then((rendered) =>
-        rtest(fetch<unknown>(options, "includeHidden", true))
-          ? this.hiddenField().plus(rendered)
-          : rendered,
+      htmlOptions: Record<string, unknown>,
+    ): Builder {
+      return new builderClass(
+        this._templateObject,
+        this._objectName,
+        this._methodName,
+        item,
+        this.sanitizeAttributeName(value),
+        text,
+        value,
+        htmlOptions,
       );
-    }
-    if (rtest(fetch<unknown>(options, "includeHidden", true))) {
-      return this.hiddenField().plus(renderedCollection);
-    } else {
-      return renderedCollection;
-    }
-  },
+    },
 
-  /** @internal */
-  hiddenField(this: CollectionHelpersHost): SafeBuffer {
-    const hiddenName = rtest(this._htmlOptions["name"])
-      ? this._htmlOptions["name"]
-      : this.hiddenFieldName();
-    const options = { id: null, form: this._htmlOptions["form"] };
-    return this._templateObject.hiddenFieldTag(hiddenName, "", options);
-  },
+    /** @internal */
+    defaultHtmlOptionsForCollection(
+      this: CollectionHelpersHost,
+      item: unknown,
+      value: unknown,
+    ): Record<string, unknown> {
+      const htmlOptions = { ...this._htmlOptions };
 
-  /** @internal */
-  hiddenFieldName(this: CollectionHelpersHost): string {
-    return `${this.tagName(false, this._options["index"])}`;
+      for (const option of ["checked", "selected", "disabled", "readonly"]) {
+        const currentValue = this._options[option];
+        if (currentValue == null) continue;
+
+        const accept = rbObjRespondTo(currentValue, "call")
+          ? (currentValue as (item: unknown) => unknown)(item)
+          : Array(currentValue)
+              .map((v) => rbObjAsString(v))
+              .includes(rbObjAsString(value));
+
+        if (rtest(accept)) {
+          htmlOptions[option] = true;
+        } else if (option === "checked") {
+          htmlOptions[option] = false;
+        }
+      }
+
+      htmlOptions["object"] = this.object;
+      return htmlOptions;
+    },
+
+    /** @internal */
+    sanitizeAttributeName(this: CollectionHelpersHost, value: unknown): string {
+      return `${this.sanitizedMethodName()}_${this.sanitizedValue(value)}`;
+    },
+
+    /**
+     * @internal
+     * @missingRailsArgs join — PERMANENT
+     * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+     * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+     */
+    renderCollection(
+      this: CollectionHelpersHost,
+      block: (
+        item: unknown,
+        value: unknown,
+        text: unknown,
+        defaultHtmlOptions: Record<string, unknown>,
+      ) => unknown,
+    ): SafeBuffer | Promise<SafeBuffer> {
+      const rendered = globalThis.Array.from(this._collection, (item) => {
+        const value = this.valueForCollection(item, this._valueMethod);
+        const text = this.valueForCollection(item, this._textMethod);
+        const defaultHtmlOptions = this.defaultHtmlOptionsForCollection(item, value);
+        const additionalHtmlOptions = this.optionHtmlAttributes(item);
+
+        return block(item, value, text, { ...defaultHtmlOptions, ...additionalHtmlOptions });
+      });
+      if (rendered.some((part) => part instanceof Promise)) {
+        return Promise.all(rendered).then((parts) => htmlSafe(parts.join("")));
+      }
+      return htmlSafe(rendered.join(""));
+    },
+
+    /**
+     * @internal
+     * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+     * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+     */
+    renderCollectionFor(
+      this: CollectionHelpersHost,
+      builderClass: typeof Builder,
+      block?: (builder: Builder) => unknown,
+    ): SafeBuffer | Promise<SafeBuffer> {
+      const options = stringifyKeys(this._options);
+      const renderedCollection = this.renderCollection((item, value, text, defaultHtmlOptions) => {
+        const builder = this.instantiateBuilder(
+          builderClass,
+          item,
+          value,
+          text,
+          defaultHtmlOptions,
+        );
+
+        if (block) {
+          return this._templateObject.capture(block, builder);
+        } else {
+          return this.renderComponent(builder);
+        }
+      });
+
+      if (renderedCollection instanceof Promise) {
+        return renderedCollection.then((rendered) =>
+          rtest(fetch<unknown>(options, "includeHidden", true))
+            ? this.hiddenField().plus(rendered)
+            : rendered,
+        );
+      }
+      if (rtest(fetch<unknown>(options, "includeHidden", true))) {
+        return this.hiddenField().plus(renderedCollection);
+      } else {
+        return renderedCollection;
+      }
+    },
+
+    /** @internal */
+    hiddenField(this: CollectionHelpersHost): SafeBuffer {
+      const hiddenName = rtest(this._htmlOptions["name"])
+        ? this._htmlOptions["name"]
+        : this.hiddenFieldName();
+      const options = { id: null, form: this._htmlOptions["form"] };
+      return this._templateObject.hiddenFieldTag(hiddenName, "", options);
+    },
+
+    /** @internal */
+    hiddenFieldName(this: CollectionHelpersHost): string {
+      return `${this.tagName(false, this._options["index"])}`;
+    },
   },
-});
+);
