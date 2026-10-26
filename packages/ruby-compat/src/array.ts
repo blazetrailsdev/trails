@@ -780,27 +780,6 @@ export function toH(ary: object): unknown {
 }
 
 /**
- * Ruby `Array#zip` with no block (`vendor/ruby/v3.3.11/array.c:4422` `rb_ary_zip`):
- * one array per receiver element, holding it and the element at the same
- * index of each argument, `nil` past an argument's end. The arguments are
- * Arrays: `take_items`' `to_ary` / `each` conversion (`:4349`) and the block
- * arm are not ported, as nothing calls them.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function zip<T, U>(ary: readonly T[], ...argv: (readonly U[])[]): (T | U | null)[][] {
-  const result: (T | U | null)[][] = [];
-  for (let i = 0; i < ary.length; i++) {
-    const tmp: (T | U | null)[] = [ary[i]];
-    for (let j = 0; j < argv.length; j++) {
-      tmp.push(i < argv[j].length ? argv[j][i] : null);
-    }
-    result.push(tmp);
-  }
-  return result;
-}
-
-/**
  * Ruby `Array#to_a` (`vendor/ruby/v3.3.11/array.c:2952` `rb_ary_to_a`): the receiver
  * itself, or a plain-Array copy of an instance of an Array subclass.
  *
@@ -813,30 +792,6 @@ export function toA<T>(ary: T[]): T[] {
     return dup;
   }
   return ary;
-}
-
-/**
- * Ruby `Array#take` (`vendor/ruby/v3.3.11/array.c:7532` `rb_ary_take`): the first `n` elements.
- * @noRailsEquivalent PERMANENT
- */
-export function take<T>(ary: readonly T[], n: number): T[] {
-  const len = num2long(n);
-  if (len < 0) throw new ArgumentError("attempt to take negative size");
-  return ary.slice(0, len);
-}
-
-/**
- * Ruby `Array#drop` (`vendor/ruby/v3.3.11/array.c:7594` `rb_ary_drop`): every element
- * after the first `n`.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function drop<T>(ary: readonly T[], n: number): T[] {
-  const pos = n;
-  if (pos < 0) {
-    throw new ArgumentError("attempt to drop negative size");
-  }
-  return ary.slice(pos);
 }
 
 /**

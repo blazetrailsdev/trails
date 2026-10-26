@@ -1,10 +1,8 @@
 import {
   ArgumentError,
-  first,
   fetch,
   flatten,
   include,
-  last,
   rbInspect,
   rbObjAsString,
   rbObjClassname,
@@ -88,10 +86,10 @@ export class Group {
   }
 
   static invoke(this: GroupClass, ...names: unknown[]): void {
-    const block = (rbObjClassname(last(names)) === "Proc" ? names.pop() : undefined) as
+    const block = (rbObjClassname(names.at(-1) ?? null) === "Proc" ? names.pop() : undefined) as
       | InvocationBlock
       | undefined;
-    const options = (rbObjIsKindOf(last(names), Hash) ? names.pop() : {}) as InvokeOptions;
+    const options = (rbObjIsKindOf(names.at(-1) ?? null, Hash) ? names.pop() : {}) as InvokeOptions;
     const verbose = fetch(options, "verbose", true);
 
     names.forEach((name) => {
@@ -121,10 +119,10 @@ export class Group {
   }
 
   static invokeFromOption(this: GroupClass, ...names: unknown[]): void {
-    const block = (rbObjClassname(last(names)) === "Proc" ? names.pop() : undefined) as
+    const block = (rbObjClassname(names.at(-1) ?? null) === "Proc" ? names.pop() : undefined) as
       | InvocationBlock
       | undefined;
-    const options = (rbObjIsKindOf(last(names), Hash) ? names.pop() : {}) as InvokeOptions;
+    const options = (rbObjIsKindOf(names.at(-1) ?? null, Hash) ? names.pop() : {}) as InvokeOptions;
     const verbose = fetch(options, "verbose", ":white");
 
     (names as string[]).forEach((name) => {
@@ -262,7 +260,7 @@ export class Group {
     config: BaseConfig,
     block?: (instance: Instance) => void,
   ): Promise<unknown> {
-    if (HELP_MAPPINGS.includes(first(givenArgs) as string)) {
+    if (HELP_MAPPINGS.includes((givenArgs[0] ?? null) as string)) {
       this.help(config.shell!);
       return;
     }
@@ -417,7 +415,7 @@ export class Group {
     command: unknown = null,
     ...args: unknown[]
   ): unknown {
-    const block = (rbObjClassname(last(args)) === "Proc" ? args.pop() : undefined) as
+    const block = (rbObjClassname(args.at(-1) ?? null) === "Proc" ? args.pop() : undefined) as
       | ((...yielded: unknown[]) => unknown)
       | undefined;
     return this.withPadding(() => {

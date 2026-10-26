@@ -1,7 +1,6 @@
 import { Date as RubyDate, type Time as RubyTime } from "@blazetrails/date";
 import {
   ArgumentError,
-  last,
   rbObjClassname,
   rbObjRespondTo,
   RuntimeError,
@@ -99,7 +98,7 @@ export const Handlers = {
     const year = tokens[0].getTag(ScalarYear)!.type;
     const month = tokens[1].getTag(RepeaterMonthName)!.index();
     const day = tokens[2].getTag(OrdinalDay)!.type;
-    const timeTokens = last(tokens, tokens.length - 3);
+    const timeTokens = tokens.slice(3);
 
     if (this.isMonthOverflow(year, month, day)) return null;
 
@@ -175,7 +174,7 @@ export const Handlers = {
     const month = tokens[0].getTag(RepeaterMonthName)!.index();
     const day = tokens[1].getTag(ScalarDay)!.type;
     const year = tokens[2].getTag(ScalarYear)!.type;
-    const timeTokens = last(tokens, tokens.length - 3);
+    const timeTokens = tokens.slice(3);
 
     if (this.isMonthOverflow(year, month, day)) return null;
 
@@ -192,7 +191,7 @@ export const Handlers = {
     const month = tokens[0].getTag(RepeaterMonthName)!.index();
     const day = tokens[1].getTag(OrdinalDay)!.type;
     const year = tokens[2].getTag(ScalarYear)!.type;
-    const timeTokens = last(tokens, tokens.length - 3);
+    const timeTokens = tokens.slice(3);
 
     if (this.isMonthOverflow(year, month, day)) return null;
 
@@ -209,7 +208,7 @@ export const Handlers = {
     const day = tokens[0].getTag(OrdinalDay)!.type;
     const month = tokens[1].getTag(RepeaterMonthName)!.index();
     const year = tokens[2].getTag(ScalarYear)!.type;
-    const timeTokens = last(tokens, tokens.length - 3);
+    const timeTokens = tokens.slice(3);
 
     if (this.isMonthOverflow(year, month, day)) return null;
 
@@ -224,7 +223,7 @@ export const Handlers = {
 
   handleSdRmnSy(this: Parser, tokens: Token[], options: Options): Span | null {
     const newTokens = [tokens[1], tokens[0], tokens[2]];
-    const timeTokens = last(tokens, tokens.length - 3);
+    const timeTokens = tokens.slice(3);
     return this.handleRmnSdSy([...newTokens, ...timeTokens], options);
   },
 
@@ -232,7 +231,7 @@ export const Handlers = {
     const month = tokens[0].getTag(ScalarMonth)!.type;
     const day = tokens[1].getTag(ScalarDay)!.type;
     const year = tokens[2].getTag(ScalarYear)!.type;
-    const timeTokens = last(tokens, tokens.length - 3);
+    const timeTokens = tokens.slice(3);
 
     if (this.isMonthOverflow(year, month, day)) return null;
 
@@ -247,13 +246,13 @@ export const Handlers = {
 
   handleSdSmSy(this: Parser, tokens: Token[], options: Options): Span | null {
     const newTokens = [tokens[1], tokens[0], tokens[2]];
-    const timeTokens = last(tokens, tokens.length - 3);
+    const timeTokens = tokens.slice(3);
     return this.handleSmSdSy([...newTokens, ...timeTokens], options);
   },
 
   handleSySmSd(this: Parser, tokens: Token[], options: Options): Span | null {
     const newTokens = [tokens[1], tokens[2], tokens[0]];
-    const timeTokens = last(tokens, tokens.length - 3);
+    const timeTokens = tokens.slice(3);
     return this.handleSmSdSy([...newTokens, ...timeTokens], options);
   },
 
@@ -261,7 +260,7 @@ export const Handlers = {
     const month = tokens[0].getTag(ScalarMonth)!.type;
     const day = tokens[1].getTag(ScalarDay)!.type;
     const year = this.now.year;
-    const timeTokens = last(tokens, tokens.length - 2);
+    const timeTokens = tokens.slice(2);
 
     if (this.isMonthOverflow(year, month, day)) return null;
 
@@ -279,7 +278,7 @@ export const Handlers = {
 
   handleSdSm(this: Parser, tokens: Token[], options: Options): Span | null {
     const newTokens = [tokens[1], tokens[0]];
-    const timeTokens = last(tokens, tokens.length - 2);
+    const timeTokens = tokens.slice(2);
     return this.handleSmSd([...newTokens, ...timeTokens], options);
   },
 
@@ -317,7 +316,7 @@ export const Handlers = {
   handleRdnRmnOd(this: Parser, tokens: Token[], options: Options): Span | null {
     const month = tokens[1].getTag(RepeaterMonthName)!;
     const day = tokens[2].getTag(OrdinalDay)!.type;
-    const timeTokens = last(tokens, tokens.length - 3);
+    const timeTokens = tokens.slice(3);
     const year = this.now.year;
 
     if (this.isMonthOverflow(year, month.index(), day)) return null;
@@ -356,7 +355,7 @@ export const Handlers = {
 
   handleRdnOd(this: Parser, tokens: Token[], options: Options): Span | null {
     const day = tokens[1].getTag(OrdinalDay)!.type;
-    const timeTokens = last(tokens, tokens.length - 2);
+    const timeTokens = tokens.slice(2);
     const year = this.now.year;
     let month = this.now.month;
     if (options.context === "future") {
@@ -383,7 +382,7 @@ export const Handlers = {
   handleRdnRmnSd(this: Parser, tokens: Token[], options: Options): Span | null {
     const month = tokens[1].getTag(RepeaterMonthName)!;
     const day = tokens[2].getTag(ScalarDay)!.type;
-    const timeTokens = last(tokens, tokens.length - 3);
+    const timeTokens = tokens.slice(3);
     const year = this.now.year;
 
     if (this.isMonthOverflow(year, month.index(), day)) return null;
@@ -426,7 +425,7 @@ export const Handlers = {
     const year = tokens[2].getTag(ScalarYear)!.type;
     let time: RubyTime, endTime: RubyTime;
     if (tokens.length > 3) {
-      time = this.getAnchor([last(tokens)!], options)!.begin!;
+      time = this.getAnchor([tokens.at(-1)!], options)!.begin!;
       const h = time.hour,
         m = time.min,
         s = time.sec;

@@ -3,7 +3,7 @@ import type { Result } from "../../result.js";
 
 export class ExplainPrettyPrinter {
   pp(result: Result): string {
-    const header = first(result.columns)!;
+    const header = result.columns[0];
     const lines = result.rows.map(first) as string[];
 
     const width = Math.max(...[header, ...lines].map((line) => line.length)) + 2;

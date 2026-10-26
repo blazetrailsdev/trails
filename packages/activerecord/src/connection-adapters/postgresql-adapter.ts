@@ -11,7 +11,6 @@ import {
   rbModConstSet,
   rbObjRespondTo,
   setEnv,
-  valuesAt,
   filterMap,
 } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
@@ -676,7 +675,8 @@ export class PostgreSQLAdapter
 
   async enableExtension(name: string, _options?: Record<string, unknown>): Promise<void> {
     let schema: string | undefined;
-    [schema, name] = valuesAt(String(name).split("."), -2, -1) as [string | undefined, string];
+    const parts = String(name).split(".");
+    [schema, name] = [parts.at(-2), parts.at(-1)!];
     let sql = `CREATE EXTENSION IF NOT EXISTS "${name}"`;
     if (schema != null) sql += ` SCHEMA ${schema}`;
     await this.internalExecQuery(sql);
@@ -685,7 +685,8 @@ export class PostgreSQLAdapter
 
   async disableExtension(name: string, options: { force?: "cascade" } = {}): Promise<void> {
     let _schema: string | undefined;
-    [_schema, name] = valuesAt(String(name).split("."), -2, -1) as [string | undefined, string];
+    const parts = String(name).split(".");
+    [_schema, name] = [parts.at(-2), parts.at(-1)!];
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     await this.internalExecQuery(`DROP EXTENSION IF EXISTS "${name}"${cascade}`);
     await this.reloadTypeMap();

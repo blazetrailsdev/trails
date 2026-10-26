@@ -4,7 +4,6 @@ import {
   arySlice,
   cmp,
   eachPair,
-  first,
   include,
   mergeBang,
   puts,
@@ -599,7 +598,7 @@ export class Thor {
 
   /** @internal */
   static retrieveCommandName(this: ThorClass, args: unknown[]): string | null | undefined {
-    const meth = args.length !== 0 ? toS(first(args)) : null;
+    const meth = args.length !== 0 ? toS(args[0] ?? null) : null;
     if (rtest(meth) && (rtest(this.map()[meth]) || !/^-/m.test(meth))) {
       return args.shift() as string | null | undefined;
     }
@@ -624,7 +623,7 @@ export class Thor {
     } else if (rtest(this.map()[meth])) {
       meth = this.map()[meth];
     } else {
-      meth = first(possibilities);
+      meth = possibilities[0] ?? null;
     }
 
     return toS(meth).replaceAll("-", "_");

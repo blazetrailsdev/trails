@@ -5,7 +5,7 @@ import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { Encryption } from "../encryption.js";
 import { Encoding, Decryption, Base } from "./errors.js";
-import { first, rbObjAsString as toS, rtest, registerConstant } from "@blazetrails/ruby-compat";
+import { rbObjAsString as toS, rtest, registerConstant } from "@blazetrails/ruby-compat";
 import { NullEncryptor } from "./null-encryptor.js";
 
 export class EncryptedAttributeType extends ValueType {
@@ -184,7 +184,7 @@ export class EncryptedAttributeType extends ValueType {
 
   /** @internal */
   private serializeWithOldest(value: unknown): unknown {
-    return first(this.previousTypes)!.serialize(value);
+    return this.previousTypes[0].serialize(value);
   }
 
   /** @internal */

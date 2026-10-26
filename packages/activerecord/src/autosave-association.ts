@@ -5,7 +5,6 @@ import {
   rbFSend,
   rbModDefineMethod,
   rbModMethodDefined,
-  zip,
   rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
@@ -246,7 +245,7 @@ export async function saveHasOneAssociation(
 
     if (!reflection.throughReflection) {
       const foreignKey = kernelArray<string>(reflection.foreignKey());
-      const primaryKeyForeignKeyPairs = zip(primaryKey, foreignKey) as [string, string][];
+      const primaryKeyForeignKeyPairs = primaryKey.map((pk, i) => [pk, foreignKey[i] ?? null]);
 
       for (const [primaryKey, foreignKey] of primaryKeyForeignKeyPairs) {
         const associationId = this._readAttribute(primaryKey);
@@ -297,7 +296,7 @@ export async function saveBelongsToAssociation(this: AutosaveAssociationHost, re
         const primaryKey = kernelArray(computePrimaryKey(reflection, record)).map(String);
         const foreignKey = kernelArray<string>(reflection.foreignKey());
 
-        const primaryKeyForeignKeyPairs = zip(primaryKey, foreignKey) as [string, string][];
+        const primaryKeyForeignKeyPairs = primaryKey.map((pk, i) => [pk, foreignKey[i] ?? null]);
         for (const [primaryKey, foreignKey] of primaryKeyForeignKeyPairs) {
           const associationId = record._readAttribute(primaryKey);
           if (!rbEqual(this.get(foreignKey), associationId)) this.set(foreignKey, associationId);

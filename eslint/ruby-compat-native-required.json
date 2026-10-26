@@ -19,11 +19,27 @@
     "maxArgs": 1,
     "kinds": ["array"]
   },
+  "dup": {
+    "member": "dup",
+    "native": "{ ...h } / [...xs]",
+    "maxArgs": 1
+  },
   "eachPair": {
     "member": "each",
     "native": "for (const [k, v] of Object.entries(h))",
     "maxArgs": 2,
     "void": true
+  },
+  "eachValue": {
+    "member": "eachValue",
+    "native": "for (const v of Object.values(h))",
+    "maxArgs": 2,
+    "void": true
+  },
+  "first": {
+    "member": "first",
+    "native": "xs[0] ?? null / xs.slice(0, n)",
+    "maxArgs": 2
   },
   "hasKey": {
     "member": "isKey",
@@ -35,6 +51,16 @@
     "native": "delete h[k]",
     "maxArgs": 2,
     "void": true
+  },
+  "keys": {
+    "member": "keys",
+    "native": "Object.keys(h)",
+    "maxArgs": 1
+  },
+  "last": {
+    "member": "last",
+    "native": "xs.at(-1) ?? null / xs.slice(-n)",
+    "maxArgs": 2
   },
   "max": {
     "member": "max",
@@ -66,11 +92,21 @@
     "maxArgs": 1,
     "kinds": ["number"]
   },
+  "toH": {
+    "member": "toH",
+    "native": "Object.fromEntries(xs)",
+    "maxArgs": 1
+  },
   "toI": {
     "member": "toI",
     "native": "Math.trunc(x)",
     "maxArgs": 1,
     "kinds": ["number"]
+  },
+  "transformValues": {
+    "member": "transformValues",
+    "native": "Object.fromEntries(Object.entries(h).map(([k, v]) => [k, f(v)]))",
+    "maxArgs": 2
   },
   "union": {
     "member": "union",
@@ -90,5 +126,10 @@
     "member": "update",
     "native": "Object.assign(h, other)",
     "maxArgs": 2
+  },
+  "valuesAt": {
+    "member": "valuesAt",
+    "native": "ks.map((k) => h[k] ?? null)",
+    "maxArgs": 99
   }
 }

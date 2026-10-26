@@ -43,7 +43,6 @@ import {
   fetch,
   isEmpty,
   isNil,
-  last,
   rbDefineInspectCustom,
   rbEnsure,
   rbFSend,
@@ -1596,7 +1595,7 @@ export class AbstractAdapter implements Quoting {
     kwargs: Record<string, unknown> = {},
   ): void {
     (mapping as TypeMap).registerType(key, undefined, (...args: string[]) => {
-      const precision = this.extractPrecision(last(args)!);
+      const precision = this.extractPrecision(args.at(-1)!);
       return new klass({ precision, ...kwargs }) as ReturnType<TypeMap["lookup"]>;
     });
   }
@@ -1650,7 +1649,7 @@ export class AbstractAdapter implements Quoting {
     klass: new (options?: { limit?: number }) => object,
   ): void {
     (mapping as TypeMap).registerType(key, undefined, (...args: string[]) => {
-      const limit = this.extractLimit(last(args)!);
+      const limit = this.extractLimit(args.at(-1)!);
       return new klass({ limit }) as ReturnType<TypeMap["lookup"]>;
     });
   }

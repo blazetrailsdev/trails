@@ -8,13 +8,7 @@ import {
   NotificationEvent as Event,
   type Logger,
 } from "@blazetrails/activesupport";
-import {
-  eachWithIndex,
-  first,
-  rbObjAsString,
-  rbObjRespondTo,
-  rtest,
-} from "@blazetrails/ruby-compat";
+import { eachWithIndex, rbObjAsString, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
 import { verboseQueryLogs } from "./active-record.js";
 import { ActiveRecord } from "./namespaces.js";
 
@@ -152,7 +146,7 @@ export class LogSubscriber extends BaseLogSubscriber {
         value = `<${byteLength(rbObjAsString(attr.valueForDatabase))} bytes of binary data>`;
       }
     } else if (Array.isArray(attr)) {
-      attr = first(attr);
+      attr = attr[0] ?? null;
     } else {
       attr = null;
     }

@@ -24,7 +24,6 @@ import {
   rbObjMethod,
   rbRegInitStr,
   rbRegToS,
-  zip,
 } from "@blazetrails/ruby-compat";
 import { Duration, type DurationParts } from "../duration.js";
 import { compact, valuesAt } from "../hash-utils.js";
@@ -321,8 +320,9 @@ export const Extensions = {
 
   readDuration(unpacker: Unpacker): Duration {
     const value = unpacker.read() as number;
+    const values = unpacker.read() as number[];
     let parts: Partial<DurationParts> = Object.fromEntries(
-      zip(Duration.PARTS, unpacker.read() as number[]),
+      Duration.PARTS.map((part, i) => [part, values[i] ?? null]),
     );
     parts = compact(parts);
     return new Duration(value, parts);

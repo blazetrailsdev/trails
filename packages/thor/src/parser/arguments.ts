@@ -1,7 +1,6 @@
 import {
   aryDelete,
   arySlice,
-  first,
   format,
   Hash,
   isInclude,
@@ -103,7 +102,7 @@ export class Arguments {
 
   /** @internal */
   protected peek(): unknown {
-    return first(this.pile) ?? null;
+    return this.pile[0] ?? null;
   }
 
   /** @internal */

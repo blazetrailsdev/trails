@@ -7,7 +7,6 @@ import {
   aryReject,
   rbFArray,
   toH,
-  zip,
   aryDelete,
   aryDeleteIf,
   aryIncludes,
@@ -277,28 +276,6 @@ describe("Array#to_a", () => {
     expect(result).not.toBe(ary);
     expect(result.constructor).toBe(Array);
     expect(result).toEqual([1, 2]);
-  });
-});
-
-describe("Array#zip", () => {
-  it("pairs each element with the same index of every argument", () => {
-    expect(zip([1, 2], ["a", "b"])).toEqual([
-      [1, "a"],
-      [2, "b"],
-    ]);
-    expect(zip<number, string | boolean>([1, 2], ["a", "b"], [true, false])).toEqual([
-      [1, "a", true],
-      [2, "b", false],
-    ]);
-  });
-
-  it("is as long as the receiver, nil past an argument's end", () => {
-    expect(zip([1, 2, 3], ["a"])).toEqual([
-      [1, "a"],
-      [2, null],
-      [3, null],
-    ]);
-    expect(zip([1], ["a", "b"])).toEqual([[1, "a"]]);
   });
 });
 

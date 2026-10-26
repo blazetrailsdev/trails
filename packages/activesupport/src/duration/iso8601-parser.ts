@@ -145,7 +145,6 @@ export class ISO8601Parser {
     );
   }
 
-  /** @missingRailsCall last — PERMANENT */
   private validateBang(): boolean {
     if (Object.keys(this.parts).length === 0) this.raiseParsingError("is empty duration");
 

@@ -12,7 +12,6 @@ import {
   ArgumentError,
   aryDeleteIf,
   block,
-  last,
   stringSplit,
   fetch,
   warn,
@@ -163,7 +162,7 @@ export function forwardedValues(
 export function bestQMatch(qValueHeader: string, availableMimes: string[]): string | null {
   const values = qValues(qValueHeader);
 
-  const matches = last(
+  const matches =
     values
       .map(([reqMime, quality]): [string, number] | null => {
         const match = availableMimes.find((am) => RackMime.match(am, reqMime));
@@ -176,8 +175,8 @@ export function bestQMatch(qValueHeader: string, availableMimes: string[]): stri
           aMatch.split("/", 2).filter((part) => part === "*").length * -10 +
           aQuality -
           (bMatch.split("/", 2).filter((part) => part === "*").length * -10 + bQuality),
-      ),
-  );
+      )
+      .at(-1) ?? null;
   return matches?.[0] ?? null;
 }
 

@@ -16,7 +16,6 @@ import {
   classAttribute,
   ToJsonWithActiveSupportEncoder,
 } from "@blazetrails/activesupport";
-import { first } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 
 interface AttributesWriter {
@@ -62,7 +61,7 @@ export class JSON {
   ): this {
     let hash = ActiveSupportJSON.decode(json);
     if (includeRoot !== false && includeRoot != null) {
-      hash = first(Object.values(hash as object));
+      hash = Object.values(hash as object)[0] ?? null;
     }
     void this.setAttributes(hash);
     return this;

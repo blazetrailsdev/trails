@@ -217,6 +217,7 @@ export class LogSubscriber extends BaseLogSubscriber {
   /** @internal */
   private format(arg: unknown): unknown {
     if (rbObjIsKindOf(arg, Hash)) {
+      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- arg may be a ruby-compat Hash
       return transformValues(arg as Record<string, unknown>, (value) => this.format(value));
     } else if (Array.isArray(arg)) {
       return arg.map((value) => this.format(value));

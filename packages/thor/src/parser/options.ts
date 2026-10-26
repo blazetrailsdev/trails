@@ -1,6 +1,5 @@
 import {
   aryDelete,
-  keys,
   matchOperator,
   rbFSend,
   rbInspect,
@@ -203,7 +202,7 @@ export class Options extends Arguments {
   }
 
   checkExclusiveBang(): void {
-    const opts = keys(this.assigns);
+    const opts = Object.keys(this.assigns);
     const found = this.exclusives.find(
       (ex) => ex.filter((o) => !opts.includes(o)).length < ex.length - 1,
     );
@@ -220,7 +219,7 @@ export class Options extends Arguments {
   }
 
   checkAtLeastOneBang(): void {
-    const opts = keys(this.assigns);
+    const opts = Object.keys(this.assigns);
     const found = this.atLeastOnes.find((oneReqs) => !oneReqs.some((o) => opts.includes(o)));
     if (found) {
       const names = this.namesToSwitchNames(found).map((n) => `'${n}'`);
@@ -244,7 +243,7 @@ export class Options extends Arguments {
       rtest(matchOperator(str, /(?<![^\n])--?(?:(?!--)[^\n])*(?![^\n])/)),
     );
     if (unknown.length !== 0)
-      throw new UnknownArgumentError(keys(this.switches), unknown as string[]);
+      throw new UnknownArgumentError(Object.keys(this.switches), unknown as string[]);
   }
 
   /** @internal */

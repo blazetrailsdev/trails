@@ -9,7 +9,6 @@ import {
   classModule,
   eachCons,
   fixMod,
-  first,
   flatten,
   hashAref,
   include,
@@ -793,7 +792,7 @@ export class TimeCursor {
     if (sec != null) {
       return this.inc(sec - this._t.sec);
     } else {
-      return this.inc(60 - this._t.sec + first(this._cron.seconds!)!);
+      return this.inc(60 - this._t.sec + this._cron.seconds![0]);
     }
   }
 

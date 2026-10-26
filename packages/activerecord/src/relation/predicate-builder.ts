@@ -1,6 +1,5 @@
 import {
   ArgumentError,
-  last,
   rbCBasicObject as BasicObject,
   rbFSend,
   rbModConstSet,
@@ -10,8 +9,6 @@ import {
   rtest,
   Range,
   Set,
-  toH,
-  zip,
   eachWithObject,
 } from "@blazetrails/ruby-compat";
 import type * as Arel from "@blazetrails/arel";
@@ -88,7 +85,9 @@ export class PredicateBuilder {
           if (!Array.isArray(idsSet)) {
             throw new ArgumentError(`Expected corresponding value for ${toS(cols)} to be an Array`);
           }
-          return this.expandFromHash(toH(zip(cols, idsSet)));
+          return this.expandFromHash(
+            Object.fromEntries(cols.map((col, i) => [col, idsSet[i] ?? null])),
+          );
         });
         return this.groupingQueries(queries);
       } else if (isPlainObject(value) && !this.table.hasColumn(key)) {
@@ -253,7 +252,7 @@ export class PredicateBuilder {
   }
 
   private handlerFor(object: unknown): { call(attr: Arel.Attribute, value: any): Nodes.Node } {
-    return last(this.handlers.find(([klass]) => rbObjIsKindOf(object, klass))!) as {
+    return (this.handlers.find(([klass]) => rbObjIsKindOf(object, klass))!.at(-1) ?? null) as {
       call(attr: Arel.Attribute, value: any): Nodes.Node;
     };
   }

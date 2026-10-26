@@ -499,7 +499,7 @@ describe("MiniMagick::Image", () => {
         `.${await ((await subject.type()) as string).toLowerCase()}`,
       ]);
       const subject = new Image(imagePath("gif"));
-      await (await first(await subject.frames()))!.write(outputPath);
+      await (await ((await subject.frames())[0] ?? null)).write(outputPath);
       expect(await new Image(outputPath).isValid()).toBeRubyTruthy();
     });
 

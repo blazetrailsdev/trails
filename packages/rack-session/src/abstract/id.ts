@@ -1,7 +1,6 @@
 import {
   hashDelete,
   ArgumentError,
-  valuesAt,
   getCrypto,
   kernelRand,
   NotImplementedError,
@@ -486,7 +485,9 @@ export class Persisted {
 
   /** @internal */
   isForceOptions(options: Record<string, unknown>): boolean {
-    return valuesAt(options, "maxAge", "renew", "drop", "defer", "expireAfter").some(isTruthy);
+    return ["maxAge", "renew", "drop", "defer", "expireAfter"]
+      .map((key) => options[key])
+      .some(isTruthy);
   }
 
   /** @internal */

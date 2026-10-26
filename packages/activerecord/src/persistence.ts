@@ -8,7 +8,6 @@ import {
   rbObjAsString,
   rbObjSingletonClass,
   rtest,
-  zip,
   eachPair,
   eachWithIndex,
   rbCallSuper,
@@ -897,7 +896,10 @@ export async function _createRecord(
     )) as unknown[] | null | undefined;
 
     if (returningValues != null) {
-      for (const [column, value] of zip<string, unknown>(returningColumns, returningValues)) {
+      for (const [column, value] of returningColumns.map((c, i) => [
+        c,
+        returningValues[i] ?? null,
+      ])) {
         if (!rtest(this._readAttribute(column as string))) {
           this._writeAttribute(
             column as string,
@@ -968,6 +970,7 @@ export function instantiateInstanceOf(
   columnTypes: Record<string, unknown> = {},
   block?: (r: any) => void,
 ): any {
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- attributes may be a Hash
   const names = keys(attributes as Record<string, unknown>);
   attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
   const record = klass.allocate();

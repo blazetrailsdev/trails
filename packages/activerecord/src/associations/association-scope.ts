@@ -10,7 +10,7 @@ import type {
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
 import { kernelArray } from "@blazetrails/activesupport";
-import { drop, eachCons, first, isEmpty, last, rbEqual, union } from "@blazetrails/ruby-compat";
+import { eachCons, isEmpty, rbEqual, union } from "@blazetrails/ruby-compat";
 import { methodMissingProxy } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 
@@ -61,7 +61,7 @@ export class AssociationScope {
 
   static getBindValues(owner: Base, chain: ReadonlyArray<AssociationReflection>): unknown[] {
     const binds: unknown[] = [];
-    const lastReflection = last(chain)!;
+    const lastReflection = chain.at(-1)!;
 
     binds.push(...lastReflection.joinIdFor(owner));
     if (lastReflection.type) {
@@ -139,7 +139,7 @@ export class AssociationScope {
   ): Array<ChainReflection> {
     const name = reflection.name;
     const chain: Array<ChainReflection> = [new RuntimeReflection(reflection, association)];
-    for (const refl of drop(reflection.chain, 1)) {
+    for (const refl of reflection.chain.slice(1)) {
       const aliasedTable = tracker.aliasedTableFor(refl.klass.arelTable, null, () =>
         refl.aliasCandidate(name),
       );
@@ -180,13 +180,13 @@ export class AssociationScope {
     owner: Base,
     chain: Array<ChainReflection>,
   ): Relation<Base> {
-    scope = this.lastChainScope(scope, last(chain)!, owner);
+    scope = this.lastChainScope(scope, chain.at(-1)!, owner);
 
     eachCons(chain, 2, ([reflection, nextReflection]) => {
       scope = this.nextChainScope(scope, reflection, nextReflection);
     });
 
-    const chainHead = first(chain)!;
+    const chainHead = chain[0];
     for (const reflection of chain.slice().reverse()) {
       for (const scopeChainItem of reflection.constraints()) {
         const item = this.evalScope(reflection, scopeChainItem, owner);

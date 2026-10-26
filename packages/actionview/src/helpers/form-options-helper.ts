@@ -11,8 +11,6 @@ import {
 } from "@blazetrails/activesupport";
 import {
   fetch,
-  first,
-  last,
   rbModDefineMethod,
   rbFSend,
   rbEql,
@@ -352,7 +350,7 @@ export function optionTextAndValue(option: unknown): [unknown, unknown] {
     rbObjRespondTo(option, "last")
   ) {
     if (globalThis.Array.isArray(option)) option = option.filter((e) => !isPlainObject(e));
-    return [first(option as unknown[]), last(option as unknown[])];
+    return [(option as unknown[])[0] ?? null, (option as unknown[]).at(-1) ?? null];
   } else {
     return [option, option];
   }

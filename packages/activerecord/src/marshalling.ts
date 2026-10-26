@@ -4,7 +4,6 @@ import {
   type Hash,
   Module,
   basicObjRespondTo,
-  keys,
   rbInspect,
   rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
@@ -93,7 +92,7 @@ export const Methods = new Module().include({
     const attributes = this.constructor
       .attributesBuilder()
       .buildFromDatabase(attributesFromDatabase);
-    for (const name of keys(attributesFromDatabase)) {
+    for (const name of Object.keys(attributesFromDatabase)) {
       if (!basicObjRespondTo(this, name)) {
         (
           rbObjSingletonClass(this) as unknown as { defineAttributeMethod(name: string): void }

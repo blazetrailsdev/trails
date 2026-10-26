@@ -4,7 +4,7 @@ import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { CpkBook, CpkOrder } from "../../test-helpers/models/cpk.js";
 
 const queriesOf = (av: AssociationQueryValue) =>
-  av.queries().map((query) => Object.fromEntries(query as Map<string, unknown>));
+  av.queries().map((query) => (query instanceof Map ? Object.fromEntries(query) : query));
 
 describe("AssociationQueryValue", () => {
   describe("scalar primary key", () => {
