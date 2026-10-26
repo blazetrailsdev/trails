@@ -47,8 +47,8 @@ describe("DurationTest", () => {
     const d = Duration.day(1);
     expect(d.isA(Duration)).toBeTruthy();
     expect(d).toBeInstanceOf(Duration);
-    expect(d.isKindOf(rbCNumeric)).toBe(true);
-    expect(d.isKindOf(rbCInteger)).toBe(true);
+    expect(d.isKindOf(rbCNumeric)).toBeTruthy();
+    expect(d.isKindOf(rbCInteger)).toBeTruthy();
     expect(d.isA(Map)).toBeFalsy();
 
     const k = class {};
