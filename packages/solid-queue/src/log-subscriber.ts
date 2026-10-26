@@ -283,7 +283,7 @@ export class LogSubscriber extends BaseLogSubscriber {
       exitstatus: unknown;
       pid: unknown;
       isSignaled(): boolean;
-      stopsig?: unknown;
+      stopsig: unknown;
       termsig: unknown;
     };
     const attributes = {
@@ -291,7 +291,7 @@ export class LogSubscriber extends BaseLogSubscriber {
       status: status.exitstatus ?? "no exit status set",
       pid_from_status: status.pid,
       signaled: status.isSignaled(),
-      stopsig: status.stopsig ?? null,
+      stopsig: status.stopsig,
       termsig: status.termsig,
     };
 

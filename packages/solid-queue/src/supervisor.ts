@@ -28,6 +28,7 @@ interface Status {
   exitstatus: number | null;
   isExited(): boolean;
   isSignaled(): boolean;
+  stopsig: null;
   termsig: null;
 }
 
@@ -297,6 +298,7 @@ export class Supervisor extends Base {
           exitstatus: exited ? 0 : null,
           isExited: () => exited,
           isSignaled: () => false,
+          stopsig: null,
           termsig: null,
         },
       ];
