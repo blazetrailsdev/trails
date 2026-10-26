@@ -1015,12 +1015,22 @@ export function extractFromProgram(
           const objectLiteral = ts.isObjectLiteralExpression(decl.initializer);
           const methods = ts.isObjectLiteralExpression(decl.initializer)
             ? harvestObjectLiteralMethods(decl.initializer, checker, relPath)
-            : isDefineModuleCall(decl.initializer)
-              ? decl.initializer.arguments
+            : isDefineModuleCall(unwrapAssertions(decl.initializer))
+              ? (unwrapAssertions(decl.initializer) as ts.CallExpression).arguments
                   .map(unwrapAssertions)
                   .filter(ts.isObjectLiteralExpression)
                   .map((o) =>
-                    ts.factory.updateObjectLiteralExpression(o, o.properties.filter(ts.isAccessor)),
+                    ts.factory.updateObjectLiteralExpression(
+                      o,
+                      o.properties.filter(
+                        (p) =>
+                          ts.isAccessor(p) ||
+                          ts.isMethodDeclaration(p) ||
+                          (ts.isPropertyAssignment(p) &&
+                            (ts.isFunctionExpression(unwrapAssertions(p.initializer)) ||
+                              ts.isArrowFunction(unwrapAssertions(p.initializer)))),
+                      ),
+                    ),
                   )
                   .flatMap((o) => harvestObjectLiteralMethods(o, checker, relPath))
               : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
