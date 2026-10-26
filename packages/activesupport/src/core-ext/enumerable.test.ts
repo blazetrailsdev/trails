@@ -460,7 +460,8 @@ describe("EnumerableTests", () => {
     const payments = [new Payment(5), new Payment(15), new Payment(10)];
     const expected = { 5: new Payment(5), 15: new Payment(15), 10: new Payment(10) };
     expect(indexBy(payments, (p) => p.price!)).toEqual(expected);
-    expect(indexBy(payments)).toBeInstanceOf(Enumerator);
+    expect(indexBy(new GenericEnumerable(payments))).toBeInstanceOf(Enumerator);
+    expect(indexBy(new GenericEnumerable(payments)).size()).toBeNull();
     expect(indexBy(payments).each((p: Payment) => p.price)).toEqual(expected);
   });
 
@@ -478,7 +479,9 @@ describe("EnumerableTests", () => {
     expect(indexWith(["title", "body"], [])).toEqual({ title: [], body: [] });
     expect(indexWith(["title", "body"], {})).toEqual({ title: {}, body: {} });
 
-    expect(indexWith(payments)).toBeInstanceOf(Enumerator);
+    const generic = new GenericEnumerable(payments) as unknown as Payment[];
+    expect(indexWith(generic)).toBeInstanceOf(Enumerator);
+    expect(indexWith(generic).size()).toBeNull();
     expect([
       ...(indexWith(payments).each((p: Payment) => p.price) as Hash<Payment, unknown>),
     ]).toEqual(expected);

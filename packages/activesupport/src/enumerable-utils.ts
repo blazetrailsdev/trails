@@ -1,4 +1,5 @@
 import {
+  block,
   type Each,
   Enumerable,
   groupBy as enumGroupBy,
@@ -14,7 +15,9 @@ import {
   rbBigNorm,
   rbEqual,
   rbFloatTypeP,
+  rbObjRespondTo,
   rbIntegerTypeP,
+  size,
   sortBy,
   toEnum,
   type Enumerator,
@@ -77,7 +80,11 @@ export function indexBy<T, K extends string | number>(
     }
     return result;
   } else {
-    return toEnum<T>(collection as object, "indexBy");
+    return toEnum<T>(
+      collection as object,
+      "indexBy",
+      block(() => (rbObjRespondTo(collection, "size") ? size(collection as unknown[]) : null)),
+    );
   }
 }
 
@@ -105,7 +112,11 @@ export function indexWith<T, V>(
     for (const elem of collection) aset(result, elem, block(elem));
     return result;
   } else if (noDefault) {
-    return toEnum<T>(collection, "indexWith");
+    return toEnum<T>(
+      collection,
+      "indexWith",
+      block(() => (rbObjRespondTo(collection, "size") ? size(collection as unknown[]) : null)),
+    );
   } else {
     const result = newResult();
     for (const elem of collection) aset(result, elem, defaultOrBlock as V);

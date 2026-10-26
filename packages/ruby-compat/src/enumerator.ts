@@ -63,6 +63,7 @@ export class Enumerator<T = unknown> {
     obj: object,
     private meth: string = "each",
     private args: unknown[] = [],
+    private size_: ((...args: unknown[]) => unknown) | null = null,
   ) {
     this.obj = rbBlockGivenP(obj)
       ? new Generator(obj as unknown as (yielder: Yielder<T>) => unknown)
@@ -129,6 +130,16 @@ export class Enumerator<T = unknown> {
   }
 
   /**
+   * `enumerator_size` (`vendor/ruby/v3.3.11/enumerator.c:1245`): the size block
+   * `to_enum` was given, called with the recorded arguments, else `nil`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  size(): unknown {
+    return this.size_ ? this.size_(...this.args) : null;
+  }
+
+  /**
    * `Enumerable#to_a` (`vendor/ruby/v3.3.11/enum.c:711` `enum_to_a`).
    *
    * @noRailsEquivalent PERMANENT
@@ -152,8 +163,8 @@ export class Enumerator<T = unknown> {
 }
 
 /**
- * `Kernel#to_enum` (`vendor/ruby/v3.3.11/enumerator.c:383` `obj_to_enum`), without the
- * size block.
+ * `Kernel#to_enum` (`vendor/ruby/v3.3.11/enumerator.c:383` `obj_to_enum`). A
+ * trailing `block()`-marked function is the size block.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -162,5 +173,6 @@ export function toEnum<T = unknown>(
   meth: string = "each",
   ...args: unknown[]
 ): Enumerator<T> {
-  return new Enumerator<T>(obj, meth, args);
+  const size = rbBlockGivenP(args.at(-1)) ? (args.pop() as (...args: unknown[]) => unknown) : null;
+  return new Enumerator<T>(obj, meth, args, size);
 }
