@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { isHtmlSafe } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
-import { TemplateHandlers } from "../template/handlers.js";
+import { Handlers } from "../template/handlers.js";
+import { Template } from "../template.js";
 import { TSE } from "../template/handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import type { ViewContext } from "./abstract-renderer.js";
@@ -14,7 +15,7 @@ describe("PartialRenderer render blocks", () => {
   let renderer: Renderer;
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     const resolver = new FixtureResolver({
       "layouts/_yield_only.html.tse": "<%= yield %>\n",
       "test/_partial.html.tse": "partial html",
@@ -29,7 +30,7 @@ describe("PartialRenderer render blocks", () => {
   });
 
   afterEach(() => {
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("yields a partial to the caller's block through _layoutFor", async () => {

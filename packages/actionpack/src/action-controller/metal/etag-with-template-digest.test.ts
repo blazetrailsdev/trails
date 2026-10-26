@@ -1,5 +1,5 @@
 import { beforeAll, describe, it, expect } from "vitest";
-import { FixtureResolver, LookupContext, TemplateHandlers } from "@blazetrails/actionview";
+import { FixtureResolver, LookupContext, Template } from "@blazetrails/actionview";
 import {
   determineTemplateEtag,
   lookupAndDigestTemplate,
@@ -20,7 +20,7 @@ function controller(actionName: string) {
 }
 
 beforeAll(() => {
-  TemplateHandlers.registerTemplateHandler("html", {
+  Template.registerTemplateHandler("html", {
     call: (_template: unknown, source: string) => `return ${JSON.stringify(source)};`,
   });
 });

@@ -22,7 +22,8 @@ import { FIXTURE_LOAD_PATH } from "../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
 import { LogSubscriber } from "../log-subscriber.js";
 import { LookupContext } from "../lookup-context.js";
-import { TemplateHandlers } from "./handlers.js";
+import { Handlers } from "./handlers.js";
+import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { Customer, GoodCustomer } from "../test-helpers/fake-models.js";
 
@@ -102,7 +103,7 @@ describe("AVLogSubscriberTest", () => {
   let viewPathsWas: unknown;
 
   beforeEach(({ task }) => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     viewPathsWas = ActionController.Base.viewPaths();
     ActionController.Base.viewPaths(FIXTURE_LOAD_PATH);
     tc = new AVLogSubscriberTest(task.name);
@@ -112,7 +113,7 @@ describe("AVLogSubscriberTest", () => {
   afterEach(() => {
     tc.teardown();
     ActionController.Base.viewPaths(viewPathsWas as never);
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("render template template", () =>

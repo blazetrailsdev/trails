@@ -1,7 +1,6 @@
 import type { PathSet } from "./path-set.js";
 import "./template.js";
-import type { Template } from "./template.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Template } from "./template.js";
 import type { TemplateHandler } from "./template/handlers.js";
 import { TSETracker } from "./dependency-tracker/tse-tracker.js";
 
@@ -27,7 +26,7 @@ export class DependencyTracker {
   }
 
   static registerTracker(extension: string, tracker: Tracker): void {
-    const handler = TemplateHandlers.handlerForExtension(extension) ?? null;
+    const handler = Template.handlerForExtension(extension) ?? null;
     if (typeof tracker.supportsViewPaths === "function") {
       DependencyTracker.#trackers.set(handler, tracker);
     } else {

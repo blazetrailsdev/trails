@@ -4,7 +4,7 @@ import { ActionView } from "../namespaces.js";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
 import { UnboundTemplate } from "../unbound-template.js";
-import { TemplateHandlers } from "../template/handlers.js";
+import { Handlers } from "../template/handlers.js";
 import { TemplatePath } from "../template-path.js";
 import { Template } from "../template.js";
 import * as Sources from "./sources/file.js";
@@ -264,7 +264,7 @@ export class PathParser {
   private regex: RegExp | null = null;
 
   buildPathRegex(): RegExp {
-    const handlers = union(TemplateHandlers.extensions().map(symbolToS));
+    const handlers = union(Handlers.extensions().map(symbolToS));
     const formats = union(Template.Types.symbols().map(symbolToS));
     const availableLocales = I18n.availableLocales().map(String);
     const regularLocales = [/[a-z]{2}(?:[-_][A-Z]{2})?/];

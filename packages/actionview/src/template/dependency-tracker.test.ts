@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DependencyTracker } from "../dependency-tracker.js";
 import { TSETracker } from "../dependency-tracker/tse-tracker.js";
 import { PathSet } from "../path-set.js";
-import type { Template } from "../template.js";
-import { TemplateHandlers, type TemplateHandler } from "../template/handlers.js";
+import { type TemplateHandler } from "../template/handlers.js";
+import { Template } from "../template.js";
 import { TSE } from "../template/handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 
@@ -48,12 +48,12 @@ function digestorViewPaths(): PathSet {
 
 describe("DependencyTrackerTest", () => {
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("neckbeard", Neckbeard);
+    Template.registerTemplateHandler("neckbeard", Neckbeard);
     DependencyTracker.registerTracker("neckbeard", NeckbeardTracker);
   });
 
   afterEach(() => {
-    TemplateHandlers.unregisterTemplateHandler("neckbeard");
+    Template.unregisterTemplateHandler("neckbeard");
     DependencyTracker.removeTracker(Neckbeard);
   });
 

@@ -6,12 +6,12 @@ import { SafeBuffer } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { Template } from "../template.js";
 import { StrictLocalsError } from "./error.js";
-import { TemplateHandlers, type TemplateHandler } from "./handlers.js";
+import { Handlers, type TemplateHandler } from "./handlers.js";
 import { Raw } from "./handlers/raw.js";
 import { TSE, type Spot } from "./handlers/tse.js";
 
 describe("TestTSETemplate", () => {
-  afterEach(() => TemplateHandlers.clear());
+  afterEach(() => Handlers.clear());
 
   const TSEHandler = new TSE();
 

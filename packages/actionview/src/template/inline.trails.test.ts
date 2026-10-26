@@ -2,7 +2,7 @@ import { ObjectSpace } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Base } from "../base.js";
 import { Inline } from "./inline.js";
-import { TemplateHandlers, type TemplateHandler } from "./handlers.js";
+import { Handlers, type TemplateHandler } from "./handlers.js";
 
 const echo: TemplateHandler = {
   call: (_template, source) => `return ${JSON.stringify(source)};`,
@@ -10,7 +10,7 @@ const echo: TemplateHandler = {
 
 describe("ActionView::Template::Inline", () => {
   afterEach(() => {
-    TemplateHandlers.clear();
+    Handlers.clear();
     vi.restoreAllMocks();
   });
 

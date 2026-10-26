@@ -40,7 +40,8 @@ import {
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
-import { TemplateHandlers } from "./handlers.js";
+import { Handlers } from "./handlers.js";
+import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import {
@@ -680,7 +681,7 @@ describe("FormHelperTest", () => {
   });
 
   it("label with block in erb", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     try {
       const erbView = Base.withEmptyTemplateCache().withViewPaths(
         [
@@ -699,7 +700,7 @@ describe("FormHelperTest", () => {
         await erbView.render("test/label_with_block"),
       );
     } finally {
-      TemplateHandlers.clear();
+      Handlers.clear();
     }
   });
 

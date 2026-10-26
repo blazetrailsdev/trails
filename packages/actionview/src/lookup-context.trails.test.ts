@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect } from "vitest";
 import { DetailsKey, LookupContext } from "./lookup-context.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Handlers } from "./template/handlers.js";
 
 describe("LookupContext", () => {
   afterEach(() => {
@@ -22,7 +22,7 @@ describe("LookupContext", () => {
     expect(ctx.defaultLocale()).toEqual([":en"]);
     expect(ctx.defaultFormats()).toEqual([":html", ":text", ":js", ":css", ":xml", ":json"]);
     expect(ctx.defaultVariants()).toEqual([]);
-    expect(ctx.defaultHandlers()).toEqual(TemplateHandlers.extensions());
+    expect(ctx.defaultHandlers()).toEqual(Handlers.extensions());
   });
 
   it("register_detail defines default_<name> for a later detail", () => {

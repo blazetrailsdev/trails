@@ -45,7 +45,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const viewsDir = path.resolve(cwd, opts.viewsDir ?? "app/views");
   const outDir = path.resolve(cwd, opts.outDir ?? ".trails");
   const outViews = opts.inPlace ? viewsDir : path.join(outDir, "views");
-  const { Base, PathParser, TemplateHandlers, TseHandler, UnboundTemplate, WrongEncodingError } =
+  const { Base, PathParser, Template, TseHandler, UnboundTemplate, WrongEncodingError } =
     await import("@blazetrails/actionview");
   for (const ext of ["ts", "js"]) {
     const application = path.join(cwd, `config/application.${ext}`);
@@ -62,10 +62,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
     : [];
   for (const initializer of existent.sort()) await loadConfigInitializer(initializer);
   const pathParser = new PathParser();
-  const { files, skipped } = await walkTemplates(
-    viewsDir,
-    TemplateHandlers.templateHandlerExtensions(),
-  );
+  const { files, skipped } = await walkTemplates(viewsDir, Template.templateHandlerExtensions());
   if (!opts.inPlace) await clearOutViews(cwd, outDir, outViews);
   const registryMap = new Map<string, string[]>();
   const appDir = path.dirname(viewsDir);
