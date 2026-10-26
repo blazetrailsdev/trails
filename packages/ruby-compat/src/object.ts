@@ -1116,9 +1116,7 @@ export function toS(obj: unknown): string | Uint8Array {
  * operators answer for the receivers that define them in Ruby: between two
  * numbers they are `Integer`'s and `Float`'s own (`rb_int_gt`,
  * `vendor/ruby/v3.3.11/numeric.c:4743`, and `rb_float_gt`, `:1753`), false for
- * a NaN operand and never raising;
- * a receiver defining the operator itself (`greaterThan` and its siblings, the
- * spelling `Date` and `TimeWithZone` give them) answers it; a number against
+ * a NaN operand and never raising; a number against
  * anything else, and any other `Comparable` receiver (a String, a Time or
  * Date, or an object defining `<=>`), go through `cmpint`
  * (`vendor/ruby/v3.3.11/compar.c:105-147`) and raise `ArgumentError` for a pair
@@ -1153,11 +1151,11 @@ export function conversionMismatch(
   );
 }
 
-const RELOPS = new Map<string, [string, (c: number) => boolean]>([
-  [">", ["greaterThan", (c) => c > 0]],
-  [">=", ["greaterThanOrEqual", (c) => c >= 0]],
-  ["<", ["lessThan", (c) => c < 0]],
-  ["<=", ["lessThanOrEqual", (c) => c <= 0]],
+const RELOPS = new Map<string, (c: number) => boolean>([
+  [">", (c) => c > 0],
+  [">=", (c) => c >= 0],
+  ["<", (c) => c < 0],
+  ["<=", (c) => c <= 0],
 ]);
 
 function isNumeric(value: unknown): value is number | bigint {
@@ -1195,12 +1193,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (mid === "+" && (isNumeric(recv) || typeof recv === "string" || Array.isArray(recv))) {
       return rbPlus(recv, other);
     }
-    const [spelling, relop] = RELOPS.get(mid) ?? [];
+    const relop = RELOPS.get(mid);
     if (relop !== undefined && isNumeric(recv) && isNumeric(other)) {
       return relop(recv < other ? -1 : recv > other ? 1 : recv == other ? 0 : NaN);
-    }
-    if (spelling !== undefined && rbObjRespondTo(recv, spelling)) {
-      return sendInternal(argc, [spelling, other], recv);
     }
     if (relop !== undefined && (isNumeric(recv) || isComparable(recv))) {
       return relop(rbCmpint(cmp(recv, other), recv, other));
