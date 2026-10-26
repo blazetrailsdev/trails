@@ -142,13 +142,13 @@ describe("Thor::Actions copy_file, link_file, get and template (trails)", () => 
     expect(File.read(file("out.rb"))).toBe("CLASS OTHER; END\n");
   });
 
-  it("raises for a frozen buffer and restores the previous one", () => {
+  it("raises for a frozen buffer, and the ensure resets the buffer it never saved", () => {
     const h = host();
     const previous = new StringIO();
     h.outputBuffer = previous;
     expect(() => h.withOutputBuffer(Object.freeze(new StringIO()), () => {})).toThrow(
       new ArgumentError("Buffer can not be a frozen object"),
     );
-    expect(h.outputBuffer).toBe(previous);
+    expect(h.outputBuffer).toBeNull();
   });
 });

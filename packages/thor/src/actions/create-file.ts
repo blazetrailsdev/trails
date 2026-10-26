@@ -52,11 +52,15 @@ export class CreateFile extends EmptyDirectory {
 
   /** @missingRailsArgs force_encoding — PERMANENT */
   async isIdentical(): Promise<boolean> {
-    if (!(await this.isExists())) return false;
-    const render = forceEncoding(await this.render(), "ASCII-8BIT");
-    return rbEqual(
-      await getFs().readFile(this.destination),
-      render instanceof Uint8Array ? render : Uint8Array.from(bytes(render)),
+    let render: string | Uint8Array;
+    return (
+      (await this.isExists()) &&
+      rbEqual(
+        await getFs().readFile(this.destination),
+        (render = forceEncoding(await this.render(), "ASCII-8BIT")) instanceof Uint8Array
+          ? render
+          : Uint8Array.from(bytes(render)),
+      )
     );
   }
 

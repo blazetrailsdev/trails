@@ -273,9 +273,10 @@ export function withOutputBuffer(
   buf: StringIO = new StringIO(),
   block: () => unknown,
 ): string {
-  const oldBuffer = this.outputBuffer;
+  let oldBuffer: StringIO | null = null;
   try {
     if (Object.isFrozen(buf)) throw new ArgumentError("Buffer can not be a frozen object");
+    oldBuffer = this.outputBuffer;
     this.outputBuffer = buf;
     block();
     return this.outputBuffer.string();
