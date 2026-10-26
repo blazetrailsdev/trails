@@ -5,8 +5,8 @@ import {
   TopLevel,
   underscore,
 } from "@blazetrails/activesupport";
-import { Base as JobBase } from "@blazetrails/activejob";
-import { getFs, getPath, registerConstant } from "@blazetrails/ruby-compat";
+import { Base as JobBase, registerJob } from "@blazetrails/activejob";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
@@ -279,72 +279,80 @@ async function defineController(klass: object): Promise<void> {
 
 /** @noRailsEquivalent PERMANENT */
 async function loadJobs(paths: Root): Promise<void> {
-  await loadAppConstants(
-    paths,
-    "jobs",
-    (value) => typeof value === "function" && value.prototype instanceof JobBase,
-    registerConstant,
-  );
+  for (const [prefix, klass] of await loadAppClasses(paths, "jobs", JobBase)) {
+    if (prefix) registerJob(`${prefix}${klass.name}`, klass);
+    else registerJob(klass);
+  }
 }
 
 /** @noRailsEquivalent PERMANENT */
 async function loadChannels(paths: Root): Promise<void> {
-  const cable = TopLevel.ActionCable;
-  if (cable == null) return;
+  if (TopLevel.ActionCable == null) return;
 
-  await loadAppConstants(
+  const { ActionCable, registerChannel, registerConnection } =
+    await import("@blazetrails/actioncable");
+  for (const [prefix, klass] of await loadAppClasses(paths, "channels", ActionCable.Channel.Base)) {
+    if (prefix) registerChannel(`${prefix}${klass.name}`, klass);
+    else registerChannel(klass);
+  }
+  for (const [prefix, klass] of await loadAppClasses(
     paths,
     "channels",
-    (value) =>
-      typeof value === "function" &&
-      (value.prototype instanceof cable.Channel!.Base ||
-        value.prototype instanceof cable.Connection!.Base),
-    registerConstant,
-  );
-}
-
-/** @internal */
-async function loadAppConstants(
-  paths: Root,
-  root: string,
-  isConstant: (value: unknown) => boolean,
-  register: (name: string, value: unknown) => void,
-): Promise<void> {
-  const node = paths.get("app");
-  if (!node) return;
-
-  const p = getPath();
-  for (const dir of await node.existentDirectories()) {
-    if (p.basename(dir) === root) await collectConstants(dir, "", isConstant, register);
+    ActionCable.Connection.Base,
+  )) {
+    if (prefix) registerConnection(`${prefix}${klass.name}`, klass);
+    else registerConnection(klass);
   }
 }
 
 /** @internal */
-async function collectConstants(
+async function loadAppClasses<T extends abstract new (...args: never[]) => unknown>(
+  paths: Root,
+  root: string,
+  base: T,
+): Promise<[string, T][]> {
+  const out: [string, T][] = [];
+  const node = paths.get("app");
+  if (!node) return out;
+
+  const p = getPath();
+  for (const dir of await node.existentDirectories()) {
+    if (p.basename(dir) === root) await collectAppClasses(dir, "", base, out);
+  }
+  return out;
+}
+
+/** @internal */
+async function collectAppClasses<T extends abstract new (...args: never[]) => unknown>(
   dir: string,
   prefix: string,
-  isConstant: (value: unknown) => boolean,
-  register: (name: string, value: unknown) => void,
+  base: T,
+  out: [string, T][],
 ): Promise<void> {
   const fs = getFs();
   const p = getPath();
   for (const entry of await fs.readdir!(dir)) {
     const full = p.join(dir, entry);
     if ((await fs.stat!(full)).isDirectory()) {
-      await collectConstants(
+      await collectAppClasses(
         full,
         `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}::`,
-        isConstant,
-        register,
+        base,
+        out,
       );
       continue;
     }
-    const match = entry.match(/^(.+)\.(?:ts|js)$/);
-    if (!match || /\.d\.ts$/.test(entry)) continue;
+    if (!/\.(?:ts|js)$/.test(entry) || /\.d\.ts$/.test(entry)) continue;
     const mod = (await import(p.pathToFileURL!(full).href)) as Record<string, unknown>;
-    const cname = camelize(underscore(match[1].replace(/-/g, "_")));
-    const value = mod[cname];
-    if (isConstant(value)) register(`${prefix}${cname}`, value);
+    for (const value of Object.values(mod)) {
+      if (
+        typeof value === "function" &&
+        value.prototype instanceof base &&
+        !out.some(([, klass]) => klass === value)
+      ) {
+        out.push([prefix, value as T]);
+      }
+    }
   }
 }
 
