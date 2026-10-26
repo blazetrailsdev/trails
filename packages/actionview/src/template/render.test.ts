@@ -5,7 +5,7 @@ import { ActionController, Mime, SourceMapLocation } from "@blazetrails/actionpa
 
 import { Base } from "../base.js";
 import { Template } from "../template.js";
-import { TemplateHandlers } from "./handlers.js";
+import { Handlers } from "./handlers.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import {
   MemoryStore,
@@ -1040,19 +1040,19 @@ describe("CachedViewRenderTest", () => {
   it.skip("render inline with locals and compilable custom type", () => {});
 
   it("render knows about types registered when extensions are checked earlier in initialization", () => {
-    TemplateHandlers.extensions();
-    TemplateHandlers.registerTemplateHandler("foo", CustomHandler);
+    Handlers.extensions();
+    Template.registerTemplateHandler("foo", CustomHandler);
     try {
-      assertIncludes(TemplateHandlers.extensions(), ":foo");
+      assertIncludes(Handlers.extensions(), ":foo");
     } finally {
-      TemplateHandlers.unregisterTemplateHandler("foo");
+      Template.unregisterTemplateHandler("foo");
     }
   });
 
   it("render does not use unregistered extension and template handler", async () => {
-    TemplateHandlers.registerTemplateHandler("foo", CustomHandler);
-    TemplateHandlers.unregisterTemplateHandler("foo");
-    assertNot(TemplateHandlers.extensions().includes(":foo"));
+    Template.registerTemplateHandler("foo", CustomHandler);
+    Template.unregisterTemplateHandler("foo");
+    assertNot(Handlers.extensions().includes(":foo"));
     assertEqual(
       "Hello, World!",
       String(await view.render({ inline: "Hello, World!", type: ":foo" })),
@@ -1315,21 +1315,19 @@ describe("CachedViewRenderTest", () => {
 
   // PERMANENT-SKIP: `CustomHandler` returns Ruby source for `module_eval`. (CLAUDE.md, "Templates are precompiled").
   it.skip("render with passing couple extensions to one register template handler function call", async () => {
-    TemplateHandlers.registerTemplateHandler("foo1", "foo2", CustomHandler);
+    Template.registerTemplateHandler("foo1", "foo2", CustomHandler);
     try {
       assertEqual(
         String(await view.render({ inline: "Hello, World!", type: ":foo1" })),
         String(await view.render({ inline: "Hello, World!", type: ":foo2" })),
       );
     } finally {
-      TemplateHandlers.unregisterTemplateHandler("foo1", "foo2");
+      Template.unregisterTemplateHandler("foo1", "foo2");
     }
   });
 
   it("render throws exception when no extensions passed to register template handler function call", async () => {
-    await assertRaises([ArgumentError], {}, () =>
-      TemplateHandlers.registerTemplateHandler(CustomHandler),
-    );
+    await assertRaises([ArgumentError], {}, () => Template.registerTemplateHandler(CustomHandler));
   });
 
   it("render object", async () => {

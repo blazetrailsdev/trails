@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { TemplateHandlers, type TemplateHandler } from "./handlers.js";
+import { Handlers, type TemplateHandler } from "./handlers.js";
+import { Template } from "../template.js";
 import { Raw } from "./handlers/raw.js";
 
 function makeHandler(): TemplateHandler {
@@ -9,76 +10,74 @@ function makeHandler(): TemplateHandler {
 }
 
 describe("Template::Handlers", () => {
-  afterEach(() => TemplateHandlers.clear());
+  afterEach(() => Handlers.clear());
 
   it("registers a handler for multiple extensions variadically", () => {
     const h = makeHandler();
-    TemplateHandlers.registerTemplateHandler("tsx", "jsx", h);
+    Template.registerTemplateHandler("tsx", "jsx", h);
 
-    expect(TemplateHandlers.registeredTemplateHandler("tsx")).toBe(h);
-    expect(TemplateHandlers.registeredTemplateHandler("jsx")).toBe(h);
+    expect(Template.registeredTemplateHandler("tsx")).toBe(h);
+    expect(Template.registeredTemplateHandler("jsx")).toBe(h);
   });
 
   it("registerTemplateHandler throws when no extension is supplied", () => {
     expect(() =>
-      (TemplateHandlers.registerTemplateHandler as unknown as (h: TemplateHandler) => void)(
-        makeHandler(),
-      ),
+      (Template.registerTemplateHandler as unknown as (h: TemplateHandler) => void)(makeHandler()),
     ).toThrow(/Extension is required/);
   });
 
   it("registers and looks up handlers by extension", () => {
     const h = makeHandler();
-    TemplateHandlers.registerTemplateHandler("tse", h);
+    Template.registerTemplateHandler("tse", h);
 
-    expect(TemplateHandlers.registeredTemplateHandler("tse")).toBe(h);
-    expect(TemplateHandlers.handlerForExtension("tse")).toBe(h);
+    expect(Template.registeredTemplateHandler("tse")).toBe(h);
+    expect(Template.handlerForExtension("tse")).toBe(h);
   });
 
   it("returns undefined for unknown extensions when no default registered", () => {
-    expect(TemplateHandlers.registeredTemplateHandler("missing")).toBeUndefined();
-    expect(TemplateHandlers.handlerForExtension("missing")).toBeUndefined();
+    expect(Template.registeredTemplateHandler("missing")).toBeUndefined();
+    expect(Template.handlerForExtension("missing")).toBeUndefined();
   });
 
   it("registeredTemplateHandler returns undefined for nullish input", () => {
-    expect(TemplateHandlers.registeredTemplateHandler(null)).toBeUndefined();
-    expect(TemplateHandlers.registeredTemplateHandler(undefined)).toBeUndefined();
+    expect(Template.registeredTemplateHandler(null)).toBeUndefined();
+    expect(Template.registeredTemplateHandler(undefined)).toBeUndefined();
   });
 
   it("registerDefaultTemplateHandler falls back for unknown extensions", () => {
     const raw = new Raw();
-    TemplateHandlers.registerDefaultTemplateHandler("raw", raw);
+    Template.registerDefaultTemplateHandler("raw", raw);
 
-    expect(TemplateHandlers.handlerForExtension("raw")).toBe(raw);
-    expect(TemplateHandlers.handlerForExtension("anything")).toBe(raw);
-    expect(TemplateHandlers.registeredTemplateHandler("anything")).toBeUndefined();
+    expect(Template.handlerForExtension("raw")).toBe(raw);
+    expect(Template.handlerForExtension("anything")).toBe(raw);
+    expect(Template.registeredTemplateHandler("anything")).toBeUndefined();
   });
 
   it("unregisterTemplateHandler removes handlers and clears default", () => {
     const raw = new Raw();
-    TemplateHandlers.registerDefaultTemplateHandler("raw", raw);
-    TemplateHandlers.unregisterTemplateHandler("raw");
+    Template.registerDefaultTemplateHandler("raw", raw);
+    Template.unregisterTemplateHandler("raw");
 
-    expect(TemplateHandlers.registeredTemplateHandler("raw")).toBeUndefined();
-    expect(TemplateHandlers.handlerForExtension("anything")).toBeUndefined();
+    expect(Template.registeredTemplateHandler("raw")).toBeUndefined();
+    expect(Template.handlerForExtension("anything")).toBeUndefined();
   });
 
   it("templateHandlerExtensions is sorted", () => {
-    TemplateHandlers.registerTemplateHandler("tse", makeHandler());
-    TemplateHandlers.registerTemplateHandler("raw", makeHandler());
-    TemplateHandlers.registerTemplateHandler("builder", makeHandler());
+    Template.registerTemplateHandler("tse", makeHandler());
+    Template.registerTemplateHandler("raw", makeHandler());
+    Template.registerTemplateHandler("builder", makeHandler());
 
-    expect(TemplateHandlers.templateHandlerExtensions()).toEqual(["builder", "raw", "tse"]);
+    expect(Template.templateHandlerExtensions()).toEqual(["builder", "raw", "tse"]);
   });
 
   it("extensions memoizes and invalidates on register/unregister", () => {
-    TemplateHandlers.registerTemplateHandler("tse", makeHandler());
-    const first = TemplateHandlers.extensions();
-    expect(TemplateHandlers.extensions()).toBe(first);
+    Template.registerTemplateHandler("tse", makeHandler());
+    const first = Handlers.extensions();
+    expect(Handlers.extensions()).toBe(first);
 
-    TemplateHandlers.registerTemplateHandler("raw", makeHandler());
-    expect(TemplateHandlers.extensions()).not.toBe(first);
-    expect(TemplateHandlers.extensions()).toEqual([":tse", ":raw"]);
+    Template.registerTemplateHandler("raw", makeHandler());
+    expect(Handlers.extensions()).not.toBe(first);
+    expect(Handlers.extensions()).toEqual([":tse", ":raw"]);
   });
 });
 

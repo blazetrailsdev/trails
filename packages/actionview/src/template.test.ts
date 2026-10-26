@@ -5,7 +5,7 @@ import { Base } from "./base.js";
 import { OutputBuffer } from "./buffers.js";
 import { Template } from "./template.js";
 import { StrictLocalsError, SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
-import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
+import { Handlers, type TemplateHandler } from "./template/handlers.js";
 import { Raw } from "./template/handlers/raw.js";
 import { TSE } from "./template/handlers/tse.js";
 
@@ -17,7 +17,7 @@ const echo: TemplateHandler = {
 const view = (): Base => new (Base.withEmptyTemplateCache())(null, {}, null);
 
 describe("ActionView::Template (smoke)", () => {
-  afterEach(() => TemplateHandlers.clear());
+  afterEach(() => Handlers.clear());
 
   it("stores Rails-named attrs and derives variable from virtualPath", () => {
     const t = new Template("hi", "posts/_form", echo, {

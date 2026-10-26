@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Base, type ViewContextClass } from "./base.js";
 import { DetailsKey } from "./lookup-context.js";
 import { Template } from "./template.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Handlers } from "./template/handlers.js";
 import { TSE } from "./template/handlers/tse.js";
 import {
   buildViewContextClass,
@@ -115,7 +115,7 @@ describe("ActionView::Rendering::ClassMethods", () => {
   });
 
   it("includes routes.url_helpers so a route helper is a bare identifier in a template", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     try {
       class C extends Controller {
         static override _routes = routesWith({ postsPath: () => "/posts" });
@@ -123,12 +123,12 @@ describe("ActionView::Rendering::ClassMethods", () => {
       const view = new (C.viewContextClass())(null, {}, null);
       expect(await renderTse("<%= postsPath() %>", {}, view)).toBe("/posts");
     } finally {
-      TemplateHandlers.clear();
+      Handlers.clear();
     }
   });
 
   it("makes a helper_method-style helper resolvable as a bare identifier in a template", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     try {
       class C extends Controller {
         static override _helpers = {
@@ -140,7 +140,7 @@ describe("ActionView::Rendering::ClassMethods", () => {
       const view = new (C.viewContextClass())(null, {}, { user: "Ada" });
       expect(await renderTse("<%= currentUser() %>", {}, view)).toBe("Ada");
     } finally {
-      TemplateHandlers.clear();
+      Handlers.clear();
     }
   });
 });

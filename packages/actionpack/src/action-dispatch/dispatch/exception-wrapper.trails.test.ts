@@ -8,7 +8,7 @@ import {
   PathSet,
   Template,
   TemplateError,
-  TemplateHandlers,
+  Handlers,
   TseHandler,
 } from "@blazetrails/actionview";
 import { rbObjClassname } from "@blazetrails/ruby-compat";
@@ -37,11 +37,11 @@ class Holder {}
 describe("ExceptionWrapper template spots", () => {
   afterEach(() => {
     PathRegistry.setViewPaths(Holder, new PathSet([]));
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("remaps a compiled-template frame onto the template's own source", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
+    Template.registerTemplateHandler("tse", new TseHandler());
     const root = decodeURIComponent(
       new URL("../../../test-fixtures/precompiled", import.meta.url).pathname,
     );

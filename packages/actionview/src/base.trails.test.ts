@@ -15,7 +15,7 @@ import { TextHelper } from "./helpers/text-helper.js";
 import { UrlHelper } from "./helpers/url-helper.js";
 import { LookupContext } from "./lookup-context.js";
 import { Template } from "./template.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Handlers } from "./template/handlers.js";
 import { TSE } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
@@ -73,11 +73,11 @@ describe("ActionView::Base#in_rendering_context", () => {
 
 describe("ActionView::Base#render returns the renderer body unwrapped", () => {
   afterEach(async () => {
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   const renderTse = async (source: string): Promise<string> => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     const lookupContext = new LookupContext(null, {}, []);
     lookupContext.appendViewPaths([new FixtureResolver({ "test/_bold.html.tse": "<b>bold</b>" })]);
     const view = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);

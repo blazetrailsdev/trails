@@ -6,7 +6,7 @@ import {
   LookupContext,
   OutputBuffer,
   Template,
-  TemplateHandlers,
+  Handlers,
   TopLevel,
   TseHandler,
 } from "@blazetrails/actionview";
@@ -384,12 +384,12 @@ async function renderAll(): Promise<Record<string, string>> {
 
 describe("TSE stand-in scope", () => {
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
+    Template.registerTemplateHandler("tse", new TseHandler());
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("covers a scenario for every fixture", () => {

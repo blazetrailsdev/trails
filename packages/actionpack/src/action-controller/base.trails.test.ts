@@ -4,7 +4,7 @@ import {
   Base as ViewBase,
   FixtureResolver,
   MissingTemplate,
-  TemplateHandlers,
+  Template,
 } from "@blazetrails/actionview";
 import { Model } from "@blazetrails/activemodel";
 import {
@@ -46,7 +46,7 @@ function makeRequest(): Request {
 }
 
 beforeAll(() => {
-  TemplateHandlers.registerTemplateHandler("html", {
+  Template.registerTemplateHandler("html", {
     call: (_template: unknown, source: string) => `return ${JSON.stringify(source)};`,
   });
   BadgeController.prependViewPath(

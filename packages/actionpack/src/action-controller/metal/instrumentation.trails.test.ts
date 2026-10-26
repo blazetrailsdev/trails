@@ -7,7 +7,7 @@ import { logProcessAction } from "./instrumentation.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { ParseError } from "../../action-dispatch/http/parameters.js";
-import { FixtureResolver, TemplateHandlers } from "@blazetrails/actionview";
+import { FixtureResolver, Template } from "@blazetrails/actionview";
 
 function subscribeOnce(name: string, sink: Record<string, unknown>[]): () => void {
   const subscriber = Notifications.subscribe(
@@ -126,7 +126,7 @@ describe("ActionController::Instrumentation#process_action", () => {
     const events: Record<string, unknown>[] = [];
     teardown.push(subscribeOnce("process_action.action_controller", events));
 
-    TemplateHandlers.registerTemplateHandler("html", {
+    Template.registerTemplateHandler("html", {
       call: (_template: unknown, source: string) => {
         const until = Date.now() + 20;
         while (Date.now() < until);

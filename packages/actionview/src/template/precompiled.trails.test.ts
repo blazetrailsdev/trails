@@ -5,7 +5,6 @@ import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { setTemplateCompiler, Template } from "../template.js";
 import { buildViews } from "@blazetrails/trails-tsc";
-import { TemplateHandlers } from "./handlers.js";
 import { Builder } from "./handlers/builder.js";
 import { TSE } from "./handlers/tse.js";
 import { shippedTemplateCompiler } from "../test-helpers/setup-compile-template.js";
@@ -119,7 +118,7 @@ describe("Templates are precompiled", () => {
       const template = find(root, "loud", "greetings");
       expect(String(await template.render(view()))).toBe("HELLO <B>THERE</B>\n");
     } finally {
-      TemplateHandlers.unregisterTemplateHandler("shout");
+      Template.unregisterTemplateHandler("shout");
     }
   });
 

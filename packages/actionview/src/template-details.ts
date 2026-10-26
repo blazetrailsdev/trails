@@ -1,5 +1,5 @@
 import type { TemplateHandler } from "./template/handlers.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Template } from "./template.js";
 import { symbolToS } from "@blazetrails/ruby-compat";
 
 export type DetailKey = string | symbol | null;
@@ -91,7 +91,7 @@ export class TemplateDetails {
   }
 
   handlerClass(): TemplateHandler | undefined {
-    return TemplateHandlers.handlerForExtension(
+    return Template.handlerForExtension(
       typeof this.handler === "string" ? symbolToS(this.handler) : null,
     );
   }

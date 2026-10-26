@@ -12,7 +12,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import type { NestedDependencies } from "./digestor.js";
 import { Base, type ViewContextClass } from "./base.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Handlers } from "./template/handlers.js";
 import { Template } from "./template.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet, type PathSetResolver } from "./path-set.js";
@@ -436,4 +436,4 @@ LookupContext.registerDetail(
   () => Base.defaultFormats ?? [":html", ":text", ":js", ":css", ":xml", ":json"],
 );
 LookupContext.registerDetail("variants", () => []);
-LookupContext.registerDetail("handlers", () => TemplateHandlers.extensions());
+LookupContext.registerDetail("handlers", () => Handlers.extensions());

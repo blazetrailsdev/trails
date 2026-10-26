@@ -22,7 +22,6 @@ import { FixtureResolver } from "../testing/resolvers.js";
 import { raw } from "../helpers/output-safety-helper.js";
 import { Base } from "../base.js";
 import { Template } from "../template.js";
-import { TemplateHandlers } from "./handlers.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
@@ -33,7 +32,7 @@ const renderTse = async (string: string): Promise<string> => {
   const template = new Template(
     string.trim(),
     "test template",
-    TemplateHandlers.handlerForExtension("tse")!,
+    Template.handlerForExtension("tse")!,
     { format: ":html", locals: [] },
   );
   const view = Base.withEmptyTemplateCache();

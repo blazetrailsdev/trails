@@ -3,18 +3,18 @@ import { Fiber } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { StreamingBuffer } from "./buffers.js";
 import { StreamingFlow } from "./flows.js";
-import type { Template } from "./template.js";
 import { LookupContext } from "./lookup-context.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Handlers } from "./template/handlers.js";
+import { Template } from "./template.js";
 import { TSE } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
 describe("StreamingFlow", () => {
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
   });
   afterEach(async () => {
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   const setup = (layoutSource: string, templateSource: string) => {

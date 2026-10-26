@@ -1,4 +1,4 @@
-export { type TemplateHandler, type RenderContext, TemplateHandlers } from "./template/handlers.js";
+export { type TemplateHandler, type RenderContext, Handlers } from "./template/handlers.js";
 export { Raw as RawHandler } from "./template/handlers/raw.js";
 export {
   TSE as TseHandler,

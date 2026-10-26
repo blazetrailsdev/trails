@@ -5,7 +5,8 @@ import { StreamingBuffer } from "../buffers.js";
 import { Body, StreamingTemplateRenderer } from "./streaming-template-renderer.js";
 import { Renderer } from "./renderer.js";
 import { LookupContext } from "../lookup-context.js";
-import { TemplateHandlers } from "../template/handlers.js";
+import { Handlers } from "../template/handlers.js";
+import { Template } from "../template.js";
 import { TSE } from "../template/handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import type { RenderableTemplate, ViewContext } from "./abstract-renderer.js";
@@ -144,7 +145,7 @@ describe("StreamingTemplateRenderer", () => {
     });
 
     it("streams a layout that reads a content_for block before it yields", async () => {
-      TemplateHandlers.registerTemplateHandler("tse", new TSE());
+      Template.registerTemplateHandler("tse", new TSE());
       try {
         const lookup = new LookupContext(null, {}, []);
         lookup.appendViewPaths([
@@ -167,12 +168,12 @@ describe("StreamingTemplateRenderer", () => {
         expect(chunks[0]).toBe("<title>");
         expect(chunks.join("")).toBe("<title>Post</title>body|foot");
       } finally {
-        TemplateHandlers.clear();
+        Handlers.clear();
       }
     });
 
     it("suspends a layout on a flow read nested inside a larger expression", async () => {
-      TemplateHandlers.registerTemplateHandler("tse", new TSE());
+      Template.registerTemplateHandler("tse", new TSE());
       try {
         const lookup = new LookupContext(null, {}, []);
         lookup.appendViewPaths([
@@ -193,7 +194,7 @@ describe("StreamingTemplateRenderer", () => {
 
         expect(chunks.join("")).toBe("body.");
       } finally {
-        TemplateHandlers.clear();
+        Handlers.clear();
       }
     });
 

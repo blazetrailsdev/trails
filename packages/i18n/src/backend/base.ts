@@ -14,7 +14,6 @@ import {
   config,
   reservedKeysPattern,
   t,
-  toSym,
   translate,
   tBang,
   type Locale,
@@ -31,6 +30,8 @@ import {
   kernelCatch,
   kernelThrow,
   rbInspect,
+  toSym,
+  trTrans,
 } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Temporal, strftime } from "@blazetrails/date";
@@ -41,7 +42,6 @@ import {
   type ProcTransliterator,
 } from "./transliterator.js";
 import { except, type TranslationData } from "../utils.js";
-import { tr } from "./flatten.js";
 
 export type TranslateOptions = { [key: string]: unknown };
 
@@ -495,7 +495,7 @@ export abstract class Base {
 
   protected loadFile(filename: string): TranslationData | Record<string, unknown> {
     let type = extname(filename);
-    type = tr(type, ".", "").toLowerCase();
+    type = trTrans(type, ".", "", false).toLowerCase();
     const loader = (this as unknown as Record<string, unknown>)[
       `load${type.charAt(0).toUpperCase()}${type.slice(1)}`
     ];

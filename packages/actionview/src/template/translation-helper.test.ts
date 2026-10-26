@@ -4,7 +4,8 @@ import { Hash } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
-import { TemplateHandlers } from "./handlers.js";
+import { Handlers } from "./handlers.js";
+import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import { localize, translate as translateHelper } from "../helpers/translation-helper.js";
@@ -36,7 +37,7 @@ describe("TranslationHelperTest", () => {
   const render = async (template: string) => String(await view.render({ template })).trim();
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     I18n.backend().storeTranslations("en", {
       translations: {
         templates: {
@@ -66,7 +67,7 @@ describe("TranslationHelperTest", () => {
   });
 
   afterEach(async () => {
-    TemplateHandlers.clear();
+    Handlers.clear();
     await I18n.backend().reloadBang();
   });
 

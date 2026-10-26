@@ -4,7 +4,7 @@ import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import "../template.js";
 import { FixtureResolver } from "../testing/resolvers.js";
-import { TemplateHandlers } from "./handlers.js";
+import { Handlers } from "./handlers.js";
 
 describe("Template::Handlers.extended", () => {
   const buildView = (): Base => {
@@ -19,7 +19,7 @@ describe("Template::Handlers.extended", () => {
   };
 
   it("registers raw as the default and the tse, html and ruby handlers", () => {
-    expect(TemplateHandlers.extensions()).toEqual([":raw", ":tse", ":html", ":builder", ":ruby"]);
+    expect(Handlers.extensions()).toEqual([":raw", ":tse", ":html", ":builder", ":ruby"]);
   });
 
   it("renders a .html template through the Html handler", async () => {

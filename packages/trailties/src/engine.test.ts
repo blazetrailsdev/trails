@@ -368,7 +368,7 @@ describe("Engine", () => {
     resetLoadHooks();
     const { ActionController, ActionView, Request, Response } =
       await import("@blazetrails/actionpack");
-    ActionView.TemplateHandlers.registerTemplateHandler("raw", new ActionView.RawHandler());
+    ActionView.Template.registerTemplateHandler("raw", new ActionView.RawHandler());
 
     class RenderEngine extends Engine {}
     Engine.register(RenderEngine, fixtureRoot);

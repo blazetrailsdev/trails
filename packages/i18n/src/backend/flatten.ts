@@ -1,4 +1,5 @@
-import { defaultSeparator, newDoubleNestedCache, toSym } from "../i18n.js";
+import { toSym, trTrans } from "@blazetrails/ruby-compat";
+import { defaultSeparator, newDoubleNestedCache } from "../i18n.js";
 import type { TranslationData } from "../utils.js";
 
 export const SEPARATOR_ESCAPE_CHAR = "\u0001";
@@ -26,19 +27,6 @@ function isHash(value: unknown): value is TranslationData | Record<string, unkno
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** @noRailsEquivalent CONVERGEABLE i18n-core-string-helpers-move-to-ruby-compat */
-export function tr(subject: string, fromStr: string, toStr: string): string {
-  const from = [...fromStr];
-  const to = [...toStr];
-  return [...subject]
-    .map((char) => {
-      const index = from.indexOf(char);
-      if (index === -1) return char;
-      return to[index] ?? to[to.length - 1] ?? "";
-    })
-    .join("");
-}
-
 function toS(value: unknown): string {
   if (value == null) return "";
   const string = String(value);
@@ -62,14 +50,14 @@ export class Flatten {
       const fromStr = `${FLATTEN_SEPARATOR}${separator}`;
       const toStr = `${SEPARATOR_ESCAPE_CHAR}${FLATTEN_SEPARATOR}`;
 
-      keys = keys.map((k) => tr(String(k), fromStr, toStr));
+      keys = keys.map((k) => trTrans(String(k), fromStr, toStr, false));
     }
 
     return keys.join(".");
   }
 
   static escapeDefaultSeparator(key: unknown): string {
-    return tr(String(key), FLATTEN_SEPARATOR, SEPARATOR_ESCAPE_CHAR);
+    return trTrans(String(key), FLATTEN_SEPARATOR, SEPARATOR_ESCAPE_CHAR, false);
   }
 }
 

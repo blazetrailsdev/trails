@@ -4,7 +4,7 @@ import {
   FixtureResolver,
   LookupContext,
   Renderer,
-  TemplateHandlers,
+  Template,
   TseHandler,
 } from "@blazetrails/actionview";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -15,7 +15,7 @@ function commentsLoaded(post: Post): boolean {
 }
 
 function buildLookupContext(): LookupContext {
-  TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
+  Template.registerTemplateHandler("tse", new TseHandler());
   return new LookupContext(
     [
       new FixtureResolver({
@@ -43,7 +43,7 @@ describe("CollectionRenderer over an ActiveRecord::Relation", () => {
   fixtures(["posts", "comments"]);
 
   afterEach(() => {
-    TemplateHandlers.unregisterTemplateHandler("tse");
+    Template.unregisterTemplateHandler("tse");
   });
 
   it("takes the PreloadCollectionIterator branch and preloads before rendering", async () => {
