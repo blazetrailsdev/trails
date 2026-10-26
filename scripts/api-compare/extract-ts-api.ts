@@ -7488,6 +7488,9 @@ function collectCalls(
         if (!skipHoistedClosures && prop === "unshift") {
           names.add(`${NATIVE_FORM_PREFIX}unshift`);
         }
+        if (!skipHoistedClosures && prop === "splice" && isInsertingSplice(n)) {
+          names.add(`${NATIVE_FORM_PREFIX}splice`);
+        }
         // An invocation off another object gets the same foreign tally as a read
         // off one (see FOREIGN_READ_PREFIX). The `X.call(...)` identifier
         // credited below is deliberately NOT tallied: that dispatch really does
@@ -7616,6 +7619,17 @@ function collectCalls(
  * the position of the routing `get` the same body makes (`Mapper#resource`'s
  * `@scope[:shallow]` beside `get :new`, `mapper.rb:1357-1363`).
  */
+
+/** `xs.splice(i, 0, ...items)`: a splice that removes nothing, Ruby's `Array#insert`. */
+function isInsertingSplice(n: ts.CallExpression): boolean {
+  const deleteCount = n.arguments[1];
+  return (
+    n.arguments.length >= 3 &&
+    deleteCount !== undefined &&
+    ts.isNumericLiteral(deleteCount) &&
+    deleteCount.text === "0"
+  );
+}
 function isOperatorIndexRead(n: ts.CallExpression): boolean {
   const callee = n.expression;
   return (

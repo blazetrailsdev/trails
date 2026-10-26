@@ -246,6 +246,10 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   `Array#prepend`. `Module#prepend` is a bare `prepend Mod` or a
  *   `Const.prepend(Mod)`, so the same receiver kinds `.length` refuses keep it
  *   flagged, as does any body whose port makes no `.unshift(...)` call.
+ * - `insert` → `splice`: a `.splice(i, 0, ...items)` call, which removes
+ *   nothing. JS has no `Array#insert`, and `Array#insert`
+ *   (`vendor/ruby/v3.3.11/array.c:2454`) is that splice. A splice with a
+ *   non-literal or non-zero delete count is not marked.
  * - `load` → `import`: a dynamic `import(x)` whose specifier is computed at run
  *   time, ESM's one way to evaluate a file by path — `Kernel#load`
  *   (`rb_f_load`, `vendor/ruby/v3.3.11/load.c:903`). A string-literal specifier
@@ -391,6 +395,7 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["size", { form: "length", receivers: "explicit" }],
   ["length", { form: "length", receivers: "explicit" }],
   ["prepend", { form: "unshift", receivers: "explicit" }],
+  ["insert", { form: "splice", receivers: "explicit" }],
   ["load", { form: "import", receivers: "implicit-self" }],
   [
     "call",
