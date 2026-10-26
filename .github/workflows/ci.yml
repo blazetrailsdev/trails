@@ -481,7 +481,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version: 24.21.0
           # The prettier step runs via `npx` and never installs pnpm, but
           # setup-node v5 defaults `package-manager-cache: true` and would
           # try to cache the pnpm store from the `packageManager` field in
