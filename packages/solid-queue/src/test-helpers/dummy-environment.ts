@@ -25,6 +25,7 @@ const dummyConfigs = ["shard_one", "shard_two", "queue"].map(
   (name) =>
     new HashConfig(envName, name, {
       ...primary.configurationHash,
+      pool: primary.adapter === "sqlite3" ? 50 : 20,
       database: databaseNameFrom(name),
     }),
 );
