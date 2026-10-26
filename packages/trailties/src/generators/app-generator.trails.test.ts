@@ -31,9 +31,9 @@ describe("AppGenerator (trails-only)", () => {
         database: "sqlite",
       }).run();
       const app = path.join(root, "my-app");
-      const node = (args: string[]) =>
+      const node = (args: string[], cwd = app) =>
         spawnSync(getProcessAdapter().execPath!(), args, {
-          cwd: app,
+          cwd,
           encoding: "utf8",
           env: { PATH: "", NODE_ENV: "test" },
         });
@@ -41,6 +41,13 @@ describe("AppGenerator (trails-only)", () => {
       const routes = node([path.join(app, "bin", "trails"), "routes"]);
       expect(routes.stderr).toBe("");
       expect(routes.status).toBe(0);
+
+      const fromSubdirectory = node(
+        [path.join(app, "bin", "trails"), "routes"],
+        path.join(app, "app", "models"),
+      );
+      expect(fromSubdirectory.stderr).toBe("");
+      expect(fromSubdirectory.status).toBe(0);
 
       const views = node([
         path.join(packageDir, "node_modules/@blazetrails/trails-tsc/bin/trails-tsc-views.js"),

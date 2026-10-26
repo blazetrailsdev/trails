@@ -217,9 +217,10 @@ describe("AppGenerator", () => {
     expect(tsconfig.compilerOptions.rewriteRelativeImportExtensions).toBe(true);
     expect(tsconfig.compilerOptions.erasableSyntaxOnly).toBe(true);
     const binstub = (n: string) => fs.readFileSync(appPath("bin", n), "utf-8");
-    expect(binstub("trails")).toBe(
-      '#!/usr/bin/env node\nimport "@blazetrails/trailties/commands";\n',
+    expect(binstub("trails")).toContain(
+      'setAppPath(join(import.meta.dirname, "../config/application.ts"));',
     );
+    expect(binstub("trails")).toContain('await import("@blazetrails/trailties/commands");');
     expect(binstub("setup")).toContain("bin/trails");
     expect(binstub("dev")).toContain('"trails"');
     for (const n of ["dev"]) {

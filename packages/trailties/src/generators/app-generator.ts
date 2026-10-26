@@ -477,7 +477,11 @@ ${
     this.createFile(
       "bin/trails",
       `#!/usr/bin/env node
-import "@blazetrails/trailties/commands";
+import { join } from "node:path";
+import { setAppPath } from "@blazetrails/trailties/app-path";
+
+setAppPath(join(import.meta.dirname, "../config/application.ts"));
+await import("@blazetrails/trailties/commands");
 `,
       { mode: 0o755 },
     );
