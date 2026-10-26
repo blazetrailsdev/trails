@@ -187,6 +187,19 @@ describe("test_help wires a booted app into the test case classes", () => {
     expect(constantize("Admin::CleanupJob")).toBe(CleanupJob);
   });
 
+  it("registers app/controllers controllers by their Ruby names", async () => {
+    const { PostsController } =
+      await import("./__fixtures__/boot-app/app/controllers/posts-controller.js");
+    const { SessionsController } =
+      await import("./__fixtures__/boot-app/app/controllers/admin/sessions-controller.js");
+    expect(constantize("PostsController")).toBe(PostsController);
+    expect(constantize("Admin::SessionsController")).toBe(SessionsController);
+    expect(rbModName(SessionsController)).toBe("Admin::SessionsController");
+    expect(safeConstantize("Admin::AdminScope")).toBeUndefined();
+    expect(safeConstantize("Concerns::Authentication")).toBeUndefined();
+    expect(safeConstantize("Authentication")).toBeUndefined();
+  });
+
   it("subscribes to app/channels channels by their Ruby names", async () => {
     const { ChatChannel } = await import("./__fixtures__/boot-app/app/channels/chat-channel.js");
     const { AppearancesChannel } =
