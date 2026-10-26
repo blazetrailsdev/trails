@@ -1,6 +1,5 @@
 import {
-  isAll,
-  isAny,
+  Enumerable,
   monSynchronize,
   newCond,
   RuntimeError,
@@ -235,8 +234,7 @@ export class ShareLock {
   private isBusyForSharing(purpose: Purpose | false): boolean {
     return (
       (this.exclusiveThread != null && this.exclusiveThread !== Thread.current()) ||
-      isAny(
-        this.waiting,
+      new Enumerable(this.waiting).isAny(
         ([t, [, c]]: [Thread, [Purpose, Compatible]]) =>
           t !== Thread.current() && !c.includes(purpose),
       )
@@ -245,12 +243,10 @@ export class ShareLock {
 
   /** @internal */
   private hasEligibleWaiters(compatible: Compatible): boolean {
-    return isAny(
-      this.waiting,
+    return new Enumerable(this.waiting).isAny(
       ([t, [p]]: [Thread, [Purpose, Compatible]]) =>
         compatible.includes(p) &&
-        isAll(
-          this.waiting,
+        new Enumerable(this.waiting).isAll(
           ([t2, [, c2]]: [Thread, [Purpose, Compatible]]) => t === t2 || c2.includes(p),
         ),
     );

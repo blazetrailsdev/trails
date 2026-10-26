@@ -52,6 +52,14 @@ function rbBlockCall<T, E, R>(
     if (e !== iterBreak) throw e;
     return result();
   };
+  if (awaiting && typeof (obj as Partial<Each<T, E>>).each === "function") {
+    const ary = enumToA(obj) as T[] | Promise<T[]>;
+    return (
+      ary instanceof Promise
+        ? ary.then((ary) => rbBlockCall(ary, block, result, true))
+        : rbBlockCall(ary, block, result, true)
+    ) as Enumerated<E, R>;
+  }
   let each: unknown;
   try {
     if (typeof (obj as Partial<Each<T, E>>).each === "function") {
@@ -1212,6 +1220,10 @@ export class Enumerable<T = unknown, E = unknown> {
 
   sortBy<T, E = unknown>(this: Each<T, E>, block: (i: T) => unknown) {
     return sortBy(this, block);
+  }
+
+  isAll<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
+    return isAll(this, ...args);
   }
 
   isAny<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {

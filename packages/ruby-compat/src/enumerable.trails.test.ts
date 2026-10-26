@@ -131,6 +131,20 @@ describe("Enumerable", () => {
     ]);
   });
 
+  it("eachWithObject awaits each block in turn over a receiver whose each yields", async () => {
+    const seen: string[] = [];
+    const hash = new Hash<string, number>().set("a", 1).set("b", 2);
+    const memo = eachWithObject(new Enumerable(hash), [] as string[], async ([k], m) => {
+      seen.push(`start ${k}`);
+      await Promise.resolve();
+      m.push(k);
+      seen.push(`end ${k}`);
+    });
+    expect(memo).toBeInstanceOf(Promise);
+    expect(await memo).toEqual(["a", "b"]);
+    expect(seen).toEqual(["start a", "end a", "start b", "end b"]);
+  });
+
   it("isAll breaks on the first element that fails RTEST", () => {
     const seen: number[] = [];
     expect(isAll([1, 2, 3], (i: number) => (seen.push(i), i < 2))).toBe(false);
