@@ -5,6 +5,7 @@ import {
   render,
   renderToString,
   viewAssigns,
+  _protectedIvars,
   _normalizeArgs,
   _normalizeOptions,
   _normalizeRender,
@@ -98,18 +99,9 @@ describe("render() and renderToString()", () => {
 });
 
 describe("viewAssigns()", () => {
-  it("returns non-protected, non-underscore-prefixed own properties", () => {
-    const host = {
-      title: "Hello",
-      count: 3,
-      _actionName: "show",
-      _internal: "hidden",
-    };
-    expect(viewAssigns.call(host)).toEqual({ title: "Hello", count: 3 });
-  });
-
   it("excludes all DEFAULT_PROTECTED_INSTANCE_VARIABLES", () => {
-    const host: Record<string, unknown> = { title: "ok" };
+    const host: Record<string, unknown> = Object.create({ _protectedIvars });
+    host.title = "ok";
     for (const name of DEFAULT_PROTECTED_INSTANCE_VARIABLES) host[name] = "no";
     expect(viewAssigns.call(host)).toEqual({ title: "ok" });
   });

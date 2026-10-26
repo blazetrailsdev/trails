@@ -8,6 +8,7 @@ export {
 
 export { Template } from "./template.js";
 export { TopLevel } from "@blazetrails/activesupport";
+export { hashAref, keys } from "@blazetrails/ruby-compat";
 export type { BacktraceLocation, Spot } from "./template/handlers/tse.js";
 
 export { FileSystemResolver, PathParser, Resolver } from "./template/resolver.js";

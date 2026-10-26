@@ -1,4 +1,5 @@
 import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
+import { keys } from "@blazetrails/ruby-compat";
 
 import type { LookupContext } from "../lookup-context.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
@@ -69,7 +70,7 @@ export class PartialRenderer extends AbstractRenderer {
 
   /** @internal */
   protected templateKeys(_: string): string[] {
-    return Object.keys(this.locals);
+    return keys(this.locals);
   }
 
   /** @internal */

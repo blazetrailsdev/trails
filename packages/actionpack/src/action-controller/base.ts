@@ -441,7 +441,7 @@ export class Base extends Metal {
     ).viewContextClass();
   }
 
-  viewAssigns = viewAssigns;
+  declare viewAssigns: typeof viewAssigns;
 
   viewContext(): ActionViewBase {
     return viewContext.call(this as unknown as ViewContextHost);

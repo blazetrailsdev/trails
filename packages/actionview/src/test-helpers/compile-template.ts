@@ -85,7 +85,12 @@ const FUNCTION_HEADER_LINES = new Function("exports", "require", "/*body*/")
 let compiled = 0;
 
 const MODULES: Record<string, unknown> = {
-  "@blazetrails/actionview": { OutputBuffer, TopLevel },
+  "@blazetrails/actionview": {
+    OutputBuffer,
+    TopLevel,
+    hashAref: RubyCompat.hashAref,
+    keys: RubyCompat.keys,
+  },
   "@blazetrails/activesupport": { htmlSafe },
   "@blazetrails/ruby-compat": RubyCompat,
 };

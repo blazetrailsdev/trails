@@ -1968,6 +1968,28 @@ function classInfoForPrototype(
   return info.classes[`${file}:${sym.name}`] ?? null;
 }
 
+/**
+ * The module entity a plain-object module's own identifier names — the target
+ * of `Object.defineProperty(Mod, "name", { value: fn })`, the non-enumerable
+ * seat of a Ruby `def self.name` on a module (root CLAUDE.md, "A Ruby module
+ * is a JS object or a JS class").
+ */
+function moduleInfoForSingleton(
+  expr: ts.Expression,
+  info: PackageInfo,
+  checker: ts.TypeChecker,
+  srcDir: string,
+): ClassInfo | null {
+  if (!ts.isIdentifier(expr)) return null;
+  const sym0 = checker.getSymbolAtLocation(expr);
+  if (!sym0) return null;
+  const sym = sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
+  const decl = sym.valueDeclaration;
+  if (!decl || !ts.isVariableDeclaration(decl)) return null;
+  const file = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
+  return info.modules[`${file}:${sym.name}`] ?? null;
+}
+
 /** Push a method name onto classInfo if not already present. */
 function pushDefinePropertyMethod(
   classInfo: ClassInfo,
@@ -2026,9 +2048,22 @@ function extractDefinePropertyDirect(
   if (!ts.isObjectLiteralExpression(descriptor)) return;
   const value = definePropertyValue(descriptor);
   if (!value) return;
+  const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
+  const moduleInfo = moduleInfoForSingleton(target, info, checker, srcDir);
+  if (moduleInfo) {
+    if (moduleInfo.classMethods.some((m) => m.name === propNameExpr.text)) return;
+    moduleInfo.classMethods.push({
+      name: propNameExpr.text,
+      visibility: "public",
+      params: paramsOfDescriptorValue(value, checker),
+      line,
+      file: moduleInfo.file,
+      isStatic: true,
+    });
+    return;
+  }
   const classInfo = classInfoForPrototype(target, info, checker, srcDir);
   if (!classInfo) return;
-  const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
   pushDefinePropertyMethod(
     classInfo,
     propNameExpr.text,

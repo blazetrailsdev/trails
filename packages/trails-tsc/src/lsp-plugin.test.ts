@@ -90,7 +90,7 @@ describe("lspPluginInit", () => {
     );
     write(
       "node_modules/@blazetrails/actionview/index.d.ts",
-      "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base {}\nexport declare const TopLevel: {};",
+      "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base {}\nexport declare const TopLevel: {};\nexport declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
     );
     write("app/models/post.ts", "export class Post { title = 0; }");
     write(

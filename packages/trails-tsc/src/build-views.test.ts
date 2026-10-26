@@ -326,7 +326,7 @@ describe("buildViews", () => {
       [
         "export interface TemplateRegistry {}",
         "export type TemplateLocals<T> = T;",
-        "export declare const TopLevel: {};",
+        "export declare const TopLevel: {};\nexport declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
         "export declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};",
       ].join("\n"),
     );
@@ -696,7 +696,7 @@ describe("runCli", () => {
       [
         "export interface TemplateRegistry {}",
         "export type TemplateLocals<T> = T;",
-        "export declare const TopLevel: {};",
+        "export declare const TopLevel: {};\nexport declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
         "export declare class Base { csrfMetaTags(): string; }",
       ].join("\n"),
     );
@@ -811,7 +811,7 @@ describe("runCli", () => {
     write(
       cwd,
       "node_modules/@blazetrails/actionview/index.d.ts",
-      "export declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};",
+      "export declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};\nexport declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
     );
     write(cwd, "app/models/post.ts", 'export class Post { title = ""; }');
     write(

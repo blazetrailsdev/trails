@@ -82,12 +82,10 @@ export function renderedFormat(): unknown {
 }
 
 export function viewAssigns<T extends object>(this: T): Record<string, unknown> {
+  const protectedIvars = (this as { _protectedIvars(): readonly string[] })._protectedIvars();
+  const variables = Object.keys(this).filter((name) => !protectedIvars.includes(name));
   const out: Record<string, unknown> = Object.create(null);
-  const protectedSet = new Set(DEFAULT_PROTECTED_INSTANCE_VARIABLES);
-  for (const name of Object.keys(this)) {
-    if (name.startsWith("_") || protectedSet.has(name)) continue;
-    out[name] = (this as Record<string, unknown>)[name];
-  }
+  for (const name of variables) out[name] = (this as Record<string, unknown>)[name];
   return out;
 }
 

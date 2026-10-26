@@ -5,6 +5,7 @@ import {
   virtualizeTse,
   virtualizeTseWithDeltas,
 } from "./tse.js";
+import * as RubyCompat from "@blazetrails/ruby-compat";
 import { diagnose } from "./tse-diagnose.js";
 
 describe("virtualizeTse", () => {
@@ -409,7 +410,11 @@ describe("virtualizeTse free-name lookup", () => {
     const { outputText } = transpileTse(virtualizeTse(source, scope));
     const exports: { default?: (...a: unknown[]) => Promise<unknown> } = {};
     const modules: Record<string, unknown> = {
-      "@blazetrails/actionview": { TopLevel: {} },
+      "@blazetrails/actionview": {
+        TopLevel: {},
+        hashAref: RubyCompat.hashAref,
+        keys: RubyCompat.keys,
+      },
       "@blazetrails/activesupport": { htmlSafe: (s: string) => s },
     };
     new Function("exports", "require", outputText)(exports, (id: string) => modules[id]);
