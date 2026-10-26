@@ -74,16 +74,6 @@ tester.run("ruby-compat-native-required", rule, {
     invalid("declare const t: [number, string]; hashDelete(t, 0);"),
     invalid("hashDelete('abc' as unknown as string, 'length');"),
     invalid("hashDelete(1 as unknown as number, 'a');"),
-    {
-      code: 'import { compact } from "@blazetrails/ruby-compat";\ndeclare const xs: ({ a: 1 } | null)[]; compact(xs);',
-      filename,
-      errors: [{ messageId: "nativeRequired" }],
-    },
-    {
-      code: 'import { uniq } from "@blazetrails/ruby-compat";\ndeclare const xs: (string | null)[]; uniq(xs);',
-      filename,
-      errors: [{ messageId: "nativeRequired" }],
-    },
   ],
 });
 

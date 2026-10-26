@@ -13,7 +13,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { b, eachWithIndex, fetch, first, rbRegMatchP } from "@blazetrails/ruby-compat";
+import { aryJoin, b, eachWithIndex, fetch, first, rbRegMatchP } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -225,7 +225,8 @@ interface SetConstraintsHost {
 
 export async function buildExplainClause(options: ExplainOption[] = []): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
-  return `EXPLAIN (${options.join(", ").toUpperCase()})`;
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- the options are Symbols (":analyze"); Symbol#to_s drops the colon, Array#join does not
+  return `EXPLAIN (${aryJoin(options, ", ").toUpperCase()})`;
 }
 
 /** @internal */

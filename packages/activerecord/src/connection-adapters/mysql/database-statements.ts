@@ -1,6 +1,7 @@
 import { sql as arelSql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
+  aryJoin,
   b,
   cmp,
   eachWithObject,
@@ -80,7 +81,8 @@ export async function buildExplainClause(
 ): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
 
-  const explainClause = `EXPLAIN ${options.join(" ").toUpperCase()}`;
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- the options are Symbols (":analyze"); Symbol#to_s drops the colon, Array#join does not
+  const explainClause = `EXPLAIN ${aryJoin(options, " ").toUpperCase()}`;
 
   if ((await isAnalyzeWithoutExplain.call(this)) && explainClause.includes("ANALYZE")) {
     return explainClause.replace("EXPLAIN ", "");
