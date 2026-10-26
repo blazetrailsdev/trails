@@ -4,7 +4,14 @@ import {
   stringifyKeys,
   type SafeBuffer,
 } from "@blazetrails/activesupport";
-import { fetch, rbObjAsString, rbObjRespondTo, rtest, slice } from "@blazetrails/ruby-compat";
+import {
+  defineModule,
+  fetch,
+  rbObjAsString,
+  rbObjRespondTo,
+  rtest,
+  slice,
+} from "@blazetrails/ruby-compat";
 
 export interface CollectionTemplateObject {
   label(
@@ -117,7 +124,7 @@ interface CollectionHelpersHost {
   hiddenFieldName(): string;
 }
 
-export const CollectionHelpers = {
+export const CollectionHelpers = defineModule({
   /** @internal */
   instantiateBuilder(
     this: CollectionHelpersHost,
@@ -250,4 +257,4 @@ export const CollectionHelpers = {
   hiddenFieldName(this: CollectionHelpersHost): string {
     return `${this.tagName(false, this._options["index"])}`;
   },
-};
+});

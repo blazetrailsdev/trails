@@ -300,7 +300,8 @@ export function _processRenderTemplateOptions(
     options["prefixes"] ??= this._prefixes();
   }
 
-  options["template"] ??= dasherize(underscore(String(options["action"] ?? this.actionName)));
+  const action = String(options["action"] ?? this.actionName);
+  options["template"] ??= dasherize(/[a-z\d][A-Z]/.test(action) ? underscore(action) : action);
 }
 
 export const ClassMethods = {
