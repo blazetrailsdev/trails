@@ -665,6 +665,9 @@ describe("minBy / maxBy / eachCons", () => {
     expect(minBy([4, 1, 3], 2).each((i) => i)).toEqual([1, 3]);
     expect(maxBy([4, 1, 3], 2).size()).toBe(3);
     expect(minBy((function* () {})()).size()).toBeNull();
+    expect(() => (minBy as (...argv: unknown[]) => unknown)([1], 1, 2)).toThrow(ArgumentError);
+    expect(() => (maxBy as (...argv: unknown[]) => unknown)([1], 1, 2)).toThrow(ArgumentError);
+    expect([...eachSlice(new Set([1, 2, 3]), 2)]).toEqual([[1, 2], [3]]);
 
     const cons = eachCons([1, 2, 3, 4], 2);
     expect(cons.size()).toBe(3);

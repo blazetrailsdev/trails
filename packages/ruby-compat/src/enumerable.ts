@@ -491,7 +491,10 @@ export function sortBy<T, E = unknown>(
  * Mirrors: Ruby's Enumerable#each_slice — `vendor/ruby/v3.3.11/enum.c:3166` `enum_each_slice`,
  * yielding each full slice as it fills (`each_slice_i`, `:3102`) and the
  * remainder last, then answering the receiver. With no block it answers its
- * `RETURN_SIZED_ENUMERATOR`, sized by `enum_each_slice_size` (`:3143`).
+ * `RETURN_SIZED_ENUMERATOR`, sized by `enum_each_slice_size` (`:3127`).
+ * The enumerator re-runs this function where Ruby's `to_enum(__method__, *args)`
+ * re-sends the method by name: `rbFSend` reaches no free function on an Array,
+ * Set or generator receiver.
  * @noRailsEquivalent PERMANENT
  */
 export function eachSlice<T, E = unknown>(
@@ -518,7 +521,7 @@ export function eachSlice<T, E = unknown>(
       blockPass((y: { yield(i: T[]): unknown }) => eachSlice(obj, n, (i: T[]) => y.yield(i))),
       "each",
       [],
-      () => enumEachSliceSize(obj, size),
+      () => enumEachSliceSize(obj, [n]),
     );
   }
   let ary: T[] = [];
@@ -543,6 +546,9 @@ export function eachSlice<T, E = unknown>(
  * keeping the first element whose block value compares lowest (`min_by_i`,
  * `:2630`) and answering `nil` for an empty receiver. With `n` it answers the
  * `n` elements with the lowest block values, in order (`rb_nmin_run`).
+ * The enumerator re-runs this function where Ruby's `to_enum(__method__, *args)`
+ * re-sends the method by name: `rbFSend` reaches no free function on an Array,
+ * Set or generator receiver.
  * @noRailsEquivalent PERMANENT
  */
 export function minBy<T, E = unknown>(
@@ -562,7 +568,9 @@ export function minBy<T, E = unknown>(
 ): Enumerated<E, T[] | T | null>;
 /** @noRailsEquivalent PERMANENT */
 export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: unknown[]): unknown {
-  if (typeof argv.at(-1) !== "function") {
+  const block = typeof argv.at(-1) === "function" ? (argv.pop() as (i: T) => unknown) : null;
+  checkArity(argv.length, 0, 1);
+  if (!block) {
     return new Enumerator<T>(
       blockPass((y: { yield(i: T): unknown }) =>
         minBy(obj, ...(argv as [number | null]), (i) => y.yield(i)),
@@ -572,8 +580,6 @@ export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
       () => enumSize(obj),
     );
   }
-  const block = argv.pop() as (i: T) => unknown;
-  checkArity(argv.length, 0, 1);
   const num = argv[0] as number | null | undefined;
   if (argv.length > 0 && num != null) {
     const size = Math.trunc(num);
@@ -633,7 +639,9 @@ export function maxBy<T, E = unknown>(
 ): Enumerated<E, T[] | T | null>;
 /** @noRailsEquivalent PERMANENT */
 export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: unknown[]): unknown {
-  if (typeof argv.at(-1) !== "function") {
+  const block = typeof argv.at(-1) === "function" ? (argv.pop() as (i: T) => unknown) : null;
+  checkArity(argv.length, 0, 1);
+  if (!block) {
     return new Enumerator<T>(
       blockPass((y: { yield(i: T): unknown }) =>
         maxBy(obj, ...(argv as [number | null]), (i) => y.yield(i)),
@@ -643,8 +651,6 @@ export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
       () => enumSize(obj),
     );
   }
-  const block = argv.pop() as (i: T) => unknown;
-  checkArity(argv.length, 0, 1);
   const num = argv[0] as number | null | undefined;
   if (argv.length > 0 && num != null) {
     const size = Math.trunc(num);
@@ -687,7 +693,10 @@ export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
  * which raises `ArgumentError "invalid size"` for a size that is not positive
  * and yields each window of `n` consecutive elements as it fills
  * (`each_cons_i`, `:3187`), answering the receiver. With no block it answers
- * its `RETURN_SIZED_ENUMERATOR`, sized by `enum_each_cons_size` (`:3223`).
+ * its `RETURN_SIZED_ENUMERATOR`, sized by `enum_each_cons_size` (`:3209`).
+ * The enumerator re-runs this function where Ruby's `to_enum(__method__, *args)`
+ * re-sends the method by name: `rbFSend` reaches no free function on an Array,
+ * Set or generator receiver.
  * @noRailsEquivalent PERMANENT
  */
 export function eachCons<T, E = unknown>(obj: Iterable<T> | Each<T, E>, n: number): Enumerator<T[]>;
@@ -711,7 +720,7 @@ export function eachCons<T, E = unknown>(
       blockPass((y: { yield(i: T[]): unknown }) => eachCons(obj, n, (i) => y.yield(i))),
       "each",
       [],
-      () => enumEachConsSize(obj, size),
+      () => enumEachConsSize(obj, [n]),
     );
   }
   const ary: T[] = [];
@@ -732,7 +741,9 @@ function enumSize(self: object): unknown {
 }
 
 /** `enum_each_slice_size` (`vendor/ruby/v3.3.11/enum.c:3127`). */
-function enumEachSliceSize(obj: object, sliceSize: number): unknown {
+function enumEachSliceSize(obj: object, args: unknown[]): unknown {
+  const sliceSize = Math.trunc(args[0] as number);
+  if (sliceSize <= 0) throw new ArgumentError("invalid slice size");
   const size = enumSize(obj);
   if (size == null) return null;
   if (size === Infinity) return size;
@@ -740,7 +751,9 @@ function enumEachSliceSize(obj: object, sliceSize: number): unknown {
 }
 
 /** `enum_each_cons_size` (`vendor/ruby/v3.3.11/enum.c:3209`). */
-function enumEachConsSize(obj: object, consSize: number): unknown {
+function enumEachConsSize(obj: object, args: unknown[]): unknown {
+  const consSize = Math.trunc(args[0] as number);
+  if (consSize <= 0) throw new ArgumentError("invalid size");
   const size = enumSize(obj);
   if (size == null) return null;
   const n = (size as number) + 1 - consSize;
