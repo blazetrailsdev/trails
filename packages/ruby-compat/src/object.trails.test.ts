@@ -30,6 +30,7 @@ import {
   CLASS_METHOD_TABLE,
   OBJECT_METHOD_TABLE,
   rbFSend,
+  ENUMERABLE_METHOD_TABLE,
   rbModAttrReader,
   rbModAttrWriter,
   rbModDefineMethod,
@@ -583,6 +584,29 @@ describe("rbFSend include?", () => {
 });
 
 describe("rbFSend", () => {
+  it("dispatches ENUMERABLE_METHOD_TABLE on an iterable, not on an each-only object", () => {
+    const table = ENUMERABLE_METHOD_TABLE as Record<string, (self: Iterable<number>) => number>;
+    table.firstOne = (self) => [...self][0];
+    try {
+      const iterable = new (class {
+        *[Symbol.iterator]() {
+          yield 7;
+        }
+      })();
+      const eachOnly = new (class {
+        each(block: (i: number) => void) {
+          block(7);
+        }
+      })();
+      expect(rbFSend(iterable, "firstOne")).toBe(7);
+      expect(basicObjRespondTo(iterable, "firstOne")).toBe(true);
+      expect(basicObjRespondTo(eachOnly, "firstOne")).toBe(false);
+      expect(() => rbFSend(eachOnly, "firstOne")).toThrow(NoMethodError);
+    } finally {
+      delete table.firstOne;
+    }
+  });
+
   it("answers a String receiver with the Ruby method over String.prototype's", () => {
     expect(rbFSend("a  b", "split", " ", -1)).toEqual(["a", "b"]);
     expect(rbFSend(",a,,b,", "split", ",", -1)).toEqual(["", "a", "", "b", ""]);

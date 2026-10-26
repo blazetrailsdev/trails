@@ -501,7 +501,9 @@ OBJECT_METHOD_TABLE.instanceExec = (self: unknown, ...args: unknown[]): unknown 
  * name, which {@link rbFSend} dispatches and {@link basicObjRespondTo} answers
  * for on the receivers `each` is bound for: a JS array, a `Set`, and a `Map`
  * or plain hash, whose Ruby classes include `Enumerable`
- * (`vendor/ruby/v3.3.11/array.c:8606`, `lib/set.rb:221`, `hash.c:7184`).
+ * (`vendor/ruby/v3.3.11/array.c:8606`, `lib/set.rb:221`, `hash.c:7184`), and
+ * an object that defines `Symbol.iterator`, a class's
+ * `include Enumerable` (`enum.c:5061`).
  * ActiveSupport's `Enumerable#maximum`
  * (`activesupport/lib/active_support/core_ext/enumerable.rb:40`) is reached by
  * `object.try(:maximum, :updated_at)` on an Array of records.
@@ -516,7 +518,13 @@ function enumerableMethod(
   mid: string,
 ): ((...args: unknown[]) => unknown) | undefined {
   return Object.hasOwn(ENUMERABLE_METHOD_TABLE, mid) &&
-    (Array.isArray(obj) || obj instanceof Set || obj instanceof Map || isPlainHash(obj))
+    (Array.isArray(obj) ||
+      obj instanceof Set ||
+      obj instanceof Map ||
+      isPlainHash(obj) ||
+      (typeof obj === "object" &&
+        obj !== null &&
+        typeof (obj as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function"))
     ? (ENUMERABLE_METHOD_TABLE[mid] as (...args: unknown[]) => unknown)
     : undefined;
 }
@@ -713,6 +721,8 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     ) {
       return true;
     }
+  } else if (enumerableMethod(obj, mid) !== undefined) {
+    return true;
   }
   const klass =
     typeof obj === "function" &&

@@ -1,4 +1,5 @@
 import { include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
+import type { Record } from "./record.js";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
@@ -20,7 +21,10 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
   }
 }
 
-/** @missingRailsCall rake_tasks — CONVERGEABLE port-solid-queue-tasks */
+/**
+ * @missingRailsCall rake_tasks — CONVERGEABLE port-solid-queue-tasks
+ * @inventedArm onLoad — CONVERGEABLE solid-queue-record-class-body-reads-config-after-initializers
+ */
 export class Engine extends TrailsEngine {
   static toString(): string {
     return "SolidQueue::Engine";
@@ -33,10 +37,16 @@ export class Engine extends TrailsEngine {
 
     this.config.set("solidQueue", new OrderedOptions());
 
+    const connectsTo = function (this: typeof Record): void {
+      if (SolidQueue.connectsTo) this.connectsTo(SolidQueue.connectsTo);
+    };
+
     this.initializer("solid_queue.config", () => {
       this.config.solidQueue.each((name, value) => {
         rbFSend(SolidQueue, `${name}=`, value);
       });
+
+      onLoad("solid_queue_record", { runOnce: true }, connectsTo);
     });
 
     this.initializer(
