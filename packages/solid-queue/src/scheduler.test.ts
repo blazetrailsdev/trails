@@ -4,7 +4,9 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
+import { TestCase } from "@blazetrails/activesupport/test-case";
 import type { Time } from "@blazetrails/date";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import {
   Job,
   Process,
@@ -33,6 +35,13 @@ function assertMetadata(process: Process, metadata: Record<string, unknown>) {
     expect(process.metadata.get(attr)).toEqual(value);
   }
 }
+
+class SchedulerTest extends TestCase {
+  static {
+    (this as unknown as { useTransactionalTests: boolean }).useTransactionalTests = false;
+  }
+}
+registerConstant("SchedulerTest", SchedulerTest);
 
 describe("SchedulerTest", () => {
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
