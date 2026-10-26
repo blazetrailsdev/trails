@@ -70,7 +70,7 @@ export class MigrationGenerator extends GeneratorBase {
       async () =>
         new CapturableERB(strNew(Array.from(await getFs().readFile(source))), {
           trimMode: "-",
-          eoutvar: "outputBuffer",
+          eoutvar: "this.outputBuffer",
         }).result(rbFBinding(this)),
       File.join("db/migrate", `${underscore(name)}${this.ext()}`),
     );

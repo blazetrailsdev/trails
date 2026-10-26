@@ -114,7 +114,7 @@ export async function template(
   return this.createFile(destination, null, config, async () => {
     const capturableErb = new CapturableERB(strNew(Array.from(await getFs().readFile(source))), {
       trimMode: "-",
-      eoutvar: "outputBuffer",
+      eoutvar: "this.outputBuffer",
     });
     capturableErb.filename = source;
     let content: unknown = capturableErb.result(context);
@@ -310,7 +310,7 @@ export class CapturableERB {
   setEoutvar(compiler: ERBCompiler, eoutvar: string = "_erbout"): void {
     compiler.bufvar = eoutvar;
     compiler.putCmd = `${eoutvar}.append`;
-    compiler.insertCmd = `((value) => ${eoutvar}.append(toS(value)))`;
+    compiler.insertCmd = `((value) => ${eoutvar}.append(typeof value === "string" ? value : toS(value)))`;
     compiler.preCmd = `${eoutvar} = new StringIO();`;
     compiler.postCmd = ".string()";
   }

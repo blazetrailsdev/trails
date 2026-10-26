@@ -135,11 +135,12 @@ describe("Thor::Actions copy_file, link_file, get and template (trails)", () => 
       host().template(
         "doc/config.rb",
         "out.rb",
-        { context: { klass: "Other" } },
+        { context: { klass: ":Other" } },
         (content: string) => content.toUpperCase(),
       ),
     );
-    expect(File.read(file("out.rb"))).toBe("CLASS OTHER; END\n");
+    expect(File.read(file("out.rb"))).toBe("CLASS :OTHER; END\n");
+    expect(Object.hasOwn(globalThis, "outputBuffer")).toBe(false);
   });
 
   it("raises for a frozen buffer, and the ensure resets the buffer it never saved", () => {
