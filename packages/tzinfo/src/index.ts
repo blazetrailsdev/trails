@@ -16,6 +16,7 @@ import {
   tzdataBaseOffsets,
   tzdataIsdst,
   tzdataIsdstFlips,
+  tzdataOffsetInstant,
 } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
 
@@ -70,6 +71,9 @@ function getZoneInfo(
   ianaName: string,
   date: Date,
 ): { abbreviation: string; utcOffsetSeconds: number } {
+  const at = Math.floor(date.getTime() / 1000);
+  const instant = tzdataOffsetInstant(ianaName, at);
+  if (instant !== at) date = new Date(instant * 1000);
   let fixed = fixedZoneInfos.get(ianaName);
   if (fixed === undefined) {
     const zoned = Temporal.Instant.fromEpochMilliseconds(0).toZonedDateTimeISO(ianaName);

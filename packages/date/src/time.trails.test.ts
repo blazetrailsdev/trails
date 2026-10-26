@@ -971,3 +971,25 @@ describe("Time#strftime week numbers before the 1582 reform", () => {
     expect(new RbDate(12, 7, 9, RbDate.GREGORIAN).strftime("%U %W %V %G")).toBe("28 28 28 0012");
   });
 });
+
+describe("Time#strftime through rb_strftime", () => {
+  it("formats a UTC time's %z and %Z as rb_strftime's gmt arm does", () => {
+    const t = Time.utc(2008, 3, 1, 6, 0, 0);
+    expect(t.strftime("%-z|%#Z|%10Z")).toBe("-0000|utc|       UTC");
+  });
+
+  it("puts the minus sign on a negative offset under an hour", () => {
+    const t = Time.new(2008, 1, 1, 0, 0, 0, "-00:00:30");
+    expect(t.strftime("%z|%:::z|%_10z|%-z")).toBe("-0000|-00:00:30|      -000|-0000");
+  });
+
+  it("reads %s %N from the time value", () => {
+    expect(Time.at(-1.25).utc().strftime("%s %N %3N %12N")).toBe("-2 750000000 750 750000000000");
+    expect(Time.utc(2008, 3, 1, 6, 0, new Rational(3, 7)).strftime("%N")).toBe("428571428");
+  });
+
+  it("raises ArgumentError for a format that ends inside a conversion", () => {
+    expect(() => Time.utc(2008, 3, 1).strftime("%")).toThrow(ArgumentError);
+    expect(Time.utc(2008, 3, 1).strftime("%-5d|%Eq|%::::z|%3:z")).toBe("1|%Eq|%::::z|+00:00");
+  });
+});

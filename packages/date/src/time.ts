@@ -1,6 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { tzdataAbbreviation } from "./tzdata-abbreviations.js";
-import { tzdataIsdst } from "./tzdata-isdst.js";
+import { tzdataIsdst, tzdataOffsetInstant } from "./tzdata-isdst.js";
+import { rbWarning } from "./rb-warning.js";
+import { rbStrftime } from "./strftime.js";
 import {
   ArgumentError,
   Date,
@@ -13,7 +15,6 @@ import {
   fToR,
   jdLocalToUtc,
   of2str,
-  strftime,
   SubMinuteOffsetZonedDateTime,
   timeToDf,
 } from "./date.js";
@@ -437,7 +438,12 @@ interface ZoneOffsetInterval {
 const zoneOffsetIntervals = new Map<string, ZoneOffsetInterval[]>();
 
 /** @internal */
-function zoneOffsetAt(timeZoneId: string, ns: bigint): number {
+function zoneOffsetAt(timeZoneId: string, ns: bigint, localZone = true): number {
+  if (!localZone) {
+    const seconds = ns / 1_000_000_000n - (ns % 1_000_000_000n < 0n ? 1n : 0n);
+    const instant = tzdataOffsetInstant(timeZoneId, Number(seconds));
+    if (instant !== Number(seconds)) ns = BigInt(instant) * 1_000_000_000n;
+  }
   let intervals = zoneOffsetIntervals.get(timeZoneId);
   if (!intervals) zoneOffsetIntervals.set(timeZoneId, (intervals = []));
   let lo = 0;
@@ -461,8 +467,12 @@ function zoneOffsetAt(timeZoneId: string, ns: bigint): number {
   return offset;
 }
 
-/** `rb_time_zone_abbreviation` (`vendor/ruby/v3.3.11/time.c:5746-5775`). */
-function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
+/**
+ * `rb_time_zone_abbreviation` (`vendor/ruby/v3.3.11/time.c:5746-5775`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
   if (typeof zone === "string") return zone;
   const tzobj = zone as {
     abbr(tm: Time): unknown;
@@ -532,7 +542,9 @@ export class Time extends rbCTime {
   /** @internal */
   get #utcOffset(): number {
     return (this.#utcOffsetMemo ??=
-      this.#timeZoneId === "UTC" ? 0 : zoneOffsetAt(this.#timeZoneId!, this.#epochNs));
+      this.#timeZoneId === "UTC"
+        ? 0
+        : zoneOffsetAt(this.#timeZoneId!, this.#epochNs, this.#localZone));
   }
 
   static now({ in: inZone = null }: { in?: string | number | Timezone | null } = {}): Time {
@@ -1427,6 +1439,15 @@ export class Time extends rbCTime {
       this.#instantMemo = null;
     } else {
       this.#instantMemo = this.#plain.toZonedDateTime(this.#timeZoneId, disambiguation).toInstant();
+      if (!this.#localZone) {
+        const offset = zoneOffsetAt(this.#timeZoneId, this.#epochNs, false);
+        if (offset !== this.#utcOffsetMemo) {
+          this.#utcOffsetMemo = offset;
+          this.#epochNsMemo =
+            utcEpochNanoseconds(this.#vtm) - BigInt(Math.round(offset * 1_000_000_000));
+          this.#instantMemo = null;
+        }
+      }
     }
   }
 
@@ -1587,34 +1608,36 @@ export class Time extends rbCTime {
     ).toDatetime();
   }
 
+  /** `time_strftime` (`vendor/ruby/v3.3.11/time.c:5234-5264`). */
   strftime(format: string): string {
+    if (format.length === 0) {
+      rbWarning("strftime called with empty format string");
+      return "";
+    }
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
-    return strftime(
+    const str = rbStrftime(
+      format,
+      this,
       {
         year: this.year,
-        jd: cCivilToJd(this.year, this.mon, this.day, Date.GREGORIAN),
-        nth: 0n,
-        gregorianP: true,
-        sg: Date.GREGORIAN,
         mon: this.mon,
-        day: this.day,
-        wday: this.wday,
-        yday: this.yday,
+        mday: this.day,
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        nsec: this.#subnano.isZero()
-          ? new Rational(this.nsec, 1)
-          : new Rational(this.nsec, 1).add(this.#subnano),
-        get zone(): string {
-          const zone = self.zone;
-          return zone == null ? "" : rbTimeZoneAbbreviation(zone, self);
-        },
+        wday: this.wday,
+        yday: this.yday,
         utcOffset: this.utcOffset,
+        get zone(): unknown {
+          return self.zone;
+        },
       },
-      format,
+      this.toR(),
+      this.#tzmodeUtc,
     );
+    if (str == null) throw new ArgumentError(`invalid format: ${format}`);
+    return str;
   }
 
   /** `time_cmp` (`vendor/ruby/v3.3.11/time.c:3951`). */

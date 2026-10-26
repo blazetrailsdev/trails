@@ -21,6 +21,8 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { Temporal } from "../packages/date/src/index.js";
+import { RUBY_ZONEINFO_PREAMBLE, tzdataVersion, zoneinfoEnv } from "./tzdata-zoneinfo.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -37,9 +39,11 @@ const HORIZON_YEAR = 2040;
  * changes it, or that changes neither the observed offset nor the bit (an
  * abbreviation-only or std/base re-split transition, which neither `Temporal`
  * nor the flips can see), with the base it moves to.
+ *
+ * Last, each transition that changes the observed offset, which
+ * `offsetGaps` compares against `Temporal`'s.
  */
-const RUBY_SCRIPT = `
-require "tzinfo"
+const RUBY_SCRIPT = `${RUBY_ZONEINFO_PREAMBLE}
 require "json"
 zones = JSON.parse(ARGV[0])
 out = {}
@@ -52,24 +56,26 @@ zones.each do |identifier|
   flips = []
   previous = first
   bases = []
+  offsets = []
   timezone.transitions_up_to(Time.utc(${HORIZON_YEAR})).each do |transition|
     offset = transition.offset
     if offset.base_utc_offset != previous.base_utc_offset ||
         (offset.observed_utc_offset == previous.observed_utc_offset && offset.dst? == previous.dst?)
       bases << [transition.timestamp_value, offset.base_utc_offset]
     end
+    offsets << [transition.timestamp_value, offset.observed_utc_offset] if offset.observed_utc_offset != previous.observed_utc_offset
     previous = offset
     dst = offset.dst?
     next if dst == current
     current = dst
     flips << transition.timestamp_value
   end
-  out[identifier] = [initial, flips, first.base_utc_offset, bases]
+  out[identifier] = [initial, flips, first.base_utc_offset, bases, first.observed_utc_offset, offsets]
 end
 puts JSON.generate(out)
 `;
 
-type ZoneRecords = [boolean, number[], number, [number, number][]];
+type ZoneRecords = [boolean, number[], number, [number, number][], number, [number, number][]];
 
 /** `[initialDst, flipInstants, initialBase, [instant, base][]]` per zone, or `null` where `ruby`/`tzinfo` is unavailable. */
 export async function rubyZoneDstFlips(
@@ -80,6 +86,7 @@ export async function rubyZoneDstFlips(
       "ruby",
       ["-e", RUBY_SCRIPT, JSON.stringify(identifiers)],
       {
+        env: await zoneinfoEnv(),
         maxBuffer: 64 * 1024 * 1024,
       },
     );
@@ -118,22 +125,105 @@ export function encodeBases(initialBase: number, bases: [number, number][]): str
   return row;
 }
 
+function temporalOffset(identifier: string, epochSeconds: number): number {
+  return (
+    Temporal.Instant.fromEpochMilliseconds(epochSeconds * 1000).toZonedDateTimeISO(identifier)
+      .offsetNanoseconds / 1e9
+  );
+}
+
+/**
+ * The spans before `HORIZON_YEAR` where Ruby tzinfo's observed offset differs
+ * from `Temporal`'s, as `[start, end]`. In each, tzinfo still observes the
+ * offset `Temporal` gives just before `start`: `ZoneinfoReader` drops a
+ * rule-generated transition in the year of the last defined one when its
+ * offset matches that transition's (tzinfo 2.0.6
+ * `lib/tzinfo/data_sources/zoneinfo_reader.rb:322-324`), so a southern zone
+ * whose last defined transition is the 2038 32-bit cut-off loses that year's
+ * spring-forward (`America/Santiago`). Any other kind of difference throws.
+ *
+ * The reader's `tzdataOffsetInstant` answers, for an instant, the instant whose
+ * `Temporal` offset is the one tzinfo observes: inside a gap, the second before
+ * it, and past `GENERATE_UP_TO` (`zoneinfo_reader.rb:16`, read off the clock
+ * when the file loads), the end of that year, since the last generated
+ * transition holds after it (`:206`, `:326`).
+ */
+export function offsetGaps(
+  identifier: string,
+  initialOffset: number,
+  offsets: [number, number][],
+): [number, number][] {
+  const horizon = Date.UTC(HORIZON_YEAR, 0, 1) / 1000;
+  const changes = new Set<number>(offsets.map(([at]) => at));
+  let zoned = Temporal.Instant.fromEpochMilliseconds(Date.UTC(1700, 0, 1)).toZonedDateTimeISO(
+    identifier,
+  );
+  for (;;) {
+    const next = zoned.getTimeZoneTransition("next");
+    if (next === null || next.epochMilliseconds / 1000 >= horizon) break;
+    changes.add(next.epochMilliseconds / 1000);
+    zoned = next;
+  }
+  const rubyOffset = (at: number): number => {
+    let offset = initialOffset;
+    for (const [instant, observed] of offsets) {
+      if (instant > at) break;
+      offset = observed;
+    }
+    return offset;
+  };
+  const gaps: [number, number][] = [];
+  let start: number | null = null;
+  for (const at of [...changes].sort((a, b) => a - b)) {
+    const differs = rubyOffset(at) !== temporalOffset(identifier, at);
+    if (differs && start === null) {
+      if (rubyOffset(at) !== temporalOffset(identifier, at - 1)) {
+        throw new Error(`${identifier}: tzinfo and Temporal differ at ${at} in an unexpected way`);
+      }
+      start = at;
+    } else if (!differs && start !== null) {
+      gaps.push([start, at]);
+      start = null;
+    }
+  }
+  if (start !== null) gaps.push([start, horizon]);
+  return gaps;
+}
+
+/** The zone's gap row: each gap's start as a base-36 delta from the end before it, and its length. */
+export function encodeGaps(gaps: [number, number][]): string {
+  let previous = 0;
+  return gaps
+    .map(([start, end]) => {
+      const row = `${(start - previous).toString(36)}:${(end - start).toString(36)}`;
+      previous = end;
+      return row;
+    })
+    .join(",");
+}
+
 /** The module packages/date/src/tzdata-isdst.ts carries, tables and reader both. */
 export function serializeTable(zoneRecords: Record<string, ZoneRecords>): string {
   const rows: string[] = [];
   const baseRows: string[] = [];
+  const gapRows: string[] = [];
   for (const identifier of Object.keys(zoneRecords).sort()) {
-    const [initial, flips, initialBase, bases] = zoneRecords[identifier];
+    const [initial, flips, initialBase, bases, initialOffset, offsets] = zoneRecords[identifier];
     baseRows.push(`${identifier} ${encodeBases(initialBase, bases)}`);
+    const gaps = offsetGaps(identifier, initialOffset, offsets);
+    if (gaps.length > 0) gapRows.push(`${identifier} ${encodeGaps(gaps)}`);
     // A zone that has never observed DST answers `false` at every instant,
     // which is what a missing row already answers.
     if (!initial && flips.length === 0) continue;
     rows.push(`${identifier} ${encodeZone(initial, flips)}`);
   }
-  return `${HEADER}export const TZDATA_ISDST = \`\n${rows.join("\n")}\n\`;\n\nexport const TZDATA_BASE_OFFSETS = \`\n${baseRows.join("\n")}\n\`;\n${READER}`;
+  return `${header()}export const TZDATA_ISDST = \`\n${rows.join("\n")}\n\`;\n\nexport const TZDATA_BASE_OFFSETS = \`\n${baseRows.join("\n")}\n\`;\n\nexport const TZDATA_OFFSET_GAPS = \`\n${gapRows.join("\n")}\n\`;\n${READER}`;
 }
 
-const HEADER = "";
+/** The IANA release the tables were generated from, which `process.versions.tz` must match. */
+export function header(): string {
+  return `/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_VERSION = "${tzdataVersion()}";\n\n`;
+}
 
 const READER = `
 const tables = new Map<string, Map<string, string>>();
@@ -187,6 +277,35 @@ function zoneRow(timeZoneId: string, table = TZDATA_ISDST): string | undefined {
     primaryZoneIds.set(timeZoneId, primary);
   }
   return rows(table).get(primary);
+}
+
+const GENERATE_UP_TO = new Date().getUTCFullYear() + 100;
+
+const generatedUpTo = Date.UTC(GENERATE_UP_TO + 1, 0, 1) / 1000;
+
+const gapRecords = new Map<string, number[]>();
+
+/** @noRailsEquivalent PERMANENT */
+export function tzdataOffsetInstant(timeZoneId: string, epochSeconds: number): number {
+  if (epochSeconds >= generatedUpTo) return generatedUpTo - 1;
+  const row = zoneRow(timeZoneId, TZDATA_OFFSET_GAPS);
+  if (row === undefined) return epochSeconds;
+  let gaps = gapRecords.get(row);
+  if (gaps === undefined) {
+    gaps = [];
+    let previous = 0;
+    for (const entry of row.split(",")) {
+      const colon = entry.indexOf(":");
+      const start = previous + parseInt(entry.slice(0, colon), 36);
+      previous = start + parseInt(entry.slice(colon + 1), 36);
+      gaps.push(start, previous);
+    }
+    gapRecords.set(row, gaps);
+  }
+  for (let i = 0; i < gaps.length && gaps[i] <= epochSeconds; i += 2) {
+    if (epochSeconds < gaps[i + 1]) return gaps[i] - 1;
+  }
+  return epochSeconds;
 }
 
 const baseRecords = new Map<string, [number, number[], number[]]>();

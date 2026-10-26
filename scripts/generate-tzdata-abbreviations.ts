@@ -15,6 +15,7 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { RUBY_ZONEINFO_PREAMBLE, tzdataVersion, zoneinfoEnv } from "./tzdata-zoneinfo.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -25,8 +26,7 @@ const HORIZON_YEAR = 2040;
  * Every zone, as its distinct abbreviations in order of first use, the index of
  * the one before its first transition, and each change as `[instant, index]`.
  */
-const RUBY_SCRIPT = `
-require "tzinfo"
+const RUBY_SCRIPT = `${RUBY_ZONEINFO_PREAMBLE}
 require "json"
 zones = (JSON.parse(ARGV[0]) + TZInfo::Timezone.all_identifiers).uniq
 out = {}
@@ -70,10 +70,13 @@ export function serializeTable(zones: Record<string, ZoneAbbreviations>): string
   const rows = Object.keys(zones)
     .sort()
     .map((identifier) => `${identifier} ${encodeZone(zones[identifier])}`);
-  return `${HEADER}export const TZDATA_ABBREVIATIONS = \`\n${rows.join("\n")}\n\`;\n${READER}`;
+  return `${header()}export const TZDATA_ABBREVIATIONS = \`\n${rows.join("\n")}\n\`;\n${READER}`;
 }
 
-const HEADER = "";
+/** The IANA release the table was generated from, which `process.versions.tz` must match. */
+export function header(): string {
+  return `/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_VERSION = "${tzdataVersion()}";\n\n`;
+}
 
 const READER = `
 let rowsByZoneId: Map<string, string>;
@@ -133,6 +136,12 @@ function zoneRow(timeZoneId: string): string | undefined {
 }
 
 /** @noRailsEquivalent PERMANENT */
+export function tzdataAbbreviationChanges(timeZoneId: string): number[] {
+  const row = zoneRow(timeZoneId);
+  return row === undefined ? [] : decodeRow(row)[1];
+}
+
+/** @noRailsEquivalent PERMANENT */
 export function tzdataAbbreviation(timeZoneId: string, epochSeconds: number): string | undefined {
   const row = zoneRow(timeZoneId);
   if (row === undefined) return undefined;
@@ -154,7 +163,7 @@ async function main(): Promise<void> {
     const { stdout } = await execFileAsync(
       "ruby",
       ["-e", RUBY_SCRIPT, JSON.stringify(identifiers)],
-      { maxBuffer: 64 * 1024 * 1024 },
+      { env: await zoneinfoEnv(), maxBuffer: 64 * 1024 * 1024 },
     );
     console.log(serializeTable(JSON.parse(stdout)).trimEnd());
   } catch {
