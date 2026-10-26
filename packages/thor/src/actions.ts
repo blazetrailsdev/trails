@@ -430,8 +430,11 @@ export const Actions = {
   commentLines,
   removeFile,
   removeDir,
+  /** @internal */
   concat,
+  /** @internal */
   capture,
+  /** @internal */
   withOutputBuffer,
   insertIntoFile,
   injectIntoFile,
