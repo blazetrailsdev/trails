@@ -27,6 +27,7 @@ import {
   type Block,
   numStep,
   sprintf,
+  defineModule,
 } from "@blazetrails/ruby-compat";
 
 import "../action-view.js";
@@ -240,7 +241,7 @@ export function timeTag(
   );
 }
 
-export const DateHelper = {
+export const DateHelper = defineModule({
   distanceOfTimeInWords,
   distanceOfTimeInWordsToNow,
   timeAgoInWords,
@@ -257,7 +258,7 @@ export const DateHelper = {
   selectMonth,
   selectYear,
   timeTag,
-};
+});
 
 type DateType = "year" | "month" | "day" | "hour" | "minute" | "second";
 
