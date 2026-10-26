@@ -7612,14 +7612,6 @@ function collectCalls(
   return [...names, ...hashForms];
 }
 
-/**
- * A `this._scope.get("key")`: `Mapper::Scope#[]` (`mapper.rb:2359-2361`), ported
- * as `Scope#get`, read off Mapper's `@scope`. extract-ruby-api.rb#walk_call_in_order
- * records no `[]` send, so the ORDER stream leaves it out, and it cannot take
- * the position of the routing `get` the same body makes (`Mapper#resource`'s
- * `@scope[:shallow]` beside `get :new`, `mapper.rb:1357-1363`).
- */
-
 /** `xs.splice(i, 0, ...items)`: a splice that removes nothing, Ruby's `Array#insert`. */
 function isInsertingSplice(n: ts.CallExpression): boolean {
   const deleteCount = n.arguments[1];
@@ -7630,6 +7622,14 @@ function isInsertingSplice(n: ts.CallExpression): boolean {
     deleteCount.text === "0"
   );
 }
+
+/**
+ * A `this._scope.get("key")`: `Mapper::Scope#[]` (`mapper.rb:2359-2361`), ported
+ * as `Scope#get`, read off Mapper's `@scope`. extract-ruby-api.rb#walk_call_in_order
+ * records no `[]` send, so the ORDER stream leaves it out, and it cannot take
+ * the position of the routing `get` the same body makes (`Mapper#resource`'s
+ * `@scope[:shallow]` beside `get :new`, `mapper.rb:1357-1363`).
+ */
 function isOperatorIndexRead(n: ts.CallExpression): boolean {
   const callee = n.expression;
   return (
