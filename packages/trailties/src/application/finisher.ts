@@ -227,15 +227,37 @@ async function loadControllers(paths: Root): Promise<Map<string, DispatchableCon
   if (!node) return out;
 
   for (const dir of await node.existentDirectories()) {
-    await collectConstants(
-      dir,
-      "",
-      (value) => typeof value === "function" && value.name.endsWith("Controller"),
-      (name, value) =>
-        out.set(underscore(name).replace(/_controller$/, ""), value as DispatchableControllerClass),
-    );
+    await collectControllers(dir, "", out);
   }
   return out;
+}
+
+/** @internal */
+async function collectControllers(
+  dir: string,
+  prefix: string,
+  out: Map<string, DispatchableControllerClass>,
+): Promise<void> {
+  const fs = getFs();
+  const p = getPath();
+  if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
+
+  for (const entry of await fs.readdir(dir)) {
+    const full = p.join(dir, entry);
+    if ((await fs.stat(full)).isDirectory()) {
+      await collectControllers(full, `${prefix}${underscore(entry.replace(/-/g, "_"))}/`, out);
+      continue;
+    }
+    const match = entry.match(/^(.+)[-_]controller\.(?:ts|js)$/);
+    if (!match) continue;
+    const mod = (await import(p.pathToFileURL(full).href)) as Record<string, unknown>;
+    for (const value of Object.values(mod)) {
+      if (typeof value === "function" && value.name.endsWith("Controller")) {
+        const name = `${prefix}${underscore(match[1].replace(/-/g, "_"))}`;
+        out.set(name, value as DispatchableControllerClass);
+      }
+    }
+  }
 }
 
 const definedControllers = new WeakSet<object>();
@@ -268,7 +290,7 @@ async function loadJobs(paths: Root): Promise<void> {
 /** @noRailsEquivalent PERMANENT */
 async function loadChannels(paths: Root): Promise<void> {
   const cable = TopLevel.ActionCable;
-  if (cable?.Engine == null) return;
+  if (cable == null) return;
 
   await loadAppConstants(
     paths,

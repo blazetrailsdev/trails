@@ -1,3 +1,3 @@
-import { Base } from "@blazetrails/actioncable/connection/base";
+import { ActionCable } from "@blazetrails/actioncable";
 
-export class Connection extends Base {}
+export class Connection extends ActionCable.Connection.Base {}
