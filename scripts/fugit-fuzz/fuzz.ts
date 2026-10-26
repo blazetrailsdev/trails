@@ -29,7 +29,7 @@ const VENDOR = path.resolve(HERE, "../../vendor");
 const GEMS = "fugit/v1.11.1 raabro/v1.4.0 et-orbi/v1.2.11 chronic/v0.10.2".split(" ");
 
 type Case =
-  | { k: "parse" | "eo"; s: string }
+  | { k: "parse" | "eo"; s: string; label?: string }
   | { k: "cron" | "dur"; s: string; from: number; zone: string }
   | { k: "chronic"; s: string; now: number };
 type Surface = Case["k"];
@@ -269,7 +269,7 @@ async function corpus(): Promise<Case[]> {
   const cases: Case[] = [];
   for (const line of lines) {
     const s = line.slice(10);
-    cases.push({ k: "parse", s });
+    cases.push({ k: "parse", s, label: `Fugit::${line.slice(0, 10).trim()}` });
     for (const from of CORPUS_FROM)
       for (const zone of CORPUS_ZONES) cases.push({ k: "cron", s, from, zone });
   }
@@ -288,7 +288,10 @@ function eo(t: EoTime): [number | string, string] {
 /** A JS `TypeError` from a call on `undefined` is the port's `NoMethodError` (CLAUDE.md, "Ruby protocol methods"). */
 function errName(e: unknown): { err: string } {
   const name = e instanceof Error ? e.constructor.name : typeof e;
-  return { err: name === "TypeError" ? "NoMethodError" : name };
+  const missing = /is not a function|Cannot read properties of (undefined|null)/;
+  return {
+    err: name === "TypeError" && missing.test((e as Error).message) ? "NoMethodError" : name,
+  };
 }
 
 function guard(f: () => unknown): unknown {
@@ -428,6 +431,11 @@ async function main(): Promise<void> {
     console.error(`  ${done}/${cases.length}`);
     batch.forEach((c, j) => {
       const ts = tss[j];
+      const labelled = "label" in c && c.label !== undefined;
+      if (labelled && (ruby[j] as unknown[] | null)?.[0] !== c.label) {
+        const key = `${c.k}: corpus label ${c.label} vs ruby`;
+        groups.set(key, [...(groups.get(key) ?? []), { c, ruby: ruby[j], ts }]);
+      }
       if (same(ruby[j], ts) || nowRelative(c, ruby[j], ts)) return;
       const key = `${c.k}: ${signature(ruby[j], ts)}`;
       if (!groups.has(key)) groups.set(key, []);
