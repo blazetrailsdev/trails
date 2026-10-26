@@ -23,7 +23,7 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
 
 /**
  * @missingRailsCall rake_tasks — CONVERGEABLE port-solid-queue-tasks
- * @inventedArm onLoad — CONVERGEABLE solid-queue-record-class-body-reads-config-after-initializers
+ * @inventedArm onLoad — PERMANENT
  */
 export class Engine extends TrailsEngine {
   static toString(): string {
@@ -38,6 +38,7 @@ export class Engine extends TrailsEngine {
     this.config.set("solidQueue", new OrderedOptions());
 
     const connectsTo = function (this: typeof Record): void {
+      this.tableNamePrefix = SolidQueue.tableNamePrefix;
       if (SolidQueue.connectsTo) this.connectsTo(SolidQueue.connectsTo);
     };
 
