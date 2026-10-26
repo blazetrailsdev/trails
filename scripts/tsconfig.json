@@ -59,6 +59,18 @@
     },
     {
       "path": "../packages/activerecord-cli"
+    },
+    {
+      "path": "../packages/fugit"
+    },
+    {
+      "path": "../packages/et-orbi"
+    },
+    {
+      "path": "../packages/chronic"
+    },
+    {
+      "path": "../packages/raabro"
     }
   ]
 }
