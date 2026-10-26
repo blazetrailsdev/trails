@@ -854,7 +854,7 @@ describe("Fugit::Cron", () => {
         `computes ${JSON.stringify(freq)} for ${JSON.stringify(cron)}`,
         { timeout: 30 * 60_000 },
         () => {
-          const f = Cron.parse(cron)!.bruteFrequency().toDebugS();
+          const f = inZone("UTC", () => Cron.parse(cron)!.bruteFrequency().toDebugS());
 
           expect(f).toEqual(freq);
         },
@@ -862,9 +862,9 @@ describe("Fugit::Cron", () => {
     }
 
     it("accepts a year argument", { timeout: 10 * 60_000 }, () => {
-      expect(Cron.parse("0 0 * * sun")!.bruteFrequency(2016).toDebugS()).toEqual(
-        "dmin: 1W, dmax: 1W, ocs: 52, spn: 52W, spnys: 0, yocs: 52",
-      );
+      expect(
+        inZone("UTC", () => Cron.parse("0 0 * * sun")!.bruteFrequency(2016).toDebugS()),
+      ).toEqual("dmin: 1W, dmax: 1W, ocs: 52, spn: 52W, spnys: 0, yocs: 52");
     });
   });
 
