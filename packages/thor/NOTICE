@@ -1,0 +1,9 @@
+@blazetrails/thor
+=================
+
+This package is a TypeScript port of the thor gem
+(https://github.com/rails/thor), licensed under the MIT License.
+
+Original copyrights:
+
+  thor — Copyright (c) 2008 Yehuda Katz, Eric Hodel, et al., MIT License.
