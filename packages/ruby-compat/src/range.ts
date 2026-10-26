@@ -101,11 +101,12 @@ export class Range<T = unknown> {
   size(): number | bigint | null {
     const b = this.begin;
     const e = this.end;
-    if (isNumeric(b)) {
-      if (isNumeric(e)) return numIntervalStepSize(b, e, this.excludeEnd);
+    if (typeof b === "number" || typeof b === "bigint") {
+      if (typeof e === "number" || typeof e === "bigint")
+        return rubyNumIntervalStepSize(b, e, this.excludeEnd);
       if (e === null) return Infinity;
     } else if (b === null) {
-      if (isNumeric(e)) return Infinity;
+      if (typeof e === "number" || typeof e === "bigint") return Infinity;
     }
     return null;
   }
@@ -353,11 +354,12 @@ export class Range<T = unknown> {
   }
 }
 
-function isNumeric(v: unknown): v is number | bigint {
-  return typeof v === "number" || typeof v === "bigint";
-}
-
-function numIntervalStepSize(
+/**
+ * `ruby_num_interval_step_size` (`vendor/ruby/v3.3.11/numeric.c:2798`) with a step of 1.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rubyNumIntervalStepSize(
   from: number | bigint,
   to: number | bigint,
   excl: boolean,
@@ -373,11 +375,15 @@ function numIntervalStepSize(
     const n = delta + 1n;
     return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n) : n;
   }
-  return floatStepSize(Number(from), Number(to), excl);
+  return rubyFloatStepSize(Number(from), Number(to), excl);
 }
 
-/** `ruby_float_step_size` (`vendor/ruby/v3.3.11/numeric.c:2720`) with a unit of 1. */
-function floatStepSize(beg: number, end: number, excl: boolean): number {
+/**
+ * `ruby_float_step_size` (`vendor/ruby/v3.3.11/numeric.c:2720`) with a unit of 1.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rubyFloatStepSize(beg: number, end: number, excl: boolean): number {
   let n = end - beg;
   let err = (Math.abs(beg) + Math.abs(end) + Math.abs(end - beg)) * Number.EPSILON;
   if (err > 0.5) err = 0.5;

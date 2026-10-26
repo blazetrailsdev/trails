@@ -63,7 +63,8 @@ export class Enumerator<T = unknown> {
     obj: object,
     private meth: string = "each",
     private args: unknown[] = [],
-    private size_: ((...args: unknown[]) => unknown) | null = null,
+    /** @noRailsEquivalent PERMANENT */
+    readonly sizeFn: ((...args: unknown[]) => unknown) | null = null,
   ) {
     this.obj = rbBlockGivenP(obj)
       ? new Generator(obj as unknown as (yielder: Yielder<T>) => unknown)
@@ -136,7 +137,7 @@ export class Enumerator<T = unknown> {
    * @noRailsEquivalent PERMANENT
    */
   size(): unknown {
-    return this.size_ ? this.size_(...this.args) : null;
+    return this.sizeFn ? this.sizeFn(...this.args) : null;
   }
 
   /**
