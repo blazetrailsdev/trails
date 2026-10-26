@@ -8,13 +8,14 @@ describe("Timezone offsets and abbreviations from the cached transition interval
   });
 
   it("searches transitions once for a zone with no transition after the instant", () => {
-    const zone = Timezone.get("Asia/Kolkata");
+    const zone = Timezone.get("Asia/Kathmandu");
     const spy = vi.spyOn(Temporal.ZonedDateTime.prototype, "getTimeZoneTransition");
-    expect(zone.observedUtcOffset(new Date(1_700_000_000_000))).toBe(19800);
-    expect(zone.abbr(new Date(1_700_000_000_000))).toBe("IST");
+    expect(zone.observedUtcOffset(new Date(1_700_000_000_000))).toBe(20700);
+    expect(zone.abbr(new Date(1_700_000_000_000))).toBe("+0545");
     const searches = spy.mock.calls.length;
-    expect(zone.observedUtcOffset(new Date(1_800_000_000_000))).toBe(19800);
-    expect(zone.abbr(new Date(1_800_000_000_000))).toBe("IST");
+    expect(searches).toBeGreaterThan(0);
+    expect(zone.observedUtcOffset(new Date(1_800_000_000_000))).toBe(20700);
+    expect(zone.abbr(new Date(1_800_000_000_000))).toBe("+0545");
     expect(spy.mock.calls.length).toBe(searches);
   });
 

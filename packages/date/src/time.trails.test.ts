@@ -932,9 +932,10 @@ describe("Time#utc_offset in a named zone, from the cached offset interval", () 
 
   it("searches transitions once for a zone with no transition after the instant", () => {
     const spy = vi.spyOn(Temporal.ZonedDateTime.prototype, "getTimeZoneTransition");
-    expect(Time.at(1_700_000_000, { in: "Asia/Kolkata" }).utcOffset).toBe(19800);
+    expect(Time.at(1_700_000_000, { in: "Asia/Thimphu" }).utcOffset).toBe(21600);
     const searches = spy.mock.calls.length;
-    expect(Time.at(1_800_000_000, { in: "Asia/Kolkata" }).utcOffset).toBe(19800);
+    expect(searches).toBeGreaterThan(0);
+    expect(Time.at(1_800_000_000, { in: "Asia/Thimphu" }).utcOffset).toBe(21600);
     expect(spy.mock.calls.length).toBe(searches);
   });
 
