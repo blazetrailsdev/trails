@@ -53,7 +53,10 @@ export class RecurringSchedule {
     return this.configuredTasks.map((task) => task.key);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm isValid — CONVERGEABLE recurring-schedule-selects-valid-tasks-on-construction
+   */
   async persistTasks(): Promise<void> {
     const valid: RecurringTask[] = [];
     for (const task of this.configuredTasks) if (await task.isValid()) valid.push(task);

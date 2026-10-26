@@ -219,7 +219,10 @@ export class RecurringTask extends Record {
     return activeJob;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm deserialize — CONVERGEABLE recurring-task-arguments-load-deserializes
+   */
   async argumentsWithKwargs(): Promise<unknown[]> {
     const arguments_ = await ActiveJobArguments.deserialize(this.arguments);
     if (this.class_name == null) {
