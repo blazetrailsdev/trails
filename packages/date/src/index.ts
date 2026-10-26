@@ -13,3 +13,4 @@ export {
 } from "./date.js";
 export { Time, Timezone, resetLocalTimeZoneId } from "./time.js";
 export { tzdataBaseOffsets, tzdataIsdst, tzdataIsdstFlips } from "./tzdata-isdst.js";
+export { tzdataAbbreviationChanges } from "./tzdata-abbreviations.js";

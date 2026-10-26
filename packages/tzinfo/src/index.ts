@@ -11,6 +11,7 @@ import {
   Temporal,
   Time,
   Timezone as DateTimezone,
+  tzdataAbbreviationChanges,
   tzdataBaseOffsets,
   tzdataIsdst,
   tzdataIsdstFlips,
@@ -78,7 +79,53 @@ function getZoneInfo(
         : null;
     fixedZoneInfos.set(ianaName, fixed);
   }
-  return fixed ?? lookupZoneInfo(ianaName, date);
+  return fixed ?? zoneInterval(ianaName, date)?.info ?? lookupZoneInfo(ianaName, date);
+}
+
+interface ZoneInterval {
+  start: number;
+  end: number;
+  info: { abbreviation: string; utcOffsetSeconds: number };
+  abbr?: string;
+}
+
+const zoneIntervals = new Map<string, ZoneInterval[]>();
+
+function zoneInterval(ianaName: string, date: Date): ZoneInterval | null {
+  const ms = date.getTime();
+  let intervals = zoneIntervals.get(ianaName);
+  if (!intervals) zoneIntervals.set(ianaName, (intervals = []));
+  let lo = 0;
+  let hi = intervals.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (intervals[mid].end <= ms) lo = mid + 1;
+    else hi = mid;
+  }
+  const hit = intervals[lo];
+  if (hit && hit.start <= ms) return hit;
+  if (!Number.isFinite(ms)) return null;
+
+  const zoned = Temporal.Instant.fromEpochMilliseconds(ms).toZonedDateTimeISO(ianaName);
+  const previous = zoned.add({ milliseconds: 1 }).getTimeZoneTransition("previous");
+  const next = zoned.getTimeZoneTransition("next");
+  let start = previous ? previous.epochMilliseconds : -Infinity;
+  let end = next ? next.epochMilliseconds : Infinity;
+  for (const flips of [tzdataIsdstFlips(ianaName), tzdataAbbreviationChanges(ianaName)]) {
+    for (const flip of flips) {
+      const flipMs = flip * 1000;
+      if (flipMs <= ms) start = Math.max(start, flipMs);
+      else {
+        end = Math.min(end, flipMs);
+        break;
+      }
+    }
+  }
+  const info = lookupZoneInfo(ianaName, date);
+  if (Math.abs(info.utcOffsetSeconds - zoned.offsetNanoseconds / 1e9) >= 60) return null;
+  const interval = { start, end, info };
+  intervals.splice(lo, 0, interval);
+  return interval;
 }
 
 function lookupZoneInfo(
@@ -492,6 +539,8 @@ export class Timezone {
     if (this.info) return this.info.constantOffset.abbreviation;
     const fixed = fixedZoneAbbreviations.get(this.identifier);
     if (fixed !== undefined) return fixed;
+    const interval = zoneInterval(this.identifier, toDate(time));
+    if (interval?.abbr !== undefined) return interval.abbr;
     const abbreviation = new DateTimezone(this.identifier).abbr(
       Time.at(new Rational(toDate(time).getTime(), 1000)),
     );
@@ -500,6 +549,7 @@ export class Timezone {
     getZoneInfo(this.identifier, toDate(time));
     if (fixedZoneInfos.get(this.identifier) != null)
       fixedZoneAbbreviations.set(this.identifier, result);
+    else if (interval) interval.abbr = result;
     return result;
   }
 
