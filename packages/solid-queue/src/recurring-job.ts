@@ -11,7 +11,7 @@ export class RecurringJob extends Base {
   }
 
   async perform(command: string): Promise<void> {
-    await import(command);
+    await ((await import(command)) as { default: () => unknown }).default();
   }
 }
 registerConstant("SolidQueue::RecurringJob", RecurringJob);
