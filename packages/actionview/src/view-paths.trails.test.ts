@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { I18n } from "@blazetrails/activesupport";
 import { PathRegistry } from "./path-registry.js";
 import { FixtureResolver } from "./testing/resolvers.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Handlers } from "./template/handlers.js";
+import { Template } from "./template.js";
 import {
   ClassMethods,
   _prefixes,
@@ -61,7 +62,7 @@ class DraftsController extends PostsController {
 
 afterEach(() => {
   PathRegistry.reset();
-  TemplateHandlers.clear();
+  Handlers.clear();
 });
 
 describe("ViewPaths::ClassMethods", () => {
@@ -160,7 +161,7 @@ describe("ViewPaths", () => {
   });
 
   test("an appended resolver is searched by template_exists?", () => {
-    TemplateHandlers.registerTemplateHandler("tse", {
+    Template.registerTemplateHandler("tse", {
       call: () => 'return "";',
     });
     const resolver = new FixtureResolver({ "posts/index.html.tse": "hello" });

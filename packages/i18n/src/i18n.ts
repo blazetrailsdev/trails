@@ -275,11 +275,6 @@ function normalizeKey(key: unknown, separator: string): TranslationKey[] {
   return normalized;
 }
 
-/** @noRailsEquivalent CONVERGEABLE i18n-core-string-helpers-move-to-ruby-compat */
-export function toSym(value: unknown): string {
-  return typeof value === "string" && value.startsWith(":") ? value : `:${String(value)}`;
-}
-
 export function normalizeKeys(
   locale: Locale | null | undefined,
   key: unknown,

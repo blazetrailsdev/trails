@@ -36,6 +36,7 @@ export class ObjectSerializer {
   }
 
   serialize(hash: unknown): Record<string, unknown> {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- hash may be a Hash, which update converts through to_hash
     return update(
       { [ActiveJob.Arguments.OBJECT_SERIALIZER_KEY]: rbModName(this.constructor) },
       hash as Record<string, unknown>,

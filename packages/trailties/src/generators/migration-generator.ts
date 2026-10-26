@@ -1,11 +1,9 @@
-import { File, getFs } from "@blazetrails/ruby-compat";
-import { compileJs } from "@blazetrails/tse-compiler";
-import { OutputBuffer } from "@blazetrails/actionview";
+import { File, getFs, rbFBinding, strNew, TSE } from "@blazetrails/ruby-compat";
 import { GeneratorBase, GeneratorOptions } from "./base.js";
 import { migrationTemplate } from "./migration.js";
 import { nextMigrationNumber } from "./active-record/migration.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
-import { ActiveRecord, Base } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
 import {
   camelize,
   foreignKey,
@@ -69,14 +67,12 @@ export class MigrationGenerator extends GeneratorBase {
     const file = await migrationTemplate(
       this,
       async () => {
-        const render = new Function(
-          "ActiveRecord",
-          `return ${compileJs(await getFs().readFile(source, "utf8"), { escapeIgnore: true }).code.replace(/^export default /u, "")}`,
-        )(ActiveRecord) as (
-          context: { outputBuffer: OutputBuffer },
-          locals: object,
-        ) => OutputBuffer;
-        return render.call(this, { outputBuffer: new OutputBuffer() }, {}).toStr();
+        const erb = new TSE(strNew(Array.from(await getFs().readFile(source))), {
+          trimMode: "-",
+          eoutvar: "@output_buffer",
+        });
+        erb.filename = source;
+        return erb.result(rbFBinding(this));
       },
       File.join("db/migrate", `${underscore(name)}${this.ext()}`),
     );

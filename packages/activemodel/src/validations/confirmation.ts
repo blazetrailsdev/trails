@@ -2,7 +2,6 @@ import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import {
   casecmp,
-  except,
   isNil,
   rbEqual,
   rbFSend,
@@ -32,10 +31,11 @@ export class ConfirmationValidator extends EachValidator {
         const humanAttributeName = (
           record.constructor as unknown as { humanAttributeName(attribute: string): string }
         ).humanAttributeName(attribute);
+        const { caseSensitive, ...options } = this.options;
         record.errors.add(
           `${attribute}Confirmation`,
           ":confirmation",
-          Object.assign(except(this.options, "caseSensitive"), { attribute: humanAttributeName }),
+          Object.assign(options, { attribute: humanAttributeName }),
         );
       }
     }

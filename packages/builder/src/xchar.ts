@@ -1,4 +1,27 @@
-import { Encoding, encode as strEncode, rbObjEncoding, trTrans } from "@blazetrails/ruby-compat";
+import {
+  Encoding,
+  RuntimeError,
+  encode as strEncode,
+  isSymbol,
+  rbModMethodDefined,
+  rbModToS,
+  rbObjEncoding,
+  symbolToS,
+  trTrans,
+} from "@blazetrails/ruby-compat";
+
+export function checkForNameCollision(
+  klass: abstract new (...args: never) => unknown,
+  methodName: string,
+  _definedConstant: unknown = null,
+): void {
+  const name = isSymbol(methodName) ? symbolToS(methodName) : methodName;
+  if (rbModMethodDefined(klass, name)) {
+    throw new RuntimeError(
+      `Name Collision: Method '${name}' is already defined in ${rbModToS(klass)}`,
+    );
+  }
+}
 
 const CP1252: Record<number, number> = {
   128: 8364,

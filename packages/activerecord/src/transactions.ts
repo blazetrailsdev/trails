@@ -447,6 +447,7 @@ export function setOptionsForCallbacksBang(
   args: unknown[],
   enforcedOptions: Record<string, unknown> = {},
 ): void {
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- the receiver is extract_options!'s return, which the call gate cannot prove a Hash
   const options = mergeBang<unknown>(extractOptionsBang(args), enforcedOptions);
   args.push(options);
 

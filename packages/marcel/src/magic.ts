@@ -1,7 +1,6 @@
 import { TYPE_EXTS, TYPE_PARENTS, EXTENSIONS, MAGIC } from "./tables.js";
 import {
   Pathname,
-  compact,
   isEmpty,
   deleteIf,
   aryDeleteIf,
@@ -60,9 +59,9 @@ export class Magic {
       magic?: MagicMatch[] | null;
     },
   ) {
-    const extensions = compact([options.extensions].flat());
+    const extensions = [options.extensions].flat().filter((x) => x != null);
     TYPE_EXTS[type] = extensions;
-    const parents = compact([options.parents].flat());
+    const parents = [options.parents].flat().filter((x) => x != null);
     if (!isEmpty(parents)) {
       TYPE_PARENTS[type] = parents;
     }

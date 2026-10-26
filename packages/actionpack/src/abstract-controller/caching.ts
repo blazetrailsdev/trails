@@ -4,7 +4,6 @@ import { rbModConstSet } from "@blazetrails/ruby-compat";
 
 import { expandCacheKey, lookupStore } from "@blazetrails/activesupport/cache";
 import { classAttribute, Concern, extend, include } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Fragments } from "./caching/fragments.js";
 import type { CacheOptions, CacheStore, Configuration } from "@blazetrails/activesupport";
 
@@ -88,7 +87,7 @@ include(Caching, Fragments);
   this.enableFragmentCacheLogging = false;
 
   classAttribute.call(this, "_viewCacheDependencies", { default: [] });
-  if (rbObjRespondTo(this, "helperMethod")) this.helperMethod("viewCacheDependencies");
+  if (typeof this.helperMethod === "function") this.helperMethod("viewCacheDependencies");
 });
 
 export function viewCacheDependencies(this: CachingHost): unknown[] {

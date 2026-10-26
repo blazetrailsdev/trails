@@ -306,9 +306,12 @@ function scopeLines(
     imports.unshift(line);
   }
   if (free.length === 0) return [];
+  imports.unshift(
+    'import { hashAref as __hashAref, keys as __keys } from "@blazetrails/ruby-compat";',
+  );
   return [
     "  const __own: Record<string, unknown> = Object.create(null);",
-    `  const __lookup = (name: string, guarded = false): any => { for (const scope of [...${scopes}, __own, globalThis] as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded) return undefined; const error = new ReferenceError(name + " is not defined"); (Error as { captureStackTrace?: (target: object, frame: unknown) => void }).captureStackTrace?.(error, __lookup); throw error; };`,
+    `  const __lookup = (name: string, guarded = false): any => { for (const scope of [...${scopes}, __own, globalThis] as object[]) if (scope === localAssigns ? __keys(localAssigns).includes(name) : name in scope) { const value: unknown = scope === localAssigns ? __hashAref(localAssigns, name) : Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded) return undefined; const error = new ReferenceError(name + " is not defined"); (Error as { captureStackTrace?: (target: object, frame: unknown) => void }).captureStackTrace?.(error, __lookup); throw error; };`,
     `  const __assign = (name: string, value: unknown): any => { for (const scope of ${scopes} as object[]) if (name in scope) { Reflect.set(scope, name, value); return value; } __own[name] = value; return value; }; void __assign;`,
     "  const __sink: any = new Proxy({}, { set: (_target, name, value) => (__assign(name as string, value), true) }); void __sink;",
     ...free.map((name) => {
@@ -405,7 +408,7 @@ const UNDECLARABLE = new Set([
   "__sink",
 ]);
 
-function freeIdentifiers(body: readonly string[]): string[] {
+export function freeIdentifiers(body: readonly string[]): string[] {
   const sf = ts.createSourceFile(
     "body.ts",
     `async function __tse() {\n${body.join("\n")}\n}`,

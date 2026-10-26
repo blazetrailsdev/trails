@@ -2233,6 +2233,35 @@ describe("body call capture", () => {
     expect(marks("eachPair")).toEqual(["@entries", "@entries:options"]);
   });
 
+  it("marks an Object.hasOwn ternary reading its own literal key as a two-argument fetch", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        options: Record<string, unknown> = {};
+        read(options: Record<string, unknown>) {
+          return Object.hasOwn(options, "a") ? options.a : null;
+        }
+        indexed() {
+          return Object.hasOwn(this.options, "a") ? this.options["a"] : 1;
+        }
+        other(options: Record<string, unknown>, name: string) {
+          return [
+            Object.hasOwn(options, "a") ? options.b : null,
+            Object.hasOwn(options, name) ? options[name] : null,
+            options.a ?? null,
+          ];
+        }
+      }`,
+    );
+    const marks = (name: string): string[] =>
+      cls.instanceMethods
+        .find((m) => m.name === name)!
+        .calls!.filter((c) => c.startsWith("@fetch"))
+        .sort();
+    expect(marks("read")).toEqual(["@fetch", "@fetch:options"]);
+    expect(marks("indexed")).toEqual(["@fetch", "@fetch:options"]);
+    expect(marks("other")).toEqual([]);
+  });
+
   it("names a leading spread through super, superFn, `x || {}`, a string-keyed index and a conditional", () => {
     const cls = extractFromSource(
       `class Foo extends Bar {
@@ -2462,6 +2491,22 @@ describe("body call capture", () => {
     expect(prepended.calls).not.toContain("@unshift");
   });
 
+  it("marks a splice() that removes nothing as a native form", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        move(xs: unknown[], i: number, x: unknown) {
+          xs.splice(i, 0, x);
+        }
+        remove(xs: unknown[], i: number) {
+          xs.splice(i, 1);
+        }
+      }`,
+    );
+    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
+    expect(calls("move")).toContain("@splice");
+    expect(calls("remove")).not.toContain("@splice");
+  });
+
   it("marks a dynamic import() of a computed specifier as a native form, not a literal one", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -2502,6 +2547,28 @@ describe("body call capture", () => {
     expect(calls("poll")).not.toContain("@timer");
     expect(calls("deadline")).not.toContain("@timer");
     expect(calls("schedule")).not.toContain("@timer");
+  });
+
+  it("credits new Enumerable(x).m(...) as the call m, with no construction", () => {
+    const cls = extractFromSource(
+      `import { Enumerable } from "@blazetrails/ruby-compat";
+      class Foo {
+        split(xs: unknown[]) {
+          return new Enumerable(xs).partition((x) => x);
+        }
+      }`,
+    );
+    const calls = cls.instanceMethods.find((m) => m.name === "split")!.calls;
+    expect(calls).toContain("partition");
+    expect(calls).not.toContain("constructor");
+    const local = extractFromSource(
+      `class Foo {
+        split(xs: unknown[]) {
+          return new Enumerable(xs).partition((x) => x);
+        }
+      }`,
+    );
+    expect(local.instanceMethods.find((m) => m.name === "split")!.calls).toContain("constructor");
   });
 
   it("records rbFSend of a string-literal name as a call to that name", () => {
@@ -6863,6 +6930,19 @@ describe("callArgs", () => {
     ).toEqual([{ name: "constructor", args: ["const:CIPHER_TYPE"], flags: [] }]);
   });
 
+  it("reads new Enumerable(x).m(...) as a site on receiver x", () => {
+    expect(
+      site(
+        `import { Enumerable } from "@blazetrails/ruby-compat";
+        class Foo {
+          create() {
+            return new Enumerable(xs).eachSlice(2, fn);
+          }
+        }`,
+      ),
+    ).toEqual([{ name: "eachSlice", args: ["num:2", "id:fn"], flags: [], recv: "id:xs" }]);
+  });
+
   it("names an rbFSend argument by the method it sends", () => {
     const sites = site(
       `class Foo {
@@ -8459,5 +8539,28 @@ describe("a top-level rbModDefineMethod seat", () => {
     const seats = fileFunctionsOf(info, "proxy.ts");
     expect(seats.map((s) => s.name)).toEqual(["debug", "info"]);
     expect(seats[0].callSeq).toEqual(["log"]);
+  });
+});
+
+describe("an interface extending a same-file accessor interface", () => {
+  it("records the base's get and set accessors as bodyless members", () => {
+    const info = extractFromFiles("/p", {
+      "lookup-context.ts": `
+        interface Accessors {
+          defaultVariants(): string[];
+          get variants(): string[];
+          set variants(value: string[]);
+        }
+        export interface LookupContext extends Accessors {}
+        export class LookupContext {}
+      `,
+    });
+    const members = info.modules["lookup-context.ts:LookupContext"].instanceMethods.filter(
+      (m) => m.name === "variants",
+    );
+    expect(members.map((m) => [m.bodyless, m.writer === true])).toEqual([
+      [true, false],
+      [true, true],
+    ]);
   });
 });

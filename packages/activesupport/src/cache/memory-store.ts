@@ -158,8 +158,8 @@ export class MemoryStore extends Store implements CacheStore {
   /** @missingRailsName integer — PERMANENT */
   private async modifyValue(name: string, amount: number, options?: CacheOptions): Promise<number> {
     options = this.mergedOptions(options);
-    const key = this.normalizeKey(name, options);
-    const version = this.normalizeVersion(name, options) ?? null;
+    const key = await this.normalizeKey(name, options);
+    const version = (await this.normalizeVersion(name, options)) ?? null;
     const entry = await this.readEntry(key, options);
     if (!entry || entry.isExpired() || entry.isMismatched(version)) {
       await this.write(name, kernelInteger(amount), options);

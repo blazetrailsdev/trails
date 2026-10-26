@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { FixtureResolver, MissingTemplate, TemplateHandlers } from "@blazetrails/actionview";
+import { FixtureResolver, MissingTemplate, Template } from "@blazetrails/actionview";
 
 import { Base } from "./base.js";
 import { Request } from "../action-dispatch/http/request.js";
@@ -23,7 +23,7 @@ async function dispatch(c: Base, action: string): Promise<unknown> {
 }
 
 beforeAll(() => {
-  TemplateHandlers.registerTemplateHandler("html", {
+  Template.registerTemplateHandler("html", {
     call: (_template: unknown, source: string) => `return ${JSON.stringify(source)};`,
   });
   DefaultLayoutController.prependViewPath(

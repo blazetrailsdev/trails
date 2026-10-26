@@ -3,7 +3,8 @@ import { I18n, type SafeBuffer } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { DetailsKey } from "../lookup-context.js";
-import { TemplateHandlers } from "./handlers.js";
+import { Handlers } from "./handlers.js";
+import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { Raw } from "./handlers/raw.js";
 import { FixtureResolver } from "../testing/resolvers.js";
@@ -51,8 +52,8 @@ function setupFiberedBase() {
   const state = {} as { assigns: Record<string, unknown>; view: Base };
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
-    TemplateHandlers.registerTemplateHandler("raw", new Raw());
+    Template.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("raw", new Raw());
     DetailsKey.clear();
 
     const viewPaths = [new FixtureResolver(FIXTURES)];
@@ -60,7 +61,7 @@ function setupFiberedBase() {
     state.view = Base.withEmptyTemplateCache().withViewPaths(viewPaths, state.assigns);
   });
 
-  afterEach(() => TemplateHandlers.clear());
+  afterEach(() => Handlers.clear());
 
   const renderBody = (options: Record<string, unknown>) =>
     state.view.viewRenderer.renderBody(state.view as unknown as ViewContext, options);

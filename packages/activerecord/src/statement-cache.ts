@@ -1,6 +1,6 @@
 import { Attribute, RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { isPlainObject } from "@blazetrails/activesupport";
-import { Range } from "@blazetrails/ruby-compat";
+import { eachWithIndex, Range } from "@blazetrails/ruby-compat";
 import { RangeError as ARRangeError } from "./errors.js";
 import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
@@ -95,28 +95,26 @@ export class BindMap {
   constructor(boundAttributes: unknown[]) {
     this._boundAttributes = boundAttributes;
     this._indexes = [];
-    for (let i = 0; i < boundAttributes.length; i++) {
-      const attr = boundAttributes[i];
+    eachWithIndex(boundAttributes, (attr, i) => {
       if (
         attr instanceof Substitute ||
         (attr instanceof Attribute && attr.valueBeforeTypeCast instanceof Substitute)
       ) {
         this._indexes.push(i);
       }
-    }
+    });
   }
 
   bind(values: unknown[]): unknown[] {
     const bas = [...this._boundAttributes];
-    for (let i = 0; i < this._indexes.length; i++) {
-      const offset = this._indexes[i];
+    eachWithIndex(this._indexes, (offset, i) => {
       const attr = bas[offset];
       if (attr instanceof Attribute) {
         bas[offset] = attr.withCastValue(values[i]);
       } else {
         bas[offset] = values[i];
       }
-    }
+    });
     return bas;
   }
 }

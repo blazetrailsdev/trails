@@ -8,6 +8,8 @@ import {
   excSetBacktrace,
   fetch,
   rbModConstSet,
+  rbFRequire,
+  rbRequireLoaded as require,
   rbObjClass,
 } from "@blazetrails/ruby-compat";
 import { ActionCable, Server } from "../namespaces.js";
@@ -15,6 +17,9 @@ import { ActionCable, Server } from "../namespaces.js";
 const BUILT_IN_ADAPTERS: Record<string, () => Promise<Record<string, unknown>>> = {
   "action_cable/subscription_adapter/inline": () => import("../subscription-adapter/inline.js"),
   "action_cable/subscription_adapter/async": () => import("../subscription-adapter/async.js"),
+  "action_cable/subscription_adapter/postgresql": () =>
+    import("../subscription-adapter/postgresql.js"),
+  "action_cable/subscription_adapter/redis": () => import("../subscription-adapter/redis.js"),
   "action_cable/subscription_adapter/test": () => import("../subscription-adapter/test.js"),
 };
 
@@ -53,7 +58,7 @@ export class Configuration {
     ];
   }
 
-  async pubsubAdapter(): Promise<unknown> {
+  pubsubAdapter(): unknown {
     let adapter = fetch(
       this.cable!,
       "adapter",
@@ -61,27 +66,13 @@ export class Configuration {
     );
 
     const pathToAdapter = `action_cable/subscription_adapter/${adapter}`;
-    const require = async (path: string): Promise<Record<string, unknown>> => {
-      const load = ActionCable.SubscriptionAdapter.loadPath[path] ?? BUILT_IN_ADAPTERS[path];
-      if (load === undefined) {
-        throw Object.assign(new LoadError(`cannot load such file -- ${path}`), { path });
-      }
-      try {
-        return (await load()) as Record<string, unknown>;
-      } catch (e) {
-        if ((e as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND") throw e;
-        throw Object.assign(new LoadError((e as Error).message, { cause: e }), {
-          path: (e as { url?: string }).url ?? null,
-        });
-      }
-    };
     let feature: Record<string, unknown>;
     try {
-      feature = await require(pathToAdapter);
+      feature = require(pathToAdapter);
     } catch (e) {
       if (!(e instanceof LoadError)) throw e;
       const klass = rbObjClass(e) as typeof LoadError;
-      if ((e as LoadError & { path?: string | null }).path === pathToAdapter) {
+      if (e.path === pathToAdapter) {
         const error = new klass(
           `Could not load the '${adapter}' Action Cable pubsub adapter. Ensure that the adapter is spelled correctly in config/cable.yml and that you've added the necessary adapter gem to your Gemfile.`,
         );
@@ -99,6 +90,21 @@ export class Configuration {
     adapter = camelize(adapter);
     if (adapter === "Postgresql") adapter = "PostgreSQL";
     return feature[adapter];
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async loadPubsubAdapter(): Promise<void> {
+    const adapter = fetch(
+      this.cable!,
+      "adapter",
+      block(() => "redis"),
+    );
+    await rbFRequire(
+      { ...BUILT_IN_ADAPTERS, ...ActionCable.SubscriptionAdapter.loadPath },
+      `action_cable/subscription_adapter/${adapter}`,
+    ).catch((e: unknown) => {
+      if (!(e instanceof LoadError)) throw e;
+    });
   }
 }
 

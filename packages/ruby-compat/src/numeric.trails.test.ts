@@ -12,10 +12,14 @@ import {
   isFinite,
   isNan,
   numStep,
+  numericAbs,
+  numericDiv,
   numericMinus,
   numericModulo,
   numericMul,
   numericPow,
+  numericUminus,
+  rbFloatTypeP,
   round,
   toF,
   toI,
@@ -63,7 +67,7 @@ describe("anybits", () => {
 describe("Float#round past the double's own digits", () => {
   it("answers the receiver once ndigits overflows it, and zero once it underflows", () => {
     expect(round(1.5, 400)).toBe(1.5);
-    expect(round(1.0e-320, 3)).toBe(0);
+    expect(round(1.0e-320, 3)).toEqual(new Number(0));
   });
 
   it("rounds the exact Rational past 14 digits, and half up below them", () => {
@@ -102,6 +106,29 @@ describe("Numeric#-", () => {
     expect(numericMinus(7, new Rational(1, 2))).toEqual(new Rational(13, 2));
     expect(numericMinus(123456789, 127960.2534332159)).toBe(123328828.74656679);
     expect(() => numericMinus(1, "a")).toThrow("String can't be coerced into Integer");
+  });
+});
+
+describe("Numeric#/", () => {
+  it("floors two Integers and divides as doubles once a Float is involved", () => {
+    expect(numericDiv(7, 2)).toBe(3);
+    expect(numericDiv(-7, 2)).toBe(-4);
+    expect(numericDiv(2n ** 64n, 2)).toBe(2n ** 63n);
+    expect(numericDiv(7, 2.0 + 0.5)).toBe(2.8);
+    expect(() => numericDiv(1, 0)).toThrow(ZeroDivisionError);
+  });
+});
+
+describe("Numeric#-@ and #abs", () => {
+  it("keeps a whole Float a Float", () => {
+    expect(numericUminus(5)).toBe(-5);
+    expect(numericUminus(0)).toBe(0);
+    expect(numericUminus(2n ** 60n)).toBe(-(2n ** 60n));
+    expect(rbFloatTypeP(numericUminus(toF(5)))).toBe(true);
+    expect(numericAbs(-5)).toBe(5);
+    expect(rbFloatTypeP(numericAbs(numericUminus(toF(5))))).toBe(true);
+    expect(Number(numericAbs(toF(-5)))).toBe(5);
+    expect(() => numericAbs("a")).toThrow(NoMethodError);
   });
 });
 
@@ -339,5 +366,13 @@ describe("numStep", () => {
 
   it("raises for a zero step", () => {
     expect(() => numStep(1, 3, 0, () => {})).toThrow("step can't be 0");
+  });
+});
+
+describe("round with positive ndigits", () => {
+  it("answers an Integer receiver itself and keeps a Float zero a Float", () => {
+    expect(round(5, 2)).toBe(5);
+    expect(round(0, 2)).toBe(0);
+    expect(round(new Number(0) as number, 2)).toEqual(new Number(0));
   });
 });

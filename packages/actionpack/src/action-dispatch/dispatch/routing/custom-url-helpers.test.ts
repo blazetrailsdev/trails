@@ -136,6 +136,7 @@ Routes.draw(function () {
   this.direct("browse", { page: 1, size: 10 }, function (options) {
     return [
       ":products",
+      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options may be a Hash, which merge dispatches on
       merge(
         options as Record<string, unknown>,
         (rbFSend(this, "params") as Parameters).permit("page", "size").toH(),

@@ -1,5 +1,5 @@
 import Driver from "websocket-driver";
-import { ArgumentError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbDeclareIvar, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Connection } from "../namespaces.js";
 import { Stream } from "./stream.js";
 
@@ -208,4 +208,5 @@ export class ClientSocket {
   }
 }
 
+rbDeclareIvar(ClientSocket, "@stream", "_stream");
 rbModConstSet(Connection, "ClientSocket", ClientSocket);

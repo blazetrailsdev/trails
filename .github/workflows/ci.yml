@@ -119,11 +119,11 @@ jobs:
           DB_ADAPTER_RE='^(packages/activerecord/src/(adapters/(postgresql|abstract-mysql-adapter)|connection-adapters/(postgresql|mysql|mysql2|abstract-mysql-adapter|abstract/|abstract-adapter\.ts|column\.ts|adapter-args\.ts|sql-classification\.ts|pool))|packages/arel/src/visitors/(postgres|mysql)|packages/activerecord-cli/src/__e2e__/(postgres|mysql))'
           AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|bcrypt|activesupport|rack|rack-test|date|did-you-mean|vitest-matchers)/'
           AV_PKGS_RE='^packages/(actionview|activesupport|date|vitest-matchers)/'
-          TRAILTIES_PKGS_RE='^packages/(trailties|actionpack|actionview|activerecord|arel|activejob|activemodel|bcrypt|activesupport|globalid|rack|date|did-you-mean|trails-tsc|vitest-matchers)/'
+          TRAILTIES_PKGS_RE='^packages/(trailties|actioncable|actionpack|actionview|activerecord|arel|activejob|activemodel|bcrypt|activesupport|globalid|rack|date|did-you-mean|thor|trails-tsc|vitest-matchers)/'
           TRAILS_TSC_PKGS_RE='^packages/trails-tsc/'
           TSE_COMPILER_PKGS_RE='^packages/tse-compiler/'
           RACK_PKGS_RE='^packages/(rack|rack-session|rack-test|activesupport|date|vitest-matchers)/'
-          ACTIONCABLE_PKGS_RE='^(packages/(actioncable|actionpack|actionview|activemodel|activesupport|bcrypt|date|did-you-mean|html-sanitizer|i18n|msgpack|nokogiri|rack|rack-session|rack-test|ruby-compat|tse-compiler|vitest-matchers)/|scripts/parity/unported-files/actioncable\.ts$)'
+          ACTIONCABLE_PKGS_RE='^(packages/(actioncable|actionpack|actionview|activemodel|activerecord|arel|activesupport|bcrypt|date|did-you-mean|html-sanitizer|i18n|msgpack|nokogiri|rack|rack-session|rack-test|ruby-compat|tse-compiler|vitest-matchers)/|scripts/parity/unported-files/actioncable\.ts$)'
           # `packages/`, `scripts/` and `eslint/` are listed whole rather than
           # enumerated, because several tests in this lane report on the WHOLE
           # tree rather than on their own package: stale-story-references
@@ -481,7 +481,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version: 24.21.0
           # The prettier step runs via `npx` and never installs pnpm, but
           # setup-node v5 defaults `package-manager-cache: true` and would
           # try to cache the pnpm store from the `packageManager` field in
@@ -916,8 +916,11 @@ jobs:
           packages/activesupport
           packages/bcrypt
           packages/builder
+          packages/chronic
           packages/date
           packages/did-you-mean
+          packages/et-orbi
+          packages/fugit
           packages/globalid
           packages/html-sanitizer
           packages/i18n
@@ -925,7 +928,9 @@ jobs:
           packages/mini-magick
           packages/msgpack
           packages/nokogiri
+          packages/raabro
           packages/ruby-compat
+          packages/tzinfo
           packages/vitest-matchers
           scripts/guides-typecheck
           scripts/tasks
@@ -960,6 +965,7 @@ jobs:
           scripts/rack-activesupport-free.test.ts
           scripts/generate-canonical-zone-identifiers.test.ts
           scripts/generate-tzdata-isdst.test.ts
+          scripts/generate-tzdata-abbreviations.test.ts
           scripts/vendor-recite.test.ts
           vendor/sources.test.ts
           vendor/fetch.test.ts
@@ -1098,15 +1104,17 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm build
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
-        run: pnpm vitest run packages/trailties
+        run: pnpm vitest run packages/trailties packages/thor
       - if: needs.changes.outputs.actioncable_only == 'true'
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
           $(git ls-files 'packages/actioncable/src/*.ts')
       - if: needs.changes.outputs.thor_only == 'true'
+        run: pnpm vitest run packages/thor
+      - if: needs.changes.outputs.thor_only == 'true'
         run: >
-          pnpm vitest related --run --project trailties
-          packages/trailties/src/thor/*.ts
+          pnpm vitest related --run --passWithNoTests --project trailties
+          $(git ls-files 'packages/thor/src/*.ts')
 
   # Reporting-only code coverage. Runs the light (non-AR) packages together
   # with v8 coverage and `--coverage.all` so untested files count toward the
@@ -1146,8 +1154,11 @@ jobs:
           packages/activesupport
           packages/bcrypt
           packages/builder
+          packages/chronic
           packages/date
           packages/did-you-mean
+          packages/et-orbi
+          packages/fugit
           packages/globalid
           packages/i18n
           packages/marcel
@@ -1155,13 +1166,16 @@ jobs:
           packages/msgpack
           packages/nokogiri
           packages/html-sanitizer
+          packages/raabro
           packages/rack
           packages/rack-session
           packages/rack-test
           packages/actionpack
           packages/actionview
           packages/trailties
+          packages/thor
           packages/tse-compiler
+          packages/tzinfo
           packages/vitest-matchers
           --coverage --coverage.all
       - name: Write coverage summary to run UI
@@ -1234,6 +1248,8 @@ jobs:
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run packages/activerecord-cli
+      - if: ${{ matrix.shard == 1 }}
+        run: pnpm --filter @blazetrails/example-twitter-clone smoke
 
   # `ARCONN=sqlite3_mem` is the only lane where `in_memory_db?` is true, so
   # without it every `skipIf(inMemoryDb())` guard is dead code (RFC 0029).
@@ -1564,6 +1580,50 @@ jobs:
         run: pnpm vitest run packages/activerecord-cli
         env:
           PG_TEST_URL: postgres://rails@localhost:5432/activerecord_unittest
+
+  # Action Cable's PostgreSQL subscription adapter against a real server
+  # (actioncable/test/subscription_adapter/postgresql_test.rb). Gated on
+  # actioncable_affected, not activerecord_affected, so an actioncable_only
+  # diff runs it; leaf-tests' Action Cable step excludes the file (no service
+  # there, see vitest.config.ts). CI=true makes a refused connection fail.
+  actioncable-postgres-tests:
+    name: Action Cable PostgreSQL Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.actioncable_affected == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: activerecord_unittest
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_INITDB_ARGS: "--no-sync"
+        ports:
+          - 5432:5432
+        options: >-
+          --mount type=tmpfs,destination=/var/lib/postgresql/data
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Provision Rails' test role
+        run: |
+          psql -h localhost -U postgres -d activerecord_unittest \
+            -v ON_ERROR_STOP=1 -f scripts/db-init/postgres/01-rails-role.sql
+      - run: pnpm vitest run packages/actioncable/src/subscription-adapter/postgresql.test.ts
+        env:
+          ARCONN: postgresql
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: rails
 
   mysql-tests:
     name: Active Record MySQL Tests
@@ -2325,7 +2385,7 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Build dependency packages for trails introspection
-        run: pnpm --filter "@blazetrails/activerecord^..." build
+        run: pnpm exec tsc --build packages/activerecord
       - name: Run trails-side dump
         run: pnpm tsx scripts/parity/pipeline/run.ts --side=trails
       - uses: actions/upload-artifact@v4
@@ -2435,7 +2495,7 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Build activerecord and its workspace dependencies
-        run: pnpm --filter "@blazetrails/activerecord..." build
+        run: pnpm exec tsc --build packages/activerecord
       - name: Run trails-side query dump
         run: pnpm tsx scripts/parity/pipeline/run.ts --type=query --side=trails
       - uses: actions/upload-artifact@v4
@@ -2492,6 +2552,7 @@ jobs:
       - sqlite-mem-tests
       - maria-prepared-tests
       - postgres-tests
+      - actioncable-postgres-tests
       - mysql-tests
       - maria-tests
       - website
@@ -2576,6 +2637,11 @@ jobs:
                 sqlite-tests)
                   # AR test skip is legitimate when no AR-affecting paths changed.
                   if [ "$AR_AFFECTED" = "false" ]; then
+                    continue
+                  fi
+                  ;;
+                actioncable-postgres-tests)
+                  if [ "$ACTIONCABLE_AFFECTED" = "false" ]; then
                     continue
                   fi
                   ;;

@@ -1,7 +1,6 @@
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 import { kernelArray } from "@blazetrails/activesupport";
 import {
-  except,
   rbClassSuperclass,
   rbModSingletonP,
   rbObjAsString,
@@ -77,12 +76,7 @@ export class UniquenessValidator extends EachValidator {
     }
 
     if (await relation.isExists()) {
-      const errorOptions: Record<string, unknown> = except(
-        this.options,
-        "caseSensitive",
-        "scope",
-        "conditions",
-      );
+      const { caseSensitive, scope, conditions, ...errorOptions } = this.options;
       errorOptions.value = value;
 
       record.errors.add(attribute, ":taken", errorOptions);

@@ -24,6 +24,7 @@ import {
   TEMPORAL_METHOD_TABLE,
 } from "@blazetrails/ruby-compat";
 import { rbWarning } from "./rb-warning.js";
+import { Time } from "./time.js";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const ABBR_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -74,6 +75,7 @@ export interface StrftimeSubject {
   jd: number;
   nth: bigint;
   gregorianP: boolean;
+  sg: number;
   mon: number;
   day: number;
   wday: number;
@@ -106,6 +108,7 @@ function temporalSubject(
     jd: cCivilToJd(plain.year, plain.month, plain.day),
     nth: 0n,
     gregorianP: true,
+    sg: DEFAULT_SG,
     mon: plain.month,
     day: plain.day,
     wday: cJdToWday(cCivilToJd(plain.year, plain.month, plain.day)),
@@ -142,20 +145,20 @@ function msecs(subject: StrftimeSubject): number {
 
 /** @internal */
 function cwyear(subject: StrftimeSubject): number | bigint {
-  const [ry] = cJdToCommercial(subject.jd);
+  const [ry] = cJdToCommercial(subject.jd, subject.sg);
   if (subject.nth === 0n) return ry;
   return encodeYear(subject.nth, ry, subject.gregorianP ? -1 : +1);
 }
 
 /** @internal */
 function cweek(subject: StrftimeSubject): number {
-  const [, rw] = cJdToCommercial(subject.jd);
+  const [, rw] = cJdToCommercial(subject.jd, subject.sg);
   return rw;
 }
 
 /** @internal */
 function wnumx(subject: StrftimeSubject, f: number): number {
-  const [, rw] = cJdToWeeknum(subject.jd, f);
+  const [, rw] = cJdToWeeknum(subject.jd, f, subject.sg);
   return rw;
 }
 
@@ -4559,6 +4562,13 @@ export class Date extends rbCDate {
   /** @internal */
   #fr2: number | Rational = 0;
 
+  static new<T extends new (...args: never[]) => unknown>(
+    this: T,
+    ...args: ConstructorParameters<T>
+  ): InstanceType<T> {
+    return new this(...args) as InstanceType<T>;
+  }
+
   constructor(year?: number | bigint, month?: number, day?: number | Rational, start?: number);
   constructor(date: Temporal.PlainDate, start?: number);
   /** @internal */
@@ -5588,13 +5598,9 @@ export class Date extends rbCDate {
     return v;
   }
 
-  toTime(): Temporal.ZonedDateTime {
+  toTime(): Time {
     const self: Date = this.isJulian ? this.gregorian() : this;
-    return new Temporal.PlainDateTime(
-      realYearToLong(self.year),
-      self.mon,
-      self.day,
-    ).toZonedDateTime(Temporal.Now.timeZoneId());
+    return Time.local(realYearToLong(self.year), self.mon, self.day);
   }
 
   /**
@@ -5823,6 +5829,7 @@ export class Date extends rbCDate {
         jd: this.mLocalJd(),
         nth: this.nth,
         gregorianP: this.isGregorian,
+        sg: virtualSg(this.nth, this.sg),
         mon: this.mon,
         day: this.day,
         wday: this.wday,
@@ -6658,27 +6665,17 @@ export class DateTime extends DateWithoutParseStatics {
     ).initializeCopy(this);
   }
 
-  override toTime(): Temporal.ZonedDateTime {
+  override toTime(): Time {
     const self: DateTime = this.isJulian ? this.gregorian() : this;
-    const ns = Number(self.#sf.numerator / self.#sf.denominator);
-    const plain = new Temporal.PlainDateTime(
+    return Time.new(
       realYearToLong(self.year),
       self.mon,
       self.day,
       self.hour,
       self.min,
-      self.sec,
-      Math.floor(ns / 1000000),
-      Math.floor(ns / 1000) % 1000,
-      ns % 1000,
+      new Rational(self.sec, 1).add(self.#sf.quo(1_000_000_000)),
+      self.#of,
     );
-    if (self.#of % 60 !== 0) {
-      return new SubMinuteOffsetZonedDateTime(
-        plain.toZonedDateTime("UTC").toInstant().subtract({ seconds: self.#of }),
-        self.#of,
-      );
-    }
-    return plain.toZonedDateTime(of2str(self.#of));
   }
 
   override toDate(): Temporal.PlainDate {
@@ -6780,6 +6777,7 @@ export class DateTime extends DateWithoutParseStatics {
         jd: this.mLocalJd(),
         nth: this.nth,
         gregorianP: this.isGregorian,
+        sg: virtualSg(this.nth, this.sg),
         mon: this.mon,
         day: this.day,
         wday: this.wday,

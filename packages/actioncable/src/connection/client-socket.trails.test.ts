@@ -1,32 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import { socketPair } from "../test-helpers/socket-pair.js";
 import { ClientSocket } from "./client-socket.js";
 import { StreamEventLoop } from "./stream-event-loop.js";
 import { WebSocket } from "./web-socket.js";
 
-type Listener = (...args: unknown[]) => void;
-
-class FakeIo {
-  listeners = new Map<string, Listener[]>();
-  written: Uint8Array[] = [];
-  on(event: string, listener: Listener): void {
-    this.listeners.set(event, [...(this.listeners.get(event) ?? []), listener]);
-  }
-  off(event: string, listener: Listener): void {
-    this.listeners.set(
-      event,
-      (this.listeners.get(event) ?? []).filter((l) => l !== listener),
-    );
-  }
-  emit(event: string, ...args: unknown[]): void {
-    for (const listener of this.listeners.get(event) ?? []) listener(...args);
-  }
-  write(data: Uint8Array): boolean {
-    this.written.push(data);
-    return true;
-  }
-  destroy(): void {}
-}
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 class Target {
   events: unknown[][] = [];
@@ -62,15 +41,15 @@ function env(): Record<string, unknown> {
 }
 
 function open() {
-  const io = new FakeIo();
+  const [io, peer] = socketPair();
   const target = new Target();
   const e = { ...env(), "rack.hijack": () => io };
   const socket = new ClientSocket(e, target, new StreamEventLoop(), ["actioncable-v1-json"]);
   expect(socket.rackResponse()).toEqual([-1, {}, []]);
-  return { io, target, socket };
+  return { io, peer, target, socket };
 }
 
-const text = (bytes: Uint8Array[]) => new TextDecoder().decode(Buffer.concat(bytes));
+const text = (bytes: unknown) => new TextDecoder().decode(bytes as Uint8Array);
 
 describe("ClientSocket", () => {
   it("determines the url from the Rack env", () => {
@@ -80,23 +59,27 @@ describe("ClientSocket", () => {
     );
   });
 
-  it("drives a session over the hijacked socket", () => {
-    const { io, target, socket } = open();
-    expect(text(io.written)).toMatch(/^HTTP\/1\.1 101 Switching Protocols\r\n/);
-    expect(text(io.written)).toContain("Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+  it("drives a session over the hijacked socket", async () => {
+    const { peer, target, socket } = open();
+    await tick();
+    const handshake = text(peer.read());
+    expect(handshake).toMatch(/^HTTP\/1\.1 101 Switching Protocols\r\n/);
+    expect(handshake).toContain("Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
     expect(socket.protocol).toBe("actioncable-v1-json");
     expect(target.events).toEqual([["open"]]);
     expect(socket.isAlive()).toBe(true);
 
-    io.emit("data", frame(1, new TextEncoder().encode("hi")));
+    peer.write(frame(1, new TextEncoder().encode("hi")));
+    await tick();
     expect(target.events.at(-1)).toEqual(["message", "hi"]);
 
-    io.written = [];
     expect(socket.transmit(42)).toBe(true);
-    expect([...io.written[0]]).toEqual([0x81, 2, 0x34, 0x32]);
+    await tick();
+    expect([...(peer.read() as Uint8Array)]).toEqual([0x81, 2, 0x34, 0x32]);
     expect(socket.transmit({})).toBe(false);
 
-    io.emit("data", frame(8, Uint8Array.from([0x0f, 0xa0, ...new TextEncoder().encode("bye")])));
+    peer.write(frame(8, Uint8Array.from([0x0f, 0xa0, ...new TextEncoder().encode("bye")])));
+    await tick();
     expect(target.events.at(-1)).toEqual(["close", "bye", 4000]);
     socket.clientGone();
     expect(target.events.filter((e) => e[0] === "close")).toHaveLength(1);

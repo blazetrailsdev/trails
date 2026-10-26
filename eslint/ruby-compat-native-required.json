@@ -1,0 +1,94 @@
+{
+  "aryIncludes": {
+    "member": "aryIncludes",
+    "native": "xs.includes(x)",
+    "maxArgs": 2,
+    "kinds": ["array"],
+    "elements": ["string", "number", "boolean", "null"]
+  },
+  "aryJoin": {
+    "member": "aryJoin",
+    "native": "xs.join(sep)",
+    "maxArgs": 2,
+    "kinds": ["array"],
+    "elements": ["string", "number"]
+  },
+  "compact": {
+    "member": "compact",
+    "native": "xs.filter((x) => x != null)",
+    "maxArgs": 1,
+    "kinds": ["array"]
+  },
+  "eachPair": {
+    "member": "each",
+    "native": "for (const [k, v] of Object.entries(h))",
+    "maxArgs": 2,
+    "void": true
+  },
+  "hasKey": {
+    "member": "isKey",
+    "native": "\"k\" in h / Object.hasOwn(h, k)",
+    "maxArgs": 2
+  },
+  "hashDelete": {
+    "member": "delete",
+    "native": "delete h[k]",
+    "maxArgs": 2,
+    "void": true
+  },
+  "max": {
+    "member": "max",
+    "native": "xs.length === 0 ? null : Math.max(...xs)",
+    "maxArgs": 1,
+    "kinds": ["array"],
+    "elements": ["number"]
+  },
+  "merge": {
+    "member": "merge",
+    "native": "{ ...h, ...other }",
+    "maxArgs": 2
+  },
+  "mergeBang": {
+    "member": "update",
+    "native": "Object.assign(h, other)",
+    "maxArgs": 2
+  },
+  "min": {
+    "member": "min",
+    "native": "xs.length === 0 ? null : Math.min(...xs)",
+    "maxArgs": 1,
+    "kinds": ["array"],
+    "elements": ["number"]
+  },
+  "round": {
+    "member": "round",
+    "native": "Math.round(x)",
+    "maxArgs": 1,
+    "kinds": ["number"]
+  },
+  "toI": {
+    "member": "toI",
+    "native": "Math.trunc(x)",
+    "maxArgs": 1,
+    "kinds": ["number"]
+  },
+  "union": {
+    "member": "union",
+    "native": "[...new Set([...a, ...b])]",
+    "maxArgs": 2,
+    "kinds": ["array"],
+    "elements": ["string", "number", "boolean", "null"]
+  },
+  "uniq": {
+    "member": "uniq",
+    "native": "[...new Set(xs)]",
+    "maxArgs": 1,
+    "kinds": ["array"],
+    "elements": ["string", "number", "boolean", "null"]
+  },
+  "update": {
+    "member": "update",
+    "native": "Object.assign(h, other)",
+    "maxArgs": 2
+  }
+}

@@ -34,6 +34,25 @@ describe("TCPSocket", () => {
     expect(io.read(1)).toBeNull();
   });
 
+  it("waits for length bytes across two data events", async () => {
+    const { socket, emit } = fakeSocket();
+    const io = new TCPSocket(socket);
+    const read = io.readBlocking(4);
+    emit("data", new Uint8Array([1, 2]));
+    emit("data", new Uint8Array([3, 4, 5]));
+    expect(await read).toEqual(new Uint8Array([1, 2, 3, 4]));
+  });
+
+  it("answers a short read at end of file", async () => {
+    const { socket, emit } = fakeSocket();
+    const io = new TCPSocket(socket);
+    const read = io.readBlocking(4);
+    emit("data", new Uint8Array([1, 2]));
+    emit("end");
+    expect(await read).toEqual(new Uint8Array([1, 2]));
+    expect(await io.readBlocking(1)).toBeNull();
+  });
+
   it("raises IOError on a closed stream and closes once both sides are shut", () => {
     const { socket, calls } = fakeSocket();
     const io = new TCPSocket(socket);

@@ -9,7 +9,8 @@ import { Inline } from "../template/inline.js";
 import { Text } from "../template/text.js";
 import { HTML } from "../template/html.js";
 import { Renderable } from "../template/renderable.js";
-import { TemplateHandlers, type TemplateHandler } from "../template/handlers.js";
+import { type TemplateHandler } from "../template/handlers.js";
+import { Template } from "../template.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
@@ -56,7 +57,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
       }
     }
     if (Object.hasOwn(options, "inline")) {
-      const handler = TemplateHandlers.handlerForExtension(options.type ?? "tse");
+      const handler = Template.handlerForExtension(options.type ?? "tse");
       const format = rbObjRespondTo(handler, "defaultFormat")
         ? (handler as TemplateHandler & { defaultFormat: string }).defaultFormat
         : ((this.lookupContext.formats[0] as string | undefined) ?? null);
@@ -173,9 +174,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
         if (!(e instanceof MissingTemplate)) throw e;
         const allDetails = {
           ...this.details,
-          formats: (
-            this.lookupContext as unknown as { defaultFormats(): readonly string[] }
-          ).defaultFormats(),
+          formats: this.lookupContext.defaultFormats(),
         };
         if (!this.templateExists(layout, [], false, keys, allDetails)) throw e;
         return null;

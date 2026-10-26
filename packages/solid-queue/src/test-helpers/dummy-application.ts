@@ -1,3 +1,4 @@
+import "./dummy-environment.js";
 import "@blazetrails/trailties/all";
 import { Executor } from "@blazetrails/activesupport";
 import { Engine } from "../engine.js";

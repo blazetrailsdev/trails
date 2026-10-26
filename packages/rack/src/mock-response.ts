@@ -86,10 +86,10 @@ export class MockResponse extends Response {
         const parsedCookie = new CGI.Cookie({
           name: cookieName.trim(),
           value: fetch(cookieAttributes, "value"),
-          path: fetch(cookieAttributes, "path", null),
-          domain: fetch(cookieAttributes, "domain", null),
-          expires: fetch(cookieAttributes, "expires", null),
-          secure: fetch(cookieAttributes, "secure", false),
+          path: Object.hasOwn(cookieAttributes, "path") ? cookieAttributes.path : null,
+          domain: Object.hasOwn(cookieAttributes, "domain") ? cookieAttributes.domain : null,
+          expires: Object.hasOwn(cookieAttributes, "expires") ? cookieAttributes.expires : null,
+          secure: Object.hasOwn(cookieAttributes, "secure") ? cookieAttributes.secure : false,
         });
         cookies[cookieName] = parsedCookie;
       }

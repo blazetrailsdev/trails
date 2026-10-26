@@ -8,9 +8,9 @@ import {
   rbObjAsString,
   rbObjSingletonClass,
   rtest,
-  union,
   zip,
   eachPair,
+  eachWithIndex,
   rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
@@ -161,9 +161,9 @@ export class ClassMethods {
       }
       const objects: InstanceType<T>[] = [];
       for (const oneId of id) objects.push(await this.find(oneId));
-      for (const [idx, object] of objects.entries()) {
-        await object.update((attributes as Record<string, unknown>[])[idx]);
-      }
+      await eachWithIndex(objects, (object, idx) =>
+        object.update((attributes as Record<string, unknown>[])[idx]),
+      );
       return objects;
     } else if (id === ":all") {
       const records = await this.all();
@@ -216,9 +216,9 @@ export class ClassMethods {
       }
       const objects: InstanceType<T>[] = [];
       for (const oneId of id) objects.push(await this.find(oneId));
-      for (const [idx, object] of objects.entries()) {
-        await object.updateBang((attributes as Record<string, unknown>[])[idx]);
-      }
+      await eachWithIndex(objects, (object, idx) =>
+        object.updateBang((attributes as Record<string, unknown>[])[idx]),
+      );
       return objects;
     } else if (id === ":all") {
       const records = await this.all();
@@ -789,7 +789,7 @@ export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
   if (this.isReadonly()) this._raiseReadonlyRecordError();
 
   let attributeNames: readonly string[] = this.timestampAttributesForUpdateInModel();
-  attributeNames = union(attributeNames, names as string[]).map((name) => {
+  attributeNames = [...new Set([...attributeNames, ...(names as string[])])].map((name) => {
     name = String(name);
     name = this.constructor.attributeAliases[name] || name;
     this.verifyReadonlyAttribute(name);

@@ -1,6 +1,6 @@
-import { TemplateHandlers } from "@blazetrails/actionview";
+import { Template } from "@blazetrails/actionview";
 
-TemplateHandlers.registerTemplateHandler("shout", {
+Template.registerTemplateHandler("shout", {
   call(_template, source) {
     return `return htmlSafe(${JSON.stringify(source.toUpperCase())});`;
   },

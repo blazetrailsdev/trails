@@ -30,9 +30,9 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     }
   }
 
-  function normalizedKey(key: string, options?: StoreOptions): string {
-    return (
-      cache as unknown as { normalizeKey(key: string, options?: StoreOptions): string }
+  async function normalizedKey(key: string, options?: StoreOptions): Promise<string> {
+    return await (
+      cache as unknown as { normalizeKey(key: string, options?: StoreOptions): Promise<string> }
     ).normalizeKey(key, options);
   }
 
@@ -50,8 +50,8 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     expect(events.map((e) => e.name)).toEqual(["cache_write_multi.active_support"]);
     expect(events[0].payload.super_operation).toBeUndefined();
     expect(events[0].payload.key).toEqual({
-      [normalizedKey(key1)]: value1,
-      [normalizedKey(key2)]: value2,
+      [await normalizedKey(key1)]: value1,
+      [await normalizedKey(key2)]: value2,
     });
   });
 
@@ -67,8 +67,8 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
 
     expect(events.map((e) => e.name)).toEqual(["cache_read_multi.active_support"]);
     expect(events[0].payload.super_operation).toBe("fetch_multi");
-    expect(events[0].payload.key).toEqual([normalizedKey(key2), normalizedKey(key1)]);
-    expect(events[0].payload.hits).toEqual([normalizedKey(key1)]);
+    expect(events[0].payload.key).toEqual([await normalizedKey(key2), await normalizedKey(key1)]);
+    expect(events[0].payload.hits).toEqual([await normalizedKey(key1)]);
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
@@ -108,8 +108,8 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_read_multi.active_support"]);
-    expect(events[0].payload.key).toEqual([normalizedKey(key2), normalizedKey(key1)]);
-    expect(events[0].payload.hits).toEqual([normalizedKey(key1)]);
+    expect(events[0].payload.key).toEqual([await normalizedKey(key2), await normalizedKey(key1)]);
+    expect(events[0].payload.hits).toEqual([await normalizedKey(key1)]);
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
@@ -122,7 +122,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_read.active_support"]);
-    expect(events[0].payload.key).toBe(normalizedKey(key));
+    expect(events[0].payload.key).toBe(await normalizedKey(key));
     assertSame(true, events[0].payload.hit);
     expect(events[0].payload.store).toBe(host.storeName);
   });
@@ -135,7 +135,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_write.active_support"]);
-    expect(events[0].payload.key).toBe(normalizedKey(key));
+    expect(events[0].payload.key).toBe(await normalizedKey(key));
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
@@ -148,7 +148,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_delete.active_support"]);
-    expect(events[0].payload.key).toBe(normalizedKey(key, options));
+    expect(events[0].payload.key).toBe(await normalizedKey(key, options));
     expect(events[0].payload.store).toBe(host.storeName);
     expect(events[0].payload.namespace).toBe("foo");
   });
@@ -164,8 +164,8 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
 
     expect(events.map((e) => e.name)).toEqual(["cache_delete_multi.active_support"]);
     expect(events[0].payload.key).toEqual([
-      normalizedKey(key2, options),
-      normalizedKey(key1, options),
+      await normalizedKey(key2, options),
+      await normalizedKey(key1, options),
     ]);
     expect(events[0].payload.store).toBe(host.storeName);
   });
@@ -179,7 +179,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_increment.active_support"]);
-    expect(events[0].payload.key).toBe(normalizedKey(key1));
+    expect(events[0].payload.key).toBe(await normalizedKey(key1));
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
@@ -192,7 +192,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_decrement.active_support"]);
-    expect(events[0].payload.key).toBe(normalizedKey(key1));
+    expect(events[0].payload.key).toBe(await normalizedKey(key1));
     expect(events[0].payload.store).toBe(host.storeName);
   });
 }

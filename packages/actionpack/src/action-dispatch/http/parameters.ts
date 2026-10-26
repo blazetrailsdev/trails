@@ -7,7 +7,7 @@ import {
   stderr,
 } from "@blazetrails/ruby-compat";
 
-import { block, fetch, merge, rbModConstSet, type Hash } from "@blazetrails/ruby-compat";
+import { block, fetch, rbModConstSet, type Hash } from "@blazetrails/ruby-compat";
 import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
 import { Mime, MimeType } from "./mime-type.js";
 import type { ParamHash } from "../request/utils.js";
@@ -122,7 +122,7 @@ export function parameters(this: ParametersHost): Record<string, unknown> {
 
   let params: Record<string, unknown>;
   try {
-    params = merge(this.requestParameters, this.queryParameters);
+    params = { ...this.requestParameters, ...this.queryParameters };
   } catch (e) {
     if (!(e instanceof EOFError)) throw e;
     params = { ...this.queryParameters };

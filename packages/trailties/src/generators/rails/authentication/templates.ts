@@ -1,5 +1,5 @@
 export const TEMPLATES: Record<string, string> = {
-  "app/models/session.rb": `import { ApplicationRecord } from "./application-record.js";
+  "app/models/session.rb": `import { ApplicationRecord } from "./application-record.ts";
 
 export class Session extends ApplicationRecord {
   static {
@@ -8,7 +8,7 @@ export class Session extends ApplicationRecord {
 }
 `,
 
-  "app/models/user.rb": `import { ApplicationRecord } from "./application-record.js";
+  "app/models/user.rb": `import { ApplicationRecord } from "./application-record.ts";
 
 export class User extends ApplicationRecord {
   declare static findByPasswordResetTokenBang: (token: unknown) => Promise<User>;
@@ -23,7 +23,7 @@ export class User extends ApplicationRecord {
 `,
 
   "app/models/current.rb": `import { CurrentAttributes, delegate } from "@blazetrails/activesupport";
-import type { Session } from "./session.js";
+import type { Session } from "./session.ts";
 
 export class Current extends CurrentAttributes {
   declare static session: Session | null | undefined;
@@ -36,8 +36,8 @@ export class Current extends CurrentAttributes {
 `,
 
   "app/controllers/sessions_controller.rb": `import { minutes } from "@blazetrails/activesupport";
-import { ApplicationController } from "./application-controller.js";
-import { User } from "../models/user.js";
+import { ApplicationController } from "./application-controller.ts";
+import { User } from "../models/user.ts";
 
 export class SessionsController extends ApplicationController {
   static {
@@ -70,8 +70,8 @@ export class SessionsController extends ApplicationController {
 `,
 
   "app/controllers/concerns/authentication.rb": `import { defineModule, extend, included } from "@blazetrails/activesupport";
-import { Current } from "../../models/current.js";
-import { Session } from "../../models/session.js";
+import { Current } from "../../models/current.ts";
+import { Session } from "../../models/session.ts";
 
 /** Rails' \`class_methods do ... end\` block. */
 export const ClassMethods = {
@@ -141,9 +141,9 @@ export const Authentication = defineModule(
 `,
 
   "app/controllers/passwords_controller.rb": `import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
-import { ApplicationController } from "./application-controller.js";
-import { User } from "../models/user.js";
-import { PasswordsMailer } from "../mailers/passwords-mailer.js";
+import { ApplicationController } from "./application-controller.ts";
+import { User } from "../models/user.ts";
+import { PasswordsMailer } from "../mailers/passwords-mailer.ts";
 
 export class PasswordsController extends ApplicationController {
   static {
@@ -189,7 +189,7 @@ export class PasswordsController extends ApplicationController {
 }
 `,
 
-  "app/channels/application_cable/connection.rb": `import { Session } from "../../models/session.js";
+  "app/channels/application_cable/connection.rb": `import { Session } from "../../models/session.ts";
 
 export class Connection {
   declare currentUser: unknown;
@@ -207,7 +207,7 @@ export class Connection {
 }
 `,
 
-  "app/mailers/passwords_mailer.rb": `import { ApplicationMailer } from "./application-mailer.js";
+  "app/mailers/passwords_mailer.rb": `import { ApplicationMailer } from "./application-mailer.ts";
 
 export class PasswordsMailer extends ApplicationMailer {
   declare user: any;
@@ -234,8 +234,8 @@ export class PasswordsMailer extends ApplicationMailer {
 <%= editPasswordUrl(user.passwordResetToken) %>
 `,
 
-  "test/mailers/previews/passwords_mailer_preview.rb": `import { PasswordsMailer } from "../../../app/mailers/passwords-mailer.js";
-import { User } from "../../../app/models/user.js";
+  "test/mailers/previews/passwords_mailer_preview.rb": `import { PasswordsMailer } from "../../../app/mailers/passwords-mailer.ts";
+import { User } from "../../../app/models/user.ts";
 
 export class PasswordsMailerPreview {
   async reset(): Promise<unknown> {

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Duration } from "../duration.js";
 import { TimeWithZone } from "../time-with-zone.js";
-import { TimeZone, Timezone, TimezonePeriod } from "../values/time-zone.js";
+import { TimeZone } from "../values/time-zone.js";
+import { Timezone, TimezonePeriod } from "@blazetrails/tzinfo";
 import { travelTo } from "../testing/time-helpers.js";
 import { instantFromDate } from "../testing/temporal-helpers.js";
 import { DateTime, Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";

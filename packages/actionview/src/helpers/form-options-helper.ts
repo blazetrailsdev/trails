@@ -21,6 +21,7 @@ import {
   rtest,
   include,
   filterMap,
+  defineModule,
 } from "@blazetrails/ruby-compat";
 
 import { contentTag, tagBuilder, type TagHelperHost } from "./tag-helper.js";
@@ -369,7 +370,7 @@ export function extractSelectedAndDisabled(selected: unknown): [unknown, unknown
   } else {
     const selectedArray = wrap(selected);
     const options = extractOptionsBang(selectedArray);
-    const selectedItems = fetch(options, "selected", selectedArray);
+    const selectedItems = Object.hasOwn(options, "selected") ? options.selected : selectedArray;
     return [selectedItems, options["disabled"]];
   }
 }
@@ -401,7 +402,7 @@ export function promptText(prompt: unknown): unknown {
     : I18n.translate("helpers.select.prompt", { default: "Please select" });
 }
 
-export const FormOptionsHelper = {
+export const FormOptionsHelper = defineModule({
   select,
   collectionSelect,
   groupedCollectionSelect,
@@ -423,7 +424,7 @@ export const FormOptionsHelper = {
   collectionCheckBoxes,
   valueForCollection,
   promptText,
-};
+});
 
 include(FormOptionsHelper, TextHelper);
 

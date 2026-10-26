@@ -2,7 +2,7 @@ import type { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
 import type { TouchArgs, TouchOptions } from "./timestamp.js";
 import { extractOptionsBang } from "@blazetrails/activesupport";
-import { union, rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { addToTransaction } from "./transactions.js";
@@ -68,7 +68,7 @@ export async function touchLater(this: TouchLaterHost, ...names: string[]): Prom
 export async function touch(this: TouchLaterHost, ...names: TouchArgs): Promise<boolean> {
   if (hasDeferTouchAttrs(this)) {
     const { time = null } = extractOptionsBang(names as unknown[]) as TouchOptions;
-    names = union(names as string[], [...this._deferTouchAttrs!]);
+    names = [...new Set([...(names as string[]), ...this._deferTouchAttrs!])];
     const result = await rbCallSuper(this, touch, ...names, { time });
     this._deferTouchAttrs = null;
     this._touchTime = null;

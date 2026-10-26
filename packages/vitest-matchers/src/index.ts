@@ -1,4 +1,4 @@
-import { isEmpty, rbEqual, rbObjRespondTo, stderr, stdout } from "@blazetrails/ruby-compat";
+import { cmp, isEmpty, rbEqual, rbObjRespondTo, stderr, stdout } from "@blazetrails/ruby-compat";
 import type { ExpectStatic } from "vitest";
 
 type MatcherState = ReturnType<ExpectStatic["getState"]>;
@@ -105,8 +105,10 @@ export const matchers = {
     max: unknown,
     mode: "inclusive" | "exclusive" = "inclusive",
   ) {
-    const [r, lo, hi] = [received, min, max] as number[];
-    const pass = mode === "inclusive" ? r >= lo && r <= hi : r > lo && r < hi;
+    const lo = cmp(received, min);
+    const hi = cmp(received, max);
+    const pass =
+      lo != null && hi != null && (mode === "inclusive" ? lo >= 0 && hi <= 0 : lo > 0 && hi < 0);
     return result(
       this,
       pass,

@@ -36,7 +36,7 @@ export class XmlMarkup extends XmlBase {
     this._special("<!-- ", " -->", commentText, null);
   }
 
-  declareBang(inst: string, ...args: unknown[]): void {
+  declareBang(inst: string, ...args: unknown[] | [...unknown[], (xml: XmlBase) => unknown]): void {
     const block =
       typeof args.at(-1) === "function" ? (args.pop() as (xml: XmlBase) => unknown) : null;
     this._indent();

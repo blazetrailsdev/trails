@@ -76,6 +76,7 @@ import {
   EVAL_CALLBACK_PREFIX,
   FOREIGN_READ_PREFIX,
   NATIVE_FORM_PREFIX,
+  TYPED_NATIVE_FORM,
   NEGATED_CALL_PREFIX,
 } from "./enumerable-idioms.js";
 import {
@@ -1014,12 +1015,22 @@ export function extractFromProgram(
           const objectLiteral = ts.isObjectLiteralExpression(decl.initializer);
           const methods = ts.isObjectLiteralExpression(decl.initializer)
             ? harvestObjectLiteralMethods(decl.initializer, checker, relPath)
-            : isDefineModuleCall(decl.initializer)
-              ? decl.initializer.arguments
+            : isDefineModuleCall(unwrapAssertions(decl.initializer))
+              ? (unwrapAssertions(decl.initializer) as ts.CallExpression).arguments
                   .map(unwrapAssertions)
                   .filter(ts.isObjectLiteralExpression)
                   .map((o) =>
-                    ts.factory.updateObjectLiteralExpression(o, o.properties.filter(ts.isAccessor)),
+                    ts.factory.updateObjectLiteralExpression(
+                      o,
+                      o.properties.filter(
+                        (p) =>
+                          ts.isAccessor(p) ||
+                          ts.isMethodDeclaration(p) ||
+                          (ts.isPropertyAssignment(p) &&
+                            (ts.isFunctionExpression(unwrapAssertions(p.initializer)) ||
+                              ts.isArrowFunction(unwrapAssertions(p.initializer)))),
+                      ),
+                    ),
                   )
                   .flatMap((o) => harvestObjectLiteralMethods(o, checker, relPath))
               : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
@@ -1957,6 +1968,28 @@ function classInfoForPrototype(
   return info.classes[`${file}:${sym.name}`] ?? null;
 }
 
+/**
+ * The module entity a plain-object module's own identifier names — the target
+ * of `Object.defineProperty(Mod, "name", { value: fn })`, the non-enumerable
+ * seat of a Ruby `def self.name` on a module (root CLAUDE.md, "A Ruby module
+ * is a JS object or a JS class").
+ */
+function moduleInfoForSingleton(
+  expr: ts.Expression,
+  info: PackageInfo,
+  checker: ts.TypeChecker,
+  srcDir: string,
+): ClassInfo | null {
+  if (!ts.isIdentifier(expr)) return null;
+  const sym0 = checker.getSymbolAtLocation(expr);
+  if (!sym0) return null;
+  const sym = sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
+  const decl = sym.valueDeclaration;
+  if (!decl || !ts.isVariableDeclaration(decl)) return null;
+  const file = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
+  return info.modules[`${file}:${sym.name}`] ?? null;
+}
+
 /** Push a method name onto classInfo if not already present. */
 function pushDefinePropertyMethod(
   classInfo: ClassInfo,
@@ -2015,9 +2048,22 @@ function extractDefinePropertyDirect(
   if (!ts.isObjectLiteralExpression(descriptor)) return;
   const value = definePropertyValue(descriptor);
   if (!value) return;
+  const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
+  const moduleInfo = moduleInfoForSingleton(target, info, checker, srcDir);
+  if (moduleInfo && (ts.isFunctionExpression(value) || ts.isArrowFunction(value))) {
+    if (moduleInfo.classMethods.some((m) => m.name === propNameExpr.text)) return;
+    moduleInfo.classMethods.push({
+      name: propNameExpr.text,
+      visibility: "public",
+      params: paramsOfDescriptorValue(value, checker),
+      line,
+      file: moduleInfo.file,
+      isStatic: true,
+    });
+    return;
+  }
   const classInfo = classInfoForPrototype(target, info, checker, srcDir);
   if (!classInfo) return;
-  const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
   pushDefinePropertyMethod(
     classInfo,
     propNameExpr.text,
@@ -5155,6 +5201,30 @@ function extractInterface(
                     : {}),
                   ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
                 });
+              } else if (
+                propDecl !== undefined &&
+                (ts.isGetAccessorDeclaration(propDecl) || ts.isSetAccessorDeclaration(propDecl)) &&
+                propDecl.getSourceFile().fileName === node.getSourceFile().fileName
+              ) {
+                for (const decl of prop.declarations ?? []) {
+                  if (!ts.isGetAccessorDeclaration(decl) && !ts.isSetAccessorDeclaration(decl)) {
+                    continue;
+                  }
+                  if (!ts.isInterfaceDeclaration(decl.parent) || internalJsDocTagApplies(decl)) {
+                    continue;
+                  }
+                  instanceMethods.push({
+                    name: propName,
+                    visibility: propVisibility,
+                    params: ts.isSetAccessorDeclaration(decl)
+                      ? extractParameters(decl.parameters)
+                      : [],
+                    line: 0,
+                    file,
+                    bodyless: true,
+                    ...(ts.isSetAccessorDeclaration(decl) ? { writer: true } : {}),
+                  });
+                }
               }
             }
           } catch {
@@ -7011,16 +7081,22 @@ function recordCallSite(
   visit: (n: ts.Node) => void,
 ): void {
   const callee = call.expression;
-  if (!ts.isIdentifier(callee) && callee.kind !== ts.SyntaxKind.SuperKeyword) visit(callee);
+  const wrapped = ts.isPropertyAccessExpression(callee)
+    ? enumerableWrapped(callee.expression)
+    : undefined;
+  if (wrapped !== undefined) visit(wrapped);
+  else if (!ts.isIdentifier(callee) && callee.kind !== ts.SyntaxKind.SuperKeyword) visit(callee);
 
   const name = callSiteName(call);
   if (name !== undefined && !(ts.isNewExpression(call) && isThrownConstruction(call))) {
     const flags: string[] = [];
     const args = describeArgs(call.arguments, flags);
     const recv =
-      ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
-        ? describeArg(callee.expression, [])
-        : undefined;
+      wrapped !== undefined
+        ? describeArg(wrapped, [])
+        : ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
+          ? describeArg(callee.expression, [])
+          : undefined;
     const rubyCompat = ts.isIdentifier(callee)
       ? rubyCompatBindingsFor(call.getSourceFile()).get(callee.text)
       : undefined;
@@ -7040,6 +7116,20 @@ function recordCallSite(
   }
 
   call.arguments?.forEach(visit);
+}
+
+/**
+ * ruby-compat's `new Enumerable(x)` wrapper, imported from `@blazetrails/ruby-compat`,
+ * is Ruby's `x` itself:
+ * `new Enumerable(xs).partition(fn)` is `xs.partition(&fn)`, so a member call
+ * on it reads its one constructor argument as the receiver and the
+ * construction makes no call of its own.
+ */
+function enumerableWrapped(expr: ts.Expression): ts.Expression | undefined {
+  while (ts.isParenthesizedExpression(expr)) expr = expr.expression;
+  if (!ts.isNewExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
+  const name = rubyCompatBindingsFor(expr.getSourceFile()).get(expr.expression.text);
+  return name === "Enumerable" && expr.arguments?.length === 1 ? expr.arguments[0] : undefined;
 }
 
 /**
@@ -7426,12 +7516,15 @@ function collectCalls(
           names.add(`${NATIVE_FORM_PREFIX}timer`);
         }
       } else if (ts.isPropertyAccessExpression(callee)) {
-        visit(callee.expression);
+        visit(enumerableWrapped(callee.expression) ?? callee.expression);
         const prop = memberNameText(callee.name);
         if (!(skipHoistedClosures && isOperatorIndexRead(n))) called.push(prop);
         negated.push(prop);
         if (!skipHoistedClosures && prop === "unshift") {
           names.add(`${NATIVE_FORM_PREFIX}unshift`);
+        }
+        if (!skipHoistedClosures && prop === "splice" && isInsertingSplice(n)) {
+          names.add(`${NATIVE_FORM_PREFIX}splice`);
         }
         // An invocation off another object gets the same foreign tally as a read
         // off one (see FOREIGN_READ_PREFIX). The `X.call(...)` identifier
@@ -7529,6 +7622,9 @@ function collectCalls(
           names.add(`${NATIVE_FORM_PREFIX}length`);
           const tail = receiverTailName(n.expression);
           if (tail !== undefined) names.add(`${NATIVE_FORM_PREFIX}length:${tail}`);
+          if (checkerProvenKind(n.expression) === "sized") {
+            names.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.length}`);
+          }
         }
       }
     }
@@ -7549,6 +7645,17 @@ function collectCalls(
   }
   if (names.size === 0 && hashForms.size === 0) return undefined;
   return [...names, ...hashForms];
+}
+
+/** `xs.splice(i, 0, ...items)`: a splice that removes nothing, Ruby's `Array#insert`. */
+function isInsertingSplice(n: ts.CallExpression): boolean {
+  const deleteCount = n.arguments[1];
+  return (
+    n.arguments.length >= 3 &&
+    deleteCount !== undefined &&
+    ts.isNumericLiteral(deleteCount) &&
+    deleteCount.text === "0"
+  );
 }
 
 /**
@@ -7599,6 +7706,21 @@ function nativeHashForms(
     const first = n.properties[0];
     if (n.properties.length < 2 || !ts.isSpreadAssignment(first)) return [];
     return [["spread", first.expression]];
+  }
+  if (ts.isConditionalExpression(n)) {
+    const test = unwrapped(n.condition);
+    if (!ts.isCallExpression(test) || test.expression.getText() !== "Object.hasOwn") return [];
+    const [receiver, key] = test.arguments;
+    const read = unwrapped(n.whenTrue);
+    if (receiver === undefined || key === undefined || !ts.isStringLiteralLike(key)) return [];
+    if (!ts.isPropertyAccessExpression(read) && !ts.isElementAccessExpression(read)) return [];
+    const readKey = ts.isPropertyAccessExpression(read)
+      ? read.name.text
+      : ts.isStringLiteralLike(read.argumentExpression)
+        ? read.argumentExpression.text
+        : undefined;
+    if (readKey !== key.text || read.expression.getText() !== receiver.getText()) return [];
+    return [["fetch", receiver, describeArg(key, [])]];
   }
   if (ts.isForOfStatement(n)) {
     const iterated = n.expression;
@@ -7671,6 +7793,39 @@ function setRoundTripForms(operand: ts.Expression | undefined): string[] {
   return union ? ["union"] : ["uniq"];
 }
 
+/**
+ * What the TS checker proves an expression's type is: `sized` for a string,
+ * array or tuple, which `.length` counts, and `object` for a plain object
+ * type (an object literal, a type literal, a mapped `Record`, an interface),
+ * which a rest-destructure copies. A class instance, an interface with a value
+ * declaration (`Map`, `Set`, `Date`), a callable or anything
+ * `any` / `unknown` proves neither, since a trails `Relation` answers `size` /
+ * `except` itself. Every member of a union has to agree.
+ */
+function checkerProvenKind(expr: ts.Expression): "sized" | "object" | undefined {
+  const checker = currentChecker;
+  if (checker === undefined) return undefined;
+  const type = checker.getTypeAtLocation(expr);
+  const parts = type.isUnion() ? type.types : [type];
+  const kinds = new Set(
+    parts.map((t): "sized" | "object" | undefined => {
+      if (t.flags & ts.TypeFlags.StringLike) return "sized";
+      if (checker.isArrayType(t) || checker.isTupleType(t)) return "sized";
+      if (!(t.flags & ts.TypeFlags.Object) || t.getCallSignatures().length > 0) return undefined;
+      const sym = t.getSymbol();
+      if (sym === undefined) return "object";
+      if (sym.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Function | ts.SymbolFlags.Variable)) {
+        return undefined;
+      }
+      return sym.flags &
+        (ts.SymbolFlags.TypeLiteral | ts.SymbolFlags.ObjectLiteral | ts.SymbolFlags.Interface)
+        ? "object"
+        : undefined;
+    }),
+  );
+  return kinds.size === 1 ? [...kinds][0] : undefined;
+}
+
 function nativeValueForms(n: ts.Node): string[] {
   if (ts.isArrayLiteralExpression(n)) {
     const [only] = n.elements;
@@ -7696,7 +7851,11 @@ function nativeValueForms(n: ts.Node): string[] {
             ts.isIdentifier(el.propertyName) ||
             ts.isStringLiteral(el.propertyName)),
       );
-    return literal ? ["except"] : [];
+    if (!literal) return [];
+    const source = ts.isVariableDeclaration(n.parent) ? n.parent.initializer : undefined;
+    return source !== undefined && checkerProvenKind(source) === "object"
+      ? ["except", TYPED_NATIVE_FORM.except]
+      : ["except"];
   }
   if (ts.isForOfStatement(n)) {
     const iterated = unwrapped(n.expression);

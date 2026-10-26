@@ -9,7 +9,6 @@ import {
 import {
   block,
   eachPair,
-  union,
   rbModName,
   rbObjClass,
   except,
@@ -108,6 +107,7 @@ export class Trailtie extends BaseTrailtie {
       }
 
       this.config.afterInitialize(() => {
+        // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options is the activeJob OrderedOptions, which eachPair dispatches on
         eachPair(options, (k, v) => {
           k = `${k}=`;
           if (rbObjRespondTo(ActiveJob, k)) {
@@ -124,6 +124,7 @@ export class Trailtie extends BaseTrailtie {
           "enqueueAfterTransactionCommit",
         );
 
+        // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options is the activeJob OrderedOptions, which eachPair dispatches on
         eachPair(options, (k, v) => {
           k = `${k}=`;
           if (rbObjRespondTo(ActiveJob, k)) {
@@ -157,7 +158,9 @@ export class Trailtie extends BaseTrailtie {
         app.config.activeJob.logQueryTagsAroundPerform;
 
       if (queryLogsTagsEnabled) {
-        app.config.activeRecord.queryLogTags = union(app.config.activeRecord.queryLogTags, ["job"]);
+        app.config.activeRecord.queryLogTags = [
+          ...new Set([...app.config.activeRecord.queryLogTags, "job"]),
+        ];
 
         onLoad("active_record", () => {
           QueryLogs.taggings = {

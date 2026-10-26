@@ -9,8 +9,8 @@ import type {
 } from "../reflection.js";
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
-import { eachCons, kernelArray } from "@blazetrails/activesupport";
-import { drop, first, isEmpty, last, rbEqual, union } from "@blazetrails/ruby-compat";
+import { kernelArray } from "@blazetrails/activesupport";
+import { drop, eachCons, first, isEmpty, last, rbEqual, union } from "@blazetrails/ruby-compat";
 import { methodMissingProxy } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 
@@ -68,7 +68,7 @@ export class AssociationScope {
       binds.push(owner.constructor.polymorphicName());
     }
 
-    eachCons(chain as AssociationReflection[], 2).forEach(([reflection, nextReflection]) => {
+    eachCons(chain as AssociationReflection[], 2, ([reflection, nextReflection]) => {
       if (reflection.type) {
         binds.push(nextReflection.klass.polymorphicName());
       }

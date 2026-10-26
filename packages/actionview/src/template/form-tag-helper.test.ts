@@ -7,7 +7,6 @@ import "../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { Template } from "../template.js";
-import { TemplateHandlers } from "./handlers.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 import { defaultEnforceUtf8, setDefaultEnforceUtf8 } from "../helpers/form-tag-helper.js";
 import { raw } from "../helpers/output-safety-helper.js";
@@ -20,7 +19,7 @@ const renderErb = async (string: string): Promise<string> => {
   const template = new Template(
     string.trim(),
     "test template",
-    TemplateHandlers.handlerForExtension("tse")!,
+    Template.handlerForExtension("tse")!,
     { format: ":html", locals: [] },
   );
   const view = Base.withEmptyTemplateCache();

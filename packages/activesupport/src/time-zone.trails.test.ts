@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { TimeZone, AmbiguousTime, PeriodNotFound } from "./values/time-zone.js";
+import { TimeZone } from "./values/time-zone.js";
+import { AmbiguousTime, PeriodNotFound } from "@blazetrails/tzinfo";
 import { ArgumentError } from "./hash-utils.js";
 import { Time } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
@@ -178,12 +179,21 @@ describe("TimeZoneLocalPeriodsTest", () => {
     const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     const utc = Time.utc(2000, 1, 1, 0, 0, 0, 123456.789);
     expect(utc.nsec).toBe(123456789);
-    expect((eastern.utcToLocal(utc) as Time).nsec).toBe(123456789);
+    expect(eastern.utcToLocal(utc).nsec).toBe(123456789);
   });
 
   it("at keeps digits below the millisecond", () => {
     const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     expect(eastern.at(946684800, 123456.789).nsec).toBe(123456789);
     expect(eastern.at(new Rational(946684800123456789n, 1_000_000_000n)).nsec).toBe(123456789);
+  });
+
+  it("tzinfo local_to_utc raises AmbiguousTime by default while TimeZone#local_to_utc picks DST", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
+    const ambiguous = Time.utc(2018, 11, 4, 1, 30, 0);
+
+    expect(() => zone.tzinfo.localToUtc(ambiguous)).toThrow(AmbiguousTime);
+    expect(zone.tzinfo.localToUtc(ambiguous, true).toI()).toBe(1541309400);
+    expect(zone.localToUtc(ambiguous).toI()).toBe(1541309400);
   });
 });

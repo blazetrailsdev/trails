@@ -918,3 +918,78 @@ describe("Time.at with a boxed Float", () => {
     expect(Time.at(toF(946684800)).toI()).toBe(946684800);
   });
 });
+
+describe("Time.at num_exact_fail", () => {
+  it("names the operand's class", () => {
+    expect(() => Time.at(null as never)).toThrow("can't convert NilClass into an exact number");
+  });
+});
+
+describe("Time#utc_offset in a named zone, from the cached offset interval", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("searches transitions once for a zone with no transition after the instant", () => {
+    const spy = vi.spyOn(Temporal.ZonedDateTime.prototype, "getTimeZoneTransition");
+    expect(Time.at(1_700_000_000, { in: "Asia/Thimphu" }).utcOffset).toBe(21600);
+    const searches = spy.mock.calls.length;
+    expect(searches).toBeGreaterThan(0);
+    expect(Time.at(1_800_000_000, { in: "Asia/Thimphu" }).utcOffset).toBe(21600);
+    expect(spy.mock.calls.length).toBe(searches);
+  });
+
+  it("starts an interval at its transition and ends it just before the next", () => {
+    const boundary = 1_710_054_000;
+    expect(Time.at(boundary - 3600, { in: "America/New_York" }).utcOffset).toBe(-18000);
+    expect(Time.at(boundary, { in: "America/New_York" }).utcOffset).toBe(-14400);
+    expect(
+      Time.at(new Rational(boundary * 1000 - 1, 1000), { in: "America/New_York" }).utcOffset,
+    ).toBe(-18000);
+  });
+
+  it("treats a lowercase utc zone as UTC", () => {
+    expect(Time.at(0, { in: "utc" }).isUtc()).toBe(true);
+  });
+});
+
+describe("Time#strftime week numbers before the 1582 reform", () => {
+  it("computes %U %W %V %G on the proleptic Gregorian calendar", () => {
+    const cases: [number, number, number, string][] = [
+      [12, 7, 9, "28 28 28 0012"],
+      [14, 6, 2, "22 22 23 0014"],
+      [1581, 3, 15, "11 10 11 1581"],
+      [1583, 3, 15, "11 11 11 1583"],
+    ];
+    for (const [y, m, d, expected] of cases) {
+      expect(Time.utc(y, m, d).strftime("%U %W %V %G")).toBe(expected);
+    }
+  });
+
+  it("leaves Date#strftime on its own start", () => {
+    expect(new RbDate(12, 7, 9).strftime("%U %W %V %G")).toBe("27 27 27 0012");
+    expect(new RbDate(12, 7, 9, RbDate.GREGORIAN).strftime("%U %W %V %G")).toBe("28 28 28 0012");
+  });
+});
+
+describe("Time#strftime through rb_strftime", () => {
+  it("formats a UTC time's %z and %Z as rb_strftime's gmt arm does", () => {
+    const t = Time.utc(2008, 3, 1, 6, 0, 0);
+    expect(t.strftime("%-z|%#Z|%10Z")).toBe("-0000|utc|       UTC");
+  });
+
+  it("puts the minus sign on a negative offset under an hour", () => {
+    const t = Time.new(2008, 1, 1, 0, 0, 0, "-00:00:30");
+    expect(t.strftime("%z|%:::z|%_10z|%-z")).toBe("-0000|-00:00:30|      -000|-0000");
+  });
+
+  it("reads %s %N from the time value", () => {
+    expect(Time.at(-1.25).utc().strftime("%s %N %3N %12N")).toBe("-2 750000000 750 750000000000");
+    expect(Time.utc(2008, 3, 1, 6, 0, new Rational(3, 7)).strftime("%N")).toBe("428571428");
+  });
+
+  it("raises ArgumentError for a format that ends inside a conversion", () => {
+    expect(() => Time.utc(2008, 3, 1).strftime("%")).toThrow(ArgumentError);
+    expect(Time.utc(2008, 3, 1).strftime("%-5d|%Eq|%::::z|%3:z")).toBe("1|%Eq|%::::z|+00:00");
+  });
+});

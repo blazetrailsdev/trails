@@ -21,7 +21,7 @@ function setup() {
     }
   }
   config.connectionClass = () => FakeConnection;
-  config.pubsubAdapter = async () =>
+  config.pubsubAdapter = () =>
     class {
       async shutdown() {
         await Promise.resolve();
@@ -56,7 +56,7 @@ describe("ActionCable::Server::Base", () => {
       log.push("halt");
       halt();
     };
-    await server.pubsub;
+    void server.pubsub;
     await server.restart();
     expect(log).toEqual(["close:server_restart", "halt", "pubsub.shutdown"]);
     expect(server.workerPool).not.toBe(pool);

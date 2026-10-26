@@ -89,7 +89,10 @@ return type.
   `await`, and `connections` is a synchronous reader in Rails. Likewise
   `Engine#app`'s `@app_build_lock` (`railties/lib/rails/engine.rb:448,516-524`):
   trails' `app()` builds with no `await`, so the `Mutex#synchronize`
-  double-check is not ported.
+  double-check is not ported. So are `ActionCable::Server::Base#worker_pool`'s
+  and `#pubsub`'s `@mutex.synchronize` (`actioncable/lib/action_cable/server/base.rb:92,97`):
+  the adapter file is loaded by an awaited step first, and neither
+  constructor call has an `await`.
 - **A bare `block()`**: `GeneratedAttributeMethods::LOCK`
   (`activerecord/lib/active_record/attribute_methods.rb:26`), taken by
   `define_attribute_methods` (`:108`) and `undefine_attribute_methods`

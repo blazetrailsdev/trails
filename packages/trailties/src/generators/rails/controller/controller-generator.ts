@@ -45,7 +45,7 @@ export class ControllerGenerator extends GeneratorBase {
 
     const source = emitControllerClass({
       className: paths.className,
-      parent: parentRefForRelative(parent, depth),
+      parent: parentRefForRelative(parent, depth, this.ext()),
       methods: actions.map((a) => actionMethod(a, ts)),
     });
     this.createFile(`app/controllers/${paths.controllerFile}${ext}`, source);

@@ -1,6 +1,6 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { ActiveRecord } from "./namespaces.js";
-import { compact, groupBy, rbFSend, rbModConstSet, take, uniq } from "@blazetrails/ruby-compat";
+import { groupBy, rbFSend, rbModConstSet, take, uniq } from "@blazetrails/ruby-compat";
 import { stripThenable } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
@@ -44,7 +44,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
     const recordsById = groupBy(records as T[], (record) => record.get(this.key));
 
     records = (await this.ids()).flatMap((id) => recordsById.get(id));
-    records = compact(records);
+    records = records.filter((x) => x != null);
 
     this._records = records as T[];
     return stripThenable(this);

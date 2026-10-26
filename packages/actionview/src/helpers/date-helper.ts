@@ -18,6 +18,7 @@ import {
   type Included,
   rbFSend,
   rbInspect,
+  rbCNumeric,
   rbObjRespondTo,
   Range,
   rbBlockGivenP,
@@ -26,6 +27,7 @@ import {
   type Block,
   numStep,
   sprintf,
+  defineModule,
 } from "@blazetrails/ruby-compat";
 
 import "../action-view.js";
@@ -108,7 +110,7 @@ export function distanceOfTimeInWords(
 
 /** @internal */
 function normalizeDistanceOfTimeArgumentToTime(value: DistanceOfTimeInput): Time {
-  if (typeof value === "number") {
+  if (value instanceof rbCNumeric) {
     return Time.at(value);
   } else if (rbObjRespondTo(value, "toTime")) {
     return rbFSend(value, "toTime") as Time;
@@ -239,7 +241,7 @@ export function timeTag(
   );
 }
 
-export const DateHelper = {
+export const DateHelper = defineModule({
   distanceOfTimeInWords,
   distanceOfTimeInWordsToNow,
   timeAgoInWords,
@@ -256,7 +258,7 @@ export const DateHelper = {
   selectMonth,
   selectYear,
   timeTag,
-};
+});
 
 type DateType = "year" | "month" | "day" | "hour" | "minute" | "second";
 

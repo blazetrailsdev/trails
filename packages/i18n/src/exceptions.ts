@@ -1,4 +1,4 @@
-import { EMPTY_HASH, normalizeKeys, toSym } from "./i18n.js";
+import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
 import {
   ArgumentError as RubyArgumentError,
@@ -7,6 +7,7 @@ import {
   isSymbol,
   rbInspect,
   symbolToS,
+  toSym,
 } from "@blazetrails/ruby-compat";
 
 export { NoMethodError };

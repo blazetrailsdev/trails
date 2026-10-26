@@ -16,7 +16,6 @@ import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfi
 import * as UrlHelper from "../helpers/url-helper.js";
 import { raw } from "../helpers/output-safety-helper.js";
 import { Template } from "../template.js";
-import { TemplateHandlers } from "./handlers.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 
 class Workshop {
@@ -96,7 +95,7 @@ const renderTse = async (string: string): Promise<string> => {
   const template = new Template(
     string.trim(),
     "test template",
-    TemplateHandlers.handlerForExtension("tse")!,
+    Template.handlerForExtension("tse")!,
     { format: ":html", locals: [] },
   );
   const view = Base.withEmptyTemplateCache();

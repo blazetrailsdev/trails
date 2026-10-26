@@ -687,6 +687,9 @@ class ApiExtractor
       end
     when :sclass
       process_sclass(node)
+    when :massign
+      record_massign_constants(node[1])
+      node.each { |child| walk(child) if child.is_a?(Array) }
     when :assign
       # Handle `CONST = Struct.new(...) do ... end` — methods defined in the
       # block belong to the struct, not to the enclosing module.
@@ -1238,6 +1241,8 @@ class ApiExtractor
         process_def_delegators(node[2])
       when "module_function"
         process_module_function(node[2])
+      when "register_detail"
+        process_register_detail(node[2])
       when "define_method"
         # Block-less parenthesized form, `define_method(:foo, some_proc)` —
         # the counterpart of process_command's bare-command arm. The far
@@ -2192,6 +2197,32 @@ class ApiExtractor
     maybe_update_module_file(fqn, target)
   end
 
+  # `LookupContext.register_detail(:x) { … }`
+  # (actionview/lib/action_view/lookup_context.rb:21-34) defines `default_x`
+  # with `Accessors.define_method` and `x` / `x=` through `Accessors.module_eval`,
+  # so the three methods exist only once each call runs.
+  def process_register_detail(args)
+    return unless current_fqn == "ActionView::LookupContext"
+
+    target = @modules["ActionView::LookupContext::Accessors"]
+    return unless target
+
+    extract_symbol_args(args).each do |name|
+      target[:instanceMethods] << {
+        name: "default_#{name}", visibility: "public", params: [],
+        file: @current_file, line: @current_line, notes: "register_detail",
+      }
+      target[:instanceMethods] << {
+        name: name, visibility: "public", params: [],
+        file: @current_file, line: @current_line, notes: "register_detail",
+      }
+      target[:instanceMethods] << {
+        name: "#{name}=", visibility: "public", params: [{ name: "value", kind: "required" }],
+        file: @current_file, line: @current_line, notes: "register_detail",
+      }
+    end
+  end
+
   # `define_method "<name>" do … end` / `define_method(:name) { … }` with a name
   # that is a plain literal. The block's parameters become the method's params,
   # so a metaprogrammed method carries the same arity information a literal
@@ -2451,9 +2482,22 @@ class ApiExtractor
   # receiver kind and template kind (`define_method` vs `class_eval`)
   # independent instead of a hard-wired pair.
   def each_loop_members(node)
+    node = name_preserving_map_receiver(node) || node
     literal_array_members(node) ||
       resolve_const_symbol_array(const_name(node)) ||
       resolve_const_symbol_hash_keys(const_name(node))
+  end
+
+  def name_preserving_map_receiver(node)
+    return nil unless node.is_a?(Array) && node[0] == :method_add_arg
+    call = node[1]
+    return nil unless call.is_a?(Array) && call[0] == :call
+    return nil unless %w[collect map].include?(ident_name(call[3]))
+    paren = node[2]
+    return nil unless paren.is_a?(Array) && paren[0] == :arg_paren
+    block_arg = paren[1].is_a?(Array) && paren[1][0] == :args_add_block ? paren[1][2] : nil
+    return nil unless %w[to_sym to_s].include?(literal_method_name(block_arg))
+    call[1]
   end
 
   # Members of a literal `[:a, :b]` / `%w[a b]` receiver, as strings. Any
@@ -3135,15 +3179,17 @@ class ApiExtractor
   # Hash forms (`in`, `delete`, `Object.assign`, a spread, an `Object.entries`
   # loop) for the Hash calls each one ports.
   RECEIVER_NAMED_CALLS = %w[
-    size length call key? has_key? include? member? delete merge! update merge each_pair
+    size length call key? has_key? include? member? delete merge! update merge each_pair fetch
   ].freeze
 
   # The Hash calls whose block arm no native form ports: the miss block of
   # `delete` and the conflict block of `merge` / `merge!` / `update`. A site
   # passing one, literal or `&blk`, records its receiver as unnamed, so no form
   # credits it. Neither does a `delete` whose removed value is used: JS
-  # `delete` answers a boolean.
-  BLOCK_ARM_HASH_CALLS = %w[delete merge merge! update].freeze
+  # `delete` answers a boolean. `fetch` keeps only its two-argument arm
+  # (`vendor/ruby/v3.3.11/hash.c:2176`): the KeyError arm and the miss block
+  # have no native form.
+  BLOCK_ARM_HASH_CALLS = %w[delete merge merge! update fetch].freeze
 
   FORM_ARMS = {
     "uniq" => ->(has_block, _args) { !has_block },
@@ -3962,6 +4008,15 @@ class ApiExtractor
   # assignment like any other — it just reaches Ripper as a `const_path_field`
   # rather than a `var_field`, which used to drop it from the allow-set and
   # leave its faithful TS port scoring as novel surface.
+  def record_massign_constants(targets)
+    return unless targets.is_a?(Array)
+    if targets[0] == :var_field && targets[1].is_a?(Array) && targets[1][0] == :@const
+      (@file_constants[@current_file] ||= {})[targets[1][1]] ||= { kind: "expr" }
+      return
+    end
+    targets.each { |child| record_massign_constants(child) if child.is_a?(Array) }
+  end
+
   def maybe_record_constant(lhs, rhs)
     const =
       if lhs.is_a?(Array) && lhs[0] == :var_field
@@ -4514,7 +4569,8 @@ class ApiExtractor
       (@call_receivers[name] ||= Set.new) << kind
       if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
         formless = ((has_block || block_pass?(args)) && BLOCK_ARM_HASH_CALLS.include?(name)) ||
-                   (value_used && name == "delete")
+                   (value_used && name == "delete") ||
+                   (name == "fetch" && positional_arg_count(args) != 2)
         recv_name = name == "merge" ? merge_receiver_name(recv) : receiver_tail_name(recv)
         (@call_receiver_names[name] ||= Set.new) << ((!formless && recv_name) || "?")
       end

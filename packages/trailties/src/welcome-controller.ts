@@ -1,4 +1,4 @@
-import { controllerConstants } from "@blazetrails/actionpack";
+import { registerController } from "@blazetrails/actionpack";
 import { ApplicationController } from "./application-controller.js";
 
 export class WelcomeController extends ApplicationController {
@@ -15,4 +15,4 @@ export class WelcomeController extends ApplicationController {
 
 WelcomeController.skipBeforeAction("verifyAuthenticityToken", { raise: false });
 
-controllerConstants.set("rails/welcome", WelcomeController);
+registerController("Rails::WelcomeController", WelcomeController);

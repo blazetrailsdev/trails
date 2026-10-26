@@ -342,7 +342,6 @@ class TestController extends ActionController.Base {
   async greeting(): Promise<void> {}
 
   async builderLayoutTest(): Promise<void> {
-    // BLOCKED: render-test-controller-gaps-owner-rulings
     this.name = null as unknown as string;
     await this.render({ action: "hello", layout: "layouts/builder" });
   }
@@ -434,11 +433,11 @@ class TestController extends ActionController.Base {
   }
 
   async helloWorldFromRxmlUsingAction(): Promise<void> {
-    await this.render({ action: "hello_world_from_rxml", handlers: ["builder"] });
+    await this.render({ action: "helloWorldFromRxml", handlers: [":builder"] });
   }
 
   async helloWorldFromRxmlUsingTemplate(): Promise<void> {
-    await this.render({ template: "test/hello_world_from_rxml", handlers: ["builder"] });
+    await this.render({ template: "test/hello-world-from-rxml", handlers: [":builder"] });
   }
 
   async actionTalkToLayout(): Promise<void> {}
@@ -748,8 +747,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
-  // BLOCKED: render-test-controller-gaps-owner-rulings — view instance_variables list
-  test.skip("controller does not leak instance variables", async () => {
+  test("controller does not leak instance variables", async () => {
     const expected = [
       "_assigns",
       "_config",
@@ -813,8 +811,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello world!");
   });
 
-  // BLOCKED: render-test-controller-gaps-owner-rulings — action-name lookup folds case
-  test.skip("render action upcased", async () => {
+  test("render action upcased", async () => {
     await expect(testCase.get("renderActionUpcasedHelloWorld")).rejects.toThrow(MissingTemplate);
   });
 
@@ -937,8 +934,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("test");
   });
 
-  // BLOCKED: port-builder-template-handler
-  test.skip("render xml", async () => {
+  test("render xml", async () => {
     await testCase.get("renderXmlHello");
     expect(testCase.response.body).toBe(
       "<html>\n  <p>Hello David</p>\n<p>This is grand!</p>\n</html>\n",
@@ -946,8 +942,7 @@ describe("RenderTest", () => {
     expect(testCase.response.mediaType).toBe("application/xml");
   });
 
-  // BLOCKED: port-builder-template-handler
-  test.skip("render xml as string template", async () => {
+  test("render xml as string template", async () => {
     await testCase.get("renderXmlHelloAsStringTemplate");
     expect(testCase.response.body).toBe(
       "<html>\n  <p>Hello David</p>\n<p>This is grand!</p>\n</html>\n",
@@ -960,8 +955,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<p>This is grand!</p>\n");
   });
 
-  // BLOCKED: port-builder-template-handler
-  test.skip("render xml with partial", async () => {
+  test("render xml with partial", async () => {
     await testCase.get("builderPartialTest");
     expect(testCase.response.body).toBe("<test>\n  <hello/>\n</test>\n");
   });
@@ -971,8 +965,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
-  // BLOCKED: port-builder-template-handler
-  test.skip("render xml with layouts", async () => {
+  test("render xml with layouts", async () => {
     await testCase.get("builderLayoutTest");
     expect(testCase.response.body).toBe(
       "<wrapper>\n<html>\n  <p>Hello </p>\n<p>This is grand!</p>\n</html>\n</wrapper>\n",
@@ -1154,7 +1147,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hi web users! here is some cached stuff");
   });
 
-  // BLOCKED: render-test-controller-gaps-owner-rulings — private name helper collides with @name
+  // PERMANENT-SKIP: ruled by the repo owner on 2026-10-26 — `@name` and the private `name` helper (`render_test.rb:52-57`) are one JS property on the view.
   test.skip("rendering with conflicting local vars", async () => {
     await testCase.get("renderingWithConflictingLocalVars");
     expect(testCase.response.body).toBe(
@@ -1189,8 +1182,7 @@ describe("RenderTest", () => {
     );
   });
 
-  // BLOCKED: port-builder-template-handler
-  test.skip("overwriting rendering relative file with extension", async () => {
+  test("overwriting rendering relative file with extension", async () => {
     await testCase.get("helloWorldFromRxmlUsingTemplate");
     expect(testCase.response.body).toBe("<html>\n  <p>Hello</p>\n</html>\n");
     await testCase.get("helloWorldFromRxmlUsingAction");
@@ -1277,8 +1269,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello: david");
   });
 
-  // BLOCKED: render-test-controller-gaps-owner-rulings — Parameters not read as partial locals
-  test.skip("partial with hashlike locals", async () => {
+  test("partial with hashlike locals", async () => {
     await testCase.get("partialWithHashlikeLocals");
     expect(testCase.response.body).toBe("Hello: david");
   });

@@ -2,7 +2,6 @@ import { LoadError } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/ruby-compat" {
   interface LoadError {
-    path?: string | null;
     isMissing(location: string): boolean;
   }
 }

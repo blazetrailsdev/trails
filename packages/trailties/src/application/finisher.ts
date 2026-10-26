@@ -1,17 +1,19 @@
-import { camelize, DescendantsTracker, runLoadHooks, underscore } from "@blazetrails/activesupport";
-import { Base as JobBase } from "@blazetrails/activejob";
-import { getFs, getPath, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  camelize,
+  DescendantsTracker,
+  runLoadHooks,
+  TopLevel,
+  underscore,
+} from "@blazetrails/activesupport";
+import { Base as JobBase, registerJob } from "@blazetrails/activejob";
+import { getFs, getPath, isRegisteredConstant, registerConstant } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { Root } from "../paths.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { DrawCallback } from "@blazetrails/actionpack";
-import {
-  ActionController,
-  controllerConstants,
-  type DispatchableControllerClass,
-} from "@blazetrails/actionpack";
+import { ActionController, registerController } from "@blazetrails/actionpack";
 import { Base, registerModel } from "@blazetrails/activerecord";
 
 export interface FinisherRoutes {
@@ -72,12 +74,10 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
 });
 
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
-  for (const [name, klass] of await loadControllers(this.paths())) {
-    controllerConstants.set(name, klass);
-  }
-  for (const klass of controllerConstants.values()) await defineController(klass);
+  await loadControllers(this.paths());
   registerModel(await loadModels(this.paths()));
   await loadJobs(this.paths());
+  await loadChannels(this.paths());
 });
 
 Finisher.initializer(
@@ -214,42 +214,11 @@ Finisher.initializer(
 );
 
 /** @noRailsEquivalent PERMANENT */
-async function loadControllers(paths: Root): Promise<Map<string, DispatchableControllerClass>> {
-  const out = new Map<string, DispatchableControllerClass>();
-  const node = paths.get("app/controllers");
-  if (!node) return out;
-
-  for (const dir of await node.existentDirectories()) {
-    await collectControllers(dir, "", out);
-  }
-  return out;
-}
-
-/** @internal */
-async function collectControllers(
-  dir: string,
-  prefix: string,
-  out: Map<string, DispatchableControllerClass>,
-): Promise<void> {
-  const fs = getFs();
-  const p = getPath();
-  if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
-
-  for (const entry of await fs.readdir(dir)) {
-    const full = p.join(dir, entry);
-    if ((await fs.stat(full)).isDirectory()) {
-      await collectControllers(full, `${prefix}${underscore(entry.replace(/-/g, "_"))}/`, out);
-      continue;
-    }
-    const match = entry.match(/^(.+)[-_]controller\.(?:ts|js)$/);
-    if (!match) continue;
-    const mod = (await import(p.pathToFileURL(full).href)) as Record<string, unknown>;
-    for (const value of Object.values(mod)) {
-      if (typeof value === "function" && value.name.endsWith("Controller")) {
-        const name = `${prefix}${underscore(match[1].replace(/-/g, "_"))}`;
-        out.set(name, value as DispatchableControllerClass);
-      }
-    }
+async function loadControllers(paths: Root): Promise<void> {
+  for (const [prefix, klass] of await loadAppClasses(paths, "controllers", ActionController.Base)) {
+    if (prefix) registerController(`${prefix}${klass.name}`, klass);
+    else registerController(klass);
+    await defineController(klass);
   }
 }
 
@@ -272,32 +241,76 @@ async function defineController(klass: object): Promise<void> {
 
 /** @noRailsEquivalent PERMANENT */
 async function loadJobs(paths: Root): Promise<void> {
-  const node = paths.get("app");
-  if (!node) return;
+  for (const [prefix, klass] of await loadAppClasses(paths, "jobs", JobBase)) {
+    if (prefix) registerJob(`${prefix}${klass.name}`, klass);
+    else registerJob(klass);
+  }
+}
 
-  const p = getPath();
-  for (const dir of await node.existentDirectories()) {
-    if (p.basename(dir) === "jobs") await collectJobs(dir, "");
+/** @noRailsEquivalent PERMANENT */
+async function loadChannels(paths: Root): Promise<void> {
+  if (TopLevel.ActionCable == null) return;
+
+  const { ActionCable, registerChannel, registerConnection } =
+    await import("@blazetrails/actioncable");
+  for (const [prefix, klass] of await loadAppClasses(paths, "channels", ActionCable.Channel.Base)) {
+    if (prefix) registerChannel(`${prefix}${klass.name}`, klass);
+    else registerChannel(klass);
+  }
+  for (const [prefix, klass] of await loadAppClasses(
+    paths,
+    "channels",
+    ActionCable.Connection.Base,
+  )) {
+    if (prefix) registerConnection(`${prefix}${klass.name}`, klass);
+    else registerConnection(klass);
   }
 }
 
 /** @internal */
-async function collectJobs(dir: string, prefix: string): Promise<void> {
+async function loadAppClasses<T extends abstract new (...args: never[]) => unknown>(
+  paths: Root,
+  root: string,
+  base: T,
+): Promise<[string, T][]> {
+  const out: [string, T][] = [];
+  const node = paths.get("app");
+  if (!node) return out;
+
+  const p = getPath();
+  for (const dir of await node.existentDirectories()) {
+    if (p.basename(dir) === root) await collectAppClasses(dir, "", base, out);
+  }
+  return out;
+}
+
+/** @internal */
+async function collectAppClasses<T extends abstract new (...args: never[]) => unknown>(
+  dir: string,
+  prefix: string,
+  base: T,
+  out: [string, T][],
+): Promise<void> {
   const fs = getFs();
   const p = getPath();
   for (const entry of await fs.readdir!(dir)) {
     const full = p.join(dir, entry);
     if ((await fs.stat!(full)).isDirectory()) {
-      await collectJobs(full, `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}::`);
+      const namespace = `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}`;
+      if (!isRegisteredConstant(namespace)) registerConstant(namespace, {});
+      await collectAppClasses(full, `${namespace}::`, base, out);
       continue;
     }
-    const match = entry.match(/^(.+)\.(?:ts|js)$/);
-    if (!match || /\.d\.ts$/.test(entry)) continue;
+    if (!/\.(?:ts|js)$/.test(entry) || /\.d\.ts$/.test(entry)) continue;
     const mod = (await import(p.pathToFileURL!(full).href)) as Record<string, unknown>;
-    const cname = camelize(underscore(match[1].replace(/-/g, "_")));
-    const value = mod[cname];
-    if (typeof value === "function" && value.prototype instanceof JobBase) {
-      registerConstant(`${prefix}${cname}`, value);
+    for (const value of Object.values(mod)) {
+      if (
+        typeof value === "function" &&
+        value.prototype instanceof base &&
+        !out.some(([, klass]) => klass === value)
+      ) {
+        out.push([prefix, value as T]);
+      }
     }
   }
 }

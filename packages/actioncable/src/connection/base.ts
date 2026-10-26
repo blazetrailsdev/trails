@@ -10,14 +10,19 @@ import {
 } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { CONTENT_TYPE, Request as RackRequest } from "@blazetrails/rack";
+import type { Set as RubySet } from "@blazetrails/ruby-compat";
 import {
   rbEqq,
   rbFArray,
   rbInspect,
+  ArgumentError,
+  rbClassInheritedP,
   rbModConstSet,
+  registerConstant,
   rbModName,
   rbObjId,
   rbObjRespondTo,
+  rbProcCall,
   sprintf,
   toS,
 } from "@blazetrails/ruby-compat";
@@ -26,7 +31,10 @@ import { ActionCable, Connection } from "../namespaces.js";
 import type { Base as ServerBase } from "../server/base.js";
 import { Authorization } from "./authorization.js";
 import { Callbacks } from "./callbacks.js";
-import { Identification } from "./identification.js";
+import {
+  Identification,
+  type ClassMethods as IdentificationClassMethods,
+} from "./identification.js";
 import { InternalChannel } from "./internal-channel.js";
 import { MessageBuffer } from "./message-buffer.js";
 import { Subscriptions } from "./subscriptions.js";
@@ -41,6 +49,10 @@ interface Coder {
 type Env = Record<string, unknown>;
 
 export class Base {
+  declare static identifiedBy: (typeof IdentificationClassMethods)["identifiedBy"];
+  declare static identifiers: RubySet<string>;
+  declare static rescueHandlers: unknown[][];
+  declare static rescueFrom: (typeof Rescuable.ClassMethods)["rescueFrom"];
   declare connectionIdentifier: string;
   /** @internal */
   declare subscribeToInternalChannel: () => void;
@@ -177,7 +189,7 @@ export class Base {
   }
 
   /** @internal */
-  private get websocket(): WebSocket {
+  protected get websocket(): WebSocket {
     return this._websocket;
   }
 
@@ -216,7 +228,7 @@ export class Base {
   private async handleOpen(): Promise<unknown> {
     try {
       this._protocol = this.websocket.protocol;
-      if (rbObjRespondTo(this, "connect"))
+      if (typeof (this as unknown as { connect?: unknown }).connect === "function")
         await (this as unknown as { connect(): unknown }).connect();
       this.subscribeToInternalChannel();
       this.sendWelcomeMessage();
@@ -249,7 +261,7 @@ export class Base {
     await this.subscriptions.unsubscribeFromAll();
     this.unsubscribeFromInternalChannel();
 
-    if (rbObjRespondTo(this, "disconnect"))
+    if (typeof (this as unknown as { disconnect?: unknown }).disconnect === "function")
       return await (this as unknown as { disconnect(): unknown }).disconnect();
     return null;
   }
@@ -301,11 +313,7 @@ export class Base {
   private newTaggedLogger(): TaggedLoggerProxy {
     return new TaggedLoggerProxy(this.server.logger, {
       tags: this.server.config.logTags.map((tag) =>
-        rbObjRespondTo(tag, "call")
-          ? typeof tag === "function"
-            ? (tag as (request: Request) => unknown)(this.request)
-            : (tag as { call(request: Request): unknown }).call(this.request)
-          : camelize(toS(tag)),
+        rbObjRespondTo(tag, "call") ? rbProcCall(tag, this.request) : camelize(toS(tag)),
       ),
     });
   }
@@ -364,5 +372,34 @@ include(Base, Callbacks);
 include(Base, Rescuable);
 
 rbModConstSet(Connection, "Base", Base);
+
+/** @noRailsEquivalent PERMANENT */
+export function registerConnection(connection: typeof Base): void;
+export function registerConnection(name: string, connection: typeof Base): void;
+export function registerConnection(connections: (typeof Base)[]): void;
+export function registerConnection(
+  nameOrConnection: string | typeof Base | (typeof Base)[],
+  connection?: typeof Base,
+): void {
+  if (Array.isArray(nameOrConnection)) {
+    for (const k of nameOrConnection) registerConnection(k);
+    return;
+  }
+  if (typeof nameOrConnection === "string") {
+    if (!connection)
+      throw new ArgumentError("registerConnection(name, connection) requires a connection class");
+  } else {
+    connection = nameOrConnection;
+  }
+  if (typeof connection !== "function" || rbClassInheritedP(connection, Base) !== true) {
+    throw new ArgumentError(
+      `registerConnection expects an ActionCable::Connection::Base subclass, got ${String(connection?.name ?? connection)}`,
+    );
+  }
+  if (typeof nameOrConnection === "string") return registerConstant(nameOrConnection, connection);
+  registerConstant(connection.name, connection);
+  const qualified = rbModName(connection)!;
+  if (qualified !== connection.name) registerConstant(qualified, connection);
+}
 
 runLoadHooks("action_cable_connection", Base);

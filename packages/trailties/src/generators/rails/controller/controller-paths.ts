@@ -93,11 +93,15 @@ export function actionMethod(name: string, ts: boolean): Method {
   });
 }
 
-export function parentRefForRelative(parent: string, depth: number): { ref: Ref; import: Import } {
+export function parentRefForRelative(
+  parent: string,
+  depth: number,
+  ext: string,
+): { ref: Ref; import: Import } {
   const parentClass = classify(parent.replace(/::/g, "_").replace(/\//g, "_"));
   const parentPath = dasherize(underscore(parent.replace(/::/g, "_").replace(/\//g, "_")));
   const prefix = depth > 0 ? "../".repeat(depth) : "./";
-  const from = `${prefix}${parentPath}.js`;
+  const from = `${prefix}${parentPath}${ext}`;
   return {
     ref: ref(parentClass, from),
     import: { from, named: { [parentClass]: "named" } },

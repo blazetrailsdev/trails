@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Channel } from "../namespaces.js";
 
-type Handler = (message: unknown) => unknown;
+export type Handler = (message: unknown) => unknown;
 
 interface Coder {
   decode(message: unknown): unknown;
@@ -23,15 +23,15 @@ interface PubSub {
 interface StreamsConnection {
   server: { eventLoop: { post(task: null, block: () => unknown): unknown } };
   workerPool: { asyncInvoke(receiver: unknown, method: string, ...args: unknown[]): unknown };
-  pubsub: PubSub | Promise<PubSub>;
+  pubsub: PubSub;
 }
 
-interface StreamsChannel {
+export interface StreamsChannel {
   connection: StreamsConnection;
   logger: { info(message: string): unknown };
   _streams?: Record<string, Handler>;
   streams: Record<string, Handler>;
-  pubsub: PubSub | Promise<PubSub>;
+  pubsub: PubSub;
   deferSubscriptionConfirmationBang(): unknown;
   ensureConfirmationSent(): unknown;
   transmit(data: unknown, options: { via: string }): unknown;
@@ -48,7 +48,7 @@ interface StreamsChannel {
   identityHandler: typeof identityHandler;
 }
 
-type StreamOptions = { coder?: Coder | null };
+export type StreamOptions = { coder?: Coder | null };
 
 /** @missingRailsArgs subscribe — PERMANENT */
 function streamFrom(
@@ -72,7 +72,7 @@ function streamFrom(
   this.streams[broadcasting as string] = handler;
 
   this.connection.server.eventLoop.post(null, async () => {
-    return (await this.pubsub).subscribe(broadcasting as string, handler, () => {
+    return this.pubsub.subscribe(broadcasting as string, handler, () => {
       this.ensureConfirmationSent();
       this.logger.info(
         `${rbModName(rbObjClass(this)) as string} is streaming from ${broadcasting as string}`,
@@ -98,7 +98,7 @@ function streamFor(
 async function stopStreamFrom(this: StreamsChannel, broadcasting: string): Promise<void> {
   const callback = hashDelete(this.streams, broadcasting);
   if (callback != null) {
-    await (await this.pubsub).unsubscribe(broadcasting, callback);
+    await this.pubsub.unsubscribe(broadcasting, callback);
     this.logger.info(
       `${rbModName(rbObjClass(this)) as string} stopped streaming from ${broadcasting}`,
     );
@@ -112,7 +112,7 @@ function stopStreamFor(this: StreamsChannel, model: unknown): Promise<void> {
 async function stopAllStreams(this: StreamsChannel): Promise<void> {
   const streams = this.streams;
   for (const [broadcasting, callback] of Object.entries(streams)) {
-    await (await this.pubsub).unsubscribe(broadcasting, callback);
+    await this.pubsub.unsubscribe(broadcasting, callback);
     this.logger.info(
       `${rbModName(rbObjClass(this)) as string} stopped streaming from ${broadcasting}`,
     );
@@ -200,12 +200,19 @@ function identityHandler(): Handler {
 }
 
 export const Streams = defineModule(
-  { streamFrom, streamFor, stopStreamFrom, stopStreamFor, stopAllStreams, streamOrRejectFor },
-  {},
   {
-    get pubsub(): PubSub | Promise<PubSub> {
+    streamFrom,
+    streamFor,
+    stopStreamFrom,
+    stopStreamFor,
+    stopAllStreams,
+    streamOrRejectFor,
+    get pubsub(): PubSub {
       return (this as unknown as StreamsChannel).connection.pubsub;
     },
+  },
+  {},
+  {
     get streams(): Record<string, Handler> {
       return ((this as unknown as StreamsChannel)._streams ??= {});
     },

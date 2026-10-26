@@ -1,4 +1,3 @@
-const content = await _();
-xml.wrapper(() => {
-  xml.append(content);
+await xml.wrapper(async () => {
+  xml.append(await _());
 });

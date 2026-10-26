@@ -6,18 +6,21 @@ export CI_BG_DIR="${CI_BG_DIR:-$(mktemp -d)}"
 
 pkg="${1:?usage: scoped-comparison.sh <package>}"
 
-case "$pkg" in
-  thor) src=packages/trailties/src/thor ;;
-  *) src="packages/$pkg/src" ;;
-esac
+src="packages/$pkg/src"
 
 only="with_entries(select(.key == \"$pkg\"))"
-with_activesupport="with_entries(select(.key == \"$pkg\" or .key == \"activesupport\"))"
-LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths | jq -c "$with_activesupport")
-if [ "$(echo "$LIB_PATHS_JSON" | jq -c "$only")" = "{}" ]; then
+ALL_LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths)
+pkg_lib=$(echo "$ALL_LIB_PATHS_JSON" | jq -r --arg pkg "$pkg" '.[$pkg] // empty')
+if [ -z "$pkg_lib" ]; then
   echo "::error::$pkg has no vendored lib path, so it is not enrolled in the compare tooling and cannot be compared alone"
   exit 1
 fi
+mixin_keys=$(
+  { grep -rhoE '^\s*(include|extend|prepend)\s+(::)?[A-Z][A-Za-z0-9]*' "$pkg_lib" --include='*.rb' || true; } |
+    sed -E 's/.*[[:space:]](::)?//' | tr '[:upper:]' '[:lower:]' | sort -u | jq -R . | jq -sc .
+)
+LIB_PATHS_JSON=$(echo "$ALL_LIB_PATHS_JSON" | jq -c --arg pkg "$pkg" --argjson mixins "$mixin_keys" \
+  'with_entries(select(.key == $pkg or (.key as $k | $mixins | index($k))))')
 LIB_ENTRY_FILES_JSON=$(pnpm --silent vendor:fetch --print-lib-entry-files | jq -c "$only")
 LIB_EXTRA_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-extra-paths | jq -c "$only")
 TEST_PATHS_JSON=$(pnpm --silent vendor:fetch --print-test-paths | jq -c "$only")

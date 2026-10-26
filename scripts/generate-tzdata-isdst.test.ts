@@ -4,7 +4,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { tzdataIsdst } from "../packages/date/src/tzdata-isdst.js";
+import { TZDATA_VERSION, tzdataIsdst } from "../packages/date/src/tzdata-isdst.js";
+import { zoneinfo, zoneinfoEnv } from "./tzdata-zoneinfo.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -12,10 +13,14 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const GENERATOR = path.join(REPO_ROOT, "scripts", "generate-tzdata-isdst.ts");
 const TZDATA_ISDST = path.join(REPO_ROOT, "packages", "date", "src", "tzdata-isdst.ts");
 
-/** The generator needs `ruby` with the `tzinfo` gem; a runner without them skips. */
+/**
+ * The generator needs `ruby` with the `tzinfo` gem, and `curl` / `zic` to build
+ * the zoneinfo for Node's tzdata release; a runner without them skips.
+ */
 async function hasTzinfo(): Promise<boolean> {
   try {
     await execFileAsync("ruby", ["-e", 'require "tzinfo"']);
+    await zoneinfo();
     return true;
   } catch {
     return false;
@@ -44,6 +49,12 @@ puts JSON.generate(out)
 `;
 
 describe("generate-tzdata-isdst", () => {
+  // A Node upgrade moves its ICU to a new tzdata release; the table has to be
+  // regenerated from that release, or the port reads two releases at once.
+  it("was generated from the tzdata release Node carries", () => {
+    expect(TZDATA_VERSION).toBe(process.versions.tz);
+  });
+
   // TZDATA_ISDST carries the `isdst` bit MRI reads off the zoneinfo file, so a
   // tzdata release that revises a zone's transition history — a retroactive
   // correction, a newly-announced permanent shift — silently changes what
@@ -74,7 +85,7 @@ describe("generate-tzdata-isdst", () => {
     const { stdout } = await execFileAsync(
       "ruby",
       ["-e", MRI_GRID_SCRIPT, JSON.stringify(identifiers)],
-      { maxBuffer: 64 * 1024 * 1024 },
+      { env: await zoneinfoEnv(), maxBuffer: 64 * 1024 * 1024 },
     );
     const samples = JSON.parse(stdout) as [string, number, boolean][];
 

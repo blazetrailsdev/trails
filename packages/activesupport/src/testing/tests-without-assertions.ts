@@ -1,8 +1,8 @@
-import { rbObjMethod } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rbObjMethod } from "@blazetrails/ruby-compat";
 import type { Test } from "./assertions.js";
 
-export function afterTeardown(this: Test, super_: () => unknown): unknown {
-  const result = super_();
+export function afterTeardown(this: Test): unknown {
+  const result = rbCallSuper(this, afterTeardown);
   const check = (): void => {
     if (this.assertions === 0 && !this.isSkipped() && !this.isError()) {
       const [file, line] = rbObjMethod(this, this.name).sourceLocation() ?? [];

@@ -1,9 +1,9 @@
-import { ActionController, controllerConstants } from "@blazetrails/actionpack";
+import { ActionController, registerController } from "@blazetrails/actionpack";
 import { ApplicationController } from "./application-controller.js";
 
 type PWARenderOptions = ActionController.RenderOptions & { template?: string };
 
-export class PWAController extends ApplicationController {
+export class PwaController extends ApplicationController {
   static override controllerPath(): string {
     return "rails/pwa";
   }
@@ -17,6 +17,6 @@ export class PWAController extends ApplicationController {
   }
 }
 
-PWAController.skipBeforeAction("verifyAuthenticityToken", { raise: false });
+PwaController.skipBeforeAction("verifyAuthenticityToken", { raise: false });
 
-controllerConstants.set("rails/pwa", PWAController);
+registerController("Rails::PwaController", PwaController);

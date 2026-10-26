@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "../../base.js";
-import { TemplateHandlers } from "../handlers.js";
+import { Handlers } from "../handlers.js";
+import { Template } from "../../template.js";
 import { TSE, type TseImplementation } from "./tse.js";
 
 describe("Template::Handlers::Tse", () => {
@@ -16,7 +17,7 @@ describe("Template::Handlers::Tse", () => {
     TSE.stripTrailingNewlines = originalStrip;
     TSE.tseTrimMode = originalTrim;
     Base.annotateRenderedViewWithFilenames = originalAnnotate;
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("supports the streaming protocol", () => {
@@ -235,7 +236,7 @@ describe("Template::Handlers::Tse", () => {
 
   it("registers against the .tse extension via Template::Handlers", () => {
     const tse = new TSE();
-    TemplateHandlers.registerTemplateHandler("tse", tse);
-    expect(TemplateHandlers.handlerForExtension("tse")).toBe(tse);
+    Template.registerTemplateHandler("tse", tse);
+    expect(Template.handlerForExtension("tse")).toBe(tse);
   });
 });

@@ -1,5 +1,5 @@
 import * as namespaces from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Enumerable, rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
   mattrAccessor,
@@ -74,8 +74,10 @@ export class ActionFilter implements CallbackPredicateLike {
   isMatch(controller: Base): boolean {
     const Constructor = controller.constructor as { raiseOnMissingCallbackActions?: boolean };
     if (Constructor.raiseOnMissingCallbackActions) {
-      const missingAction = [...this._actions].find((a) => !controller.isAvailableAction(a));
-      if (missingAction !== undefined) {
+      const missingAction = new Enumerable(this._actions).find(
+        (action: string) => !controller.isAvailableAction(action),
+      ) as string | null;
+      if (missingAction != null) {
         const filterNames =
           this._filters.length === 1
             ? _inspectFilter(this._filters[0])

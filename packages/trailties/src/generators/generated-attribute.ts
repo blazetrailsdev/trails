@@ -1,7 +1,7 @@
 import { humanize, pluralize, singularize } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import { Trails } from "../rails.js";
-import { Error as ThorError } from "../thor/error.js";
+import { Error as ThorError } from "@blazetrails/thor/error";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export class GeneratorError extends ThorError {}

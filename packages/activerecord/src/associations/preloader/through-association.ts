@@ -4,10 +4,11 @@ import { Association } from "./association.js";
 import { Associations } from "../../namespaces.js";
 import { any } from "@blazetrails/activesupport";
 import {
+  sortByBang,
   Hash,
+  eachWithObject,
   first,
   isEmpty,
-  rbObjRespondTo,
   reduce,
   union,
   uniq,
@@ -34,39 +35,38 @@ export class ThroughAssociation extends Association {
   async recordsByOwner(): Promise<Map<Base, Base[]>> {
     if (this._recordsByOwner !== undefined) return this._recordsByOwner;
 
-    const result = new Hash<Base, Base[]>();
-
-    for (const owner of this.owners) {
-      if (this.isLoaded(owner)) {
-        result.set(owner, this.targetFor(owner));
-        continue;
-      }
-
-      let throughRecords = (await this.throughRecordsByOwner())!.get(owner) ?? [];
-
-      if (first(this.owners)!.association(this.throughReflection.name).loaded) {
-        const sourceType = this.reflection.options.sourceType;
-        if (sourceType) {
-          throughRecords = throughRecords.filter(
-            (record) => record.readAttribute(this.reflection.foreignType!) === sourceType,
-          );
+    return (this._recordsByOwner = await eachWithObject(
+      this.owners,
+      new Hash<Base, Base[]>(),
+      async (owner, result) => {
+        if (this.isLoaded(owner)) {
+          result.set(owner, this.targetFor(owner));
+          return;
         }
-      }
 
-      const sourceRecordsByOwner = (await this.sourceRecordsByOwner())!;
-      let records = throughRecords.flatMap((record) => sourceRecordsByOwner.get(record) ?? []);
+        let throughRecords = (await this.throughRecordsByOwner())!.get(owner) ?? [];
 
-      records = records.filter((record) => record != null);
-      if (any(this.scope.orderValues)) {
-        const preloadIndex = await this.preloadIndex();
-        records.sort((a, b) => (preloadIndex.get(a) ?? 0) - (preloadIndex.get(b) ?? 0));
-      }
-      if (this.scope.distinctValue) records = uniq(records);
-      result.set(owner, records);
-    }
+        if (first(this.owners)!.association(this.throughReflection.name).loaded) {
+          const sourceType = this.reflection.options.sourceType;
+          if (sourceType) {
+            throughRecords = throughRecords.filter(
+              (record) => record.readAttribute(this.reflection.foreignType!) === sourceType,
+            );
+          }
+        }
 
-    this._recordsByOwner = result;
-    return result;
+        const sourceRecordsByOwner = (await this.sourceRecordsByOwner())!;
+        let records = throughRecords.flatMap((record) => sourceRecordsByOwner.get(record) ?? []);
+
+        records = records.filter((record) => record != null);
+        if (any(this.scope.orderValues)) {
+          const preloadIndex = await this.preloadIndex();
+          sortByBang(records, (rhs) => preloadIndex.get(rhs));
+        }
+        if (this.scope.distinctValue) records = uniq(records);
+        result.set(owner, records);
+      },
+    ));
   }
 
   async runnableLoaders(): Promise<Association[]> {
@@ -98,7 +98,7 @@ export class ThroughAssociation extends Association {
       const sourceClasses = this.sourceReflection.chain
         .filter(
           (reflection) =>
-            !(rbObjRespondTo(reflection, "isPolymorphic") && reflection.isPolymorphic()),
+            !(typeof reflection.isPolymorphic === "function" && reflection.isPolymorphic()),
         )
         .map((reflection) => reflection.klass);
       return uniq([...throughClasses, ...sourceClasses]);

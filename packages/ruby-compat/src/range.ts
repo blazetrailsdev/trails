@@ -14,6 +14,7 @@ import { cmp, rbCmpint } from "./comparable.js";
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
 import { rbInspect } from "./object.js";
+import { rubyNumIntervalStepSize } from "./numeric.js";
 
 const inspectRecursing = new Set<object>();
 
@@ -92,6 +93,24 @@ export class Range<T = unknown> {
      */
     readonly excludeEnd: boolean = false,
   ) {}
+
+  /**
+   * @noRailsEquivalent PERMANENT — core Ruby `Range#size`
+   * (`vendor/ruby/v3.3.11/range.c:836` `range_size`), over
+   * `ruby_num_interval_step_size` (`numeric.c:2798`) with a step of 1.
+   */
+  size(): number | bigint | null {
+    const b = this.begin;
+    const e = this.end;
+    if (typeof b === "number" || typeof b === "bigint") {
+      if (typeof e === "number" || typeof e === "bigint")
+        return rubyNumIntervalStepSize(b, e, this.excludeEnd);
+      if (e === null) return Infinity;
+    } else if (b === null) {
+      if (typeof e === "number" || typeof e === "bigint") return Infinity;
+    }
+    return null;
+  }
 
   /** Raises before any other check on a beginless range, as Ruby does
    *  (`vendor/ruby/v3.3.11/range.c:1243` `range_first`). */
@@ -263,9 +282,14 @@ export class Range<T = unknown> {
   }
 
   /** `vendor/ruby/v3.3.11/range.c:934` `range_each`. */
-  *each(): Generator<T> {
+  each(): Generator<T>;
+  each(block: (value: T) => unknown): this;
+  each(block?: ((value: T) => unknown) | null): Generator<T> | this;
+  each(block?: ((value: T) => unknown) | null): Generator<T> | this {
     if (this.begin === null) throw new TypeError("can't iterate from NilClass");
-    yield* this.step(1);
+    if (block == null) return this.step(1);
+    for (const v of this.step(1)) block(v);
+    return this;
   }
 
   /**
@@ -289,37 +313,44 @@ export class Range<T = unknown> {
   }
 
   /** `vendor/ruby/v3.3.11/range.c:439` `range_step`. */
-  *step(n: number = 1): Generator<T> {
+  step(n?: number): Generator<T>;
+  step(n: number, block: (value: T) => unknown): this;
+  step(n?: number, block?: ((value: T) => unknown) | null): Generator<T> | this;
+  step(n: number = 1, block?: ((value: T) => unknown) | null): Generator<T> | this {
     checkStepDomain(n);
-
-    if (typeof this.begin !== "number" && this.begin !== null) {
-      /* `step_i_iter` (`vendor/ruby/v3.3.11/range.c:312-325`) counts DOWN from `iter[0]`,
-         which `range_step` seeds at 1 (`:465`), and reseeds it to `step` on each
-         yield. So the first element always yields, and a fractional step never
-         lands on 0 again — which is exactly what MRI does here. */
-      let iter = 1;
-      let v = this.begin as T;
-      while (
-        this.end === null ||
-        (this.excludeEnd ? rLess(v, this.end) < 0 : rLess(v, this.end) <= 0)
-      ) {
-        if (--iter === 0) {
-          yield v;
-          iter = n;
+    const values = function* (this: Range<T>): Generator<T> {
+      if (typeof this.begin !== "number" && this.begin !== null) {
+        /* `step_i_iter` (`vendor/ruby/v3.3.11/range.c:312-325`) counts DOWN from `iter[0]`,
+           which `range_step` seeds at 1 (`:465`), and reseeds it to `step` on each
+           yield. So the first element always yields, and a fractional step never
+           lands on 0 again — which is exactly what MRI does here. */
+        let iter = 1;
+        let v = this.begin as T;
+        while (
+          this.end === null ||
+          (this.excludeEnd ? rLess(v, this.end) < 0 : rLess(v, this.end) <= 0)
+        ) {
+          if (--iter === 0) {
+            yield v;
+            iter = n;
+          }
+          v = objSucc(v);
         }
-        v = objSucc(v);
+        return;
       }
-      return;
-    }
 
-    let current = this.first() as number;
-    while (true) {
-      if (this.end !== null) {
-        const end = this.end as number;
-        if (this.excludeEnd ? current >= end : current > end) break;
+      let current = this.first() as number;
+      while (true) {
+        if (this.end !== null) {
+          const end = this.end as number;
+          if (this.excludeEnd ? current >= end : current > end) break;
+        }
+        yield current as T;
+        current += n;
       }
-      yield current as T;
-      current += n;
-    }
+    };
+    if (block == null) return values.call(this);
+    for (const v of values.call(this)) block(v);
+    return this;
   }
 }

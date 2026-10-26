@@ -472,7 +472,7 @@ describe("NamedScopingTest", () => {
   it("find all should behave like select", async () => {
     const toA = await Topic.base();
     expect((await Topic.base()).filter((t) => t.approved)).toEqual(
-      Enumerable.findAll.call(
+      Enumerable.prototype.findAll.call(
         { each: (block) => toA.forEach(block) },
         (t) => (t as Topic).approved,
       ),

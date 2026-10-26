@@ -388,8 +388,8 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/builder",
         libEntryFile: "lib/builder.rb",
         testPath: "test",
-        compareApi: false,
-        compareTests: false,
+        compareApi: true,
+        compareTests: true,
       },
     ],
   },
@@ -767,6 +767,77 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "test",
         compareApi: false,
         compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "raabro",
+    origin: {
+      type: "git",
+      url: "https://github.com/floraison/raabro.git",
+      ref: "v1.4.0",
+    },
+    packages: [
+      {
+        name: "raabro",
+        libPath: "lib",
+        testPath: "spec",
+        compareApi: true,
+        compareTests: true,
+      },
+    ],
+  },
+  {
+    name: "et-orbi",
+    origin: {
+      type: "git",
+      url: "https://github.com/floraison/et-orbi.git",
+      ref: "v1.2.11",
+    },
+    packages: [
+      {
+        name: "et-orbi",
+        libPath: "lib/et-orbi",
+        libEntryFile: "lib/et-orbi.rb",
+        testPath: "spec",
+        compareApi: true,
+        compareTests: true,
+      },
+    ],
+  },
+  {
+    name: "fugit",
+    origin: {
+      type: "git",
+      url: "https://github.com/floraison/fugit.git",
+      ref: "v1.11.1",
+    },
+    packages: [
+      {
+        name: "fugit",
+        libPath: "lib/fugit",
+        libEntryFile: "lib/fugit.rb",
+        testPath: "spec",
+        compareApi: true,
+        compareTests: true,
+      },
+    ],
+  },
+  {
+    name: "chronic",
+    origin: {
+      type: "git",
+      url: "https://github.com/mojombo/chronic.git",
+      ref: "v0.10.2",
+    },
+    packages: [
+      {
+        name: "chronic",
+        libPath: "lib/chronic",
+        libEntryFile: "lib/chronic.rb",
+        testPath: "test",
+        compareApi: true,
+        compareTests: true,
       },
     ],
   },

@@ -22,6 +22,7 @@ import {
   rbObjRespondTo,
   update,
   include,
+  defineModule,
 } from "@blazetrails/ruby-compat";
 
 import { ActionView } from "../namespaces.js";
@@ -509,6 +510,7 @@ export function submitTag(
   options: Record<string, unknown> | Hash<string, unknown> = {},
 ): SafeBuffer {
   options = deepStringifyKeys(options) as Record<string, unknown> | Hash<string, unknown>;
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options may be a Hash, which update converts through to_hash
   const tagOptions = update<unknown>({ type: "submit", name: "commit", value: value }, options);
   setDefaultDisableWith(value, tagOptions);
   return tag.call(this, "input", tagOptions) as SafeBuffer;
@@ -662,7 +664,7 @@ export function convertDirectUploadOptionToUrl(
   return options;
 }
 
-export const FormTagHelper = {
+export const FormTagHelper = defineModule({
   formTag,
   fieldId,
   fieldName,
@@ -704,7 +706,7 @@ export const FormTagHelper = {
   sanitizeToId,
   setDefaultDisableWith,
   convertDirectUploadOptionToUrl,
-};
+});
 
 extend(FormTagHelper, Concern);
 include(FormTagHelper, UrlHelper);

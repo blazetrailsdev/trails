@@ -2,7 +2,6 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { isBlank, isPresent, stripThenable } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import {
-  except,
   hashDelete,
   isModuleIncluded,
   Range,
@@ -28,7 +27,7 @@ import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotUnique } from "./errors.js";
-import { compact, groupBy, max, min, take } from "@blazetrails/ruby-compat";
+import { groupBy, max, min, take } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { PermittedAttributes, SerializeOptions } from "@blazetrails/activemodel";
 
@@ -396,9 +395,10 @@ export class Relation<T extends Base, G extends boolean = false> {
         : this._records
       : this.annotate("loading for inspect");
     const inspectEntries = (records: T[]): string => {
-      const entries = take(records, min(compact([this.limitValue, 11])) as number).map((record) =>
-        record.inspect(),
-      );
+      const entries = take(
+        records,
+        min([this.limitValue, 11].filter((x) => x != null)) as number,
+      ).map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
       return `#<${(this.constructor as typeof Relation).name} [${entries.join(", ")}]>`;
     };
@@ -406,7 +406,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return (
       subject instanceof Promise
         ? subject
-        : subject.take(min(compact([this.limitValue, 11])) as number)
+        : subject.take(min([this.limitValue, 11].filter((x) => x != null)) as number)
     ).then(inspectEntries);
   }
 
@@ -414,8 +414,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     const subject = this.isLoaded ? await this.records() : this.annotate("loading for pp");
     const entries = (
       Array.isArray(subject)
-        ? subject.slice(0, min(compact([this.limitValue, 11])) as number)
-        : await subject.take(min(compact([this.limitValue, 11])) as number)
+        ? subject.slice(0, min([this.limitValue, 11].filter((x) => x != null)) as number)
+        : await subject.take(min([this.limitValue, 11].filter((x) => x != null)) as number)
     ) as (T | string)[];
     if (entries.length === 11) entries[10] = "...";
     await pp.pp(entries);
@@ -590,7 +590,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     if (this.isNullRelation()) return false;
 
     if (isPresent(args))
-      return Enumerable.isAny.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+      return Enumerable.prototype.isAny.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
         this,
         ...args,
       );
@@ -609,7 +609,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     if (this.isNullRelation()) return false;
 
     if (isPresent(args))
-      return Enumerable.isOne.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+      return Enumerable.prototype.isOne.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
         this,
         ...args,
       );
@@ -980,7 +980,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   scopeForCreate(): Record<string, unknown> {
     const hash = this.whereClause.toH(this.model.tableName, { equalityOnly: true });
-    if (!isEmpty(this.createWithValue)) {
+    if (Object.keys(this.createWithValue).length > 0) {
       for (const [k, v] of Object.entries(this.createWithValue)) hash[k] = v;
     }
     return hash;
@@ -1454,7 +1454,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     if (this.isNullRelation()) return true;
 
     if (isPresent(args))
-      return Enumerable.isNone.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+      return Enumerable.prototype.isNone.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
         this,
         ...args,
       );
@@ -1489,7 +1489,8 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   /** @missingRailsName values — PERMANENT */
   valuesForQueries(): Record<string, unknown> {
-    return except(this._values, "extending", "skipQueryCache", "strictLoading");
+    const { extending, skipQueryCache, strictLoading, ...values } = this._values;
+    return values;
   }
 
   get isEmptyScope(): boolean {
@@ -1606,7 +1607,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         let arel: unknown;
         if (collection.hasLimitOrOffset) {
           const query = collection.select(sql(`${column} AS collection_cache_key_timestamp`));
-          if (this.distinctValue && isEmpty(collection.selectValues)) {
+          if (this.distinctValue && collection.selectValues.length === 0) {
             query.selectValues = [...query.selectValues, this.table.get(star())];
           }
           const subqueryAlias = "subquery_for_cache_key";

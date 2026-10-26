@@ -208,20 +208,26 @@ describe("AppGenerator", () => {
     expect(pkg.scripts["db:seed"]).toBeDefined();
     expect(pkg.scripts["db:setup"]).toBeDefined();
     expect(pkg.devDependencies.vite).toBeDefined();
-    expect(pkg.devDependencies.tsx).toBeDefined();
-    expect(pkg.scripts["db:seed"]).toContain("tsx");
-    expect(pkg.scripts.dev).toContain("tsx");
-    expect(pkg.scripts.trails).toContain("tsx");
+    expect(pkg.devDependencies.tsx).toBeUndefined();
+    expect(pkg.devDependencies.typescript).toBe("^5.8.0");
+    expect(pkg.scripts["db:seed"]).toBe("trails db seed");
+    expect(pkg.scripts.dev).toBe("trails server");
+    expect(pkg.scripts.trails).toBe("trails");
+    const tsconfig = JSON.parse(fs.readFileSync(appPath("tsconfig.json"), "utf-8"));
+    expect(tsconfig.compilerOptions.rewriteRelativeImportExtensions).toBe(true);
+    expect(tsconfig.compilerOptions.erasableSyntaxOnly).toBe(true);
     const binstub = (n: string) => fs.readFileSync(appPath("bin", n), "utf-8");
-    expect(binstub("trails")).toContain("tsx");
+    expect(binstub("trails")).toContain(
+      'setAppPath(join(import.meta.dirname, "../config/application.ts"));',
+    );
+    expect(binstub("trails")).toContain('await import("@blazetrails/trailties/commands");');
     expect(binstub("setup")).toContain("bin/trails");
     expect(binstub("dev")).toContain('"trails"');
-    for (const n of ["trails", "dev"]) {
+    for (const n of ["dev"]) {
       expect(binstub(n)).toContain("spawnSync");
       expect(binstub(n)).not.toContain('.join(" ")');
       expect(binstub(n)).toContain("fileURLToPath(import.meta.url)");
     }
-    expect(binstub("trails")).toContain('join(root, "node_modules", ".bin", "tsx")');
     const readme = fs.readFileSync(appPath("README.md"), "utf-8");
     expect(readme).not.toMatch(/^\| `trails /m);
   });
@@ -443,11 +449,11 @@ describe("AppGenerator", () => {
     expect(appConfig).toContain("Application.register(MyApp, import.meta.dirname);");
 
     const environment = fs.readFileSync(appPath("config/environment.ts"), "utf-8");
-    expect(environment).toContain(`import "./application.js";`);
+    expect(environment).toContain(`import "./application.ts";`);
     expect(environment).toContain("await Trails.initialize()");
 
     const configRu = fs.readFileSync(appPath("config.ts"), "utf-8");
-    expect(configRu).toContain(`import "./config/environment.js";`);
+    expect(configRu).toContain(`import "./config/environment.ts";`);
     expect(configRu).toContain("export default Trails.application;");
     expect(configRu).toContain("Trails.application.loadServer();");
   });

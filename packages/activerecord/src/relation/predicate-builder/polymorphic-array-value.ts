@@ -1,5 +1,5 @@
 import type { Base } from "../../base.js";
-import { Hash, eachWithObject, isEmpty } from "@blazetrails/ruby-compat";
+import { Hash, eachWithObject } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../../namespaces.js";
 export class PolymorphicArrayValue {
   private readonly _associatedTable: {
@@ -32,7 +32,7 @@ export class PolymorphicArrayValue {
   }
 
   queries(): Map<unknown, unknown>[] {
-    if (isEmpty(this.values)) {
+    if (this.values.length === 0) {
       return [new Map([[this.associatedTable.joinForeignKey, this.values]])];
     }
 

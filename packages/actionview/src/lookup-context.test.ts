@@ -6,7 +6,7 @@ import { Resolver } from "./template/resolver.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 import { Template } from "./template.js";
 import { TemplatePath } from "./template-path.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Handlers } from "./template/handlers.js";
 import { TSE } from "./template/handlers/tse.js";
 
 async function render(ctx: LookupContext, options: RenderOptions) {
@@ -138,11 +138,11 @@ describe("Base#render (trails)", () => {
   }
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("restores the parent's virtual path after a nested partial returns", async () => {
@@ -204,11 +204,11 @@ describe("LookupContext#render with a layout", () => {
   }
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("renders the content template inside the layout", async () => {

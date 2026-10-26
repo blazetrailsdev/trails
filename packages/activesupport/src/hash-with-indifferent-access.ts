@@ -217,6 +217,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       if (hash instanceof Map) {
         for (const [key, value] of hash) eachPairBlock(key as string, value as V);
       } else {
+        // eslint-disable-next-line blazetrails/ruby-compat-native-required -- hash may answer each itself, which eachPair dispatches on
         eachPair(hash as Record<string, V>, eachPairBlock);
       }
     }

@@ -322,9 +322,12 @@ export class Application extends Engine {
     { env = Trails.env.toString() }: { env?: string } = {},
   ): Promise<unknown> {
     const configDir = ((await this.paths().get("config")?.existent()) ?? [])[0];
-    const yaml = `${configDir}/${name}`;
+    const isPath = getPath().isAbsolute!(name);
+    const yaml = isPath ? name : `${configDir}/${name}`;
     let ext: string | undefined;
-    for (const e of [".ts", ".js"]) ext ??= (await getFs().exists(`${yaml}${e}`)) ? e : undefined;
+    for (const e of isPath ? [""] : [".ts", ".js"]) {
+      ext ??= (await getFs().exists(`${yaml}${e}`)) ? e : undefined;
+    }
     if (ext !== undefined) {
       const mod: { default?: unknown } = await import(
         getPath().pathToFileURL!(`${yaml}${ext}`).href

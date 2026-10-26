@@ -60,3 +60,33 @@ describe("Ruby extractor minitest spec forms", () => {
     expect(cases["expect receivers"]).toEqual({ count: 2, kinds: ["must_equal", "must_be"] });
   });
 });
+
+describe("Ruby extractor loop-member string escapes", () => {
+  it("unescapes a double-quoted member before inspecting it into a test name", () => {
+    const cases = rubyTestCases(`
+      describe Foo do
+        [ "\\n2018 +11", 'a\\nb' ].each do |s|
+          it "parses #{s.inspect}" do
+            expect(s).to eq(s)
+          end
+        end
+      end
+    `);
+    expect(Object.keys(cases)).toEqual(['parses "\\n2018 +11"', 'parses "a\\\\nb"']);
+  });
+});
+
+describe("Ruby extractor loop-member floats", () => {
+  it("unrolls a Float member into the test name, bound as a string like an Integer member", () => {
+    const cases = rubyTestCases(`
+      describe Foo do
+        [ [ 1001.05, 'PT1001.05S' ] ].each do |source, target|
+          it "turns numeric #{source.inspect} into ISO #{target.inspect}" do
+            expect(source).to eq(source)
+          end
+        end
+      end
+    `);
+    expect(Object.keys(cases)).toEqual(['turns numeric "1001.05" into ISO "PT1001.05S"']);
+  });
+});

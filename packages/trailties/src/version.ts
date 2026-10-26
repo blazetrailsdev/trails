@@ -1,1 +1,5 @@
-export const VERSION = "0.1.0";
+import { VERSION } from "./gem-version.js";
+
+export function version(): string {
+  return VERSION.STRING;
+}

@@ -3,8 +3,7 @@ import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
 import { Hash } from "./hash.js";
-import { IndexError } from "./index-error.js";
-import { find, partition } from "./enumerable.js";
+import { eachCons, find, partition, sortBy } from "./enumerable.js";
 import { rbBigNorm, rbPlus } from "./numeric.js";
 import { NoMethodError } from "./no-method-error.js";
 import {
@@ -514,6 +513,19 @@ function subseq<T>(ary: readonly T[], beg: number, len: number): T[] | null {
 }
 
 /**
+ * Mirrors: Ruby's Array#sort_by! — `vendor/ruby/v3.3.11/array.c:3593`
+ * `rb_ary_sort_by_bang`, which replaces the receiver's elements with
+ * `sort_by`'s result and answers the receiver.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function sortByBang<T>(ary: T[], block: (item: T) => unknown): T[] {
+  const sorted = sortBy(ary, block);
+  ary.splice(0, ary.length, ...sorted);
+  return ary;
+}
+
+/**
  * Ruby `Array#delete_if` (`vendor/ruby/v3.3.11/array.c:4330` `rb_ary_delete_if`):
  * removes, in place, every element the block answers truthily for
  * (`reject_bang_i`, `array.c:4225`) and answers the receiver. When the block
@@ -605,31 +617,6 @@ export function deleteAt<T>(ary: T[], pos: number): T | null {
   const del = ary[pos];
   ary.splice(pos, 1);
   return del;
-}
-
-/**
- * Ruby `Array#insert` (`vendor/ruby/v3.3.11/array.c:2454` `rb_ary_insert`): inserts,
- * in place, `objects` before the element at `pos` and answers the array. `-1`
- * appends, any other negative `pos` inserts after the element it counts back
- * to, and a `pos` past the end pads with `nil` (`rb_ary_splice`).
- *
- * @noRailsEquivalent PERMANENT
- */
-export function insert<T>(ary: (T | null)[], pos: number, ...objects: T[]): (T | null)[] {
-  pos = num2long(pos);
-  if (objects.length === 0) return ary;
-  if (pos === -1) {
-    pos = ary.length;
-  } else if (pos < 0) {
-    const minpos = -ary.length - 1;
-    if (pos < minpos) {
-      throw new IndexError(`index ${pos} too small for array; minimum: ${minpos}`);
-    }
-    pos++;
-  }
-  while (ary.length < pos) ary.push(null);
-  ary.splice(pos, 0, ...objects);
-  return ary;
 }
 
 /**
@@ -1019,6 +1006,20 @@ export function union<T>(ary1: readonly T[], ary2: readonly T[]): T[] {
 }
 
 /**
+ * Ruby `Array#product` (`vendor/ruby/v3.3.11/array.c:7426` `rb_ary_product`), the
+ * block-less form: every combination taking one element from `ary` and one from
+ * each of `args`, the last array varying fastest.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#product`.
+ */
+export function product<T>(ary: readonly T[], ...args: (readonly T[])[]): T[][] {
+  let result: T[][] = ary.map((e) => [e]);
+  for (const other of args) {
+    result = result.flatMap((combo) => other.map((e) => [...combo, e]));
+  }
+  return result;
+}
+
+/**
  * Ruby `Array#intersect?` (`vendor/ruby/v3.3.11/array.c:5680` `rb_ary_intersect_p`):
  * whether the two arrays share an element, compared by `eql?` as
  * `rb_ary_includes_by_eql` does. An empty array on either side answers false.
@@ -1196,13 +1197,8 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
     return self;
   },
   /** `enum_each_cons` (`vendor/ruby/v3.3.11/enum.c:3244`). */
-  eachCons: (self, n: number, block?: Block) => {
-    if (n <= 0) throw new ArgumentError("invalid size");
-    const ary = self.slice(n - 1).map((_, i) => self.slice(i, i + n));
-    if (!block) return ary;
-    ary.forEach((v) => block(v));
-    return self;
-  },
+  eachCons: (self, n: number, block?: Block) =>
+    block ? eachCons(self, n, (cons) => block(cons)) : eachCons(self, n),
   /** `Enumerable#to_set` (`vendor/ruby/v3.3.11/prelude.rb:28`). */
   toSet: (self) => new Set(self),
 } satisfies Record<string, ArrayMethod>);

@@ -32,15 +32,25 @@
     "node": ">=24"
   },
   "peerDependencies": {
+    "pg": ">=8.19.0",
     "websocket-driver": ">=0.7.4"
   },
   "peerDependenciesMeta": {
     "websocket-driver": {
       "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "ioredis": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
+    "@rails/actioncable": "8.0.200",
+    "ioredis": "^6.0.0",
     "websocket-driver": "0.7.4"
   }
 }

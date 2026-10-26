@@ -40,7 +40,7 @@ import {
 } from "./testing/time-helpers.js";
 import { FileFixtures } from "./testing/file-fixtures.js";
 import { include, type Extended } from "@blazetrails/ruby-compat/include";
-import { prepend, type PrependMethod } from "@blazetrails/ruby-compat";
+import { prepend } from "@blazetrails/ruby-compat";
 
 export class TestCase extends Minitest.Test {
   static toString(): string {
@@ -98,14 +98,12 @@ export class TestCase extends Minitest.Test {
 }
 
 include(TestCase, TaggedLogging);
-prepend(TestCase.prototype, {
-  beforeSetup: setupAndTeardownBeforeSetup as PrependMethod,
-  afterTeardown: setupAndTeardownAfterTeardown as PrependMethod,
+prepend(TestCase, {
+  beforeSetup: setupAndTeardownBeforeSetup,
+  afterTeardown: setupAndTeardownAfterTeardown,
 });
 setupAndTeardownPrepended(TestCase);
-prepend(TestCase.prototype, {
-  afterTeardown: testsWithoutAssertionsAfterTeardown as PrependMethod,
-});
+prepend(TestCase, { afterTeardown: testsWithoutAssertionsAfterTeardown });
 include(TestCase, ErrorReporterAssertions);
 include(TestCase, TimeHelpers);
 include(TestCase, FileFixtures);

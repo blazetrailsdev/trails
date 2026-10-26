@@ -1,7 +1,5 @@
 import {
   aryDelete,
-  compact,
-  isEmpty,
   kernelCatch,
   rbEqual,
   rbFSend,
@@ -88,7 +86,7 @@ export abstract class CollectionAssociation extends Association {
         this.target,
         ...(kernelArray(this.reflection.associationPrimaryKey()) as (keyof Base)[]),
       );
-    } else if (!isEmpty(this.target)) {
+    } else if (this.target.length > 0) {
       return pluck(
         await this.loadTarget(),
         ...(kernelArray(this.reflection.associationPrimaryKey()) as (keyof Base)[]),
@@ -119,7 +117,7 @@ export abstract class CollectionAssociation extends Association {
         (record) => String(record._readAttribute(primaryKey as string)),
       );
     }
-    const records = compact(valuesAt(indexed, ...ids.map(String)));
+    const records = valuesAt(indexed, ...ids.map(String)).filter((x) => x != null);
 
     if (records.length !== ids.length) {
       const foundIds = records.map((record) => String(record._readAttribute(primaryKey as string)));
@@ -369,7 +367,7 @@ export abstract class CollectionAssociation extends Association {
       return this.target.length;
     } else if (this._associationIds) {
       return this._associationIds.length;
-    } else if (!isEmpty(this.associationScope().groupValues)) {
+    } else if (this.associationScope().groupValues.length > 0) {
       return Promise.resolve(this.loadTarget()).then((target) => target.length);
     } else if (!this.associationScope().distinctValue && this.target.length !== 0) {
       const unsavedRecords = this.target.filter((record) => record.isNewRecord());

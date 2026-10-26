@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbCallSuper, rbClassNewInstance } from "./include.js";
+import { defineModule, rbCModule, rbCallSuper, rbClassNewInstance } from "./include.js";
 import {
   rbCArray,
   rbCBasicObject,
@@ -30,6 +30,7 @@ import {
   CLASS_METHOD_TABLE,
   OBJECT_METHOD_TABLE,
   rbFSend,
+  ENUMERABLE_METHOD_TABLE,
   rbModAttrReader,
   rbModAttrWriter,
   rbModDefineMethod,
@@ -583,6 +584,29 @@ describe("rbFSend include?", () => {
 });
 
 describe("rbFSend", () => {
+  it("dispatches ENUMERABLE_METHOD_TABLE on an iterable, not on an each-only object", () => {
+    const table = ENUMERABLE_METHOD_TABLE as Record<string, (self: Iterable<number>) => number>;
+    table.firstOne = (self) => [...self][0];
+    try {
+      const iterable = new (class {
+        *[Symbol.iterator]() {
+          yield 7;
+        }
+      })();
+      const eachOnly = new (class {
+        each(block: (i: number) => void) {
+          block(7);
+        }
+      })();
+      expect(rbFSend(iterable, "firstOne")).toBe(7);
+      expect(basicObjRespondTo(iterable, "firstOne")).toBe(true);
+      expect(basicObjRespondTo(eachOnly, "firstOne")).toBe(false);
+      expect(() => rbFSend(eachOnly, "firstOne")).toThrow(NoMethodError);
+    } finally {
+      delete table.firstOne;
+    }
+  });
+
   it("answers a String receiver with the Ruby method over String.prototype's", () => {
     expect(rbFSend("a  b", "split", " ", -1)).toEqual(["a", "b"]);
     expect(rbFSend(",a,,b,", "split", ",", -1)).toEqual(["", "a", "", "b", ""]);
@@ -710,12 +734,6 @@ describe("rbFSend", () => {
     const recv = { equals: (other: unknown) => other === "same" };
     expect(rbFSend(recv, "==", "same")).toBe(true);
     expect(rbFSend(recv, "!=", "same")).toBe(false);
-  });
-
-  it("sends an ordering operator to the receiver's own method before its <=>", () => {
-    const recv = { greaterThan: () => "own", compareTo: () => -1 };
-    expect(rbFSend(recv, ">", 1)).toBe("own");
-    expect(rbFSend(recv, "<", 1)).toBe(true);
   });
 
   it("raises NoMethodError for an ordering operator the receiver does not define", () => {
@@ -1371,6 +1389,13 @@ describe("rbClassAttachedObject", () => {
 });
 
 describe("a JS String object as a Ruby String", () => {
+  it("classes a defineModule object as Module, as rbObjIsKindOf does", () => {
+    const mod = defineModule({});
+    expect(rbObjClass(mod)).toBe(rbCModule);
+    expect(rbObjIsKindOf(mod, rbCModule)).toBe(true);
+    expect(rbObjClass({})).toBe(Hash);
+  });
+
   class MyString extends String {}
 
   it("classes a bare String object as String and a subclass as itself", () => {

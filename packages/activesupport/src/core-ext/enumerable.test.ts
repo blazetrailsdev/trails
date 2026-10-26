@@ -4,6 +4,7 @@ import {
   excluding,
   without,
   sum,
+  indexBy,
   indexWith,
   many,
   pluck,
@@ -17,12 +18,13 @@ import {
 import { compactBlank as hashCompactBlank, compactBlankBang } from "../hash-utils.js";
 import {
   Complex,
+  Enumerator,
+  type Hash,
   TypeError,
   complex,
   rational,
   rbEqual,
   rbObjClassname,
-  toI,
 } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { assertEqual, assertRaise, assertRaises } from "../testing/assertions.js";
@@ -89,11 +91,11 @@ class ExpandedPayment {
 
 describe("EnumerableTests", () => {
   it("minimum with empty enumerable", () => {
-    expect(minimum([], () => 0)).toBeUndefined();
+    expect(minimum([], () => 0)).toBeNull();
   });
 
   it("maximum with empty enumerable", () => {
-    expect(maximum([], () => 0)).toBeUndefined();
+    expect(maximum([], () => 0)).toBeNull();
   });
 
   it("sums", async () => {
@@ -184,7 +186,7 @@ describe("EnumerableTests", () => {
     ]);
     await assertRaise([expectedRaise], {}, () => sum(payments, (p) => p.price));
 
-    expect(sum(payments, (p) => (toI(p.price) as number) * 2)).toEqual(60);
+    expect(sum(payments, (p) => Math.trunc(p.price ?? 0) * 2)).toEqual(60);
   });
 
   it("empty sums", () => {
@@ -381,8 +383,8 @@ describe("EnumerableTests", () => {
     ];
     expect(pick(expanded, "dollars", "cents")).toEqual([5, 99]);
 
-    expect(pick([] as Payment[], "price")).toBeUndefined();
-    expect(pick([] as ExpandedPayment[], "dollars", "cents")).toBeUndefined();
+    expect(pick([] as Payment[], "price")).toBeNull();
+    expect(pick([] as ExpandedPayment[], "dollars", "cents")).toBeNull();
   });
 
   it("compact blank", () => {
@@ -453,21 +455,36 @@ describe("EnumerableTests", () => {
     expect(() => sole([1, null])).toThrow();
   });
 
-  it.skip("index with", () => {
-    // BLOCKED: port-a-minimal-enumerator-for-to-enum-arms
-    const payments = [new Payment(5), new Payment(15), new Payment(10)];
+  it("index by", () => {
+    const payments = new GenericEnumerable([new Payment(5), new Payment(15), new Payment(10)]);
+    const expected = { 5: new Payment(5), 15: new Payment(15), 10: new Payment(10) };
+    expect(indexBy(payments, (p) => p.price!)).toEqual(expected);
+    expect(indexBy(payments).constructor).toBe(Enumerator);
+    expect(indexBy(payments).size()).toBeNull();
+    expect(indexBy(new Range(1, 42)).size()).toBe(42);
+    expect(indexBy(payments).each((p: Payment) => p.price)).toEqual(expected);
+  });
 
-    expect(indexWith(payments, (p) => p.price)).toEqual(
-      new Map([
-        [payments[0], 5],
-        [payments[1], 15],
-        [payments[2], 10],
-      ]),
-    );
+  it("index with", () => {
+    const payments = new GenericEnumerable([new Payment(5), new Payment(15), new Payment(10)]);
+    const expected = [
+      [new Payment(5), 5],
+      [new Payment(15), 15],
+      [new Payment(10), 10],
+    ];
+
+    expect([...(indexWith(payments, (p) => p.price) as Hash<Payment, unknown>)]).toEqual(expected);
 
     expect(indexWith(["title", "body"], null)).toEqual({ title: null, body: null });
     expect(indexWith(["title", "body"], [])).toEqual({ title: [], body: [] });
     expect(indexWith(["title", "body"], {})).toEqual({ title: {}, body: {} });
+
+    expect(indexWith(payments).constructor).toBe(Enumerator);
+    expect(indexWith(payments).size()).toBeNull();
+    expect(indexWith(new Range(1, 42)).size()).toBe(42);
+    expect([
+      ...(indexWith(payments).each((p: Payment) => p.price) as Hash<Payment, unknown>),
+    ]).toEqual(expected);
   });
 
   it.skip("doesnt bust constant cache", () => {

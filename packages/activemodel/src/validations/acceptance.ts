@@ -1,7 +1,7 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { include, included, kernelArray, Module } from "@blazetrails/activesupport";
-import { aryIncludes, except, includedModules } from "@blazetrails/ruby-compat";
+import { aryIncludes, includedModules } from "@blazetrails/ruby-compat";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 interface AttributeMethodQueryable {
@@ -20,7 +20,8 @@ export class AcceptanceValidator extends EachValidator {
 
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     if (!this.isAcceptableOption(value)) {
-      record.errors.add(attribute, ":accepted", except(this.options, "accept", "allowNil"));
+      const { accept, allowNil, ...options } = this.options;
+      record.errors.add(attribute, ":accepted", options);
     }
   }
 

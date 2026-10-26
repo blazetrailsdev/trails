@@ -18,6 +18,7 @@ export class LibSQLRemoteAdapter extends AbstractAdapter {
     this._memoryDatabase = false;
     this._lastAffectedRows = 0;
     this._previousReadUncommitted = null;
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- _config can hold { k: undefined } for an absent keyword, which hasKey reads as absent
     if (!hasKey(this._config, "strict")) {
       this._config.strict = SQLite3Adapter.strictStringsByDefault;
     }

@@ -1407,11 +1407,12 @@ class TestExtractor
       name = extract_string_content([:string_literal, node[1]])
       name && LoopSymbolName.new(name)
     when :string_literal
-      extract_string_content(node)
+      content = extract_string_content(node)
+      content && unescape_string_literal(content, double_quoted_literal?(node))
     when :@tstring_content
       # `%w(a b)` / `%i(a b)` elements, which Ripper emits bare.
       node[1]
-    when :@int
+    when :@int, :@float
       node[1]
     when :array
       # A table row (`["/", [:SLASH]]`) — resolved so a destructuring loop can

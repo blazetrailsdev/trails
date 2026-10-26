@@ -12,7 +12,6 @@ import {
   ArgumentError,
   aryDeleteIf,
   block,
-  compact,
   last,
   stringSplit,
   fetch,
@@ -165,18 +164,19 @@ export function bestQMatch(qValueHeader: string, availableMimes: string[]): stri
   const values = qValues(qValueHeader);
 
   const matches = last(
-    compact(
-      values.map(([reqMime, quality]): [string, number] | null => {
+    values
+      .map(([reqMime, quality]): [string, number] | null => {
         const match = availableMimes.find((am) => RackMime.match(am, reqMime));
         if (!match) return null;
         return [match, quality];
-      }),
-    ).sort(
-      ([aMatch, aQuality], [bMatch, bQuality]) =>
-        aMatch.split("/", 2).filter((part) => part === "*").length * -10 +
-        aQuality -
-        (bMatch.split("/", 2).filter((part) => part === "*").length * -10 + bQuality),
-    ),
+      })
+      .filter((x) => x != null)
+      .sort(
+        ([aMatch, aQuality], [bMatch, bQuality]) =>
+          aMatch.split("/", 2).filter((part) => part === "*").length * -10 +
+          aQuality -
+          (bMatch.split("/", 2).filter((part) => part === "*").length * -10 + bQuality),
+      ),
   );
   return matches?.[0] ?? null;
 }

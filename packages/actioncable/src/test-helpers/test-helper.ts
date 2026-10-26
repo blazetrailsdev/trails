@@ -1,4 +1,4 @@
-import { Logger, MethodCallAssertions, include } from "@blazetrails/activesupport";
+import { Logger, MethodCallAssertions, include, type Included } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { RuntimeError, globalIoExecutor } from "@blazetrails/ruby-compat";
 import { ActionCable } from "../namespaces.js";
@@ -14,6 +14,10 @@ server.config.cable = { adapter: "test" };
 server.config.logger = new Logger(null);
 
 export class TestCase extends ActiveSupportTestCase {
+  declare assertCalled: Included<typeof MethodCallAssertions>["assertCalled"];
+  declare assertNotCalled: Included<typeof MethodCallAssertions>["assertNotCalled"];
+  declare assertCalledWith: Included<typeof MethodCallAssertions>["assertCalledWith"];
+
   static {
     include(this, MethodCallAssertions);
   }

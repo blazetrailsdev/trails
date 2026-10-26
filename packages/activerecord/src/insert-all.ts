@@ -9,7 +9,6 @@ import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
 import {
-  isEmpty,
   isSymbol,
   rbEqual,
   rbFArray,
@@ -30,7 +29,7 @@ import {
   transformKeys,
 } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
-import { aryJoin, first } from "@blazetrails/ruby-compat";
+import { Enumerable, aryJoin, first } from "@blazetrails/ruby-compat";
 import { withConnection } from "./connection-handling.js";
 
 type ModelClass = typeof Base;
@@ -154,7 +153,7 @@ export class InsertAll {
           : options.returning;
     }
 
-    if (isEmpty(this.inserts)) {
+    if (this.inserts.length === 0) {
       this.keys = new Set();
     } else {
       this.resolveSti();
@@ -220,7 +219,9 @@ export class InsertAll {
 
       this.verifyAttributes(attributes);
 
-      return [...this.keysIncludingTimestamps()].map((key) => block(key, attributes[key]));
+      return new Enumerable(this.keysIncludingTimestamps()).map<string, T>((key) =>
+        block(key, attributes[key]),
+      ) as T[];
     });
   }
 
@@ -266,7 +267,7 @@ export class InsertAll {
     } else if (this.isCustomUpdateSqlProvided()) {
       this.updateSql = onDuplicate as Nodes.SqlLiteral;
       this.onDuplicate = ":update";
-    } else if (onDuplicate === ":update" && isEmpty(this.updatableColumns())) {
+    } else if (onDuplicate === ":update" && this.updatableColumns().length === 0) {
       this.onDuplicate = ":skip";
     }
   }
@@ -460,7 +461,7 @@ export class Builder implements InsertBuilder {
 
   /** @internal */
   private quoteColumns(columns: Iterable<string>): string[] {
-    return [...columns].map((column) => this.quoteColumn(column));
+    return new Enumerable(columns).map((column: string) => this.quoteColumn(column));
   }
 
   /** @internal */
@@ -544,6 +545,7 @@ export class Builder implements InsertBuilder {
     if (!this._insertAll.updateDuplicates() || !this._insertAll.recordTimestamps()) {
       return "";
     }
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- Ruby's separator-less join is "", JS's is ","
     return aryJoin(
       filterMap(this.model.timestampAttributesForUpdateInModel(), (columnName) => {
         if (this.touchTimestampAttribute(columnName)) {

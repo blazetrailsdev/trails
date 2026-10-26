@@ -184,6 +184,17 @@ export const FOREIGN_READ_PREFIX = ".";
 export const NATIVE_FORM_PREFIX = "@";
 
 /**
+ * The native forms the extractor marks a second time when the TS checker
+ * proves the receiver (`checkerProvenKind`, extract-ts-api.ts): a `.length`
+ * read of a string, array or tuple, and a literal-key rest-destructure of a
+ * plain object. `significantCallsForReceivers` (compare.ts) credits `empty?` /
+ * `size` / `length` and `except` from these even where Ripper left the Ruby
+ * receiver unproven (an ivar, a method call), since the TS type already rules
+ * out the Relation homonym.
+ */
+export const TYPED_NATIVE_FORM = { length: "length@typed", except: "except@typed" } as const;
+
+/**
  * Prefix the TS extractor gives, in the ORDER stream only, to a call first made
  * inside a `moduleEval` / `classEval` callback. Its Ruby counterpart is either a
  * block, which Ripper walks in place, or a String (`module_eval <<-RUBY`,
@@ -215,6 +226,7 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
   ["assign", "Object.assign(h, other)"],
   ["spread", "{ ...h, ...other }"],
   ["entries", "for (const [k, v] of Object.entries(h))"],
+  ["fetch", 'Object.hasOwn(h, "k") ? h.k : d'],
 ]);
 
 /**
@@ -234,6 +246,10 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   `Array#prepend`. `Module#prepend` is a bare `prepend Mod` or a
  *   `Const.prepend(Mod)`, so the same receiver kinds `.length` refuses keep it
  *   flagged, as does any body whose port makes no `.unshift(...)` call.
+ * - `insert` → `splice`: a `.splice(i, 0, ...items)` call, which removes
+ *   nothing. JS has no `Array#insert`, and `Array#insert`
+ *   (`vendor/ruby/v3.3.11/array.c:2454`) is that splice. A splice with a
+ *   non-literal or non-zero delete count is not marked.
  * - `load` → `import`: a dynamic `import(x)` whose specifier is computed at run
  *   time, ESM's one way to evaluate a file by path — `Kernel#load`
  *   (`rb_f_load`, `vendor/ruby/v3.3.11/load.c:903`). A string-literal specifier
@@ -298,9 +314,14 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   that `merge` gives to its argument. What follows the leading spread is not
  *   paired with the Ruby argument.
  *   `each` on a hash has no row: {@link NO_JS_CALL_FORM} (compare.ts) already
- *   drops it for every receiver. `fetch` has none either, because JS has no
- *   form for it: `h.k ?? d` substitutes the default for a stored `nil`, which
- *   `h.fetch(:k, d)` does not, and marks nothing.
+ *   drops it for every receiver. `fetch` (`hash.c:2176`) credits on its
+ *   two-argument arm only, as `Object.hasOwn(h, "k") ? h.k : d` with a literal
+ *   key read back off the same receiver: a stored `nil` / `false` answers the
+ *   stored value and a miss the default. `h.k ?? d` substitutes the default
+ *   for a stored `nil` and marks nothing. The one-argument KeyError arm and
+ *   the block arm leave the receiver unnamed (extract-ruby-api.rb), so only
+ *   the helper satisfies them, and the row takes a proven `hash` receiver
+ *   only, since `Cache::Store#fetch` is the same name.
  * - The value rows (RFC 0194). Each credits only where every site of the name
  *   has the one proven kind its form ports, and records no receiver name:
  *   `extract-ts-api.ts#nativeValueForms` marks the form wherever it appears.
@@ -374,6 +395,7 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["size", { form: "length", receivers: "explicit" }],
   ["length", { form: "length", receivers: "explicit" }],
   ["prepend", { form: "unshift", receivers: "explicit" }],
+  ["insert", { form: "splice", receivers: "explicit" }],
   ["load", { form: "import", receivers: "implicit-self" }],
   [
     "call",
@@ -412,6 +434,7 @@ export const NATIVE_FORM_ANALOGUES = new Map<
     "member?",
     { form: "in", receivers: "explicit", creditedKinds: new Set(["hash"]), named: true, key: true },
   ],
+  ["fetch", { form: "fetch", receivers: "explicit", creditedKinds: HASH, named: true, key: true }],
   [
     "delete",
     { form: "delete", receivers: "explicit", uncreditedKinds: NOT_A_HASH, named: true, key: true },

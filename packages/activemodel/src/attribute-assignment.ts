@@ -6,10 +6,13 @@ import {
   RuntimeError,
   TypeError,
   eachPair,
+  isAbsentHalf,
   isEmpty,
+  methodCacheSerial,
   rbFSend,
   rbObjClassname,
   rbObjRespondTo,
+  writerSpelling,
 } from "@blazetrails/ruby-compat";
 import { UnknownAttributeError } from "./errors.js";
 
@@ -70,10 +73,25 @@ export function attributeWriterMissing(
   throw new UnknownAttributeError(this, name);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE rbfsend-per-prototype-writer-cache
+ */
 export function _assignAttribute(this: AttributeAssignment, k: string, v: unknown): unknown {
   const setter = `${k}=`;
   try {
+    const writer = writerSpelling(k);
+    const write =
+      Object.hasOwn(this, setter) ||
+      Object.hasOwn(this, k) ||
+      (writer !== undefined && Object.hasOwn(this, writer))
+        ? _resolveWriter(this, k, setter)
+        : _cachedWriter(Object.getPrototypeOf(this) as object | null, k, setter);
+    if (typeof write === "function") return write.call(this, v);
+    if (write) {
+      (this as unknown as Record<string, unknown>)[k] = v;
+      return v;
+    }
     return rbFSend(this, setter, v);
   } catch (error) {
     if (!(error instanceof NoMethodError)) throw error;
@@ -83,6 +101,40 @@ export function _assignAttribute(this: AttributeAssignment, k: string, v: unknow
       this.attributeWriterMissing(k, v);
     }
   }
+}
+
+type Writer = ((v: unknown) => unknown) | boolean;
+
+let writerCache = new WeakMap<object, Map<string, Writer>>();
+let writerCacheSerial = methodCacheSerial;
+
+function _cachedWriter(proto: object | null, k: string, setter: string): Writer {
+  if (proto === null) return false;
+  if (writerCacheSerial !== methodCacheSerial) {
+    writerCache = new WeakMap();
+    writerCacheSerial = methodCacheSerial;
+  }
+  let writers = writerCache.get(proto);
+  if (writers === undefined) writerCache.set(proto, (writers = new Map()));
+  let write = writers.get(k);
+  if (write === undefined) writers.set(k, (write = _resolveWriter(proto, k, setter)));
+  return write;
+}
+
+function _resolveWriter(start: object, k: string, setter: string): Writer {
+  const writer = writerSpelling(k);
+  for (let o: object | null = start; o; o = Object.getPrototypeOf(o)) {
+    if (Object.hasOwn(o, setter)) {
+      const write = (o as Record<string, unknown>)[setter];
+      return typeof write === "function" ? (write as (v: unknown) => unknown) : false;
+    }
+    if (Object.hasOwn(o, k)) {
+      const set = Object.getOwnPropertyDescriptor(o, k)!.set;
+      return set !== undefined && !isAbsentHalf(set);
+    }
+    if (writer !== undefined && Object.hasOwn(o, writer)) return false;
+  }
+  return false;
 }
 
 export interface AttributeAssignment {

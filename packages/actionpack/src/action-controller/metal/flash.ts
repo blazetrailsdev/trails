@@ -1,7 +1,6 @@
 import { ActionController } from "../../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { classAttribute, Concern, extend, Module } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
 import type { RedirectToOptions, RedirectToResponseOptions } from "./redirecting.js";
@@ -59,7 +58,7 @@ export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
       configurable: true,
     });
     this.methodAdded(type);
-    if (rbObjRespondTo(this, "helperMethod")) this.helperMethod!(type);
+    if (typeof this.helperMethod === "function") this.helperMethod(type);
 
     this._flashTypes = [...this._flashTypes, type];
   }

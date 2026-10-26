@@ -14,7 +14,6 @@ import {
   config,
   reservedKeysPattern,
   t,
-  toSym,
   translate,
   tBang,
   type Locale,
@@ -31,6 +30,8 @@ import {
   kernelCatch,
   kernelThrow,
   rbInspect,
+  toSym,
+  trTrans,
 } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Temporal, strftime } from "@blazetrails/date";
@@ -41,7 +42,6 @@ import {
   type ProcTransliterator,
 } from "./transliterator.js";
 import { except, type TranslationData } from "../utils.js";
-import { tr } from "./flatten.js";
 
 export type TranslateOptions = { [key: string]: unknown };
 
@@ -401,6 +401,7 @@ export abstract class Base {
     if (!(isHash(entry) && truthy(count))) return entry;
 
     const key = this.pluralizationKey(entry, count);
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- entry may be a Hash, which hasKey dispatches on
     if (!hasKey(entry, key)) throw new InvalidPluralizationData(entry, count, key);
     return hashAref(entry, key);
   }
@@ -495,7 +496,7 @@ export abstract class Base {
 
   protected loadFile(filename: string): TranslationData | Record<string, unknown> {
     let type = extname(filename);
-    type = tr(type, ".", "").toLowerCase();
+    type = trTrans(type, ".", "", false).toLowerCase();
     const loader = (this as unknown as Record<string, unknown>)[
       `load${type.charAt(0).toUpperCase()}${type.slice(1)}`
     ];
@@ -553,6 +554,7 @@ export abstract class Base {
 
   protected pluralizationKey(entry: TranslationData, count: unknown): string {
     let key: string | undefined;
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- entry may be a Hash, which hasKey dispatches on
     if (count === 0 && hasKey(entry, ":zero")) key = ":zero";
     key ??= count === 1 ? ":one" : ":other";
     return key;

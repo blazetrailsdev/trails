@@ -4,7 +4,7 @@ import { Base } from "./base.js";
 import { logger } from "./helpers/controller-helper.js";
 import { LookupContext } from "./lookup-context.js";
 import { OutputBuffer } from "./buffers.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Handlers } from "./template/handlers.js";
 import { TSE } from "./template/handlers/tse.js";
 import { Template } from "./template.js";
 import { FixtureResolver } from "./testing/resolvers.js";
@@ -132,22 +132,22 @@ describe("ActionView::Base include Helpers", () => {
   });
 
   it("resolves a helper as a bare identifier in a template", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     try {
       const out = await renderTse('<%= contentTag("p", name) %>', { name: "Ada" }, view());
       expect(out).toBe("<p>Ada</p>");
     } finally {
-      TemplateHandlers.clear();
+      Handlers.clear();
     }
   });
 
   it("resolves a number helper as a bare identifier in a template", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     try {
       const out = await renderTse("<%= numberToCurrency(amount) %>", { amount: 12.5 }, view());
       expect(out).toContain("12.50");
     } finally {
-      TemplateHandlers.clear();
+      Handlers.clear();
     }
   });
 });
@@ -213,20 +213,20 @@ describe("ActionView::Base include ControllerHelper", () => {
   });
 
   it("makes params reachable as a bare identifier in a template", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     try {
       const view = new (Base.withEmptyTemplateCache())(null, {}, controller);
       const out = await renderTse("<%= params().id %>", {}, view);
       expect(out).toBe("1");
     } finally {
-      TemplateHandlers.clear();
+      Handlers.clear();
     }
   });
 });
 
 describe("ActionView::Base include TSE::Util", () => {
   it("resolves h() as a bare identifier in a template", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     try {
       const out = await renderTse(
         "<%= h(name) %>",
@@ -235,7 +235,7 @@ describe("ActionView::Base include TSE::Util", () => {
       );
       expect(out).toBe("&lt;b&gt;");
     } finally {
-      TemplateHandlers.clear();
+      Handlers.clear();
     }
   });
 
@@ -315,7 +315,7 @@ describe("ActionView::Base attr_internal readers", () => {
   });
 
   it("resolves request as a bare identifier in a template", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     try {
       const out = await renderTse(
         "<%= request.host %>",
@@ -324,17 +324,17 @@ describe("ActionView::Base attr_internal readers", () => {
       );
       expect(out).toBe("example.com");
     } finally {
-      TemplateHandlers.clear();
+      Handlers.clear();
     }
   });
 });
 
 describe("ActionView::Base#render", () => {
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
   });
   afterEach(() => {
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   const buildView = (): Base => {

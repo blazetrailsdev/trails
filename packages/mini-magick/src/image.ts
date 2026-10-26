@@ -18,7 +18,6 @@ import {
   excSetupMessage,
   ArgumentError,
   rbCheckArrayType,
-  toA,
   pack,
   rbObjDup,
   Pathname,
@@ -236,7 +235,7 @@ export class Image {
       shell.run(convert.command()),
     );
     const pixelsArray = output.unpack("C*");
-    const pixels = toA(eachSlice(eachSlice(pixelsArray, map.length), this.width));
+    const pixels = eachSlice(eachSlice(pixelsArray, map.length), this.width).toA();
     if (Array.isArray(output)) output.length = 0;
     else output.clear();
     if (Array.isArray(pixelsArray)) pixelsArray.length = 0;

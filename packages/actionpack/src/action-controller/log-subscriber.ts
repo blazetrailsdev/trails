@@ -8,14 +8,7 @@ import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { Base } from "./base.js";
 import type { CachingClassMethods } from "../abstract-controller/caching.js";
 import { ExceptionWrapper } from "../action-dispatch/middleware/exception-wrapper.js";
-import {
-  inspect,
-  isSymbol,
-  rbInspect,
-  rbObjAsString,
-  round,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { isSymbol, rbInspect, rbObjAsString, round, symbolToS } from "@blazetrails/ruby-compat";
 
 const INTERNAL_PARAMS = ["controller", "action", "format", "_method", "only_path"];
 
@@ -43,7 +36,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     if (format == null) format = "*/*";
 
     this.info(`Processing by ${payload.controller}#${payload.action} as ${format}`);
-    if (Object.keys(params).length !== 0) this.info(`  Parameters: ${inspect(params)}`);
+    if (Object.keys(params).length !== 0) this.info(`  Parameters: ${rbInspect(params)}`);
   }
 
   processAction(event: Event): void {
@@ -63,7 +56,7 @@ export class LogSubscriber extends BaseLogSubscriber {
       additions.push(`GC: ${round(event.gcTime, 1)}ms`);
 
       let message =
-        `Completed ${rbObjAsString(status)} ${rbObjAsString(HTTP_STATUS_CODES[status!])} in ${round(event.duration)}ms` +
+        `Completed ${rbObjAsString(status)} ${rbObjAsString(HTTP_STATUS_CODES[status!])} in ${Math.round(event.duration)}ms` +
         ` (${additions.join(" | ")})`;
       if (TopLevel.Trails !== undefined && TopLevel.Trails.env["development?"]()) message += "\n\n";
 

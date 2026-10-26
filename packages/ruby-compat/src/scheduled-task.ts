@@ -1,8 +1,22 @@
 import { ArgumentError } from "./argument-error.js";
+import { StandardError } from "./standard-error.js";
+import { globalIoExecutor } from "./thread-pool-executor.js";
 
 type Executor = { post(task: () => unknown): unknown };
 
 const MAX_TIMEOUT = 2 ** 31 - 1;
+
+type Observer = (time: Date, value: unknown, reason: unknown) => unknown;
+
+/**
+ * concurrent-ruby 1.3.6 `Concurrent::CancelledOperationError`
+ * (`concurrent/errors.rb:21`, not vendored), a subclass of `StandardError`
+ * (`vendor/ruby/v3.3.11/error.c:3321`), which `ScheduledTask#cancel` hands its
+ * observers.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class CancelledOperationError extends StandardError {}
 
 /**
  * concurrent-ruby 1.3.6 `Concurrent::ScheduledTask`
@@ -22,11 +36,13 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
   private time: number | null = null;
   private readonly executor: Executor;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  /** @noRailsEquivalent PERMANENT */
+  readonly observers: Observer[] = [];
 
   /** @noRailsEquivalent PERMANENT */
   constructor(
     delay: number,
-    opts: { args?: A; executor: Executor },
+    opts: { args?: A; executor?: Executor },
     task: (...args: A) => unknown,
   ) {
     if (typeof task !== "function") throw new ArgumentError("no block given");
@@ -34,13 +50,13 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
     this.args = opts.args ?? ([] as unknown as A);
     this.delay = delay;
     this.task = task;
-    this.executor = opts.executor;
+    this.executor = opts.executor ?? globalIoExecutor();
   }
 
   /** @noRailsEquivalent PERMANENT */
   static execute<A extends unknown[]>(
     delay: number,
-    opts: { args?: A; executor: Executor },
+    opts: { args?: A; executor?: Executor },
     task: (...args: A) => unknown,
   ): ScheduledTask<A> {
     return new ScheduledTask(delay, opts, task).execute();
@@ -51,6 +67,8 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
     if (this.state === "pending" || this.state === "unscheduled") {
       this.state = "cancelled";
       clearTimeout(this.timer);
+      const reason = new CancelledOperationError();
+      for (const observer of this.observers) observer(new Date(), null, reason);
       return true;
     } else {
       return false;
@@ -66,8 +84,21 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
     return this;
   }
 
-  private processTask(): unknown {
-    return this.task(...this.args);
+  /** @noRailsEquivalent PERMANENT */
+  addObserver(block: Observer): Observer {
+    this.observers.push(block);
+    return block;
+  }
+
+  private async processTask(): Promise<void> {
+    let value: unknown = null;
+    let reason: unknown = null;
+    try {
+      value = await this.task(...this.args);
+    } catch (error) {
+      reason = error;
+    }
+    for (const observer of this.observers) observer(new Date(), value, reason);
   }
 
   private nsSchedule(delay: number): void {

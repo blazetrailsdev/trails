@@ -6,7 +6,7 @@ import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
 import { Template } from "./template.js";
 import { EncodingError, WrongEncodingError } from "./template/error.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Handlers } from "./template/handlers.js";
 import { TSE } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
@@ -14,11 +14,11 @@ describe("Template#compile! across DetailsKey.clear", () => {
   class ViewPathsOwner {}
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {
-    TemplateHandlers.clear();
+    Handlers.clear();
     PathRegistry.reset();
     DetailsKey.clear();
   });
@@ -46,11 +46,11 @@ describe("Template#compile! across DetailsKey.clear", () => {
 
 describe("Template#compile", () => {
   afterEach(() => {
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("names the compiled source after the identifier without evaluating it", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     const g = globalThis as { __templateIdentifierEvaluated?: boolean };
     const t = new Template(
       "hi",

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-THOR_ONLY_RE='^(packages/trailties/src/thor/|vendor/thor/|scripts/parity/unported-files/thor\.ts$|scripts/api-compare/call-mismatches-(exclude|unreviewed)/thor/)'
+THOR_ONLY_RE='^(packages/thor/|vendor/thor/|scripts/parity/unported-files/thor\.ts$|scripts/api-compare/call-mismatches-(exclude|unreviewed)/thor/)'
 ACTIONCABLE_ONLY_RE='^(packages/actioncable/|scripts/parity/unported-files/actioncable\.ts$)'
 files="${1:-}"
 scoped_only() {

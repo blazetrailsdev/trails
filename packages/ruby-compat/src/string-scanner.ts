@@ -1,4 +1,6 @@
 const HEADONLY = new WeakMap<RegExp, RegExp>();
+const SEARCH = new WeakMap<RegExp, RegExp>();
+const REGS = new WeakMap<StringScanner, RegExpExecArray | null>();
 
 /**
  * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1667` `rb_define_class("StringScanner", rb_cObject)`.
@@ -6,7 +8,7 @@ const HEADONLY = new WeakMap<RegExp, RegExp>();
  * @noRailsEquivalent PERMANENT
  */
 export class StringScanner {
-  readonly #str: string;
+  #str: string;
   #curr = 0;
 
   /**
@@ -25,6 +27,29 @@ export class StringScanner {
    */
   get string(): string {
     return this.#str;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:372` `strscan_set_string`, which
+   * also resets the scan pointer and clears the match.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  set string(str: string) {
+    this.#str = str;
+    this.#curr = 0;
+    REGS.set(this, null);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:314` `strscan_reset`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  reset(): this {
+    this.#curr = 0;
+    REGS.set(this, null);
+    return this;
   }
 
   /**
@@ -52,9 +77,61 @@ export class StringScanner {
     }
     re.lastIndex = 0;
     const m = re.exec(this.#str.slice(this.#curr));
+    REGS.set(this, m);
     if (m === null) return null;
     this.#curr += m[0].length;
     return m[0];
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:778` `strscan_scan_until`: the
+   * match is searched for over the rest of the string (`strscan_do_scan`,
+   * `:605`, with `headonly` false), and the answer runs from the old scan
+   * pointer to the end of the match.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  scanUntil(pattern: RegExp): string | null {
+    let re = SEARCH.get(pattern);
+    if (re === undefined) {
+      re = new RegExp(pattern.source, `${pattern.flags.replace(/[gy]/g, "")}g`);
+      SEARCH.set(pattern, re);
+    }
+    const rest = this.#str.slice(this.#curr);
+    re.lastIndex = 0;
+    const m = re.exec(rest);
+    REGS.set(this, m);
+    if (m === null) return null;
+    const prev = this.#curr;
+    this.#curr += m.index + m[0].length;
+    return this.#str.slice(prev, this.#curr);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1132` `strscan_matched_size`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  matchedSize(): number | null {
+    const regs = REGS.get(this) ?? null;
+    if (regs === null) return null;
+    return regs[0].length;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1186` `strscan_aref`, `StringScanner#[]`
+   * by group number.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  get(idx: number): string | null {
+    const regs = REGS.get(this) ?? null;
+    if (regs === null) return null;
+    let i = idx;
+    if (i < 0) i += regs.length;
+    if (i < 0) return null;
+    if (i >= regs.length) return null;
+    return regs[i] ?? null;
   }
 
   /**

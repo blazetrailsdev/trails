@@ -1,16 +1,17 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { assertEqual, assertNil } from "@blazetrails/activesupport";
 import { FixtureResolver } from "../../testing/resolvers.js";
-import { TemplateHandlers } from "../handlers.js";
+import { Handlers } from "../handlers.js";
+import { Template } from "../../template.js";
 import { TSE } from "../handlers/tse.js";
 
 describe("FixtureResolverTest", () => {
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("should return empty list for unknown path", () => {

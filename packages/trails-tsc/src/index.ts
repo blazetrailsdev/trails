@@ -34,4 +34,5 @@ export {
 } from "./build-views.js";
 export { watchViews, type WatchHandle, type WatchViewsOptions } from "./watch-views.js";
 export { init as lspPluginInit } from "./lsp-plugin.js";
+export { buildTemplates } from "./build-templates.js";
 export { runCli } from "./cli.js";

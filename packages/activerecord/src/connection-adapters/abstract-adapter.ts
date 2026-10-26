@@ -981,7 +981,9 @@ export class AbstractAdapter implements Quoting {
 
     this._advisoryLocksEnabled = (
       this.constructor as typeof AbstractAdapter
-    ).typeCastConfigToBoolean(fetch(this._config, "advisoryLocks", true));
+    ).typeCastConfigToBoolean(
+      Object.hasOwn(this._config, "advisoryLocks") ? this._config.advisoryLocks : true,
+    );
 
     this._defaultTimezone = (this.constructor as typeof AbstractAdapter).validateDefaultTimezone(
       this._config.defaultTimezone,

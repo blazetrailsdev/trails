@@ -60,4 +60,13 @@ export const Gem = {
 
     return winPlatform;
   },
+
+  /**
+   * `vendor/ruby/v3.3.11/lib/rubygems.rb:162` — `@loaded_specs`, read through
+   * `Gem.loaded_specs`. No gem is activated in a Node process, so it stays the
+   * empty Hash RubyGems starts with.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem.loaded_specs`.
+   */
+  loadedSpecs: {} as Record<string, { version: Version } | undefined>,
 };

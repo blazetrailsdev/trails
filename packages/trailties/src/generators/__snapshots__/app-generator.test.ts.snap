@@ -59,7 +59,7 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > config.ts 1`] = `
 "// This file is used by Rack-based servers to start the application.
 import { Trails } from "@blazetrails/trailties";
 
-import "./config/environment.js";
+import "./config/environment.ts";
 
 export default Trails.application;
 
@@ -383,7 +383,7 @@ import { env, setEnv } from "@blazetrails/ruby-compat";
 
 export async function setup(): Promise<void> {
   if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
-  await import("../config/environment.js");
+  await import("../config/environment.ts");
   await import("@blazetrails/trailties/testing/maintain-test-schema");
 }
 
@@ -398,7 +398,7 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > test-helper.ts 1`
 import { env, setEnv } from "@blazetrails/ruby-compat";
 
 if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
-await import("../config/environment.js");
+await import("../config/environment.ts");
 await import("@blazetrails/trailties/test-help");
 
 // Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.

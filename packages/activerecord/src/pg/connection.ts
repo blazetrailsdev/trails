@@ -17,6 +17,12 @@ export interface PGConnection extends pg.Client {
   sendQuery(sql: string): void;
   getLastResult(): Promise<PG.Result | null>;
   execParams(sql: string | null, params: unknown[]): Promise<PG.Result>;
+  exec(sql: string | null): Promise<PG.Result>;
+  escapeString(str: string): string;
+  waitForNotify(
+    timeout?: number | null,
+    block?: (relname: string, bePid: number, extra: string | undefined) => unknown,
+  ): Promise<string | null>;
   unescapeBytea(value: string | Uint8Array): Buffer;
   transactionStatus(): number;
   status(): number;
@@ -66,12 +72,24 @@ export class Connection {
   pendingResult: Promise<PG.Result> | null = null;
   pendingResultTaken = false;
   typeMapForResults = new PGTypeMapByOid();
+  notifies: pg.Notification[] = [];
+  notifyWaiter: ((error?: unknown) => void) | null = null;
+  parameterStatuses: Record<string, string> = {};
+
+  static conndefaultsHash = conndefaultsHash;
 
   constructor(client: object, connParams?: pg.ClientConfig) {
     this.client = client as Client;
     this.connParams = connParams;
     listen(this, this.client);
-    if (typeof this.client.on === "function") this.client.on("error", () => {});
+    if (typeof this.client.on === "function") {
+      this.client.on("notification", (notification: pg.Notification) => {
+        this.notifies.push(notification);
+        this.notifyWaiter?.();
+      });
+      this.client.on("error", (error: unknown) => this.notifyWaiter?.(error));
+      this.client.on("end", () => this.notifyWaiter?.(new ConnectionBad("connection closed")));
+    }
   }
 
   query(...args: unknown[]): unknown {
@@ -170,6 +188,39 @@ export class Connection {
         sql != null ? { text: sql, rowMode: "array", types: types(this) } : sql,
       ).catch((error: unknown) => raise(this, error)),
     );
+  }
+
+  exec(sql: string | null): Promise<PG.Result> {
+    return this.asyncExec(sql);
+  }
+
+  escapeString(str: string): string {
+    const escaped = str.replace(/'/g, "''");
+    return this.parameterStatuses["standard_conforming_strings"] === "off"
+      ? escaped.replace(/\\/g, "\\\\")
+      : escaped;
+  }
+
+  async waitForNotify(
+    timeout: number | null = null,
+    block?: (relname: string, bePid: number, extra: string | undefined) => unknown,
+  ): Promise<string | null> {
+    if (this.notifies.length === 0) {
+      await new Promise<void>((resolve, reject) => {
+        const timer = timeout == null ? undefined : setTimeout(() => done(), timeout * 1000);
+        const done = (error?: unknown): void => {
+          clearTimeout(timer);
+          this.notifyWaiter = null;
+          if (error === undefined) resolve();
+          else reject(error);
+        };
+        this.notifyWaiter = done;
+      });
+    }
+    const notification = this.notifies.shift();
+    if (notification === undefined) return null;
+    block?.(notification.channel, notification.processId, notification.payload);
+    return notification.channel;
   }
 
   sendQuery(sql: string): void {
@@ -283,6 +334,12 @@ function listen(conn: Connection, client: Client): void {
     connection.on("readyForQuery", (message: { status?: string }) => {
       if (typeof message?.status === "string") conn.readyForQuery = message.status;
     });
+    connection.on(
+      "parameterStatus",
+      (message: { parameterName: string; parameterValue: string }) => {
+        conn.parameterStatuses[message.parameterName] = message.parameterValue;
+      },
+    );
     connection.on("errorMessage", () => {
       if (conn.readyForQuery === "T") conn.readyForQuery = "E";
     });

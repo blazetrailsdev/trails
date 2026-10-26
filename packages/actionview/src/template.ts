@@ -11,6 +11,7 @@ import {
   forceEncoding,
   isValidEncoding,
   Exception,
+  extend,
   LoadError,
   NotImplementedError,
   rbModConstSet,
@@ -25,11 +26,7 @@ import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer, StreamingBuffer } from "./buffers.js";
 import { ActionView } from "./namespaces.js";
 import { SyntaxErrorInTemplate, TemplateError, WrongEncodingError } from "./template/error.js";
-import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
-import { Html } from "./template/handlers/html.js";
-import { Builder } from "./template/handlers/builder.js";
-import { Raw } from "./template/handlers/raw.js";
-import { TSE } from "./template/handlers/tse.js";
+import { Handlers, type TemplateHandler } from "./template/handlers.js";
 import { SimpleType } from "./template/types.js";
 import { File as SourcesFile } from "./template/sources/file.js";
 import { type BacktraceLocation, type Spot } from "./template/handlers/tse.js";
@@ -113,15 +110,12 @@ export interface TemplateOptions {
 }
 
 export class Template {
-  static {
-    TemplateHandlers.registerDefaultTemplateHandler("raw", new Raw());
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
-    TemplateHandlers.registerTemplateHandler("html", new Html());
-    TemplateHandlers.registerTemplateHandler("builder", new Builder());
-    TemplateHandlers.registerTemplateHandler("ruby", {
-      call: (_: unknown, source: string) => source,
-    });
-  }
+  declare static registerTemplateHandler: Handlers["registerTemplateHandler"];
+  declare static unregisterTemplateHandler: Handlers["unregisterTemplateHandler"];
+  declare static templateHandlerExtensions: Handlers["templateHandlerExtensions"];
+  declare static registeredTemplateHandler: Handlers["registeredTemplateHandler"];
+  declare static registerDefaultTemplateHandler: Handlers["registerDefaultTemplateHandler"];
+  declare static handlerForExtension: Handlers["handlerForExtension"];
 
   static frozenStringLiteral: boolean | null | undefined = false;
 
@@ -545,6 +539,8 @@ export class Template {
     return { virtual_path: this.virtualPath, identifier: this.identifier };
   }
 }
+
+extend(Template, Handlers);
 
 rbModConstSet(ActionView, "Template", Template);
 rbModConstSet(Template, "Error", TemplateError);

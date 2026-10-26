@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import "../index.js";
 import { Base as ServerBase } from "../server/base.js";
 import { Configuration } from "../server/configuration.js";
+import { socketPair } from "../test-helpers/socket-pair.js";
 import { StreamEventLoop } from "./stream-event-loop.js";
 import { Base } from "./base.js";
 
 const noop = () => {};
-const io = { on: noop, off: noop, write: () => true, destroy: noop };
+const [io] = socketPair();
 
 function env(): Record<string, unknown> {
   return {
@@ -77,5 +78,12 @@ describe("ActionCable::Connection::Base", () => {
       { type: "disconnect", reason: "unauthorized", reconnect: false },
     ]);
     expect(s.connections).toEqual([]);
+  });
+
+  it("tags the logger with a lambda log tag's value for the request", () => {
+    const s = server();
+    s.config.logTags = [(request: { requestMethod: string }) => request.requestMethod, "my_tag"];
+    const connection = new Connection(s, env());
+    expect(connection.logger.tags).toEqual(["GET", "MyTag"]);
   });
 });

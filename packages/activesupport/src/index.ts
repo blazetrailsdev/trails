@@ -249,9 +249,6 @@ export {
   many,
   excluding,
   including,
-  minBy,
-  maxBy,
-  eachCons,
   inOrderOf,
   exclude,
   without,
@@ -385,7 +382,7 @@ export * from "./core-ext/string/zones.js";
 export { Duration, seconds, minutes, hours, days, weeks, months, years } from "./duration.js";
 export type { DurationParts } from "./duration.js";
 
-export { TimeZone, ZONES_MAP, InvalidTimezoneIdentifier } from "./values/time-zone.js";
+export { TimeZone, ZONES_MAP } from "./values/time-zone.js";
 export { TimeWithZone } from "./time-with-zone.js";
 export type { ChangeOptions, AdvanceOptions } from "./time-with-zone.js";
 export {
@@ -552,8 +549,6 @@ export {
   extend,
   included,
   extended,
-  initialize,
-  initializeIncludedModules,
   isModuleIncluded,
   Module,
   defineModule,
@@ -565,7 +560,6 @@ export { CodeGenerator, MethodSet } from "./code-generator.js";
 export type { MethodSource } from "./code-generator.js";
 export { methodMissingProxy } from "@blazetrails/ruby-compat/method-missing-proxy";
 export { prepend } from "@blazetrails/ruby-compat";
-export type { PrependMethod, PrependModule } from "@blazetrails/ruby-compat";
 export { ClassAttribute } from "./class-attribute.js";
 
 export {

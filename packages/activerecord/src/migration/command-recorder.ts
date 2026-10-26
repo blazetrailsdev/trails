@@ -1,5 +1,4 @@
 import {
-  compact,
   hashDelete,
   include,
   isEmpty,
@@ -140,7 +139,7 @@ export class CommandRecorder {
 
   async replay(migration: unknown): Promise<void> {
     for (const [cmd, args, block] of this.commands) {
-      await rbFSend(migration, cmd, ...args, ...compact([block]));
+      await rbFSend(migration, cmd, ...args, ...[block].filter((x) => x != null));
     }
   }
 

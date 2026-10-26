@@ -120,21 +120,35 @@ port a body:
 - **`fetch` vs `??`.** `h.fetch(:k, default)` returns the _stored_ value
   whenever the key exists — including a stored `nil` or `false`. `h.k ?? default`
   substitutes the default for `null`/`undefined`. They differ, and Rails
-  relation readers depend on the difference. `fetch` has no native form, so it
-  is always ruby-compat's `fetch` (see the next bullet).
+  relation readers depend on the difference. Its two-argument arm on a plain
+  object with a literal key is `Object.hasOwn(h, "k") ? h.k : default`; every
+  other `fetch` is ruby-compat's `fetch` (see the next bullet).
+- **Native first (RFC 0194).** Every ruby-compat helper follows one rule:
+  write the native JS form wherever behavior at the call site is identical,
+  and keep the helper only where it dispatches or where semantics observably
+  differ. "Dispatches" means the receiver may be a `Map` / `Hash`, the
+  receiver answers the call itself (`isEmpty`, `fetch`, `isRespondTo`), or
+  the name is computed. Where the form is identical the helper is not
+  optional but wrong (owner ruling, 2026-10-19), and
+  `ruby-compat-native-required` (`eslint/ruby-compat-native-required.mjs`)
+  reports the helpers listed in its only-grow
+  `ruby-compat-native-required.json` called on an Array, `string`, `number`
+  or plain object. The Hash table and the Array / String / Enumerable table
+  below are this rule applied.
 - **Hash calls on a plain object.** Where the receiver is a plain object, write
   the JS form and not the ruby-compat helper. The call gates credit the form on
   the receiver Rails names, and `parity:api:calls:args` checks a literal key.
 
-  | Ruby                                       | Native form                               | Keeps the helper where                                                                                                    |
-  | ------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-  | `h.key?(:k)` / `has_key?`                  | `"k" in h`; `Object.hasOwn(h, k)`         | the object can hold `{ k: undefined }` for an absent keyword                                                              |
-  | `h[k]` / `h[k] = v`                        | `h[k]` / `h[k] = v`                       | a miss must read `null`; `k` is caller-supplied (`"__proto__"`, an `Object.prototype` name); a test asserts `FrozenError` |
-  | `h.delete(:k)`                             | `delete h.k`                              | the removed value is used, or a block is passed                                                                           |
-  | `h.merge!(other)` / `update`               | `Object.assign(h, other)`                 | a conflict block is passed                                                                                                |
-  | `h.merge(other)`                           | `{ ...h, ...other }`                      | a conflict block is passed; the result must have no prototype                                                             |
-  | `h.each_pair { \|k, v\| }`                 | `for (const [k, v] of Object.entries(h))` | the call's return value is used                                                                                           |
-  | `fetch`, `delete_if`, `keep_if`, `replace` | none                                      | always                                                                                                                    |
+  | Ruby                              | Native form                               | Keeps the helper where                                                                                                    |
+  | --------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+  | `h.key?(:k)` / `has_key?`         | `"k" in h`; `Object.hasOwn(h, k)`         | the object can hold `{ k: undefined }` for an absent keyword                                                              |
+  | `h[k]` / `h[k] = v`               | `h[k]` / `h[k] = v`                       | a miss must read `null`; `k` is caller-supplied (`"__proto__"`, an `Object.prototype` name); a test asserts `FrozenError` |
+  | `h.delete(:k)`                    | `delete h.k`                              | the removed value is used, or a block is passed                                                                           |
+  | `h.merge!(other)` / `update`      | `Object.assign(h, other)`                 | a conflict block is passed                                                                                                |
+  | `h.merge(other)`                  | `{ ...h, ...other }`                      | a conflict block is passed; the result must have no prototype                                                             |
+  | `h.each_pair { \|k, v\| }`        | `for (const [k, v] of Object.entries(h))` | the call's return value is used                                                                                           |
+  | `h.fetch(:k, default)`            | `Object.hasOwn(h, "k") ? h.k : default`   | the key is computed; one argument (`KeyError`) or a block is passed                                                       |
+  | `delete_if`, `keep_if`, `replace` | none                                      | always                                                                                                                    |
 
   `in` is for a literal key that is not an `Object.prototype` member name;
   a computed or caller-supplied key is `Object.hasOwn(h, k)`, since `in` walks
@@ -143,6 +157,29 @@ port a body:
   answers the call itself (`isKey`, `get`, `set`, `each`), because the helper
   dispatches and the form does not. A member call (`headers.hasKey(k)` for
   `Rack::Headers#key?`) is a ported Rails method, not a helper, and stays.
+
+- **Array, String and Enumerable calls on a native value.** The same rule,
+  for the receivers JS already has. `ruby-compat-native-required` enforces
+  each row once its sweep adds the helper to the JSON list; until then it
+  is enforced by review.
+
+  | Ruby                               | Native form                            | Keeps the helper where                                                        |
+  | ---------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------- |
+  | `a.first` / `a.last` (no argument) | `a[0] ?? null` / `a.at(-1) ?? null`    | the receiver may be an Enumerable or a `Range`; a count argument is passed    |
+  | `a.include?(x)`                    | `a.includes(x)`                        | equality must be Ruby `==` (`rbEqual`) on objects, not `SameValueZero`        |
+  | `a.map` / `a.select` / `a.reject`  | `a.map` / `a.filter` / `!` in filter   | the block result is read with Ruby truthiness (`0`, `""` are truthy in Ruby)  |
+  | `a.join(sep)`                      | `a.join(sep)`                          | an element is a nested Array: Ruby joins it with `sep`, JS with `","`         |
+  | `a.compact`                        | `a.filter((x) => x != null)`           | the in-place `compact!` and its `nil`-when-unchanged result                   |
+  | `a.each_with_index`                | `a.forEach((x, i) => …)` / `entries`   | the receiver may be any `each` receiver, or the enumerator result is used     |
+  | `s.start_with?` / `s.end_with?`    | `startsWith` / `endsWith`              | a Regexp or several prefixes are passed                                       |
+  | `s.include?(t)`                    | `s.includes(t)`                        | never, on a `string` receiver                                                 |
+  | `s.strip` / `upcase` / `downcase`  | `trim` / `toUpperCase` / `toLowerCase` | Ruby's whitespace set (`strip` keeps `\u00A0`) or ASCII-only case mapping     |
+  | `s.split(sep)`                     | `s.split(sep)`                         | trailing empty fields are dropped, a limit is passed, or `sep` is `nil`/`" "` |
+
+  Enumerable helpers are free functions taking the receiver first,
+  `partition(enum, fn)`, never a method spliced onto `Array.prototype`. Keep
+  one only where the receiver is not an Array (`each` receiver, `Range`,
+  `Set`) or where it reads its block with Ruby truthiness.
 
 - **`present?` / `blank?` / `presence`.** Use the ActiveSupport analogues, not
   `!!x` or `x?.length`. `" "` is blank in Ruby and truthy in JS.
@@ -642,7 +679,21 @@ step — `parity:*` is the only name to write.
 ## Module mixins (Ruby `include` → TypeScript)
 
 Rails uses `include`/`extend` to mix module methods into a class. TS has no
-equivalent, so we use **`this`-typed functions assigned directly to the class**.
+language-level equivalent, so `@blazetrails/ruby-compat` and
+`@blazetrails/activesupport` supply one for each Ruby construct. **Pick by
+what the Ruby does**, so the TS reads back as the same mixin:
+
+| Ruby                                | TypeScript                           |
+| ----------------------------------- | ------------------------------------ |
+| `include SomeModule`                | `include()` / `Included<>`           |
+| `extend SomeModule`, `ClassMethods` | `extend()` / `Extended<>`            |
+| `prepend SomeModule`                | `prepend()`                          |
+| `included do ... end`               | the `included` / `extended` hooks    |
+| `class_attribute :foo`              | `classAttribute()`                   |
+| one method, no module               | a `this`-typed function on the class |
+
+**One method, no module.** Where Rails defines a single method rather than
+mixing a module, assign a `this`-typed function directly:
 
 ```ts
 // attribute-methods.ts
@@ -659,38 +710,42 @@ export class Model {
 
 Why: code lives in the file that matches Rails' layout (so `parity:api`
 finds it), no delegation wrappers, type-checked via the host interface,
-and `this` resolves to the actual subclass at runtime.
+and `this` resolves to the actual subclass at runtime. This form is for an
+_individual_ method. A run of `static X = X` lines standing in for one Ruby
+`extend SomeModule` is a hand-rolled `extend`: use `extend()`, so the mixin
+survives as one construct.
 
-For **instance methods mixed in bulk** (like Rails' `include QueryMethods`),
-use `include()` / `Included<>` from `@blazetrails/activesupport`. See
-`ruby-compat/src/include.ts` and `relation.ts` + `relation/query-methods.ts`.
+**Instance methods mixed in bulk** (Rails' `include QueryMethods`) are
+`include()` / `Included<>`; see `ruby-compat/src/include.ts` and `relation.ts` +
+`relation/query-methods.ts`. **Class methods mixed in bulk** (Rails'
+`extend SomeModule`, and the `ClassMethods` half of an
+`ActiveSupport::Concern`) are `extend()` / `Extended<>`.
 
-When NOT to use this:
+**An `included do ... end` block** is a property on the module keyed by the
+exported `included` symbol (`Symbol.for("@blazetrails/ruby-compat:included")`).
+`include()` calls it with the including class after the module's methods are
+installed, which is where Ruby runs the block; `extend()` does the same with
+`extended`. `ruby-compat/src/include.test.ts` covers both: "fires the included
+callback after methods are copied" and "does not copy the included symbol onto
+the prototype".
+
+**`class_attribute :foo`**, including one inside an `included do` block, is
+`classAttribute()`, which already gives Rails' semantics (reads walk the
+constructor chain, writes are local to the class); do not hand-roll
+copy-on-first-write per call site.
+
+When NOT to use these:
 
 - A **string-named** `extended` / `included` / `inherited` method. Those names
   are Ruby lifecycle hooks; a TS method spelled that way is drift, not a
   mirror, which is why `SKIP_GROUPS` in `scripts/parity/conventions.ts` marks
-  them `tsMirrorIsDrift: true` and `parity:api:extra` keeps flagging them.
+  them `tsMirrorIsDrift: true` and `parity:api:extra` keeps flagging them. The
+  hooks above are symbol-keyed, so they never collide with that entry.
+- `inherited`, unlike the other two, has **no** equivalent: JS has no hook that
+  fires when a subclass is defined (see § "`inherited` is deferred to
+  own-property memo guards").
 - If the method needs Model-specific state beyond the host interface,
   keep it in `model.ts` directly.
-
-`included` and `extended` themselves **do** have a TS equivalent, and the
-sentence above is only about the spelling. `include()` / `extend()` fire
-callbacks keyed by the exported `included` / `extended` symbols
-(`Symbol.for("@blazetrails/ruby-compat:included")`, see
-`ruby-compat/src/include.ts`), which is how you port an
-`included do ... end` block. Because they are symbol-keyed they are not public
-string-named members, so they never collide with the `SKIP_GROUPS` entry above.
-Only `inherited` has no equivalent — JS has no hook that fires when a subclass
-is defined, so its Rails semantics have to be deferred some other way (see
-§ "`inherited` is deferred to own-property memo guards").
-
-The class-method half of a Concern is `extend()` / `Extended<>`, the mirror of
-Ruby `extend SomeModule` — reach for it instead of hand-assigning
-`static x = x` onto the class. And an `included do class_attribute :foo ... end`
-is `classAttribute()` from `@blazetrails/activesupport`, which already gives
-Rails' semantics (reads walk the constructor chain, writes are local to the
-class); do not hand-roll copy-on-first-write per call site.
 
 ### A Ruby module is a JS object or a JS class
 
@@ -1385,12 +1440,16 @@ thread.** The `connection/` port, when it lands, follows these rules:
   partial-write arms (`stream.rb:54,65`) and `run`
   (`stream_event_loop.rb:105`), none of which exists here, so a body would be
   an empty stub.
-- `attach` and `detach` keep their Rails names and callers. `attach(io, stream)`
-  (`stream_event_loop.rb:30-36`) registers the socket's `data` / `end` /
-  `error` listeners, held in `@map` where Rails holds the NIO monitor, and they
-  call `stream.receive` and `stream.close` exactly where `run` does
-  (`:111-129`). `detach` (`:38-45`) removes them, deletes the map entry and
-  closes the socket.
+- `attach` and `detach` keep their Rails names and callers. The hijacked io
+  is the ruby-compat `TCPSocket` the Rack handler hands out, a Ruby IO, so
+  `attach(io, stream)` (`stream_event_loop.rb:30-36`) holds the stream in
+  `@map` where Rails holds the NIO monitor and reads the io as `run` does
+  (`:111-129`): it awaits `io.wait_readable` where `run` waits in `select`,
+  then calls `io.read_nonblock(4096, exception: false)` and hands the result
+  to `stream.receive`, or calls `stream.close` at end of file or on a raise,
+  and keeps reading. The read ends when the io leaves `@map`: `detach`
+  (`:38-45`) deletes the entry and calls `io.close`, and `Stream#close`
+  reaches `detach`; a `stream.close` that raises deletes it as `run` does.
 - `timer`, `post` and `stop` (`:19-28`, `:56-59`) port as ordinary methods over
   ruby-compat's `TimerTask` and `ThreadPoolExecutor`.
 - `Stream#write` calls the socket's `write` and keeps its `@stream_send` arm
@@ -1620,7 +1679,7 @@ the capability, in a different place. Each is decided here, and each but
 | `active_support/current_attributes.rb`                | nothing               |
 | `active_support/delegation.rb`                        | Proxy                 |
 | `deprecation/proxy_wrappers.rb`                       | Proxy                 |
-| `active_support/duration.rb`                          | nothing               |
+| `active_support/duration.rb`                          | named method, no trap |
 | `log_subscriber/test_helper.rb`                       | typed forwarders      |
 | `multibyte/chars.rb`                                  | nothing (no file)     |
 | `active_support/option_merger.rb`                     | Proxy                 |
@@ -1701,6 +1760,11 @@ method is a JS generator and the block body is the caller's `for…of` body.
 reaches public API; `parity:api:blocks` credits a non-public generator's
 `yield` as its block and still flags a public one. Ruled by the repo owner on
 trails#9053.
+
+The builder gem is the one exception to `block()`: a `.builder` template's
+blocks (`xml.p(() => …)`, `tag!`, `declare!`, `XmlEvents`) are plain trailing
+functions, read off the end of the argument list by `typeof`, because a tag's
+`*args` hold no other function. Ruled by the repo owner on 2026-10-22.
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 

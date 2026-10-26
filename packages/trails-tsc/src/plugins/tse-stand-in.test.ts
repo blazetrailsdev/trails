@@ -6,10 +6,11 @@ import {
   LookupContext,
   OutputBuffer,
   Template,
-  TemplateHandlers,
+  Handlers,
   TopLevel,
   TseHandler,
 } from "@blazetrails/actionview";
+import { hashAref, keys } from "@blazetrails/ruby-compat";
 import { tseLookupTransformer, virtualizeTse } from "./tse.js";
 
 // @ts-expect-error -- Property 'glob' does not exist on type 'ImportMeta'
@@ -30,8 +31,16 @@ function standIn(source: string): StandIn {
   }).outputText;
   const body = js
     .replace('import { TopLevel } from "@blazetrails/actionview";', "")
+    .replace(
+      'import { hashAref as __hashAref, keys as __keys } from "@blazetrails/ruby-compat";',
+      "",
+    )
     .replace("export default async function render(", "return async function render(");
-  return new Function("TopLevel", body)(TopLevel) as StandIn;
+  return new Function("TopLevel", "__hashAref", "__keys", body)(
+    TopLevel,
+    hashAref,
+    keys,
+  ) as StandIn;
 }
 
 const ACTIONPACK = "actionpack/";
@@ -384,12 +393,12 @@ async function renderAll(): Promise<Record<string, string>> {
 
 describe("TSE stand-in scope", () => {
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
+    Template.registerTemplateHandler("tse", new TseHandler());
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("covers a scenario for every fixture", () => {

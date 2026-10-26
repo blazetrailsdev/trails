@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { Info, PropertyList } from "./info.js";
-import { VERSION } from "./version.js";
+import { VERSION } from "./gem-version.js";
 
 describe("InfoTest", () => {
   beforeEach(() => {
     Info.properties = new PropertyList();
-    Info.property("Trails version", VERSION);
+    Info.property("Trails version", VERSION.STRING);
   });
 
   test("test_property_with_block_swallows_exceptions_and_ignores_property", () => {
@@ -28,7 +28,7 @@ describe("InfoTest", () => {
   });
 
   test("test_rails_version", () => {
-    expect(Info.properties.valueFor("Trails version")).toBe(VERSION);
+    expect(Info.properties.valueFor("Trails version")).toBe(VERSION.STRING);
   });
 
   test("test_html_includes_middleware", () => {

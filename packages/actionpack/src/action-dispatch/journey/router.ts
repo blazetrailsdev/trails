@@ -1,5 +1,4 @@
 import type { SafeBuffer } from "@blazetrails/activesupport";
-import { merge } from "@blazetrails/ruby-compat";
 import { X_CASCADE } from "../constants.js";
 import { Builder } from "./gtg/index.js";
 import { Utils } from "./router/utils.js";
@@ -85,7 +84,7 @@ export class Router {
         if (!post.startsWith("/")) post = "/" + post;
         railsReq.pathInfo = post;
       }
-      const merged: Record<string, unknown> = merge(route.defaults, parameters);
+      const merged: Record<string, unknown> = { ...route.defaults, ...parameters };
       if (block(route, merged) === true) return;
     }
   }

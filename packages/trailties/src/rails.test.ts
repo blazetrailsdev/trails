@@ -8,7 +8,7 @@ import { getFs } from "@blazetrails/ruby-compat";
 import { Trails, _resetTrailsEnv } from "./rails.js";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
-import { VERSION } from "./version.js";
+import { VERSION } from "./gem-version.js";
 
 beforeEach(() => {
   Trails.application = null;
@@ -27,7 +27,7 @@ afterEach(() => {
 
 describe("Trails", () => {
   it("Trails.version returns the trailties package version", () => {
-    expect(Trails.version).toBe(VERSION);
+    expect(Trails.version()).toBe(VERSION.STRING);
   });
 
   it("Trails.application returns null when no app is registered", () => {

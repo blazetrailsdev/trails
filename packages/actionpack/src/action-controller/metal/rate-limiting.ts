@@ -8,7 +8,7 @@ import {
   type Duration,
   type Included,
 } from "@blazetrails/activesupport";
-import { compact } from "@blazetrails/ruby-compat";
+
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { CallbackOptions, beforeAction } from "../../abstract-controller/callbacks.js";
 
@@ -87,7 +87,9 @@ export async function rateLimiting(
     name: string | null;
   },
 ): Promise<void> {
-  const cacheKey = compact(["rate-limit", this.controllerPath(), name, by.call(this)]).join(":");
+  const cacheKey = ["rate-limit", this.controllerPath(), name, by.call(this)]
+    .filter((x) => x != null)
+    .join(":");
   const count = await store.increment(cacheKey, 1, { expiresIn: within });
   if (count != null && count > to) {
     await Notifications.instrument("rate_limit.action_controller", { request: this.request }, () =>

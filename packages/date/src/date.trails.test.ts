@@ -1193,8 +1193,8 @@ describe("DateTime", () => {
 
   it("toTime names the exact instant of a sub-minute offset, as datetime_to_time's Time.new does", () => {
     const t = gemDateTime("1883-11-18T12:00:00-04:56:02").toTime();
-    expect(Number(t.epochNanoseconds / 1000000000n)).toBe(-2717651038);
-    expect([t.hour, t.minute, t.second]).toEqual([12, 0, 0]);
+    expect(t.toI()).toBe(-2717651038);
+    expect([t.hour, t.min, t.sec]).toEqual([12, 0, 0]);
   });
 
   it("spells a half-hour and a named zone's offset", () => {

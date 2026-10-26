@@ -190,6 +190,26 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("rack/test/utils_spec.rb", "rack-test")).toBe("utils.test.ts");
   });
 
+  it("strips chronic's test_ prefix", () => {
+    expect(rubyToConventionTs("test_repeater_day_name.rb", "chronic")).toBe(
+      "repeater-day-name.test.ts",
+    );
+    expect(rubyToConventionTs("test_chronic.rb", "chronic")).toBe("chronic.test.ts");
+  });
+
+  it("strips fugit's _spec suffix", () => {
+    expect(rubyToConventionTs("cron_spec.rb", "fugit")).toBe("cron.test.ts");
+  });
+
+  it("strips raabro's _spec suffix", () => {
+    expect(rubyToConventionTs("sample_xel_spec.rb", "raabro")).toBe("sample-xel.test.ts");
+  });
+
+  it("strips et-orbi's _spec suffix", () => {
+    expect(rubyToConventionTs("eo_time_spec.rb", "et-orbi")).toBe("eo-time.test.ts");
+    expect(rubyToConventionTs("module_spec.rb", "et-orbi")).toBe("module.test.ts");
+  });
+
   it("strips thor's _spec suffix and keeps its lib-relative spec path", () => {
     expect(rubyToConventionTs("actions/create_file_spec.rb", "thor")).toBe(
       "actions/create-file.test.ts",

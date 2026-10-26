@@ -1,7 +1,9 @@
-import { ArgumentError, getCrypto, type Bytes } from "@blazetrails/ruby-compat";
+import { ArgumentError, classModule, getCrypto, type Bytes } from "@blazetrails/ruby-compat";
 
 export class SecurityUtils {
-  static fixedLengthSecureCompare(a: string | Bytes, b: string | Bytes): boolean {
+  static readonly [classModule] = true;
+
+  fixedLengthSecureCompare(a: string | Bytes, b: string | Bytes): boolean {
     const aBuf = typeof a === "string" ? Buffer.from(a) : a;
     const bBuf = typeof b === "string" ? Buffer.from(b) : b;
 
@@ -12,9 +14,10 @@ export class SecurityUtils {
     return getCrypto().timingSafeEqual(aBuf, bBuf);
   }
 
-  static secureCompare(a: string, b: string): boolean {
-    return (
-      Buffer.byteLength(a) === Buffer.byteLength(b) && SecurityUtils.fixedLengthSecureCompare(a, b)
-    );
+  secureCompare(a: string, b: string): boolean {
+    return Buffer.byteLength(a) === Buffer.byteLength(b) && this.fixedLengthSecureCompare(a, b);
   }
+
+  static fixedLengthSecureCompare = SecurityUtils.prototype.fixedLengthSecureCompare;
+  static secureCompare = SecurityUtils.prototype.secureCompare;
 }

@@ -5,7 +5,8 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { ActionController, Request, Response, RouteSet } from "@blazetrails/actionpack";
 import { FixtureResolver } from "../../testing/resolvers.js";
 import { MissingTemplate } from "../../template/error.js";
-import { TemplateHandlers, type TemplateHandler } from "../../template/handlers.js";
+import { type TemplateHandler } from "../../template/handlers.js";
+import { Template } from "../../template.js";
 import { DetailsKey } from "../../lookup-context.js";
 
 registerConstant("ControllerNameSpace", { name: "ControllerNameSpace" });
@@ -41,13 +42,13 @@ async function withTemplateHandler(
   const block = args.pop() as () => Promise<void>;
   const handler = args.pop() as TemplateHandler;
   const extensions = args as string[];
-  TemplateHandlers.registerTemplateHandler(...extensions, handler);
+  Template.registerTemplateHandler(...extensions, handler);
   ActionController.Base.viewPaths().paths.forEach((path) => path.clearCache?.());
   DetailsKey.clear();
   try {
     await block();
   } finally {
-    TemplateHandlers.unregisterTemplateHandler(...extensions);
+    Template.unregisterTemplateHandler(...extensions);
     ActionController.Base.viewPaths().paths.forEach((path) => path.clearCache?.());
     DetailsKey.clear();
   }

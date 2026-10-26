@@ -13,6 +13,14 @@
       "default": "./dist/server/index.js"
     },
     "./all": "./dist/all.js",
+    "./app-path": {
+      "types": "./dist/app-path.d.ts",
+      "default": "./dist/app-path.js"
+    },
+    "./commands": {
+      "types": "./dist/bin.d.ts",
+      "default": "./dist/bin.js"
+    },
     "./generators": "./dist/generators/index.js",
     "./engine": {
       "types": "./dist/engine.d.ts",
@@ -49,17 +57,18 @@
   },
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "node -e \"require('fs').cpSync('src/generators/active-record/migration/templates', 'dist/generators/active-record/migration/templates', { recursive: true }); require('fs').cpSync('src/templates/rails', 'dist/templates/rails', { recursive: true })\" && trails-tsc-views build --views dist/templates/rails --in-place"
+    "build:templates": "node -e \"require('fs').cpSync('src/generators/active-record/migration/templates', 'dist/generators/active-record/migration/templates', { recursive: true }); require('fs').cpSync('src/templates/rails', 'dist/templates/rails', { recursive: true })\" && trails-tsc-views build --views dist/templates/rails --in-place && trails-tsc-views build-templates dist/generators"
   },
   "files": [
     "dist",
     "bin"
   ],
   "dependencies": {
+    "@blazetrails/actioncable": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
-    "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",
@@ -68,6 +77,7 @@
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/thor": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
     "commander": "^14.0.0",
@@ -75,6 +85,7 @@
   },
   "devDependencies": {
     "@blazetrails/activerecord-cli": "workspace:*",
+    "@blazetrails/et-orbi": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependencies": {

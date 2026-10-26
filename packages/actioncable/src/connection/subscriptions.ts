@@ -46,24 +46,21 @@ export class Subscriptions {
     this.subscriptions = Object.create(null) as Record<string, Subscription>;
   }
 
-  async executeCommand(data: Data): Promise<void> {
+  async executeCommand(data: Data): Promise<unknown> {
     try {
       switch (data["command"]) {
         case "subscribe":
-          await this.add(data);
-          break;
+          return await this.add(data);
         case "unsubscribe":
-          await this.remove(data);
-          break;
+          return await this.remove(data);
         case "message":
-          await this.performAction(data);
-          break;
+          return await this.performAction(data);
         default:
-          this.logger.error(`Received unrecognized command in ${rbInspect(data)}`);
+          return this.logger.error(`Received unrecognized command in ${rbInspect(data)}`);
       }
     } catch (e) {
       await this.connection.rescueWithHandler(e);
-      this.logger.error(
+      return this.logger.error(
         `Could not execute command from (${rbInspect(data)}) [${rbObjClassname(e)} - ${(e as Error).message}]: ${excBacktrace(
           e as Error,
         )!
@@ -73,13 +70,13 @@ export class Subscriptions {
     }
   }
 
-  async add(data: Data): Promise<void> {
+  async add(data: Data): Promise<unknown> {
     const idKey = data["identifier"] as string;
     const idOptions = withIndifferentAccess(
       ActiveSupportJSON.decode(idKey) as Record<string, unknown>,
     );
 
-    if (Object.hasOwn(this.subscriptions, idKey)) return;
+    if (Object.hasOwn(this.subscriptions, idKey)) return null;
 
     const subscriptionKlass = safeConstantize(
       idOptions.get("channel") as string,
@@ -89,15 +86,17 @@ export class Subscriptions {
     if (subscriptionKlass != null && rbModGt(Base, subscriptionKlass)) {
       const subscription = new subscriptionKlass(this.connection, idKey, idOptions);
       this.subscriptions[idKey] = subscription;
-      await subscription.subscribeToChannel();
+      return await subscription.subscribeToChannel();
     } else {
-      this.logger.error(`Subscription class not found: ${rbInspect(idOptions.get("channel"))}`);
+      return this.logger.error(
+        `Subscription class not found: ${rbInspect(idOptions.get("channel"))}`,
+      );
     }
   }
 
-  async remove(data: Data): Promise<void> {
+  async remove(data: Data): Promise<Subscription | undefined> {
     this.logger.info(`Unsubscribing from channel: ${data["identifier"] as string}`);
-    await this.removeSubscription(this.find(data));
+    return await this.removeSubscription(this.find(data));
   }
 
   async removeSubscription(subscription: Subscription): Promise<Subscription | undefined> {
@@ -105,8 +104,8 @@ export class Subscriptions {
     return hashDelete(this.subscriptions, subscription.identifier) as Subscription | undefined;
   }
 
-  async performAction(data: Data): Promise<void> {
-    await this.find(data).performAction(ActiveSupportJSON.decode(data["data"] as string));
+  async performAction(data: Data): Promise<unknown> {
+    return await this.find(data).performAction(ActiveSupportJSON.decode(data["data"] as string));
   }
 
   get identifiers(): string[] {

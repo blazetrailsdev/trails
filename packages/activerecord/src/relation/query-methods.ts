@@ -1,11 +1,11 @@
 import {
+  eachWithIndex,
   eachPair,
   extend,
   fetch,
   first,
   flatten,
   Hash,
-  isEmpty,
   isModuleIncluded,
   isSymbol,
   merge,
@@ -968,6 +968,7 @@ function createWithBang(
 ): any {
   if (value) {
     value = sanitizeForbiddenAttributes(value);
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- value may be a Map, which merge converts through to_hash
     this.createWithValue = merge(this.createWithValue, value);
   } else {
     this.createWithValue = {};
@@ -1027,7 +1028,7 @@ function optimizerHints(this: QueryMethodsHost, ...args: string[]): any {
 }
 
 function optimizerHintsBang(this: QueryMethodsHost, ...args: string[]): any {
-  this.optimizerHintsValues = union(this.optimizerHintsValues, args);
+  this.optimizerHintsValues = [...new Set([...this.optimizerHintsValues, ...args])];
   return this;
 }
 
@@ -1221,6 +1222,7 @@ const VALID_DIRECTIONS = new Set([":asc", ":desc", ":ASC", ":DESC", "asc", "desc
 export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
   for (const arg of args) {
     if (!isHash(arg)) continue;
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- arg may be a Hash, which eachPair dispatches on
     eachPair(arg as Record<string, unknown>, (_key, value) => {
       if (isHash(value)) {
         validateOrderArgs.call(this, [value]);
@@ -1326,7 +1328,7 @@ export function buildSubquery(
   const subquery = this.except("optimizerHints").arel().as(subqueryAlias);
 
   const arel = new SelectManager(subquery).project(selectValue as ArelNode);
-  if (!isEmpty(this.optimizerHintsValues)) arel.optimizerHints(...this.optimizerHintsValues);
+  if (this.optimizerHintsValues.length > 0) arel.optimizerHints(...this.optimizerHintsValues);
   return arel;
 }
 
@@ -1808,7 +1810,7 @@ export function arelColumnsFromHash(
 /** @internal */
 export function orderColumn(this: QueryMethodsHost, field: string): unknown {
   return arelColumn.call(this, field, (attrName: string) => {
-    if (attrName === "count" && !isEmpty(this.groupValues)) {
+    if (attrName === "count" && this.groupValues.length > 0) {
       return this.table.get(attrName);
     } else {
       return Arel.sql(this.model.adapterClass().quoteTableName(attrName), {
@@ -1948,8 +1950,8 @@ export function eachJoinDependencies(
 /** @internal */
 export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
   let joins = union(this.joinsValues as AssociationSpec[], this.leftOuterJoinsValues);
-  if (!isEmpty(this.eagerLoadValues)) joins = union(joins, this.eagerLoadValues);
-  if (!isEmpty(this.includesValues)) joins = union(joins, this.includesValues);
+  if (this.eagerLoadValues.length > 0) joins = union(joins, this.eagerLoadValues);
+  if (this.includesValues.length > 0) joins = union(joins, this.includesValues);
 
   const joinDependencies: JoinDependency[] = [];
   joinDependencies.unshift(
@@ -1996,7 +1998,7 @@ export function buildArel(
 
   if (this.annotateValues.length > 0) {
     const annotates =
-      this.annotateValues.length > 1 ? uniq(this.annotateValues) : this.annotateValues;
+      this.annotateValues.length > 1 ? [...new Set(this.annotateValues)] : this.annotateValues;
     arel.comment?.(...annotates);
   }
 
@@ -2058,7 +2060,7 @@ export function buildJoinBuckets(
   });
 
   let stashedLeftJoins: JoinDependency[] | undefined;
-  if (!isEmpty(this.leftOuterJoinsValues)) {
+  if (this.leftOuterJoinsValues.length > 0) {
     stashedLeftJoins = [];
     const leftJoins = selectNamedJoins.call(
       this,
@@ -2075,7 +2077,7 @@ export function buildJoinBuckets(
       },
     );
 
-    if (isEmpty(this.joinsValues)) {
+    if (this.joinsValues.length === 0) {
       buckets.set("named_join", leftJoins);
       buckets.set("stashed_join", stashedLeftJoins);
       return [buckets, Nodes.OuterJoin];
@@ -2094,11 +2096,11 @@ export function buildJoinBuckets(
     }
   }
 
-  for (const [i, join] of joins.entries()) {
+  eachWithIndex(joins, (join, i) => {
     if (typeof join === "string" && !join.startsWith(":")) {
       joins[i] = new Nodes.StringJoin(Arel.sql(join.trim())) as Nodes.Join;
     }
-  }
+  });
 
   while (joins[0] instanceof Nodes.Join) {
     const joinNode = joins.shift() as Nodes.Join;
@@ -2134,7 +2136,7 @@ export function buildJoins(
   joinSources: any[],
   aliases?: AliasTracker,
 ): any[] {
-  if (isEmpty(this.joinsValues) && isEmpty(this.leftOuterJoinsValues)) return joinSources;
+  if (this.joinsValues.length === 0 && this.leftOuterJoinsValues.length === 0) return joinSources;
 
   const [buckets, joinType] = buildJoinBuckets.call(this);
 
@@ -2143,9 +2145,9 @@ export function buildJoins(
   const leadingJoins = buckets.get("leading_join")! as Nodes.Join[];
   const joinNodes = buckets.get("join_node")! as Nodes.Join[];
 
-  if (!isEmpty(leadingJoins)) joinSources.push(...leadingJoins);
+  if (leadingJoins.length > 0) joinSources.push(...leadingJoins);
 
-  if (!(isEmpty(namedJoins) && isEmpty(stashedJoins))) {
+  if (!(namedJoins.length === 0 && stashedJoins.length === 0)) {
     const aliasTracker = this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
     const joinDependency = constructJoinDependency.call(this, namedJoins, joinType);
     joinSources.push(
@@ -2153,13 +2155,13 @@ export function buildJoins(
     );
   }
 
-  if (!isEmpty(joinNodes)) joinSources.push(...joinNodes);
+  if (joinNodes.length > 0) joinSources.push(...joinNodes);
   return joinSources;
 }
 
 /** @internal */
 export function buildWith(this: QueryMethodsHost, arel: SelectManager): SelectManager | undefined {
-  if (isEmpty(this.withValues)) return;
+  if (this.withValues.length === 0) return;
 
   const withStatements = this.withValues.map((withValue) =>
     buildWithValueFromHash.call(this, withValue),

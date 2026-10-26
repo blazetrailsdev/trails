@@ -2,7 +2,6 @@ import {
   RuntimeError,
   deleteAt,
   rbInspect,
-  insert,
   rbBlockGivenP,
   rbFSend,
 } from "@blazetrails/ruby-compat";
@@ -176,7 +175,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
     const sourceMiddleware = deleteAt(this.middlewares, sourceIndex)!;
 
     const targetIndex = this.assertIndex(target, "before");
-    insert(this.middlewares, targetIndex, sourceMiddleware);
+    this.middlewares.splice(targetIndex, 0, sourceMiddleware);
   }
 
   moveBefore(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {
@@ -188,7 +187,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
     const sourceMiddleware = deleteAt(this.middlewares, sourceIndex)!;
 
     const targetIndex = this.assertIndex(target, "after");
-    insert(this.middlewares, targetIndex + 1, sourceMiddleware);
+    this.middlewares.splice(targetIndex + 1, 0, sourceMiddleware);
   }
 
   use(klass: MiddlewareFactory, ...args: MiddlewareArgs): void {

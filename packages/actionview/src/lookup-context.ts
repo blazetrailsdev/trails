@@ -12,7 +12,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import type { NestedDependencies } from "./digestor.js";
 import { Base, type ViewContextClass } from "./base.js";
-import { TemplateHandlers } from "./template/handlers.js";
+import { Handlers } from "./template/handlers.js";
 import { Template } from "./template.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet, type PathSetResolver } from "./path-set.js";
@@ -31,19 +31,20 @@ export const Accessors = Object.assign(new Module(), {
   DEFAULT_PROCS: {} as Record<string, DefaultProc>,
 });
 
-type Accessors = {
-  get formats(): DetailValue;
-  set formats(value: DetailWriter);
-  get variants(): DetailValue;
-  set variants(value: DetailWriter);
-  get handlers(): DetailValue;
-  set handlers(value: DetailWriter);
+interface Accessors {
+  defaultLocale(): DetailValue;
   get locale(): unknown;
   set locale(value: DetailWriter);
-};
-
-/** @noRailsEquivalent CONVERGEABLE lookup-context-register-detail-accessors-typed-on-merge */
-type DefaultAccessors = Record<"defaultLocale" | "defaultFormats", () => DetailValue>;
+  defaultFormats(): DetailValue;
+  get formats(): DetailValue;
+  set formats(value: DetailWriter);
+  defaultVariants(): DetailValue;
+  get variants(): DetailValue;
+  set variants(value: DetailWriter);
+  defaultHandlers(): DetailValue;
+  get handlers(): DetailValue;
+  set handlers(value: DetailWriter);
+}
 
 type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
 
@@ -218,10 +219,10 @@ export class LookupContext {
       config.locale = isSymbol(value) ? symbolToS(value) : value;
     }
 
-    const defaultLocale = (this as unknown as DefaultAccessors).defaultLocale();
+    const defaultLocale = this.defaultLocale();
     const detail: DetailValue = isPresent(defaultLocale)
       ? kernelArray(defaultLocale as (string | symbol)[])
-      : (this as unknown as DefaultAccessors).defaultLocale();
+      : this.defaultLocale();
     if (!rbEqual(detail, this._details.locale)) this._setDetail("locale", detail);
   }
 
@@ -231,10 +232,7 @@ export class LookupContext {
   set formats(values: DetailValue | null | undefined) {
     if (values) {
       let arr = [...values];
-      if (arr.includes("*/*"))
-        arr = arr
-          .filter((v) => v !== "*/*")
-          .concat((this as unknown as DefaultAccessors).defaultFormats());
+      if (arr.includes("*/*")) arr = arr.filter((v) => v !== "*/*").concat(this.defaultFormats());
       arr = Array.from(new Set(arr));
 
       if (!Template.Types.isValidSymbols(arr)) {
@@ -252,7 +250,7 @@ export class LookupContext {
     }
     const detail: DetailValue = isPresent(values)
       ? kernelArray(values as (string | symbol)[])
-      : (this as unknown as DefaultAccessors).defaultFormats();
+      : this.defaultFormats();
     if (!rbEqual(detail, this._details.formats)) this._setDetail("formats", detail);
   }
   get htmlFallbackForJs(): boolean {
@@ -438,4 +436,4 @@ LookupContext.registerDetail(
   () => Base.defaultFormats ?? [":html", ":text", ":js", ":css", ":xml", ":json"],
 );
 LookupContext.registerDetail("variants", () => []);
-LookupContext.registerDetail("handlers", () => TemplateHandlers.extensions());
+LookupContext.registerDetail("handlers", () => Handlers.extensions());

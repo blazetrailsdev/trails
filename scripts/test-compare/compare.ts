@@ -84,7 +84,6 @@ import {
 import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
-import { ROOT_DIR as API_ROOT_DIR, packageSrcDir } from "../api-compare/config.js";
 import { classifyTestFile, closureFiles } from "./closure-manifest.js";
 
 const SCRIPT_DIR = __dirname;
@@ -175,6 +174,20 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     const base = path.basename(rest, ".rb").replace(/_spec$/, "");
     const tsFile = base.replace(/_/g, "-") + ".test.ts";
     return dir === "." ? tsFile : path.join(dir, tsFile);
+  }
+
+  if (pkg === "et-orbi" || pkg === "raabro" || pkg === "fugit") {
+    return (
+      path
+        .basename(rubyFile, ".rb")
+        .replace(/_spec$/, "")
+        .replace(/_/g, "-") + ".test.ts"
+    );
+  }
+
+  if (pkg === "chronic" || pkg === "builder") {
+    const base = path.basename(rubyFile, ".rb").replace(/^test_/, "");
+    return base.replace(/_/g, "-") + ".test.ts";
   }
 
   if (pkg === "rack" || pkg === "rack-session") {
@@ -1658,6 +1671,11 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   bcrypt: "packages/bcrypt/src/",
   msgpack: "packages/msgpack/src/",
   marcel: "packages/marcel/src/",
+  chronic: "packages/chronic/src/",
+  builder: "packages/builder/src/",
+  "et-orbi": "packages/et-orbi/src/",
+  raabro: "packages/raabro/src/",
+  fugit: "packages/fugit/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
@@ -1670,7 +1688,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   i18n: "packages/i18n/src/",
   date: "packages/date/src/",
   "ruby-compat": "packages/ruby-compat/src/",
-  thor: `${path.relative(API_ROOT_DIR, packageSrcDir("thor")).split(path.sep).join("/")}/`,
+  thor: "packages/thor/src/",
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {

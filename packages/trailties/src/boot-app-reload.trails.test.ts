@@ -1,8 +1,7 @@
 import type { RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
-import { onLoad, resetLoadHooks } from "@blazetrails/activesupport";
-import { controllerConstants } from "@blazetrails/actionpack";
+import { constantize, onLoad, resetLoadHooks } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
@@ -32,8 +31,8 @@ describe("a generated app reloads its views in development", () => {
     const view = `${tmp}/posts/show.html.tse`;
     File.write(view, "<h1>Before edit</h1>");
     FileUtils.touch(view, { mtime: new Date(Date.now() - 10_000) });
-    const posts = [...controllerConstants.values()].find((k) => k.name === "PostsController")!;
-    (posts as unknown as { prependViewPath(path: string): void }).prependViewPath(tmp);
+    const posts = constantize("PostsController");
+    (posts as { prependViewPath(path: string): void }).prependViewPath(tmp);
 
     const show = async (): Promise<string> => {
       const [, , body] = await (rbFSend(app.app(), "call", {

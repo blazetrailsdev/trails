@@ -92,6 +92,30 @@ export class BasicSocket extends IO {
   }
 
   /**
+   * `IO#read` as Ruby's blocking `io_read` (`vendor/ruby/v3.3.11/io.c:3731`)
+   * answers it: waits until `length` bytes have arrived, or end of file, then
+   * reads them as {@link read} does, so fewer come back only at end of file.
+   * With no length it waits for end of file. A Node socket cannot block a
+   * read, so this is its awaited form, as `rbFLoad` is `Kernel#load`'s.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async readBlocking(
+    length?: number | null,
+    str?: Uint8Array | null,
+  ): Promise<string | Uint8Array | null> {
+    while (
+      !this._eof &&
+      !this._closed &&
+      !this._readClosed &&
+      (length == null || this._rbufLength < length)
+    ) {
+      await new Promise<void>((resolve) => this._waiting.push(resolve));
+    }
+    return this.read(length ?? null, str);
+  }
+
+  /**
    * `IO#read_nonblock` (`vendor/ruby/v3.3.11/io.rb:62`, `io.c:3611`
    * `io_read_nonblock`): at most `len` of the bytes delivered so far. With
    * none buffered it raises `IO::EAGAINWaitReadable` ("read would block",

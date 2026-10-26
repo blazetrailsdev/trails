@@ -558,6 +558,7 @@ export async function initialize(this: Wrapper, opts: Options = {}): Promise<Mys
   this.queryOptions = { ...defaultQueryOptions() };
   Object.assign(this.queryOptions, opts);
 
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- opts can hold { k: undefined } for an absent keyword, which hasKey reads as absent
   if (!hasKey(opts, "connectTimeout")) opts.connectTimeout = 120;
 
   for (const key of [
@@ -565,6 +566,7 @@ export async function initialize(this: Wrapper, opts: Options = {}): Promise<Mys
     ...["defaultFile", "defaultGroup", "secureAuth", "initCommand", "automaticClose"],
     ...["enableCleartextPlugin", "defaultAuth"],
   ]) {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- opts can hold { k: undefined } for an absent keyword, which hasKey reads as absent
     if (!hasKey(opts, key)) continue;
 
     switch (key) {
@@ -599,6 +601,7 @@ export async function initialize(this: Wrapper, opts: Options = {}): Promise<Mys
   if (rtest(opts.sslverify)) flags |= CLIENT_FLAGS.SSL_VERIFY_SERVER_CERT;
 
   if (
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- queryOptions can hold { k: undefined } for an absent keyword, which hasKey reads as absent
     ["user", "pass", "hostname", "dbname", "db", "sock"].some((k) => hasKey(this.queryOptions, k))
   ) {
     warn("============= WARNING FROM mysql2 =============");
@@ -623,6 +626,7 @@ export async function initialize(this: Wrapper, opts: Options = {}): Promise<Mys
   if (user != null) user = String(user);
   if (pass != null) pass = String(pass);
   if (host != null) host = String(host);
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- a database.yml or ENV port is a String; String#to_i answers 0 where Math.trunc answers NaN
   if (port != null) port = Number(toI(port));
   if (database != null) database = String(database);
   if (socket != null) socket = String(socket);

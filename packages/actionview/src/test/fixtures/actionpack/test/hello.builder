@@ -1,5 +1,4 @@
-const greeting = await render({ template: "test/greeting" });
-xml.html(() => {
-  xml.p(`Hello ${this.name}`);
-  xml.append(greeting);
+await xml.html(async () => {
+  xml.p(`Hello ${this.name ?? ""}`);
+  xml.append(await render({ template: "test/greeting" }));
 });

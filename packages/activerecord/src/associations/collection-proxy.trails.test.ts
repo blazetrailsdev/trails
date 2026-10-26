@@ -85,10 +85,10 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("map and findAll are Enumerable's, over a loaded and an unloaded relation", async () => {
     const author = await authorWithPosts();
     const unloaded = Post.where({ author_id: author.id }).order("title");
-    expect(Relation.prototype.map).toBe(Enumerable.map);
-    expect(Relation.prototype.findAll).toBe(Enumerable.findAll);
+    expect(Relation.prototype.map).toBe(Enumerable.prototype.map);
+    expect(Relation.prototype.findAll).toBe(Enumerable.prototype.findAll);
     for (const name of ["first", "select", "isAny", "isInclude", "sum"] as const) {
-      expect(Relation.prototype[name]).not.toBe(Enumerable[name]);
+      expect(Relation.prototype[name]).not.toBe(Enumerable.prototype[name]);
     }
     expect((unloaded as Partial<Iterable<Post>>)[Symbol.iterator]).toBeUndefined();
     expect(unloaded.isLoaded).toBe(false);

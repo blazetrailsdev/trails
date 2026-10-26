@@ -1,7 +1,6 @@
 import { Shell } from "./shell.js";
 import {
   PROTOCOL_PROBES,
-  merge,
   rbCheckArrayType,
   rbStrSend,
   rbFArray,
@@ -72,7 +71,7 @@ export class Tool {
   }
 
   call({ ...options }: Record<string, unknown> = {}, block?: (...args: unknown[]) => unknown) {
-    options = merge(this._options, options);
+    options = { ...this._options, ...options };
     if (block != null) {
       options.warnings = false;
     }

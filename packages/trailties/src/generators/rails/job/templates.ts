@@ -2,13 +2,13 @@ import { classify } from "@blazetrails/activesupport";
 import { dasherize } from "../../base.js";
 import type { JobGenerator } from "./job-generator.js";
 
-type Template = (this: JobGenerator) => string;
+type Template = (this: JobGenerator, ext: string) => string;
 
 /** @missingRailsCall module_namespacing — CONVERGEABLE scaffold-controller-hooks-test-framework-and-engine-arms */
-const job: Template = function () {
+const job: Template = function (ext) {
   const parentClassName = this.parentClassName();
   const root = "../".repeat(this.classPathParts.length);
-  return `import { ${classify(parentClassName)} } from "${root || "./"}${dasherize(parentClassName)}.js";
+  return `import { ${classify(parentClassName)} } from "${root || "./"}${dasherize(parentClassName)}${ext}";
 
 export class ${this.className().split("::").pop()}Job extends ${classify(parentClassName)} {
   static {

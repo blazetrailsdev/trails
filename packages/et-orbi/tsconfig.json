@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../chronic"
+    },
+    {
+      "path": "../date"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../tzinfo"
+    },
+    {
+      "path": "../vitest-matchers"
+    }
+  ]
+}

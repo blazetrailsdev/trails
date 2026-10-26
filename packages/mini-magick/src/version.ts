@@ -1,4 +1,4 @@
-import { Gem, compact, classModule } from "@blazetrails/ruby-compat";
+import { Gem, classModule } from "@blazetrails/ruby-compat";
 
 export function version() {
   return new Gem.Version(VERSION.STRING as string | number | null);
@@ -19,7 +19,7 @@ export class VERSION {
 
   static PRE: unknown = null;
 
-  static STRING: unknown = compact([VERSION.MAJOR, VERSION.MINOR, VERSION.TINY, VERSION.PRE]).join(
-    ".",
-  );
+  static STRING: unknown = [VERSION.MAJOR, VERSION.MINOR, VERSION.TINY, VERSION.PRE]
+    .filter((x) => x != null)
+    .join(".");
 }

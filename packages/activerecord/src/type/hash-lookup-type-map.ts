@@ -1,6 +1,6 @@
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import * as Type from "../type.js";
-import { Concurrent, block as blockPass, compact, fetch } from "@blazetrails/ruby-compat";
+import { Concurrent, block as blockPass, fetch } from "@blazetrails/ruby-compat";
 
 type Key = string | number;
 type Callable = (lookupKey: Key, ...args: unknown[]) => ValueType;
@@ -23,7 +23,7 @@ export class HashLookupTypeMap {
     const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
     return this._cache.get(lookupKey)!.fetchOrStore(
       args,
-      blockPass(() => this.performFetch(lookupKey, ...args, ...compact([block]))),
+      blockPass(() => this.performFetch(lookupKey, ...args, ...[block].filter((x) => x != null))),
     );
   }
 

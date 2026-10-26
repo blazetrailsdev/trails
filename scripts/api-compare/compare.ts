@@ -166,6 +166,7 @@ import {
   EVAL_CALLBACK_PREFIX,
   LENGTH_READ_UNCREDITED_RECEIVER_KINDS,
   NATIVE_FORM_ANALOGUES,
+  TYPED_NATIVE_FORM,
   NEGATED_ALIASES,
   partitionNegatedCalls,
   requiresNegatedAlias,
@@ -330,9 +331,10 @@ function idiomSurplus(skeleton: readonly string[], counterpart: readonly string[
 // `.first`/`.size` into indexing a preloaded array (dropping the query trigger)
 // permanently invisible to the gate — exactly the fidelity gap it exists to
 // catch. `delete`, `merge`, `merge!` and `fetch` stay in the comparison too.
-// `fetch` is satisfied by a call only. The other three are also satisfied by a
-// marked native form on the receiver the Ruby site names (`delete h[k]`,
-// `{ ...h, ...other }`, `Object.assign(h, other)`; RFC 0190): unlike `.length`
+// Each is also satisfied by a marked native form on the receiver the Ruby site
+// names (`delete h[k]`, `{ ...h, ...other }`, `Object.assign(h, other)`, and
+// for a two-argument `fetch` on a proven Hash `Object.hasOwn(h, "k") ? h.k : d`;
+// RFC 0190, RFC 0194): unlike `.length`
 // and `[0]`, none of those forms is a spelling anyone gives a Relation call.
 //
 // MEASURED, 2026-08-08 (RFC 0092 `positional-idiom-analogues`): the question
@@ -804,12 +806,28 @@ export function significantCallsForReceivers(
         return false;
       }
       if (value === "with_indifferent_access" && tsNativeForms.has("object")) return false;
-      if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
       const kinds = receivers?.[value];
+      if (isTypedNativeForm(value, kinds, tsNativeForms)) return false;
+      if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
       const proven = SIZE_ANALOGUES.has(value) ? SIZED_RECEIVER_KINDS : ARRAY_RECEIVER_KIND;
       return !(kinds && kinds.length > 0 && kinds.every((k) => proven.has(k)));
     },
   };
+}
+
+/**
+ * Whether the paired TS body writes `value`'s native form on a receiver the TS
+ * checker proved ({@link TYPED_NATIVE_FORM}). An implicit-self Ruby site is
+ * never credited: a bare `empty?` in `Relation` is `Relation#empty?`.
+ */
+function isTypedNativeForm(
+  value: string,
+  kinds: readonly string[] | undefined,
+  tsNativeForms: ReadonlySet<string>,
+): boolean {
+  if (kinds === undefined || kinds.length === 0 || kinds.includes("self")) return false;
+  if (SIZE_ANALOGUES.has(value)) return tsNativeForms.has(TYPED_NATIVE_FORM.length);
+  return value === "except" && tsNativeForms.has(TYPED_NATIVE_FORM.except);
 }
 
 /**
@@ -899,7 +917,8 @@ function hasNativeFormAnalogue(
         (analogue.key === true &&
           /^[A-Z][A-Z0-9_]*$/.test(bare) &&
           tsNativeForms.has(`${analogue.form}:${bare}`)) ||
-        (analogue.form === "invoke" && tsNativeForms.has(`invoke:${bare}`))
+        (analogue.form === "invoke" && tsNativeForms.has(`invoke:${bare}`)) ||
+        (bare === "except" && tsNativeForms.has(TYPED_NATIVE_FORM.except))
       );
     }),
   );
@@ -2418,6 +2437,11 @@ export function misplacedClusterVerdict(
  * real declaration from silently retiring its method's call-parity rows; an
  * alias entry has no calls to retire, so the faithful alias IS the port. See
  * `MethodInfo.aliasOf`.
+ *
+ * A `register_detail` entry (`actionview/lib/action_view/lookup_context.rb:21-34`)
+ * is defined at run time on both sides — `Accessors.module_eval` in Ruby,
+ * `Object.defineProperty` in `registerDetail` — so the only static TS form it
+ * can have is the declaration typing it on the merged interface.
  */
 export function declarationOnlyInFile(
   tsFile: string,
@@ -2429,6 +2453,7 @@ export function declarationOnlyInFile(
 ): boolean {
   if (bodylessOwnersByFile.get(tsFile)?.has(name) !== true) return false;
   if (rubyNotes === "alias" && aliasNamesByFile?.get(tsFile)?.has(name) === true) return false;
+  if (rubyNotes === "register_detail") return false;
   return bodiedOwnersByFile.get(tsFile)?.has(name) !== true;
 }
 

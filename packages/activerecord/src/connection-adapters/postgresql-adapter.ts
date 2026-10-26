@@ -24,7 +24,14 @@ import {
   tryCall,
 } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
-import { hashDelete, IO, rbRegMatchP, rtest, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  eachWithObject,
+  hashDelete,
+  IO,
+  rbRegMatchP,
+  rtest,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -737,14 +744,18 @@ export class PostgreSQLAdapter
       allowRetry: true,
       materializeTransactions: false,
     });
-    const memo = new Map<string, string[]>();
-    for (const row of result.castValues() as unknown[][]) {
-      const name = row[0] as string;
-      const schema = row[2] === currentSchema ? null : (row[2] as string);
-      const fullName = [schema, name].filter((part) => part != null).join(".");
-      memo.set(fullName, row.at(-1) as string[]);
-    }
-    return Array.from(memo);
+    return Array.from(
+      eachWithObject(
+        result.castValues() as unknown[][],
+        new Map<string, string[]>(),
+        (row, memo) => {
+          const name = row[0] as string;
+          const schema = row[2] === currentSchema ? null : (row[2] as string);
+          const fullName = [schema, name].filter((part) => part != null).join(".");
+          memo.set(fullName, row.at(-1) as string[]);
+        },
+      ),
+    );
   }
   async createEnum(
     name: string,

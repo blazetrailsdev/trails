@@ -555,6 +555,7 @@ export class Wrapper {
       throw new LintError("headers object should not be frozen, but is");
     }
 
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- headers may be a Hash, which eachPair dispatches on
     eachPair(headers, (key: unknown, value: any) => {
       if (typeof key !== "string") {
         throw new LintError(`header key must be a string, was ${rbObjClassname(key)}`);

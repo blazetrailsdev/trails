@@ -18,11 +18,11 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { DetailsKey, LookupContext } from "../lookup-context.js";
 import { PathSet } from "../path-set.js";
-import type { Template } from "../template.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import { ActionView } from "../namespaces.js";
 import { MissingTemplate } from "./error.js";
-import { TemplateHandlers } from "./handlers.js";
+import { Handlers } from "./handlers.js";
+import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 
 const FIXTURE_LOAD_PATH = new FixtureResolver({
@@ -44,7 +44,7 @@ describe("LookupContextTest", () => {
   }
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
     enforceAvailableLocales = I18n.enforceAvailableLocales();
     I18n.setEnforceAvailableLocales(false);
     lookupContext = buildLookupContext([FIXTURE_LOAD_PATH], {});
@@ -54,7 +54,7 @@ describe("LookupContextTest", () => {
   afterEach(() => {
     I18n.setLocale("en");
     I18n.setEnforceAvailableLocales(enforceAvailableLocales);
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("allows to override default_formats with ActionView::Base.default_formats", () => {
@@ -62,10 +62,7 @@ describe("LookupContextTest", () => {
     try {
       Base.defaultFormats = [":foo", ":bar"];
 
-      assertEqual(
-        [":foo", ":bar"],
-        (new LookupContext([]) as unknown as { defaultFormats(): unknown }).defaultFormats(),
-      );
+      assertEqual([":foo", ":bar"], new LookupContext([]).defaultFormats());
     } finally {
       Base.defaultFormats = formats;
     }
@@ -175,7 +172,7 @@ describe("LookupContextTest", () => {
 
   // BLOCKED: port-builder-template-handler
   it.skip("found templates have nil format if one cannot be found from template or handler", async () => {
-    const { Builder } = TemplateHandlers as unknown as { Builder: { defaultFormat: unknown } };
+    const { Builder } = Handlers as unknown as { Builder: { defaultFormat: unknown } };
     await assertCalled(Builder, "defaultFormat", null, { returns: null }, () => {
       lookupContext.formats = [":text"];
       const template = lookupContext.find("hello", ["test"]) as Template;

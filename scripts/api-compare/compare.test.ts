@@ -416,6 +416,16 @@ describe("significantMissingCalls", () => {
     expect(local.has("empty?")).toBe(true);
   });
 
+  it("significantCallsForReceivers credits empty?/except on an unproven receiver the TS checker typed", () => {
+    const receivers = { "empty?": ["ivar"], except: ["expr"], size: ["self"] };
+    const typed = new Set(["length@typed", "except@typed"]);
+    const sig = significantCallsForReceivers(receivers, undefined, typed);
+    expect(sig.has("empty?")).toBe(false);
+    expect(sig.has("except")).toBe(false);
+    expect(sig.has("size")).toBe(true);
+    expect(significantCallsForReceivers(receivers).has("empty?")).toBe(true);
+  });
+
   it("significantCallsForReceivers still flags a positional-array name with no receiver proof at all", () => {
     const sig = significantCallsForReceivers({});
     expect(sig.has("first")).toBe(true);
@@ -459,6 +469,31 @@ describe("significantMissingCalls", () => {
       { size: ["?"] },
     );
     expect(unnamed.has("size")).toBe(true);
+  });
+
+  it("significantCallsForReceivers credits two-argument fetch on a proven hash only", () => {
+    const sig = (kinds: string[], names: string[], forms = ["fetch", "fetch:options"]) =>
+      significantCallsForReceivers({ fetch: kinds }, undefined, new Set(forms), {
+        fetch: names,
+      }).has("fetch");
+    expect(sig(["hash"], ["options"])).toBe(false);
+    expect(sig(["hash"], ["options"], [])).toBe(true);
+    expect(sig(["local"], ["options"])).toBe(true);
+    expect(sig(["hash"], ["other"])).toBe(true);
+  });
+
+  it("significantCallsForReceivers keeps the KeyError and block arms of fetch helper-only", () => {
+    const forms = new Set(["fetch", "fetch:options"]);
+    expect(
+      significantCallsForReceivers({ fetch: ["hash"] }, undefined, forms, { fetch: ["?"] }).has(
+        "fetch",
+      ),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers({ fetch: ["hash"] }, undefined, forms, {
+        fetch: ["options", "?"],
+      }).has("fetch"),
+    ).toBe(true);
   });
 
   it("significantCallsForReceivers drops key? off a SCREAMING_CASE constant only for that constant's in form", () => {
@@ -4614,6 +4649,12 @@ describe("declarationOnlyInFile", () => {
     expect(
       declarationOnlyInFile("crud.ts", "compileInsert", bodyless, new Map(), "alias", new Map()),
     ).toBe(true);
+  });
+
+  it("credits a register_detail entry, defined at run time on both sides", () => {
+    expect(
+      declarationOnlyInFile("crud.ts", "compileInsert", bodyless, new Map(), "register_detail"),
+    ).toBe(false);
   });
 });
 

@@ -13,6 +13,9 @@ import { Base, Resolver, SanitizeHelper } from "@blazetrails/actionview";
 import { HTML, HTML4 } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
 import { Trailtie as ActionViewTrailtie } from "../trailties/action-view.js";
+import "../trailties/action-cable.js";
+import { ActionCable } from "@blazetrails/actioncable";
+import type { Base as CableServer } from "@blazetrails/actioncable/server/base";
 import { env, getFs, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { LOAD_DEFAULTS_VERSION } from "./configuration.js";
@@ -321,5 +324,13 @@ describe("ConfigurationTest", () => {
     application.config.actionDispatch.logRescuedResponses = false;
 
     expect(application.envConfig()["action_dispatch.log_rescued_responses"]).toBe(false);
+  });
+
+  it("ActionCable.server.config.cable is set when missing configuration for the current environment", async () => {
+    await writeFile(join(appPath, "config", "cable.ts"), "export default { test: {} };\n");
+    const application = await app("missing");
+    await application.initialize();
+
+    expect((ActionCable.server() as CableServer).config.cable).toBeInstanceOf(Object);
   });
 });

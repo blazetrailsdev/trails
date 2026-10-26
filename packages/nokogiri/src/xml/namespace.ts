@@ -8,7 +8,11 @@ export class Namespace {
      * @internal
      * @noRailsEquivalent PERMANENT
      */
-    readonly _node: { readonly prefix: string | null; readonly href: string },
+    readonly _node: {
+      readonly owner?: unknown;
+      readonly prefix: string | null;
+      readonly href: string;
+    },
     readonly document: unknown = null,
   ) {}
 

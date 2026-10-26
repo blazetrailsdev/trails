@@ -17,6 +17,7 @@ export class TestRequest extends Request {
 
   static create(env: RackEnv = {}): TestRequest {
     env["rack.request.cookie_hash"] ??= {};
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- the receiver is DEFAULT_ENV, which the call gate cannot prove a Hash
     return new TestRequest(merge<unknown>(TestRequest.defaultEnv(), env));
   }
 

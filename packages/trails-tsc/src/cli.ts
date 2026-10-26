@@ -1,18 +1,33 @@
 #!/usr/bin/env node
 
+import { buildTemplates } from "./build-templates.js";
 import { buildViews, type BuildViewsOptions } from "./build-views.js";
 import { watchViews, type WatchHandle } from "./watch-views.js";
 
 const USAGE =
-  "usage: trails-tsc-views <build|dev> [--cwd <dir>] [--views <dir>] [--out <dir>] [--in-place] [--handlers <module>]...\n";
+  "usage: trails-tsc-views <build|dev> [--cwd <dir>] [--views <dir>] [--out <dir>] [--in-place]\n" +
+  "       trails-tsc-views build-templates <template|dir>...\n";
 
-const VALUE_FLAGS = new Set(["--cwd", "--views", "--out", "--handlers"]);
+const VALUE_FLAGS = new Set(["--cwd", "--views", "--out"]);
 
 export async function runCli(argv: readonly string[]): Promise<number> {
   const cmd = argv[0];
   if (cmd === undefined || cmd === "--help" || cmd === "-h") {
     process.stdout.write(USAGE);
     return 0;
+  }
+  if (cmd === "build-templates") {
+    try {
+      const built = await buildTemplates(argv.slice(1));
+      process.stdout.write(
+        `trails-tsc-views: built ${built.length} template${built.length === 1 ? "" : "s"}\n`,
+      );
+      return 0;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`trails-tsc-views: ${msg}\n`);
+      return 1;
+    }
   }
   if (cmd !== "build" && cmd !== "dev") {
     process.stderr.write(`trails-tsc-views: unknown command ${JSON.stringify(cmd)}\n${USAGE}`);
@@ -33,7 +48,6 @@ export async function runCli(argv: readonly string[]): Promise<number> {
       }
       if (a === "--cwd") opts.cwd = v;
       else if (a === "--views") opts.viewsDir = v;
-      else if (a === "--handlers") opts.handlers = [...(opts.handlers ?? []), v];
       else opts.outDir = v;
       i++;
       continue;

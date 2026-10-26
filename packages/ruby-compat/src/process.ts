@@ -138,6 +138,33 @@ export class Process {
   }
 
   /**
+   * `rb_f_kill` (`vendor/ruby/v3.3.11/signal.c:431`): a signal name, with or
+   * without `SIG` and as a String or Symbol, is read as `signm2signo` does,
+   * a negative signal signals each pid's process group (`killpg`, which MRI
+   * defines as `kill(-(pg), sig)`), and each pid is signalled in turn, raising
+   * the failing call's `Errno` (`rb_sys_fail`). Answers the number of pids
+   * signalled. Signal `0` only checks that the process may be signalled.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process.kill`
+   * (`vendor/ruby/v3.3.11/process.c:9155`).
+   */
+  static kill(signal: number | string, ...pids: number[]): number {
+    let sig = typeof signal === "number" ? signal : signal.replace(/^:/, "");
+    if (typeof sig === "string") {
+      if (sig.startsWith("-")) sig = `-${sig.slice(1).replace(/^(SIG)?/, "SIG")}`;
+      else sig = sig.replace(/^(SIG)?/, "SIG");
+    }
+
+    if (typeof sig === "number" ? sig < 0 : sig.startsWith("-")) {
+      const positive = typeof sig === "number" ? -sig : sig.slice(1);
+      for (const pid of pids) getProcessAdapter().kill!(-pid, positive);
+    } else {
+      for (const pid of pids) getProcessAdapter().kill!(pid, sig);
+    }
+    return pids.length;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/process.c:8283` `rb_clock_gettime`, which reads the tick for
    * `clockId` and then hands it to `make_clock_result` for `unit`.
    *

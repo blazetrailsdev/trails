@@ -2,7 +2,7 @@ import type { Base } from "../../base.js";
 import type { Preloader } from "../preloader.js";
 import type { Association } from "./association.js";
 import type { Branch } from "./branch.js";
-import { groupBy, partition, uniq } from "@blazetrails/ruby-compat";
+import { groupBy, partition } from "@blazetrails/ruby-compat";
 import { ThroughAssociation } from "./through-association.js";
 
 export class Batch {
@@ -39,7 +39,7 @@ export class Batch {
             })(),
           );
         }
-        const futureTables = uniq(futureClasses.flat().map((k) => k.tableName));
+        const futureTables = [...new Set(futureClasses.flat().map((k) => k.tableName))];
 
         let targetLoaders = loaders.filter((l) => !futureTables.includes(l.tableName));
         if (targetLoaders.length === 0) targetLoaders = loaders;

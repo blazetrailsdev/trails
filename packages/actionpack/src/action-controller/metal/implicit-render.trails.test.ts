@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { FixtureResolver, TemplateHandlers } from "@blazetrails/actionview";
+import { FixtureResolver, Template } from "@blazetrails/actionview";
 
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
@@ -20,7 +20,7 @@ function makeRequest(opts: Record<string, unknown> = {}): Request {
 }
 
 beforeAll(() => {
-  TemplateHandlers.registerTemplateHandler("html", {
+  Template.registerTemplateHandler("html", {
     call: (_template: unknown, source: string) => `return ${JSON.stringify(source)};`,
   });
   ImplicitRenderTestController.prependViewPath(

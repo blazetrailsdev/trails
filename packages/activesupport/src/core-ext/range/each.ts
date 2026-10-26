@@ -1,17 +1,19 @@
-import { prepend } from "@blazetrails/ruby-compat";
+import { prepend, rbCallSuper } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { TimeWithZone } from "../../time-with-zone.js";
 
-type SuperEach<T> = (...args: unknown[]) => unknown;
-
-export function* each<T>(this: Range<T>, super_: SuperEach<T>): Generator<T> {
+export function each<T>(this: Range<T>, block?: ((value: T) => unknown) | null): unknown {
   ensureIterationAllowed.call(this);
-  yield* super_.call(this) as Generator<T>;
+  return rbCallSuper(this, each, block);
 }
 
-export function* step<T>(this: Range<T>, super_: SuperEach<T>, n: number = 1): Generator<T> {
+export function step<T>(
+  this: Range<T>,
+  n: number = 1,
+  block?: ((value: T) => unknown) | null,
+): unknown {
   ensureIterationAllowed.call(this);
-  yield* super_.call(this, n) as Generator<T>;
+  return rbCallSuper(this, step, n, block);
 }
 
 /** @internal */
@@ -22,4 +24,4 @@ function ensureIterationAllowed<T>(this: Range<T>): void {
   }
 }
 
-prepend(Range.prototype, { each, step });
+prepend(Range, { each, step });

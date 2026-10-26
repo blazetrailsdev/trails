@@ -1,9 +1,11 @@
 import { include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
+import type { Record } from "./record.js";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ConcurrencyControls } from "./active-job/concurrency-controls.js";
 import { Base } from "./processes/base.js";
+import { LogSubscriber } from "./log-subscriber.js";
 import { Interruptible } from "./processes/interruptible.js";
 import { SolidQueue } from "./solid-queue.js";
 
@@ -21,7 +23,7 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
 
 /**
  * @missingRailsCall rake_tasks — CONVERGEABLE port-solid-queue-tasks
- * @missingRailsCall attach_to — CONVERGEABLE port-solid-queue-log-subscriber
+ * @inventedArm onLoad — PERMANENT
  */
 export class Engine extends TrailsEngine {
   static toString(): string {
@@ -35,10 +37,16 @@ export class Engine extends TrailsEngine {
 
     this.config.set("solidQueue", new OrderedOptions());
 
+    const solidQueueRecord = function (this: typeof Record): void {
+      if (SolidQueue.connectsTo) this.connectsTo(SolidQueue.connectsTo);
+    };
+
     this.initializer("solid_queue.config", () => {
       this.config.solidQueue.each((name, value) => {
         rbFSend(SolidQueue, `${name}=`, value);
       });
+
+      onLoad("solid_queue_record", { runOnce: true }, solidQueueRecord);
     });
 
     this.initializer(
@@ -58,6 +66,8 @@ export class Engine extends TrailsEngine {
       onLoad("solid_queue", function (this: typeof SolidQueue) {
         if (this.logger === SolidQueue.DEFAULT_LOGGER) this.logger = TopLevel.Trails!.logger!;
       });
+
+      LogSubscriber.attachTo("solid_queue");
     });
 
     this.initializer("solid_queue.active_job.extensions", () => {

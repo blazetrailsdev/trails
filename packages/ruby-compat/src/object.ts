@@ -1,5 +1,5 @@
 import { LocalJumpError } from "./local-jump-error.js";
-import { classpaths } from "./classpath.js";
+import { classpaths, isModuleObject } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
 import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
@@ -50,7 +50,9 @@ type Klass = abstract new (...args: never) => unknown;
  *  `Date` and a `Temporal.PlainTime`. A function is a `Class` when its
  *  `prototype` is non-writable and a `Proc` otherwise. `Temporal.PlainDate` and
  *  `Temporal.PlainDateTime` are the seats of `Date` and `DateTime`, and a
- *  record whose prototype chain holds no class is a `Hash`. `-0` is a whole
+ *  record whose prototype chain holds no class is a `Hash`, or a `Module` when
+ *  `const_set` or `defineModule` marked it (`rb_obj_class`,
+ *  `vendor/ruby/v3.3.11/object.c:296`). `-0` is a whole
  *  `number` and so an `Integer`, though Ruby has no negative Integer zero: JS
  *  integer arithmetic answers `-0` (`Math.round(-0.4)`, `0 * -1`) where Ruby
  *  answers `0`, so reading it as `-0.0` would turn those into Floats. The
@@ -88,7 +90,8 @@ export function rbObjClass(obj: unknown): Klass {
   if (tag === "Temporal.PlainDate") return reopened(rbCDate) as Klass;
   if (tag === "Temporal.PlainDateTime") return reopened(rbCDateTime) as Klass;
   if (tag === "Temporal.PlainTime") return reopened(rbCTime) as Klass;
-  if (isPlainHash(obj)) return Hash;
+  if (isPlainHash(obj))
+    return isModuleObject(obj) ? (Object.getPrototypeOf(rbCClass) as Klass) : Hash;
   const klass = (obj as object).constructor as Klass | undefined;
   if (klass === Date) return reopened(rbCTime) as Klass;
   return typeof klass === "function" ? klass : Object;
@@ -498,7 +501,9 @@ OBJECT_METHOD_TABLE.instanceExec = (self: unknown, ...args: unknown[]): unknown 
  * name, which {@link rbFSend} dispatches and {@link basicObjRespondTo} answers
  * for on the receivers `each` is bound for: a JS array, a `Set`, and a `Map`
  * or plain hash, whose Ruby classes include `Enumerable`
- * (`vendor/ruby/v3.3.11/array.c:8606`, `lib/set.rb:221`, `hash.c:7184`).
+ * (`vendor/ruby/v3.3.11/array.c:8606`, `lib/set.rb:221`, `hash.c:7184`), and
+ * an object that defines `Symbol.iterator`, a class's
+ * `include Enumerable` (`enum.c:5061`).
  * ActiveSupport's `Enumerable#maximum`
  * (`activesupport/lib/active_support/core_ext/enumerable.rb:40`) is reached by
  * `object.try(:maximum, :updated_at)` on an Array of records.
@@ -513,7 +518,13 @@ function enumerableMethod(
   mid: string,
 ): ((...args: unknown[]) => unknown) | undefined {
   return Object.hasOwn(ENUMERABLE_METHOD_TABLE, mid) &&
-    (Array.isArray(obj) || obj instanceof Set || obj instanceof Map || isPlainHash(obj))
+    (Array.isArray(obj) ||
+      obj instanceof Set ||
+      obj instanceof Map ||
+      isPlainHash(obj) ||
+      (typeof obj === "object" &&
+        obj !== null &&
+        typeof (obj as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function"))
     ? (ENUMERABLE_METHOD_TABLE[mid] as (...args: unknown[]) => unknown)
     : undefined;
 }
@@ -525,7 +536,7 @@ function enumerableMethod(
  * `ARRAY_METHOD_TABLE` entry of that name.
  */
 const enumerableModule = (): Record<string, AnyFunction> =>
-  Enumerable as unknown as Record<string, AnyFunction>;
+  Enumerable.prototype as unknown as Record<string, AnyFunction>;
 
 /**
  * `rb_obj_is_proc` (`vendor/ruby/v3.3.11/proc.c:120`): a function that is not
@@ -535,6 +546,18 @@ const enumerableModule = (): Record<string, AnyFunction> =>
  */
 export function rbObjIsProc(proc: unknown): proc is AnyFunction {
   return typeof proc === "function" && rbObjClass(proc) === rbCProc;
+}
+
+/**
+ * Ruby's `callable.call(*args)`: `rb_proc_call` (`vendor/ruby/v3.3.11/proc.c:990`)
+ * applies a proc to the arguments, where JS `Function.prototype.call` would
+ * take the first as `this`; any other receiver answers its own `call`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbProcCall(callable: unknown, ...args: unknown[]): unknown {
+  if (rbObjIsProc(callable)) return callable(...args);
+  return (callable as { call(...a: unknown[]): unknown }).call(...args);
 }
 
 /**
@@ -698,6 +721,8 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     ) {
       return true;
     }
+  } else if (enumerableMethod(obj, mid) !== undefined) {
+    return true;
   }
   const klass =
     typeof obj === "function" &&
@@ -761,7 +786,14 @@ export function objRespondToMissing(_obj: unknown, _mid: string, _priv: boolean)
 
 const writerSpellings = new Map<string, string>();
 
-function writerSpelling(attr: string | undefined): string | undefined {
+/**
+ * The `setName` method that answers a Ruby writer `name=` (`rb_id_attrset`,
+ * `vendor/ruby/v3.3.11/vm_method.c:1895`) when it is not a JS accessor's
+ * setter, as {@link rbFSend} and {@link rbObjRespondTo} look it up.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function writerSpelling(attr: string | undefined): string | undefined {
   if (attr === undefined || attr.startsWith("_")) return undefined;
   let writer = writerSpellings.get(attr);
   if (writer === undefined) writerSpellings.set(attr, (writer = camelized(`set_${attr}`)));
@@ -1094,9 +1126,7 @@ export function toS(obj: unknown): string | Uint8Array {
  * operators answer for the receivers that define them in Ruby: between two
  * numbers they are `Integer`'s and `Float`'s own (`rb_int_gt`,
  * `vendor/ruby/v3.3.11/numeric.c:4743`, and `rb_float_gt`, `:1753`), false for
- * a NaN operand and never raising;
- * a receiver defining the operator itself (`greaterThan` and its siblings, the
- * spelling `Date` and `TimeWithZone` give them) answers it; a number against
+ * a NaN operand and never raising; a number against
  * anything else, and any other `Comparable` receiver (a String, a Time or
  * Date, or an object defining `<=>`), go through `cmpint`
  * (`vendor/ruby/v3.3.11/compar.c:105-147`) and raise `ArgumentError` for a pair
@@ -1131,11 +1161,11 @@ export function conversionMismatch(
   );
 }
 
-const RELOPS = new Map<string, [string, (c: number) => boolean]>([
-  [">", ["greaterThan", (c) => c > 0]],
-  [">=", ["greaterThanOrEqual", (c) => c >= 0]],
-  ["<", ["lessThan", (c) => c < 0]],
-  ["<=", ["lessThanOrEqual", (c) => c <= 0]],
+const RELOPS = new Map<string, (c: number) => boolean>([
+  [">", (c) => c > 0],
+  [">=", (c) => c >= 0],
+  ["<", (c) => c < 0],
+  ["<=", (c) => c <= 0],
 ]);
 
 function isNumeric(value: unknown): value is number | bigint {
@@ -1173,12 +1203,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (mid === "+" && (isNumeric(recv) || typeof recv === "string" || Array.isArray(recv))) {
       return rbPlus(recv, other);
     }
-    const [spelling, relop] = RELOPS.get(mid) ?? [];
+    const relop = RELOPS.get(mid);
     if (relop !== undefined && isNumeric(recv) && isNumeric(other)) {
       return relop(recv < other ? -1 : recv > other ? 1 : recv == other ? 0 : NaN);
-    }
-    if (spelling !== undefined && rbObjRespondTo(recv, spelling)) {
-      return sendInternal(argc, [spelling, other], recv);
     }
     if (relop !== undefined && (isNumeric(recv) || isComparable(recv))) {
       return relop(rbCmpint(cmp(recv, other), recv, other));
@@ -1204,7 +1231,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (recv instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
   }
-  if (mid === "call" && rbObjIsProc(recv)) return recv(...args);
+  if (mid === "call" && rbObjIsProc(recv)) return rbProcCall(recv, ...args);
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   const writer = writerSpelling(attr);
@@ -1291,6 +1318,17 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
 }
 
 type AnyFunction = (...args: unknown[]) => unknown;
+
+/**
+ * `rb_check_funcall` (`vendor/ruby/v3.3.11/vm_eval.c:687`): the call when the
+ * receiver responds to `mid`, else `undefined`, MRI's `Qundef`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbCheckFuncall(recv: unknown, mid: string, ...args: unknown[]): unknown {
+  if (!rbObjRespondTo(recv, mid)) return undefined;
+  return sendInternal(args.length, [mid, ...args], recv);
+}
 
 /**
  * `rb_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2934`) — the SEND of

@@ -175,9 +175,9 @@ describe("DateAndTimeCompatibilityTest", () => {
 
     await withPreserveTimezone(null, async () => {
       await withEnvTz("US/Eastern", async () => {
-        const foreignTime = foreignZone.tzinfo.utcToLocal(
-          new RubyTime(2016, 4, 23, 15, 11, 12, "-0700"),
-        );
+        const foreignTime = foreignZone.tzinfo
+          .utcToLocal(new RubyTime(2016, 4, 23, 15, 11, 12, "-0700"))
+          .toZonedDateTime();
         const convertedTime: Temporal.ZonedDateTime = await assertDeprecated(deprecator(), () =>
           toTime(foreignTime),
         );
@@ -190,9 +190,9 @@ describe("DateAndTimeCompatibilityTest", () => {
 
     await withPreserveTimezone(null, async () => {
       await withEnvTz("US/Eastern", async () => {
-        const foreignTime = foreignZone.tzinfo.utcToLocal(
-          new RubyTime(2016, 11, 23, 15, 11, 12, "-0700"),
-        );
+        const foreignTime = foreignZone.tzinfo
+          .utcToLocal(new RubyTime(2016, 11, 23, 15, 11, 12, "-0700"))
+          .toZonedDateTime();
         const convertedTime: Temporal.ZonedDateTime = await assertDeprecated(deprecator(), () =>
           toTime(foreignTime),
         );

@@ -978,7 +978,7 @@ export function dbCommand(): Command {
           if (filename.endsWith(".ts")) {
             const enhanced = new Error(
               `Failed to load schema file "${filename}". ` +
-                `Ensure a TypeScript loader (tsx, ts-node) is configured, ` +
+                `Node imports it directly, so it may use only erasable TypeScript syntax; ` +
                 `or choose a different schema format with --format js/sql, ` +
                 `SCHEMA_FORMAT=js/sql, or config.schemaFormat.`,
             );

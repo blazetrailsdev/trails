@@ -38,18 +38,19 @@ export function round<T extends { round(ndigits?: number): T }>(
 export function round(x: number | { round(ndigits?: number): unknown }, ndigits = 0): unknown {
   if (typeof x !== "number" && !(x instanceof Number)) return x.round(ndigits);
   const number = x.valueOf();
-  if (number === 0) return ndigits > 0 ? number : 0;
+  if (number === 0) return ndigits > 0 ? x : 0;
   if (ndigits < 0) return intRound(Number(toI(number)), ndigits);
   if (ndigits === 0) return roundHalfUp(number, 1);
+  if (!rbFloatTypeP(x)) return number;
   if (Number.isFinite(number)) {
     const binexp = frexp(number);
-    if (floatRoundOverflow(ndigits, binexp)) return number;
-    if (floatRoundUnderflow(ndigits, binexp)) return 0;
-    if (ndigits > 14) return floRoundByRational(number, ndigits);
+    if (floatRoundOverflow(ndigits, binexp)) return x;
+    if (floatRoundUnderflow(ndigits, binexp)) return rbDbl2num(0);
+    if (ndigits > 14) return rbDbl2num(floRoundByRational(number, ndigits));
     const f = 10 ** ndigits;
-    return roundHalfUp(number, f) / f;
+    return rbDbl2num(roundHalfUp(number, f) / f);
   }
-  return number;
+  return x;
 }
 
 function roundHalfUp(x: number, s: number): number {
@@ -155,7 +156,7 @@ export function toI(obj: unknown): number | bigint {
   if (typeof obj === "bigint") return obj;
   if (typeof obj === "number" || obj instanceof Number) {
     if (!Number.isFinite(obj.valueOf())) throw new FloatDomainError(String(obj));
-    const f = Math.trunc(obj.valueOf());
+    const f = Math.trunc(obj.valueOf()) + 0;
     return Number.isSafeInteger(f) ? f : BigInt(f);
   }
   if (isSymbol(obj)) throw new NoMethodError("undefined method 'to_i' for an instance of Symbol");
@@ -306,6 +307,51 @@ export function numericMinus(x: unknown, y: unknown): unknown {
     throw new NoMethodError(`undefined method '-' for an instance of ${rbObjClassname(x)}`);
   }
   throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
+}
+
+/**
+ * `Integer#/` (`vendor/ruby/v3.3.11/numeric.c:4220` `rb_int_div`, `fix_divide`
+ * at `:4164`) and `Float#/` (`numeric.c:1292` `rb_float_div`): two Integers
+ * floor (`rb_fix_div_fix`, a Bignum through `rb_big_div`), and a Float on either
+ * side divides as doubles (`rb_flo_div_flo`), answering a Float.
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericDiv(x: unknown, y: unknown): unknown {
+  if (rbIntegerTypeP(x) && rbIntegerTypeP(y)) {
+    if (typeof x === "number" && typeof y === "number") return fixDiv(x, y);
+    const a = BigInt(x);
+    const b = BigInt(y);
+    if (b === 0n) throw new ZeroDivisionError("divided by 0");
+    const q = a / b;
+    return rbBigNorm(a % b !== 0n && a < 0n !== b < 0n ? q - 1n : q);
+  }
+  if ((rbIntegerTypeP(x) || rbFloatTypeP(x)) && (rbIntegerTypeP(y) || rbFloatTypeP(y)))
+    return rbDbl2num(Number(x.valueOf()) / Number(y.valueOf()));
+  throw new NoMethodError(`undefined method '/' for an instance of ${rbObjClassname(x)}`);
+}
+
+/**
+ * `Integer#-@` (`vendor/ruby/v3.3.11/numeric.c:3833` `rb_int_uminus`) and
+ * `Float#-@` (`numeric.c:1156` `rb_float_uminus`): a Float stays a Float.
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericUminus(x: unknown): unknown {
+  if (rbFloatTypeP(x)) return rbDbl2num(-x.valueOf());
+  if (typeof x === "bigint") return rbBigNorm(-x);
+  if (rbIntegerTypeP(x)) return x === 0 ? 0 : -x;
+  throw new NoMethodError(`undefined method '-@' for an instance of ${rbObjClassname(x)}`);
+}
+
+/**
+ * `Integer#abs` (`vendor/ruby/v3.3.11/numeric.c:5384` `rb_int_abs`) and
+ * `Float#abs` (`numeric.c:1942` `rb_float_abs`): a Float stays a Float.
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericAbs(x: unknown): unknown {
+  if (rbFloatTypeP(x)) return rbDbl2num(Math.abs(x.valueOf()));
+  if (typeof x === "bigint") return x < 0n ? -x : x;
+  if (rbIntegerTypeP(x)) return Math.abs(x as number);
+  throw new NoMethodError(`undefined method 'abs' for an instance of ${rbObjClassname(x)}`);
 }
 
 /**
@@ -695,4 +741,28 @@ function rubyFloatStep(
       block(d);
     }
   }
+}
+
+/**
+ * `ruby_num_interval_step_size` (`vendor/ruby/v3.3.11/numeric.c:2798`) with a step of 1.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rubyNumIntervalStepSize(
+  from: number | bigint,
+  to: number | bigint,
+  excl: boolean,
+): number | bigint {
+  if (
+    typeof from === "bigint" ||
+    typeof to === "bigint" ||
+    (Number.isInteger(from) && Number.isInteger(to))
+  ) {
+    let delta = BigInt(to) - BigInt(from);
+    if (excl) delta--;
+    if (delta < 0n) return 0;
+    const n = delta + 1n;
+    return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n) : n;
+  }
+  return rubyFloatStepSize(Number(from), Number(to), 1, excl);
 }

@@ -1,5 +1,5 @@
 import { NameError } from "./core-ext/name-error.js";
-import { Module } from "@blazetrails/ruby-compat/include";
+import { Module, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
 
 export type MethodSource = (mod: Record<string, unknown>) => void;
 
@@ -59,6 +59,7 @@ export class MethodSet {
         owner.moduleEval((mod) => Object.defineProperty(mod, as, instanceMethod));
       } else Object.defineProperty(owner.prototype, as, instanceMethod);
     }
+    rbClearMethodCache();
   }
 }
 

@@ -5,9 +5,7 @@ import {
   type Each,
   rbObjAsString,
   rtest,
-  compact,
   first as aryFirst,
-  isEmpty,
   last as aryLast,
   take as aryTake,
   uniq,
@@ -141,7 +139,10 @@ export function find(this: FinderRelation, block: (record: any) => unknown): Pro
 export function find(this: FinderRelation, ...args: unknown[]): Promise<any>;
 export async function find(this: FinderRelation, ...args: unknown[]): Promise<any> {
   if (typeof args[args.length - 1] === "function") {
-    return Enumerable.find.call(this as unknown as Each<unknown, Promise<unknown>>, ...args);
+    return Enumerable.prototype.find.call(
+      this as unknown as Each<unknown, Promise<unknown>>,
+      ...args,
+    );
   }
   return findWithIds.call(this, ...args);
 }
@@ -243,7 +244,7 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
     return records[records.length - index] ?? null;
   }
   const relation: any = orderedRelation.call(this);
-  if (isEmpty(relation.orderValues) || relation.hasLimitOrOffset) {
+  if (relation.orderValues.length === 0 || relation.hasLimitOrOffset) {
     const records = await relation.records();
     return records[records.length - index] ?? null;
   }
@@ -468,8 +469,8 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
       .limitBang(1);
   }
 
-  if (Array.isArray(conditions) || isPlainObject(conditions) || conditions instanceof Map) {
-    if (!isEmpty(conditions)) relation.whereBang(conditions);
+  if (Array.isArray(conditions) || isPlainObject(conditions)) {
+    if (Object.keys(conditions).length > 0) relation.whereBang(conditions);
   } else {
     if (conditions !== ":none") relation.whereBang(new Map([[this.primaryKey, conditions]]));
   }
@@ -547,7 +548,7 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
 
   if (expectsArray) ids = aryFirst(ids) as unknown[];
 
-  ids = uniq(compact(ids));
+  ids = uniq(ids.filter((x) => x != null));
 
   const modelName = this.model.name;
 
@@ -677,7 +678,7 @@ export async function findLast(this: FinderRelation, limit?: number): Promise<an
 /** @internal */
 export function orderedRelation(this: FinderRelation): any {
   if (
-    isEmpty(this.orderValues) &&
+    this.orderValues.length === 0 &&
     (rtest(this.model.implicitOrderColumn) ||
       this.model.queryConstraintsList() != null ||
       rtest(this.primaryKey))
@@ -699,5 +700,5 @@ export function _orderColumns(this: FinderRelation): string[] {
     oc.push(this.model.primaryKey);
   }
 
-  return compact(uniq(oc.flat()));
+  return [...new Set(oc.flat())].filter((x) => x != null);
 }

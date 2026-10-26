@@ -1091,7 +1091,7 @@ export function typeCastCalculatedValue(
 
 /** @internal */
 export async function selectForCount(this: CalculationRelation): Promise<string> {
-  if (isEmpty(this.selectValues)) return ":all";
+  if (this.selectValues.length === 0) return ":all";
   return this.withConnection((conn) =>
     (arelColumns.call(this as never, this.selectValues as never[]) as ArelNode[])
       .map((column) => conn.visitor.compile(column))

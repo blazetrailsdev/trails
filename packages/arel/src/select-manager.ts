@@ -20,7 +20,6 @@ import { sql } from "./arel.js";
 import { Arel, Nodes } from "./namespaces.js";
 import {
   capitalize,
-  compact,
   isEmpty,
   isSymbol,
   rbConstGet,
@@ -298,7 +297,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
   }
 
   protected collapse(exprs: unknown[]): ArelNode {
-    exprs = compact(exprs);
+    exprs = exprs.filter((x) => x != null);
     exprs = exprs.map((expr) => (typeof expr === "string" ? sql(expr) : (expr as Node)));
     if (exprs.length === 1) return exprs[0] as Node;
     return this.createAnd(exprs as Node[]);

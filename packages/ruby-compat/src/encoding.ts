@@ -106,6 +106,18 @@ const ROWS: readonly [name: string, decoderLabel: string | null, aliases: string
   ["SJIS-SoftBank", null, []],
 ];
 
+const DUMMY_NAMES = new Set([
+  "UTF-16",
+  "UTF-32",
+  "IBM037",
+  "ISO-2022-JP",
+  "ISO-2022-JP-2",
+  "CP50220",
+  "CP50221",
+  "UTF-7",
+  "ISO-2022-JP-KDDI",
+]);
+
 /**
  * Ruby core `Encoding` — the registry `Encoding.find` (`enc_find`,
  * `vendor/ruby/v3.3.11/encoding.c:1368`) resolves a name against, which Rails inherits
@@ -211,6 +223,14 @@ export class Encoding {
    */
   toString(): string {
     return this.name;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Encoding#dummy?`
+   * (`vendor/ruby/v3.3.11/encoding.c:613` `enc_dummy_p`).
+   */
+  isDummy(): boolean {
+    return DUMMY_NAMES.has(this.name);
   }
 
   /**

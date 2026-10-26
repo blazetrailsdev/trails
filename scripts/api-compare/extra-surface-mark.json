@@ -3,7 +3,7 @@
     "novel": 0,
     "total": 10,
     "noCounterpartFiles": 0,
-    "allowed": 4
+    "allowed": 5
   },
   "actiondispatch": {
     "novel": 0,
@@ -21,7 +21,7 @@
     "novel": 0,
     "total": 0,
     "noCounterpartFiles": 0,
-    "allowed": 12
+    "allowed": 10
   },
   "ruby-compat": {
     "novel": 0,

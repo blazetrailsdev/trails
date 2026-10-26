@@ -3,11 +3,13 @@
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { NoMethodError, isEmpty } from "@blazetrails/ruby-compat";
+import { UnknownAttributeError } from "./errors.js";
 import { Model } from "./index.js";
 import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { AttributeMethods } from "./attribute-methods.js";
+import { include, removePossibleMethod } from "@blazetrails/activesupport";
 
 class ProtectedParams {
   private parameters: Record<string, unknown>;
@@ -228,5 +230,153 @@ describe("AttributeAssignmentTest", () => {
     expect(seen).toContainEqual(["name", "Eve"]);
     expect(seen).toContainEqual(["age", 5]);
     expect(p._readAttribute("name")).toBe("Eve");
+  });
+
+  it("assigns through an accessor setter defined on an ancestor prototype", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("name", "string");
+      }
+    }
+    interface Person extends Attributes {}
+    class Admin extends Person {}
+    class SuperAdmin extends Admin {}
+
+    const p = new SuperAdmin({});
+    void p.assignAttributes({ name: "bob" });
+    expect(p.attribute("name")).toBe("bob");
+  });
+
+  it("raises UnknownAttributeError for a getter-only property", () => {
+    class Person extends Model {
+      get nickname(): string {
+        return "n";
+      }
+    }
+    const p = new Person({});
+    expect(() => p.assignAttributes({ nickname: "bob" })).toThrow(UnknownAttributeError);
+  });
+
+  it("prefers a nearer setX writer over an ancestor accessor setter", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("name", "string");
+      }
+    }
+    interface Person extends Attributes {}
+    const seen: unknown[] = [];
+    class Admin extends Person {
+      setName(v: string): void {
+        seen.push(v);
+      }
+    }
+
+    const p = new Admin({});
+    void p.assignAttributes({ name: "bob" });
+    expect(seen).toEqual(["bob"]);
+    expect(p.attribute("name")).toBeNull();
+  });
+
+  it("re-raises a NoMethodError raised inside a defined setter", () => {
+    class Person extends Model {
+      set name(_v: string) {
+        throw new NoMethodError("undefined method 'boom'");
+      }
+    }
+    const p = new Person({});
+    expect(() => p.assignAttributes({ name: "bob" })).toThrow(NoMethodError);
+  });
+
+  describe("writer resolution cache", () => {
+    class Proxied extends Model {
+      declare static attributeMethodSuffix: (...suffixes: string[]) => void;
+      declare static defineAttributeMethods: (...names: string[]) => void;
+      declare static undefineAttributeMethods: () => void;
+      declare static generatedAttributeMethods: () => { prototype: object };
+      written: [string, unknown][] = [];
+
+      static {
+        include(this, AttributeMethods);
+        this.attributeMethodSuffix("=");
+      }
+
+      "attribute="(name: string, value: unknown): void {
+        this.written.push([name, value]);
+      }
+    }
+
+    it("sees attribute methods defined after the first assignment", () => {
+      class Person extends Proxied {}
+      const p = new Person();
+      expect(() => p.assignAttributes({ foo: 1 })).toThrow(UnknownAttributeError);
+      Person.defineAttributeMethods("foo");
+      p.assignAttributes({ foo: 2 });
+      expect(p.written).toEqual([["foo", 2]]);
+    });
+
+    it("sees attribute methods undefined after the first assignment", () => {
+      class Person extends Proxied {}
+      Person.defineAttributeMethods("foo");
+      const p = new Person();
+      p.assignAttributes({ foo: 1 });
+      expect(p.written).toEqual([["foo", 1]]);
+      Person.undefineAttributeMethods();
+      expect(() => p.assignAttributes({ foo: 2 })).toThrow(UnknownAttributeError);
+      expect(p.written).toEqual([["foo", 1]]);
+    });
+
+    it("sees a writer removed after the first assignment", () => {
+      class Person extends Proxied {}
+      Person.defineAttributeMethods("foo");
+      const p = new Person();
+      p.assignAttributes({ foo: 1 });
+      removePossibleMethod.call(Person.generatedAttributeMethods(), "foo=");
+      expect(() => p.assignAttributes({ foo: 2 })).toThrow(UnknownAttributeError);
+      class Plain extends Model {
+        "bar="(_: unknown): void {}
+      }
+      const q = new Plain();
+      q.assignAttributes({ bar: 1 });
+      removePossibleMethod.call(Plain, "bar=");
+      expect(() => q.assignAttributes({ bar: 2 })).toThrow(UnknownAttributeError);
+    });
+
+    it("an instance-own setK writer outranks a prototype k= writer", () => {
+      class Person extends Proxied {}
+      Person.defineAttributeMethods("foo");
+      const p = new Person();
+      p.assignAttributes({ foo: 1 });
+      const q = new Person() as Person & { setFoo?: (v: unknown) => void };
+      const seen: unknown[] = [];
+      q.setFoo = (v) => seen.push(v);
+      q.assignAttributes({ foo: 2 });
+      expect(seen).toEqual([2]);
+      expect(q.written).toEqual([]);
+    });
+
+    it("sees an attribute declared after the first assignment", () => {
+      class Person extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          this.attribute("name", "string");
+        }
+      }
+      interface Person extends Attributes {}
+      const p = new Person();
+      p.assignAttributes({ name: "a" });
+      expect(() => p.assignAttributes({ age: "3" })).toThrow(UnknownAttributeError);
+      Person.attribute("age", "integer");
+      const q = new Person();
+      q.assignAttributes({ age: "3" });
+      expect(q.attribute("age")).toBe(3);
+    });
   });
 });

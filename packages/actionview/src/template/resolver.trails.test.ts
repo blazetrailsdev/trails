@@ -6,8 +6,8 @@ import { I18n } from "@blazetrails/activesupport";
 import { LookupContext } from "../lookup-context.js";
 import { FileSystemResolver } from "./resolver.js";
 import { FixtureResolver } from "../testing/resolvers.js";
-import { TemplateHandlers } from "./handlers.js";
-import type { Template } from "../template.js";
+import { Handlers } from "./handlers.js";
+import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { Base } from "../base.js";
 
@@ -28,11 +28,11 @@ describe("FileSystemResolver", () => {
     await write("i*x.html.tse", "<h1>Star</h1>");
     await fs.mkdir!(path.join(dir, "po?sts"), { recursive: true });
     await fs.writeFile!(path.join(dir, "po?sts", "index.html.tse"), "<h1>Query</h1>");
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(async () => {
-    TemplateHandlers.clear();
+    Handlers.clear();
     const fs = getFs();
     fs.rmSync(dir, { recursive: true, force: true });
   });
@@ -216,14 +216,14 @@ describe("PathParser locales", () => {
   beforeEach(() => {
     originalLocale = I18n.locale();
     I18n.setEnforceAvailableLocales(false);
-    TemplateHandlers.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {
     I18n.setLocale(originalLocale);
     I18n.setAvailableLocales(null);
     I18n.setEnforceAvailableLocales(true);
-    TemplateHandlers.clear();
+    Handlers.clear();
   });
 
   it("resolves a dashed-locale template when the locale is pt-BR", () => {

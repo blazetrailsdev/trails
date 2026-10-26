@@ -56,7 +56,7 @@ export function inGroupsOf<T>(
     eachSlice(collection, number, block);
     return collection as unknown as (T | null | false)[][];
   } else {
-    return eachSlice(collection, number);
+    return eachSlice(collection, number).toA();
   }
 }
 

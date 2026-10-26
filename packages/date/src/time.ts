@@ -1,5 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
-import { tzdataIsdst } from "./tzdata-isdst.js";
+import { tzdataAbbreviation } from "./tzdata-abbreviations.js";
+import { tzdataIsdst, tzdataOffsetInstant } from "./tzdata-isdst.js";
+import { rbWarning } from "./rb-warning.js";
+import { rbStrftime, type StrftimeVtm } from "./strftime.js";
 import {
   ArgumentError,
   Date,
@@ -12,13 +15,14 @@ import {
   fToR,
   jdLocalToUtc,
   of2str,
-  strftime,
   SubMinuteOffsetZonedDateTime,
   timeToDf,
 } from "./date.js";
 import {
   Rational,
   TEMPORAL_METHOD_TABLE,
+  cmp,
+  rbCmpint,
   isRubyTzUptodate,
   kernelInteger,
   rbCTime,
@@ -30,6 +34,10 @@ import {
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
+  rbCheckFuncall,
+  rbCheckToInt,
+  rbIntegerTypeP,
+  rbObjClassname,
   registerConstant,
   setRubyTzUptodate,
   stringInspect,
@@ -99,73 +107,12 @@ function utcOffsetArgument(zone: string | number | Rational): "UTC" | number {
   );
 }
 
-const ZONE_ABBREVIATIONS: Record<string, readonly [string] | readonly [string, string]> = {
-  "Africa/Cairo": ["EET", "EEST"],
-  "Africa/Harare": ["CAT"],
-  "Africa/Johannesburg": ["SAST"],
-  "Africa/Lagos": ["WAT"],
-  "Africa/Nairobi": ["EAT"],
-  "America/St_Johns": ["NST", "NDT"],
-  "Asia/Hong_Kong": ["HKT"],
-  "Asia/Jakarta": ["WIB"],
-  "Asia/Jayapura": ["WIT"],
-  "Asia/Jerusalem": ["IST", "IDT"],
-  "Asia/Karachi": ["PKT"],
-  "Asia/Kolkata": ["IST"],
-  "Asia/Makassar": ["WITA"],
-  "Asia/Manila": ["PST"],
-  "Asia/Seoul": ["KST"],
-  "Asia/Shanghai": ["CST"],
-  "Asia/Taipei": ["CST"],
-  "Asia/Tokyo": ["JST"],
-  "Asia/Yangon": ["MMT"],
-  "Australia/Adelaide": ["ACST", "ACDT"],
-  "Australia/Brisbane": ["AEST"],
-  "Australia/Darwin": ["ACST"],
-  "Australia/Perth": ["AWST"],
-  "Australia/Sydney": ["AEST", "AEDT"],
-  "Europe/Athens": ["EET", "EEST"],
-  "Europe/Berlin": ["CET", "CEST"],
-  "Europe/Dublin": ["GMT", "IST"],
-  "Europe/Lisbon": ["WET", "WEST"],
-  "Europe/London": ["GMT", "BST"],
-  "Europe/Moscow": ["MSK"],
-  "Europe/Paris": ["CET", "CEST"],
-  "Pacific/Auckland": ["NZST", "NZDT"],
-  "Pacific/Guam": ["ChST"],
-};
-
-function primaryZoneId(timeZoneId: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: timeZoneId }).resolvedOptions().timeZone;
-}
-
-let abbreviationsByPrimaryZoneId: Map<string, readonly [string] | readonly [string, string]>;
-
-function zoneAbbreviations(
-  timeZoneId: string,
-): readonly [string] | readonly [string, string] | undefined {
-  const abbreviations = ZONE_ABBREVIATIONS[timeZoneId];
-  if (abbreviations !== undefined) return abbreviations;
-  abbreviationsByPrimaryZoneId ??= new Map(
-    Object.entries(ZONE_ABBREVIATIONS).map(([id, entry]) => [primaryZoneId(id), entry]),
+function zoneAbbreviation(zoned: Temporal.ZonedDateTime): string {
+  const abbreviation = tzdataAbbreviation(
+    zoned.timeZoneId,
+    Math.floor(zoned.epochMilliseconds / 1000),
   );
-  return abbreviationsByPrimaryZoneId.get(primaryZoneId(timeZoneId));
-}
-
-function tzdataAbbreviation(zoned: Temporal.ZonedDateTime): string {
-  const abbreviations = zoneAbbreviations(zoned.timeZoneId);
-  if (abbreviations !== undefined) {
-    if (abbreviations.length === 1) return abbreviations[0];
-    return tzdataIsdst(zoned.timeZoneId, Math.floor(zoned.epochMilliseconds / 1000))
-      ? abbreviations[1]
-      : abbreviations[0];
-  }
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: zoned.timeZoneId,
-    timeZoneName: "short",
-  }).formatToParts(new globalThis.Date(zoned.epochMilliseconds));
-  const short = parts.find((part) => part.type === "timeZoneName")!.value;
-  if (short === "GMT" || !short.startsWith("GMT")) return short;
+  if (abbreviation !== undefined) return abbreviation;
   const offset = zoned.offset;
   return offset.endsWith(":00") ? offset.slice(0, 3) : offset.replace(":", "");
 }
@@ -177,19 +124,43 @@ function subsecNanoseconds(sec: number | Rational): number {
 }
 
 /**
- * `num_exact` / `num_exact_check` (`vendor/ruby/v3.3.11/time.c:518-573`). A Float, primitive or
- * ruby-compat's boxed integral one, takes the default arm's `to_r` (`time.c:532-549`), which is `fToR`.
+ * `num_exact_check` (`vendor/ruby/v3.3.11/time.c:518-559`). A Float, primitive or
+ * ruby-compat's boxed integral one, takes the default arm's `to_r` (`:532-549`).
+ * `rb_rational_canonicalize` (`:529`, `:542`) is not called: every
+ * caller does Rational arithmetic on the result, where `(3/1)` and `3` are the same
+ * value. The `T_STRING` arm is `typeof v === "string"`, since a Ruby String is a JS
+ * string primitive (CLAUDE.md § "Ruby Strings are JS string primitives").
  */
-function numExact(v: unknown): Rational {
+function numExactCheck(v: unknown): Rational | null {
+  if (rbIntegerTypeP(v)) return new Rational(v, 1);
   if (v instanceof Rational) return v;
-  if (typeof v === "bigint") return new Rational(v, 1);
-  if (v instanceof Number) return fToR(v.valueOf());
-  if (typeof v !== "number") {
-    throw new TypeError(
-      `can't convert ${(v as object)?.constructor?.name ?? String(v)} into an exact number`,
-    );
+  if (v != null && typeof v !== "string") {
+    let tmp = rbCheckFuncall(v, "toR");
+    if (tmp !== undefined) {
+      if (rbObjRespondTo(v, "toInt")) {
+        if (rbIntegerTypeP(tmp)) {
+          return new Rational(tmp, 1);
+        } else if (tmp instanceof Rational) {
+          return tmp;
+        }
+      }
+    } else if ((tmp = rbCheckToInt(v)) != null) {
+      return new Rational(tmp as number, 1);
+    }
   }
-  return fToR(v);
+  return null;
+}
+
+/** `num_exact_fail` (`vendor/ruby/v3.3.11/time.c:561-565`). */
+function numExactFail(v: unknown): never {
+  throw new TypeError(`can't convert ${rbObjClassname(v)} into an exact number`);
+}
+
+/** `num_exact` (`vendor/ruby/v3.3.11/time.c:567-573`). */
+function numExact(v: unknown): Rational {
+  const num = numExactCheck(v);
+  if (num == null) numExactFail(v);
+  return num;
 }
 
 /** `ndigits_denominator` (`vendor/ruby/v3.3.11/time.c:4504`). */
@@ -379,12 +350,58 @@ export interface TimeNewOptions {
   precision?: number | null;
 }
 
+interface Vtm {
+  year: number;
+  mon: number;
+  mday: number;
+  hour: number;
+  min: number;
+  sec: number;
+  nsec: number;
+  wday: number;
+  yday: number;
+}
+
+const NO_SUBNANO = new Rational(0, 1);
+
+function vtmFromDate(d: globalThis.Date, nsec: number): Vtm {
+  const year = d.getUTCFullYear();
+  const mon = d.getUTCMonth() + 1;
+  const mday = d.getUTCDate();
+  return {
+    year,
+    mon,
+    mday,
+    hour: d.getUTCHours(),
+    min: d.getUTCMinutes(),
+    sec: d.getUTCSeconds(),
+    nsec,
+    wday: d.getUTCDay(),
+    yday: cCivilToJd(year, mon, mday, Date.GREGORIAN) - cCivilToJd(year, 1, 1, Date.GREGORIAN) + 1,
+  };
+}
+
+function localVtm(epochNs: bigint, utcOffset: number): Vtm {
+  const localNs = epochNs + BigInt(Math.round(utcOffset * 1_000_000_000));
+  let ms = localNs / 1_000_000n;
+  if (ms * 1_000_000n > localNs) ms -= 1n;
+  const d = new globalThis.Date(Number(ms));
+  return vtmFromDate(d, d.getUTCMilliseconds() * 1_000_000 + Number(localNs - ms * 1_000_000n));
+}
+
+function utcEpochNanoseconds(vtm: Vtm): bigint {
+  const d = new globalThis.Date(0);
+  d.setUTCFullYear(vtm.year, vtm.mon - 1, vtm.mday);
+  d.setUTCHours(vtm.hour, vtm.min, vtm.sec);
+  return BigInt(d.getTime()) * 1_000_000n + BigInt(vtm.nsec);
+}
+
 /** @noRailsEquivalent PERMANENT */
 let seatedTime: {
-  zoned: Temporal.ZonedDateTime | null;
-  plain: Temporal.PlainDateTime | null;
+  vtm: Vtm | null;
   utcOffset: number | null;
-  instant: Temporal.Instant;
+  instant: Temporal.Instant | null;
+  epochNs: bigint | null;
   timeZoneId: string | null;
   tzmodeUtc: boolean;
   localZone: boolean;
@@ -408,12 +425,72 @@ export class Timezone {
   }
 
   abbr(time: Time): string {
-    return tzdataAbbreviation(time.toZonedDateTime().withTimeZone(this.identifier));
+    return zoneAbbreviation(time.toZonedDateTime().withTimeZone(this.identifier));
   }
 }
 
-/** `rb_time_zone_abbreviation` (`vendor/ruby/v3.3.11/time.c:5746-5775`). */
-function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
+interface ZoneOffsetInterval {
+  start: bigint | number;
+  end: bigint | number;
+  offset: number;
+}
+
+const zoneOffsetIntervals = new Map<string, ZoneOffsetInterval[]>();
+
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
+function zoneOffsetAt(timeZoneId: string, ns: bigint, localZone = true): number {
+  if (!localZone) {
+    const seconds = ns / 1_000_000_000n - (ns % 1_000_000_000n < 0n ? 1n : 0n);
+    const instant = tzdataOffsetInstant(timeZoneId, Number(seconds));
+    if (instant !== Number(seconds)) ns = BigInt(instant) * 1_000_000_000n;
+  }
+  let intervals = zoneOffsetIntervals.get(timeZoneId);
+  if (!intervals) zoneOffsetIntervals.set(timeZoneId, (intervals = []));
+  let lo = 0;
+  let hi = intervals.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (intervals[mid].end <= ns) lo = mid + 1;
+    else hi = mid;
+  }
+  const hit = intervals[lo];
+  if (hit && hit.start <= ns) return hit.offset;
+  const zoned = Temporal.Instant.fromEpochNanoseconds(ns).toZonedDateTimeISO(timeZoneId);
+  const offset = Number(zoned.offsetNanoseconds) / 1_000_000_000;
+  const previous = zoned.add({ nanoseconds: 1 }).getTimeZoneTransition("previous");
+  const next = zoned.getTimeZoneTransition("next");
+  intervals.splice(lo, 0, {
+    start: previous ? previous.epochNanoseconds : -Infinity,
+    end: next ? next.epochNanoseconds : Infinity,
+    offset,
+  });
+  return offset;
+}
+
+/**
+ * `rb_strftime_alloc` (`vendor/ruby/v3.3.11/time.c:5194-5210`).
+ *
+ * @missingRailsCall rb_strftime_timespec — PERMANENT
+ */
+function rbStrftimeAlloc(
+  format: string,
+  time: Time,
+  vtm: StrftimeVtm,
+  timev: Rational,
+  gmt: boolean,
+): string | null {
+  return rbStrftime(format, time, vtm, timev, gmt);
+}
+
+/**
+ * `rb_time_zone_abbreviation` (`vendor/ruby/v3.3.11/time.c:5746-5775`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
   if (typeof zone === "string") return zone;
   const tzobj = zone as {
     abbr(tm: Time): unknown;
@@ -428,11 +505,9 @@ function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
 }
 
 export class Time extends rbCTime {
-  #plainMemo: Temporal.PlainDateTime | null;
+  #vtmMemo: Vtm | null;
   /** @internal */
-  #zoned: Temporal.ZonedDateTime | null;
-  /** @internal */
-  #instant: Temporal.Instant;
+  #instantMemo: Temporal.Instant | null;
   /** @internal */
   #timeZoneId: string | null;
   /** @internal */
@@ -449,13 +524,45 @@ export class Time extends rbCTime {
   #isdstMemo: boolean | null = null;
 
   /** @internal */
+  #epochNsMemo: bigint | null = null;
+
+  /** @internal */
+  get #epochNs(): bigint {
+    return (this.#epochNsMemo ??= this.#instantMemo!.epochNanoseconds);
+  }
+
+  /** @internal */
+  get #instant(): Temporal.Instant {
+    return (this.#instantMemo ??= Temporal.Instant.fromEpochNanoseconds(this.#epochNsMemo!));
+  }
+
+  /** @internal */
+  get #vtm(): Vtm {
+    return (this.#vtmMemo ??= localVtm(this.#epochNs, this.#utcOffset));
+  }
+
+  /** @internal */
   get #plain(): Temporal.PlainDateTime {
-    return (this.#plainMemo ??= this.#zoned!.toPlainDateTime());
+    const vtm = this.#vtm;
+    return new Temporal.PlainDateTime(
+      vtm.year,
+      vtm.mon,
+      vtm.mday,
+      vtm.hour,
+      vtm.min,
+      vtm.sec,
+      Math.floor(vtm.nsec / 1_000_000),
+      Math.floor(vtm.nsec / 1_000) % 1_000,
+      vtm.nsec % 1_000,
+    );
   }
 
   /** @internal */
   get #utcOffset(): number {
-    return (this.#utcOffsetMemo ??= Number(this.#zoned!.offsetNanoseconds) / 1_000_000_000);
+    return (this.#utcOffsetMemo ??=
+      this.#timeZoneId === "UTC"
+        ? 0
+        : zoneOffsetAt(this.#timeZoneId!, this.#epochNs, this.#localZone));
   }
 
   static now({ in: inZone = null }: { in?: string | number | Timezone | null } = {}): Time {
@@ -510,23 +617,22 @@ export class Time extends rbCTime {
   }
 
   static #atInstant(
-    instant: Temporal.Instant,
+    at: Temporal.Instant | bigint,
     zone: string | number | object | null = null,
     tzmodeUtc?: boolean,
-    subnano: Rational = new Rational(0, 1),
+    subnano: Rational = NO_SUBNANO,
   ): Time {
     if (zone instanceof Timezone) zone = zone.identifier;
     if (maybeTzobjP(zone))
-      return Time.#zoneLocaltime(zone, Time.#atInstant(instant, "UTC", false, subnano))!;
+      return Time.#zoneLocaltime(zone, Time.#atInstant(at, "UTC", false, subnano))!;
+    const instant = typeof at === "bigint" ? null : at;
+    const epochNs = typeof at === "bigint" ? at : null;
     if (typeof zone === "number") {
       seatedTime = {
-        zoned: null,
-        plain: instant
-          .add({ nanoseconds: Math.round(zone * 1_000_000_000) })
-          .toZonedDateTimeISO("UTC")
-          .toPlainDateTime(),
+        vtm: null,
         utcOffset: zone,
         instant,
+        epochNs,
         timeZoneId: null,
         tzmodeUtc: tzmodeUtc ?? false,
         localZone: false,
@@ -535,14 +641,13 @@ export class Time extends rbCTime {
       return new Time(0);
     }
     const timeZoneId = zone == null ? nowTimeZoneId() : zone;
-    const zoned = instant.toZonedDateTimeISO(timeZoneId);
     seatedTime = {
-      zoned,
-      plain: null,
+      vtm: null,
       utcOffset: null,
       instant,
+      epochNs,
       timeZoneId,
-      tzmodeUtc: tzmodeUtc ?? (zone != null && zoned.timeZoneId === "UTC"),
+      tzmodeUtc: tzmodeUtc ?? (zone != null && timeZoneId.toUpperCase() === "UTC"),
       localZone: zone == null,
       subnano,
     };
@@ -557,7 +662,12 @@ export class Time extends rbCTime {
         ? local.toI() + (local.#localZone ? 0 : local.utcOffset)
         : Math.floor(Number((local as Temporal.ZonedDateTime).epochMilliseconds) / 1000) +
           Number((local as Temporal.ZonedDateTime).offsetNanoseconds) / 1_000_000_000;
-    const t = Time.#atInstant(time.#instant, s - time.toI(), false, time.#subnano);
+    const t = Time.#atInstant(
+      time.#epochNsMemo ?? time.#instantMemo!,
+      s - time.toI(),
+      false,
+      time.#subnano,
+    );
     t.#zoneObject = zone;
     const dst = rbObjRespondTo(zone, "isDst")
       ? (zone as { isDst(tm: Time): unknown }).isDst(time)
@@ -600,7 +710,12 @@ export class Time extends rbCTime {
         .add(numExact(subsec).mul(1_000_000_000).quo(scale));
       t = Time.#timeNewTimew(timew);
     } else if (time instanceof Time) {
-      t = Time.#atInstant(time.#instant, time.#zoneArgument(), time.#tzmodeUtc, time.#subnano);
+      t = Time.#atInstant(
+        time.#epochNsMemo ?? time.#instantMemo!,
+        time.#zoneArgument(),
+        time.#tzmodeUtc,
+        time.#subnano,
+      );
     } else {
       const timew = numExact(time).mul(1_000_000_000);
       t = Time.#timeNewTimew(timew);
@@ -1099,7 +1214,7 @@ export class Time extends rbCTime {
         (d.cwyear != null && year == null) ||
         ((d.cwday != null || d.cweek != null) && !(d.mon != null && d.mday != null))
       ) {
-        return Time.#atInstant(dNewByFrags(Date._strptime(date, format)).toTime().toInstant());
+        return dNewByFrags(Date._strptime(date, format)).toTime();
       }
       if (
         (d.wnum0 != null || d.wnum1 != null) &&
@@ -1272,10 +1387,10 @@ export class Time extends rbCTime {
     if (seatedTime !== null) {
       const seat = seatedTime;
       seatedTime = null;
-      this.#plainMemo = seat.plain;
+      this.#vtmMemo = seat.vtm;
       this.#utcOffsetMemo = seat.utcOffset;
-      this.#zoned = seat.zoned;
-      this.#instant = seat.instant;
+      this.#instantMemo = seat.instant;
+      this.#epochNsMemo = seat.epochNs;
       this.#timeZoneId = seat.timeZoneId;
       this.#tzmodeUtc = seat.tzmodeUtc;
       this.#localZone = seat.localZone;
@@ -1289,8 +1404,9 @@ export class Time extends rbCTime {
     min = min == null ? 0 : obj2vint(min);
     if (sec == null) sec = 0;
     else if (typeof sec === "string") sec = obj2vint(sec);
-    const nsec = subsecNanoseconds(sec);
-    this.#subnano = numExact(sec).mod(1).mul(1_000_000_000).add(-nsec);
+    const integralSec = typeof sec === "number" && Number.isSafeInteger(sec);
+    const nsec = integralSec ? 0 : subsecNanoseconds(sec);
+    this.#subnano = integralSec ? NO_SUBNANO : numExact(sec).mod(1).mul(1_000_000_000).add(-nsec);
     const wholeSec = sec instanceof Rational ? sec.div(1) : Math.floor(sec);
     obj2ubits(month, 4);
     obj2ubits(day, 5);
@@ -1302,22 +1418,10 @@ export class Time extends rbCTime {
     validateVtmRange("hour", hour, 0, 24);
     validateVtmRange("min", min, 0, hour === 24 ? 0 : 59);
     validateVtmRange("sec", wholeSec, 0, hour === 24 ? 0 : 60);
-    const overflowDays = Math.max(day - Time.#monthDays(year, month), 0);
-    const inMonth = new Temporal.PlainDateTime(
-      year,
-      month,
-      day - overflowDays,
-      hour === 24 ? 23 : hour,
-      min,
-      wholeSec === 60 ? 59 : wholeSec,
-      Math.floor(nsec / 1_000_000),
-      Math.floor(nsec / 1_000) % 1_000,
-      nsec % 1_000,
-    );
-    const plain = overflowDays === 0 ? inMonth : inMonth.add({ days: overflowDays });
-    this.#zoned = null;
-    this.#plainMemo =
-      hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
+    const d = new globalThis.Date(0);
+    d.setUTCFullYear(year, month - 1, day);
+    d.setUTCHours(hour, min, wholeSec);
+    this.#vtmMemo = vtmFromDate(d, nsec);
     const zoneArgument = zone ?? options.in ?? null;
     const zoneObject =
       zoneArgument instanceof Timezone
@@ -1340,59 +1444,69 @@ export class Time extends rbCTime {
     this.#utcOffsetMemo =
       typeof utcOffset === "number"
         ? utcOffset
-        : Number(this.#plain.toZonedDateTime(utcOffset, disambiguation).offsetNanoseconds) /
-          1_000_000_000;
+        : utcOffset === "UTC"
+          ? 0
+          : Number(this.#plain.toZonedDateTime(utcOffset, disambiguation).offsetNanoseconds) /
+            1_000_000_000;
     if (this.#timeZoneId == null) {
-      const instant = this.#plain.toZonedDateTime("UTC").toInstant();
-      this.#instant =
-        this.#utcOffset === 0
-          ? instant
-          : instant.subtract({ nanoseconds: Math.round(this.#utcOffset * 1_000_000_000) });
+      this.#epochNsMemo =
+        utcEpochNanoseconds(this.#vtm) - BigInt(Math.round(this.#utcOffset * 1_000_000_000));
+      this.#instantMemo = null;
+    } else if (this.#timeZoneId === "UTC") {
+      this.#epochNsMemo = utcEpochNanoseconds(this.#vtm);
+      this.#instantMemo = null;
     } else {
-      this.#instant = this.#plain.toZonedDateTime(this.#timeZoneId, disambiguation).toInstant();
+      this.#instantMemo = this.#plain.toZonedDateTime(this.#timeZoneId, disambiguation).toInstant();
+      if (!this.#localZone) {
+        const offset = zoneOffsetAt(this.#timeZoneId, this.#epochNs, false);
+        if (offset !== this.#utcOffsetMemo) {
+          this.#utcOffsetMemo = offset;
+          this.#epochNsMemo =
+            utcEpochNanoseconds(this.#vtm) - BigInt(Math.round(offset * 1_000_000_000));
+          this.#instantMemo = null;
+        }
+      }
     }
   }
 
   get year(): number {
-    return this.#plain.year;
+    return this.#vtm.year;
   }
 
   get mon(): number {
-    return this.#plain.month;
+    return this.#vtm.mon;
   }
 
   get month(): number {
-    return this.#plain.month;
+    return this.#vtm.mon;
   }
 
   get day(): number {
-    return this.#plain.day;
+    return this.#vtm.mday;
   }
 
   get mday(): number {
-    return this.#plain.day;
+    return this.#vtm.mday;
   }
 
   get wday(): number {
-    return this.#plain.dayOfWeek % 7;
+    return this.#vtm.wday;
   }
 
   get hour(): number {
-    return this.#plain.hour;
+    return this.#vtm.hour;
   }
 
   get min(): number {
-    return this.#plain.minute;
+    return this.#vtm.min;
   }
 
   get sec(): number {
-    return this.#plain.second;
+    return this.#vtm.sec;
   }
 
   get nsec(): number {
-    return (
-      this.#plain.millisecond * 1_000_000 + this.#plain.microsecond * 1_000 + this.#plain.nanosecond
-    );
+    return this.#vtm.nsec;
   }
 
   get tvNsec(): number {
@@ -1400,7 +1514,7 @@ export class Time extends rbCTime {
   }
 
   get usec(): number {
-    return this.#plain.millisecond * 1_000 + this.#plain.microsecond;
+    return Math.floor(this.#vtm.nsec / 1_000);
   }
 
   get subsec(): number | Rational {
@@ -1410,14 +1524,14 @@ export class Time extends rbCTime {
   }
 
   get yday(): number {
-    return this.#plain.dayOfYear;
+    return this.#vtm.yday;
   }
 
   get zone(): string | object | null {
     if (this.#tzmodeUtc) return "UTC";
     if (this.#timeZoneId == null) return this.#zoneObject;
     if (!this.#localZone) return (this.#zoneObject ??= new Timezone(this.#timeZoneId));
-    return tzdataAbbreviation(this.#instant.toZonedDateTimeISO(this.#timeZoneId));
+    return zoneAbbreviation(this.#instant.toZonedDateTimeISO(this.#timeZoneId));
   }
 
   /** @internal */
@@ -1444,7 +1558,7 @@ export class Time extends rbCTime {
   }
 
   toI(): number {
-    const nanoseconds = this.#instant.epochNanoseconds;
+    const nanoseconds = this.#epochNs;
     const seconds = nanoseconds / 1_000_000_000n - (nanoseconds % 1_000_000_000n < 0n ? 1n : 0n);
     return Number(seconds);
   }
@@ -1458,9 +1572,7 @@ export class Time extends rbCTime {
   }
 
   toR(): Rational {
-    return new Rational(this.#instant.epochNanoseconds, 1_000_000_000n).add(
-      this.#subnano.quo(1_000_000_000),
-    );
+    return new Rational(this.#epochNs, 1_000_000_000n).add(this.#subnano.quo(1_000_000_000));
   }
 
   /** `time_to_time` (`vendor/ruby/v3.3.11/ext/date/date_core.c:8883-8887`). */
@@ -1514,46 +1626,64 @@ export class Time extends rbCTime {
     ).toDatetime();
   }
 
+  /** `time_strftime` (`vendor/ruby/v3.3.11/time.c:5234-5264`). */
   strftime(format: string): string {
+    if (format.length === 0) {
+      rbWarning("strftime called with empty format string");
+      return "";
+    }
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
-    return strftime(
+    const str = rbStrftimeAlloc(
+      format,
+      this,
       {
         year: this.year,
-        jd: cCivilToJd(this.year, this.mon, this.day),
-        nth: 0n,
-        gregorianP: true,
         mon: this.mon,
-        day: this.day,
-        wday: this.wday,
-        yday: this.yday,
+        mday: this.day,
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        nsec: new Rational(this.nsec, 1).add(this.#subnano),
-        get zone(): string {
-          const zone = self.zone;
-          return zone == null ? "" : rbTimeZoneAbbreviation(zone, self);
-        },
+        wday: this.wday,
+        yday: this.yday,
         utcOffset: this.utcOffset,
+        get zone(): unknown {
+          return self.zone;
+        },
       },
-      format,
+      this.toR(),
+      this.#tzmodeUtc,
     );
+    if (str == null) throw new ArgumentError(`invalid format: ${format}`);
+    return str;
   }
 
+  /** `time_cmp` (`vendor/ruby/v3.3.11/time.c:3951`). */
   compare(other: unknown): number | null {
-    if (!(other instanceof Time)) return null;
-    const n = this.#instant.epochNanoseconds - other.#instant.epochNanoseconds;
+    if (!(other instanceof Time)) {
+      const invcmp = cmp(other, this);
+      if (invcmp === null) return null;
+      return -rbCmpint(invcmp, this, other);
+    }
+    const n = this.#epochNs - other.#epochNs;
     if (n === 0n) return this.#subnano.cmp(other.#subnano);
     return n > 0n ? 1 : -1;
+  }
+
+  /** `Comparable#==` (`cmp_equal`, `vendor/ruby/v3.3.11/compar.c:79`). */
+  equals(other: unknown): boolean {
+    if ((this as unknown) === other) return true;
+    const c = this.compare(other);
+    if (c === null) return false;
+    return rbCmpint(c, this, other) === 0;
   }
 
   /** `time_init_copy` (`vendor/ruby/v3.3.11/time.c:4046`), whose `MEMCPY` copies the whole `time_object`. */
   initializeCopy(time: Time): this {
     if ((this as Time) === time) return this;
-    this.#plainMemo = time.#plainMemo;
-    this.#zoned = time.#zoned;
-    this.#instant = time.#instant;
+    this.#vtmMemo = time.#vtmMemo;
+    this.#instantMemo = time.#instantMemo;
+    this.#epochNsMemo = time.#epochNsMemo;
     this.#timeZoneId = time.#timeZoneId;
     this.#tzmodeUtc = time.#tzmodeUtc;
     this.#localZone = time.#localZone;
@@ -1566,10 +1696,7 @@ export class Time extends rbCTime {
 
   eql(other: unknown): boolean {
     if (!(other instanceof Time)) return false;
-    return (
-      this.#instant.epochNanoseconds === other.#instant.epochNanoseconds &&
-      this.#subnano.cmp(other.#subnano) === 0
-    );
+    return this.#epochNs === other.#epochNs && this.#subnano.cmp(other.#subnano) === 0;
   }
 
   /**
@@ -1577,7 +1704,7 @@ export class Time extends rbCTime {
    * `timew`, the instant `time_eql` compares.
    */
   hash(): number {
-    return rbHash([this.#instant.epochNanoseconds, this.#subnano]);
+    return rbHash([this.#epochNs, this.#subnano]);
   }
 
   isUtc(): boolean {
@@ -1595,7 +1722,7 @@ export class Time extends rbCTime {
   minus(offset: number | bigint | Rational | Time): Time | number;
   minus(offset: unknown): Time | number {
     if (offset instanceof Time) {
-      return new Rational(this.#instant.epochNanoseconds - offset.#instant.epochNanoseconds, 1)
+      return new Rational(this.#epochNs - offset.#epochNs, 1)
         .add(this.#subnano)
         .add(offset.#subnano.mul(-1))
         .quo(1_000_000_000)
@@ -1605,13 +1732,21 @@ export class Time extends rbCTime {
   }
 
   #timeAdd(offset: number | bigint | Rational, sign: 1 | -1): Time {
+    if (Number.isSafeInteger(offset) && this.#subnano.isZero()) {
+      return Time.#atInstant(
+        this.#epochNs + BigInt(offset as number) * 1_000_000_000n * BigInt(sign),
+        this.#zoneArgument(),
+        undefined,
+        this.#subnano,
+      );
+    }
     const timew = numExact(offset)
       .mul(1_000_000_000 * sign)
       .add(this.#subnano);
     const nanoseconds =
       timew.numerator / timew.denominator - (timew.numerator % timew.denominator < 0n ? 1n : 0n);
     return Time.#atInstant(
-      Temporal.Instant.fromEpochNanoseconds(this.#instant.epochNanoseconds + nanoseconds),
+      this.#epochNs + nanoseconds,
       this.#zoneArgument(),
       undefined,
       timew.add(-nanoseconds),
@@ -1643,8 +1778,7 @@ export class Time extends rbCTime {
       return this;
     }
 
-    this.#zoned = this.#instant.toZonedDateTimeISO("UTC");
-    if (this.#utcOffsetMemo !== 0) this.#plainMemo = null;
+    if (this.#utcOffsetMemo !== 0) this.#vtmMemo = null;
     this.#utcOffsetMemo = null;
     this.#timeZoneId = "UTC";
     this.#localZone = false;
@@ -1672,13 +1806,18 @@ export class Time extends rbCTime {
       (typeof utcOffset === "object" && utcOffset !== null)
     ) {
       return Time.#atInstant(
-        this.#instant,
+        this.#epochNsMemo ?? this.#instantMemo!,
         utcOffsetArgument(typeof utcOffset === "string" ? utcOffset : numExact(utcOffset)),
         undefined,
         this.#subnano,
       );
     }
-    return Time.#atInstant(this.#instant, utcOffset, undefined, this.#subnano);
+    return Time.#atInstant(
+      this.#epochNsMemo ?? this.#instantMemo!,
+      utcOffset,
+      undefined,
+      this.#subnano,
+    );
   }
 
   toS(): string {
@@ -1909,10 +2048,10 @@ Time.prototype.iso8601 = Time.prototype.xmlschema;
 
 rbDefineAllocFunc(Time, (klass) => {
   seatedTime = {
-    zoned: null,
-    plain: null,
+    vtm: null,
     utcOffset: null,
-    instant: Temporal.Instant.fromEpochNanoseconds(0n),
+    instant: null,
+    epochNs: 0n,
     timeZoneId: null,
     tzmodeUtc: false,
     localZone: false,

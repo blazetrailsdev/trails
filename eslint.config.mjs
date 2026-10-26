@@ -42,6 +42,7 @@ import {
 } from "./eslint/test-infra-scope.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
 import noRubyCompatReimplementation from "./eslint/no-ruby-compat-reimplementation.mjs";
+import rubyCompatNativeRequired from "./eslint/ruby-compat-native-required.mjs";
 import {
   noRubyCompatReimplementationFiles,
   noRubyCompatReimplementationIgnores,
@@ -129,6 +130,8 @@ export default defineConfig(
     ignores: [
       "vendor/**",
       "**/dist/**",
+      "**/*.tt.js",
+      "packages/thor/src/test-helpers/fixtures/doc/*.rb.js",
       // The Journey visualizer's shipped assets: fsm.js and fsm.css are
       // byte-for-byte copies of
       // vendor/rails/v8.0.2/actionpack/lib/action_dispatch/journey/visualizer/, and
@@ -310,6 +313,7 @@ export default defineConfig(
           "no-raw-sql": noRawSql,
           "no-standalone-associations": noStandaloneAssociations,
           "no-ruby-compat-reimplementation": noRubyCompatReimplementation,
+          "ruby-compat-native-required": rubyCompatNativeRequired,
           "ruby-compat-needs-mri-citation": rubyCompatNeedsMriCitation,
           "no-internal-canonical-loaders": noInternalCanonicalLoaders,
           "no-load-schema-with-stubbed-ddl": noLoadSchemaWithStubbedDdl,
@@ -334,6 +338,7 @@ export default defineConfig(
   {
     files: [
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/arel/src/**/*.ts",
@@ -363,6 +368,7 @@ export default defineConfig(
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
       "packages/website/src/**/*.ts",
     ],
     ignores: [
@@ -429,6 +435,7 @@ export default defineConfig(
       "packages/did-you-mean/src/**/*.ts",
       "packages/bcrypt/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -445,6 +452,7 @@ export default defineConfig(
   {
     files: [
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/globalid/src/**/*.ts",
@@ -508,6 +516,7 @@ export default defineConfig(
       "packages/actionview/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
       "packages/activejob/src/**/*.ts",
       "packages/bcrypt/src/**/*.ts",
       "packages/date/src/**/*.ts",
@@ -819,22 +828,23 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/trailties/src/thor/**/*.ts"],
+    files: ["packages/thor/src/**/*.ts"],
     ignores: [
-      "packages/trailties/src/thor/actions.trails.test.ts",
-      "packages/trailties/src/thor/actions/create-file.trails.test.ts",
-      "packages/trailties/src/thor/actions/file-manipulation.trails.test.ts",
-      "packages/trailties/src/thor/line-editor/basic.test.ts",
-      "packages/trailties/src/thor/nested-context.test.ts",
-      "packages/trailties/src/thor/parser/argument.test.ts",
-      "packages/trailties/src/thor/parser/arguments.test.ts",
-      "packages/trailties/src/thor/parser/option.test.ts",
-      "packages/trailties/src/thor/parser/options.test.ts",
-      "packages/trailties/src/thor/shell.test.ts",
-      "packages/trailties/src/thor/shell.trails.test.ts",
-      "packages/trailties/src/thor/shell/color.test.ts",
-      "packages/trailties/src/thor/shell/table-printer.trails.test.ts",
-      "packages/trailties/src/thor/util.test.ts",
+      "packages/thor/src/actions.trails.test.ts",
+      "packages/thor/src/actions/create-file.trails.test.ts",
+      "packages/thor/src/actions/file-manipulation.trails.test.ts",
+      "packages/thor/src/line-editor/basic.test.ts",
+      "packages/thor/src/nested-context.test.ts",
+      "packages/thor/src/parser/argument.test.ts",
+      "packages/thor/src/parser/arguments.test.ts",
+      "packages/thor/src/parser/option.test.ts",
+      "packages/thor/src/parser/options.test.ts",
+      "packages/thor/src/shell.test.ts",
+      "packages/thor/src/shell.trails.test.ts",
+      "packages/thor/src/shell/color.test.ts",
+      "packages/thor/src/shell/table-printer.trails.test.ts",
+      "packages/thor/src/util.test.ts",
+      "packages/thor/src/test-helpers/build-templates.ts",
     ],
     rules: {
       "blazetrails/thor-import-boundary": "error",
@@ -842,7 +852,7 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/trailties/src/**/*.ts"],
+    files: ["packages/thor/src/**/*.ts", "packages/trailties/src/**/*.ts"],
     rules: {
       "blazetrails/thor-command-registration": "error",
     },
@@ -896,6 +906,14 @@ export default defineConfig(
       // (autofixable via `--fix`) lets the codebase converge to direct awaits
       // without breaking lint or forcing a mass rewrite in one PR.
       "blazetrails/prefer-await-relation": "error",
+    },
+  },
+
+  // ── ruby-compat-native-required: the native form where it is the same operation (RFC 0194) ──
+  {
+    files: ["packages/*/src/**/*.ts"],
+    rules: {
+      "blazetrails/ruby-compat-native-required": "error",
     },
   },
 
@@ -1114,7 +1132,11 @@ export default defineConfig(
 
   // ── actionpack + trailties ──
   {
-    files: ["packages/actionpack/src/**/*.ts", "packages/trailties/src/**/*.ts"],
+    files: [
+      "packages/actionpack/src/**/*.ts",
+      "packages/trailties/src/**/*.ts",
+      "packages/thor/src/**/*.ts",
+    ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "unused-imports/no-unused-vars": "off",

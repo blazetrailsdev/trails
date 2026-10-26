@@ -10,6 +10,7 @@ import {
   byteslice,
   rbStrPlus,
   rbStrStartWith,
+  transformValues,
   unpack1,
 } from "@blazetrails/ruby-compat";
 import { Entry } from "./entry.js";
@@ -176,8 +177,9 @@ class StringDeserializer implements CoderSerializer {
   }
 }
 
-const STRING_DESERIALIZERS = new Map(
-  [...STRING_ENCODINGS].map(([type, encoding]) => [type, new StringDeserializer(encoding)]),
+const STRING_DESERIALIZERS = transformValues(
+  STRING_ENCODINGS,
+  (encoding) => new StringDeserializer(encoding),
 );
 
 type LazyEntryOptions = { version: string | Uint8Array | null; expiresAt: number | null };

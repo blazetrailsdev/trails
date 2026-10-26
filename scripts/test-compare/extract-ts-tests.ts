@@ -10,8 +10,6 @@ import {
   extractTestsFromSource,
   type HelperMap,
 } from "./extract-ts-core.js";
-import { PKG_SRC_DIRS } from "./compare.js";
-import { PACKAGE_DIR_OVERRIDES } from "../api-compare/config.js";
 import { scopeOf } from "../api-compare/scope.js";
 
 export { extractTestsFromSource } from "./extract-ts-core.js";
@@ -19,8 +17,6 @@ export { extractTestsFromSource } from "./extract-ts-core.js";
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
-
-const NESTED_PACKAGES = ["thor"];
 
 function getPackageTestFiles(): Record<string, string[]> {
   const packages = [
@@ -34,6 +30,11 @@ function getPackageTestFiles(): Record<string, string[]> {
     "bcrypt",
     "msgpack",
     "marcel",
+    "chronic",
+    "builder",
+    "et-orbi",
+    "raabro",
+    "fugit",
     "actionview",
     "actioncable",
     "activejob",
@@ -43,6 +44,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "i18n",
     "date",
     "ruby-compat",
+    "thor",
   ];
   const packageAliases: Record<string, string> = {};
   const result: Record<string, string[]> = {};
@@ -51,12 +53,9 @@ function getPackageTestFiles(): Record<string, string[]> {
     const pattern = `packages/${pkg}/src/**/*.test.ts`;
     // Twin of the Ruby side's `test/**/behaviors/*_behavior.rb` glob.
     const behaviorPattern = `packages/${pkg}/src/**/behaviors/*-behavior.ts`;
-    const ignore = NESTED_PACKAGES.filter((nested) => PACKAGE_DIR_OVERRIDES[nested] === pkg).map(
-      (nested) => `${PKG_SRC_DIRS[nested]}**`,
-    );
     const files = [
-      ...globSync(pattern, { cwd: ROOT_DIR, ignore }),
-      ...globSync(behaviorPattern, { cwd: ROOT_DIR, ignore }),
+      ...globSync(pattern, { cwd: ROOT_DIR }),
+      ...globSync(behaviorPattern, { cwd: ROOT_DIR }),
     ].sort();
 
     result[pkg] = files;
@@ -79,10 +78,6 @@ function getPackageTestFiles(): Record<string, string[]> {
   // Shared test files also relevant to controller/ Ruby tests
   result["actioncontroller"] = [...actionControllerFiles, ...actionDispatchFiles];
   result["abstractcontroller"] = abstractControllerFiles;
-
-  for (const pkg of NESTED_PACKAGES) {
-    result[pkg] = globSync(`${PKG_SRC_DIRS[pkg]}**/*.test.ts`, { cwd: ROOT_DIR }).sort();
-  }
 
   // Aliased packages (trailties → cli)
   for (const [alias, dir] of Object.entries(packageAliases)) {

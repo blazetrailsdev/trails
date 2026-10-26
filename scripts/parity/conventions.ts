@@ -209,6 +209,8 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // without this the default rule would expect `../i18n.ts`, outside src.
   "i18n:../i18n.rb": "i18n.ts",
   "msgpack:../msgpack.rb": "msgpack.ts",
+  "chronic:../chronic.rb": "chronic.ts",
+  "et-orbi:../et-orbi.rb": "et-orbi.ts",
   // `interpolate/ruby.rb` reopens `module I18n`, which `backend/cache.rb`
   // defines first — so without an entry here its `interpolate` /
   // `interpolate_hash` are measured against `backend/cache.ts` and, since
@@ -439,6 +441,10 @@ export const OPERATORS = new Set([
   "===",
   "!=",
   "<=>",
+  "<",
+  "<=",
+  ">",
+  ">=",
   "+",
   "-",
   "*",
@@ -707,6 +713,15 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "`Integer#xchr` and `String#to_xs` (builder xchar.rb:161-198) are the " +
+      "`else` arm of `if String.method_defined?(:encode)` (:97), a Ruby 1.8 " +
+      "fallback that no Ruby since 1.9 loads. Scoped to builder's xchar.rb.",
+    names: ["xchr", "to_xs"],
+    rubyFiles: ["xchar.rb"],
+    packages: ["builder"],
+  },
+  {
+    reason:
       "Node's event loop stands in for Action Cable's `NIO::Selector` and its " +
       "thread (CLAUDE.md, \"Node's event loop stands in for Action Cable's nio4r " +
       'selector"). `spawn`, `run` and `wakeup` own and interrupt the selector ' +
@@ -715,6 +730,16 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "`write_nonblock`, which a `net.Socket` never leaves.",
     names: ["spawn", "run", "wakeup", "writes_pending", "flush_write_buffer"],
     rubyFiles: ["connection/stream_event_loop.rb", "connection/stream.rb"],
+    packages: ["actioncable"],
+  },
+  {
+    reason:
+      "redis.rb:212-252 switches on the redis-rb version. trails ports the redis-rb 5 " +
+      "arm (`extract_subscribed_client(conn)` answers `conn`), which matches ioredis: " +
+      "it subscribes on the connection itself and has no inner raw client to write to. " +
+      "The redis-rb 4 arm's `SubscribedClient#send_command` writes to `conn._client`, so it has no counterpart.",
+    names: ["send_command"],
+    rubyFiles: ["subscription_adapter/redis.rb"],
     packages: ["actioncable"],
   },
   {

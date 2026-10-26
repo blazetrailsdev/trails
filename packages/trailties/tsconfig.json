@@ -13,6 +13,7 @@
     { "path": "../activejob" },
     { "path": "../activerecord-cli" },
     { "path": "../rack" },
+    { "path": "../actioncable" },
     { "path": "../actionpack" },
     { "path": "../actionview" },
     { "path": "../activemodel" },
@@ -20,6 +21,8 @@
     { "path": "../tse-compiler" },
     { "path": "../html-sanitizer" },
     { "path": "../nokogiri" },
-    { "path": "../did-you-mean" }
+    { "path": "../did-you-mean" },
+    { "path": "../thor" },
+    { "path": "../et-orbi" }
   ]
 }
