@@ -113,11 +113,32 @@ for an unresolved identifier, so there is no loader graph for a
 so a port would be invented surface with no Ruby source to mirror.
 
 **Trails has no autoloader.** Application constants come from explicit imports
-and trails' eager directory scan: `loadControllers` in
-`trailties/src/application/finisher.ts`, which walks every existent
-`app/controllers` directory, dynamically `import()`s each `*_controller` /
-`*-controller` `.ts`/`.js` file, and registers each exported `…Controller`
-function under its underscored, namespace-prefixed name. That scan is the port.
+and trails' eager directory scan in `trailties/src/application/finisher.ts`:
+`loadAppClasses` / `collectAppClasses` walk every existent `app/<root>`
+directory, dynamically `import()` every `.ts`/`.js` file whatever it is named,
+and keep each exported subclass of the framework base. A subdirectory is a
+namespace: it is seated as a plain-object module when nothing holds the name
+(Zeitwerk's implicit namespace), and its classes are prefixed `Admin::`. That
+scan is the port.
+
+**A scanned app class registers through its package's `registerX`.** Every
+framework base an app subclasses has one, beside the base class:
+`registerModel` (`activerecord/src/associations.ts`), `registerController`
+(`actionpack/src/action-controller/base.ts`), `registerJob`
+(`activejob/src/base.ts`), `registerChannel`
+(`actioncable/src/channel/base.ts`) and `registerConnection`
+(`actioncable/src/connection/base.ts`). Each takes `(klass)`, `(name, klass)`
+or `(klasses[])`, checks the base with `rbClassInheritedP` and raises
+`ArgumentError` on a mismatch, and seats the class under `klass.name` plus
+`rbModName`. A directory prefix goes through `(name, klass)`. A new scanned
+directory (mailers, an engine's `app/` dirs) adds a `registerX` in the package
+that owns the base, tagged `@noRailsEquivalent PERMANENT` citing this section,
+and never a bare `registerConstant` or a `mod[camelize(filename)]` lookup in the
+finisher. Ruled by the repo owner on 2026-10-26 (trails#9319). The last
+exception, `loadControllers`' file-name selection and its `controllerConstants`
+map, converged under `load-controllers-shares-collect-constants`; route dispatch
+reaches a registered controller through `controller_class_for`'s `constantize`.
+
 As a consequence:
 
 - The finisher's `eager_load!` initializer runs only its portable arms. The three

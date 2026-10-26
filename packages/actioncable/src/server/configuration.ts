@@ -19,6 +19,7 @@ const BUILT_IN_ADAPTERS: Record<string, () => Promise<Record<string, unknown>>> 
   "action_cable/subscription_adapter/async": () => import("../subscription-adapter/async.js"),
   "action_cable/subscription_adapter/postgresql": () =>
     import("../subscription-adapter/postgresql.js"),
+  "action_cable/subscription_adapter/redis": () => import("../subscription-adapter/redis.js"),
   "action_cable/subscription_adapter/test": () => import("../subscription-adapter/test.js"),
 };
 
@@ -57,21 +58,6 @@ export class Configuration {
     ];
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  async loadPubsubAdapter(): Promise<void> {
-    const adapter = fetch(
-      this.cable!,
-      "adapter",
-      block(() => "redis"),
-    );
-    await rbFRequire(
-      { ...BUILT_IN_ADAPTERS, ...ActionCable.SubscriptionAdapter.loadPath },
-      `action_cable/subscription_adapter/${adapter}`,
-    ).catch((e: unknown) => {
-      if (!(e instanceof LoadError)) throw e;
-    });
-  }
-
   pubsubAdapter(): unknown {
     let adapter = fetch(
       this.cable!,
@@ -104,6 +90,21 @@ export class Configuration {
     adapter = camelize(adapter);
     if (adapter === "Postgresql") adapter = "PostgreSQL";
     return feature[adapter];
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async loadPubsubAdapter(): Promise<void> {
+    const adapter = fetch(
+      this.cable!,
+      "adapter",
+      block(() => "redis"),
+    );
+    await rbFRequire(
+      { ...BUILT_IN_ADAPTERS, ...ActionCable.SubscriptionAdapter.loadPath },
+      `action_cable/subscription_adapter/${adapter}`,
+    ).catch((e: unknown) => {
+      if (!(e instanceof LoadError)) throw e;
+    });
   }
 }
 

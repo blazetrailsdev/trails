@@ -6,18 +6,14 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { Base as JobBase, registerJob } from "@blazetrails/activejob";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { getFs, getPath, isRegisteredConstant, registerConstant } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { Root } from "../paths.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { DrawCallback } from "@blazetrails/actionpack";
-import {
-  ActionController,
-  controllerConstants,
-  type DispatchableControllerClass,
-} from "@blazetrails/actionpack";
+import { ActionController, registerController } from "@blazetrails/actionpack";
 import { Base, registerModel } from "@blazetrails/activerecord";
 
 export interface FinisherRoutes {
@@ -78,10 +74,7 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
 });
 
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
-  for (const [name, klass] of await loadControllers(this.paths())) {
-    controllerConstants.set(name, klass);
-  }
-  for (const klass of controllerConstants.values()) await defineController(klass);
+  await loadControllers(this.paths());
   registerModel(await loadModels(this.paths()));
   await loadJobs(this.paths());
   await loadChannels(this.paths());
@@ -221,42 +214,11 @@ Finisher.initializer(
 );
 
 /** @noRailsEquivalent PERMANENT */
-async function loadControllers(paths: Root): Promise<Map<string, DispatchableControllerClass>> {
-  const out = new Map<string, DispatchableControllerClass>();
-  const node = paths.get("app/controllers");
-  if (!node) return out;
-
-  for (const dir of await node.existentDirectories()) {
-    await collectControllers(dir, "", out);
-  }
-  return out;
-}
-
-/** @internal */
-async function collectControllers(
-  dir: string,
-  prefix: string,
-  out: Map<string, DispatchableControllerClass>,
-): Promise<void> {
-  const fs = getFs();
-  const p = getPath();
-  if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
-
-  for (const entry of await fs.readdir(dir)) {
-    const full = p.join(dir, entry);
-    if ((await fs.stat(full)).isDirectory()) {
-      await collectControllers(full, `${prefix}${underscore(entry.replace(/-/g, "_"))}/`, out);
-      continue;
-    }
-    const match = entry.match(/^(.+)[-_]controller\.(?:ts|js)$/);
-    if (!match) continue;
-    const mod = (await import(p.pathToFileURL(full).href)) as Record<string, unknown>;
-    for (const value of Object.values(mod)) {
-      if (typeof value === "function" && value.name.endsWith("Controller")) {
-        const name = `${prefix}${underscore(match[1].replace(/-/g, "_"))}`;
-        out.set(name, value as DispatchableControllerClass);
-      }
-    }
+async function loadControllers(paths: Root): Promise<void> {
+  for (const [prefix, klass] of await loadAppClasses(paths, "controllers", ActionController.Base)) {
+    if (prefix) registerController(`${prefix}${klass.name}`, klass);
+    else registerController(klass);
+    await defineController(klass);
   }
 }
 
@@ -334,12 +296,9 @@ async function collectAppClasses<T extends abstract new (...args: never[]) => un
   for (const entry of await fs.readdir!(dir)) {
     const full = p.join(dir, entry);
     if ((await fs.stat!(full)).isDirectory()) {
-      await collectAppClasses(
-        full,
-        `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}::`,
-        base,
-        out,
-      );
+      const namespace = `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}`;
+      if (!isRegisteredConstant(namespace)) registerConstant(namespace, {});
+      await collectAppClasses(full, `${namespace}::`, base, out);
       continue;
     }
     if (!/\.(?:ts|js)$/.test(entry) || /\.d\.ts$/.test(entry)) continue;

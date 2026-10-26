@@ -1,12 +1,16 @@
 import { describe, it, expect, afterEach, onTestFinished, vi } from "vitest";
-import {
-  ActionController,
-  ActionView,
-  controllerConstants,
-  type Journey,
-} from "@blazetrails/actionpack";
+import { ActionController, ActionView, type Journey } from "@blazetrails/actionpack";
 import { Base } from "@blazetrails/activerecord";
-import { env, getFs, getOsAsync, getPath, setEnv, rbFLoad } from "@blazetrails/ruby-compat";
+import {
+  env,
+  getFs,
+  getOsAsync,
+  getPath,
+  setEnv,
+  rbFLoad,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { createProgram } from "../cli.js";
 import { Trails, _resetTrailsEnv } from "../rails.js";
@@ -26,8 +30,14 @@ function route(requirements: Record<string, string>): Journey.Route {
 }
 
 describe("UnusedRoutesCommand", () => {
+  const seated: [string, unknown][] = [];
+  const seat = (name: string, klass: unknown): void => {
+    registerConstant(name, klass);
+    seated.push([name, klass]);
+  };
+
   afterEach(() => {
-    controllerConstants.clear();
+    for (const [name, klass] of seated.splice(0)) unregisterConstant(name, klass);
   });
 
   it("RouteInfo is unused when the controller class is not registered", async () => {
@@ -39,7 +49,7 @@ describe("UnusedRoutesCommand", () => {
     class PostsController extends ActionController.Metal {
       index(): void {}
     }
-    controllerConstants.set("posts", PostsController as never);
+    seat("PostsController", PostsController);
     const info = new RouteInfo(route({ controller: "posts", action: "index" }));
     expect(await info.unused()).toBe(false);
   });
@@ -49,7 +59,7 @@ describe("UnusedRoutesCommand", () => {
       showHTML(): void {}
       sekrit_data(): void {}
     }
-    controllerConstants.set("posts", PostsController as never);
+    seat("PostsController", PostsController);
     for (const action of ["showHTML", "sekrit_data"]) {
       const info = new RouteInfo(route({ controller: "posts", action }));
       expect(await info.unused()).toBe(false);
@@ -60,7 +70,7 @@ describe("UnusedRoutesCommand", () => {
 
   it("RouteInfo is unused when the action and its template are both missing", async () => {
     class PostsController extends ActionController.Metal {}
-    controllerConstants.set("posts", PostsController as never);
+    seat("PostsController", PostsController);
     const info = new RouteInfo(route({ controller: "posts", action: "index" }));
     expect(await info.unused()).toBe(true);
   });
@@ -75,7 +85,7 @@ describe("UnusedRoutesCommand", () => {
         ]);
       }
     }
-    controllerConstants.set("posts", PostsController as never);
+    seat("PostsController", PostsController);
     const info = new RouteInfo(route({ controller: "posts", action: "index" }));
     expect(await info.unused()).toBe(false);
   });
@@ -90,7 +100,7 @@ describe("UnusedRoutesCommand", () => {
         ]);
       }
     }
-    controllerConstants.set("posts", PostsController as never);
+    seat("PostsController", PostsController);
 
     const covered = new RouteInfo(route({ controller: "posts", action: "recentPosts" }));
     const uncovered = new RouteInfo(route({ controller: "posts", action: "oldPosts" }));
@@ -109,7 +119,7 @@ describe("UnusedRoutesCommand", () => {
         ]);
       }
     }
-    controllerConstants.set("admin/story_pages", StoryPagesController as never);
+    seat("Admin::StoryPagesController", StoryPagesController);
 
     const covered = new RouteInfo(route({ controller: "admin/story_pages", action: "index" }));
     const uncovered = new RouteInfo(route({ controller: "admin/story_pages", action: "show" }));
@@ -120,11 +130,19 @@ describe("UnusedRoutesCommand", () => {
 
   it("RouteInfo does not count an inherited non-action method as the route's action", async () => {
     class PostsController extends ActionController.Metal {}
-    controllerConstants.set("posts", PostsController as never);
+    seat("PostsController", PostsController);
 
     const info = new RouteInfo(route({ controller: "posts", action: "process" }));
 
     expect(await info.unused()).toBe(true);
+  });
+
+  it("RouteInfo resolves the framework rails/pwa controller by its Rails constant", async () => {
+    await import("../pwa-controller.js");
+
+    const info = new RouteInfo(route({ controller: "rails/pwa", action: "manifest" }));
+
+    expect(await info.unused()).toBe(false);
   });
 
   it("lists a booted app's unused routes before anything has drawn them", async () => {
@@ -158,7 +176,7 @@ describe("UnusedRoutesCommand", () => {
     await createProgram().parseAsync(["routes", "-u"], { from: "user" });
     const output = log.mock.calls.map((args) => args.join(" ")).join("\n");
     expect(output).toMatch(/^Found 1 unused route:$/m);
-    expect(output).toMatch(/rails_health_check GET\s+\/up\(\.:format\)\s+rails\/health#show/);
+    expect(output).toMatch(/legacy GET\s+\/legacy\(\.:format\)\s+legacy#index/);
     expect(exit).toHaveBeenCalledWith(1);
   }, 15_000);
 });

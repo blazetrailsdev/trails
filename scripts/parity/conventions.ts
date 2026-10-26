@@ -734,6 +734,16 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      "redis.rb:212-252 switches on the redis-rb version. trails ports the redis-rb 5 " +
+      "arm (`extract_subscribed_client(conn)` answers `conn`), which matches ioredis: " +
+      "it subscribes on the connection itself and has no inner raw client to write to. " +
+      "The redis-rb 4 arm's `SubscribedClient#send_command` writes to `conn._client`, so it has no counterpart.",
+    names: ["send_command"],
+    rubyFiles: ["subscription_adapter/redis.rb"],
+    packages: ["actioncable"],
+  },
+  {
+    reason:
       "`Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs " +
       "Thorfiles) is not ported, and these `Thor::Util` members exist only for it: " +
       "`namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside " +
