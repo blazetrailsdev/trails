@@ -410,12 +410,9 @@ describe("virtualizeTse free-name lookup", () => {
     const { outputText } = transpileTse(virtualizeTse(source, scope));
     const exports: { default?: (...a: unknown[]) => Promise<unknown> } = {};
     const modules: Record<string, unknown> = {
-      "@blazetrails/actionview": {
-        TopLevel: {},
-        hashAref: RubyCompat.hashAref,
-        keys: RubyCompat.keys,
-      },
+      "@blazetrails/actionview": { TopLevel: {} },
       "@blazetrails/activesupport": { htmlSafe: (s: string) => s },
+      "@blazetrails/ruby-compat": RubyCompat,
     };
     new Function("exports", "require", outputText)(exports, (id: string) => modules[id]);
     const out: string[] = [];

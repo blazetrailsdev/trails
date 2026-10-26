@@ -307,7 +307,7 @@ function scopeLines(
   }
   if (free.length === 0) return [];
   imports.unshift(
-    'import { hashAref as __hashAref, keys as __keys } from "@blazetrails/actionview";',
+    'import { hashAref as __hashAref, keys as __keys } from "@blazetrails/ruby-compat";',
   );
   return [
     "  const __own: Record<string, unknown> = Object.create(null);",

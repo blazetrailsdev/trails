@@ -85,12 +85,20 @@ describe("lspPluginInit", () => {
       fs.writeFileSync(path.join(cwd, rel), body);
     };
     write(
+      "node_modules/@blazetrails/ruby-compat/package.json",
+      '{ "name": "@blazetrails/ruby-compat", "types": "index.d.ts" }',
+    );
+    write(
+      "node_modules/@blazetrails/ruby-compat/index.d.ts",
+      "export declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
+    );
+    write(
       "node_modules/@blazetrails/actionview/package.json",
       '{ "name": "@blazetrails/actionview", "types": "index.d.ts" }',
     );
     write(
       "node_modules/@blazetrails/actionview/index.d.ts",
-      "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base {}\nexport declare const TopLevel: {};\nexport declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
+      "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base {}\nexport declare const TopLevel: {};",
     );
     write("app/models/post.ts", "export class Post { title = 0; }");
     write(

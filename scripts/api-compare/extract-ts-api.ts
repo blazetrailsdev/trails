@@ -2050,7 +2050,7 @@ function extractDefinePropertyDirect(
   if (!value) return;
   const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
   const moduleInfo = moduleInfoForSingleton(target, info, checker, srcDir);
-  if (moduleInfo) {
+  if (moduleInfo && (ts.isFunctionExpression(value) || ts.isArrowFunction(value))) {
     if (moduleInfo.classMethods.some((m) => m.name === propNameExpr.text)) return;
     moduleInfo.classMethods.push({
       name: propNameExpr.text,

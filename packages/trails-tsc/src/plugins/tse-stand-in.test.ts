@@ -32,7 +32,7 @@ function standIn(source: string): StandIn {
   const body = js
     .replace('import { TopLevel } from "@blazetrails/actionview";', "")
     .replace(
-      'import { hashAref as __hashAref, keys as __keys } from "@blazetrails/actionview";',
+      'import { hashAref as __hashAref, keys as __keys } from "@blazetrails/ruby-compat";',
       "",
     )
     .replace("export default async function render(", "return async function render(");
