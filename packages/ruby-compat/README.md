@@ -323,7 +323,9 @@ families are kept on purpose, with no substitution story:
 - **The object model**: `include` / `extend` / `defineModule`, `rbObjDup` /
   `rbObjClone`, the singleton class, constants, and `rbFSend` /
   `rbObjRespondTo` for a computed name or a `method_missing` receiver.
-- **The Hash semantics JS lacks**: `fetch`, `deleteIf` / `keepIf` /
+- **The Hash semantics JS lacks**: `fetch` where the key is computed or one
+  argument or a block is passed (the two-argument literal-key arm on a plain
+  object is `Object.hasOwn(h, "k") ? h.k : default`), `deleteIf` / `keepIf` /
   `hashReplace`, and the `Hash` class for the features listed above.
 - **Exceptions and Kernel**: the error classes, `excSetupMessage`, `rbFLoad`,
   `block()` / `rbBlockGivenP`, and `toEnum`.
