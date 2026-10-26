@@ -9,7 +9,7 @@ import {
   Rational,
   StringIO,
   KeyError,
-  aryIncludes,
+  Enumerable,
   type ConflictBlock,
   eachKey,
   eachPair,
@@ -275,7 +275,7 @@ export class Parameters {
   }
 
   hasValue(value: unknown): boolean {
-    return aryIncludes([...this.eachValue()], this.convertValueToParameters(value));
+    return new Enumerable(this.eachValue()).isInclude(this.convertValueToParameters(value));
   }
 
   declare isValue: Parameters["hasValue"];

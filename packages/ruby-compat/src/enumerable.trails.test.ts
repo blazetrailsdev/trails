@@ -5,7 +5,9 @@ import {
   Enumerable,
   eachCons,
   eachWithIndex,
+  eachWithObject,
   eachSlice,
+  isAll,
   maxBy,
   minBy,
   sortBy,
@@ -102,6 +104,72 @@ describe("Enumerable over an each that answers a promise", () => {
 });
 
 describe("Enumerable", () => {
+  it("eachWithObject awaits a block that answers a promise before yielding the next element", async () => {
+    const seen: string[] = [];
+    const memo = eachWithObject(["a", "b", "c"], [] as string[], async (i, m) => {
+      seen.push(`start ${i}`);
+      await Promise.resolve();
+      m.push(i);
+      seen.push(`end ${i}`);
+    });
+    expect(memo).toBeInstanceOf(Promise);
+    expect(await memo).toEqual(["a", "b", "c"]);
+    expect(seen).toEqual(["start a", "end a", "start b", "end b", "start c", "end c"]);
+  });
+
+  it("eachWithIndex awaits a block that answers a promise and answers the receiver", async () => {
+    const ary = ["a", "b"];
+    const seen: [string, number][] = [];
+    const result = eachWithIndex(ary, async (i, n) => {
+      await Promise.resolve();
+      seen.push([i, n]);
+    });
+    expect(await result).toBe(ary);
+    expect(seen).toEqual([
+      ["a", 0],
+      ["b", 1],
+    ]);
+  });
+
+  it("eachWithObject awaits each block in turn over a receiver whose each yields", async () => {
+    const seen: string[] = [];
+    const hash = new Hash<string, number>().set("a", 1).set("b", 2);
+    const memo = eachWithObject(new Enumerable(hash), [] as string[], async ([k], m) => {
+      seen.push(`start ${k}`);
+      await Promise.resolve();
+      m.push(k);
+      seen.push(`end ${k}`);
+    });
+    expect(memo).toBeInstanceOf(Promise);
+    expect(await memo).toEqual(["a", "b"]);
+    expect(seen).toEqual(["start a", "end a", "start b", "end b"]);
+  });
+
+  it("eachWithObject streams through each when the block answers no promise", () => {
+    const seen: string[] = [];
+    const receiver = {
+      each(block: (i: number) => void) {
+        for (const i of [1, 2]) {
+          seen.push(`yield ${i}`);
+          block(i);
+        }
+      },
+    };
+    expect(
+      eachWithObject(receiver, [] as number[], (i, m) => seen.push(`block ${i}`) && m.push(i)),
+    ).toEqual([1, 2]);
+    expect(seen).toEqual(["yield 1", "block 1", "yield 2", "block 2"]);
+  });
+
+  it("isAll breaks on the first element that fails RTEST", () => {
+    const seen: number[] = [];
+    expect(isAll([1, 2, 3], (i: number) => (seen.push(i), i < 2))).toBe(false);
+    expect(seen).toEqual([1, 2]);
+    expect(isAll([0, ""])).toBe(true);
+    expect(isAll([1, null])).toBe(false);
+    expect(isAll(new Map([["a", 1]]), ([, v]: [string, number]) => v === 1)).toBe(true);
+  });
+
   it("eachWithIndex yields each element with its count and answers the receiver", () => {
     const seen: [string, number][] = [];
     const ary = ["a", "b", "c"];

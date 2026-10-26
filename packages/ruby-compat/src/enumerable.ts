@@ -46,15 +46,51 @@ function rbBlockCall<T, E, R>(
   obj: Iterable<T> | Each<T, E>,
   block: (i: T) => unknown,
   result: () => R,
+  awaiting = false,
 ): Enumerated<E, R> {
   const rescue = (e: unknown): R => {
     if (e !== iterBreak) throw e;
     return result();
   };
+  if (awaiting && typeof (obj as Partial<Each<T, E>>).each === "function") {
+    let pending: PromiseLike<unknown> | null = null;
+    const rest: T[] = [];
+    return rbBlockCall(
+      obj,
+      (i) => {
+        if (pending) return void rest.push(i);
+        const r = block(i);
+        if (r != null && typeof (r as PromiseLike<unknown>).then === "function") {
+          pending = r as PromiseLike<unknown>;
+        }
+      },
+      () => {
+        if (!pending) return result();
+        const awaited = pending;
+        return (async () => {
+          await awaited;
+          for (const i of rest) await block(i);
+          return result();
+        })();
+      },
+    ) as Enumerated<E, R>;
+  }
   let each: unknown;
   try {
     if (typeof (obj as Partial<Each<T, E>>).each === "function") {
       each = (obj as Each<T, E>).each(block);
+    } else if (awaiting) {
+      const it = (obj as Iterable<T>)[Symbol.iterator]();
+      for (let step = it.next(); !step.done; step = it.next()) {
+        const r = block(step.value);
+        if (r != null && typeof (r as PromiseLike<unknown>).then === "function") {
+          each = (async () => {
+            await r;
+            for (let step = it.next(); !step.done; step = it.next()) await block(step.value);
+          })();
+          break;
+        }
+      }
     } else {
       for (const i of obj as Iterable<T>) block(i);
     }
@@ -432,15 +468,24 @@ export function drop<T, E = unknown>(obj: Iterable<T> | Each<T, E>, n: number): 
  */
 export function eachWithIndex<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
+  block: (i: T, n: number) => PromiseLike<unknown>,
+): Promise<Iterable<T> | Each<T, E>>;
+/** @noRailsEquivalent PERMANENT */
+export function eachWithIndex<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
   block: (i: T, n: number) => unknown,
-): Enumerated<E, Iterable<T> | Each<T, E>> {
+): Enumerated<E, Iterable<T> | Each<T, E>>;
+/** @noRailsEquivalent PERMANENT */
+export function eachWithIndex<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T, n: number) => unknown,
+): unknown {
   let n = 0;
   return rbBlockCall(
     obj,
-    (i) => {
-      block(i, n++);
-    },
+    (i) => block(i, n++),
     () => obj,
+    true,
   );
 }
 
@@ -453,14 +498,25 @@ export function eachWithIndex<T, E = unknown>(
 export function eachWithObject<T, M, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
   memo: M,
+  block: (i: T, memo: M) => PromiseLike<unknown>,
+): Promise<M>;
+/** @noRailsEquivalent PERMANENT */
+export function eachWithObject<T, M, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  memo: M,
   block: (i: T, memo: M) => unknown,
-): Enumerated<E, M> {
+): Enumerated<E, M>;
+/** @noRailsEquivalent PERMANENT */
+export function eachWithObject<T, M, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  memo: M,
+  block: (i: T, memo: M) => unknown,
+): unknown {
   return rbBlockCall(
     obj,
-    (i) => {
-      block(i, memo);
-    },
+    (i) => block(i, memo),
     () => memo,
+    true,
   );
 }
 
@@ -688,6 +744,31 @@ export function eachCons<T, E = unknown>(
 function enumfunc<T>(args: unknown[]): (i: T) => unknown {
   checkArity(args.length, 0, 1);
   return args.length > 0 ? (i) => rbEqq(args[0], i) : (i) => i;
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#all? — `vendor/ruby/v3.3.11/enum.c:1799` `enum_all`,
+ * breaking on the first element whose `pattern === element`, or the element
+ * itself with no argument, fails `RTEST`.
+ * @noRailsEquivalent PERMANENT
+ */
+export function isAll<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  ...args: unknown[]
+): Enumerated<E, boolean> {
+  const func = enumfunc<T>(args);
+  let memo = true;
+  return rbBlockCall(
+    obj,
+    (i) => {
+      const result = func(i);
+      if (result == null || result === false) {
+        memo = false;
+        throw iterBreak;
+      }
+    },
+    () => memo,
+  );
 }
 
 /**
@@ -1155,6 +1236,10 @@ export class Enumerable<T = unknown, E = unknown> {
 
   sortBy<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown) {
     return sortBy(this, block);
+  }
+
+  isAll<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
+    return isAll(this, ...args);
   }
 
   isAny<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
