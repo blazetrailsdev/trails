@@ -137,6 +137,14 @@ describe("UnusedRoutesCommand", () => {
     expect(await info.unused()).toBe(true);
   });
 
+  it("RouteInfo resolves the framework rails/pwa controller by its Rails constant", async () => {
+    await import("../pwa-controller.js");
+
+    const info = new RouteInfo(route({ controller: "rails/pwa", action: "manifest" }));
+
+    expect(await info.unused()).toBe(false);
+  });
+
   it("lists a booted app's unused routes before anything has drawn them", async () => {
     const fs = getFs();
     const dir = await fs.mkdtemp!(`${(await getOsAsync()).tmpdir()}${getPath().sep}boot-app-`);
