@@ -17,7 +17,6 @@ interface RedisConnection {
   unsubscribe(...channels: string[]): Promise<unknown>;
   on(event: string, listener: (...args: never[]) => unknown): unknown;
   emit(event: string, ...args: unknown[]): boolean;
-  disconnect(): void;
   options: { retryStrategy?: (times: number) => number | void | null };
 }
 
@@ -102,8 +101,18 @@ export class Redis extends Base {
 }
 prepend(Redis, ChannelPrefix);
 cattrAccessor.call(Redis, "redisConnector", {
-  default: () => (config: Record<string, unknown>) =>
-    new IORedis(except(config, "adapter", "channelPrefix") as RedisOptions),
+  default: () => (config: Record<string, unknown>) => {
+    const conn = new IORedis(except(config, "adapter", "channelPrefix") as RedisOptions);
+    for (const command of ["subscribe", "unsubscribe"] as const) {
+      const send = conn[command].bind(conn) as (...channel: string[]) => Promise<unknown>;
+      conn[command] = (async (...channel: string[]) => {
+        const count = await send(...channel);
+        for (const chan of channel.length === 0 ? [""] : channel) conn.emit(command, chan, count);
+        return count;
+      }) as never;
+    }
+    return conn;
+  },
 });
 
 export class Listener extends SubscriberMap {
@@ -113,7 +122,7 @@ export class Listener extends SubscriberMap {
   private _subscriptionLock: Mutex;
   private _reconnectAttempt: number;
   private _reconnectAttempts: number[];
-  private _subscribedClient: SubscribedClient | null;
+  private _subscribedClient: RedisConnection | null;
   private _whenConnected: (() => unknown)[];
   private _thread: Thread<Promise<unknown>> | null;
 
@@ -176,13 +185,12 @@ export class Listener extends SubscriberMap {
           this._subscriptionLock.synchronize(() => {
             this._subscribedClient = null;
           });
-          conn.disconnect();
           resolve();
         }
       });
 
       conn.on("end", () => reject(new ConnectionError("Connection lost")));
-      originalClient.subscribe("_action_cable_internal");
+      void originalClient.subscribe("_action_cable_internal");
     });
   }
 
@@ -191,7 +199,7 @@ export class Listener extends SubscriberMap {
       if (this._thread == null) return null;
 
       this.whenConnected(() => {
-        this._subscribedClient!.unsubscribe();
+        void this._subscribedClient!.unsubscribe();
         this._subscribedClient = null;
       });
       return this._thread;
@@ -265,7 +273,7 @@ export class Listener extends SubscriberMap {
   /** @internal */
   private resubscribe(): void {
     const channels = this.sync.synchronize(() => Object.keys(this.subscribers)) as string[];
-    if (channels.length !== 0) this._subscribedClient!.subscribe(...channels);
+    if (channels.length !== 0) void this._subscribedClient!.subscribe(...channels);
   }
 
   /** @internal */
@@ -278,46 +286,12 @@ export class Listener extends SubscriberMap {
   }
 
   /** @internal */
-  private extractSubscribedClient(conn: RedisConnection): SubscribedClient {
-    return new SubscribedClient(conn);
+  private extractSubscribedClient(conn: RedisConnection): RedisConnection {
+    return conn;
   }
 }
 
 /** @internal */
 export class ConnectionError extends Error {}
-
-/** @internal */
-export class SubscribedClient {
-  private _rawClient: RedisConnection;
-
-  constructor(rawClient: RedisConnection) {
-    this._rawClient = rawClient;
-  }
-
-  subscribe(...channel: string[]): null {
-    return this.sendCommand("subscribe", ...channel);
-  }
-
-  unsubscribe(...channel: string[]): null {
-    return this.sendCommand("unsubscribe", ...channel);
-  }
-
-  /**
-   * @internal
-   * @missingRailsCall write — PERMANENT
-   */
-  private sendCommand(...command: ["subscribe" | "unsubscribe", ...string[]]): null {
-    const [name, ...channel] = command;
-    void this._rawClient[name](...channel).then(
-      (count) => {
-        for (const chan of channel.length === 0 ? [""] : channel) {
-          this._rawClient.emit(name, chan, count);
-        }
-      },
-      () => {},
-    );
-    return null;
-  }
-}
 
 SubscriptionAdapter.Redis = Redis;

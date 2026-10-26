@@ -11,6 +11,14 @@ vi.mock("ioredis", () => ({
     constructor(...args: unknown[]) {
       redisNew(...args);
     }
+
+    async subscribe(): Promise<number> {
+      return 0;
+    }
+
+    async unsubscribe(): Promise<number> {
+      return 0;
+    }
   },
 }));
 
