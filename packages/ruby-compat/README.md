@@ -271,7 +271,12 @@ below).
 
 ### 1. Only what trails actually calls
 
-No member exists here without a real call site elsewhere in this repo. This is
+No member exists here without a real call site elsewhere in this repo, and one
+call site is not enough (RFC 0194). A helper earns its place with one of three
+things: **two or more importing files**, **object-model state** (constant
+tables, ivar seats, module records), or **an adapter seam** (RFC 0135). A
+helper with one importing file and neither of the others is inlined at that
+caller, reduced to the subset the caller reaches. This is
 not a general-purpose Ruby runtime, and it is not a place to port a method
 because its siblings are already here — `String#succ` earns its keep because
 `arel` calls it; `String#squeeze` does not, until something calls it.
@@ -307,6 +312,36 @@ So there is no raise path, and none is needed: the mark stays only-shrink
 every other gated package. The `total` it holds today is the residue of members
 that never got their receipt, a rule 2 violation burnt down by
 `receipt-ruby-compat-moved-residue`.
+
+### Native first: the helper families kept on purpose
+
+Where the native JS form is identical at a call site, the helper is wrong, not
+optional (RFC 0194, owner ruling 2026-10-19); `ruby-compat-native-required`
+enforces it for the helpers in `eslint/ruby-compat-native-required.json`. These
+families are kept on purpose, with no substitution story:
+
+- **The object model**: `include` / `extend` / `defineModule`, `rbObjDup` /
+  `rbObjClone`, the singleton class, constants, and `rbFSend` /
+  `rbObjRespondTo` for a computed name or a `method_missing` receiver.
+- **The Hash semantics JS lacks**: `fetch` where the key is computed or one
+  argument or a block is passed (the two-argument literal-key arm on a plain
+  object is `Object.hasOwn(h, "k") ? h.k : default`), `deleteIf` / `keepIf` /
+  `hashReplace`, and the `Hash` class for the features listed above.
+- **Exceptions and Kernel**: the error classes, `excSetupMessage`, `rbFLoad`,
+  `block()` / `rbBlockGivenP`, and `toEnum`.
+- **`rbInspect`**, for a message Ruby renders with `inspect`.
+- **`rtest`, `isSymbol` and `symbolToS`**, which cost the same as native and
+  are the sanctioned spellings.
+
+Any other helper survives only at a site where it dispatches (a `Map` / `Hash`
+receiver, a receiver answering the call itself, a computed name) or where its
+semantics observably differ.
+
+**Enumerable is free functions.** `enumerable.ts` exports each method as a
+function taking the receiver first — `partition(enum, fn)`, `groupBy(enum,
+fn)`, `eachSlice(enum, n, fn)` — and dispatches on an `each` receiver, an
+iterable or a `Range`. Nothing is installed on `Array.prototype`. On an Array
+whose block result is a boolean, the native method is the form.
 
 ### 2. Every export carries BOTH a `vendor/ruby` citation and a receipt
 

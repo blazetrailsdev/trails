@@ -123,6 +123,18 @@ port a body:
   relation readers depend on the difference. Its two-argument arm on a plain
   object with a literal key is `Object.hasOwn(h, "k") ? h.k : default`; every
   other `fetch` is ruby-compat's `fetch` (see the next bullet).
+- **Native first (RFC 0194).** Every ruby-compat helper follows one rule:
+  write the native JS form wherever behavior at the call site is identical,
+  and keep the helper only where it dispatches or where semantics observably
+  differ. "Dispatches" means the receiver may be a `Map` / `Hash`, the
+  receiver answers the call itself (`isEmpty`, `fetch`, `isRespondTo`), or
+  the name is computed. Where the form is identical the helper is not
+  optional but wrong (owner ruling, 2026-10-19), and
+  `ruby-compat-native-required` (`eslint/ruby-compat-native-required.mjs`)
+  reports the helpers listed in its only-grow
+  `ruby-compat-native-required.json` called on an Array, `string`, `number`
+  or plain object. The Hash table and the Array / String / Enumerable table
+  below are this rule applied.
 - **Hash calls on a plain object.** Where the receiver is a plain object, write
   the JS form and not the ruby-compat helper. The call gates credit the form on
   the receiver Rails names, and `parity:api:calls:args` checks a literal key.
@@ -145,6 +157,29 @@ port a body:
   answers the call itself (`isKey`, `get`, `set`, `each`), because the helper
   dispatches and the form does not. A member call (`headers.hasKey(k)` for
   `Rack::Headers#key?`) is a ported Rails method, not a helper, and stays.
+
+- **Array, String and Enumerable calls on a native value.** The same rule,
+  for the receivers JS already has. `ruby-compat-native-required` enforces
+  each row once its sweep adds the helper to the JSON list; until then it
+  is enforced by review.
+
+  | Ruby                               | Native form                            | Keeps the helper where                                                        |
+  | ---------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------- |
+  | `a.first` / `a.last` (no argument) | `a[0] ?? null` / `a.at(-1) ?? null`    | the receiver may be an Enumerable or a `Range`; a count argument is passed    |
+  | `a.include?(x)`                    | `a.includes(x)`                        | equality must be Ruby `==` (`rbEqual`) on objects, not `SameValueZero`        |
+  | `a.map` / `a.select` / `a.reject`  | `a.map` / `a.filter` / `!` in filter   | the block result is read with Ruby truthiness (`0`, `""` are truthy in Ruby)  |
+  | `a.join(sep)`                      | `a.join(sep)`                          | an element is a nested Array: Ruby joins it with `sep`, JS with `","`         |
+  | `a.compact`                        | `a.filter((x) => x != null)`           | the in-place `compact!` and its `nil`-when-unchanged result                   |
+  | `a.each_with_index`                | `a.forEach((x, i) => …)` / `entries`   | the receiver may be any `each` receiver, or the enumerator result is used     |
+  | `s.start_with?` / `s.end_with?`    | `startsWith` / `endsWith`              | a Regexp or several prefixes are passed                                       |
+  | `s.include?(t)`                    | `s.includes(t)`                        | never, on a `string` receiver                                                 |
+  | `s.strip` / `upcase` / `downcase`  | `trim` / `toUpperCase` / `toLowerCase` | Ruby's whitespace set (`strip` keeps `\u00A0`) or ASCII-only case mapping     |
+  | `s.split(sep)`                     | `s.split(sep)`                         | trailing empty fields are dropped, a limit is passed, or `sep` is `nil`/`" "` |
+
+  Enumerable helpers are free functions taking the receiver first,
+  `partition(enum, fn)`, never a method spliced onto `Array.prototype`. Keep
+  one only where the receiver is not an Array (`each` receiver, `Range`,
+  `Set`) or where it reads its block with Ruby truthiness.
 
 - **`present?` / `blank?` / `presence`.** Use the ActiveSupport analogues, not
   `!!x` or `x?.length`. `" "` is blank in Ruby and truthy in JS.
