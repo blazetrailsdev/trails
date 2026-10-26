@@ -129,6 +129,6 @@ describe("Time.at with a Duration", () => {
 
   it("a Duration is kind of Numeric", () => {
     expect(seconds(30)).toBeInstanceOf(rbCNumeric);
-    expect(5 instanceof rbCNumeric).toBe(false);
+    expect(days(1).isA(rbCNumeric)).toBe(true);
   });
 });
