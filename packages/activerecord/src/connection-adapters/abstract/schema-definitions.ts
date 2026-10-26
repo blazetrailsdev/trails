@@ -9,7 +9,6 @@ import {
   registerConstant,
   slice,
   symbolToS,
-  update,
 } from "@blazetrails/ruby-compat";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { SchemaStatementsLike } from "./schema-statements-like.js";
@@ -830,7 +829,7 @@ export class TableDefinition {
 
       if (isPlainObject(id)) {
         const { type, ...idOptions } = id as Record<string, unknown>;
-        update(options, idOptions);
+        Object.assign(options, idOptions);
         id = fetch(id as Record<string, ColumnType>, "type", "primary_key");
       }
 

@@ -968,6 +968,7 @@ function createWithBang(
 ): any {
   if (value) {
     value = sanitizeForbiddenAttributes(value);
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- value may be a Map, which merge converts through to_hash
     this.createWithValue = merge(this.createWithValue, value);
   } else {
     this.createWithValue = {};
@@ -1221,6 +1222,7 @@ const VALID_DIRECTIONS = new Set([":asc", ":desc", ":ASC", ":DESC", "asc", "desc
 export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
   for (const arg of args) {
     if (!isHash(arg)) continue;
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- arg may be a Hash, which eachPair dispatches on
     eachPair(arg as Record<string, unknown>, (_key, value) => {
       if (isHash(value)) {
         validateOrderArgs.call(this, [value]);

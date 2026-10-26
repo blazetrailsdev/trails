@@ -19,6 +19,17 @@
     "maxArgs": 1,
     "kinds": ["array"]
   },
+  "eachPair": {
+    "member": "each",
+    "native": "for (const [k, v] of Object.entries(h))",
+    "maxArgs": 2,
+    "void": true
+  },
+  "hasKey": {
+    "member": "isKey",
+    "native": "\"k\" in h / Object.hasOwn(h, k)",
+    "maxArgs": 2
+  },
   "hashDelete": {
     "member": "delete",
     "native": "delete h[k]",
@@ -31,6 +42,16 @@
     "maxArgs": 1,
     "kinds": ["array"],
     "elements": ["number"]
+  },
+  "merge": {
+    "member": "merge",
+    "native": "{ ...h, ...other }",
+    "maxArgs": 2
+  },
+  "mergeBang": {
+    "member": "update",
+    "native": "Object.assign(h, other)",
+    "maxArgs": 2
   },
   "min": {
     "member": "min",
@@ -64,5 +85,10 @@
     "maxArgs": 1,
     "kinds": ["array"],
     "elements": ["string", "number", "boolean", "null"]
+  },
+  "update": {
+    "member": "update",
+    "native": "Object.assign(h, other)",
+    "maxArgs": 2
   }
 }

@@ -401,6 +401,7 @@ export abstract class Base {
     if (!(isHash(entry) && truthy(count))) return entry;
 
     const key = this.pluralizationKey(entry, count);
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- entry may be a Hash, which hasKey dispatches on
     if (!hasKey(entry, key)) throw new InvalidPluralizationData(entry, count, key);
     return hashAref(entry, key);
   }
@@ -553,6 +554,7 @@ export abstract class Base {
 
   protected pluralizationKey(entry: TranslationData, count: unknown): string {
     let key: string | undefined;
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- entry may be a Hash, which hasKey dispatches on
     if (count === 0 && hasKey(entry, ":zero")) key = ":zero";
     key ??= count === 1 ? ":one" : ":other";
     return key;

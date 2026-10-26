@@ -1,6 +1,6 @@
 import type { SafeBuffer } from "@blazetrails/activesupport";
 import { Date as RubyDate } from "@blazetrails/date";
-import { fetch, include, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
+import { include, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
 
 import { Tags } from "../../namespaces.js";
 import { FormOptionsHelper } from "../form-options-helper.js";
@@ -27,9 +27,15 @@ export class WeekdaySelect extends Base {
     const value = this.value();
     return this.selectContentTag(
       this.weekdayOptionsForSelect(rtest(value) ? value : this._options["selected"], {
-        indexAsValue: fetch(this._options, "indexAsValue", false),
-        dayFormat: fetch(this._options, "dayFormat", "day_names"),
-        beginningOfWeek: fetch(this._options, "beginningOfWeek", RubyDate.beginningOfWeek()),
+        indexAsValue: Object.hasOwn(this._options, "indexAsValue")
+          ? this._options.indexAsValue
+          : false,
+        dayFormat: Object.hasOwn(this._options, "dayFormat")
+          ? this._options.dayFormat
+          : "day_names",
+        beginningOfWeek: Object.hasOwn(this._options, "beginningOfWeek")
+          ? this._options.beginningOfWeek
+          : RubyDate.beginningOfWeek(),
       }),
       this._options,
       this._htmlOptions,

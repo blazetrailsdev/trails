@@ -77,6 +77,7 @@ export class Hstore extends ValueType {
   override serialize(value: unknown): unknown {
     if (isPlainObject(value) || value instanceof Map) {
       const pairs: string[] = [];
+      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- value may be a Map, which eachPair dispatches on
       eachPair(value as Record<string, unknown>, (k, v) => {
         pairs.push(`${escapeHstore(k)}=>${escapeHstore(v as string | null)}`);
       });

@@ -1594,6 +1594,7 @@ export class Mapper {
 
     this.match(
       path,
+      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options may be a Hash, which merge converts through to_hash
       merge({ to: app as MountableApp, anchor: false, format: false }, options as RouteOptions),
     );
 

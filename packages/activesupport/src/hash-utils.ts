@@ -352,6 +352,7 @@ export function reverseMerge<T extends object>(obj: T, otherHash: object): T {
   if (!(otherHash instanceof Map) && !isPlainObject(otherHash)) {
     return rbFSend(otherHash, "merge", obj) as T;
   }
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- otherHash may be a Map, which merge dispatches on
   return merge(otherHash as Record<string, unknown>, obj as Record<string, unknown>) as T;
 }
 

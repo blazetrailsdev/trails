@@ -568,6 +568,7 @@ describe("ParametersPermitTest", () => {
     const params = new Parameters();
     params.permitBang();
 
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- params is a Parameters, which update converts through to_hash
     assertEqual({ a: 1 }, mergeBang({ a: 1 }, params));
   });
 

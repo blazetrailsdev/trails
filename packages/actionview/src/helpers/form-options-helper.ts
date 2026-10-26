@@ -370,7 +370,7 @@ export function extractSelectedAndDisabled(selected: unknown): [unknown, unknown
   } else {
     const selectedArray = wrap(selected);
     const options = extractOptionsBang(selectedArray);
-    const selectedItems = fetch(options, "selected", selectedArray);
+    const selectedItems = Object.hasOwn(options, "selected") ? options.selected : selectedArray;
     return [selectedItems, options["disabled"]];
   }
 }

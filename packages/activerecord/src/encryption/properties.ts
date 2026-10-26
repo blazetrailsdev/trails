@@ -83,6 +83,7 @@ export class Properties {
   }
 
   add(otherProperties: Record<string, unknown> | Properties): void {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- otherProperties may be a Properties, which eachPair dispatches on
     eachPair(otherProperties as Record<string, unknown>, (key, value) => {
       this.set(key, value);
     });

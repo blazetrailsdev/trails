@@ -36,6 +36,7 @@ export class ParamEncoder {
         return new UploadedFile(params as UploadedFileOptions) as unknown as ParamValue;
       } else {
         const hwia: ParamHash = Object.create(null);
+        // eslint-disable-next-line blazetrails/ruby-compat-native-required -- params is a Hash here, which eachPair dispatches on
         eachPair(params as ParamHash, (key, val) => {
           hwia[key] = this.normalizeEncodeParams(val);
         });

@@ -6,7 +6,6 @@ import {
   StandardError,
   OpenSSL,
   Zlib,
-  fetch,
   hashAref,
   hashAset,
   rbFArray,
@@ -136,12 +135,14 @@ export class Cookie extends PersistedSecure {
     this.encryptors = secrets.map((secret) => new Encryptor(secret, encryptorOpts));
 
     if ("legacyHmacSecret" in options || "secret" in options) {
-      this.legacyHmac = fetch(options, "legacyHmac", "SHA1");
+      this.legacyHmac = Object.hasOwn(options, "legacyHmac") ? options.legacyHmac : "SHA1";
 
       this.legacyHmacSecret = isTruthy(options["legacyHmacSecret"])
         ? options["legacyHmacSecret"]
         : options["secret"];
-      this.legacyHmacCoder = fetch(options, "legacyHmacCoder", new Cookie.Base64.Marshal());
+      this.legacyHmacCoder = Object.hasOwn(options, "legacyHmacCoder")
+        ? (options.legacyHmacCoder as Coder)
+        : new Cookie.Base64.Marshal();
     } else {
       this.legacyHmac = false;
     }

@@ -449,7 +449,8 @@ export function jobsWith(
     }
 
     if (queue != null && queue !== false) {
-      if (toS(queue) !== fetch(job, ":queue", jobClass.queueName)) return false;
+      if (toS(queue) !== (Object.hasOwn(job, ":queue") ? job[":queue"] : jobClass.queueName))
+        return false;
     }
 
     if (at != null && at !== false && job[":at"] != null && job[":at"] !== false) {

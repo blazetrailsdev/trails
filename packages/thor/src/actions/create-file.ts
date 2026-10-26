@@ -75,6 +75,7 @@ export class CreateFile extends EmptyDirectory {
     if (await this.isIdentical()) {
       this.sayStatus("identical", ":blue");
     } else {
+      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- base.options is a HashWithIndifferentAccess, which merge dispatches on
       const options = merge(this.base.options, this.config);
       await this.forceOrSkipOrConflict(options["force"], options["skip"], block);
     }

@@ -1,8 +1,6 @@
 import {
   ArgumentError,
   capitalize,
-  fetch,
-  hasKey,
   isEmpty,
   isSymbol,
   rbCNumeric,
@@ -41,8 +39,8 @@ export class Option extends Argument {
 
   protected override initialize(name: string | null, options: OptionOptions = {}): void {
     this.checkDefaultType = options.checkDefaultType ?? null;
-    if (!hasKey(options, "required")) options.required = false;
-    this.repeatable = fetch(options, "repeatable", false);
+    if (!("required" in options)) options.required = false;
+    this.repeatable = Object.hasOwn(options, "repeatable") ? options.repeatable : false;
     super.initialize(name, options);
     this.lazyDefault = options.lazyDefault ?? null;
     this.group = rtest(options.group) ? capitalize(rbObjAsString(options.group), []) : null;

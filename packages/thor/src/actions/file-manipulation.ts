@@ -1,6 +1,5 @@
 import {
   bytes,
-  fetch,
   File,
   FileUtils,
   getFs,
@@ -30,7 +29,7 @@ export async function chmod(
   this.sayStatus(
     "chmod",
     this.relativeToOriginalDestinationRoot(path),
-    fetch(config, "verbose", true),
+    Object.hasOwn(config, "verbose") ? config.verbose : true,
   );
   if (!rtest(this.options["pretend"])) {
     await FileUtils.chmodRAsync(mode, path);
@@ -90,13 +89,14 @@ export async function gsubFile(
   const block = typeof last(args) === "function" ? args.pop() : undefined;
   const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
 
-  if (!(this.behavior === "invoke" || rtest(fetch(config, "force", false)))) return;
+  if (!(this.behavior === "invoke" || rtest(Object.hasOwn(config, "force") ? config.force : false)))
+    return;
 
   path = File.expandPath(path, this.destinationRoot);
   this.sayStatus(
     "gsub",
     this.relativeToOriginalDestinationRoot(path),
-    fetch(config, "verbose", true),
+    Object.hasOwn(config, "verbose") ? config.verbose : true,
   );
 
   if (!rtest(this.options["pretend"])) {
@@ -139,7 +139,7 @@ export async function removeFile(
   this.sayStatus(
     "remove",
     this.relativeToOriginalDestinationRoot(path),
-    fetch(config, "verbose", true),
+    Object.hasOwn(config, "verbose") ? config.verbose : true,
   );
   if (
     !rtest(this.options["pretend"]) &&

@@ -1,7 +1,6 @@
 import type { RackHeaders } from "./index.js";
 import {
   ArgumentError,
-  hasKey,
   hashDelete,
   rbFSend,
   rbObjRespondTo,
@@ -396,7 +395,7 @@ export class Raw {
   }
 
   hasHeader(key: any): boolean {
-    return hasKey(this.headers, String(key));
+    return Object.hasOwn(this.headers, String(key));
   }
   getHeader(key: any): any {
     return this.headers[String(key)];

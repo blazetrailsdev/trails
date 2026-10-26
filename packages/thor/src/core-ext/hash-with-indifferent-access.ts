@@ -46,6 +46,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
 
   constructor(hash: AnyHash<V> = {}) {
     super();
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- hash may be a Hash, which eachPair dispatches on
     eachPair(hash as Record<string, V>, (key, value) => {
       this.set(this.convertKey(key), value);
     });
@@ -90,6 +91,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   mergeBang(other: AnyHash<V>): this {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- other may be a Hash, which eachPair dispatches on
     eachPair(other as Record<string, V>, (key, value) => {
       this.set(this.convertKey(key), value);
     });

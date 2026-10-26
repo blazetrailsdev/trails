@@ -2,7 +2,6 @@ import {
   ArgumentError,
   first,
   last,
-  hasKey,
   isEmpty,
   Range,
   rbModName,
@@ -56,7 +55,7 @@ export class Argument {
 
     this.name = rbObjAsString(name);
     this.description = options.desc ?? null;
-    this.required = hasKey(options, "required") ? options.required : true;
+    this.required = "required" in options ? options.required : true;
     this.type = type ?? "string";
     this.default = options.default ?? null;
     this.banner = rtest(options.banner) ? options.banner : this.defaultBanner();

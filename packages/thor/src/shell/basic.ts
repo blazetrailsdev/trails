@@ -1,6 +1,5 @@
 import {
   chomp,
-  fetch,
   Hash,
   isSymbol,
   matchOperator,
@@ -253,7 +252,9 @@ export class Basic {
     options: Record<string, unknown>,
   ): Promise<unknown> {
     const answerSet = options.limitedTo as unknown[];
-    const caseInsensitive = fetch(options, "caseInsensitive", false);
+    const caseInsensitive = Object.hasOwn(options, "caseInsensitive")
+      ? options.caseInsensitive
+      : false;
     let correctAnswer: unknown = null;
     while (!rtest(correctAnswer)) {
       const answers = answerSet.flat(Infinity).join(", ");
