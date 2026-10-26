@@ -4,7 +4,7 @@ import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
 import { Hash } from "./hash.js";
 import { IndexError } from "./index-error.js";
-import { eachCons, find, partition } from "./enumerable.js";
+import { eachCons, find, partition, sortBy } from "./enumerable.js";
 import { rbBigNorm, rbPlus } from "./numeric.js";
 import { NoMethodError } from "./no-method-error.js";
 import {
@@ -511,6 +511,19 @@ export function arySlice<T>(ary: readonly T[], arg: unknown, length?: unknown): 
 function subseq<T>(ary: readonly T[], beg: number, len: number): T[] | null {
   if (beg > ary.length || beg < 0 || len < 0) return null;
   return ary.slice(beg, beg + len);
+}
+
+/**
+ * Mirrors: Ruby's Array#sort_by! — `vendor/ruby/v3.3.11/array.c:3593`
+ * `rb_ary_sort_by_bang`, which replaces the receiver's elements with
+ * `sort_by`'s result and answers the receiver.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function sortByBang<T>(ary: T[], block: (item: T) => unknown): T[] {
+  const sorted = sortBy(ary, block);
+  ary.splice(0, ary.length, ...sorted);
+  return ary;
 }
 
 /**

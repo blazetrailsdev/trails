@@ -1,4 +1,5 @@
 import {
+  eachWithIndex,
   eachPair,
   extend,
   fetch,
@@ -2093,11 +2094,11 @@ export function buildJoinBuckets(
     }
   }
 
-  for (const [i, join] of joins.entries()) {
+  eachWithIndex(joins, (join, i) => {
     if (typeof join === "string" && !join.startsWith(":")) {
       joins[i] = new Nodes.StringJoin(Arel.sql(join.trim())) as Nodes.Join;
     }
-  }
+  });
 
   while (joins[0] instanceof Nodes.Join) {
     const joinNode = joins.shift() as Nodes.Join;

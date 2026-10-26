@@ -1,5 +1,6 @@
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import {
+  sortByBang,
   anybits,
   fetch,
   last,
@@ -623,9 +624,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const groupedFk: Array<Array<Record<string, unknown>>> = [
       ...groupBy(fkInfo.toArray(), (row) => row["id"]).values(),
     ];
-    for (const group of groupedFk) {
-      group.sort((a, b) => (a["seq"] as number) - (b["seq"] as number));
-    }
+    for (const group of groupedFk) sortByBang(group, (row) => row["seq"]);
     return groupedFk.map((group) => {
       const row = group[0];
       const options: Partial<AddForeignKeyOptions> = {

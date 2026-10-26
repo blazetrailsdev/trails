@@ -34,6 +34,7 @@ export {
   minBy,
   maxBy,
   eachWithObject,
+  eachWithIndex,
   sortBy,
   filterMap,
   groupBy,
@@ -228,6 +229,7 @@ export {
   uniq,
   unpack,
   unpack1,
+  sortByBang,
   ARRAY_METHOD_TABLE,
 } from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";

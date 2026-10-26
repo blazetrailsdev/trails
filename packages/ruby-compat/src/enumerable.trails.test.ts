@@ -4,6 +4,7 @@ import {
   AsyncEnumerable,
   Enumerable,
   eachCons,
+  eachWithIndex,
   eachSlice,
   maxBy,
   minBy,
@@ -101,6 +102,17 @@ describe("Enumerable over an each that answers a promise", () => {
 });
 
 describe("Enumerable", () => {
+  it("eachWithIndex yields each element with its count and answers the receiver", () => {
+    const seen: [string, number][] = [];
+    const ary = ["a", "b", "c"];
+    expect(eachWithIndex(ary, (i, n) => seen.push([i, n]))).toBe(ary);
+    expect(seen).toEqual([
+      ["a", 0],
+      ["b", 1],
+      ["c", 2],
+    ]);
+  });
+
   it("findAll keeps each element whose block result RTESTs", () => {
     expect(Enumerable.prototype.findAll.call(new Bag([1, null, 0, false, ""]), (i) => i)).toEqual([
       1,

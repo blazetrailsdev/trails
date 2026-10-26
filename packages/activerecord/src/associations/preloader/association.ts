@@ -1,5 +1,6 @@
 import { isPresent, wrap } from "@blazetrails/activesupport";
 import {
+  eachWithIndex,
   first,
   Hash,
   rbEqual,
@@ -179,14 +180,15 @@ export class Association {
       isPresent(r.readAttribute(associationKeyName)),
     )) {
       const owners = this.ownersByKey.get(this.deriveKey(record, this.associationKeyName));
-      owners?.forEach((owner, i) => {
-        const association = owner.association(this.reflection.name);
-        association.target = record;
+      if (owners)
+        eachWithIndex(owners, (owner, i) => {
+          const association = owner.association(this.reflection.name);
+          association.target = record;
 
-        if (i === 0) {
-          association.setInverseInstance(record);
-        }
-      });
+          if (i === 0) {
+            association.setInverseInstance(record);
+          }
+        });
     }
   }
 

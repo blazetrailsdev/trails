@@ -425,6 +425,26 @@ export function drop<T, E = unknown>(obj: Iterable<T> | Each<T, E>, n: number): 
 }
 
 /**
+ * Mirrors: Ruby's Enumerable#each_with_index — `vendor/ruby/v3.3.11/enum.c:2967`
+ * `enum_each_with_index`, yielding each element with its count
+ * (`each_with_index_i`, `:2930`) and answering the receiver.
+ * @noRailsEquivalent PERMANENT
+ */
+export function eachWithIndex<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T, n: number) => unknown,
+): Enumerated<E, Iterable<T> | Each<T, E>> {
+  let n = 0;
+  return rbBlockCall(
+    obj,
+    (i) => {
+      block(i, n++);
+    },
+    () => obj,
+  );
+}
+
+/**
  * Mirrors: Ruby's Enumerable#each_with_object — `vendor/ruby/v3.3.11/enum.c:3285`
  * `enum_each_with_object`, yielding each element with the memo
  * (`each_with_object_i`) and answering the memo.
