@@ -90,3 +90,4 @@ export class Process extends Record {
     return isPresent(this.supervisor_id);
   }
 }
+SolidQueue.Process = Process;
