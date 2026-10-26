@@ -104,6 +104,7 @@ async function waitWhileWithTimeout(timeout: number, block: () => boolean) {
 }
 
 describe("SolidQueue::RecurringTaskTest", () => {
+  let oldQueueAdapter: unknown;
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
 
   beforeAll(async () => {
@@ -111,6 +112,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
     const pool = RecurringTask.connectionPool();
     await pool.schemaReflection.loadAllBang(pool);
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    oldQueueAdapter = Base.queueAdapter;
     Base.setQueueAdapter(new SolidQueueAdapter());
     oldPermanentConnectionCheckout = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
@@ -126,6 +128,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
 
   afterAll(() => {
     setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
+    Base.setQueueAdapter(oldQueueAdapter);
   });
 
   async function enqueueAndAssertPerformedWithResult(task: RecurringTask, result: unknown) {
