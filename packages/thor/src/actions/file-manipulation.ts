@@ -9,6 +9,7 @@ import {
   hashDelete,
   last,
   rbFBinding,
+  rbObjAsString,
   rbObjIsKindOf,
   rbObjRespondTo,
   rbStrSend,
@@ -310,17 +311,17 @@ export class CapturableERB {
   setEoutvar(compiler: ERBCompiler, eoutvar: string = "_erbout"): void {
     compiler.bufvar = eoutvar;
     compiler.putCmd = `${eoutvar}.append`;
-    compiler.insertCmd = `((value) => ${eoutvar}.append(typeof value === "string" ? value : toS(value)))`;
+    compiler.insertCmd = `((value) => ${eoutvar}.append(rbObjAsString(value)))`;
     compiler.preCmd = `${eoutvar} = new StringIO();`;
     compiler.postCmd = ".string()";
   }
 
   /** @noRailsEquivalent PERMANENT */
   result(b: object): string {
-    return new Function("StringIO", "toS", `with (this) { ${this.#src} }`).call(
+    return new Function("StringIO", "rbObjAsString", `with (this) { ${this.#src} }`).call(
       b,
       StringIO,
-      toS,
+      rbObjAsString,
     ) as string;
   }
 }
