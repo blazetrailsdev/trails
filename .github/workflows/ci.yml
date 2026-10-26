@@ -2379,7 +2379,7 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Build dependency packages for trails introspection
-        run: pnpm --filter "@blazetrails/activerecord^..." build
+        run: pnpm exec tsc --build packages/activerecord
       - name: Run trails-side dump
         run: pnpm tsx scripts/parity/pipeline/run.ts --side=trails
       - uses: actions/upload-artifact@v4
@@ -2489,7 +2489,7 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Build activerecord and its workspace dependencies
-        run: pnpm --filter "@blazetrails/activerecord..." build
+        run: pnpm exec tsc --build packages/activerecord
       - name: Run trails-side query dump
         run: pnpm tsx scripts/parity/pipeline/run.ts --type=query --side=trails
       - uses: actions/upload-artifact@v4
