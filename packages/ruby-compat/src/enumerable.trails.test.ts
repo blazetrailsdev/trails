@@ -24,6 +24,7 @@ import {
   take,
   takeWhile,
 } from "./enumerable.js";
+import { Enumerator } from "./enumerator.js";
 import { Hash } from "./hash.js";
 import { include } from "./include.js";
 import { Rational } from "./rational.js";
@@ -496,8 +497,8 @@ describe("Enumerable free functions over any receiver", () => {
       expect(filterMap(build([0, 1, 2, 3]), (i) => (i === 1 ? false : i === 2 ? null : i))).toEqual(
         [0, 3],
       );
-      expect(eachSlice(build([1, 2, 3, 4, 5]), 2)).toEqual([[1, 2], [3, 4], [5]]);
-      expect(eachCons(build([1, 2, 3, 4]), 2)).toEqual([
+      expect(eachSlice(build([1, 2, 3, 4, 5]), 2).toA()).toEqual([[1, 2], [3, 4], [5]]);
+      expect(eachCons(build([1, 2, 3, 4]), 2).toA()).toEqual([
         [1, 2],
         [2, 3],
         [3, 4],
@@ -530,7 +531,7 @@ describe("Enumerable free functions over any receiver", () => {
     ]);
     expect(partition(map, ([, v]) => v > 1)).toEqual([[["b", 2]], [["a", 1]]]);
     expect(filterMap(map, ([k, v]) => v > 1 && k)).toEqual(["b"]);
-    expect(eachSlice(map, 1)).toEqual([[["a", 1]], [["b", 2]]]);
+    expect(eachSlice(map, 1).toA()).toEqual([[["a", 1]], [["b", 2]]]);
     expect([...groupBy(map, ([, v]) => v % 2)]).toEqual([
       [1, [["a", 1]]],
       [0, [["b", 2]]],
@@ -550,7 +551,9 @@ describe("Enumerable free functions over any receiver", () => {
       [3, 1],
     ]);
     expect(await filterMap(bag, (i) => (i as number) > 1 && i)).toEqual([2, 3]);
-    expect(await eachSlice(bag, 2)).toEqual([[1, 2], [3]]);
+    const slices: unknown[] = [];
+    expect(await eachSlice(bag, 2, (slice) => slices.push(slice))).toBe(bag);
+    expect(slices).toEqual([[1, 2], [3]]);
     expect(await first(bag)).toBe(1);
   });
 
@@ -592,13 +595,38 @@ describe("Enumerable free functions over any receiver", () => {
 });
 
 describe("new Enumerable(obj)", () => {
+  it("answers Symbol.asyncIterator over an each that answers a promise", async () => {
+    const e = new Enumerable({
+      each: async (block: (i: number) => void) => {
+        for (const i of [1, 2, 3]) {
+          await Promise.resolve();
+          block(i);
+        }
+      },
+    });
+    const seen: number[] = [];
+    for await (const i of e) seen.push(i);
+    expect(seen).toEqual([1, 2, 3]);
+  });
+
+  it("gives an includer no Symbol.asyncIterator", () => {
+    class Klass {
+      each(block: (i: number) => void) {
+        block(1);
+        return this;
+      }
+    }
+    include(Klass, Enumerable);
+    expect(Symbol.asyncIterator in Klass.prototype).toBe(false);
+  });
+
   it("wraps an Array", () => {
     const e = new Enumerable([1, 2, 3, 4]);
     expect(e.partition((i) => i % 2 === 0)).toEqual([
       [2, 4],
       [1, 3],
     ]);
-    expect(e.eachSlice(3)).toEqual([[1, 2, 3], [4]]);
+    expect((e.eachSlice(3) as Enumerator<number[]>).toA()).toEqual([[1, 2, 3], [4]]);
     expect([...e]).toEqual([1, 2, 3, 4]);
     expect(e.map((i) => i * 2)).toBeInstanceOf(Array);
   });
@@ -645,7 +673,10 @@ describe("new Enumerable(obj)", () => {
     expect(tally).toBeInstanceOf(Hash);
     expect(tally.get(1)).toBe(2);
     expect(new Enumerable(gen()).filterMap((i) => i > 1 && i * 10)).toEqual([20]);
-    expect(new Enumerable(gen()).eachSlice(2)).toEqual([[1, 2], [1]]);
+    expect((new Enumerable(gen()).eachSlice(2) as Enumerator<number[]>).toA()).toEqual([
+      [1, 2],
+      [1],
+    ]);
   });
 
   it("wraps an each-answerer", () => {
@@ -691,6 +722,35 @@ describe("minBy / maxBy / eachCons", () => {
     const seen: unknown[] = [];
     expect(eachCons(ary, 3, (w) => seen.push(w))).toBe(ary);
     expect(seen).toEqual([]);
+  });
+
+  it("answers a sized enumerator without a block", () => {
+    const minE = minBy([5, 15, 10]);
+    expect(minE).toBeInstanceOf(Enumerator);
+    expect(minE.size()).toBe(3);
+    expect(minE.each((i) => -(i as number))).toBe(15);
+    expect(maxBy(new Set([5, 15, 10])).each((i) => -(i as number))).toBe(5);
+    expect(minBy([4, 1, 3], 2).each((i) => i)).toEqual([1, 3]);
+    expect(maxBy([4, 1, 3], 2).size()).toBe(3);
+    expect(minBy((function* () {})()).size()).toBeNull();
+    expect(() => (minBy as (...argv: unknown[]) => unknown)([1], 1, 2)).toThrow(ArgumentError);
+    expect(() => (maxBy as (...argv: unknown[]) => unknown)([1], 1, 2)).toThrow(ArgumentError);
+    expect([...eachSlice(new Set([1, 2, 3]), 2)]).toEqual([[1, 2], [3]]);
+
+    const cons = eachCons([1, 2, 3, 4], 2);
+    expect(cons.size()).toBe(3);
+    expect(cons.toA()).toEqual([
+      [1, 2],
+      [2, 3],
+      [3, 4],
+    ]);
+    expect(eachCons([1, 2], 3).size()).toBe(0);
+    expect(() => eachCons([1, 2], 0)).toThrow(new ArgumentError("invalid size"));
+
+    const slices = eachSlice([1, 2, 3, 4, 5], 2);
+    expect(slices.size()).toBe(3);
+    expect(slices.toA()).toEqual([[1, 2], [3, 4], [5]]);
+    expect(eachSlice([], 2).size()).toBe(0);
   });
 });
 

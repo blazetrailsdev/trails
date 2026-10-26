@@ -19,7 +19,8 @@ import {
   rbIntegerTypeP,
   rbPlus,
 } from "./numeric.js";
-import { rbFSend } from "./object.js";
+import { rbCheckFuncall, rbFSend } from "./object.js";
+import { Enumerator } from "./enumerator.js";
 import { Rational } from "./rational.js";
 import { checkArity } from "./string/support.js";
 import { cmp, rbCmpint } from "./comparable.js";
@@ -544,14 +545,16 @@ export function sortBy<T, E = unknown>(
 /**
  * Mirrors: Ruby's Enumerable#each_slice — `vendor/ruby/v3.3.11/enum.c:3166` `enum_each_slice`,
  * yielding each full slice as it fills (`each_slice_i`, `:3102`) and the
- * remainder last, then answering the receiver. With no block it answers the
- * slices, the elements of its `RETURN_SIZED_ENUMERATOR`.
+ * remainder last, then answering the receiver. With no block it answers its
+ * `RETURN_SIZED_ENUMERATOR`, sized by `enum_each_slice_size` (`:3127`).
+ * The enumerator's receiver answers this method by name over `obj`, since
+ * `rbFSend` reaches no free function on an Array, Set or generator.
  * @noRailsEquivalent PERMANENT
  */
 export function eachSlice<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
   n: number,
-): Enumerated<E, T[][]>;
+): Enumerator<T[]>;
 /** @noRailsEquivalent PERMANENT */
 export function eachSlice<T, O extends Iterable<T> | Each<T, unknown>>(
   obj: O,
@@ -567,21 +570,33 @@ export function eachSlice<T, E = unknown>(
   const size = Math.trunc(n);
 
   if (size <= 0) throw new ArgumentError("invalid slice size");
-  const slices: T[][] = [];
-  const yieldSlice = block ?? ((slice: T[]) => slices.push(slice));
+  if (!block) {
+    return new Enumerator<T[]>(
+      { eachSlice: (n: number, block: (slice: T[]) => unknown) => eachSlice(obj, n, block) },
+      "eachSlice",
+      [n],
+      (n) => {
+        const sliceSize = Math.trunc(n as number);
+        if (sliceSize <= 0) throw new ArgumentError("invalid slice size");
+        const size = Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null);
+        if (size == null || size === Infinity) return size;
+        return Math.floor(((size as number) + sliceSize - 1) / sliceSize);
+      },
+    );
+  }
   let ary: T[] = [];
   return rbBlockCall(
     obj,
     (i) => {
       ary.push(i);
       if (ary.length === size) {
-        yieldSlice(ary);
+        block(ary);
         ary = [];
       }
     },
     () => {
-      if (ary.length > 0) yieldSlice(ary);
-      return block ? obj : slices;
+      if (ary.length > 0) block(ary);
+      return obj;
     },
   );
 }
@@ -591,8 +606,15 @@ export function eachSlice<T, E = unknown>(
  * keeping the first element whose block value compares lowest (`min_by_i`,
  * `:2630`) and answering `nil` for an empty receiver. With `n` it answers the
  * `n` elements with the lowest block values, in order (`rb_nmin_run`).
+ * The enumerator's receiver answers this method by name over `obj`, since
+ * `rbFSend` reaches no free function on an Array, Set or generator.
  * @noRailsEquivalent PERMANENT
  */
+export function minBy<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  n?: number | null,
+): Enumerator<T>;
+/** @noRailsEquivalent PERMANENT */
 export function minBy<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
   block: (i: T) => unknown,
@@ -605,8 +627,16 @@ export function minBy<T, E = unknown>(
 ): Enumerated<E, T[] | T | null>;
 /** @noRailsEquivalent PERMANENT */
 export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: unknown[]): unknown {
-  const block = argv.pop() as (i: T) => unknown;
+  const block = typeof argv.at(-1) === "function" ? (argv.pop() as (i: T) => unknown) : null;
   checkArity(argv.length, 0, 1);
+  if (!block) {
+    return new Enumerator<T>(
+      { minBy: (...argv: unknown[]) => (minBy as (...argv: unknown[]) => unknown)(obj, ...argv) },
+      "minBy",
+      argv,
+      () => (Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null)),
+    );
+  }
   const num = argv[0] as number | null | undefined;
   if (argv.length > 0 && num != null) {
     const size = Math.trunc(num);
@@ -651,6 +681,11 @@ export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
  */
 export function maxBy<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
+  n?: number | null,
+): Enumerator<T>;
+/** @noRailsEquivalent PERMANENT */
+export function maxBy<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
   block: (i: T) => unknown,
 ): Enumerated<E, T | null>;
 /** @noRailsEquivalent PERMANENT */
@@ -661,8 +696,16 @@ export function maxBy<T, E = unknown>(
 ): Enumerated<E, T[] | T | null>;
 /** @noRailsEquivalent PERMANENT */
 export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: unknown[]): unknown {
-  const block = argv.pop() as (i: T) => unknown;
+  const block = typeof argv.at(-1) === "function" ? (argv.pop() as (i: T) => unknown) : null;
   checkArity(argv.length, 0, 1);
+  if (!block) {
+    return new Enumerator<T>(
+      { maxBy: (...argv: unknown[]) => (maxBy as (...argv: unknown[]) => unknown)(obj, ...argv) },
+      "maxBy",
+      argv,
+      () => (Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null)),
+    );
+  }
   const num = argv[0] as number | null | undefined;
   if (argv.length > 0 && num != null) {
     const size = Math.trunc(num);
@@ -705,13 +748,12 @@ export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
  * which raises `ArgumentError "invalid size"` for a size that is not positive
  * and yields each window of `n` consecutive elements as it fills
  * (`each_cons_i`, `:3187`), answering the receiver. With no block it answers
- * the windows, the elements of its `RETURN_SIZED_ENUMERATOR`.
+ * its `RETURN_SIZED_ENUMERATOR`, sized by `enum_each_cons_size` (`:3209`).
+ * The enumerator's receiver answers this method by name over `obj`, since
+ * `rbFSend` reaches no free function on an Array, Set or generator.
  * @noRailsEquivalent PERMANENT
  */
-export function eachCons<T, E = unknown>(
-  obj: Iterable<T> | Each<T, E>,
-  n: number,
-): Enumerated<E, T[][]>;
+export function eachCons<T, E = unknown>(obj: Iterable<T> | Each<T, E>, n: number): Enumerator<T[]>;
 /** @noRailsEquivalent PERMANENT */
 export function eachCons<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
@@ -727,17 +769,29 @@ export function eachCons<T, E = unknown>(
   const size = Math.trunc(n);
 
   if (size <= 0) throw new ArgumentError("invalid size");
-  const windows: T[][] = [];
-  const yieldCons = block ?? ((cons: T[]) => windows.push(cons));
+  if (!block) {
+    return new Enumerator<T[]>(
+      { eachCons: (n: number, block: (cons: T[]) => unknown) => eachCons(obj, n, block) },
+      "eachCons",
+      [n],
+      (n) => {
+        const consSize = Math.trunc(n as number);
+        if (consSize <= 0) throw new ArgumentError("invalid size");
+        const size = Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null);
+        if (size == null) return null;
+        return Math.max((size as number) + 1 - consSize, 0);
+      },
+    );
+  }
   const ary: T[] = [];
   return rbBlockCall(
     obj,
     (i) => {
       if (ary.length === size) ary.shift();
       ary.push(i);
-      if (ary.length === size) yieldCons([...ary]);
+      if (ary.length === size) block([...ary]);
     },
-    () => (block ? obj : windows),
+    () => obj,
   );
 }
 
@@ -1177,6 +1231,11 @@ export class Enumerable<T = unknown, E = unknown> {
         }
         for (const i of obj as Iterable<T>) block(i);
         return obj as unknown as E;
+      },
+    });
+    Object.defineProperty(this, Symbol.asyncIterator, {
+      value: async function* (this: Each<T, E>): AsyncGenerator<T> {
+        yield* (await enumToA(this)) as T[];
       },
     });
   }

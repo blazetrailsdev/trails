@@ -68,7 +68,7 @@ export class AssociationScope {
       binds.push(owner.constructor.polymorphicName());
     }
 
-    eachCons(chain as AssociationReflection[], 2).forEach(([reflection, nextReflection]) => {
+    eachCons(chain as AssociationReflection[], 2, ([reflection, nextReflection]) => {
       if (reflection.type) {
         binds.push(nextReflection.klass.polymorphicName());
       }
