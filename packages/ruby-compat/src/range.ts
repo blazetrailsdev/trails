@@ -14,6 +14,7 @@ import { cmp, rbCmpint } from "./comparable.js";
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
 import { rbInspect } from "./object.js";
+import { rubyNumIntervalStepSize } from "./numeric.js";
 
 const inspectRecursing = new Set<object>();
 
@@ -92,6 +93,24 @@ export class Range<T = unknown> {
      */
     readonly excludeEnd: boolean = false,
   ) {}
+
+  /**
+   * @noRailsEquivalent PERMANENT — core Ruby `Range#size`
+   * (`vendor/ruby/v3.3.11/range.c:836` `range_size`), over
+   * `ruby_num_interval_step_size` (`numeric.c:2798`) with a step of 1.
+   */
+  size(): number | bigint | null {
+    const b = this.begin;
+    const e = this.end;
+    if (typeof b === "number" || typeof b === "bigint") {
+      if (typeof e === "number" || typeof e === "bigint")
+        return rubyNumIntervalStepSize(b, e, this.excludeEnd);
+      if (e === null) return Infinity;
+    } else if (b === null) {
+      if (typeof e === "number" || typeof e === "bigint") return Infinity;
+    }
+    return null;
+  }
 
   /** Raises before any other check on a beginless range, as Ruby does
    *  (`vendor/ruby/v3.3.11/range.c:1243` `range_first`). */

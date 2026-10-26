@@ -34,7 +34,7 @@ class Connection extends ConnectionBase {
     this.id = (this.request.params["id"] as string | undefined) ?? SecureRandom.hex(4);
   }
 }
-Connection.identifiedBy("id");
+(Connection as unknown as { identifiedBy(...ids: string[]): void }).identifiedBy("id");
 rbModConstSet(ClientTest, "Connection", Connection);
 
 class EchoChannel extends ChannelBase {
@@ -42,7 +42,7 @@ class EchoChannel extends ChannelBase {
     return this.streamFrom("global");
   }
 
-  override unsubscribed(): unknown {
+  protected override unsubscribed(): unknown {
     return "Goodbye from EchoChannel!";
   }
 
@@ -382,7 +382,7 @@ describe("ClientTest", () => {
       ).subscriptions.subscriptions;
       expect(Object.keys(subscriptions).length, "Missing EchoChannel subscription").not.toBe(0);
       const channel = Object.values(subscriptions)[0];
-      await assertCalled(channel, "unsubscribed", null, {}, async () => {
+      await assertCalled(channel, "unsubscribed" as never, null, {}, async () => {
         await c.close();
         await sleep(0.1);
       });

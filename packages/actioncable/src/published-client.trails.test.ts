@@ -21,7 +21,7 @@ class Connection extends ConnectionBase {
     this.id = this.request.params["id"] as string;
   }
 }
-Connection.identifiedBy("id");
+(Connection as unknown as { identifiedBy(...ids: string[]): void }).identifiedBy("id");
 
 class EchoChannel extends ChannelBase {
   protected override subscribed(): unknown {

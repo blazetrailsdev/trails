@@ -28,7 +28,6 @@ import { NoMethodError } from "./no-method-error.js";
 import { isRegisteredConstant, registeredConstant } from "./variable.js";
 import { temporalTag } from "./temporal-tag.js";
 import { classModule } from "./class-module.js";
-import { markModuleObject } from "./classpath.js";
 export { classModule };
 import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
@@ -47,7 +46,6 @@ import {
   rbAnyToS,
   rbCBasicObject,
   rbCClass,
-  rbClassSuperclass,
   rbCDate,
   rbCNumeric,
   rbCInteger,
@@ -79,7 +77,6 @@ type ModuleHooks = {
   [included]?: (klass: unknown) => void;
   [extended]?: (klass: unknown) => void;
   [prepended]?: (klass: unknown) => void;
-  [initialize]?: (this: object, ...args: never[]) => void | Generator;
 };
 
 /**
@@ -542,10 +539,6 @@ export class Module<I extends object = Record<never, never>> {
       else splicePlainModule(prependOrigins.get(base.prototype as object) ?? base.prototype, mod);
     }
     trackIncludedModule(base.prototype, this);
-    const instanceInitializer = (this as ModuleHooks)[initialize];
-    if (typeof instanceInitializer === "function") {
-      trackInstanceInitializer(base.prototype, instanceInitializer);
-    }
     const proto = prependOrigins.get(base.prototype as object) ?? (base.prototype as object);
     const link = Object.create(Object.getPrototypeOf(proto)) as object;
     Object.defineProperties(link, Object.getOwnPropertyDescriptors(carrierOf(this)));
@@ -582,10 +575,6 @@ export class Module<I extends object = Record<never, never>> {
   prependFeatures(base: AnyClass): void {
     rbClearMethodCache();
     trackIncludedModule(base.prototype, this);
-    const instanceInitializer = (this as ModuleHooks)[initialize];
-    if (typeof instanceInitializer === "function") {
-      trackInstanceInitializer(base.prototype, instanceInitializer, prependedInstanceInitializers);
-    }
     const proto = base.prototype as object;
     const source = carrierOf(this);
     let origin = prependOrigins.get(proto);
@@ -949,175 +938,6 @@ export const extended = Symbol.for("@blazetrails/ruby-compat:extended");
  * hook, which the language has no equivalent of.
  */
 export const prepended = Symbol.for("@blazetrails/ruby-compat:prepended");
-
-/**
- * Symbol key for a module's `initialize`, the per-instance half of Ruby's
- * `include`. `rb_include_module` (vendor/ruby/v3.3.11/class.c:1179) splices the module
- * into the lookup chain, so a module that defines `initialize` and calls
- * `super` runs against every new instance of the including class — which is
- * how `ActiveRecord::Railties::ControllerRuntime#initialize`
- * (activerecord/lib/active_record/railties/controller_runtime.rb:26-29) seats
- * `db_runtime` on each controller.
- *
- * JavaScript has no construction hook a mixin can splice into, so the class at
- * the bottom of the chain calls `initializeIncludedModules(this)` where Ruby's
- * `initialize` calls `super`. Every root whose Ruby `initialize` carries such a
- * `super` does so: `ActionController::Metal` (`metal.rb:210-217`),
- * `ActiveModel::API` (`api.rb:80-85`, which `ActiveRecord::Base`'s constructor
- * reaches through its own `super` at `core.rb:477`), and `ActionView::Base`
- * (`base.rb:244-259`). `AbstractController::Base` defines no `initialize`
- * (`abstract_controller/base.rb`), so it has no `super` site to hook and a
- * mixin included there is seated by whichever subclass root does.
- *
- * A class module's generator `initialize`, included into a class that has a
- * superclass, is instead spliced between that class and its superclass, where
- * `rb_include_module` puts the module: a `super(...)` call, and the implicit
- * one of a class that declares no constructor, resolves its target through the
- * class's prototype when it runs. So `ActiveRecord::Type::Internal::Timezone#initialize`
- * (activerecord/lib/active_record/type/internal/timezone.rb:7-10) wraps its
- * includer's construction. The value the generator yields is the argument list
- * of an explicit `super(...)`, and a bare `yield` forwards the arguments it was
- * called with. A constructor has no `this` until its `super(...)` returns, so
- * the code before the `yield` runs once with `this` undefined, to read those
- * arguments, and the whole body then runs against the instance: that code may
- * only compute the arguments, and one that raises, or a superclass
- * constructor that does, leaves the code after the `yield` unrun. A `Module`'s
- * `initialize` that writes to `self` ahead of `super` (thor/actions.rb:72-85)
- * therefore stays on the root's `super` site.
- *
- * Symbol-keyed for the same reason `included` is: `initialize` is a Ruby
- * lifecycle name, and a string-named TS method spelled that way is drift.
- *
- * @noRailsEquivalent PERMANENT — the TypeScript spelling of a Ruby lifecycle
- * hook, which the language has no equivalent of.
- */
-export const initialize = Symbol.for("@blazetrails/ruby-compat:initialize");
-
-const instanceInitializers = Symbol.for("@blazetrails/ruby-compat:instanceInitializers");
-
-const prependedInstanceInitializers = Symbol.for(
-  "@blazetrails/ruby-compat:prependedInstanceInitializers",
-);
-
-/**
- * Run the `initialize` of every module included into `instance`'s class, in
- * include order — the order Ruby unwinds the `super` chain in, since a module
- * included later sits higher in the ancestry and so completes last. A module
- * already in the ancestry contributes one initializer, not two, because
- * `include_modules_at` skips a module whose method table it finds in the
- * superclass chain (vendor/ruby/v3.3.11/class.c:1281,1291,1296).
- *
- * `args` are the arguments a bare `super` forwards
- * (vendor/ruby/v3.3.11/vm_insnhelper.c:5620 `rb_vm_invokesuper`), which is how
- * `Thor::Shell#initialize(args, options, config)` (thor/shell.rb:44-48) reads
- * `config[:shell]`.
- *
- * An `initialize` that runs code before its `super`, as
- * `Thor::Actions#initialize` does (thor/actions.rb:72-85), is a generator
- * function whose `yield` stands where Ruby's `super` does: the code before the
- * `yield` runs before every initializer beneath it, the code after it once
- * they have completed. One that raises closes the generators above it, so an
- * `ensure` around `super` (a `finally` around the `yield`) runs and the code
- * after the `yield` does not. Only a synchronous generator function is read
- * this way: a constructor cannot await, so an async one is never resumed.
- *
- * Mirrors: the `super` call in a class whose ancestry carries module
- * `initialize` definitions — vendor/ruby/v3.3.11/class.c:1179 `rb_include_module`.
- *
- * @noRailsEquivalent PERMANENT — Ruby reaches these through `super`;
- * JavaScript has no construction hook a mixin can splice into.
- */
-export function initializeIncludedModules(instance: object, ...args: unknown[]): void {
-  const chain: Array<Array<(this: object, ...args: unknown[]) => void>> = [];
-  for (
-    let proto: object | null = Object.getPrototypeOf(instance) as object | null;
-    proto;
-    proto = Object.getPrototypeOf(proto) as object | null
-  ) {
-    const level: Array<(this: object, ...args: unknown[]) => void> = [];
-    for (const registry of [instanceInitializers, prependedInstanceInitializers]) {
-      if (!Object.hasOwn(proto, registry)) continue;
-      level.push(
-        ...((proto as Record<symbol, unknown>)[registry] as Array<
-          (this: object, ...args: unknown[]) => void
-        >),
-      );
-    }
-    if (level.length !== 0) chain.unshift(level);
-    if (Object.hasOwn(proto, delegateClass)) break;
-  }
-  const initializers = chain.flat();
-  const unwind = (index: number): void => {
-    if (index < 0) return;
-    const initializer = initializers[index];
-    if (Object.getPrototypeOf(initializer) === GeneratorFunction) {
-      const body = initializer.call(instance, ...args) as unknown as Generator;
-      body.next();
-      try {
-        unwind(index - 1);
-      } catch (error) {
-        body.return(undefined);
-        throw error;
-      }
-      if (body.next().done !== true) {
-        body.return(undefined);
-        throw new TypeError("an initialize generator yields once, where Ruby calls super");
-      }
-    } else {
-      unwind(index - 1);
-      initializer.call(instance, ...args);
-    }
-  };
-  unwind(initializers.length - 1);
-}
-
-const GeneratorFunction = Object.getPrototypeOf(function* () {}) as object;
-
-function trackInstanceInitializer(
-  proto: object,
-  initializer: (this: object, ...args: never[]) => void,
-  registry: symbol = instanceInitializers,
-): void {
-  let list = (proto as Record<symbol, unknown>)[registry] as
-    | Array<(this: object, ...args: never[]) => void>
-    | undefined;
-  if (!Object.hasOwn(proto, registry)) {
-    list = [];
-    Object.defineProperty(proto, registry, {
-      value: list,
-      writable: true,
-      configurable: true,
-      enumerable: false,
-    });
-  }
-  list!.push(initializer);
-}
-
-function spliceInstanceInitializer(
-  klass: AnyClass,
-  mod: object,
-  initializer: (this: object, ...args: never[]) => void | Generator,
-): void {
-  const superclass = Object.getPrototypeOf(klass) as new (...args: unknown[]) => object;
-  const link = class extends superclass {
-    constructor(...args: unknown[]) {
-      const zsuper = (
-        initializer.call(undefined as never, ...(args as never[])) as Generator<
-          unknown[] | undefined
-        >
-      ).next();
-      super(...(zsuper.done !== true && zsuper.value !== undefined ? zsuper.value : args));
-      const body = initializer.call(this, ...(args as never[])) as Generator;
-      body.next();
-      if (body.next().done !== true) {
-        body.return(undefined);
-        throw new TypeError("an initialize generator yields once, where Ruby calls super");
-      }
-    }
-  };
-  Object.defineProperty(link, T_ICLASS, { value: mod });
-  Object.setPrototypeOf(klass, link);
-}
 
 const includedKeys = Symbol.for("@blazetrails/ruby-compat:includedKeys");
 
@@ -1640,12 +1460,6 @@ type CallableMethods<M extends object> = {
 
 export type Included<M extends object> = CallableMethods<M extends Module<infer I> ? I : M>;
 
-/** @noRailsEquivalent PERMANENT */
-export type Initialized<K extends abstract new (...args: never[]) => object, M> = (new (
-  ...args: M extends { [initialize]: (...args: infer A) => unknown } ? A : never
-) => InstanceType<K>) &
-  Pick<K, keyof K>;
-
 function isClass(klass: object): klass is AnyClass {
   return typeof klass === "function";
 }
@@ -1675,8 +1489,6 @@ function featureHook(mod: unknown, name: string): ((base: unknown) => void) | un
  * uses but does not define.
  */
 export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
-  if (!isClassReceiver(klass)) markModuleObject(klass);
-  markModuleObject(mod);
   const appendFeatures = featureHook(mod, "appendFeatures");
   if (appendFeatures) {
     appendFeatures(klass);
@@ -1735,18 +1547,6 @@ export function rbModAppendFeatures(
     }
   }
   trackIncludedModule(klass.prototype, mod);
-  const instanceInitializer = (mod as ModuleHooks)[initialize];
-  if (typeof instanceInitializer === "function") {
-    if (
-      typeof mod === "function" &&
-      Object.getPrototypeOf(instanceInitializer) === GeneratorFunction &&
-      rbClassSuperclass(klass) !== null
-    ) {
-      spliceInstanceInitializer(klass, mod, instanceInitializer);
-    } else {
-      trackInstanceInitializer(klass.prototype, instanceInitializer);
-    }
-  }
   const descriptors: PropertyDescriptorMap = {};
   const installed = trackedKeys(klass.prototype);
 
@@ -2123,10 +1923,7 @@ function initCopyHook(
  * The method it replaces is seated under the module method's super slot, so
  * the module reaches it with {@link rbCallSuper}, as Ruby's `super` does.
  *
- * A prepended module carries the same per-instance `initialize` an included one
- * does, since Ruby reaches both through the same `super` chain — but it sits
- * ABOVE the class, so its post-`super` body completes after every included
- * module's. A module whose method table is already in the ancestry is skipped
+ * A module whose method table is already in the ancestry is skipped
  * whole, the way `include_modules_at` skips one
  * (vendor/ruby/v3.3.11/class.c:1281,1291,1296).
  *
@@ -2141,8 +1938,6 @@ export function prepend(
   mod: ModuleObject | AnyClass | Module,
 ): void {
   const klass = target as AnyClass;
-  if (!isClassReceiver(klass)) markModuleObject(klass);
-  markModuleObject(mod);
   const prependFeatures = featureHook(mod, "prependFeatures");
   if (prependFeatures) {
     prependFeatures(klass);
@@ -2179,10 +1974,6 @@ export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyCla
     }
   }
   trackIncludedModule(klass.prototype, mod);
-  const instanceInitializer = (mod as ModuleHooks)[initialize];
-  if (typeof instanceInitializer === "function") {
-    trackInstanceInitializer(klass.prototype, instanceInitializer, prependedInstanceInitializers);
-  }
   const source = typeof mod === "function" ? (mod as AnyClass).prototype : mod;
   const seated: PropertyDescriptorMap = {};
   for (const key of Object.getOwnPropertyNames(source)) {
@@ -2249,7 +2040,6 @@ export function extend<T extends AnyClass | object>(
 }
 
 function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
-  markModuleObject(mod);
   const extendedHook = featureHook(mod, "extended");
   if (extendedHook) {
     extendedHook(klass);

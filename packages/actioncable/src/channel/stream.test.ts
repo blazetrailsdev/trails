@@ -21,10 +21,6 @@ const StreamTests = { name: "ActionCable::StreamTests" };
 rbModConstSet(ActionCable, "StreamTests", StreamTests);
 
 class Connection extends ConnectionBase {
-  override get websocket(): WebSocket {
-    return super.websocket;
-  }
-
   override sendAsync(method: string, ...args: unknown[]): unknown {
     return (this as unknown as Record<string, (...a: unknown[]) => unknown>)[method](...args);
   }
@@ -155,7 +151,7 @@ describe("StreamTest", () => {
       channel.streamFor(new Room(1));
       await tc.waitForAsync();
 
-      const pubsubCall = (rbObjClass(channel.pubsub) as typeof SuccessAdapter).subscribeCalled;
+      const pubsubCall = (rbObjClass(connection.pubsub) as typeof SuccessAdapter).subscribeCalled;
 
       expect(pubsubCall.channel).toBe("action_cable:stream_tests:chat:Room#1-Campfire");
       expect(pubsubCall.callback).toBeInstanceOf(Function);
@@ -172,7 +168,7 @@ describe("StreamTest", () => {
       channel.streamOrRejectFor(new Room(1));
       await tc.waitForAsync();
 
-      const pubsubCall = (rbObjClass(channel.pubsub) as typeof SuccessAdapter).subscribeCalled;
+      const pubsubCall = (rbObjClass(connection.pubsub) as typeof SuccessAdapter).subscribeCalled;
 
       expect(pubsubCall.channel).toBe("action_cable:stream_tests:chat:Room#1-Campfire");
       expect(pubsubCall.callback).toBeInstanceOf(Function);
@@ -370,7 +366,7 @@ describe("StreamFromTest", () => {
   });
 
   function websocketOf(connection: Connection): WebSocket {
-    return connection.websocket;
+    return (connection as unknown as { websocket: WebSocket }).websocket;
   }
 
   it("custom encoder", async () => {

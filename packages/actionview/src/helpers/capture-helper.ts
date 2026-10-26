@@ -1,4 +1,3 @@
-import { defineModule } from "@blazetrails/ruby-compat";
 import { SafeBuffer, htmlEscape, isPresent, presence } from "@blazetrails/activesupport";
 
 import { OutputBuffer } from "../buffers.js";
@@ -125,10 +124,10 @@ export function withOutputBuffer(
   }
 }
 
-export const CaptureHelper = defineModule({
+export const CaptureHelper = {
   capture,
   contentFor,
   provide,
   isContentFor,
   withOutputBuffer,
-});
+};

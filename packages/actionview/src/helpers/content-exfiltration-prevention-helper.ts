@@ -1,4 +1,3 @@
-import { defineModule } from "@blazetrails/ruby-compat";
 import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
 
 export let prependContentExfiltrationPrevention: boolean = false;
@@ -27,6 +26,6 @@ export function preventContentExfiltration(html: SafeBuffer): SafeBuffer {
   }
 }
 
-export const ContentExfiltrationPreventionHelper = defineModule({
+export const ContentExfiltrationPreventionHelper = {
   preventContentExfiltration,
-});
+};

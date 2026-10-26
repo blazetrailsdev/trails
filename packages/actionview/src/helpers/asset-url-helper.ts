@@ -1,5 +1,5 @@
 import { isBlank } from "@blazetrails/activesupport";
-import { ArgumentError, Zlib, defineModule } from "@blazetrails/ruby-compat";
+import { ArgumentError, Zlib } from "@blazetrails/ruby-compat";
 
 export const URI_REGEXP = /^[-a-z]+:\/\/|^(?:cid|data):|^\/\//i;
 
@@ -289,7 +289,7 @@ export function fontUrl(
 
 export const urlToFont = fontUrl;
 
-export const AssetUrlHelper = defineModule({
+export const AssetUrlHelper = {
   assetPath,
   pathToAsset,
   assetUrl,
@@ -322,4 +322,4 @@ export const AssetUrlHelper = defineModule({
   pathToFont,
   fontUrl,
   urlToFont,
-});
+};

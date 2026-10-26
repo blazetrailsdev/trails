@@ -11,10 +11,6 @@ import type { WebSocket } from "./web-socket.js";
 import type { MessageBuffer } from "./message-buffer.js";
 
 class Connection extends Base {
-  override get websocket(): WebSocket {
-    return super.websocket;
-  }
-
   connected?: boolean;
 
   connect(): void {
@@ -64,10 +60,12 @@ describe("ActionCable::Connection::BaseTest", () => {
       const connection = openConnection();
       connection.process();
 
-      expect(connection.websocket.isPossible()).toBeRubyTruthy();
+      expect(
+        (connection as unknown as { websocket: WebSocket }).websocket.isPossible(),
+      ).toBeRubyTruthy();
 
       await tc.waitForAsync();
-      expect(connection.websocket.isAlive()).toBeTruthy();
+      expect((connection as unknown as { websocket: WebSocket }).websocket.isAlive()).toBeTruthy();
     });
   });
 
@@ -85,7 +83,7 @@ describe("ActionCable::Connection::BaseTest", () => {
       const connection = openConnection();
 
       await tc.assertCalledWith(
-        connection.websocket,
+        (connection as unknown as { websocket: WebSocket }).websocket,
         "transmit",
         [ActiveSupportJSON.encode({ type: "welcome" })],
         {},
@@ -143,9 +141,15 @@ describe("ActionCable::Connection::BaseTest", () => {
       const connection = openConnection();
       connection.process();
 
-      await tc.assertCalled(connection.websocket, "close", null, {}, () => {
-        connection.close({ reason: "testing" });
-      });
+      await tc.assertCalled(
+        (connection as unknown as { websocket: WebSocket }).websocket,
+        "close",
+        null,
+        {},
+        () => {
+          connection.close({ reason: "testing" });
+        },
+      );
     });
   });
 

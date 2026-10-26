@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 import { Range } from "./range.js";
-import { defineModule, extend, include, rbObjIsKindOf } from "./include.js";
-import { Hash } from "./hash.js";
+import { defineModule } from "./include.js";
 import { stringSuperclass } from "./string/method-table.js";
 
 describe("rbEqual over the values a Ruby binary String stands in for", () => {
@@ -90,17 +89,6 @@ describe("rbEqual over a plain-object module", () => {
     expect(rbEqual(a, b)).toBe(false);
     expect(rbEql(a, b)).toBe(false);
     expect(rbEqual(a, a)).toBe(true);
-  });
-
-  it("answers identity for object-literal modules marked by extend and include", () => {
-    const greet = (): string => "hi";
-    const a = { greet };
-    const b = { greet };
-    extend({}, a);
-    include(class {}, b);
-    expect(rbEqual(a, b)).toBe(false);
-    expect(rbEql(a, b)).toBe(false);
-    expect(rbObjIsKindOf(a, Hash)).toBe(false);
   });
 });
 

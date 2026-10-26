@@ -1,4 +1,3 @@
-import { defineModule } from "@blazetrails/ruby-compat";
 import type { Rational } from "@blazetrails/ruby-compat";
 import {
   NumberHelper as ActiveSupportNumberHelper,
@@ -140,7 +139,7 @@ export function parseFloat(number: unknown, raiseError: boolean): number | null 
   return null;
 }
 
-export const NumberHelper = defineModule({
+export const NumberHelper = {
   numberToPhone,
   numberToCurrency,
   numberToPercentage,
@@ -154,4 +153,4 @@ export const NumberHelper = defineModule({
   wrapWithOutputSafetyHandling,
   validFloat,
   parseFloat,
-});
+};

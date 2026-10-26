@@ -1,5 +1,5 @@
 import type { SafeBuffer } from "@blazetrails/activesupport";
-import { isSymbol, defineModule } from "@blazetrails/ruby-compat";
+import { isSymbol } from "@blazetrails/ruby-compat";
 import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
@@ -21,4 +21,4 @@ export function _layoutFor(
   }
 }
 
-export const RenderingHelper = defineModule({ _layoutFor });
+export const RenderingHelper = { _layoutFor };

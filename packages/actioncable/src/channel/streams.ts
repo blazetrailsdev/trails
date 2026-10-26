@@ -26,7 +26,7 @@ interface StreamsConnection {
   pubsub: PubSub;
 }
 
-export interface StreamsChannel {
+interface StreamsChannel {
   connection: StreamsConnection;
   logger: { info(message: string): unknown };
   _streams?: Record<string, Handler>;
@@ -200,19 +200,12 @@ function identityHandler(): Handler {
 }
 
 export const Streams = defineModule(
+  { streamFrom, streamFor, stopStreamFrom, stopStreamFor, stopAllStreams, streamOrRejectFor },
+  {},
   {
-    streamFrom,
-    streamFor,
-    stopStreamFrom,
-    stopStreamFor,
-    stopAllStreams,
-    streamOrRejectFor,
     get pubsub(): PubSub {
       return (this as unknown as StreamsChannel).connection.pubsub;
     },
-  },
-  {},
-  {
     get streams(): Record<string, Handler> {
       return ((this as unknown as StreamsChannel)._streams ??= {});
     },

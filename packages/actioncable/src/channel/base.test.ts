@@ -18,6 +18,9 @@ import { Base } from "./base.js";
 type Data = Record<string, unknown>;
 
 interface ChannelHost {
+  afterSubscribe(...methods: unknown[]): void;
+  afterUnsubscribe(...methods: unknown[]): void;
+  rescueFrom(...args: unknown[]): void;
   methodAdded(name: string): void;
 }
 
@@ -45,9 +48,10 @@ class ChatChannel extends BasicChannel {
   }
 
   static {
-    this.afterSubscribe(":toggleSubscribed");
-    this.afterUnsubscribe(":toggleSubscribed");
-    this.rescueFrom(SomeCustomError, { with: ":errorHandler" });
+    const host = this as unknown as ChannelHost;
+    host.afterSubscribe(":toggleSubscribed");
+    host.afterUnsubscribe(":toggleSubscribed");
+    host.rescueFrom(SomeCustomError, { with: ":errorHandler" });
   }
 
   constructor(connection: TestConnection, identifier: string, params: Data = {}) {

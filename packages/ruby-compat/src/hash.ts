@@ -582,17 +582,6 @@ export function eachPair<T>(
 }
 
 /**
- * Ruby `Hash#inspect` (`vendor/ruby/v3.3.11/hash.c:3483` `rb_hash_inspect`): `"{}"` for
- * an empty hash, and otherwise `inspect_hash` (`hash.c:3459`) wrapping the
- * `inspect_i` (`hash.c:3439`) pairs — each `rb_inspect(key)`, `"=>"`,
- * `rb_inspect(value)`, joined by `", "`.
- * @noRailsEquivalent PERMANENT — Ruby core `Hash#inspect` (`vendor/ruby/v3.3.11/hash.c:3483`).
- */
-export function inspect(hash: Record<string, unknown> | Map<unknown, unknown>): string {
-  return rbInspect(hash);
-}
-
-/**
  * Ruby `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060` `rb_hash_each_value`):
  * yields each value alone and returns the receiver.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
@@ -921,9 +910,11 @@ export function valuesAt(
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#size` (`vendor/ruby/v3.3.11/hash.c:3002`).
  */
 export function size(
-  hash: Record<string, unknown> | Map<unknown, unknown> | readonly unknown[],
+  hash: Record<string, unknown> | Map<unknown, unknown> | readonly unknown[] | object,
 ): number {
-  if (hash instanceof Map) return hash.size;
+  const own = ownMethod(hash, "size");
+  if (own) return own.call(hash) as number;
+  if (hash instanceof Map || hash instanceof Set) return hash.size;
   if (Array.isArray(hash)) return hash.length;
   return Object.keys(hash).length;
 }
@@ -1138,7 +1129,7 @@ export class Hash<K, V> extends Map<K, V> {
    */
   private modifyCheck(): void {
     if (this.#frozen) {
-      throw new FrozenError(`can't modify frozen ${this.constructor.name}: ${inspect(this)}`, {
+      throw new FrozenError(`can't modify frozen ${this.constructor.name}: ${rbInspect(this)}`, {
         receiver: this,
       });
     }

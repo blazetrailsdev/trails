@@ -1,4 +1,3 @@
-import { defineModule } from "@blazetrails/ruby-compat";
 import { SafeBuffer, htmlSafe, isPlainObject } from "@blazetrails/activesupport";
 
 import { capture } from "./capture-helper.js";
@@ -67,9 +66,9 @@ export function javascriptTag(
   return contentTag.call(this, "script", javascriptCdataSection(content), htmlOptions);
 }
 
-export const JavaScriptHelper = defineModule({
+export const JavaScriptHelper = {
   escapeJavascript,
   j,
   javascriptCdataSection,
   javascriptTag,
-});
+};

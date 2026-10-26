@@ -10,7 +10,7 @@ import {
   extend,
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
-import { chomp, fetch, regexpEscape, include, defineModule } from "@blazetrails/ruby-compat";
+import { chomp, fetch, regexpEscape, include } from "@blazetrails/ruby-compat";
 import { TagHelper, contentTag, type TagHelperHost } from "./tag-helper.js";
 import { SanitizeHelper, sanitize } from "./sanitize-helper.js";
 import { OutputSafetyHelper, raw } from "./output-safety-helper.js";
@@ -374,7 +374,7 @@ function splitParagraphs(text: string): string[] {
     .map((t) => t.replace(/([^\n]\n)(?=[^\n])/g, "$1<br />"));
 }
 
-export const TextHelper = defineModule({
+export const TextHelper = {
   concat,
   safeConcat,
   truncate,
@@ -386,7 +386,7 @@ export const TextHelper = defineModule({
   cycle,
   currentCycle,
   resetCycle,
-});
+};
 
 extend(TextHelper, Concern);
 include(TextHelper, SanitizeHelper);
