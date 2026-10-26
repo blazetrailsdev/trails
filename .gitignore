@@ -70,3 +70,7 @@ packages/thor/src/test-helpers/sandbox/
 
 # Trails application logs (log/<env>.log), written by apps booted in tests
 log/
+
+# precompiled generator templates (trails-tsc-views build-templates)
+*.tt.js
+packages/thor/src/test-helpers/fixtures/doc/*.rb.js

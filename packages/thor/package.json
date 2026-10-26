@@ -27,7 +27,8 @@
     "@blazetrails/ruby-compat": "workspace:*"
   },
   "devDependencies": {
-    "@blazetrails/activesupport": "workspace:*"
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*"
   },
   "engines": {
     "node": ">=24"

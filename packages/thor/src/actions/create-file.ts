@@ -16,7 +16,7 @@ import type { ActionsHost } from "../actions.js";
 import { EmptyDirectory, type EmptyDirectoryBase } from "./empty-directory.js";
 
 type Block = () => unknown;
-type Data = string | (() => unknown);
+type Data = string | Uint8Array | (() => unknown);
 
 export function createFile(this: ActionsHost, destination: string, ...args: unknown[]): unknown {
   const block = (typeof last(args) === "function" ? args.pop() : undefined) as
@@ -24,14 +24,21 @@ export function createFile(this: ActionsHost, destination: string, ...args: unkn
     | undefined;
   const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
   const data = args[0];
-  return this.action(new CreateFile(this, destination, block || toS(data), config));
+  return this.action(
+    new CreateFile(
+      this,
+      destination,
+      block || (data instanceof Uint8Array ? data : toS(data)),
+      config,
+    ),
+  );
 }
 export const addFile = createFile;
 
 export class CreateFile extends EmptyDirectory {
   data: Data;
   /** @internal */
-  private _render?: string;
+  private _render?: string | Uint8Array;
 
   constructor(
     base: EmptyDirectoryBase,
@@ -45,19 +52,22 @@ export class CreateFile extends EmptyDirectory {
 
   /** @missingRailsArgs force_encoding — PERMANENT */
   async isIdentical(): Promise<boolean> {
+    let render: string | Uint8Array;
     return (
       (await this.isExists()) &&
       rbEqual(
         await getFs().readFile(this.destination),
-        Uint8Array.from(bytes(forceEncoding(await this.render(), "ASCII-8BIT"))),
+        (render = forceEncoding(await this.render(), "ASCII-8BIT")) instanceof Uint8Array
+          ? render
+          : Uint8Array.from(bytes(render)),
       )
     );
   }
 
-  async render(): Promise<string> {
-    return (this._render ??= (
-      typeof this.data === "function" ? await this.data() : this.data
-    ) as string);
+  async render(): Promise<string | Uint8Array> {
+    return (this._render ??= (typeof this.data === "function" ? await this.data() : this.data) as
+      | string
+      | Uint8Array);
   }
 
   override async invokeBang(): Promise<unknown> {

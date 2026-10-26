@@ -10,6 +10,8 @@ export interface EmitJsOptions {
   fileName?: string;
   sourceFileName?: string;
   bufvar?: string;
+  putCmd?: string;
+  insertCmd?: string;
 }
 
 export interface EmitResult {
@@ -292,11 +294,12 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
   if (options.preamble) push(options.preamble);
   for (const { node, bufRef, awaits, suffix } of emitSteps(ast.nodes, bufvar, options.async)) {
     if (node.kind === "blockExpr") {
-      push(`${bufRef}.${exprAppend}(${awaits ? "await (" : ""}${node.value}`, node.srcLine);
+      const insertCmd = options.insertCmd ?? `${bufRef}.${exprAppend}`;
+      push(`${insertCmd}(${awaits ? "await (" : ""}${node.value}`, node.srcLine);
     } else if (suffix !== undefined) {
       push(`${node.value.replace(/;\s*$/, "")}${suffix}`, node.srcLine);
     } else {
-      push(emitNode(node, exprAppend, bufRef, awaits), node.srcLine);
+      push(emitNode(node, exprAppend, bufRef, awaits, options), node.srcLine);
     }
   }
   code += "\n";
@@ -313,12 +316,18 @@ function blockCall(value: string): string {
   return `_(${(m[1] ?? m[2]).trim()})`;
 }
 
-function emitNode(node: TseNode, exprAppend: string, bufRef: string, awaits = false): string {
+function emitNode(
+  node: TseNode,
+  exprAppend: string,
+  bufRef: string,
+  awaits = false,
+  { putCmd, insertCmd }: EmitJsOptions = {},
+): string {
   const expr = node.kind === "expr" || node.kind === "rawExpr" ? blockCall(node.value) : node.value;
   const value = awaits ? `await (${awaitFlowReads(expr)})` : expr;
   switch (node.kind) {
     case "text":
-      return `${bufRef}.safeAppend(${JSON.stringify(node.value)});`;
+      return `${putCmd ?? `${bufRef}.safeAppend`}(${JSON.stringify(node.value)});`;
     case "code": {
       const t = node.value.trimEnd();
       return (
@@ -327,9 +336,9 @@ function emitNode(node: TseNode, exprAppend: string, bufRef: string, awaits = fa
       );
     }
     case "expr":
-      return `${bufRef}.${exprAppend}(${value});`;
+      return `${insertCmd ?? `${bufRef}.${exprAppend}`}(${value});`;
     case "rawExpr":
-      return `${bufRef}.safeExprAppend(${value});`;
+      return `${insertCmd ?? `${bufRef}.safeExprAppend`}(${value});`;
     case "blockExpr":
       throw new Error(
         "unreachable: blockExpr nodes are handled in the emit() loop, not emitNode()",

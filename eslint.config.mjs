@@ -130,6 +130,8 @@ export default defineConfig(
     ignores: [
       "vendor/**",
       "**/dist/**",
+      "**/*.tt.js",
+      "packages/thor/src/test-helpers/fixtures/doc/*.rb.js",
       // The Journey visualizer's shipped assets: fsm.js and fsm.css are
       // byte-for-byte copies of
       // vendor/rails/v8.0.2/actionpack/lib/action_dispatch/journey/visualizer/, and
@@ -842,6 +844,7 @@ export default defineConfig(
       "packages/thor/src/shell/color.test.ts",
       "packages/thor/src/shell/table-printer.trails.test.ts",
       "packages/thor/src/util.test.ts",
+      "packages/thor/src/test-helpers/build-templates.ts",
     ],
     rules: {
       "blazetrails/thor-import-boundary": "error",

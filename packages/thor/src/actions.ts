@@ -31,16 +31,25 @@ import { emptyDirectory } from "./actions/empty-directory.js";
 import {
   appendFile,
   appendToFile,
+  capture,
   chmod,
   commentLines,
+  concat,
+  copyFile,
+  get,
   gsubFile,
   injectIntoClass,
   injectIntoModule,
+  linkFile,
   prependFile,
   prependToFile,
   removeDir,
+  outputBuffer,
   removeFile,
+  setOutputBuffer,
+  template,
   uncommentLines,
+  withOutputBuffer,
 } from "./actions/file-manipulation.js";
 import { injectIntoFile, insertIntoFile } from "./actions/inject-into-file.js";
 import { TEMPLATE_EXTNAME } from "./base.js";
@@ -404,6 +413,10 @@ export const Actions = {
   addFile,
   createLink,
   addLink,
+  copyFile,
+  linkFile,
+  get,
+  template,
   chmod,
   prependToFile,
   prependFile,
@@ -416,6 +429,12 @@ export const Actions = {
   commentLines,
   removeFile,
   removeDir,
+  /** @internal */
+  concat,
+  /** @internal */
+  capture,
+  /** @internal */
+  withOutputBuffer,
   insertIntoFile,
   injectIntoFile,
   _sharedConfiguration,
@@ -426,6 +445,12 @@ rbModAttrWriter({ prototype: Actions }, "behavior");
 Object.defineProperty(Actions, "destinationRoot", {
   get: destinationRoot,
   set: setDestinationRoot,
+  enumerable: true,
+  configurable: true,
+});
+Object.defineProperty(Actions, "outputBuffer", {
+  get: outputBuffer,
+  set: setOutputBuffer,
   enumerable: true,
   configurable: true,
 });
