@@ -924,3 +924,30 @@ describe("Time.at num_exact_fail", () => {
     expect(() => Time.at(null as never)).toThrow("can't convert NilClass into an exact number");
   });
 });
+
+describe("Time#utc_offset in a named zone, from the cached offset interval", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("searches transitions once for a zone with no transition after the instant", () => {
+    const spy = vi.spyOn(Temporal.ZonedDateTime.prototype, "getTimeZoneTransition");
+    expect(Time.at(1_700_000_000, { in: "Asia/Kolkata" }).utcOffset).toBe(19800);
+    const searches = spy.mock.calls.length;
+    expect(Time.at(1_800_000_000, { in: "Asia/Kolkata" }).utcOffset).toBe(19800);
+    expect(spy.mock.calls.length).toBe(searches);
+  });
+
+  it("starts an interval at its transition and ends it just before the next", () => {
+    const boundary = 1_710_054_000;
+    expect(Time.at(boundary - 3600, { in: "America/New_York" }).utcOffset).toBe(-18000);
+    expect(Time.at(boundary, { in: "America/New_York" }).utcOffset).toBe(-14400);
+    expect(
+      Time.at(new Rational(boundary * 1000 - 1, 1000), { in: "America/New_York" }).utcOffset,
+    ).toBe(-18000);
+  });
+
+  it("treats a lowercase utc zone as UTC", () => {
+    expect(Time.at(0, { in: "utc" }).isUtc()).toBe(true);
+  });
+});

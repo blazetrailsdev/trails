@@ -617,7 +617,7 @@ export class Time extends rbCTime {
       instant,
       epochNs,
       timeZoneId,
-      tzmodeUtc: tzmodeUtc ?? (zone != null && timeZoneId === "UTC"),
+      tzmodeUtc: tzmodeUtc ?? (zone != null && timeZoneId.toUpperCase() === "UTC"),
       localZone: zone == null,
       subnano,
     };

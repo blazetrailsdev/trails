@@ -121,9 +121,7 @@ function zoneInterval(ianaName: string, date: Date): ZoneInterval | null {
       }
     }
   }
-  const info = lookupZoneInfo(ianaName, date);
-  if (Math.abs(info.utcOffsetSeconds - zoned.offsetNanoseconds / 1e9) >= 60) return null;
-  const interval = { start, end, info };
+  const interval = { start, end, info: lookupZoneInfo(ianaName, date) };
   intervals.splice(lo, 0, interval);
   return interval;
 }

@@ -930,6 +930,7 @@ jobs:
           packages/nokogiri
           packages/raabro
           packages/ruby-compat
+          packages/tzinfo
           packages/vitest-matchers
           scripts/guides-typecheck
           scripts/tasks
@@ -1170,6 +1171,7 @@ jobs:
           packages/actionview
           packages/trailties
           packages/tse-compiler
+          packages/tzinfo
           packages/vitest-matchers
           --coverage --coverage.all
       - name: Write coverage summary to run UI
