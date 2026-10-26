@@ -447,7 +447,7 @@ describe("ModelGeneratorTest", () => {
   it("polymorphic belongs to generates correct model", async () => {
     await makeGen().run("account", ["supplier:references{polymorphic}"]);
 
-    const expectedFile = `import { ApplicationRecord } from "./application-record.js";
+    const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
 export class Account extends ApplicationRecord {
   static toString(): string {
@@ -528,7 +528,7 @@ export class Account extends ApplicationRecord {
   it("token option adds has secure token", async () => {
     await makeGen().run("user", ["token:token", "auth_token:token"]);
 
-    const expectedFile = `import { ApplicationRecord } from "./application-record.js";
+    const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
 export class User extends ApplicationRecord {
   static toString(): string {
@@ -547,7 +547,7 @@ export class User extends ApplicationRecord {
   it("model with rich text attribute adds has rich text", async () => {
     await makeGen().run("message", ["content:rich_text"]);
 
-    const expectedFile = `import { ApplicationRecord } from "./application-record.js";
+    const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
 export class Message extends ApplicationRecord {
   static toString(): string {
@@ -565,7 +565,7 @@ export class Message extends ApplicationRecord {
   it("model with attachment attribute adds has one attached", async () => {
     await makeGen().run("message", ["video:attachment"]);
 
-    const expectedFile = `import { ApplicationRecord } from "./application-record.js";
+    const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
 export class Message extends ApplicationRecord {
   static toString(): string {
@@ -583,7 +583,7 @@ export class Message extends ApplicationRecord {
   it("model with attachments attribute adds has many attached", async () => {
     await makeGen().run("message", ["photos:attachments"]);
 
-    const expectedFile = `import { ApplicationRecord } from "./application-record.js";
+    const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
 export class Message extends ApplicationRecord {
   static toString(): string {

@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ControllerGenerator emit > matches snapshot for namespaced controller with parent 1`] = `
-"import { AdminController } from "../admin-controller.js";
+"import { AdminController } from "../admin-controller.ts";
 
 export class AdminDashboardController extends AdminController {
   async index(): Promise<void> {
@@ -12,7 +12,7 @@ export class AdminDashboardController extends AdminController {
 `;
 
 exports[`ControllerGenerator emit > matches snapshot for simple controller 1`] = `
-"import { ApplicationController } from "./application-controller.js";
+"import { ApplicationController } from "./application-controller.ts";
 
 export class AccountController extends ApplicationController {
   async index(): Promise<void> {

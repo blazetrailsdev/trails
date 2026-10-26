@@ -6,7 +6,7 @@ import { generateCommand } from "./generate.js";
 export function appTemplateCommand(): Command {
   return new Command("app:template")
     .description("Apply the template supplied by <location>")
-    .argument("<location>", "Template file (.mjs/.js; .ts needs a TS loader like tsx)")
+    .argument("<location>", "Template file (.mjs/.js/.ts)")
     .action(async (location: string) => {
       const gen = new AppGenerator({ cwd: Dir.pwd(), output: console.log });
       (await gen.sourcePaths()).push(Dir.pwd());

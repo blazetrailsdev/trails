@@ -77,7 +77,7 @@ export async function loadDatabaseConfigModule(
     const message = rawMessage.replace(/[.!?]+$/, "");
     const enhanced = new Error(
       `Failed to load database config from "${rel}": ${message}. ` +
-        `Run with tsx (e.g., "npx tsx node_modules/.bin/trails").`,
+        `Node imports it directly: its relative imports must name the .ts file, and it may use only erasable TypeScript syntax.`,
     );
     (enhanced as { cause?: unknown }).cause = error;
     throw enhanced;

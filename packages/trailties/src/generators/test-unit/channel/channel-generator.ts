@@ -22,7 +22,7 @@ export class ChannelGenerator extends NamedBase {
         ...this.classPathParts,
         `${dasherize(this.fileName)}-channel.test${this.ext()}`,
       ),
-      TEMPLATES.channel_test.call(this),
+      TEMPLATES.channel_test.call(this, this.ext()),
     );
   }
 }

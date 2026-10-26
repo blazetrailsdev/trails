@@ -144,7 +144,7 @@ describe("AuthenticationGenerator", () => {
     await makeGen().run();
     const ac = read(APP_CTRL_PATH);
     expect(ac).toContain(
-      'import { Authentication, type ClassMethods } from "./concerns/authentication.js";',
+      'import { Authentication, type ClassMethods } from "./concerns/authentication.ts";',
     );
     expect(ac.match(/include\(this, Authentication\)/g)).toHaveLength(1);
     expect(parseTs(ac).diagnostics).toEqual([]);

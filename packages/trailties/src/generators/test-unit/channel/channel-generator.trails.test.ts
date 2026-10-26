@@ -24,7 +24,7 @@ describe("TestUnit::Generators::ChannelGenerator", () => {
   it("nests a namespaced name under its class path", async () => {
     const root = await generate("admin/chat");
     const path = File.join(root, "test/channels/admin/chat-channel.test.ts");
-    expect(File.read(path)).toContain('import "../../test-helper.js";');
+    expect(File.read(path)).toContain('import "../../test-helper.ts";');
     expect(File.read(path)).toContain("export class AdminChatChannelTest");
   });
 });

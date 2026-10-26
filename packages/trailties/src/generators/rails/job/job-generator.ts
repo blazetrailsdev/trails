@@ -42,7 +42,7 @@ export class JobGenerator extends NamedBase {
   createJobFile(): void {
     this.createFile(
       File.join("app/jobs", ...this.classPathParts, `${dasherize(this.fileName)}-job${this.ext()}`),
-      TEMPLATES.job.call(this),
+      TEMPLATES.job.call(this, this.ext()),
     );
 
     if (
