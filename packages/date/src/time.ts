@@ -321,12 +321,59 @@ export interface TimeNewOptions {
   precision?: number | null;
 }
 
+interface Vtm {
+  year: number;
+  mon: number;
+  mday: number;
+  hour: number;
+  min: number;
+  sec: number;
+  nsec: number;
+  wday: number;
+  yday: number;
+}
+
+const NO_SUBNANO = new Rational(0, 1);
+
+function vtmFromDate(d: globalThis.Date, nsec: number): Vtm {
+  const year = d.getUTCFullYear();
+  const mon = d.getUTCMonth() + 1;
+  const mday = d.getUTCDate();
+  return {
+    year,
+    mon,
+    mday,
+    hour: d.getUTCHours(),
+    min: d.getUTCMinutes(),
+    sec: d.getUTCSeconds(),
+    nsec,
+    wday: d.getUTCDay(),
+    yday: cCivilToJd(year, mon, mday, Date.GREGORIAN) - cCivilToJd(year, 1, 1, Date.GREGORIAN) + 1,
+  };
+}
+
+function localVtm(epochNs: bigint, utcOffset: number): Vtm {
+  const localNs = epochNs + BigInt(Math.round(utcOffset * 1_000_000_000));
+  let ms = localNs / 1_000_000n;
+  if (ms * 1_000_000n > localNs) ms -= 1n;
+  const d = new globalThis.Date(Number(ms));
+  return vtmFromDate(d, d.getUTCMilliseconds() * 1_000_000 + Number(localNs - ms * 1_000_000n));
+}
+
+function utcEpochNanoseconds(vtm: Vtm): bigint {
+  const d = new globalThis.Date(0);
+  d.setUTCFullYear(vtm.year, vtm.mon - 1, vtm.mday);
+  d.setUTCHours(vtm.hour, vtm.min, vtm.sec);
+  return BigInt(d.getTime()) * 1_000_000n + BigInt(vtm.nsec);
+}
+
 /** @noRailsEquivalent PERMANENT */
 let seatedTime: {
   zoned: Temporal.ZonedDateTime | null;
-  plain: Temporal.PlainDateTime | null;
+  vtm: Vtm | null;
   utcOffset: number | null;
-  instant: Temporal.Instant;
+  instant: Temporal.Instant | null;
+  epochNs: bigint | null;
   timeZoneId: string | null;
   tzmodeUtc: boolean;
   localZone: boolean;
@@ -370,11 +417,11 @@ function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
 }
 
 export class Time extends rbCTime {
-  #plainMemo: Temporal.PlainDateTime | null;
+  #vtmMemo: Vtm | null;
   /** @internal */
-  #zoned: Temporal.ZonedDateTime | null;
+  #zonedMemo: Temporal.ZonedDateTime | null;
   /** @internal */
-  #instant: Temporal.Instant;
+  #instantMemo: Temporal.Instant | null;
   /** @internal */
   #timeZoneId: string | null;
   /** @internal */
@@ -391,13 +438,50 @@ export class Time extends rbCTime {
   #isdstMemo: boolean | null = null;
 
   /** @internal */
+  #epochNsMemo: bigint | null = null;
+
+  /** @internal */
+  get #epochNs(): bigint {
+    return (this.#epochNsMemo ??= this.#instantMemo!.epochNanoseconds);
+  }
+
+  /** @internal */
+  get #instant(): Temporal.Instant {
+    return (this.#instantMemo ??= Temporal.Instant.fromEpochNanoseconds(this.#epochNsMemo!));
+  }
+
+  /** @internal */
+  get #zoned(): Temporal.ZonedDateTime | null {
+    if (this.#zonedMemo === null && this.#timeZoneId != null)
+      this.#zonedMemo = this.#instant.toZonedDateTimeISO(this.#timeZoneId);
+    return this.#zonedMemo;
+  }
+
+  /** @internal */
+  get #vtm(): Vtm {
+    return (this.#vtmMemo ??= localVtm(this.#epochNs, this.#utcOffset));
+  }
+
+  /** @internal */
   get #plain(): Temporal.PlainDateTime {
-    return (this.#plainMemo ??= this.#zoned!.toPlainDateTime());
+    const vtm = this.#vtm;
+    return new Temporal.PlainDateTime(
+      vtm.year,
+      vtm.mon,
+      vtm.mday,
+      vtm.hour,
+      vtm.min,
+      vtm.sec,
+      Math.floor(vtm.nsec / 1_000_000),
+      Math.floor(vtm.nsec / 1_000) % 1_000,
+      vtm.nsec % 1_000,
+    );
   }
 
   /** @internal */
   get #utcOffset(): number {
-    return (this.#utcOffsetMemo ??= Number(this.#zoned!.offsetNanoseconds) / 1_000_000_000);
+    return (this.#utcOffsetMemo ??=
+      this.#timeZoneId === "UTC" ? 0 : Number(this.#zoned!.offsetNanoseconds) / 1_000_000_000);
   }
 
   static now({ in: inZone = null }: { in?: string | number | Timezone | null } = {}): Time {
@@ -452,23 +536,23 @@ export class Time extends rbCTime {
   }
 
   static #atInstant(
-    instant: Temporal.Instant,
+    at: Temporal.Instant | bigint,
     zone: string | number | object | null = null,
     tzmodeUtc?: boolean,
-    subnano: Rational = new Rational(0, 1),
+    subnano: Rational = NO_SUBNANO,
   ): Time {
     if (zone instanceof Timezone) zone = zone.identifier;
     if (maybeTzobjP(zone))
-      return Time.#zoneLocaltime(zone, Time.#atInstant(instant, "UTC", false, subnano))!;
+      return Time.#zoneLocaltime(zone, Time.#atInstant(at, "UTC", false, subnano))!;
+    const instant = typeof at === "bigint" ? null : at;
+    const epochNs = typeof at === "bigint" ? at : null;
     if (typeof zone === "number") {
       seatedTime = {
         zoned: null,
-        plain: instant
-          .add({ nanoseconds: Math.round(zone * 1_000_000_000) })
-          .toZonedDateTimeISO("UTC")
-          .toPlainDateTime(),
+        vtm: null,
         utcOffset: zone,
         instant,
+        epochNs,
         timeZoneId: null,
         tzmodeUtc: tzmodeUtc ?? false,
         localZone: false,
@@ -477,14 +561,20 @@ export class Time extends rbCTime {
       return new Time(0);
     }
     const timeZoneId = zone == null ? nowTimeZoneId() : zone;
-    const zoned = instant.toZonedDateTimeISO(timeZoneId);
+    const zoned =
+      timeZoneId === "UTC"
+        ? null
+        : (instant ?? Temporal.Instant.fromEpochNanoseconds(epochNs!)).toZonedDateTimeISO(
+            timeZoneId,
+          );
     seatedTime = {
       zoned,
-      plain: null,
+      vtm: null,
       utcOffset: null,
-      instant,
+      instant: instant ?? zoned?.toInstant() ?? null,
+      epochNs,
       timeZoneId,
-      tzmodeUtc: tzmodeUtc ?? (zone != null && zoned.timeZoneId === "UTC"),
+      tzmodeUtc: tzmodeUtc ?? (zone != null && (zoned?.timeZoneId ?? timeZoneId) === "UTC"),
       localZone: zone == null,
       subnano,
     };
@@ -499,7 +589,12 @@ export class Time extends rbCTime {
         ? local.toI() + (local.#localZone ? 0 : local.utcOffset)
         : Math.floor(Number((local as Temporal.ZonedDateTime).epochMilliseconds) / 1000) +
           Number((local as Temporal.ZonedDateTime).offsetNanoseconds) / 1_000_000_000;
-    const t = Time.#atInstant(time.#instant, s - time.toI(), false, time.#subnano);
+    const t = Time.#atInstant(
+      time.#epochNsMemo ?? time.#instantMemo!,
+      s - time.toI(),
+      false,
+      time.#subnano,
+    );
     t.#zoneObject = zone;
     const dst = rbObjRespondTo(zone, "isDst")
       ? (zone as { isDst(tm: Time): unknown }).isDst(time)
@@ -542,7 +637,12 @@ export class Time extends rbCTime {
         .add(numExact(subsec).mul(1_000_000_000).quo(scale));
       t = Time.#timeNewTimew(timew);
     } else if (time instanceof Time) {
-      t = Time.#atInstant(time.#instant, time.#zoneArgument(), time.#tzmodeUtc, time.#subnano);
+      t = Time.#atInstant(
+        time.#epochNsMemo ?? time.#instantMemo!,
+        time.#zoneArgument(),
+        time.#tzmodeUtc,
+        time.#subnano,
+      );
     } else {
       const timew = numExact(time).mul(1_000_000_000);
       t = Time.#timeNewTimew(timew);
@@ -1214,10 +1314,11 @@ export class Time extends rbCTime {
     if (seatedTime !== null) {
       const seat = seatedTime;
       seatedTime = null;
-      this.#plainMemo = seat.plain;
+      this.#vtmMemo = seat.vtm;
       this.#utcOffsetMemo = seat.utcOffset;
-      this.#zoned = seat.zoned;
-      this.#instant = seat.instant;
+      this.#zonedMemo = seat.zoned;
+      this.#instantMemo = seat.instant;
+      this.#epochNsMemo = seat.epochNs;
       this.#timeZoneId = seat.timeZoneId;
       this.#tzmodeUtc = seat.tzmodeUtc;
       this.#localZone = seat.localZone;
@@ -1231,8 +1332,9 @@ export class Time extends rbCTime {
     min = min == null ? 0 : obj2vint(min);
     if (sec == null) sec = 0;
     else if (typeof sec === "string") sec = obj2vint(sec);
-    const nsec = subsecNanoseconds(sec);
-    this.#subnano = numExact(sec).mod(1).mul(1_000_000_000).add(-nsec);
+    const integralSec = typeof sec === "number" && Number.isSafeInteger(sec);
+    const nsec = integralSec ? 0 : subsecNanoseconds(sec);
+    this.#subnano = integralSec ? NO_SUBNANO : numExact(sec).mod(1).mul(1_000_000_000).add(-nsec);
     const wholeSec = sec instanceof Rational ? sec.div(1) : Math.floor(sec);
     obj2ubits(month, 4);
     obj2ubits(day, 5);
@@ -1244,22 +1346,11 @@ export class Time extends rbCTime {
     validateVtmRange("hour", hour, 0, 24);
     validateVtmRange("min", min, 0, hour === 24 ? 0 : 59);
     validateVtmRange("sec", wholeSec, 0, hour === 24 ? 0 : 60);
-    const overflowDays = Math.max(day - Time.#monthDays(year, month), 0);
-    const inMonth = new Temporal.PlainDateTime(
-      year,
-      month,
-      day - overflowDays,
-      hour === 24 ? 23 : hour,
-      min,
-      wholeSec === 60 ? 59 : wholeSec,
-      Math.floor(nsec / 1_000_000),
-      Math.floor(nsec / 1_000) % 1_000,
-      nsec % 1_000,
-    );
-    const plain = overflowDays === 0 ? inMonth : inMonth.add({ days: overflowDays });
-    this.#zoned = null;
-    this.#plainMemo =
-      hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
+    const d = new globalThis.Date(0);
+    d.setUTCFullYear(year, month - 1, day);
+    d.setUTCHours(hour, min, wholeSec);
+    this.#zonedMemo = null;
+    this.#vtmMemo = vtmFromDate(d, nsec);
     const zoneArgument = zone ?? options.in ?? null;
     const zoneObject =
       zoneArgument instanceof Timezone
@@ -1282,59 +1373,60 @@ export class Time extends rbCTime {
     this.#utcOffsetMemo =
       typeof utcOffset === "number"
         ? utcOffset
-        : Number(this.#plain.toZonedDateTime(utcOffset, disambiguation).offsetNanoseconds) /
-          1_000_000_000;
+        : utcOffset === "UTC"
+          ? 0
+          : Number(this.#plain.toZonedDateTime(utcOffset, disambiguation).offsetNanoseconds) /
+            1_000_000_000;
     if (this.#timeZoneId == null) {
-      const instant = this.#plain.toZonedDateTime("UTC").toInstant();
-      this.#instant =
-        this.#utcOffset === 0
-          ? instant
-          : instant.subtract({ nanoseconds: Math.round(this.#utcOffset * 1_000_000_000) });
+      this.#epochNsMemo =
+        utcEpochNanoseconds(this.#vtm) - BigInt(Math.round(this.#utcOffset * 1_000_000_000));
+      this.#instantMemo = null;
+    } else if (this.#timeZoneId === "UTC") {
+      this.#epochNsMemo = utcEpochNanoseconds(this.#vtm);
+      this.#instantMemo = null;
     } else {
-      this.#instant = this.#plain.toZonedDateTime(this.#timeZoneId, disambiguation).toInstant();
+      this.#instantMemo = this.#plain.toZonedDateTime(this.#timeZoneId, disambiguation).toInstant();
     }
   }
 
   get year(): number {
-    return this.#plain.year;
+    return this.#vtm.year;
   }
 
   get mon(): number {
-    return this.#plain.month;
+    return this.#vtm.mon;
   }
 
   get month(): number {
-    return this.#plain.month;
+    return this.#vtm.mon;
   }
 
   get day(): number {
-    return this.#plain.day;
+    return this.#vtm.mday;
   }
 
   get mday(): number {
-    return this.#plain.day;
+    return this.#vtm.mday;
   }
 
   get wday(): number {
-    return this.#plain.dayOfWeek % 7;
+    return this.#vtm.wday;
   }
 
   get hour(): number {
-    return this.#plain.hour;
+    return this.#vtm.hour;
   }
 
   get min(): number {
-    return this.#plain.minute;
+    return this.#vtm.min;
   }
 
   get sec(): number {
-    return this.#plain.second;
+    return this.#vtm.sec;
   }
 
   get nsec(): number {
-    return (
-      this.#plain.millisecond * 1_000_000 + this.#plain.microsecond * 1_000 + this.#plain.nanosecond
-    );
+    return this.#vtm.nsec;
   }
 
   get tvNsec(): number {
@@ -1342,7 +1434,7 @@ export class Time extends rbCTime {
   }
 
   get usec(): number {
-    return this.#plain.millisecond * 1_000 + this.#plain.microsecond;
+    return Math.floor(this.#vtm.nsec / 1_000);
   }
 
   get subsec(): number | Rational {
@@ -1352,7 +1444,7 @@ export class Time extends rbCTime {
   }
 
   get yday(): number {
-    return this.#plain.dayOfYear;
+    return this.#vtm.yday;
   }
 
   get zone(): string | object | null {
@@ -1386,7 +1478,7 @@ export class Time extends rbCTime {
   }
 
   toI(): number {
-    const nanoseconds = this.#instant.epochNanoseconds;
+    const nanoseconds = this.#epochNs;
     const seconds = nanoseconds / 1_000_000_000n - (nanoseconds % 1_000_000_000n < 0n ? 1n : 0n);
     return Number(seconds);
   }
@@ -1400,9 +1492,7 @@ export class Time extends rbCTime {
   }
 
   toR(): Rational {
-    return new Rational(this.#instant.epochNanoseconds, 1_000_000_000n).add(
-      this.#subnano.quo(1_000_000_000),
-    );
+    return new Rational(this.#epochNs, 1_000_000_000n).add(this.#subnano.quo(1_000_000_000));
   }
 
   /** `time_to_time` (`vendor/ruby/v3.3.11/ext/date/date_core.c:8883-8887`). */
@@ -1472,7 +1562,9 @@ export class Time extends rbCTime {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        nsec: new Rational(this.nsec, 1).add(this.#subnano),
+        nsec: this.#subnano.isZero()
+          ? new Rational(this.nsec, 1)
+          : new Rational(this.nsec, 1).add(this.#subnano),
         get zone(): string {
           const zone = self.zone;
           return zone == null ? "" : rbTimeZoneAbbreviation(zone, self);
@@ -1490,7 +1582,7 @@ export class Time extends rbCTime {
       if (invcmp === null) return null;
       return -rbCmpint(invcmp, this, other);
     }
-    const n = this.#instant.epochNanoseconds - other.#instant.epochNanoseconds;
+    const n = this.#epochNs - other.#epochNs;
     if (n === 0n) return this.#subnano.cmp(other.#subnano);
     return n > 0n ? 1 : -1;
   }
@@ -1506,9 +1598,10 @@ export class Time extends rbCTime {
   /** `time_init_copy` (`vendor/ruby/v3.3.11/time.c:4046`), whose `MEMCPY` copies the whole `time_object`. */
   initializeCopy(time: Time): this {
     if ((this as Time) === time) return this;
-    this.#plainMemo = time.#plainMemo;
-    this.#zoned = time.#zoned;
-    this.#instant = time.#instant;
+    this.#vtmMemo = time.#vtmMemo;
+    this.#zonedMemo = time.#zonedMemo;
+    this.#instantMemo = time.#instantMemo;
+    this.#epochNsMemo = time.#epochNsMemo;
     this.#timeZoneId = time.#timeZoneId;
     this.#tzmodeUtc = time.#tzmodeUtc;
     this.#localZone = time.#localZone;
@@ -1521,10 +1614,7 @@ export class Time extends rbCTime {
 
   eql(other: unknown): boolean {
     if (!(other instanceof Time)) return false;
-    return (
-      this.#instant.epochNanoseconds === other.#instant.epochNanoseconds &&
-      this.#subnano.cmp(other.#subnano) === 0
-    );
+    return this.#epochNs === other.#epochNs && this.#subnano.cmp(other.#subnano) === 0;
   }
 
   /**
@@ -1532,7 +1622,7 @@ export class Time extends rbCTime {
    * `timew`, the instant `time_eql` compares.
    */
   hash(): number {
-    return rbHash([this.#instant.epochNanoseconds, this.#subnano]);
+    return rbHash([this.#epochNs, this.#subnano]);
   }
 
   isUtc(): boolean {
@@ -1550,7 +1640,7 @@ export class Time extends rbCTime {
   minus(offset: number | bigint | Rational | Time): Time | number;
   minus(offset: unknown): Time | number {
     if (offset instanceof Time) {
-      return new Rational(this.#instant.epochNanoseconds - offset.#instant.epochNanoseconds, 1)
+      return new Rational(this.#epochNs - offset.#epochNs, 1)
         .add(this.#subnano)
         .add(offset.#subnano.mul(-1))
         .quo(1_000_000_000)
@@ -1560,13 +1650,21 @@ export class Time extends rbCTime {
   }
 
   #timeAdd(offset: number | bigint | Rational, sign: 1 | -1): Time {
+    if (Number.isSafeInteger(offset) && this.#subnano.isZero()) {
+      return Time.#atInstant(
+        this.#epochNs + BigInt(offset as number) * 1_000_000_000n * BigInt(sign),
+        this.#zoneArgument(),
+        undefined,
+        this.#subnano,
+      );
+    }
     const timew = numExact(offset)
       .mul(1_000_000_000 * sign)
       .add(this.#subnano);
     const nanoseconds =
       timew.numerator / timew.denominator - (timew.numerator % timew.denominator < 0n ? 1n : 0n);
     return Time.#atInstant(
-      Temporal.Instant.fromEpochNanoseconds(this.#instant.epochNanoseconds + nanoseconds),
+      this.#epochNs + nanoseconds,
       this.#zoneArgument(),
       undefined,
       timew.add(-nanoseconds),
@@ -1598,8 +1696,8 @@ export class Time extends rbCTime {
       return this;
     }
 
-    this.#zoned = this.#instant.toZonedDateTimeISO("UTC");
-    if (this.#utcOffsetMemo !== 0) this.#plainMemo = null;
+    this.#zonedMemo = null;
+    if (this.#utcOffsetMemo !== 0) this.#vtmMemo = null;
     this.#utcOffsetMemo = null;
     this.#timeZoneId = "UTC";
     this.#localZone = false;
@@ -1627,13 +1725,18 @@ export class Time extends rbCTime {
       (typeof utcOffset === "object" && utcOffset !== null)
     ) {
       return Time.#atInstant(
-        this.#instant,
+        this.#epochNsMemo ?? this.#instantMemo!,
         utcOffsetArgument(typeof utcOffset === "string" ? utcOffset : numExact(utcOffset)),
         undefined,
         this.#subnano,
       );
     }
-    return Time.#atInstant(this.#instant, utcOffset, undefined, this.#subnano);
+    return Time.#atInstant(
+      this.#epochNsMemo ?? this.#instantMemo!,
+      utcOffset,
+      undefined,
+      this.#subnano,
+    );
   }
 
   toS(): string {
@@ -1865,9 +1968,10 @@ Time.prototype.iso8601 = Time.prototype.xmlschema;
 rbDefineAllocFunc(Time, (klass) => {
   seatedTime = {
     zoned: null,
-    plain: null,
+    vtm: null,
     utcOffset: null,
-    instant: Temporal.Instant.fromEpochNanoseconds(0n),
+    instant: null,
+    epochNs: 0n,
     timeZoneId: null,
     tzmodeUtc: false,
     localZone: false,

@@ -23,7 +23,7 @@ export class InvalidTimezoneIdentifier extends Error {
 
 function toDate(at: Date | Temporal.Instant | Time): Date {
   if (at instanceof Date) return at;
-  if (at instanceof Time) return new Date(at.toZonedDateTime().toInstant().epochMilliseconds);
+  if (at instanceof Time) return new Date(at.toI() * 1000 + Math.floor(at.nsec / 1_000_000));
   return new Date(at.epochMilliseconds);
 }
 
@@ -60,7 +60,27 @@ const ETC_GMT_LINKS = new Set([
 const abbreviationFormatters = new Map<string, Intl.DateTimeFormat>();
 const localFormatters = new Map<string, Intl.DateTimeFormat>();
 
+const fixedZoneInfos = new Map<string, { abbreviation: string; utcOffsetSeconds: number } | null>();
+const fixedZoneAbbreviations = new Map<string, string>();
+
 function getZoneInfo(
+  ianaName: string,
+  date: Date,
+): { abbreviation: string; utcOffsetSeconds: number } {
+  let fixed = fixedZoneInfos.get(ianaName);
+  if (fixed === undefined) {
+    const zoned = Temporal.Instant.fromEpochMilliseconds(0).toZonedDateTimeISO(ianaName);
+    fixed =
+      zoned.getTimeZoneTransition("next") === null &&
+      zoned.getTimeZoneTransition("previous") === null
+        ? lookupZoneInfo(ianaName, date)
+        : null;
+    fixedZoneInfos.set(ianaName, fixed);
+  }
+  return fixed ?? lookupZoneInfo(ianaName, date);
+}
+
+function lookupZoneInfo(
   ianaName: string,
   date: Date,
 ): { abbreviation: string; utcOffsetSeconds: number } {
@@ -133,20 +153,6 @@ export class TimezoneTransition {
   }
 }
 
-const periodTransitions = new WeakMap<
-  TimezonePeriod,
-  (() => (TimezoneTransition | null)[]) | (TimezoneTransition | null)[]
->();
-
-function boundaries(period: TimezonePeriod): (TimezoneTransition | null)[] {
-  let transitions = periodTransitions.get(period)!;
-  if (typeof transitions === "function") {
-    transitions = transitions();
-    periodTransitions.set(period, transitions);
-  }
-  return transitions;
-}
-
 /** @noRailsEquivalent PERMANENT */
 export class TimezonePeriod {
   readonly abbreviation: string;
@@ -165,15 +171,22 @@ export class TimezonePeriod {
     this.observedUtcOffset = observedUtcOffset;
     this.baseUtcOffset = baseUtcOffset;
     this._dst = dst;
-    periodTransitions.set(this, transitions);
+    this.#transitions = transitions;
+  }
+
+  #transitions: (() => (TimezoneTransition | null)[]) | (TimezoneTransition | null)[];
+
+  #boundaries(): (TimezoneTransition | null)[] {
+    if (typeof this.#transitions === "function") this.#transitions = this.#transitions();
+    return this.#transitions;
   }
 
   get startTransition(): TimezoneTransition | null {
-    return boundaries(this)[0];
+    return this.#boundaries()[0];
   }
 
   get endTransition(): TimezoneTransition | null {
-    return boundaries(this)[1];
+    return this.#boundaries()[1];
   }
 
   get offset(): TimezoneOffset {
@@ -408,6 +421,8 @@ const TZDB_NAMES: readonly string[] = [
   "Zulu",
 ];
 
+const loadedTimezoneIdentifiers = new Set<string>();
+
 /** @noRailsEquivalent PERMANENT */
 export class Timezone {
   static all(): Timezone[] {
@@ -417,11 +432,14 @@ export class Timezone {
   }
 
   static get(identifier: string): Timezone {
-    try {
-      new Intl.DateTimeFormat("en-US", { timeZone: identifier });
-    } catch (error) {
-      if (!(error instanceof RangeError)) throw error;
-      throw new InvalidTimezoneIdentifier(`Invalid identifier: ${identifier}`);
+    if (!loadedTimezoneIdentifiers.has(identifier)) {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: identifier });
+      } catch (error) {
+        if (!(error instanceof RangeError)) throw error;
+        throw new InvalidTimezoneIdentifier(`Invalid identifier: ${identifier}`);
+      }
+      loadedTimezoneIdentifiers.add(identifier);
     }
     return new Timezone(identifier);
   }
@@ -471,10 +489,17 @@ export class Timezone {
 
   abbr(time: Date | Temporal.Instant): string {
     if (this.info) return this.info.constantOffset.abbreviation;
+    const fixed = fixedZoneAbbreviations.get(this.identifier);
+    if (fixed !== undefined) return fixed;
     const abbreviation = new DateTimezone(this.identifier).abbr(
       Time.at(new Rational(toDate(time).getTime(), 1000)),
     );
-    return abbreviation === "UTC" && ETC_GMT_LINKS.has(this.identifier) ? "GMT" : abbreviation;
+    const result =
+      abbreviation === "UTC" && ETC_GMT_LINKS.has(this.identifier) ? "GMT" : abbreviation;
+    getZoneInfo(this.identifier, toDate(time));
+    if (fixedZoneInfos.get(this.identifier) != null)
+      fixedZoneAbbreviations.set(this.identifier, result);
+    return result;
   }
 
   observedUtcOffset(time: Date | Temporal.Instant): number {

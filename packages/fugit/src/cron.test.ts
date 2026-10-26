@@ -834,12 +834,15 @@ describe("Fugit::Cron", () => {
       await new Promise((r) => setTimeout(r, 50));
     });
 
-    // BLOCKED: eotime-next-time-fast-enough-for-fugit-brute-frequency
-    it.skip('computes "dmin: 1m, dmax: 1m, ocs: 525600, spn: 52W1D, spnys: 1, yocs: 525600" for "* * * * *"', () => {
-      const f = Cron.parse("* * * * *")!.bruteFrequency().toDebugS();
+    it(
+      'computes "dmin: 1m, dmax: 1m, ocs: 525600, spn: 52W1D, spnys: 1, yocs: 525600" for "* * * * *"',
+      { timeout: 30 * 60_000 },
+      () => {
+        const f = Cron.parse("* * * * *")!.bruteFrequency().toDebugS();
 
-      expect(f).toEqual("dmin: 1m, dmax: 1m, ocs: 525600, spn: 52W1D, spnys: 1, yocs: 525600");
-    });
+        expect(f).toEqual("dmin: 1m, dmax: 1m, ocs: 525600, spn: 52W1D, spnys: 1, yocs: 525600");
+      },
+    );
 
     for (const [cron, freq] of [
       ["0 0 * * *", "dmin: 1D, dmax: 1D, ocs: 365, spn: 52W1D, spnys: 1, yocs: 365"],
