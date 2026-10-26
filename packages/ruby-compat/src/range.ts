@@ -14,6 +14,7 @@ import { cmp, rbCmpint } from "./comparable.js";
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
 import { rbInspect } from "./object.js";
+import { rubyNumIntervalStepSize } from "./numeric.js";
 
 const inspectRecursing = new Set<object>();
 
@@ -352,60 +353,4 @@ export class Range<T = unknown> {
     for (const v of values.call(this)) block(v);
     return this;
   }
-}
-
-/**
- * `ruby_num_interval_step_size` (`vendor/ruby/v3.3.11/numeric.c:2798`) with a step of 1.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rubyNumIntervalStepSize(
-  from: number | bigint,
-  to: number | bigint,
-  excl: boolean,
-): number | bigint {
-  if (
-    typeof from === "bigint" ||
-    typeof to === "bigint" ||
-    (Number.isInteger(from) && Number.isInteger(to))
-  ) {
-    let delta = BigInt(to) - BigInt(from);
-    if (excl) delta--;
-    if (delta < 0n) return 0;
-    const n = delta + 1n;
-    return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n) : n;
-  }
-  return rubyFloatStepSize(Number(from), Number(to), excl);
-}
-
-/**
- * `ruby_float_step_size` (`vendor/ruby/v3.3.11/numeric.c:2720`) with a unit of 1.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rubyFloatStepSize(beg: number, end: number, excl: boolean): number {
-  let n = end - beg;
-  let err = (Math.abs(beg) + Math.abs(end) + Math.abs(end - beg)) * Number.EPSILON;
-  if (err > 0.5) err = 0.5;
-  if (excl) {
-    if (n <= 0) return 0;
-    if (n < 1) n = 0;
-    else n = Math.floor(n - err);
-    const d = n + 1 + beg;
-    if (beg < end) {
-      if (d < end) n++;
-    } else if (beg > end) {
-      if (d > end) n++;
-    }
-  } else {
-    if (n < 0) return 0;
-    n = Math.floor(n + err);
-    const d = n + 1 + beg;
-    if (beg < end) {
-      if (d <= end) n++;
-    } else if (beg > end) {
-      if (d >= end) n++;
-    }
-  }
-  return n + 1;
 }

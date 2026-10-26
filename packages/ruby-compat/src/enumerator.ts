@@ -51,6 +51,7 @@ export class Enumerator<T = unknown> {
   private obj: object;
   private fib: Fiber<unknown> | null = null;
   private stopExc: StopIteration | null = null;
+  #size: ((...args: unknown[]) => unknown) | null;
 
   /**
    * `enumerator_init`, and `Enumerator.new`
@@ -63,9 +64,9 @@ export class Enumerator<T = unknown> {
     obj: object,
     private meth: string = "each",
     private args: unknown[] = [],
-    /** @noRailsEquivalent PERMANENT */
-    readonly sizeFn: ((...args: unknown[]) => unknown) | null = null,
+    size: ((...args: unknown[]) => unknown) | null = null,
   ) {
+    this.#size = size;
     this.obj = rbBlockGivenP(obj)
       ? new Generator(obj as unknown as (yielder: Yielder<T>) => unknown)
       : obj;
@@ -137,7 +138,7 @@ export class Enumerator<T = unknown> {
    * @noRailsEquivalent PERMANENT
    */
   size(): unknown {
-    return this.sizeFn ? this.sizeFn(...this.args) : null;
+    return this.#size ? this.#size(...this.args) : null;
   }
 
   /**
