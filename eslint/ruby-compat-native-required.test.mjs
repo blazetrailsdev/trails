@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { RuleTester } from "eslint";
+import ts from "typescript-5";
 import { describe, expect, it } from "vitest";
 import rule from "./ruby-compat-native-required.mjs";
 
@@ -103,21 +104,21 @@ const LISTED_FLOOR = [
 
 describe("ruby-compat-native-required fixture project", () => {
   it("resolves its lib, so the dispatching-receiver cases are not vacuous", () => {
-    const ts = parseFixture(
+    const parsed = parseFixture(
       "declare const m: Map<string, number>; declare const r: Record<string, number>; declare const xs: string[]; m; r; xs;",
     );
-    const checker = ts.services.program.getTypeChecker();
-    const types = ts.ast.body
+    const checker = parsed.services.program.getTypeChecker();
+    const types = parsed.ast.body
       .slice(-3)
       .map((stmt) =>
-        checker.getTypeAtLocation(ts.services.esTreeNodeToTSNodeMap.get(stmt.expression)),
+        checker.getTypeAtLocation(parsed.services.esTreeNodeToTSNodeMap.get(stmt.expression)),
       );
     expect(types.map((t) => checker.typeToString(t))).toEqual([
       "Map<string, number>",
       "Record<string, number>",
       "string[]",
     ]);
-    expect(types.every((t) => (t.flags & 1) === 0)).toBe(true);
+    expect(types.every((t) => (t.flags & ts.TypeFlags.Any) === 0)).toBe(true);
     expect(checker.isArrayType(types[2])).toBe(true);
   });
 });
