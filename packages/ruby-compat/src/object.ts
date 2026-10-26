@@ -502,7 +502,7 @@ OBJECT_METHOD_TABLE.instanceExec = (self: unknown, ...args: unknown[]): unknown 
  * for on the receivers `each` is bound for: a JS array, a `Set`, and a `Map`
  * or plain hash, whose Ruby classes include `Enumerable`
  * (`vendor/ruby/v3.3.11/array.c:8606`, `lib/set.rb:221`, `hash.c:7184`), and
- * an object that defines `each` or `Symbol.iterator`, a class's
+ * an object that defines `Symbol.iterator`, a class's
  * `include Enumerable` (`enum.c:5061`).
  * ActiveSupport's `Enumerable#maximum`
  * (`activesupport/lib/active_support/core_ext/enumerable.rb:40`) is reached by
@@ -524,8 +524,7 @@ function enumerableMethod(
       isPlainHash(obj) ||
       (typeof obj === "object" &&
         obj !== null &&
-        (typeof (obj as { each?: unknown }).each === "function" ||
-          typeof (obj as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function")))
+        typeof (obj as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function"))
     ? (ENUMERABLE_METHOD_TABLE[mid] as (...args: unknown[]) => unknown)
     : undefined;
 }
@@ -722,6 +721,8 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     ) {
       return true;
     }
+  } else if (enumerableMethod(obj, mid) !== undefined) {
+    return true;
   }
   const klass =
     typeof obj === "function" &&

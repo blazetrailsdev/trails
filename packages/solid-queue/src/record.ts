@@ -3,6 +3,7 @@ import { Base, registerModel, type Relation } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
 import { SolidQueue } from "./solid-queue.js";
 
+/** @missingRailsCall connectsTo — PERMANENT */
 export class Record extends Base {
   static {
     this.abstractClass = true;

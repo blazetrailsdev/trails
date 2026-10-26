@@ -21,7 +21,10 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
   }
 }
 
-/** @missingRailsCall rake_tasks — CONVERGEABLE port-solid-queue-tasks */
+/**
+ * @missingRailsCall rake_tasks — CONVERGEABLE port-solid-queue-tasks
+ * @inventedArm onLoad — PERMANENT
+ */
 export class Engine extends TrailsEngine {
   static toString(): string {
     return "SolidQueue::Engine";
@@ -34,14 +37,16 @@ export class Engine extends TrailsEngine {
 
     this.config.set("solidQueue", new OrderedOptions());
 
+    const connectsTo = function (this: typeof Record): void {
+      if (SolidQueue.connectsTo) this.connectsTo(SolidQueue.connectsTo);
+    };
+
     this.initializer("solid_queue.config", () => {
       this.config.solidQueue.each((name, value) => {
         rbFSend(SolidQueue, `${name}=`, value);
       });
 
-      onLoad("solid_queue_record", function (this: typeof Record) {
-        if (SolidQueue.connectsTo) this.connectsTo(SolidQueue.connectsTo);
-      });
+      onLoad("solid_queue_record", { runOnce: true }, connectsTo);
     });
 
     this.initializer(
