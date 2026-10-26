@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Time, resetLocalTimeZoneId } from "./time.js";
-import { tzdataIsdst } from "./tzdata-isdst.js";
+import { TZDATA_ISDST, tzdataBaseOffsets, tzdataIsdst } from "./tzdata-isdst.js";
 
 function localIsdst(zone: string, epochSeconds: number): boolean {
   vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue(zone);
@@ -48,5 +48,14 @@ describe("tzdataIsdst", () => {
   it("answers for a zone's tzdata link names", () => {
     expect(tzdataIsdst("Asia/Calcutta", 1719835200)).toBe(tzdataIsdst("Asia/Kolkata", 1719835200));
     expect(tzdataIsdst("US/Eastern", 1719835200)).toBe(true);
+  });
+});
+
+describe("tzdataBaseOffsets", () => {
+  it("carries a base row for every zone that has ever observed DST", () => {
+    const zones = TZDATA_ISDST.trim()
+      .split("\n")
+      .map((row) => row.slice(0, row.indexOf(" ")));
+    expect(zones.filter((zone) => tzdataBaseOffsets(zone) === null)).toEqual([]);
   });
 });

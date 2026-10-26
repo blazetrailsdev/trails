@@ -67,7 +67,7 @@ describe("anybits", () => {
 describe("Float#round past the double's own digits", () => {
   it("answers the receiver once ndigits overflows it, and zero once it underflows", () => {
     expect(round(1.5, 400)).toBe(1.5);
-    expect(round(1.0e-320, 3)).toBe(0);
+    expect(round(1.0e-320, 3)).toEqual(new Number(0));
   });
 
   it("rounds the exact Rational past 14 digits, and half up below them", () => {
@@ -366,5 +366,13 @@ describe("numStep", () => {
 
   it("raises for a zero step", () => {
     expect(() => numStep(1, 3, 0, () => {})).toThrow("step can't be 0");
+  });
+});
+
+describe("round with positive ndigits", () => {
+  it("answers an Integer receiver itself and keeps a Float zero a Float", () => {
+    expect(round(5, 2)).toBe(5);
+    expect(round(0, 2)).toBe(0);
+    expect(round(new Number(0) as number, 2)).toEqual(new Number(0));
   });
 });

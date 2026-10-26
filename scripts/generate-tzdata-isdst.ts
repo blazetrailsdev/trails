@@ -32,6 +32,11 @@ const HORIZON_YEAR = 2040;
  * at — a transition that only moves the offset (a permanent shift, a war-time
  * re-basing) is not a flip and carries no entry. TZInfo reads the same records
  * `TimezonePeriod#dst?` answers from (tzinfo `timezone_offset.rb`).
+ *
+ * Beside them, the zone's initial `base_utc_offset` and each transition that
+ * changes it, or that changes neither the observed offset nor the bit (an
+ * abbreviation-only or std/base re-split transition, which neither `Temporal`
+ * nor the flips can see), with the base it moves to.
  */
 const RUBY_SCRIPT = `
 require "tzinfo"
@@ -41,24 +46,35 @@ out = {}
 zones.each do |identifier|
   timezone = (TZInfo::Timezone.get(identifier) rescue nil)
   next if timezone.nil?
-  initial = timezone.period_for_utc(Time.utc(1700)).dst?
+  first = timezone.period_for_utc(Time.utc(1700)).offset
+  initial = first.dst?
   current = initial
   flips = []
+  previous = first
+  bases = []
   timezone.transitions_up_to(Time.utc(${HORIZON_YEAR})).each do |transition|
-    dst = transition.offset.dst?
+    offset = transition.offset
+    if offset.base_utc_offset != previous.base_utc_offset ||
+        (offset.observed_utc_offset == previous.observed_utc_offset && offset.dst? == previous.dst?)
+      bases << [transition.timestamp_value, offset.base_utc_offset]
+    end
+    previous = offset
+    dst = offset.dst?
     next if dst == current
     current = dst
     flips << transition.timestamp_value
   end
-  out[identifier] = [initial, flips]
+  out[identifier] = [initial, flips, first.base_utc_offset, bases]
 end
 puts JSON.generate(out)
 `;
 
-/** `[initialDst, flipInstants]` per zone, or `null` where `ruby`/`tzinfo` is unavailable. */
+type ZoneRecords = [boolean, number[], number, [number, number][]];
+
+/** `[initialDst, flipInstants, initialBase, [instant, base][]]` per zone, or `null` where `ruby`/`tzinfo` is unavailable. */
 export async function rubyZoneDstFlips(
   identifiers: string[],
-): Promise<Record<string, [boolean, number[]]> | null> {
+): Promise<Record<string, ZoneRecords> | null> {
   try {
     const { stdout } = await execFileAsync(
       "ruby",
@@ -67,7 +83,7 @@ export async function rubyZoneDstFlips(
         maxBuffer: 64 * 1024 * 1024,
       },
     );
-    return JSON.parse(stdout) as Record<string, [boolean, number[]]>;
+    return JSON.parse(stdout) as Record<string, ZoneRecords>;
   } catch {
     return null;
   }
@@ -88,33 +104,54 @@ export function encodeZone(initial: boolean, flips: number[]): string {
   return row;
 }
 
-/** The module packages/date/src/tzdata-isdst.ts carries, table and reader both. */
-export function serializeTable(zoneDstFlips: Record<string, [boolean, number[]]>): string {
+/**
+ * The zone's base row: the initial base offset, then each entry as a base-36
+ * delta from the instant before it and the base-36 base it moves to.
+ */
+export function encodeBases(initialBase: number, bases: [number, number][]): string {
+  let previous = 0;
+  let row = initialBase.toString(36);
+  for (const [instant, base] of bases) {
+    row += `,${(instant - previous).toString(36)}:${base.toString(36)}`;
+    previous = instant;
+  }
+  return row;
+}
+
+/** The module packages/date/src/tzdata-isdst.ts carries, tables and reader both. */
+export function serializeTable(zoneRecords: Record<string, ZoneRecords>): string {
   const rows: string[] = [];
-  for (const identifier of Object.keys(zoneDstFlips).sort()) {
-    const [initial, flips] = zoneDstFlips[identifier];
+  const baseRows: string[] = [];
+  for (const identifier of Object.keys(zoneRecords).sort()) {
+    const [initial, flips, initialBase, bases] = zoneRecords[identifier];
+    baseRows.push(`${identifier} ${encodeBases(initialBase, bases)}`);
     // A zone that has never observed DST answers `false` at every instant,
     // which is what a missing row already answers.
     if (!initial && flips.length === 0) continue;
     rows.push(`${identifier} ${encodeZone(initial, flips)}`);
   }
-  return `${HEADER}export const TZDATA_ISDST = \`\n${rows.join("\n")}\n\`;\n${READER}`;
+  return `${HEADER}export const TZDATA_ISDST = \`\n${rows.join("\n")}\n\`;\n\nexport const TZDATA_BASE_OFFSETS = \`\n${baseRows.join("\n")}\n\`;\n${READER}`;
 }
 
 const HEADER = "";
 
 const READER = `
-let rowsByZoneId: Map<string, string>;
+const tables = new Map<string, Map<string, string>>();
 
-function rows(): Map<string, string> {
-  rowsByZoneId ??= new Map(
-    TZDATA_ISDST.trim()
-      .split("\\n")
-      .map((row) => {
-        const space = row.indexOf(" ");
-        return [row.slice(0, space), row.slice(space + 1)] as [string, string];
-      }),
-  );
+function rows(table: string): Map<string, string> {
+  let rowsByZoneId = tables.get(table);
+  if (rowsByZoneId === undefined) {
+    rowsByZoneId = new Map(
+      table
+        .trim()
+        .split("\\n")
+        .map((row) => {
+          const space = row.indexOf(" ");
+          return [row.slice(0, space), row.slice(space + 1)] as [string, string];
+        }),
+    );
+    tables.set(table, rowsByZoneId);
+  }
   return rowsByZoneId;
 }
 
@@ -134,22 +171,44 @@ function zoneFlipInstants(row: string): number[] {
   return instants;
 }
 
-const rowsByPrimaryZoneId = new Map<string, string | undefined>();
+const primaryZoneIds = new Map<string, string>();
 
-function zoneRow(timeZoneId: string): string | undefined {
-  const row = rows().get(timeZoneId);
+function zoneRow(timeZoneId: string, table = TZDATA_ISDST): string | undefined {
+  const row = rows(table).get(timeZoneId);
   if (row !== undefined) return row;
-  if (!rowsByPrimaryZoneId.has(timeZoneId)) {
-    let primary: string;
+  let primary = primaryZoneIds.get(timeZoneId);
+  if (primary === undefined) {
     try {
       primary = new Intl.DateTimeFormat("en-US", { timeZone: timeZoneId }).resolvedOptions()
         .timeZone;
     } catch {
       primary = timeZoneId;
     }
-    rowsByPrimaryZoneId.set(timeZoneId, rows().get(primary));
+    primaryZoneIds.set(timeZoneId, primary);
   }
-  return rowsByPrimaryZoneId.get(timeZoneId);
+  return rows(table).get(primary);
+}
+
+const baseRecords = new Map<string, [number, number[], number[]]>();
+
+/** @noRailsEquivalent PERMANENT */
+export function tzdataBaseOffsets(timeZoneId: string): [number, number[], number[]] | null {
+  const row = zoneRow(timeZoneId, TZDATA_BASE_OFFSETS);
+  if (row === undefined) return null;
+  let records = baseRecords.get(row);
+  if (records === undefined) {
+    const [initial, ...entries] = row.split(",");
+    records = [parseInt(initial, 36), [], []];
+    let previous = 0;
+    for (const entry of entries) {
+      const colon = entry.indexOf(":");
+      previous += parseInt(entry.slice(0, colon), 36);
+      records[1].push(previous);
+      records[2].push(parseInt(entry.slice(colon + 1), 36));
+    }
+    baseRecords.set(row, records);
+  }
+  return records;
 }
 
 /** @noRailsEquivalent PERMANENT */

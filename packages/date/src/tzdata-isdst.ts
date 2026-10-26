@@ -283,17 +283,425 @@ Pacific/Saipan 0,-5hlkw0,txp80,3frms0,qdrpo,7kgac,3ljw0,c8tg0,6u7w0,bvus0,6u7w0,
 Pacific/Tongatapu 0,fj6ms0,8fpc0,bvs00,4bh80,eelg0,4bh80,7pmis0,3lmo0
 `;
 
-let rowsByZoneId: Map<string, string>;
+export const TZDATA_BASE_OFFSETS = `
+Africa/Abidjan -qw,-u9rgl4:0
+Africa/Accra -1g,-s9p1ak:0,dpkimk:1e0,21gem0:0
+Africa/Addis_Ababa 760,-1g6t8i0:76w,ymedb4:8c0
+Africa/Algiers kc,-154gb8c:fl,afgo4r:0,f451zl:2s0,3g9uc0:0,4uy840:2s0,3rdzw0:0,7ku800:2s0,11t400:0,sg5g0:2s0
+Africa/Bamako -1hc,-u9rfuo:0,bk956o:-2s0,dqe840:0
+Africa/Bangui 3fw,-u9rkrw:2s0
+Africa/Banjul -330,-u9re90:-330,b38800:-2s0,4m1rp0:0
+Africa/Bissau -2vw,-u9rek0:-2s0,wvoyo0:0
+Africa/Blantyre 6hc,-ui1t5c:6ja,1j56m2:6j0,5qqlca:5k0
+Africa/Brazzaville 2tw,-u9rk5w:2s0
+Africa/Bujumbura 5fs,-15r1ers:5k0
+Africa/Cairo 5sl,-1054wgl:5k0
+Africa/Casablanca -1ek,-tblt9g:0,10qh7xg:2s0,xqqk0:0,r5xvrj:0
+Africa/Ceuta -zg,-100edc0:0,17f9s00:2s0
+Africa/Conakry -2jg,-u9resk:0,bk944k:-2s0,dhlk40:0
+Africa/Dakar -388,-u9re3s:-2s0,fcoa7s:0
+Africa/Dar_es_Salaam 79w,-kcrtxw:8c0,8ve49w:7n0,6sagp0:8c0
+Africa/Djibouti 7zo,-uj8fzo:8c0
+Africa/Douala 1so,-u9rj4o:2s0
+Africa/El_Aaiun -2g0,-isdxk0:-2s0,m2g0c0:0,w8hy7j:0
+Africa/Freetown -2gc,-19xcavo:-2gc,gfpuo0:-2s0,eu9cbo:0
+Africa/Gaborone 4ss,-18cyvgs:460,9h5hys:5k0
+Africa/Harare 5r0,-yvtf30:5k0
+Africa/Johannesburg 56o,-14nj6io:460,5rpt0o:5k0
+Africa/Juba 5us,-kcrsis:5k0,10158as:8c0,azg180:5k0
+Africa/Kampala 604,-lnse04:8c0,s8lo4:6y0,9e6420:7n0,4p4vb0:8c0
+Africa/Khartoum 60w,-kcrsow:5k0,10158gw:8c0,9ac180:5k0
+Africa/Kigali 5kg,-i1ulkg:5k0
+Africa/Kinshasa 2u0,-11ngdi0:2s0
+Africa/Lagos mn,-xnxnan:0,1kdnan:mn,2ve7dd:1e0,2yfgkn:2s0
+Africa/Libreville 1r0,-u9rj30:2s0
+Africa/Lome 84,-146nmw4:0
+Africa/Luanda 2g8,-14phh48:2es,afpx08:2s0
+Africa/Lubumbashi 534,-11ngfr4:2s0,bpwyb4:5k0
+Africa/Lusaka 58k,-yvtekk:5k0
+Africa/Malabo 1mk,-u9riyk:0,r44sak:2s0
+Africa/Maputo 616,-vu3fd6:5k0
+Africa/Maseru 53c,-yvtefc:5k0
+Africa/Mbabane 5rc,-yvtf3c:5k0
+Africa/Mogadishu 8eg,-13r0weg:8c0,je91eg:6y0,dkj2q0:8c0
+Africa/Monrovia -1zw,-19xcbc4:-1zw,je5c00:-226,rl202a:0
+Africa/Nairobi 6tg,-w6p5hg:6y0,aiwqjg:8c0,sg1a0:6y0,3nbte0:7n0,2wu1z0:8c0
+Africa/Ndjamena 2sc,-u9rk4c:2s0
+Africa/Niamey e4,-u9rhq4:-2s0,bk99u4:0,dhlek0:2s0
+Africa/Nouakchott -2yc,-u9redo:0,bk93po:-2s0,dyodg0:0
+Africa/Ouagadougou -a4,-u9rh1w:0
+Africa/Porto-Novo hg,-u9rhtg:0,bk975g:2s0
+Africa/Sao_Tome 18w,-18vsjww:-1p9,em12kw:0,1jbm840:2s0,irxc0:0
+Africa/Tripoli 2fw,-q3gfrw:2s0,kcrmbw:5k0,c05bw0:2s0,4cmys0:5k0,3cf3w0:2s0,izc00:5k0,7vqyw0:2s0,hyao0:5k0
+Africa/Tunis 1vw,-1a9dr7w:fl,fke44b:2s0
+Africa/Windhoek 360,-14nj4i0:460,5rpr00:5k0,19fnam0:5k0,235k00:2s0,cbb9c0:5k0
+America/Adak xya,-1hc7qjz:-wpq,h4z1xp:-uk0,nh5v6a:-uk0,bacpc0:-uk0,8niw40:-rs0,1l940:-rs0
+America/Anchorage 12wo,-1hc7qjz:-rrc,h4ywzb:-rs0,nh604o:-rs0,bacmk0:-rs0,8niw40:-p00,1l940:-p00
+America/Anguilla -bog,-u6m6zk:-b40
+America/Antigua -bg0,-u6m780:-dw0,k9mqg0:-b40
+America/Araguaina -8xc,-t85j2o:-8c0,1sqpk27:-8c0
+America/Argentina/La_Rioja -cdo,-138a8yc:-bw0,db2a6c:-b40,pspb80:-8c0,b63rs0:-b40,3g880:-8c0,4dyyk0:-b40,7thc0:-8c0,27s800:-b40,z9g0:-8c0,hiyr7j:-8c0
+America/Argentina/Rio_Gallegos -ctg,-138a8ik:-bw0,db29qk:-b40,pspb80:-8c0,fniyk0:-b40,7thc0:-8c0,27s800:-b40,z9g0:-8c0,hiyr7j:-8c0
+America/Argentina/Salta -c44,-138a97w:-bw0,db2afw:-b40,pspb80:-8c0,b67h40:-b40,bvxk0:-8c0,45fjw0:-b40,7thc0:-8c0,jrq8nj:-8c0
+America/Argentina/San_Juan -cos,-138a8n8:-bw0,db29v8:-b40,pspb80:-8c0,b63rs0:-b40,3g880:-8c0,4dyyk0:-b40,7thc0:-8c0,27qdc0:-b40,2txg0:-8c0,hh5xvj:-8c0
+America/Argentina/San_Luis -cac,-138a91o:-bw0,db2a9o:-b40,pspb80:-8c0,anzx40:-b40,mudk0:-8c0,4conw0:-b40,7thc0:-8c0,27qdc0:-b40,2txg0:-8c0,1tkyg0:-b40,wcyw0:-8c0,er80jj:-8c0
+America/Argentina/Tucuman -c2s,-138a998:-bw0,db2ah8:-b40,pspb80:-8c0,b67h40:-b40,bvxk0:-8c0,45fjw0:-b40,7thc0:-8c0,27s800:-b40,mas0:-8c0,hjbpvj:-8c0
+America/Argentina/Ushuaia -cnc,-138a8oo:-bw0,db29wo:-b40,pspb80:-8c0,fniyk0:-b40,7thc0:-8c0,27oio0:-b40,12ys0:-8c0,hiyr7j:-8c0
+America/Aruba -czc,-u7lcco:-ci0,rlo7io:-b40
+America/Asuncion -aog,-15r0ynk:-aog,lsruo0:-b40,ldwofk:-8c0,s4vw0:-b40,qdl6o0:-8c0,6x6dzj:-8c0
+America/Bahia -74s,-t85kv8:-8c0,1sqplur:-8c0
+America/Bahia_Banderas -jho,-p1u4k0:-jg0,2u5s00:-go0,1si580:-jg0,pvk40:-go0,591h80:-jg0,zgln00:-go0
+America/Barbados -b1h,-ug8iaj:-b40
+America/Belem -8z8,-t85j0s:-8c0,1sqpk0b:-8c0
+America/Belize -gc0,-u52ic0:-go0,hezow0:-go0
+America/Blanc-Sablon -aks,-18vs838:-b40,w5pen8:-b40
+America/Boa_Vista -b8g,-t85grk:-b40,1sqphr3:-b40
+America/Bogota -dps,-18s2sy8:-dps,g0p400:-dw0,1s9xpxr:-dw0
+America/Boise -lip,-18y0gg0:-m80,klqxk0:-jg0,bm6pg0:-jg0
+America/Cambridge_Bay 0,-q3gdc0:-jg0,dddjw0:-jg0,sajd00:-go0,ipzw0:-dw0,ct40:-go0,7kj40:-jg0
+America/Campo_Grande -a44,-t85hvw:-b40,1sqpivf:-b40
+America/Cancun -g2g,-p1u7c0:-go0,vb0dk0:-dw0,j8d00:-go0,7q8tk0:-dw0,eefw0:-go0,8m19k0:-dw0
+America/Caracas -ce8,-15r0wxs:-ce4,bjfjzw:-ci0,rlo83w:-b40,meoxm0:-ci0,4dps00:-b40,bc2g7j:-b40
+America/Cayenne -9ow,-uj7yb4:-b40,tcw6r4:-8c0,10ovsjj:-8c0
+America/Cayman -f2k,-15r0u9g:-e7y,biv5te:-dw0
+America/Chicago -g8c,-18y0m00:-go0,raa6w0:-dw0,dbjw0:-go0,4kc1s0:-go0
+America/Chihuahua -jn8,-p1u4k0:-jg0,2u5s00:-go0,1si580:-jg0,pvk40:-go0,yg8aw0:-jg0,ctmfw0:-go0
+America/Ciudad_Juarez -jpw,-p1u4k0:-jg0,2u5s00:-go0,1si580:-jg0,pvk40:-go0,yg8aw0:-jg0,ctmfw0:-go0,1l940:-jg0
+America/Coral_Harbour -gys,-1353b18:-go0,ol1998:-go0,1tz8c0:-go0,2dsw0:-dw0
+America/Costa_Rica -fkd,-15r0trn:-fkd,g74lc0:-go0
+America/Coyhaique -dcg,-15r0vzk:-d39,ag6l2t:-dw0,3dlssr:-d39,157b79:-b40,f4e0r:-d39,49hzb9:-dw0,2lzcsr:-b40,534ik0:-dw0,351g0:-b40,24lbw0:-dw0,dolc0:-b40,14maik0:-8c0,6p5hzj:-8c0
+America/Creston -lks,-18vrx38:-jg0,h39xv8:-m80,vbus0:-jg0
+America/Cuiaba -adw,-t85hm4:-b40,1sqpiln:-b40
+America/Curacao -crn,-u7lckd:-ci0,rlo7qd:-b40
+America/Danmarkshavn -3gg,-rvusjk:-8c0,15gc7jk:0
+America/Dawson -ptg,-1079suk:-p00,nh6zek:-p00,epwp40:-m80,oj9zs0:-jg0
+America/Dawson_Creek -m9k,-18vrweg:-m80,w5p2yg:-m80,e43ig0:-jg0
+America/Denver -jfw,-18y0j80:-jg0,w7xps0:-jg0
+America/Detroit -fdn,-xx8dyd:-go0,5eraud:-dw0,fse9o0:-dw0
+America/Dominica -bdc,-uj7wl0:-b40
+America/Edmonton -l0g,-x1yazk:-jg0,kbvhjk:-jg0,16dw6c0:-go0
+America/Eirunepe -cxs,-t85f28:-dw0,1db3qa8:-b40,2t2t80:-dw0,cmiwjj:-dw0
+America/El_Salvador -gio,-pkm4tc:-go0
+America/Fort_Nelson -mpz,-18vrvy1:-m80,w5p2i1:-m80,10ayuk0:-jg0
+America/Fortaleza -74o,-t85kvc:-8c0,1sqpluv:-8c0
+America/Glace_Bay -b3o,-z94kwc:-b40,mj1rgc:-b40
+America/Goose_Bay -b6s,-18vs7h8:-9rg,qqpd8o:-9q0,5f00sk:-9q0,aqove0:-b40
+America/Grand_Turk -d68,-15r0w5s:-e7y,biv7pq:-dw0,1ht1h82:-b40,1kj6o0:-dw0
+America/Grenada -bfo,-uj7wkc:-b40
+America/Guadeloupe -be8,-ukehxs:-b40
+America/Guatemala -grg,-qqqskk:-go0
+America/Guayaquil -es8,-15r0ujs:-ejc,le9mf4:-dw0,1jvb947:-dw0
+America/Guyana -arr,-uhmik9:-b40,1va8c9:-af0,vj6nb0:-8c0,8p0jd0:-b40,nwp4jj:-b40
+America/Halifax -bs0,-z94k80:-b40,mj1qs0:-b40
+America/Havana -f94,-15r0u2w:-f9c,ijto08:-dw0
+America/Hermosillo -kjs,-p1u4k0:-jg0,2u5s00:-go0,1si580:-jg0,pvk40:-go0,591h80:-jg0
+America/Indiana/Knox -g1i,-18y0m00:-go0,w7xsk0:-go0,8puuc0:-dw0,s3180:-go0,em2w00:-dw0,7j5400:-go0
+America/Indiana/Marengo -fzn,-18y0m00:-go0,w7xsk0:-go0,874ro0:-dw0,6mdek0:-go0,f4g00:-dw0
+America/Indiana/Petersburg -g5v,-18y0m00:-go0,w7xsk0:-go0,aa12c0:-dw0,sfzw0:-go0,5qoqo0:-dw0,eu02o0:-go0,tvxc0:-dw0
+America/Indiana/Tell_City -g2f,-18y0m00:-go0,w7xsk0:-go0,9razo0:-dw0,1tw580:-go0,s36s0:-dw0,j9vjw0:-go0
+America/Indiana/Vevay -fr4,-18y0m00:-go0,w7xsk0:-go0,4jcbo0:-dw0
+America/Indiana/Vincennes -g7j,-18y0m00:-go0,w7xsk0:-go0,9razo0:-dw0,lvuvw0:-go0,tvxc0:-dw0
+America/Indiana/Winamac -g1d,-18y0m00:-go0,w7xsk0:-go0,874ro0:-dw0,ng13w0:-go0,hn9g0:-dw0
+America/Inuvik 0,-8ve5c0:-m80,dqkh40:-jg0
+America/Iqaluit 0,-eb6ao0:-dw0,1l3h80:-dw0,saj7g0:-go0,iq5g0:-dw0
+America/Jamaica -e7y,-15r0v42:-e7y,biv6o0:-dw0
+America/Juneau 15rv,-1hc7qjz:-ow5,h4yu44:-m80,nh62zv:-m80,i3z7w0:-p00,9d1c0:-m80,1kj3w0:-p00,1leo0:-p00
+America/Kentucky/Monticello -fpo,-18y0m00:-go0,w7xsk0:-go0,st9cw0:-dw0
+America/Kralendijk -crn,-u7lckd:-ci0,rlo7qd:-b40
+America/La_Paz -cmc,-15r0wpo:-cmc,m15mk0:-b40,1j8fb57:-b40
+America/Lima -e9o,-15r0v2c:-eac,9ov9co:-dw0,1vkpmp7:-dw0
+America/Los_Angeles -lwa,-18y0gg0:-m80,w7xn00:-m80
+America/Lower_Princes -crn,-u7lckd:-ci0,rlo7qd:-b40
+America/Maceio -6m4,-t85ldw:-8c0,1sqpmdf:-8c0
+America/Managua -fz8,-15r0tcs:-fzc,n7jmo4:-go0,ka1i0o:-dw0,xqqk0:-go0,8t1ck0:-dw0,dq240:-go0,53es0:-dw0,235h80:-go0
+America/Manaus -b44,-t85gvw:-b40,1sqphvf:-b40
+America/Marigot -be4,-u6m79w:-b40
+America/Martinique -bb8,-15r0y0s:-bb8,b4o2o0:-b40
+America/Matamoros -i20,-p1u7c0:-go0
+America/Mazatlan -jpg,-p1u4k0:-jg0,2u5s00:-go0,1si580:-jg0,pvk40:-go0,591h80:-jg0
+America/Menominee -g83,-17zjvrx:-go0,v9h2bx:-go0,cdabo0:-dw0,2396k0:-go0
+America/Merida -glg,-p1u7c0:-go0,vb0dk0:-dw0,fzuk0:-go0
+America/Metlakatla 16au,-1hc7qjz:-od6,h4ytl5:-m80,nh63iu:-m80,10n7l80:-p00,1kj6o0:-m80,3ylc0:-p00
+America/Mexico_City -id0,-p1u4k0:-jg0,2u5s00:-go0,1si580:-jg0,pvk40:-go0
+America/Miquelon -aeg,-uk1k9k:-b40,zy4wpk:-8c0,u4gojj:-8c0,li7kh:-8c0
+America/Moncton -bzw,-18wys04:-dw0,9nu9w4:-b40,mj1oo0:-b40
+America/Monterrey -iks,-p1u7c0:-jg0,2u5us0:-go0,1si580:-jg0,pvk40:-go0
+America/Montevideo -aer,-w4mll9:-aer,67elc0:-b40,21lxx9:-9q0,9w0mm0:-8c0,1di5gpj:-8c0
+America/Montserrat -bis,-uj7wfk:-b40
+America/Nassau -ebu,-u6m4c6:-dw0,hgjaw6:-dw0
+America/New_York -dpe,-18y0os0:-dw0,w7xvc0:-dw0
+America/Nome 101a,-1hc7qjz:-umq,h4yzup:-uk0,nh5x9a:-uk0,bacpc0:-uk0,8niw40:-p00,1l6c0:-p00
+America/Noronha -604,-t85lzw:-5k0,1sqpmzf:-5k0
+America/North_Dakota/Beulah -iuj,-18y0j80:-jg0,w7xps0:-jg0,y1l2c0:-go0
+America/North_Dakota/Center -irc,-18y0j80:-jg0,w7xps0:-jg0,omqx00:-go0
+America/North_Dakota/New_Salem -is3,-18y0j80:-jg0,w7xps0:-jg0,udfno0:-go0
+America/Ojinaga -jc4,-p1u4k0:-jg0,2u5s00:-go0,1si580:-jg0,pvk40:-go0,yg8aw0:-jg0,ctmfw0:-go0
+America/Panama -eq8,-15r0uls:-eso,9jvmqg:-dw0
+America/Paramaribo -a7s,-usj4g8:-a84,cixc0c:-a7o,5lydbk:-9q0,kcrm6c:-8c0,rtftxj:-8c0
+America/Phoenix -kr6,-18y0j80:-jg0
+America/Port-au-Prince -de8,-15r0vxs:-ddo,e4gmng:-dw0
+America/Port_of_Spain -be4,-u6m79w:-b40
+America/Porto_Velho -bu0,-t85g60:-b40,1sqph5j:-b40
+America/Puerto_Rico -c8p,-10xhp3b:-b40,o7evnb:-b40
+America/Punta_Arenas -d4s,-15r0w78:-d39,ag6lah:-dw0,3dlssr:-d39,157b79:-b40,f4e0r:-d39,49hzb9:-dw0,2lzcsr:-b40,534ik0:-dw0,351g0:-b40,24lbw0:-dw0,dolc0:-b40,10aj3w0:-8c0,b0wwnj:-8c0
+America/Rankin_Inlet 0,-6s8lc0:-go0,mvf4s0:-dw0,7x9g0:-go0
+America/Recife -6go,-t85ljc:-8c0,1sqpmiv:-8c0
+America/Regina -jdo,-xkq9yc:-jg0,kungic:-jg0,7o1t40:-go0
+America/Resolute 0,-bnp9c0:-go0,rqvss0:-dw0,7x9g0:-go0,2ws580:-dw0,6udg0:-go0
+America/Rio_Branco -ck0,-t85fg0:-dw0,1db3qo0:-b40,2t2t80:-dw0,cmiwjj:-dw0
+America/Santarem -a4o,-t85hvc:-b40,1db3qbc:-8c0,fflsjj:-8c0
+America/Santiago -d39,-15r0w8r:-d39,ag6lc0:-dw0,3dlssr:-d39,157b79:-b40,f4e0r:-d39,49hzb9:-dw0,2lzcsr:-b40,534ik0:-dw0,351g0:-b40,24l940:-dw0,doo40:-b40,1bbg0jj:-b40,mky0h:-b40
+America/Santo_Domingo -cy0,-15r0we0:-cyo,mkixco:-dw0,lp1m9c:-b40,dkmtg0:-dw0,1stc0:-b40
+America/Sao_Paulo -8ms,-t85jd8:-8c0,1sqpkcr:-8c0
+America/Scoresbysund -42g,-rvurxk:-5k0,xr0s5k:-2s0,mg0t80:-5k0,77d7jj:-5k0,m7tsh:-5k0
+America/Sitka 15lz,-1hc7qjz:-p21,h4yua0:-m80,nh62tz:-m80,jxvd40:-p00,1leo0:-p00
+America/St_Barthelemy -be4,-u6m79w:-b40
+America/St_Johns -9rg,-18vs8wk:-9rg,qqpeo0:-9q0,5f00sk:-9q0
+America/St_Kitts -bm4,-u6m71w:-b40
+America/St_Lucia -bao,-15r0y1c:-bao,bh9s00:-b40
+America/St_Thomas -c0w,-uj7vz4:-b40
+America/St_Vincent -bc8,-15r0xzs:-bc8,bh9s00:-b40
+America/Swift_Current -jyw,-xkq9d4:-jg0,kunfx4:-jg0,dxtl40:-go0
+America/Tegucigalpa -g5g,-pfzh6k:-go0
+America/Thule -cqk,-rvuj9g:-b40
+America/Tijuana -lo4,-p1u4k0:-jg0,11juo0:-m80,1sm040:-jg0,1si580:-m80,7p3b40:-m80
+America/Toronto -ep8,-1353das:-dw0,ol18qs:-dw0,1tzb40:-dw0
+America/Tortola -bys,-uj7w18:-b40
+America/Vancouver -mss,-18vrvv8:-m80,w5p2f8:-m80,16dw940:-jg0
+America/Whitehorse -p0c,-1079tno:-p00,nh707o:-p00,apvig0:-m80,sjb6g0:-jg0
+America/Winnipeg -hzo,-171bfcc:-go0,ub8lwc:-go0
+America/Yakutat 14sh,-1hc7qjz:-pvj,h4yv3i:-p00,nh620h:-p00,jzgrs0:-p00
+Antarctica/Casey 0,-irxc0:m80,lag4o0:uk0,73bo0:m80,uz1o0:uk0,60l80:m80,2fnh80:uk0,pz9g0:m80,at4c0:uk0,89u80:m80,acgc0:uk0,80no0:m80,asw1o:uk0,89wyc:m80,ag5po:uk0,89wyc:m80,ag5po:uk0,84lac:m80,7rcf7j:m80
+Antarctica/Davis 0,-6rmdc0:jg0,42jdw0:0,27wgs0:jg0,l8uss0:dw0,7eqs0:jg0,unmk0:dw0,60qs0:jg0,dismrj:jg0
+Antarctica/DumontDUrville 0,-c05eo0:rs0,2mks80:0,2i72g0:rs0,16dxkzj:rs0
+Antarctica/Macquarie 0,-10mb9c0:rs0,a4ouw0:0,f4kh40:rs0
+Antarctica/Mawson 0,-8aelc0:go0,t22y80:dw0,eqvo3j:dw0
+Antarctica/McMurdo 0,-7b2dc0:xc0
+Antarctica/Palmer 0,-2lxhc0:-b40,2hets0:-8c0,6k5rw0:-b40,i20000:-8c0,b0wwnj:-8c0
+Antarctica/Rothera 0,3lxs00:-8c0,vwm8zj:-8c0
+Antarctica/Syowa 0,-6qsqo0:8c0,169crnj:8c0
+Antarctica/Troll 0,ibruo0:0,h6s6bj:0,m7tsh:0
+Antarctica/Vostok 0,-6aaao0:jg0,iushw0:0,e23g0:jg0,f79gs0:dw0,7cq9jj:dw0
+Arctic/Longyearbyen 1zo,-1353tzo:2s0
+Asia/Aden 8bu,-afs0bu:8c0,19yc1bd:8c0
+Asia/Almaty e90,-nu1a90:dw0,37a0d0:go0,vpvhg0:dw0,f4is0:go0,grdzo0:dw0,78xazj:dw0
+Asia/Amman 6nk,-kcrtbk:5k0,1bx7frk:8c0,7y4ejj:8c0
+Asia/Anadyr wv8,-nu1sv8:xc0,379zj8:1040,r0u580:xc0,4p1f00:uk0,f4is0:xc0,9hprw0:uk0,iq5g0:xc0,dzvtzj:xc0
+Asia/Aqtau 9b4,-nu15b4:b40,379y74:dw0,qrh3w0:go0,9cyk0:dw0,4p1f00:b40,f4is0:dw0,1eeqk0:b40,59rk40:dw0,hc4x7j:dw0
+Asia/Aqtobe al4,-nu16l4:b40,379zh4:dw0,qrh140:go0,9d1c0:dw0,4p1f00:b40,f4is0:dw0,o0b7vj:dw0
+Asia/Ashgabat at8,-nu16t8:b40,379zp8:dw0,vpvhg0:b40,f4is0:dw0,o0b7vj:dw0
+Asia/Atyrau 9m8,-nu15m8:8c0,37a1a8:dw0,qrh140:go0,9cyk0:dw0,4p1f00:b40,f4is0:dw0,3r1180:b40,2x59g0:dw0,hc4x7j:dw0
+Asia/Baghdad 884,-15r1hk4:880,em11c4:8c0,1qnkh7j:8c0
+Asia/Bahrain 9d8,-eukpd8:9q0,1a1eb8:b40,etwby0:8c0,y9703j:8c0
+Asia/Baku 98c,-nu158c:8c0,h4tkwc:b40,hsbxg0:8c0,s36s0:b40,nnch3j:b40
+Asia/Bangkok im4,-1ayyla4:im4,l06800:jg0,1phce9n:jg0
+Asia/Barnaul fic,-q4ljic:go0,5hu6uc:jg0,vpvhg0:go0,f4is0:jg0,1r07k0:go0,89fps0:jg0,1vbzw0:go0,qnc40:jg0,bdw43j:jg0
+Asia/Beirut 6ko,-1ayy98o:5k0
+Asia/Bishkek dtc,-nu19tc:dw0,379zxc:go0,vpvhg0:dw0,7hyd40:go0,gxhgbj:go0
+Asia/Brunei la4,-mvofy4:ku0,3khxs4:m80,1itqj5j:m80
+Asia/Chita l0g,-q4cfog:m80,5hkxgg:p00,vpvhg0:m80,f4is0:p00,a0fuk0:rs0,1vbzw0:m80,qnew0:p00,bdw9nj:p00
+Asia/Colombo esc,-1ayyhgc:esk,dkh6ns:fa0,1b6ekuk:i20,7x5a0:go0,4xvqq0:fa0,gktuxj:fa0
+Asia/Damascus 6q0,-q3gk20:5k0,1hnw3q0:8c0,7y4hbj:8c0
+Asia/Dhaka gqs,-15r1q2s:gcw,r080dw:i20,bmgyw:fa0,5lxg0:i20,4qknw0:go0,191kodj:go0
+Asia/Dili n98,-u9s3k0:m80,fqct80:p00,hufs00:m80,cpz440:p00,jhkf7j:p00
+Asia/Dubai a8o,-q3gnko:b40,1pm0ok7:b40
+Asia/Dushanbe cqo,-nu18qo:dw0,379yuo:go0,vpvhg0:dw0,offtfj:dw0
+Asia/Famagusta 6ac,-p4bqac:5k0,1dhh9yc:8c0,leog0:5k0
+Asia/Gaza 6ds,-1054x1s:5k0,1dply5s:5k0
+Asia/Hebron 6hz,-1054x5z:5k0,1dply9z:5k0
+Asia/Hong_Kong l56,-y0i0s0:m80,j9odk0:p00,25mag0:m80
+Asia/Hovd gz0,-xmcoz0:go0,11sncb0:jg0,vc9dnj:jg0
+Asia/Irkutsk jb5,-1ayylz5:jb5,kwq5c0:jg0,5fh175:m80,vpvhg0:jg0,f4is0:m80,a0fuk0:p00,1vbzw0:m80,c4jlrj:m80
+Asia/Jakarta js0,-1hftyg0:js0,tfikqo:kdc,4lzxc0:ku0,4wdzjc:p00,1tu960:ku0,1cx860:m80,11jta0:ku0,74uc20:jg0
+Asia/Jayapura q20,-jebm20:p00,66bqe0:qe0,a37vy0:p00
+Asia/Jerusalem 6iu,-1ayy96u:6ig,jtxuoe:5k0
+Asia/Kabul ctc,-15r1m5c:b40,spc1pc:ci0,1ck9lfj:ci0
+Asia/Kamchatka tdo,-olrupo:uk0,3z045o:xc0,vpvhg0:uk0,f4is0:xc0,9hprw0:uk0,iq5g0:xc0,dzvtzj:xc0
+Asia/Karachi cf0,-wvpb30:fa0,ncoqh0:dw0,a63o20:dw0
+Asia/Khandyga p3p,-q4cjrp:m80,5hl1jp:p00,vpvhg0:m80,f4is0:p00,68j3o0:rs0,3rwo40:uk0,8ql00:rs0,1mlho0:p00,c4jojj:p00
+Asia/Krasnoyarsk h72,-q37l72:go0,5gg8j2:jg0,vpvhg0:go0,f4is0:jg0,a0fuk0:m80,1vbzw0:jg0,c4jizj:jg0
+Asia/Kuala_Lumpur ity,-100ew5y:j8d,2ax69l:jg0,fyn071:kdc,2yhc00:ku0,8n3jc:p00,1v2p60:ku0,iy3ms0:m80,t93z7j:m80
+Asia/Kuching kfk,-mvof3k:ku0,3khwxk:m80,4rg6m0:p00,1v2qk0:m80,1c77lzj:m80
+Asia/Kuwait 8vw,-afs0vw:8c0,19yc1vf:8c0
+Asia/Macau l0y,-y0i2cy:m80,jdvyoy:p00,1yxpc0:m80
+Asia/Magadan rxc,-nu1nxc:rs0,37a05c:uk0,vpvhg0:rs0,f4is0:uk0,a0fuk0:xc0,1vbzw0:rs0,s39k0:uk0,bcgkjj:uk0
+Asia/Makassar m40,-q3gzg0:m40,6p5hc0:m80,4u87w0:p00,1w02k0:m80
+Asia/Manila -189k,-1t8ix2g:meg,sjc9ig:m80,m58uk0:p00,1leo00:m80
+Asia/Muscat auo,-q3go6o:b40,1pm0p67:b40
+Asia/Nicosia 66g,-p4bq6g:5k0
+Asia/Novokuznetsk g5c,-nu36tc:go0,37bu5c:jg0,vpvhg0:go0,f4is0:jg0,9hprw0:go0,iq5g0:jg0,dzvg3j:jg0
+Asia/Novosibirsk fcs,-q4do0s:go0,5hmbcs:jg0,vpvhg0:go0,f4is0:jg0,p73k0:go0,9b8ts0:jg0,1vbzw0:go0,wrpg0:jg0,b7rqrj:jg0
+Asia/Omsk dl6,-q5xmx6:dw0,5j6d16:go0,vpvhg0:dw0,f4is0:go0,a0fuk0:jg0,1vbzw0:go0,c4jg7j:go0
+Asia/Oral 9ic,-nu15ic:8c0,37a16c:dw0,qrgyc0:go0,9d1c0:dw0,3n8b00:b40,1gxms0:dw0,3ljw0:b40,6kkqs0:dw0,hc4x7j:dw0
+Asia/Phnom_Penh jfg,-x568rg:jqu,2isicm:jg0,gj25iu:m80,15ct80:p00,8so00:jg0,1c7q4nj:jg0
+Asia/Pontianak k8w,-w6piww:k8w,cse2o0:ku0,4tnu2w:p00,1wkei0:ku0,1cx860:m80,11jta0:ku0,74uc20:m80,cixam0:jg0
+Asia/Pyongyang nac,-w895yc:nm0,1yh10c:p00,hk5da0:p00,10ipmo0:nm0,1f4qo0:p00
+Asia/Qatar 9jk,-q3gmvk:b40,rctnrk:8c0,y9703j:8c0
+Asia/Qostanay bs4,-nu17s4:b40,37a0o4:dw0,qrh140:go0,9d1c0:dw0,4p1f00:b40,f4is0:dw0,6o67w0:go0,a37p00:dw0,78xazj:dw0
+Asia/Qyzylorda c4g,-nu184g:b40,37a10g:dw0,qrh140:go0,9d1c0:dw0,4p1f00:b40,9d440:dw0,5rbw0:go0,3ljw0:dw0,6kkqs0:go0,7dmqc0:dw0,9yi9nj:dw0
+Asia/Riyadh 8ng,-bwgbbg:8c0,1bf0caz:8c0
+Asia/Sakhalin qfc,-xl87rc:p00,kvnarc:uk0,nsoqo0:rs0,f4is0:uk0,2pkvw0:rs0,7av1g0:uk0,1vbzw0:rs0,qnc40:uk0,bdwf7j:uk0
+Asia/Samarkand ceh,-nu18eh:b40,37a1ah:dw0,qrh140:go0,9d1c0:dw0,t4h5nj:dw0
+Asia/Seoul nig,-w8966g:nm0,1yh18g:p00,hkx5a0:p00,4gadc0:nm0,3uu6q0:p00
+Asia/Shanghai mhj,-100eztj:m80
+Asia/Singapore j8d,-100ewkd:j8d,2ax6o0:jg0,fyn071:kdc,2yhc00:ku0,8n3jc:p00,1v2p60:ku0,iy3ms0:m80,t93z7j:m80
+Asia/Srednekolymsk sgs,-nu1ogs:rs0,37a0os:uk0,vpvhg0:rs0,f4is0:uk0,a0fuk0:xc0,1vbzw0:uk0,c4ju3j:uk0
+Asia/Taipei mi0,-12mch60:m80,lsd1m0:p00,45slc0:m80
+Asia/Tashkent ctz,-nu18tz:dw0,379yxz:go0,vpvhg0:dw0,offtfj:dw0
+Asia/Tbilisi 8an,-1ayyayn:8an,n4x6o0:8c0,h4tjyn:b40,hsbxg0:8c0,1tj3s0:b40,1b62k0:b40,3s4000:8c0,e1v40:b40,h4kmfj:b40
+Asia/Tehran 9iw,-s6m6uw:9iw,a5dpc0:9q0,m3tx0w:b40,juuq0:9q0,uw3qrj:9q0
+Asia/Thimphu glo,-bojclo:fa0,kxymno:go0,q94qxj:go0
+Asia/Tokyo pvn,-16snno0:p00
+Asia/Tomsk fqf,-q3zbqf:go0,5h7z2f:jg0,vpvhg0:go0,f4is0:jg0,5d5mk0:go0,4naas0:jg0,1vbzw0:go0,tw040:jg0,bang3j:jg0
+Asia/Ulaanbaatar jsk,-xmcrsk:jg0,11sncck:m80,vc9gfj:m80
+Asia/Urumqi g7w,-lx5pjw:go0,1lfpqjf:go0
+Asia/Ust-Nera qiu,-q4cl6u:m80,5hl2yu:p00,qi27w0:uk0,57t400:rs0,f4is0:uk0,a0fuk0:xc0,8ql00:uk0,1mlho0:rs0,c4jrbj:rs0
+Asia/Vientiane j00,-x568c0:jqu,2ishx6:jg0,gj25iu:m80,15ct80:p00,8so00:jg0,tmtk0:m80,470yk0:jg0,1772cjj:jg0
+Asia/Vladivostok of7,-oligf7:p00,3yqvf7:rs0,vpvhg0:p00,f4is0:rs0,a0fuk0:uk0,1vbzw0:rs0,c4jrbj:rs0
+Asia/Yakutsk o0y,-q4cioy:m80,5hl0gy:p00,vpvhg0:m80,f4is0:p00,a0fuk0:rs0,1vbzw0:p00,c4jojj:p00
+Asia/Yekaterinburg b89,-rx5hw9:af5,1kybx4:b40,5pfyv5:dw0,vpvhg0:b40,f4is0:dw0,a0fuk0:go0,1vbzw0:dw0,c4jdfj:dw0
+Asia/Yerevan 88o,-nu148o:8c0,h4tjwo:b40,hsbxg0:8c0,2c9es0:b40,m3693j:b40
+Atlantic/Azores -4r4,-18vsdww:-5aw,em124w:-5k0,skphk0:-2s0,doy540:0,8ufw0:-2s0,n9ta7j:-2s0,m7tsh:-2s0
+Atlantic/Bermuda -c06,-15r0xbu:-c06,kvhuw0:-b40
+Atlantic/Canary -2uo,-oytbtc:-2s0,ctvupc:0
+Atlantic/Cape_Verde -4cs,-u9rbs0:-5k0,xckiw0:-2s0,wfqtvj:-2s0
+Atlantic/Madeira -34o,-18vsfjc:-34o,em10zc:-2s0,skphk0:0
+Atlantic/Reykjavik -42o,-wcwx9c:-2s0,vgb05c:0
+Atlantic/South_Georgia -6rk,-15r12kg:-5k0,259l3jz:-5k0
+Atlantic/St_Helena -120,-15r18a0:-120,vu1eo0:0
+Atlantic/Stanley -apo,-15r0ymc:-apo,bkx9c0:-b40,114itqc:-8c0,18nbw0:-b40,d16z00:-8c0,eaalnj:-8c0
+Australia/Adelaide pnw,-133j2zw:p00,27qdzw:qe0
+Australia/Brisbane sc8,-1354kc8:rs0
+Australia/Broken_Hill q70,-133j3j0:rs0,t9nr0:p00,1egqs0:qe0
+Australia/Darwin o88,-133j1k8:p00,27qck8:qe0
+Australia/Eucla nv4,-12nxx74:ob0,226hy6n:ob0
+Australia/Hobart ra4,-12smja4:rs0
+Australia/Lindeman rl8,-1354jl8:rs0
+Australia/Lord_Howe tgk,-133j6sk:rs0,18x8f0k:t60,tousrj:t60,mk0oh:t60
+Australia/Melbourne qug,-133j46g:rs0
+Australia/Perth lgc,-12nxusc:m80
+Australia/Sydney s04,-133j5c4:rs0
+Europe/Amsterdam wk,-1ygf4wk:wk,1hhpuk0:xc,1i0ir8:2s0
+Europe/Andorra a4,-100edm4:0,nvgqy4:2s0
+Europe/Astrakhan 8wc,-nu2zkc:8c0,37bv8c:b40,uo2dg0:8c0,11t6s0:b40,ipzw0:8c0,9wudg0:b40,1vbzw0:8c0,qnc40:b40,bdvvrj:b40
+Europe/Athens 4e4,-12rxtq4:4e4,aw2tdo:5k0,cx4c0g:2s0,1j1mw0:5k0
+Europe/Belgrade 3so,-18vsmgo:2s0
+Europe/Berlin 2h4,-1421154:2s0
+Europe/Bratislava 2o8,-1qmkw08:2o8,lsd1c0:2s0,ssh6w8:0,4bk00:2s0
+Europe/Brussels t6,-1ayy3h6:t6,6forh6:0,br3hc0:2s0,23byk0:0,b8cpo0:2s0
+Europe/Bucharest 4u0,-14u7wu0:4u0,krxxc0:5k0
+Europe/Budapest 3j8,-15bee78:2s0
+Europe/Busingen 1kw,-1os49kw:1dm,lc05ja:2s0
+Europe/Chisinau 5c8,-1ayy808:5bo,jw96ok:4u0,70f1to:5k0,57jr60:2s0,1mc2s0:8c0,nul9c0:5k0
+Europe/Copenhagen 2bw,-15r1bnw:2bw,235k00:2s0
+Europe/Dublin -169,-1anxqtr:-169,ivfew0:0,r6c3tr:2s0,1kjf00:0
+Europe/Gibraltar -zo,-1anxr0c:0,14101wc:2s0
+Europe/Guernsey -gx,-tiakv3:0,e40sr3:2s0,2j3jw0:2s0,3i5o0:0,c5hug0:2s0,1kjf00:0
+Europe/Helsinki 4md,-1bss9yd:4md,mebs00:5k0
+Europe/Isle_of_Man -tv,-19a1gi5:0,18nv8e5:2s0,1kjf00:0
+Europe/Istanbul 5d4,-1ayy814:5ew,g1oam8:5k0,zcsaew:8c0,3b6w80:5k0,gmefs0:8c0,b5gbzj:8c0
+Europe/Jersey -e2,-11cerk0:0,ly4zg0:2s0,2j3jw0:2s0,3i5o0:0,c5hug0:2s0,1kjf00:0
+Europe/Kaliningrad 3so,-14212go:2s0,r5ezko:5k0,imdc0:8c0,mfb1g0:5k0,bhdk40:8c0,1vbzw0:5k0
+Europe/Kirov 97c,-qcx400:8c0,5q5zo0:b40,uo2dg0:8c0,11t6s0:b40,ipzw0:8c0,9wudg0:b40,1vbzw0:8c0
+Europe/Lisbon -1p9,-18vsgyr:-1p9,em0zmr:0,skphk0:2s0,57ljs0:0,8co5g0:2s0,1tw800:0
+Europe/Ljubljana 2os,-18vslcs:2s0
+Europe/London -23,-1rprx9x:0,1r3lp5x:2s0,1kjf00:0
+Europe/Luxembourg 150,-y89550:2s0,7k4910:0,b7clo0:2s0
+Europe/Madrid -ok,-100edc0:0,kgmfw0:2s0
+Europe/Malta 2os,-13qyw0s:2s0
+Europe/Mariehamn 4md,-1bss9yd:4md,mebs00:5k0
+Europe/Minsk 53s,-1ayy7rs:53c,n4x6og:5k0,379zjc:8c0,6gd1o0:2s0,vbjo0:8c0,oe6w40:5k0,afkg40:8c0,dzv4zj:8c0
+Europe/Monaco 1d8,-14hnyp8:fl,9tlnln:0,fpl1nl:2s0,7x3w0:0,7x9g0:2s0,c8w80:0,7k800:2s0,9q000:0,9d1c0:2s0,9nzs0:0,922w0:2s0
+Europe/Moscow 6yh,-1ayy9mh:6yh,j1sw00:707,zwfqa:8c0,5i840:707,d9p80:8c0,1qno87:5k0,412as0:8c0,vpvhg0:5k0,f4is0:8c0,a0fuk0:b40,1vbzw0:8c0
+Europe/Oslo 1zo,-1353tzo:2s0
+Europe/Paris fl,-154gb3l:fl,afgo00:0,f9uavl:2s0,26t1c0:2s0,29k40:0,922w0:2s0
+Europe/Podgorica 3so,-18vsmgo:2s0
+Europe/Prague 2o8,-1qmkw08:2o8,lsd1c0:2s0,ssh6w8:0,4bk00:2s0
+Europe/Riga 4gy,-1ayy74y:4gy,o6xpc0:5k0,7fhlky:8c0,164wc0:2s0,10kig0:8c0,n74tc0:5k0
+Europe/Rome 2b8,-1hs7rn8:2b8,e170v8:2s0
+Europe/Samara 99w,-qcx400:8c0,5q5zo0:b40,uo2dg0:8c0,11t6s0:5k0,9d440:8c0,12w00:b40,9me7s0:8c0,iq5g0:b40,dzv7rj:b40
+Europe/San_Marino 2b8,-1hs7rn8:2b8,e170v8:2s0
+Europe/Sarajevo 3es,-18vsm2s:2s0
+Europe/Saratov 8j6,-qcx400:8c0,5q5zo0:b40,u5cas0:8c0,1kj9g0:b40,ipzw0:8c0,9wudg0:b40,1vbzw0:8c0,13m040:b40,b0x7rj:b40
+Europe/Simferopol 6bc,-1ayy8zc:6ao,n4x6oo:5k0,37a0qo:8c0,6gd1o0:2s0,r5jo0:8c0,o4bc40:5k0,200fs0:8c0,1iqog0:5k0,8ve2k0:b40,asqg0:8c0
+Europe/Skopje 3yw,-18vsmmw:2s0
+Europe/Sofia 4bg,-1ayy6zg:5ew,7s708k:5k0,p0d6uw:2s0,19des0:5k0
+Europe/Stockholm 3cc,-1bhq3cc:2se,ayjpvy:2s0
+Europe/Tallinn 4l0,-1ayy790:4l0,jvj9c0:2s0,qhr50:4l0,ygov0:5k0,a1zgd0:8c0,1631o0:2s0,zhjo0:8c0,n87s40:5k0
+Europe/Tirane 3o8,-t85vo8:2s0
+Europe/Ulyanovsk 8yo,-qcx400:8c0,5q5zo0:b40,uo2dg0:8c0,11t6s0:5k0,f4is0:8c0,a0fuk0:b40,1vbzw0:8c0,qnc40:b40,bdvvrj:b40
+Europe/Vaduz 1rg,-13g44fg:2s0
+Europe/Vatican 2b8,-1hs7rn8:2b8,e170v8:2s0
+Europe/Vienna 30x,-14211ox:2s0
+Europe/Vilnius 4os,-1ayy7cs:3w0,jb5y4s:4fc,1g224o:2s0,e75nc:5k0,4kqk0:2s0,acbs40:8c0,168iw0:2s0,wt900:8c0,naw2s0:5k0,4p8qw0:2s0,tvxc0:5k0
+Europe/Volgograd 884,-q3cw84:8c0,5glrw4:b40,u5cas0:8c0,1kj9g0:b40,ipzw0:8c0,9wudg0:b40,1vbzw0:8c0,239c40:b40,14oqk0:8c0
+Europe/Warsaw 3w0,-1ayy6k0:3w0,iko800:2s0,1mjlc0:5k0,1xn6c0:2s0
+Europe/Zagreb 2yg,-18vslmg:2s0
+Europe/Zurich 1kw,-1os49kw:1dm,lc05ja:2s0
+Indian/Antananarivo 8ss,-uj8gss:8c0
+Indian/Chagos des,-wvpc2s:dw0,1ag64us:go0,ly387j:go0
+Indian/Christmas jks,-133iwws:jg0,22m2xwb:jg0
+Indian/Cocos hy4,-10j6sm4:i20,201qtln:i20
+Indian/Comoro 80g,-uj8g0g:8c0
+Indian/Kerguelen 0,-afrs00:dw0,19ybszj:dw0
+Indian/Mahe a9o,-wvp8xo:b40,1we99x7:b40
+Indian/Maldives dm0,-1ayyga0:dm0,15r19c0:dw0,14qh7xj:dw0
+Indian/Mauritius anc,-wvp9bc:b40,1we9aav:b40
+Indian/Mayotte 8dk,-uj8gdk:8c0
+Indian/Reunion a9s,-uks29s:b40,1u3c39b:b40
+Pacific/Apia yv4,-14fxxj4:-vsw,9nfeo0:-vy0,kcrmt4:-uk0,wcrd60:1040,dljjvj:1040
+Pacific/Auckland wd4,-1gsoz14:vy0,149qpp4:xc0
+Pacific/Bougainville st4,-1ayyvh4:r8w,7tuc88:rs0,osc24w:p00,1n05g0:rs0,1071c40:uk0,c1b0jj:uk0
+Pacific/Chatham xz0,-1gsp0n0:y10,149qqm0:zf0,1c1ib0j:zf0,mjxwh:zf0
+Pacific/Easter -k94,-15r0p2w:-k94,m9leo0:-jg0,puliqw:-go0,t5dsnj:-go0,mky0h:-go0
+Pacific/Efate v64,-u964i4:uk0,1trq5hn:uk0
+Pacific/Fakaofo -vpk,-100dhmg:-uk0,1lxe1ig:1040,dljh3j:1040
+Pacific/Fiji x4w,-sa2x4w:xc0,1rsmy4f:xc0
+Pacific/Funafuti x6s,-100fais:xc0,1zizbib:xc0
+Pacific/Galapagos -glc,-kcr62o:-dw0,spdryo:-go0,r5xf3j:-go0
+Pacific/Gambier -ozo,-tvndoc:-p00,1te7env:-p00
+Pacific/Guadalcanal tmc,-tvowac:uk0,1te8x9v:uk0
+Pacific/Guam -13v0,-1t8j1h0:qt0,t83xc0:rs0,ld6pp0:p00,1dl9g0:rs0,tfm7w0:rs0
+Pacific/Honolulu -t8e,-12lnw3m:-t60,pvl2nm:-t60,y2yu0:-rs0
+Pacific/Kiritimati -t4w,-100dk74:-tmo,153iz5s:-rs0,7yirhc:12w0,mgvujj:12w0
+Pacific/Kosrae -10hg,-1t8j4uk:u6k,t83xc0:uk0,76a4yk:p00,29hhk0:uk0,9cmd40:rs0,27sas0:p00,29fk40:uk0,cm2540:xc0,f9l3w0:uk0,kdq4zj:uk0
+Pacific/Kwajalein uzk,-100f8bk:uk0,ise0fk:rs0,27sas0:p00,1hjus0:uk0,ddxug0:-xc0,cgv6k0:xc0,n6g2bj:xc0
+Pacific/Majuro vpc,-100f91c:uk0,76a6hc:p00,29hhk0:uk0,9cmd40:rs0,27sas0:p00,1h6w40:uk0,deat40:xc0,znb8vj:xc0
+Pacific/Marquesas -pu0,-tvncu0:-qe0,1te7dtj:-qe0
+Pacific/Midway -wug,-100dghk:-uk0
+Pacific/Nauru uws,-pjxiws:vy0,ba66ys:p00,1kwca0:vy0,hfzda0:xc0,urfndj:xc0
+Pacific/Niue -vgs,-8zbv78:-vhc,63yiok:-uk0,12dxdi7:-uk0
+Pacific/Norfolk v3s,-100f8fs:v40,q3eins:vy0,xso4q0:uk0,bmwm1j:uk0,mk0oh:uk0
+Pacific/Noumea uto,-u9645o:uk0,1trq557:uk0
+Pacific/Pago_Pago z20,-14fxxq0:-vm0,9nfeo0:-uk0
+Pacific/Palau -15rg,-1t8izkk:owk,t83xc0:p00,1ziz383:p00
+Pacific/Pitcairn -o38,-100dp8s:-nm0,1esg26s:-m80,kqho1j:-m80
+Pacific/Port_Moresby r94,-1ayytx4:r8w,7tuao8:rs0,22nok8f:rs0
+Pacific/Rarotonga 112w,-10jifqw:-tl4,rk6io0:-t60,drmi4w:-rs0,uq9fxj:-rs0
+Pacific/Saipan -13oc,-1t8j1no:qzo,t83xc0:p00,mpn8no:rs0,tgqyk0:rs0
+Pacific/Tahiti -rp4,-tvnayw:-rs0,1te7byf:-rs0
+Pacific/Tarawa w1g,-100f9dg:xc0,1zizacz:xc0
+Pacific/Tongatapu y80,-corjk0:y9c,7znjyo:1040,147o0kv:1040
+Pacific/Wake uus,-100f86s:xc0,1ziz96b:xc0
+Pacific/Wallis y1k,-100fbdk:xc0,1zizcd3:xc0
+`;
 
-function rows(): Map<string, string> {
-  rowsByZoneId ??= new Map(
-    TZDATA_ISDST.trim()
-      .split("\n")
-      .map((row) => {
-        const space = row.indexOf(" ");
-        return [row.slice(0, space), row.slice(space + 1)] as [string, string];
-      }),
-  );
+const tables = new Map<string, Map<string, string>>();
+
+function rows(table: string): Map<string, string> {
+  let rowsByZoneId = tables.get(table);
+  if (rowsByZoneId === undefined) {
+    rowsByZoneId = new Map(
+      table
+        .trim()
+        .split("\n")
+        .map((row) => {
+          const space = row.indexOf(" ");
+          return [row.slice(0, space), row.slice(space + 1)] as [string, string];
+        }),
+    );
+    tables.set(table, rowsByZoneId);
+  }
   return rowsByZoneId;
 }
 
@@ -313,22 +721,44 @@ function zoneFlipInstants(row: string): number[] {
   return instants;
 }
 
-const rowsByPrimaryZoneId = new Map<string, string | undefined>();
+const primaryZoneIds = new Map<string, string>();
 
-function zoneRow(timeZoneId: string): string | undefined {
-  const row = rows().get(timeZoneId);
+function zoneRow(timeZoneId: string, table = TZDATA_ISDST): string | undefined {
+  const row = rows(table).get(timeZoneId);
   if (row !== undefined) return row;
-  if (!rowsByPrimaryZoneId.has(timeZoneId)) {
-    let primary: string;
+  let primary = primaryZoneIds.get(timeZoneId);
+  if (primary === undefined) {
     try {
       primary = new Intl.DateTimeFormat("en-US", { timeZone: timeZoneId }).resolvedOptions()
         .timeZone;
     } catch {
       primary = timeZoneId;
     }
-    rowsByPrimaryZoneId.set(timeZoneId, rows().get(primary));
+    primaryZoneIds.set(timeZoneId, primary);
   }
-  return rowsByPrimaryZoneId.get(timeZoneId);
+  return rows(table).get(primary);
+}
+
+const baseRecords = new Map<string, [number, number[], number[]]>();
+
+/** @noRailsEquivalent PERMANENT */
+export function tzdataBaseOffsets(timeZoneId: string): [number, number[], number[]] | null {
+  const row = zoneRow(timeZoneId, TZDATA_BASE_OFFSETS);
+  if (row === undefined) return null;
+  let records = baseRecords.get(row);
+  if (records === undefined) {
+    const [initial, ...entries] = row.split(",");
+    records = [parseInt(initial, 36), [], []];
+    let previous = 0;
+    for (const entry of entries) {
+      const colon = entry.indexOf(":");
+      previous += parseInt(entry.slice(0, colon), 36);
+      records[1].push(previous);
+      records[2].push(parseInt(entry.slice(colon + 1), 36));
+    }
+    baseRecords.set(row, records);
+  }
+  return records;
 }
 
 /** @noRailsEquivalent PERMANENT */

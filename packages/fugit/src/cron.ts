@@ -17,6 +17,7 @@ import {
   isSymbol,
   max,
   min,
+  numericModulo,
   product,
   rbCmpint,
   rbEqual,
@@ -153,20 +154,20 @@ export class Cron {
   }
 
   isMonthMatch(nt: TimeCursor | EoTime): boolean {
-    return !this.months || this.months.includes(nt.month());
+    return !this.months || this.months.includes(nt.month);
   }
   isHourMatch(nt: TimeCursor | EoTime): boolean {
-    return !this.hours || this.hours.includes(nt.hour());
+    return !this.hours || this.hours.includes(nt.hour);
   }
   isMinMatch(nt: TimeCursor | EoTime): boolean {
-    return !this.minutes || this.minutes.includes(nt.min());
+    return !this.minutes || this.minutes.includes(nt.min);
   }
   isSecMatch(nt: TimeCursor | EoTime): boolean {
-    return !this.seconds || this.seconds.includes(nt.sec());
+    return !this.seconds || this.seconds.includes(nt.sec);
   }
 
   isWeekdayHashMatch(nt: TimeCursor | EoTime, hsh: number): boolean {
-    const [phsh, nhsh] = nt.wdayInMonth();
+    const [phsh, nhsh] = nt.wdayInMonth;
 
     if (hsh > 0) {
       return hsh === phsh;
@@ -176,13 +177,13 @@ export class Cron {
   }
 
   isWeekdayModuloMatch(nt: TimeCursor | EoTime, mod: [number, number]): boolean {
-    return fixMod(nt.rweek(), mod[0]) === fixMod(mod[1], mod[0]);
+    return fixMod(nt.rweek, mod[0]) === fixMod(mod[1], mod[0]);
   }
 
   isWeekdayMatch(nt: TimeCursor | EoTime): boolean {
     if (this.weekdays == null) return true;
 
-    const [wd, hom] = this.weekdays.find(([d]) => d === nt.wday()) ?? [];
+    const [wd, hom] = this.weekdays.find(([d]) => d === nt.wday) ?? [];
 
     if (wd == null) return false;
     if (hom == null) return true;
@@ -201,10 +202,9 @@ export class Cron {
       new TimeCursor(this, nt)
         .incMonth()
         .time()
-        .minus(24 * 3600)
-        .day() + 1;
+        .minus(24 * 3600).day + 1;
 
-    return this.monthdays.map((d) => (d < 1 ? last + d : d)).includes(nt.day());
+    return this.monthdays.map((d) => (d < 1 ? last + d : d)).includes(nt.day);
   }
 
   isDayMatch(nt: TimeCursor | EoTime): boolean {
@@ -364,8 +364,8 @@ export class Cron {
         t1 = this.nextTime(t);
         if (t0) deltas.push(toI(t1.minus(t)) as number);
         t0 ??= t1;
-        if (deltas.length > 0 && t1.year() > year) break;
-        if (t1.year() - t0.year() > 7) break;
+        if (deltas.length > 0 && t1.year > year) break;
+        if (t1.year - t0.year > 7) break;
         t = t1;
       }
 
@@ -583,7 +583,7 @@ export class Cron {
     return uniq(
       a
         .map((e, i) => [e, i] as const)
-        .filter(([_e, i]) => i % sla === 0)
+        .filter(([_e, i]) => numericModulo(i, sla) === 0)
         .map(([e]) => e),
     );
   }
@@ -708,16 +708,16 @@ export class Cron {
 }
 
 export class TimeCursor {
-  declare year: () => number;
-  declare month: () => number;
-  declare day: () => number;
-  declare wday: () => number;
-  declare hour: () => number;
-  declare min: () => number;
-  declare sec: () => number;
-  declare wdayInMonth: () => [number, number];
-  declare rweek: () => number;
-  declare rday: () => number;
+  declare readonly year: number;
+  declare readonly month: number;
+  declare readonly day: number;
+  declare readonly wday: number;
+  declare readonly hour: number;
+  declare readonly min: number;
+  declare readonly sec: number;
+  declare readonly wdayInMonth: [number, number];
+  declare readonly rweek: number;
+  declare readonly rday: number;
   /** @internal */
   declare protected _cron: Cron;
   /** @internal */
@@ -748,8 +748,8 @@ export class TimeCursor {
   }
 
   incMonth(): this {
-    let y = this._t.year();
-    let m = this._t.month() + 1;
+    let y = this._t.year;
+    let m = this._t.month + 1;
     if (m === 13) {
       m = 1;
       y += 1;
@@ -761,68 +761,70 @@ export class TimeCursor {
   }
 
   incDay(): this | undefined {
-    this.inc((24 - this._t.hour()) * 3600 - this._t.min() * 60 - this._t.sec());
+    this.inc((24 - this._t.hour) * 3600 - this._t.min * 60 - this._t.sec);
 
-    if (this._t.hour() === 0) return;
+    if (this._t.hour === 0) return;
 
-    if (this._t.hour() < 12) {
+    if (this._t.hour < 12) {
       try {
-        this._t = EtOrbi.make(this._t.year(), this._t.month(), this._t.day(), this._t.zone);
+        this._t = EtOrbi.make(this._t.year, this._t.month, this._t.day, this._t.zone);
       } catch (e) {
         if (!(e instanceof TZInfo.PeriodNotFound)) throw e;
-        return this.inc((24 - this._t.hour()) * 3600);
+        return this.inc((24 - this._t.hour) * 3600);
       }
       return;
     } else {
-      return this.inc((24 - this._t.hour()) * 3600);
+      return this.inc((24 - this._t.hour) * 3600);
     }
   }
 
   incHour(): this {
-    return this.inc((60 - this._t.min()) * 60 - this._t.sec());
+    return this.inc((60 - this._t.min) * 60 - this._t.sec);
   }
   incMin(): this {
-    return this.inc(60 - this._t.sec());
+    return this.inc(60 - this._t.sec);
   }
 
   incSec(): this {
-    const sec = this._cron.seconds!.find((s) => s > this._t.sec());
+    const sec = this._cron.seconds!.find((s) => s > this._t.sec);
     if (sec != null) {
-      return this.inc(sec - this._t.sec());
+      return this.inc(sec - this._t.sec);
     } else {
-      return this.inc(60 - this._t.sec() + first(this._cron.seconds!)!);
+      return this.inc(60 - this._t.sec + first(this._cron.seconds!)!);
     }
   }
 
   decMonth(): this {
     return this.dec(
-      (this._t.day() - 1) * DAY_S + this._t.hour() * 3600 + this._t.min() * 60 + this._t.sec() + 1,
+      (this._t.day - 1) * DAY_S + this._t.hour * 3600 + this._t.min * 60 + this._t.sec + 1,
     );
   }
 
   decDay(): this {
-    return this.dec(this._t.hour() * 3600 + this._t.min() * 60 + this._t.sec() + 1);
+    return this.dec(this._t.hour * 3600 + this._t.min * 60 + this._t.sec + 1);
   }
   decHour(): this {
-    return this.dec(this._t.min() * 60 + this._t.sec() + 1);
+    return this.dec(this._t.min * 60 + this._t.sec + 1);
   }
   decMin(): this {
-    return this.dec(this._t.sec() + 1);
+    return this.dec(this._t.sec + 1);
   }
 
   decSec(): this {
     const target =
-      [...this._cron.seconds!].reverse().find((s) => s < this._t.sec()) ??
+      [...this._cron.seconds!].reverse().find((s) => s < this._t.sec) ??
       this._cron.seconds![this._cron.seconds!.length - 1];
-    return this.inc(target - this._t.sec() - (this._t.sec() > target ? 0 : 60));
+    return this.inc(target - this._t.sec - (this._t.sec > target ? 0 : 60));
   }
 }
 
 (
   ["year", "month", "day", "wday", "hour", "min", "sec", "wdayInMonth", "rweek", "rday"] as const
 ).forEach((k) => {
-  rbModDefineMethod(TimeCursor, k, function (this: TimeCursor) {
-    return (this as unknown as { _t: EoTime })._t[k]();
+  rbModDefineMethod(TimeCursor, k, {
+    get(this: TimeCursor) {
+      return (this as unknown as { _t: EoTime })._t[k];
+    },
   });
 });
 

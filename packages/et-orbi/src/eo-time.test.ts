@@ -432,7 +432,7 @@ describe("EtOrbi::EoTime", () => {
       it(`computes the wday in month interval for ${rbInspect(k)}`, () => {
         const t = typeof k === "string" ? EtOrbi.makeTime(k) : new EoTime(...k);
 
-        expect(t.wdayInMonth()).toEqual(v);
+        expect(t.wdayInMonth).toEqual(v);
       });
     }
   });
@@ -454,12 +454,7 @@ describe("EtOrbi::EoTime", () => {
       it(`for ${t}, returns rweek:${rweek}/rday:${rday}`, () => {
         const et = EtOrbi.makeTime(t);
 
-        expect([WDAYS[et.wday()], et.yday(), et.rweek(), et.rday()]).toEqual([
-          wday,
-          yday,
-          rweek,
-          rday,
-        ]);
+        expect([WDAYS[et.wday], et.yday, et.rweek, et.rday]).toEqual([wday, yday, rweek, rday]);
       });
     }
   });

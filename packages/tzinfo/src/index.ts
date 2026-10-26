@@ -11,6 +11,7 @@ import {
   Temporal,
   Time,
   Timezone as DateTimezone,
+  tzdataBaseOffsets,
   tzdataIsdst,
   tzdataIsdstFlips,
 } from "@blazetrails/date";
@@ -529,28 +530,32 @@ export class Timezone {
     let flipIndex = 0;
     while (flipIndex < flips.length && flips[flipIndex] <= at) flipIndex++;
     const lastFlip = flips[flipIndex - 1];
+    const [initialBase, baseInstants, bases] = tzdataBaseOffsets(this.identifier) ?? [
+      observed,
+      [],
+      [],
+    ];
+    let baseIndex = 0;
+    while (baseIndex < baseInstants.length && baseInstants[baseIndex] <= at) baseIndex++;
+    const base = baseIndex === 0 ? initialBase : bases[baseIndex - 1];
     const periodAt = (seconds: number) =>
       this.periodForUtc(Time.at(new Rational(seconds * 1000, 1000)).getutc());
     const zoned = () =>
       Temporal.Instant.fromEpochMilliseconds(at * 1000 + 1).toZonedDateTimeISO(this.identifier);
-    const startAt = () => {
-      const previous = zoned().getTimeZoneTransition("previous");
-      const starts = [lastFlip, previous && previous.epochMilliseconds / 1000];
-      return Math.max(...starts.filter((s): s is number => s != null));
-    };
-    let base = observed;
-    if (dst && lastFlip !== undefined) {
-      if (this.observedUtcOffset(new Date(lastFlip * 1000)) === observed) {
-        base = this.observedUtcOffset(new Date((lastFlip - 1) * 1000));
-      } else {
-        const previous = periodAt(startAt() - 1);
-        base = previous.isDst() ? observed - previous.stdOffset : previous.observedUtcOffset;
-      }
-    }
     const period: TimezonePeriod = new TimezonePeriod(this.abbr(d), observed, dst, base, () => {
+      const previous = zoned().getTimeZoneTransition("previous");
       const next = zoned().getTimeZoneTransition("next");
-      const ends = [flips[flipIndex], next && next.epochMilliseconds / 1000];
-      const start = startAt();
+      const starts = [
+        lastFlip,
+        baseInstants[baseIndex - 1],
+        previous && previous.epochMilliseconds / 1000,
+      ];
+      const ends = [
+        flips[flipIndex],
+        baseInstants[baseIndex],
+        next && next.epochMilliseconds / 1000,
+      ];
+      const start = Math.max(...starts.filter((s): s is number => s != null));
       const end = Math.min(...ends.filter((e): e is number => e != null));
       return [
         Number.isFinite(start)
@@ -632,7 +637,8 @@ export class Timezone {
     const local = Time.at(new Rational(ignoringOffset(time).getTime(), 1000)).getutc();
     const localMs = toDate(local).getTime();
     const period = this.periodForLocal(local, dst);
-    return Time.at(new Rational(localMs - period.observedUtcOffset * 1000, 1000)).getutc();
+    const utcNs = BigInt(localMs - period.observedUtcOffset * 1000) * 1_000_000n;
+    return Time.at(new Rational(utcNs + BigInt(time.nsec % 1_000_000), 1_000_000_000n)).getutc();
   }
 }
 

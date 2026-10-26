@@ -336,7 +336,7 @@ export class Duration {
     for (const [k, a] of Duration.NON_INFLA_KEYS) {
       const v = this.h[k];
       if (v == null) continue;
-      const at = [et.year(), et.month(), et.day(), et.hour(), et.min(), et.sec()];
+      const at = [et.year, et.month, et.day, et.hour, et.min, et.sec];
 
       at[a.x!] = numericPlus(at[a.x!], v) as number;
 
