@@ -1,6 +1,7 @@
 import { LocalJumpError } from "./local-jump-error.js";
 import { classpaths, isModuleObject } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
+import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, rbErrorArity, stringValue } from "./string/support.js";
@@ -521,6 +522,15 @@ function enumerableMethod(
 }
 
 /**
+ * `rb_include_module(rb_cArray, rb_mEnumerable)` (`vendor/ruby/v3.3.11/array.c:8606`):
+ * the ported `Enumerable` module, which {@link rbFSend} dispatches and
+ * {@link basicObjRespondTo} answers for on an Array that has no member or
+ * `ARRAY_METHOD_TABLE` entry of that name.
+ */
+const enumerableModule = (): Record<string, AnyFunction> =>
+  Enumerable.prototype as unknown as Record<string, AnyFunction>;
+
+/**
  * `rb_obj_is_proc` (`vendor/ruby/v3.3.11/proc.c:120`): a function that is not
  * a class, which is what a block or a lambda is.
  *
@@ -676,6 +686,7 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
     if (obj instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) return true;
     if (Array.isArray(obj) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) return true;
+    if (Array.isArray(obj) && Object.hasOwn(enumerableModule(), mid)) return true;
     if (temporalMethod(obj, mid) !== undefined) return true;
     if (enumerableMethod(obj, mid) !== undefined) return true;
     if (
@@ -1268,6 +1279,10 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (mid === "toHash" && (recv instanceof Map || isPlainHash(recv))) return recv;
   if (Array.isArray(recv) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) {
     return (ARRAY_METHOD_TABLE[mid] as AnyFunction)(recv, ...args);
+  }
+  if (Array.isArray(recv) && Object.hasOwn(enumerableModule(), mid)) {
+    const each = (block: (i: unknown) => void): void => recv.forEach((i) => block(i));
+    return enumerableModule()[mid].call({ each }, ...args);
   }
   const enumerable = enumerableMethod(recv, mid);
   if (enumerable !== undefined) return enumerable(recv, ...args);
