@@ -968,5 +968,6 @@ describe("Time#strftime week numbers before the 1582 reform", () => {
 
   it("leaves Date#strftime on its own start", () => {
     expect(new RbDate(12, 7, 9).strftime("%U %W %V %G")).toBe("27 27 27 0012");
+    expect(new RbDate(12, 7, 9, RbDate.GREGORIAN).strftime("%U %W %V %G")).toBe("28 28 28 0012");
   });
 });
