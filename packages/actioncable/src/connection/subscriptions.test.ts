@@ -26,7 +26,7 @@ class Connection extends Base {
   }
 
   static {
-    (this as unknown as { rescueFrom(...args: unknown[]): void }).rescueFrom(ChatChannelError, {
+    this.rescueFrom(ChatChannelError, {
       with: ":errorHandler",
     });
   }
