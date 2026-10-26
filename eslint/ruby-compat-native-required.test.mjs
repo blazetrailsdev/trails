@@ -26,13 +26,12 @@ const tester = new RuleTester({
 });
 
 function parseFixture(code) {
-  const { ast, services } = parser.parseForESLint(code, {
+  return parser.parseForESLint(code, {
     filePath: filename,
     project: "./tsconfig.json",
     tsconfigRootDir: fixtureDir,
     disallowAutomaticSingleRunInference: true,
   });
-  return { ast, services };
 }
 
 const head = 'import { hashDelete, Hash } from "@blazetrails/ruby-compat";\n';
