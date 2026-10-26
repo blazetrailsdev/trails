@@ -536,7 +536,7 @@ describe("new Enumerable(obj)", () => {
     expect(e.partition()).toEqual([1, 2, 3]);
   });
 
-  it("sortBy without a block answers the elements, as enum_sort_by's RETURN_SIZED_ENUMERATOR", () => {
+  it("sortBy without a block answers the elements unsorted, as the blockless partition and reject do", () => {
     expect(sortBy(new Set([3, 1, 2]))).toEqual([3, 1, 2]);
     expect(new Enumerable(new Set([3, 1, 2])).sortBy()).toEqual([3, 1, 2]);
   });
