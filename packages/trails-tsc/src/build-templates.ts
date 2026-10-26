@@ -40,8 +40,8 @@ function compileTemplate(source: string): string {
   const free = freeIdentifiers(render.split("\n")).filter((name) => !IMPORTED.has(name));
   const preamble = [
     "const __own = Object.create(null);",
-    'const __lookup = (name, guarded = false) => { for (const scope of [this, __own, globalThis]) if (name in scope) { const value = scope[name]; return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded) return undefined; throw new ReferenceError(`${name} is not defined`); };',
-    "const __assign = (name, value) => { if (name in this) this[name] = value; else __own[name] = value; return value; };",
+    'const __lookup = (name, guarded = false) => { for (const scope of [__own, this, globalThis]) if (name in scope) { const value = scope[name]; return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded) return undefined; throw new ReferenceError(`${name} is not defined`); };',
+    "const __assign = (name, value) => { __own[name] = value; return value; };",
     "const __sink = new Proxy({}, { set: (_target, name, value) => (__assign(name, value), true) });",
     ...free.map((name) => `let ${name} = __lookup(${JSON.stringify(name)});`),
   ].join(" ");

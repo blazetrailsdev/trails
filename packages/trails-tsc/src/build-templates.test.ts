@@ -42,4 +42,10 @@ describe("buildTemplates", () => {
     };
     expect(await render("<%= upper() %>", binding)).toBe("X");
   });
+
+  it("assigns a free name as a template local, never onto the binding", async () => {
+    const binding = { title: "member" };
+    expect(await render('<% title = "local" %><%= title %>', binding)).toBe("local");
+    expect(binding.title).toBe("member");
+  });
 });
