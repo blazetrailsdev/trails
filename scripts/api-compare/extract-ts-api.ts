@@ -5165,6 +5165,9 @@ function extractInterface(
                   if (!ts.isGetAccessorDeclaration(decl) && !ts.isSetAccessorDeclaration(decl)) {
                     continue;
                   }
+                  if (!ts.isInterfaceDeclaration(decl.parent) || internalJsDocTagApplies(decl)) {
+                    continue;
+                  }
                   instanceMethods.push({
                     name: propName,
                     visibility: propVisibility,
@@ -5175,7 +5178,6 @@ function extractInterface(
                     file,
                     bodyless: true,
                     ...(ts.isSetAccessorDeclaration(decl) ? { writer: true } : {}),
-                    ...(internalJsDocTagApplies(decl) ? { internal: true } : {}),
                   });
                 }
               }
