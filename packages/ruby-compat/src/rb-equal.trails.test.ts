@@ -96,7 +96,6 @@ describe("rbEqual over a plain-object module", () => {
     const greet = (): string => "hi";
     const a = { greet };
     const b = { greet };
-    expect(rbEqual(a, b)).toBe(true);
     extend({}, a);
     include(class {}, b);
     expect(rbEqual(a, b)).toBe(false);

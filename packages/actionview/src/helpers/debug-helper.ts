@@ -1,5 +1,5 @@
 import { SafeBuffer, htmlEscape } from "@blazetrails/activesupport";
-import { Exception, Marshal, StandardError, include } from "@blazetrails/ruby-compat";
+import { Exception, Marshal, StandardError, include, defineModule } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import { contentTag, type TagHelperHost, TagHelper } from "./tag-helper.js";
 
@@ -41,8 +41,8 @@ function inspect(value: unknown, seen: WeakSet<object> = new WeakSet()): string 
   }
 }
 
-export const DebugHelper = {
+export const DebugHelper = defineModule({
   debug,
-};
+});
 
 include(DebugHelper, TagHelper);

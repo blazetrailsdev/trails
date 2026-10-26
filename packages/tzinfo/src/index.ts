@@ -12,6 +12,7 @@ import {
   Temporal,
   Time,
   Timezone as DateTimezone,
+  tzdataAbbreviationChanges,
   tzdataBaseOffsets,
   tzdataIsdst,
   tzdataIsdstFlips,
@@ -111,12 +112,14 @@ function zoneInterval(ianaName: string, date: Date): ZoneInterval | null {
   const next = zoned.getTimeZoneTransition("next");
   let start = previous ? previous.epochMilliseconds : -Infinity;
   let end = next ? next.epochMilliseconds : Infinity;
-  for (const flip of tzdataIsdstFlips(ianaName)) {
-    const flipMs = flip * 1000;
-    if (flipMs <= ms) start = Math.max(start, flipMs);
-    else {
-      end = Math.min(end, flipMs);
-      break;
+  for (const flips of [tzdataIsdstFlips(ianaName), tzdataAbbreviationChanges(ianaName)]) {
+    for (const flip of flips) {
+      const flipMs = flip * 1000;
+      if (flipMs <= ms) start = Math.max(start, flipMs);
+      else {
+        end = Math.min(end, flipMs);
+        break;
+      }
     }
   }
   const info = lookupZoneInfo(ianaName, date);

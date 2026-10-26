@@ -1,3 +1,4 @@
+import { defineModule } from "@blazetrails/ruby-compat";
 import {
   IsolatedExecutionState,
   isPlainObject,
@@ -206,7 +207,7 @@ export const CachingRegistry = {
   },
 };
 
-export const CacheHelper = {
+export const CacheHelper = defineModule({
   cache,
   isCaching,
   uncacheableBang,
@@ -215,4 +216,4 @@ export const CacheHelper = {
   cacheFragmentName,
   digestPathFromTemplate,
   fragmentFor,
-};
+});

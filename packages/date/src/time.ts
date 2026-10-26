@@ -369,7 +369,6 @@ function utcEpochNanoseconds(vtm: Vtm): bigint {
 
 /** @noRailsEquivalent PERMANENT */
 let seatedTime: {
-  zoned: Temporal.ZonedDateTime | null;
   vtm: Vtm | null;
   utcOffset: number | null;
   instant: Temporal.Instant | null;
@@ -452,8 +451,6 @@ function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
 
 export class Time extends rbCTime {
   #vtmMemo: Vtm | null;
-  /** @internal */
-  #zonedMemo: Temporal.ZonedDateTime | null;
   /** @internal */
   #instantMemo: Temporal.Instant | null;
   /** @internal */
@@ -575,7 +572,6 @@ export class Time extends rbCTime {
     const epochNs = typeof at === "bigint" ? at : null;
     if (typeof zone === "number") {
       seatedTime = {
-        zoned: null,
         vtm: null,
         utcOffset: zone,
         instant,
@@ -588,20 +584,13 @@ export class Time extends rbCTime {
       return new Time(0);
     }
     const timeZoneId = zone == null ? nowTimeZoneId() : zone;
-    const zoned =
-      timeZoneId === "UTC"
-        ? null
-        : (instant ?? Temporal.Instant.fromEpochNanoseconds(epochNs!)).toZonedDateTimeISO(
-            timeZoneId,
-          );
     seatedTime = {
-      zoned,
       vtm: null,
       utcOffset: null,
-      instant: instant ?? zoned?.toInstant() ?? null,
+      instant,
       epochNs,
       timeZoneId,
-      tzmodeUtc: tzmodeUtc ?? (zone != null && (zoned?.timeZoneId ?? timeZoneId) === "UTC"),
+      tzmodeUtc: tzmodeUtc ?? (zone != null && timeZoneId === "UTC"),
       localZone: zone == null,
       subnano,
     };
@@ -1343,7 +1332,6 @@ export class Time extends rbCTime {
       seatedTime = null;
       this.#vtmMemo = seat.vtm;
       this.#utcOffsetMemo = seat.utcOffset;
-      this.#zonedMemo = seat.zoned;
       this.#instantMemo = seat.instant;
       this.#epochNsMemo = seat.epochNs;
       this.#timeZoneId = seat.timeZoneId;
@@ -1376,7 +1364,6 @@ export class Time extends rbCTime {
     const d = new globalThis.Date(0);
     d.setUTCFullYear(year, month - 1, day);
     d.setUTCHours(hour, min, wholeSec);
-    this.#zonedMemo = null;
     this.#vtmMemo = vtmFromDate(d, nsec);
     const zoneArgument = zone ?? options.in ?? null;
     const zoneObject =
@@ -1626,7 +1613,6 @@ export class Time extends rbCTime {
   initializeCopy(time: Time): this {
     if ((this as Time) === time) return this;
     this.#vtmMemo = time.#vtmMemo;
-    this.#zonedMemo = time.#zonedMemo;
     this.#instantMemo = time.#instantMemo;
     this.#epochNsMemo = time.#epochNsMemo;
     this.#timeZoneId = time.#timeZoneId;
@@ -1723,7 +1709,6 @@ export class Time extends rbCTime {
       return this;
     }
 
-    this.#zonedMemo = null;
     if (this.#utcOffsetMemo !== 0) this.#vtmMemo = null;
     this.#utcOffsetMemo = null;
     this.#timeZoneId = "UTC";
@@ -1994,7 +1979,6 @@ Time.prototype.iso8601 = Time.prototype.xmlschema;
 
 rbDefineAllocFunc(Time, (klass) => {
   seatedTime = {
-    zoned: null,
     vtm: null,
     utcOffset: null,
     instant: null,

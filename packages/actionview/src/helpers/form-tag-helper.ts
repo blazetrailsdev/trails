@@ -22,6 +22,7 @@ import {
   rbObjRespondTo,
   update,
   include,
+  defineModule,
 } from "@blazetrails/ruby-compat";
 
 import { ActionView } from "../namespaces.js";
@@ -662,7 +663,7 @@ export function convertDirectUploadOptionToUrl(
   return options;
 }
 
-export const FormTagHelper = {
+export const FormTagHelper = defineModule({
   formTag,
   fieldId,
   fieldName,
@@ -704,7 +705,7 @@ export const FormTagHelper = {
   sanitizeToId,
   setDefaultDisableWith,
   convertDirectUploadOptionToUrl,
-};
+});
 
 extend(FormTagHelper, Concern);
 include(FormTagHelper, UrlHelper);
