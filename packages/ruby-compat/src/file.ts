@@ -630,7 +630,7 @@ export class File extends IO {
   ): Promise<number> {
     const fs = getFs();
     if (fs.writeFile) await fs.writeFile(name, string, { mode: perm, flag: mode });
-    else fs.writeFileSync(name, string, perm == null ? undefined : { mode: perm });
+    else fs.writeFileSync(name, string, { mode: perm, flag: mode });
     return typeof string === "string" ? new TextEncoder().encode(string).length : string.length;
   }
 

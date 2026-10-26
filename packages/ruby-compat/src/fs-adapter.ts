@@ -49,7 +49,7 @@ export interface FsAdapter {
   writeFileSync(
     path: string,
     content: string | Uint8Array,
-    options?: { mode?: number } | string,
+    options?: { mode?: number; flag?: string } | string,
   ): void;
   existsSync(path: string): boolean;
   mkdirSync(path: string, options?: { recursive?: boolean }): void;
