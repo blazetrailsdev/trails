@@ -93,6 +93,23 @@ export class Range<T = unknown> {
     readonly excludeEnd: boolean = false,
   ) {}
 
+  /**
+   * @noRailsEquivalent PERMANENT — core Ruby `Range#size`
+   * (`vendor/ruby/v3.3.11/range.c:836` `range_size`), over
+   * `ruby_num_interval_step_size` (`numeric.c:2798`) with a step of 1.
+   */
+  size(): number | bigint | null {
+    const b = this.begin;
+    const e = this.end;
+    if (isNumeric(b)) {
+      if (isNumeric(e)) return numIntervalStepSize(b, e, this.excludeEnd);
+      if (e === null) return Infinity;
+    } else if (b === null) {
+      if (isNumeric(e)) return Infinity;
+    }
+    return null;
+  }
+
   /** Raises before any other check on a beginless range, as Ruby does
    *  (`vendor/ruby/v3.3.11/range.c:1243` `range_first`). */
   first(): T {
@@ -334,4 +351,55 @@ export class Range<T = unknown> {
     for (const v of values.call(this)) block(v);
     return this;
   }
+}
+
+function isNumeric(v: unknown): v is number | bigint {
+  return typeof v === "number" || typeof v === "bigint";
+}
+
+function numIntervalStepSize(
+  from: number | bigint,
+  to: number | bigint,
+  excl: boolean,
+): number | bigint {
+  if (
+    typeof from === "bigint" ||
+    typeof to === "bigint" ||
+    (Number.isInteger(from) && Number.isInteger(to))
+  ) {
+    let delta = BigInt(to) - BigInt(from);
+    if (excl) delta--;
+    if (delta < 0n) return 0;
+    const n = delta + 1n;
+    return n <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(n) : n;
+  }
+  return floatStepSize(Number(from), Number(to), excl);
+}
+
+/** `ruby_float_step_size` (`vendor/ruby/v3.3.11/numeric.c:2720`) with a unit of 1. */
+function floatStepSize(beg: number, end: number, excl: boolean): number {
+  let n = end - beg;
+  let err = (Math.abs(beg) + Math.abs(end) + Math.abs(end - beg)) * Number.EPSILON;
+  if (err > 0.5) err = 0.5;
+  if (excl) {
+    if (n <= 0) return 0;
+    if (n < 1) n = 0;
+    else n = Math.floor(n - err);
+    const d = n + 1 + beg;
+    if (beg < end) {
+      if (d < end) n++;
+    } else if (beg > end) {
+      if (d > end) n++;
+    }
+  } else {
+    if (n < 0) return 0;
+    n = Math.floor(n + err);
+    const d = n + 1 + beg;
+    if (beg < end) {
+      if (d <= end) n++;
+    } else if (beg > end) {
+      if (d >= end) n++;
+    }
+  }
+  return n + 1;
 }

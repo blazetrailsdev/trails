@@ -83,44 +83,46 @@ export function indexBy<T, K extends string | number>(
     return toEnum<T>(
       collection as object,
       "indexBy",
-      block(() => (rbObjRespondTo(collection, "size") ? size(collection as unknown[]) : null)),
+      block(() => (rbObjRespondTo(collection, "size") ? size(collection) : null)),
     );
   }
 }
 
 export function indexWith<V>(
-  collection: readonly string[],
+  collection: Iterable<string> | Each<string>,
   defaultOrBlock: V | ((elem: string) => V),
 ): Record<string, V>;
 export function indexWith<T, V>(
-  collection: readonly T[],
+  collection: Iterable<T> | Each<T>,
   defaultOrBlock: V | ((elem: T) => V),
 ): Hash<T, V> | Record<string, V>;
-export function indexWith<T>(collection: readonly T[]): Enumerator<T>;
+export function indexWith<T>(collection: Iterable<T> | Each<T>): Enumerator<T>;
 export function indexWith<T, V>(
-  collection: readonly T[],
+  collection: Iterable<T> | Each<T>,
   defaultOrBlock?: V | ((elem: T) => V),
 ): Hash<T, V> | Record<string, V> | Enumerator<T> {
   const noDefault = arguments.length < 2;
-  const newResult = (): Hash<T, V> | Record<string, V> =>
-    collection.every((elem) => typeof elem === "string") ? {} : new Hash<T, V>();
+  const each = (block: (elem: T, result: Hash<T, V> | Record<string, V>) => void) => {
+    const elems = toA(collection);
+    const result: Hash<T, V> | Record<string, V> = elems.every((elem) => typeof elem === "string")
+      ? {}
+      : new Hash<T, V>();
+    for (const elem of elems) block(elem, result);
+    return result;
+  };
   const aset = (result: Hash<T, V> | Record<string, V>, elem: T, value: V): unknown =>
     result instanceof Hash ? result.set(elem, value) : hashAset(result, elem as string, value);
   if (typeof defaultOrBlock === "function") {
-    const result = newResult();
     const block = defaultOrBlock as (elem: T) => V;
-    for (const elem of collection) aset(result, elem, block(elem));
-    return result;
+    return each((elem, result) => aset(result, elem, block(elem)));
   } else if (noDefault) {
     return toEnum<T>(
-      collection,
+      collection as object,
       "indexWith",
-      block(() => (rbObjRespondTo(collection, "size") ? size(collection as unknown[]) : null)),
+      block(() => (rbObjRespondTo(collection, "size") ? size(collection) : null)),
     );
   } else {
-    const result = newResult();
-    for (const elem of collection) aset(result, elem, defaultOrBlock as V);
-    return result;
+    return each((elem, result) => aset(result, elem, defaultOrBlock as V));
   }
 }
 

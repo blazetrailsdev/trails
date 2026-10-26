@@ -30,7 +30,7 @@ ENUMERABLE_METHOD_TABLE.maximum = (self: Iterable<unknown>, key?: string | null)
 ENUMERABLE_METHOD_TABLE.indexBy = (self: Iterable<unknown>, block?: (elem: unknown) => string) =>
   block === undefined ? indexBy(self) : indexBy(self, block);
 
-ENUMERABLE_METHOD_TABLE.indexWith = (self: unknown[], ...args: unknown[]) =>
+ENUMERABLE_METHOD_TABLE.indexWith = (self: Iterable<unknown>, ...args: unknown[]) =>
   args.length === 0 ? indexWith(self) : indexWith(self, args[0]);
 
 ENUMERABLE_METHOD_TABLE.isExclude = (self: Iterable<unknown>, object: unknown) =>

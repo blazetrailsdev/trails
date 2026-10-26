@@ -457,20 +457,21 @@ describe("EnumerableTests", () => {
   });
 
   it("index by", () => {
-    const payments = [new Payment(5), new Payment(15), new Payment(10)];
+    const payments = new GenericEnumerable([new Payment(5), new Payment(15), new Payment(10)]);
     const expected = { 5: new Payment(5), 15: new Payment(15), 10: new Payment(10) };
     expect(indexBy(payments, (p) => p.price!)).toEqual(expected);
-    expect(indexBy(new GenericEnumerable(payments))).toBeInstanceOf(Enumerator);
-    expect(indexBy(new GenericEnumerable(payments)).size()).toBeNull();
-    expect(indexBy(payments).each((p: Payment) => p.price)).toEqual(expected);
+    expect(indexBy(payments)).toBeInstanceOf(Enumerator);
+    expect(indexBy(payments).size()).toBeNull();
+    expect(indexBy(new Range(1, 42)).size()).toBe(42);
+    expect(indexBy([...payments]).each((p: Payment) => p.price)).toEqual(expected);
   });
 
   it("index with", () => {
-    const payments = [new Payment(5), new Payment(15), new Payment(10)];
+    const payments = new GenericEnumerable([new Payment(5), new Payment(15), new Payment(10)]);
     const expected = [
-      [payments[0], 5],
-      [payments[1], 15],
-      [payments[2], 10],
+      [new Payment(5), 5],
+      [new Payment(15), 15],
+      [new Payment(10), 10],
     ];
 
     expect([...(indexWith(payments, (p) => p.price) as Hash<Payment, unknown>)]).toEqual(expected);
@@ -479,11 +480,11 @@ describe("EnumerableTests", () => {
     expect(indexWith(["title", "body"], [])).toEqual({ title: [], body: [] });
     expect(indexWith(["title", "body"], {})).toEqual({ title: {}, body: {} });
 
-    const generic = new GenericEnumerable(payments) as unknown as Payment[];
-    expect(indexWith(generic)).toBeInstanceOf(Enumerator);
-    expect(indexWith(generic).size()).toBeNull();
+    expect(indexWith(payments)).toBeInstanceOf(Enumerator);
+    expect(indexWith(payments).size()).toBeNull();
+    expect(indexWith(new Range(1, 42)).size()).toBe(42);
     expect([
-      ...(indexWith(payments).each((p: Payment) => p.price) as Hash<Payment, unknown>),
+      ...(indexWith([...payments]).each((p: Payment) => p.price) as Hash<Payment, unknown>),
     ]).toEqual(expected);
   });
 

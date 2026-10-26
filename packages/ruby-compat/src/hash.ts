@@ -910,9 +910,11 @@ export function valuesAt(
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#size` (`vendor/ruby/v3.3.11/hash.c:3002`).
  */
 export function size(
-  hash: Record<string, unknown> | Map<unknown, unknown> | readonly unknown[],
+  hash: Record<string, unknown> | Map<unknown, unknown> | readonly unknown[] | object,
 ): number {
-  if (hash instanceof Map) return hash.size;
+  const own = ownMethod(hash, "size");
+  if (own) return own.call(hash) as number;
+  if (hash instanceof Map || hash instanceof Set) return hash.size;
   if (Array.isArray(hash)) return hash.length;
   return Object.keys(hash).length;
 }
