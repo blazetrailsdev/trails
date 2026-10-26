@@ -555,12 +555,6 @@ function zoneRow(timeZoneId: string): string | undefined {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function tzdataAbbreviationChanges(timeZoneId: string): number[] {
-  const row = zoneRow(timeZoneId);
-  return row === undefined ? [] : decodeRow(row)[1];
-}
-
-/** @noRailsEquivalent PERMANENT */
 export function tzdataAbbreviation(timeZoneId: string, epochSeconds: number): string | undefined {
   const row = zoneRow(timeZoneId);
   if (row === undefined) return undefined;
