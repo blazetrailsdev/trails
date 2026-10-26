@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { RuleTester } from "eslint";
+import ts from "typescript-5";
 import { describe, expect, it } from "vitest";
 import rule from "./ruby-compat-native-required.mjs";
 
@@ -9,14 +10,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixtureDir = path.join(__dirname, "fixtures", "ruby-compat-native-required");
 const filename = path.join(fixtureDir, "file.ts");
 
+const parser = (await import("typescript-eslint")).parser;
+
 const tester = new RuleTester({
   languageOptions: {
     ecmaVersion: 2022,
     sourceType: "module",
-    parser: (await import("typescript-eslint")).parser,
-    parserOptions: { project: "./tsconfig.json", tsconfigRootDir: fixtureDir },
+    parser,
+    parserOptions: {
+      project: "./tsconfig.json",
+      tsconfigRootDir: fixtureDir,
+      disallowAutomaticSingleRunInference: true,
+    },
   },
 });
+
+function parseFixture(code) {
+  return parser.parseForESLint(code, {
+    filePath: filename,
+    project: "./tsconfig.json",
+    tsconfigRootDir: fixtureDir,
+    disallowAutomaticSingleRunInference: true,
+  });
+}
 
 const head = 'import { hashDelete, Hash } from "@blazetrails/ruby-compat";\n';
 const valid = (code) => ({ code: head + code, filename });
@@ -63,9 +79,7 @@ tester.run("ruby-compat-native-required", rule, {
   ],
   invalid: [
     // plain objects
-    invalid(
-      "type Record<K extends keyof any, T> = { [P in K]: T }; declare const h: Record<string, number>; hashDelete(h, 'a');",
-    ),
+    invalid("declare const h: Record<string, number>; hashDelete(h, 'a');"),
     invalid("declare const h: { [k: string]: number }; hashDelete(h, 'a');"),
     invalid("declare const h: { a?: number }; hashDelete(h, 'a');"),
     invalid("declare const h: { a: number } | undefined; hashDelete(h!, 'a');"),
@@ -96,6 +110,27 @@ const LISTED_FLOOR = [
   "union",
   "uniq",
 ];
+
+describe("ruby-compat-native-required fixture project", () => {
+  it("resolves its lib, so the dispatching-receiver cases are not vacuous", () => {
+    const parsed = parseFixture(
+      "declare const m: Map<string, number>; declare const r: Record<string, number>; declare const xs: string[]; m; r; xs;",
+    );
+    const checker = parsed.services.program.getTypeChecker();
+    const types = parsed.ast.body
+      .slice(-3)
+      .map((stmt) =>
+        checker.getTypeAtLocation(parsed.services.esTreeNodeToTSNodeMap.get(stmt.expression)),
+      );
+    expect(types.map((t) => checker.typeToString(t))).toEqual([
+      "Map<string, number>",
+      "Record<string, number>",
+      "string[]",
+    ]);
+    expect(types.every((t) => (t.flags & ts.TypeFlags.Any) === 0)).toBe(true);
+    expect(checker.isArrayType(types[2])).toBe(true);
+  });
+});
 
 describe("ruby-compat-native-required.json", () => {
   it("never drops a helper while ruby-compat still exports it", async () => {
