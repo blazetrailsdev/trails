@@ -368,3 +368,11 @@ describe("numStep", () => {
     expect(() => numStep(1, 3, 0, () => {})).toThrow("step can't be 0");
   });
 });
+
+describe("round with positive ndigits", () => {
+  it("answers an Integer receiver itself and keeps a Float zero a Float", () => {
+    expect(round(5, 2)).toBe(5);
+    expect(round(0, 2)).toBe(0);
+    expect(round(new Number(0) as number, 2)).toEqual(new Number(0));
+  });
+});
