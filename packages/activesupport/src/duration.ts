@@ -493,13 +493,11 @@ export class Duration {
     return [new Scalar(other as number), this];
   }
 
-  /** @internal */
-  respondToMissing(method: string, _includePrivate = false): boolean {
+  private respondToMissing(method: string, _includePrivate = false): boolean {
     return rbObjRespondTo(this.value, method);
   }
 
-  /** @internal */
-  methodMissing(...args: [string, ...unknown[]]): unknown {
+  private methodMissing(...args: [string, ...unknown[]]): unknown {
     return rbFSend(this.value, ...args);
   }
 
@@ -876,7 +874,7 @@ Object.defineProperty(rbCNumeric, Symbol.hasInstance, {
   value(this: typeof rbCNumeric, other: unknown): boolean {
     return (
       Function.prototype[Symbol.hasInstance].call(this, other) ||
-      (this === rbCNumeric && other instanceof Duration && other.isA(rbCNumeric))
+      (other instanceof Duration && other.isA(this))
     );
   },
 });

@@ -121,11 +121,14 @@ function subsecNanoseconds(sec: number | Rational): number {
 }
 
 /**
- * `num_exact` / `num_exact_check` (`vendor/ruby/v3.3.11/time.c:518-573`). A Float, primitive or
- * ruby-compat's boxed integral one, takes the default arm's `to_r` (`time.c:532-549`), which is `fToR`.
+ * `num_exact_check` (`vendor/ruby/v3.3.11/time.c:518-559`). A Float, primitive or
+ * ruby-compat's boxed integral one, takes the default arm's `to_r` (`:532-549`),
+ * which is `fToR`. `rb_rational_canonicalize` (`:529`, `:542`) is not called: every
+ * caller does Rational arithmetic on the result, where `(3/1)` and `3` are the same
+ * value. The `T_STRING` arm is `typeof v === "string"`, since a Ruby String is a JS
+ * string primitive (CLAUDE.md § "Ruby Strings are JS string primitives").
  */
-/** `num_exact_check` (`vendor/ruby/v3.3.11/time.c:518`) and `num_exact_fail` (`:561`). */
-function numExact(v: unknown): Rational {
+function numExactCheck(v: unknown): Rational | null {
   if (v instanceof Rational) return v;
   if (typeof v === "bigint") return new Rational(v, 1);
   if (v instanceof Number) return fToR(v.valueOf());
@@ -144,9 +147,21 @@ function numExact(v: unknown): Rational {
       return new Rational(tmp as number, 1);
     }
   }
+  return null;
+}
+
+/** `num_exact_fail` (`vendor/ruby/v3.3.11/time.c:561-565`). */
+function numExactFail(v: unknown): never {
   throw new TypeError(
     `can't convert ${(v as object)?.constructor?.name ?? String(v)} into an exact number`,
   );
+}
+
+/** `num_exact` (`vendor/ruby/v3.3.11/time.c:567-573`). */
+function numExact(v: unknown): Rational {
+  const num = numExactCheck(v);
+  if (num == null) numExactFail(v);
+  return num;
 }
 
 /** `ndigits_denominator` (`vendor/ruby/v3.3.11/time.c:4504`). */
