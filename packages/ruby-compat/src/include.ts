@@ -36,6 +36,7 @@ import { FrozenError } from "./frozen-error.js";
 import { BigDecimal } from "./big-decimal.js";
 import { Complex } from "./complex.js";
 import { Rational } from "./rational.js";
+import { toI } from "./numeric.js";
 import {
   FL_SINGLETON,
   T_ICLASS,
@@ -48,6 +49,9 @@ import {
   rbClassSuperclass,
   rbCDate,
   rbCNumeric,
+  rbCInteger,
+  rbCFloat,
+  rbModDefineMethod,
   rbObjClass,
   rbObjSingletonClass,
   rbInspect,
@@ -2430,6 +2434,23 @@ for (const klass of [Rational, Complex, BigDecimal]) {
   Object.setPrototypeOf(klass, rbCNumeric);
   Object.setPrototypeOf(klass.prototype, rbCNumeric.prototype);
 }
+
+/** `Integer#to_r` (`vendor/ruby/v3.3.11/rational.c:2148`). */
+rbModDefineMethod(rbCInteger, "toR", function (this: number | bigint) {
+  return new Rational(this, 1);
+});
+/** `Integer#to_int` (`vendor/ruby/v3.3.11/numeric.rb:255`). */
+rbModDefineMethod(rbCInteger, "toInt", function (this: number | bigint) {
+  return this;
+});
+/** `Float#to_r` (`vendor/ruby/v3.3.11/rational.c:2199`). */
+rbModDefineMethod(rbCFloat, "toR", function (this: number) {
+  return new Rational(this, 1);
+});
+/** `Float#to_int` (`vendor/ruby/v3.3.11/numeric.c:2597`). */
+rbModDefineMethod(rbCFloat, "toInt", function (this: number) {
+  return toI(this);
+});
 
 include(rbCNumeric, rbMComparable);
 include(rbCString, rbMComparable);

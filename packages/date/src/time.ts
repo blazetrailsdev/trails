@@ -33,6 +33,7 @@ import {
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
+  rbFSend,
   registerConstant,
   setRubyTzUptodate,
   stringInspect,
@@ -122,16 +123,32 @@ function subsecNanoseconds(sec: number | Rational): number {
  * `num_exact` / `num_exact_check` (`vendor/ruby/v3.3.11/time.c:518-573`). A Float, primitive or
  * ruby-compat's boxed integral one, takes the default arm's `to_r` (`time.c:532-549`), which is `fToR`.
  */
+/** `num_exact_check` (`vendor/ruby/v3.3.11/time.c:518`) and `num_exact_fail` (`:561`). */
 function numExact(v: unknown): Rational {
   if (v instanceof Rational) return v;
   if (typeof v === "bigint") return new Rational(v, 1);
   if (v instanceof Number) return fToR(v.valueOf());
-  if (typeof v !== "number") {
-    throw new TypeError(
-      `can't convert ${(v as object)?.constructor?.name ?? String(v)} into an exact number`,
-    );
+  if (typeof v === "number") return fToR(v);
+  if (v != null && typeof v !== "string") {
+    if (rbObjRespondTo(v, "toR")) {
+      const tmp = rbFSend(v, "toR");
+      if (rbObjRespondTo(v, "toInt")) {
+        if (typeof tmp === "bigint" || Number.isInteger(tmp)) {
+          return new Rational(tmp as number | bigint, 1);
+        } else if (tmp instanceof Rational) {
+          return tmp;
+        }
+      }
+    } else if (rbObjRespondTo(v, "toInt")) {
+      const tmp = rbFSend(v, "toInt");
+      if (typeof tmp === "bigint" || Number.isInteger(tmp)) {
+        return new Rational(tmp as number | bigint, 1);
+      }
+    }
   }
-  return fToR(v);
+  throw new TypeError(
+    `can't convert ${(v as object)?.constructor?.name ?? String(v)} into an exact number`,
+  );
 }
 
 /** `ndigits_denominator` (`vendor/ruby/v3.3.11/time.c:4504`). */
