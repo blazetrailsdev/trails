@@ -1644,7 +1644,7 @@ the capability, in a different place. Each is decided here, and each but
 | `active_support/current_attributes.rb`                | nothing               |
 | `active_support/delegation.rb`                        | Proxy                 |
 | `deprecation/proxy_wrappers.rb`                       | Proxy                 |
-| `active_support/duration.rb`                          | nothing               |
+| `active_support/duration.rb`                          | named method, no trap |
 | `log_subscriber/test_helper.rb`                       | typed forwarders      |
 | `multibyte/chars.rb`                                  | nothing (no file)     |
 | `active_support/option_merger.rb`                     | Proxy                 |

@@ -94,6 +94,7 @@ export {
   rbObjSingletonClass,
   rbSetClassPathString,
   rbFSend,
+  rbCheckFuncall,
   toS,
   toSym,
   rbModAttrReader,
@@ -274,7 +275,7 @@ export { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "./kern
 export { kernelFloat } from "./kernel-float.js";
 export { format, sprintf } from "./kernel-format.js";
 export { warn } from "./kernel-warn.js";
-export { kernelInteger } from "./kernel-integer.js";
+export { kernelInteger, rbCheckToInt } from "./kernel-integer.js";
 export { kernelRand } from "./kernel-rand.js";
 export { rbFSystem } from "./kernel-system.js";
 export { IndexError } from "./index-error.js";
@@ -472,7 +473,7 @@ export {
 } from "./thread-pool-executor.js";
 export { BasicSocket, Socket, TCPSocket } from "./socket.js";
 export { ImmediateExecutor } from "./immediate-executor.js";
-export { ScheduledTask } from "./scheduled-task.js";
+export { CancelledOperationError, ScheduledTask } from "./scheduled-task.js";
 export { Concurrent } from "./concurrent/map.js";
 import "./concurrent/count-down-latch.js";
 import "./concurrent/cyclic-barrier.js";

@@ -1315,6 +1315,17 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
 type AnyFunction = (...args: unknown[]) => unknown;
 
 /**
+ * `rb_check_funcall` (`vendor/ruby/v3.3.11/vm_eval.c:687`): the call when the
+ * receiver responds to `mid`, else `undefined`, MRI's `Qundef`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbCheckFuncall(recv: unknown, mid: string, ...args: unknown[]): unknown {
+  if (!rbObjRespondTo(recv, mid)) return undefined;
+  return sendInternal(args.length, [mid, ...args], recv);
+}
+
+/**
  * `rb_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2934`) — the SEND of
  * `respond_to?`, which `vm_respond_to` (`vm_method.c:2882`) routes through an
  * overridden `respond_to?` when the receiver's class defines one (as

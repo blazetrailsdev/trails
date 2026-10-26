@@ -682,6 +682,9 @@ importers:
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date
+      '@blazetrails/fugit':
+        specifier: workspace:*
+        version: link:../fugit
       '@blazetrails/globalid':
         specifier: workspace:*
         version: link:../globalid

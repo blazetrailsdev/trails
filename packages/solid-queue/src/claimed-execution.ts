@@ -42,7 +42,9 @@ export class ClaimedExecution extends Execution {
       { process_id: processId, job_ids: jobIds },
       async (payload) => {
         await this.insertAllBang(jobData);
-        const claimed = await this.where({ job_id: jobIds, process_id: processId }).toArray();
+        const claimed = await (
+          await this.where({ job_id: jobIds, process_id: processId }).load()
+        ).toArray();
         await block(claimed);
 
         payload["size"] = claimed.length;

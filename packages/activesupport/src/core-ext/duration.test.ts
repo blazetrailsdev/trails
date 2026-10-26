@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Duration, Scalar, days } from "../duration.js";
-import { cmp, rbEqual, rbInspect as inspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  cmp,
+  rbEqual,
+  rbInspect as inspect,
+  rbObjRespondTo,
+  rbCInteger,
+  rbCNumeric,
+} from "@blazetrails/ruby-compat";
 import {
   assertNothingRaised,
   assertRaise,
@@ -40,8 +47,8 @@ describe("DurationTest", () => {
     const d = Duration.day(1);
     expect(d.isA(Duration)).toBeTruthy();
     expect(d).toBeInstanceOf(Duration);
-    expect(d.isKindOf(Number)).toBeTruthy();
-    expect(Number.isInteger(d.toI())).toBeTruthy();
+    expect(d.isKindOf(rbCNumeric)).toBeTruthy();
+    expect(d.isKindOf(rbCInteger)).toBeTruthy();
     expect(d.isA(Map)).toBeFalsy();
 
     const k = class {};

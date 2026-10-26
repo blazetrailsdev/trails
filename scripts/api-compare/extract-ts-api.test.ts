@@ -8525,3 +8525,26 @@ describe("a top-level rbModDefineMethod seat", () => {
     expect(seats[0].callSeq).toEqual(["log"]);
   });
 });
+
+describe("an interface extending a same-file accessor interface", () => {
+  it("records the base's get and set accessors as bodyless members", () => {
+    const info = extractFromFiles("/p", {
+      "lookup-context.ts": `
+        interface Accessors {
+          defaultVariants(): string[];
+          get variants(): string[];
+          set variants(value: string[]);
+        }
+        export interface LookupContext extends Accessors {}
+        export class LookupContext {}
+      `,
+    });
+    const members = info.modules["lookup-context.ts:LookupContext"].instanceMethods.filter(
+      (m) => m.name === "variants",
+    );
+    expect(members.map((m) => [m.bodyless, m.writer === true])).toEqual([
+      [true, false],
+      [true, true],
+    ]);
+  });
+});
