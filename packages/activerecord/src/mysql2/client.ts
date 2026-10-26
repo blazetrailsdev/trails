@@ -5,6 +5,7 @@ import {
   Rational,
   rbProgname,
   rtest,
+  toI,
   toS,
   warn,
 } from "@blazetrails/ruby-compat";
@@ -622,7 +623,8 @@ export async function initialize(this: Wrapper, opts: Options = {}): Promise<Mys
   if (user != null) user = String(user);
   if (pass != null) pass = String(pass);
   if (host != null) host = String(host);
-  if (port != null) port = Math.trunc(port);
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- a database.yml or ENV port is a String; String#to_i answers 0 where Math.trunc answers NaN
+  if (port != null) port = Number(toI(port));
   if (database != null) database = String(database);
   if (socket != null) socket = String(socket);
   const connAttrs = parseConnectAttrs(opts.connectAttrs as Options | null | undefined);
