@@ -7863,7 +7863,14 @@ function checkerProvenKind(expr: ts.Expression): "sized" | "object" | undefined 
 function isTypedValuesAtLiteral(n: ts.ArrayLiteralExpression): boolean {
   if (n.elements.length < 2) return false;
   const subjects = n.elements.map((el) => {
-    const read = unwrapped(el);
+    let read = unwrapped(el);
+    if (
+      ts.isBinaryExpression(read) &&
+      read.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken &&
+      read.right.kind === ts.SyntaxKind.NullKeyword
+    ) {
+      read = unwrapped(read.left);
+    }
     return ts.isCallExpression(read) &&
       ts.isPropertyAccessExpression(read.expression) &&
       read.expression.name.text === "at" &&
