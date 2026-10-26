@@ -519,7 +519,13 @@ export function eachSlice<T, E = unknown>(
       { eachSlice: (n: number, block: (slice: T[]) => unknown) => eachSlice(obj, n, block) },
       "eachSlice",
       [n],
-      (n) => enumEachSliceSize(obj, [n]),
+      (n) => {
+        const sliceSize = Math.trunc(n as number);
+        if (sliceSize <= 0) throw new ArgumentError("invalid slice size");
+        const size = Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null);
+        if (size == null || size === Infinity) return size;
+        return Math.floor(((size as number) + sliceSize - 1) / sliceSize);
+      },
     );
   }
   let ary: T[] = [];
@@ -572,7 +578,7 @@ export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
       { minBy: (...argv: unknown[]) => (minBy as (...argv: unknown[]) => unknown)(obj, ...argv) },
       "minBy",
       argv,
-      () => enumSize(obj),
+      () => (Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null)),
     );
   }
   const num = argv[0] as number | null | undefined;
@@ -641,7 +647,7 @@ export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
       { maxBy: (...argv: unknown[]) => (maxBy as (...argv: unknown[]) => unknown)(obj, ...argv) },
       "maxBy",
       argv,
-      () => enumSize(obj),
+      () => (Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null)),
     );
   }
   const num = argv[0] as number | null | undefined;
@@ -712,7 +718,13 @@ export function eachCons<T, E = unknown>(
       { eachCons: (n: number, block: (cons: T[]) => unknown) => eachCons(obj, n, block) },
       "eachCons",
       [n],
-      (n) => enumEachConsSize(obj, [n]),
+      (n) => {
+        const consSize = Math.trunc(n as number);
+        if (consSize <= 0) throw new ArgumentError("invalid size");
+        const size = Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null);
+        if (size == null) return null;
+        return Math.max((size as number) + 1 - consSize, 0);
+      },
     );
   }
   const ary: T[] = [];
@@ -725,31 +737,6 @@ export function eachCons<T, E = unknown>(
     },
     () => obj,
   );
-}
-
-/** `enum_size` (`vendor/ruby/v3.3.11/enum.c:467`): `self.size`, else `nil`. */
-function enumSize(self: object): unknown {
-  return Array.isArray(self) ? self.length : (rbCheckFuncall(self, "size") ?? null);
-}
-
-/** `enum_each_slice_size` (`vendor/ruby/v3.3.11/enum.c:3127`). */
-function enumEachSliceSize(obj: object, args: unknown[]): unknown {
-  const sliceSize = Math.trunc(args[0] as number);
-  if (sliceSize <= 0) throw new ArgumentError("invalid slice size");
-  const size = enumSize(obj);
-  if (size == null) return null;
-  if (size === Infinity) return size;
-  return Math.floor(((size as number) + sliceSize - 1) / sliceSize);
-}
-
-/** `enum_each_cons_size` (`vendor/ruby/v3.3.11/enum.c:3209`). */
-function enumEachConsSize(obj: object, args: unknown[]): unknown {
-  const consSize = Math.trunc(args[0] as number);
-  if (consSize <= 0) throw new ArgumentError("invalid size");
-  const size = enumSize(obj);
-  if (size == null) return null;
-  const n = (size as number) + 1 - consSize;
-  return n < 0 ? 0 : n;
 }
 
 function enumfunc<T>(args: unknown[]): (i: T) => unknown {
