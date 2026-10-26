@@ -3,7 +3,7 @@ import { Base, registerModel, type Relation } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
 import { SolidQueue } from "./solid-queue.js";
 
-/** @missingRailsCall connectsTo — CONVERGEABLE solid-queue-record-class-body-reads-config-after-initializers */
+/** @missingRailsCall connectsTo — PERMANENT */
 export class Record extends Base {
   static {
     this.abstractClass = true;
