@@ -1091,6 +1091,14 @@ export function extractFromProgram(
       if (constructSigs.length === 0) return;
 
       const instanceType = constructSigs[0].getReturnType();
+      const returnedClass = instanceType.getSymbol()?.declarations?.[0];
+      if (
+        returnedClass !== undefined &&
+        returnedClass.getSourceFile() !== sourceFile &&
+        !returnsOwnClass(node, checker)
+      ) {
+        return;
+      }
       const mixinKey = `${relPath}:${node.name.text}__mixin`;
       const mixinMethods: MethodInfo[] = [];
 
@@ -3361,6 +3369,45 @@ function isInternalCallableRef(expr: ts.Expression, checker: ts.TypeChecker): bo
  * `extractClass` so member shape (arity, visibility, calls, JSDoc tags) matches
  * every other class in the manifest.
  */
+function returnsOwnClass(fn: ts.FunctionDeclaration, checker: ts.TypeChecker): boolean {
+  const isOwnClass = (expr: ts.Expression): boolean => {
+    while (
+      ts.isParenthesizedExpression(expr) ||
+      ts.isAsExpression(expr) ||
+      ts.isSatisfiesExpression(expr) ||
+      ts.isNonNullExpression(expr)
+    ) {
+      expr = expr.expression;
+    }
+    if (ts.isClassExpression(expr)) return true;
+    if (!ts.isIdentifier(expr)) return false;
+    const decl = checker.getSymbolAtLocation(expr)?.valueDeclaration;
+    return (
+      decl !== undefined &&
+      (ts.isClassDeclaration(decl) ||
+        (ts.isVariableDeclaration(decl) &&
+          decl.initializer !== undefined &&
+          ts.isClassExpression(decl.initializer))) &&
+      decl.pos >= fn.pos &&
+      decl.end <= fn.end
+    );
+  };
+  const returned: ts.Expression[] = [];
+  let bareReturn = false;
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionLike(node) || ts.isClassLike(node)) return;
+    if (ts.isReturnStatement(node)) {
+      if (node.expression === undefined) bareReturn = true;
+      else returned.push(node.expression);
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  if (fn.body === undefined) return false;
+  ts.forEachChild(fn.body, visit);
+  return !bareReturn && returned.length > 0 && returned.every(isOwnClass);
+}
+
 export function factoryClassMembers(
   fn: ts.FunctionDeclaration,
   checker: ts.TypeChecker,

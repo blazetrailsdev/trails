@@ -6,14 +6,12 @@ import * as Nokogiri from "@blazetrails/nokogiri";
 type HtmlDocument = (typeof HTML5)["Document"];
 type HtmlDocumentFragment = (typeof HTML5)["DocumentFragment"];
 
-export interface Testing {
+export const Testing = {} as {
   defaultHtmlVersion: string;
   isHtml5Support(): boolean;
   htmlDocument(options?: { htmlVersion?: string | null }): HtmlDocument;
   htmlDocumentFragment(options?: { htmlVersion?: string | null }): HtmlDocumentFragment;
-}
-
-export const Testing = {} as Testing;
+};
 
 mattrAccessor.call(Testing, "defaultHtmlVersion", { default: ":html5" });
 

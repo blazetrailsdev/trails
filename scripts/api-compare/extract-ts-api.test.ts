@@ -8092,6 +8092,108 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(seats("isConfig")).toEqual([]);
   });
 
+  it("credits mattrAccessor on the file module when a function only returns another file's class", () => {
+    const info = extractFromFiles("/p", {
+      "document.ts": `export class Document { css(): void {} }`,
+      "testing.ts": `
+        import { mattrAccessor } from "@blazetrails/activesupport";
+        import { Document } from "./document.js";
+        export const Testing = {} as { defaultHtmlVersion: string };
+        mattrAccessor.call(Testing, "defaultHtmlVersion", { default: ":html5" });
+        export function htmlDocument(): typeof Document {
+          return Document;
+        }
+      `,
+    });
+    expect(info.modules["testing.ts:htmlDocument__mixin"]).toBeUndefined();
+    const mod = info.modules["testing.ts:Testing"];
+    expect(mod.synthesizedFileModule).toBe(true);
+    expect(mod.classMethods.some((m) => m.name === "defaultHtmlVersion")).toBe(true);
+  });
+
+  it("does not read a class nested in a callback as the class a function returns", () => {
+    const info = extractFromFiles("/p", {
+      "document.ts": `export class Document { css(): void {} }`,
+      "testing.ts": `
+        import { mattrAccessor } from "@blazetrails/activesupport";
+        import { Document } from "./document.js";
+        export const Testing = {} as { defaultHtmlVersion: string };
+        mattrAccessor.call(Testing, "defaultHtmlVersion");
+        export function htmlDocument(): typeof Document {
+          [1].forEach(() => { class Local {} });
+          return Document;
+        }
+      `,
+    });
+    expect(info.modules["testing.ts:htmlDocument__mixin"]).toBeUndefined();
+    expect(info.modules["testing.ts:Testing"].synthesizedFileModule).toBe(true);
+  });
+
+  it("does not read a function that returns a local class on one branch only as a mixin", () => {
+    const info = extractFromFiles("/p", {
+      "document.ts": `export class Document { css(): void {} }`,
+      "testing.ts": `
+        import { mattrAccessor } from "@blazetrails/activesupport";
+        import { Document } from "./document.js";
+        export const Testing = {} as { defaultHtmlVersion: string };
+        mattrAccessor.call(Testing, "defaultHtmlVersion");
+        export function htmlDocument(flag: boolean): typeof Document {
+          if (flag) {
+            class Local extends Document {}
+            return Local;
+          }
+          return Document;
+        }
+      `,
+    });
+    expect(info.modules["testing.ts:htmlDocument__mixin"]).toBeUndefined();
+    expect(info.modules["testing.ts:Testing"].synthesizedFileModule).toBe(true);
+  });
+
+  it("counts a class's internal method and a same-line internal file function as two", () => {
+    const method = (name: string, isStatic: boolean): MethodInfo => ({
+      name,
+      visibility: "public",
+      params: [],
+      isStatic,
+      line: 3,
+      file: "testing.ts",
+      internal: true,
+    });
+    const klass: ClassInfo = {
+      name: "Parser",
+      file: "testing.ts",
+      includes: [],
+      extends: [],
+      instanceMethods: [method("choose", false)],
+      classMethods: [],
+    };
+    expect(countTsInternalNames("testing.ts", [klass], [], [method("choose", false)], [])).toBe(2);
+  });
+
+  it("counts a synthesized file module's own internal members once, beside its internal functions", () => {
+    const fn = (name: string, line: number, internal: boolean): MethodInfo => ({
+      name,
+      visibility: "public",
+      params: [],
+      isStatic: false,
+      line,
+      file: "testing.ts",
+      ...(internal ? { internal: true } : {}),
+    });
+    const fileFunctions = [fn("isHtml5Support", 6, false), fn("chooseParser", 8, true)];
+    const testing: ClassInfo = {
+      name: "Testing",
+      file: "testing.ts",
+      includes: [],
+      extends: [],
+      instanceMethods: fileFunctions.map((m) => ({ ...m })),
+      classMethods: [{ ...fn("secret", 5, true), isStatic: true }],
+      synthesizedFileModule: true,
+    };
+    expect(countTsInternalNames("testing.ts", [], [testing], fileFunctions, [])).toBe(2);
+  });
+
   it("credits attrInternal on a moduleEval carrier as the module's instance reader and writer", () => {
     const info = extractFromFiles("/p", {
       "form-helper.ts": `
