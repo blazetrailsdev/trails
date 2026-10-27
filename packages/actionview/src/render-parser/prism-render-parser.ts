@@ -50,7 +50,7 @@ function unescaped(node: string): string {
 
 /** @internal */
 export class PrismRenderParser extends Base {
-  /** @missingRailsCall parse — PERMANENT */
+  /** @missingRailsCall parse — CONVERGEABLE prism-render-parser-walks-a-js-ast */
   renderCalls(): string[] {
     const code = this._code;
     let masked = "";

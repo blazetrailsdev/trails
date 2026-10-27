@@ -1,4 +1,5 @@
 import type { PathSet } from "../path-set.js";
+import type { Base } from "../render-parser.js";
 import { PrismRenderParser } from "../render-parser/prism-render-parser.js";
 import type { Template } from "../template.js";
 import { WildcardResolver } from "./wildcard-resolver.js";
@@ -25,13 +26,17 @@ export class RubyTracker {
   private _name: string;
   private _template: Template;
   private _viewPaths: PathSet | null;
-  private _parserClass: typeof PrismRenderParser;
+  private _parserClass: new (name: string, code: string) => Base & { renderCalls(): string[] };
 
   constructor(
     name: string,
     template: Template,
     viewPaths: PathSet | null = null,
-    { parserClass = PrismRenderParser }: { parserClass?: typeof PrismRenderParser } = {},
+    {
+      parserClass = PrismRenderParser,
+    }: {
+      parserClass?: new (name: string, code: string) => Base & { renderCalls(): string[] };
+    } = {},
   ) {
     this._name = name;
     this._template = template;
