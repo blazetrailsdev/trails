@@ -1,6 +1,5 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { File, update, rbObjClone } from "@blazetrails/ruby-compat";
-import { rbBinop } from "./codegen-runtime.js";
 import { MiniMagick } from "./mini-magick.js";
 import { Shell } from "./shell.js";
 import "./test-helpers/spec-helper.js";
@@ -20,21 +19,21 @@ describe("MiniMagick::Tool", () => {
   });
 
   describe("#call", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-shell-over-open3-capture3
     it.fails("calls the shell to run the command", async () => {
       subject.append(imagePath("gif"));
       const output = await subject();
       expect(output).toMatch("GIF");
     });
 
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-shell-over-open3-capture3
     it.fails("strips the output", async () => {
       subject.append(imagePath());
       const output = await subject();
       expect(output).not.toEndWith("\n");
     });
 
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-shell-over-open3-capture3
     it.fails("accepts a block, and yields stdin, stdout and exit status", async () => {
       vi.spyOn(Shell.prototype, "execute").mockReturnValue(["stdout", "stderr", 0]);
       await expect(async (block: unknown) => await subject(block)).toYieldWithArgs(
@@ -45,7 +44,7 @@ describe("MiniMagick::Tool", () => {
       expect(await subject(() => {})).toEqual("stdout");
     });
 
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-shell-over-open3-capture3
     it.fails("accepts stdin", async () => {
       subject.append("-");
       const output = await subject({ stdin: File.read(imagePath() as string) });
@@ -54,7 +53,7 @@ describe("MiniMagick::Tool", () => {
   });
 
   describe(".new", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-shell-over-open3-capture3
     it.fails("accepts a block, and immediately executes the command", async () => {
       const output = new Tool(
         "identify",
@@ -72,7 +71,7 @@ describe("MiniMagick::Tool", () => {
   });
 
   describe("#command", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-specs-native-and-typed
     it.fails("includes the executable and the arguments", async () => {
       vi.spyOn(subject, "args").mockReturnValue(["-list", "Command"]);
       expect(await subject.command()).toInclude(...["identify", "-list", "Command"]);
@@ -80,28 +79,28 @@ describe("MiniMagick::Tool", () => {
   });
 
   describe("#executable", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-specs-native-and-typed
     it.fails("prepends 'magick' to the command when using ImageMagick 7", async () => {
       vi.spyOn(MiniMagick, "isImagemagick7").mockReturnValue(true);
       expect(await subject.executable()).toEqual(["magick", "identify"]);
       expect(await (await MiniMagick.convert()).executable()).toEqual(["magick"]);
     });
 
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-specs-native-and-typed
     it.fails("prepends 'gm' to the command when using GraphicsMagick", async () => {
       vi.spyOn(MiniMagick, "graphicsmagick").mockReturnValue(true);
       expect(await subject.executable()).toEqual(["gm", "identify"]);
       expect(await (await MiniMagick.convert()).executable()).toEqual(["gm", "convert"]);
     });
 
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-specs-native-and-typed
     it.fails("respects #cli_prefix as a string", async () => {
       vi.spyOn(MiniMagick, "isImagemagick7").mockReturnValue(false);
       vi.spyOn(MiniMagick, "cliPrefix").mockReturnValue("firejail");
       expect(await subject.executable()).toEqual(["firejail", "identify"]);
     });
 
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-specs-native-and-typed
     it.fails("respects #cli_prefix as an array", async () => {
       vi.spyOn(MiniMagick, "isImagemagick7").mockReturnValue(false);
       vi.spyOn(MiniMagick, "cliPrefix").mockReturnValue(["firejail", "--force"]);
@@ -110,8 +109,7 @@ describe("MiniMagick::Tool", () => {
   });
 
   describe("#<<", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
-    it.fails("adds argument to the args list", async () => {
+    it("adds argument to the args list", async () => {
       await ((x) =>
         typeof x === "string"
           ? x + 123
@@ -142,7 +140,7 @@ describe("MiniMagick::Tool", () => {
   });
 
   describe("#merge!", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-specs-native-and-typed
     it.fails("adds arguments to the args list", async () => {
       subject.append("pre-existing");
       await update(subject, ["foo", 123]);
@@ -151,18 +149,17 @@ describe("MiniMagick::Tool", () => {
   });
 
   describe("#+", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
-    it.fails("switches the last option to + form", async () => {
-      await subject.help();
-      await rbBinop(await subject.help(), "+", undefined);
-      await rbBinop(await subject.debug(), "+", "foo");
-      await rbBinop(await subject.debug(), "+", 8);
+    it("switches the last option to + form", async () => {
+      subject.help();
+      subject.help().plus();
+      subject.debug().plus("foo");
+      subject.debug().plus(8, "bar");
       expect(await subject.args).toEqual(["-help", "+help", "+debug", "foo", "+debug", "8", "bar"]);
     });
   });
 
   describe("#stdin", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-specs-native-and-typed
     it.fails("appends the '-' pseudo-filename", async () => {
       await subject.stdin;
       expect(await subject.args).toEqual(["-"]);
@@ -170,7 +167,7 @@ describe("MiniMagick::Tool", () => {
   });
 
   describe("#stdout", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-specs-native-and-typed
     it.fails("appends the '-' pseudo-filename", async () => {
       await subject.stdout;
       expect(await subject.args).toEqual(["-"]);
@@ -178,8 +175,7 @@ describe("MiniMagick::Tool", () => {
   });
 
   describe("#stack", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
-    it.fails("it surrounds added arguments with parentheses", async () => {
+    it("it surrounds added arguments with parentheses", async () => {
       await subject.stack(async (stack) => {
         if (Array.isArray(stack)) stack.push("foo");
         else if (stack instanceof globalThis.Set) stack.add("foo");
@@ -195,43 +191,39 @@ describe("MiniMagick::Tool", () => {
       expect(await subject.args).toEqual(["(", "foo", "bar", ")"]);
     });
 
-    // BLOCKED: mini-magick-cli-tool-shortcuts
-    it.fails("accepts hash of options", async () => {
+    it("accepts hash of options", async () => {
       await subject.stack({ foo: "bar", a: ["b", "c"] }, "foo.gif");
       expect(await subject.args).toEqual(["(", "-foo", "bar", "-a", "b", "c", "foo.gif", ")"]);
     });
   });
 
   describe("#clone", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-specs-native-and-typed
     it.fails("adds an option instead of the default behaviour", async () => {
       await rbObjClone(subject);
       expect(await subject.args).toEqual(["-clone"]);
     });
 
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-specs-native-and-typed
     it.fails("accepts arguments", async () => {
       await rbObjClone(subject);
       expect(await subject.args).toEqual(["-clone", "0"]);
     });
 
-    // BLOCKED: mini-magick-cli-tool-shortcuts
-    it.fails("is convertible to plus version", async () => {
-      await rbBinop(await rbObjClone(subject), "+", undefined);
+    it("is convertible to plus version", async () => {
+      subject.clone().plus();
       expect(await subject.args).toEqual(["+clone"]);
     });
   });
 
   describe("#method_missing", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
-    it.fails("adds CLI options", async () => {
+    it("adds CLI options", async () => {
       await subject.fooBar("baz");
       expect(await subject.args).toEqual(["-foo-bar", "baz"]);
     });
   });
 
-  // BLOCKED: mini-magick-cli-tool-shortcuts
-  it.fails("defines creation operator methods", async () => {
+  it("defines creation operator methods", async () => {
     await (await subject.radialGradient()).canvas("khaki");
     expect(await subject.args).toEqual(["radial-gradient:", "canvas:khaki"]);
   });

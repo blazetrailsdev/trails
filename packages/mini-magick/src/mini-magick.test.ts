@@ -4,7 +4,7 @@ import { expect, it, describe } from "vitest";
 
 describe("MiniMagick", () => {
   describe(".cli_version", () => {
-    // BLOCKED: mini-magick-cli-tool-shortcuts
+    // BLOCKED: mini-magick-shell-over-open3-capture3
     it.fails("returns ImageMagick's version", async () => {
       expect(await MiniMagick.cliVersion()).toMatch(/^\d+\.\d+\.\d+-\d+$/m);
     });

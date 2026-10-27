@@ -1,5 +1,4 @@
 import type {} from "@blazetrails/vitest-matchers";
-import { getEnv } from "@blazetrails/activesupport";
 import {
   File,
   StringIO,
@@ -17,8 +16,8 @@ import {
   first,
   StandardError,
   rbObjAsString,
+  env,
 } from "@blazetrails/ruby-compat";
-import { inject, lines } from "./codegen-runtime.js";
 import { Image } from "./image.js";
 import { cliVersion, Error } from "./mini-magick.js";
 import { MiniMagick } from "./mini-magick.js";
@@ -96,7 +95,7 @@ describe("MiniMagick::Image", () => {
     });
 
     beforeEach(async () => {
-      pixels = [await inject(dimensions, "*"), (i) => i];
+      pixels = [dimensions.reduce((a: number, b: number) => a * b), (i) => i];
     });
 
     beforeEach(async () => {
@@ -650,7 +649,7 @@ describe("MiniMagick::Image", () => {
     // BLOCKED: mini-magick-lib-native-idioms
 
     it.fails("decodes the ExifVersion", async (ctx) => {
-      ctx.skip(!!((getEnv("CI") ?? false) !== false));
+      ctx.skip(env.CI != null);
       const subject = new Image(imagePath("exif"));
       expect((await subject.exif())["ExifVersion"]).toEqual("0220");
     });
@@ -681,7 +680,7 @@ describe("MiniMagick::Image", () => {
       // BLOCKED: mini-magick-lib-native-idioms
 
       it.fails("returns image JSON data", async (ctx) => {
-        ctx.skip(!!((getEnv("CI") ?? false) !== false));
+        ctx.skip(env.CI != null);
         expect((await subject.data())["format"]).toEqual("JPEG");
         expect((await subject.data())["colorspace"]).toEqual("sRGB");
       });
@@ -695,7 +694,7 @@ describe("MiniMagick::Image", () => {
       // BLOCKED: mini-magick-lib-native-idioms
 
       it.fails("returns image JSON data", async (ctx) => {
-        ctx.skip(!!((getEnv("CI") ?? false) !== false));
+        ctx.skip(env.CI != null);
         expect((await subject.data())["format"]).toEqual("PNG");
         expect((await subject.data())["colorspace"]).toEqual("sRGB");
       });
@@ -1031,7 +1030,7 @@ describe("MiniMagick::Image", () => {
 
     it.fails("collapses the image to one frame", async () => {
       await subject.collapseBang();
-      expect(await (await lines(await subject.identify())).length).toEqual(1);
+      expect(await (await subject.identify()).split("\n").length).toEqual(1);
     });
 
     // BLOCKED: mini-magick-lib-native-idioms

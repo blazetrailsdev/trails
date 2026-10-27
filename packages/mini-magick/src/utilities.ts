@@ -1,17 +1,9 @@
-import { getEnv } from "@blazetrails/activesupport";
-import { rbStrSend, fetch, File, Tempfile } from "@blazetrails/ruby-compat";
+import { rbStrSend, fetch, File, Tempfile, env } from "@blazetrails/ruby-compat";
 import { MiniMagick } from "./mini-magick.js";
 
 export function which(cmd: string) {
-  const exts =
-    (getEnv("PATHEXT") ?? false) !== false
-      ? (rbStrSend(getEnv("PATHEXT"), "split", ";")[0] as string[])
-      : [""];
-  for (const path of rbStrSend(
-    fetch(process.env, "PATH"),
-    "split",
-    File.PATH_SEPARATOR,
-  )[0] as string[]) {
+  const exts = env.PATHEXT != null ? (rbStrSend(env.PATHEXT, "split", ";")[0] as string[]) : [""];
+  for (const path of rbStrSend(fetch(env, "PATH"), "split", File.PATH_SEPARATOR)[0] as string[]) {
     for (const ext of exts) {
       const exe = File.join(path, `${cmd ?? ""}${ext ?? ""}`);
       if (File.isExecutable(exe)) {

@@ -65,7 +65,11 @@ export class Tool {
       get(target, name, receiver) {
         if (typeof name === "symbol" || name in target || PROTOCOL_PROBES.has(name))
           return Reflect.get(target, name, receiver);
-        return (...args: unknown[]) => (receiver as Tool).methodMissing(name, ...args);
+        return (...args: unknown[]) =>
+          (receiver as Tool).methodMissing(
+            name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`),
+            ...args,
+          );
       },
     });
   }
@@ -115,7 +119,7 @@ export class Tool {
   }
 
   plus(...values: unknown[]) {
-    this.args[-1] = rbStrSend(this.args[-1] as string, "sub", /^-/m, "+")[0];
+    this.args[this.args.length - 1] = (this.args.at(-1) as string).replace(/^-/m, "+");
     this.mergeBang(values);
     return this;
   }
