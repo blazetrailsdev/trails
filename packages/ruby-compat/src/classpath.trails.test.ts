@@ -53,6 +53,18 @@ describe("rbModName over the generated class-path table", () => {
     expect(rbModName(Later)).toBe("Deferred::Later");
   });
 
+  it("reports a thunk still unresolved when the check runs", () => {
+    registerClassPaths([
+      [
+        () => {
+          throw new ReferenceError("Cannot access 'Never' before initialization");
+        },
+        "Deferred::Never",
+      ],
+    ]);
+    expect(classPathMismatches()).toContainEqual(["<unresolved>", "Deferred::Never"]);
+  });
+
   it("seats a plain-object module", () => {
     const Mod = {};
     registerClassPaths([[() => Mod, "Outer::PlainModule"]]);
