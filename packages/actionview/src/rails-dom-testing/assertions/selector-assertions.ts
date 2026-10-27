@@ -31,7 +31,10 @@ export function cssSelect(this: SelectorAssertionsHost, ...args: unknown[]): Nod
   return nodeset(root).css(args[0]);
 }
 
-export function assertDom(this: SelectorAssertionsHost, ...args: unknown[]): NodeSet | undefined {
+export function assertDom(
+  this: SelectorAssertionsHost,
+  ...args: unknown[] | [...unknown[], (selected: NodeSet | Html5DocumentFragment) => void]
+): NodeSet | undefined {
   const block = rbBlockGivenP(args.at(-1))
     ? (args.pop() as (s: NodeSet | Html5DocumentFragment) => void)
     : null;
