@@ -253,6 +253,15 @@ export class Tool {
         rbConstWarnIfDeprecated(Tool, rbStrSend(tool, "capitalize")[0] as string);
         return klass;
       },
+      set(value: unknown) {
+        Object.defineProperty(Tool, rbStrSend(tool, "capitalize")[0] as string, {
+          value,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      },
+      enumerable: true,
       configurable: true,
     });
     rbModDeprecateConstant(Tool, rbStrSend(tool, "capitalize")[0] as string);

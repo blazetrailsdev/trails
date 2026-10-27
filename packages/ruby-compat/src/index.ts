@@ -277,7 +277,7 @@ export { JSON } from "./json.js";
 export { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "./kernel-catch.js";
 export { kernelFloat } from "./kernel-float.js";
 export { format, sprintf } from "./kernel-format.js";
-export { warn } from "./kernel-warn.js";
+export { rbWarningSAref, rbWarningSAset, warn } from "./kernel-warn.js";
 export { kernelInteger, rbCheckToInt } from "./kernel-integer.js";
 export { kernelRand } from "./kernel-rand.js";
 export { rbFSystem } from "./kernel-system.js";
