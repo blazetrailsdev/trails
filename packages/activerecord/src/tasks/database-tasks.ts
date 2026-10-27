@@ -35,7 +35,7 @@ import {
   rbModConstSet,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
-import type { Base } from "../base.js";
+import { Base } from "../base.js";
 import { dumpSchemaAfterMigration, schemaFormat } from "../active-record.js";
 import { ActiveRecord } from "../namespaces.js";
 
@@ -374,12 +374,12 @@ export class DatabaseTasks {
       includeHidden?: boolean;
     } = {},
   ): HashConfig[] | HashConfig | undefined {
-    return ActiveRecord.Base.configurations().configsFor(options as { name: string });
+    return Base.configurations().configsFor(options as { name: string });
   }
 
   /** @internal */
   private static resolveConfiguration(configuration: unknown): HashConfig | null {
-    return ActiveRecord.Base.configurations().resolve(configuration);
+    return Base.configurations().resolve(configuration);
   }
 
   /** @internal */
@@ -400,7 +400,7 @@ export class DatabaseTasks {
 
   /** @internal */
   static async eachLocalConfiguration(block: (dbConfig: HashConfig) => unknown): Promise<void> {
-    for (const dbConfig of ActiveRecord.Base.configurations().configsFor()) {
+    for (const dbConfig of Base.configurations().configsFor()) {
       if (!dbConfig.database) continue;
 
       if (this.isLocalDatabase(dbConfig)) {
@@ -517,8 +517,8 @@ export class DatabaseTasks {
         const migrationConnectionPool = this.migrationConnectionPool();
         await File.open(filename, "w:utf-8", async (file) => {
           await SchemaDumper.dump(migrationConnectionPool, file, {
-            tableNamePrefix: ActiveRecord.Base.tableNamePrefix,
-            tableNameSuffix: ActiveRecord.Base.tableNameSuffix,
+            tableNamePrefix: Base.tableNamePrefix,
+            tableNameSuffix: Base.tableNameSuffix,
             schemaFormat: format,
           });
         });
@@ -615,7 +615,7 @@ export class DatabaseTasks {
   }
 
   static async migrateAll(): Promise<void> {
-    const configs = ActiveRecord.Base.configurations().configsFor({
+    const configs = Base.configurations().configsFor({
       envName: DatabaseTasks.env,
     });
 
@@ -742,7 +742,7 @@ export class DatabaseTasks {
   }
 
   static migrationClass(): typeof Base {
-    return ActiveRecord.Base;
+    return Base;
   }
 
   static migrationConnection(): Promise<

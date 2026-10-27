@@ -10,7 +10,7 @@ import {
 } from "@blazetrails/activesupport";
 import { eachWithIndex, rbObjAsString, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
 import { verboseQueryLogs } from "./active-record.js";
-import { ActiveRecord } from "./namespaces.js";
+import { Base } from "./base.js";
 
 function byteLength(value: unknown): number {
   if (value == null) return 0;
@@ -112,7 +112,7 @@ export class LogSubscriber extends BaseLogSubscriber {
 
   /** @internal */
   override get logger(): Logger | null {
-    return ActiveRecord.Base.logger as Logger | null;
+    return Base.logger as Logger | null;
   }
 
   /** @internal */
@@ -174,7 +174,7 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   private filter(name: string | null, value: unknown): unknown {
-    return ActiveRecord.Base.inspectionFilter().filterParam(name as string, value);
+    return Base.inspectionFilter().filterParam(name as string, value);
   }
 }
 

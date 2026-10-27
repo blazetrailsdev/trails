@@ -27,8 +27,8 @@ import {
   isDangerousClassMethod,
   isMethodDefinedWithin,
 } from "./attribute-methods.js";
-import { ActiveRecord } from "./namespaces.js";
 import { isReplayingOverColdSchema } from "./attributes.js";
+import { Relation } from "./relation.js";
 
 type EnumValue = number | string | boolean | null;
 
@@ -326,7 +326,7 @@ export function detectEnumConflictBang(
 ): void {
   if (klassMethod && isDangerousClassMethod.call(this, methodName)) {
     raiseConflictError.call(this, enumName, methodName, { type: "class" });
-  } else if (klassMethod && isMethodDefinedWithin.call(this, methodName, ActiveRecord.Relation)) {
+  } else if (klassMethod && isMethodDefinedWithin.call(this, methodName, Relation)) {
     raiseConflictError.call(this, enumName, methodName, {
       type: "class",
       source: "ActiveRecord::Relation",

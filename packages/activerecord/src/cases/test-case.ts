@@ -39,7 +39,7 @@ import {
   setDbWarningsIgnore,
   setDefaultTimezone,
 } from "../active-record.js";
-import type { Base } from "../base.js";
+import { Base } from "../base.js";
 import type { PoolManager } from "../connection-adapters/pool-manager.js";
 import { FixtureSet } from "../fixtures.js";
 import { ActiveRecord } from "../namespaces.js";
@@ -107,7 +107,7 @@ export class TestCase extends ActiveSupportTestCase {
     if (this.inMemoryDb()) return;
 
     const leakedConn: [Thread | Fiber, unknown][] = [];
-    for (const pool of ActiveRecord.Base.connectionHandler.eachConnectionPool()) {
+    for (const pool of Base.connectionHandler.eachConnectionPool()) {
       if (pool.asyncExecutor) {
         if (pool.asyncExecutor.scheduledTaskCount !== pool.asyncExecutor.completedTaskCount) {
           for (const conn of pool.connections) {
@@ -222,10 +222,7 @@ export class TestCase extends ActiveSupportTestCase {
     assertNotIncludes(model.columnNames(), String(columnName), msg);
   }
 
-  async withHasManyInversing(
-    model: typeof Base = ActiveRecord.Base,
-    block: () => unknown,
-  ): Promise<void> {
+  async withHasManyInversing(model: typeof Base = Base, block: () => unknown): Promise<void> {
     const old = model.hasManyInversing;
     try {
       model.hasManyInversing = true;
@@ -270,13 +267,13 @@ export class TestCase extends ActiveSupportTestCase {
       setDbWarningsAction(action);
       setDbWarningsIgnore(warningsToIgnore);
 
-      await (await ActiveRecord.Base.leaseConnection()).disconnectBang();
+      await (await Base.leaseConnection()).disconnectBang();
 
       await block();
     } finally {
       setDbWarningsAction(this._originalDbWarningsAction!);
       setDbWarningsIgnore(originalDbWarningsIgnore);
-      await (await ActiveRecord.Base.leaseConnection()).disconnectBang();
+      await (await Base.leaseConnection()).disconnectBang();
     }
   }
 
@@ -340,8 +337,8 @@ export class TestCase extends ActiveSupportTestCase {
     this.verifyDefaultTimezoneConfig();
 
     const oldDefaultZone = defaultTimezone();
-    const oldAwareness = ActiveRecord.Base.timeZoneAwareAttributes;
-    const oldAwareTypes = ActiveRecord.Base.timeZoneAwareTypes;
+    const oldAwareness = Base.timeZoneAwareAttributes;
+    const oldAwareTypes = Base.timeZoneAwareTypes;
     const oldZone = zone();
 
     try {
@@ -349,10 +346,10 @@ export class TestCase extends ActiveSupportTestCase {
         setDefaultTimezone(cfg.default!);
       }
       if ("awareAttributes" in cfg) {
-        ActiveRecord.Base.timeZoneAwareAttributes = cfg.awareAttributes!;
+        Base.timeZoneAwareAttributes = cfg.awareAttributes!;
       }
       if ("awareTypes" in cfg) {
-        ActiveRecord.Base.timeZoneAwareTypes = cfg.awareTypes!;
+        Base.timeZoneAwareTypes = cfg.awareTypes!;
       }
       if ("zone" in cfg) {
         setZone(cfg.zone!);
@@ -360,8 +357,8 @@ export class TestCase extends ActiveSupportTestCase {
       await block();
     } finally {
       setDefaultTimezone(oldDefaultZone);
-      ActiveRecord.Base.timeZoneAwareAttributes = oldAwareness;
-      ActiveRecord.Base.timeZoneAwareTypes = oldAwareTypes;
+      Base.timeZoneAwareAttributes = oldAwareness;
+      Base.timeZoneAwareTypes = oldAwareTypes;
       setZone(oldZone);
     }
   }
@@ -379,30 +376,28 @@ export class TestCase extends ActiveSupportTestCase {
         `    \n${this}\n        Global state \`ActiveRecord.default_timezone\` was leaked.\n          Expected: ${TestCase.EXPECTED_DEFAULT_TIMEZONE}\n          Got: ${defaultTimezone()}\n`,
       );
     }
-    if (
-      ActiveRecord.Base.timeZoneAwareAttributes !== TestCase.EXPECTED_TIME_ZONE_AWARE_ATTRIBUTES
-    ) {
+    if (Base.timeZoneAwareAttributes !== TestCase.EXPECTED_TIME_ZONE_AWARE_ATTRIBUTES) {
       puts.call(
         stderr,
-        `    \n${this}\n        Global state \`ActiveRecord::Base.time_zone_aware_attributes\` was leaked.\n          Expected: ${TestCase.EXPECTED_TIME_ZONE_AWARE_ATTRIBUTES}\n          Got: ${ActiveRecord.Base.timeZoneAwareAttributes}\n`,
+        `    \n${this}\n        Global state \`ActiveRecord::Base.time_zone_aware_attributes\` was leaked.\n          Expected: ${TestCase.EXPECTED_TIME_ZONE_AWARE_ATTRIBUTES}\n          Got: ${Base.timeZoneAwareAttributes}\n`,
       );
     }
-    if (!rbEqual(ActiveRecord.Base.timeZoneAwareTypes, TestCase.EXPECTED_AWARE_TYPES)) {
+    if (!rbEqual(Base.timeZoneAwareTypes, TestCase.EXPECTED_AWARE_TYPES)) {
       puts.call(
         stderr,
-        `    \n${this}\n        Global state \`ActiveRecord::Base.time_zone_aware_types\` was leaked.\n          Expected: ${rbInspect(TestCase.EXPECTED_AWARE_TYPES)}\n          Got: ${rbInspect(ActiveRecord.Base.timeZoneAwareTypes)}\n`,
+        `    \n${this}\n        Global state \`ActiveRecord::Base.time_zone_aware_types\` was leaked.\n          Expected: ${rbInspect(TestCase.EXPECTED_AWARE_TYPES)}\n          Got: ${rbInspect(Base.timeZoneAwareTypes)}\n`,
       );
     }
   }
 
   cleanUpConnectionHandler(): void {
-    const handler = ActiveRecord.Base.connectionHandler as unknown as {
+    const handler = Base.connectionHandler as unknown as {
       _connectionNameToPoolManager: { eachPair(block: (k: string, v: PoolManager) => void): void };
     };
     handler._connectionNameToPoolManager.eachPair((owner, poolManager) => {
       for (const roleName of [...poolManager.roleNames]) {
         if (
-          roleName === ActiveRecord.Base.defaultRole &&
+          roleName === Base.defaultRole &&
           ["ActiveRecord::Base", "ARUnit2Model", "Contact", "ContactSti"].includes(owner)
         )
           continue;
@@ -412,7 +407,7 @@ export class TestCase extends ActiveSupportTestCase {
   }
 
   quoteTableName(name: string): string {
-    return ActiveRecord.Base.adapterClass().quoteTableName(name);
+    return Base.adapterClass().quoteTableName(name);
   }
 }
 
