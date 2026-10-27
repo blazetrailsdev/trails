@@ -46,7 +46,10 @@ export class Column {
     return this.sqlTypeMetadata?.sqlType ?? null;
   }
 
-  /** @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15 */
+  /**
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15
+   * @inventedArm if — PERMANENT
+   */
   constructor(
     name: string,
     defaultValue: string | Uint8Array | null,

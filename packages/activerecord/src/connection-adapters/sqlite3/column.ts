@@ -8,7 +8,7 @@ export class Column extends BaseColumn {
   rowid: boolean;
   private _generatedType: "stored" | "virtual" | null;
 
-  /** @inventedArm if — CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor */
+  /** @inventedArm if — PERMANENT */
   constructor(
     name: string,
     defaultValue: string | Uint8Array | null,
