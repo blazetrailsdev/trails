@@ -29,7 +29,7 @@ export class CredentialsGenerator extends GeneratorBase {
   }
 
   async addCredentialsFile(): Promise<void> {
-    if (this.fileExists(this.contentPath)) return;
+    if (File.isExist(File.join(this.destinationRoot, this.contentPath))) return;
     this.say(`Adding ${this.contentPath} to store encrypted credentials.`);
     this.say("");
     const content = this.renderTemplate();

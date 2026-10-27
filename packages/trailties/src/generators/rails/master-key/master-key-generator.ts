@@ -1,3 +1,4 @@
+import { File } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { EncryptionKeyFileGenerator } from "../encryption-key-file/encryption-key-file-generator.js";
@@ -17,7 +18,7 @@ export class MasterKeyGenerator extends GeneratorBase {
   }
 
   addMasterKeyFile(): void {
-    if (!this.fileExists(MASTER_KEY_PATH)) {
+    if (!File.isExist(File.join(this.destinationRoot, MASTER_KEY_PATH))) {
       const key = EncryptedFile.generateKey();
 
       this.log(`Adding ${MASTER_KEY_PATH} to store the master encryption key: ${key}`);
@@ -35,7 +36,7 @@ export class MasterKeyGenerator extends GeneratorBase {
   }
 
   addMasterKeyFileSilently(key?: string): void {
-    if (this.fileExists(MASTER_KEY_PATH)) return;
+    if (File.isExist(File.join(this.destinationRoot, MASTER_KEY_PATH))) return;
     this.keyFileGenerator().addKeyFileSilently(MASTER_KEY_PATH, key);
   }
 

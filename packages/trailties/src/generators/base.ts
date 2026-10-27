@@ -895,22 +895,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     if (!this.options.pretend) File.write(fullPath, updated);
   }
 
-  protected readFile(relativePath: string): string {
-    return File.read(File.join(this.cwd, relativePath));
-  }
-
-  protected fileExists(relativePath: string): boolean {
-    return File.isExist(File.join(this.cwd, relativePath));
-  }
-
-  protected removeFile(relativePath: string): boolean {
-    const fullPath = File.join(this.cwd, relativePath);
-    if (!File.isExist(fullPath)) return false;
-    File.delete(fullPath);
-    this.output(`      remove  ${relativePath}`);
-    return true;
-  }
-
   getCreatedFiles(): string[] {
     return [...this.createdFiles];
   }
