@@ -4,6 +4,8 @@ import { Autoload, extend, type Extended, TopLevel } from "@blazetrails/activesu
 import type { INTERNAL, server } from "./action-cable.js";
 import type { Base as ChannelBase } from "./channel/base.js";
 import type { Base as ConnectionBase } from "./connection/base.js";
+import type { TestCase } from "./test-case.js";
+import type { TestHelper } from "./test-helper.js";
 import { rbDeclareIvar, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
@@ -40,6 +42,8 @@ export const ActionCable = { name: "ActionCable" } as AutoloadModule & {
   Channel: typeof Channel;
   SubscriptionAdapter: typeof SubscriptionAdapter;
   Helpers: typeof Helpers;
+  TestCase?: typeof TestCase;
+  TestHelper?: typeof TestHelper;
   Engine?: unknown;
   _server?: unknown;
 };
