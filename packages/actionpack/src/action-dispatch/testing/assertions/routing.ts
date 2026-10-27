@@ -3,10 +3,8 @@ import {
   extend,
   include,
   InvalidURIError,
-  Module,
-  NoMethodError,
+  rbCallSuper,
   rbFSend,
-  rbObjClassname,
   rbObjClone,
   rbObjMethod,
   rbObjRespondTo,
@@ -266,15 +264,7 @@ export function methodMissing(
   if (this.controller != null && this.routes?.namedRoutes?.isRouteDefined(selector)) {
     return rbFSend(this.controller, selector, ...args);
   } else {
-    const super_ = RoutingAssertions.superMethod(this, "methodMissing");
-    if (super_ !== undefined) return super_(selector, ...args);
-    throw new NoMethodError(
-      `undefined method '${selector}' for an instance of ${rbObjClassname(this)}`,
-      selector,
-      args,
-      false,
-      { receiver: this },
-    );
+    return rbCallSuper(this, methodMissing, selector, ...args);
   }
 }
 
@@ -358,9 +348,7 @@ export function createRoutes<T>(
       ).viewContextClass() {};
       include(viewContextClass, _routes.urlHelpers());
 
-      const customViewContext = new Module((mod) => {
-        mod.defineMethod("viewContextClass", () => viewContextClass);
-      });
+      const customViewContext = { viewContextClass: () => viewContextClass };
       extend(this.controller as object, customViewContext);
     }
   }
@@ -427,29 +415,25 @@ export type RoutingAssertions = {
   failOn: typeof failOn;
 };
 
-export const RoutingAssertions = new Module((mod) => {
-  extend(mod, Concern);
+export const RoutingAssertions = {
+  ClassMethods,
+  setup,
+  withRouting,
+  assertRecognizes,
+  assertGenerates,
+  assertRouting,
+  methodMissing,
+  createRoutes,
+  resetRoutes,
+  recognizedRequestFor,
+  failOn,
+};
+extend(RoutingAssertions, Concern);
 
-  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
-
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      setup,
-      withRouting,
-      assertRecognizes,
-      assertGenerates,
-      assertRouting,
-      methodMissing,
-      createRoutes,
-      resetRoutes,
-      recognizedRequestFor,
-      failOn,
-    });
-  });
-
-  (
-    mod as unknown as { included(base: null, block: (this: { prototype: object }) => void): void }
-  ).included(null, function (this: { prototype: object }) {
-    spliceMethodMissing(Object.getPrototypeOf(this.prototype) as object);
-  });
+(
+  RoutingAssertions as unknown as {
+    included(base: null, block: (this: { prototype: object }) => void): void;
+  }
+).included(null, function (this: { prototype: object }) {
+  spliceMethodMissing(this.prototype);
 });

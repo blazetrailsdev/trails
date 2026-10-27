@@ -2165,6 +2165,8 @@ export interface KernelModule {
   initializeDup(this: object, orig: unknown): object;
   initializeClone(this: object, orig: unknown): object;
   freeze(this: object): object;
+  respondToMissing(this: object, mid: string, priv: boolean): boolean;
+  methodMissing(this: object, mid: string, ...args: unknown[]): never;
   abort: typeof abort;
   rand: typeof kernelRand;
 }
@@ -2205,6 +2207,29 @@ export const Kernel = {
   /** @noRailsEquivalent PERMANENT */
   freeze(this: object): object {
     return Object.freeze(this);
+  },
+  /**
+   * Mirrors: `Kernel#respond_to_missing?` — vendor/ruby/v3.3.11/vm_method.c:3018.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  respondToMissing(this: object, _mid: string, _priv: boolean): boolean {
+    return false;
+  },
+  /**
+   * Mirrors: `BasicObject#method_missing` — vendor/ruby/v3.3.11/vm_eval.c:2570,
+   * the last stop of a `super` search, as `Kernel` is here.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  methodMissing(this: object, mid: string, ...args: unknown[]): never {
+    throw new NoMethodError(
+      `undefined method '${mid}' for an instance of ${this.constructor.name}`,
+      mid,
+      args,
+      false,
+      { receiver: this },
+    );
   },
 } as KernelModule;
 
