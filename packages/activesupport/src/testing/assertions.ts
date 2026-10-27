@@ -328,7 +328,7 @@ export async function assertRaises<K extends new (...args: any[]) => Error>(
       `${msg}${exp.map((e) => e.name).join(", ")} expected but nothing was raised`,
     );
   if (!exp.some((klass) => error instanceof klass)) {
-    assert(false, `${exp.map((e) => e.name).join(", ")} expected, not ${error.name}`);
+    assert(false, `${msg}${exp.map((e) => e.name).join(", ")} expected, not ${error.name}`);
   }
   assert(true);
   if (match) assertMatch(match, error.message);

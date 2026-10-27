@@ -58,7 +58,11 @@ export const ChannelStub = defineModule({
     return this.isSubscriptionRejected();
   },
 
-  streamFrom(this: StubbedChannel & { streams: string[] }, broadcasting: string): string[] {
+  streamFrom(
+    this: StubbedChannel & { streams: string[] },
+    broadcasting: string,
+    ..._rest: unknown[]
+  ): string[] {
     this.streams.push(broadcasting);
     return this.streams;
   },
@@ -105,8 +109,9 @@ export class ConnectionStub {
     this.logger = TaggedLogging.new(new Logger(new StringIO()));
   }
 
-  transmit(cableMessage: Data): number {
-    return this.transmissions.push(withIndifferentAccess(cableMessage) as unknown as Data);
+  transmit(cableMessage: Data): Data[] {
+    this.transmissions.push(withIndifferentAccess(cableMessage) as unknown as Data);
+    return this.transmissions;
   }
 
   get connectionIdentifier(): string {
