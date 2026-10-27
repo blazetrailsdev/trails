@@ -4,7 +4,7 @@ import { EOFError } from "./eof-error.js";
 import { Errno } from "./errno.js";
 import { IO } from "./io.js";
 import { IOError } from "./io-error.js";
-import { rbInspect } from "./object.js";
+import { rbInspect, rbObjAsString } from "./object.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { getProcessAdapter } from "./process-adapter.js";
 
@@ -182,8 +182,9 @@ export class BasicSocket extends IO {
 
   /**
    * `IO#write_nonblock` (`vendor/ruby/v3.3.11/io.rb:120`, `io.c:3666`
-   * `io_write_nonblock`). A non-boolean `exception` raises `ArgumentError`
-   * first (`rb_bool_expected`, `io.c:3673`, `object.c:3320-3335`), and an
+   * `io_write_nonblock`). A `buf` that is not a String is sent `to_s` first
+   * (`rb_obj_as_string`, `io.c:3671-3672`); then a non-boolean `exception`
+   * raises `ArgumentError` (`rb_bool_expected`, `io.c:3673`, `object.c:3320-3335`), and an
    * empty `buf` answers 0 without regard to room, as a zero-length
    * `write(2)` does (`io.c:3682-3699`). The socket's write queue below its high-water mark
    * stands in for the kernel's send buffer: as many bytes as fit there are
@@ -199,15 +200,16 @@ export class BasicSocket extends IO {
    * @noRailsEquivalent PERMANENT
    */
   writeNonblock(
-    buf: string | Uint8Array,
+    buf: unknown,
     { exception = true }: { exception?: boolean } = {},
   ): number | "wait_writable" {
+    const str: string | Uint8Array = rbObjAsString(buf);
     if (exception !== true && exception !== false) {
       throw new ArgumentError(`expected true or false as exception: ${rbInspect(exception)}`);
     }
     if (this._closed || this._writeClosed) throw new IOError("closed stream");
     if (this._peerGone) throw this._hostError ?? new Errno.EPIPE();
-    const bytes = typeof buf === "string" ? new TextEncoder().encode(buf) : buf;
+    const bytes = typeof str === "string" ? new TextEncoder().encode(str) : str;
     if (bytes.length === 0) return 0;
     const room = this._socket.writableHighWaterMark - this._socket.writableLength;
     if (room <= 0) {

@@ -220,4 +220,11 @@ describe("TCPSocket", () => {
     );
     expect(written).toHaveLength(0);
   });
+
+  it("writes the to_s of a buf that is not a String", () => {
+    const { socket, written } = fakeSocket();
+    const io = new TCPSocket(socket);
+    expect(io.writeNonblock(42)).toBe(2);
+    expect(written[0]).toEqual(new TextEncoder().encode("42"));
+  });
 });
