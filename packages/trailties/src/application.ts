@@ -323,10 +323,9 @@ export class Application extends Engine {
     { env = Trails.env.toString() }: { env?: string } = {},
   ): Promise<unknown> {
     const configDir = ((await this.paths().get("config")?.existent()) ?? [])[0];
-    const isPath = name instanceof Pathname;
     const yaml = name instanceof Pathname ? name : new Pathname(`${configDir}/${name}`);
     let ext: string | undefined;
-    for (const e of isPath ? [""] : [".ts", ".js"]) {
+    for (const e of name instanceof Pathname ? [""] : [".ts", ".js"]) {
       ext ??= (await getFs().exists(`${yaml}${e}`)) ? e : undefined;
     }
     if (ext !== undefined) {
