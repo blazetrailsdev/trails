@@ -2155,7 +2155,7 @@ ActiveRecord.Migration = Migration;
 ActiveRecord.IrreversibleMigration = IrreversibleMigration;
 
 rbModConstSet(ActiveRecord, "MigrationError", MigrationError);
-rbModConstSet(ActiveRecord, "IrreversibleMigration", IrreversibleMigration);
+ActiveRecord.IrreversibleMigration = IrreversibleMigration;
 rbModConstSet(ActiveRecord, "DuplicateMigrationVersionError", DuplicateMigrationVersionError);
 rbModConstSet(ActiveRecord, "DuplicateMigrationNameError", DuplicateMigrationNameError);
 rbModConstSet(ActiveRecord, "UnknownMigrationVersionError", UnknownMigrationVersionError);

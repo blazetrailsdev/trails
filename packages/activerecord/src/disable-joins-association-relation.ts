@@ -1,6 +1,6 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { ActiveRecord } from "./namespaces.js";
-import { groupBy, rbFSend, rbModConstSet, take, uniq } from "@blazetrails/ruby-compat";
+import { groupBy, rbFSend, take, uniq } from "@blazetrails/ruby-compat";
 import { stripThenable } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
@@ -51,4 +51,4 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
   }
 }
 
-rbModConstSet(ActiveRecord, "DisableJoinsAssociationRelation", DisableJoinsAssociationRelation);
+ActiveRecord.DisableJoinsAssociationRelation = DisableJoinsAssociationRelation;

@@ -1,13 +1,5 @@
 import { isBlank, kernelArray, Tempfile } from "@blazetrails/activesupport";
-import {
-  File,
-  FileUtils,
-  rtest,
-  rbEqq,
-  rbFSystem,
-  rbModConstSet,
-  RuntimeError,
-} from "@blazetrails/ruby-compat";
+import { File, FileUtils, rtest, rbEqq, rbFSystem, RuntimeError } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
@@ -195,5 +187,5 @@ export class PostgreSQLDatabaseTasks {
   }
 }
 
-rbModConstSet(Tasks, "PostgreSQLDatabaseTasks", PostgreSQLDatabaseTasks);
+Tasks.PostgreSQLDatabaseTasks = PostgreSQLDatabaseTasks;
 DatabaseTasks.registerTask(/postgres/, PostgreSQLDatabaseTasks);
