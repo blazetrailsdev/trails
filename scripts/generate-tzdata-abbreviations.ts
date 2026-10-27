@@ -155,9 +155,11 @@ export function tzdataAbbreviation(timeZoneId: string, epochSeconds: number): st
     if (instants[middle] <= epochSeconds) low = middle + 1;
     else high = middle;
   }
-  if (epochSeconds >= horizon && low > 1 && instants[low - 1] >= horizon - 366 * 86400) {
+  if (epochSeconds >= horizon && low > 0 && instants[low - 1] >= horizon - 366 * 86400) {
     const isdst = tzdataIsdst(timeZoneId, epochSeconds);
-    if (tzdataIsdst(timeZoneId, instants[low - 1]) !== isdst) return names[indexes[low - 2]];
+    for (let i = low - 1; i >= 0 && instants[i] >= horizon - 2 * 366 * 86400; i--) {
+      if (tzdataIsdst(timeZoneId, instants[i]) === isdst) return names[indexes[i]];
+    }
   }
   return names[low === 0 ? 0 : indexes[low - 1]];
 }
