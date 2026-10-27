@@ -860,6 +860,15 @@ describe("hashDelete", () => {
   });
 });
 
+describe("hashDelete on an Array", () => {
+  it("removes the element and returns it, or nil when it is absent, as Array#delete does", () => {
+    const ary = ["a", "b", "a"];
+    expect(hashDelete(ary, "a")).toBe("a");
+    expect(ary).toEqual(["b"]);
+    expect(hashDelete(ary, "z")).toBeNull();
+  });
+});
+
 describe("hashDelete on a Map", () => {
   it("removes the entry and returns its stored value, or nil for an absent key", () => {
     const hash = new Map<string, number>([["foo", 0]]);

@@ -376,6 +376,7 @@ export {
   rbModConstGet,
   rbModConstants,
   rbModDeprecateConstant,
+  rbConstWarnIfDeprecated,
   rbConstMissing,
   rbModConstMissing,
   rbFBinding,

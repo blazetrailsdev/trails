@@ -9,6 +9,7 @@ import {
   rbObjIsKindOf,
   Hash,
   rbFSend,
+  rbConstWarnIfDeprecated,
   rbModDeprecateConstant,
 } from "@blazetrails/ruby-compat";
 import { MiniMagick, isImagemagick7 } from "./mini-magick.js";
@@ -238,16 +239,22 @@ export class Tool {
     "montage",
     "stream",
   ]) {
-    (Tool as unknown as Record<string, typeof Tool>)[rbStrSend(tool, "capitalize")[0] as string] =
-      class extends Tool {
-        static toString(): string {
-          return `MiniMagick::Tool::${rbStrSend(tool, "capitalize")[0] as string}`;
-        }
+    const klass = class extends Tool {
+      static toString(): string {
+        return `MiniMagick::Tool::${rbStrSend(tool, "capitalize")[0] as string}`;
+      }
 
-        constructor(...args: unknown[]) {
-          super(tool, ...(args as [Record<string, unknown>?]));
-        }
-      };
+      constructor(...args: unknown[]) {
+        super(tool, ...(args as [Record<string, unknown>?]));
+      }
+    };
+    Object.defineProperty(Tool, rbStrSend(tool, "capitalize")[0] as string, {
+      get() {
+        rbConstWarnIfDeprecated(Tool, rbStrSend(tool, "capitalize")[0] as string);
+        return klass;
+      },
+      configurable: true,
+    });
     rbModDeprecateConstant(Tool, rbStrSend(tool, "capitalize")[0] as string);
   }
 }
