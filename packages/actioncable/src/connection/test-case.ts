@@ -14,7 +14,6 @@ import {
   Logger,
   runLoadHooks,
   StringIO,
-  symbolizeKeys,
   TaggedLogging,
   toQuery,
   withIndifferentAccess,
@@ -23,6 +22,7 @@ import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/te
 import {
   defineModule,
   Hash,
+  hashAref,
   rbClassInheritedP,
   rbObjRespondTo,
   rbObjSingletonClass,
@@ -62,7 +62,7 @@ export class TestCookies extends HashWithIndifferentAccess {
   override set(name: string, options: unknown): this {
     const value =
       isPlainObject(options) || options instanceof Hash
-        ? (symbolizeKeys(options as Data) as Data)["value"]
+        ? hashAref(options as Data, "value")
         : options;
     return super.set(name, value);
   }

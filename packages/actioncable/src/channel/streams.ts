@@ -1,5 +1,6 @@
 import { ActiveSupportJSON, Concern, extend } from "@blazetrails/activesupport";
 import {
+  aryDelete,
   defineModule,
   hashDelete,
   isPlainHash,
@@ -94,7 +95,10 @@ function streamFor(
 }
 
 async function stopStreamFrom(this: StreamsChannel, broadcasting: string): Promise<void> {
-  const callback = hashDelete(this.streams, broadcasting);
+  const streams: Record<string, Handler> | string[] = this.streams;
+  const callback = Array.isArray(streams)
+    ? aryDelete(streams, broadcasting, () => null)
+    : hashDelete(streams, broadcasting);
   if (callback != null) {
     await this.pubsub.unsubscribe(broadcasting, callback);
     this.logger.info(
