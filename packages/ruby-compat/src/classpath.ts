@@ -82,12 +82,15 @@ export function generatedClass(path: string): unknown {
  * Every generated path that disagrees with the classpath `rb_const_set`
  * (`vendor/ruby/v3.3.11/variable.c:3648`) wrote, as `[seated, generated]`
  * pairs, and every path whose class is still unresolved after the entry has
- * loaded, as `["<unresolved>", generated]`: the `parity:class-paths` check.
+ * loaded, as `["<unresolved>", generated]`, and every class two tables name
+ * under different paths, as `["<also> first", generated]`: the
+ * `parity:class-paths` check.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function classPathMismatches(): [string, string][] {
   const mismatches: [string, string][] = [];
+  const named = new Map<unknown, string>();
   for (const [path, thunk] of generatedClasses) {
     let klass: unknown;
     try {
@@ -101,6 +104,9 @@ export function classPathMismatches(): [string, string][] {
         ? classpaths.get(klass)?.path
         : undefined;
     if (seated !== undefined && seated !== path) mismatches.push([seated, path]);
+    const first = named.get(klass);
+    if (first !== undefined && first !== path) mismatches.push([`<also> ${first}`, path]);
+    else if (klass !== undefined) named.set(klass, path);
   }
   return mismatches;
 }

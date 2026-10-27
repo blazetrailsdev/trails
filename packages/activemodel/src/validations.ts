@@ -15,7 +15,6 @@ import {
   rbCallSuper,
   rbBlockGivenP,
   rbFSend,
-  rbModConstSet,
   rbModMethodDefined,
   rbModSingletonP,
   uniq,
@@ -76,6 +75,17 @@ export interface ValidationsInternalsHost<TBase extends object = object> {
 type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 
 export class Validations {
+  declare static AbsenceValidator: typeof AbsenceValidator;
+  declare static AcceptanceValidator: typeof AcceptanceValidator;
+  declare static ComparisonValidator: typeof ComparisonValidator;
+  declare static ConfirmationValidator: typeof ConfirmationValidator;
+  declare static ExclusionValidator: typeof ExclusionValidator;
+  declare static FormatValidator: typeof FormatValidator;
+  declare static InclusionValidator: typeof InclusionValidator;
+  declare static LengthValidator: typeof LengthValidator;
+  declare static NumericalityValidator: typeof NumericalityValidator;
+  declare static PresenceValidator: typeof PresenceValidator;
+  declare static WithValidator: typeof WithValidator;
   static [included](base: IncludingClass): void {
     include(base, SuperMethods);
     include(base, { validatesWith: withValidatesWith });
@@ -409,16 +419,15 @@ export interface ConditionalOptions {
 }
 
 ActiveModel.ValidationError = ValidationError;
-rbModConstSet(ActiveModel, "Validations", Validations);
-rbModConstSet(ActiveModel, "ValidationContext", ValidationContext);
-rbModConstSet(Validations, "AbsenceValidator", AbsenceValidator);
-rbModConstSet(Validations, "AcceptanceValidator", AcceptanceValidator);
-rbModConstSet(Validations, "ComparisonValidator", ComparisonValidator);
-rbModConstSet(Validations, "ConfirmationValidator", ConfirmationValidator);
-rbModConstSet(Validations, "ExclusionValidator", ExclusionValidator);
-rbModConstSet(Validations, "FormatValidator", FormatValidator);
-rbModConstSet(Validations, "InclusionValidator", InclusionValidator);
-rbModConstSet(Validations, "LengthValidator", LengthValidator);
-rbModConstSet(Validations, "NumericalityValidator", NumericalityValidator);
-rbModConstSet(Validations, "PresenceValidator", PresenceValidator);
-rbModConstSet(Validations, "WithValidator", WithValidator);
+ActiveModel.Validations = Validations;
+Validations.AbsenceValidator = AbsenceValidator;
+Validations.AcceptanceValidator = AcceptanceValidator;
+Validations.ComparisonValidator = ComparisonValidator;
+Validations.ConfirmationValidator = ConfirmationValidator;
+Validations.ExclusionValidator = ExclusionValidator;
+Validations.FormatValidator = FormatValidator;
+Validations.InclusionValidator = InclusionValidator;
+Validations.LengthValidator = LengthValidator;
+Validations.NumericalityValidator = NumericalityValidator;
+Validations.PresenceValidator = PresenceValidator;
+Validations.WithValidator = WithValidator;

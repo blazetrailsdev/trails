@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
@@ -88,4 +88,4 @@ extend(Flash, Concern);
   this.addFlashTypes("alert", "notice");
 });
 
-rbModConstSet(ActionController, "Flash", Flash);
+ActionController.Flash = Flash;

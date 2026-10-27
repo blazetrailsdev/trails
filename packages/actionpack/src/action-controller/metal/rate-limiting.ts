@@ -1,5 +1,4 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
   Notifications,
@@ -98,4 +97,4 @@ export async function rateLimiting(
   }
 }
 
-rbModConstSet(ActionController, "RateLimiting", RateLimiting);
+ActionController.RateLimiting = RateLimiting;

@@ -1,4 +1,4 @@
-import { rbModConstSet, registerConstant, rtest } from "@blazetrails/ruby-compat";
+import { registerConstant, rtest } from "@blazetrails/ruby-compat";
 import { Attribute, FromUser } from "../attribute.js";
 import { ValueType } from "../type/value.js";
 
@@ -56,5 +56,5 @@ export class UserProvidedDefault extends FromUser {
   }
 }
 
-rbModConstSet(Attribute, "UserProvidedDefault", UserProvidedDefault);
+Attribute.UserProvidedDefault = UserProvidedDefault;
 registerConstant("ActiveModel::Attribute::UserProvidedDefault", UserProvidedDefault);

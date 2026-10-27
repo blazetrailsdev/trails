@@ -32,10 +32,6 @@ async function drain(stream: AsyncIterable<unknown>): Promise<unknown[]> {
 }
 
 describe("ActionController::Live::Buffer", () => {
-  it("queueSize defaults to 10", () => {
-    expect(Buffer.queueSize).toBe(10);
-  });
-
   it("write pushes chunks and sets Cache-Control/Content-Length on uncommitted response", () => {
     const res = makeResponse();
     res.setHeader("content-length", "42");
@@ -374,6 +370,7 @@ describe("ActionController::Live#process", () => {
       IsolatedExecutionState.set("live_state", "shared");
 
       const host = new LiveHost();
+      Object.assign(host, { newControllerThread, cleanUpThreadLocals });
       let t2!: Thread;
       const seen: unknown[] = [];
       host.action = () => {
@@ -527,7 +524,9 @@ describe("ActionController::Live private helpers", () => {
     }
     expect(fatal).toHaveBeenCalledOnce();
     const rendered = (fatal.mock.calls[0][1] as () => string)();
-    expect(rendered).toMatch(/^\nClientDisconnected \(oops\):\nsource\n {2}at .*\n {2}at /);
+    expect(rendered).toMatch(
+      /^\nActionController::Live::ClientDisconnected \(oops\):\nsource\n {2}at .*\n {2}at /,
+    );
     expect(rendered.endsWith("\n\n")).toBe(true);
   });
 

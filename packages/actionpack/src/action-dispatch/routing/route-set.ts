@@ -60,7 +60,7 @@ import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Response as AdResponse } from "../http/response.js";
 import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
-import { ActionController } from "../../namespaces.js";
+import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import { Request as AdRequest } from "../http/request.js";
 import { camelize, NameError, squish } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -658,8 +658,8 @@ export class NamedRouteCollection {
       let options: Record<string, unknown> | Hash<string, unknown> | undefined;
       if (isPlainObject(last)) {
         options = args.pop() as Record<string, unknown>;
-      } else if (last instanceof ActionController.Parameters) {
-        options = (args.pop() as InstanceType<typeof ActionController.Parameters>).toH();
+      } else if (last instanceof Parameters) {
+        options = (args.pop() as Parameters).toH();
       }
       return helper.call(this, name, args, options, urlStrategy);
     });

@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import type { Base as ActionViewBase, Renderer, RenderToBodyHost } from "@blazetrails/actionview";
 import type { Response } from "../../action-dispatch/http/response.js";
 
@@ -33,4 +33,4 @@ export async function _renderTemplate(
 
 export const Streaming = { _renderTemplate };
 
-rbModConstSet(ActionController, "Streaming", Streaming);
+ActionController.Streaming = Streaming;

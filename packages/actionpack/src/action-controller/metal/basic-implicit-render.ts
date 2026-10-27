@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 
 /** @internal */
 export interface BasicImplicitRenderHost {
@@ -24,4 +24,4 @@ export function defaultRender(this: BasicImplicitRenderHost): void {
 
 export const BasicImplicitRender = { sendAction, defaultRender };
 
-rbModConstSet(ActionController, "BasicImplicitRender", BasicImplicitRender);
+ActionController.BasicImplicitRender = BasicImplicitRender;

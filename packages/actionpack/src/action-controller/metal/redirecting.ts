@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { hashDelete, rbModConstSet } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat";
 import { statusCode, type StatusSymbol } from "@blazetrails/rack";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 import type { UrlOptions } from "../../action-dispatch/http/url.js";
@@ -246,4 +246,4 @@ include(Redirecting, UrlFor);
   },
 );
 
-rbModConstSet(ActionController, "Redirecting", Redirecting);
+ActionController.Redirecting = Redirecting;

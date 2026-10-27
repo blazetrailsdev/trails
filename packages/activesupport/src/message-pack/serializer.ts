@@ -1,5 +1,4 @@
 import { RuntimeError, env as ENV, fetch, rbStrGetbyte, toI } from "@blazetrails/ruby-compat";
-import { rbModConstSet } from "@blazetrails/ruby-compat/include";
 import { Factory, type Pool } from "@blazetrails/msgpack";
 import { delegate } from "../module-ext.js";
 import { Extensions } from "./extensions.js";
@@ -82,5 +81,3 @@ export const Serializer = {
   },
 };
 delegate.call(Serializer, "registerType", { to: "messagePackFactory" });
-rbModConstSet(Serializer, "SIGNATURE", SIGNATURE);
-rbModConstSet(Serializer, "SIGNATURE_INT", SIGNATURE_INT);

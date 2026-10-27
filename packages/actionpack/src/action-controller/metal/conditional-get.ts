@@ -1,5 +1,4 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
   Duration,
@@ -170,4 +169,4 @@ export function combineEtags(
   );
 }
 
-rbModConstSet(ActionController, "ConditionalGet", ConditionalGet);
+ActionController.ConditionalGet = ConditionalGet;

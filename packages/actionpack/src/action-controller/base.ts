@@ -16,7 +16,6 @@ import {
   isModuleIncluded,
   rbClassInheritedP,
   rbModConstGet,
-  rbModConstSet,
   rbModName,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -752,7 +751,7 @@ for (const mod of Base.MODULES) {
 }
 Base.setupRendererBang();
 
-rbModConstSet(ActionController, "Base", Base);
+ActionController.Base = Base;
 
 /** @noRailsEquivalent PERMANENT */
 export function registerController(controller: typeof Base): void;

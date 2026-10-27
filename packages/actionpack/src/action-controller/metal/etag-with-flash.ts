@@ -1,5 +1,4 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, extend, include } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
@@ -21,4 +20,4 @@ include(EtagWithFlash, ConditionalGet);
   });
 });
 
-rbModConstSet(ActionController, "EtagWithFlash", EtagWithFlash);
+ActionController.EtagWithFlash = EtagWithFlash;

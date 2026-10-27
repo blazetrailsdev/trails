@@ -25,7 +25,7 @@ import {
 import { Module } from "@blazetrails/ruby-compat/include";
 import { Concern, IsolatedExecutionState, Notifications, extend } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
-import { ActionController } from "../../namespaces.js";
+import { Base } from "../base.js";
 
 export class ClientDisconnected extends RuntimeError {}
 
@@ -346,7 +346,7 @@ export const ClassMethods: Module = new Module((mod) => {
 
 /** @internal */
 export function logError(this: LiveControllerHost, exception: Error): void {
-  const logger = ActionController.Base.logger;
+  const logger = Base.logger;
   if (logger == null) return;
 
   logger.fatal(undefined, () => {

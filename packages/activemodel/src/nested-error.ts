@@ -1,4 +1,4 @@
-import { block, fetch, rbModConstSet } from "@blazetrails/ruby-compat";
+import { block, fetch } from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
 import { ActiveModel } from "./namespaces.js";
 
@@ -37,4 +37,4 @@ export class NestedError extends ActiveModelError {
   }
 }
 
-rbModConstSet(ActiveModel, "NestedError", NestedError);
+ActiveModel.NestedError = NestedError;

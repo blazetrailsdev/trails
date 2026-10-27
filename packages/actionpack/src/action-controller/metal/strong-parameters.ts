@@ -27,7 +27,6 @@ import {
   rbFSend,
   rbHash,
   rbInspect,
-  rbModConstSet,
   rbModName,
   rbObjClass,
   rbObjClassname,
@@ -37,6 +36,7 @@ import {
   toH,
   transformValues,
   filterMap,
+  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { coderTag, type Psych } from "@blazetrails/ruby-compat/psych";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
@@ -1055,12 +1055,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
-rbModConstSet(ActionController, "ParameterMissing", ParameterMissing);
-rbModConstSet(ActionController, "ExpectedParameterMissing", ExpectedParameterMissing);
-rbModConstSet(ActionController, "UnpermittedParameters", UnpermittedParameters);
-rbModConstSet(ActionController, "UnfilteredParameters", UnfilteredParameters);
-rbModConstSet(ActionController, "InvalidParameterKey", InvalidParameterKey);
 rbModConstSet(ActionController, "Parameters", Parameters);
 Parameters.hookIntoYamlLoading();
 
-rbModConstSet(ActionController, "StrongParameters", StrongParameters);
+ActionController.StrongParameters = StrongParameters;

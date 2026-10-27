@@ -2,7 +2,7 @@ import type { HelpersClass, HelpersClassMethods } from "../../abstract-controlle
 import { moduleParents } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { helpersPath } from "../metal/helpers.js";
-import { ActionController } from "../../namespaces.js";
+import { Base } from "../base.js";
 
 export interface HelpersPathControllerClass extends HelpersClassMethods {
   helpersPath?: string[];
@@ -26,7 +26,7 @@ export async function inherited(klass: HelpersPathControllerClass): Promise<void
 
   klass.helpersPath = paths;
 
-  const base = ActionController.Base as unknown as HelpersPathControllerClass;
+  const base = Base as unknown as HelpersPathControllerClass;
   if (Object.getPrototypeOf(klass) === base && base.includeAllHelpers) {
     (klass as HelpersClass).helper(":all");
   }

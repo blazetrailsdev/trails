@@ -1,5 +1,4 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
   classAttribute,
@@ -79,4 +78,4 @@ include(EtagWithTemplateDigest, ConditionalGet);
   });
 });
 
-rbModConstSet(ActionController, "EtagWithTemplateDigest", EtagWithTemplateDigest);
+ActionController.EtagWithTemplateDigest = EtagWithTemplateDigest;

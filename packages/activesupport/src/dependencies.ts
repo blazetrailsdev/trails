@@ -1,6 +1,4 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Interlock } from "./dependencies/interlock.js";
-import { ActiveSupport } from "./namespaces.js";
 
 export const Dependencies = {
   interlock: new Interlock(),
@@ -17,4 +15,3 @@ export const Dependencies = {
     return this.interlock.unloading(block);
   },
 };
-rbModConstSet(ActiveSupport, "Dependencies", Dependencies);

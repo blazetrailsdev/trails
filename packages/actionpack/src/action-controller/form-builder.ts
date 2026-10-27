@@ -1,5 +1,4 @@
 import { ActionController } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, classAttribute, extend } from "@blazetrails/activesupport";
 
 interface FormBuilderClassHost {
@@ -27,4 +26,4 @@ extend(FormBuilder, Concern);
   },
 );
 
-rbModConstSet(ActionController, "FormBuilder", FormBuilder);
+ActionController.FormBuilder = FormBuilder;

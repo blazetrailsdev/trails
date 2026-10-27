@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet, TypeError } from "@blazetrails/ruby-compat";
+import { TypeError } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   Base64,
@@ -770,6 +770,4 @@ Object.defineProperty(NullSessionHash, "name", {
     "ActionController::RequestForgeryProtection::ProtectionMethods::NullSession::NullSessionHash",
 });
 
-rbModConstSet(ActionController, "InvalidAuthenticityToken", InvalidAuthenticityToken);
-rbModConstSet(ActionController, "InvalidCrossOriginRequest", InvalidCrossOriginRequest);
-rbModConstSet(ActionController, "RequestForgeryProtection", RequestForgeryProtection);
+ActionController.RequestForgeryProtection = RequestForgeryProtection;

@@ -33,7 +33,8 @@ describe("root build", () => {
       [
         "--input-type=module",
         "-e",
-        `const { DebugExceptions } = await import("./dist/action-dispatch/middleware/debug-exceptions.js");
+        `await import("./dist/index.js");
+         const { DebugExceptions } = await import("./dist/action-dispatch/middleware/debug-exceptions.js");
          const app = new DebugExceptions(async () => [404, { "x-cascade": "pass" }, []]);
          const [status, , body] = await app.call({
            REQUEST_METHOD: "GET",

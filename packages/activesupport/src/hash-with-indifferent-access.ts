@@ -11,7 +11,6 @@ import {
   eachPair,
   include,
   isSymbol,
-  rbModConstSet,
   rbObjClassname,
   rbObjRespondTo,
   symbolToS,
@@ -664,4 +663,4 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
 }
 
 include(HashWithIndifferentAccess, DeepMergeable);
-rbModConstSet(ActiveSupport, "HashWithIndifferentAccess", HashWithIndifferentAccess);
+ActiveSupport.HashWithIndifferentAccess = HashWithIndifferentAccess;

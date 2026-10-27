@@ -11,7 +11,7 @@ import {
   rbStrStartWith,
 } from "@blazetrails/ruby-compat";
 
-import { extend, include, rbModConstSet } from "@blazetrails/ruby-compat/include";
+import { extend, include } from "@blazetrails/ruby-compat/include";
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Store } from "./store.js";
@@ -201,7 +201,7 @@ const SERIALIZERS = new Hash<string, Serializer>()
   .set("marshal_7_1", marshal71WithFallback)
   .set("message_pack", messagePackWithFallback);
 
-rbModConstSet(SerializerWithFallback, "SERIALIZERS", SERIALIZERS);
+SerializerWithFallback.SERIALIZERS = SERIALIZERS;
 extend(SerializerWithFallback, {
   /** @missingRailsCall require — PERMANENT */
   get(format: string): Serializer {

@@ -1,6 +1,5 @@
 import type { RackApp } from "@blazetrails/rack";
 import { CacheStore, type CacheStoreSessionOptions } from "./cache-store.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Session } from "../../../namespaces.js";
 
 export interface MemCacheStoreSessionOptions extends CacheStoreSessionOptions {
@@ -29,4 +28,4 @@ export class MemCacheStore extends CacheStore {
   }
 }
 
-rbModConstSet(Session, "MemCacheStore", MemCacheStore);
+Session.MemCacheStore = MemCacheStore;

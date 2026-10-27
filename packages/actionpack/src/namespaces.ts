@@ -12,7 +12,6 @@ import {
   RuntimeError,
   rbInspect,
   rbModConstGet,
-  rbModConstSet,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Base, DetailsKey, Template } from "@blazetrails/actionview";
@@ -40,6 +39,37 @@ import type {
 } from "./action-dispatch/middleware/session/abstract-store.js";
 import type { CacheStore } from "./action-dispatch/middleware/session/cache-store.js";
 import type { CookieStore } from "./action-dispatch/middleware/session/cookie-store.js";
+import type { Caching } from "./action-controller/caching.js";
+import type { ApiRendering } from "./action-controller/api/api-rendering.js";
+import type { FormBuilder } from "./action-controller/form-builder.js";
+import type { DataStreaming } from "./action-controller/metal/data-streaming.js";
+import type { ImplicitRender } from "./action-controller/metal/implicit-render.js";
+import type { EtagWithFlash } from "./action-controller/metal/etag-with-flash.js";
+import type { ConditionalGet } from "./action-controller/metal/conditional-get.js";
+import type { ContentSecurityPolicy } from "./action-controller/metal/content-security-policy.js";
+import type { Flash } from "./action-controller/metal/flash.js";
+import type { ParamsWrapper } from "./action-controller/metal/params-wrapper.js";
+import type { UrlFor as ControllerUrlFor } from "./action-controller/metal/url-for.js";
+import type { Helpers } from "./action-controller/metal/helpers.js";
+import type { BasicImplicitRender } from "./action-controller/metal/basic-implicit-render.js";
+import type { Logging } from "./action-controller/metal/logging.js";
+import type { AllowBrowser } from "./action-controller/metal/allow-browser.js";
+import type { ParameterEncoding } from "./action-controller/metal/parameter-encoding.js";
+import type { Redirecting } from "./action-controller/metal/redirecting.js";
+import type { EtagWithTemplateDigest } from "./action-controller/metal/etag-with-template-digest.js";
+import type { Instrumentation } from "./action-controller/metal/instrumentation.js";
+import type { StrongParameters } from "./action-controller/metal/strong-parameters.js";
+import type { RateLimiting } from "./action-controller/metal/rate-limiting.js";
+import type { PermissionsPolicy } from "./action-controller/metal/permissions-policy.js";
+import type { Rescue } from "./action-controller/metal/rescue.js";
+import type { RequestForgeryProtection } from "./action-controller/metal/request-forgery-protection.js";
+import type { DefaultHeaders } from "./action-controller/metal/default-headers.js";
+import type { HttpAuthentication } from "./action-controller/metal/http-authentication.js";
+import type { Rendering } from "./action-controller/metal/rendering.js";
+import type { Cookies } from "./action-controller/metal/cookies.js";
+import type { Streaming } from "./action-controller/metal/streaming.js";
+import type { MimeResponds } from "./action-controller/metal/mime-responds.js";
+import type { Renderers } from "./action-controller/metal/renderers.js";
 import type { MemCacheStore } from "./action-dispatch/middleware/session/mem-cache-store.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
@@ -115,7 +145,7 @@ export const Http = { name: "ActionDispatch::Http" } as {
   MimeNegotiation: typeof MimeNegotiation;
   Parameters: typeof HttpParameters;
 };
-rbModConstSet(ActionDispatch, "Http", Http);
+ActionDispatch.Http = Http;
 
 export const Session = { name: "ActionDispatch::Session", loadPath } as AutoloadModule & {
   AbstractStore: typeof AbstractStore;
@@ -162,6 +192,37 @@ export const ActionController = { name: "ActionController", loadPath } as Autolo
   TestRequest: typeof TestRequest;
   TemplateAssertions: typeof TemplateAssertions;
   Testing: typeof Testing;
+  Caching: typeof Caching;
+  ApiRendering: typeof ApiRendering;
+  FormBuilder: typeof FormBuilder;
+  DataStreaming: typeof DataStreaming;
+  ImplicitRender: typeof ImplicitRender;
+  EtagWithFlash: typeof EtagWithFlash;
+  ConditionalGet: typeof ConditionalGet;
+  ContentSecurityPolicy: typeof ContentSecurityPolicy;
+  Flash: typeof Flash;
+  ParamsWrapper: typeof ParamsWrapper;
+  UrlFor: typeof ControllerUrlFor;
+  Helpers: typeof Helpers;
+  BasicImplicitRender: typeof BasicImplicitRender;
+  Logging: typeof Logging;
+  AllowBrowser: typeof AllowBrowser;
+  ParameterEncoding: typeof ParameterEncoding;
+  Redirecting: typeof Redirecting;
+  EtagWithTemplateDigest: typeof EtagWithTemplateDigest;
+  Instrumentation: typeof Instrumentation;
+  StrongParameters: typeof StrongParameters;
+  RateLimiting: typeof RateLimiting;
+  PermissionsPolicy: typeof PermissionsPolicy;
+  Rescue: typeof Rescue;
+  RequestForgeryProtection: typeof RequestForgeryProtection;
+  DefaultHeaders: typeof DefaultHeaders;
+  HttpAuthentication: typeof HttpAuthentication;
+  Rendering: typeof Rendering;
+  Cookies: typeof Cookies;
+  Streaming: typeof Streaming;
+  MimeResponds: typeof MimeResponds;
+  Renderers: typeof Renderers;
 };
 extend(ActionController, Autoload);
 ActionController.autoload("Base");
