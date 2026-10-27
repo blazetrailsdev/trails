@@ -42,11 +42,12 @@ import { TranslationHelper } from "./helpers/translation-helper.js";
 import { UrlHelper } from "./helpers/url-helper.js";
 
 type HelpersModule = Autoload.Autoload &
-  Extended<typeof Autoload> & { eagerLoadBang(): Promise<void> };
+  Extended<typeof Autoload> & { Tags: typeof Tags; eagerLoadBang(): Promise<void> };
 
 export const Helpers = {} as HelpersModule;
 extend(Helpers, Autoload);
 Helpers.autoload("Tags");
+Helpers.Tags = Tags;
 export async function eagerLoadBang(this: HelpersModule): Promise<void> {
   await Autoload.eagerLoadBang.call(this);
   await Tags.eagerLoadBang();

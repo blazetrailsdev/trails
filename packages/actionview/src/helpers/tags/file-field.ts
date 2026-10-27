@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { stringifyKeys, type SafeBuffer } from "@blazetrails/activesupport";
 import { hashDelete } from "@blazetrails/ruby-compat";
 
@@ -30,3 +31,5 @@ export class FileField extends TextField {
     }) as SafeBuffer;
   }
 }
+
+Tags.FileField = FileField;

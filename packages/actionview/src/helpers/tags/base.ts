@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import {
   ArgumentError,
   block,
@@ -217,3 +218,5 @@ export interface Base
 include(Base, FormTagHelper);
 include(Base, TagHelper);
 include(Base, ActiveModelInstanceTag);
+
+Tags.Base = Base;

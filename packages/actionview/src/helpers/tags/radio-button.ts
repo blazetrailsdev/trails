@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { stringifyKeys } from "@blazetrails/activesupport";
 import { include } from "@blazetrails/ruby-compat";
 
@@ -34,3 +35,5 @@ export class RadioButton extends Base {
 }
 
 include(RadioButton, Checkable);
+
+Tags.RadioButton = RadioButton;

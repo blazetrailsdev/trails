@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { TextField } from "./text-field.js";
 
 export class PasswordField extends TextField {
@@ -6,3 +7,5 @@ export class PasswordField extends TextField {
     return super.render();
   }
 }
+
+Tags.PasswordField = PasswordField;

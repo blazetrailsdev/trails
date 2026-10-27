@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { humanize, stringifyKeys } from "@blazetrails/activesupport";
 import { hashDelete, include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
@@ -52,3 +53,5 @@ export class TextArea extends Base {
 }
 
 include(TextArea, Placeholderable);
+
+Tags.TextArea = TextArea;

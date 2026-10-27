@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { I18n, presence } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
@@ -52,3 +53,5 @@ export class Translator {
     return null;
   }
 }
+
+Tags.Translator = Translator;

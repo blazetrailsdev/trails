@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { DatetimeField, strftime } from "./datetime-field.js";
 
 export class WeekField extends DatetimeField {
@@ -5,3 +6,5 @@ export class WeekField extends DatetimeField {
     return value == null ? null : strftime(value, "%Y-W%V");
   }
 }
+
+Tags.WeekField = WeekField;

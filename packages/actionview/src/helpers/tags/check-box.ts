@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { htmlSafe, stringifyKeys, type SafeBuffer } from "@blazetrails/activesupport";
 import {
   hashDelete,
@@ -83,3 +84,5 @@ export class CheckBox extends Base {
 }
 
 include(CheckBox, Checkable);
+
+Tags.CheckBox = CheckBox;

@@ -1,3 +1,4 @@
+import { ActionView } from "../namespaces.js";
 import { isPresent, SyntaxErrorProxy, symbolizeKeys } from "@blazetrails/activesupport";
 import { Correctable, Jaro } from "@blazetrails/did-you-mean";
 import {
@@ -312,3 +313,10 @@ export class SyntaxErrorInTemplate extends TemplateError {
     });
   }
 }
+
+ActionView.ActionViewError = ActionViewError;
+ActionView.EncodingError = EncodingError;
+ActionView.WrongEncodingError = WrongEncodingError;
+ActionView.StrictLocalsError = StrictLocalsError;
+ActionView.MissingTemplate = MissingTemplate;
+ActionView.SyntaxErrorInTemplate = SyntaxErrorInTemplate;

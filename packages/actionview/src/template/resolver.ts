@@ -1,3 +1,4 @@
+import { ActionView } from "../namespaces.js";
 import { I18n, cattrAccessor } from "@blazetrails/activesupport";
 import { Dir, File, NotImplementedError, symbolToS } from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
@@ -307,3 +308,5 @@ function union(alternatives: readonly (string | RegExp)[]): string {
     )
     .join("|");
 }
+
+ActionView.FileSystemResolver = FileSystemResolver;

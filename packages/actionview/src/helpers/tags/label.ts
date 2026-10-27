@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import {
   SafeBuffer,
   humanize,
@@ -124,3 +125,5 @@ export class Label extends Base {
     return builder.translation();
   }
 }
+
+Tags.Label = Label;

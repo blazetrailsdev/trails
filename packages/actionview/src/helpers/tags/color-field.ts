@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
 import { TextField } from "./text-field.js";
@@ -21,3 +22,5 @@ export class ColorField extends TextField {
     }
   }
 }
+
+Tags.ColorField = ColorField;

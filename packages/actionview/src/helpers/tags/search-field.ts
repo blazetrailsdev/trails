@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
 import { TextField } from "./text-field.js";
@@ -24,3 +25,5 @@ export class SearchField extends TextField {
     return super.render();
   }
 }
+
+Tags.SearchField = SearchField;

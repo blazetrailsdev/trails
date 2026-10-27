@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { stringifyKeys } from "@blazetrails/activesupport";
 import { DateTime, strftime as dateStrftime, type Temporal } from "@blazetrails/date";
 import { NotImplementedError, rbObjRespondTo } from "@blazetrails/ruby-compat";
@@ -48,3 +49,5 @@ export function strftime(value: unknown, format: string): string {
     ? (value as { strftime(format: string): string }).strftime(format)
     : dateStrftime(value as Temporal.PlainDateTime, format);
 }
+
+Tags.DatetimeField = DatetimeField;

@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { humanize, stringifyKeys } from "@blazetrails/activesupport";
 import { block, fetch, include } from "@blazetrails/ruby-compat";
 
@@ -62,3 +63,5 @@ export class TextField extends Base {
 }
 
 include(TextField, Placeholderable);
+
+Tags.TextField = TextField;

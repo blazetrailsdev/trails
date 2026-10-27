@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { stringifyKeys } from "@blazetrails/activesupport";
 import { hashDelete, type Range } from "@blazetrails/ruby-compat";
 
@@ -17,3 +18,5 @@ export class NumberField extends TextField {
     return super.render();
   }
 }
+
+Tags.NumberField = NumberField;
