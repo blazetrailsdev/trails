@@ -8111,6 +8111,47 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(mod.classMethods.some((m) => m.name === "defaultHtmlVersion")).toBe(true);
   });
 
+  it("does not read a class nested in a callback as the class a function returns", () => {
+    const info = extractFromFiles("/p", {
+      "document.ts": `export class Document { css(): void {} }`,
+      "testing.ts": `
+        import { mattrAccessor } from "@blazetrails/activesupport";
+        import { Document } from "./document.js";
+        export const Testing = {} as { defaultHtmlVersion: string };
+        mattrAccessor.call(Testing, "defaultHtmlVersion");
+        export function htmlDocument(): typeof Document {
+          [1].forEach(() => { class Local {} });
+          return Document;
+        }
+      `,
+    });
+    expect(info.modules["testing.ts:htmlDocument__mixin"]).toBeUndefined();
+    expect(info.modules["testing.ts:Testing"].synthesizedFileModule).toBe(true);
+  });
+
+  it("counts a synthesized file module's own internal members once, beside its internal functions", () => {
+    const fn = (name: string, line: number, internal: boolean): MethodInfo => ({
+      name,
+      visibility: "public",
+      params: [],
+      isStatic: false,
+      line,
+      file: "testing.ts",
+      ...(internal ? { internal: true } : {}),
+    });
+    const fileFunctions = [fn("isHtml5Support", 6, false), fn("chooseParser", 8, true)];
+    const testing: ClassInfo = {
+      name: "Testing",
+      file: "testing.ts",
+      includes: [],
+      extends: [],
+      instanceMethods: fileFunctions.map((m) => ({ ...m })),
+      classMethods: [{ ...fn("secret", 5, true), isStatic: true }],
+      synthesizedFileModule: true,
+    };
+    expect(countTsInternalNames("testing.ts", [], [testing], fileFunctions, [])).toBe(2);
+  });
+
   it("credits attrInternal on a moduleEval carrier as the module's instance reader and writer", () => {
     const info = extractFromFiles("/p", {
       "form-helper.ts": `

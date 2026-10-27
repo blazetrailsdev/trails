@@ -1095,7 +1095,7 @@ export function extractFromProgram(
       if (
         returnedClass !== undefined &&
         returnedClass.getSourceFile() !== sourceFile &&
-        !definesClass(node)
+        !returnsOwnClass(node, checker)
       ) {
         return;
       }
@@ -3369,12 +3369,36 @@ function isInternalCallableRef(expr: ts.Expression, checker: ts.TypeChecker): bo
  * `extractClass` so member shape (arity, visibility, calls, JSDoc tags) matches
  * every other class in the manifest.
  */
-function definesClass(node: ts.Node): boolean {
-  return (
-    ts.isClassDeclaration(node) ||
-    ts.isClassExpression(node) ||
-    ts.forEachChild(node, definesClass) === true
-  );
+function returnsOwnClass(fn: ts.FunctionDeclaration, checker: ts.TypeChecker): boolean {
+  const isOwnClass = (expr: ts.Expression): boolean => {
+    while (
+      ts.isParenthesizedExpression(expr) ||
+      ts.isAsExpression(expr) ||
+      ts.isSatisfiesExpression(expr) ||
+      ts.isNonNullExpression(expr)
+    ) {
+      expr = expr.expression;
+    }
+    if (ts.isClassExpression(expr)) return true;
+    if (!ts.isIdentifier(expr)) return false;
+    const decl = checker.getSymbolAtLocation(expr)?.valueDeclaration;
+    return (
+      decl !== undefined &&
+      (ts.isClassDeclaration(decl) ||
+        (ts.isVariableDeclaration(decl) &&
+          decl.initializer !== undefined &&
+          ts.isClassExpression(decl.initializer))) &&
+      decl.pos >= fn.pos &&
+      decl.end <= fn.end
+    );
+  };
+  const visit = (node: ts.Node): boolean => {
+    if (ts.isFunctionLike(node) || ts.isClassLike(node)) return false;
+    if (ts.isReturnStatement(node))
+      return node.expression !== undefined && isOwnClass(node.expression);
+    return ts.forEachChild(node, visit) === true;
+  };
+  return fn.body !== undefined && ts.forEachChild(fn.body, visit) === true;
 }
 
 export function factoryClassMembers(
