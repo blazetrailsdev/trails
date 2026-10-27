@@ -39,4 +39,14 @@ describe("AssertSelectTest", () => {
       "Element is required when called from a nonnested assert_dom",
     );
   });
+
+  it("rejects a trailing function not marked with block() at compile time", () => {
+    const unmarked = () => {
+      // @ts-expect-error a bare function is not a block()-marked &block
+      assertSelect("div", () => {});
+      // @ts-expect-error a bare function after an equality test is not a block()-marked &block
+      assertSelect("div", 1, () => {});
+    };
+    expect(unmarked).toBeTypeOf("function");
+  });
 });
