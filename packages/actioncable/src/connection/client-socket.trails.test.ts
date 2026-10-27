@@ -102,7 +102,7 @@ describe("ClientSocket", () => {
 
   it("delegates write errors to on_error", () => {
     const { io, target, socket } = open();
-    io.write = () => {
+    io.writeNonblock = () => {
       throw new Error("foo");
     };
     socket.write("boo");
