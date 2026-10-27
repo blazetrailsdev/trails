@@ -45,7 +45,7 @@ export class Image {
     return this.create(ext, (file) => IO.copyStream(stream, file));
   }
 
-  static importPixels(
+  static async importPixels(
     blob: unknown,
     columns: unknown,
     rows: unknown,
@@ -53,9 +53,9 @@ export class Image {
     map: string,
     format: unknown = "png",
   ) {
-    return ((image) => {
+    return (async (image) => {
       const outputPath = rbStrSend(image.path(), "sub", /\.\w+$/m, `.${format}`)[0];
-      MiniMagick.convert((convert: unknown) => {
+      await MiniMagick.convert((convert: unknown) => {
         convert.size(`${columns ?? ""}x${rows ?? ""}`);
         convert.depth(depth);
         if (Array.isArray(convert)) convert.push(`${map ?? ""}:${image.path() ?? ""}`);
@@ -105,7 +105,7 @@ export class Image {
   static attribute(name: string, key: string = rbObjAsString(name)) {
     return rbModDefineMethod(this, name, function (this: Image, ...args: unknown[][]) {
       if (args.some((x) => x != null && x !== false) && !rbEqual(name, "resolution")) {
-        return this.mogrify((b: unknown) => rbFSend(b, name, ...args));
+        return this.mogrify(undefined, (b: unknown) => rbFSend(b, name, ...args));
       } else {
         return (this._info as Info).get(key, ...args);
       }
@@ -144,10 +144,10 @@ export class Image {
     });
   }
 
-  equals(other: Info) {
+  async equals(other: Info) {
     return (
       rbEqual(rbObjClass(this) as unknown as typeof Image, rbObjClass(other)) &&
-      rbEqual(this.signature(), other.signature())
+      rbEqual(await this.signature(), await other.signature())
     );
   }
 
@@ -155,17 +155,17 @@ export class Image {
     return this.equals(other as Info);
   }
 
-  hash() {
-    return rbHash(this.signature());
+  async hash() {
+    return rbHash(await this.signature());
   }
 
   toBlob() {
     return File.binread(this.path);
   }
 
-  isValid() {
+  async isValid() {
     try {
-      this.validateBang();
+      await this.validateBang();
       return true;
     } catch (error) {
       if (error instanceof Invalid) {
@@ -176,9 +176,9 @@ export class Image {
     }
   }
 
-  validateBang() {
+  async validateBang() {
     try {
-      return this.identify();
+      return await this.identify();
     } catch (error) {
       if (error instanceof Error) {
         throw excSetupMessage(new Invalid(error.message), error);
@@ -196,8 +196,8 @@ export class Image {
     return this.get(value);
   }
 
-  layers() {
-    const layersCount = (this.identify() as string).split("\n").length;
+  async layers() {
+    const layersCount = (await this.identify()).split("\n").length;
     return ((x) =>
       x instanceof globalThis.Set || x instanceof globalThis.Map || x instanceof Enumerator
         ? [...x]
@@ -216,7 +216,7 @@ export class Image {
     return this.layers();
   }
 
-  getPixels(map: unknown[] | string = "RGB") {
+  async getPixels(map: unknown[] | string = "RGB") {
     if (!["RGB", "RGBA"].includes(map)) {
       throw new ArgumentError("Invalid map value");
     }
@@ -229,11 +229,9 @@ export class Image {
     else if (convert instanceof globalThis.Set) convert.add(`${map}:-`);
     else convert.append(`${map}:-`);
     const shell = new Shell();
-    const [output] = ((x) => (x == null ? [] : (rbCheckArrayType(x) ?? [x])))(
-      shell.run(convert.command()),
-    );
+    const [output] = await shell.run(convert.command());
     const pixelsArray = output.unpack("C*");
-    const pixels = eachSlice(eachSlice(pixelsArray, map.length), this.width).toA();
+    const pixels = eachSlice(eachSlice(pixelsArray, map.length), await this.width()).toA();
     if (Array.isArray(output)) output.length = 0;
     else output.clear();
     if (Array.isArray(pixelsArray)) pixelsArray.length = 0;
@@ -259,7 +257,7 @@ export class Image {
     );
   }
 
-  format(
+  async format(
     format: string,
     page: unknown = 0,
     readOpts: unknown = {},
@@ -279,7 +277,7 @@ export class Image {
         else if (inputPath instanceof globalThis.Set) inputPath.add(`[${page}]`);
         else inputPath.append(`[${page}]`);
       }
-      MiniMagick.convert((convert: unknown): unknown => {
+      await MiniMagick.convert((convert: unknown): unknown => {
         for (const [opt, val] of Object.entries(readOpts)) {
           rbFSend(convert, rbObjAsString(opt), val);
         }
@@ -324,7 +322,7 @@ export class Image {
     return this.mogrify(undefined, block);
   }
 
-  methodMissing(name: string, ...args: unknown[][]) {
+  methodMissing(name: string, ...args: unknown[][]): Promise<this> {
     return this.mogrify(undefined, (builder) => rbFSend(builder, name, ...args));
   }
 
@@ -332,10 +330,10 @@ export class Image {
     return false;
   }
 
-  write(outputTo: unknown) {
+  async write(outputTo: unknown) {
     if (typeof outputTo === "string" || outputTo instanceof Pathname) {
       if (this.isLayer()) {
-        return MiniMagick.convert((builder: unknown) => {
+        return await MiniMagick.convert((builder: unknown) => {
           if (Array.isArray(builder)) builder.push(this.path);
           else if (builder instanceof globalThis.Set) builder.add(this.path);
           else builder.append(this.path);
@@ -356,14 +354,16 @@ export class Image {
     }
   }
 
-  composite(
+  async composite(
     otherImage: unknown,
-    outputExtension: unknown = (this.type() as string).toLowerCase(),
+    outputExtension: unknown = undefined,
     mask: unknown = null,
     block?: (...args: unknown[]) => unknown,
   ) {
+    if (outputExtension === undefined)
+      outputExtension = ((await this.type()) as string).toLowerCase();
     const outputTempfile = Utilities.tempfile(`.${outputExtension}`);
-    MiniMagick.composite((composite: unknown) => {
+    await MiniMagick.composite((composite: unknown) => {
       if (block != null) {
         block(composite);
       }
@@ -405,7 +405,7 @@ export class Image {
     return null;
   }
 
-  identify(block?: (...args: unknown[]) => unknown) {
+  identify(block?: (...args: unknown[]) => unknown): Promise<string> {
     return MiniMagick.identify((builder: unknown) => {
       if (block != null) {
         block(builder);
@@ -417,11 +417,11 @@ export class Image {
           : builder instanceof globalThis.Set
             ? builder.add(this.path)
             : builder.append(this.path);
-    });
+    }) as Promise<string>;
   }
 
-  mogrify(page: undefined | null = null, block?: (...args: unknown[]) => unknown) {
-    MiniMagick.mogrify((builder: unknown) => {
+  async mogrify(page: undefined | null = null, block?: (...args: unknown[]) => unknown) {
+    await MiniMagick.mogrify((builder: unknown) => {
       if (block != null) {
         block(builder);
       }
@@ -463,12 +463,12 @@ export class Image {
     return matchOperator(this.path, /\[\d+\]$/m);
   }
 
-  isLandscape() {
-    return this.width > this.height();
+  async isLandscape() {
+    return (await this.width()) > (await this.height());
   }
 
-  isPortrait() {
-    return this.height() > this.width;
+  async isPortrait() {
+    return (await this.height()) > (await this.width());
   }
 }
 {

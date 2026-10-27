@@ -15,10 +15,10 @@ export function isImagemagick7() {
   return (MiniMagick._imagemagick7 = !!((Utilities.which("magick") ?? false) !== false));
 }
 
-export function cliVersion(): unknown {
-  const output = MiniMagick.identify((x: Tool) =>
+export async function cliVersion(): Promise<string | null> {
+  const output = await (MiniMagick.identify((x: Tool) =>
     (x as unknown as { version(): Tool }).version(),
-  ) as string;
+  ) as Promise<string>);
   return output.match(/\d+\.\d+\.\d+(-\d+)?/)?.[0] ?? null;
 }
 
@@ -68,7 +68,7 @@ for (const tool of [
     block?: (tool: Tool) => unknown,
   ) => {
     if (typeof options === "function") [options, block] = [{}, options];
-    const name = isImagemagick7() && tool === "convert" ? "magick" : tool;
+    const name = MiniMagick.isImagemagick7() && tool === "convert" ? "magick" : tool;
     return Tool.new(name, options, block);
   };
 }

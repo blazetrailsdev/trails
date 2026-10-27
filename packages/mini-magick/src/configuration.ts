@@ -1,5 +1,5 @@
 import { Logger } from "@blazetrails/ruby-compat";
-import { Dir, stdout as $stdout, classModule } from "@blazetrails/ruby-compat";
+import { Dir, stdout as $stdout, classModule, extended } from "@blazetrails/ruby-compat";
 
 export class Configuration {
   declare _graphicsmagick: unknown;
@@ -90,7 +90,7 @@ export class Configuration {
     this._warnings = value;
   }
 
-  static extended(base: Record<string, unknown>) {
+  static [extended](base: Record<string, unknown>) {
     base.tmpdir = Dir.tmpdir();
     base.errors = true;
     base.logger = ((l) => {

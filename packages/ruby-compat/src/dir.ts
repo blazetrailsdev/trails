@@ -232,6 +232,21 @@ export class Dir {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/dir.c:3504` `dir_s_home` with no user: `HOME`, as
+   * `rb_default_home_dir` reads it (`vendor/ruby/v3.3.11/file.c:3650-3652`).
+   * The password-database fallback for an unset `HOME` raises its
+   * `ArgumentError` (`file.c:3683`), as no host lookup is exposed.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.home`
+   * (`vendor/ruby/v3.3.11/dir.c:3504`).
+   */
+  static home(): string {
+    const dir = env["HOME"];
+    if (dir == null) throw new ArgumentError("couldn't find HOME environment -- expanding `~'");
+    return dir;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/dir.c:1172` `dir_s_chdir` — `HOME`, then `LOGDIR`,
    * when no path is given, and `rb_get_path`'s `TypeError` for a given `nil` — and `chdir_path` (`dir.c:1080-1107`): given a
    * block, changes into `path`, yields it, and restores the previous directory
