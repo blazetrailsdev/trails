@@ -312,9 +312,10 @@ export function assertNot(object: unknown, message?: string | (() => string) | n
 
 export async function assertRaises<K extends new (...args: any[]) => Error>(
   exp: K[],
-  { match }: { match?: RegExp | string | null } = {},
+  { match, message }: { match?: RegExp | string | null; message?: string | null } = {},
   block?: () => unknown,
 ): Promise<InstanceType<K>> {
+  const msg = message != null ? `${message}.\n` : "";
   let error: InstanceType<K> | undefined;
   try {
     await block?.();
@@ -323,9 +324,11 @@ export async function assertRaises<K extends new (...args: any[]) => Error>(
     error = e as InstanceType<K>;
   }
   if (!error)
-    throw new Assertion(`${exp.map((e) => e.name).join(", ")} expected but nothing was raised`);
+    throw new Assertion(
+      `${msg}${exp.map((e) => e.name).join(", ")} expected but nothing was raised`,
+    );
   if (!exp.some((klass) => error instanceof klass)) {
-    assert(false, `${exp.map((e) => e.name).join(", ")} expected, not ${error.name}`);
+    assert(false, `${msg}${exp.map((e) => e.name).join(", ")} expected, not ${error.name}`);
   }
   assert(true);
   if (match) assertMatch(match, error.message);

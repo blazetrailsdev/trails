@@ -5,6 +5,21 @@ import type { INTERNAL, server } from "./action-cable.js";
 import type { Base as ChannelBase } from "./channel/base.js";
 import type { Base as ConnectionBase } from "./connection/base.js";
 import type { TestCase } from "./test-case.js";
+import type {
+  TestCase as ChannelTestCase,
+  NonInferrableChannelError,
+  ChannelStub,
+  ConnectionStub,
+} from "./channel/test-case.js";
+import type {
+  TestCase as ConnectionTestCase,
+  NonInferrableConnectionError,
+  Assertions,
+  TestCookies,
+  TestCookieJar,
+  TestRequest,
+  TestConnection,
+} from "./connection/test-case.js";
 import type { TestHelper } from "./test-helper.js";
 import { rbDeclareIvar, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 
@@ -17,11 +32,22 @@ extend(Server, Autoload);
 
 export const Connection = { name: "ActionCable::Connection" } as AutoloadModule & {
   Base: typeof ConnectionBase;
+  TestCase?: typeof ConnectionTestCase;
+  NonInferrableConnectionError?: typeof NonInferrableConnectionError;
+  Assertions?: typeof Assertions;
+  TestCookies?: typeof TestCookies;
+  TestCookieJar?: typeof TestCookieJar;
+  TestRequest?: typeof TestRequest;
+  TestConnection?: typeof TestConnection;
 };
 extend(Connection, Autoload);
 
 export const Channel = { name: "ActionCable::Channel" } as AutoloadModule & {
   Base: typeof ChannelBase;
+  TestCase?: typeof ChannelTestCase;
+  NonInferrableChannelError?: typeof NonInferrableChannelError;
+  ChannelStub?: typeof ChannelStub;
+  ConnectionStub?: typeof ConnectionStub;
 };
 extend(Channel, Autoload);
 
