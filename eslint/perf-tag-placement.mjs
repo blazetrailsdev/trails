@@ -8,6 +8,10 @@
  * number and unit (`100ns`, `2x`, `30%`). It must document a declaration: a
  * tag left behind when its declaration was deleted is stale. A `CONVERGEABLE`
  * story that is closed is caught by `scripts/stale-story-references.ts`.
+ * Two staleness cases are not caught, by decision: a `PERMANENT` tag never
+ * goes stale, and a tag whose declaration was deleted while the next one moved
+ * up beneath it reads as documenting that one. The story-id pattern is
+ * `no-freeform-comments`' `STORY_ID_RE`.
  *
  * Hard rules: no node:* imports, no process.* references.
  */

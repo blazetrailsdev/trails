@@ -50,7 +50,6 @@ export namespace Configurable {
       block(config.call(this));
     }
 
-    /** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */
     export function configAccessor(
       this: any,
       ...namesAndOptions: (string | ConfigAccessorOptions)[]

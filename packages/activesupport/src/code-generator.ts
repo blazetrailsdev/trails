@@ -44,7 +44,6 @@ export class MethodSet {
     return canonicalName;
   }
 
-  /** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */
   apply(owner: Owner, _path: string, _line: number): void {
     if (this.sources.length !== 0) {
       for (const source of this.sources) source(this.cache);

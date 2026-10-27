@@ -54,9 +54,12 @@ Mirror, method by method and line by line:
   documents no declaration; `stale-story-references` reds one naming a landed
   story. `@perf` exempts nothing: it is not a `@noRailsEquivalent`, does not
   discharge `@inventedArm` or any call gate, and does not take a declaration
-  out of the `internal` or extra-surface counts. A perf helper stays out of
-  them only by being module-private (unexported), never by a `_` prefix or
-  this tag.
+  out of the `internal` or extra-surface counts. A module-private helper is
+  still counted as internal (`extractFileLocalHelpers` marks it so); what
+  keeps a perf helper out of that count is the `_` prefix
+  `countTsInternalNames` skips, and the helper carries `@perf` so the prefix
+  is receipted. The tag goes on the cache machinery itself, not on a
+  declaration that only bumps it.
 
 **Only a genuine TypeScript language shortcoming can justify a deviation** —
 and even then, converge the shape as far as the language allows and keep the

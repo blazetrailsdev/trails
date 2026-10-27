@@ -108,6 +108,7 @@ type Writer = ((v: unknown) => unknown) | boolean;
 
 /** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */
 let writerCache = new WeakMap<object, Map<string, Writer>>();
+/** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */
 let writerCacheSerial = methodCacheSerial;
 
 /** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */
