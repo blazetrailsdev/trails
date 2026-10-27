@@ -47,6 +47,14 @@ describe("Time", () => {
     resetLocalTimeZoneId();
   });
 
+  it("reads a summer abbreviation past the tzdata table's 2040 horizon, as tzinfo does", () => {
+    const zone = new Timezone("CET");
+    expect(zone.abbr(Time.utc(2040, 6, 28, 13))).toBe("CEST");
+    expect(zone.abbr(Time.utc(2040, 1, 15, 13))).toBe("CET");
+    expect(new Timezone("America/New_York").abbr(Time.utc(2045, 7, 1))).toBe("EDT");
+    expect(new Timezone("Asia/Tokyo").abbr(Time.utc(2045, 7, 1))).toBe("JST");
+  });
+
   it("Time.utc builds a UTC time", () => {
     const time = Time.utc(2008, 3, 1, 6, 0, 0);
     expect(time.zone).toBe("UTC");

@@ -1,5 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
-import { tzdataAbbreviation } from "./tzdata-abbreviations.js";
+import { tzdataAbbreviation, tzdataAbbreviationChanges } from "./tzdata-abbreviations.js";
 import { tzdataIsdst, tzdataOffsetInstant } from "./tzdata-isdst.js";
 import { rbWarning } from "./rb-warning.js";
 import { rbStrftime, type StrftimeVtm } from "./strftime.js";
@@ -107,11 +107,21 @@ function utcOffsetArgument(zone: string | number | Rational): "UTC" | number {
   );
 }
 
+const TZDATA_ABBREVIATIONS_HORIZON = 2208988800;
+
 function zoneAbbreviation(zoned: Temporal.ZonedDateTime): string {
-  const abbreviation = tzdataAbbreviation(
-    zoned.timeZoneId,
-    Math.floor(zoned.epochMilliseconds / 1000),
-  );
+  let at = Math.floor(zoned.epochMilliseconds / 1000);
+  if (at >= TZDATA_ABBREVIATIONS_HORIZON) {
+    const changes = tzdataAbbreviationChanges(zoned.timeZoneId);
+    for (let i = changes.length - 1; i >= 0; i--) {
+      const change = Temporal.Instant.fromEpochMilliseconds(changes[i] * 1000);
+      if (change.toZonedDateTimeISO(zoned.timeZoneId).offset === zoned.offset) {
+        at = changes[i];
+        break;
+      }
+    }
+  }
+  const abbreviation = tzdataAbbreviation(zoned.timeZoneId, at);
   if (abbreviation !== undefined) return abbreviation;
   const offset = zoned.offset;
   return offset.endsWith(":00") ? offset.slice(0, 3) : offset.replace(":", "");
