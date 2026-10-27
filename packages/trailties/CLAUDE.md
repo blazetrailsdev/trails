@@ -131,8 +131,11 @@ Two rules bound it:
 
 `trails server` calls `app.loadServer()` itself, after `log_to_stdout` and
 before it binds, which is where Rails reaches it through `config.ru`
-(`server_command.rb:32-41`). It moves into the rackup file when
-`port-server-command-onto-rails-command-base` lands.
+(`server_command.rb:32-41`). `trails server` never evaluates `config.ts`, so
+the generated `config.ts`'s own `loadServer()` runs only under another rackup
+host, and each path runs the blocks exactly once. When
+`port-server-command-onto-rails-command-base` builds the app from `config.ts`,
+the direct call in `commands/server.ts` goes, or blocks run twice.
 
 This is a genuine language shortcoming, ratified here: JS has no synchronous
 await. A server-block runner returning a promise is the designed shape.

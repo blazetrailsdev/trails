@@ -119,10 +119,6 @@ export class Application extends Engine {
       .plus(Finisher.initializersFor(this));
   }
 
-  server(blk: TrailtieBlock): void {
-    (this.constructor as typeof Application).server(blk);
-  }
-
   /** @internal */
   override async runServerBlocks(app: unknown): Promise<void> {
     for (const r of this.railties()) await r.runServerBlocks(app);
@@ -215,6 +211,10 @@ export class Application extends Engine {
     const libTemplates = this.paths().get("lib/templates");
     const existent = libTemplates ? await libTemplates.existent() : [];
     configuredPaths.unshift(...existent.filter((p) => !configuredPaths.includes(p)));
+  }
+
+  server(blk: TrailtieBlock): void {
+    (this.constructor as typeof Application).server(blk);
   }
 
   async requireEnvironmentBang(): Promise<void> {
