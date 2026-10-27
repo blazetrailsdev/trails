@@ -1,5 +1,10 @@
 import { include } from "@blazetrails/activesupport";
-import { AtomicFixnum, Mutex, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import {
+  AtomicFixnum,
+  Mutex,
+  ThreadPoolExecutor,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { AppExecutor } from "./app-executor.js";
 import type { ClaimedExecution } from "./claimed-execution.js";
 
@@ -11,10 +16,6 @@ const DEFAULT_OPTIONS = {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below. */
 export class Pool {
-  static toString(): string {
-    return "SolidQueue::Pool";
-  }
-
   static {
     include(this, AppExecutor);
   }
@@ -103,3 +104,5 @@ export interface Pool {
   wrapInAppExecutor<T>(block: () => T): T;
   handleThreadError(error: unknown): void;
 }
+
+registerConstant("SolidQueue::Pool", Pool);

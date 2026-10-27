@@ -1,5 +1,10 @@
 import { include } from "@blazetrails/activesupport";
-import { CancelledOperationError, ScheduledTask, rbFArray } from "@blazetrails/ruby-compat";
+import {
+  CancelledOperationError,
+  ScheduledTask,
+  rbFArray,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
 import { RecurringTask } from "../recurring-task.js";
 
@@ -7,10 +12,6 @@ type TaskConfiguration = Parameters<typeof RecurringTask.wrap>[0];
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include AppExecutor` (`scheduler/recurring_schedule.rb:5`). */
 export class RecurringSchedule {
-  static toString(): string {
-    return "SolidQueue::Scheduler::RecurringSchedule";
-  }
-
   static {
     include(this, AppExecutor);
   }
@@ -97,3 +98,5 @@ export interface RecurringSchedule {
   wrapInAppExecutor<T>(block: () => T): T;
   handleThreadError(error: unknown): void;
 }
+
+registerConstant("SolidQueue::Scheduler::RecurringSchedule", RecurringSchedule);
