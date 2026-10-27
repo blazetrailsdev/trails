@@ -252,11 +252,6 @@ function applyVfsOverrides(
         this.output(`      create  ${relativePath}`);
       },
     },
-    fileExists: {
-      value(relativePath: string) {
-        return vfs.exists(relativePath);
-      },
-    },
   });
 }
 

@@ -14,7 +14,7 @@ export class ChannelGenerator extends NamedBase {
     this.fileName = this.fileName.replace(/_channel$/i, "");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions */
+  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
   createTestFiles(): void {
     this.createFile(
       File.join(

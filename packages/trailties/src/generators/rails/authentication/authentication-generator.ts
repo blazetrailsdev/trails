@@ -68,7 +68,7 @@ export class AuthenticationGenerator extends GeneratorBase {
       .replace(/\.rb$/, ".ts")
       .replace(/\.erb$/, ".tse")
       .replace(/[^/]+(?=\/|\.)/g, (segment) => segment.replace(/_/g, "-"));
-    if (this.fileExists(destination)) {
+    if (File.isExist(File.join(this.destinationRoot, destination))) {
       this.output(`      skip  ${destination} (already exists)`);
       return;
     }
@@ -77,7 +77,7 @@ export class AuthenticationGenerator extends GeneratorBase {
 
   private configureApplicationController(): void {
     const file = "app/controllers/application-controller.ts";
-    if (!this.fileExists(file)) return;
+    if (!File.isExist(File.join(this.destinationRoot, file))) return;
     const full = File.join(this.cwd, file);
     let src = File.read(full);
     const mixin = src.includes("include(this, Authentication)") ? "" : STATIC_INIT;
@@ -100,7 +100,7 @@ export class AuthenticationGenerator extends GeneratorBase {
   }
 
   private enableBcrypt(): void {
-    if (!this.fileExists("package.json")) return;
+    if (!File.isExist(File.join(this.destinationRoot, "package.json"))) return;
     const full = File.join(this.cwd, "package.json");
     const json = JSON.parse(File.read(full));
     if (!json.dependencies?.["bcryptjs"] || !json.dependencies?.["@blazetrails/bcrypt"]) {
@@ -110,7 +110,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.executeCommand(json.packageManager?.split("@")[0] ?? "pnpm", "install --silent");
 
     const application = "config/application.ts";
-    if (!this.fileExists(application)) return;
+    if (!File.isExist(File.join(this.destinationRoot, application))) return;
     const appFull = File.join(this.cwd, application);
     const src = File.read(appFull);
     if (src.includes(BCRYPT_IMPORT)) return;

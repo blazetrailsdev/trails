@@ -1,4 +1,5 @@
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
+import { File, Pathname } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 
 export class EncryptionKeyFileGenerator extends GeneratorBase {
@@ -12,8 +13,10 @@ export class EncryptionKeyFileGenerator extends GeneratorBase {
     return generator.getCreatedFiles();
   }
 
-  addKeyFile(keyPath: string): void {
-    if (!this.fileExists(keyPath)) {
+  addKeyFile(keyPath: string | Pathname): void {
+    keyPath = new Pathname(keyPath);
+
+    if (!keyPath.isExist()) {
       const key = EncryptedFile.generateKey();
 
       this.log(`Adding ${keyPath} to store the encryption key: ${key}`);
@@ -30,13 +33,13 @@ export class EncryptionKeyFileGenerator extends GeneratorBase {
     }
   }
 
-  addKeyFileSilently(keyPath: string, key?: string): void {
+  addKeyFileSilently(keyPath: string | Pathname, key?: string): void {
     this.createFile(keyPath, key ?? EncryptedFile.generateKey(), { mode: 0o600 });
   }
 
-  ignoreKeyFile(keyPath: string, ignore: string = this.keyIgnore(keyPath)): void {
-    if (this.fileExists(".gitignore")) {
-      if (!this.readFile(".gitignore").includes(ignore)) {
+  ignoreKeyFile(keyPath: string | Pathname, ignore: string = this.keyIgnore(keyPath)): void {
+    if (File.isExist(".gitignore")) {
+      if (!File.read(".gitignore").includes(ignore)) {
         this.log(`Ignoring ${keyPath} so it won't end up in Git history:`);
         this.log("");
         this.appendToFile(".gitignore", ignore);
@@ -49,9 +52,12 @@ export class EncryptionKeyFileGenerator extends GeneratorBase {
     }
   }
 
-  ignoreKeyFileSilently(keyPath: string, ignore: string = this.keyIgnore(keyPath)): void {
-    if (this.fileExists(".gitignore")) this.appendToFile(".gitignore", ignore);
+  ignoreKeyFileSilently(
+    keyPath: string | Pathname,
+    ignore: string = this.keyIgnore(keyPath),
+  ): void {
+    if (File.isExist(".gitignore")) this.appendToFile(".gitignore", ignore);
   }
 
-  private keyIgnore = (keyPath: string): string => `\n/${keyPath}\n`;
+  private keyIgnore = (keyPath: string | Pathname): string => `\n/${keyPath}\n`;
 }

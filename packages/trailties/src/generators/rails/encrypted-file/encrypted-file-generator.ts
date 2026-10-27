@@ -24,7 +24,7 @@ export class EncryptedFileGenerator extends GeneratorBase {
     keyPath: string,
     template: string = DEFAULT_TEMPLATE,
   ): Promise<void> {
-    if (this.fileExists(filePath)) return;
+    if (File.isExist(File.join(this.destinationRoot, filePath))) return;
     const file = new EncryptedFile({
       contentPath: File.join(this.cwd, filePath),
       keyPath: File.join(this.cwd, keyPath),

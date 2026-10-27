@@ -55,8 +55,9 @@ export class ChangeGenerator extends GeneratorBase {
   /** @missingRailsArgs template — PERMANENT */
   editDatabaseConfig(): void {
     const target =
-      ["config/database.ts", "config/database.js"].find((p) => this.fileExists(p)) ??
-      `config/database${this.ext()}`;
+      ["config/database.ts", "config/database.js"].find((p) =>
+        File.isExist(File.join(this.destinationRoot, p)),
+      ) ?? `config/database${this.ext()}`;
     this.template(this.database.template, target);
   }
 
@@ -68,7 +69,7 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   editPackageJson(): void {
-    if (!this.fileExists("package.json")) return;
+    if (!File.isExist(File.join(this.destinationRoot, "package.json"))) return;
     const fullPath = File.join(this.cwd, "package.json");
     const raw = File.read(fullPath);
     let pkg: { dependencies?: unknown } & Record<string, unknown>;
@@ -99,7 +100,7 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   editDockerfile(): void {
-    if (!this.fileExists("Dockerfile")) return;
+    if (!File.isExist(File.join(this.destinationRoot, "Dockerfile"))) return;
     const fullPath = File.join(this.cwd, "Dockerfile");
     const before = File.read(fullPath);
     let after = before.replace(
@@ -116,7 +117,7 @@ export class ChangeGenerator extends GeneratorBase {
 
   private writeOrUpdate(relativePath: string, content: string): void {
     const full = File.join(this.cwd, relativePath);
-    const existed = this.fileExists(relativePath);
+    const existed = File.isExist(File.join(this.destinationRoot, relativePath));
     if (existed && File.read(full) === content) {
       this.output(`   identical  ${relativePath}`);
       return;
@@ -132,14 +133,14 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   editDevcontainerFiles(): void {
-    if (!this.fileExists(".devcontainer")) return;
+    if (!File.isExist(File.join(this.destinationRoot, ".devcontainer"))) return;
     this.editDevcontainerJson();
     this.editComposeYaml();
   }
 
   private editDevcontainerJson(): void {
     const rel = ".devcontainer/devcontainer.json";
-    if (!this.fileExists(rel)) return;
+    if (!File.isExist(File.join(this.destinationRoot, rel))) return;
     const full = File.join(this.cwd, rel);
     let json: Record<string, unknown>;
     try {
