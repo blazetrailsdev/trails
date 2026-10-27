@@ -239,8 +239,11 @@ export const Redirecting = {
 extend(Redirecting, Concern);
 include(Redirecting, Logger);
 include(Redirecting, UrlFor);
-Concern.included.call(Redirecting as never, null, function (this: object) {
-  mattrAccessor.call(this, "raiseOnOpenRedirects", { default: false });
-});
+(Redirecting as unknown as { included(base: null, block: (this: object) => void): void }).included(
+  null,
+  function (this: object) {
+    mattrAccessor.call(this, "raiseOnOpenRedirects", { default: false });
+  },
+);
 
 rbModConstSet(ActionController, "Redirecting", Redirecting);

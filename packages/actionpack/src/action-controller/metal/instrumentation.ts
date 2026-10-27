@@ -162,8 +162,12 @@ export class Instrumentation {
 extend(Instrumentation, Concern);
 include(Instrumentation, Logger);
 attrInternal.call(Instrumentation.prototype, "viewRuntime");
-Object.assign(Instrumentation.prototype, { render, sendFile, sendData, redirectTo, processAction });
 Object.assign(Instrumentation.prototype, {
+  render,
+  sendFile,
+  sendData,
+  redirectTo,
+  processAction,
   haltedCallbackHook,
   cleanupViewRuntime,
   appendInfoToPayload,

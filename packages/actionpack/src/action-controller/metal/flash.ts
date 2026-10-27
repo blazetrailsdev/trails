@@ -79,7 +79,9 @@ export const ClassMethods = { addFlashTypes, actionMethods };
 /** @missingRailsCall delegate — CONVERGEABLE base-included-modules-dispatch-privates-through-self */
 export const Flash = { ClassMethods, redirectTo };
 extend(Flash, Concern);
-Concern.included.call(Flash as never, null, function (this: FlashClassHost) {
+(
+  Flash as unknown as { included(base: null, block: (this: FlashClassHost) => void): void }
+).included(null, function (this: FlashClassHost) {
   classAttribute.call(this, "_flashTypes", { instanceAccessor: false, default: [] });
 
   Object.defineProperty(this.prototype, "flash", { get: flash, configurable: true });

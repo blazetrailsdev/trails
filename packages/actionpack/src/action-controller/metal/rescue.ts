@@ -2,6 +2,10 @@ import { ActionController } from "../../namespaces.js";
 import { rbCallSuper, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
 import { Concern, Rescuable, extend, include } from "@blazetrails/activesupport";
 
+export const Rescue = { isShowDetailedExceptions, processAction };
+extend(Rescue, Concern);
+include(Rescue, Rescuable);
+
 interface RescueHost {
   request: { env: Record<string, unknown> };
   isShowDetailedExceptions(): boolean;
@@ -24,9 +28,5 @@ export async function processAction(this: RescueHost, ...args: unknown[]): Promi
     return handled;
   }
 }
-
-export const Rescue = { isShowDetailedExceptions, processAction };
-extend(Rescue, Concern);
-include(Rescue, Rescuable);
 
 rbModConstSet(ActionController, "Rescue", Rescue);

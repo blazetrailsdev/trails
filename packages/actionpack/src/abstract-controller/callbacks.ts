@@ -327,7 +327,11 @@ type CallbacksIncludingClass = typeof Base & ActionCallbackHost;
 export const Callbacks = { ClassMethods, processAction };
 extend(Callbacks, Concern);
 include(Callbacks, ASCallbacks);
-Concern.included.call(Callbacks as never, null, function (this: CallbacksIncludingClass) {
+(
+  Callbacks as unknown as {
+    included(base: null, block: (this: CallbacksIncludingClass) => void): void;
+  }
+).included(null, function (this: CallbacksIncludingClass) {
   this.defineCallbacks("process_action", {
     terminator: async (controller, resultLambda) => {
       await resultLambda();

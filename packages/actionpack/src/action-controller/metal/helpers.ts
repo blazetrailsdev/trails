@@ -86,9 +86,12 @@ export function helpers(this: {
 export const Helpers = { ClassMethods, helpers };
 extend(Helpers, Concern);
 include(Helpers, AbstractHelpers);
-Concern.included.call(Helpers as never, null, function (this: object) {
-  classAttribute.call(this, "helpersPath", { default: [] });
-  classAttribute.call(this, "includeAllHelpers", { default: true });
-});
+(Helpers as unknown as { included(base: null, block: (this: object) => void): void }).included(
+  null,
+  function (this: object) {
+    classAttribute.call(this, "helpersPath", { default: [] });
+    classAttribute.call(this, "includeAllHelpers", { default: true });
+  },
+);
 
 rbModConstSet(ActionController, "Helpers", Helpers);
