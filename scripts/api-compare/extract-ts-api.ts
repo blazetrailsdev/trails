@@ -7441,7 +7441,7 @@ function collectCalls(
     }
     if (checkerProvenKind(receiver) === "object") {
       if (form === "spread") hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.merge}`);
-      if (form === "assign") {
+      if (form === "assign" && assignSourceProven(receiver)) {
         hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.mergeBang}`);
         hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.update}`);
       }
@@ -7790,6 +7790,23 @@ function setRoundTripForms(operand: ts.Expression | undefined): string[] {
  * `any` / `unknown` proves neither, since a trails `Relation` answers `size` /
  * `except` itself. Every member of a union has to agree.
  */
+/** A callback whose result the checker types `boolean`, so JS and Ruby truthiness agree. */
+function isBooleanCallback(fn: ts.Expression | undefined): boolean {
+  const result = fn && callbackResult(fn);
+  const checker = currentChecker;
+  if (result === undefined || checker === undefined) return false;
+  const type = checker.getTypeAtLocation(result);
+  const parts = type.isUnion() ? type.types : [type];
+  return parts.every((t) => (t.flags & ts.TypeFlags.BooleanLike) !== 0);
+}
+
+/** `Object.assign(h, other)` with exactly one source the checker proves a plain object. */
+function assignSourceProven(target: ts.Expression): boolean {
+  const call = target.parent;
+  if (!ts.isCallExpression(call) || call.arguments.length !== 2) return false;
+  return checkerProvenKind(call.arguments[1]) === "object";
+}
+
 function checkerProvenKind(expr: ts.Expression): "sized" | "object" | undefined {
   const checker = currentChecker;
   if (checker === undefined) return undefined;
@@ -7890,7 +7907,8 @@ function nativeValueForms(n: ts.Node): string[] {
     return ts.isCallExpression(counted) &&
       ts.isPropertyAccessExpression(counted.expression) &&
       counted.expression.name.text === "filter"
-      ? checkerProvenKind(counted.expression.expression) === "sized"
+      ? checkerProvenKind(counted.expression.expression) === "sized" &&
+        isBooleanCallback(counted.arguments[0])
         ? ["count", TYPED_NATIVE_FORM.count]
         : ["count"]
       : [];

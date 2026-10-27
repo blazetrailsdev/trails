@@ -6637,6 +6637,23 @@ describe("@missingRailsCall extraction", () => {
 const nativeForms = (m: MethodInfo): Set<string> =>
   partitionNegatedCalls(m.calls ?? []).nativeForms;
 
+describe("typed merge! credit", () => {
+  const forms = (body: string): Set<string> =>
+    nativeForms(
+      extractFromFiles("/p", {
+        "foo.ts": `export class Foo {
+          m(xs: [{ ok(): boolean; v(): unknown }], h: { a?: number }, o: { a?: number }) { ${body} }
+        }`,
+      }).classes["foo.ts:Foo"].instanceMethods.find((m) => m.name === "m")!,
+    );
+
+  it("credits merge!@typed only for one plain-object source", () => {
+    expect(forms(`Object.assign(h, o);`).has("merge!@typed")).toBe(true);
+    expect(forms(`Object.assign(h);`).has("merge!@typed")).toBe(false);
+    expect(forms(`Object.assign(h, xs);`).has("merge!@typed")).toBe(false);
+  });
+});
+
 describe("a native hash form credits the Hash call it ports", () => {
   const credited = (
     rubyCall: string,

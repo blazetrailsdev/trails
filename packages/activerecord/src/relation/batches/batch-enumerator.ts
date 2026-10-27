@@ -5,7 +5,7 @@ interface BatchRelation {
   toArray(): Promise<any[]>;
   deleteAll(): Promise<number>;
   updateAll(updates: Record<string, unknown>): Promise<number>;
-  destroyAll(): Promise<any[]>;
+  destroyAll(): Promise<{ isDestroyed(): boolean }[]>;
   touchAll(...args: TouchAllArgs): Promise<number>;
 }
 
