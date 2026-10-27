@@ -6,7 +6,6 @@ import { I18n } from "@blazetrails/activesupport";
 import { LookupContext } from "../lookup-context.js";
 import { FileSystemResolver } from "./resolver.js";
 import { FixtureResolver } from "../testing/resolvers.js";
-import { Handlers } from "./handlers.js";
 import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { Base } from "../base.js";
@@ -32,7 +31,6 @@ describe("FileSystemResolver", () => {
   });
 
   afterEach(async () => {
-    Handlers.clear();
     const fs = getFs();
     fs.rmSync(dir, { recursive: true, force: true });
   });
@@ -223,7 +221,6 @@ describe("PathParser locales", () => {
     I18n.setLocale(originalLocale);
     I18n.setAvailableLocales(null);
     I18n.setEnforceAvailableLocales(true);
-    Handlers.clear();
   });
 
   it("resolves a dashed-locale template when the locale is pt-BR", () => {

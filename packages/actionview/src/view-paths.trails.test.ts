@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { I18n } from "@blazetrails/activesupport";
 import { PathRegistry } from "./path-registry.js";
 import { FixtureResolver } from "./testing/resolvers.js";
-import { Handlers } from "./template/handlers.js";
 import { Template } from "./template.js";
 import {
   ClassMethods,
@@ -62,7 +61,6 @@ class DraftsController extends PostsController {
 
 afterEach(() => {
   PathRegistry.reset();
-  Handlers.clear();
 });
 
 describe("ViewPaths::ClassMethods", () => {

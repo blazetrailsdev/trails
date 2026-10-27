@@ -1,8 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { isHtmlSafe } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
-import { Handlers } from "../template/handlers.js";
 import { Template } from "../template.js";
 import { TSE } from "../template/handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
@@ -27,10 +26,6 @@ describe("PartialRenderer render blocks", () => {
     const base = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
     renderer = base.viewRenderer;
     view = base as unknown as ViewContext;
-  });
-
-  afterEach(() => {
-    Handlers.clear();
   });
 
   it("yields a partial to the caller's block through _layoutFor", async () => {

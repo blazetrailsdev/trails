@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Base, type ViewContextClass } from "./base.js";
 import { DetailsKey } from "./lookup-context.js";
 import { Template } from "./template.js";
-import { Handlers } from "./template/handlers.js";
 import { TSE } from "./template/handlers/tse.js";
 import {
   buildViewContextClass,
@@ -116,31 +115,23 @@ describe("ActionView::Rendering::ClassMethods", () => {
 
   it("includes routes.url_helpers so a route helper is a bare identifier in a template", async () => {
     Template.registerTemplateHandler("tse", new TSE());
-    try {
-      class C extends Controller {
-        static override _routes = routesWith({ postsPath: () => "/posts" });
-      }
-      const view = new (C.viewContextClass())(null, {}, null);
-      expect(await renderTse("<%= postsPath() %>", {}, view)).toBe("/posts");
-    } finally {
-      Handlers.clear();
+    class C extends Controller {
+      static override _routes = routesWith({ postsPath: () => "/posts" });
     }
+    const view = new (C.viewContextClass())(null, {}, null);
+    expect(await renderTse("<%= postsPath() %>", {}, view)).toBe("/posts");
   });
 
   it("makes a helper_method-style helper resolvable as a bare identifier in a template", async () => {
     Template.registerTemplateHandler("tse", new TSE());
-    try {
-      class C extends Controller {
-        static override _helpers = {
-          currentUser(this: Base) {
-            return (this.controller as { user: string }).user;
-          },
-        };
-      }
-      const view = new (C.viewContextClass())(null, {}, { user: "Ada" });
-      expect(await renderTse("<%= currentUser() %>", {}, view)).toBe("Ada");
-    } finally {
-      Handlers.clear();
+    class C extends Controller {
+      static override _helpers = {
+        currentUser(this: Base) {
+          return (this.controller as { user: string }).user;
+        },
+      };
     }
+    const view = new (C.viewContextClass())(null, {}, { user: "Ada" });
+    expect(await renderTse("<%= currentUser() %>", {}, view)).toBe("Ada");
   });
 });

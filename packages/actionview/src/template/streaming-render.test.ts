@@ -3,7 +3,6 @@ import { I18n, type SafeBuffer } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { DetailsKey } from "../lookup-context.js";
-import { Handlers } from "./handlers.js";
 import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { Raw } from "./handlers/raw.js";
@@ -60,8 +59,6 @@ function setupFiberedBase() {
     state.assigns = { secret: "in the sauce", name: null };
     state.view = Base.withEmptyTemplateCache().withViewPaths(viewPaths, state.assigns);
   });
-
-  afterEach(() => Handlers.clear());
 
   const renderBody = (options: Record<string, unknown>) =>
     state.view.viewRenderer.renderBody(state.view as unknown as ViewContext, options);

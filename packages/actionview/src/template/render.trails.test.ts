@@ -1,8 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
-import { Handlers } from "./handlers.js";
 import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
@@ -24,10 +23,6 @@ describe("Base#render collection: inside a template", () => {
     const lookupContext = new LookupContext(null, {}, []);
     lookupContext.appendViewPaths([resolver]);
     view = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
-  });
-
-  afterEach(() => {
-    Handlers.clear();
   });
 
   it("renders a partial collection from inside a compiled template", async () => {

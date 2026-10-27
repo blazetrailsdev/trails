@@ -6,7 +6,6 @@ import {
   LookupContext,
   OutputBuffer,
   Template,
-  Handlers,
   TopLevel,
   TseHandler,
 } from "@blazetrails/actionview";
@@ -398,7 +397,6 @@ describe("TSE stand-in scope", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    Handlers.clear();
   });
 
   it("covers a scenario for every fixture", () => {

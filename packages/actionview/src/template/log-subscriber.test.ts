@@ -22,7 +22,6 @@ import { FIXTURE_LOAD_PATH } from "../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
 import { LogSubscriber } from "../log-subscriber.js";
 import { LookupContext } from "../lookup-context.js";
-import { Handlers } from "./handlers.js";
 import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { Customer, GoodCustomer } from "../test-helpers/fake-models.js";
@@ -113,7 +112,6 @@ describe("AVLogSubscriberTest", () => {
   afterEach(() => {
     tc.teardown();
     ActionController.Base.viewPaths(viewPathsWas as never);
-    Handlers.clear();
   });
 
   it("render template template", () =>

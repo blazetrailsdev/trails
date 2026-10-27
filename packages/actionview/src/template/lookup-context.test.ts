@@ -21,7 +21,6 @@ import { PathSet } from "../path-set.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import { ActionView } from "../namespaces.js";
 import { MissingTemplate } from "./error.js";
-import { Handlers } from "./handlers.js";
 import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { Builder } from "./handlers/builder.js";
@@ -58,7 +57,6 @@ describe("LookupContextTest", () => {
   afterEach(() => {
     I18n.setLocale("en");
     I18n.setEnforceAvailableLocales(enforceAvailableLocales);
-    Handlers.clear();
   });
 
   it("allows to override default_formats with ActionView::Base.default_formats", () => {

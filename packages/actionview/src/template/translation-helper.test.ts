@@ -4,7 +4,6 @@ import { Hash } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
-import { Handlers } from "./handlers.js";
 import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
@@ -67,7 +66,6 @@ describe("TranslationHelperTest", () => {
   });
 
   afterEach(async () => {
-    Handlers.clear();
     await I18n.backend().reloadBang();
   });
 

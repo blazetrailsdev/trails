@@ -15,7 +15,6 @@ import { TextHelper } from "./helpers/text-helper.js";
 import { UrlHelper } from "./helpers/url-helper.js";
 import { LookupContext } from "./lookup-context.js";
 import { Template } from "./template.js";
-import { Handlers } from "./template/handlers.js";
 import { TSE } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
@@ -72,10 +71,6 @@ describe("ActionView::Base#in_rendering_context", () => {
 });
 
 describe("ActionView::Base#render returns the renderer body unwrapped", () => {
-  afterEach(async () => {
-    Handlers.clear();
-  });
-
   const renderTse = async (source: string): Promise<string> => {
     Template.registerTemplateHandler("tse", new TSE());
     const lookupContext = new LookupContext(null, {}, []);
