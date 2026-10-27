@@ -15,14 +15,16 @@ const TZDATA_ISDST = path.join(REPO_ROOT, "packages", "date", "src", "tzdata-isd
 
 /**
  * The generator needs `ruby` with the `tzinfo` gem, and `curl` / `zic` to build
- * the zoneinfo for Node's tzdata release; a runner without them skips.
+ * the zoneinfo for Node's tzdata release; a runner without them skips. A
+ * tarball that fails the release-signature check fails the test instead.
  */
 async function hasTzinfo(): Promise<boolean> {
   try {
     await execFileAsync("ruby", ["-e", 'require "tzinfo"']);
     await zoneinfo();
     return true;
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("is not signed by the tz release key")) throw e;
     return false;
   }
 }
