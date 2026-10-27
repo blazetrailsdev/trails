@@ -1,6 +1,6 @@
 import { ActionController } from "../../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { Concern, Module, extend } from "@blazetrails/activesupport";
+import { Concern, extend } from "@blazetrails/activesupport";
 import { ArgumentError, File, slice, stringDelete } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
@@ -116,16 +116,7 @@ export function sendFileHeadersBang(
   this.headers.set("Content-Transfer-Encoding", "binary");
 }
 
-export const DataStreaming: Module<{
-  sendFile: OmitThisParameter<typeof sendFile>;
-  sendData: OmitThisParameter<typeof sendData>;
-  sendFileHeadersBang: OmitThisParameter<typeof sendFileHeadersBang>;
-}> = new Module((mod) => {
-  extend(mod, Concern);
-
-  mod.defineMethod("sendFile", sendFile);
-  mod.defineMethod("sendData", sendData);
-  mod.defineMethod("sendFileHeadersBang", sendFileHeadersBang);
-});
+export const DataStreaming = { sendFile, sendData, sendFileHeadersBang };
+extend(DataStreaming, Concern);
 
 rbModConstSet(ActionController, "DataStreaming", DataStreaming);

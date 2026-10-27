@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { classModule, rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   attrInternal,
   Benchmark,
@@ -7,7 +7,6 @@ import {
   ExecutionContext,
   extend,
   include,
-  Module,
   Notifications,
   toF,
 } from "@blazetrails/activesupport";
@@ -18,23 +17,6 @@ import type { Response } from "../../action-dispatch/http/response.js";
 import { Exception, StandardError, rbObjClassname, throwDataP } from "@blazetrails/ruby-compat";
 import type { DataStreamingHost, SendDataOptions, SendFileOptions } from "./data-streaming.js";
 import type { redirectTo as flashRedirectTo } from "./flash.js";
-
-export const Instrumentation = new Module((mod) => {
-  extend(mod, Concern);
-
-  include(mod, Logger);
-
-  mod.moduleEval((carrier) => attrInternal.call(carrier, "viewRuntime"));
-
-  mod.defineMethod("render", render);
-  mod.defineMethod("sendFile", sendFile);
-  mod.defineMethod("sendData", sendData);
-  mod.defineMethod("redirectTo", redirectTo);
-  mod.defineMethod("processAction", processAction);
-  mod.defineMethod("haltedCallbackHook", haltedCallbackHook);
-  mod.defineMethod("cleanupViewRuntime", cleanupViewRuntime);
-  mod.defineMethod("appendInfoToPayload", appendInfoToPayload);
-}) as Module & { ClassMethods: Module };
 
 interface InstrumentationHost {
   actionName?: string;
@@ -50,7 +32,7 @@ export function render(
   let renderOutput: unknown = null;
   const viewRuntime = this.cleanupViewRuntime(() =>
     Benchmark.realtime(":float_millisecond", () => {
-      return (renderOutput = Instrumentation.superMethod(this, "render")!(...args));
+      return (renderOutput = rbCallSuper(this, render, ...args));
     }),
   ) as number | Promise<number>;
   if (typeof viewRuntime === "number") {
@@ -91,7 +73,7 @@ export async function processAction(
     rawPayload,
     async (payload) => {
       try {
-        const result = await Instrumentation.superMethod(this, "processAction")!(...args);
+        const result = await rbCallSuper(this, processAction, ...args);
         payload.response = this.response;
         payload.status = this.response.status;
         return result;
@@ -113,7 +95,7 @@ export function sendFile(
   options: SendFileOptions = {},
 ): void {
   return Notifications.instrument("send_file.action_controller", { ...options, path }, () =>
-    Instrumentation.superMethod(this, "sendFile")!(path, options),
+    rbCallSuper(this, sendFile, path, options),
   ) as void;
 }
 
@@ -125,7 +107,7 @@ export function sendData(
   return Notifications.instrument(
     "send_data.action_controller",
     options as Record<string, unknown>,
-    () => Instrumentation.superMethod(this, "sendData")!(data, options),
+    () => rbCallSuper(this, sendData, data, options),
   ) as void | Promise<void>;
 }
 
@@ -137,7 +119,7 @@ export function redirectTo(
     "redirect_to.action_controller",
     { request: this.request },
     (payload) => {
-      const result = Instrumentation.superMethod(this, "redirectTo")!(...args) as number;
+      const result = rbCallSuper(this, redirectTo, ...args) as number;
       payload.status = this.response.status;
       payload.location = this.response.filteredLocation();
       return result;
@@ -172,10 +154,22 @@ export function logProcessAction(payload: Record<string, unknown>): string[] {
   return messages;
 }
 
-export const ClassMethods: Module = new Module((mod) => {
-  mod.defineMethod("logProcessAction", logProcessAction);
-});
+export const ClassMethods = { logProcessAction };
 
-Instrumentation.ClassMethods = ClassMethods;
+export class Instrumentation {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+  declare static ClassMethods: typeof ClassMethods;
+}
+extend(Instrumentation, Concern);
+include(Instrumentation, Logger);
+attrInternal.call(Instrumentation.prototype, "viewRuntime");
+Object.assign(Instrumentation.prototype, { render, sendFile, sendData, redirectTo, processAction });
+Object.assign(Instrumentation.prototype, {
+  haltedCallbackHook,
+  cleanupViewRuntime,
+  appendInfoToPayload,
+});
+Object.defineProperty(Instrumentation, "ClassMethods", { value: ClassMethods });
 
 rbModConstSet(ActionController, "Instrumentation", Instrumentation);

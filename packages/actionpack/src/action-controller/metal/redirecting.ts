@@ -9,7 +9,6 @@ import type { Parameters } from "./strong-parameters.js";
 import type { RedirectToResponseOptionsAndFlash } from "./flash.js";
 import {
   Concern,
-  Module,
   extend,
   include,
   mattrAccessor,
@@ -223,35 +222,25 @@ export function _ensureUrlIsHttpHeaderSafe(this: unknown, url: string): void {
   }
 }
 
-type IncludedBlock = { included(base: null, block: (this: object) => void): void };
-
-export const Redirecting = new Module((mod) => {
-  extend(mod, Concern);
-
-  include(mod, Logger);
-  include(mod, UrlFor);
-
-  (mod as unknown as IncludedBlock).included(null, function (this: object) {
-    mattrAccessor.call(this, "raiseOnOpenRedirects", { default: false });
-  });
-
-  mod.defineMethod("redirectTo", redirectTo);
-  mod.defineMethod("redirectBack", redirectBack);
-  mod.defineMethod("redirectBackOrTo", redirectBackOrTo);
-  mod.defineMethod("_computeRedirectToLocation", _computeRedirectToLocation);
-  mod.defineMethod("urlFrom", urlFrom);
-  mod.defineMethod("_allowOtherHost", _allowOtherHost);
-  mod.defineMethod("_extractRedirectToStatus", _extractRedirectToStatus);
-  mod.defineMethod("_enforceOpenRedirectProtection", _enforceOpenRedirectProtection);
-  mod.defineMethod("_urlHostAllowed", _urlHostAllowed);
-  mod.defineMethod("_ensureUrlIsHttpHeaderSafe", _ensureUrlIsHttpHeaderSafe);
-}) as Module<{
-  redirectTo: typeof redirectTo;
-  redirectBack: typeof redirectBack;
-  redirectBackOrTo: typeof redirectBackOrTo;
-  _computeRedirectToLocation: typeof _computeRedirectToLocation;
-  urlFrom: typeof urlFrom;
-}> & { _computeRedirectToLocation: OmitThisParameter<typeof _computeRedirectToLocation> };
-Redirecting._computeRedirectToLocation = _computeRedirectToLocation;
+export const Redirecting = {
+  redirectTo,
+  redirectBack,
+  redirectBackOrTo,
+  _computeRedirectToLocation: _computeRedirectToLocation as OmitThisParameter<
+    typeof _computeRedirectToLocation
+  >,
+  urlFrom,
+  _allowOtherHost,
+  _extractRedirectToStatus,
+  _enforceOpenRedirectProtection,
+  _urlHostAllowed,
+  _ensureUrlIsHttpHeaderSafe,
+};
+extend(Redirecting, Concern);
+include(Redirecting, Logger);
+include(Redirecting, UrlFor);
+Concern.included.call(Redirecting as never, null, function (this: object) {
+  mattrAccessor.call(this, "raiseOnOpenRedirects", { default: false });
+});
 
 rbModConstSet(ActionController, "Redirecting", Redirecting);
