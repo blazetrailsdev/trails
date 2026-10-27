@@ -417,7 +417,8 @@ export function hashDelete(hash: object, key: unknown): unknown;
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#delete` (`vendor/ruby/v3.3.11/hash.c:2441`).
  */
 export function hashDelete(hash: object, key: unknown, block?: (key: never) => unknown): unknown {
-  if (Array.isArray(hash)) return aryDelete(hash, key, block) ?? null;
+  if (Array.isArray(hash))
+    return aryDelete<unknown, unknown>(hash, key, block as (item: unknown) => unknown) ?? null;
   if (hash instanceof Map) {
     if (hash.has(key)) {
       const val = hash.get(key);
