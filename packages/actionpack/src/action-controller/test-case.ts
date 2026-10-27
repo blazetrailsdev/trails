@@ -74,7 +74,7 @@ declare module "./metal.js" {
   interface Metal extends Included<(typeof Testing)["Functional"]> {}
 }
 
-Live.aliasMethod("originalNewControllerThread", "newControllerThread");
+Object.assign(Live, { originalNewControllerThread: Live.newControllerThread });
 
 export async function newControllerThread(
   this: LiveControllerHost,
@@ -83,12 +83,12 @@ export async function newControllerThread(
   await block();
 }
 
-Live.aliasMethod("originalCleanUpThreadLocals", "cleanUpThreadLocals");
+Object.assign(Live, { originalCleanUpThreadLocals: Live.cleanUpThreadLocals });
 
 export function cleanUpThreadLocals(this: LiveControllerHost, ..._args: unknown[]): void {}
 
-Live.defineMethod("newControllerThread", newControllerThread);
-Live.defineMethod("cleanUpThreadLocals", cleanUpThreadLocals);
+Live.newControllerThread = newControllerThread as unknown as typeof Live.newControllerThread;
+Live.cleanUpThreadLocals = cleanUpThreadLocals;
 
 LiveBuffer.queueSize = null;
 

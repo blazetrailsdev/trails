@@ -1613,7 +1613,11 @@ export function rbModAppendFeatures(
         }
         installed.add(key);
         descriptors[key] = { ...modDesc, configurable: true, enumerable: false };
-        if (typeof key === "string") rbSeatSuper(klass.prototype, key, modDesc.value, descriptors);
+        if (typeof key === "string") {
+          rbSeatSuper(klass.prototype, key, modDesc.value, descriptors);
+          rbSeatSuper(klass.prototype, key, modDesc.get, descriptors, "get");
+          rbSeatSuper(klass.prototype, key, modDesc.set, descriptors, "set");
+        }
       }
       ancestor = Object.getPrototypeOf(ancestor) as object | null;
     }
