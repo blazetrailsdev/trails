@@ -1,5 +1,9 @@
 import { Temporal } from "@js-temporal/polyfill";
-import { tzdataAbbreviation, tzdataAbbreviationChanges } from "./tzdata-abbreviations.js";
+import {
+  TZDATA_ABBREVIATIONS_HORIZON,
+  tzdataAbbreviation,
+  tzdataAbbreviationChanges,
+} from "./tzdata-abbreviations.js";
 import { tzdataIsdst, tzdataOffsetInstant } from "./tzdata-isdst.js";
 import { rbWarning } from "./rb-warning.js";
 import { rbStrftime, type StrftimeVtm } from "./strftime.js";
@@ -106,8 +110,6 @@ function utcOffsetArgument(zone: string | number | Rational): "UTC" | number {
     `"+HH:MM", "-HH:MM", "UTC" or "A".."I","K".."Z" expected for utc_offset: ${zone}`,
   );
 }
-
-const TZDATA_ABBREVIATIONS_HORIZON = 2208988800;
 
 function zoneAbbreviation(zoned: Temporal.ZonedDateTime): string {
   let at = Math.floor(zoned.epochMilliseconds / 1000);

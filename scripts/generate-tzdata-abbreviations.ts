@@ -75,7 +75,10 @@ export function serializeTable(zones: Record<string, ZoneAbbreviations>): string
 
 /** The IANA release the table was generated from, which `process.versions.tz` must match. */
 export function header(): string {
-  return `/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_VERSION = "${tzdataVersion()}";\n\n`;
+  return (
+    `/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_VERSION = "${tzdataVersion()}";\n\n` +
+    `/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_ABBREVIATIONS_HORIZON = ${Date.UTC(HORIZON_YEAR, 0, 1) / 1000};\n\n`
+  );
 }
 
 const READER = `

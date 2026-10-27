@@ -1,6 +1,9 @@
 /** @noRailsEquivalent PERMANENT */
 export const TZDATA_VERSION = "2026c";
 
+/** @noRailsEquivalent PERMANENT */
+export const TZDATA_ABBREVIATIONS_HORIZON = 2208988800;
+
 export const TZDATA_ABBREVIATIONS = `
 Africa/Abidjan LMT|GMT,1-u9rgl4
 Africa/Accra LMT|GMT,1-u9rgl4
