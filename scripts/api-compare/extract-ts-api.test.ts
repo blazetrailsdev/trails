@@ -6139,7 +6139,7 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
         class Foo {
           /**
            * @noRailsEquivalent PERMANENT
-           * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
+           * @perf 100ns — PERMANENT
            */
           clearCache(): void {}
         }
