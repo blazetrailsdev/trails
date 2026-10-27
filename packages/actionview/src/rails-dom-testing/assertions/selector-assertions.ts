@@ -2,8 +2,10 @@ import { assert, assertEqual, assertOperator } from "@blazetrails/activesupport"
 import {
   ArgumentError,
   aryJoin,
+  block as rbBlock,
   LocalJumpError,
   NotImplementedError,
+  rbBlockGivenP,
   rbInspect,
 } from "@blazetrails/ruby-compat";
 import {
@@ -13,7 +15,7 @@ import {
   type Html5Node,
   type NodeSet,
 } from "@blazetrails/nokogiri";
-import { Testing } from "../../testing.js";
+import { Testing } from "../testing.js";
 import { HTMLSelector, type EqualityTests } from "./selector-assertions/html-selector.js";
 
 export interface SelectorAssertionsHost {
@@ -30,7 +32,9 @@ export function cssSelect(this: SelectorAssertionsHost, ...args: unknown[]): Nod
 }
 
 export function assertDom(this: SelectorAssertionsHost, ...args: unknown[]): NodeSet | undefined {
-  const block = typeof args.at(-1) === "function" ? (args.pop() as (s: NodeSet) => void) : null;
+  const block = rbBlockGivenP(args.at(-1))
+    ? (args.pop() as (s: NodeSet | Html5DocumentFragment) => void)
+    : null;
   this.selected ??= null;
 
   const selector = new HTMLSelector(args, this.selected, () => nodeset(this.documentRootElement()));
@@ -43,8 +47,7 @@ export function assertDom(this: SelectorAssertionsHost, ...args: unknown[]): Nod
   const matches = selector.select();
   assertSizeMatch(matches.size, selector.tests, selector.cssSelector, selector.message);
 
-  if (block && !matches.isEmpty())
-    nestSelection.call(this, matches, block as (s: NodeSet | Html5DocumentFragment) => void);
+  if (block && !matches.isEmpty()) nestSelection.call(this, matches, block);
   return matches;
 }
 
@@ -74,7 +77,7 @@ export function assertDomEncoded(
       if (!block) throw new LocalJumpError("no block given (yield)");
       block(selected);
     } else {
-      assertDom.call(this, ":root", ...(block ? [block] : []));
+      assertDom.call(this, ":root", ...(block ? [rbBlock(block)] : []));
     }
   });
 }

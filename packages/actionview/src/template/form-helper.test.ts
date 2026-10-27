@@ -57,7 +57,7 @@ import type { CheckBoxBuilder } from "../helpers/tags/collection-check-boxes.js"
 import type { RadioButtonBuilder } from "../helpers/tags/collection-radio-buttons.js";
 import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 import { assertSelect } from "../rails-dom-testing/assertions/selector-assertions.js";
-import { Testing } from "../testing.js";
+import { Testing } from "../rails-dom-testing/testing.js";
 import { Blog, Cpk } from "../test-helpers/fake-models.js";
 
 class Post {

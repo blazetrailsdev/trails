@@ -1,7 +1,7 @@
 import { assert, assertNot, isBlank } from "@blazetrails/activesupport";
 import { type Html5DocumentFragment, type Html5Node } from "@blazetrails/nokogiri";
 import { rbEqual, stringSplit } from "@blazetrails/ruby-compat";
-import { Testing } from "../../testing.js";
+import { Testing } from "../testing.js";
 
 type Fragment = Html5DocumentFragment | Html5Node;
 type Attr = Html5Node["attributeNodes"][number];
