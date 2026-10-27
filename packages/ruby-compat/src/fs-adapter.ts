@@ -153,16 +153,6 @@ interface FlockableFs {
 const LOCK_RETRY_MS = 5;
 let sleepBuffer: Int32Array | null = null;
 
-function sleepSync(ms: number): void {
-  try {
-    sleepBuffer ??= new Int32Array(new SharedArrayBuffer(4));
-    if (Atomics.wait(sleepBuffer, 0, 0, ms) !== "timed-out") return;
-  } catch {
-    const until = Date.now() + ms;
-    while (Date.now() < until) continue;
-  }
-}
-
 const flockPaths = new Map<number, string>();
 const flockHeld = new Map<number, string>();
 
@@ -191,7 +181,13 @@ function withFlock<T extends FlockableFs>(nodeFs: T): Partial<FsAdapter> {
       } catch (error) {
         if ((error as { code?: string }).code !== "EEXIST") throw error;
         if (operation === "exnb") return false;
-        sleepSync(LOCK_RETRY_MS);
+        try {
+          sleepBuffer ??= new Int32Array(new SharedArrayBuffer(4));
+          if (Atomics.wait(sleepBuffer, 0, 0, LOCK_RETRY_MS) !== "timed-out") continue;
+        } catch {
+          const until = Date.now() + LOCK_RETRY_MS;
+          while (Date.now() < until) continue;
+        }
       }
     }
   };
