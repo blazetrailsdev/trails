@@ -202,4 +202,22 @@ describe("TCPSocket", () => {
     expect(() => io.writeNonblock("x")).toThrow(IOError);
     await expect(io.waitWritable()).rejects.toThrow(IOError);
   });
+
+  it("answers 0 for an empty nonblocking write even with no room", () => {
+    const { socket, written } = fakeSocket();
+    const io = new TCPSocket(socket);
+    io.write("12345678");
+    expect(io.writeNonblock("")).toBe(0);
+    expect(io.writeNonblock(new Uint8Array(0), { exception: false })).toBe(0);
+    expect(written).toHaveLength(1);
+  });
+
+  it("refuses a non-boolean exception to a nonblocking write", () => {
+    const { socket, written } = fakeSocket();
+    const io = new TCPSocket(socket);
+    expect(() => io.writeNonblock("x", { exception: 0 as unknown as boolean })).toThrow(
+      "expected true or false as exception: 0",
+    );
+    expect(written).toHaveLength(0);
+  });
 });
