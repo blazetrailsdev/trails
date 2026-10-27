@@ -118,20 +118,10 @@ export const TestConnection = defineModule({
   get request(): TestRequest {
     return (this as unknown as TestConnectionHost)._request;
   },
-
-  /** @noRailsEquivalent PERMANENT */
-  initialize(this: TestConnectionHost, request: TestRequest): void {
-    const innerLogger = new Logger(new StringIO());
-    const taggedLogging = TaggedLogging.new(innerLogger);
-    this._logger = new TaggedLoggerProxy(taggedLogging, { tags: [] });
-    this._request = request;
-    this.env = request.env;
-  },
 });
 
 type ConnectionClass = typeof Base;
 type TestedConnection = Base & {
-  initialize(request: TestRequest): void;
   connect?(): unknown;
   disconnect?(): unknown;
 };
@@ -209,7 +199,13 @@ async function connect(
     (this.constructor as unknown as BehaviorClass).connectionClass().prototype,
   ) as TestedConnection;
   include(rbObjSingletonClass(connection), TestConnection);
-  connection.initialize(buildTestRequest.call(this, path, requestParams));
+  const request = buildTestRequest.call(this, path, requestParams);
+  const innerLogger = new Logger(new StringIO());
+  const taggedLogging = TaggedLogging.new(innerLogger);
+  const host = connection as unknown as TestConnectionHost;
+  host._logger = new TaggedLoggerProxy(taggedLogging, { tags: [] });
+  host._request = request;
+  host.env = request.env;
   if (rbObjRespondTo(connection, "connect")) await connection.connect!();
   return (this._connection = connection);
 }
