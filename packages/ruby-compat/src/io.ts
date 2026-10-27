@@ -536,6 +536,32 @@ class EAGAINWaitReadable extends Errno.EAGAIN {
 }
 
 /**
+ * `IO::WaitWritable` (`vendor/ruby/v3.3.11/io.c:15387`), the module
+ * `IO::EAGAINWaitWritable` includes (`io.c:15393`), so `rescue
+ * IO::WaitWritable` catches it.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO::WaitWritable`.
+ */
+const WaitWritable = {
+  [Symbol.hasInstance](error: unknown): boolean {
+    return error instanceof EAGAINWaitWritable;
+  },
+};
+
+/**
+ * `IO::EAGAINWaitWritable` (`vendor/ruby/v3.3.11/io.c:15392`), the
+ * `Errno::EAGAIN` `write_nonblock` raises when a write would block.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO::EAGAINWaitWritable`.
+ */
+class EAGAINWaitWritable extends Errno.EAGAIN {
+  constructor(mesg?: string) {
+    super(mesg);
+    this.name = "IO::EAGAINWaitWritable";
+  }
+}
+
+/**
  * `IO` (`vendor/ruby/v3.3.11/io.c:15371` `rb_cIO`), the sliver of it trails calls.
  *
  * Rails writes a credentials file through this class —
@@ -551,6 +577,18 @@ class EAGAINWaitReadable extends Errno.EAGAIN {
 export class IO {
   /** @noRailsEquivalent PERMANENT */
   static readonly EAGAINWaitReadable = EAGAINWaitReadable;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly WaitWritable = WaitWritable;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly EAGAINWaitWritable = EAGAINWaitWritable;
+  /**
+   * `IO::EWOULDBLOCKWaitWritable` (`vendor/ruby/v3.3.11/io.c:15400`), the
+   * same class as {@link IO.EAGAINWaitWritable} where `EAGAIN == EWOULDBLOCK`,
+   * as on every platform Node runs on.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static readonly EWOULDBLOCKWaitWritable = EAGAINWaitWritable;
 
   /**
    * `vendor/ruby/v3.3.11/file.c:7848` — `File::Constants::NULL`, which `IO`

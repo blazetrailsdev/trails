@@ -52,7 +52,7 @@ describe("ActionCable::Connection::StreamTest", () => {
           .websocket.websocket;
         stub(
           rackHijackIo,
-          "write",
+          "writeNonblock",
           () => {
             throw new closedException("foo");
           },

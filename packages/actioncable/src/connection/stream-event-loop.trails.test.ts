@@ -8,6 +8,13 @@ function stream(closeRaises = false, shutdown: () => void = () => {}) {
   return {
     received: [] as unknown[],
     closes: 0,
+    flushes: [] as boolean[],
+    pending: 0,
+    flushWriteBuffer() {
+      const done = --this.pending <= 0;
+      this.flushes.push(done);
+      return done;
+    },
     receive(data: unknown) {
       this.received.push(data);
     },
@@ -47,6 +54,21 @@ describe("ActionCable::Connection::StreamEventLoop", () => {
     peer.write("y");
     await tick();
     expect(s.closes).toBe(1);
+  });
+
+  it("flushes the stream's write buffer while writes are pending, until it reports empty", async () => {
+    const loop = new StreamEventLoop();
+    const [io] = socketPair();
+    const s = stream();
+    s.pending = 2;
+    loop.attach(io, s);
+    loop.writesPending(io);
+    loop.writesPending(io);
+    await tick();
+    expect(s.flushes).toEqual([false, true]);
+    loop.writesPending(io);
+    await tick();
+    expect(s.flushes).toEqual([false, true, true]);
   });
 
   it("detach stops reading and closes the io", async () => {
