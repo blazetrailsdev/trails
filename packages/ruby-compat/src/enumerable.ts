@@ -223,7 +223,7 @@ function enumFindAll<T, E = unknown>(
     () => ary,
   );
 }
-export { enumFindAll as findAll };
+export { enumFindAll as findAll, enumFindAll as select };
 export { enumToA as toA };
 
 /**
@@ -554,7 +554,7 @@ export function sortBy<T, E = unknown>(
 export function eachSlice<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
   n: number,
-): Enumerator<T[]>;
+): Enumerator<T[], E>;
 /** @noRailsEquivalent PERMANENT */
 export function eachSlice<T, O extends Iterable<T> | Each<T, unknown>>(
   obj: O,
@@ -571,17 +571,11 @@ export function eachSlice<T, E = unknown>(
 
   if (size <= 0) throw new ArgumentError("invalid slice size");
   if (!block) {
-    return new Enumerator<T[]>(
+    return new Enumerator<T[], E>(
       { eachSlice: (n: number, block: (slice: T[]) => unknown) => eachSlice(obj, n, block) },
       "eachSlice",
       [n],
-      (n) => {
-        const sliceSize = Math.trunc(n as number);
-        if (sliceSize <= 0) throw new ArgumentError("invalid slice size");
-        const size = Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null);
-        if (size == null || size === Infinity) return size;
-        return Math.floor(((size as number) + sliceSize - 1) / sliceSize);
-      },
+      (...args) => enumEachSliceSize(obj, args),
     );
   }
   let ary: T[] = [];
@@ -613,7 +607,7 @@ export function eachSlice<T, E = unknown>(
 export function minBy<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
   n?: number | null,
-): Enumerator<T>;
+): Enumerator<T, E>;
 /** @noRailsEquivalent PERMANENT */
 export function minBy<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
@@ -630,11 +624,11 @@ export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
   const block = typeof argv.at(-1) === "function" ? (argv.pop() as (i: T) => unknown) : null;
   checkArity(argv.length, 0, 1);
   if (!block) {
-    return new Enumerator<T>(
+    return new Enumerator<T, E>(
       { minBy: (...argv: unknown[]) => (minBy as (...argv: unknown[]) => unknown)(obj, ...argv) },
       "minBy",
       argv,
-      () => (Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null)),
+      () => enumSize(obj),
     );
   }
   const num = argv[0] as number | null | undefined;
@@ -682,7 +676,7 @@ export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
 export function maxBy<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
   n?: number | null,
-): Enumerator<T>;
+): Enumerator<T, E>;
 /** @noRailsEquivalent PERMANENT */
 export function maxBy<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
@@ -699,11 +693,11 @@ export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
   const block = typeof argv.at(-1) === "function" ? (argv.pop() as (i: T) => unknown) : null;
   checkArity(argv.length, 0, 1);
   if (!block) {
-    return new Enumerator<T>(
+    return new Enumerator<T, E>(
       { maxBy: (...argv: unknown[]) => (maxBy as (...argv: unknown[]) => unknown)(obj, ...argv) },
       "maxBy",
       argv,
-      () => (Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null)),
+      () => enumSize(obj),
     );
   }
   const num = argv[0] as number | null | undefined;
@@ -753,7 +747,10 @@ export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
  * `rbFSend` reaches no free function on an Array, Set or generator.
  * @noRailsEquivalent PERMANENT
  */
-export function eachCons<T, E = unknown>(obj: Iterable<T> | Each<T, E>, n: number): Enumerator<T[]>;
+export function eachCons<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  n: number,
+): Enumerator<T[], E>;
 /** @noRailsEquivalent PERMANENT */
 export function eachCons<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
@@ -770,17 +767,11 @@ export function eachCons<T, E = unknown>(
 
   if (size <= 0) throw new ArgumentError("invalid size");
   if (!block) {
-    return new Enumerator<T[]>(
+    return new Enumerator<T[], E>(
       { eachCons: (n: number, block: (cons: T[]) => unknown) => eachCons(obj, n, block) },
       "eachCons",
       [n],
-      (n) => {
-        const consSize = Math.trunc(n as number);
-        if (consSize <= 0) throw new ArgumentError("invalid size");
-        const size = Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null);
-        if (size == null) return null;
-        return Math.max((size as number) + 1 - consSize, 0);
-      },
+      (...args) => enumEachConsSize(obj, args),
     );
   }
   const ary: T[] = [];
@@ -793,6 +784,30 @@ export function eachCons<T, E = unknown>(
     },
     () => obj,
   );
+}
+
+/** Mirrors MRI `enum_size` (`vendor/ruby/v3.3.11/enum.c:467`). */
+function enumSize(obj: unknown): unknown {
+  return Array.isArray(obj) ? obj.length : (rbCheckFuncall(obj, "size") ?? null);
+}
+
+/** Mirrors MRI `enum_each_slice_size` (`vendor/ruby/v3.3.11/enum.c:3127`). */
+function enumEachSliceSize(obj: unknown, args: unknown[]): unknown {
+  const sliceSize = Math.trunc(args[0] as number);
+  if (sliceSize <= 0) throw new ArgumentError("invalid slice size");
+  const size = enumSize(obj);
+  if (size == null) return null;
+  if (size === Infinity) return size;
+  return Math.floor(((size as number) + sliceSize - 1) / sliceSize);
+}
+
+/** Mirrors MRI `enum_each_cons_size` (`vendor/ruby/v3.3.11/enum.c:3209`). */
+function enumEachConsSize(obj: unknown, args: unknown[]): unknown {
+  const consSize = Math.trunc(args[0] as number);
+  if (consSize <= 0) throw new ArgumentError("invalid size");
+  const size = enumSize(obj);
+  if (size == null) return null;
+  return Math.max((size as number) + 1 - consSize, 0);
 }
 
 function enumfunc<T>(args: unknown[]): (i: T) => unknown {
