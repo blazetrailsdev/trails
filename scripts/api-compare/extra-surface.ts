@@ -1513,9 +1513,6 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  * which is also how the symbol import resolves at every site in the repo,
  * since the binding is imported under that bare name.
  *
- * `[initialize]` is the third: a MODULE's `def initialize`, reached through the
- * includer's `super` (`initializeIncludedModules`), credited off the manifest.
- *
  * The string-named `included` / `extended` / `inherited` methods are a
  * different thing and stay drift: `SKIP_GROUPS` in `scripts/parity/conventions.ts`
  * marks them `tsMirrorIsDrift`, and a bracketed name never collides with a
@@ -1524,7 +1521,6 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
 export const CONCERN_HOOK_MEMBERS = {
   included: "[included]",
   extended: "[extended]",
-  initialize: "[initialize]",
 } as const;
 
 /** `included do ... end` — activemodel/lib/active_model/api.rb:65. */
@@ -1552,15 +1548,6 @@ export function concernHookNames(rubySource: string): Set<string> {
   }
   if (SELF_EXTENDED_RE.test(rubySource)) names.add(CONCERN_HOOK_MEMBERS.extended);
   return names;
-}
-
-/** The `.rb` files in which a MODULE defines `initialize` (type/serialize_cast_value.rb:41-44). */
-export function moduleInitializeFiles(pkg: PackageInfo): Set<string> {
-  const files = new Set<string>();
-  for (const mod of Object.values(pkg.modules)) {
-    if (mod.file && mod.instanceMethods.some((m) => m.name === "initialize")) files.add(mod.file);
-  }
-  return files;
 }
 
 /** Key into the `concernHooks` map: one entry per (package, Ruby file). */
@@ -1595,7 +1582,6 @@ export async function loadConcernHooks(
     if (filterPkg !== null && pkg !== filterPkg) continue;
     const libDir = libPaths[pkg];
     if (libDir === undefined) continue;
-    const initializeFiles = moduleInitializeFiles(rubyPkg);
     for (const rubyFile of rubyFilesOf(rubyPkg)) {
       let source: string | undefined;
       for (const dir of [libDir, ...(extraPaths[pkg] ?? [])]) {
@@ -1608,7 +1594,6 @@ export async function loadConcernHooks(
       }
       if (source === undefined) continue;
       const names = concernHookNames(source);
-      if (initializeFiles.has(rubyFile)) names.add(CONCERN_HOOK_MEMBERS.initialize);
       if (names.size > 0) hooks.set(concernHookKey(pkg, rubyFile), names);
     }
   }
@@ -2247,7 +2232,6 @@ export function inlinedModuleMembers(
         if (m.name === "initialize" && hostDefinesInitialize) continue;
         const sameFileOwners = definedByRubyFile.get(host.file)?.get(m.name);
         if (sameFileOwners !== undefined && [...sameFileOwners].some((o) => o !== host)) continue;
-        if (m.name === "initialize" && moduleBodies?.has(CONCERN_HOOK_MEMBERS.initialize)) continue;
         if (m.name === "initialize" && taggedByTsFile.get(hostTs)?.has(fqn) === true) continue;
         if (
           (m.calls ?? []).includes("super") &&

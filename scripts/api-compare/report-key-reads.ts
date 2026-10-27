@@ -42,7 +42,6 @@ import ts from "typescript-5";
 import { snakeToCamel } from "@blazetrails/parity/conventions";
 import { libPathsManifest } from "../../vendor/sources.js";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR, packageSrcDir } from "./config.js";
-import { MODULE_INITIALIZE_HOOK } from "./compare.js";
 import { normalizeRubyKey } from "./options-keys.js";
 import type { SkeletonArtifact, SkeletonRow } from "./report-arms.js";
 
@@ -174,29 +173,8 @@ function isWriteTarget(node: ts.Node): boolean {
   );
 }
 
-/**
- * A module's `initialize` hook, seated under ruby-compat's `initialize` symbol
- * (`static [initialize]() {}` or `mod[initialize] = function* () {}`), pairs
- * as compare.ts#MODULE_INITIALIZE_HOOK.
- */
-function isInitializeHook(node: ts.Node): boolean {
-  if (ts.isMethodDeclaration(node) && ts.isComputedPropertyName(node.name)) {
-    return node.name.expression.getText() === "initialize";
-  }
-  if (!ts.isFunctionExpression(node) && !ts.isArrowFunction(node)) return false;
-  const parent = node.parent;
-  return (
-    ts.isBinaryExpression(parent) &&
-    parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-    parent.right === node &&
-    ts.isElementAccessExpression(parent.left) &&
-    parent.left.argumentExpression.getText() === "initialize"
-  );
-}
-
 function functionName(node: ts.Node): string | undefined {
   if (ts.isConstructorDeclaration(node)) return "constructor";
-  if (isInitializeHook(node)) return MODULE_INITIALIZE_HOOK;
   if (
     ts.isFunctionDeclaration(node) ||
     ts.isMethodDeclaration(node) ||

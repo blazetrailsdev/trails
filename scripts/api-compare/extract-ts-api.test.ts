@@ -217,18 +217,6 @@ describe("harvestObjectLiteralMethods", () => {
     expect(objectLiteralMethods(`export const _allocation = { klass: null };`)).toEqual([]);
   });
 
-  it("records a plain-object module's [initialize] hook", () => {
-    const methods = objectLiteralMethods(
-      `declare const initialize: unique symbol;
-      declare const other: unique symbol;
-      export const DatabaseStatements = {
-        [initialize](this: { resetTransaction(): void }): void { this.resetTransaction(); },
-        [other](): void {},
-      };`,
-    );
-    expect(methods.map((m) => m.name)).toEqual(["[initialize]"]);
-  });
-
   it("reads @internal off the declaration a mixin entry references", () => {
     const methods = objectLiteralMethods(
       `/** @internal */
@@ -3707,36 +3695,6 @@ describe("extractFromProgram — include() detection", () => {
     });
     const methods = info.modules["serializer.ts:Serializer"].instanceMethods;
     expect(methods.map((m) => [m.name, m.bodyless === true])).toEqual([["registerType", false]]);
-  });
-
-  it("records the [initialize] hook a Module's block assigns as the module's initialize", () => {
-    const info = extractFromFiles("/p", {
-      "shell.ts": `
-        declare const initialize: unique symbol;
-        declare class Module {
-          constructor(block?: (mod: Module) => void);
-        }
-        export const Shell = new Module((mod) => {
-          (mod as unknown as Record<symbol, unknown>)[initialize] = function (
-            this: { shell: unknown },
-            args: unknown[] = [],
-            options: unknown = {},
-            config: { shell?: unknown } = {},
-          ) {
-            this.shell = config.shell;
-          };
-        });
-        export const Other = new Module((mod) => {
-          const other = {} as Record<symbol, unknown>;
-          other[initialize] = function () {};
-        });
-      `,
-    });
-    const methods = info.modules["shell.ts:Shell"].instanceMethods;
-    expect(methods.map((m) => [m.name, m.params.map((p) => p.name)])).toEqual([
-      ["[initialize]", ["this", "args", "options", "config"]],
-    ]);
-    expect(info.modules["shell.ts:Other"]).toBeUndefined();
   });
 
   it("does not record a SCREAMING_SNAKE method-table constant as a module", () => {

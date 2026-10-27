@@ -16,7 +16,6 @@ import {
   concernHookNames,
   concernHookKey,
   inlinedModuleMembers,
-  moduleInitializeFiles,
 } from "./extra-surface.js";
 import type { TaggedEntry, TaggedSummary } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
@@ -5003,30 +5002,6 @@ describe("buildReport — members Ruby supplies without a def in the mapped file
         Other: tsClass("type/other.ts", ["serializeCastValue"]),
       }),
     ).toEqual({ "type/other.ts": ["serializeCastValue"] });
-  });
-
-  it("finds the files in which a module defines initialize", () => {
-    expect([...moduleInitializeFiles(ruby.packages.activemodel)]).toEqual([
-      "type/serialize_cast_value.rb",
-    ]);
-  });
-
-  it("does not report a host constructor as inlined once the module twin carries [initialize]", () => {
-    const { classes, modules } = ruby.packages.activemodel;
-    const byShort = new Map([["SerializeCastValue", ["ActiveModel::Type::SerializeCastValue"]]]);
-    const inlined = (twin: string[]) =>
-      inlinedModuleMembers(
-        "activemodel",
-        classes,
-        modules,
-        byShort,
-        new Map([
-          ["type/value.ts", new Set(["constructor"])],
-          ["type/serialize-cast-value.ts", new Set(twin)],
-        ]),
-      ).map((f) => f.tsName);
-    expect(inlined([])).toEqual(["constructor"]);
-    expect(inlined(["[initialize]"])).toEqual([]);
   });
 });
 

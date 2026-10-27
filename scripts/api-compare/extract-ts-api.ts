@@ -1643,7 +1643,6 @@ export function extractFromProgram(
             ? hostInfo.file
             : path.relative(srcDir, from.getSourceFile().fileName).replace(/\\/g, "/");
         for (const m of methods) {
-          if (m.name === "[initialize]") continue;
           if (hostInfo.instanceMethods.some((existing) => existing.name === m.name)) continue;
           hostInfo.instanceMethods.push({
             ...m,
@@ -4061,9 +4060,6 @@ function unwrapAssertions(expr: ts.Expression): ts.Expression {
  * - `new Module((mod) => { delegate.call(mod, "m", { to: "target" }) })` — every
  *   literal name `delegate` is handed with the block's own parameter as `self`
  *   (Ruby's `delegate :m, to: :target` in a module body).
- * - `new Module((mod) => { mod[initialize] = function () {} })` — the module's
- *   `def initialize` (`Thor::Shell#initialize`, thor/shell.rb:44-48), recorded
- *   as `[initialize]`, the name a class's `static [initialize]` is recorded by.
  */
 export function harvestModuleInstanceMethods(
   init: ts.Expression,
@@ -4092,25 +4088,6 @@ export function harvestModuleInstanceMethods(
   const visit = (node: ts.Node): void => {
     if (ts.isFunctionLike(node) && node !== block) return;
     ts.forEachChild(node, visit);
-    const hook = moduleInitializeHook(node, mod.text);
-    if (hook !== undefined) {
-      const calls = extractCalls(hook.body);
-      const callSeq = extractCallSeq(hook.body);
-      const callArgs = extractCallArgs(hook.body);
-      const skeleton = extractSkeleton(hook.body);
-      out.push({
-        name: "[initialize]",
-        visibility: "public",
-        params: extractParameters(hook.parameters),
-        line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
-        file,
-        ...(calls !== undefined ? { calls } : {}),
-        ...(callSeq !== undefined ? { callSeq } : {}),
-        ...(callArgs !== undefined ? { callArgs } : {}),
-        ...(skeleton !== undefined ? { skeleton } : {}),
-      });
-      return;
-    }
     if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return;
     const receiver = node.expression.expression;
     if (
@@ -4272,35 +4249,6 @@ function sameFileObjectLiteral(expr: ts.Expression): ts.ObjectLiteralExpression 
   return undefined;
 }
 
-function moduleInitializeHook(node: ts.Node, mod: string): ts.FunctionExpression | undefined {
-  if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
-    return undefined;
-  }
-  if (!ts.isElementAccessExpression(node.left) || !ts.isFunctionExpression(node.right)) {
-    return undefined;
-  }
-  let receiver: ts.Expression = node.left.expression;
-  while (ts.isParenthesizedExpression(receiver) || ts.isAsExpression(receiver)) {
-    receiver = receiver.expression;
-  }
-  if (!ts.isIdentifier(receiver) || receiver.text !== mod) return undefined;
-  const key = node.left.argumentExpression;
-  return ts.isIdentifier(key) && key.text === "initialize" ? node.right : undefined;
-}
-
-/**
- * `{ [initialize]() {} }`: a plain-object module's `def initialize`
- * (`DatabaseStatements#initialize`, abstract/database_statements.rb:6-9),
- * recorded as `[initialize]` like a class's `static [initialize]`.
- */
-function isInitializeHookName(name: ts.PropertyName): name is ts.ComputedPropertyName {
-  return (
-    ts.isComputedPropertyName(name) &&
-    ts.isIdentifier(name.expression) &&
-    name.expression.text === "initialize"
-  );
-}
-
 export function harvestObjectLiteralMethods(
   obj: ts.ObjectLiteralExpression,
   checker: ts.TypeChecker,
@@ -4343,11 +4291,9 @@ export function harvestObjectLiteralMethods(
     if (
       ts.isMethodDeclaration(prop) &&
       prop.name &&
-      (ts.isIdentifier(prop.name) ||
-        ts.isStringLiteral(prop.name) ||
-        isInitializeHookName(prop.name))
+      (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name))
     ) {
-      mname = ts.isComputedPropertyName(prop.name) ? "[initialize]" : prop.name.text;
+      mname = prop.name.text;
       params = extractParameters(prop.parameters);
       optionKeys = extractOptionKeys(prop.parameters, checker);
       optionReads = extractOptionReads(prop.parameters, prop.body);

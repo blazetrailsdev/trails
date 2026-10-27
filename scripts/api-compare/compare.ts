@@ -3622,44 +3622,8 @@ export function mixinMethodCreditedToOwnFile(
   const tsFile = rubyFileToTs(mixinFile, pkg);
   const mixinTsMethods = tsMethodsByFile.get(tsFile);
   if (mixinTsMethods === undefined) return null;
-  const tsName =
-    rm.rubyName === "initialize" && mixinTsMethods.has(MODULE_INITIALIZE_HOOK)
-      ? MODULE_INITIALIZE_HOOK
-      : candidates.find((c) => mixinTsMethods.has(c));
+  const tsName = candidates.find((c) => mixinTsMethods.has(c));
   return tsName === undefined ? null : { tsName, tsFile };
-}
-
-/**
- * Is an includer's `constructor` only the chain seat for an included module's
- * `initialize`?
- *
- * `Thor::Group` defines no `initialize`; it inherits `Thor::Base#initialize`
- * (`thor/base.rb:53`) through `include Thor::Base` (`thor/group.rb:270`). A JS
- * class still needs a constructor to run the module's `[initialize]` hook, and
- * that constructor is `initializeIncludedModules(this, ...args)`: Ruby's
- * implicit `super` into the module. It makes none of the module body's calls,
- * so it is an `include` seam exactly as a one-line forwarder is, and the
- * module's own bucket is where the body is compared.
- *
- * Narrow by construction: the method must arrive from a mixin defined in
- * another Ruby file, and every constructor of that name in the TS file must
- * call `initializeIncludedModules` and nothing else. A constructor that makes
- * any other call is still held to the module body's call set.
- */
-export function includerConstructorIsInitializeSeat(
-  rm: { rubyName: string; mixinFile?: string },
-  hostRubyFile: string,
-  tsName: string,
-  tsCallSets: readonly (readonly string[])[] | undefined,
-): boolean {
-  if (rm.rubyName !== "initialize" || tsName !== "constructor") return false;
-  if (rm.mixinFile === undefined || rm.mixinFile === hostRubyFile) return false;
-  if (tsCallSets === undefined || tsCallSets.length === 0) return false;
-  return tsCallSets.every(
-    (calls) =>
-      calls.length > 0 &&
-      calls.every((call) => call.replace(/^@invoked:/, "") === "initializeIncludedModules"),
-  );
 }
 
 /**
@@ -3825,28 +3789,10 @@ export function crossFileCredit(
 }
 
 /**
- * The extractor's name for `static [initialize]`: a computed member is recorded
- * by its source text. `CONCERN_HOOK_MEMBERS.initialize` in extra-surface.ts is
- * the same spelling.
- */
-export const MODULE_INITIALIZE_HOOK = "[initialize]";
-
-/**
- * The TS candidates for a Ruby method, with a MODULE's `def initialize` offered
- * its hook first.
+ * The TS candidates for a Ruby method, with a MODULE's `new` offered its own
+ * member first.
  *
- * A module has no constructor to be. `SerializeCastValue#initialize`
- * (`type/serialize_cast_value.rb:41`) is ported as the symbol-keyed
- * `static [initialize]` that `initializeIncludedModules` runs where the
- * includer's `initialize` calls `super`. Offered only `constructor`, the
- * expectation is answered by the includer's own constructor
- * (`ValueType`, type/value.ts) and reported as a method to relocate.
- *
- * The hook is offered only when the expected file declares one, so a module
- * whose `initialize` is unported still falls through to the arms that report
- * it.
- *
- * A module's `new` is the same: `Deduplicable::ClassMethods#new`
+ * `Deduplicable::ClassMethods#new`
  * (`connection_adapters/deduplicable.rb:13-15`) wraps the includer's
  * constructor through `super` and is ported as a `new` member, so it is
  * offered `new` ahead of the includer's `constructor` (`Column`, column.ts).
@@ -3858,9 +3804,7 @@ export function moduleInitializeCandidates(
   candidates: string[],
 ): string[] {
   if (rubyName === "new" && ownerIsModule && tsMethods.has("new")) return ["new", ...candidates];
-  if (rubyName !== "initialize" || !ownerIsModule) return candidates;
-  if (!tsMethods.has(MODULE_INITIALIZE_HOOK)) return candidates;
-  return [MODULE_INITIALIZE_HOOK, ...candidates];
+  return candidates;
 }
 
 /** A Ruby class or module, paired with the fully-qualified name it was found under. */
@@ -6444,13 +6388,7 @@ export function main() {
               pkg,
               (f) => byFile.has(f),
               tsMethodsByFile,
-            ) !== null ||
-            includerConstructorIsInitializeSeat(
-              { rubyName, mixinFile },
-              rubyFile,
-              directMatch,
-              tsCallsByFileName.get(expectedTs)?.get(directMatch),
-            );
+            ) !== null;
           checkArity(
             rubyName,
             directMatch,

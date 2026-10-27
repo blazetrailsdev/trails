@@ -16,7 +16,6 @@ import {
   flattenIncludedMethodInfos,
   bodyInDefiningFile,
   crossFileCredit,
-  includerConstructorIsInitializeSeat,
   mixinMethodCreditedToOwnFile,
   moduleInitializeCandidates,
   reopeningMethodCreditedToOwnFile,
@@ -3572,75 +3571,6 @@ describe("splitOverriddenFileBuckets", () => {
   });
 });
 
-describe("includerConstructorIsInitializeSeat", () => {
-  const seat = [["@invoked:initializeIncludedModules", "initializeIncludedModules"]];
-
-  it("recognizes a constructor that only runs the included module's initialize", () => {
-    expect(
-      includerConstructorIsInitializeSeat(
-        { rubyName: "initialize", mixinFile: "base.rb" },
-        "group.rb",
-        "constructor",
-        seat,
-      ),
-    ).toBe(true);
-  });
-
-  it("holds a constructor that inlines the module's body to its call set", () => {
-    expect(
-      includerConstructorIsInitializeSeat(
-        { rubyName: "initialize", mixinFile: "base.rb" },
-        "group.rb",
-        "constructor",
-        [...seat, ["classOptions", "merge"]],
-      ),
-    ).toBe(false);
-    expect(
-      includerConstructorIsInitializeSeat(
-        { rubyName: "initialize", mixinFile: "base.rb" },
-        "group.rb",
-        "constructor",
-        [["initializeIncludedModules", "classOptions", "merge"]],
-      ),
-    ).toBe(false);
-    expect(
-      includerConstructorIsInitializeSeat(
-        { rubyName: "initialize", mixinFile: "base.rb" },
-        "group.rb",
-        "constructor",
-        undefined,
-      ),
-    ).toBe(false);
-  });
-
-  it("leaves the class's own initialize, and any other method, alone", () => {
-    expect(
-      includerConstructorIsInitializeSeat(
-        { rubyName: "initialize" },
-        "group.rb",
-        "constructor",
-        seat,
-      ),
-    ).toBe(false);
-    expect(
-      includerConstructorIsInitializeSeat(
-        { rubyName: "initialize", mixinFile: "group.rb" },
-        "group.rb",
-        "constructor",
-        seat,
-      ),
-    ).toBe(false);
-    expect(
-      includerConstructorIsInitializeSeat(
-        { rubyName: "help", mixinFile: "base.rb" },
-        "group.rb",
-        "help",
-        seat,
-      ),
-    ).toBe(false);
-  });
-});
-
 describe("mixinMethodCreditedToOwnFile", () => {
   const encryptableTs = new Set(["encryptedAttributes", "encrypts", "schemeFor"]);
   const tsMethodsByFile = new Map([["encryption/encryptable-record.ts", encryptableTs]]);
@@ -3684,18 +3614,6 @@ describe("mixinMethodCreditedToOwnFile", () => {
       tsName: "quotedDate",
       tsFile: "connection-adapters/postgresql/quoting.ts",
     });
-  });
-
-  it("credits an includer's inherited initialize to the mixin file's [initialize] hook", () => {
-    expect(
-      mixinMethodCreditedToOwnFile(
-        { rubyName: "initialize", rubyModule: "Host", mixinFile: "metal/url_for.rb" },
-        "api.rb",
-        "actioncontroller",
-        (f) => f === "metal/url_for.rb",
-        new Map([["metal/url-for.ts", new Set(["[initialize]", "urlOptions"])]]),
-      ),
-    ).toEqual({ tsName: "[initialize]", tsFile: "metal/url-for.ts" });
   });
 
   it("leaves an includer's own initialize to its constructor", () => {
@@ -4026,25 +3944,6 @@ describe("crossFileCredit", () => {
 
 describe("moduleInitializeCandidates", () => {
   const withHook = new Set(["[initialize]", "itselfIfSerializeCastValueCompatible"]);
-
-  it("offers a module's initialize its [initialize] hook first", () => {
-    expect(moduleInitializeCandidates("initialize", true, withHook, ["constructor"])).toEqual([
-      "[initialize]",
-      "constructor",
-    ]);
-  });
-
-  it("leaves a class's initialize as the constructor", () => {
-    expect(moduleInitializeCandidates("initialize", false, withHook, ["constructor"])).toEqual([
-      "constructor",
-    ]);
-  });
-
-  it("leaves a module without the hook to report through its other arms", () => {
-    expect(moduleInitializeCandidates("initialize", true, new Set(), ["constructor"])).toEqual([
-      "constructor",
-    ]);
-  });
 
   it("offers a module's new its own new member first", () => {
     const withNew = new Set(["new", "registry"]);
