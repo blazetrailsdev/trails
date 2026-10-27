@@ -5,10 +5,10 @@ import {
   mysqlAdvisoryLockName,
   newRunToken,
   ownRunDatabases,
+  runDatabasePrefix,
   pgAdvisoryLockKey,
   runTokenOfDatabase,
   runTokenStartedAt,
-  slotDatabaseName,
   staleRunDatabases,
 } from "./run-token.js";
 
@@ -31,14 +31,16 @@ describe("run token", () => {
 
 describe("slot database names", () => {
   it("stamps the run token into every slot, slot 1 included", () => {
-    expect(slotDatabaseName(BASE, "rabc000001", 1)).toBe("activerecord_unittest_rabc000001_1");
-    expect(slotDatabaseName(BASE, "rabc000001", 4)).toBe("activerecord_unittest_rabc000001_4");
+    expect(`${runDatabasePrefix(BASE, "rabc000001")}1`).toBe("activerecord_unittest_rabc000001_1");
+    expect(`${runDatabasePrefix(BASE, "rabc000001")}4`).toBe("activerecord_unittest_rabc000001_4");
   });
 
   it("two runs never name the same slot database", () => {
     const [a, b] = [newRunToken(), newRunToken()];
     for (let slot = 1; slot <= 8; slot++) {
-      expect(slotDatabaseName(BASE, a, slot)).not.toBe(slotDatabaseName(BASE, b, slot));
+      expect(`${runDatabasePrefix(BASE, a)}${slot}`).not.toBe(
+        `${runDatabasePrefix(BASE, b)}${slot}`,
+      );
     }
   });
 
@@ -60,11 +62,11 @@ describe("drop targets", () => {
     const names = [
       BASE,
       "activerecord_unittest_2",
-      slotDatabaseName(BASE, mine, 1),
-      slotDatabaseName(BASE, mine, 2),
-      arunitDatabaseNames(slotDatabaseName(BASE, mine, 2)).arunit2,
-      slotDatabaseName(BASE, theirs, 1),
-      slotDatabaseName(BASE, theirs, 2),
+      `${runDatabasePrefix(BASE, mine)}1`,
+      `${runDatabasePrefix(BASE, mine)}2`,
+      arunitDatabaseNames(`${runDatabasePrefix(BASE, mine)}2`).arunit2,
+      `${runDatabasePrefix(BASE, theirs)}1`,
+      `${runDatabasePrefix(BASE, theirs)}2`,
       "postgres",
       "template1",
     ];
@@ -80,7 +82,7 @@ describe("drop targets", () => {
     const mine = newRunToken();
     const theirs = newRunToken();
     for (let slot = 1; slot <= 40; slot++) {
-      const sibling = arunitDatabaseNames(slotDatabaseName(BASE, mine, slot)).arunit2;
+      const sibling = arunitDatabaseNames(`${runDatabasePrefix(BASE, mine)}${slot}`).arunit2;
       expect(runTokenOfDatabase(BASE, sibling)).toBe(mine);
       expect(ownRunDatabases(BASE, mine, [sibling])).toEqual([sibling]);
       expect(ownRunDatabases(BASE, theirs, [sibling])).toEqual([]);
@@ -91,7 +93,7 @@ describe("drop targets", () => {
   it("reads back exactly the token that minted the name", () => {
     for (const token of [newRunToken(), `${newRunToken()}2`, "r2222222222"]) {
       for (let slot = 1; slot <= 40; slot++) {
-        const slotDb = slotDatabaseName(BASE, token, slot);
+        const slotDb = `${runDatabasePrefix(BASE, token)}${slot}`;
         for (const name of [slotDb, arunitDatabaseNames(slotDb).arunit2]) {
           expect(runTokenOfDatabase(BASE, name)).toBe(token);
         }
@@ -105,13 +107,13 @@ describe("stale sweep", () => {
   const tokenAt = (millis: number): string => `r${millis.toString(36)}zzzzzz`;
 
   it("reclaims databases orphaned by a killed run", () => {
-    const orphan = slotDatabaseName(BASE, tokenAt(now - STALE_DB_AGE_MS - 1), 3);
+    const orphan = `${runDatabasePrefix(BASE, tokenAt(now - STALE_DB_AGE_MS - 1))}3`;
     expect(staleRunDatabases(BASE, "raaa000001", [orphan], now)).toEqual([orphan]);
   });
 
   it("leaves a concurrent run's live databases alone", () => {
-    const live = slotDatabaseName(BASE, tokenAt(now - 60_000), 3);
-    const mine = slotDatabaseName(BASE, "raaa000001", 1);
+    const live = `${runDatabasePrefix(BASE, tokenAt(now - 60_000))}3`;
+    const mine = `${runDatabasePrefix(BASE, "raaa000001")}1`;
     expect(staleRunDatabases(BASE, "raaa000001", [live, mine, BASE], now)).toEqual([]);
   });
 });

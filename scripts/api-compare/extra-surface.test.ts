@@ -2133,9 +2133,7 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
 
   it("drops host-interface members that inheritance.ts does not declare", () => {
     const info = extract(FILES);
-    const mixin = info.modules["inheritance.ts:stiClassFor__mixin"];
-    expect(mixin?.synthesizedMixin).toBe(true);
-    expect(mixin.instanceMethods.find((m) => m.name === "toSlug")?.declaredIn).toBe("base.ts");
+    expect(info.modules["inheritance.ts:stiClassFor__mixin"]).toBeUndefined();
 
     const names = collectTsFileNames(
       "inheritance.ts",
@@ -2170,10 +2168,6 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
 
   it("drops the synthetic constructor entry of a class base.ts declares", () => {
     const info = extract(FILES);
-    const ctor = info.modules["inheritance.ts:stiClassFor__mixin"].instanceMethods.find(
-      (m) => m.name === "constructor",
-    );
-    expect(ctor?.declaredIn).toBe("base.ts");
 
     const names = collectTsFileNames(
       "inheritance.ts",

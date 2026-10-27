@@ -1233,7 +1233,7 @@ export function countTsInternalNames(
     isInternal(m) && !(m.bodyless === true && functionNames.has(m.name));
   let count = internalConstants.filter((n) => !n.startsWith("_")).length;
   for (const c of [...classes, ...modules]) {
-    if (c.file !== file) continue;
+    if (c.file !== file || c.synthesizedFileModule === true) continue;
     count += [...c.instanceMethods, ...c.classMethods].filter(isOwnMember).length;
   }
   return count + (fileFunctions ?? []).filter(isInternal).length;

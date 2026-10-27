@@ -8092,6 +8092,25 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(seats("isConfig")).toEqual([]);
   });
 
+  it("credits mattrAccessor on the file module when a function only returns another file's class", () => {
+    const info = extractFromFiles("/p", {
+      "document.ts": `export class Document { css(): void {} }`,
+      "testing.ts": `
+        import { mattrAccessor } from "@blazetrails/activesupport";
+        import { Document } from "./document.js";
+        export const Testing = {} as { defaultHtmlVersion: string };
+        mattrAccessor.call(Testing, "defaultHtmlVersion", { default: ":html5" });
+        export function htmlDocument(): typeof Document {
+          return Document;
+        }
+      `,
+    });
+    expect(info.modules["testing.ts:htmlDocument__mixin"]).toBeUndefined();
+    const mod = info.modules["testing.ts:Testing"];
+    expect(mod.synthesizedFileModule).toBe(true);
+    expect(mod.classMethods.some((m) => m.name === "defaultHtmlVersion")).toBe(true);
+  });
+
   it("credits attrInternal on a moduleEval carrier as the module's instance reader and writer", () => {
     const info = extractFromFiles("/p", {
       "form-helper.ts": `

@@ -26,10 +26,6 @@ export function runDatabasePrefix(base: string, runToken: string): string {
   return `${base}_${runToken}_`;
 }
 
-export function slotDatabaseName(base: string, runToken: string, slot: number): string {
-  return `${runDatabasePrefix(base, runToken)}${slot}`;
-}
-
 export function splitRunDatabaseName(name: string): { base: string; suffix: string } {
   const suffix = new RegExp(`(_${TOKEN_PATTERN})?(_\\d+)?$`).exec(name)?.[0] ?? "";
   return { base: suffix === "" ? name : name.slice(0, -suffix.length), suffix };

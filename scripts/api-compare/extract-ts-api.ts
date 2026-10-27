@@ -1091,6 +1091,17 @@ export function extractFromProgram(
       if (constructSigs.length === 0) return;
 
       const instanceType = constructSigs[0].getReturnType();
+      // A function that returns a class another file defines and defines none itself
+      // (rails-dom-testing's `htmlDocument` answers `HTML5.Document`) is a module
+      // function, not a mixin.
+      const returnedClass = instanceType.getSymbol()?.declarations?.[0];
+      if (
+        returnedClass !== undefined &&
+        returnedClass.getSourceFile() !== sourceFile &&
+        !definesClass(node)
+      ) {
+        return;
+      }
       const mixinKey = `${relPath}:${node.name.text}__mixin`;
       const mixinMethods: MethodInfo[] = [];
 
@@ -3361,6 +3372,14 @@ function isInternalCallableRef(expr: ts.Expression, checker: ts.TypeChecker): bo
  * `extractClass` so member shape (arity, visibility, calls, JSDoc tags) matches
  * every other class in the manifest.
  */
+function definesClass(node: ts.Node): boolean {
+  return (
+    ts.isClassDeclaration(node) ||
+    ts.isClassExpression(node) ||
+    ts.forEachChild(node, definesClass) === true
+  );
+}
+
 export function factoryClassMembers(
   fn: ts.FunctionDeclaration,
   checker: ts.TypeChecker,
