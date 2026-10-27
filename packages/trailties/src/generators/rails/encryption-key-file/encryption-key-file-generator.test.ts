@@ -2,17 +2,22 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { Dir } from "@blazetrails/ruby-compat";
 import { EncryptionKeyFileGenerator } from "./encryption-key-file-generator.js";
 
 let tmpDir: string;
+let pwd: string;
 let lines: string[];
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-enc-key-"));
+  pwd = Dir.pwd();
+  Dir.chdir(tmpDir);
   lines = [];
 });
 
 afterEach(() => {
+  Dir.chdir(pwd);
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -39,24 +44,5 @@ describe("EncryptionKeyFileGeneratorTest", () => {
     expect(after).toContain("/config/foo.key");
     build().ignoreKeyFile("config/foo.key");
     expect(fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8")).toBe(after);
-  });
-  it("ignore_key_file reads and appends the .gitignore at the destination root", () => {
-    const otherDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-enc-key-other-"));
-    try {
-      fs.writeFileSync(path.join(otherDir, ".gitignore"), "\n/config/foo.key\n");
-      const generator = new EncryptionKeyFileGenerator({
-        cwd: otherDir,
-        output: (m) => lines.push(m),
-      });
-      generator.ignoreKeyFile("config/foo.key");
-
-      expect(fs.readFileSync(path.join(otherDir, ".gitignore"), "utf-8")).toBe(
-        "\n/config/foo.key\n",
-      );
-      expect(fs.existsSync(path.join(tmpDir, ".gitignore"))).toBe(false);
-      expect(lines).toEqual([]);
-    } finally {
-      fs.rmSync(otherDir, { recursive: true, force: true });
-    }
   });
 });

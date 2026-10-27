@@ -36,6 +36,11 @@ export class Pathname {
     return this.path;
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:873` `path_exist_p` */
+  isExist(): boolean {
+    return File.isExist(this.path);
+  }
+
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:647` `path_open` */
   open(...args: unknown[]): unknown {
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as (file: File) => unknown) : undefined;

@@ -13,6 +13,7 @@ import {
   NoMethodError,
   rbObjRespondTo,
   FileUtils,
+  Pathname,
   getFs,
   include,
   hashDelete,
@@ -820,7 +821,12 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     return this.isTypeScript() ? ".ts" : ".js";
   }
 
-  protected createFile(relativePath: string, content: string, options?: { mode?: number }): string {
+  protected createFile(
+    destination: string | Pathname,
+    content: string,
+    options?: { mode?: number },
+  ): string {
+    const relativePath = destination.toString();
     const fullPath = File.join(this.cwd, relativePath);
     if (this.behavior === "revoke") {
       this.output(`      remove  ${relativePath}`);
