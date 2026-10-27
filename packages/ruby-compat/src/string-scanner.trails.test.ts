@@ -67,4 +67,15 @@ describe("StringScanner", () => {
     expect(s.scanUntil(/z/)).toBeNull();
     expect(s.matchedSize()).toBeNull();
   });
+
+  it("getch reads one character and unscan steps back over it", () => {
+    const s = new StringScanner("a😀b");
+    expect(s.getch()).toBe("a");
+    expect(s.getch()).toBe("😀");
+    s.unscan();
+    expect(s.getch()).toBe("😀");
+    expect(s.getch()).toBe("b");
+    expect(s.getch()).toBeNull();
+    expect(() => s.unscan()).toThrow(StringScanner.Error);
+  });
 });

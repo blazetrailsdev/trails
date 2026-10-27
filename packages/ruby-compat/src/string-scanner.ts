@@ -1,3 +1,5 @@
+import { StandardError } from "./standard-error.js";
+
 const HEADONLY = new WeakMap<RegExp, RegExp>();
 const SEARCH = new WeakMap<RegExp, RegExp>();
 const REGS = new WeakMap<StringScanner, RegExpExecArray | null>();
@@ -10,6 +12,14 @@ const REGS = new WeakMap<StringScanner, RegExpExecArray | null>();
 export class StringScanner {
   #str: string;
   #curr = 0;
+  #prev = 0;
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1668` `StringScanner::Error`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static Error = class Error extends StandardError {};
 
   /**
    * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:233` `strscan_initialize`.
@@ -79,6 +89,7 @@ export class StringScanner {
     const m = re.exec(this.#str.slice(this.#curr));
     REGS.set(this, m);
     if (m === null) return null;
+    this.#prev = this.#curr;
     this.#curr += m[0].length;
     return m[0];
   }
@@ -102,9 +113,41 @@ export class StringScanner {
     const m = re.exec(rest);
     REGS.set(this, m);
     if (m === null) return null;
-    const prev = this.#curr;
+    this.#prev = this.#curr;
     this.#curr += m.index + m[0].length;
-    return this.#str.slice(prev, this.#curr);
+    return this.#str.slice(this.#prev, this.#curr);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:884` `strscan_getch`: one
+   * character, so a surrogate pair is read whole.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  getch(): string | null {
+    REGS.set(this, null);
+    if (this.isEos()) return null;
+    const cp = this.#str.codePointAt(this.#curr)!;
+    const len = cp > 0xffff ? 2 : 1;
+    this.#prev = this.#curr;
+    this.#curr += len;
+    const ch = this.#str.slice(this.#prev, this.#curr);
+    REGS.set(this, Object.assign([ch], { index: this.#prev, input: this.#str }) as RegExpExecArray);
+    return ch;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1000` `strscan_unscan`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  unscan(): this {
+    if ((REGS.get(this) ?? null) === null) {
+      throw new StringScanner.Error("unscan failed: previous match record not exist");
+    }
+    this.#curr = this.#prev;
+    REGS.set(this, null);
+    return this;
   }
 
   /**
