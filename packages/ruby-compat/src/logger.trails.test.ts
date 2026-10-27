@@ -27,6 +27,16 @@ describe("Logger", () => {
   });
 });
 
+describe("Logger::Formatter", () => {
+  it("formats an exception's message once, then its backtrace", () => {
+    const formatter = new Logger.Formatter() as unknown as { msg2str(msg: unknown): string };
+    const error = new Error("boom");
+    const lines = formatter.msg2str(error).split("\n");
+    expect(lines[0]).toBe("boom (Error)");
+    expect(lines.filter((line) => line.includes("boom"))).toHaveLength(1);
+  });
+});
+
 describe("Benchmark.realtime", () => {
   it("answers elapsed seconds", () => {
     expect(Benchmark.realtime(() => 1)).toBeGreaterThanOrEqual(0);

@@ -1,4 +1,10 @@
-import { Logger as RubyLogger, rbInspect, stdout } from "@blazetrails/ruby-compat";
+import {
+  Logger as RubyLogger,
+  rbInspect,
+  stdout,
+  type Logdev,
+  type LoggerKwargs,
+} from "@blazetrails/ruby-compat";
 import { File } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import { include } from "@blazetrails/ruby-compat/include";
@@ -62,8 +68,13 @@ export class Logger extends RubyLogger {
     );
   }
 
-  constructor(...args: ConstructorParameters<typeof RubyLogger> | []) {
-    super(...(args.length === 0 ? [defaultOutput] : args));
+  constructor(
+    logdev: Logdev = defaultOutput,
+    shiftAge?: number | string | LoggerKwargs,
+    shiftSize?: number,
+    kwargs?: LoggerKwargs,
+  ) {
+    super(logdev, shiftAge, shiftSize, kwargs);
     this.formatter ??= new SimpleFormatter();
   }
 

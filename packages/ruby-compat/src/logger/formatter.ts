@@ -1,5 +1,6 @@
 import { sprintf } from "../kernel-format.js";
 import { TEMPORAL_METHOD_TABLE, rbInspect } from "../object.js";
+import { excBacktrace } from "../backtrace-location.js";
 import { Process } from "../process.js";
 
 /**
@@ -44,7 +45,8 @@ export class Formatter {
     if (typeof msg === "string") {
       return msg;
     } else if (msg instanceof Error) {
-      return `${msg.message} (${msg.constructor.name})\n${msg.stack ?? ""}`;
+      const backtrace = excBacktrace(msg);
+      return `${msg.message} (${msg.constructor.name})\n${backtrace != null ? backtrace.join("\n") : ""}`;
     } else {
       return rbInspect(msg);
     }

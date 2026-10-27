@@ -56,9 +56,13 @@ export class LogDevice {
    */
   write(message: string): void {
     try {
-      this.dev!.write(message);
-    } catch (error) {
-      warn(`log writing failed. ${(error as Error).message}`);
+      try {
+        this.dev!.write(message);
+      } catch (error) {
+        warn(`log writing failed. ${(error as Error).message}`);
+      }
+    } catch (ignored) {
+      warn(`log writing failed. ${(ignored as Error).message}`);
     }
   }
 
