@@ -1,14 +1,9 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { Column as BaseColumn } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
+import { ConnectionAdapters } from "../../namespaces.js";
 
 export class Column extends BaseColumn {
-  /** @noRailsEquivalent CONVERGEABLE deduplicable-new-runs-after-the-most-derived-constructor */
-  constructor(...args: ConstructorParameters<typeof BaseColumn>) {
-    super(...args);
-    if (new.target === Column) return this.deduplicate();
-  }
-
   get extra(): string | null {
     return (this.sqlTypeMetadata as TypeMetadata | null)?.extra ?? null;
   }
@@ -35,3 +30,4 @@ export class Column extends BaseColumn {
 }
 
 registerConstant("ActiveRecord::ConnectionAdapters::MySQL::Column", Column);
+ConnectionAdapters.MySQL.Column = Column;

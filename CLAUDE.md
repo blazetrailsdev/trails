@@ -1384,6 +1384,18 @@ ratified here so no port re-derives them.
   `setRawMode`, and `stty` reports libc- and locale-dependent text, never the
   number. ruby-compat raises a bare `SystemCallError` where Ruby raises the
   specific `Errno` class. A native termios binding is not taken on.
+- **A `ClassMethods#new` that runs after `super` (`Deduplicable`).**
+  `Deduplicable::ClassMethods#new` is `super.deduplicate`
+  (`activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15`),
+  so it runs once, after the most-derived class's whole `initialize` chain.
+  JS has no hook that runs after the most-derived constructor returns, and a
+  static `Klass.new` is ruled out (§ "A record is built with `new Klass`
+  only"). So each includer's or subclass's constructor ends with
+  `if (new.target === X) return this.deduplicate();`, and a subclass with no
+  Rails `initialize` (`MySQL::Column`) is named in its parent's guard rather
+  than given a constructor. Each guard carries `@inventedArm if — PERMANENT`
+  where the arm gate compares the declaration.
+  Ruled by the repo owner on 2026-10-27.
 - **A `self.new` that answers `nil` or `false`.** A JS constructor that returns
   a primitive answers `this` instead, so a Rails `self.new` ported as the
   constructor (RFC 0188) cannot answer `nil`: `DeprecationProxy`'s

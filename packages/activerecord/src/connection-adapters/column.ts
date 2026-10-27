@@ -1,6 +1,7 @@
 import { Deduplicable } from "./deduplicable.js";
 import type { ClassMethods } from "./deduplicable.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
+import { ConnectionAdapters } from "../namespaces.js";
 import { humanize } from "@blazetrails/activesupport";
 import {
   Encoding,
@@ -64,7 +65,8 @@ export class Column {
     this.defaultFunction = defaultFunction;
     this.collation = options.collation ?? null;
     this.comment = options.comment ?? null;
-    if (new.target === Column) return this.deduplicate();
+    if (new.target === Column || new.target === ConnectionAdapters.MySQL.Column)
+      return this.deduplicate();
   }
 
   get hasDefault(): boolean {
