@@ -14,7 +14,7 @@ import {
 import {
   DelegateClass,
   Dir,
-  Module,
+  rbCallSuper,
   type Generic,
   hashAref,
   hashAset,
@@ -90,17 +90,17 @@ SharedTestRoutes.draw(function () {
   });
 });
 
-export const SharedRoutes = new Module();
-
-SharedRoutes.defineMethod("beforeSetup", function (this: { routes?: RouteSet }): unknown {
+function beforeSetup(this: { routes?: RouteSet }): unknown {
   this.routes = new RouteSet();
   deprecator().silence(() => {
     this.routes!.draw(function () {
       this.get(":controller(/:action)");
     });
   });
-  return SharedRoutes.superMethod(this, "beforeSetup")!();
-});
+  return rbCallSuper(this, beforeSetup);
+}
+
+export const SharedRoutes = { beforeSetup };
 
 Object.assign(ActionDispatch, { SharedRoutes });
 

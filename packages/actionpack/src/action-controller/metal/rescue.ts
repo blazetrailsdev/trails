@@ -1,21 +1,16 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { Concern, Module, Rescuable, extend, include } from "@blazetrails/activesupport";
-import { rtest } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
+import { Concern, Rescuable, extend, include } from "@blazetrails/activesupport";
+
+export const Rescue = { isShowDetailedExceptions, processAction };
+extend(Rescue, Concern);
+include(Rescue, Rescuable);
 
 interface RescueHost {
   request: { env: Record<string, unknown> };
   isShowDetailedExceptions(): boolean;
   rescueWithHandler(exception: unknown): unknown;
 }
-
-export const Rescue: Module = new Module((mod) => {
-  extend(mod, Concern);
-  include(mod, Rescuable);
-
-  mod.defineMethod("isShowDetailedExceptions", isShowDetailedExceptions);
-  mod.defineMethod("processAction", processAction);
-});
 
 export function isShowDetailedExceptions(): boolean {
   return false;
@@ -24,7 +19,7 @@ export function isShowDetailedExceptions(): boolean {
 /** @internal */
 export async function processAction(this: RescueHost, ...args: unknown[]): Promise<unknown> {
   try {
-    return await Rescue.superMethod(this, "processAction")!(...args);
+    return await rbCallSuper(this, processAction, ...args);
   } catch (exception) {
     this.request.env["action_dispatch.show_detailed_exceptions"] ||=
       this.isShowDetailedExceptions();

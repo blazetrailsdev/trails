@@ -1,11 +1,10 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   Concern,
   extend,
   include,
-  Module,
   type InheritableOptions,
 } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
@@ -49,7 +48,7 @@ export function modulesForHelpers(
   if (aryDelete(args, ":all") != null) {
     args = [...args, ...this.allApplicationHelpers()];
   }
-  return ClassMethods.superMethod(this, "modulesForHelpers")!(args) as HelperMethodsModule[];
+  return rbCallSuper(this, modulesForHelpers, args) as HelperMethodsModule[];
 }
 
 /** @internal */
@@ -57,10 +56,10 @@ function allApplicationHelpers(this: HelpersClassHost): string[] {
   return this.allHelpersFromPath(this.helpersPath);
 }
 
-export const ClassMethods: Module = new Module((mod) => {
-  mod.defineMethod("helperAttr", helperAttr);
+export const ClassMethods = {
+  helperAttr,
 
-  mod.defineMethod("helpers", function (this: HelpersClass): ActionViewBase {
+  helpers(this: HelpersClass): ActionViewBase {
     return ((rbObjIvarGet(this, "@helper_proxy") as ActionViewBase | null) ||
       rbObjIvarSet(
         this,
@@ -71,11 +70,11 @@ export const ClassMethods: Module = new Module((mod) => {
           return extend(proxy, this._helpers);
         })(),
       )) as ActionViewBase;
-  });
+  },
 
-  mod.defineMethod("modulesForHelpers", modulesForHelpers);
-  mod.defineMethod("allApplicationHelpers", allApplicationHelpers);
-});
+  modulesForHelpers,
+  allApplicationHelpers,
+};
 
 export function helpers(this: {
   _helperProxy?: ActionViewBase | null;
@@ -84,21 +83,15 @@ export function helpers(this: {
   return (this._helperProxy ??= this.viewContext());
 }
 
-export const Helpers = new Module((mod) => {
-  extend(mod, Concern);
-
-  include(mod, AbstractHelpers);
-
-  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
-    null,
-    function (this: object) {
-      classAttribute.call(this, "helpersPath", { default: [] });
-      classAttribute.call(this, "includeAllHelpers", { default: true });
-    },
-  );
-
-  mod.defineMethod("helpers", helpers);
-}) as Module<{ helpers: typeof helpers }> & { ClassMethods: typeof ClassMethods };
-Helpers.ClassMethods = ClassMethods;
+export const Helpers = { ClassMethods, helpers };
+extend(Helpers, Concern);
+include(Helpers, AbstractHelpers);
+(Helpers as unknown as { included(base: null, block: (this: object) => void): void }).included(
+  null,
+  function (this: object) {
+    classAttribute.call(this, "helpersPath", { default: [] });
+    classAttribute.call(this, "includeAllHelpers", { default: true });
+  },
+);
 
 rbModConstSet(ActionController, "Helpers", Helpers);

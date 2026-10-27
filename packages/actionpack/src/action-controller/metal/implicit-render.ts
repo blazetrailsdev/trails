@@ -1,7 +1,11 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { dasherize, underscore } from "@blazetrails/activesupport";
-import { Module, rbInspect as inspect } from "@blazetrails/ruby-compat";
+import {
+  include,
+  rbCallSuper,
+  rbInspect as inspect,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
 
@@ -67,7 +71,7 @@ export function defaultRender(this: ImplicitRenderHost): void | Promise<void> {
     throw new MissingExactTemplate(message, this.constructor, this.actionName);
   }
   this.logger?.info(`No template found for ${name}#${this.actionName}, rendering head :no_content`);
-  return ImplicitRender.superMethod(this, "defaultRender")!() as void | Promise<void>;
+  return rbCallSuper(this, defaultRender) as void | Promise<void>;
 }
 
 /** @internal */
@@ -82,9 +86,7 @@ function variantsFor(variant: unknown): readonly (string | symbol)[] {
  * @internal
  */
 export function methodForAction(this: ImplicitRenderHost, actionName: string): string | undefined {
-  const sup = ImplicitRender.superMethod(this, "methodForAction")!(actionName) as
-    | string
-    | undefined;
+  const sup = rbCallSuper(this, methodForAction, actionName) as string | undefined;
   if (sup) return sup;
   if (this.templateExists?.(dasherize(underscore(String(actionName))), this._prefixes?.()))
     return "defaultRender";
@@ -98,12 +100,7 @@ export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
   return req.isGet?.() === true && req.format?.symbol === ":html" && req.xhr !== true;
 }
 
-export const ImplicitRender = new Module((mod) => {
-  mod.include(BasicImplicitRender);
-
-  mod.moduleEval((m) => {
-    Object.assign(m, { defaultRender, methodForAction, isInteractiveBrowserRequest });
-  });
-});
+export const ImplicitRender = { defaultRender, methodForAction, isInteractiveBrowserRequest };
+include(ImplicitRender, BasicImplicitRender);
 
 rbModConstSet(ActionController, "ImplicitRender", ImplicitRender);

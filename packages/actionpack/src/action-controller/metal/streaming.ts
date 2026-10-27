@@ -1,7 +1,6 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
 import type { Base as ActionViewBase, Renderer, RenderToBodyHost } from "@blazetrails/actionview";
-import { Module } from "@blazetrails/activesupport";
 import type { Response } from "../../action-dispatch/http/response.js";
 
 /** @internal */
@@ -28,12 +27,10 @@ export async function _renderTemplate(
       await this.viewRenderer().renderBody(this.viewContext(), options as never),
     );
   } else {
-    return Streaming.superMethod(this, "_renderTemplate")!(options);
+    return rbCallSuper(this, _renderTemplate, options);
   }
 }
 
-export const Streaming = new Module((mod) => {
-  mod.defineMethod("_renderTemplate", _renderTemplate);
-});
+export const Streaming = { _renderTemplate };
 
 rbModConstSet(ActionController, "Streaming", Streaming);

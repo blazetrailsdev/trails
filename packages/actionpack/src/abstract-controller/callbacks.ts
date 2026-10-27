@@ -1,5 +1,5 @@
 import * as namespaces from "../namespaces.js";
-import { Enumerable, rbModConstSet } from "@blazetrails/ruby-compat";
+import { Enumerable, rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
   mattrAccessor,
@@ -7,7 +7,6 @@ import {
   Concern,
   extend,
   include,
-  Module,
   type Extended,
   type FilterListEntry,
   type Included,
@@ -297,56 +296,50 @@ export const appendBeforeAction = beforeAction;
 export const appendAfterAction = afterAction;
 export const appendAroundAction = aroundAction;
 
-export const ClassMethods: Module = new Module((mod) => {
-  mod.defineMethod("_normalizeCallbackOptions", _normalizeCallbackOptions);
-  mod.defineMethod("_normalizeCallbackOption", _normalizeCallbackOption);
-  mod.defineMethod("_insertCallbacks", _insertCallbacks);
-  mod.defineMethod("beforeAction", beforeAction);
-  mod.defineMethod("prependBeforeAction", prependBeforeAction);
-  mod.defineMethod("skipBeforeAction", skipBeforeAction);
-  mod.defineMethod("appendBeforeAction", appendBeforeAction);
-  mod.defineMethod("afterAction", afterAction);
-  mod.defineMethod("prependAfterAction", prependAfterAction);
-  mod.defineMethod("skipAfterAction", skipAfterAction);
-  mod.defineMethod("appendAfterAction", appendAfterAction);
-  mod.defineMethod("aroundAction", aroundAction);
-  mod.defineMethod("prependAroundAction", prependAroundAction);
-  mod.defineMethod("skipAroundAction", skipAroundAction);
-  mod.defineMethod("appendAroundAction", appendAroundAction);
-});
+export const ClassMethods = {
+  _normalizeCallbackOptions,
+  _normalizeCallbackOption,
+  _insertCallbacks,
+  beforeAction,
+  prependBeforeAction,
+  skipBeforeAction,
+  appendBeforeAction,
+  afterAction,
+  prependAfterAction,
+  skipAfterAction,
+  appendAfterAction,
+  aroundAction,
+  prependAroundAction,
+  skipAroundAction,
+  appendAroundAction,
+};
 
 /** @internal */
 export async function processAction(
   this: Base & Included<typeof ASCallbacks>,
   ...args: unknown[]
 ): Promise<unknown> {
-  return this.runCallbacks("process_action", () =>
-    Callbacks.superMethod(this, "processAction")!(...args),
-  );
+  return this.runCallbacks("process_action", () => rbCallSuper(this, processAction, ...args));
 }
 
 type CallbacksIncludingClass = typeof Base & ActionCallbackHost;
 
-export const Callbacks = new Module((mod) => {
-  extend(mod, Concern);
-
-  include(mod, ASCallbacks);
-
-  (
-    mod as unknown as { included(base: null, block: (this: CallbacksIncludingClass) => void): void }
-  ).included(null, function (this: CallbacksIncludingClass) {
-    this.defineCallbacks("process_action", {
-      terminator: async (controller, resultLambda) => {
-        await resultLambda();
-        return (controller as Base).performed;
-      },
-      skipAfterCallbacksIfTerminated: true,
-    });
-    mattrAccessor.call(this, "raiseOnMissingCallbackActions", { default: false });
+export const Callbacks = { ClassMethods, processAction };
+extend(Callbacks, Concern);
+include(Callbacks, ASCallbacks);
+(
+  Callbacks as unknown as {
+    included(base: null, block: (this: CallbacksIncludingClass) => void): void;
+  }
+).included(null, function (this: CallbacksIncludingClass) {
+  this.defineCallbacks("process_action", {
+    terminator: async (controller, resultLambda) => {
+      await resultLambda();
+      return (controller as Base).performed;
+    },
+    skipAfterCallbacksIfTerminated: true,
   });
-
-  mod.defineMethod("processAction", processAction);
-}) as Module & { ClassMethods: typeof ClassMethods };
-Callbacks.ClassMethods = ClassMethods;
+  mattrAccessor.call(this, "raiseOnMissingCallbackActions", { default: false });
+});
 
 rbModConstSet(namespaces.AbstractController, "Callbacks", Callbacks);
