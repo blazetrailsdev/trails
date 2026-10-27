@@ -6133,6 +6133,20 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toThrow(/truncated by a bare `@internal`/);
   });
 
+  it("accepts a @perf receipt after @noRailsEquivalent", () => {
+    expect(() =>
+      extractFromSource(`
+        class Foo {
+          /**
+           * @noRailsEquivalent PERMANENT
+           * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
+           */
+          clearCache(): void {}
+        }
+      `),
+    ).not.toThrow();
+  });
+
   it("throws when a prose tag name wraps onto the start of a continuation line", () => {
     expect(() =>
       extractFromSource(`

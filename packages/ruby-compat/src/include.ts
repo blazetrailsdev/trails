@@ -899,14 +899,14 @@ function relinkIncluders(mod: Module): void {
  * the old table misses. trails keeps one serial for every class: a cache reads
  * {@link methodCacheSerial} and is stale once it differs.
  *
- * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
  * @noRailsEquivalent PERMANENT
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
  */
 export let methodCacheSerial = 0;
 
 /**
- * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
  * @noRailsEquivalent PERMANENT
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
  */
 export function rbClearMethodCache(): void {
   methodCacheSerial++;
