@@ -237,7 +237,7 @@ describe("Engine", () => {
   });
 
   describe("load_server", () => {
-    it("invokes the registered server blocks and returns self", () => {
+    it("invokes the registered server blocks and returns self", async () => {
       class ServerEngine extends Engine {}
       Engine.register(ServerEngine, fixtureRoot);
       const seen: unknown[] = [];
@@ -245,11 +245,11 @@ describe("Engine", () => {
         seen.push(app);
       });
       const engine = ServerEngine.instance();
-      expect(engine.loadServer()).toBe(engine);
+      expect(await engine.loadServer()).toBe(engine);
       expect(seen).toEqual([engine]);
     });
 
-    it("passes the given app to the server blocks", () => {
+    it("passes the given app to the server blocks", async () => {
       class ServerAppEngine extends Engine {}
       Engine.register(ServerAppEngine, fixtureRoot);
       const seen: unknown[] = [];
@@ -257,7 +257,7 @@ describe("Engine", () => {
         seen.push(app);
       });
       const other = {};
-      ServerAppEngine.instance().loadServer(other);
+      await ServerAppEngine.instance().loadServer(other);
       expect(seen).toEqual([other]);
     });
   });

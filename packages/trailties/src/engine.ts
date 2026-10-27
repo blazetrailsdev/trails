@@ -230,8 +230,8 @@ export class Engine extends Trailtie {
     return this;
   }
 
-  loadServer(app: unknown = this): this {
-    this.runServerBlocks(app);
+  async loadServer(app: unknown = this): Promise<this> {
+    await this.runServerBlocks(app);
     return this;
   }
 

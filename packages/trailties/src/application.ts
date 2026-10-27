@@ -26,7 +26,7 @@ import { Deprecators } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 import { Engine } from "./engine.js";
 import type { MiddlewareStackProxy } from "./configuration.js";
-import { Trailtie } from "./trailtie.js";
+import { Trailtie, type TrailtieBlock } from "./trailtie.js";
 import { Bootstrap } from "./application/bootstrap.js";
 import { DefaultMiddlewareStack } from "./application/default-middleware-stack.js";
 import { Finisher } from "./application/finisher.js";
@@ -120,6 +120,12 @@ export class Application extends Engine {
   }
 
   /** @internal */
+  override async runServerBlocks(app: unknown): Promise<void> {
+    for (const r of this.railties()) await r.runServerBlocks(app);
+    await super.runServerBlocks(app);
+  }
+
+  /** @internal */
   orderedRailties(): Array<Trailtie | Trailtie[] | string> {
     if (!this._orderedRailties) {
       const order: Array<Trailtie | Trailtie[] | string> = this.config.railtiesOrder.map(
@@ -205,6 +211,10 @@ export class Application extends Engine {
     const libTemplates = this.paths().get("lib/templates");
     const existent = libTemplates ? await libTemplates.existent() : [];
     configuredPaths.unshift(...existent.filter((p) => !configuredPaths.includes(p)));
+  }
+
+  server(blk: TrailtieBlock): void {
+    (this.constructor as typeof Application).server(blk);
   }
 
   async requireEnvironmentBang(): Promise<void> {

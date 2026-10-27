@@ -16,7 +16,7 @@ export function generateRailtieName(string: string): string {
 }
 
 export type BlockRunnerKind = "rakeTasks" | "console" | "runner" | "generators" | "server";
-export type TrailtieBlock = (this: Trailtie, app: unknown) => void;
+export type TrailtieBlock = (this: Trailtie, app: unknown) => unknown;
 
 export class Trailtie extends Initializable {
   /** @internal */
@@ -144,8 +144,10 @@ export class Trailtie extends Initializable {
   runTasksBlocks(app: unknown): void {
     eachRegisteredBlock(this, "rakeTasks", (b) => b.call(this, app));
   }
-  runServerBlocks(app: unknown): void {
-    eachRegisteredBlock(this, "server", (b) => b.call(this, app));
+  async runServerBlocks(app: unknown): Promise<void> {
+    const blocks: TrailtieBlock[] = [];
+    eachRegisteredBlock(this, "server", (b) => blocks.push(b));
+    for (const b of blocks) await b.call(this, app);
   }
 }
 
