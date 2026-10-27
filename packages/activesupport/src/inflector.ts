@@ -3,9 +3,9 @@ import { NameError } from "./core-ext/name-error.js";
 import {
   generatedClass,
   isRegisteredConstant,
-  rbModConstSet,
   regexpEscape,
   registeredConstant,
+  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import * as Inflector from "./inflector.js";

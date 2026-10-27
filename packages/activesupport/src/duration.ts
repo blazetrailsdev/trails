@@ -35,7 +35,7 @@ import {
   since as datetimeSince,
 } from "./core-ext/date-time/calculations.js";
 import { current as timeCurrent } from "./core-ext/time/calculations.js";
-import { rbInspect as inspect, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import { ArgumentError } from "./hash-utils.js";
 import { toSentence } from "./array-utils.js";
@@ -868,7 +868,7 @@ export class Scalar {
   }
 }
 
-rbModConstSet(ActiveSupport, "Duration", Duration);
+ActiveSupport.Duration = Duration;
 
 Object.defineProperty(rbCNumeric, Symbol.hasInstance, {
   value(this: typeof rbCNumeric, other: unknown): boolean {

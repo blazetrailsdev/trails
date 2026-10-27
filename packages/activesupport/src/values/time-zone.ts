@@ -23,7 +23,6 @@ import {
   equals as cmpEquals,
   fetch,
   KeyError,
-  rbModConstSet,
   rbModName,
   rbObjClass,
   Rational,
@@ -32,7 +31,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import type { DateParts } from "@blazetrails/date";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
-import { ActiveSupport } from "../namespaces.js";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
 import { utcToLocalReturnsUtcOffsetTimes } from "../core-ext/date-and-time/compatibility.js";
@@ -784,5 +782,3 @@ export class TimeZone {
 }
 
 export { MAPPING as ZONES_MAP };
-
-rbModConstSet(ActiveSupport, "TimeZone", TimeZone);

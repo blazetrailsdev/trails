@@ -1,5 +1,3 @@
-import { AbstractController } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   I18n,
   HtmlSafeTranslation,
@@ -64,5 +62,3 @@ export function localize(
 export const l = localize;
 
 export const Translation = { translate, t: translate, localize, l: localize };
-
-rbModConstSet(AbstractController, "Translation", Translation);

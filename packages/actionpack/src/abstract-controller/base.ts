@@ -1,7 +1,6 @@
 import { Configurable, include, underscore } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
-import { AbstractController } from "../namespaces.js";
-import { rbFSend, rbModConstSet, rbModName, rbObjId, sprintf } from "@blazetrails/ruby-compat";
+import { rbFSend, rbModName, rbObjId, sprintf } from "@blazetrails/ruby-compat";
 
 function ownPublicMethodNames(proto: object | null | undefined): string[] {
   if (!proto) return [];
@@ -286,6 +285,3 @@ export class Base {
 }
 
 include(Base, Configurable);
-
-rbModConstSet(AbstractController, "Base", Base);
-rbModConstSet(AbstractController, "ActionNotFound", ActionNotFound);

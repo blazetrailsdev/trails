@@ -1,5 +1,4 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import type { aroundAction, CallbackOptions } from "../../abstract-controller/callbacks.js";
 import { Concern, extend, type LogLevel } from "@blazetrails/activesupport";
 
@@ -23,4 +22,4 @@ export const ClassMethods = { logAt };
 export const Logging = { ClassMethods };
 extend(Logging, Concern);
 
-rbModConstSet(ActionController, "Logging", Logging);
+ActionController.Logging = Logging;

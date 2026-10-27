@@ -1,5 +1,4 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
   Module,
@@ -113,7 +112,7 @@ Renderers.ClassMethods = ClassMethods;
 Renderers.add = add;
 Renderers.remove = remove;
 Renderers._renderWithRendererMethodName = _renderWithRendererMethodName;
-rbModConstSet(ActionController, "Renderers", Renderers);
+ActionController.Renderers = Renderers;
 
 export const All = new Module((mod) => {
   extend(mod, Concern);
@@ -123,7 +122,7 @@ export const All = new Module((mod) => {
     this._renderers = RENDERERS;
   });
 });
-rbModConstSet(Renderers, "All", All);
+Renderers.All = All;
 
 Renderers.add("json", function (json, options) {
   const {

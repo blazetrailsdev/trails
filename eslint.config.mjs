@@ -1172,6 +1172,7 @@ export default defineConfig(
             "packages/website/docs/.vitepress/config.ts",
             "vitest.config.ts",
             "vitest.dx-tests.config.ts",
+            "packages/ruby-compat/test-setup/class-paths.ts",
           ],
         },
         tsconfigRootDir: import.meta.dirname,

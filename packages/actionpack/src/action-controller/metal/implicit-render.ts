@@ -1,11 +1,6 @@
 import { ActionController } from "../../namespaces.js";
 import { dasherize, underscore } from "@blazetrails/activesupport";
-import {
-  include,
-  rbCallSuper,
-  rbInspect as inspect,
-  rbModConstSet,
-} from "@blazetrails/ruby-compat";
+import { include, rbCallSuper, rbInspect as inspect } from "@blazetrails/ruby-compat";
 
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
 
@@ -103,4 +98,4 @@ export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
 export const ImplicitRender = { defaultRender, methodForAction, isInteractiveBrowserRequest };
 include(ImplicitRender, BasicImplicitRender);
 
-rbModConstSet(ActionController, "ImplicitRender", ImplicitRender);
+ActionController.ImplicitRender = ImplicitRender;

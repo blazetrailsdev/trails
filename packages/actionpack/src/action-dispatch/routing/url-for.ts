@@ -14,7 +14,6 @@ import {
   isSymbol,
   Module,
   rbFSend,
-  rbModConstSet,
   rbModMethodDefined,
   symbolToS,
   toH,
@@ -198,4 +197,4 @@ export const UrlFor = new Module((mod) => {
     });
   });
 });
-rbModConstSet(Routing, "UrlFor", UrlFor);
+Routing.UrlFor = UrlFor;

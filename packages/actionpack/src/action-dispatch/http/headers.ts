@@ -1,5 +1,4 @@
-import type { Request } from "./request.js";
-import { ActionDispatch } from "../../namespaces.js";
+import { Request } from "./request.js";
 import { KeyError, eachPair } from "@blazetrails/ruby-compat";
 
 const CGI_VARIABLES = new Set([
@@ -58,7 +57,7 @@ export class Headers {
   }
 
   static fromHash(hash: Record<string, unknown>): Headers {
-    return new Headers(new ActionDispatch.Request(hash));
+    return new Headers(new Request(hash));
   }
 
   add(key: string, value: unknown): void {

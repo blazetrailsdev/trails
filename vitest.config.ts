@@ -433,6 +433,7 @@ const otherSetupFiles = [
   "./packages/activesupport/src/test-setup-abstract-unit.ts",
   "./packages/arel/src/test-setup-engine.ts",
   "./packages/actionview/src/test-helpers/setup-compile-template.ts",
+  "./packages/ruby-compat/test-setup/class-paths.ts",
 ];
 
 export default defineConfig({
@@ -513,6 +514,7 @@ export default defineConfig({
               ? ["./packages/activerecord/src/test-setup-pg-cancel-trace.ts"]
               : []),
             "./packages/activerecord/src/test-setup-dy.ts",
+            "./packages/ruby-compat/test-setup/class-paths.ts",
             // Opt-in DDL timing profiler, gated on DDL_PROFILE=1 (dormant/no-op when off).
             ...(process.env.DDL_PROFILE === "1"
               ? ["./packages/activerecord/src/test-setup-ddl-profile.ts"]
@@ -539,6 +541,7 @@ export default defineConfig({
           name: "sqlite-drivers",
           include: SQLITE_DRIVER_TESTS,
           exclude: [...SHARED_EXCLUDE],
+          setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
         },
       },
       {
@@ -634,7 +637,10 @@ export default defineConfig({
           globals: true,
           include: ["packages/et-orbi/src/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
-          setupFiles: ["./packages/vitest-matchers/src/setup.ts"],
+          setupFiles: [
+            "./packages/vitest-matchers/src/setup.ts",
+            "./packages/ruby-compat/test-setup/class-paths.ts",
+          ],
         },
       },
       {
@@ -644,6 +650,7 @@ export default defineConfig({
           globals: true,
           include: ["packages/raabro/src/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
+          setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
         },
       },
       {
@@ -653,7 +660,10 @@ export default defineConfig({
           globals: true,
           include: ["packages/fugit/src/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
-          setupFiles: ["./packages/vitest-matchers/src/setup.ts"],
+          setupFiles: [
+            "./packages/vitest-matchers/src/setup.ts",
+            "./packages/ruby-compat/test-setup/class-paths.ts",
+          ],
         },
       },
     ],

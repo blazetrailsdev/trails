@@ -1,5 +1,3 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActionDispatch } from "../../namespaces.js";
 import {
   ParameterTypeError as RackParameterTypeError,
   InvalidParameterError as RackInvalidParameterError,
@@ -54,8 +52,3 @@ export class ParamsTooDeepError extends ParamError {
     this.name = "ActionDispatch::ParamsTooDeepError";
   }
 }
-
-rbModConstSet(ActionDispatch, "ParamError", ParamError);
-rbModConstSet(ActionDispatch, "ParameterTypeError", ParameterTypeError);
-rbModConstSet(ActionDispatch, "InvalidParameterError", InvalidParameterError);
-rbModConstSet(ActionDispatch, "ParamsTooDeepError", ParamsTooDeepError);

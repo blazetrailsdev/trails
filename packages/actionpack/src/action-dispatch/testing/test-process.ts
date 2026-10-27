@@ -1,4 +1,4 @@
-import { File, NoMethodError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { File, NoMethodError } from "@blazetrails/ruby-compat";
 
 export { NoMethodError };
 
@@ -84,4 +84,4 @@ export const FixtureFile = {
   fileFixtureUpload,
   fixtureFileUpload,
 };
-rbModConstSet(ActionDispatch, "TestProcess", TestProcess);
+ActionDispatch.TestProcess = TestProcess;

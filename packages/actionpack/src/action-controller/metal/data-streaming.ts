@@ -1,5 +1,4 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, extend } from "@blazetrails/activesupport";
 import { ArgumentError, File, slice, stringDelete } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
@@ -119,4 +118,4 @@ export function sendFileHeadersBang(
 export const DataStreaming = { sendFile, sendData, sendFileHeadersBang };
 extend(DataStreaming, Concern);
 
-rbModConstSet(ActionController, "DataStreaming", DataStreaming);
+ActionController.DataStreaming = DataStreaming;

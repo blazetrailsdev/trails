@@ -12,12 +12,12 @@ import {
   Encoding,
   StringIO,
   forceEncoding,
-  rbModConstSet,
   rbRegMatchP,
   rbStrDump,
   toI,
   excSetupMessage,
   rbObjDup,
+  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
@@ -951,9 +951,8 @@ Request.prototype.formatFromPathExtension = function (this: Request) {
 Request.prototype.setFormat = _setFormat;
 Request.prototype.isParamsReadable = _isParamsReadable;
 
-rbModConstSet(ActionDispatch, "Request", Request);
-rbModConstSet(Request, "Utils", Utils);
-rbModConstSet(Request, "Session", Session);
+ActionDispatch.Request = Request;
+Request.Utils = Utils;
 rbModConstSet(ActionDispatch, "MissingController", MissingController);
 
 runLoadHooks("action_dispatch_request", Request);

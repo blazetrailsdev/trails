@@ -214,6 +214,7 @@ registerClassPaths([
   [() => m67.SelectManager, "Arel::SelectManager"],
   [() => m68.Table, "Arel::Table"],
   [() => m69.TreeManager, "Arel::TreeManager"],
+  [() => m69.StatementMethods, "Arel::TreeManager::StatementMethods"],
   [() => m70.UpdateManager, "Arel::UpdateManager"],
   [() => m71.Dot, "Arel::Visitors::Dot"],
   [() => m71.Edge, "Arel::Visitors::Dot::Edge"],

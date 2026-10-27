@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rtest } from "@blazetrails/ruby-compat";
 import { Concern, Rescuable, extend, include } from "@blazetrails/activesupport";
 
 export const Rescue = { isShowDetailedExceptions, processAction };
@@ -29,4 +29,4 @@ export async function processAction(this: RescueHost, ...args: unknown[]): Promi
   }
 }
 
-rbModConstSet(ActionController, "Rescue", Rescue);
+ActionController.Rescue = Rescue;

@@ -1,4 +1,4 @@
-import { rbFSend, rbModConstSet, URI } from "@blazetrails/ruby-compat";
+import { rbFSend, URI } from "@blazetrails/ruby-compat";
 import { ActionableError, cattrAccessor } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_LENGTH, CONTENT_TYPE } from "@blazetrails/rack";
@@ -65,4 +65,4 @@ export class ActionableExceptions {
   }
 }
 
-rbModConstSet(ActionDispatch, "ActionableExceptions", ActionableExceptions);
+ActionDispatch.ActionableExceptions = ActionableExceptions;

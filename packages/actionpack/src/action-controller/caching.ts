@@ -1,5 +1,4 @@
 import { Concern, extend, include } from "@blazetrails/activesupport";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Caching as AbstractControllerCaching } from "../abstract-controller/caching.js";
 import { ActionController } from "../namespaces.js";
 interface CachingInstrumentHost {
@@ -89,4 +88,4 @@ export function fragmentCacheKey(
   return controller ? `${controller}/${sorted}` : sorted;
 }
 
-rbModConstSet(ActionController, "Caching", Caching);
+ActionController.Caching = Caching;

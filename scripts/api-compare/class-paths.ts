@@ -110,13 +110,18 @@ function isExported(source: string, name: string): boolean {
     new RegExp(`^export\\s+(?:default\\s+)?(?:abstract\\s+)?class\\s+${name}\\b`, "m").test(
       source,
     ) ||
-    new RegExp(`^export\\s+const\\s+${name}\\b`, "m").test(source) ||
-    new RegExp(`^export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*;`, "m").test(source)
+    new RegExp(`^export\\s+(?:const|namespace)\\s+${name}\\b`, "m").test(source) ||
+    new RegExp(
+      `^export\\s*\\{[^}]*(?<!\\bas\\s+)\\b${name}\\b(?!\\s+as\\b)[^}]*\\}\\s*;`,
+      "m",
+    ).test(source)
   );
 }
 
 /** Paired classes a table cannot import, which `--check` reports. */
 const unexported: string[] = [];
+/** Paired Ruby modules with no exported binding; reported, not gated. */
+const unexportedModules: string[] = [];
 const known = new Set<string>();
 
 /**
@@ -148,6 +153,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
   const ts = await readJson<Manifest>("ts-api.json");
   const byDir = new Map<string, ClassPathEntry[]>();
   unexported.length = 0;
+  unexportedModules.length = 0;
   known.clear();
 
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
@@ -159,10 +165,12 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
 
     const paired = new Map<string, ClassPathEntry>();
     const modules = new Set<string>();
+    const fallbackModules = new Set<string>();
     const ambiguous = new Set<string>();
     for (const kind of ["classes", "modules"] as const) {
       const tsByFileName = new Map<string, ClassInfo>();
-      for (const cls of Object.values(tsPkg[kind] ?? {})) {
+      const tsKinds = kind === "modules" ? (["modules", "classes"] as const) : ([kind] as const);
+      for (const cls of tsKinds.flatMap((k) => Object.values(tsPkg[k] ?? {}))) {
         if (cls.file) tsByFileName.set(`${cls.file}::${cls.name}`, cls);
       }
       for (const [fqn, info] of Object.entries(rubyPkg[kind] ?? {})) {
@@ -173,11 +181,21 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
           continue;
         }
         const short = fqn.split("::").at(-1)!;
-        const tsCls = resolveTsClassForRuby(short, rubyFileToTs(info.file, pkg), tsByFileName);
+        const tsFile = rubyFileToTs(info.file, pkg);
         const rubyPath = renameTokens(fqn);
+        const rubyShort = rubyPath.split("::").at(-1)!;
+        let tsCls: { file?: string; name: string } | undefined = resolveTsClassForRuby(
+          short,
+          tsFile,
+          tsByFileName,
+        );
+        const fallback = tsCls === undefined && kind === "modules";
+        if (fallback) tsCls = { file: tsFile, name: rubyShort };
         if (!tsCls?.file || rubyPath === tsCls.name) continue;
+        if (kind === "modules" && tsCls.name !== rubyShort) continue;
         const file = path.join(subDir, tsCls.file);
         const key = `${file}::${tsCls.name}`;
+        if (fallback) fallbackModules.add(key);
         if (paired.has(key) && paired.get(key)!.fqn !== rubyPath) ambiguous.add(key);
         paired.set(key, { file, tsName: tsCls.name, fqn: rubyPath });
         if (kind === "modules") modules.add(key);
@@ -196,8 +214,10 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       if (!reachable.has(entry.file)) continue;
       const source = await fs.readFile(path.join(srcRoot, entry.file), "utf8");
       if (isExported(source, entry.tsName)) entries.push(entry);
-      else if (modules.has(key)) continue;
-      else if (KNOWN_UNEXPORTED.has(entry.fqn)) known.add(entry.fqn);
+      else if (fallbackModules.has(key)) continue;
+      else if (modules.has(key)) {
+        unexportedModules.push(`${dir}/src/${entry.file}: ${entry.tsName} (${entry.fqn})`);
+      } else if (KNOWN_UNEXPORTED.has(entry.fqn)) known.add(entry.fqn);
       else unexported.push(`${dir}/src/${entry.file}: ${entry.tsName} (${entry.fqn})`);
     }
     byDir.set(dir, entries);
@@ -288,6 +308,11 @@ async function main(): Promise<void> {
     if (current === next) continue;
     if (check) stale.push(path.relative(ROOT_DIR, target));
     else await fs.writeFile(target, next);
+  }
+  if (check && unexportedModules.length > 0) {
+    console.warn(
+      `Modules paired with a Ruby module but with no exported binding (not gated):\n  ${unexportedModules.join("\n  ")}`,
+    );
   }
   if (check && unexported.length > 0) {
     console.error(

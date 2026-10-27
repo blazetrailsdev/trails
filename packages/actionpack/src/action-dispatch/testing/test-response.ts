@@ -1,4 +1,3 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActionDispatch } from "../../namespaces.js";
 import { Response } from "../http/response.js";
 import { Headers } from "@blazetrails/rack";
@@ -35,4 +34,4 @@ export class TestResponse extends Response {
     return this._responseParser;
   }
 }
-rbModConstSet(ActionDispatch, "TestResponse", TestResponse);
+ActionDispatch.TestResponse = TestResponse;

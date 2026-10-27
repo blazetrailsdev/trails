@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   Concern,
@@ -94,4 +94,4 @@ include(Helpers, AbstractHelpers);
   },
 );
 
-rbModConstSet(ActionController, "Helpers", Helpers);
+ActionController.Helpers = Helpers;

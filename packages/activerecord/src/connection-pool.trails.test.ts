@@ -1124,7 +1124,9 @@ describe("NullPool member parity", () => {
       expect(() => pool[probe]).toThrow(NoMethodError);
     }
     expect(pool.inspect).toBeUndefined();
-    expect(rbObjInspect(pool)).toMatch(/^#<NullPool:0x[0-9a-f]+ .*@server_version=nil/);
+    expect(rbObjInspect(pool)).toMatch(
+      /^#<ActiveRecord::ConnectionAdapters::NullPool:0x[0-9a-f]+ .*@server_version=nil/,
+    );
     expect(pool.toString).toBe(Object.prototype.toString);
     expect(pool[Symbol.toStringTag as unknown as string]).toBeUndefined();
   });

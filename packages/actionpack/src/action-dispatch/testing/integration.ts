@@ -9,7 +9,6 @@ import {
   URI,
   include,
   rbFSend,
-  rbModConstSet,
   rbObjClassname,
   rbObjDup,
   Module,
@@ -653,13 +652,12 @@ export const Runner = new Module((mod) => {
   });
 }) as Module & { APP_SESSIONS: Map<unknown, typeof Session> };
 
-rbModConstSet(Runner, "APP_SESSIONS", new Map<unknown, typeof Session>());
+Runner.APP_SESSIONS = new Map<unknown, typeof Session>();
 
-rbModConstSet(ActionDispatch, "Integration", {
+ActionDispatch.Integration = {
   name: "ActionDispatch::Integration",
   Session,
-  Runner,
-});
+};
 
 type SessionMethodMissing = Pick<
   Session,

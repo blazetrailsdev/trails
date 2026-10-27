@@ -2,7 +2,6 @@ import type { RackApp } from "@blazetrails/rack";
 import type { CacheStore as CacheStoreLike } from "@blazetrails/activesupport";
 import { SessionId, type PersistedRequest } from "@blazetrails/rack-session";
 import { AbstractSecureStore } from "./abstract-store.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Session } from "../../../namespaces.js";
 import type { Session as RequestSession } from "../../request/session.js";
 
@@ -98,4 +97,4 @@ export class CacheStore extends AbstractSecureStore {
   }
 }
 
-rbModConstSet(Session, "CacheStore", CacheStore);
+Session.CacheStore = CacheStore;

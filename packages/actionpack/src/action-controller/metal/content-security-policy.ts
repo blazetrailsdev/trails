@@ -1,5 +1,4 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, extend, include } from "@blazetrails/activesupport";
 import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Callbacks, type CallbackOptions } from "../../abstract-controller/callbacks.js";
@@ -98,4 +97,4 @@ include(ContentSecurityPolicy, Callbacks);
   this.helperMethod("contentSecurityPolicyNonce");
 });
 
-rbModConstSet(ActionController, "ContentSecurityPolicy", ContentSecurityPolicy);
+ActionController.ContentSecurityPolicy = ContentSecurityPolicy;

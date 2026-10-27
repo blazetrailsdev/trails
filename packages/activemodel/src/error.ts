@@ -4,7 +4,6 @@ import {
   kernelCatch,
   rbHash,
   rbInspect,
-  rbModConstSet,
   rbModName,
   rbObjDup,
   rbObjRespondTo,
@@ -311,4 +310,4 @@ export class Error {
 
 Error.prototype.eql = Error.prototype.equals;
 
-rbModConstSet(ActiveModel, "Error", Error);
+ActiveModel.Error = Error;

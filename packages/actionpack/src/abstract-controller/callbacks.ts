@@ -1,5 +1,4 @@
-import * as namespaces from "../namespaces.js";
-import { Enumerable, rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
+import { Enumerable, rbCallSuper } from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
   mattrAccessor,
@@ -341,5 +340,3 @@ include(Callbacks, ASCallbacks);
   });
   mattrAccessor.call(this, "raiseOnMissingCallbackActions", { default: false });
 });
-
-rbModConstSet(namespaces.AbstractController, "Callbacks", Callbacks);

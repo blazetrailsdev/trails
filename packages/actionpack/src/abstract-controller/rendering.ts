@@ -1,5 +1,3 @@
-import { AbstractController } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { ViewPaths } from "@blazetrails/actionview";
 import { Concern, extend, include, isPlainObject } from "@blazetrails/activesupport";
 import { ArgumentError, Hash, Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
@@ -161,5 +159,3 @@ export const Rendering = new Module((mod) => {
   mod.defineMethod("_normalizeRender", _normalizeRender);
   mod.defineMethod("_protectedIvars", _protectedIvars);
 });
-
-rbModConstSet(AbstractController, "Rendering", Rendering);

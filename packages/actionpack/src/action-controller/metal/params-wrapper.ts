@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import {
   deleteAt,
   except,
@@ -343,4 +343,4 @@ extend(ParamsWrapper, Concern);
   deferInherited.call(this as WrapperHostClass);
 });
 
-rbModConstSet(ActionController, "ParamsWrapper", ParamsWrapper);
+ActionController.ParamsWrapper = ParamsWrapper;

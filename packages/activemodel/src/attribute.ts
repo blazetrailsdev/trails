@@ -5,7 +5,6 @@ import {
   hasKey,
   rbEqual,
   rbHash,
-  rbModConstSet,
   rbDeclareIvar,
   rbObjAsString,
   rbObjDup,
@@ -377,12 +376,12 @@ export class Uninitialized extends Attribute {
 
 Attribute.prototype.eql = Attribute.prototype.equals;
 
-rbModConstSet(ActiveModel, "Attribute", Attribute);
-rbModConstSet(Attribute, "FromDatabase", FromDatabase);
-rbModConstSet(Attribute, "FromUser", FromUser);
-rbModConstSet(Attribute, "WithCastValue", WithCastValue);
-rbModConstSet(Attribute, "Null", Null);
-rbModConstSet(Attribute, "Uninitialized", Uninitialized);
+ActiveModel.Attribute = Attribute;
+Attribute.FromDatabase = FromDatabase;
+Attribute.FromUser = FromUser;
+Attribute.WithCastValue = WithCastValue;
+Attribute.Null = Null;
+Attribute.Uninitialized = Uninitialized;
 
 registerConstant("ActiveModel::Attribute", Attribute);
 registerConstant("ActiveModel::Attribute::FromDatabase", FromDatabase);

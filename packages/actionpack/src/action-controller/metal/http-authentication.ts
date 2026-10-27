@@ -1,5 +1,4 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 /* eslint-disable @typescript-eslint/no-namespace -- `HttpAuthentication::Basic`, `Digest` and `Token` each nest a `ControllerMethods` and share `authenticate` / `encode_credentials` / `authentication_request` (`action_controller/metal/http_authentication.rb:69,189,425`); nested namespaces keep every one at its Rails name. */
 import {
   ArgumentError,
@@ -477,4 +476,4 @@ Object.defineProperty(HttpAuthentication.Basic.ControllerMethods, included, {
   },
 });
 
-rbModConstSet(ActionController, "HttpAuthentication", HttpAuthentication);
+ActionController.HttpAuthentication = HttpAuthentication;

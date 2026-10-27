@@ -1,5 +1,4 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
   extend,
@@ -216,4 +215,4 @@ export const Rendering = new Module((mod) => {
 }) as Module & { ClassMethods: Module };
 Rendering.ClassMethods = ClassMethods;
 
-rbModConstSet(ActionController, "Rendering", Rendering);
+ActionController.Rendering = Rendering;

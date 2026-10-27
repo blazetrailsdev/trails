@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import {
   attrInternal,
   Benchmark,
@@ -174,4 +174,4 @@ Object.assign(Instrumentation.prototype, {
 });
 Object.defineProperty(Instrumentation, "ClassMethods", { value: ClassMethods });
 
-rbModConstSet(ActionController, "Instrumentation", Instrumentation);
+ActionController.Instrumentation = Instrumentation;

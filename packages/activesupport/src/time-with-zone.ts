@@ -12,7 +12,6 @@ import {
   lessThanOrEqual,
   NoMethodError,
   PROTOCOL_PROBES,
-  rbModConstSet,
   rbObjClassname,
   rubyClass,
 } from "@blazetrails/ruby-compat";
@@ -22,7 +21,6 @@ import { currentTime } from "./time-travel.js";
 import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js";
 import { DateTime, Temporal } from "@blazetrails/date";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
-import { ActiveSupport } from "./namespaces.js";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
 import {
@@ -943,4 +941,3 @@ rbDefineAllocFunc(
 
 YAML.loadTags["!ruby/object:ActiveSupport::TimeWithZone"] = "ActiveSupport::TimeWithZone";
 YAML.dumpTags.set(TimeWithZone, "!ruby/object:ActiveSupport::TimeWithZone");
-rbModConstSet(ActiveSupport, "TimeWithZone", TimeWithZone);
