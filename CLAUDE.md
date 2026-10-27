@@ -1393,7 +1393,8 @@ ratified here so no port re-derives them.
   only"). So each includer's or subclass's constructor ends with
   `if (new.target === X) return this.deduplicate();`, and a subclass with no
   Rails `initialize` (`MySQL::Column`) is named in its parent's guard rather
-  than given a constructor. Each guard carries `@inventedArm if — PERMANENT`.
+  than given a constructor. Each guard carries `@inventedArm if — PERMANENT`
+  where the arm gate compares the declaration.
   Ruled by the repo owner on 2026-10-27.
 - **A `self.new` that answers `nil` or `false`.** A JS constructor that returns
   a primitive answers `this` instead, so a Rails `self.new` ported as the
