@@ -1,4 +1,4 @@
-import { Benchmark } from "@blazetrails/activesupport";
+import { Benchmark } from "@blazetrails/ruby-compat";
 import {
   rbCheckArrayType,
   Enumerator,
