@@ -1,5 +1,5 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError, registerConstant } from "@blazetrails/ruby-compat";
 
 interface Status {
   pid: number | string | null;
@@ -9,10 +9,6 @@ interface Status {
 }
 
 export class ProcessExitError extends RuntimeError {
-  static override toString(): string {
-    return "SolidQueue::Processes::ProcessExitError";
-  }
-
   constructor(status: Status) {
     let message = `Process pid=${status.pid} exited unexpectedly.`;
     if (isPresent(status.exitstatus)) {
@@ -26,3 +22,5 @@ export class ProcessExitError extends RuntimeError {
     super(message);
   }
 }
+
+registerConstant("SolidQueue::Processes::ProcessExitError", ProcessExitError);

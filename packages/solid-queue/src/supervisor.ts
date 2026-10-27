@@ -1,5 +1,5 @@
 import { include, seconds } from "@blazetrails/activesupport";
-import { Process, STDERR, STDOUT, abort } from "@blazetrails/ruby-compat";
+import { Process, STDERR, STDOUT, abort, registerConstant } from "@blazetrails/ruby-compat";
 import { Configuration } from "./configuration.js";
 import {
   LifecycleHooks,
@@ -38,10 +38,6 @@ export class Supervisor extends Base {
   declare static onStart: typeof LifecycleHooksClassMethods.onStart;
   declare static onStop: typeof LifecycleHooksClassMethods.onStop;
   declare static clearHooks: typeof LifecycleHooksClassMethods.clearHooks;
-
-  static override toString(): string {
-    return "SolidQueue::Supervisor";
-  }
 
   static {
     include(this, LifecycleHooks);
@@ -318,3 +314,5 @@ export interface Supervisor {
 }
 
 SolidQueue.Supervisor = Supervisor;
+
+registerConstant("SolidQueue::Supervisor", Supervisor);

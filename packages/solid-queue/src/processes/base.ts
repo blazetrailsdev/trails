@@ -1,5 +1,11 @@
 import { demodulize, include } from "@blazetrails/activesupport";
-import { Process, SecureRandom, Socket, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  Process,
+  SecureRandom,
+  Socket,
+  registerConstant,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
 import { Callbacks } from "./callbacks.js";
 import { Procline } from "./procline.js";
@@ -26,7 +32,7 @@ export class Base {
   }
 
   get kind(): string {
-    return demodulize(String(this.constructor));
+    return demodulize(rbModName(this.constructor)!);
   }
 
   get hostname(): string {

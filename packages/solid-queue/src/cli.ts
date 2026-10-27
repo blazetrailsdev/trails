@@ -1,13 +1,10 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { camelize, transformKeys } from "@blazetrails/activesupport";
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import { Configuration } from "./configuration.js";
 import { Supervisor } from "./supervisor.js";
 
 export class Cli extends Thor {
-  static override toString(): string {
-    return "SolidQueue::Cli";
-  }
-
   static {
     const klass = this as unknown as ThorClass;
     klass.classOption("config_file", {
@@ -46,3 +43,5 @@ export class Cli extends Thor {
     await Supervisor.start(transformKeys({ ...options }, (key) => camelize(key, false)));
   }
 }
+
+registerConstant("SolidQueue::Cli", Cli);

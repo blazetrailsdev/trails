@@ -4,7 +4,14 @@ import {
   NotificationEvent as Event,
   type Logger,
 } from "@blazetrails/activesupport";
-import { rbInspect, rbModName, rbObjClass, round, slice } from "@blazetrails/ruby-compat";
+import {
+  rbInspect,
+  rbModName,
+  rbObjClass,
+  round,
+  slice,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { SolidQueue } from "./solid-queue.js";
 import { VERSION } from "./version.js";
 
@@ -22,10 +29,6 @@ interface LoggedProcess {
 }
 
 export class LogSubscriber extends BaseLogSubscriber {
-  static override toString(): string {
-    return "SolidQueue::LogSubscriber";
-  }
-
   dispatchScheduled(event: Event): void {
     this.debug(
       this.formattedEvent(event, {
@@ -339,3 +342,5 @@ export class LogSubscriber extends BaseLogSubscriber {
     return SolidQueue.logger;
   }
 }
+
+registerConstant("SolidQueue::LogSubscriber", LogSubscriber);
