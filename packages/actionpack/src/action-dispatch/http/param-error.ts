@@ -7,6 +7,10 @@ import {
 import { ParseError } from "./parameters.js";
 
 export class ParamError extends ParseError {
+  constructor(message?: string) {
+    super(message);
+  }
+
   /** @noRailsEquivalent PERMANENT */
   static [Symbol.hasInstance](other: unknown): boolean {
     if (this === ParamError) {
