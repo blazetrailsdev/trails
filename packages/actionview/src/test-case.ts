@@ -45,7 +45,7 @@ import { Helpers } from "./helpers.js";
 import { RecordIdentifier } from "./record-identifier.js";
 import { RoutingUrlFor } from "./routing-url-for.js";
 import { ActionView } from "./namespaces.js";
-import { Testing } from "./testing.js";
+import { Testing } from "./rails-dom-testing/testing.js";
 import { Assertions as DomTestingAssertions } from "./rails-dom-testing/assertions.js";
 
 type HelperModule = object;

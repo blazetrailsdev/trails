@@ -1,17 +1,14 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { Base } from "../base.js";
 import { PrismRenderParser } from "../render-parser/prism-render-parser.js";
 import { TSETracker } from "../dependency-tracker/tse-tracker.js";
 import { PathSet } from "../path-set.js";
 import { Template } from "../template.js";
-import { Handlers } from "../template/handlers.js";
 import { TSE } from "../template/handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 
 describe("TSETracker reads Template#source", () => {
-  afterEach(() => Handlers.clear());
-
   it("returns the same dependencies after the template has been compiled", () => {
     Template.registerTemplateHandler("tse", new TSE());
 

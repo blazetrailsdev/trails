@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { Handlers, type TemplateHandler } from "./handlers.js";
 import { Template } from "../template.js";
 import { Raw } from "./handlers/raw.js";
@@ -10,7 +10,7 @@ function makeHandler(): TemplateHandler {
 }
 
 describe("Template::Handlers", () => {
-  afterEach(() => Handlers.clear());
+  beforeEach(() => Template.unregisterTemplateHandler(...Template.templateHandlerExtensions()));
 
   it("registers a handler for multiple extensions variadically", () => {
     const h = makeHandler();

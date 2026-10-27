@@ -1,6 +1,7 @@
+import { block } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import type { Html5Document } from "@blazetrails/nokogiri";
-import { Testing } from "../../testing.js";
+import { Testing } from "../testing.js";
 import {
   assertSelect as _assertSelect,
   assertSelectEncoded as _assertSelectEncoded,
@@ -18,18 +19,34 @@ describe("AssertSelectTest", () => {
       "<div><span>&lt;p&gt;Test 1&lt;/p&gt;</span><span>&lt;p&gt;Test 2&lt;/p&gt;</span></div>",
     );
 
-    assertSelect("span", () => {
-      assertSelectEncoded(null, {}, () => {
-        assertSelect("p", { count: 2, text: /Test/ });
-      });
-    });
-    assertSelect("div", () => {
-      assertSelectEncoded(null, {}, () => {
-        assertSelect("p", 0);
-      });
-    });
+    assertSelect(
+      "span",
+      block(() => {
+        assertSelectEncoded(null, {}, () => {
+          assertSelect("p", { count: 2, text: /Test/ });
+        });
+      }),
+    );
+    assertSelect(
+      "div",
+      block(() => {
+        assertSelectEncoded(null, {}, () => {
+          assertSelect("p", 0);
+        });
+      }),
+    );
     expect(() => assertSelectEncoded()).toThrow(
       "Element is required when called from a nonnested assert_dom",
     );
+  });
+
+  it("rejects a trailing function not marked with block() at compile time", () => {
+    const unmarked = () => {
+      // @ts-expect-error a bare function is not a block()-marked &block
+      assertSelect("div", () => {});
+      // @ts-expect-error a bare function after an equality test is not a block()-marked &block
+      assertSelect("div", 1, () => {});
+    };
+    expect(unmarked).toBeTypeOf("function");
   });
 });

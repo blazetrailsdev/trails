@@ -5,7 +5,6 @@ import { StreamingBuffer } from "../buffers.js";
 import { Body, StreamingTemplateRenderer } from "./streaming-template-renderer.js";
 import { Renderer } from "./renderer.js";
 import { LookupContext } from "../lookup-context.js";
-import { Handlers } from "../template/handlers.js";
 import { Template } from "../template.js";
 import { TSE } from "../template/handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
@@ -146,56 +145,48 @@ describe("StreamingTemplateRenderer", () => {
 
     it("streams a layout that reads a content_for block before it yields", async () => {
       Template.registerTemplateHandler("tse", new TSE());
-      try {
-        const lookup = new LookupContext(null, {}, []);
-        lookup.appendViewPaths([
-          new FixtureResolver({
-            "layouts/application.html.tse":
-              '<title><%= _layoutFor("title") %></title><%= yield %><%= _layoutFor("footer") %>',
-            "posts/show.html.tse":
-              '<% provide("title", "Post") %>body<% contentFor("footer", "|foot") %>',
-          }),
-        ]);
+      const lookup = new LookupContext(null, {}, []);
+      lookup.appendViewPaths([
+        new FixtureResolver({
+          "layouts/application.html.tse":
+            '<title><%= _layoutFor("title") %></title><%= yield %><%= _layoutFor("footer") %>',
+          "posts/show.html.tse":
+            '<% provide("title", "Post") %>body<% contentFor("footer", "|foot") %>',
+        }),
+      ]);
 
-        const renderer = new StreamingTemplateRenderer(lookup);
-        const chunks = await collectChunks(
-          renderer.render(makeView(lookup), {
-            template: "posts/show",
-            layout: "layouts/application",
-          }),
-        );
+      const renderer = new StreamingTemplateRenderer(lookup);
+      const chunks = await collectChunks(
+        renderer.render(makeView(lookup), {
+          template: "posts/show",
+          layout: "layouts/application",
+        }),
+      );
 
-        expect(chunks[0]).toBe("<title>");
-        expect(chunks.join("")).toBe("<title>Post</title>body|foot");
-      } finally {
-        Handlers.clear();
-      }
+      expect(chunks[0]).toBe("<title>");
+      expect(chunks.join("")).toBe("<title>Post</title>body|foot");
     });
 
     it("suspends a layout on a flow read nested inside a larger expression", async () => {
       Template.registerTemplateHandler("tse", new TSE());
-      try {
-        const lookup = new LookupContext(null, {}, []);
-        lookup.appendViewPaths([
-          new FixtureResolver({
-            "layouts/application.html.tse":
-              '<%= yield %><%= _layoutFor("unknown").toString() || "." %>',
-            "posts/show.html.tse": "body",
-          }),
-        ]);
+      const lookup = new LookupContext(null, {}, []);
+      lookup.appendViewPaths([
+        new FixtureResolver({
+          "layouts/application.html.tse":
+            '<%= yield %><%= _layoutFor("unknown").toString() || "." %>',
+          "posts/show.html.tse": "body",
+        }),
+      ]);
 
-        const renderer = new StreamingTemplateRenderer(lookup);
-        const chunks = await collectChunks(
-          renderer.render(makeView(lookup), {
-            template: "posts/show",
-            layout: "layouts/application",
-          }),
-        );
+      const renderer = new StreamingTemplateRenderer(lookup);
+      const chunks = await collectChunks(
+        renderer.render(makeView(lookup), {
+          template: "posts/show",
+          layout: "layouts/application",
+        }),
+      );
 
-        expect(chunks.join("")).toBe("body.");
-      } finally {
-        Handlers.clear();
-      }
+      expect(chunks.join("")).toBe("body.");
     });
 
     it("instruments the whole streamed render as render_template.action_view", async () => {

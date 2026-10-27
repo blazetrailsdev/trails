@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import { DetailsKey, LookupContext } from "./lookup-context.js";
 import type { RenderableTemplate, RenderOptions } from "./renderer/abstract-renderer.js";
 import { MissingTemplate } from "./template/error.js";
@@ -6,7 +6,6 @@ import { Resolver } from "./template/resolver.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 import { Template } from "./template.js";
 import { TemplatePath } from "./template-path.js";
-import { Handlers } from "./template/handlers.js";
 import { TSE } from "./template/handlers/tse.js";
 
 async function render(ctx: LookupContext, options: RenderOptions) {
@@ -141,10 +140,6 @@ describe("Base#render (trails)", () => {
     Template.registerTemplateHandler("tse", new TSE());
   });
 
-  afterEach(() => {
-    Handlers.clear();
-  });
-
   it("restores the parent's virtual path after a nested partial returns", async () => {
     const ctx = contextWith({
       "posts/_post":
@@ -205,10 +200,6 @@ describe("LookupContext#render with a layout", () => {
 
   beforeEach(() => {
     Template.registerTemplateHandler("tse", new TSE());
-  });
-
-  afterEach(() => {
-    Handlers.clear();
   });
 
   it("renders the content template inside the layout", async () => {

@@ -6,7 +6,6 @@ import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
 import { Template } from "./template.js";
 import { EncodingError, WrongEncodingError } from "./template/error.js";
-import { Handlers } from "./template/handlers.js";
 import { TSE } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
@@ -18,7 +17,6 @@ describe("Template#compile! across DetailsKey.clear", () => {
   });
 
   afterEach(() => {
-    Handlers.clear();
     PathRegistry.reset();
     DetailsKey.clear();
   });
@@ -45,10 +43,6 @@ describe("Template#compile! across DetailsKey.clear", () => {
 });
 
 describe("Template#compile", () => {
-  afterEach(() => {
-    Handlers.clear();
-  });
-
   it("names the compiled source after the identifier without evaluating it", async () => {
     Template.registerTemplateHandler("tse", new TSE());
     const g = globalThis as { __templateIdentifierEvaluated?: boolean };

@@ -6,37 +6,40 @@ import * as Nokogiri from "@blazetrails/nokogiri";
 type HtmlDocument = (typeof HTML5)["Document"];
 type HtmlDocumentFragment = (typeof HTML5)["DocumentFragment"];
 
-export const Testing = {} as {
+export interface Testing {
   defaultHtmlVersion: string;
   isHtml5Support(): boolean;
   htmlDocument(options?: { htmlVersion?: string | null }): HtmlDocument;
   htmlDocumentFragment(options?: { htmlVersion?: string | null }): HtmlDocumentFragment;
-};
+}
+
+export const Testing = {} as Testing;
 
 mattrAccessor.call(Testing, "defaultHtmlVersion", { default: ":html5" });
 
-Testing.isHtml5Support = function isHtml5Support(): boolean {
+export function isHtml5Support(): boolean {
   return "HTML5" in Nokogiri;
-};
+}
 
-Testing.htmlDocument = function htmlDocument({
+export function htmlDocument({
   htmlVersion = null,
 }: { htmlVersion?: string | null } = {}): HtmlDocument {
   const parserClasses: Record<string, HtmlDocument | undefined> = { html4: undefined };
   if (Testing.isHtml5Support()) parserClasses.html5 = HTML5.Document;
 
   return chooseHtmlParser(parserClasses, { htmlVersion });
-};
+}
 
-Testing.htmlDocumentFragment = function htmlDocumentFragment({
+export function htmlDocumentFragment({
   htmlVersion = null,
 }: { htmlVersion?: string | null } = {}): HtmlDocumentFragment {
   const parserClasses: Record<string, HtmlDocumentFragment | undefined> = { html4: undefined };
   if (Testing.isHtml5Support()) parserClasses.html5 = HTML5.DocumentFragment;
 
   return chooseHtmlParser(parserClasses, { htmlVersion });
-};
+}
 
+/** @internal */
 function chooseHtmlParser<T>(
   parserClasses: Record<string, T | undefined>,
   { htmlVersion = null }: { htmlVersion?: string | null } = {},
@@ -62,3 +65,5 @@ function chooseHtmlParser<T>(
       );
   }
 }
+
+Object.assign(Testing, { isHtml5Support, htmlDocument, htmlDocumentFragment });

@@ -2,7 +2,6 @@ import { Encoding, getFs, getOsAsync, getPath } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { Template } from "../template.js";
-import { Handlers } from "./handlers.js";
 import { TSE } from "./handlers/tse.js";
 import { File as SourcesFile } from "./sources/file.js";
 
@@ -33,7 +32,6 @@ function withExternalEncoding<T>(encoding: string | Encoding, block: () => T): T
 
 describe("Template#encode!", () => {
   afterEach(async () => {
-    Handlers.clear();
     for (const dir of dirs.splice(0)) getFs().rmSync(dir, { recursive: true, force: true });
   });
 

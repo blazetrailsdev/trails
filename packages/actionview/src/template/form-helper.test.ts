@@ -40,7 +40,6 @@ import {
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
-import { Handlers } from "./handlers.js";
 import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
@@ -58,7 +57,7 @@ import type { CheckBoxBuilder } from "../helpers/tags/collection-check-boxes.js"
 import type { RadioButtonBuilder } from "../helpers/tags/collection-radio-buttons.js";
 import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 import { assertSelect } from "../rails-dom-testing/assertions/selector-assertions.js";
-import { Testing } from "../testing.js";
+import { Testing } from "../rails-dom-testing/testing.js";
 import { Blog, Cpk } from "../test-helpers/fake-models.js";
 
 class Post {
@@ -682,26 +681,22 @@ describe("FormHelperTest", () => {
 
   it("label with block in erb", async () => {
     Template.registerTemplateHandler("tse", new TSE());
-    try {
-      const erbView = Base.withEmptyTemplateCache().withViewPaths(
-        [
-          new FixtureResolver({
-            "test/_label_with_block.html.tse":
-              "<%= label('post', 'message', null, null, () => { %>\n" +
-              "  Message\n" +
-              "  <%= textField('post', 'message') %>\n" +
-              "<% }) %>\n",
-          }),
-        ],
-        {},
-      );
-      assertDomEqual(
-        '<label for="post_message">\n  Message\n  <input id="post_message" name="post[message]" type="text" />\n</label>',
-        await erbView.render("test/label_with_block"),
-      );
-    } finally {
-      Handlers.clear();
-    }
+    const erbView = Base.withEmptyTemplateCache().withViewPaths(
+      [
+        new FixtureResolver({
+          "test/_label_with_block.html.tse":
+            "<%= label('post', 'message', null, null, () => { %>\n" +
+            "  Message\n" +
+            "  <%= textField('post', 'message') %>\n" +
+            "<% }) %>\n",
+        }),
+      ],
+      {},
+    );
+    assertDomEqual(
+      '<label for="post_message">\n  Message\n  <input id="post_message" name="post[message]" type="text" />\n</label>',
+      await erbView.render("test/label_with_block"),
+    );
   });
 
   it("label with to model", () => {

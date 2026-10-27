@@ -4,7 +4,7 @@ import {
   ToJsonWithActiveSupportEncoder,
   type ToJsonWithActiveSupportEncoderHost,
 } from "@blazetrails/activesupport";
-import { Testing } from "@blazetrails/actionview/testing";
+import { Testing } from "@blazetrails/actionview/rails-dom-testing/testing";
 import { Mime, MimeType } from "../http/mime-type.js";
 
 export type ResponseParser = (body: string) => unknown;

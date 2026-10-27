@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import "@blazetrails/actionpack";
 import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { ArgumentError, Marshal } from "@blazetrails/ruby-compat";
@@ -6,13 +6,11 @@ import { SafeBuffer } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { Template } from "../template.js";
 import { StrictLocalsError } from "./error.js";
-import { Handlers, type TemplateHandler } from "./handlers.js";
+import { type TemplateHandler } from "./handlers.js";
 import { Raw } from "./handlers/raw.js";
 import { TSE, type Spot } from "./handlers/tse.js";
 
 describe("TestTSETemplate", () => {
-  afterEach(() => Handlers.clear());
-
   const TSEHandler = new TSE();
 
   class Context extends Base {

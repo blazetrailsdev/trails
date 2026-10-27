@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it } from "vitest";
 import { assertEqual, assertNot } from "@blazetrails/activesupport";
-import { ArgumentError, Range } from "@blazetrails/ruby-compat";
+import { block, ArgumentError, Range } from "@blazetrails/ruby-compat";
 import { CSS, XML, type Html5Document, type NodeSet } from "@blazetrails/nokogiri";
-import { Testing } from "../../testing.js";
+import { Testing } from "../testing.js";
 import {
   assertSelect as _assertSelect,
   assertSelectEncoded as _assertSelectEncoded,
@@ -129,16 +129,27 @@ describe("AssertSelectTest", () => {
 
   it("substitution values", () => {
     renderHtml('<div id="1">foo</div><div id="2">foo</div>');
-    assertSelect("div:match('id', ?)", /\d+/, (elements: NodeSet) => {
-      assertEqual(2, elements.size);
-    });
-    assertSelect("div", () => {
-      assertSelect(":match('id', ?)", /\d+/, (elements: NodeSet) => {
+    assertSelect(
+      "div:match('id', ?)",
+      /\d+/,
+      block((elements: NodeSet) => {
         assertEqual(2, elements.size);
-        assertSelect("#1");
-        assertSelect("#2");
-      });
-    });
+      }),
+    );
+    assertSelect(
+      "div",
+      block(() => {
+        assertSelect(
+          ":match('id', ?)",
+          /\d+/,
+          block((elements: NodeSet) => {
+            assertEqual(2, elements.size);
+            assertSelect("#1");
+            assertSelect("#2");
+          }),
+        );
+      }),
+    );
   });
 
   it("substitution value with quotes", () => {
@@ -153,12 +164,20 @@ describe("AssertSelectTest", () => {
 
   it("substitution values with values other than string or regexp", () => {
     renderHtml('<div id="id_string">symbol</div><div id="1">numeric</div>');
-    assertSelect("div:match('id', ?)", "id_string", (elements: NodeSet) => {
-      assertEqual(1, elements.size);
-    });
-    assertSelect("div:match('id', ?)", 1, (elements: NodeSet) => {
-      assertEqual(1, elements.size);
-    });
+    assertSelect(
+      "div:match('id', ?)",
+      "id_string",
+      block((elements: NodeSet) => {
+        assertEqual(1, elements.size);
+      }),
+    );
+    assertSelect(
+      "div:match('id', ?)",
+      1,
+      block((elements: NodeSet) => {
+        assertEqual(1, elements.size);
+      }),
+    );
   });
 
   it("assert select root html", () => {
@@ -169,42 +188,57 @@ describe("AssertSelectTest", () => {
 
   it("nested assert select", () => {
     renderHtml('<div id="1">foo</div><div id="2">foo</div>');
-    assertSelect("div", (elements: NodeSet) => {
-      assertEqual(2, elements.size);
-      assertSelect(elements, "#1");
-      assertSelect(elements, "#2");
-    });
-    assertSelect("div", () => {
-      assertSelect("div", (elements: NodeSet) => {
+    assertSelect(
+      "div",
+      block((elements: NodeSet) => {
         assertEqual(2, elements.size);
-        assertSelect("#1,#2");
-        assertSelect("#1");
-        assertSelect("#2");
-        assertSelect("#3", false);
-      });
-    });
+        assertSelect(elements, "#1");
+        assertSelect(elements, "#2");
+      }),
+    );
+    assertSelect(
+      "div",
+      block(() => {
+        assertSelect(
+          "div",
+          block((elements: NodeSet) => {
+            assertEqual(2, elements.size);
+            assertSelect("#1,#2");
+            assertSelect("#1");
+            assertSelect("#2");
+            assertSelect("#3", false);
+          }),
+        );
+      }),
+    );
 
     assertFailure(/Expected at least 1 element matching "#4", found 0\./, () => {
-      assertSelect("div", () => {
-        assertSelect("#4");
-      });
+      assertSelect(
+        "div",
+        block(() => {
+          assertSelect("#4");
+        }),
+      );
     });
   });
 
   it("assert select text match", () => {
     renderHtml('<div id="1"><span>foo</span></div><div id="2"><span>bar</span></div>');
-    assertSelect("div", () => {
-      expect(() => assertSelect("div", "foo")).not.toThrow();
-      expect(() => assertSelect("div", "bar")).not.toThrow();
-      expect(() => assertSelect("div", /\w*/)).not.toThrow();
-      expect(() => assertSelect("div", { text: /\w*/, count: 2 })).not.toThrow();
-      expect(() => assertSelect("div", { text: "foo", count: 2 })).toThrow();
-      expect(() => assertSelect("div", { html: "<span>bar</span>" })).not.toThrow();
-      expect(() => assertSelect("div", { html: "<span>bar</span>" })).not.toThrow();
-      expect(() => assertSelect("div", { html: /\w*/ })).not.toThrow();
-      expect(() => assertSelect("div", { html: /\w*/, count: 2 })).not.toThrow();
-      expect(() => assertSelect("div", { html: "<span>foo</span>", count: 2 })).toThrow();
-    });
+    assertSelect(
+      "div",
+      block(() => {
+        expect(() => assertSelect("div", "foo")).not.toThrow();
+        expect(() => assertSelect("div", "bar")).not.toThrow();
+        expect(() => assertSelect("div", /\w*/)).not.toThrow();
+        expect(() => assertSelect("div", { text: /\w*/, count: 2 })).not.toThrow();
+        expect(() => assertSelect("div", { text: "foo", count: 2 })).toThrow();
+        expect(() => assertSelect("div", { html: "<span>bar</span>" })).not.toThrow();
+        expect(() => assertSelect("div", { html: "<span>bar</span>" })).not.toThrow();
+        expect(() => assertSelect("div", { html: /\w*/ })).not.toThrow();
+        expect(() => assertSelect("div", { html: /\w*/, count: 2 })).not.toThrow();
+        expect(() => assertSelect("div", { html: "<span>foo</span>", count: 2 })).toThrow();
+      }),
+    );
   });
 
   it("css select", () => {
@@ -215,19 +249,26 @@ describe("AssertSelectTest", () => {
 
   it("nested css select", () => {
     renderHtml('<div id="1">foo</div><div id="2">foo</div>');
-    assertSelect("div:match('id', ?)", /\d+/, (elements: NodeSet) => {
-      const [first, second] = elements;
-      assertEqual(1, cssSelect(first, "div").size);
-      assertEqual(1, cssSelect(second, "div").size);
-    });
-    assertSelect("div", () => {
-      assertEqual(2, cssSelect("div").size);
-      for (const _element of cssSelect("div")) {
-        assertNot(cssSelect("#1,#2").isEmpty());
-        assertNot(cssSelect("#1").isEmpty());
-        assertNot(cssSelect("#2").isEmpty());
-      }
-    });
+    assertSelect(
+      "div:match('id', ?)",
+      /\d+/,
+      block((elements: NodeSet) => {
+        const [first, second] = elements;
+        assertEqual(1, cssSelect(first, "div").size);
+        assertEqual(1, cssSelect(second, "div").size);
+      }),
+    );
+    assertSelect(
+      "div",
+      block(() => {
+        assertEqual(2, cssSelect("div").size);
+        for (const _element of cssSelect("div")) {
+          assertNot(cssSelect("#1,#2").isEmpty());
+          assertNot(cssSelect("#1").isEmpty());
+          assertNot(cssSelect("#2").isEmpty());
+        }
+      }),
+    );
   });
 
   it("assert select with invalid selector", () => {
@@ -259,26 +300,35 @@ describe("AssertSelectTest", () => {
 </rss>
 `);
 
-    assertSelect("channel item description", () => {
-      assertSelectEncoded(null, {}, () => {
-        assertSelect("p", { count: 2, text: /Test/ });
-      });
-
-      assertSelect("description", (elements: NodeSet) => {
-        assertSelectEncoded([...elements][0], {}, () => {
-          assertSelect("p", "Test 1");
+    assertSelect(
+      "channel item description",
+      block(() => {
+        assertSelectEncoded(null, {}, () => {
+          assertSelect("p", { count: 2, text: /Test/ });
         });
-        assertSelectEncoded([...elements][1], {}, () => {
-          assertSelect("p", "Test 2");
-        });
-      });
-    });
 
-    assertSelect("channel item", () => {
-      assertSelectEncoded(null, {}, () => {
-        assertSelect("p", 0);
-      });
-    });
+        assertSelect(
+          "description",
+          block((elements: NodeSet) => {
+            assertSelectEncoded([...elements][0], {}, () => {
+              assertSelect("p", "Test 1");
+            });
+            assertSelectEncoded([...elements][1], {}, () => {
+              assertSelect("p", "Test 2");
+            });
+          }),
+        );
+      }),
+    );
+
+    assertSelect(
+      "channel item",
+      block(() => {
+        assertSelectEncoded(null, {}, () => {
+          assertSelect("p", 0);
+        });
+      }),
+    );
   });
 
   it("feed item encoded with html version", () => {
@@ -290,15 +340,18 @@ describe("AssertSelectTest", () => {
 </root>
 `);
 
-    assertSelect("root contents", () => {
-      assertSelectEncoded(null, {}, (contents: any) => {
-        assertEqual(html5Result, contents.toString());
-      });
+    assertSelect(
+      "root contents",
+      block(() => {
+        assertSelectEncoded(null, {}, (contents: any) => {
+          assertEqual(html5Result, contents.toString());
+        });
 
-      assertSelectEncoded(null, { htmlVersion: ":html5" }, (contents: any) => {
-        assertEqual(html5Result, contents.toString());
-      });
-    });
+        assertSelectEncoded(null, { htmlVersion: ":html5" }, (contents: any) => {
+          assertEqual(html5Result, contents.toString());
+        });
+      }),
+    );
   });
 
   it("nested assert select with match failure shows nice regex", () => {

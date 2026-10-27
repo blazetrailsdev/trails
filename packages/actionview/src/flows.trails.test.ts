@@ -1,10 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { Fiber } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { StreamingBuffer } from "./buffers.js";
 import { StreamingFlow } from "./flows.js";
 import { LookupContext } from "./lookup-context.js";
-import { Handlers } from "./template/handlers.js";
 import { Template } from "./template.js";
 import { TSE } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
@@ -12,9 +11,6 @@ import { FixtureResolver } from "./testing/resolvers.js";
 describe("StreamingFlow", () => {
   beforeEach(() => {
     Template.registerTemplateHandler("tse", new TSE());
-  });
-  afterEach(async () => {
-    Handlers.clear();
   });
 
   const setup = (layoutSource: string, templateSource: string) => {

@@ -51,13 +51,6 @@ export class Handlers {
     return (cachedExtensions ??= [...handlers.keys()]);
   }
 
-  /** @internal */
-  static clear(): void {
-    handlers.clear();
-    defaultHandler = null;
-    cachedExtensions = null;
-  }
-
   registerTemplateHandler(...extensionsAndHandler: [...string[], TemplateHandler]): void {
     const handler = extensionsAndHandler[extensionsAndHandler.length - 1] as TemplateHandler;
     const extensions = extensionsAndHandler.slice(0, -1) as string[];

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, it } from "vitest";
-import { Struct } from "@blazetrails/ruby-compat";
+import { block, Struct } from "@blazetrails/ruby-compat";
 import "../test-helpers/abstract-unit.js";
 import { TestCase } from "../test-case.js";
 
@@ -277,12 +277,20 @@ describe("FormCollectionsHelperTest", () => {
       (b: any) => b.label({ "data-value": b.value }, () => b.radioButton().plus(b.text)),
     );
 
-    tc.assertSelect("label[for=user_active_true][data-value=true]", "true", () => {
-      tc.assertSelect("input#user_active_true[type=radio]");
-    });
-    tc.assertSelect("label[for=user_active_false][data-value=false]", "false", () => {
-      tc.assertSelect("input#user_active_false[type=radio]");
-    });
+    tc.assertSelect(
+      "label[for=user_active_true][data-value=true]",
+      "true",
+      block(() => {
+        tc.assertSelect("input#user_active_true[type=radio]");
+      }),
+    );
+    tc.assertSelect(
+      "label[for=user_active_false][data-value=false]",
+      "false",
+      block(() => {
+        tc.assertSelect("input#user_active_false[type=radio]");
+      }),
+    );
   });
 
   it("collection radio with block helpers allows access to the current object item in the collection to access extra properties", () => {
@@ -297,12 +305,20 @@ describe("FormCollectionsHelperTest", () => {
       (b: any) => b.label({ class: b.object }, () => b.radioButton().plus(b.text)),
     );
 
-    tc.assertSelect("label.true[for=user_active_true]", "true", () => {
-      tc.assertSelect("input#user_active_true[type=radio]");
-    });
-    tc.assertSelect("label.false[for=user_active_false]", "false", () => {
-      tc.assertSelect("input#user_active_false[type=radio]");
-    });
+    tc.assertSelect(
+      "label.true[for=user_active_true]",
+      "true",
+      block(() => {
+        tc.assertSelect("input#user_active_true[type=radio]");
+      }),
+    );
+    tc.assertSelect(
+      "label.false[for=user_active_false]",
+      "false",
+      block(() => {
+        tc.assertSelect("input#user_active_false[type=radio]");
+      }),
+    );
   });
 
   it("collection radio buttons with fields for", () => {
@@ -770,12 +786,20 @@ describe("FormCollectionsHelperTest", () => {
       (b: any) => b.label({ "data-value": b.value }, () => b.checkbox().plus(b.text)),
     );
 
-    tc.assertSelect("label[for=user_active_true][data-value=true]", "true", () => {
-      tc.assertSelect("input#user_active_true[type=checkbox]");
-    });
-    tc.assertSelect("label[for=user_active_false][data-value=false]", "false", () => {
-      tc.assertSelect("input#user_active_false[type=checkbox]");
-    });
+    tc.assertSelect(
+      "label[for=user_active_true][data-value=true]",
+      "true",
+      block(() => {
+        tc.assertSelect("input#user_active_true[type=checkbox]");
+      }),
+    );
+    tc.assertSelect(
+      "label[for=user_active_false][data-value=false]",
+      "false",
+      block(() => {
+        tc.assertSelect("input#user_active_false[type=checkbox]");
+      }),
+    );
   });
 
   it("collection check boxes with block helpers allows access to the current object item in the collection to access extra properties", () => {
@@ -790,11 +814,19 @@ describe("FormCollectionsHelperTest", () => {
       (b: any) => b.label({ class: b.object }, () => b.checkbox().plus(b.text)),
     );
 
-    tc.assertSelect("label.true[for=user_active_true]", "true", () => {
-      tc.assertSelect("input#user_active_true[type=checkbox]");
-    });
-    tc.assertSelect("label.false[for=user_active_false]", "false", () => {
-      tc.assertSelect("input#user_active_false[type=checkbox]");
-    });
+    tc.assertSelect(
+      "label.true[for=user_active_true]",
+      "true",
+      block(() => {
+        tc.assertSelect("input#user_active_true[type=checkbox]");
+      }),
+    );
+    tc.assertSelect(
+      "label.false[for=user_active_false]",
+      "false",
+      block(() => {
+        tc.assertSelect("input#user_active_false[type=checkbox]");
+      }),
+    );
   });
 });

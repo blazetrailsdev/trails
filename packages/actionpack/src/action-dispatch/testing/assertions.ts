@@ -1,6 +1,6 @@
 import { Concern } from "@blazetrails/activesupport";
 import { XML, type Html5Document, type XmlDocument } from "@blazetrails/nokogiri";
-import { Testing } from "@blazetrails/actionview/testing";
+import { Testing } from "@blazetrails/actionview/rails-dom-testing/testing";
 import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/rails-dom-testing/assertions";
 import type * as DomAssertions from "@blazetrails/actionview/rails-dom-testing/assertions/dom-assertions";
 import type * as SelectorAssertions from "@blazetrails/actionview/rails-dom-testing/assertions/selector-assertions";

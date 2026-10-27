@@ -512,6 +512,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "rails-dom-testing",
         libPath: "lib/rails/dom/testing",
+        libEntryFile: "lib/rails/dom/testing.rb",
         compareTests: false,
       },
     ],

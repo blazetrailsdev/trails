@@ -8,7 +8,6 @@ import {
   PathSet,
   Template,
   TemplateError,
-  Handlers,
   TseHandler,
 } from "@blazetrails/actionview";
 import { rbObjClassname } from "@blazetrails/ruby-compat";
@@ -37,7 +36,6 @@ class Holder {}
 describe("ExceptionWrapper template spots", () => {
   afterEach(() => {
     PathRegistry.setViewPaths(Holder, new PathSet([]));
-    Handlers.clear();
   });
 
   it("remaps a compiled-template frame onto the template's own source", async () => {

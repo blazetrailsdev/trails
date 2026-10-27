@@ -18,6 +18,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Base, TemplateError } from "@blazetrails/actionview";
 import {
+  block,
   CGI,
   NameError,
   PP,
@@ -853,9 +854,12 @@ describe("DebugExceptionsTest", () => {
     });
 
     t.assertResponse(500);
-    t.assertSelect("#Application-Trace-0", () => {
-      t.assertSelect("code", /syntax error, unexpected|syntax errors found/);
-    });
+    t.assertSelect(
+      "#Application-Trace-0",
+      block(() => {
+        t.assertSelect("code", /syntax error, unexpected|syntax errors found/);
+      }),
+    );
   });
 
   // BLOCKED: debug-view-rescue-templates-are-never-shipped
@@ -886,9 +890,12 @@ describe("DebugExceptionsTest", () => {
     });
 
     t.assertResponse(500);
-    tc.assertSelect("#Application-Trace-0", () => {
-      tc.assertSelect("code", /syntax error, unexpected|syntax errors found/);
-    });
+    tc.assertSelect(
+      "#Application-Trace-0",
+      block(() => {
+        tc.assertSelect("code", /syntax error, unexpected|syntax errors found/);
+      }),
+    );
     assertMatch(/Showing <i>.*dispatch\/debug-exceptions.test.ts<\/i>/, body());
   });
 
@@ -903,25 +910,40 @@ describe("DebugExceptionsTest", () => {
     await t.get("/framework_raises", { headers: { "action_dispatch.backtrace_cleaner": cleaner } });
 
     t.assertResponse(500);
-    tc.assertSelect("div.exception-message", () => {
-      tc.assertSelect("div", /error in framework/);
-    });
+    tc.assertSelect(
+      "div.exception-message",
+      block(() => {
+        tc.assertSelect("div", /error in framework/);
+      }),
+    );
 
-    tc.assertSelect("div.source:not(.hidden)", () => {
-      tc.assertSelect("pre .line.active", /methodThatRaises/);
-    });
+    tc.assertSelect(
+      "div.source:not(.hidden)",
+      block(() => {
+        tc.assertSelect("pre .line.active", /methodThatRaises/);
+      }),
+    );
 
-    tc.assertSelect("div.source", () => {
-      tc.assertSelect("pre .line.active", /throw new StandardError/);
-    });
+    tc.assertSelect(
+      "div.source",
+      block(() => {
+        tc.assertSelect("pre .line.active", /throw new StandardError/);
+      }),
+    );
 
-    tc.assertSelect("#Application-Trace-0", () => {
-      tc.assertSelect("code a:first", /dispatch\/debug-exceptions\.test\.ts:\d+/);
-    });
+    tc.assertSelect(
+      "#Application-Trace-0",
+      block(() => {
+        tc.assertSelect("code a:first", /dispatch\/debug-exceptions\.test\.ts:\d+/);
+      }),
+    );
 
-    tc.assertSelect("#Framework-Trace-0", () => {
-      tc.assertSelect("code a:first", /methodThatRaises/);
-    });
+    tc.assertSelect(
+      "#Framework-Trace-0",
+      block(() => {
+        tc.assertSelect("code a:first", /methodThatRaises/);
+      }),
+    );
   });
 
   it("invoke interceptors before rendering", async () => {
@@ -952,25 +974,40 @@ describe("DebugExceptionsTest", () => {
     });
 
     t.assertResponse(500);
-    tc.assertSelect("div.exception-message", () => {
-      tc.assertSelect("div", /Third error/);
-    });
+    tc.assertSelect(
+      "div.exception-message",
+      block(() => {
+        tc.assertSelect("div", /Third error/);
+      }),
+    );
 
-    tc.assertSelect("div.source:not(.hidden)", () => {
-      tc.assertSelect("pre .line.active", /Third error/);
-    });
+    tc.assertSelect(
+      "div.source:not(.hidden)",
+      block(() => {
+        tc.assertSelect("pre .line.active", /Third error/);
+      }),
+    );
 
-    tc.assertSelect("#Application-Trace-0", () => {
-      tc.assertSelect("code a:first", /raiseNestedExceptionsThird/);
-    });
+    tc.assertSelect(
+      "#Application-Trace-0",
+      block(() => {
+        tc.assertSelect("code a:first", /raiseNestedExceptionsThird/);
+      }),
+    );
 
-    tc.assertSelect("#Application-Trace-1", () => {
-      tc.assertSelect("code a:first", /raiseNestedExceptionsSecond/);
-    });
+    tc.assertSelect(
+      "#Application-Trace-1",
+      block(() => {
+        tc.assertSelect("code a:first", /raiseNestedExceptionsSecond/);
+      }),
+    );
 
-    tc.assertSelect("#Application-Trace-2", () => {
-      tc.assertSelect("code a:first", /raiseNestedExceptionsFirst/);
-    });
+    tc.assertSelect(
+      "#Application-Trace-2",
+      block(() => {
+        tc.assertSelect("code a:first", /raiseNestedExceptionsFirst/);
+      }),
+    );
   });
 
   // BLOCKED: debug-view-rescue-templates-are-never-shipped

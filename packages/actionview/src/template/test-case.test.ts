@@ -21,6 +21,7 @@ import { HTML5 } from "@blazetrails/nokogiri";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import {
+  block,
   include,
   NoMethodError,
   rbCString,
@@ -484,9 +485,12 @@ describe("AssertionsTest", () => {
   it("uses the output_buffer for assert_select", async () => {
     await tc().render({ partial: "test/from_helper" });
 
-    tc().assertSelect("form", () => {
-      tc().assertSelect("li", { text: "foo" });
-    });
+    tc().assertSelect(
+      "form",
+      block(() => {
+        tc().assertSelect("li", { text: "foo" });
+      }),
+    );
   });
 
   it("do not memoize the document_root_element in view tests", () => {
