@@ -69,8 +69,9 @@ export class LogDevice {
   close(): void {
     try {
       this.dev!.close!();
-      // eslint-disable-next-line no-empty -- `@dev.close rescue nil`
-    } catch {}
+    } catch (error) {
+      void error;
+    }
   }
 
   /**
@@ -83,8 +84,9 @@ export class LogDevice {
       if (this.filename != null && this.dev != null) {
         try {
           this.dev.close!();
-          // eslint-disable-next-line no-empty -- `@dev.close rescue nil`
-        } catch {}
+        } catch (error) {
+          void error;
+        }
         this.filename = null;
       }
       this.setDev(log);
