@@ -36,3 +36,5 @@ export function createProgram(): Command {
 
   return program;
 }
+
+import "./class-paths.generated.js";

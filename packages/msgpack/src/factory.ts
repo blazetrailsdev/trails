@@ -392,6 +392,6 @@ export class Pool {
   }
 }
 
-rbModConstSet(Pool, "MemberPool", MemberPool);
-rbModConstSet(Factory, "Pool", Pool);
 rbModConstSet(MessagePack, "Factory", Factory);
+rbModConstSet(Factory, "Pool", Pool);
+rbModConstSet(Pool, "MemberPool", MemberPool);

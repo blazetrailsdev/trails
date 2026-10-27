@@ -33,6 +33,7 @@ import {
   rbModToS,
 } from "./object.js";
 import { Range } from "./range.js";
+import { generatedClass } from "./classpath.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { Struct } from "./struct.js";
 import { TypeError } from "./type-error.js";
@@ -183,6 +184,10 @@ export function rbPathToClass(pathname: string): unknown {
 
   if (pend === 0 || pathname[0] === "#") {
     throw new ArgumentError(`can't retrieve anonymous class ${pathname}`);
+  }
+  if (!RCLASS_CONST_TBL.has(pathname)) {
+    const generated = generatedClass(pathname);
+    if (generated !== undefined) return generated;
   }
   while (p < pend) {
     if (RCLASS_CONST_TBL.has(pathname)) p = pend;

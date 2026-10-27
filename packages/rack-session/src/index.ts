@@ -18,3 +18,5 @@ export {
   RACK_SESSION_OPTIONS,
   RACK_SESSION_UNPACKED_COOKIE_DATA,
 } from "./constants.js";
+
+import "./class-paths.generated.js";

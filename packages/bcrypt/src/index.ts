@@ -18,3 +18,5 @@ rbModConstSet(BCrypt, "Errors", Errors);
 rbModConstSet(BCrypt, "Engine", Engine);
 rbModConstSet(BCrypt, "Password", Password);
 TopLevel.BCrypt = BCrypt;
+
+import "./class-paths.generated.js";

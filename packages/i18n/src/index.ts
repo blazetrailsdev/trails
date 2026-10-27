@@ -80,3 +80,5 @@ export { Fallbacks as LocaleFallbacks, Tag } from "./locale.js";
 export type { FallbackMappings } from "./locale.js";
 export { deepMerge, deepMergeBang, deepSymbolizeKeys, except } from "./utils.js";
 export type { TranslationData } from "./utils.js";
+
+import "./class-paths.generated.js";

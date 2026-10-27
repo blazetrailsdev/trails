@@ -8,7 +8,6 @@ import {
   Hash,
   rbFArray,
   rbClassInheritedP,
-  rbModConstSet,
   rbObjMethod,
   slice,
   StandardError,
@@ -265,8 +264,8 @@ type LocatorInvalidModelIdError = typeof InvalidModelIdError;
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace Locator {
-  const InvalidModelIdError: LocatorInvalidModelIdError;
+  let InvalidModelIdError: LocatorInvalidModelIdError;
 }
-rbModConstSet(Locator, "InvalidModelIdError", InvalidModelIdError);
+Locator.InvalidModelIdError = InvalidModelIdError;
 
 GlobalID.Locator = Locator;

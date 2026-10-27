@@ -115,3 +115,5 @@ export type {
   DateInfinity as DateInfinityType,
   DateNegativeInfinity as DateNegativeInfinityType,
 } from "./type/internal/sentinels.js";
+
+import "./class-paths.generated.js";

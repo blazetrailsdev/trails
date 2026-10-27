@@ -654,3 +654,5 @@ export { Multibyte } from "./multibyte.js";
 export { Chars } from "./multibyte/chars.js";
 export { Unicode } from "./multibyte/unicode.js";
 export { mbChars, isUtf8 } from "./core-ext/string/multibyte.js";
+
+import "./class-paths.generated.js";

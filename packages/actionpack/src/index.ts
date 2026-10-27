@@ -6,3 +6,5 @@ export * as AbstractController from "./abstract-controller/index.js";
 export * as ActionPack from "./action-pack/index.js";
 export * as ActionView from "@blazetrails/actionview";
 export { ActionDispatch } from "./namespaces.js";
+
+import "./class-paths.generated.js";

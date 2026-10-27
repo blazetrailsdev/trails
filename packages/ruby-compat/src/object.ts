@@ -1,5 +1,5 @@
 import { LocalJumpError } from "./local-jump-error.js";
-import { classpaths, isModuleObject } from "./classpath.js";
+import { classpaths, generatedClassPath, isModuleObject } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
 import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
@@ -457,19 +457,25 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
   return (
     classpaths.get(klass)?.path ??
     (Object.hasOwn(klass, "toString") ? String(klass) : undefined) ??
-    (klass.name || `#<Class:${objAddress(klass)}>`)
+    rbModName(klass) ??
+    `#<Class:${objAddress(klass)}>`
   );
 }
 
 /**
  * `rb_mod_name` (`vendor/ruby/v3.3.11/variable.c:122-127`), `Module#name`: the
- * classpath `const_set` gave the class, else the name its definition gave it,
- * or `nil` while it is anonymous.
+ * classpath a `const_set` or a module-eval seat gave the class, else the path
+ * its package's generated table holds (RFC 0205), else the name its
+ * definition gave it, or `nil` while it is anonymous.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModName(klass: object): string | null {
-  return classpaths.get(klass)?.path ?? ((klass as { name?: string | null }).name || null);
+  return (
+    classpaths.get(klass)?.path ??
+    generatedClassPath(klass) ??
+    ((klass as { name?: string | null }).name || null)
+  );
 }
 
 /**
