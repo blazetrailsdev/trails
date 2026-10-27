@@ -1,6 +1,7 @@
 import type { HttpSocket } from "./http-adapter.js";
 import { ArgumentError } from "./argument-error.js";
 import { EOFError } from "./eof-error.js";
+import { Errno } from "./errno.js";
 import { IO } from "./io.js";
 import { IOError } from "./io-error.js";
 import { NotImplementedError } from "./not-implemented-error.js";
@@ -31,6 +32,7 @@ export class BasicSocket extends IO {
   private _writeClosed = false;
   private _waiting: (() => void)[] = [];
   private _congested = false;
+  private _peerGone = false;
   private _writeWaiting: (() => void)[] = [];
 
   /** @noRailsEquivalent PERMANENT */
@@ -61,9 +63,13 @@ export class BasicSocket extends IO {
     socket.on("close", () => {
       this._eof = true;
       this._wake();
-      this._drained();
+      this._peerGone = true;
+      this._wakeWriters();
     });
-    socket.on("drain", () => this._drained());
+    socket.on("drain", () => {
+      this._congested = false;
+      this._wakeWriters();
+    });
   }
 
   /**
@@ -181,33 +187,61 @@ export class BasicSocket extends IO {
    * is its own signal that the peer is not keeping up: once a write has
    * filled the socket past its high-water mark, and until it drains, this
    * raises `IO::EAGAINWaitWritable` ("write would block", `io.c:3693`), or
-   * answers `:wait_writable` under `exception: false` (`io.c:3690`). Otherwise
-   * the whole string is written and its length answered.
+   * answers `:wait_writable` under `exception: false` (`io.c:3690`). Ruby
+   * allows a short count (`io.rb:76-79`), but a Node socket never accepts
+   * part of a write: it takes the whole buffer and delivers it in order, so
+   * the whole length is answered. Once the peer has gone, the write fails as
+   * `write(2)` on a reset socket does, with `Errno::ECONNRESET` whatever
+   * `exception` says (`io.c:3696`), which Action Cable rescues
+   * (`actioncable/lib/action_cable/connection/stream.rb:68`).
    *
    * @noRailsEquivalent PERMANENT
    */
   writeNonblock(
-    string: string | Uint8Array,
+    buf: string | Uint8Array,
     { exception = true }: { exception?: boolean } = {},
   ): number | "wait_writable" {
     if (this._closed || this._writeClosed) throw new IOError("closed stream");
+    if (this._peerGone) throw new Errno.ECONNRESET();
     if (this._congested) {
       if (!exception) return "wait_writable";
       throw new IO.EAGAINWaitWritable("write would block");
     }
-    return this.write(string);
+    return this.write(buf);
   }
 
   /**
    * `IO#wait_writable` (`vendor/ruby/v3.3.11/io.c:9766` `io_wait_writable`):
    * resolves with the socket once a write would not block — at once unless a
-   * write has backed it up, otherwise when it drains or the peer goes.
+   * write has backed it up, otherwise when it drains or the peer goes, as
+   * `select(2)` reports a reset socket writable — or with `nil` once
+   * `timeout` seconds pass first (`io.c:9710-9716`). A closed write side
+   * raises `IOError` before the wait (`rb_io_check_writable`, `io.c:9771`),
+   * and a socket closed during it raises after (`io.c:1451-1458`).
    *
    * @noRailsEquivalent PERMANENT
    */
-  waitWritable(): Promise<this> {
-    if (!this._congested) return Promise.resolve(this);
-    return new Promise((resolve) => this._writeWaiting.push(() => resolve(this)));
+  async waitWritable(timeout: number | null = null): Promise<this | null> {
+    if (this._closed || this._writeClosed) throw new IOError("closed stream");
+    if (this._congested && !this._peerGone) {
+      const ready = await new Promise<boolean>((resolve) => {
+        const wake = (): void => {
+          if (timer !== null) clearTimeout(timer);
+          resolve(true);
+        };
+        const timer =
+          timeout === null
+            ? null
+            : setTimeout(() => {
+                this._writeWaiting.splice(this._writeWaiting.indexOf(wake), 1);
+                resolve(false);
+              }, timeout * 1000);
+        this._writeWaiting.push(wake);
+      });
+      if (this._closed) throw new IOError("closed stream");
+      if (!ready) return null;
+    }
+    return this;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -279,8 +313,7 @@ export class BasicSocket extends IO {
     return out;
   }
 
-  private _drained(): void {
-    this._congested = false;
+  private _wakeWriters(): void {
     for (const wake of this._writeWaiting.splice(0)) wake();
   }
 

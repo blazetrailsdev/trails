@@ -116,6 +116,16 @@ describe("TCPSocket", () => {
     expect(() => io.writeNonblock("x")).toThrow(IO.EAGAINWaitWritable);
     expect(() => io.writeNonblock("x")).toThrow(Errno.EAGAIN);
     expect(() => io.writeNonblock("x")).toThrow("write would block");
+    expect(
+      (() => {
+        try {
+          io.writeNonblock("x");
+        } catch (error) {
+          return error;
+        }
+      })(),
+    ).toBeInstanceOf(IO.WaitWritable as unknown as typeof Error);
+    expect(IO.EWOULDBLOCKWaitWritable).toBe(IO.EAGAINWaitWritable);
     expect(calls.filter((call) => call === "write")).toHaveLength(2);
   });
 
@@ -143,12 +153,34 @@ describe("TCPSocket", () => {
     const waiting = io.waitWritable();
     emit("close");
     await expect(waiting).resolves.toBe(io);
+    expect(() => io.writeNonblock("x", { exception: false })).toThrow(Errno.ECONNRESET);
   });
 
-  it("refuses a nonblocking write once the write side is closed", () => {
+  it("answers nil when the wait to be writable times out", async () => {
+    const { socket, backUp } = fakeSocket();
+    const io = new TCPSocket(socket);
+    backUp(true);
+    io.write("x");
+    await expect(io.waitWritable(0.01)).resolves.toBeNull();
+    expect(io.writeNonblock("y", { exception: false })).toBe("wait_writable");
+  });
+
+  it("raises when the socket is closed while waiting to be writable", async () => {
+    const { socket, emit, backUp } = fakeSocket();
+    const io = new TCPSocket(socket);
+    backUp(true);
+    io.write("x");
+    const waiting = io.waitWritable();
+    io.close();
+    emit("close");
+    await expect(waiting).rejects.toThrow(IOError);
+  });
+
+  it("refuses a nonblocking write once the write side is closed", async () => {
     const { socket } = fakeSocket();
     const io = new TCPSocket(socket);
     io.closeWrite();
     expect(() => io.writeNonblock("x")).toThrow(IOError);
+    await expect(io.waitWritable()).rejects.toThrow(IOError);
   });
 });
