@@ -10,6 +10,7 @@
  *   pnpm parity:class-paths           # rewrite the tables
  *   pnpm parity:class-paths --check   # red on a stale table, or on a generated
  *                                     # path that disagrees with a seated one
+ *   ... --check --package <pkg>       # one api-compare package, for the scoped CI driver
  *
  * The pairing is compare.ts's own: `rubyFileToTs` for the file and
  * `resolveTsClassForRuby` for the class, so a class gets a path exactly where
@@ -129,7 +130,7 @@ const KNOWN_UNEXPORTED = new Set([
   "Rack::Session::Encryptor::InvalidMessage",
 ]);
 
-export async function collectClassPaths(): Promise<Map<string, ClassPathEntry[]>> {
+export async function collectClassPaths(only?: string): Promise<Map<string, ClassPathEntry[]>> {
   const ruby = await readJson<Manifest>("rails-api.json");
   const ts = await readJson<Manifest>("ts-api.json");
   const byDir = new Map<string, ClassPathEntry[]>();
@@ -138,7 +139,7 @@ export async function collectClassPaths(): Promise<Map<string, ClassPathEntry[]>
 
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
     const tsPkg = ts.packages[pkg];
-    if (!tsPkg || SKIPPED.has(pkg)) continue;
+    if (!tsPkg || SKIPPED.has(pkg) || (only !== undefined && pkg !== only)) continue;
     const dir = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
     const srcRoot = path.join(ROOT_DIR, "packages", dir, "src");
     const subDir = path.relative(srcRoot, packageSrcDir(pkg));
@@ -236,8 +237,10 @@ async function checkSeatedPaths(dir: string): Promise<void> {
 
 async function main(): Promise<void> {
   const check = process.argv.includes("--check");
+  const at = process.argv.indexOf("--package");
+  const only = at === -1 ? undefined : process.argv[at + 1];
   const stale: string[] = [];
-  const tables = await collectClassPaths();
+  const tables = await collectClassPaths(only);
   for (const [dir, entries] of tables) {
     const target = path.join(ROOT_DIR, "packages", dir, "src", GENERATED);
     if (entries.length === 0) {
@@ -271,7 +274,7 @@ async function main(): Promise<void> {
     process.exitCode = 1;
   }
   const gone = [...KNOWN_UNEXPORTED].filter((fqn) => !known.has(fqn));
-  if (check && gone.length > 0) {
+  if (check && only === undefined && gone.length > 0) {
     console.error(`No longer reported — delete from KNOWN_UNEXPORTED:\n  ${gone.join("\n  ")}`);
     process.exitCode = 1;
   }
