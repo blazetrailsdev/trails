@@ -7277,6 +7277,12 @@ function describeArg(node: ts.Expression, flags: string[]): string {
       if (!ts.isStringLiteralLike(sent)) return `call:${SEND_CALLEES_RUBY_NAME[sender]}`;
       return `call:${sent.text}`;
     }
+    // A native form passed as an argument pairs by the Ruby call it spells:
+    // `xs.filter((x) => x != null)` is `xs.compact`, `Math.trunc(n)` is `n.to_i`.
+    if (expr.expression.getText() === "Math.trunc" && expr.arguments.length === 1) {
+      return "call:toI";
+    }
+    if (nativeValueForms(expr).includes("compact")) return "call:compact";
     const name = callSiteName(expr);
     return name === undefined ? "?" : `call:${name}`;
   }
@@ -7434,6 +7440,13 @@ function collectCalls(
     const tails = form === "spread" ? spreadReceiverNames(receiver) : [receiverTailName(receiver)];
     for (const tail of tails) {
       if (tail !== undefined) hashForms.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
+    }
+    if (checkerProvenKind(receiver) === "object") {
+      if (form === "spread") hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.merge}`);
+      if (form === "assign") {
+        hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.mergeBang}`);
+        hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.update}`);
+      }
     }
   };
   const visit = (n: ts.Node): void => {
@@ -7879,7 +7892,9 @@ function nativeValueForms(n: ts.Node): string[] {
     return ts.isCallExpression(counted) &&
       ts.isPropertyAccessExpression(counted.expression) &&
       counted.expression.name.text === "filter"
-      ? ["count"]
+      ? checkerProvenKind(counted.expression.expression) === "sized"
+        ? ["count", TYPED_NATIVE_FORM.count]
+        : ["count"]
       : [];
   }
   if (ts.isConditionalExpression(n)) {
@@ -7980,7 +7995,10 @@ function nativeValueForms(n: ts.Node): string[] {
       return args.length === 0 ? [method] : [];
     case "filter": {
       const [param] = callbackParams(first) ?? [];
-      return param !== undefined && isNotNullTest(callbackResult(first), param) ? ["compact"] : [];
+      if (param === undefined || !isNotNullTest(callbackResult(first), param)) return [];
+      return checkerProvenKind(n.expression.expression) === "sized"
+        ? ["compact", TYPED_NATIVE_FORM.compact]
+        : ["compact"];
     }
     case "map": {
       const params = callbackParams(first);

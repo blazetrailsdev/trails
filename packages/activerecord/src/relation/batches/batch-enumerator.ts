@@ -1,4 +1,4 @@
-import { AsyncEnumerable, type AsyncEnumerator, aryCount, include } from "@blazetrails/ruby-compat";
+import { AsyncEnumerable, type AsyncEnumerator, include } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "../../timestamp.js";
 
 interface BatchRelation {
@@ -94,7 +94,7 @@ export class BatchEnumerator<T extends BatchRelation> {
 
   destroyAll(): Promise<number> {
     return this.sum(async (relation) => {
-      return aryCount(await relation.destroyAll(), (r) => r.isDestroyed());
+      return (await relation.destroyAll()).filter((r) => r.isDestroyed()).length;
     });
   }
 

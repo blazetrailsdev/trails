@@ -1,5 +1,4 @@
 import {
-  aryCount,
   aryDelete,
   aryDeleteIf,
   Fiber,
@@ -614,9 +613,9 @@ export class ConnectionPool implements ReapablePool {
     return {
       size: this.size,
       connections: this._connections!.length,
-      busy: aryCount(this._connections!, (c) => c.isInUse() && c.owner!.isAlive()),
-      dead: aryCount(this._connections!, (c) => c.isInUse() && !c.owner!.isAlive()),
-      idle: aryCount(this._connections!, (c) => !c.isInUse()),
+      busy: this._connections!.filter((c) => c.isInUse() && c.owner!.isAlive()).length,
+      dead: this._connections!.filter((c) => c.isInUse() && !c.owner!.isAlive()).length,
+      idle: this._connections!.filter((c) => !c.isInUse()).length,
       waiting: this.numWaitingInQueue(),
       checkoutTimeout: this.checkoutTimeout,
     };

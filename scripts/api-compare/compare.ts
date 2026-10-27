@@ -823,6 +823,11 @@ const TYPED_CREDITED_CALLS = new Set([
   "drop",
   "values_at",
   "transform_values",
+  "count",
+  "compact",
+  "merge",
+  "merge!",
+  "update",
 ]);
 
 /**
