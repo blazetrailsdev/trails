@@ -1,9 +1,10 @@
 import { BroadcastLogger, Logger } from "@blazetrails/activesupport";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { afterAll, beforeAll, describe, it, vi } from "vitest";
+import { env, setEnv, StringIO } from "@blazetrails/ruby-compat";
 import { Handler } from "@blazetrails/rack";
 import { Trails } from "../rails.js";
 import { Application } from "../application.js";
+import { assertOutput } from "../support/console-helpers.js";
 
 vi.mock("../command/actions.js", () => ({ requireApplicationBang: async () => {} }));
 vi.mock("@blazetrails/trails-tsc", () => ({ watchViews: async () => ({ close() {} }) }));
@@ -51,6 +52,8 @@ describe("ServerTest", () => {
 
     await serverCommand().parseAsync(["-b", "localhost"], { from: "user" });
 
-    expect(output).toEqual(["Hello world", "Listening"]);
+    const primary = new StringIO(output.join("\n"));
+    assertOutput("Hello world", primary, 100);
+    assertOutput("Listening", primary, 100);
   });
 });
