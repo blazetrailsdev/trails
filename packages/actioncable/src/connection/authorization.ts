@@ -13,4 +13,6 @@ function rejectUnauthorizedConnection(this: AuthorizationConnection): never {
 
 export const Authorization = defineModule({ rejectUnauthorizedConnection }) as {
   rejectUnauthorizedConnection: typeof rejectUnauthorizedConnection;
+  UnauthorizedError: typeof UnauthorizedError;
 };
+Authorization.UnauthorizedError = UnauthorizedError;
