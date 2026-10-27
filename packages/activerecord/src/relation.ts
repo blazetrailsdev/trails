@@ -20,14 +20,14 @@ import {
 } from "@blazetrails/ruby-compat";
 import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
-import { ARRAY_METHOD_TABLE, fetch, first } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE, fetch } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import type { Psych } from "@blazetrails/ruby-compat/psych";
 import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotUnique } from "./errors.js";
-import { groupBy, max, min, take } from "@blazetrails/ruby-compat";
+import { groupBy, max, min } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { PermittedAttributes, SerializeOptions } from "@blazetrails/activemodel";
 
@@ -395,10 +395,9 @@ export class Relation<T extends Base, G extends boolean = false> {
         : this._records
       : this.annotate("loading for inspect");
     const inspectEntries = (records: T[]): string => {
-      const entries = take(
-        records,
-        min([this.limitValue, 11].filter((x) => x != null)) as number,
-      ).map((record) => record.inspect());
+      const entries = records
+        .slice(0, min([this.limitValue, 11].filter((x) => x != null)) as number)
+        .map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
       return `#<${(this.constructor as typeof Relation).name} [${entries.join(", ")}]>`;
     };
@@ -1622,7 +1621,7 @@ export class Relation<T extends Base, G extends boolean = false> {
           arel = query.arel();
         }
 
-        [size, timestamp] = first(await c.selectRows(arel, null)) ?? [];
+        [size, timestamp] = (await c.selectRows(arel, null))[0] ?? [];
 
         if (size != null) {
           const columnType = this.model.typeForAttribute(timestampColumn);

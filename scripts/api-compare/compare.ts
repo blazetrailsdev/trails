@@ -815,6 +815,16 @@ export function significantCallsForReceivers(
   };
 }
 
+const TYPED_CREDITED_CALLS = new Set([
+  "except",
+  "first",
+  "last",
+  "take",
+  "drop",
+  "values_at",
+  "transform_values",
+]);
+
 /**
  * Whether the paired TS body writes `value`'s native form on a receiver the TS
  * checker proved ({@link TYPED_NATIVE_FORM}). An implicit-self Ruby site is
@@ -827,7 +837,7 @@ function isTypedNativeForm(
 ): boolean {
   if (kinds === undefined || kinds.length === 0 || kinds.includes("self")) return false;
   if (SIZE_ANALOGUES.has(value)) return tsNativeForms.has(TYPED_NATIVE_FORM.length);
-  return value === "except" && tsNativeForms.has(TYPED_NATIVE_FORM.except);
+  return TYPED_CREDITED_CALLS.has(value) && tsNativeForms.has(`${value}@typed`);
 }
 
 /**

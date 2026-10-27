@@ -1,3 +1,5 @@
+import { Temporal } from "@js-temporal/polyfill";
+
 /** @noRailsEquivalent PERMANENT */
 export const TZDATA_VERSION = "2026c";
 
@@ -798,6 +800,8 @@ function zoneRow(timeZoneId: string, table = TZDATA_ISDST): string | undefined {
   return rows(table).get(primary);
 }
 
+const horizon = Date.UTC(2040, 0, 1) / 1000;
+
 const GENERATE_UP_TO = new Date().getUTCFullYear() + 100;
 
 const generatedUpTo = Date.UTC(GENERATE_UP_TO + 1, 0, 1) / 1000;
@@ -867,5 +871,14 @@ export function tzdataIsdst(timeZoneId: string, epochSeconds: number): boolean {
     if (instants[middle] <= epochSeconds) low = middle + 1;
     else high = middle;
   }
-  return (row.charCodeAt(0) === 49 ? low + 1 : low) % 2 === 1;
+  const isdst = (row.charCodeAt(0) === 49 ? low + 1 : low) % 2 === 1;
+  if (epochSeconds < horizon || low === 0 || instants[low - 1] < horizon - 366 * 86400) {
+    return isdst;
+  }
+  const offsetAt = (at: number): number =>
+    Temporal.Instant.fromEpochMilliseconds(at * 1000).toZonedDateTimeISO(timeZoneId)
+      .offsetNanoseconds;
+  return offsetAt(tzdataOffsetInstant(timeZoneId, epochSeconds)) === offsetAt(instants[low - 1])
+    ? isdst
+    : !isdst;
 }

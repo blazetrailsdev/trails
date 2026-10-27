@@ -1,7 +1,6 @@
 import { isPresent, wrap } from "@blazetrails/activesupport";
 import {
   eachWithIndex,
-  first,
   Hash,
   rbEqual,
   rbHash,
@@ -9,7 +8,6 @@ import {
   Set,
   toS,
   uniq,
-  zip,
   eachWithObject,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
@@ -136,7 +134,7 @@ export class Association {
   setInverse(record: Base): void {
     const owners = this.ownersByKey.get(this.deriveKey(record, this.associationKeyName));
     if (owners != null) {
-      const association = first(owners)!.association(this.reflection.name);
+      const association = owners[0].association(this.reflection.name);
       association.setInverseInstance(record);
     }
   }
@@ -316,10 +314,10 @@ export class LoaderQuery {
       );
 
       eachWithObject(keys, queryConstraints, (valuesSet, constraints) => {
-        for (const [keyName, value] of zip(
-          this.associationKeyName as string[],
-          valuesSet as unknown[],
-        )) {
+        for (const [keyName, value] of (this.associationKeyName as string[]).map((keyName, i) => [
+          keyName,
+          (valuesSet as unknown[])[i] ?? null,
+        ])) {
           constraints.get(keyName as string)!.add(value);
         }
       });

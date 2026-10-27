@@ -1,6 +1,5 @@
 import {
   ArgumentError,
-  dup,
   excBacktraceLocations,
   NoMethodError,
   rbCheckArity,
@@ -85,8 +84,8 @@ export class Command extends Struct.new(
 
   override initializeCopy(other: Command): this {
     super.initializeCopy(other);
-    if (rtest(other.options)) this.options = dup(other.options);
-    if (rtest(other.optionsRelation)) this.optionsRelation = dup(other.optionsRelation);
+    if (rtest(other.options)) this.options = { ...other.options };
+    if (rtest(other.optionsRelation)) this.optionsRelation = { ...other.optionsRelation };
     return this;
   }
 

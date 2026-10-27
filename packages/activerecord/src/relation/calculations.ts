@@ -23,7 +23,6 @@ import {
 import {
   block,
   fetch,
-  first,
   hashAref,
   Hash,
   isEmpty,
@@ -441,7 +440,7 @@ export async function pluck(
     );
   }
 
-  if (hasInclude.call(this, first(columnNames))) {
+  if (hasInclude.call(this, columnNames[0] ?? null)) {
     const relation = await this.applyJoinDependency();
     return relation.pluck(...columnNames);
   }
@@ -490,7 +489,7 @@ export async function pick(
 
   return this.limit(1)
     .pluck(...columnNames)
-    .then((values) => first(values) ?? null);
+    .then((values) => values[0] ?? null);
 }
 
 export function asyncPick(
@@ -886,7 +885,7 @@ export async function executeSimpleCalculation(
     if (type instanceof EnumType) type = type.subtype;
   }
 
-  return typeCastCalculatedValue.call(this, first(result.castValues()), operation, type);
+  return typeCastCalculatedValue.call(this, result.castValues()[0] ?? null, operation, type);
 }
 
 /** @internal */
@@ -957,7 +956,7 @@ export async function executeGroupedCalculation(
 
     let keyRecords: Record<string | number, Base> | undefined;
     if (association) {
-      const keyIds = calculatedData.toArray().map((row) => row[first(groupAliases)!]);
+      const keyIds = calculatedData.toArray().map((row) => row[groupAliases[0]]);
       keyRecords = await (association.klass.baseClass as typeof Base)
         .where(new Map([[association.klass.baseClass.primaryKey, keyIds]]))
         .indexBy((record) => record.id as string | number);

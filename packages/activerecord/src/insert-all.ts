@@ -29,7 +29,7 @@ import {
   transformKeys,
 } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
-import { Enumerable, aryJoin, first } from "@blazetrails/ruby-compat";
+import { Enumerable, aryJoin } from "@blazetrails/ruby-compat";
 import { withConnection } from "./connection-handling.js";
 
 type ModelClass = typeof Base;
@@ -158,7 +158,7 @@ export class InsertAll {
     } else {
       this.resolveSti();
       this.resolveAttributeAliases();
-      this.keys = new Set(Object.keys(first(this.inserts) as Record<string, unknown>));
+      this.keys = new Set(Object.keys(this.inserts[0] ?? null));
     }
 
     this.scopeAttributes = except(
@@ -319,7 +319,7 @@ export class InsertAll {
 
   /** @internal */
   private resolveAttributeAliases(): void {
-    if (!this.hasAttributeAliases(first(this.inserts) ?? {})) return;
+    if (!this.hasAttributeAliases(this.inserts[0] ?? {})) return;
     this.inserts = this.inserts.map((insert) =>
       transformKeys(insert, (attribute) => this.resolveAttributeAlias(attribute)),
     );
@@ -446,7 +446,7 @@ export class Builder implements InsertBuilder {
     const columns = await this.model.schemaCache().columnsHash(tableName);
 
     const columnsKeys = Object.keys(columns);
-    const unknownColumn = first(keys.filter((key) => !columnsKeys.includes(key)));
+    const unknownColumn = keys.filter((key) => !columnsKeys.includes(key))[0] ?? null;
     if (unknownColumn != null) {
       throw new UnknownAttributeError(new this.model(), unknownColumn);
     }

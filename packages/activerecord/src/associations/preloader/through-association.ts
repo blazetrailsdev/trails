@@ -7,7 +7,6 @@ import {
   sortByBang,
   Hash,
   eachWithObject,
-  first,
   isEmpty,
   reduce,
   union,
@@ -46,7 +45,7 @@ export class ThroughAssociation extends Association {
 
         let throughRecords = (await this.throughRecordsByOwner())!.get(owner) ?? [];
 
-        if (first(this.owners)!.association(this.throughReflection.name).loaded) {
+        if (this.owners[0].association(this.throughReflection.name).loaded) {
           const sourceType = this.reflection.options.sourceType;
           if (sourceType) {
             throughRecords = throughRecords.filter(

@@ -352,7 +352,7 @@ export function optionTextAndValue(option: unknown): [unknown, unknown] {
     rbObjRespondTo(option, "last")
   ) {
     if (globalThis.Array.isArray(option)) option = option.filter((e) => !isPlainObject(e));
-    return [first(option as unknown[]), last(option as unknown[])];
+    return [first(option as Iterable<unknown>), last(option as { readonly last: unknown })];
   } else {
     return [option, option];
   }

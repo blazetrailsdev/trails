@@ -1,4 +1,4 @@
-import { rbFSend, rbObjRespondTo, toH, zip } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import { ActiveRecord } from "../../namespaces.js";
 import type { Relation } from "../../relation.js";
@@ -40,7 +40,9 @@ export class AssociationQueryValue {
         ];
       }
 
-      return idList.map((idsSet) => toH(zip(joinForeignKey, idsSet as unknown[])));
+      return idList.map((idsSet) =>
+        Object.fromEntries(joinForeignKey.map((key, i) => [key, (idsSet as unknown[])[i] ?? null])),
+      );
     } else {
       return [{ [joinForeignKey]: this.ids() }];
     }

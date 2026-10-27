@@ -1,6 +1,6 @@
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { hashDelete, last, rbRegMatchP, toH, toI, toS } from "@blazetrails/ruby-compat";
+import { hashDelete, rbRegMatchP, toI, toH, toS } from "@blazetrails/ruby-compat";
 import { StatementInvalid } from "../../errors.js";
 import { isPresent, presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
@@ -121,19 +121,19 @@ export class SchemaStatements extends BaseSchemaStatements {
         if (expression != null) {
           expression = expression.replaceAll("\\'", "'");
           if (!expression.startsWith("(")) expression = `(${expression})`;
-          last(indexes)![3].push(expression);
-          last(indexes)![4].expressions ||= {};
-          last(indexes)![4].expressions![expression] = expression;
-          if (row["Collation"] === "D") last(indexes)![4].orders![expression] = "desc";
+          indexes.at(-1)![3].push(expression);
+          indexes.at(-1)![4].expressions ||= {};
+          indexes.at(-1)![4].expressions![expression] = expression;
+          if (row["Collation"] === "D") indexes.at(-1)![4].orders![expression] = "desc";
         } else {
-          last(indexes)![3].push(row["Column_name"] as string);
+          indexes.at(-1)![3].push(row["Column_name"] as string);
           if (row["Sub_part"] != null) {
-            last(indexes)![4].lengths![row["Column_name"] as string] = toI(
+            indexes.at(-1)![4].lengths![row["Column_name"] as string] = toI(
               row["Sub_part"],
             ) as number;
           }
           if (row["Collation"] === "D") {
-            last(indexes)![4].orders![row["Column_name"] as string] = "desc";
+            indexes.at(-1)![4].orders![row["Column_name"] as string] = "desc";
           }
         }
       }
@@ -147,6 +147,7 @@ export class SchemaStatements extends BaseSchemaStatements {
           const orders = hashDelete(options, "orders") as IndexOptions["orders"];
           const lengths = hashDelete(options, "lengths") as IndexOptions["lengths"];
 
+          // eslint-disable-next-line blazetrails/ruby-compat-native-required -- addOptionsForIndexColumns takes a Hash
           const columns = toH<string, string>(
             index[3].map((name) => [name, expressions[name] ?? this.quoteColumnName(name)]),
           );

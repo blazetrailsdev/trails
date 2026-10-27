@@ -3,7 +3,6 @@ import {
   ArgumentError,
   block,
   fetch,
-  first,
   type Hash,
   hashAref,
   KeyError,
@@ -11,7 +10,6 @@ import {
   rbEqual,
   rbInspect,
   rbModConstSet,
-  transformValues,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import { FutureResult, type Complete } from "./future-result.js";
@@ -71,7 +69,9 @@ export class IndexedRow {
   }
 
   toH(): Record<string, unknown> {
-    return transformValues(this.columnIndexes, (index) => this.row[index]);
+    return Object.fromEntries(
+      Object.entries(this.columnIndexes).map(([key, index]) => [key, this.row[index]]),
+    );
   }
 
   toHash(): Record<string, unknown> {
@@ -181,7 +181,8 @@ export class Result {
   last(): Record<string, unknown> | null;
   last(n: number): Record<string, unknown>[];
   last(n?: number): Record<string, unknown> | Record<string, unknown>[] | null {
-    return n != null ? last(this.hashRows(), n) : last(this.hashRows());
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- n may be 0, where slice(-0) answers every row
+    return n != null ? last(this.hashRows(), n) : (this.hashRows().at(-1) ?? null);
   }
 
   result(): Result {
@@ -196,8 +197,8 @@ export class Result {
   castValues(typeOverrides: ColumnTypes | Hash<string, ColumnType> | ColumnType[] = {}): unknown[] {
     if (this.columns.length === 1) {
       const type = Array.isArray(typeOverrides)
-        ? first(typeOverrides)!
-        : this.#columnType(first(this.columns)!, 0, typeOverrides);
+        ? typeOverrides[0]
+        : this.#columnType(this.columns[0], 0, typeOverrides);
 
       return this.rows.map(([value]) => type.deserialize(value));
     } else {
@@ -245,7 +246,9 @@ export class Result {
   /** @internal */
   private hashRows(): Record<string, unknown>[] {
     return (this.#hashRows ??= this.rows.map((row) =>
-      transformValues(this.columnIndexes, (index) => row[index]),
+      Object.fromEntries(
+        Object.entries(this.columnIndexes).map(([key, index]) => [key, row[index]]),
+      ),
     ));
   }
 

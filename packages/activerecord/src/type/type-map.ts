@@ -1,6 +1,6 @@
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import * as Type from "../type.js";
-import { Concurrent, block as blockPass, last, rbEqq } from "@blazetrails/ruby-compat";
+import { Concurrent, block as blockPass, rbEqq } from "@blazetrails/ruby-compat";
 
 export class TypeMap {
   private _mapping: Map<string | RegExp, (...args: string[]) => ValueType> = new Map();
@@ -47,7 +47,7 @@ export class TypeMap {
     const matchingPair = [...this._mapping].reverse().find(([key]) => rbEqq(key, lookupKey));
 
     if (matchingPair) {
-      return (last(matchingPair) as (key: string) => ValueType)(lookupKey as string);
+      return ((matchingPair.at(-1) ?? null) as (key: string) => ValueType)(lookupKey as string);
     } else if (this._parent) {
       return this._parent.performFetch(lookupKey, block);
     } else {

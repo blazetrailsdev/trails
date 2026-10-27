@@ -4,7 +4,6 @@ import {
   deleteAt,
   except,
   flatten,
-  last,
   rbFArray,
   rbObjDup,
   rbObjRespondTo,
@@ -150,7 +149,7 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
       } else {
         const namespaces = modelName.split("::");
         deleteAt(namespaces, -2);
-        if (last(namespaces) === modelName) break;
+        if ((namespaces.at(-1) ?? null) === modelName) break;
         modelName = namespaces.join("::");
       }
     } while (modelKlass == null);

@@ -7273,6 +7273,31 @@ function productFactors(node: ts.Expression): string[] | undefined {
   return /^(num|id):/.test(factor) ? [factor] : undefined;
 }
 
+/**
+ * The Ruby reader an argument's native positional read ports: `xs[0] ?? null`
+ * is `xs.first` and `xs.at(-1)` is `xs.last` (RFC 0194). A bare `xs[0]` is
+ * left alone, since it also ports `args[0]` of a splat.
+ */
+function positionalReadName(expr: ts.Expression): string | undefined {
+  if (
+    ts.isBinaryExpression(expr) &&
+    expr.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken &&
+    expr.right.kind === ts.SyntaxKind.NullKeyword
+  ) {
+    const left = unwrapArg(expr.left);
+    return ts.isElementAccessExpression(left) && left.argumentExpression.getText() === "0"
+      ? "first"
+      : positionalReadName(left);
+  }
+  return ts.isCallExpression(expr) &&
+    ts.isPropertyAccessExpression(expr.expression) &&
+    expr.expression.name.text === "at" &&
+    expr.arguments.length === 1 &&
+    expr.arguments[0].getText() === "-1"
+    ? "last"
+    : undefined;
+}
+
 function describeArg(node: ts.Expression, flags: string[]): string {
   const expr = unwrapArg(node);
   if (ts.isIdentifier(expr)) {
@@ -7288,6 +7313,11 @@ function describeArg(node: ts.Expression, flags: string[]): string {
   if (expr.kind === ts.SyntaxKind.FalseKeyword) return "bool:false";
   if (expr.kind === ts.SyntaxKind.NullKeyword) return "nil";
   if (ts.isNewExpression(expr)) return "call:constructor";
+  const positional = positionalReadName(expr);
+  if (positional !== undefined) return `call:${positional}`;
+  if (ts.isCallExpression(expr) && expr.expression.getText() === "Object.fromEntries") {
+    return "call:toH";
+  }
   if (ts.isCallExpression(expr)) {
     const dispatched = dispatchedCallName(expr);
     if (dispatched !== undefined) return `call:${dispatched}`;
@@ -7826,12 +7856,43 @@ function checkerProvenKind(expr: ts.Expression): "sized" | "object" | undefined 
   return kinds.size === 1 ? [...kinds][0] : undefined;
 }
 
+/**
+ * `[xs.at(i), xs.at(j)]` over one array or tuple the checker proves: Ruby's
+ * `xs.values_at(i, j)` with Integer indexes (`rb_ary_values_at`).
+ */
+function isTypedValuesAtLiteral(n: ts.ArrayLiteralExpression): boolean {
+  if (n.elements.length < 2) return false;
+  const subjects = n.elements.map((el) => {
+    let read = unwrapped(el);
+    if (
+      ts.isBinaryExpression(read) &&
+      read.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken &&
+      read.right.kind === ts.SyntaxKind.NullKeyword
+    ) {
+      read = unwrapped(read.left);
+    }
+    return ts.isCallExpression(read) &&
+      ts.isPropertyAccessExpression(read.expression) &&
+      read.expression.name.text === "at" &&
+      read.arguments.length === 1
+      ? read.expression.expression
+      : undefined;
+  });
+  const [subject] = subjects;
+  return (
+    subject !== undefined &&
+    subjects.every((s) => s?.getText() === subject.getText()) &&
+    checkerProvenKind(subject) === "sized"
+  );
+}
+
 function nativeValueForms(n: ts.Node): string[] {
   if (ts.isArrayLiteralExpression(n)) {
     const [only] = n.elements;
-    return n.elements.length === 1 && only !== undefined && ts.isSpreadElement(only)
-      ? setRoundTripForms(setOperand(only.expression))
-      : [];
+    if (n.elements.length === 1 && only !== undefined && ts.isSpreadElement(only)) {
+      return setRoundTripForms(setOperand(only.expression));
+    }
+    return isTypedValuesAtLiteral(n) ? [TYPED_NATIVE_FORM.valuesAt] : [];
   }
   if (ts.isObjectLiteralExpression(n)) {
     const [only] = n.properties;
@@ -7856,6 +7917,9 @@ function nativeValueForms(n: ts.Node): string[] {
     return source !== undefined && checkerProvenKind(source) === "object"
       ? ["except", TYPED_NATIVE_FORM.except]
       : ["except"];
+  }
+  if (ts.isElementAccessExpression(n) && n.argumentExpression.getText() === "0") {
+    return checkerProvenKind(n.expression) === "sized" ? [TYPED_NATIVE_FORM.first] : [];
   }
   if (ts.isForOfStatement(n)) {
     const iterated = unwrapped(n.expression);
@@ -7919,13 +7983,24 @@ function nativeValueForms(n: ts.Node): string[] {
       return ["values"];
     case "Object.fromEntries": {
       const mapped = args[0] && unwrapped(args[0]);
-      const transform =
+      const entries =
         mapped !== undefined &&
         ts.isCallExpression(mapped) &&
         ts.isPropertyAccessExpression(mapped.expression) &&
-        mapped.expression.name.text === "map" &&
-        mapped.expression.expression.getText().startsWith("Object.entries(");
-      return transform ? ["toH", "transformValues"] : ["toH"];
+        mapped.expression.name.text === "map"
+          ? unwrapped(mapped.expression.expression)
+          : undefined;
+      if (
+        entries === undefined ||
+        !ts.isCallExpression(entries) ||
+        entries.expression.getText() !== "Object.entries"
+      ) {
+        return ["toH"];
+      }
+      const [hash] = entries.arguments;
+      return hash !== undefined && checkerProvenKind(hash) === "object"
+        ? ["toH", "transformValues", TYPED_NATIVE_FORM.transformValues]
+        : ["toH", "transformValues"];
     }
     case "Number.parseInt":
       return args.length === 2 && args[1].getText() === "10" ? ["toI"] : [];
@@ -7938,9 +8013,21 @@ function nativeValueForms(n: ts.Node): string[] {
   const method = n.expression.name.text;
   const [first, second] = args;
   switch (method) {
-    case "slice":
-      if (args.length === 1) return ["drop"];
-      return args.length === 2 && first.getText() === "0" ? ["take"] : [];
+    case "slice": {
+      const typed = checkerProvenKind(n.expression.expression) === "sized";
+      if (args.length === 1) {
+        if (/^-[1-9]\d*$/.test(first.getText())) return typed ? [TYPED_NATIVE_FORM.last] : [];
+        return typed ? ["drop", TYPED_NATIVE_FORM.drop] : ["drop"];
+      }
+      if (args.length !== 2 || first.getText() !== "0") return [];
+      return typed ? ["take", TYPED_NATIVE_FORM.take, TYPED_NATIVE_FORM.first] : ["take"];
+    }
+    case "at":
+      return args.length === 1 &&
+        first.getText() === "-1" &&
+        checkerProvenKind(n.expression.expression) === "sized"
+        ? [TYPED_NATIVE_FORM.last]
+        : [];
     case "trim":
     case "trimEnd":
       return args.length === 0 ? [method] : [];
@@ -7952,8 +8039,17 @@ function nativeValueForms(n: ts.Node): string[] {
       const params = callbackParams(first);
       const result = first && callbackResult(first);
       if (params === undefined || result === undefined) return [];
-      if (params.length === 1 && ts.isElementAccessExpression(result)) {
-        return isIdent(result.argumentExpression, params[0]) ? ["valuesAt"] : [];
+      const read =
+        ts.isBinaryExpression(result) &&
+        result.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken &&
+        result.right.kind === ts.SyntaxKind.NullKeyword
+          ? unwrapped(result.left)
+          : result;
+      if (params.length === 1 && ts.isElementAccessExpression(read)) {
+        if (!isIdent(read.argumentExpression, params[0])) return [];
+        return checkerProvenKind(read.expression) === "object"
+          ? ["valuesAt", TYPED_NATIVE_FORM.valuesAt]
+          : ["valuesAt"];
       }
       const zipped =
         params.length === 2 &&
@@ -8053,6 +8149,8 @@ function receiverTailName(receiver: ts.Expression): string | undefined {
   ) {
     return e.arguments[0].text;
   }
+  const positional = positionalReadName(e);
+  if (positional !== undefined) return positional;
   if (ts.isCallExpression(e)) e = e.expression;
   if (
     ts.isBinaryExpression(e) &&

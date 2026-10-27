@@ -875,32 +875,16 @@ export function valuesAt<T>(
  */
 export function valuesAt<K, T>(hash: Map<K, T>, ...keys: K[]): (T | null)[];
 /**
- * Ruby `Array#values_at` with Integer indexes (`vendor/ruby/v3.3.11/array.c:3769`
- * `rb_ary_values_at`): the element at each index, a negative one counting from
- * the end (`rb_ary_entry`, `array.c:1687`), `nil` past either end. The Range
- * arm of `rb_get_values_at` (`array.c:3672`) is not ported: nothing calls it.
- * @noRailsEquivalent PERMANENT — Ruby core `Array#values_at` (`vendor/ruby/v3.3.11/array.c:3769`).
- */
-export function valuesAt<T>(ary: readonly T[], ...indexes: number[]): (T | null)[];
-/**
  * `rb_hash_values_at` pushes `rb_hash_aref(hash, argv[i])` for each key, so the
  * arms share one body over the rest parameter.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#values_at` (`vendor/ruby/v3.3.11/hash.c:2713`).
  */
 export function valuesAt(
-  hash: Record<string, unknown> | Map<unknown, unknown> | readonly unknown[],
+  hash: Record<string, unknown> | Map<unknown, unknown>,
   ...keys: unknown[]
 ) {
   if (hash instanceof Map) return keys.map((key) => (hash.has(key) ? hash.get(key) : null));
-  if (Array.isArray(hash)) {
-    return keys.map((index) => {
-      const offset = (index as number) < 0 ? (index as number) + hash.length : (index as number);
-      return offset >= 0 && offset < hash.length ? hash[offset] : null;
-    });
-  }
-  return keys.map((key) =>
-    Object.hasOwn(hash, key as string) ? (hash as Record<string, unknown>)[key as string] : null,
-  );
+  return keys.map((key) => (Object.hasOwn(hash, key as string) ? hash[key as string] : null));
 }
 
 /**

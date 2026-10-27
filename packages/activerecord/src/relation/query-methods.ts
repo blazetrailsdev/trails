@@ -3,7 +3,6 @@ import {
   eachPair,
   extend,
   fetch,
-  first,
   flatten,
   Hash,
   isModuleIncluded,
@@ -21,7 +20,6 @@ import {
   symbolToS,
   toI,
   toS,
-  transformValues,
   union,
   uniq,
   TypeError,
@@ -1261,21 +1259,23 @@ export function buildNamedBoundSqlLiteral(
   statement: string,
   values: Record<string, unknown>,
 ): Nodes.BoundSqlLiteral {
-  const boundValues = transformValues(values, (value) => {
-    if (value instanceof ActiveRecord.Relation) {
-      return Arel.sql(value.toSql());
-    } else if (rbObjRespondTo(value, "map") && !actsLike.call(value, "string")) {
-      const values = (value as { map<R>(b: (v: unknown) => R): R[] }).map((v) =>
-        rbObjRespondTo(v, "idForDatabase") ? (v as { idForDatabase: unknown }).idForDatabase : v,
-      );
-      return values.length === 0 ? null : values;
-    } else {
-      if (rbObjRespondTo(value, "idForDatabase")) {
-        value = (value as { idForDatabase: unknown }).idForDatabase;
+  const boundValues = Object.fromEntries(
+    Object.entries(values).map(([key, value]) => {
+      if (value instanceof ActiveRecord.Relation) {
+        return [key, Arel.sql(value.toSql())];
+      } else if (rbObjRespondTo(value, "map") && !actsLike.call(value, "string")) {
+        const values = (value as { map<R>(b: (v: unknown) => R): R[] }).map((v) =>
+          rbObjRespondTo(v, "idForDatabase") ? (v as { idForDatabase: unknown }).idForDatabase : v,
+        );
+        return [key, values.length === 0 ? null : values];
+      } else {
+        if (rbObjRespondTo(value, "idForDatabase")) {
+          value = (value as { idForDatabase: unknown }).idForDatabase;
+        }
+        return [key, value];
       }
-      return value;
-    }
-  });
+    }),
+  );
 
   try {
     return new Nodes.BoundSqlLiteral(`(${statement})`, null, boundValues);
@@ -2180,7 +2180,7 @@ export function buildWithJoinNode(
 ): unknown {
   const withTable = new ArelTable(name);
 
-  return first(
+  return (
     this.table
       .join(withTable, kind)
       .on(
@@ -2188,6 +2188,6 @@ export function buildWithJoinNode(
           .get(foreignKey(String(this.model.modelName)))
           .eq(this.table.get(this.model.primaryKey as string)),
       )
-      .joinSources(),
+      .joinSources()[0] ?? null
   );
 }

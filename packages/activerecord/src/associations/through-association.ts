@@ -1,3 +1,4 @@
+import type { ThroughReflection } from "../reflection.js";
 import type { Base } from "../base.js";
 import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
@@ -6,22 +7,13 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
-import {
-  drop,
-  first,
-  isNil,
-  rbCallSuper,
-  rbEqual,
-  transformValues,
-  zip,
-  filterMap,
-} from "@blazetrails/ruby-compat";
+import { isNil, rbCallSuper, rbEqual, filterMap } from "@blazetrails/ruby-compat";
 import { delegate, kernelArray as Array, presence } from "@blazetrails/activesupport";
 
 /** @internal */
 export interface ThroughAssociationHost {
   owner: Base;
-  reflection: any;
+  reflection: ThroughReflection;
   options: any;
   /** @internal */
   _throughReflection?: any;
@@ -49,10 +41,10 @@ export function transaction<R>(
 /** @internal */
 export function throughReflection(this: ThroughAssociationHost): any {
   return (this._throughReflection ??= (() => {
-    let refl = this.reflection.throughReflection;
+    let refl = this.reflection.throughReflection!;
 
     while (refl.isThroughReflection()) {
-      refl = refl.throughReflection;
+      refl = refl.throughReflection!;
     }
 
     return refl;
@@ -67,7 +59,7 @@ export function throughAssociation(this: ThroughAssociationHost): any {
 /** @internal */
 export function targetScope(this: ThroughAssociationHost): any {
   const scope = rbCallSuper(this, targetScope) as any;
-  for (const reflection of drop<any>(this.reflection.chain, 1)) {
+  for (const reflection of this.reflection.chain.slice(1)) {
     const relation = reflection.klass.scopeForAssociation();
     scope.mergeBang(
       relation.except(
@@ -116,7 +108,9 @@ export function constructJoinAttributes(
   }
 
   if (records.length === 1) {
-    return transformValues(joinAttributes, (value) => first(value as unknown[]));
+    return Object.fromEntries(
+      Object.entries(joinAttributes).map(([key, value]) => [key, (value as unknown[])[0] ?? null]),
+    );
   } else {
     return joinAttributes;
   }
@@ -186,11 +180,11 @@ export function buildRecord(
     const target = this.throughAssociation().target;
 
     if (inverse != null && target != null && !globalThis.Array.isArray(target)) {
-      zip(Array(target.id), Array(inverse.foreignKey())).map(
-        ([primaryKeyValue, foreignKeyColumn]) => {
+      Array(target.id)
+        .map((id, i) => [id, Array(inverse.foreignKey())[i] ?? null])
+        .map(([primaryKeyValue, foreignKeyColumn]) => {
           attributes[foreignKeyColumn as string] = primaryKeyValue;
-        },
-      );
+        });
     }
   }
 

@@ -75,13 +75,12 @@ export function serializeTable(zones: Record<string, ZoneAbbreviations>): string
 
 /** The IANA release the table was generated from, which `process.versions.tz` must match. */
 export function header(): string {
-  return (
-    `/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_VERSION = "${tzdataVersion()}";\n\n` +
-    `/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_ABBREVIATIONS_HORIZON = ${Date.UTC(HORIZON_YEAR, 0, 1) / 1000};\n\n`
-  );
+  return `import { tzdataIsdst } from "./tzdata-isdst.js";\n\n/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_VERSION = "${tzdataVersion()}";\n\n`;
 }
 
 const READER = `
+const horizon = Date.UTC(${HORIZON_YEAR}, 0, 1) / 1000;
+
 let rowsByZoneId: Map<string, string>;
 
 function rows(): Map<string, string> {
@@ -155,6 +154,12 @@ export function tzdataAbbreviation(timeZoneId: string, epochSeconds: number): st
     const middle = (low + high) >> 1;
     if (instants[middle] <= epochSeconds) low = middle + 1;
     else high = middle;
+  }
+  if (epochSeconds >= horizon && low > 0 && instants[low - 1] >= horizon - 366 * 86400) {
+    const isdst = tzdataIsdst(timeZoneId, epochSeconds);
+    for (let i = low - 1; i >= 0 && instants[i] >= horizon - 2 * 366 * 86400; i--) {
+      if (tzdataIsdst(timeZoneId, instants[i]) === isdst) return names[indexes[i]];
+    }
   }
   return names[low === 0 ? 0 : indexes[low - 1]];
 }

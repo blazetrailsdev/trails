@@ -11,7 +11,6 @@ import {
   Open3,
   Errno,
   IOError,
-  first,
   format,
 } from "@blazetrails/ruby-compat";
 import { TimeoutError, Error } from "./mini-magick.js";
@@ -83,7 +82,7 @@ export class Shell {
       return [stdout, stderr, status?.exitstatus()];
     } catch (error) {
       if (error instanceof Errno.ENOENT || error instanceof IOError) {
-        return ["", `executable not found: "${first(command) ?? ""}"`, 127];
+        return ["", `executable not found: "${command[0] ?? ""}"`, 127];
       } else {
         throw error;
       }

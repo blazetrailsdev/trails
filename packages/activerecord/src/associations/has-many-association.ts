@@ -1,7 +1,6 @@
 import type { PermittedAttributes } from "@blazetrails/activemodel";
 import {
   fetch,
-  first,
   include,
   kernelThrow,
   rbEqual,
@@ -87,7 +86,7 @@ export class HasManyAssociation extends CollectionAssociation {
         }
 
         if (this.target.length !== 0) {
-          const associationClass = first(this.target)!.constructor;
+          const associationClass = this.target[0].constructor;
           let primaryKeyColumn: string | string[];
           let ids: unknown[];
           if (queryConstraintsList.call(associationClass)) {

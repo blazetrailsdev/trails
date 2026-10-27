@@ -6,7 +6,6 @@ import {
   getFs,
   Hash,
   hashDelete,
-  last,
   OpenURI,
   rbFBinding,
   rbObjIsKindOf,
@@ -34,10 +33,13 @@ type FileHost = ActionsHost & {
 type BufferHost = { outputBuffer: StringIO | null; _outputBuffer?: StringIO | null };
 
 export async function copyFile(this: FileHost, source: string, ...args: unknown[]): Promise<void> {
-  const block = (typeof last(args) === "function" ? args.pop() : undefined) as
+  const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
     | ContentBlock
     | undefined;
-  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
   const destination = (args[0] as string | undefined) || source;
   source = File.expandPath(await this.findInSourcePaths(toS(source)));
 
@@ -57,7 +59,10 @@ export async function linkFile(
   source: string,
   ...args: unknown[]
 ): Promise<unknown> {
-  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
   const destination = (args[0] as string | undefined) || source;
   source = File.expandPath(await this.findInSourcePaths(toS(source)));
 
@@ -69,10 +74,13 @@ export async function linkFile(
  * @inventedArm throw — PERMANENT
  */
 export async function get(this: FileHost, source: string, ...args: unknown[]): Promise<unknown> {
-  const block = (typeof last(args) === "function" ? args.pop() : undefined) as
+  const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
     | ((render?: Uint8Array) => unknown)
     | undefined;
-  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
   let destination = args[0] as string | undefined;
 
   let render: Uint8Array;
@@ -103,10 +111,13 @@ export async function template(
   source: string,
   ...args: unknown[]
 ): Promise<unknown> {
-  const block = (typeof last(args) === "function" ? args.pop() : undefined) as
+  const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
     | ContentBlock
     | undefined;
-  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
   const destination =
     (args[0] as string | undefined) || source.replace(RegExp(`${TEMPLATE_EXTNAME}$`), "");
 
@@ -147,8 +158,11 @@ export async function chmod(
 }
 
 export function prependToFile(this: InsertHost, path: string, ...args: unknown[]): unknown {
-  const block = typeof last(args) === "function" ? args.pop() : undefined;
-  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
   config["after"] = /^/;
   args.push(config);
   return this.insertIntoFile(path, ...args, ...(block ? [block] : []));
@@ -156,8 +170,11 @@ export function prependToFile(this: InsertHost, path: string, ...args: unknown[]
 export const prependFile = prependToFile;
 
 export function appendToFile(this: InsertHost, path: string, ...args: unknown[]): unknown {
-  const block = typeof last(args) === "function" ? args.pop() : undefined;
-  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
   config["before"] = /$/;
   args.push(config);
   return this.insertIntoFile(path, ...args, ...(block ? [block] : []));
@@ -170,8 +187,11 @@ export function injectIntoClass(
   klass: unknown,
   ...args: unknown[]
 ): unknown {
-  const block = typeof last(args) === "function" ? args.pop() : undefined;
-  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
   config["after"] = new RegExp(`class ${toS(klass)}\\n|class ${toS(klass)} .*\\n`);
   args.push(config);
   return this.insertIntoFile(path, ...args, ...(block ? [block] : []));
@@ -183,8 +203,11 @@ export function injectIntoModule(
   moduleName: unknown,
   ...args: unknown[]
 ): unknown {
-  const block = typeof last(args) === "function" ? args.pop() : undefined;
-  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
   config["after"] = new RegExp(`module ${toS(moduleName)}\\n|module ${toS(moduleName)} .*\\n`);
   args.push(config);
   return this.insertIntoFile(path, ...args, ...(block ? [block] : []));
@@ -196,8 +219,11 @@ export async function gsubFile(
   flag: RegExp | string,
   ...args: unknown[]
 ): Promise<void> {
-  const block = typeof last(args) === "function" ? args.pop() : undefined;
-  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
 
   if (!(this.behavior === "invoke" || rtest(Object.hasOwn(config, "force") ? config.force : false)))
     return;

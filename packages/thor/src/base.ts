@@ -10,7 +10,6 @@ import {
   hashDelete,
   include,
   included,
-  last,
   NotImplementedError,
   rbArgv,
   rbFSend,
@@ -353,7 +352,7 @@ export const ClassMethods = {
   },
 
   removeArgument(this: BaseClass, ...names: unknown[]): void {
-    const options = (rbObjIsKindOf(last(names), Hash) ? names.pop() : {}) as {
+    const options = (rbObjIsKindOf(names.at(-1) ?? null, Hash) ? names.pop() : {}) as {
       undefine?: unknown;
     };
 
@@ -401,7 +400,7 @@ export const ClassMethods = {
   allTasks: undefined as unknown as BaseClass["allCommands"],
 
   removeCommand(this: BaseClass, ...names: unknown[]): void {
-    const options = (rbObjIsKindOf(last(names), Hash) ? names.pop() : {}) as {
+    const options = (rbObjIsKindOf(names.at(-1) ?? null, Hash) ? names.pop() : {}) as {
       undefine?: unknown;
     };
 
@@ -668,10 +667,10 @@ export const ClassMethods = {
     relation: string,
     ...args: unknown[]
   ): void {
-    const block = (typeof last(args) === "function" ? args.pop() : undefined) as
+    const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
       | RelationBlock
       | undefined;
-    let opt = (rbObjIsKindOf(last(args), Hash) ? args.pop() : undefined) as
+    let opt = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : undefined) as
       | { for?: string }
       | undefined;
     opt ||= {};

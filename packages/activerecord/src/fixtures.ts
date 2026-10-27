@@ -22,7 +22,6 @@ import {
   rbModConstSet,
   rbObjRespondTo,
   slice,
-  valuesAt,
   isModuleIncluded,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Encryption } from "./namespaces.js";
@@ -87,7 +86,8 @@ export class FixtureSet {
     keysToFetch: readonly string[] | null = null,
   ): (FixtureSet | null)[] {
     if (keysToFetch) {
-      return valuesAt(this.cacheForConnectionPool(connectionPool), ...keysToFetch);
+      const cache = this.cacheForConnectionPool(connectionPool);
+      return keysToFetch.map((key) => cache[key] ?? null);
     } else {
       return Object.values(this.cacheForConnectionPool(connectionPool));
     }

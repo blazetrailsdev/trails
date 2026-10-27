@@ -541,12 +541,12 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
   if (this.primaryKey == null) throw new UnknownPrimaryKey(this.model as any);
 
   const expectsArray = this.model.isCompositePrimaryKey()
-    ? Array.isArray(aryFirst(aryFirst(ids) as unknown[]))
-    : Array.isArray(aryFirst(ids));
+    ? Array.isArray(aryFirst((ids[0] ?? null) as Iterable<unknown>))
+    : Array.isArray(ids[0] ?? null);
 
-  if (expectsArray && (aryFirst(ids) as unknown[]).length === 0) return [];
+  if (expectsArray && (ids[0] as unknown[]).length === 0) return [];
 
-  if (expectsArray) ids = aryFirst(ids) as unknown[];
+  if (expectsArray) ids = ids[0] as unknown[];
 
   ids = uniq(ids.filter((x) => x != null));
 
@@ -558,7 +558,7 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
       throw new RecordNotFound(errorMessage, modelName, this.primaryKey);
     }
     case 1: {
-      const result = await findOne.call(this, aryFirst(ids));
+      const result = await findOne.call(this, ids[0] ?? null);
       return expectsArray ? [result] : result;
     }
     default:
@@ -652,8 +652,8 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
 
 /** @internal */
 export async function findTake(this: FinderRelation): Promise<any | null> {
-  if (this.isLoaded) return aryFirst(await this.records()) ?? null;
-  this._take ??= aryFirst(await this.limit(1).records()) ?? null;
+  if (this.isLoaded) return (await this.records())[0] ?? null;
+  this._take ??= (await this.limit(1).records())[0] ?? null;
   return this._take;
 }
 
@@ -666,13 +666,14 @@ export async function findTakeWithLimit(this: FinderRelation, limit: number): Pr
 /** @internal */
 export async function findNth(this: FinderRelation, index: number): Promise<any | null> {
   this._offsets ||= {};
-  return (this._offsets[index] ||= aryFirst(await this.findNthWithLimit(index, 1)) ?? null);
+  return (this._offsets[index] ||= (await this.findNthWithLimit(index, 1))[0] ?? null);
 }
 
 /** @internal */
 export async function findLast(this: FinderRelation, limit?: number): Promise<any> {
   const records: any[] = await this.records();
-  return limit != null ? aryLast(records, limit) : (aryLast(records) ?? null);
+  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- limit may be 0, where slice(-0) answers every record
+  return limit != null ? aryLast(records, limit) : (records.at(-1) ?? null);
 }
 
 /** @internal */

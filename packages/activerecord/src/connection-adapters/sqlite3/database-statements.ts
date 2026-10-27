@@ -1,6 +1,6 @@
 import * as Arel from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { b, first, rbRegMatchP, StandardError } from "@blazetrails/ruby-compat";
+import { b, rbRegMatchP, StandardError } from "@blazetrails/ruby-compat";
 import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
@@ -264,7 +264,7 @@ export function buildTruncateStatement(this: QuoteTableNameHost | void, tableNam
 
 /** @internal */
 export function returningColumnValues(result: Result): unknown[] | null {
-  return first(result.rows);
+  return result.rows[0] ?? null;
 }
 
 /** @internal */

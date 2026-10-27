@@ -2,7 +2,6 @@ import {
   hashDelete,
   include,
   isEmpty,
-  last,
   rbFSend,
   rbObjDup,
   rtest,
@@ -181,8 +180,8 @@ export class CommandRecorder {
 
   /** @internal */
   invertCreateTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    if (isPlainObject(last(args))) {
-      delete (last(args) as Record<string, unknown>).ifNotExists;
+    if (isPlainObject(args.at(-1) ?? null)) {
+      delete ((args.at(-1) ?? null) as Record<string, unknown>).ifNotExists;
     }
     return ["dropTable", args, block];
   }
@@ -253,7 +252,8 @@ export class CommandRecorder {
 
   /** @internal */
   invertAddForeignKey(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    if (isPlainObject(last(args))) delete (last(args) as Record<string, unknown>).validate;
+    if (isPlainObject(args.at(-1) ?? null))
+      delete ((args.at(-1) ?? null) as Record<string, unknown>).validate;
     return ["removeForeignKey", args, block];
   }
 
@@ -278,7 +278,7 @@ export class CommandRecorder {
 
   /** @internal */
   invertAddCheckConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    const options = last(args);
+    const options = args.at(-1) ?? null;
     if (isPlainObject(options)) {
       delete options.validate;
       if ("ifNotExists" in options) options["ifExists"] = hashDelete(options, "ifNotExists");
@@ -294,7 +294,7 @@ export class CommandRecorder {
       );
     }
 
-    const options = last(args);
+    const options = args.at(-1) ?? null;
     if (isPlainObject(options)) {
       if ("ifExists" in options) options["ifNotExists"] = hashDelete(options, "ifExists");
     }

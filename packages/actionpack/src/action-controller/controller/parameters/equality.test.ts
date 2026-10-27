@@ -1,6 +1,5 @@
 import { beforeEach, describe, it } from "vitest";
 import { assert, assertNot, assertNotEqual } from "@blazetrails/activesupport";
-import { toH } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../metal/strong-parameters.js";
 
 describe("ParametersAccessorsTest", () => {
@@ -21,7 +20,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("parameters are not equal to the hash", () => {
-    const hash = toH([...params.eachPair()]);
+    const hash = Object.fromEntries([...params.eachPair()]);
     assertNotEqual(params, hash);
   });
 

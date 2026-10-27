@@ -1,15 +1,6 @@
 import { sql as arelSql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import {
-  aryJoin,
-  b,
-  cmp,
-  eachWithObject,
-  first,
-  last,
-  rbCmpint,
-  rbRegMatchP,
-} from "@blazetrails/ruby-compat";
+import { aryJoin, b, cmp, eachWithObject, rbCmpint, rbRegMatchP } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "../../errors.js";
 import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
@@ -115,7 +106,7 @@ export async function returningColumnValues(
   result: Result,
 ): Promise<unknown[] | null> {
   if (this.supportsInsertReturning()) {
-    return first(result.rows);
+    return result.rows[0] ?? null;
   } else {
     return abstractReturningColumnValues.call(
       this as SupportsInsertReturningHost & DatabaseStatementsHost,
@@ -130,7 +121,7 @@ export async function combineMultiStatements(
   totalSql: string[],
 ): Promise<string[]> {
   return eachWithObject(totalSql, [] as string[], async (sql, totalSqlChunks) => {
-    const previousPacket = last(totalSqlChunks);
+    const previousPacket = totalSqlChunks.at(-1) ?? null;
     if (await isMaxAllowedPacketReached.call(this, sql, previousPacket)) {
       totalSqlChunks.push(sql);
     } else {

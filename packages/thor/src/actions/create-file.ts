@@ -5,7 +5,6 @@ import {
   forceEncoding,
   getFs,
   Hash,
-  last,
   merge,
   rbEqual,
   rbObjIsKindOf,
@@ -19,10 +18,13 @@ type Block = () => unknown;
 type Data = string | Uint8Array | (() => unknown);
 
 export function createFile(this: ActionsHost, destination: string, ...args: unknown[]): unknown {
-  const block = (typeof last(args) === "function" ? args.pop() : undefined) as
+  const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
     | (() => unknown)
     | undefined;
-  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
   const data = args[0];
   return this.action(
     new CreateFile(

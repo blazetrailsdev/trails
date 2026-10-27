@@ -1,5 +1,4 @@
 import {
-  first,
   type Hash,
   hashDelete,
   type Module,
@@ -70,7 +69,7 @@ export class BelongsTo extends SingularAssociation {
     name: string,
     touch: any,
   ): Promise<void> {
-    const oldForeignId = changes.get(foreignKey) && first(changes.get(foreignKey)!);
+    const oldForeignId = changes.get(foreignKey) && (changes.get(foreignKey)![0] ?? null);
 
     if (rtest(oldForeignId)) {
       const association = o.association(name);
@@ -78,7 +77,8 @@ export class BelongsTo extends SingularAssociation {
       let klass: any;
       if (reflection.isPolymorphic()) {
         const foreignType = reflection.foreignType;
-        klass = (changes.get(foreignType) && first(changes.get(foreignType)!)) || o[foreignType];
+        klass =
+          (changes.get(foreignType) && (changes.get(foreignType)![0] ?? null)) || o[foreignType];
         klass = o.constructor.polymorphicClassFor(klass);
       } else {
         klass = association.klass;

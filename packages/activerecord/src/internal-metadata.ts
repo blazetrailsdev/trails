@@ -3,7 +3,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
-import { first } from "@blazetrails/ruby-compat";
 import {
   Table,
   SelectManager,
@@ -133,7 +132,7 @@ export class InternalMetadata {
     const values = await this._pool.withConnection((connection) =>
       connection.selectValues(sm, `${this.constructor.name} Count`),
     );
-    return first(values) as number;
+    return (values[0] ?? null) as number;
   }
 
   async tableExists(): Promise<boolean> {
