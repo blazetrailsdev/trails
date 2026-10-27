@@ -24,7 +24,6 @@ import {
   ArgumentError,
   b,
   KeyError,
-  merge,
   rbModAttrReader,
   rbObjIvarSet,
   RuntimeError,
@@ -734,8 +733,7 @@ export class TestRequest extends AbstractTestRequest {
    */
   override paramsParsers(): ParameterParsers {
     const base = super.paramsParsers();
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- the receiver is super's return, which the call gate cannot prove a Hash
-    return merge<unknown>(base, this._customParamParsers) as ParameterParsers;
+    return { ...base, ...this._customParamParsers } as ParameterParsers;
   }
 }
 

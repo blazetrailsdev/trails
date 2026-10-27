@@ -92,10 +92,6 @@ function release(data: MonData, owner: Owner): MonEntry {
   return entry;
 }
 
-function parentFor(data: MonData, owner: Owner): Owner | null {
-  return data.entries.some((entry) => entry.owner === owner) ? owner : null;
-}
-
 /**
  * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:191` `mon_owned?`, true when the
  * current execution context holds the monitor.
@@ -120,7 +116,9 @@ export function isMonOwned(this: object): boolean {
 export async function monSynchronize<T>(this: object, block: () => T | Promise<T>): Promise<T> {
   const data = monData(this);
   const owner = Symbol("monitor");
-  const acquired = acquire(data, parentFor(data, currentOwner(data)), {
+  const current = currentOwner(data);
+  const parent = data.entries.some((entry) => entry.owner === current) ? current : null;
+  const acquired = acquire(data, parent, {
     owner,
     count: 1,
     thread: Thread.current(),

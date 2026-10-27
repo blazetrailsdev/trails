@@ -3,7 +3,6 @@ import { SignedGlobalID, type ParseOptions } from "./signed-global-id.js";
 import { GID } from "./uri/gid.js";
 import {
   ArgumentError,
-  compact,
   except,
   Hash,
   rbFArray,
@@ -199,8 +198,9 @@ export class Locator {
     options: LocateSignedOptions = {},
   ): Promise<unknown[]> {
     return Locator.locateMany(
-      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- parity:api:calls:args pairs this argument by the Ruby call name
-      compact(sgids.map((sgid) => SignedGlobalID.parse(String(sgid), slice(options, "for")))),
+      sgids
+        .map((sgid) => SignedGlobalID.parse(String(sgid), slice(options, "for")))
+        .filter((g) => g != null),
       options,
     );
   }

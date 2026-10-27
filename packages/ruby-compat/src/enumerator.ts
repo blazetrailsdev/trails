@@ -1,6 +1,7 @@
 import { Fiber } from "./fiber.js";
 import { rbBlockGivenP } from "./hash.js";
 import { rbFSend, rtest } from "./object.js";
+import type { Enumerated } from "./enumerable.js";
 import { StopIteration } from "./stop-iteration.js";
 
 /**
@@ -47,7 +48,7 @@ class Generator<T> {
  *
  * @noRailsEquivalent PERMANENT
  */
-export class Enumerator<T = unknown> {
+export class Enumerator<T = unknown, E = unknown> {
   private obj: object;
   private fib: Fiber<unknown> | null = null;
   private stopExc: StopIteration | null = null;
@@ -142,25 +143,36 @@ export class Enumerator<T = unknown> {
   }
 
   /**
-   * `Enumerable#to_a` (`vendor/ruby/v3.3.11/enum.c:711` `enum_to_a`).
+   * `Enumerable#to_a` (`vendor/ruby/v3.3.11/enum.c:711` `enum_to_a`): what
+   * `each` yields, packed as `rb_enum_values_pack` (`enum.c:53`) packs a
+   * multi-value yield. Over an `each` that answers a promise, a promise of them.
    *
    * @noRailsEquivalent PERMANENT
    */
-  toA(): T[] {
-    return [...this];
+  toA(): Enumerated<E, T[]> {
+    const ary: T[] = [];
+    const each = this.each((...values: T[]) =>
+      ary.push(values.length <= 1 ? values[0] : (values as T)),
+    );
+    if (each != null && typeof (each as PromiseLike<unknown>).then === "function") {
+      return Promise.resolve(each as PromiseLike<unknown>).then(() => ary) as Enumerated<E, T[]>;
+    }
+    return ary as Enumerated<E, T[]>;
   }
 
   /**
    * `enumerator_each` (`vendor/ruby/v3.3.11/enumerator.c:613`) run to completion
-   * into a snapshot, which a `for…of` then walks. A multi-value yield is packed
-   * into one Array (`vendor/ruby/v3.3.11/enum.c:53` `rb_enum_values_pack`).
+   * into a snapshot, which a `for…of` then walks.
    *
    * @noRailsEquivalent PERMANENT
    */
   *[Symbol.iterator](): globalThis.Generator<T> {
-    const buffer: T[] = [];
-    this.each((...values: T[]) => buffer.push(values.length <= 1 ? values[0] : (values as T)));
-    yield* buffer;
+    yield* this.toA() as T[];
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async *[Symbol.asyncIterator](): AsyncGenerator<T> {
+    yield* await this.toA();
   }
 }
 

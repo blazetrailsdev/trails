@@ -1,4 +1,4 @@
-import { compact, Hash, Module, strip, toS } from "@blazetrails/ruby-compat";
+import { Hash, Module, strip, toS } from "@blazetrails/ruby-compat";
 import { LogSubscriber } from "../log-subscriber.js";
 import { LOG_LEVELS, type Logger, type LogLevel } from "../logger.js";
 import { Notifications } from "../notifications.js";
@@ -98,8 +98,10 @@ export class MockLogger {
   }
 
   logged(level: LogLevel): string[] {
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- parity:api:calls does not credit filter as compact over a Map#get receiver
-    return compact(this._logged.get(level)!).map((l) => strip(toS(l)));
+    return this._logged
+      .get(level)!
+      .filter((l) => l != null)
+      .map((l) => strip(toS(l)));
   }
 
   flush(): void {

@@ -1452,12 +1452,8 @@ type CallableMethods<M extends object> = {
 
 export type Included<M extends object> = CallableMethods<M extends Module<infer I> ? I : M>;
 
-function isClass(klass: object): klass is AnyClass {
-  return typeof klass === "function";
-}
-
 function isClassReceiver(klass: object): klass is AnyClass {
-  return isClass(klass) && !Object.hasOwn(klass, classModule);
+  return typeof klass === "function" && !Object.hasOwn(klass, classModule);
 }
 
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {

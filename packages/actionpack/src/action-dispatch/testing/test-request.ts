@@ -1,6 +1,5 @@
 import { MockRequest, type RackEnv } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
-import { merge } from "@blazetrails/ruby-compat";
 
 /** @internal */
 const DEFAULT_ENV: RackEnv = MockRequest.envFor("/", {
@@ -17,8 +16,7 @@ export class TestRequest extends Request {
 
   static create(env: RackEnv = {}): TestRequest {
     env["rack.request.cookie_hash"] ??= {};
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- the receiver is DEFAULT_ENV, which the call gate cannot prove a Hash
-    return new TestRequest(merge<unknown>(TestRequest.defaultEnv(), env));
+    return new TestRequest({ ...TestRequest.defaultEnv(), ...env });
   }
 
   get requestMethod(): string {

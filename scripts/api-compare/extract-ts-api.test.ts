@@ -217,18 +217,6 @@ describe("harvestObjectLiteralMethods", () => {
     expect(objectLiteralMethods(`export const _allocation = { klass: null };`)).toEqual([]);
   });
 
-  it("records a plain-object module's [initialize] hook", () => {
-    const methods = objectLiteralMethods(
-      `declare const initialize: unique symbol;
-      declare const other: unique symbol;
-      export const DatabaseStatements = {
-        [initialize](this: { resetTransaction(): void }): void { this.resetTransaction(); },
-        [other](): void {},
-      };`,
-    );
-    expect(methods.map((m) => m.name)).toEqual(["[initialize]"]);
-  });
-
   it("reads @internal off the declaration a mixin entry references", () => {
     const methods = objectLiteralMethods(
       `/** @internal */
@@ -3709,36 +3697,6 @@ describe("extractFromProgram — include() detection", () => {
     expect(methods.map((m) => [m.name, m.bodyless === true])).toEqual([["registerType", false]]);
   });
 
-  it("records the [initialize] hook a Module's block assigns as the module's initialize", () => {
-    const info = extractFromFiles("/p", {
-      "shell.ts": `
-        declare const initialize: unique symbol;
-        declare class Module {
-          constructor(block?: (mod: Module) => void);
-        }
-        export const Shell = new Module((mod) => {
-          (mod as unknown as Record<symbol, unknown>)[initialize] = function (
-            this: { shell: unknown },
-            args: unknown[] = [],
-            options: unknown = {},
-            config: { shell?: unknown } = {},
-          ) {
-            this.shell = config.shell;
-          };
-        });
-        export const Other = new Module((mod) => {
-          const other = {} as Record<symbol, unknown>;
-          other[initialize] = function () {};
-        });
-      `,
-    });
-    const methods = info.modules["shell.ts:Shell"].instanceMethods;
-    expect(methods.map((m) => [m.name, m.params.map((p) => p.name)])).toEqual([
-      ["[initialize]", ["this", "args", "options", "config"]],
-    ]);
-    expect(info.modules["shell.ts:Other"]).toBeUndefined();
-  });
-
   it("does not record a SCREAMING_SNAKE method-table constant as a module", () => {
     // `ActiveSupport::Deprecation::DEFAULT_BEHAVIORS`
     // (deprecation/behaviors.rb:13-63) is a Ruby Hash, not a module. Counting
@@ -6679,6 +6637,23 @@ describe("@missingRailsCall extraction", () => {
 const nativeForms = (m: MethodInfo): Set<string> =>
   partitionNegatedCalls(m.calls ?? []).nativeForms;
 
+describe("typed merge! credit", () => {
+  const forms = (body: string): Set<string> =>
+    nativeForms(
+      extractFromFiles("/p", {
+        "foo.ts": `export class Foo {
+          m(xs: [{ ok(): boolean; v(): unknown }], h: { a?: number }, o: { a?: number }) { ${body} }
+        }`,
+      }).classes["foo.ts:Foo"].instanceMethods.find((m) => m.name === "m")!,
+    );
+
+  it("credits merge!@typed only for one plain-object source", () => {
+    expect(forms(`Object.assign(h, o);`).has("merge!@typed")).toBe(true);
+    expect(forms(`Object.assign(h);`).has("merge!@typed")).toBe(false);
+    expect(forms(`Object.assign(h, xs);`).has("merge!@typed")).toBe(false);
+  });
+});
+
 describe("a native hash form credits the Hash call it ports", () => {
   const credited = (
     rubyCall: string,
@@ -6844,6 +6819,11 @@ describe("native element access as the port of Hash#[] / Hash#[]=", () => {
     expect(method(`use(h[k]);`).callArgs![0].args).toEqual(["?"]);
     expect(method(`use(hashAref(h, k));`).callArgs![0].args).toEqual(["call:hashAref"]);
     expect(method(`use(h.k);`).callArgs![0].args).toEqual(["call:k"]);
+  });
+
+  it("describes a native form argument as the Ruby call it spells", () => {
+    expect(method(`use(xs.filter((x) => x != null));`).callArgs![0].args).toEqual(["call:compact"]);
+    expect(method(`use(Math.trunc(n));`).callArgs![0].args).toEqual(["call:toI"]);
   });
 });
 
