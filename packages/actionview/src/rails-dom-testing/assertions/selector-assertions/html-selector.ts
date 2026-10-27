@@ -20,12 +20,12 @@ export class HTMLSelector {
   readonly tests: EqualityTests;
   message: unknown;
   private readonly values: unknown[];
-  private readonly _root: { css(...args: unknown[]): NodeSet };
+  private readonly root: { css(...args: unknown[]): NodeSet };
   private selector!: string;
 
   constructor(values: unknown[], previousSelection: unknown = null, rootFallback: () => unknown) {
     this.values = values;
-    this._root = this.extractRoot(previousSelection, rootFallback) as HTMLSelector["_root"];
+    this.root = this.extractRoot(previousSelection, rootFallback) as HTMLSelector["root"];
     this.extractSelectors();
     this.tests = this.extractEqualityTests();
     this.message = this.values.shift();
@@ -49,7 +49,7 @@ export class HTMLSelector {
   }
 
   select(): NodeSet {
-    return this.filter(this._root.css(this.selector, HTMLSelector.context));
+    return this.filter(this.root.css(this.selector, HTMLSelector.context));
   }
 
   private filter(matches: NodeSet): NodeSet {

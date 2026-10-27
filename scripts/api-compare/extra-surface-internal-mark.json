@@ -21,7 +21,7 @@
   "rack": 214,
   "rack-session": 60,
   "rack-test": 45,
-  "rails-dom-testing": 29,
+  "rails-dom-testing": 31,
   "ruby-compat": 931,
   "thor": 175
 }

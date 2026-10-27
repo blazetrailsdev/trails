@@ -1,7 +1,7 @@
 import { assert, assertNot, isBlank } from "@blazetrails/activesupport";
 import { type Html5DocumentFragment, type Html5Node } from "@blazetrails/nokogiri";
+import { rbEqual, stringSplit } from "@blazetrails/ruby-compat";
 import { Testing } from "../../testing.js";
-import { stringSplit } from "@blazetrails/ruby-compat";
 
 type Fragment = Html5DocumentFragment | Html5Node;
 type Attr = Html5Node["attributeNodes"][number];
@@ -72,7 +72,7 @@ function isEqualChild(child: Html5Node, otherChild: Html5Node, strict: boolean):
   if (strict) {
     return child.toString() === otherChild.toString();
   } else {
-    return stringSplit(child.toString()).join(" ") === stringSplit(otherChild.toString()).join(" ");
+    return rbEqual(stringSplit(child.toString()), stringSplit(otherChild.toString()));
   }
 }
 
