@@ -590,104 +590,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "api.rb",
-    "rubyName": "_allow_other_host",
-    "digest": "bdadc11e288edfbf",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "_enforce_open_redirect_protection",
-    "digest": "06104a3be786d54b",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "_ensure_url_is_http_header_safe",
-    "digest": "dfab896e49bf08f3",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "_extract_parameters",
-    "digest": "f6cbb84142172e4c",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "_extract_redirect_to_status",
-    "digest": "e4e0b76a09055fda",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "_perform_parameter_wrapping",
-    "digest": "3d790037accee08b",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "_url_host_allowed?",
-    "digest": "6601294ca30a17d4",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "_wrap_parameters",
-    "digest": "edbb636ca0c127b3",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "_wrapper_enabled?",
-    "digest": "fb73f20ed0487d87",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "_wrapper_formats",
-    "digest": "86c07edec3169630",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "_wrapper_key",
-    "digest": "f2cc5fbe54aeb8a1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "append_info_to_payload",
-    "digest": "c8b72182f62836b9",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "cleanup_view_runtime",
-    "digest": "0a252ca5c7e40056",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "halted_callback_hook",
-    "digest": "1ca1034e75f1a1c0",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
     "rubyName": "initialize",
     "digest": "cab1e19689f2ddff",
     "ref": "v8.0.2"
@@ -709,13 +611,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "api.rb",
-    "rubyName": "process_action",
-    "digest": "267e83f1a7f29b00",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
     "rubyName": "render",
     "digest": "115cc5659b81e077",
     "ref": "v8.0.2"
@@ -725,13 +620,6 @@
     "rubyFile": "api.rb",
     "rubyName": "render_to_body",
     "digest": "04efee3599017c31",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "show_detailed_exceptions?",
-    "digest": "9583c381d896cc8b",
     "ref": "v8.0.2"
   },
   {
