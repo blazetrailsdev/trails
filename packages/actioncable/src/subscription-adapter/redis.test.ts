@@ -20,7 +20,7 @@ vi.mock("ioredis", async (importOriginal) => {
     ...actual,
     Redis: class {
       constructor(url: string, options: RedisOptions) {
-        redisNew(options);
+        redisNew(url, options);
         if (!stubRedisNew.value) return new actual.Redis(url, options) as never;
       }
 
@@ -172,7 +172,7 @@ function connectorTests(host: ConnectorHost): () => object {
 
 function testSetsConnectionIdForConnection(host: ConnectorHost, adapter: object): void {
   redisConnection(adapter);
-  expect(redisNew).toHaveBeenCalledWith(host.expectedConnection());
+  expect(redisNew).toHaveBeenCalledWith(host.expectedConnection().url, host.expectedConnection());
 }
 
 describe("RedisAdapterTest::AlternateConfiguration", () => {
@@ -264,6 +264,6 @@ describe("RedisAdapterTest::SentinelConfigAsHash", () => {
 
   it("sets sentinels as array of hashes with keyword arguments", () => {
     redisConnection(adapter);
-    expect(redisNew).toHaveBeenCalledWith(host.expectedConnection());
+    expect(redisNew).toHaveBeenCalledWith(host.expectedConnection().url, host.expectedConnection());
   });
 });
