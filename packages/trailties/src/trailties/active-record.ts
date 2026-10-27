@@ -1,17 +1,11 @@
 import "./active-model.js";
 import "./action-controller.js";
-import {
-  constantize,
-  include,
-  isPresent,
-  onLoad,
-  TopLevel,
-  upcaseFirst,
-} from "@blazetrails/activesupport";
+import { include, isPresent, onLoad, TopLevel, upcaseFirst } from "@blazetrails/activesupport";
 import { except, Process, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Callbacks } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
+import { Fixture } from "@blazetrails/activerecord/fixtures.js";
 import {
   ActiveRecordError,
   AsynchronousQueriesTracker,
@@ -306,7 +300,7 @@ export class Trailtie extends BaseTrailtie {
 
       onLoad("active_record_fixture_set", () => {
         if (Encryption.config.encryptFixtures) {
-          prepend(constantize("ActiveRecord::Fixture") as new () => object, EncryptedFixtures);
+          prepend(Fixture, EncryptedFixtures);
         }
       });
     });

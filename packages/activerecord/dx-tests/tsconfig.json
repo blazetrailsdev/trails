@@ -6,6 +6,7 @@
     "paths": {
       "@blazetrails/activerecord/enum": ["../src/enum.ts"],
       "@blazetrails/activerecord/connection-adapters/*.js": ["../src/connection-adapters/*.ts"],
+      "@blazetrails/activerecord/fixtures.js": ["../src/fixtures.ts"],
       "@blazetrails/activerecord": ["../src/index.ts"],
       "@blazetrails/rack-session": ["../../rack-session/src/index.ts"],
       "@blazetrails/activemodel": ["../../activemodel/src/index.ts"],
