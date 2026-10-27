@@ -45,5 +45,6 @@ describe("Warning.[]=", () => {
     warn("old", { category: ":deprecated" });
     expect(write).toHaveBeenCalledWith("old\n");
     expect(() => rbWarningSAset(":nope", true)).toThrow("unknown category: :nope");
+    expect(() => rbWarningSAref("toString")).toThrow("unknown category: toString");
   });
 });
