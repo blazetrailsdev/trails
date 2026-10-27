@@ -161,4 +161,46 @@ export class StringScanner {
   isEos(): boolean {
     return this.#curr >= this.#str.length;
   }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:332` `strscan_terminate`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  terminate(): this {
+    this.#curr = this.#str.length;
+    REGS.set(this, null);
+    return this;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1109` `strscan_matched`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  matched(): string | null {
+    const regs = REGS.get(this) ?? null;
+    if (regs === null) return null;
+    return regs[0];
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1320` `strscan_pre_match`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  preMatch(): string | null {
+    const regs = REGS.get(this) ?? null;
+    if (regs === null) return null;
+    return this.#str.slice(0, this.#curr - regs[0].length);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1357` `strscan_rest`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  rest(): string {
+    return this.#str.slice(this.#curr);
+  }
 }

@@ -24,12 +24,15 @@ import { MissingTemplate } from "./error.js";
 import { Handlers } from "./handlers.js";
 import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
+import { Builder } from "./handlers/builder.js";
 
 const FIXTURE_LOAD_PATH = new FixtureResolver({
   "test/hello_world.tse": "Hello world!",
   "test/hello_world.da.html.tse": "Hey verden",
   "test/hello_world.html+phone.tse": "Hello phone!",
   "test/hello_world.text+phone.tse": "Hello texty phone!",
+  "test/hello.builder":
+    'await xml.html(async () => {\n  xml.p(`Hello ${this.name ?? ""}`);\n  xml.append(await render({ template: "test/greeting" }));\n});\n',
 });
 
 describe("LookupContextTest", () => {
@@ -45,6 +48,7 @@ describe("LookupContextTest", () => {
 
   beforeEach(() => {
     Template.registerTemplateHandler("tse", new TSE());
+    Template.registerTemplateHandler("builder", new Builder());
     enforceAvailableLocales = I18n.enforceAvailableLocales();
     I18n.setEnforceAvailableLocales(false);
     lookupContext = buildLookupContext([FIXTURE_LOAD_PATH], {});
@@ -170,9 +174,7 @@ describe("LookupContextTest", () => {
     assertEqual("Hello texty phone!", template.source);
   });
 
-  // BLOCKED: port-builder-template-handler
-  it.skip("found templates have nil format if one cannot be found from template or handler", async () => {
-    const { Builder } = Handlers as unknown as { Builder: { defaultFormat: unknown } };
+  it("found templates have nil format if one cannot be found from template or handler", async () => {
     await assertCalled(Builder, "defaultFormat", null, { returns: null }, () => {
       lookupContext.formats = [":text"];
       const template = lookupContext.find("hello", ["test"]) as Template;
