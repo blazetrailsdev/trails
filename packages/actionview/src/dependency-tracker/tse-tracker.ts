@@ -228,6 +228,7 @@ export class TSETracker {
     return options;
   }
 
+  /** @inventedArm if — CONVERGEABLE port-ruby-tracker-and-converge-tse-tracker-to-erb-tracker */
   private addDependencies(renderDependencies: string[], arguments_: string, pattern: RegExp): void {
     const match = pattern.exec(arguments_);
     if (match?.index !== 0) return;

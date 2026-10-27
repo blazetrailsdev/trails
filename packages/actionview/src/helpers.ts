@@ -48,9 +48,9 @@ export const Helpers = {} as HelpersModule;
 extend(Helpers, Autoload);
 Helpers.autoload("Tags");
 rbModConstSet(Helpers, "Tags", Tags);
-export async function eagerLoadBang(): Promise<void> {
-  await Autoload.eagerLoadBang.call(Helpers);
-  await Helpers.Tags.eagerLoadBang();
+export async function eagerLoadBang(this: HelpersModule): Promise<void> {
+  await Autoload.eagerLoadBang.call(this);
+  await this.Tags.eagerLoadBang();
 }
 Object.defineProperty(Helpers, "eagerLoadBang", {
   value: eagerLoadBang,
