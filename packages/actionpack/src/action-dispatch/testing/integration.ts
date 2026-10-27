@@ -546,7 +546,6 @@ function methodMissing(this: RunnerHost, method: string, ...args: unknown[]): un
 
 export interface Runner {
   readonly app: unknown;
-  /** @internal */
   rootSession: Runner | null;
   readonly integrationSession: Session;
   resetBang(): void;
