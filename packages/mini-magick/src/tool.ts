@@ -1,12 +1,8 @@
 import { Shell } from "./shell.js";
 import {
   PROTOCOL_PROBES,
-  rbCheckArrayType,
-  rbStrSend,
+  chomp,
   rbFArray,
-  rbObjAsString,
-  rbObjIsKindOf,
-  Hash,
   rbFSend,
   rbConstWarnIfDeprecated,
   rbModDeprecateConstant,
@@ -15,14 +11,14 @@ import { MiniMagick } from "./mini-magick.js";
 
 export class Tool {
   declare _name: string;
-  declare _args: unknown[];
+  declare _args: string[];
   declare _options: { [x: string]: unknown };
 
   static toString(): string {
     return "MiniMagick::Tool";
   }
 
-  static CREATION_OPERATORS: unknown = [
+  static CREATION_OPERATORS: string[] = [
     "xc",
     "canvas",
     "logo",
@@ -87,15 +83,15 @@ export class Tool {
     if (block != null) {
       await block(stdout, stderr, status);
     }
-    return rbStrSend(stdout, "chomp", "\n")[0] as string;
+    return chomp(stdout, "\n");
   }
 
   command(): string[] {
-    return [...this.executable(), ...(this.args as string[])];
+    return [...this.executable(), ...this.args];
   }
 
   executable() {
-    const exe = rbFArray(MiniMagick.cliPrefix);
+    const exe = rbFArray(MiniMagick.cliPrefix) as string[];
     if (MiniMagick.isImagemagick7() && this.name !== "magick") {
       exe.push("magick");
     }
@@ -103,25 +99,23 @@ export class Tool {
       exe.push("gm");
     }
     exe.push(this.name);
-    return exe as string[];
+    return exe;
   }
 
-  append(arg: string) {
-    if (Array.isArray(this.args)) this.args.push(rbObjAsString(arg));
-    else if (this.args instanceof globalThis.Set) this.args.add(rbObjAsString(arg));
-    else this.args.append(rbObjAsString(arg));
+  append(arg: unknown) {
+    this.args.push(String(arg));
     return this;
   }
 
   mergeBang(newArgs: unknown[]) {
     for (const arg of newArgs) {
-      this.append(arg as string);
+      this.append(arg);
     }
     return this;
   }
 
   plus(...values: unknown[]) {
-    this.args[this.args.length - 1] = (this.args.at(-1) as string).replace(/^-/m, "+");
+    this.args[this.args.length - 1] = this.args.at(-1)!.replace(/^-/m, "+");
     this.mergeBang(values);
     return this;
   }
@@ -133,16 +127,9 @@ export class Tool {
         : undefined;
     this.append("(");
     for (const value of args) {
-      if (rbObjIsKindOf(value, Hash)) {
-        {
-          const items = value;
-          for (const [key, value] of items instanceof globalThis.Map
-            ? [...items]
-            : Array.isArray(items)
-              ? items
-              : Object.entries(items ?? {})) {
-            rbFSend(this, key, ...(value == null ? [] : (rbCheckArrayType(value) ?? [value])));
-          }
+      if (value != null && Object.getPrototypeOf(value) === Object.prototype) {
+        for (const [key, val] of Object.entries(value)) {
+          rbFSend(this, key, ...(val == null ? [] : Array.isArray(val) ? val : [val]));
         }
       } else if (typeof value === "string") {
         this.append(value);
@@ -219,7 +206,7 @@ export class Tool {
   }
 
   methodMissing(name: string, ...args: unknown[]) {
-    const option = `-${rbStrSend(rbObjAsString(name), "tr", "_", "-")[0] as string}`;
+    const option = `-${name.replaceAll("_", "-")}`;
     this.append(option);
     this.mergeBang(args);
     return this;
@@ -240,22 +227,23 @@ export class Tool {
     "montage",
     "stream",
   ]) {
+    const Name = tool[0].toUpperCase() + tool.slice(1);
     const klass = class extends Tool {
       static toString(): string {
-        return `MiniMagick::Tool::${rbStrSend(tool, "capitalize")[0] as string}`;
+        return `MiniMagick::Tool::${Name}`;
       }
 
       constructor(...args: unknown[]) {
         super(tool, ...(args as [Record<string, unknown>?]));
       }
     };
-    Object.defineProperty(Tool, rbStrSend(tool, "capitalize")[0] as string, {
+    Object.defineProperty(Tool, Name, {
       get() {
-        rbConstWarnIfDeprecated(Tool, rbStrSend(tool, "capitalize")[0] as string);
+        rbConstWarnIfDeprecated(Tool, Name);
         return klass;
       },
       set(value: unknown) {
-        Object.defineProperty(Tool, rbStrSend(tool, "capitalize")[0] as string, {
+        Object.defineProperty(Tool, Name, {
           value,
           writable: true,
           enumerable: true,
@@ -265,6 +253,6 @@ export class Tool {
       enumerable: true,
       configurable: true,
     });
-    rbModDeprecateConstant(Tool, rbStrSend(tool, "capitalize")[0] as string);
+    rbModDeprecateConstant(Tool, Name);
   }
 }
