@@ -70,6 +70,7 @@ export const TopLevel: {
         root?: string | null;
         paths(): { get(path: string): { firstSync(): string | undefined } | undefined };
       };
+      initialized(): boolean;
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
       routes(): { namedRoutes: { helperNames(): string[] } };
       envConfig(): Record<string, unknown>;

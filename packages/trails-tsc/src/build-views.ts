@@ -62,11 +62,16 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
         .map((file) => path.join(initializersDir, file))
     : [];
   for (const initializer of existent.sort()) await loadConfigInitializer(initializer);
-  for (const ext of ["ts", "js"]) {
-    const routes = path.join(cwd, `config/routes.${ext}`);
-    if (TopLevel.Trails?.application && (await exists(routes))) {
-      await rbFLoad(routes);
-      break;
+  const application = TopLevel.Trails?.application;
+  if (application?.initialized()) {
+    await application.reloadRoutesUnlessLoaded();
+  } else if (application) {
+    for (const ext of ["ts", "js"]) {
+      const routes = path.join(cwd, `config/routes.${ext}`);
+      if (await exists(routes)) {
+        await rbFLoad(routes);
+        break;
+      }
     }
   }
   const pathParser = new PathParser();
