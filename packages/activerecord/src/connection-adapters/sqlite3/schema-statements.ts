@@ -18,13 +18,13 @@ import { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
 import { TableDefinition as SQLite3TableDefinition } from "./schema-definitions.js";
 import { IndexDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
-import { ActiveRecord } from "../../namespaces.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
 import { quoteTableName } from "./quoting.js";
+import { Base } from "../../base.js";
 
 interface SQLite3SchemaAdapter extends DatabaseAdapter {
   /** @internal */
@@ -150,7 +150,7 @@ export async function removeForeignKey(
       table = toTable;
     } else {
       table = toS(options.column).replace(/_id$/, "");
-      table = ActiveRecord.Base.pluralizeTableNames ? pluralize(table) : table;
+      table = Base.pluralizeTableNames ? pluralize(table) : table;
     }
     table = this.stripTableNamePrefixAndSuffix(table);
     const fkOptions = fk.options as Record<string, unknown>;

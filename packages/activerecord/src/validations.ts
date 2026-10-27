@@ -132,5 +132,3 @@ export async function performValidations(
 export function raiseValidationError(record: unknown): never {
   throw new RecordInvalid(record);
 }
-
-rbModConstSet(ActiveRecord, "RecordInvalid", RecordInvalid);

@@ -15,13 +15,13 @@ import {
   rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
-import type { Packer } from "./packer.js";
+import { Packer } from "./packer.js";
 
 export const CoreExt = {
   name: "MessagePack::CoreExt",
   toMsgpack(this: unknown, packerOrIo: unknown = null): Uint8Array | Packer | null {
     if (packerOrIo != null && packerOrIo !== false) {
-      if (rbObjIsKindOf(packerOrIo, MessagePack.Packer)) {
+      if (rbObjIsKindOf(packerOrIo, Packer)) {
         return rbFSend(this, "toMsgpackWithPacker", packerOrIo) as Packer;
       } else {
         return MessagePack.pack(this, packerOrIo);

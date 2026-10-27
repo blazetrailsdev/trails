@@ -5,7 +5,6 @@ import {
   hasKey,
   hashAref,
   rbDeclareIvar,
-  rbModConstSet,
   rbModName,
 } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
@@ -1802,7 +1801,7 @@ export class Base extends Model {
   }
 }
 
-rbModConstSet(ActiveRecord, "Base", Base);
+ActiveRecord.Base = Base;
 rbDeclareIvar({ prototype: Base }, "@attribute_names", "_attributeNames");
 rbDeclareIvar({ prototype: Base }, "@generated_relation_methods", "_generatedRelationMethods");
 

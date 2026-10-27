@@ -1,4 +1,4 @@
-import { rbFArray, Pathname, block as rbBlock, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbFArray, Pathname, block as rbBlock } from "@blazetrails/ruby-compat";
 import { Magic, type MagicMatch } from "./magic.js";
 import { Marcel as MarcelSeat } from "./namespaces.js";
 import { TYPE_EXTS, TYPE_PARENTS } from "./tables.js";
@@ -110,4 +110,4 @@ export class MimeType {
       : x.reduce((type, candidate) => (Magic.isChild(candidate, type) ? candidate : type));
   }
 }
-rbModConstSet(MarcelSeat, "MimeType", MimeType);
+MarcelSeat.MimeType = MimeType;

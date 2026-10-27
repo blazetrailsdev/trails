@@ -7,6 +7,7 @@ import {
 } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
+import { Namespace } from "./namespace.js";
 
 import type { Node } from "../html5/node.js";
 import {
@@ -55,7 +56,7 @@ export class NodeSet implements Iterable<Node> {
     const list = [...this._list];
     for (const n2 of nodeSet) {
       const skip = this._list.some((n1) =>
-        n1 instanceof XML.Namespace && n2 instanceof XML.Namespace
+        n1 instanceof Namespace && n2 instanceof Namespace
           ? n1._node.owner === n2._node.owner && n1.prefix === n2.prefix
           : n1.pointerId === n2.pointerId,
       );

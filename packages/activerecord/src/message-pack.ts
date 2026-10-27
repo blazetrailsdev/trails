@@ -3,8 +3,7 @@ import { Extensions as ActiveSupportExtensions } from "@blazetrails/activesuppor
 import type { Factory, Packer, Unpacker } from "@blazetrails/msgpack";
 import { RuntimeError, rbInspect } from "@blazetrails/ruby-compat";
 import { AssociationNotFoundError } from "./associations/errors.js";
-import type { Base } from "./base.js";
-import { ActiveRecord } from "./namespaces.js";
+import { Base } from "./base.js";
 
 export const FORMAT_VERSION = 1;
 
@@ -28,7 +27,7 @@ export const Extensions = {
       unpacker: "new",
     });
 
-    registry.registerType(120, ActiveRecord.Base, {
+    registry.registerType(120, Base, {
       packer: Extensions.writeRecord,
       unpacker: Extensions.readRecord,
       recursive: true,

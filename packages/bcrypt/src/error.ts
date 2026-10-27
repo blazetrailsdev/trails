@@ -1,23 +1,19 @@
-import { StandardError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat";
 
 export class Error extends StandardError {}
 
-class InvalidSalt extends Error {}
+export class InvalidSalt extends Error {}
 
-class InvalidHash extends Error {}
+export class InvalidHash extends Error {}
 
-class InvalidCost extends Error {}
+export class InvalidCost extends Error {}
 
-class InvalidSecret extends Error {}
+export class InvalidSecret extends Error {}
 
-export const Errors = { name: "BCrypt::Errors" } as {
-  readonly name: string;
-  InvalidSalt: typeof InvalidSalt;
-  InvalidHash: typeof InvalidHash;
-  InvalidCost: typeof InvalidCost;
-  InvalidSecret: typeof InvalidSecret;
-};
-rbModConstSet(Errors, "InvalidSalt", InvalidSalt);
-rbModConstSet(Errors, "InvalidHash", InvalidHash);
-rbModConstSet(Errors, "InvalidCost", InvalidCost);
-rbModConstSet(Errors, "InvalidSecret", InvalidSecret);
+export const Errors = {
+  name: "BCrypt::Errors",
+  InvalidSalt,
+  InvalidHash,
+  InvalidCost,
+  InvalidSecret,
+} as const;

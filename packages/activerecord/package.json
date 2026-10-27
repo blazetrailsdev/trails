@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./fixtures.js": {
+      "types": "./dist/fixtures.d.ts",
+      "default": "./dist/fixtures.js"
+    },
     "./connection-adapters/sqlite3-adapter.js": {
       "types": "./dist/connection-adapters/sqlite3-adapter.d.ts",
       "default": "./dist/connection-adapters/sqlite3-adapter.js"

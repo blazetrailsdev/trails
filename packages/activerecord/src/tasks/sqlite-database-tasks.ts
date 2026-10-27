@@ -4,7 +4,6 @@ import {
   getChildProcessAsync,
   rbEqq,
   rbFSystem,
-  rbModConstSet,
   File,
   FileUtils,
 } from "@blazetrails/ruby-compat";
@@ -122,5 +121,5 @@ export class SQLiteDatabaseTasks {
   }
 }
 
-rbModConstSet(Tasks, "SQLiteDatabaseTasks", SQLiteDatabaseTasks);
+Tasks.SQLiteDatabaseTasks = SQLiteDatabaseTasks;
 DatabaseTasks.registerTask(/sqlite/, SQLiteDatabaseTasks);

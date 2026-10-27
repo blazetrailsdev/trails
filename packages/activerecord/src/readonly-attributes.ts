@@ -1,5 +1,3 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveRecord } from "./namespaces.js";
 import type { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
 import { classAttribute, include, included } from "@blazetrails/activesupport";
@@ -58,5 +56,3 @@ export const ClassMethods = {
   attrReadonly,
   isReadonlyAttribute,
 };
-
-rbModConstSet(ActiveRecord, "ReadonlyAttributeError", ReadonlyAttributeError);

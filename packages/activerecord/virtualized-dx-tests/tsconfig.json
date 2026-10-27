@@ -4,6 +4,7 @@
     "composite": false,
     "noEmit": true,
     "paths": {
+      "@blazetrails/activerecord/fixtures.js": ["../src/fixtures.ts"],
       "@blazetrails/activerecord": ["../src/index.ts"],
       "@blazetrails/activemodel": ["../../activemodel/src/index.ts"],
       "@blazetrails/arel": ["../../arel/src/index.ts"],

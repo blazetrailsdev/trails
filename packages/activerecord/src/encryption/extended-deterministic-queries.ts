@@ -1,4 +1,4 @@
-import { ActiveRecord, Encryption } from "../namespaces.js";
+import { Encryption } from "../namespaces.js";
 import {
   Concern,
   any,
@@ -9,7 +9,7 @@ import {
 import { extend, hashAref, hashAset, include, rbCallSuper } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Relation } from "../relation.js";
-import type { Base } from "../base.js";
+import { Base } from "../base.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 
 export interface SerializableType {
@@ -19,7 +19,7 @@ export interface SerializableType {
 export class ExtendedDeterministicQueries {
   static installSupport(): void {
     prepend(Relation, RelationQueries);
-    include(ActiveRecord.Base, CoreQueries);
+    include(Base, CoreQueries);
     prepend(EncryptedAttributeType, ExtendedEncryptableType);
   }
 }

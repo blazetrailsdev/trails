@@ -12,7 +12,6 @@ import {
   rbCSymbol,
   rbClassInheritedP,
   rbInspect,
-  rbModConstSet,
   rbObjClass,
   rbObjClassname,
   rbObjIsKindOf,
@@ -197,7 +196,7 @@ export class Factory {
   }
 
   pool(size: number = 1, options: object = {}): Pool {
-    return new Factory.Pool(
+    return new Pool(
       Object.isFrozen(this) ? this : this.dup().freeze(),
       size,
       Object.keys(options).length === 0 ? null : options,
@@ -359,11 +358,11 @@ export class Pool {
   constructor(factory: Factory, size: number, options: object | null = null) {
     if (options == null || Object.keys(options).length === 0) options = null;
     this.factory = factory;
-    this.packers = new Pool.MemberPool(
+    this.packers = new MemberPool(
       size,
       () => Object.freeze(factory.packer(options)) as Packer<null>,
     );
-    this.unpackers = new Pool.MemberPool(
+    this.unpackers = new MemberPool(
       size,
       () => Object.freeze(factory.unpacker(options)) as Unpacker,
     );
@@ -392,6 +391,6 @@ export class Pool {
   }
 }
 
-rbModConstSet(MessagePack, "Factory", Factory);
-rbModConstSet(Factory, "Pool", Pool);
-rbModConstSet(Pool, "MemberPool", MemberPool);
+MessagePack.Factory = Factory;
+Factory.Pool = Pool;
+Pool.MemberPool = MemberPool;

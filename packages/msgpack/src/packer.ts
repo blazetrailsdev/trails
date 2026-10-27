@@ -18,7 +18,6 @@ import {
   rbInspect,
   isStruct,
   rbCNumeric,
-  rbModConstSet,
   rbObjAsString,
   rbObjClass,
   rbObjIsKindOf,
@@ -537,4 +536,4 @@ export class Packer<Io = unknown> {
   }
 }
 
-rbModConstSet(MessagePack, "Packer", Packer);
+MessagePack.Packer = Packer;

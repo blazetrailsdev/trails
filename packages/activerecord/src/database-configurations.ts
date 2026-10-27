@@ -14,9 +14,9 @@ import {
   DatabaseConfig,
   type DatabaseConfigOptions,
 } from "./database-configurations/database-config.js";
-import { ActiveRecord } from "./namespaces.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
+import * as ConnectionHandling from "./connection-handling.js";
 
 export class InvalidConfigurationError extends Error {
   constructor(message?: string) {
@@ -144,7 +144,7 @@ export class DatabaseConfigurations {
 
   /** @internal */
   private defaultEnv(): string {
-    return String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
+    return String(ConnectionHandling.DEFAULT_ENV());
   }
 
   /** @internal */

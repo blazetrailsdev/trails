@@ -386,7 +386,7 @@ export class Unpacker {
 }
 
 rbModConstSet(MessagePack, "TypeError", TypeError);
-rbModConstSet(MessagePack, "Unpacker", Unpacker);
+MessagePack.Unpacker = Unpacker;
 rbModConstSet(MessagePack, "UnpackError", UnpackError);
 rbModConstSet(MessagePack, "MalformedFormatError", MalformedFormatError);
 rbModConstSet(MessagePack, "StackError", StackError);

@@ -20,7 +20,7 @@ import {
 import type { Node } from "../html5/node.js";
 import { HTML5, XML } from "../namespaces.js";
 import type { NodeSet } from "./node-set.js";
-import "./namespace.js";
+import { Namespace } from "./namespace.js";
 import {
   evaluate,
   toXPathString,
@@ -409,7 +409,7 @@ export class XPathContext {
   private wrap(node: XPathNode): Node {
     if (node instanceof LibXmlRoot) return this._document as Node;
     if (node instanceof NamespaceNode) {
-      return new XML.Namespace(node, this._document) as unknown as Node;
+      return new Namespace(node, this._document) as unknown as Node;
     }
     if (node instanceof LibXmlAttribute || node instanceof Parse5AttrNode) {
       return new XML.Attr(node, this._document) as unknown as Node;

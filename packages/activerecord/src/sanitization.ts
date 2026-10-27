@@ -10,7 +10,7 @@ import {
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
-import { ActiveRecord } from "./namespaces.js";
+import { Relation } from "./relation.js";
 
 /** @internal */
 export type Quoter = Pick<
@@ -175,7 +175,7 @@ export function replaceBindVariables(
 
 /** @internal */
 function replaceBindVariable(connection: Quoter, value: unknown): string {
-  if (value instanceof ActiveRecord.Relation) {
+  if (value instanceof Relation) {
     return value.toSql();
   } else {
     return quoteBoundValue(connection, value);

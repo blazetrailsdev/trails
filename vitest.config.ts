@@ -220,6 +220,10 @@ const alias = {
   "@blazetrails/arel/src": path.resolve(__dirname, "packages/arel/src"),
   "@blazetrails/arel": path.resolve(__dirname, "packages/arel/src/index.ts"),
   "@blazetrails/activemodel": path.resolve(__dirname, "packages/activemodel/src/index.ts"),
+  "@blazetrails/activerecord/fixtures.js": path.resolve(
+    __dirname,
+    "packages/activerecord/src/fixtures.ts",
+  ),
   "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js": path.resolve(
     __dirname,
     "packages/activerecord/src/connection-adapters/sqlite3-adapter.ts",
