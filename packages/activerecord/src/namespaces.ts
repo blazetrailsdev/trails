@@ -25,6 +25,7 @@ import type { Write } from "./attribute-methods/write.js";
 import type { Base } from "./base.js";
 import type { TestCase } from "./cases/test-case.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import type { Column as MySQLColumn } from "./connection-adapters/mysql/column.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import type { load, register, resolve } from "./connection-adapters.js";
 import type * as ConnectionHandling from "./connection-handling.js";
@@ -340,6 +341,7 @@ export const ConnectionAdapters = {
 } as AutoloadModule & {
   adapters: Map<string, [string, string]>;
   ConnectionPool: typeof ConnectionPool;
+  MySQL: { name: string; Column: typeof MySQLColumn };
   PostgreSQLAdapter: typeof PostgreSQLAdapter;
   register: typeof register;
   load: typeof load;
@@ -349,6 +351,9 @@ extend(ConnectionAdapters, Autoload);
 ConnectionAdapters.autoloadAt("active_record/connection_adapters/abstract/connection_pool", () => {
   ConnectionAdapters.autoload("ConnectionPool");
 });
+ConnectionAdapters.MySQL = {
+  name: "ActiveRecord::ConnectionAdapters::MySQL",
+} as typeof ConnectionAdapters.MySQL;
 
 export const Encryption = { name: "ActiveRecord::Encryption", loadPath } as AutoloadModule & {
   AutoFilteredParameters: typeof AutoFilteredParameters;
