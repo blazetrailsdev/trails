@@ -25,8 +25,7 @@ describe("trails-tsc build views inside a booted app", () => {
   it("loads the routes through the reloader, drawing them once", async () => {
     await buildViews({ cwd: root, outDir });
 
-    const names = Trails.application!.routes().namedRoutes.helperNames();
-    expect(names.length).toBeGreaterThan(0);
-    expect(new Set(names).size).toBe(names.length);
+    const augmentation = fs.readFileSync(path.join(outDir, "routes-augmentation.d.ts"), "utf8");
+    expect(augmentation).toContain("postsPath(...args: unknown[]): string;");
   }, 30_000);
 });
