@@ -406,8 +406,6 @@ export class CollectionIdsAssignmentError extends ActiveRecordError {
   }
 }
 
-rbModConstSet(ActiveRecord, "AssociationNotFoundError", AssociationNotFoundError);
-rbModConstSet(ActiveRecord, "InverseOfAssociationNotFoundError", InverseOfAssociationNotFoundError);
 rbModConstSet(
   ActiveRecord,
   "InverseOfAssociationRecursiveError",
@@ -448,7 +446,6 @@ rbModConstSet(
   "HasManyThroughSourceAssociationNotFoundError",
   HasManyThroughSourceAssociationNotFoundError,
 );
-rbModConstSet(ActiveRecord, "HasManyThroughOrderError", HasManyThroughOrderError);
 rbModConstSet(
   ActiveRecord,
   "ThroughCantAssociateThroughHasOneOrManyReflection",
@@ -464,7 +461,6 @@ rbModConstSet(
   "HasOneThroughCantAssociateThroughHasOneOrManyReflection",
   HasOneThroughCantAssociateThroughHasOneOrManyReflection,
 );
-rbModConstSet(ActiveRecord, "CompositePrimaryKeyMismatchError", CompositePrimaryKeyMismatchError);
 rbModConstSet(
   ActiveRecord,
   "AmbiguousSourceReflectionForThroughAssociation",
@@ -485,5 +481,3 @@ rbModConstSet(
   "HasOneThroughNestedAssociationsAreReadonly",
   HasOneThroughNestedAssociationsAreReadonly,
 );
-rbModConstSet(ActiveRecord, "EagerLoadPolymorphicError", EagerLoadPolymorphicError);
-rbModConstSet(ActiveRecord, "DeleteRestrictionError", DeleteRestrictionError);

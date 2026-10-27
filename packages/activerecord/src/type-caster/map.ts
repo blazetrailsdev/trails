@@ -1,6 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { rbModConstSet, rbObjAsString as toS } from "@blazetrails/ruby-compat";
-import { TypeCaster } from "../namespaces.js";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 
 export class Map {
   private _klass: any;
@@ -33,4 +32,3 @@ export class Map {
     return this._klass;
   }
 }
-rbModConstSet(TypeCaster, "Map", Map);
