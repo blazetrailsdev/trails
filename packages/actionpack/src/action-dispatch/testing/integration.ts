@@ -4,14 +4,14 @@ import { Mime } from "../http/mime-type.js";
 import { isPresent, reverseMergeBang, runLoadHooks } from "@blazetrails/activesupport";
 import {
   HTTPS,
+  NoMethodError,
   RuntimeError,
   URI,
   include,
   rbFSend,
+  rbObjClassname,
   rbObjDup,
-  rbCallSuper,
-  rbModAttrReader,
-  rbModAttrWriter,
+  Module,
   rbObjRespondTo,
   stringSplit,
   type Generic,
@@ -133,16 +133,11 @@ interface RequestHelpersMethods {
   followRedirectBang: typeof followRedirectBang;
 }
 
-export const RequestHelpers = {
-  get,
-  post,
-  patch,
-  put,
-  delete: delete_,
-  head,
-  options,
-  followRedirectBang,
-};
+export const RequestHelpers = new Module((mod) => {
+  mod.moduleEval((m) => {
+    Object.assign(m, { get, post, patch, put, delete: delete_, head, options, followRedirectBang });
+  });
+});
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Session {
@@ -461,7 +456,7 @@ interface RunnerHost {
 
 function beforeSetup(this: RunnerHost): unknown {
   this._app = null;
-  return rbCallSuper(this, beforeSetup);
+  return Runner.superMethod(this, "beforeSetup")!();
 }
 
 function integrationSession(this: RunnerHost): Session {
@@ -499,12 +494,14 @@ function openSession<T extends RunnerHost>(this: T, block?: (session: T) => void
 }
 
 function assertions(this: RunnerHost): number {
-  return this.rootSession ? this.rootSession.assertions : (rbCallSuper(this, assertions) as number);
+  return this.rootSession
+    ? this.rootSession.assertions
+    : (Runner.superMethod(this, "assertions")!() as number);
 }
 
 function setAssertions(this: RunnerHost, assertions: number): void {
   if (this.rootSession) this.rootSession.assertions = assertions;
-  else rbCallSuper(this, setAssertions, assertions);
+  else Runner.superMethod(this, "assertions=")!(assertions);
 }
 
 function copySessionVariablesBang(this: RunnerHost): void {
@@ -524,7 +521,7 @@ function setDefaultUrlOptions(this: RunnerHost, options: Record<string, unknown>
 function respondToMissing(this: RunnerHost, method: string, _: boolean): boolean {
   return (
     rbObjRespondTo(this.integrationSession, method) ||
-    rbCallSuper(this, respondToMissing, method, _) === true
+    Runner.superMethod(this, "respondToMissing")?.(method, _) === true
   );
 }
 
@@ -540,12 +537,21 @@ function methodMissing(this: RunnerHost, method: string, ...args: unknown[]): un
     this.copySessionVariablesBang();
     return result;
   } else {
-    return rbCallSuper(this, methodMissing, method, ...args);
+    const super_ = Runner.superMethod(this, "methodMissing");
+    if (super_ !== undefined) return super_(method, ...args);
+    throw new NoMethodError(
+      `undefined method '${method}' for an instance of ${rbObjClassname(this)}`,
+      method,
+      args,
+      false,
+      { receiver: this },
+    );
   }
 }
 
 export interface Runner {
   readonly app: unknown;
+  /** @internal */
   rootSession: Runner | null;
   readonly integrationSession: Session;
   resetBang(): void;
@@ -575,74 +581,78 @@ export interface Runner {
 }
 
 /** @missingRailsCall include — CONVERGEABLE integration-runner-includes-assertions */
-export const Runner = {
-  APP_SESSIONS: new Map<unknown, typeof Session>(),
-  beforeSetup,
-  resetBang,
-  createSession,
-  removeBang,
-};
-rbModAttrReader({ prototype: Runner }, "app");
-rbModAttrReader({ prototype: Runner }, "rootSession");
-rbModAttrWriter({ prototype: Runner }, "rootSession");
-for (const method of [
-  "get",
-  "post",
-  "patch",
-  "put",
-  "head",
-  "delete",
-  "cookies",
-  "assigns",
-  "followRedirectBang",
-] as const) {
-  if (method === "cookies" || method === "assigns") {
-    Object.defineProperty(Runner, method, {
-      ...(method === "cookies"
-        ? {
-            get(this: RunnerHost) {
-              const result = this.integrationSession[method];
-              this.copySessionVariablesBang();
-              return result;
-            },
-          }
-        : {
-            value(this: RunnerHost, ...args: unknown[]) {
-              const result = rbFSend(this.integrationSession, method, ...args);
-              this.copySessionVariablesBang();
-              return result;
-            },
-            writable: true,
-          }),
-      configurable: true,
-      enumerable: true,
-    });
-  } else {
-    Object.defineProperty(Runner, method, {
-      value: async function (this: RunnerHost, ...args: unknown[]) {
+export const Runner = new Module((mod) => {
+  mod.attrReader("app");
+  mod.attrReader("rootSession");
+  mod.attrWriter("rootSession");
+
+  mod.defineMethod("beforeSetup", beforeSetup);
+  mod.defineMethod("resetBang", resetBang);
+  mod.defineMethod("createSession", createSession);
+  mod.defineMethod("removeBang", removeBang);
+  for (const method of [
+    "get",
+    "post",
+    "patch",
+    "put",
+    "head",
+    "delete",
+    "cookies",
+    "assigns",
+    "followRedirectBang",
+  ] as const) {
+    if (method === "cookies" || method === "assigns") {
+      mod.moduleEval((m) => {
+        Object.defineProperty(m, method, {
+          ...(method === "cookies"
+            ? {
+                get(this: RunnerHost) {
+                  const result = this.integrationSession[method];
+                  this.copySessionVariablesBang();
+                  return result;
+                },
+              }
+            : {
+                value(this: RunnerHost, ...args: unknown[]) {
+                  const result = rbFSend(this.integrationSession, method, ...args);
+                  this.copySessionVariablesBang();
+                  return result;
+                },
+                writable: true,
+              }),
+          configurable: true,
+        });
+      });
+    } else {
+      mod.defineMethod(method, async function (this: RunnerHost, ...args: unknown[]) {
         this._htmlDocument = null;
 
         const result = await rbFSend(this.integrationSession, method, ...args);
         this.copySessionVariablesBang();
         return result;
-      },
-      writable: true,
-      configurable: true,
-      enumerable: true,
-    });
+      });
+    }
   }
-}
-Object.assign(Runner, { openSession, copySessionVariablesBang, respondToMissing, methodMissing });
-Object.defineProperties(Runner, {
-  integrationSession: { get: integrationSession, configurable: true, enumerable: true },
-  assertions: { get: assertions, set: setAssertions, configurable: true, enumerable: true },
-  defaultUrlOptions: {
-    get: defaultUrlOptions,
-    set: setDefaultUrlOptions,
-    configurable: true,
-    enumerable: true,
-  },
-});
+  mod.defineMethod("openSession", openSession);
+  mod.defineMethod("copySessionVariablesBang", copySessionVariablesBang);
+  mod.defineMethod("respondToMissing", respondToMissing);
+  mod.defineMethod("methodMissing", methodMissing);
+  mod.moduleEval((m) => {
+    Object.defineProperty(m, "integrationSession", { get: integrationSession, configurable: true });
+    Object.defineProperty(m, "assertions", {
+      get: assertions,
+      set: setAssertions,
+      configurable: true,
+    });
+    Object.defineProperty(m, "defaultUrlOptions", {
+      get: defaultUrlOptions,
+      set: setDefaultUrlOptions,
+      configurable: true,
+    });
+  });
+}) as Module & { APP_SESSIONS: Map<unknown, typeof Session> };
+
+Runner.APP_SESSIONS = new Map<unknown, typeof Session>();
 
 ActionDispatch.Integration = {
   name: "ActionDispatch::Integration",
@@ -733,8 +743,10 @@ export class IntegrationTest extends TestCase {
   declare _app?: unknown;
 
   get app(): unknown {
-    const app = this._app ?? null;
-    return app != null && app !== false ? app : (this.constructor as typeof IntegrationTest).app;
+    return (
+      Reflect.get(Object.getPrototypeOf(IntegrationTest.prototype) as object, "app", this) ??
+      (this.constructor as typeof IntegrationTest).app
+    );
   }
 
   set app(value: unknown) {

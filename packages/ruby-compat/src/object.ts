@@ -881,7 +881,7 @@ export function rbSeatSuper(
     link = Object.getPrototypeOf(link) as object | null
   ) {
     const desc = Object.getOwnPropertyDescriptor(link, key);
-    if (desc) {
+    if (desc && (half === "value" || desc[half] !== undefined)) {
       shadowed = desc[half];
       break;
     }
