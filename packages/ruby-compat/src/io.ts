@@ -536,6 +536,19 @@ class EAGAINWaitReadable extends Errno.EAGAIN {
 }
 
 /**
+ * `IO::EAGAINWaitWritable` (`vendor/ruby/v3.3.11/io.c:15392`), the
+ * `Errno::EAGAIN` `write_nonblock` raises when a write would block.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO::EAGAINWaitWritable`.
+ */
+class EAGAINWaitWritable extends Errno.EAGAIN {
+  constructor(mesg?: string) {
+    super(mesg);
+    this.name = "IO::EAGAINWaitWritable";
+  }
+}
+
+/**
  * `IO` (`vendor/ruby/v3.3.11/io.c:15371` `rb_cIO`), the sliver of it trails calls.
  *
  * Rails writes a credentials file through this class —
@@ -551,6 +564,8 @@ class EAGAINWaitReadable extends Errno.EAGAIN {
 export class IO {
   /** @noRailsEquivalent PERMANENT */
   static readonly EAGAINWaitReadable = EAGAINWaitReadable;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly EAGAINWaitWritable = EAGAINWaitWritable;
 
   /**
    * `vendor/ruby/v3.3.11/file.c:7848` — `File::Constants::NULL`, which `IO`

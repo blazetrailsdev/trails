@@ -30,6 +30,8 @@ export class BasicSocket extends IO {
   private _readClosed = false;
   private _writeClosed = false;
   private _waiting: (() => void)[] = [];
+  private _congested = false;
+  private _writeWaiting: (() => void)[] = [];
 
   /** @noRailsEquivalent PERMANENT */
   constructor(socket: HttpSocket) {
@@ -59,7 +61,9 @@ export class BasicSocket extends IO {
     socket.on("close", () => {
       this._eof = true;
       this._wake();
+      this._drained();
     });
+    socket.on("drain", () => this._drained());
   }
 
   /**
@@ -167,8 +171,43 @@ export class BasicSocket extends IO {
   override write(string: string | Uint8Array): number {
     if (this._closed || this._writeClosed) throw new IOError("closed stream");
     const buffer = typeof string === "string" ? new TextEncoder().encode(string) : string;
-    this._socket.write(buffer);
+    if (this._socket.write(buffer) === false) this._congested = true;
     return buffer.length;
+  }
+
+  /**
+   * `IO#write_nonblock` (`vendor/ruby/v3.3.11/io.rb:120`, `io.c:3666`
+   * `io_write_nonblock`). A Node socket takes every write, so "would block"
+   * is its own signal that the peer is not keeping up: once a write has
+   * filled the socket past its high-water mark, and until it drains, this
+   * raises `IO::EAGAINWaitWritable` ("write would block", `io.c:3693`), or
+   * answers `:wait_writable` under `exception: false` (`io.c:3690`). Otherwise
+   * the whole string is written and its length answered.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  writeNonblock(
+    string: string | Uint8Array,
+    { exception = true }: { exception?: boolean } = {},
+  ): number | "wait_writable" {
+    if (this._closed || this._writeClosed) throw new IOError("closed stream");
+    if (this._congested) {
+      if (!exception) return "wait_writable";
+      throw new IO.EAGAINWaitWritable("write would block");
+    }
+    return this.write(string);
+  }
+
+  /**
+   * `IO#wait_writable` (`vendor/ruby/v3.3.11/io.c:9766` `io_wait_writable`):
+   * resolves with the socket once a write would not block — at once unless a
+   * write has backed it up, otherwise when it drains or the peer goes.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  waitWritable(): Promise<this> {
+    if (!this._congested) return Promise.resolve(this);
+    return new Promise((resolve) => this._writeWaiting.push(() => resolve(this)));
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -238,6 +277,11 @@ export class BasicSocket extends IO {
       this._socket.resume();
     }
     return out;
+  }
+
+  private _drained(): void {
+    this._congested = false;
+    for (const wake of this._writeWaiting.splice(0)) wake();
   }
 
   private _wake(): void {

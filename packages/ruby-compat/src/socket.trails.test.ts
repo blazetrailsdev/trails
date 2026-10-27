@@ -9,8 +9,9 @@ import { TCPSocket } from "./socket.js";
 function fakeSocket() {
   const listeners: Record<string, ((arg?: unknown) => void)[]> = {};
   const calls: string[] = [];
+  let accepting = true;
   const socket = {
-    write: () => calls.push("write"),
+    write: () => (calls.push("write"), accepting),
     end: () => calls.push("end"),
     destroy: () => calls.push("destroy"),
     unshift: () => null,
@@ -20,7 +21,8 @@ function fakeSocket() {
     removeListener: () => null,
   };
   const emit = (event: string, arg?: unknown) => listeners[event]?.forEach((fn) => fn(arg));
-  return { socket: socket as unknown as HttpSocket, calls, emit };
+  const backUp = (full: boolean) => void (accepting = !full);
+  return { socket: socket as unknown as HttpSocket, calls, emit, backUp };
 }
 
 describe("TCPSocket", () => {
@@ -102,5 +104,51 @@ describe("TCPSocket", () => {
     expect(calls).toEqual(["resume", "pause"]);
     io.readNonblock(1);
     expect(calls).toEqual(["resume", "pause", "resume"]);
+  });
+
+  it("writes without blocking until a write backs the socket up", () => {
+    const { socket, calls, backUp } = fakeSocket();
+    const io = new TCPSocket(socket);
+    expect(io.writeNonblock("hi")).toBe(2);
+    backUp(true);
+    expect(io.writeNonblock(new Uint8Array([1, 2, 3]))).toBe(3);
+    expect(io.writeNonblock("x", { exception: false })).toBe("wait_writable");
+    expect(() => io.writeNonblock("x")).toThrow(IO.EAGAINWaitWritable);
+    expect(() => io.writeNonblock("x")).toThrow(Errno.EAGAIN);
+    expect(() => io.writeNonblock("x")).toThrow("write would block");
+    expect(calls.filter((call) => call === "write")).toHaveLength(2);
+  });
+
+  it("waits to be writable until the socket drains", async () => {
+    const { socket, emit, backUp } = fakeSocket();
+    const io = new TCPSocket(socket);
+    await expect(io.waitWritable()).resolves.toBe(io);
+    backUp(true);
+    io.write("x");
+    let woke = false;
+    const waiting = io.waitWritable().then(() => (woke = true));
+    await Promise.resolve();
+    expect(woke).toBe(false);
+    backUp(false);
+    emit("drain");
+    await waiting;
+    expect(io.writeNonblock("y")).toBe(1);
+  });
+
+  it("stops waiting to be writable when the peer goes", async () => {
+    const { socket, emit, backUp } = fakeSocket();
+    const io = new TCPSocket(socket);
+    backUp(true);
+    io.write("x");
+    const waiting = io.waitWritable();
+    emit("close");
+    await expect(waiting).resolves.toBe(io);
+  });
+
+  it("refuses a nonblocking write once the write side is closed", () => {
+    const { socket } = fakeSocket();
+    const io = new TCPSocket(socket);
+    io.closeWrite();
+    expect(() => io.writeNonblock("x")).toThrow(IOError);
   });
 });
