@@ -55,7 +55,7 @@ export class Image {
   ) {
     return ((image) => {
       const outputPath = rbStrSend(image.path(), "sub", /\.\w+$/m, `.${format}`)[0];
-      MiniMagick.convert({}, (convert: unknown) => {
+      MiniMagick.convert((convert: unknown) => {
         convert.size(`${columns ?? ""}x${rows ?? ""}`);
         convert.depth(depth);
         if (Array.isArray(convert)) convert.push(`${map ?? ""}:${image.path() ?? ""}`);
@@ -279,7 +279,7 @@ export class Image {
         else if (inputPath instanceof globalThis.Set) inputPath.add(`[${page}]`);
         else inputPath.append(`[${page}]`);
       }
-      MiniMagick.convert({}, (convert: unknown): unknown => {
+      MiniMagick.convert((convert: unknown): unknown => {
         for (const [opt, val] of Object.entries(readOpts)) {
           rbFSend(convert, rbObjAsString(opt), val);
         }
@@ -335,7 +335,7 @@ export class Image {
   write(outputTo: unknown) {
     if (typeof outputTo === "string" || outputTo instanceof Pathname) {
       if (this.isLayer()) {
-        return MiniMagick.convert({}, (builder: unknown) => {
+        return MiniMagick.convert((builder: unknown) => {
           if (Array.isArray(builder)) builder.push(this.path);
           else if (builder instanceof globalThis.Set) builder.add(this.path);
           else builder.append(this.path);
@@ -406,7 +406,7 @@ export class Image {
   }
 
   identify(block?: (...args: unknown[]) => unknown) {
-    return MiniMagick.identify({}, (builder: unknown) => {
+    return MiniMagick.identify((builder: unknown) => {
       if (block != null) {
         block(builder);
       }
@@ -421,7 +421,7 @@ export class Image {
   }
 
   mogrify(page: undefined | null = null, block?: (...args: unknown[]) => unknown) {
-    MiniMagick.mogrify({}, (builder: unknown) => {
+    MiniMagick.mogrify((builder: unknown) => {
       if (block != null) {
         block(builder);
       }

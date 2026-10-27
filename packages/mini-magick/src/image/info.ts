@@ -173,7 +173,7 @@ export class Info {
     let json, data;
     if (!((this._info["data"] ?? false) !== false))
       this._info["data"] = (() => {
-        json = MiniMagick.convert({}, (convert: unknown) => {
+        json = MiniMagick.convert((convert: unknown) => {
           if (Array.isArray(convert)) convert.push(this.path());
           else if (convert instanceof globalThis.Set) convert.add(this.path());
           else convert.append(this.path());
@@ -195,7 +195,7 @@ export class Info {
   }
 
   identify(block?: (...args: unknown[]) => unknown) {
-    return MiniMagick.identify({}, (builder: unknown) => {
+    return MiniMagick.identify((builder: unknown) => {
       if (block != null) {
         block(builder);
       }

@@ -16,7 +16,7 @@ export function isImagemagick7() {
 }
 
 export function cliVersion(): unknown {
-  const output = MiniMagick.identify({}, (x: Tool) =>
+  const output = MiniMagick.identify((x: Tool) =>
     (x as unknown as { version(): Tool }).version(),
   ) as string;
   return output.match(/\d+\.\d+\.\d+(-\d+)?/)?.[0] ?? null;
@@ -28,7 +28,13 @@ export const MiniMagick = { version, isImagemagick7, cliVersion } as {
   cliVersion: typeof cliVersion;
   _imagemagick7?: boolean;
 } & Configuration &
-  Record<CliTool, (options?: Record<string, unknown>, block?: (tool: Tool) => unknown) => unknown>;
+  Record<
+    CliTool,
+    (
+      options?: Record<string, unknown> | ((tool: Tool) => unknown),
+      block?: (tool: Tool) => unknown,
+    ) => unknown
+  >;
 extend(MiniMagick, Configuration);
 
 type CliTool =
@@ -58,9 +64,10 @@ for (const tool of [
   "stream",
 ] as const) {
   MiniMagick[tool] = (
-    { ...options }: Record<string, unknown> = {},
+    options: Record<string, unknown> | ((tool: Tool) => unknown) = {},
     block?: (tool: Tool) => unknown,
   ) => {
+    if (typeof options === "function") [options, block] = [{}, options];
     const name = isImagemagick7() && tool === "convert" ? "magick" : tool;
     return Tool.new(name, options, block);
   };

@@ -1030,7 +1030,7 @@ describe("MiniMagick::Image", () => {
 
     it.fails("collapses the image to one frame", async () => {
       await subject.collapseBang();
-      expect(await (await subject.identify()).split("\n").length).toEqual(1);
+      expect((await subject.identify()).split("\n").length).toEqual(1);
     });
 
     // BLOCKED: mini-magick-lib-native-idioms
