@@ -9,7 +9,12 @@ export { EOFError } from "./eof-error.js";
 export { Errno, SystemCallError } from "./errno.js";
 export { File } from "./file.js";
 export { Base64 } from "./base64.js";
-export { classPathMismatches, registerClassPaths } from "./classpath.js";
+export {
+  classPathMismatches,
+  generatedClass,
+  generatedClassPath,
+  registerClassPaths,
+} from "./classpath.js";
 export { CGI } from "./cgi.js";
 export { IO, STDERR, STDOUT, print, printf, puts } from "./io.js";
 export { IOError } from "./io-error.js";

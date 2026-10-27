@@ -30,23 +30,6 @@ export function registerClassPaths(entries: readonly [() => unknown, string][]):
   }
 }
 
-function drainClassPaths(): void {
-  let unresolved = 0;
-  for (const entry of pendingClassPaths) {
-    let klass: unknown;
-    try {
-      klass = entry[0]();
-    } catch {
-      pendingClassPaths[unresolved++] = entry;
-      continue;
-    }
-    if (typeof klass === "function" && !generatedClassPaths.has(klass)) {
-      generatedClassPaths.set(klass, entry[1]);
-    }
-  }
-  pendingClassPaths.length = unresolved;
-}
-
 /**
  * The `classpath` `rb_mod_name` (`vendor/ruby/v3.3.11/variable.c:122`) reads,
  * from the class's generated table, or `undefined`.
@@ -54,7 +37,22 @@ function drainClassPaths(): void {
  * @noRailsEquivalent PERMANENT
  */
 export function generatedClassPath(klass: object): string | undefined {
-  if (pendingClassPaths.length > 0) drainClassPaths();
+  if (pendingClassPaths.length > 0) {
+    let unresolved = 0;
+    for (const entry of pendingClassPaths) {
+      let value: unknown;
+      try {
+        value = entry[0]();
+      } catch {
+        pendingClassPaths[unresolved++] = entry;
+        continue;
+      }
+      if (typeof value === "function" && !generatedClassPaths.has(value)) {
+        generatedClassPaths.set(value, entry[1]);
+      }
+    }
+    pendingClassPaths.length = unresolved;
+  }
   return generatedClassPaths.get(klass);
 }
 
