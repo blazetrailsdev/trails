@@ -1091,9 +1091,6 @@ export function extractFromProgram(
       if (constructSigs.length === 0) return;
 
       const instanceType = constructSigs[0].getReturnType();
-      // A function that returns a class another file defines and defines none itself
-      // (rails-dom-testing's `htmlDocument` answers `HTML5.Document`) is a module
-      // function, not a mixin.
       const returnedClass = instanceType.getSymbol()?.declarations?.[0];
       if (
         returnedClass !== undefined &&
