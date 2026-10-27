@@ -536,19 +536,6 @@ class EAGAINWaitReadable extends Errno.EAGAIN {
 }
 
 /**
- * `IO::EAGAINWaitWritable` (`vendor/ruby/v3.3.11/io.c:15392`), the
- * `Errno::EAGAIN` `write_nonblock` raises when a write would block.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `IO::EAGAINWaitWritable`.
- */
-class EAGAINWaitWritable extends Errno.EAGAIN {
-  constructor(mesg?: string) {
-    super(mesg);
-    this.name = "IO::EAGAINWaitWritable";
-  }
-}
-
-/**
  * `IO::WaitWritable` (`vendor/ruby/v3.3.11/io.c:15387`), the module
  * `IO::EAGAINWaitWritable` includes (`io.c:15393`), so `rescue
  * IO::WaitWritable` catches it.
@@ -560,6 +547,19 @@ const WaitWritable = {
     return error instanceof EAGAINWaitWritable;
   },
 };
+
+/**
+ * `IO::EAGAINWaitWritable` (`vendor/ruby/v3.3.11/io.c:15392`), the
+ * `Errno::EAGAIN` `write_nonblock` raises when a write would block.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO::EAGAINWaitWritable`.
+ */
+class EAGAINWaitWritable extends Errno.EAGAIN {
+  constructor(mesg?: string) {
+    super(mesg);
+    this.name = "IO::EAGAINWaitWritable";
+  }
+}
 
 /**
  * `IO` (`vendor/ruby/v3.3.11/io.c:15371` `rb_cIO`), the sliver of it trails calls.
@@ -578,6 +578,8 @@ export class IO {
   /** @noRailsEquivalent PERMANENT */
   static readonly EAGAINWaitReadable = EAGAINWaitReadable;
   /** @noRailsEquivalent PERMANENT */
+  static readonly WaitWritable = WaitWritable;
+  /** @noRailsEquivalent PERMANENT */
   static readonly EAGAINWaitWritable = EAGAINWaitWritable;
   /**
    * `IO::EWOULDBLOCKWaitWritable` (`vendor/ruby/v3.3.11/io.c:15400`), the
@@ -587,8 +589,6 @@ export class IO {
    * @noRailsEquivalent PERMANENT
    */
   static readonly EWOULDBLOCKWaitWritable = EAGAINWaitWritable;
-  /** @noRailsEquivalent PERMANENT */
-  static readonly WaitWritable = WaitWritable;
 
   /**
    * `vendor/ruby/v3.3.11/file.c:7848` — `File::Constants::NULL`, which `IO`

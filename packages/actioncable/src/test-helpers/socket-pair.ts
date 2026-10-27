@@ -6,6 +6,8 @@ class PairedSocket implements HttpSocket {
   peer!: PairedSocket;
   private _listeners = new Map<string, Listener[]>();
   private _destroyed = false;
+  readonly writableLength = 0;
+  readonly writableHighWaterMark = 16 * 1024;
 
   write(chunk: string | Uint8Array): boolean {
     const bytes = typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;

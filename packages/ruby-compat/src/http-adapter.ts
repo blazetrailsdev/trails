@@ -18,6 +18,8 @@ export interface HttpResponse {
 
 /** @noRailsEquivalent PERMANENT */
 export interface HttpSocket {
+  readonly writableLength: number;
+  readonly writableHighWaterMark: number;
   write(chunk: string | Uint8Array): unknown;
   end(chunk?: string | Uint8Array): unknown;
   destroy(): unknown;
