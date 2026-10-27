@@ -25,7 +25,9 @@ export class HTMLSelector {
 
   constructor(values: unknown[], previousSelection: unknown = null, rootFallback: () => unknown) {
     this.values = values;
-    this.root = this.extractRoot(previousSelection, rootFallback) as HTMLSelector["root"];
+    this.root = this.extractRoot(previousSelection, rootFallback) as {
+      css(...args: unknown[]): NodeSet;
+    };
     this.extractSelectors();
     this.tests = this.extractEqualityTests();
     this.message = this.values.shift();
