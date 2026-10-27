@@ -144,7 +144,6 @@ export class Trailtie extends Initializable {
   runTasksBlocks(app: unknown): void {
     eachRegisteredBlock(this, "rakeTasks", (b) => b.call(this, app));
   }
-  /** @noRailsEquivalent PERMANENT */
   async runServerBlocks(app: unknown): Promise<void> {
     const blocks: TrailtieBlock[] = [];
     eachRegisteredBlock(this, "server", (b) => blocks.push(b));
