@@ -18,6 +18,7 @@ import { rbRegToS } from "./regexp.js";
 import { NoMethodError } from "./no-method-error.js";
 import { Hash } from "./hash.js";
 import { toEnum } from "./enumerator.js";
+import { methodCacheSerial, rbClearMethodCache } from "./method-cache.js";
 
 /**
  * Each method's `super` slot, which {@link rbSeatSuper} writes and
@@ -927,6 +928,7 @@ export function rbModDefineMethod(
     descriptors,
   );
   Object.defineProperties(mod.prototype, descriptors);
+  rbClearMethodCache();
   return mid;
 }
 
@@ -1013,6 +1015,7 @@ export function defineAccessorHalf(
     get: half.get ?? existing?.get ?? absentHalf(name, false),
     set: half.set ?? existing?.set ?? absentHalf(name, true),
   });
+  rbClearMethodCache();
 }
 
 /**
@@ -1146,6 +1149,10 @@ export function toS(obj: unknown): string | Uint8Array {
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`).
  */
 export function rbFSend(recv: unknown, mid: unknown, ...args: unknown[]): unknown {
+  if (args.length === 1 && typeof mid === "string" && typeof recv === "object" && recv !== null) {
+    const write = _writerFor(recv, mid);
+    if (write !== null) return write.call(recv, args[0]);
+  }
   return sendInternal(args.length, [mid, ...args], recv);
 }
 
@@ -1324,6 +1331,68 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
 }
 
 type AnyFunction = (...args: unknown[]) => unknown;
+
+/** @perf 100ns — PERMANENT */
+function _writerFor(recv: object, mid: string): AnyFunction | null {
+  let entry = _writerEntries.get(mid);
+  if (entry === undefined) {
+    const n = mid.length;
+    const attr = mid.slice(0, -1);
+    entry =
+      n < 2 || mid.charCodeAt(n - 1) !== 61 || !/\w/.test(mid[n - 2])
+        ? null
+        : { mid, attr, writer: writerSpelling(attr), proto: null, serial: -1, write: null };
+    _writerEntries.set(mid, entry);
+  }
+  if (entry === null) return null;
+  const proto = Object.getPrototypeOf(recv) as object | null;
+  if (proto === null) return null;
+  if (entry.proto !== proto || entry.serial !== methodCacheSerial) {
+    entry.proto = proto;
+    entry.serial = methodCacheSerial;
+    entry.write = null;
+    if (!(proto instanceof Date || proto === Date.prototype || temporalTag(proto) !== null)) {
+      for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
+        const desc = Object.getOwnPropertyDescriptor(o, entry.mid);
+        if (typeof desc?.value === "function") entry.write = desc.value as AnyFunction;
+        if (desc) break;
+        const setter = Object.getOwnPropertyDescriptor(o, entry.attr)?.set;
+        if (setter && !isAbsentHalf(setter)) {
+          entry.write = setter as AnyFunction;
+          break;
+        }
+        const set =
+          entry.writer === undefined ? undefined : Object.getOwnPropertyDescriptor(o, entry.writer);
+        if (typeof set?.value === "function") {
+          entry.write = set.value as AnyFunction;
+          break;
+        }
+      }
+    }
+  }
+  if (
+    entry.write === null ||
+    Object.hasOwn(recv, entry.mid) ||
+    Object.hasOwn(recv, entry.attr) ||
+    (entry.writer !== undefined && Object.hasOwn(recv, entry.writer))
+  ) {
+    return null;
+  }
+  return entry.write;
+}
+
+/** @perf 100ns — PERMANENT */
+const _writerEntries = new Map<
+  string,
+  {
+    mid: string;
+    attr: string;
+    writer: string | undefined;
+    proto: object | null;
+    serial: number;
+    write: AnyFunction | null;
+  } | null
+>();
 
 /**
  * `rb_check_funcall` (`vendor/ruby/v3.3.11/vm_eval.c:687`): the call when the

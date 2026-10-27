@@ -20,6 +20,7 @@
  *   include(Relation, QueryMethods);
  */
 
+import { methodCacheSerial, rbClearMethodCache } from "./method-cache.js";
 import { ArgumentError } from "./argument-error.js";
 import type { abort } from "./process-adapter.js";
 import type { kernelRand } from "./kernel-rand.js";
@@ -549,6 +550,7 @@ export class Module<I extends object = Record<never, never>> {
     UNDEF_METHOD_TABLES.add(link);
     Object.defineProperty(link, T_ICLASS, { value: this });
     Object.setPrototypeOf(proto, link);
+    rbClearMethodCache();
   }
 
   /**
@@ -617,6 +619,7 @@ export class Module<I extends object = Record<never, never>> {
     for (const mod of nestedModules.get(this) ?? []) {
       if (!(mod instanceof Module)) splicePlainModule(link, mod);
     }
+    rbClearMethodCache();
   }
 
   /**
@@ -678,6 +681,7 @@ export class Module<I extends object = Record<never, never>> {
     for (const mod of nestedModules.get(this) ?? []) {
       if (!(mod instanceof Module)) splicePlainModule(link, mod);
     }
+    rbClearMethodCache();
   }
 
   /**
@@ -893,24 +897,7 @@ function relinkIncluders(mod: Module): void {
   }
 }
 
-/**
- * Mirrors: MRI's `rb_clear_method_cache` — vendor/ruby/v3.3.11/vm_method.c:295,
- * which every method-table or ancestry change calls so a call cache keyed on
- * the old table misses. trails keeps one serial for every class: a cache reads
- * {@link methodCacheSerial} and is stale once it differs.
- *
- * @noRailsEquivalent PERMANENT
- * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
- */
-export let methodCacheSerial = 0;
-
-/**
- * @noRailsEquivalent PERMANENT
- * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
- */
-export function rbClearMethodCache(): void {
-  methodCacheSerial++;
-}
+export { methodCacheSerial, rbClearMethodCache };
 
 /**
  * Symbol key for Ruby's Module#included callback, which `rb_mod_include` fires

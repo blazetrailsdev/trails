@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { defineModule, rbCModule, rbCallSuper, rbClassNewInstance } from "./include.js";
+import {
+  defineModule,
+  rbCModule,
+  rbCallSuper,
+  rbClassNewInstance,
+  rbClearMethodCache,
+  prepend,
+} from "./include.js";
 import {
   rbCArray,
   rbCBasicObject,
@@ -1418,5 +1425,74 @@ describe("rbObjIsKindOf(obj, Module)", () => {
     expect(rbObjIsKindOf(mod, Module)).toBe(true);
     expect(rbObjIsKindOf(Outer, Module)).toBe(true);
     expect(rbObjIsKindOf({ a: 1 }, Module)).toBe(false);
+  });
+});
+
+describe("rbFSend writer cache", () => {
+  it("re-resolves a writer after the method cache is cleared", () => {
+    class Point {
+      _x: unknown = null;
+      setX(v: unknown): void {
+        this._x = v;
+      }
+    }
+    const p = new Point();
+    rbFSend(p, "x=", 1);
+    expect(p._x).toBe(1);
+    Point.prototype.setX = function (this: Point, v: unknown) {
+      this._x = [v];
+    };
+    rbClearMethodCache();
+    rbFSend(p, "x=", 2);
+    expect(p._x).toEqual([2]);
+  });
+
+  it("dispatches a receiver's own writer over the cached one", () => {
+    class Point {
+      _x: unknown = null;
+      setX(v: unknown): void {
+        this._x = v;
+      }
+    }
+    const a = new Point();
+    const b = new Point();
+    rbFSend(a, "x=", 1);
+    Object.defineProperty(b, "x=", { value: (v: unknown) => (b._x = `own ${v}`) });
+    rbFSend(b, "x=", 1);
+    expect(b._x).toBe("own 1");
+  });
+
+  it("re-resolves a writer after a module is prepended", () => {
+    class Point {
+      _x: unknown = null;
+      setX(v: unknown): void {
+        this._x = v;
+      }
+    }
+    const p = new Point();
+    rbFSend(p, "x=", 1);
+    prepend(Point, {
+      setX(this: Point, v: unknown) {
+        this._x = ["prepended", v];
+      },
+    });
+    rbFSend(p, "x=", 2);
+    expect(p._x).toEqual(["prepended", 2]);
+  });
+
+  it("re-resolves a writer after define_method", () => {
+    class Point {
+      _x: unknown = null;
+      setX(v: unknown): void {
+        this._x = v;
+      }
+    }
+    const p = new Point();
+    rbFSend(p, "x=", 1);
+    rbModDefineMethod(Point, "x=", function (this: Point, v: unknown) {
+      this._x = ["defined", v];
+    });
+    rbFSend(p, "x=", 2);
+    expect(p._x).toEqual(["defined", 2]);
   });
 });
