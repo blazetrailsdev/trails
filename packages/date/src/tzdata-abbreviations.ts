@@ -1,3 +1,5 @@
+import { tzdataIsdst } from "./tzdata-isdst.js";
+
 /** @noRailsEquivalent PERMANENT */
 export const TZDATA_VERSION = "2026c";
 
@@ -602,6 +604,8 @@ WET LMT|WET|WEST|WEMT|CET|CEST,1-u9rhc0,22bufw0,16zxg0,266800,1bq580,271s40,1bq5
 Zulu UTC
 `;
 
+const horizon = Date.UTC(2040, 0, 1) / 1000;
+
 let rowsByZoneId: Map<string, string>;
 
 function rows(): Map<string, string> {
@@ -675,6 +679,10 @@ export function tzdataAbbreviation(timeZoneId: string, epochSeconds: number): st
     const middle = (low + high) >> 1;
     if (instants[middle] <= epochSeconds) low = middle + 1;
     else high = middle;
+  }
+  if (epochSeconds >= horizon && low > 1 && instants[low - 1] >= horizon - 366 * 86400) {
+    const isdst = tzdataIsdst(timeZoneId, epochSeconds);
+    if (tzdataIsdst(timeZoneId, instants[low - 1]) !== isdst) return names[indexes[low - 2]];
   }
   return names[low === 0 ? 0 : indexes[low - 1]];
 }

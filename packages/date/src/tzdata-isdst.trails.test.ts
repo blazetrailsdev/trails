@@ -1,6 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Time, resetLocalTimeZoneId } from "./time.js";
+import { tzdataAbbreviation } from "./tzdata-abbreviations.js";
 import { TZDATA_ISDST, tzdataBaseOffsets, tzdataIsdst } from "./tzdata-isdst.js";
 
 function localIsdst(zone: string, epochSeconds: number): boolean {
@@ -48,6 +49,18 @@ describe("tzdataIsdst", () => {
   it("answers for a zone's tzdata link names", () => {
     expect(tzdataIsdst("Asia/Calcutta", 1719835200)).toBe(tzdataIsdst("Asia/Kolkata", 1719835200));
     expect(tzdataIsdst("US/Eastern", 1719835200)).toBe(true);
+  });
+});
+
+describe("past the tables' 2040 horizon", () => {
+  it.each([
+    ["Europe/London", 2540246400, true, "BST"],
+    ["Europe/London", 2524608000, false, "GMT"],
+    ["Europe/Paris", 2224495166, true, "CEST"],
+    ["America/New_York", 4907001600, true, "EDT"],
+  ] as const)("%s at %i answers %s / %s", (zone, at, isdst, abbreviation) => {
+    expect(tzdataIsdst(zone, at)).toBe(isdst);
+    expect(tzdataAbbreviation(zone, at)).toBe(abbreviation);
   });
 });
 
