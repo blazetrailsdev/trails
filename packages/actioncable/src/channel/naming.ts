@@ -1,6 +1,5 @@
 import { Concern, extend, underscore } from "@blazetrails/activesupport";
-import { defineModule, rbModConstSet, rbModName, rbObjClass } from "@blazetrails/ruby-compat";
-import { Channel } from "../namespaces.js";
+import { defineModule, rbModName, rbObjClass } from "@blazetrails/ruby-compat";
 
 interface NamingClass {
   _channelName?: string;
@@ -27,5 +26,3 @@ export const Naming = defineModule({
 });
 extend(Naming, Concern);
 Object.defineProperty(Naming, "ClassMethods", { value: ClassMethods });
-
-rbModConstSet(Channel, "Naming", Naming);

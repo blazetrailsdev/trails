@@ -1,6 +1,5 @@
 import { ActiveSupportJSON, Notifications, truncate } from "@blazetrails/activesupport";
-import { defineModule, rbInspect, rbModConstSet } from "@blazetrails/ruby-compat";
-import { Server } from "../namespaces.js";
+import { defineModule, rbInspect } from "@blazetrails/ruby-compat";
 
 interface Coder {
   encode(message: unknown): unknown;
@@ -67,6 +66,3 @@ export class Broadcaster {
     });
   }
 }
-
-rbModConstSet(Server, "Broadcasting", Broadcasting);
-rbModConstSet(Broadcasting, "Broadcaster", Broadcaster);

@@ -21,7 +21,7 @@ import type {
   TestConnection,
 } from "./connection/test-case.js";
 import type { TestHelper } from "./test-helper.js";
-import { rbDeclareIvar, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { rbDeclareIvar, registerConstant } from "@blazetrails/ruby-compat";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -60,7 +60,14 @@ extend(SubscriptionAdapter, Autoload);
 export const Helpers = { name: "ActionCable::Helpers" } as AutoloadModule;
 extend(Helpers, Autoload);
 
-export const ActionCable = { name: "ActionCable" } as AutoloadModule & {
+export const ActionCable = {
+  name: "ActionCable",
+  Server,
+  Connection,
+  Channel,
+  SubscriptionAdapter,
+  Helpers,
+} as AutoloadModule & {
   INTERNAL: typeof INTERNAL;
   server: typeof server;
   Server: typeof Server;
@@ -76,10 +83,5 @@ export const ActionCable = { name: "ActionCable" } as AutoloadModule & {
 registerConstant("ActionCable", ActionCable);
 extend(ActionCable, Autoload);
 rbDeclareIvar({ prototype: ActionCable }, "@server", "_server");
-rbModConstSet(ActionCable, "Server", Server);
-rbModConstSet(ActionCable, "Connection", Connection);
-rbModConstSet(ActionCable, "Channel", Channel);
-rbModConstSet(ActionCable, "SubscriptionAdapter", SubscriptionAdapter);
-rbModConstSet(ActionCable, "Helpers", Helpers);
 
 TopLevel.ActionCable = ActionCable;

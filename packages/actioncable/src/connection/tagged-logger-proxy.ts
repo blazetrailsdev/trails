@@ -1,12 +1,10 @@
 import {
   ARRAY_METHOD_TABLE,
   flatten,
-  rbModConstSet,
   rbModDefineMethod,
   rbObjRespondTo,
   uniq,
 } from "@blazetrails/ruby-compat";
-import { Connection } from "../namespaces.js";
 
 type Severity = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 
@@ -75,5 +73,3 @@ for (const severity of ["debug", "info", "warn", "error", "fatal", "unknown"] as
     },
   );
 }
-
-rbModConstSet(Connection, "TaggedLoggerProxy", TaggedLoggerProxy);

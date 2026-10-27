@@ -18,7 +18,6 @@ import {
   rbInspect,
   ArgumentError,
   rbClassInheritedP,
-  rbModConstSet,
   registerConstant,
   rbModName,
   rbObjClass,
@@ -26,8 +25,8 @@ import {
   rbObjMethod,
   toS,
 } from "@blazetrails/ruby-compat";
-import "../action-cable.js";
-import { ActionCable, Channel } from "../namespaces.js";
+import { INTERNAL } from "../action-cable.js";
+import { Channel } from "../namespaces.js";
 import { Broadcasting, type ClassMethods as BroadcastingClassMethods } from "./broadcasting.js";
 import { Callbacks, type ClassMethods as CallbacksClassMethods } from "./callbacks.js";
 import { Naming } from "./naming.js";
@@ -114,7 +113,7 @@ export class Base {
   /** @missingRailsArgs public_instance_methods — PERMANENT */
   static actionMethods(): Set<string> {
     if (!Object.hasOwn(this, "_actionMethods") || this._actionMethods == null) {
-      const internal = new Set(publicInstanceMethods(ActionCable.Channel.Base, true));
+      const internal = new Set(publicInstanceMethods(Base, true));
       const methods = [
         ...publicInstanceMethods(this, true).filter((name) => !internal.has(name)),
         ...publicInstanceMethods(this, false),
@@ -302,7 +301,7 @@ export class Base {
         () => {
           this.connection.transmit({
             identifier: this.identifier,
-            type: ActionCable.INTERNAL.messageTypes.confirmation,
+            type: INTERNAL.messageTypes.confirmation,
           });
           return (this._subscriptionConfirmationSent = true);
         },
@@ -330,7 +329,7 @@ export class Base {
       () =>
         this.connection.transmit({
           identifier: this.identifier,
-          type: ActionCable.INTERNAL.messageTypes.rejection,
+          type: INTERNAL.messageTypes.rejection,
         }),
     );
   }
@@ -342,7 +341,7 @@ include(Base, Naming);
 include(Base, Broadcasting);
 include(Base, Rescuable);
 
-rbModConstSet(Channel, "Base", Base);
+Channel.Base = Base;
 
 /** @noRailsEquivalent PERMANENT */
 export function registerChannel(channel: typeof Base): void;

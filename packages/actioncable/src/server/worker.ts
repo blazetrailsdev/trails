@@ -13,11 +13,10 @@ import {
   isPlainHash,
   rbBlockGivenP,
   rbFSend,
-  rbModConstSet,
   rbObjClassname,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
-import { ActionCable, Server } from "../namespaces.js";
+import { ActionCable } from "../namespaces.js";
 import { ActiveRecordConnectionManagement } from "./worker/active-record-connection-management.js";
 
 interface Logger {
@@ -136,6 +135,3 @@ include(Worker, Callbacks);
 threadMattrAccessor.call(Worker as never, "connection");
 Worker.defineCallbacks("work");
 include(Worker, ActiveRecordConnectionManagement);
-
-rbModConstSet(Worker, "ActiveRecordConnectionManagement", ActiveRecordConnectionManagement);
-rbModConstSet(Server, "Worker", Worker);

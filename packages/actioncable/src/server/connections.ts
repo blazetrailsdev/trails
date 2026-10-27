@@ -1,5 +1,4 @@
-import { defineModule, rbModConstSet } from "@blazetrails/ruby-compat";
-import { Server } from "../namespaces.js";
+import { defineModule } from "@blazetrails/ruby-compat";
 
 interface Connection {
   beat(): unknown;
@@ -50,6 +49,3 @@ export const Connections = defineModule({
     return (this as unknown as ConnectionsHost).connections.map((c) => c.statistics);
   },
 });
-rbModConstSet(Connections, "BEAT_INTERVAL", BEAT_INTERVAL);
-
-rbModConstSet(Server, "Connections", Connections);

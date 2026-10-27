@@ -3,11 +3,9 @@ import {
   defineModule,
   hashDelete,
   isPlainHash,
-  rbModConstSet,
   rbModName,
   rbObjClass,
 } from "@blazetrails/ruby-compat";
-import { Channel } from "../namespaces.js";
 
 export type Handler = (message: unknown) => unknown;
 
@@ -233,5 +231,3 @@ extend(Streams, Concern);
 ).included(null, function () {
   this.onUnsubscribe(":stopAllStreams");
 });
-
-rbModConstSet(Channel, "Streams", Streams);

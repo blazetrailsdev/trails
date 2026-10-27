@@ -1,6 +1,7 @@
 import { cattrAccessor, include, runLoadHooks, type Included } from "@blazetrails/activesupport";
-import { Monitor, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActionCable, Server } from "../namespaces.js";
+import { Monitor } from "@blazetrails/ruby-compat";
+import { INTERNAL } from "../action-cable.js";
+import { Server } from "../namespaces.js";
 import { StreamEventLoop } from "../connection/stream-event-loop.js";
 import { Broadcasting } from "./broadcasting.js";
 import { Configuration } from "./configuration.js";
@@ -69,7 +70,7 @@ export class Base {
 
   async restart(): Promise<void> {
     for (const connection of this.connections) {
-      connection.close({ reason: ActionCable.INTERNAL.disconnectReasons.serverRestart });
+      connection.close({ reason: INTERNAL.disconnectReasons.serverRestart });
     }
 
     await this.mutex.synchronize(async () => {
@@ -107,6 +108,6 @@ include(Base, Broadcasting);
 include(Base, Connections);
 cattrAccessor.call(Base, "config", { instanceAccessor: false, default: new Configuration() });
 
-rbModConstSet(Server, "Base", Base);
+Server.Base = Base;
 
 runLoadHooks("action_cable", Base.config);

@@ -1,5 +1,4 @@
-import { EOFError, Errno, rbModConstSet } from "@blazetrails/ruby-compat";
-import { Connection } from "../namespaces.js";
+import { EOFError, Errno } from "@blazetrails/ruby-compat";
 
 type Data = string | Uint8Array;
 
@@ -92,5 +91,3 @@ export class Stream {
     this.rackHijackIo = null;
   }
 }
-
-rbModConstSet(Connection, "Stream", Stream);

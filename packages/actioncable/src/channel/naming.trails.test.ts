@@ -19,7 +19,6 @@ describe("ActionCable::Channel::Naming constant names", () => {
 
   it("names a framework module by its Ruby constant path", () => {
     expect(safeConstantize("ActionCable::Channel::Naming")).toBe(Naming);
-    expect((ActionCable.Channel as unknown as Record<string, unknown>).Naming).toBe(Naming);
   });
 
   it("reads a namespaced channel's full Ruby name and resolves it through safeConstantize", () => {

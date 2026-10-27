@@ -1,5 +1,4 @@
-import { Mutex, rbModConstSet } from "@blazetrails/ruby-compat";
-import { SubscriptionAdapter } from "../namespaces.js";
+import { Mutex } from "@blazetrails/ruby-compat";
 
 type Subscriber = (message: unknown) => unknown;
 
@@ -55,5 +54,3 @@ export class SubscriberMap {
     callback(message);
   }
 }
-
-rbModConstSet(SubscriptionAdapter, "SubscriberMap", SubscriberMap);

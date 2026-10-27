@@ -7,12 +7,12 @@ import {
   excBacktrace,
   excSetBacktrace,
   fetch,
-  rbModConstSet,
   rbFRequire,
   rbRequireLoaded as require,
   rbObjClass,
 } from "@blazetrails/ruby-compat";
-import { ActionCable, Server } from "../namespaces.js";
+import { Base } from "../connection/base.js";
+import { SubscriptionAdapter } from "../namespaces.js";
 
 const BUILT_IN_ADAPTERS: Record<string, () => Promise<Record<string, unknown>>> = {
   "action_cable/subscription_adapter/inline": () => import("../subscription-adapter/inline.js"),
@@ -44,7 +44,7 @@ export class Configuration {
   constructor() {
     this.logTags = [];
 
-    this.connectionClass = () => (ActionCable.Connection as unknown as { Base: unknown }).Base;
+    this.connectionClass = () => Base;
     this.workerPoolSize = 4;
 
     this.disableRequestForgeryProtection = false;
@@ -100,12 +100,10 @@ export class Configuration {
       block(() => "redis"),
     );
     await rbFRequire(
-      { ...BUILT_IN_ADAPTERS, ...ActionCable.SubscriptionAdapter.loadPath },
+      { ...BUILT_IN_ADAPTERS, ...SubscriptionAdapter.loadPath },
       `action_cable/subscription_adapter/${adapter}`,
     ).catch((e: unknown) => {
       if (!(e instanceof LoadError)) throw e;
     });
   }
 }
-
-rbModConstSet(Server, "Configuration", Configuration);
