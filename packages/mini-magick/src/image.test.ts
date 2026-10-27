@@ -28,24 +28,24 @@ import { Utilities } from "./utilities.js";
 import { beforeEach, expect, it, describe, vi, afterEach } from "vitest";
 
 describe("MiniMagick::Image", () => {
-  let subject: unknown;
-  let dimensions: unknown;
-  let depth: unknown;
-  let map: unknown;
-  let pixels: unknown;
-  let blob: unknown;
-  let newTmpDir: unknown;
-  let image: unknown;
-  let sameImage: unknown;
-  let otherImage: unknown;
-  let magenta: unknown;
-  let gray: unknown;
-  let green: unknown;
-  let cyan: unknown;
-  let pix: unknown;
-  let cols: unknown;
-  let rows: unknown;
-  let mask: unknown;
+  let subject: Image;
+  let dimensions: [number, number];
+  let depth: number;
+  let map: string;
+  let pixels: number[];
+  let blob: Uint8Array;
+  let newTmpDir: string;
+  let image: Image;
+  let sameImage: Image;
+  let otherImage: Image;
+  let magenta: number[];
+  let gray: number[];
+  let green: number[];
+  let cyan: number[];
+  let pix: number[][][];
+  let cols: number;
+  let rows: number;
+  let mask: Image;
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -238,7 +238,7 @@ describe("MiniMagick::Image", () => {
       // BLOCKED: mini-magick-lib-native-idioms
 
       it.fails("uses the tmpdir to create the file", async () => {
-        vi.spyOn(MiniMagick, "tmpdir").mockReturnValue(newTmpDir);
+        vi.spyOn(MiniMagick, "tmpdir", "get").mockReturnValue(newTmpDir);
         const image = await this.create();
         expect(File.dirname(await image.path())).toEqualRuby(newTmpDir);
       });
@@ -705,7 +705,7 @@ describe("MiniMagick::Image", () => {
     // BLOCKED: mini-magick-lib-native-idioms
     it.fails("returns a list of images", async () => {
       for (const x of await subject.layers()) expect(x).toBeInstanceOf(Image);
-      expect(await (await first(await subject.layers())).isValid()).toBeRubyTruthy();
+      expect(await (await subject.layers())[0].isValid()).toBeRubyTruthy();
     });
 
     // BLOCKED: mini-magick-lib-native-idioms

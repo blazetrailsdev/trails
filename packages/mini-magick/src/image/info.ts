@@ -59,13 +59,13 @@ export class Info {
     return (Object.keys(this._info).forEach((k) => delete this._info[k]), this._info);
   }
 
-  cheapInfo(value: string) {
+  async cheapInfo(value: string) {
     try {
       if (Object.hasOwn(this._info, value)) {
         return this._info[value];
       }
       const [format, width, height, size] = rbStrSend(
-        this.parseWarnings(this.get("%m %w %h %b")) as string,
+        this.parseWarnings(await this.get("%m %w %h %b")) as string,
         "split",
         " ",
       )[0] as string[];
@@ -105,13 +105,14 @@ export class Info {
     throw new TypeError();
   }
 
-  colorspace() {
-    if (!((this._info["colorspace"] ?? false) !== false)) this._info["colorspace"] = this.get("%r");
+  async colorspace() {
+    if (!((this._info["colorspace"] ?? false) !== false))
+      this._info["colorspace"] = await this.get("%r");
     return this._info["colorspace"];
   }
 
-  resolution(unit: unknown = null) {
-    const output = this.identify((b) => {
+  async resolution(unit: unknown = null) {
+    const output = await this.identify((b) => {
       if (unit != null && unit !== false) {
         b.units(unit);
       }
@@ -124,12 +125,12 @@ export class Info {
     return this.get(`%[${value ?? ""}]`);
   }
 
-  exif() {
+  async exif() {
     let hash: unknown, output;
     if (!((this._info["exif"] ?? false) !== false))
-      this._info["exif"] = (() => {
+      this._info["exif"] = await (async () => {
         hash = {};
-        output = this.get("%[EXIF:*]");
+        output = await this.get("%[EXIF:*]");
         rbStrSend(output as string, "eachLine", (line: unknown): unknown => {
           let match, key, value;
           line = rbStrSend(line as string, "chomp", "\n")[0];
@@ -158,22 +159,23 @@ export class Info {
     return this._info["exif"];
   }
 
-  raw(value: string) {
+  async raw(value: string) {
     if (!((this._info[`raw:${value ?? ""}`] ?? false) !== false))
-      this._info[`raw:${value ?? ""}`] = this.identify((b) => b.format(value));
+      this._info[`raw:${value ?? ""}`] = await this.identify((b) => b.format(value));
     return this._info[`raw:${value ?? ""}`];
   }
 
-  signature() {
-    if (!((this._info["signature"] ?? false) !== false)) this._info["signature"] = this.get("%#");
+  async signature() {
+    if (!((this._info["signature"] ?? false) !== false))
+      this._info["signature"] = await this.get("%#");
     return this._info["signature"];
   }
 
-  data() {
+  async data() {
     let json, data;
     if (!((this._info["data"] ?? false) !== false))
-      this._info["data"] = (() => {
-        json = MiniMagick.convert((convert: unknown) => {
+      this._info["data"] = await (async () => {
+        json = await MiniMagick.convert((convert: unknown) => {
           if (Array.isArray(convert)) convert.push(this.path());
           else if (convert instanceof globalThis.Set) convert.add(this.path());
           else convert.append(this.path());
@@ -194,7 +196,7 @@ export class Info {
     return this._info["data"];
   }
 
-  identify(block?: (...args: unknown[]) => unknown) {
+  identify(block?: (...args: unknown[]) => unknown): Promise<string> {
     return MiniMagick.identify((builder: unknown) => {
       if (block != null) {
         block(builder);
@@ -206,7 +208,7 @@ export class Info {
           : builder instanceof globalThis.Set
             ? builder.add(this.path())
             : builder.append(this.path());
-    });
+    }) as Promise<string>;
   }
 
   /** @internal */

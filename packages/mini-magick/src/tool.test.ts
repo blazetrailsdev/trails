@@ -1,5 +1,5 @@
 import type {} from "@blazetrails/vitest-matchers";
-import { File, update, rbObjClone } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { MiniMagick } from "./mini-magick.js";
 import { Shell } from "./shell.js";
 import "./test-helpers/spec-helper.js";
@@ -7,224 +7,172 @@ import { imagePath } from "./test-helpers/support/helpers.js";
 import { Tool } from "./tool.js";
 import { beforeEach, expect, it, vi, describe, afterEach } from "vitest";
 
+type CliTool = Tool & { [option: string]: (...args: unknown[]) => CliTool };
+
 describe("MiniMagick::Tool", () => {
-  let subject: unknown;
+  let subject: CliTool;
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  beforeEach(async () => {
-    subject = await MiniMagick.identify();
+  beforeEach(() => {
+    subject = MiniMagick.identify() as CliTool;
   });
 
   describe("#call", () => {
-    // BLOCKED: mini-magick-shell-over-open3-capture3
-    it.fails("calls the shell to run the command", async () => {
+    it("calls the shell to run the command", async () => {
       subject.append(imagePath("gif"));
-      const output = await subject();
+      const output = await subject.call();
       expect(output).toMatch("GIF");
     });
 
-    // BLOCKED: mini-magick-shell-over-open3-capture3
-    it.fails("strips the output", async () => {
+    it("strips the output", async () => {
       subject.append(imagePath());
-      const output = await subject();
-      expect(output).not.toEndWith("\n");
+      const output = await subject.call();
+      expect(output.endsWith("\n")).toBe(false);
     });
 
-    // BLOCKED: mini-magick-shell-over-open3-capture3
-    it.fails("accepts a block, and yields stdin, stdout and exit status", async () => {
-      vi.spyOn(Shell.prototype, "execute").mockReturnValue(["stdout", "stderr", 0]);
-      await expect(async (block: unknown) => await subject(block)).toYieldWithArgs(
-        "stdout",
-        "stderr",
-        0,
-      );
-      expect(await subject(() => {})).toEqual("stdout");
+    it("accepts a block, and yields stdin, stdout and exit status", async () => {
+      vi.spyOn(Shell.prototype, "execute").mockResolvedValue(["stdout", "stderr", 0]);
+      await expect((block: (...args: unknown[]) => unknown) =>
+        subject.call({}, block),
+      ).toYieldWithArgs("stdout", "stderr", 0);
+      expect(await subject.call({}, () => {})).toEqual("stdout");
     });
 
-    // BLOCKED: mini-magick-shell-over-open3-capture3
-    it.fails("accepts stdin", async () => {
+    it("accepts stdin", async () => {
       subject.append("-");
-      const output = await subject({ stdin: File.read(imagePath() as string) });
+      const output = await subject.call({ stdin: File.binread(imagePath()) });
       expect(output).toMatch(/JPEG/);
     });
   });
 
   describe(".new", () => {
-    // BLOCKED: mini-magick-shell-over-open3-capture3
-    it.fails("accepts a block, and immediately executes the command", async () => {
-      const output = new Tool(
-        "identify",
-        async (builder) =>
-          await (typeof builder === "string"
-            ? builder + imagePath("gif")
-            : Array.isArray(builder)
-              ? (builder.push(imagePath("gif")), builder)
-              : builder instanceof globalThis.Set
-                ? builder.add(imagePath("gif"))
-                : builder.append(imagePath("gif"))),
-      );
+    it("accepts a block, and immediately executes the command", async () => {
+      const output = await Tool.new("identify", (builder: Tool) => {
+        builder.append(imagePath("gif"));
+      });
       expect(output).toMatch("GIF");
     });
   });
 
   describe("#command", () => {
-    // BLOCKED: mini-magick-specs-native-and-typed
-    it.fails("includes the executable and the arguments", async () => {
-      vi.spyOn(subject, "args").mockReturnValue(["-list", "Command"]);
-      expect(await subject.command()).toInclude(...["identify", "-list", "Command"]);
+    it("includes the executable and the arguments", () => {
+      vi.spyOn(subject, "args", "get").mockReturnValue(["-list", "Command"]);
+      expect(subject.command()).toEqual(expect.arrayContaining(["identify", "-list", "Command"]));
     });
   });
 
   describe("#executable", () => {
-    // BLOCKED: mini-magick-specs-native-and-typed
-    it.fails("prepends 'magick' to the command when using ImageMagick 7", async () => {
+    it("prepends 'magick' to the command when using ImageMagick 7", () => {
       vi.spyOn(MiniMagick, "isImagemagick7").mockReturnValue(true);
-      expect(await subject.executable()).toEqual(["magick", "identify"]);
-      expect(await (await MiniMagick.convert()).executable()).toEqual(["magick"]);
+      expect(subject.executable()).toEqual(["magick", "identify"]);
+      expect((MiniMagick.convert() as Tool).executable()).toEqual(["magick"]);
     });
 
-    // BLOCKED: mini-magick-specs-native-and-typed
-    it.fails("prepends 'gm' to the command when using GraphicsMagick", async () => {
-      vi.spyOn(MiniMagick, "graphicsmagick").mockReturnValue(true);
-      expect(await subject.executable()).toEqual(["gm", "identify"]);
-      expect(await (await MiniMagick.convert()).executable()).toEqual(["gm", "convert"]);
+    it("prepends 'gm' to the command when using GraphicsMagick", () => {
+      vi.spyOn(MiniMagick, "graphicsmagick", "get").mockReturnValue(true);
+      expect(subject.executable()).toEqual(["gm", "identify"]);
+      expect((MiniMagick.convert() as Tool).executable()).toEqual(["gm", "convert"]);
     });
 
-    // BLOCKED: mini-magick-specs-native-and-typed
-    it.fails("respects #cli_prefix as a string", async () => {
+    it("respects #cli_prefix as a string", () => {
       vi.spyOn(MiniMagick, "isImagemagick7").mockReturnValue(false);
-      vi.spyOn(MiniMagick, "cliPrefix").mockReturnValue("firejail");
-      expect(await subject.executable()).toEqual(["firejail", "identify"]);
+      vi.spyOn(MiniMagick, "cliPrefix", "get").mockReturnValue("firejail");
+      expect(subject.executable()).toEqual(["firejail", "identify"]);
     });
 
-    // BLOCKED: mini-magick-specs-native-and-typed
-    it.fails("respects #cli_prefix as an array", async () => {
+    it("respects #cli_prefix as an array", () => {
       vi.spyOn(MiniMagick, "isImagemagick7").mockReturnValue(false);
-      vi.spyOn(MiniMagick, "cliPrefix").mockReturnValue(["firejail", "--force"]);
-      expect(await subject.executable()).toEqual(["firejail", "--force", "identify"]);
+      vi.spyOn(MiniMagick, "cliPrefix", "get").mockReturnValue(["firejail", "--force"]);
+      expect(subject.executable()).toEqual(["firejail", "--force", "identify"]);
     });
   });
 
   describe("#<<", () => {
-    it("adds argument to the args list", async () => {
-      await ((x) =>
-        typeof x === "string"
-          ? x + 123
-          : Array.isArray(x)
-            ? (x.push(123), x)
-            : x instanceof globalThis.Set
-              ? x.add(123)
-              : x.append(123))(
-        await ((x) =>
-          typeof x === "string"
-            ? x + "bar"
-            : Array.isArray(x)
-              ? (x.push("bar"), x)
-              : x instanceof globalThis.Set
-                ? x.add("bar")
-                : x.append("bar"))(
-          await (typeof subject === "string"
-            ? subject + "foo"
-            : Array.isArray(subject)
-              ? (subject.push("foo"), subject)
-              : subject instanceof globalThis.Set
-                ? subject.add("foo")
-                : subject.append("foo")),
-        ),
-      );
-      expect(await subject.args).toEqual(["foo", "bar", "123"]);
+    it("adds argument to the args list", () => {
+      subject
+        .append("foo")
+        .append("bar")
+        .append(123 as unknown as string);
+      expect(subject.args).toEqual(["foo", "bar", "123"]);
     });
   });
 
   describe("#merge!", () => {
-    // BLOCKED: mini-magick-specs-native-and-typed
-    it.fails("adds arguments to the args list", async () => {
+    it("adds arguments to the args list", () => {
       subject.append("pre-existing");
-      await update(subject, ["foo", 123]);
-      expect(await subject.args).toEqual(["pre-existing", "foo", "123"]);
+      subject.mergeBang(["foo", 123]);
+      expect(subject.args).toEqual(["pre-existing", "foo", "123"]);
     });
   });
 
   describe("#+", () => {
-    it("switches the last option to + form", async () => {
+    it("switches the last option to + form", () => {
       subject.help();
       subject.help().plus();
       subject.debug().plus("foo");
       subject.debug().plus(8, "bar");
-      expect(await subject.args).toEqual(["-help", "+help", "+debug", "foo", "+debug", "8", "bar"]);
+      expect(subject.args).toEqual(["-help", "+help", "+debug", "foo", "+debug", "8", "bar"]);
     });
   });
 
   describe("#stdin", () => {
-    // BLOCKED: mini-magick-specs-native-and-typed
-    it.fails("appends the '-' pseudo-filename", async () => {
-      await subject.stdin;
-      expect(await subject.args).toEqual(["-"]);
+    it("appends the '-' pseudo-filename", () => {
+      subject.stdin();
+      expect(subject.args).toEqual(["-"]);
     });
   });
 
   describe("#stdout", () => {
-    // BLOCKED: mini-magick-specs-native-and-typed
-    it.fails("appends the '-' pseudo-filename", async () => {
-      await subject.stdout;
-      expect(await subject.args).toEqual(["-"]);
+    it("appends the '-' pseudo-filename", () => {
+      subject.stdout();
+      expect(subject.args).toEqual(["-"]);
     });
   });
 
   describe("#stack", () => {
-    it("it surrounds added arguments with parentheses", async () => {
-      await subject.stack(async (stack) => {
-        if (Array.isArray(stack)) stack.push("foo");
-        else if (stack instanceof globalThis.Set) stack.add("foo");
-        else stack.append("foo");
-        return await (typeof stack === "string"
-          ? stack + "bar"
-          : Array.isArray(stack)
-            ? (stack.push("bar"), stack)
-            : stack instanceof globalThis.Set
-              ? stack.add("bar")
-              : stack.append("bar"));
+    it("it surrounds added arguments with parentheses", () => {
+      subject.stack((stack: Tool) => {
+        stack.append("foo");
+        stack.append("bar");
       });
-      expect(await subject.args).toEqual(["(", "foo", "bar", ")"]);
+      expect(subject.args).toEqual(["(", "foo", "bar", ")"]);
     });
 
-    it("accepts hash of options", async () => {
-      await subject.stack({ foo: "bar", a: ["b", "c"] }, "foo.gif");
-      expect(await subject.args).toEqual(["(", "-foo", "bar", "-a", "b", "c", "foo.gif", ")"]);
+    it("accepts hash of options", () => {
+      subject.stack({ foo: "bar", a: ["b", "c"] }, "foo.gif");
+      expect(subject.args).toEqual(["(", "-foo", "bar", "-a", "b", "c", "foo.gif", ")"]);
     });
   });
 
   describe("#clone", () => {
-    // BLOCKED: mini-magick-specs-native-and-typed
-    it.fails("adds an option instead of the default behaviour", async () => {
-      await rbObjClone(subject);
-      expect(await subject.args).toEqual(["-clone"]);
+    it("adds an option instead of the default behaviour", () => {
+      subject.clone();
+      expect(subject.args).toEqual(["-clone"]);
     });
 
-    // BLOCKED: mini-magick-specs-native-and-typed
-    it.fails("accepts arguments", async () => {
-      await rbObjClone(subject);
-      expect(await subject.args).toEqual(["-clone", "0"]);
+    it("accepts arguments", () => {
+      subject.clone(0);
+      expect(subject.args).toEqual(["-clone", "0"]);
     });
 
-    it("is convertible to plus version", async () => {
+    it("is convertible to plus version", () => {
       subject.clone().plus();
-      expect(await subject.args).toEqual(["+clone"]);
+      expect(subject.args).toEqual(["+clone"]);
     });
   });
 
   describe("#method_missing", () => {
-    it("adds CLI options", async () => {
-      await subject.fooBar("baz");
-      expect(await subject.args).toEqual(["-foo-bar", "baz"]);
+    it("adds CLI options", () => {
+      subject.fooBar("baz");
+      expect(subject.args).toEqual(["-foo-bar", "baz"]);
     });
   });
 
-  it("defines creation operator methods", async () => {
-    await (await subject.radialGradient()).canvas("khaki");
-    expect(await subject.args).toEqual(["radial-gradient:", "canvas:khaki"]);
+  it("defines creation operator methods", () => {
+    subject.radialGradient().canvas("khaki");
+    expect(subject.args).toEqual(["radial-gradient:", "canvas:khaki"]);
   });
 });

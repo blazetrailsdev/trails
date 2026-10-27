@@ -4,14 +4,13 @@ import {
   rbCheckArrayType,
   rbStrSend,
   rbFArray,
-  rbEqual,
   rbObjAsString,
   rbObjIsKindOf,
   Hash,
   rbFSend,
   rbModDeprecateConstant,
 } from "@blazetrails/ruby-compat";
-import { MiniMagick, isImagemagick7 } from "./mini-magick.js";
+import { MiniMagick } from "./mini-magick.js";
 
 export class Tool {
   declare _name: string;
@@ -74,34 +73,36 @@ export class Tool {
     });
   }
 
-  call({ ...options }: Record<string, unknown> = {}, block?: (...args: unknown[]) => unknown) {
+  async call(
+    { ...options }: Record<string, unknown> = {},
+    block?: (stdout: string, stderr: string, status: number | null) => unknown,
+  ): Promise<string> {
     options = { ...this._options, ...options };
     if (block != null) {
       options.warnings = false;
     }
     const shell = new Shell();
-    const [stdout, stderr, status] = ((x) => (x == null ? [] : (rbCheckArrayType(x) ?? [x])))(
-      shell.run(this.command(), { ...options }),
-    );
+    const [stdout, stderr, status] = await shell.run(this.command(), { ...options });
     if (block != null) {
-      block(stdout, stderr, status);
+      await block(stdout, stderr, status);
     }
-    return rbStrSend(stdout as string, "chomp", "\n")[0];
+    return rbStrSend(stdout, "chomp", "\n")[0] as string;
   }
 
-  command() {
-    return [...this.executable(), ...this.args];
+  command(): string[] {
+    return [...this.executable(), ...(this.args as string[])];
   }
 
   executable() {
     const exe = rbFArray(MiniMagick.cliPrefix);
-    if (isImagemagick7() && !rbEqual(this.name, "magick")) {
+    if (MiniMagick.isImagemagick7() && this.name !== "magick") {
       exe.push("magick");
     }
     if ((MiniMagick.graphicsmagick ?? false) !== false) {
       exe.push("gm");
     }
-    return exe.push(this.name);
+    exe.push(this.name);
+    return exe as string[];
   }
 
   append(arg: string) {

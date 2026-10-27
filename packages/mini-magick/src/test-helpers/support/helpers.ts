@@ -4,7 +4,7 @@ export function imagePath(type: string = "default") {
   let path: unknown;
   if (type !== "jpg_without_extension") {
     return File.join(
-      "spec/fixtures",
+      File.expandPath("../fixtures", import.meta.dirname),
       (() => {
         if (type === "default" || type === "jpg") {
           return "default.jpg";

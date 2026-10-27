@@ -62,6 +62,11 @@ class Status {
     this.#status = status.error === undefined ? status.status : null;
   }
 
+  /** `Process::Status#exitstatus` (`pst_wexitstatus`, `vendor/ruby/v3.3.11/process.c:1084-1091`). */
+  exitstatus(): number | null {
+    return this.#status;
+  }
+
   isSuccess(): boolean | null {
     if (this.#status === null) return null;
     return this.#status === 0;

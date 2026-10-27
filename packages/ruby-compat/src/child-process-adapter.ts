@@ -70,7 +70,7 @@ export interface ChildProcessAdapter {
     command: string,
     env: Record<string, string | undefined>,
     args: string[] | null,
-    stdinData: string,
+    stdinData: string | Uint8Array,
   ): Promise<[stdout: string, stderr: string, status: WaitStatus]>;
 }
 
@@ -125,7 +125,10 @@ type NodeReadable = {
 
 type NodeChild = {
   pid?: number;
-  stdin: { end(data?: string): void; on(event: "error", listener: () => void): void } | null;
+  stdin: {
+    end(data?: string | Uint8Array): void;
+    on(event: "error", listener: () => void): void;
+  } | null;
   stdout: NodeReadable | null;
   stderr: NodeReadable | null;
   on(event: "error", listener: (error: Error) => void): void;
@@ -144,7 +147,7 @@ function spawnChild(
   env: Record<string, string | undefined>,
   stdio: unknown,
   read: (chunk: string) => void,
-  input?: string,
+  input?: string | Uint8Array,
   readErr?: (chunk: string) => void,
 ): Promise<WaitStatus> {
   return new Promise((resolve) => {
