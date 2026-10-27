@@ -113,7 +113,7 @@ describe("virtualize — deltas", () => {
   test("schemaColumnsByTable types `id` from an integer primary key", () => {
     const src = "export class Post extends Base {}\n";
     const { text } = virtualize(src, "post.ts", {
-      schemaColumnsByTable: { posts: { id: { type: "bigint", null: false, primaryKey: true } } },
+      schemaColumnsByTable: { posts: { id: { type: "bigint", null: false, primaryKey: 0 } } },
     });
     expect(text).toMatch(/get id\(\): number;/);
   });
@@ -121,7 +121,7 @@ describe("virtualize — deltas", () => {
   test("schemaColumnsByTable types `id` from a uuid primary key", () => {
     const src = "export class Token extends Base {}\n";
     const { text } = virtualize(src, "token.ts", {
-      schemaColumnsByTable: { tokens: { id: { type: "uuid", null: false, primaryKey: true } } },
+      schemaColumnsByTable: { tokens: { id: { type: "uuid", null: false, primaryKey: 0 } } },
     });
     expect(text).toMatch(/get id\(\): string;/);
   });
@@ -132,8 +132,8 @@ describe("virtualize — deltas", () => {
       schemaColumnsByTable: {
         taggings: {
           taggable_type: "string",
-          tag_id: { type: "integer", null: false, primaryKey: true },
-          name: { type: "string", null: false, primaryKey: true },
+          name: { type: "string", null: false, primaryKey: 1 },
+          tag_id: { type: "integer", null: false, primaryKey: 0 },
         },
       },
     });

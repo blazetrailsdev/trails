@@ -9,6 +9,7 @@ import {
 } from "typescript/unstable/sync";
 import * as path from "node:path";
 import * as fs from "node:fs";
+import * as ts from "typescript/unstable/ast";
 import { tsApi } from "../type-virtualization/ts-api.js";
 import { virtualize, missingTables, type ModelTable } from "../type-virtualization/virtualize.js";
 import {
@@ -74,11 +75,24 @@ export async function loadTimeZoneAwareAttributes(appRoot: string): Promise<bool
   let value: boolean | undefined = true;
   for (const file of files) {
     const text = await fs.promises.readFile(file, "utf8").catch(() => "");
-    if (/\btimeZoneAwareTypes\s*=/.test(text)) return undefined;
-    for (const m of text.matchAll(/\btimeZoneAwareAttributes\s*=\s*([^;\n]*)/g)) {
-      const literal = m[1].trim();
-      if (literal !== "true" && literal !== "false") return undefined;
-      value = literal === "true";
+    const assigned: [string, ts.Expression][] = [];
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        ts.isPropertyAccessExpression(node.left)
+      ) {
+        assigned.push([node.left.name.text, node.right]);
+      }
+      node.forEachChild(visit);
+    };
+    visit(tsApi().createSourceFile(file, text));
+    for (const [name, right] of assigned) {
+      if (name === "timeZoneAwareTypes") return undefined;
+      if (name !== "timeZoneAwareAttributes") continue;
+      if (right.kind === ts.SyntaxKind.TrueKeyword) value = true;
+      else if (right.kind === ts.SyntaxKind.FalseKeyword) value = false;
+      else return undefined;
     }
   }
   return value;

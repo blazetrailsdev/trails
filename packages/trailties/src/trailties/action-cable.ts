@@ -76,7 +76,7 @@ export class Engine extends BaseEngine {
       onLoad("action_cable", function (this: Configuration) {
         hook = (async () => {
           const configPath = new Pathname((await app.config.paths().get("config/cable")!.first())!);
-          if (await File.isExist(configPath.toString())) {
+          if (await File.isExist(configPath)) {
             this.cable = { ...((await app.configFor(configPath)) as OrderedOptions | null)?.toH() };
             await this.loadPubsubAdapter();
           }

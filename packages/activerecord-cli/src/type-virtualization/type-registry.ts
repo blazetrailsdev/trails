@@ -30,7 +30,7 @@ export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {
 };
 
 export function tsTypeFor(railsType: string, timeZoneAware?: boolean): string {
-  if (railsType === "datetime" && timeZoneAware !== undefined) {
+  if ((railsType === "datetime" || railsType === "time") && timeZoneAware !== undefined) {
     return timeZoneAware ? TWZ : TIME;
   }
   return ATTRIBUTE_TYPE_MAP[railsType] ?? "unknown";

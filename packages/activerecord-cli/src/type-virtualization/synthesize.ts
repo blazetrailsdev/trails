@@ -22,7 +22,7 @@ export type SchemaColumnValue =
       type: string;
       null?: boolean;
       arrayElementType?: string;
-      primaryKey?: boolean;
+      primaryKey?: number;
     };
 
 export interface SynthesizeOptions {
@@ -163,9 +163,13 @@ function renderSchemaColumnDeclares(
   const out: RenderedLine[] = [];
   const entries = Object.entries(cols).sort(([a], [b]) => a.localeCompare(b));
   const composedCols = opts.composedOfColumns?.get(info.name);
-  const pkTypes = Object.entries(cols)
-    .filter(([, value]) => typeof value !== "string" && value.primaryKey === true)
-    .map(([, value]) => primaryKeyTsType((value as { type: string }).type));
+  const pkTypes = Object.values(cols)
+    .filter(
+      (value): value is Extract<SchemaColumnValue, object> & { primaryKey: number } =>
+        typeof value !== "string" && value.primaryKey !== undefined,
+    )
+    .sort((a, b) => a.primaryKey - b.primaryKey)
+    .map((value) => primaryKeyTsType(value.type));
   if (
     pkTypes.length > 0 &&
     !synthesizedInstanceNames.has("id") &&

@@ -139,7 +139,7 @@ describe("parseSchemaTs", () => {
     `;
     const result = parseSchemaTs(source, FILE);
     expect(result["settings"]).not.toHaveProperty("id");
-    expect(result["settings"]["key"]).toEqual({ type: "string", null: false, primaryKey: true });
+    expect(result["settings"]["key"]).toEqual({ type: "string", null: false, primaryKey: 0 });
   });
 
   it("id: 'integer' keeps its type; an id type the registry does not map stays the default", () => {
@@ -150,8 +150,8 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["counters"]["id"]).toEqual({ type: "integer", null: false, primaryKey: true });
-    expect(result["events"]["id"]).toEqual({ type: "bigint", null: false, primaryKey: true });
+    expect(result["counters"]["id"]).toEqual({ type: "integer", null: false, primaryKey: 0 });
+    expect(result["events"]["id"]).toEqual({ type: "bigint", null: false, primaryKey: 0 });
   });
 
   it("id: false → no id column synthesized", () => {
@@ -176,7 +176,7 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["tokens"]["id"]).toEqual({ type: "uuid", null: false, primaryKey: true });
+    expect(result["tokens"]["id"]).toEqual({ type: "uuid", null: false, primaryKey: 0 });
   });
 
   it("composite primaryKey: [...] → id: false, PK cols captured from body", () => {
@@ -194,12 +194,12 @@ describe("parseSchemaTs", () => {
     expect(result["taggings"]["tag_id"]).toEqual({
       type: "integer",
       null: false,
-      primaryKey: true,
+      primaryKey: 0,
     });
     expect(result["taggings"]["taggable_id"]).toEqual({
       type: "integer",
       null: false,
-      primaryKey: true,
+      primaryKey: 1,
     });
     expect(result["taggings"]["taggable_type"]).toEqual({ type: "string", null: true });
   });
