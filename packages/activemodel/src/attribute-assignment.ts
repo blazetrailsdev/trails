@@ -76,6 +76,7 @@ export function attributeWriterMissing(
 /**
  * @internal
  * @inventedArm if — CONVERGEABLE rbfsend-per-prototype-writer-cache
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
  */
 export function _assignAttribute(this: AttributeAssignment, k: string, v: unknown): unknown {
   const setter = `${k}=`;
@@ -105,9 +106,12 @@ export function _assignAttribute(this: AttributeAssignment, k: string, v: unknow
 
 type Writer = ((v: unknown) => unknown) | boolean;
 
+/** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */
 let writerCache = new WeakMap<object, Map<string, Writer>>();
+/** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */
 let writerCacheSerial = methodCacheSerial;
 
+/** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */
 function _cachedWriter(proto: object | null, k: string, setter: string): Writer {
   if (proto === null) return false;
   if (writerCacheSerial !== methodCacheSerial) {
@@ -121,6 +125,7 @@ function _cachedWriter(proto: object | null, k: string, setter: string): Writer 
   return write;
 }
 
+/** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */
 function _resolveWriter(start: object, k: string, setter: string): Writer {
   const writer = writerSpelling(k);
   for (let o: object | null = start; o; o = Object.getPrototypeOf(o)) {

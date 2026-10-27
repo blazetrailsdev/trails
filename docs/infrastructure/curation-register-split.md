@@ -16,8 +16,8 @@ to JSDoc too?" question is answered once.
 | Anything that is not a TS declaration | JSON, whatever its granularity.             |
 
 The tag family is `@noRailsEquivalent`, `@missingRailsCall`,
-`@missingRailsArgs`, `@missingRailsName`, `@inventedArm` and `@inlinedFrom`
-(see CLAUDE.md, "Before you open the PR"). A new per-site register joins that
+`@missingRailsArgs`, `@missingRailsName`, `@inventedArm`, `@inlinedFrom` and
+`@perf` (see CLAUDE.md, "Before you open the PR" and "Fidelity is the job"). A new per-site register joins that
 family rather than inventing a new file.
 
 ## Inventory

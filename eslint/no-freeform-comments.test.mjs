@@ -31,6 +31,9 @@ tester.run("no-freeform-comments", rule, {
     { code: `/** @missingRailsName throw — PERMANENT */\nconst x = 1;\n` },
     { code: `/** @inventedArm if — PERMANENT */\nconst x = 1;\n` },
     {
+      code: `/** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */\nconst x = 1;\n`,
+    },
+    {
       code: `/** @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84 */\nconst x = 1;\n`,
     },
     {

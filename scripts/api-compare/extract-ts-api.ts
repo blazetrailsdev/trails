@@ -254,6 +254,7 @@ const TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT = new Set([
   "defaultValue",
   "remarks",
   "deprecated",
+  "perf",
 ]);
 
 if (!isMainThread && parentPort) {

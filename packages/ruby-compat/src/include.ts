@@ -900,10 +900,14 @@ function relinkIncluders(mod: Module): void {
  * {@link methodCacheSerial} and is stale once it differs.
  *
  * @noRailsEquivalent PERMANENT
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
  */
 export let methodCacheSerial = 0;
 
-/** @noRailsEquivalent PERMANENT */
+/**
+ * @noRailsEquivalent PERMANENT
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
+ */
 export function rbClearMethodCache(): void {
   methodCacheSerial++;
 }
