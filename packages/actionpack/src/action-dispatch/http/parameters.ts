@@ -32,7 +32,11 @@ export const DEFAULT_PARSERS: ParameterParsers = {
   },
 };
 
-export class ParseError extends StandardError {}
+export class ParseError extends StandardError {
+  constructor(message?: string) {
+    super(message);
+  }
+}
 
 export interface ParametersHost {
   controllerClassFor(name: string): unknown;
