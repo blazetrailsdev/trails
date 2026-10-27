@@ -19,6 +19,7 @@ import {
   FileUtils,
   URI,
   matchOperator,
+  rbObjAsString,
 } from "@blazetrails/ruby-compat";
 import type { Tool } from "./tool.js";
 import { Invalid, Error } from "./mini-magick.js";
@@ -175,11 +176,11 @@ export class Image {
     }
   }
 
-  get(value: string) {
-    return this._info.get(String(value));
+  get(value: unknown) {
+    return this._info.get(rbObjAsString(value));
   }
 
-  info(value: string) {
+  info(value: unknown) {
     return this.get(value);
   }
 

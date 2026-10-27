@@ -3,6 +3,7 @@ import {
   PROTOCOL_PROBES,
   chomp,
   rbFArray,
+  rbObjAsString,
   rbFSend,
   rbConstWarnIfDeprecated,
   rbModDeprecateConstant,
@@ -103,7 +104,7 @@ export class Tool {
   }
 
   append(arg: unknown) {
-    this.args.push(String(arg));
+    this.args.push(rbObjAsString(arg));
     return this;
   }
 
@@ -127,8 +128,11 @@ export class Tool {
         : undefined;
     this.append("(");
     for (const value of args) {
-      if (value != null && Object.getPrototypeOf(value) === Object.prototype) {
-        for (const [key, val] of Object.entries(value)) {
+      if (
+        value instanceof Map ||
+        (value != null && Object.getPrototypeOf(value) === Object.prototype)
+      ) {
+        for (const [key, val] of value instanceof Map ? value : Object.entries(value)) {
           rbFSend(this, key, ...(val == null ? [] : Array.isArray(val) ? val : [val]));
         }
       } else if (typeof value === "string") {

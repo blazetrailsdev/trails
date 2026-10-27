@@ -4,6 +4,7 @@ import {
   stringSplit,
   rbStrEnumerateLines,
   matchOperator,
+  RangeError,
   kernelInteger,
   File,
   ArgumentError,
@@ -193,7 +194,10 @@ export class Info {
     }
     return (encodedValue!.match(/\d+/g) ?? [])
       .map((x) => parseInt(x, 10))
-      .map((x) => String.fromCharCode(x))
+      .map((x) => {
+        if (x > 255) throw new RangeError(`${x} out of char range`);
+        return String.fromCharCode(x);
+      })
       .join("");
   }
 
