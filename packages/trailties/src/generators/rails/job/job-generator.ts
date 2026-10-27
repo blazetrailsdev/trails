@@ -36,8 +36,8 @@ export class JobGenerator extends NamedBase {
   }
 
   /**
-   * @missingRailsCall template — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions
-   * @missingRailsCall in_root — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions
+   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsCall in_root — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
    */
   createJobFile(): void {
     this.createFile(

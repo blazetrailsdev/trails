@@ -14,7 +14,7 @@ export class JobGenerator extends NamedBase {
     this.fileName = this.fileName.replace(/_job$/i, "");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions */
+  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
   createTestFile(): void {
     this.createFile(
       File.join(
