@@ -10,7 +10,6 @@ import {
   excSetupMessage,
   JSON,
 } from "@blazetrails/ruby-compat";
-import { rbBinop } from "../codegen-runtime.js";
 import { Invalid } from "../mini-magick.js";
 import { MiniMagick } from "../mini-magick.js";
 
@@ -240,7 +239,7 @@ export class Info {
   protected path() {
     let value = this._path;
     if (!((matchOperator(value, /\[\d+\]$/m) ?? false) !== false)) {
-      value = rbBinop(value, "+", "[0]");
+      value = value + "[0]";
     }
     return value;
   }

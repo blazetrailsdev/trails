@@ -23,7 +23,6 @@ import {
   Pathname,
   FileUtils,
 } from "@blazetrails/ruby-compat";
-import { replace, rbAref, lines } from "./codegen-runtime.js";
 import { Invalid, Error } from "./mini-magick.js";
 import { MiniMagick } from "./mini-magick.js";
 import { Shell } from "./shell.js";
@@ -71,7 +70,7 @@ export class Image {
               ? convert.add(outputPath)
               : convert.append(outputPath);
       });
-      replace(image.path(), outputPath);
+      image._path = (image._info as Info)._path = outputPath as string;
       return image;
     })(this.read(blob as string | Tempfile | StringIO, ".dat"));
   }
@@ -104,11 +103,11 @@ export class Image {
   }
 
   static attribute(name: string, key: string = rbObjAsString(name)) {
-    return rbModDefineMethod(this, name, (...args: unknown[][]) => {
+    return rbModDefineMethod(this, name, function (this: Image, ...args: unknown[][]) {
       if (args.some((x) => x != null && x !== false) && !rbEqual(name, "resolution")) {
         return this.mogrify((b: unknown) => rbFSend(b, name, ...args));
       } else {
-        return rbAref(this._info, key, ...args);
+        return (this._info as Info).get(key, ...args);
       }
     });
   }
@@ -134,14 +133,13 @@ export class Image {
     }
     return new Proxy(this, {
       get(target, name, receiver) {
-        if (
-          typeof name === "symbol" ||
-          name in target ||
-          PROTOCOL_PROBES.has(name) ||
-          !(receiver as Image).isRespondToMissing(name, false)
-        )
+        if (typeof name === "symbol" || name in target || PROTOCOL_PROBES.has(name))
           return Reflect.get(target, name, receiver);
-        return (...args: unknown[]) => (receiver as Image).methodMissing(name, ...args);
+        return (...args: unknown[]) =>
+          (receiver as Image).methodMissing(
+            name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`),
+            ...args,
+          );
       },
     });
   }
@@ -199,7 +197,7 @@ export class Image {
   }
 
   layers() {
-    const layersCount = lines(this.identify()).length;
+    const layersCount = (this.identify() as string).split("\n").length;
     return ((x) =>
       x instanceof globalThis.Set || x instanceof globalThis.Map || x instanceof Enumerator
         ? [...x]
@@ -305,7 +303,7 @@ export class Image {
       } else if (!(rbEqual(this.path, newPath) || this.isLayer())) {
         File.delete(this.path);
       }
-      replace(this.path, newPath);
+      this._path = (this._info as Info)._path = newPath as string;
       if (Array.isArray(this._info)) this._info.length = 0;
       else if (typeof this._info === "string") this._info = "";
       else this._info.clear();

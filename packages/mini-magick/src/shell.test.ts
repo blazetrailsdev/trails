@@ -1,5 +1,5 @@
 import type {} from "@blazetrails/vitest-matchers";
-import { Logger } from "@blazetrails/activesupport";
+import { Logger } from "@blazetrails/ruby-compat";
 import {
   rbCheckArrayType,
   StringIO,

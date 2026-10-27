@@ -1,4 +1,4 @@
-import { Logger } from "@blazetrails/activesupport";
+import { Logger } from "@blazetrails/ruby-compat";
 import { Dir, stdout as $stdout, classModule } from "@blazetrails/ruby-compat";
 
 export class Configuration {

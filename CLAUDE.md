@@ -1724,6 +1724,8 @@ the capability, in a different place. Each is decided here, and each but
 | `thor/core_ext/hash_with_indifferent_access.rb`       | Proxy (proto chain)   |
 | `rack/multipart/uploaded_file.rb`                     | Proxy                 |
 | `builder/xmlbase.rb`                                  | Proxy (misses only)   |
+| `mini_magick/tool.rb`                                 | Proxy                 |
+| `mini_magick/image.rb`                                | Proxy (ungated)       |
 
 Rules that apply across the table:
 
@@ -1744,6 +1746,11 @@ Rules that apply across the table:
   `method_missing`. Thor's HWIA reads a missed name as `self[method]` with
   Ruby truthiness, and a missed assignment as `[]=` (so a frozen hash raises
   `FrozenError`); its one-argument compare arm is reached only by `rbFSend`.
+- `mini_magick/image.rb`'s `respond_to_missing?` answers `false`
+  (`image.rb:471-473`) only to keep `Array#flatten` off an image, so its
+  Proxy forwards every name but `PROTOCOL_PROBES` to `mogrify` without
+  consulting it — the one exception to the first rule above (owner ruling,
+  2026-10-22).
 - A `Proxy (misses only)` row reaches `method_missing` only for a name the
   object does not already answer, so a builder tag named `constructor`,
   `toString` or `append` is written `xml.tagBang(name)`, Ruby's `tag!`.
