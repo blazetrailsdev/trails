@@ -1,8 +1,8 @@
 {
   "actionpack": {
-    "newModule": 22,
-    "superMethod": 22,
-    "moduleImport": 10
+    "newModule": 14,
+    "superMethod": 11,
+    "moduleImport": 7
   },
   "actionview": {
     "newModule": 12,
