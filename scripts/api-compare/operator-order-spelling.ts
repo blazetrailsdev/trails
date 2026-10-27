@@ -88,6 +88,8 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // action_dispatch/http/headers.rb:63 `def [](key)` → http/headers.ts
   // `Headers#get`, and :68 `def []=(key, value)` → `set`.
   "ActionDispatch::Http::Headers": { "[]": ["get"], "[]=": ["set"] },
+  // action_cable/connection/test_case.rb:34 `def []=(name, options)` → `set`.
+  "ActionCable::Connection::TestCookies": { "[]=": ["set"] },
   // rack/headers.rb:91 `def self.[](*items)` → headers.ts `static get`, :110
   // `def [](key)` → `get`, and :114 `def []=(key, value)` → `set`.
   "Rack::Headers": { "self.[]": ["get"], "[]": ["get"], "[]=": ["set"] },
