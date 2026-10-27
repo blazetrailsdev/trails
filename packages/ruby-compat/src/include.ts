@@ -28,7 +28,7 @@ import { NoMethodError } from "./no-method-error.js";
 import { isRegisteredConstant, registeredConstant } from "./variable.js";
 import { temporalTag } from "./temporal-tag.js";
 import { classModule } from "./class-module.js";
-import { markModuleObject } from "./classpath.js";
+import { generatedClassPath, markModuleObject } from "./classpath.js";
 export { classModule };
 import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
@@ -247,7 +247,7 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   get name(): string | null {
-    return classpaths.get(this)?.path ?? null;
+    return classpaths.get(this)?.path ?? generatedClassPath(this) ?? null;
   }
 
   /**

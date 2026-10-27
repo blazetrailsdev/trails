@@ -13,3 +13,5 @@ export { At } from "./at.js";
 export { Cron } from "./cron.js";
 export { Duration } from "./duration.js";
 export { Nat } from "./nat.js";
+
+import "./class-paths.generated.js";

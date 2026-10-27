@@ -59,6 +59,7 @@ blocks after compare: $api/lint-block-params.ts --package $pkg
 predicates after compare: $api/lint-predicate-kinds.ts --package $pkg
 parents after compare: $api/lint-ambiguous-parents.ts --package $pkg
 inlined after compare: $api/lint-inlined-from.ts
+class-paths after compare: $api/class-paths.ts --check --package $pkg
 privates-manifest after ruby-api: pnpm exec tsx scripts/build-rails-privates-manifest.ts --package $pkg
 rails-private after privates-manifest: pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs $src
 detached-jsdoc: $api/lint-detached-jsdoc-tags.ts --package $pkg

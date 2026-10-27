@@ -50,3 +50,5 @@ export const EtOrbi = Object.assign(ZonesEtOrbi, {
 });
 
 export { EoTime } from "./time.js";
+
+import "./class-paths.generated.js";

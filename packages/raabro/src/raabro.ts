@@ -788,3 +788,5 @@ export class ModuleMethods {
 extend(Raabro, ModuleMethods);
 
 Raabro.makeIncludable();
+
+import "./class-paths.generated.js";

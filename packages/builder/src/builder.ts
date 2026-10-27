@@ -8,3 +8,5 @@ export { XmlMarkup } from "./xmlmarkup.js";
 export { XmlEvents } from "./xmlevents.js";
 
 (TopLevel as { Builder?: typeof Builder }).Builder = Builder;
+
+import "./class-paths.generated.js";

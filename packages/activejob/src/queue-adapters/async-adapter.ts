@@ -124,6 +124,6 @@ export class Scheduler {
     return this.immediate ? this._immediateExecutor : this._asyncExecutor;
   }
 }
+rbModConstSet(QueueAdapters, "AsyncAdapter", AsyncAdapter);
 rbModConstSet(AsyncAdapter, "JobWrapper", JobWrapper);
 rbModConstSet(AsyncAdapter, "Scheduler", Scheduler);
-rbModConstSet(QueueAdapters, "AsyncAdapter", AsyncAdapter);

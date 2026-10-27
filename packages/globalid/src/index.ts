@@ -27,3 +27,5 @@ export {
   toSgid,
   toSgidParam,
 } from "./identification.js";
+
+import "./class-paths.generated.js";

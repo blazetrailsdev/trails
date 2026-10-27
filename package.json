@@ -64,6 +64,8 @@
     "parity:api:sends": "tsx -e \"import('./scripts/parity/send-count.ts').then((m) => m.main()).then(console.log)\"",
     "parity:api:blocks": "pnpm tsx scripts/api-compare/lint-block-params.ts",
     "parity:api:blocks:tighten": "pnpm tsx scripts/api-compare/lint-block-params.ts --tighten",
+    "parity:class-paths": "pnpm tsx scripts/api-compare/class-paths.ts",
+    "parity:class-paths:check": "pnpm tsx scripts/api-compare/class-paths.ts --check",
     "parity:api:inlined": "pnpm tsx scripts/api-compare/lint-inlined-from.ts",
     "parity:api:inlined:fix": "pnpm tsx scripts/api-compare/lint-inlined-from.ts --fix",
     "parity:api:pins": "pnpm tsx scripts/api-compare/lint-body-pins.ts",

@@ -68,5 +68,5 @@ export class Broadcaster {
   }
 }
 
-rbModConstSet(Broadcasting, "Broadcaster", Broadcaster);
 rbModConstSet(Server, "Broadcasting", Broadcasting);
+rbModConstSet(Broadcasting, "Broadcaster", Broadcaster);

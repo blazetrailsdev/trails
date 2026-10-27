@@ -260,3 +260,5 @@ export { DatabaseSelector } from "./middleware/database-selector.js";
 export { ShardSelector } from "./middleware/shard-selector.js";
 
 import "./associations/disable-joins-association-scope.js";
+
+import "./class-paths.generated.js";

@@ -146,3 +146,5 @@ Chronic.parse = parse;
 Chronic.construct = construct;
 
 export { Chronic };
+
+import "./class-paths.generated.js";

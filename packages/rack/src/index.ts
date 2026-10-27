@@ -81,3 +81,5 @@ export * as Mime from "./mime.js";
 export * as Utils from "./utils.js";
 /** @noRailsEquivalent PERMANENT */
 export * as Handler from "./handler/index.js";
+
+import "./class-paths.generated.js";

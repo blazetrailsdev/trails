@@ -13,3 +13,5 @@ export * from "./time.js";
 export * from "./timestamp.js";
 export * from "./unpacker.js";
 export * from "./version.js";
+
+import "./class-paths.generated.js";

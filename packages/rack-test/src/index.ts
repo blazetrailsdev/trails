@@ -13,3 +13,5 @@ export { Utils } from "./utils.js";
 export { Methods, type MethodsHost } from "./methods.js";
 export { Cookie, CookieJar } from "./cookie-jar.js";
 export { UploadedFile } from "./uploaded-file.js";
+
+import "./class-paths.generated.js";

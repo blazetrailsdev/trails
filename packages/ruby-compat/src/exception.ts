@@ -1,4 +1,4 @@
-import { classpaths } from "./classpath.js";
+import { classpaths, generatedClassPath } from "./classpath.js";
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
@@ -40,7 +40,7 @@ Exception.prototype.toS = function (this: Exception): string {
 
   if (mesg == null) {
     const klass = this.constructor;
-    return classpaths.get(klass)?.path ?? (klass.name || "");
+    return classpaths.get(klass)?.path ?? generatedClassPath(klass) ?? (klass.name || "");
   }
   return String(mesg);
 };

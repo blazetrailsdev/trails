@@ -104,3 +104,5 @@ export type NoExtraKeys<T> = T & { [K in Exclude<string, keyof T>]?: never };
 export { RoutingUrlFor, type RoutingUrlForHost } from "./routing-url-for.js";
 export { VERSION, gemVersion } from "./gem-version.js";
 export { version } from "./version.js";
+
+import "./class-paths.generated.js";

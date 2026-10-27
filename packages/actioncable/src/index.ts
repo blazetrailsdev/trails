@@ -31,3 +31,5 @@ import "./channel/broadcasting.js";
 export { registerConnection } from "./connection/base.js";
 import "./channel/streams.js";
 export { registerChannel } from "./channel/base.js";
+
+import "./class-paths.generated.js";

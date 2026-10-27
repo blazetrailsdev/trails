@@ -33,6 +33,7 @@ import {
   rbModToS,
 } from "./object.js";
 import { Range } from "./range.js";
+import { generatedClass } from "./classpath.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { Struct } from "./struct.js";
 import { TypeError } from "./type-error.js";
@@ -205,6 +206,8 @@ export function rbPathToClass(pathname: string): unknown {
         ? (c as Record<string, unknown>)[id]
         : undefined;
     if (c === undefined) {
+      const generated = generatedClass(pathname);
+      if (generated !== undefined) return generated;
       throw new ArgumentError(`undefined class/module ${pathname.slice(0, p)}`);
     }
     if (c === null || (typeof c !== "object" && typeof c !== "function")) {
