@@ -2,7 +2,7 @@ import type { Requested, TemplateDetails } from "./template-details.js";
 import type { TemplatePath } from "./template-path.js";
 import type { Template } from "./template.js";
 import { MissingTemplate } from "./template/error.js";
-import { ActionView } from "./namespaces.js";
+import { FileSystemResolver } from "./template/resolver.js";
 import { rbInspect } from "@blazetrails/ruby-compat";
 
 export type LookupDetails =
@@ -122,7 +122,7 @@ export class PathSet implements Iterable<PathSetResolver> {
   private typecast(paths: ReadonlyArray<PathSetResolver | unknown>): PathSetResolver[] {
     return paths.map((path) => {
       if (typeof path === "string") {
-        return new ActionView.FileSystemResolver(path);
+        return new FileSystemResolver(path);
       } else if (
         path !== null &&
         typeof path === "object" &&

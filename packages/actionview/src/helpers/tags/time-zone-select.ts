@@ -1,7 +1,7 @@
-import { TimeZone, type SafeBuffer } from "@blazetrails/activesupport";
-import { include, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
-
 import { Tags } from "../../namespaces.js";
+import { TimeZone, type SafeBuffer } from "@blazetrails/activesupport";
+import { include, rtest } from "@blazetrails/ruby-compat";
+
 import { FormOptionsHelper } from "../form-options-helper.js";
 import { Base } from "./base.js";
 import { SelectRenderer } from "./select-renderer.js";
@@ -56,4 +56,4 @@ export interface TimeZoneSelect {
 include(TimeZoneSelect, SelectRenderer);
 include(TimeZoneSelect, FormOptionsHelper);
 
-rbModConstSet(Tags, "TimeZoneSelect", TimeZoneSelect);
+Tags.TimeZoneSelect = TimeZoneSelect;

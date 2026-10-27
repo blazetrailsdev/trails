@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { isBlank, isPlainObject } from "@blazetrails/activesupport";
 import {
   block as rbBlock,
@@ -5,12 +6,10 @@ import {
   include,
   Range,
   rbFSend,
-  rbModConstSet,
   rbObjRespondTo,
   rtest,
 } from "@blazetrails/ruby-compat";
 
-import { Tags } from "../../namespaces.js";
 import { FormOptionsHelper } from "../form-options-helper.js";
 import { Base } from "./base.js";
 import { SelectRenderer } from "./select-renderer.js";
@@ -95,4 +94,4 @@ export interface Select {
 include(Select, SelectRenderer);
 include(Select, FormOptionsHelper);
 
-rbModConstSet(Tags, "Select", Select);
+Tags.Select = Select;

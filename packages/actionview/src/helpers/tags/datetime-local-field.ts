@@ -1,5 +1,4 @@
-import { Tags } from "../../namespaces.js";
-import { hashDelete, rbModConstSet } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat";
 
 import { DatetimeField, strftime } from "./datetime-field.js";
 
@@ -30,5 +29,3 @@ export class DatetimeLocalField extends DatetimeField {
     }
   }
 }
-
-rbModConstSet(Tags, "DatetimeLocalField", DatetimeLocalField);

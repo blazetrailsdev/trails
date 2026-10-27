@@ -10,10 +10,8 @@ import {
   type Location,
   rbInspect,
   regexpEscape,
-  rbModConstSet,
   StandardError,
 } from "@blazetrails/ruby-compat";
-import { ActionView } from "../namespaces.js";
 import type { TemplatePath } from "../template-path.js";
 import type { Template } from "../template.js";
 
@@ -314,10 +312,3 @@ export class SyntaxErrorInTemplate extends TemplateError {
     });
   }
 }
-
-rbModConstSet(ActionView, "ActionViewError", ActionViewError);
-rbModConstSet(ActionView, "EncodingError", EncodingError);
-rbModConstSet(ActionView, "WrongEncodingError", WrongEncodingError);
-rbModConstSet(ActionView, "StrictLocalsError", StrictLocalsError);
-rbModConstSet(ActionView, "MissingTemplate", MissingTemplate);
-rbModConstSet(ActionView, "SyntaxErrorInTemplate", SyntaxErrorInTemplate);

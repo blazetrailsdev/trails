@@ -1,7 +1,7 @@
-import { type SafeBuffer } from "@blazetrails/activesupport";
-import { block as rbBlock, fetch, include, rbModConstSet } from "@blazetrails/ruby-compat";
-
 import { Tags } from "../../namespaces.js";
+import { type SafeBuffer } from "@blazetrails/activesupport";
+import { block as rbBlock, fetch, include } from "@blazetrails/ruby-compat";
+
 import { FormOptionsHelper } from "../form-options-helper.js";
 import { Base } from "./base.js";
 import { SelectRenderer } from "./select-renderer.js";
@@ -82,4 +82,4 @@ export interface GroupedCollectionSelect {
 include(GroupedCollectionSelect, SelectRenderer);
 include(GroupedCollectionSelect, FormOptionsHelper);
 
-rbModConstSet(Tags, "GroupedCollectionSelect", GroupedCollectionSelect);
+Tags.GroupedCollectionSelect = GroupedCollectionSelect;

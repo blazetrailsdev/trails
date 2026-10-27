@@ -1,5 +1,3 @@
-import { Tags } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
 import { TextField } from "./text-field.js";
@@ -26,5 +24,3 @@ export class SearchField extends TextField {
     return super.render();
   }
 }
-
-rbModConstSet(Tags, "SearchField", SearchField);

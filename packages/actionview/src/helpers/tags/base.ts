@@ -1,4 +1,3 @@
-import { Tags } from "../../namespaces.js";
 import {
   ArgumentError,
   block,
@@ -10,7 +9,6 @@ import {
   rbFSend,
   rbInspect,
   rbObjRespondTo,
-  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 
 import { isBlank, isPresent, toParam } from "@blazetrails/activesupport";
@@ -219,5 +217,3 @@ export interface Base
 include(Base, FormTagHelper);
 include(Base, TagHelper);
 include(Base, ActiveModelInstanceTag);
-
-rbModConstSet(Tags, "Base", Base);

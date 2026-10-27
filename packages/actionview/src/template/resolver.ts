@@ -1,6 +1,5 @@
 import { I18n, cattrAccessor } from "@blazetrails/activesupport";
-import { Dir, File, NotImplementedError, rbModConstSet, symbolToS } from "@blazetrails/ruby-compat";
-import { ActionView } from "../namespaces.js";
+import { Dir, File, NotImplementedError, symbolToS } from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
 import { UnboundTemplate } from "../unbound-template.js";
@@ -247,8 +246,6 @@ export class FileSystemResolver extends Resolver {
     return entry.replace(/[*?{}[\]]/g, "\\$&");
   }
 }
-
-rbModConstSet(ActionView, "FileSystemResolver", FileSystemResolver);
 
 export class ParsedPath {
   readonly path: TemplatePath;

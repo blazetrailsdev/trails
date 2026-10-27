@@ -2,7 +2,7 @@ import { I18n, Notifications, type SafeBuffer } from "@blazetrails/activesupport
 import { Fiber, excBacktrace, rbObjClassname, rbObjRespondTo, toS } from "@blazetrails/ruby-compat";
 import { StreamingBuffer } from "../buffers.js";
 import { StreamingFlow } from "../flows.js";
-import { ActionView } from "../namespaces.js";
+import { Base } from "../base.js";
 import { TemplateRenderer } from "./template-renderer.js";
 import type {
   RenderableTemplate,
@@ -27,14 +27,14 @@ export class Body {
       await this.start(block);
     } catch (exception) {
       this.logError(exception as Error);
-      block(ActionView.Base.streamingCompletionOnException);
+      block(Base.streamingCompletionOnException);
     }
     return this;
   }
 
   /** @internal */
   private logError(exception: Error & { annotatedSourceCode?(): unknown }): void {
-    const logger = ActionView.Base.logger as { fatal(message: string): unknown } | null;
+    const logger = Base.logger as { fatal(message: string): unknown } | null;
     if (logger == null) return;
 
     let message = `\n${rbObjClassname(exception)} (${exception.message}):\n`;

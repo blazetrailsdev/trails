@@ -1,6 +1,5 @@
-import { Tags } from "../../namespaces.js";
 import { humanize, stringifyKeys } from "@blazetrails/activesupport";
-import { block, fetch, include, rbModConstSet } from "@blazetrails/ruby-compat";
+import { block, fetch, include } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
 import { Placeholderable } from "./placeholderable.js";
@@ -63,5 +62,3 @@ export class TextField extends Base {
 }
 
 include(TextField, Placeholderable);
-
-rbModConstSet(Tags, "TextField", TextField);

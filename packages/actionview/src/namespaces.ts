@@ -1,42 +1,16 @@
 import { Autoload, extend, TopLevel, type Extended } from "@blazetrails/activesupport";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
-import type { FileSystemResolver } from "./template/resolver.js";
-import type { Template } from "./template.js";
-import type { SelectRenderer } from "./helpers/tags/select-renderer.js";
-import type { Base as TagsBase } from "./helpers/tags/base.js";
-import type { Translator } from "./helpers/tags/translator.js";
-import type { CheckBox } from "./helpers/tags/check-box.js";
-import type { CollectionCheckBoxes } from "./helpers/tags/collection-check-boxes.js";
-import type { CollectionRadioButtons } from "./helpers/tags/collection-radio-buttons.js";
-import type { CollectionSelect } from "./helpers/tags/collection-select.js";
-import type { ColorField } from "./helpers/tags/color-field.js";
-import type { DateField } from "./helpers/tags/date-field.js";
 import type { DateSelect } from "./helpers/tags/date-select.js";
-import type { DatetimeField } from "./helpers/tags/datetime-field.js";
-import type { DatetimeLocalField } from "./helpers/tags/datetime-local-field.js";
-import type { DatetimeSelect } from "./helpers/tags/datetime-select.js";
-import type { EmailField } from "./helpers/tags/email-field.js";
-import type { FileField } from "./helpers/tags/file-field.js";
-import type { GroupedCollectionSelect } from "./helpers/tags/grouped-collection-select.js";
-import type { HiddenField } from "./helpers/tags/hidden-field.js";
-import type { Label } from "./helpers/tags/label.js";
-import type { MonthField } from "./helpers/tags/month-field.js";
-import type { NumberField } from "./helpers/tags/number-field.js";
-import type { PasswordField } from "./helpers/tags/password-field.js";
-import type { RadioButton } from "./helpers/tags/radio-button.js";
-import type { RangeField } from "./helpers/tags/range-field.js";
-import type { SearchField } from "./helpers/tags/search-field.js";
-import type { Select } from "./helpers/tags/select.js";
-import type { TelField } from "./helpers/tags/tel-field.js";
-import type { TextArea } from "./helpers/tags/text-area.js";
-import type { TextField } from "./helpers/tags/text-field.js";
-import type { TimeField } from "./helpers/tags/time-field.js";
 import type { TimeSelect } from "./helpers/tags/time-select.js";
+import type { DatetimeSelect } from "./helpers/tags/datetime-select.js";
+import type { Select } from "./helpers/tags/select.js";
+import type { CollectionSelect } from "./helpers/tags/collection-select.js";
+import type { GroupedCollectionSelect } from "./helpers/tags/grouped-collection-select.js";
 import type { TimeZoneSelect } from "./helpers/tags/time-zone-select.js";
-import type { UrlField } from "./helpers/tags/url-field.js";
-import type { WeekField } from "./helpers/tags/week-field.js";
 import type { WeekdaySelect } from "./helpers/tags/weekday-select.js";
+import type { CollectionRadioButtons } from "./helpers/tags/collection-radio-buttons.js";
+import type { CollectionCheckBoxes } from "./helpers/tags/collection-check-boxes.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -46,8 +20,6 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 
 export const ActionView = { name: "ActionView", loadPath } as AutoloadModule & {
   Base: typeof Base;
-  FileSystemResolver: typeof FileSystemResolver;
-  Template: typeof Template;
 };
 registerConstant("ActionView", ActionView);
 extend(ActionView, Autoload);
@@ -102,40 +74,16 @@ export const Tags = {
   name: "ActionView::Helpers::Tags",
   loadPath: tagsLoadPath,
 } as AutoloadModule & {
-  SelectRenderer: typeof SelectRenderer;
-  Base: typeof TagsBase;
-  Translator: typeof Translator;
-  CheckBox: typeof CheckBox;
-  CollectionCheckBoxes: typeof CollectionCheckBoxes;
-  CollectionRadioButtons: typeof CollectionRadioButtons;
-  CollectionSelect: typeof CollectionSelect;
-  ColorField: typeof ColorField;
-  DateField: typeof DateField;
   DateSelect: typeof DateSelect;
-  DatetimeField: typeof DatetimeField;
-  DatetimeLocalField: typeof DatetimeLocalField;
-  DatetimeSelect: typeof DatetimeSelect;
-  EmailField: typeof EmailField;
-  FileField: typeof FileField;
-  GroupedCollectionSelect: typeof GroupedCollectionSelect;
-  HiddenField: typeof HiddenField;
-  Label: typeof Label;
-  MonthField: typeof MonthField;
-  NumberField: typeof NumberField;
-  PasswordField: typeof PasswordField;
-  RadioButton: typeof RadioButton;
-  RangeField: typeof RangeField;
-  SearchField: typeof SearchField;
-  Select: typeof Select;
-  TelField: typeof TelField;
-  TextArea: typeof TextArea;
-  TextField: typeof TextField;
-  TimeField: typeof TimeField;
   TimeSelect: typeof TimeSelect;
+  DatetimeSelect: typeof DatetimeSelect;
+  Select: typeof Select;
+  CollectionSelect: typeof CollectionSelect;
+  GroupedCollectionSelect: typeof GroupedCollectionSelect;
   TimeZoneSelect: typeof TimeZoneSelect;
-  UrlField: typeof UrlField;
-  WeekField: typeof WeekField;
   WeekdaySelect: typeof WeekdaySelect;
+  CollectionRadioButtons: typeof CollectionRadioButtons;
+  CollectionCheckBoxes: typeof CollectionCheckBoxes;
 };
 extend(Tags, Autoload);
 Tags.autoload("SelectRenderer");

@@ -1,5 +1,3 @@
-import { Tags } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { DatetimeField, strftime } from "./datetime-field.js";
 
 export class WeekField extends DatetimeField {
@@ -7,5 +5,3 @@ export class WeekField extends DatetimeField {
     return value == null ? null : strftime(value, "%Y-W%V");
   }
 }
-
-rbModConstSet(Tags, "WeekField", WeekField);

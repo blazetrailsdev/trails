@@ -1,8 +1,8 @@
+import { Tags } from "../../namespaces.js";
 import type { SafeBuffer } from "@blazetrails/activesupport";
 import { Date as RubyDate } from "@blazetrails/date";
-import { include, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
+import { include, rtest } from "@blazetrails/ruby-compat";
 
-import { Tags } from "../../namespaces.js";
 import { FormOptionsHelper } from "../form-options-helper.js";
 import { Base } from "./base.js";
 import { SelectRenderer } from "./select-renderer.js";
@@ -60,4 +60,4 @@ export interface WeekdaySelect {
 include(WeekdaySelect, SelectRenderer);
 include(WeekdaySelect, FormOptionsHelper);
 
-rbModConstSet(Tags, "WeekdaySelect", WeekdaySelect);
+Tags.WeekdaySelect = WeekdaySelect;

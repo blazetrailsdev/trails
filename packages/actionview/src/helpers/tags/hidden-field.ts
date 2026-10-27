@@ -1,5 +1,3 @@
-import { Tags } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { TextField } from "./text-field.js";
 
 export class HiddenField extends TextField {
@@ -8,5 +6,3 @@ export class HiddenField extends TextField {
     return super.render();
   }
 }
-
-rbModConstSet(Tags, "HiddenField", HiddenField);
