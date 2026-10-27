@@ -754,12 +754,12 @@ Base.setupRendererBang();
 ActionController.Base = Base;
 
 /** @noRailsEquivalent PERMANENT */
-export function registerController(controller: typeof Base): void;
-export function registerController(name: string, controller: typeof Base): void;
-export function registerController(controllers: (typeof Base)[]): void;
+export function registerController(controller: typeof Metal): void;
+export function registerController(name: string, controller: typeof Metal): void;
+export function registerController(controllers: (typeof Metal)[]): void;
 export function registerController(
-  nameOrController: string | typeof Base | (typeof Base)[],
-  controller?: typeof Base,
+  nameOrController: string | typeof Metal | (typeof Metal)[],
+  controller?: typeof Metal,
 ): void {
   if (Array.isArray(nameOrController)) {
     for (const k of nameOrController) registerController(k);
@@ -771,9 +771,9 @@ export function registerController(
   } else {
     controller = nameOrController;
   }
-  if (typeof controller !== "function" || rbClassInheritedP(controller, Base) !== true) {
+  if (typeof controller !== "function" || rbClassInheritedP(controller, Metal) !== true) {
     throw new ArgumentError(
-      `registerController expects an ActionController::Base subclass, got ${String(controller?.name ?? controller)}`,
+      `registerController expects an ActionController::Metal subclass, got ${String(controller?.name ?? controller)}`,
     );
   }
   if (typeof nameOrController === "string") return registerConstant(nameOrController, controller);

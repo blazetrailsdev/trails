@@ -8,6 +8,7 @@ import { Base } from "../../base.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../base.js";
 
 registerConstant("Render", { name: "Render" });
 
@@ -81,9 +82,9 @@ class ChildRenderController extends BlankRenderController {
   }
 }
 
-registerConstant("Render::BlankRenderController", BlankRenderController);
-registerConstant("Render::DoubleRenderController", DoubleRenderController);
-registerConstant("Render::ChildRenderController", ChildRenderController);
+registerController("Render::BlankRenderController", BlankRenderController);
+registerController("Render::DoubleRenderController", DoubleRenderController);
+registerController("Render::ChildRenderController", ChildRenderController);
 
 class RenderTest extends Rack.TestCase {}
 

@@ -9,7 +9,6 @@ import {
 import { MockRequest, type RackBody, Utils as RackUtils } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
 import { Request } from "../http/request.js";
-import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Utils } from "../journey/router/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -49,8 +48,9 @@ import {
   UnfilteredParameters,
 } from "../../action-controller/metal/strong-parameters.js";
 import { Redirection } from "../routing/redirection.js";
+import { registerController } from "../../action-controller/base.js";
 
-class StubController {
+class StubController extends Base {
   static actionEncodingTemplate(): null {
     return null;
   }
@@ -131,10 +131,7 @@ beforeEach(() => {
     "transport/taxis",
     "users",
   ]) {
-    registerConstant(
-      `${camelize(name)}Controller`,
-      StubController as unknown as DispatchableControllerClass,
-    );
+    registerController(`${camelize(name)}Controller`, StubController);
   }
 });
 
@@ -144,7 +141,7 @@ afterEach(() => {
 
 const routeSpec = (match: Record<string, unknown>): string => `${match.controller}#${match.action}`;
 
-class EchoParamsController {
+class EchoParamsController extends Base {
   static actionEncodingTemplate(): null {
     return null;
   }
@@ -425,10 +422,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/posts/:id", { to: "posts#show" });
     });
-    registerConstant(
-      "PostsController",
-      EchoParamsController as unknown as DispatchableControllerClass,
-    );
+    registerController("PostsController", EchoParamsController);
     const [status, , body] = await routes.call({
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/7",
@@ -4600,10 +4594,7 @@ describe("TestDefaultScope", () => {
   });
 
   beforeEach(() => {
-    registerConstant(
-      "Blog::PostsController",
-      PostsController as unknown as DispatchableControllerClass,
-    );
+    registerController("Blog::PostsController", PostsController);
   });
   afterEach(() => {
     if (isRegisteredConstant("Blog::PostsController"))
@@ -4873,7 +4864,7 @@ describe("TestNamespaceWithControllerOption", () => {
 
   let t: TestNamespaceWithControllerOption;
   beforeEach(({ testCase }) => {
-    registerConstant("Admin::StorageFilesController", StorageFilesController);
+    registerController("Admin::StorageFilesController", StorageFilesController);
     t = testCase as TestNamespaceWithControllerOption;
   });
   afterEach(() => {
@@ -5134,8 +5125,8 @@ describe("TestNamedRouteUrlHelpers", () => {
 
   let t: TestNamedRouteUrlHelpers;
   beforeEach(({ testCase }) => {
-    registerConstant("TestNamedRouteUrlHelpers::CategoriesController", CategoriesController);
-    registerConstant("TestNamedRouteUrlHelpers::ProductsController", ProductsController);
+    registerController("TestNamedRouteUrlHelpers::CategoriesController", CategoriesController);
+    registerController("TestNamedRouteUrlHelpers::ProductsController", ProductsController);
     t = testCase as TestNamedRouteUrlHelpers;
   });
 
@@ -5249,7 +5240,7 @@ describe("TestInvalidUrls", () => {
 
   let t: TestInvalidUrls;
   beforeEach(({ testCase }) => {
-    registerConstant("TestInvalidUrls::FooController", FooController);
+    registerController("TestInvalidUrls::FooController", FooController);
     t = testCase as TestInvalidUrls;
   });
   afterEach(() => {
@@ -5655,7 +5646,7 @@ describe("TestErrorsInController", () => {
 
   let t: TestErrorsInController;
   beforeEach(({ testCase }) => {
-    registerConstant("PostsController", PostsController);
+    registerController("PostsController", PostsController);
     t = testCase as TestErrorsInController;
   });
   afterEach(() => {
@@ -5784,7 +5775,7 @@ describe("TestOptionalScopesWithOrWithoutParams", () => {
 
   let t: TestOptionalScopesWithOrWithoutParams;
   beforeEach(({ testCase }) => {
-    registerConstant("TestOptionalScopesWithOrWithoutParams::HomeController", HomeController);
+    registerController("TestOptionalScopesWithOrWithoutParams::HomeController", HomeController);
     t = testCase as TestOptionalScopesWithOrWithoutParams;
   });
 
@@ -5841,8 +5832,8 @@ describe("TestPathParameters", () => {
 
   let t: TestPathParameters;
   beforeEach(({ testCase }) => {
-    registerConstant("TestPathParameters::HomeController", HomeController);
-    registerConstant("TestPathParameters::PagesController", PagesController);
+    registerController("TestPathParameters::HomeController", HomeController);
+    registerController("TestPathParameters::PagesController", PagesController);
     t = testCase as TestPathParameters;
   });
 
@@ -5863,7 +5854,7 @@ describe("TestInternalRoutingParams", () => {
       this.head("ok");
     }
   }
-  registerConstant("InternalController", InternalController);
+  registerController("InternalController", InternalController);
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestInternalRoutingParams extends IntegrationTest {
@@ -5950,7 +5941,7 @@ describe("FlashRedirectTest", () => {
 
   let t: FlashRedirectTest;
   beforeEach(({ testCase }) => {
-    registerConstant("FlashRedirectTest::FooController", FooController);
+    registerController("FlashRedirectTest::FooController", FooController);
     t = testCase as FlashRedirectTest;
   });
 
@@ -6145,7 +6136,7 @@ describe("TestMultipleNestedController", () => {
 
   let t: TestMultipleNestedController;
   beforeEach(({ testCase }) => {
-    registerConstant("Foo::Bar::BazController", BazController);
+    registerController("Foo::Bar::BazController", BazController);
     t = testCase as TestMultipleNestedController;
   });
   afterEach(() => {
@@ -6267,7 +6258,7 @@ describe("TestDefaultUrlOptions", () => {
 
   let t: TestDefaultUrlOptions;
   beforeEach(({ testCase }) => {
-    registerConstant("PostsController", PostsController);
+    registerController("PostsController", PostsController);
     t = testCase as TestDefaultUrlOptions;
   });
 

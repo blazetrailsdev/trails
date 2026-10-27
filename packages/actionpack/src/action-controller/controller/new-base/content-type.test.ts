@@ -6,6 +6,7 @@ import { Mime } from "../../../action-dispatch/http/mime-type.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../base.js";
 
 registerConstant("ContentType", { name: "ContentType" });
 
@@ -56,9 +57,9 @@ for (const [klass, name] of [
 ] as const) {
   Object.defineProperty(klass, "name", { value: name });
 }
-registerConstant("ContentType::BaseController", BaseController);
-registerConstant("ContentType::ImpliedController", ImpliedController);
-registerConstant("ContentType::CharsetController", CharsetController);
+registerController("ContentType::BaseController", BaseController);
+registerController("ContentType::ImpliedController", ImpliedController);
+registerController("ContentType::CharsetController", CharsetController);
 
 class ExplicitContentTypeTest extends Rack.TestCase {}
 

@@ -23,7 +23,6 @@ import {
   rbStrSend,
   stringSplit,
   URI,
-  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Head, MethodOverride, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { RoutesHelpers } from "../abstract-controller/trailties/routes-helpers.js";
@@ -61,6 +60,7 @@ import {
 } from "../action-dispatch/testing/integration.js";
 import { TestProcess } from "../action-dispatch/testing/test-process.js";
 import { SystemTestCase } from "../action-dispatch/system-test-case.js";
+import { registerController } from "../action-controller/base.js";
 
 export const ActionPackTestSuiteUtils = {
   async requireHelpers(helpersDirs: string | string[]): Promise<void> {
@@ -483,10 +483,10 @@ export class CommentsController extends ResourcesController {}
 export class AccountsController extends ResourcesController {}
 export class ImagesController extends ResourcesController {}
 
-registerConstant("ResourcesController", ResourcesController);
-registerConstant("CommentsController", CommentsController);
-registerConstant("AccountsController", AccountsController);
-registerConstant("ImagesController", ImagesController);
+registerController("ResourcesController", ResourcesController);
+registerController("CommentsController", CommentsController);
+registerController("AccountsController", AccountsController);
+registerController("ImagesController", ImagesController);
 
 type SetCookieAttributes = Record<string, string | true>;
 

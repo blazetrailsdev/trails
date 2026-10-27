@@ -1,12 +1,13 @@
 import { beforeEach, describe, it } from "vitest";
 import { assertEqual } from "@blazetrails/activesupport";
-import { include, registerConstant } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
 import { URL } from "../http/url.js";
 import { RouteSet } from "../routing/route-set.js";
 import type { UrlForRoutes } from "../routing/url-for.js";
 import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
+import { registerController } from "../../action-controller/base.js";
 
 type Helper = (...args: unknown[]) => string;
 
@@ -45,7 +46,7 @@ describe("WithMountPoint", () => {
     }
   }
   include(MyRouteGeneratingController, Routes.urlHelpers());
-  registerConstant("MyRouteGeneratingController", MyRouteGeneratingController);
+  registerController("MyRouteGeneratingController", MyRouteGeneratingController);
 
   Routes.draw(function () {
     this.get("/foo", { to: "my_route_generating#index", as: "foo" });

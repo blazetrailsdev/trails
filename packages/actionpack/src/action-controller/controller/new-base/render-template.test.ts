@@ -6,6 +6,7 @@ import { Base } from "../../base.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../base.js";
 
 registerConstant("RenderTemplate", { name: "RenderTemplate" });
 
@@ -221,8 +222,8 @@ class WithLayoutController extends ApplicationController {
   }
 }
 
-registerConstant("RenderTemplate::WithoutLayoutController", WithoutLayoutController);
-registerConstant("RenderTemplate::WithLayoutController", WithLayoutController);
+registerController("RenderTemplate::WithoutLayoutController", WithoutLayoutController);
+registerController("RenderTemplate::WithLayoutController", WithLayoutController);
 
 class TestWithLayout extends Rack.TestCase {}
 
@@ -302,7 +303,7 @@ describe("TestWithLayout", () => {
     }
   }
 
-  registerConstant(
+  registerController(
     "RenderTemplate::Compatibility::WithoutLayoutController",
     WithoutLayoutController,
   );

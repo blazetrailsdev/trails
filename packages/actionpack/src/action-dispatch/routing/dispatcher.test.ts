@@ -1,13 +1,16 @@
 import { camelize } from "@blazetrails/activesupport";
-import { registerConstant, isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "./route-set.js";
-import type { DispatchableControllerClass } from "./dispatcher.js";
 import { X_CASCADE } from "../constants.js";
 import { Response } from "../http/response.js";
 import { Request } from "../http/request.js";
 import { Dispatcher, StaticDispatcher } from "./route-set.js";
 import type { RouterRequest } from "../journey/router.js";
+import {
+  Base,
+  registerController as registerControllerClass,
+} from "../../action-controller/base.js";
 
 function makeReq(path: string, method = "GET"): RouterRequest {
   const req = new Request({
@@ -22,8 +25,8 @@ function makeReq(path: string, method = "GET"): RouterRequest {
 
 function makeControllerClass(
   body: (action: string, req: RouterRequest) => [number, Record<string, string>, string[]],
-): DispatchableControllerClass {
-  return class {
+): typeof Base {
+  return class extends Base {
     static actionEncodingTemplate(): null {
       return null;
     }
@@ -38,14 +41,14 @@ function makeControllerClass(
     ): Promise<[number, Record<string, string>, string[]]> {
       return body(action, req as unknown as RouterRequest);
     }
-  } as unknown as DispatchableControllerClass;
+  };
 }
 
 describe("RouteDispatcher", () => {
   const registered: string[] = [];
 
-  function registerController(controller: string, controllerClass: DispatchableControllerClass) {
-    registerConstant(`${camelize(controller)}Controller`, controllerClass);
+  function registerController(controller: string, controllerClass: typeof Base) {
+    registerControllerClass(`${camelize(controller)}Controller`, controllerClass);
     registered.push(controller);
   }
 
@@ -186,7 +189,7 @@ describe("RouteDispatcher", () => {
 });
 
 describe("Dispatcher over the controller constant table", () => {
-  class PostsController {
+  class PostsController extends Base {
     static actionEncodingTemplate(): null {
       return null;
     }
@@ -201,7 +204,7 @@ describe("Dispatcher over the controller constant table", () => {
   }
 
   beforeEach(() => {
-    registerConstant("PostsController", PostsController as unknown as DispatchableControllerClass);
+    registerControllerClass("PostsController", PostsController);
   });
   afterEach(() => {
     if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");

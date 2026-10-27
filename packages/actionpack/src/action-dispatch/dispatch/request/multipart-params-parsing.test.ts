@@ -12,6 +12,7 @@ import { deprecator } from "../../deprecator.js";
 import { IntegrationTest } from "../../testing/integration.js";
 import type { RouteSet } from "../../routing/route-set.js";
 import "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../../action-controller/base.js";
 
 interface UploadedFile {
   originalFilename: string;
@@ -60,7 +61,7 @@ describe("MultipartParamsParsingTest", () => {
       });
     }
   }
-  registerConstant("MultipartParamsParsingTest::TestController", TestController);
+  registerController("MultipartParamsParsingTest::TestController", TestController);
 
   const FIXTURE_PATH = File.expandPath(
     "../../../test-helpers/fixtures/multipart",

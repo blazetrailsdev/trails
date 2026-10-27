@@ -35,6 +35,7 @@ import {
 
 import type { MiddlewareFactory } from "../middleware/stack.js";
 import { RouteSet } from "../routing/route-set.js";
+import { registerController } from "../../action-controller/base.js";
 
 describe("ContentSecurityPolicyTest", () => {
   it("build", () => {
@@ -621,7 +622,7 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
       this.get("/redirect", { to: this.redirect("/") });
     });
   });
-  registerConstant(
+  registerController(
     "DefaultContentSecurityPolicyIntegrationTest::PolicyController",
     PolicyController,
   );
@@ -784,7 +785,7 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
       this.get("/not-modified", { to: "policy#notModified" });
     });
   });
-  registerConstant("ContentSecurityPolicyIntegrationTest::PolicyController", PolicyController);
+  registerController("ContentSecurityPolicyIntegrationTest::PolicyController", PolicyController);
 
   const POLICY = new ContentSecurityPolicy((p) => {
     p.defaultSrc(":self");
@@ -910,7 +911,7 @@ describe("DisabledContentSecurityPolicyIntegrationTest", () => {
       this.get("/inline", { to: "policy#inline" });
     });
   });
-  registerConstant(
+  registerController(
     "DisabledContentSecurityPolicyIntegrationTest::PolicyController",
     PolicyController,
   );
@@ -968,7 +969,7 @@ describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
       this.get("/", { to: "policy#index" });
     });
   });
-  registerConstant(
+  registerController(
     "NonceDirectiveContentSecurityPolicyIntegrationTest::PolicyController",
     PolicyController,
   );
@@ -1058,7 +1059,7 @@ describe("HelpersContentSecurityPolicyIntegrationTest", () => {
       this.get("/", { to: "policy#index" });
     });
   });
-  registerConstant(
+  registerController(
     "HelpersContentSecurityPolicyIntegrationTest::PolicyController",
     PolicyController,
   );

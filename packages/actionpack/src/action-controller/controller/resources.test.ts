@@ -17,7 +17,6 @@ import {
   rbInspect,
   rbObjClassname,
   rbObjSingletonClass,
-  registerConstant,
 } from "@blazetrails/ruby-compat";
 import {
   AccountsController,
@@ -29,7 +28,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { RoutingError } from "../metal/exceptions.js";
 import { TestCase } from "../test-case.js";
 import type { Base } from "../base.js";
-import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
+import { registerController } from "../base.js";
 
 type Options = Record<string, any>;
 
@@ -60,11 +59,8 @@ beforeAll(() => {
     "backoffice/admin/products": Backoffice.Admin.ProductsController,
     "backoffice/admin/images": Backoffice.Admin.ImagesController,
   })) {
-    registerConstant(
-      `${camelize(name)}Controller`,
-      klass as unknown as DispatchableControllerClass,
-    );
-    registerConstant(`${camelize(name).replace(/\//g, "::")}Controller`, klass);
+    registerController(`${camelize(name)}Controller`, klass);
+    registerController(`${camelize(name).replace(/\//g, "::")}Controller`, klass);
   }
 });
 

@@ -1,9 +1,7 @@
 import { camelize } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeAll, describe, expect, it } from "vitest";
 import "../../../test-helpers/abstract-unit.js";
 import { RouteSet } from "../../routing/route-set.js";
-import type { DispatchableControllerClass } from "../../routing/dispatcher.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
 import {
   assertGenerates,
@@ -13,6 +11,7 @@ import {
   withRouting,
   type RoutingAssertionsHost,
 } from "./routing.js";
+import { Base, registerController } from "../../../action-controller/base.js";
 
 function buildHost(): RoutingAssertionsHost {
   const routes = new RouteSet();
@@ -26,7 +25,7 @@ function buildHost(): RoutingAssertionsHost {
   return { routes };
 }
 
-class StubController {
+class StubController extends Base {
   static actionEncodingTemplate(): null {
     return null;
   }
@@ -34,10 +33,7 @@ class StubController {
 
 beforeAll(() => {
   for (const name of ["items", "tmp", "x"]) {
-    registerConstant(
-      `${camelize(name)}Controller`,
-      StubController as unknown as DispatchableControllerClass,
-    );
+    registerController(`${camelize(name)}Controller`, StubController);
   }
 });
 

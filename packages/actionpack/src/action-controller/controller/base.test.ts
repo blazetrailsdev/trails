@@ -28,6 +28,7 @@ import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import "../../test-helpers/abstract-unit.js";
+import { registerController } from "../base.js";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({
@@ -126,8 +127,8 @@ class RecordIdentifierIncludedController extends Base {
 }
 include(RecordIdentifierIncludedController, { domId, domClass });
 
-registerConstant("UrlOptionsController", UrlOptionsController);
-registerConstant("DefaultUrlOptionsController", DefaultUrlOptionsController);
+registerController("UrlOptionsController", UrlOptionsController);
+registerController("DefaultUrlOptionsController", DefaultUrlOptionsController);
 
 describe("ControllerClassTests", () => {
   it("controller path", () => {

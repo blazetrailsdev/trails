@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, it } from "vitest";
 import { Notifications, assertMatch, assertNoMatch } from "@blazetrails/activesupport";
 import { Lint, MockRequest } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { rbFSend, registerConstant } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
 import { SERVER_TIMING } from "../constants.js";
 import type { MiddlewareFactory } from "../middleware/stack.js";
@@ -10,6 +10,7 @@ import { ServerTiming } from "../middleware/server-timing.js";
 import { RouteSet } from "../routing/route-set.js";
 import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
+import { registerController } from "../../action-controller/base.js";
 
 describe("ServerTimingTest", () => {
   class TestController extends Base {
@@ -28,7 +29,7 @@ describe("ServerTimingTest", () => {
       });
     }
   }
-  registerConstant("ServerTimingTest::TestController", TestController);
+  registerController("ServerTimingTest::TestController", TestController);
 
   let middlewares: MiddlewareFactory[];
   let headerName: string;

@@ -1,12 +1,11 @@
 import { camelize } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeAll, describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { RouteSet } from "./route-set.js";
-import type { DispatchableControllerClass } from "./dispatcher.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
+import { Base, registerController } from "../../action-controller/base.js";
 
-class StubController {
+class StubController extends Base {
   static actionEncodingTemplate(): null {
     return null;
   }
@@ -26,10 +25,7 @@ beforeAll(() => {
     "api/v1/articles",
     "api/v1/posts",
   ]) {
-    registerConstant(
-      `${camelize(name)}Controller`,
-      StubController as unknown as DispatchableControllerClass,
-    );
+    registerController(`${camelize(name)}Controller`, StubController);
   }
 });
 

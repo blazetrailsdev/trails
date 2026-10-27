@@ -1,4 +1,3 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertEqual, assertRaises } from "@blazetrails/activesupport";
@@ -6,6 +5,7 @@ import type { Mapper } from "../../routing/mapper.js";
 import { RouteSet } from "../../routing/route-set.js";
 import { IntegrationTest } from "../../testing/integration.js";
 import { ResourcesController } from "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../../action-controller/base.js";
 
 class ReviewsController extends ResourcesController {}
 
@@ -49,7 +49,7 @@ describe("RoutingConcernsTest", () => {
   let session: IntegrationTest;
 
   beforeAll(() => {
-    registerConstant("ReviewsController", ReviewsController);
+    registerController("ReviewsController", ReviewsController);
   });
 
   beforeEach(({ task }) => {

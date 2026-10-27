@@ -1,4 +1,3 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { htmlSafe, include } from "@blazetrails/activesupport";
@@ -9,6 +8,7 @@ import { Rendering } from "../../metal/rendering.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../base.js";
 
 class MinimalController extends Metal {
   declare render: (options: Record<string, unknown>) => void | Promise<void>;
@@ -98,9 +98,9 @@ class WithLayoutController extends ApplicationController {
   }
 }
 
-registerConstant("RenderHtml::MinimalController", MinimalController);
-registerConstant("RenderHtml::SimpleController", SimpleController);
-registerConstant("RenderHtml::WithLayoutController", WithLayoutController);
+registerController("RenderHtml::MinimalController", MinimalController);
+registerController("RenderHtml::SimpleController", SimpleController);
+registerController("RenderHtml::WithLayoutController", WithLayoutController);
 
 class RenderHtmlTest extends Rack.TestCase {}
 

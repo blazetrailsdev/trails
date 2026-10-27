@@ -4,6 +4,7 @@ import { assertEqual, assertMatch, Logger } from "@blazetrails/activesupport";
 import { registerConstant, StringIO } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../base.js";
 
 registerConstant("RenderStreaming", { name: "RenderStreaming" });
 
@@ -53,7 +54,7 @@ class BasicController extends Base {
   }
 }
 
-registerConstant("RenderStreaming::BasicController", BasicController);
+registerController("RenderStreaming::BasicController", BasicController);
 
 class StreamingTest extends Rack.TestCase {}
 

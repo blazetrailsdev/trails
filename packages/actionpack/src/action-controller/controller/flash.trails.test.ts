@@ -1,4 +1,3 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { describe, it, expect } from "vitest";
@@ -12,6 +11,7 @@ import { ShowExceptions } from "../../action-dispatch/middleware/show-exceptions
 import type { MiddlewareFactory } from "../../action-dispatch/middleware/stack.js";
 import { IntegrationTest, Session } from "../../action-dispatch/testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
+import { registerController } from "../base.js";
 
 class NoticesController extends Base {
   async create(): Promise<void> {
@@ -54,7 +54,7 @@ describe("add_flash_types readers", () => {
       middleware.use(CookieStore as MiddlewareFactory, { key: "_session" });
       middleware.delete(ShowExceptions as MiddlewareFactory);
     });
-    registerConstant("NoticesController", NoticesController);
+    registerController("NoticesController", NoticesController);
 
     await t.post("/notices");
     t.assertResponse("redirect");

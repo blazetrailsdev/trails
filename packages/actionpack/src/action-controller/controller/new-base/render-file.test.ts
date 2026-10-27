@@ -2,6 +2,7 @@ import { beforeEach, describe, it } from "vitest";
 import { File, Pathname, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../base.js";
 
 registerConstant("RenderFile", { name: "RenderFile" });
 
@@ -33,7 +34,7 @@ class BasicController extends Base {
   }
 }
 
-registerConstant("RenderFile::BasicController", BasicController);
+registerController("RenderFile::BasicController", BasicController);
 
 class TestBasic extends Rack.TestCase {
   static {

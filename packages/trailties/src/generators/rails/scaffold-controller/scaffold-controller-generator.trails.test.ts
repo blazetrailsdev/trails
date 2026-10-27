@@ -10,6 +10,7 @@ import {
 } from "./scaffold-controller-generator.js";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { registerController } from "@blazetrails/actionpack";
 
 afterEach(() => {
   if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
@@ -27,7 +28,7 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
     routes.draw(function () {
       this.resources("posts");
     });
-    registerConstant("PostsController", PostsController as never);
+    registerController("PostsController", PostsController as never);
 
     const [status, , body] = await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/posts/new" });
 
@@ -52,7 +53,7 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
       this.resources("posts");
     });
     include(PostsController, routes.urlHelpers());
-    registerConstant("PostsController", PostsController as never);
+    registerController("PostsController", PostsController as never);
 
     const [status, headers] = await routes.call({
       REQUEST_METHOD: "DELETE",

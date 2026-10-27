@@ -3,6 +3,7 @@ import { FixtureResolver } from "@blazetrails/actionview";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../base.js";
 
 registerConstant("RenderPartial", { name: "RenderPartial" });
 
@@ -49,8 +50,8 @@ class ChildController extends BasicController {
   }
 }
 
-registerConstant("RenderPartial::BasicController", BasicController);
-registerConstant("RenderPartial::ChildController", ChildController);
+registerController("RenderPartial::BasicController", BasicController);
+registerController("RenderPartial::ChildController", ChildController);
 
 class TestPartial extends Rack.TestCase {
   static {

@@ -16,18 +16,17 @@ import {
   URI,
   first,
   rbModConstDefined,
-  registerConstant,
   type Module,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import { Request } from "../../action-dispatch/http/request.js";
-import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
 import { RouteSet, type DrawCallback } from "../../action-dispatch/routing/route-set.js";
 import { RoutingError, UnknownHttpMethod, UrlGenerationError } from "../metal/exceptions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { RoutingTestHelpers, RoutingVerbs } from "../../test-helpers/abstract-unit.js";
 import "../../test-helpers/lib/controller/fake-controllers.js";
+import { registerController } from "../base.js";
 
 type NamedRoutes = Record<string, (...args: unknown[]) => string>;
 
@@ -42,11 +41,8 @@ class MilestonesController extends Base {
     this.prototype.show = this.prototype.index;
   }
 }
-registerConstant("MilestonesController", MilestonesController);
-registerConstant(
-  "MilestonesController",
-  MilestonesController as unknown as DispatchableControllerClass,
-);
+registerController("MilestonesController", MilestonesController);
+registerController("MilestonesController", MilestonesController);
 
 class UriReservedCharactersRoutingTest {
   set!: RouteSet;

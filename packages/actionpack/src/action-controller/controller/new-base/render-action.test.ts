@@ -4,6 +4,7 @@ import { assertRaises } from "@blazetrails/activesupport";
 import { ArgumentError, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../base.js";
 
 {
   registerConstant("RenderAction", { name: "RenderAction" });
@@ -53,7 +54,7 @@ import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit
     }
   }
 
-  registerConstant("RenderAction::BasicController", BasicController);
+  registerController("RenderAction::BasicController", BasicController);
 
   class RenderActionTest extends Rack.TestCase {}
 
@@ -191,7 +192,7 @@ import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit
     }
   }
 
-  registerConstant("RenderActionWithApplicationLayout::BasicController", BasicController);
+  registerController("RenderActionWithApplicationLayout::BasicController", BasicController);
 
   class LayoutTest extends Rack.TestCase {}
 
@@ -302,7 +303,7 @@ import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit
     }
   }
 
-  registerConstant("RenderActionWithControllerLayout::BasicController", BasicController);
+  registerController("RenderActionWithControllerLayout::BasicController", BasicController);
 
   class ControllerLayoutTest extends Rack.TestCase {}
 
@@ -380,7 +381,7 @@ import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit
     }
   }
 
-  registerConstant("RenderActionWithBothLayouts::BasicController", BasicController);
+  registerController("RenderActionWithBothLayouts::BasicController", BasicController);
 
   class ControllerLayoutTest extends Rack.TestCase {}
 

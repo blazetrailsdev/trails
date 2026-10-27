@@ -1,16 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
-import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { Base } from "../base.js";
 import { API } from "../api.js";
-import {
-  StringIO,
-  registerConstant,
-  isRegisteredConstant,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { StringIO, isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { registerController } from "../base.js";
 
 afterEach(() => {
   if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
@@ -120,7 +115,7 @@ describe("Controller JSON rendering integration", () => {
     routes.draw(function () {
       this.resources("posts");
     });
-    registerConstant("PostsController", PostsController as unknown as DispatchableControllerClass);
+    registerController("PostsController", PostsController);
 
     const [status, headers, body] = await routes.call({
       REQUEST_METHOD: "GET",

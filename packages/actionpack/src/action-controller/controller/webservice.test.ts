@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { ActiveSupportJSON, withIndifferentAccess } from "@blazetrails/activesupport";
-import { Interrupt, StringIO, registerConstant } from "@blazetrails/ruby-compat";
+import { Interrupt, StringIO } from "@blazetrails/ruby-compat";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import { Mime } from "../../action-dispatch/http/mime-type.js";
 import { Request } from "../../action-dispatch/http/request.js";
@@ -9,6 +9,7 @@ import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { Base } from "../base.js";
 import { Parameters } from "../metal/strong-parameters.js";
 import "../../test-helpers/abstract-unit.js";
+import { registerController } from "../base.js";
 
 class TestController extends Base {
   declare params: Parameters;
@@ -52,7 +53,7 @@ class WebServiceTest extends IntegrationTest {
   declare controller: TestController;
 
   static {
-    registerConstant("WebServiceTest::TestController", TestController);
+    registerController("WebServiceTest::TestController", TestController);
   }
 
   async withParamsParsers(
