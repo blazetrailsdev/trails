@@ -47,18 +47,18 @@ export function trSetupTable(sets: unknown[]): (cp: number) => boolean {
   return (cp) => tables.every((t) => t(cp));
 }
 
-interface TrTable {
+type _TrTable = {
   trans: Map<number, number>;
   members: Set<number>;
   last: number;
   cflag: boolean;
-}
+};
 
 const TR_CACHE_MAX = 64;
-const trCache = new Map<string, Map<string, TrTable>>();
+const trCache = new Map<string, Map<string, _TrTable>>();
 let trCacheSize = 0;
 
-function trCompile(srcStr: string, replStr: string): TrTable {
+function _trCompile(srcStr: string, replStr: string): _TrTable {
   let byRepl = trCache.get(srcStr);
   const cached = byRepl?.get(replStr);
   if (cached) return cached;
@@ -93,7 +93,7 @@ export function trTrans(str: string, src: unknown, repl: unknown, sflag: boolean
   const srcStr = stringValue(src);
   const replStr = stringValue(repl);
   if (replStr.length === 0) return strDelete(str, [src]);
-  const { trans, members, last, cflag } = trCompile(srcStr, replStr);
+  const { trans, members, last, cflag } = _trCompile(srcStr, replStr);
   let out = "";
   let save = -1;
   for (const ch of str) {
