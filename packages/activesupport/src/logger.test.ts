@@ -228,7 +228,7 @@ describe("LoggerTest", () => {
     const path = join(dir, "development.log");
     writeFileSync(path, "");
     const t = { path };
-    const broadcast = new BroadcastLogger(new Logger({ filename: t.path, write: () => {} }));
+    const broadcast = new BroadcastLogger(new Logger(t.path));
 
     try {
       expect(Logger.isLoggerOutputsTo(broadcast, t)).toBeTruthy();

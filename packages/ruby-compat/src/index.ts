@@ -450,6 +450,8 @@ export { rbEnsure } from "./ensure.js";
 export { coreHashMergeKwd, keywordSplat, rbGetKwargs, rbScanArgs } from "./keyword-splat.js";
 export { Queue, SizedQueue } from "./queue.js";
 export { Fiber } from "./fiber.js";
+export { Logger, type Logdev, type LoggerFormatter, type LoggerKwargs } from "./logger.js";
+export { Benchmark } from "./benchmark.js";
 export { FiberError } from "./fiber-error.js";
 export { Thread, rbIterBreakValue } from "./thread.js";
 export {

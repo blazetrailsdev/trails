@@ -10,8 +10,6 @@ function inspect(value: unknown): string {
 
 /** @internal */
 export class LoggerThreadSafeLevel {
-  declare protected _level: number;
-
   declare private _localLevelKey?: symbol;
 
   /** @internal */
@@ -49,14 +47,6 @@ export class LoggerThreadSafeLevel {
     }
   }
 
-  get level(): number {
-    return this.localLevel ?? this._level;
-  }
-
-  set level(severity: number | LogLevel | string) {
-    this._level = coerce(severity);
-  }
-
   logAt<T>(level: number | LogLevel, fn: () => T): T {
     const oldLocalLevel = this.localLevel;
     this.localLevel = level;
@@ -72,12 +62,4 @@ export class LoggerThreadSafeLevel {
       if (!async) this.localLevel = oldLocalLevel;
     }
   }
-}
-
-function coerce(severity: number | string): number {
-  if (typeof severity === "number") return severity;
-  const name = severity.startsWith(":") ? severity.slice(1) : severity;
-  const level = LOG_LEVELS[`:${name.toLowerCase()}` as LogLevel];
-  if (level === undefined) throw new ArgumentError(`invalid log level: ${name}`);
-  return level;
 }
