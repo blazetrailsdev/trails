@@ -47,23 +47,53 @@ export function trSetupTable(sets: unknown[]): (cp: number) => boolean {
   return (cp) => tables.every((t) => t(cp));
 }
 
-/**
- * `tr_trans` (`vendor/ruby/v3.3.11/string.c:7924`), for `tr` and — with `sflag` —
- * `tr_s`, which squeezes each run of one translated character.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function trTrans(str: string, src: unknown, repl: unknown, sflag: boolean): string {
-  const srcCps = Array.from(stringValue(src), (c) => c.codePointAt(0)!);
-  const replStr = stringValue(repl);
-  if (replStr.length === 0) return strDelete(str, [src]);
+interface TrTable {
+  trans: Map<number, number>;
+  members: Set<number>;
+  last: number;
+  cflag: boolean;
+}
+
+const TR_CACHE_MAX = 64;
+const trCache = new Map<string, Map<string, TrTable>>();
+let trCacheSize = 0;
+
+function trCompile(srcStr: string, replStr: string): TrTable {
+  let byRepl = trCache.get(srcStr);
+  const cached = byRepl?.get(replStr);
+  if (cached) return cached;
+  const srcCps = Array.from(srcStr, (c) => c.codePointAt(0)!);
   const cflag = srcCps.length > 1 && srcCps[0] === 0x5e;
   const replCps = [...trnext(Array.from(replStr, (c) => c.codePointAt(0)!))];
   const last = replCps[replCps.length - 1];
   const trans = new Map<number, number>();
   const from = [...trnext(cflag ? srcCps.slice(1) : srcCps)];
   if (!cflag) from.forEach((c, i) => trans.set(c, i < replCps.length ? replCps[i] : last));
-  const members = new Set(from);
+  const table = { trans, members: new Set(from), last, cflag };
+  if (trCacheSize >= TR_CACHE_MAX) {
+    trCache.clear();
+    trCacheSize = 0;
+    byRepl = undefined;
+  }
+  if (!byRepl) trCache.set(srcStr, (byRepl = new Map()));
+  byRepl.set(replStr, table);
+  trCacheSize++;
+  return table;
+}
+
+/**
+ * `tr_trans` (`vendor/ruby/v3.3.11/string.c:7924`), for `tr` and — with `sflag` —
+ * `tr_s`, which squeezes each run of one translated character. MRI rebuilds
+ * its 256-entry table per call; the compiled tables here are cached per
+ * `(src, repl)` pair, since building them dominates builder's escaping.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function trTrans(str: string, src: unknown, repl: unknown, sflag: boolean): string {
+  const srcStr = stringValue(src);
+  const replStr = stringValue(repl);
+  if (replStr.length === 0) return strDelete(str, [src]);
+  const { trans, members, last, cflag } = trCompile(srcStr, replStr);
   let out = "";
   let save = -1;
   for (const ch of str) {
