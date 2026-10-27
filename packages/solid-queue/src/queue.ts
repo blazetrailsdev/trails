@@ -1,6 +1,6 @@
 import { Duration } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { rbHash, toI } from "@blazetrails/ruby-compat";
+import { rbHash, registerConstant, toI } from "@blazetrails/ruby-compat";
 import { Job } from "./job.js";
 import { Pause } from "./pause.js";
 import { ReadyExecution } from "./ready-execution.js";
@@ -73,3 +73,4 @@ export class Queue {
     return rbHash(this.name);
   }
 }
+registerConstant("SolidQueue::Queue", Queue);

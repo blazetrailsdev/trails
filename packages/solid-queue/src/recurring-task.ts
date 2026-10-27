@@ -45,7 +45,7 @@ export class RecurringTask extends Record {
   static Arguments = Arguments;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::RecurringTask", this);
 
     this.serialize("arguments", { coder: Arguments, default: [] });
 

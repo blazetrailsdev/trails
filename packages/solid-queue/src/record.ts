@@ -7,7 +7,6 @@ import { SolidQueue } from "./solid-queue.js";
 export class Record extends Base {
   static {
     this.abstractClass = true;
-    this.tableNamePrefix = SolidQueue.tableNamePrefix;
   }
 
   static nonBlockingLock<T extends typeof Record>(this: T): Relation<InstanceType<T>> {
@@ -19,6 +18,6 @@ export class Record extends Base {
   }
 }
 
-registerModel(Record);
+registerModel("SolidQueue::Record", Record);
 
 runLoadHooks("solid_queue_record", Record);

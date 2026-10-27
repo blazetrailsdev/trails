@@ -9,7 +9,7 @@ export class ReadyExecution extends Execution {
   declare static queuedAs: (queueName: unknown) => Relation<ReadyExecution>;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::ReadyExecution", this);
 
     this.scope("queuedAs", function (queueName: unknown) {
       return this.where({ queue_name: queueName });

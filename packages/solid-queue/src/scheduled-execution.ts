@@ -16,7 +16,7 @@ export class ScheduledExecution extends Execution {
   declare scheduled_at: Time | null;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::ScheduledExecution", this);
     include(this, Dispatching);
 
     this.scope("due", function () {

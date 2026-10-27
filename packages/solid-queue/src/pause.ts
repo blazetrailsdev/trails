@@ -5,6 +5,6 @@ export class Pause extends Record {
   declare queue_name: string;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::Pause", this);
   }
 }

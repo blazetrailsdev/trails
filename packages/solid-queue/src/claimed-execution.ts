@@ -1,6 +1,6 @@
 import { registerModel, type Base, type Relation } from "@blazetrails/activerecord";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { rbFArray } from "@blazetrails/ruby-compat";
+import { rbFArray, registerConstant } from "@blazetrails/ruby-compat";
 import { Execution, UndiscardableError } from "./execution.js";
 import { SolidQueue } from "./solid-queue.js";
 
@@ -21,7 +21,7 @@ export class ClaimedExecution extends Execution {
   declare process: Promise<Base | null>;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::ClaimedExecution", this);
 
     this.belongsTo("process");
 
@@ -144,3 +144,4 @@ export class ClaimedExecution extends Execution {
     });
   }
 }
+registerConstant("SolidQueue::ClaimedExecution::Result", Result);

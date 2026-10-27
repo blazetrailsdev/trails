@@ -1,6 +1,6 @@
 import { RecordNotUnique, registerModel, type Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, registerConstant } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import type { Job } from "./job.js";
 
@@ -12,7 +12,7 @@ export class Semaphore extends Record {
   declare expires_at: Time;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::Semaphore", this);
 
     this.scope("available", function () {
       return this.where("value > 0");
@@ -129,3 +129,4 @@ export class Proxy {
     return this.job.concurrencyLimit() ?? 1;
   }
 }
+registerConstant("SolidQueue::Semaphore::Proxy", Proxy);

@@ -1,6 +1,6 @@
 import type { Relation } from "@blazetrails/activerecord";
 import { presence } from "@blazetrails/activesupport";
-import { aryDelete, rbFArray, toS } from "@blazetrails/ruby-compat";
+import { aryDelete, rbFArray, registerConstant, toS } from "@blazetrails/ruby-compat";
 import type { ReadyExecution } from "./ready-execution.js";
 import { Pause } from "./pause.js";
 
@@ -128,3 +128,4 @@ export class QueueSelector {
     return null;
   }
 }
+registerConstant("SolidQueue::QueueSelector", QueueSelector);

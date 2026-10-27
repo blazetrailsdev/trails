@@ -14,7 +14,7 @@ export class BlockedExecution extends Execution {
   declare semaphore: Promise<Semaphore | null>;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::BlockedExecution", this);
 
     this.assumesAttributesFromJob("concurrency_key");
     this.beforeCreate(function (this: BlockedExecution) {
