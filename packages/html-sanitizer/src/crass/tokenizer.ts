@@ -43,7 +43,6 @@ export class Tokenizer {
   }
 
   consume(): Token | null {
-    const T = Tokenizer;
     if (this._s.isEos()) return null;
 
     this._s.mark();
@@ -57,7 +56,7 @@ export class Tokenizer {
       }
     }
 
-    if (this._s.scan(T.RE_WHITESPACE) !== null) return this.createToken("whitespace");
+    if (this._s.scan(Tokenizer.RE_WHITESPACE) !== null) return this.createToken("whitespace");
 
     const char = this._s.consume();
 
@@ -65,7 +64,7 @@ export class Tokenizer {
       case '"':
         return this.consumeString();
       case "#":
-        if (T.RE_NAME.test(this._s.peek()) || this.isValidEscape(this._s.peek(2))) {
+        if (Tokenizer.RE_NAME.test(this._s.peek()) || this.isValidEscape(this._s.peek(2))) {
           return this.createToken("hash", {
             type: this.isStartIdentifier(this._s.peek(3)) ? "id" : "unrestricted",
             value: this.consumeName(),
@@ -90,7 +89,7 @@ export class Tokenizer {
         if (this._s.peek() === "=") {
           this._s.consume();
           return this.createToken("substring_match");
-        } else if (this._options.preserveHacks && T.RE_NAME_START.test(this._s.peek())) {
+        } else if (this._options.preserveHacks && Tokenizer.RE_NAME_START.test(this._s.peek())) {
           this._s.reconsume();
           return this.consumeIdent();
         } else {
@@ -173,7 +172,7 @@ export class Tokenizer {
         return this.createToken("}");
       case "U":
       case "u":
-        if (T.RE_UNICODE_RANGE_START.test(this._s.peek(2))) {
+        if (Tokenizer.RE_UNICODE_RANGE_START.test(this._s.peek(2))) {
           this._s.consume();
           return this.consumeUnicodeRange();
         } else {
@@ -199,10 +198,10 @@ export class Tokenizer {
           return this.createToken("delim", { value: char });
         }
       default:
-        if (T.RE_DIGIT.test(char)) {
+        if (Tokenizer.RE_DIGIT.test(char)) {
           this._s.reconsume();
           return this.consumeNumeric();
-        } else if (T.RE_NAME_START.test(char)) {
+        } else if (Tokenizer.RE_NAME_START.test(char)) {
           this._s.reconsume();
           return this.consumeIdent();
         } else {
@@ -348,6 +347,8 @@ export class Tokenizer {
 
     if (type === "integer") {
       value = Math.trunc(value) + 0;
+    } else {
+      value = Number(value);
     }
 
     if (this.isStartIdentifier(this._s.peek(3))) {
@@ -514,14 +515,18 @@ export class Tokenizer {
   isStartNumber(text: string | null = null): boolean {
     if (text === null) text = this._s.current + this._s.peek(2);
 
-    const digit = (c: string | undefined): boolean => c !== undefined && Tokenizer.RE_DIGIT.test(c);
     const first = text[0];
     if (first === "+" || first === "-") {
-      return digit(text[1]) || (text[1] === "." && digit(text[2]));
+      return (
+        Tokenizer.RE_DIGIT.test(text[1] ?? "") ||
+        (text[1] === "." && Tokenizer.RE_DIGIT.test(text[2] ?? ""))
+      );
     } else if (first === ".") {
-      return digit(text[1]);
+      return Tokenizer.RE_DIGIT.test(text[1] ?? "");
+    } else if (Tokenizer.RE_DIGIT.test(first ?? "")) {
+      return true;
     } else {
-      return digit(first);
+      return false;
     }
   }
 
