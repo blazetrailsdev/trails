@@ -2,6 +2,7 @@ import { pluralize, singularize } from "@blazetrails/activesupport";
 import { StringScanner } from "@blazetrails/ruby-compat";
 
 import type { PathSet } from "../path-set.js";
+import type { Base } from "../render-parser.js";
 import type { Template } from "../template.js";
 import { WildcardResolver } from "./wildcard-resolver.js";
 
@@ -43,11 +44,24 @@ export class TSETracker {
   private _name: string;
   private _template: Template;
   private _viewPaths: PathSet | null;
+  private _parserClass:
+    | (new (name: string, code: string) => Base & { renderCalls(): string[] })
+    | null;
 
-  constructor(name: string, template: Template, viewPaths: PathSet | null = null) {
+  constructor(
+    name: string,
+    template: Template,
+    viewPaths: PathSet | null = null,
+    {
+      parserClass = null,
+    }: {
+      parserClass?: (new (name: string, code: string) => Base & { renderCalls(): string[] }) | null;
+    } = {},
+  ) {
     this._name = name;
     this._template = template;
     this._viewPaths = viewPaths;
+    this._parserClass = parserClass;
   }
 
   dependencies(): string[] {
@@ -73,7 +87,18 @@ export class TSETracker {
     return this.name.split("/").slice(0, -1).join("/");
   }
 
+  /** @inventedArm if — PERMANENT */
   private renderDependencies(): string[] {
+    if (this._parserClass != null) {
+      if (!this.template.source.includes("render")) return [];
+
+      const compiledSource = this.template.handler.call(this.template, this.template.source);
+
+      return new this._parserClass(this._name, compiledSource)
+        .renderCalls()
+        .map((renderCall) => renderCall.replace(/\/_/g, "/"));
+    }
+
     const dependencies: string[] = [];
     const renderCalls = this.source.split(/\brender\b/).slice(1);
 

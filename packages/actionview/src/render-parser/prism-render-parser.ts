@@ -1,6 +1,5 @@
 import { pluralize, singularize } from "@blazetrails/activesupport";
 
-import { RenderParser } from "../namespaces.js";
 import { ALL_KNOWN_KEYS, Base, RENDER_TYPE_KEYS } from "../render-parser.js";
 
 const IDENTIFIER = /[\p{ID_Start}$_][\p{ID_Continue}$]*/u;
@@ -186,5 +185,3 @@ export class PrismRenderParser extends Base {
     return [template, objectTemplate];
   }
 }
-
-RenderParser.Default = PrismRenderParser;

@@ -3,7 +3,6 @@ import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { FileSystemResolver } from "./template/resolver.js";
 import type { Template } from "./template.js";
-import type { PrismRenderParser } from "./render-parser/prism-render-parser.js";
 import type { SelectRenderer } from "./helpers/tags/select-renderer.js";
 import type { Base as TagsBase } from "./helpers/tags/base.js";
 import type { Translator } from "./helpers/tags/translator.js";
@@ -57,11 +56,6 @@ ActionView.eagerAutoload(() => {
 });
 
 TopLevel.ActionView = ActionView;
-
-export const RenderParser = { name: "ActionView::RenderParser" } as {
-  name: string;
-  Default: typeof PrismRenderParser;
-};
 
 const tagsLoadPath: Record<string, () => Promise<unknown>> = {
   "action_view/helpers/tags/select_renderer": () => import("./helpers/tags/select-renderer.js"),
