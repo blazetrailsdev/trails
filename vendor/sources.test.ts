@@ -208,6 +208,7 @@ describe("vendor/sources.ts", () => {
       "marcel",
       "builder",
       "thor",
+      "rails-dom-testing",
       "i18n",
       "solid-queue",
       "et-orbi",
