@@ -12,7 +12,7 @@ export class Semaphore extends Record {
   declare expires_at: Time;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::Semaphore", this);
 
     this.scope("available", function () {
       return this.where("value > 0");

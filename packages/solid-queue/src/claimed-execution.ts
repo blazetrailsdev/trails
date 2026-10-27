@@ -21,7 +21,7 @@ export class ClaimedExecution extends Execution {
   declare process: Promise<Base | null>;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::ClaimedExecution", this);
 
     this.belongsTo("process");
 

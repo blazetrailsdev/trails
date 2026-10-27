@@ -12,7 +12,6 @@ import { STDOUT, registerConstant } from "@blazetrails/ruby-compat";
 
 export const SolidQueue = {
   name: "SolidQueue",
-  tableNamePrefix: "solid_queue_",
 
   DEFAULT_LOGGER: new Logger(STDOUT),
 
@@ -61,7 +60,6 @@ export const SolidQueue = {
   },
 } as {
   name: string;
-  tableNamePrefix: string;
   DEFAULT_LOGGER: Logger;
   logger: Logger;
   appExecutor: { wrap<T>(block: () => T, options?: { source?: string }): T } | null;

@@ -71,7 +71,7 @@ export class Job extends Record {
   declare resetExecutionCounters: typeof Retryable.prototype.resetExecutionCounters;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::Job", this);
 
     include(this, Recurrable);
     include(this, Clearable);

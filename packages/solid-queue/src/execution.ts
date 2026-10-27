@@ -119,4 +119,4 @@ export class Execution extends Record {
   }
 }
 
-registerModel(Execution);
+registerModel("SolidQueue::Execution", Execution);

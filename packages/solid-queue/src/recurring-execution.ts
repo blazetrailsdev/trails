@@ -11,7 +11,7 @@ export class RecurringExecution extends Execution {
   declare run_at: unknown;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::RecurringExecution", this);
 
     this.scope("clearable", function () {
       return this.where().missing("job");

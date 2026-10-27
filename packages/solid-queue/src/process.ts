@@ -22,7 +22,7 @@ export class Process extends Record {
   declare static prune: typeof PrunableClassMethods.prune;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::Process", this);
 
     include(this, Executor);
     include(this, Prunable);

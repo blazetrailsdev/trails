@@ -17,7 +17,7 @@ export class FailedExecution extends Execution {
   declare private _exception: Error | null | undefined;
 
   static {
-    registerModel(this);
+    registerModel("SolidQueue::FailedExecution", this);
     include(this, Dispatching);
 
     this.serialize("error", { coder: JSON });
