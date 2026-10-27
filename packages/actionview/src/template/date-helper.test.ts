@@ -30,7 +30,7 @@ import {
 } from "../helpers/date-helper.js";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 
 const Post = Struct.new("id", "written_on", "updated_at");
 Object.defineProperties(Post.prototype, {

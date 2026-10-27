@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Html5Document } from "@blazetrails/nokogiri";
-import { Testing } from "../testing.js";
+import { Testing } from "../../testing.js";
 import {
   assertSelect as _assertSelect,
   assertSelectEncoded as _assertSelectEncoded,

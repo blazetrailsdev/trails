@@ -2,7 +2,7 @@ import { describe, it } from "vitest";
 import { include } from "@blazetrails/ruby-compat";
 import { CsrfHelper, type csrfMetaTags } from "../helpers/csrf-helper.js";
 import { TagHelper } from "../helpers/tag-helper.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 
 class CsrfHelperTest {
   static requestForgery = false;

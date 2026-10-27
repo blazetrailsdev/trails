@@ -174,6 +174,7 @@ export const ROWLESS_PACKAGES = [
   "rack",
   "rack-session",
   "rack-test",
+  "rails-dom-testing",
 ] as const;
 
 /**

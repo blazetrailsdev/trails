@@ -8,7 +8,7 @@ import { include } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import type { FormBuilder } from "../helpers/form-helper.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 
 const Routes = new RouteSet();
 Routes.draw(function () {

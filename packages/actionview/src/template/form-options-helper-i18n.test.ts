@@ -5,7 +5,7 @@ import { I18n, assertCalledWith } from "@blazetrails/activesupport";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 
 describe("FormOptionsHelperI18nTests", () => {
   let view: Base & Record<string, any>;

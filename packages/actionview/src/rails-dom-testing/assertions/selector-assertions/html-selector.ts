@@ -13,24 +13,24 @@ export interface EqualityTests {
   maximum?: number;
 }
 
-/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export class HTMLSelector {
   private static readonly context = new SubstitutionContext();
 
-  /** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
   cssSelector!: string;
   readonly tests: EqualityTests;
   message: unknown;
-  private readonly _values: unknown[];
-  private readonly _root: { css(...args: unknown[]): NodeSet };
-  private _selector!: string;
+  private readonly values: unknown[];
+  private readonly root: { css(...args: unknown[]): NodeSet };
+  private selector!: string;
 
   constructor(values: unknown[], previousSelection: unknown = null, rootFallback: () => unknown) {
-    this._values = values;
-    this._root = this.extractRoot(previousSelection, rootFallback) as HTMLSelector["_root"];
+    this.values = values;
+    this.root = this.extractRoot(previousSelection, rootFallback) as {
+      css(...args: unknown[]): NodeSet;
+    };
     this.extractSelectors();
     this.tests = this.extractEqualityTests();
-    this.message = this._values.shift();
+    this.message = this.values.shift();
 
     if (this.message != null && Object.getPrototypeOf(this.message) === Object.prototype) {
       throw new ArgumentError(
@@ -38,7 +38,7 @@ export class HTMLSelector {
       );
     }
 
-    const extra = this._values.shift();
+    const extra = this.values.shift();
     if (extra != null && extra !== false) {
       throw new ArgumentError(
         "Not expecting that last argument, you either have too many arguments, or they're the wrong type",
@@ -46,13 +46,12 @@ export class HTMLSelector {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
   isSelectingNoBody(): boolean {
-    return this._selector === "body" && this.tests.count === 0;
+    return this.selector === "body" && this.tests.count === 0;
   }
 
   select(): NodeSet {
-    return this.filter(this._root.css(this._selector, HTMLSelector.context));
+    return this.filter(this.root.css(this.selector, HTMLSelector.context));
   }
 
   private filter(matches: NodeSet): NodeSet {
@@ -83,7 +82,7 @@ export class HTMLSelector {
   }
 
   private extractRoot(previousSelection: unknown, rootFallback: () => unknown): unknown {
-    const possibleRoot = this._values[0];
+    const possibleRoot = this.values[0];
 
     if (possibleRoot == null) {
       throw new ArgumentError(
@@ -92,7 +91,7 @@ export class HTMLSelector {
           "an element that does not exist?",
       );
     } else if (typeof (possibleRoot as { css?: unknown }).css === "function") {
-      this._values.shift();
+      this.values.shift();
       return possibleRoot;
     } else if (previousSelection != null) {
       return previousSelection;
@@ -102,19 +101,19 @@ export class HTMLSelector {
   }
 
   private extractSelectors(): void {
-    const selector = this._values.shift();
+    const selector = this.values.shift();
 
     if (typeof selector !== "string") {
       throw new ArgumentError("Expecting a selector as the first argument");
     }
 
-    this.cssSelector = HTMLSelector.context.substituteBang(selector, [...this._values], true);
-    this._selector = HTMLSelector.context.substituteBang(selector, this._values);
+    this.cssSelector = HTMLSelector.context.substituteBang(selector, [...this.values], true);
+    this.selector = HTMLSelector.context.substituteBang(selector, this.values);
   }
 
   private extractEqualityTests(): EqualityTests {
     let comparisons: EqualityTests = {};
-    const comparator = this._values.shift();
+    const comparator = this.values.shift();
     if (comparator != null && Object.getPrototypeOf(comparator) === Object.prototype) {
       comparisons = comparator as EqualityTests;
     } else if (typeof comparator === "string" || comparator instanceof RegExp) {

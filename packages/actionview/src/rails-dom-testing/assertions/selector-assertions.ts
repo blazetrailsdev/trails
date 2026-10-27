@@ -1,6 +1,7 @@
 import { assert, assertEqual, assertOperator } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  aryJoin,
   LocalJumpError,
   NotImplementedError,
   rbInspect,
@@ -12,15 +13,14 @@ import {
   type Html5Node,
   type NodeSet,
 } from "@blazetrails/nokogiri";
-import { Testing } from "../testing.js";
+import { Testing } from "../../testing.js";
 import { HTMLSelector, type EqualityTests } from "./selector-assertions/html-selector.js";
 
 export interface SelectorAssertionsHost {
-  _selected?: NodeSet | Html5DocumentFragment | null;
+  selected?: NodeSet | Html5DocumentFragment | null;
   documentRootElement(): unknown;
 }
 
-/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export function cssSelect(this: SelectorAssertionsHost, ...args: unknown[]): NodeSet {
   if (args.length === 0) throw new ArgumentError("you at least need a selector argument");
 
@@ -29,14 +29,11 @@ export function cssSelect(this: SelectorAssertionsHost, ...args: unknown[]): Nod
   return nodeset(root).css(args[0]);
 }
 
-/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export function assertDom(this: SelectorAssertionsHost, ...args: unknown[]): NodeSet | undefined {
   const block = typeof args.at(-1) === "function" ? (args.pop() as (s: NodeSet) => void) : null;
-  this._selected ??= null;
+  this.selected ??= null;
 
-  const selector = new HTMLSelector(args, this._selected, () =>
-    nodeset(this.documentRootElement()),
-  );
+  const selector = new HTMLSelector(args, this.selected, () => nodeset(this.documentRootElement()));
 
   if (selector.isSelectingNoBody()) {
     assert(true);
@@ -46,35 +43,33 @@ export function assertDom(this: SelectorAssertionsHost, ...args: unknown[]): Nod
   const matches = selector.select();
   assertSizeMatch(matches.size, selector.tests, selector.cssSelector, selector.message);
 
-  if (block && !matches.isEmpty()) (nestSelection<NodeSet>).call(this, matches, block);
+  if (block && !matches.isEmpty())
+    nestSelection.call(this, matches, block as (s: NodeSet | Html5DocumentFragment) => void);
   return matches;
 }
 
-/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export const assertSelect = assertDom;
 
-/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export function assertDomEncoded(
   this: SelectorAssertionsHost,
   element: unknown = null,
   { htmlVersion = null }: { htmlVersion?: string | null } = {},
   block?: (selected: NodeSet | Html5DocumentFragment) => void,
 ): void {
-  if (element == null && this._selected == null) {
+  if (element == null && this.selected == null) {
     throw new ArgumentError("Element is required when called from a nonnested assert_dom");
   }
 
-  const content = nodeset(element ?? this._selected)
-    .map((elem) =>
+  const content = aryJoin(
+    nodeset(element ?? this.selected).map((elem) =>
       elem.children
         .filter((child) => child.isCdata() || (child.isText() && !child.isBlank()))
         .map((child) => child.content),
-    )
-    .flat()
-    .join("");
+    ),
+  );
 
   const selected = Testing.htmlDocumentFragment({ htmlVersion }).parse(content);
-  (nestSelection<Html5DocumentFragment>).call(this, selected, () => {
+  nestSelection.call(this, selected, () => {
     if (content.length === 0) {
       if (!block) throw new LocalJumpError("no block given (yield)");
       block(selected);
@@ -84,7 +79,6 @@ export function assertDomEncoded(
   });
 }
 
-/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export const assertSelectEncoded = assertDomEncoded;
 
 /** @internal */
@@ -135,12 +129,12 @@ function nestSelection<T extends NodeSet | Html5DocumentFragment>(
   selection: T,
   block: (selected: T) => void,
 ): void {
-  const oldSelected = this._selected;
-  this._selected = selection;
+  const oldSelected = this.selected;
+  this.selected = selection;
   try {
-    block(this._selected as T);
+    block(this.selected as T);
   } finally {
-    this._selected = oldSelected;
+    this.selected = oldSelected;
   }
 }
 

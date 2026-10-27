@@ -399,6 +399,7 @@ describe("vendor/sources.ts", () => {
         "rack",
         "rack-session",
         "rack-test",
+        "rails-dom-testing",
         "sqlite3",
         "solid-queue",
         "thor",

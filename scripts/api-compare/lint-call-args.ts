@@ -125,6 +125,7 @@ export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
   "rack",
   "rack-session",
   "rack-test",
+  "rails-dom-testing",
 ];
 
 /**

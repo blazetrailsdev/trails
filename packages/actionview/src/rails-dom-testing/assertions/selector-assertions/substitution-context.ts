@@ -1,17 +1,15 @@
 import { rbInspect, rbRegInitStr, rbRegToS } from "@blazetrails/ruby-compat";
 import type { Html5Node, NodeSet } from "@blazetrails/nokogiri";
 
-/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export class SubstitutionContext {
-  private readonly _substitute: string;
+  private readonly substitute: string;
 
   constructor() {
-    this._substitute = "?";
+    this.substitute = "?";
   }
 
-  /** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
   substituteBang(selector: string, values: unknown[], formatForPresentation = false): string {
-    return selector.replaceAll(this._substitute, (match) => {
+    return selector.replaceAll(this.substitute, (match) => {
       if (values.length === 0 || !this.isSubstitutable(values[0])) return match[0];
       return this.matcherFor(values.shift(), formatForPresentation);
     });

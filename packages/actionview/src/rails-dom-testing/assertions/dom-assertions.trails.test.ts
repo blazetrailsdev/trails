@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { assertDomEqual, assertDomNotEqual } from "./dom-assertions.js";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
-import { Testing } from "../testing.js";
+import { Testing } from "../../testing.js";
 
 describe("DomAssertions", () => {
   it("ignores attribute order and entity spelling", () => {

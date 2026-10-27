@@ -107,6 +107,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "rack",
   "rack-session",
   "rack-test",
+  "rails-dom-testing",
   "solid-queue",
   "sqlite3",
   "thor",

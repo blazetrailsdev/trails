@@ -49,7 +49,7 @@ import {
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { TestResponse } from "../action-dispatch/testing/test-response.js";
 import { Assertions } from "../action-dispatch/testing/assertions.js";
-import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/testing/assertions";
+import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/rails-dom-testing/assertions";
 import type { Html5Document, XmlDocument } from "@blazetrails/nokogiri";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";

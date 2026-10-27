@@ -101,5 +101,11 @@
       "generators/base.rb": 2,
       "initializable.rb": 1
     }
+  },
+  "rails-dom-testing": {
+    "total": 1,
+    "byFile": {
+      "assertions/selector_assertions.rb": 1
+    }
   }
 }

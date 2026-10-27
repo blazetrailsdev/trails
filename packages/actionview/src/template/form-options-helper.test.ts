@@ -10,7 +10,7 @@ import { Base } from "../base.js";
 import { FormBuilder } from "../helpers/form-helper.js";
 import { LookupContext } from "../lookup-context.js";
 import type { TextHelperHost } from "../helpers/text-helper.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 
 class Map extends Hash<string, unknown> {
   get category(): string {

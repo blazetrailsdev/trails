@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { assertEqual, assertNot } from "@blazetrails/activesupport";
 import { ArgumentError, Range } from "@blazetrails/ruby-compat";
 import { CSS, XML, type Html5Document, type NodeSet } from "@blazetrails/nokogiri";
-import { Testing } from "../testing.js";
+import { Testing } from "../../testing.js";
 import {
   assertSelect as _assertSelect,
   assertSelectEncoded as _assertSelectEncoded,
