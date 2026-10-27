@@ -9,6 +9,7 @@ import {
 } from "typescript/unstable/sync";
 import * as path from "node:path";
 import * as fs from "node:fs";
+import * as ts from "typescript/unstable/ast";
 import { tsApi } from "../type-virtualization/ts-api.js";
 import { virtualize, missingTables, type ModelTable } from "../type-virtualization/virtualize.js";
 import {
@@ -61,6 +62,42 @@ export function loadSchemaColumns(args: string[]): SchemaColumns | undefined {
     }
   }
   return merged;
+}
+
+export async function loadTimeZoneAwareAttributes(appRoot: string): Promise<boolean | undefined> {
+  const configDir = path.join(appRoot, "config");
+  const initializers = path.join(configDir, "initializers");
+  const application = path.join(configDir, "application.ts");
+  if (!(await fs.promises.stat(application).catch(() => null))) return undefined;
+  const files = [application];
+  const entries = await fs.promises.readdir(initializers).catch(() => [] as string[]);
+  for (const entry of entries.sort()) {
+    if (/\.[cm]?ts$/.test(entry)) files.push(path.join(initializers, entry));
+  }
+  let value: boolean | undefined = true;
+  for (const file of files) {
+    const text = await fs.promises.readFile(file, "utf8").catch(() => "");
+    const assigned: [string, ts.Expression][] = [];
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        ts.isPropertyAccessExpression(node.left)
+      ) {
+        assigned.push([node.left.name.text, node.right]);
+      }
+      node.forEachChild(visit);
+    };
+    visit(tsApi().createSourceFile(file, text));
+    for (const [name, right] of assigned) {
+      if (name === "timeZoneAwareTypes") return undefined;
+      if (name !== "timeZoneAwareAttributes") continue;
+      if (right.kind === ts.SyntaxKind.TrueKeyword) value = true;
+      else if (right.kind === ts.SyntaxKind.FalseKeyword) value = false;
+      else return undefined;
+    }
+  }
+  return value;
 }
 
 function loadSchemaFile(resolved: string): SchemaColumns | undefined {
@@ -332,9 +369,16 @@ async function handleBuildMode(args: string[]): Promise<void> {
     const isDir = fs.existsSync(root) && fs.statSync(root).isDirectory();
     await buildConfiguredViews(isDir ? path.join(root, "tsconfig.json") : root);
   }
+  const firstRoot = rootConfigs[0];
+  const timeZoneAwareAttributes = await loadTimeZoneAwareAttributes(
+    (await fs.promises.stat(firstRoot).catch(() => null))?.isDirectory()
+      ? firstRoot
+      : path.dirname(firstRoot),
+  );
   const builder = createArSolutionBuilder(rootConfigs, {
     verbose,
     schemaColumnsByTable,
+    timeZoneAwareAttributes,
     onModel: reporter.onModel,
     onDiagnostic: (d) => {
       const out = pretty
@@ -430,6 +474,7 @@ export async function main(): Promise<void> {
   await buildConfiguredViews(configPath);
   const { program, host, configDiagnostics } = createArTrailsProgram(configPath, {
     schemaColumnsByTable,
+    timeZoneAwareAttributes: await loadTimeZoneAwareAttributes(path.dirname(configPath)),
     onModel: reporter.onModel,
   });
   reporter.flush();

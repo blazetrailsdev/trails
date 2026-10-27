@@ -16,7 +16,7 @@ import { Trailtie as ActionViewTrailtie } from "../trailties/action-view.js";
 import "../trailties/action-cable.js";
 import { ActionCable } from "@blazetrails/actioncable";
 import type { Base as CableServer } from "@blazetrails/actioncable/server/base";
-import { env, getFs, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
+import { env, getFs, Pathname, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { LOAD_DEFAULTS_VERSION } from "./configuration.js";
 import { Trails, _resetTrailsEnv } from "../rails.js";
@@ -118,6 +118,14 @@ describe("ConfigurationTest", () => {
   it("config_for returns only the env array when shared is an array", async () => {
     await setCustomConfig(`export default { development: ["baz"], shared: ["foo", "bar"] };`);
     expect(await (await app("development")).configFor("custom")).toEqual(["baz"]);
+  });
+
+  it("config_for uses the Pathname object if it is provided", async () => {
+    await setCustomConfig(`export default { development: { key: "custom key" } };`);
+    const myCustomConfig = (await (
+      await app("development")
+    ).configFor(new Pathname(join(appPath, "config", "custom.ts")))) as OrderedOptions;
+    expect(myCustomConfig.get("key")).toBe("custom key");
   });
 
   it("config_for raises an exception if the file does not exist", async () => {

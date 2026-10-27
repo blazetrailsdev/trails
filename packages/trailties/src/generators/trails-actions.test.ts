@@ -209,7 +209,7 @@ describe("TrailsActions", () => {
 
   describe("environment", () => {
     const app = `export class MyApp extends Application {\n  static {\n    this.config.loadDefaults("8.0");\n  }\n}\n`;
-    const env = `Trails.application!.configure(function () {\n  this.config.eagerLoad = false;\n});\n`;
+    const env = `Trails.application.configure(function () {\n  this.config.eagerLoad = false;\n});\n`;
 
     it("injects code into application.ts after the class sentinel by default", async () => {
       files.set("/app/config/application.ts", app);
@@ -252,7 +252,7 @@ describe("TrailsActions", () => {
       });
       for (const name of ["production", "test"]) {
         expect(files.get(`/app/config/environments/${name}.ts`)).toBe(
-          `Trails.application!.configure(function () {\n  this.config.logLevel = "warn";\n  this.config.eagerLoad = false;\n});\n`,
+          `Trails.application.configure(function () {\n  this.config.logLevel = "warn";\n  this.config.eagerLoad = false;\n});\n`,
         );
       }
     });

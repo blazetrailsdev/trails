@@ -13,10 +13,11 @@ export interface ArModelsPluginOptions {
   modelRegistry: ReadonlyMap<string, string>;
   schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, SchemaColumnValue>>>>;
   onModel?: (missing: ModelTable) => void;
+  timeZoneAwareAttributes?: boolean;
 }
 
 export function createArModelsPlugin(opts: ArModelsPluginOptions): TscPlugin {
-  const { baseNames, modelRegistry, schemaColumnsByTable, onModel } = opts;
+  const { baseNames, modelRegistry, schemaColumnsByTable, onModel, timeZoneAwareAttributes } = opts;
   const baseNameSet = new Set(baseNames);
   const hasSchemaColumns = schemaColumnsByTable && Object.keys(schemaColumnsByTable).length > 0;
   const EXTENDS_IDENT = /\bextends\s+([\w$]+)/g;
@@ -45,6 +46,7 @@ export function createArModelsPlugin(opts: ArModelsPluginOptions): TscPlugin {
         prependImports,
         schemaColumnsByTable,
         onModel,
+        timeZoneAwareAttributes,
       });
       return { ts: result.text, deltas: result.deltas };
     },

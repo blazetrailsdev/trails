@@ -6,6 +6,7 @@ export interface DumpColumnSchema {
   type: string;
   null: boolean;
   arrayElementType?: string;
+  primaryKey?: number;
 }
 export type SchemaColumnsByTable = Record<string, Record<string, DumpColumnSchema>>;
 
@@ -70,7 +71,7 @@ export function parseCreateTable(
 function synthesizePk(
   opts: ts.ObjectLiteralExpression | undefined,
 ): { name: string; col: DumpColumnSchema } | null {
-  if (!opts) return { name: "id", col: { type: DEFAULT_PK_TYPE, null: false } };
+  if (!opts) return { name: "id", col: { type: DEFAULT_PK_TYPE, null: false, primaryKey: 0 } };
 
   const idVal = objPropValue(opts, "id");
   const pkVal = objPropValue(opts, "primaryKey");
@@ -85,6 +86,7 @@ function synthesizePk(
           ? idType
           : DEFAULT_PK_TYPE,
       null: false,
+      primaryKey: 0,
     },
   };
 }
@@ -179,6 +181,14 @@ function visitNode(node: ts.Node, result: SchemaColumnsByTable): void {
 
       if (arrowBody) {
         walkBody(arrowBody, table);
+      }
+
+      const pkVal = opts && objPropValue(opts, "primaryKey");
+      if (isArrayLiteral(pkVal)) {
+        pkVal.elements.forEach((el, index) => {
+          const col = table[strLiteral(el) ?? ""];
+          if (col) col.primaryKey = index;
+        });
       }
 
       result[name] = table;

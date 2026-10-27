@@ -22,6 +22,7 @@ export type SchemaColumnValue =
       type: string;
       null?: boolean;
       arrayElementType?: string;
+      primaryKey?: number;
     };
 
 export interface SynthesizeOptions {
@@ -34,6 +35,7 @@ export interface SynthesizeOptions {
   composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
   isKnownTarget?: (name: string, host: ClassInfo) => boolean;
   mergeAttributeInterface?: boolean;
+  timeZoneAwareAttributes?: boolean;
 }
 
 export interface SynthesizedDeclares {
@@ -92,6 +94,7 @@ export function synthesizeDeclares(
       targets,
       opts.attributesNullable ?? false,
       isKnownTarget,
+      opts.timeZoneAwareAttributes,
     )) {
       if (!line.skipIfPresent || !memberPresent(info, line)) {
         emit(line);
@@ -160,6 +163,26 @@ function renderSchemaColumnDeclares(
   const out: RenderedLine[] = [];
   const entries = Object.entries(cols).sort(([a], [b]) => a.localeCompare(b));
   const composedCols = opts.composedOfColumns?.get(info.name);
+  const pkTypes = Object.values(cols)
+    .filter(
+      (value): value is Extract<SchemaColumnValue, object> & { primaryKey: number } =>
+        typeof value !== "string" && value.primaryKey !== undefined,
+    )
+    .sort((a, b) => a.primaryKey - b.primaryKey)
+    .map((value) => primaryKeyTsType(value.type));
+  if (
+    pkTypes.length > 0 &&
+    !synthesizedInstanceNames.has("id") &&
+    !info.existingMembers.has("id")
+  ) {
+    out.push(
+      line(
+        `declare id: ${pkTypes.length === 1 ? pkTypes[0] : `[${pkTypes.join(", ")}]`};`,
+        "id",
+        false,
+      ),
+    );
+  }
   for (const [col, value] of entries) {
     if (synthesizedInstanceNames.has(col)) continue;
     if (info.existingMembers.has(col)) continue;
@@ -168,10 +191,16 @@ function renderSchemaColumnDeclares(
     if (info.skipSchemaColumns.has(col)) continue;
     const tsType = isForeignKeyColumn(col, value)
       ? `${AR_IMPORT}.PrimaryKeyValue`
-      : renderSchemaValueType(value);
+      : renderSchemaValueType(value, opts.timeZoneAwareAttributes);
     out.push(attributeLine(renderDeclaredMemberName(col), tsType, col));
   }
   return out;
+}
+
+function primaryKeyTsType(type: string): string {
+  return type === "integer" || type === "bigint" || type === "big_integer"
+    ? "number"
+    : tsTypeFor(type);
 }
 
 export function tableNameFor(info: ClassInfo): string {
@@ -184,9 +213,9 @@ function isForeignKeyColumn(col: string, value: SchemaColumnValue): boolean {
   return type === "integer" || type === "big_integer" || type === "bigint";
 }
 
-function renderSchemaValueType(value: SchemaColumnValue): string {
-  if (typeof value === "string") return tsTypeFor(value);
-  let tsT = tsTypeFor(value.type);
+function renderSchemaValueType(value: SchemaColumnValue, timeZoneAware?: boolean): string {
+  if (typeof value === "string") return tsTypeFor(value, timeZoneAware);
+  let tsT = tsTypeFor(value.type, timeZoneAware);
   if (value.type === "array" && value.arrayElementType) {
     const elType = tsTypeFor(value.arrayElementType);
     tsT = elType.includes("|") ? `(${elType})[]` : `${elType}[]`;
@@ -294,10 +323,11 @@ function renderCall(
   targets: ReadonlyMap<string, string> | undefined,
   attributesNullable: boolean,
   isKnownTarget: ((name: string) => boolean) | undefined,
+  timeZoneAware: boolean | undefined,
 ): RenderedLine[] {
   switch (call.kind) {
     case "attribute":
-      return renderAttribute(call, attributesNullable);
+      return renderAttribute(call, attributesNullable, timeZoneAware);
     case "hasMany":
     case "hasAndBelongsToMany":
       return renderCollectionAssoc(info, call, aliases, targets, isKnownTarget);
@@ -313,13 +343,17 @@ function renderCall(
   }
 }
 
-function renderAttribute(call: AttributeCall, nullable: boolean): RenderedLine[] {
+function renderAttribute(
+  call: AttributeCall,
+  nullable: boolean,
+  timeZoneAware: boolean | undefined,
+): RenderedLine[] {
   if (call.name === "id") return [];
   const memberName = renderDeclaredMemberName(call.name);
   if (isForeignKeyColumn(call.name, call.railsType)) {
     return [attributeLine(memberName, `${AR_IMPORT}.PrimaryKeyValue`, call.name)];
   }
-  const tsType = tsTypeFor(call.railsType);
+  const tsType = tsTypeFor(call.railsType, timeZoneAware);
   const rendered = nullable
     ? tsType.includes("|")
       ? `(${tsType}) | null`

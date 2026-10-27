@@ -1,6 +1,7 @@
 const T = `import("@blazetrails/date").Temporal`;
 const IPADDR = `import("@blazetrails/ruby-compat").IPAddr`;
 const TWZ = `import("@blazetrails/activesupport").TimeWithZone`;
+const TIME = `import("@blazetrails/date").Time`;
 
 export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {
   string: "string",
@@ -16,10 +17,10 @@ export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {
   decimal: "number",
   boolean: "boolean",
   date: `${T}.PlainDate`,
-  datetime: `${T}.Instant | ${T}.PlainDateTime`,
+  datetime: `${TWZ} | ${TIME}`,
   timestamp: `${T}.PlainDateTime`,
   timestamptz: `${T}.Instant`,
-  time: `${T}.Instant | ${TWZ}`,
+  time: `${TWZ} | ${TIME}`,
   json: "unknown",
   jsonb: "unknown",
   hstore: "Record<string, string | null>",
@@ -28,6 +29,9 @@ export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {
   value: "unknown",
 };
 
-export function tsTypeFor(railsType: string): string {
+export function tsTypeFor(railsType: string, timeZoneAware?: boolean): string {
+  if ((railsType === "datetime" || railsType === "time") && timeZoneAware !== undefined) {
+    return timeZoneAware ? TWZ : TIME;
+  }
   return ATTRIBUTE_TYPE_MAP[railsType] ?? "unknown";
 }

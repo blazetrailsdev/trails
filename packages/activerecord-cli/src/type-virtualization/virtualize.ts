@@ -29,6 +29,7 @@ export interface VirtualizeOptions extends WalkOptions {
   composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
   isKnownTarget?: (name: string, host: import("./walker.js").ClassInfo) => boolean;
   onModel?: (model: ModelTable) => void;
+  timeZoneAwareAttributes?: boolean;
 }
 
 export interface ModelTable {
@@ -141,6 +142,7 @@ export function virtualize(
       schemaColumnsByTable: options.schemaColumnsByTable,
       classNameAliases: options.classNameAliases,
       attributesNullable: options.attributesNullable,
+      timeZoneAwareAttributes: options.timeZoneAwareAttributes,
       associationTargets: options.associationTargets,
       composedOfColumns: options.composedOfColumns,
       isKnownTarget: options.isKnownTarget,
