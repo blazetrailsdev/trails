@@ -1580,6 +1580,36 @@ jobs:
         env:
           PG_TEST_URL: postgres://rails@localhost:5432/activerecord_unittest
 
+  # Action Cable's Redis subscription adapter against a real server
+  # (actioncable/test/subscription_adapter/redis_test.rb). Gated like
+  # actioncable-postgres-tests; vitest.config.ts excludes the file wherever
+  # REDIS_URL is unset, so a missing service fails here rather than skipping.
+  actioncable-redis-tests:
+    name: Action Cable Redis Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.actioncable_affected == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm vitest run packages/actioncable/src/subscription-adapter/redis.test.ts
+        env:
+          REDIS_URL: redis://localhost:6379/1
+
   # Action Cable's PostgreSQL subscription adapter against a real server
   # (actioncable/test/subscription_adapter/postgresql_test.rb). Gated on
   # actioncable_affected, not activerecord_affected, so an actioncable_only
@@ -2552,6 +2582,7 @@ jobs:
       - maria-prepared-tests
       - postgres-tests
       - actioncable-postgres-tests
+      - actioncable-redis-tests
       - mysql-tests
       - maria-tests
       - website
@@ -2639,7 +2670,7 @@ jobs:
                     continue
                   fi
                   ;;
-                actioncable-postgres-tests)
+                actioncable-postgres-tests|actioncable-redis-tests)
                   if [ "$ACTIONCABLE_AFFECTED" = "false" ]; then
                     continue
                   fi
