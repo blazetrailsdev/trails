@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { classModule, rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   attrInternal,
   Benchmark,
@@ -157,8 +157,6 @@ export function logProcessAction(payload: Record<string, unknown>): string[] {
 export const ClassMethods = { logProcessAction };
 
 export class Instrumentation {
-  /** @noRailsEquivalent PERMANENT */
-  static readonly [classModule] = true;
   declare static ClassMethods: typeof ClassMethods;
 }
 extend(Instrumentation, Concern);
