@@ -1,5 +1,11 @@
 import { demodulize, include } from "@blazetrails/activesupport";
-import { Process, SecureRandom, Socket } from "@blazetrails/ruby-compat";
+import {
+  Process,
+  SecureRandom,
+  Socket,
+  registerConstant,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
 import { Callbacks } from "./callbacks.js";
 import { Procline } from "./procline.js";
@@ -8,10 +14,6 @@ import type { Process as ProcessRecord } from "../process.js";
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` of the process concerns (`processes/base.rb:6-7`). */
 export class Base {
-  static toString(): string {
-    return "SolidQueue::Processes::Base";
-  }
-
   static {
     include(this, Callbacks);
     include(this, AppExecutor);
@@ -30,7 +32,7 @@ export class Base {
   }
 
   get kind(): string {
-    return demodulize(String(this.constructor));
+    return demodulize(rbModName(this.constructor)!);
   }
 
   get hostname(): string {
@@ -72,3 +74,5 @@ export interface Base {
   isRegistered(): boolean;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+
+registerConstant("SolidQueue::Processes::Base", Base);

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { include, presence } from "@blazetrails/activesupport";
 import { SolidQueue } from "./solid-queue.js";
 import {
@@ -15,10 +16,6 @@ export class Scheduler extends Base {
   declare static onStart: typeof LifecycleHooksClassMethods.onStart;
   declare static onStop: typeof LifecycleHooksClassMethods.onStop;
   declare static clearHooks: typeof LifecycleHooksClassMethods.clearHooks;
-
-  static override toString(): string {
-    return "SolidQueue::Scheduler";
-  }
 
   static RecurringSchedule = RecurringSchedule;
 
@@ -106,3 +103,5 @@ export interface Scheduler {
 }
 
 SolidQueue.Scheduler = Scheduler;
+
+registerConstant("SolidQueue::Scheduler", Scheduler);

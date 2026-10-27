@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { include, seconds } from "@blazetrails/activesupport";
 import { Configuration } from "./configuration.js";
 import { ConcurrencyMaintenance } from "./dispatcher/concurrency-maintenance.js";
@@ -22,10 +23,6 @@ export class Dispatcher extends Poller {
   declare static onStart: typeof LifecycleHooksClassMethods.onStart;
   declare static onStop: typeof LifecycleHooksClassMethods.onStop;
   declare static clearHooks: typeof LifecycleHooksClassMethods.clearHooks;
-
-  static override toString(): string {
-    return "SolidQueue::Dispatcher";
-  }
 
   static ConcurrencyMaintenance = ConcurrencyMaintenance;
 
@@ -102,3 +99,5 @@ export class Dispatcher extends Poller {
 }
 
 SolidQueue.Dispatcher = Dispatcher;
+
+registerConstant("SolidQueue::Dispatcher", Dispatcher);

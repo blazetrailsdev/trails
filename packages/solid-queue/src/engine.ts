@@ -1,7 +1,7 @@
 import { include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
 import type { Record } from "./record.js";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend, registerConstant } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ConcurrencyControls } from "./active-job/concurrency-controls.js";
 import { Base } from "./processes/base.js";
@@ -26,10 +26,6 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
  * @inventedArm onLoad — PERMANENT
  */
 export class Engine extends TrailsEngine {
-  static toString(): string {
-    return "SolidQueue::Engine";
-  }
-
   static {
     TrailsEngine.register(this, import.meta.dirname);
 
@@ -81,3 +77,5 @@ export class Engine extends TrailsEngine {
     });
   }
 }
+
+registerConstant("SolidQueue::Engine", Engine);

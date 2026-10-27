@@ -1,15 +1,11 @@
 import { include } from "@blazetrails/activesupport";
-import { TimerTask } from "@blazetrails/ruby-compat";
+import { TimerTask, registerConstant } from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
 import { BlockedExecution } from "../blocked-execution.js";
 import { Semaphore } from "../semaphore.js";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below. */
 export class ConcurrencyMaintenance {
-  static toString(): string {
-    return "SolidQueue::Dispatcher::ConcurrencyMaintenance";
-  }
-
   static {
     include(this, AppExecutor);
   }
@@ -65,3 +61,5 @@ export interface ConcurrencyMaintenance {
   wrapInAppExecutor<T>(block: () => T): T;
   handleThreadError(error: unknown): void;
 }
+
+registerConstant("SolidQueue::Dispatcher::ConcurrencyMaintenance", ConcurrencyMaintenance);

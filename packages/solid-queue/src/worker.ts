@@ -1,5 +1,5 @@
 import { include, minutes } from "@blazetrails/activesupport";
-import { rbFArray, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbFArray, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Configuration } from "./configuration.js";
 import {
   LifecycleHooks,
@@ -22,10 +22,6 @@ export class Worker extends Poller {
   declare static onStart: typeof LifecycleHooksClassMethods.onStart;
   declare static onStop: typeof LifecycleHooksClassMethods.onStop;
   declare static clearHooks: typeof LifecycleHooksClassMethods.clearHooks;
-
-  static override toString(): string {
-    return "SolidQueue::Worker";
-  }
 
   static {
     include(this, LifecycleHooks);
@@ -90,3 +86,5 @@ export class Worker extends Poller {
 }
 
 rbModConstSet(SolidQueue as never, "Worker", Worker);
+
+registerConstant("SolidQueue::Worker", Worker);

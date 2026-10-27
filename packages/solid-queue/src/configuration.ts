@@ -12,7 +12,14 @@ import {
   transformKeys,
 } from "@blazetrails/activesupport";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
-import { File, Pathname, RuntimeError, env, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  File,
+  Pathname,
+  RuntimeError,
+  env,
+  rbInspect,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { RecurringTask } from "./recurring-task.js";
 import { Record } from "./record.js";
 
@@ -33,10 +40,6 @@ class Process {
 }
 
 export class Configuration extends Model {
-  static override toString(): string {
-    return "SolidQueue::Configuration";
-  }
-
   static Process = Process;
 
   static {
@@ -308,3 +311,5 @@ export class Configuration extends Model {
     return (threadCount ?? 1) + 2;
   }
 }
+
+registerConstant("SolidQueue::Configuration", Configuration);

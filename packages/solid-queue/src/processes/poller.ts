@@ -1,16 +1,12 @@
 import { ActiveRecord } from "@blazetrails/activerecord";
 import { include } from "@blazetrails/activesupport";
-import { NotImplementedError, type Thread } from "@blazetrails/ruby-compat";
+import { NotImplementedError, type Thread, registerConstant } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 import { Base } from "./base.js";
 import { Runnable } from "./runnable.js";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below. */
 export class Poller extends Base {
-  static override toString(): string {
-    return "SolidQueue::Processes::Poller";
-  }
-
   static {
     include(this, Runnable);
   }
@@ -83,3 +79,5 @@ export interface Poller {
   setProcline(): void;
   isAllWorkCompleted(): Promise<boolean>;
 }
+
+registerConstant("SolidQueue::Processes::Poller", Poller);
