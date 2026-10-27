@@ -8,7 +8,6 @@ import {
   rtest,
   slice,
   toI,
-  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
@@ -86,4 +85,4 @@ export class CheckBox extends Base {
 
 include(CheckBox, Checkable);
 
-rbModConstSet(Tags, "CheckBox", CheckBox);
+Tags.CheckBox = CheckBox;

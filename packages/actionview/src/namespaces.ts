@@ -3,6 +3,14 @@ import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { FileSystemResolver } from "./template/resolver.js";
 import type { Template } from "./template.js";
+import type {
+  ActionViewError,
+  EncodingError,
+  MissingTemplate,
+  StrictLocalsError,
+  SyntaxErrorInTemplate,
+  WrongEncodingError,
+} from "./template/error.js";
 import type { SelectRenderer } from "./helpers/tags/select-renderer.js";
 import type { Base as TagsBase } from "./helpers/tags/base.js";
 import type { Translator } from "./helpers/tags/translator.js";
@@ -48,6 +56,12 @@ export const ActionView = { name: "ActionView", loadPath } as AutoloadModule & {
   Base: typeof Base;
   FileSystemResolver: typeof FileSystemResolver;
   Template: typeof Template;
+  ActionViewError: typeof ActionViewError;
+  EncodingError: typeof EncodingError;
+  WrongEncodingError: typeof WrongEncodingError;
+  StrictLocalsError: typeof StrictLocalsError;
+  MissingTemplate: typeof MissingTemplate;
+  SyntaxErrorInTemplate: typeof SyntaxErrorInTemplate;
 };
 registerConstant("ActionView", ActionView);
 extend(ActionView, Autoload);

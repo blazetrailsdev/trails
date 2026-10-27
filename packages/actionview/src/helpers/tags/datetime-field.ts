@@ -1,7 +1,7 @@
 import { Tags } from "../../namespaces.js";
 import { stringifyKeys } from "@blazetrails/activesupport";
 import { DateTime, strftime as dateStrftime, type Temporal } from "@blazetrails/date";
-import { NotImplementedError, rbObjRespondTo, rbModConstSet } from "@blazetrails/ruby-compat";
+import { NotImplementedError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { TextField } from "./text-field.js";
 
@@ -50,4 +50,4 @@ export function strftime(value: unknown, format: string): string {
     : dateStrftime(value as Temporal.PlainDateTime, format);
 }
 
-rbModConstSet(Tags, "DatetimeField", DatetimeField);
+Tags.DatetimeField = DatetimeField;

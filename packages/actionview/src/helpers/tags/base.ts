@@ -10,7 +10,6 @@ import {
   rbFSend,
   rbInspect,
   rbObjRespondTo,
-  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 
 import { isBlank, isPresent, toParam } from "@blazetrails/activesupport";
@@ -220,4 +219,4 @@ include(Base, FormTagHelper);
 include(Base, TagHelper);
 include(Base, ActiveModelInstanceTag);
 
-rbModConstSet(Tags, "Base", Base);
+Tags.Base = Base;

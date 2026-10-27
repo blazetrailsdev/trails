@@ -1,5 +1,4 @@
 import { Tags } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
 import { TextField } from "./text-field.js";
@@ -24,4 +23,4 @@ export class ColorField extends TextField {
   }
 }
 
-rbModConstSet(Tags, "ColorField", ColorField);
+Tags.ColorField = ColorField;

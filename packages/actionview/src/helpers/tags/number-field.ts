@@ -1,6 +1,6 @@
 import { Tags } from "../../namespaces.js";
 import { stringifyKeys } from "@blazetrails/activesupport";
-import { hashDelete, type Range, rbModConstSet } from "@blazetrails/ruby-compat";
+import { hashDelete, type Range } from "@blazetrails/ruby-compat";
 
 import { TextField } from "./text-field.js";
 
@@ -19,4 +19,4 @@ export class NumberField extends TextField {
   }
 }
 
-rbModConstSet(Tags, "NumberField", NumberField);
+Tags.NumberField = NumberField;

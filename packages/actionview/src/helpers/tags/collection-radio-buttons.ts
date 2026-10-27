@@ -1,7 +1,7 @@
-import { type SafeBuffer } from "@blazetrails/activesupport";
-import { include, rbModConstSet } from "@blazetrails/ruby-compat";
-
 import { Tags } from "../../namespaces.js";
+import { type SafeBuffer } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/ruby-compat";
+
 import { FormOptionsHelper } from "../form-options-helper.js";
 import { Base } from "./base.js";
 import { Builder, CollectionHelpers } from "./collection-helpers.js";
@@ -68,4 +68,4 @@ export interface CollectionRadioButtons {
 include(CollectionRadioButtons, CollectionHelpers);
 include(CollectionRadioButtons, FormOptionsHelper);
 
-rbModConstSet(Tags, "CollectionRadioButtons", CollectionRadioButtons);
+Tags.CollectionRadioButtons = CollectionRadioButtons;

@@ -6,7 +6,7 @@ import {
   isPresent,
   stringifyKeys,
 } from "@blazetrails/activesupport";
-import { hashDelete, rbModConstSet } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
 import { Translator } from "./translator.js";
@@ -126,4 +126,4 @@ export class Label extends Base {
   }
 }
 
-rbModConstSet(Tags, "Label", Label);
+Tags.Label = Label;

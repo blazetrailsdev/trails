@@ -1,5 +1,4 @@
 import { Tags } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { DatetimeField, strftime } from "./datetime-field.js";
 
 export class DateField extends DatetimeField {
@@ -8,4 +7,4 @@ export class DateField extends DatetimeField {
   }
 }
 
-rbModConstSet(Tags, "DateField", DateField);
+Tags.DateField = DateField;

@@ -1,6 +1,6 @@
 import { Tags } from "../../namespaces.js";
 import { stringifyKeys } from "@blazetrails/activesupport";
-import { include, rbModConstSet } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
 import { Checkable } from "./checkable.js";
@@ -36,4 +36,4 @@ export class RadioButton extends Base {
 
 include(RadioButton, Checkable);
 
-rbModConstSet(Tags, "RadioButton", RadioButton);
+Tags.RadioButton = RadioButton;

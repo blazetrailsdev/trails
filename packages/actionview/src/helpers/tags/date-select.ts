@@ -1,8 +1,8 @@
+import { Tags } from "../../namespaces.js";
 import { htmlSafe } from "@blazetrails/activesupport";
 import { Date as RubyDate, Time } from "@blazetrails/date";
-import { block, fetch, include, rbFSend, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
+import { block, fetch, include, rbFSend, rtest } from "@blazetrails/ruby-compat";
 
-import { Tags } from "../../namespaces.js";
 import { DateTimeSelector } from "../date-helper.js";
 import { Base } from "./base.js";
 import { SelectRenderer } from "./select-renderer.js";
@@ -102,4 +102,4 @@ export class DateSelect extends Base {
 
 include(DateSelect, SelectRenderer);
 
-rbModConstSet(Tags, "DateSelect", DateSelect);
+Tags.DateSelect = DateSelect;

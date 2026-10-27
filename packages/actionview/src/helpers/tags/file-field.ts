@@ -1,6 +1,6 @@
 import { Tags } from "../../namespaces.js";
 import { stringifyKeys, type SafeBuffer } from "@blazetrails/activesupport";
-import { hashDelete, rbModConstSet } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat";
 
 import { TextField } from "./text-field.js";
 
@@ -32,4 +32,4 @@ export class FileField extends TextField {
   }
 }
 
-rbModConstSet(Tags, "FileField", FileField);
+Tags.FileField = FileField;
