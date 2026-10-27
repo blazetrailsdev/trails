@@ -1,6 +1,6 @@
 import { RecordNotUnique, registerModel, type Relation } from "@blazetrails/activerecord";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { StandardError } from "@blazetrails/ruby-compat";
+import { StandardError, registerConstant } from "@blazetrails/ruby-compat";
 import { Execution } from "./execution.js";
 
 export class AlreadyRecorded extends StandardError {}
@@ -60,3 +60,4 @@ export class RecurringExecution extends Execution {
     }
   }
 }
+registerConstant("SolidQueue::RecurringExecution::AlreadyRecorded", AlreadyRecorded);
