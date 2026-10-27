@@ -12,11 +12,10 @@ class SimpleConnection extends Base {
   static disconnectedUserId: unknown;
 
   declare userId: unknown;
-  declare request: TestRequest;
 
   connect(): void {
     this.userId =
-      hashAref(this.request.params, "user_id") ??
+      hashAref((this.request as unknown as TestRequest).params, "user_id") ??
       (this.cookies as unknown as Cookies).get("user_id");
   }
 
@@ -89,11 +88,12 @@ class Connection extends Base {
 
   declare currentUserId: unknown;
   declare token: unknown;
-  declare request: TestRequest;
 
   connect(): void {
     this.currentUserId = this.verifyUser();
-    this.token = (this.request.headers as unknown as Cookies).get("X-API-TOKEN");
+    this.token = ((this.request as unknown as TestRequest).headers as unknown as Cookies).get(
+      "X-API-TOKEN",
+    );
     (this.logger as unknown as { addTags(...tags: string[]): unknown }).addTags("ActionCable");
   }
 
@@ -189,7 +189,6 @@ describe("EncryptedCookiesConnectionTest", () => {
 
 class SessionConnection extends Base {
   declare userId: unknown;
-  declare request: TestRequest;
 
   connect(): void {
     this.userId = this.verifyUser();
@@ -198,7 +197,7 @@ class SessionConnection extends Base {
   /** @internal */
   private verifyUser(): unknown {
     return (
-      presence(hashAref(this.request.session as object, "user_id")) ??
+      presence(hashAref((this.request as unknown as TestRequest).session as object, "user_id")) ??
       this.rejectUnauthorizedConnection()
     );
   }

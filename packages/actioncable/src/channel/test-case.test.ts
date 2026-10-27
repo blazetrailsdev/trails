@@ -5,6 +5,7 @@ import "../test-helpers/test-helper.js";
 import { User } from "../test-helpers/stubs/user.js";
 import { ActionCable } from "../namespaces.js";
 import { Base } from "./base.js";
+import type { Broadcasting } from "./broadcasting.js";
 import { TestCase } from "./test-case.js";
 
 type Data = Record<string, unknown>;
@@ -265,7 +266,7 @@ class BroadcastsTestChannel extends Base {
   async broadcastToUser(data: Data): Promise<void> {
     const user = new User((this as unknown as { userId(): string }).userId());
 
-    await this.broadcastTo(user, { text: data["message"] });
+    await (this as unknown as typeof Broadcasting).broadcastTo(user, { text: data["message"] });
   }
 }
 registerConstant("BroadcastsTestChannel", BroadcastsTestChannel);
