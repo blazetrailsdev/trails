@@ -20,7 +20,7 @@ export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {
   datetime: `${TWZ} | ${TIME}`,
   timestamp: `${T}.PlainDateTime`,
   timestamptz: `${T}.Instant`,
-  time: `${T}.Instant | ${TWZ}`,
+  time: `${TWZ} | ${TIME}`,
   json: "unknown",
   jsonb: "unknown",
   hstore: "Record<string, string | null>",

@@ -10,7 +10,7 @@ export interface Event {
   set starts_at(value: unknown);
   get starts_on(): import("@blazetrails/date").Temporal.PlainDate;
   set starts_on(value: unknown);
-  get duration(): import("@blazetrails/date").Temporal.Instant | import("@blazetrails/activesupport").TimeWithZone;
+  get duration(): import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time;
   set duration(value: unknown);
 }
 

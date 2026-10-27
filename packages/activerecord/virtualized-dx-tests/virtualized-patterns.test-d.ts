@@ -138,15 +138,14 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     expectTypeOf(Task.notLow()).toMatchTypeOf<Relation<Task>>();
   });
 
-  it("Temporal attribute types: datetime → TimeWithZone | Time, date → PlainDate, time → Instant | TimeWithZone", () => {
+  it("Temporal attribute types: datetime → Instant | PlainDateTime, date → PlainDate, time → Instant | TimeWithZone", () => {
     const e = new Event({});
     expectTypeOf(e.starts_at).toEqualTypeOf<
       import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time
     >();
     expectTypeOf(e.starts_on).toEqualTypeOf<import("@blazetrails/date").Temporal.PlainDate>();
     expectTypeOf(e.duration).toEqualTypeOf<
-      | import("@blazetrails/date").Temporal.Instant
-      | import("@blazetrails/activesupport").TimeWithZone
+      import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time
     >();
   });
 });

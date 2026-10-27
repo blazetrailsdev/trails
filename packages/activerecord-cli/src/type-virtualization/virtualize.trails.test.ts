@@ -308,7 +308,7 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/get created_at\(\):.*Temporal\.Instant;/);
     expect(text).toMatch(/get updated_at\(\):.*Temporal\.PlainDateTime;/);
     expect(text).toMatch(/get starts_on\(\):.*Temporal\.PlainDate.*\| null/);
-    expect(text).toMatch(/get duration\(\):.*Temporal\.Instant.*TimeWithZone;/);
+    expect(text).toMatch(/get duration\(\):.*TimeWithZone.*date"\)\.Time;/);
     expect(text).toMatch(/get scheduled_at\(\): \(.*TimeWithZone.*date"\)\.Time\) \| null/);
   });
 
