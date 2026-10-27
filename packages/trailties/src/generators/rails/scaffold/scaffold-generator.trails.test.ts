@@ -148,6 +148,46 @@ describe("ScaffoldGenerator (type-check)", () => {
           "}",
         ].join("\n"),
       );
+      fs.writeFileSync(
+        path.join(appDir, "config/routes.ts"),
+        [
+          'import { Trails } from "@blazetrails/trailties";',
+          "Trails.application.routes().draw(function () {",
+          '  this.resources("posts");',
+          '  this.resource("session");',
+          '  this.get("about", { to: "pages#about", as: "about_us" });',
+          '  this.namespace("admin", function () {',
+          '    this.resources("posts", function () {',
+          '      this.resources("comments");',
+          "    });",
+          "  });",
+          '  this.root("posts#index");',
+          "});",
+        ].join("\n"),
+      );
+      fs.writeFileSync(
+        path.join(appDir, "app/controllers/pages-controller.ts"),
+        [
+          'import { ApplicationController } from "./application-controller.ts";',
+          "export class PagesController extends ApplicationController {",
+          "  about(): void {",
+          "    this.redirectTo(this.rootPath());",
+          "    this.redirectTo(this.aboutUsUrl());",
+          "    this.redirectTo(this.newSessionPath());",
+          "    this.redirectTo(this.adminPostCommentsPath(1));",
+          "  }",
+          "}",
+        ].join("\n"),
+      );
+      fs.writeFileSync(
+        path.join(appDir, "config/integration-test-helpers.ts"),
+        [
+          'import type { IntegrationTest } from "@blazetrails/actionpack";',
+          "export function urls(t: IntegrationTest): string[] {",
+          "  return [t.postsUrl(), t.newPostUrl(), t.rootUrl(), t.adminPostPath(1)];",
+          "}",
+        ].join("\n"),
+      );
       const code = await run(
         [
           "typecheck",
