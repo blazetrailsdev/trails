@@ -6836,5 +6836,18 @@ for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
   });
 }
 
+for (const seat of ["Temporal.Instant", "Date"]) {
+  (TEMPORAL_METHOD_TABLE[seat] ??= {}).strftime = (
+    self: Temporal.Instant | globalThis.Date,
+    format: string,
+  ) =>
+    strftime(
+      self instanceof Temporal.Instant
+        ? self
+        : Temporal.Instant.fromEpochMilliseconds(self.getTime()),
+      format,
+    );
+}
+
 registerConstant("Date", Date);
 registerConstant("DateTime", DateTime);

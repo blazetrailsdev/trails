@@ -184,7 +184,7 @@ export class BroadcastLogger extends Logger {
   }
 
   private dispatch(block: (logger: Logger) => void): boolean {
-    this.broadcasts.forEach((logger) => block(logger));
+    this.broadcasts?.forEach((logger) => block(logger));
     return true;
   }
 

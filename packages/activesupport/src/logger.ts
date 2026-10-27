@@ -1,9 +1,16 @@
-import { Process, rbInspect, sprintf, stdout } from "@blazetrails/ruby-compat";
-import { Temporal, strftime } from "@blazetrails/date";
+import {
+  Logger as RubyLogger,
+  rbInspect,
+  stdout,
+  type Logdev,
+  type LoggerKwargs,
+} from "@blazetrails/ruby-compat";
 import { File } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import { include } from "@blazetrails/ruby-compat/include";
 import { LoggerThreadSafeLevel } from "./logger-thread-safe-level.js";
+
+export type { LoggerFormatter } from "@blazetrails/ruby-compat";
 
 export type LogLevel = ":debug" | ":info" | ":warn" | ":error" | ":fatal" | ":unknown";
 
@@ -14,15 +21,6 @@ export const LOG_LEVELS: Record<LogLevel, number> = {
   ":error": 3,
   ":fatal": 4,
   ":unknown": 5,
-};
-
-const LEVEL_NAMES: Record<number, string> = {
-  0: "debug",
-  1: "info",
-  2: "warn",
-  3: "error",
-  4: "fatal",
-  5: "unknown",
 };
 
 export interface LoggerOutput {
@@ -36,79 +34,11 @@ const defaultOutput: LoggerOutput = {
   },
 };
 
-export type LoggerFormatter =
-  | ((severity: string, datetime: Temporal.Instant, progname: string | null, msg: any) => string)
-  | {
-      call(severity: string, datetime: Temporal.Instant, progname: string | null, msg: any): string;
-    };
-
-/** @noRailsEquivalent PERMANENT */
-export class Formatter {
-  static readonly Format = "%.1s, [%s #%d] %5s -- %s: %s\n";
-  static readonly DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%6N";
-
-  datetimeFormat: string | null;
-
-  constructor() {
-    this.datetimeFormat = null;
-  }
-
-  call(severity: string, time: Temporal.Instant, progname: string | null, msg: unknown): string {
-    return sprintf(
-      Formatter.Format,
-      severity,
-      this.formatDatetime(time),
-      Process.pid,
-      severity,
-      progname,
-      this.msg2str(msg),
-    );
-  }
-
-  private formatDatetime(time: Temporal.Instant): string {
-    return strftime(time, this.datetimeFormat ?? Formatter.DatetimeFormat);
-  }
-
-  private msg2str(msg: unknown): string {
-    if (typeof msg === "string") {
-      return msg;
-    } else if (msg instanceof Error) {
-      return `${msg.message} (${msg.constructor.name})\n${msg.stack ?? ""}`;
-    } else {
-      return rbInspect(msg);
-    }
-  }
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerThreadSafeLevel` (`logger_silence.rb:9`); the class/interface merge is how `include()` surfaces on the type side.
-export class Logger {
+export class Logger extends RubyLogger {
   static toString(): string {
     return "ActiveSupport::Logger";
   }
-
-  progname: string | null = null;
-  /** @noRailsEquivalent PERMANENT */
-  static Formatter = Formatter;
-
-  protected _formatter: LoggerFormatter | null = null;
-  private _defaultFormatter: Formatter;
-
-  get datetimeFormat(): string | null {
-    return this._defaultFormatter.datetimeFormat;
-  }
-  set datetimeFormat(datetimeFormat: string | null) {
-    this._defaultFormatter.datetimeFormat = datetimeFormat;
-  }
-
-  get formatter(): LoggerFormatter | null {
-    return this._formatter;
-  }
-  set formatter(value: LoggerFormatter | null) {
-    this._formatter = value;
-  }
-
-  protected _level: number = 0;
-  protected output: LoggerOutput | null;
 
   static silencer: boolean = true;
 
@@ -128,142 +58,36 @@ export class Logger {
     const loggers: Logger[] =
       logger instanceof ActiveSupport.BroadcastLogger ? logger.broadcasts : [logger];
 
-    const logdevs = loggers.map((logger) => logger.output);
+    const logdevs = loggers.map((logger) => logger.logdev);
     const loggerSources = logdevs
-      .map((logdev) => logdev?.filename ?? logdev)
+      .map((logdev) => logdev?.filename ?? logdev?.dev)
       .filter((source) => source != null);
 
-    const normalizedLoggerSources = Logger.normalizeSources(loggerSources);
     return Logger.normalizeSources(sources).some((source) =>
-      normalizedLoggerSources.includes(source),
+      Logger.normalizeSources(loggerSources).includes(source),
     );
   }
 
-  static readonly DEBUG = 0;
-  static readonly INFO = 1;
-  static readonly WARN = 2;
-  static readonly ERROR = 3;
-  static readonly FATAL = 4;
-  static readonly UNKNOWN = 5;
-
   constructor(
-    ...args: [output?: LoggerOutput | null, kwargs?: { level?: number | LogLevel | string }]
+    logdev: Logdev = defaultOutput,
+    shiftAge?: number | string | LoggerKwargs,
+    shiftSize?: number,
+    kwargs?: LoggerKwargs,
   ) {
-    const [output = defaultOutput, kwargs = {}] = args;
-    if (Object.hasOwn(kwargs, "level")) this.level = kwargs.level!;
-    this._defaultFormatter = new Formatter();
-    this.output = output;
-    this._formatter ??= new SimpleFormatter();
+    super(logdev, shiftAge, shiftSize, kwargs);
+    this.formatter ??= new SimpleFormatter();
   }
 
-  add(
-    severity: number | null,
-    message: unknown = null,
-    progname: unknown = null,
-    block?: () => unknown,
-  ): boolean {
-    severity ??= Logger.UNKNOWN;
-    if (this.output == null || severity < this.level) {
-      return true;
-    }
-    if (progname == null) {
-      progname = this.progname;
-    }
-    if (message == null) {
-      if (block !== undefined) {
-        message = block();
-      } else {
-        message = progname;
-        progname = this.progname;
-      }
-    }
-    const severityName = (LEVEL_NAMES[severity] ?? "unknown").toUpperCase();
-    this.output.write(this.formatMessage(severityName, Temporal.Now.instant(), progname, message));
-    return true;
+  override get level(): number {
+    return this.localLevel ?? super.level;
   }
 
-  declare log: Logger["add"];
-
-  debug(progname: unknown = null, block?: () => unknown): boolean {
-    return this.add(Logger.DEBUG, null, progname, block);
-  }
-
-  info(progname: unknown = null, block?: () => unknown): boolean {
-    return this.add(Logger.INFO, null, progname, block);
-  }
-
-  warn(progname: unknown = null, block?: () => unknown): boolean {
-    return this.add(Logger.WARN, null, progname, block);
-  }
-
-  error(progname: unknown = null, block?: () => unknown): boolean {
-    return this.add(Logger.ERROR, null, progname, block);
-  }
-
-  fatal(progname: unknown = null, block?: () => unknown): boolean {
-    return this.add(Logger.FATAL, null, progname, block);
-  }
-
-  unknown(progname: unknown = null, block?: () => unknown): boolean {
-    return this.add(Logger.UNKNOWN, null, progname, block);
-  }
-
-  get "debug?"(): boolean {
-    return this.level <= Logger.DEBUG;
-  }
-  get "info?"(): boolean {
-    return this.level <= Logger.INFO;
-  }
-  get "warn?"(): boolean {
-    return this.level <= Logger.WARN;
-  }
-  get "error?"(): boolean {
-    return this.level <= Logger.ERROR;
-  }
-  get "fatal?"(): boolean {
-    return this.level <= Logger.FATAL;
+  override set level(severity: number | LogLevel | string) {
+    super.level = severity;
   }
 
   silence<T>(severity: number | LogLevel = Logger.ERROR, fn?: (logger: this) => T): T | undefined {
     return this.silencer ? this.logAt(severity, () => fn?.(this)) : fn?.(this);
-  }
-
-  debugBang(): void {
-    this.level = Logger.DEBUG;
-  }
-
-  infoBang(): void {
-    this.level = Logger.INFO;
-  }
-
-  warnBang(): void {
-    this.level = Logger.WARN;
-  }
-
-  errorBang(): void {
-    this.level = Logger.ERROR;
-  }
-
-  fatalBang(): void {
-    this.level = Logger.FATAL;
-  }
-
-  close(): void {}
-
-  private formatMessage(
-    severity: string,
-    datetime: Temporal.Instant,
-    progname: unknown,
-    msg: unknown,
-  ): string {
-    const formatter = this.formatter ?? this._defaultFormatter;
-    return typeof formatter === "function"
-      ? formatter(severity, datetime, progname as string | null, msg)
-      : formatter.call(severity, datetime, progname as string | null, msg);
-  }
-
-  append(s: string): void {
-    this.output?.write(s);
   }
 
   private static normalizeSources(sources: unknown[]): unknown[] {
@@ -279,37 +103,18 @@ export class Logger {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the class/interface merge is how `include()` surfaces on the type side. */
 export interface Logger {
-  get level(): number;
-  set level(severity: number | LogLevel | string);
   get localLevel(): number | null;
   set localLevel(level: number | LogLevel | null);
   logAt<T>(level: number | LogLevel, fn: () => T): T;
 }
 include(Logger, LoggerThreadSafeLevel);
 
-Logger.prototype.log = Logger.prototype.add;
-
-export class SimpleFormatter extends Formatter {
+export class SimpleFormatter extends RubyLogger.Formatter {
   static toString(): string {
     return "ActiveSupport::Logger::SimpleFormatter";
   }
 
-  override call(
-    severity: string,
-    timestamp: Temporal.Instant,
-    progname: string | null,
-    msg: unknown,
-  ): string {
+  override call(severity: string, timestamp: unknown, progname: unknown, msg: unknown): string {
     return `${typeof msg === "string" ? msg : rbInspect(msg)}\n`;
   }
-}
-
-export function simpleFormatter(): (
-  severity: string,
-  timestamp: Temporal.Instant,
-  progname: string | null,
-  msg: unknown,
-) => string {
-  const fmt = new SimpleFormatter();
-  return fmt.call.bind(fmt);
 }
