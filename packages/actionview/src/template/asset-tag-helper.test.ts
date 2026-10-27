@@ -66,7 +66,7 @@ import {
 } from "../helpers/asset-tag-helper.js";
 import type { CaptureHelperHost } from "../helpers/capture-helper.js";
 import { tag } from "../helpers/tag-helper.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 
 Template.mimeTypesImplementation = Mime;
 

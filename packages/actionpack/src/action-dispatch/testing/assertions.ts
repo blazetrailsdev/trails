@@ -1,9 +1,9 @@
 import { Concern } from "@blazetrails/activesupport";
 import { XML, type Html5Document, type XmlDocument } from "@blazetrails/nokogiri";
 import { Testing } from "@blazetrails/actionview/testing";
-import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/testing/assertions";
-import type * as DomAssertions from "@blazetrails/actionview/testing/dom-assertions";
-import type * as SelectorAssertions from "@blazetrails/actionview/testing/selector-assertions";
+import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/rails-dom-testing/assertions";
+import type * as DomAssertions from "@blazetrails/actionview/rails-dom-testing/assertions/dom-assertions";
+import type * as SelectorAssertions from "@blazetrails/actionview/rails-dom-testing/assertions/selector-assertions";
 import { extend, include, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActionDispatch } from "../../namespaces.js";
 import { ResponseAssertions } from "./assertions/response.js";

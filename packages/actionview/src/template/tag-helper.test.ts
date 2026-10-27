@@ -22,7 +22,7 @@ import { FixtureResolver } from "../testing/resolvers.js";
 import { raw } from "../helpers/output-safety-helper.js";
 import { Base } from "../base.js";
 import { Template } from "../template.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const tag = _tag.bind(view);

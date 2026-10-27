@@ -10,7 +10,7 @@ import {
   javascriptTag,
 } from "../helpers/javascript-helper.js";
 import { Base } from "../base.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 
 function host() {
   return {

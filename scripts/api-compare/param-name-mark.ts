@@ -49,6 +49,7 @@ export const GATED_PACKAGES = [
   "globalid",
   "marcel",
   "rack",
+  "rails-dom-testing",
   "trailties",
 ] as const;
 

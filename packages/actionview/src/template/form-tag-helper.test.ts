@@ -7,7 +7,7 @@ import "../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { Template } from "../template.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 import { defaultEnforceUtf8, setDefaultEnforceUtf8 } from "../helpers/form-tag-helper.js";
 import { raw } from "../helpers/output-safety-helper.js";
 import {

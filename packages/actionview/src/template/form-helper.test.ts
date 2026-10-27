@@ -56,8 +56,8 @@ import { Base as TagsBase } from "../helpers/tags/base.js";
 import type { LabelBuilder } from "../helpers/tags/label.js";
 import type { CheckBoxBuilder } from "../helpers/tags/collection-check-boxes.js";
 import type { RadioButtonBuilder } from "../helpers/tags/collection-radio-buttons.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
-import { assertSelect } from "../testing/selector-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
+import { assertSelect } from "../rails-dom-testing/assertions/selector-assertions.js";
 import { Testing } from "../testing.js";
 import { Blog, Cpk } from "../test-helpers/fake-models.js";
 
@@ -4435,7 +4435,7 @@ describe("FormHelperTest", () => {
 
     assertSelect.call(
       {
-        _selected: null,
+        selected: null,
         documentRootElement: () => Testing.htmlDocument().parse(String(rendered)).root,
       },
       "select#namespace_post_written_on_1i",

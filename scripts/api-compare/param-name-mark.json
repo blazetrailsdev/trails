@@ -78,5 +78,9 @@
   "trailties": {
     "total": 0,
     "byFile": {}
+  },
+  "rails-dom-testing": {
+    "total": 0,
+    "byFile": {}
   }
 }

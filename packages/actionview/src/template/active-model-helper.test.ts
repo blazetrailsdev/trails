@@ -6,7 +6,7 @@ import { Date as RubyDate } from "@blazetrails/date";
 import { Base } from "../base.js";
 import { raw } from "../helpers/output-safety-helper.js";
 import { LookupContext } from "../lookup-context.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 
 class Post {
   static modelName = { singular: "post", paramKey: "post", i18nKey: "post" };

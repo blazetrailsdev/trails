@@ -46,7 +46,7 @@ import { RecordIdentifier } from "./record-identifier.js";
 import { RoutingUrlFor } from "./routing-url-for.js";
 import { ActionView } from "./namespaces.js";
 import { Testing } from "./testing.js";
-import { Assertions as DomTestingAssertions } from "./testing/assertions.js";
+import { Assertions as DomTestingAssertions } from "./rails-dom-testing/assertions.js";
 
 type HelperModule = object;
 type Parser = ((rendered: string) => unknown) | null | undefined;

@@ -16,7 +16,7 @@ import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfi
 import * as UrlHelper from "../helpers/url-helper.js";
 import { raw } from "../helpers/output-safety-helper.js";
 import { Template } from "../template.js";
-import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertDomEqual } from "../rails-dom-testing/assertions/dom-assertions.js";
 
 class Workshop {
   static {

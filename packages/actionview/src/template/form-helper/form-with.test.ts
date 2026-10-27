@@ -41,7 +41,7 @@ import { FormBuilder as FormBuilderClass, type FormBuilder } from "../../helpers
 import { CheckBoxBuilder } from "../../helpers/tags/collection-check-boxes.js";
 import { RadioButtonBuilder } from "../../helpers/tags/collection-radio-buttons.js";
 import { Blog } from "../../test-helpers/fake-models.js";
-import { assertDomEqual } from "../../testing/dom-assertions.js";
+import { assertDomEqual } from "../../rails-dom-testing/assertions/dom-assertions.js";
 
 function withDefaultEnforceUtf8(value: boolean, block: () => void): void {
   const oldValue = defaultEnforceUtf8;
