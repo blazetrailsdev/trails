@@ -1,7 +1,7 @@
 const T = `import("@blazetrails/date").Temporal`;
 const IPADDR = `import("@blazetrails/ruby-compat").IPAddr`;
 const TWZ = `import("@blazetrails/activesupport").TimeWithZone`;
-const TIME = `import("@blazetrails/ruby-compat").Time`;
+const TIME = `import("@blazetrails/date").Time`;
 
 export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {
   string: "string",

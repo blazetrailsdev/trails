@@ -67,7 +67,7 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/get title\(\): string;/);
     expect(text.match(/get title\(\): string;/g)?.length).toBe(1);
     expect(text).toMatch(/get body\(\): string;/);
-    expect(text).toMatch(/get published_at\(\):.*TimeWithZone.*ruby-compat"\)\.Time/);
+    expect(text).toMatch(/get published_at\(\):.*TimeWithZone.*date"\)\.Time/);
     expect(text).toMatch(/get views\(\): number;/);
   });
 
@@ -85,7 +85,7 @@ describe("virtualize — deltas", () => {
       schemaColumnsByTable: columns,
       timeZoneAwareAttributes: false,
     });
-    expect(naive.text).toMatch(/get created_at\(\): import\("@blazetrails\/ruby-compat"\)\.Time;/);
+    expect(naive.text).toMatch(/get created_at\(\): import\("@blazetrails\/date"\)\.Time;/);
   });
 
   test("schemaColumnsByTable skips user-authored declares", () => {
@@ -115,7 +115,7 @@ describe("virtualize — deltas", () => {
     const { text } = virtualize(src, "post.ts", {
       schemaColumnsByTable: { posts: { id: { type: "bigint", null: false, primaryKey: 0 } } },
     });
-    expect(text).toMatch(/get id\(\): number;/);
+    expect(text).toMatch(/declare id: number;/);
   });
 
   test("schemaColumnsByTable types `id` from a uuid primary key", () => {
@@ -123,7 +123,7 @@ describe("virtualize — deltas", () => {
     const { text } = virtualize(src, "token.ts", {
       schemaColumnsByTable: { tokens: { id: { type: "uuid", null: false, primaryKey: 0 } } },
     });
-    expect(text).toMatch(/get id\(\): string;/);
+    expect(text).toMatch(/declare id: string;/);
   });
 
   test("schemaColumnsByTable types `id` as a tuple for a composite primary key", () => {
@@ -137,7 +137,7 @@ describe("virtualize — deltas", () => {
         },
       },
     });
-    expect(text).toMatch(/get id\(\): \[number, string\];/);
+    expect(text).toMatch(/declare id: \[number, string\];/);
   });
 
   test("schemaColumnsByTable quotes non-identifier and reserved-word column names", () => {
@@ -309,7 +309,7 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/get updated_at\(\):.*Temporal\.PlainDateTime;/);
     expect(text).toMatch(/get starts_on\(\):.*Temporal\.PlainDate.*\| null/);
     expect(text).toMatch(/get duration\(\):.*Temporal\.Instant.*TimeWithZone;/);
-    expect(text).toMatch(/get scheduled_at\(\): \(.*TimeWithZone.*ruby-compat"\)\.Time\) \| null/);
+    expect(text).toMatch(/get scheduled_at\(\): \(.*TimeWithZone.*date"\)\.Time\) \| null/);
   });
 
   test("schemaColumnsByTable emits bigint for big_integer schema columns", () => {
@@ -937,7 +937,7 @@ describe("virtualize — attribute accessor pairs", () => {
       "}\n";
     const { text } = virtualize(src, "post.ts");
     expect(text).toMatch(/export interface Post \{/);
-    expect(text).toMatch(/get published_at\(\):.*TimeWithZone.*ruby-compat"\)\.Time;/);
+    expect(text).toMatch(/get published_at\(\):.*TimeWithZone.*date"\)\.Time;/);
     expect(text).toMatch(/set published_at\(value: unknown\);/);
   });
 

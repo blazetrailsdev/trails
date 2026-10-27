@@ -67,7 +67,9 @@ export function loadSchemaColumns(args: string[]): SchemaColumns | undefined {
 export async function loadTimeZoneAwareAttributes(appRoot: string): Promise<boolean | undefined> {
   const configDir = path.join(appRoot, "config");
   const initializers = path.join(configDir, "initializers");
-  const files = [path.join(configDir, "application.ts")];
+  const application = path.join(configDir, "application.ts");
+  if (!(await fs.promises.stat(application).catch(() => null))) return undefined;
+  const files = [application];
   const entries = await fs.promises.readdir(initializers).catch(() => [] as string[]);
   for (const entry of entries.sort()) {
     if (/\.[cm]?ts$/.test(entry)) files.push(path.join(initializers, entry));

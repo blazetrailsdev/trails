@@ -6,7 +6,7 @@ export class Event extends Base {
   }
 }
 export interface Event {
-  get starts_at(): import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/ruby-compat").Time;
+  get starts_at(): import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time;
   set starts_at(value: unknown);
   get starts_on(): import("@blazetrails/date").Temporal.PlainDate;
   set starts_on(value: unknown);

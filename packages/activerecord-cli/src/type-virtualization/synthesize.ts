@@ -176,7 +176,11 @@ function renderSchemaColumnDeclares(
     !info.existingMembers.has("id")
   ) {
     out.push(
-      attributeLine("id", pkTypes.length === 1 ? pkTypes[0] : `[${pkTypes.join(", ")}]`, "id"),
+      line(
+        `declare id: ${pkTypes.length === 1 ? pkTypes[0] : `[${pkTypes.join(", ")}]`};`,
+        "id",
+        false,
+      ),
     );
   }
   for (const [col, value] of entries) {

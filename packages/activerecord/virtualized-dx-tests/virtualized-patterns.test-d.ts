@@ -138,11 +138,10 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     expectTypeOf(Task.notLow()).toMatchTypeOf<Relation<Task>>();
   });
 
-  it("Temporal attribute types: datetime → Instant | PlainDateTime, date → PlainDate, time → Instant | TimeWithZone", () => {
+  it("Temporal attribute types: datetime → TimeWithZone | Time, date → PlainDate, time → Instant | TimeWithZone", () => {
     const e = new Event({});
     expectTypeOf(e.starts_at).toEqualTypeOf<
-      | import("@blazetrails/date").Temporal.Instant
-      | import("@blazetrails/date").Temporal.PlainDateTime
+      import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time
     >();
     expectTypeOf(e.starts_on).toEqualTypeOf<import("@blazetrails/date").Temporal.PlainDate>();
     expectTypeOf(e.duration).toEqualTypeOf<
@@ -157,8 +156,7 @@ describe("generated attribute accessors", () => {
     const e = new Event({});
     e.starts_at = "2008-01-01 00:00:00";
     expectTypeOf(e.starts_at).toEqualTypeOf<
-      | import("@blazetrails/date").Temporal.Instant
-      | import("@blazetrails/date").Temporal.PlainDateTime
+      import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time
     >();
 
     e.overloaded_float = "1.1";

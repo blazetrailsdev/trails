@@ -13,7 +13,7 @@ export interface Post {
   set view_count(value: unknown);
   get published(): boolean;
   set published(value: unknown);
-  get published_at(): import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/ruby-compat").Time;
+  get published_at(): import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time;
   set published_at(value: unknown);
 }
 

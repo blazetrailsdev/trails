@@ -881,6 +881,7 @@ describe("loadTimeZoneAwareAttributes", () => {
     try {
       fs.mkdirSync(path.join(root, "config", "initializers"), { recursive: true });
       const app = path.join(root, "config", "application.ts");
+      expect(await loadTimeZoneAwareAttributes(root)).toBeUndefined();
       fs.writeFileSync(
         app,
         "export class Blog extends Application {}\n// this.config.activeRecord.timeZoneAwareTypes = [];\n",
