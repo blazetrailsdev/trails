@@ -1,6 +1,6 @@
 import { Configurable, include, underscore } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
-import { rbFSend, rbModName, rbObjId, sprintf } from "@blazetrails/ruby-compat";
+import { StandardError, rbFSend, rbModName, rbObjId, sprintf } from "@blazetrails/ruby-compat";
 
 function ownPublicMethodNames(proto: object | null | undefined): string[] {
   if (!proto) return [];
@@ -30,7 +30,7 @@ export type {
   CallbackPredicateLike,
 } from "./callbacks.js";
 
-export class ActionNotFound extends Error {
+export class ActionNotFound extends StandardError {
   readonly controller: Base | null;
   readonly action: string | null;
 
@@ -40,7 +40,6 @@ export class ActionNotFound extends Error {
     action: string | null = null,
   ) {
     super(message ?? "AbstractController::ActionNotFound");
-    this.name = "AbstractController::ActionNotFound";
     this.controller = controller;
     this.action = action;
   }

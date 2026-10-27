@@ -2,7 +2,6 @@ import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { rbInspect, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
 
 registerConstant("ContentNegotiation", { name: "ContentNegotiation" });
@@ -23,7 +22,7 @@ class BasicController extends Base {
 }
 
 Object.defineProperty(BasicController, "name", { value: "ContentNegotiation::BasicController" });
-controllerConstants.set("content_negotiation/basic", BasicController);
+registerConstant("ContentNegotiation::BasicController", BasicController);
 
 class TestContentNegotiation extends Rack.TestCase {}
 

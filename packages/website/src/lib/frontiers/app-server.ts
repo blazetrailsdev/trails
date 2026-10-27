@@ -6,7 +6,9 @@
  */
 
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { RouteSet, ActionController, controllerConstants } from "@blazetrails/actionpack";
+import { RouteSet, ActionController } from "@blazetrails/actionpack";
+import { camelize } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { DispatchableControllerClass, DrawCallback } from "@blazetrails/actionpack";
 
 export interface AppServerDeps {
@@ -42,7 +44,7 @@ export function createAppServer(_deps: AppServerDeps): AppServer {
     },
 
     registerController(name: string, controllerClass: ControllerClass) {
-      controllerConstants.set(name, controllerClass);
+      registerConstant(`${camelize(name)}Controller`, controllerClass);
     },
 
     drawRoutes(fn: DrawCallback) {

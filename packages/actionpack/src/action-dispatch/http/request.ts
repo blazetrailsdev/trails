@@ -700,7 +700,6 @@ export class Request {
     return this.controllerClassFor(params["controller"] as string | undefined);
   }
 
-  /** @inventedArm get — CONVERGEABLE controller-constant-resolution-throws-instead-of-constantize */
   controllerClassFor(
     name: string | undefined | null,
   ): DispatchableControllerClass | typeof PASS_NOT_FOUND {
@@ -708,10 +707,7 @@ export class Request {
       const controllerParam = underscore(name);
       const constName = `${camelize(controllerParam)}Controller`;
       try {
-        return (
-          controllerConstants.get(controllerParam) ??
-          (constantize(constName) as DispatchableControllerClass)
-        );
+        return constantize(constName) as DispatchableControllerClass;
       } catch (error) {
         if (!(error instanceof NameError)) throw error;
         if (error.missingName() === constName || constName.startsWith(`${error.missingName()}::`)) {
@@ -918,12 +914,8 @@ export async function* emptyRackBody(): RackBody {}
 export class MissingController extends NameError {
   constructor(message: string, constantName?: string) {
     super(message, constantName);
-    this.name = "MissingController";
   }
 }
-
-/** @noRailsEquivalent CONVERGEABLE controller-constant-resolution-throws-instead-of-constantize */
-export const controllerConstants = new Map<string, DispatchableControllerClass>();
 
 export class PASS_NOT_FOUND {
   /** @internal */

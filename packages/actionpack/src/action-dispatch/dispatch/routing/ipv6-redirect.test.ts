@@ -1,8 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
 import { assertEqual } from "@blazetrails/activesupport";
-import { include } from "@blazetrails/ruby-compat";
+import { include, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../../action-controller/base.js";
-import { controllerConstants } from "../../http/request.js";
 import { RouteSet } from "../../routing/route-set.js";
 import { IntegrationTest } from "../../testing/integration.js";
 import "../../../test-helpers/abstract-unit.js";
@@ -22,7 +21,7 @@ class BadRouteRequestController extends Base {
     this.redirectTo({ action: "index" });
   }
 }
-controllerConstants.set("bad_route_request", BadRouteRequestController);
+registerConstant("BadRouteRequestController", BadRouteRequestController);
 
 Routes.draw(function () {
   this.get("/", { to: "bad_route_request#index", as: "index" });

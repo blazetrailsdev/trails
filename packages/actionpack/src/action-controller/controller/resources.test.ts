@@ -25,7 +25,6 @@ import {
   ResourcesController,
 } from "../../test-helpers/abstract-unit.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
-import { controllerConstants } from "../../action-dispatch/http/request.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { RoutingError } from "../metal/exceptions.js";
 import { TestCase } from "../test-case.js";
@@ -61,7 +60,10 @@ beforeAll(() => {
     "backoffice/admin/products": Backoffice.Admin.ProductsController,
     "backoffice/admin/images": Backoffice.Admin.ImagesController,
   })) {
-    controllerConstants.set(name, klass as unknown as DispatchableControllerClass);
+    registerConstant(
+      `${camelize(name)}Controller`,
+      klass as unknown as DispatchableControllerClass,
+    );
     registerConstant(`${camelize(name).replace(/\//g, "::")}Controller`, klass);
   }
 });

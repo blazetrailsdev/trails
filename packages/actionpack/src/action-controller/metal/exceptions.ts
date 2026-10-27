@@ -7,31 +7,23 @@ import type { RouteSetLike } from "../../abstract-controller/url-for.js";
 export class ActionControllerError extends StandardError {
   constructor(msg?: string) {
     super(msg ?? "");
-    this.name = "ActionControllerError";
   }
 }
 
 export class BadRequest extends ActionControllerError {
   constructor(msg?: string, errinfo?: Error | null) {
     super(msg);
-    this.name = "ActionController::BadRequest";
     if (errinfo) excSetBacktrace(this, excBacktrace(errinfo));
   }
 }
 
-export class RenderError extends ActionControllerError {
-  constructor(message?: string) {
-    super(message);
-    this.name = "RenderError";
-  }
-}
+export class RenderError extends ActionControllerError {}
 
 export class RoutingError extends ActionControllerError {
   readonly failures: unknown[];
 
   constructor(message: string, failures: unknown[] = []) {
     super(message);
-    this.name = "ActionController::RoutingError";
     this.failures = failures;
   }
 }
@@ -49,7 +41,6 @@ export class UrlGenerationError extends ActionControllerError {
     methodName: string | null = null,
   ) {
     super(message);
-    this.name = "ActionController::UrlGenerationError";
     this.routes = routes;
     this.routeName = routeName;
     this.methodName = methodName;
@@ -74,23 +65,16 @@ include(UrlGenerationError, Correctable);
 export class MethodNotAllowed extends ActionControllerError {
   constructor(...allowedMethods: string[]) {
     super(`Only ${toSentence(allowedMethods)} requests are allowed.`);
-    this.name = "ActionController::MethodNotAllowed";
   }
 }
 
 export class NotImplemented extends MethodNotAllowed {
   constructor(...allowedMethods: string[]) {
     super(...allowedMethods);
-    this.name = "ActionController::NotImplemented";
   }
 }
 
-export class MissingFile extends ActionControllerError {
-  constructor(message?: string) {
-    super(message);
-    this.name = "MissingFile";
-  }
-}
+export class MissingFile extends ActionControllerError {}
 
 export class SessionOverflowError extends ActionControllerError {
   static DEFAULT_MESSAGE =
@@ -98,21 +82,14 @@ export class SessionOverflowError extends ActionControllerError {
 
   constructor(message?: string) {
     super(message ?? SessionOverflowError.DEFAULT_MESSAGE);
-    this.name = "SessionOverflowError";
   }
 }
 
-export class UnknownHttpMethod extends ActionControllerError {
-  constructor(message?: string) {
-    super(message);
-    this.name = "ActionController::UnknownHttpMethod";
-  }
-}
+export class UnknownHttpMethod extends ActionControllerError {}
 
 export class UnknownFormat extends ActionControllerError {
   constructor(message?: string) {
     super(message ?? "ActionController::UnknownFormat");
-    this.name = "ActionController::UnknownFormat";
   }
 }
 
@@ -122,7 +99,6 @@ export class RespondToMismatchError extends ActionControllerError {
 
   constructor(message?: string) {
     super(message ?? RespondToMismatchError.DEFAULT_MESSAGE);
-    this.name = "RespondToMismatchError";
   }
 }
 
@@ -132,7 +108,6 @@ export class MissingExactTemplate extends UnknownFormat {
 
   constructor(message: string, controller: { name: string }, actionName: string) {
     super(message);
-    this.name = "ActionController::MissingExactTemplate";
     this.controller = controller;
     this.actionName = actionName;
   }

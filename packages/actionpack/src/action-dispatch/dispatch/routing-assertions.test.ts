@@ -1,3 +1,4 @@
+import { camelize } from "@blazetrails/activesupport";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   Assertion,
@@ -8,12 +9,11 @@ import {
   include,
   TopLevel,
 } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+import { File, registerConstant } from "@blazetrails/ruby-compat";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import { Base } from "../../action-controller/base.js";
 import { TestCase } from "../../action-controller/test-case.js";
-import { controllerConstants } from "../http/request.js";
 import type { MiddlewareFactory, MiddlewareStack, RackApp } from "../middleware/stack.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import type { Request } from "../http/request.js";
@@ -48,7 +48,10 @@ beforeAll(() => {
     block_books: BlockBooksController,
     query_books: QueryBooksController,
   })) {
-    controllerConstants.set(name, klass as unknown as DispatchableControllerClass);
+    registerConstant(
+      `${camelize(name)}Controller`,
+      klass as unknown as DispatchableControllerClass,
+    );
   }
 });
 

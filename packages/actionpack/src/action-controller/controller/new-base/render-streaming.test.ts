@@ -3,7 +3,6 @@ import { Base as ActionViewBase, FixtureResolver } from "@blazetrails/actionview
 import { assertEqual, assertMatch, Logger } from "@blazetrails/activesupport";
 import { registerConstant, StringIO } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
 
 registerConstant("RenderStreaming", { name: "RenderStreaming" });
@@ -54,7 +53,7 @@ class BasicController extends Base {
   }
 }
 
-controllerConstants.set("render_streaming/basic", BasicController);
+registerConstant("RenderStreaming::BasicController", BasicController);
 
 class StreamingTest extends Rack.TestCase {}
 

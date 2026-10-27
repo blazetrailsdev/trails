@@ -3,7 +3,6 @@ import { FixtureResolver } from "@blazetrails/actionview";
 import { assertMatch } from "@blazetrails/activesupport";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
@@ -222,8 +221,8 @@ class WithLayoutController extends ApplicationController {
   }
 }
 
-controllerConstants.set("render_template/without_layout", WithoutLayoutController);
-controllerConstants.set("render_template/with_layout", WithLayoutController);
+registerConstant("RenderTemplate::WithoutLayoutController", WithoutLayoutController);
+registerConstant("RenderTemplate::WithLayoutController", WithLayoutController);
 
 class TestWithLayout extends Rack.TestCase {}
 
@@ -303,7 +302,10 @@ describe("TestWithLayout", () => {
     }
   }
 
-  controllerConstants.set("render_template/compatibility/without_layout", WithoutLayoutController);
+  registerConstant(
+    "RenderTemplate::Compatibility::WithoutLayoutController",
+    WithoutLayoutController,
+  );
 
   class TestTemplateRenderWithForwardSlash extends Rack.TestCase {}
 

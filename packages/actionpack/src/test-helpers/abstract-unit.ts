@@ -23,6 +23,7 @@ import {
   rbStrSend,
   stringSplit,
   URI,
+  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Head, MethodOverride, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { RoutesHelpers } from "../abstract-controller/trailties/routes-helpers.js";
@@ -33,7 +34,7 @@ import { Metal } from "../action-controller/metal.js";
 import { RoutingError } from "../action-controller/metal/exceptions.js";
 import { TestCase as ActionControllerTestCase } from "../action-controller/test-case.js";
 import { deprecator } from "../action-dispatch/deprecator.js";
-import { controllerConstants, Request } from "../action-dispatch/http/request.js";
+import { Request } from "../action-dispatch/http/request.js";
 import type { Response } from "../action-dispatch/http/response.js";
 import { ActionableExceptions } from "../action-dispatch/middleware/actionable-exceptions.js";
 import { Callbacks } from "../action-dispatch/middleware/callbacks.js";
@@ -482,10 +483,10 @@ export class CommentsController extends ResourcesController {}
 export class AccountsController extends ResourcesController {}
 export class ImagesController extends ResourcesController {}
 
-controllerConstants.set("resources", ResourcesController);
-controllerConstants.set("comments", CommentsController);
-controllerConstants.set("accounts", AccountsController);
-controllerConstants.set("images", ImagesController);
+registerConstant("ResourcesController", ResourcesController);
+registerConstant("CommentsController", CommentsController);
+registerConstant("AccountsController", AccountsController);
+registerConstant("ImagesController", ImagesController);
 
 type SetCookieAttributes = Record<string, string | true>;
 

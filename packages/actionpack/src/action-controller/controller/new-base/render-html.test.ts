@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { htmlSafe, include } from "@blazetrails/activesupport";
@@ -5,7 +6,6 @@ import { Rendering as AbstractControllerRendering } from "../../../abstract-cont
 import { Base } from "../../base.js";
 import { Metal } from "../../metal.js";
 import { Rendering } from "../../metal/rendering.js";
-import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
@@ -98,9 +98,9 @@ class WithLayoutController extends ApplicationController {
   }
 }
 
-controllerConstants.set("render_html/minimal", MinimalController);
-controllerConstants.set("render_html/simple", SimpleController);
-controllerConstants.set("render_html/with_layout", WithLayoutController);
+registerConstant("RenderHtml::MinimalController", MinimalController);
+registerConstant("RenderHtml::SimpleController", SimpleController);
+registerConstant("RenderHtml::WithLayoutController", WithLayoutController);
 
 class RenderHtmlTest extends Rack.TestCase {}
 

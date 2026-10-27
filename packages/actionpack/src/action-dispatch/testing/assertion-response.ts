@@ -1,3 +1,4 @@
+import { ActionDispatch } from "../../namespaces.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { HTTP_STATUS_CODES, statusCode as rackStatusCode } from "@blazetrails/rack";
 
@@ -48,3 +49,4 @@ function nameFromCode(code: number | string): string | null {
     null
   );
 }
+ActionDispatch.AssertionResponse = AssertionResponse;

@@ -812,6 +812,7 @@ export class IntegrationTest extends TestCase {
     this.resetBang();
   }
 }
+ActionDispatch.IntegrationTest = IntegrationTest;
 
 /**
  * @internal

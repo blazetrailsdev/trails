@@ -1,7 +1,8 @@
+import { camelize } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeAll, describe, expect, it } from "vitest";
 import "../../../test-helpers/abstract-unit.js";
 import { RouteSet } from "../../routing/route-set.js";
-import { controllerConstants } from "../../http/request.js";
 import type { DispatchableControllerClass } from "../../routing/dispatcher.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
 import {
@@ -33,7 +34,10 @@ class StubController {
 
 beforeAll(() => {
   for (const name of ["items", "tmp", "x"]) {
-    controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+    registerConstant(
+      `${camelize(name)}Controller`,
+      StubController as unknown as DispatchableControllerClass,
+    );
   }
 });
 

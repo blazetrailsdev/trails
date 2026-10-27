@@ -1,3 +1,4 @@
+import { camelize } from "@blazetrails/activesupport";
 import { beforeAll, beforeEach, describe, it, expect } from "vitest";
 import {
   assertEqual,
@@ -6,9 +7,8 @@ import {
   assertPredicate,
   assertRaises,
 } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, registerConstant } from "@blazetrails/ruby-compat";
 import { MockRequest } from "@blazetrails/rack";
-import { controllerConstants } from "../../http/request.js";
 import type { DispatchableControllerClass } from "../../routing/dispatcher.js";
 import { RouteSet, type DrawCallback } from "../../routing/route-set.js";
 
@@ -20,7 +20,10 @@ class StubController {
 
 beforeAll(() => {
   for (const name of ["posts", "late", "seed"]) {
-    controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+    registerConstant(
+      `${camelize(name)}Controller`,
+      StubController as unknown as DispatchableControllerClass,
+    );
   }
 });
 

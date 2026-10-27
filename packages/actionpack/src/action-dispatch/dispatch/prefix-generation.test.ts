@@ -4,12 +4,11 @@
 import { beforeEach, describe, it, expect } from "vitest";
 import { ModelName, Naming } from "@blazetrails/activemodel";
 import { assertRespondTo, extend, TopLevel } from "@blazetrails/activesupport";
-import { File, include } from "@blazetrails/ruby-compat";
+import { File, include, registerConstant } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import { Base } from "../../action-controller/base.js";
-import { controllerConstants } from "../http/request.js";
 import type { MountableApp } from "../routing/mapper.js";
 import { RouteSet } from "../routing/route-set.js";
 import type { RoutesProxyInstance } from "../routing/routes-proxy.js";
@@ -152,7 +151,7 @@ describe("WithMountedEngine", () => {
   }
   include(InsideEngineGeneratingController, BlogEngine.routes().urlHelpers());
   include(InsideEngineGeneratingController, RailsApplication.routes().mountedHelpers());
-  controllerConstants.set("inside_engine_generating", InsideEngineGeneratingController);
+  registerConstant("InsideEngineGeneratingController", InsideEngineGeneratingController);
 
   class OutsideEngineGeneratingController extends Base {
     async index(): Promise<void> {
@@ -186,7 +185,7 @@ describe("WithMountedEngine", () => {
   }
   include(OutsideEngineGeneratingController, BlogEngine.routes().mountedHelpers());
   include(OutsideEngineGeneratingController, RailsApplication.routes().urlHelpers());
-  controllerConstants.set("outside_engine_generating", OutsideEngineGeneratingController);
+  registerConstant("OutsideEngineGeneratingController", OutsideEngineGeneratingController);
 
   class EngineObject {
     constructor(_kw: { kw: unknown }) {}
@@ -482,7 +481,7 @@ describe("EngineMountedAtRoot", () => {
   }
   include(PostsController, BlogEngine.routes().urlHelpers());
   include(PostsController, RailsApplication.routes().mountedHelpers());
-  controllerConstants.set("posts", PostsController);
+  registerConstant("PostsController", PostsController);
 
   class EngineMountedAtRoot extends IntegrationTest {
     override get app(): unknown {

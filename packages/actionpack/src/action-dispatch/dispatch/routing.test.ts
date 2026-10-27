@@ -1,3 +1,4 @@
+import { camelize } from "@blazetrails/activesupport";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import {
   Config,
@@ -7,7 +8,7 @@ import {
 } from "../routing/route-set.js";
 import { MockRequest, type RackBody, Utils as RackUtils } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
-import { controllerConstants, Request } from "../http/request.js";
+import { Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Utils } from "../journey/router/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -29,6 +30,8 @@ import {
   rbObjRespondTo,
   registerConstant,
   rbFSend,
+  isRegisteredConstant,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
@@ -128,12 +131,15 @@ beforeEach(() => {
     "transport/taxis",
     "users",
   ]) {
-    controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+    registerConstant(
+      `${camelize(name)}Controller`,
+      StubController as unknown as DispatchableControllerClass,
+    );
   }
 });
 
 afterEach(() => {
-  controllerConstants.delete("posts");
+  if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
 });
 
 const routeSpec = (match: Record<string, unknown>): string => `${match.controller}#${match.action}`;
@@ -419,8 +425,8 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/posts/:id", { to: "posts#show" });
     });
-    controllerConstants.set(
-      "posts",
+    registerConstant(
+      "PostsController",
       EchoParamsController as unknown as DispatchableControllerClass,
     );
     const [status, , body] = await routes.call({
@@ -435,7 +441,7 @@ describe("TestRoutingMapper", () => {
   });
 
   it("sets action_dispatch.request.path_parameters", async () => {
-    controllerConstants.delete("posts");
+    rbModRemoveConst(Object, "PostsController");
     const routes = new RouteSet();
     routes.draw(function () {
       this.get("/posts/:id", { to: "posts#show" });
@@ -4594,13 +4600,14 @@ describe("TestDefaultScope", () => {
   });
 
   beforeEach(() => {
-    controllerConstants.set(
-      "blog/posts",
+    registerConstant(
+      "Blog::PostsController",
       PostsController as unknown as DispatchableControllerClass,
     );
   });
   afterEach(() => {
-    controllerConstants.delete("blog/posts");
+    if (isRegisteredConstant("Blog::PostsController"))
+      rbModRemoveConst(Object, "Blog::PostsController");
   });
 
   it("default scope", async () => {
@@ -4866,11 +4873,12 @@ describe("TestNamespaceWithControllerOption", () => {
 
   let t: TestNamespaceWithControllerOption;
   beforeEach(({ testCase }) => {
-    controllerConstants.set("admin/storage_files", StorageFilesController);
+    registerConstant("Admin::StorageFilesController", StorageFilesController);
     t = testCase as TestNamespaceWithControllerOption;
   });
   afterEach(() => {
-    controllerConstants.delete("admin/storage_files");
+    if (isRegisteredConstant("Admin::StorageFilesController"))
+      rbModRemoveConst(Object, "Admin::StorageFilesController");
   });
 
   function draw(block: DrawCallback): void {
@@ -5126,8 +5134,8 @@ describe("TestNamedRouteUrlHelpers", () => {
 
   let t: TestNamedRouteUrlHelpers;
   beforeEach(({ testCase }) => {
-    controllerConstants.set("test_named_route_url_helpers/categories", CategoriesController);
-    controllerConstants.set("test_named_route_url_helpers/products", ProductsController);
+    registerConstant("TestNamedRouteUrlHelpers::CategoriesController", CategoriesController);
+    registerConstant("TestNamedRouteUrlHelpers::ProductsController", ProductsController);
     t = testCase as TestNamedRouteUrlHelpers;
   });
 
@@ -5241,11 +5249,12 @@ describe("TestInvalidUrls", () => {
 
   let t: TestInvalidUrls;
   beforeEach(({ testCase }) => {
-    controllerConstants.set("test_invalid_urls/foo", FooController);
+    registerConstant("TestInvalidUrls::FooController", FooController);
     t = testCase as TestInvalidUrls;
   });
   afterEach(() => {
-    controllerConstants.delete("test_invalid_urls/foo");
+    if (isRegisteredConstant("TestInvalidUrls::FooController"))
+      rbModRemoveConst(Object, "TestInvalidUrls::FooController");
   });
   const get = (path: string) => t.get(path);
   const assertResponse = (type: string): void => t.assertResponse(type);
@@ -5646,11 +5655,11 @@ describe("TestErrorsInController", () => {
 
   let t: TestErrorsInController;
   beforeEach(({ testCase }) => {
-    controllerConstants.set("posts", PostsController);
+    registerConstant("PostsController", PostsController);
     t = testCase as TestErrorsInController;
   });
   afterEach(() => {
-    controllerConstants.delete("posts");
+    if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
   });
 
   it("legit no method errors are not caught", async () => {
@@ -5775,7 +5784,7 @@ describe("TestOptionalScopesWithOrWithoutParams", () => {
 
   let t: TestOptionalScopesWithOrWithoutParams;
   beforeEach(({ testCase }) => {
-    controllerConstants.set("test_optional_scopes_with_or_without_params/home", HomeController);
+    registerConstant("TestOptionalScopesWithOrWithoutParams::HomeController", HomeController);
     t = testCase as TestOptionalScopesWithOrWithoutParams;
   });
 
@@ -5832,8 +5841,8 @@ describe("TestPathParameters", () => {
 
   let t: TestPathParameters;
   beforeEach(({ testCase }) => {
-    controllerConstants.set("test_path_parameters/home", HomeController);
-    controllerConstants.set("test_path_parameters/pages", PagesController);
+    registerConstant("TestPathParameters::HomeController", HomeController);
+    registerConstant("TestPathParameters::PagesController", PagesController);
     t = testCase as TestPathParameters;
   });
 
@@ -5854,7 +5863,7 @@ describe("TestInternalRoutingParams", () => {
       this.head("ok");
     }
   }
-  controllerConstants.set("internal", InternalController);
+  registerConstant("InternalController", InternalController);
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestInternalRoutingParams extends IntegrationTest {
@@ -5941,7 +5950,7 @@ describe("FlashRedirectTest", () => {
 
   let t: FlashRedirectTest;
   beforeEach(({ testCase }) => {
-    controllerConstants.set("flash_redirect_test/foo", FooController);
+    registerConstant("FlashRedirectTest::FooController", FooController);
     t = testCase as FlashRedirectTest;
   });
 
@@ -6136,11 +6145,12 @@ describe("TestMultipleNestedController", () => {
 
   let t: TestMultipleNestedController;
   beforeEach(({ testCase }) => {
-    controllerConstants.set("foo/bar/baz", BazController);
+    registerConstant("Foo::Bar::BazController", BazController);
     t = testCase as TestMultipleNestedController;
   });
   afterEach(() => {
-    controllerConstants.delete("foo/bar/baz");
+    if (isRegisteredConstant("Foo::Bar::BazController"))
+      rbModRemoveConst(Object, "Foo::Bar::BazController");
   });
 
   it("controller option which starts with '/' from multiple nested controller", async () => {
@@ -6257,7 +6267,7 @@ describe("TestDefaultUrlOptions", () => {
 
   let t: TestDefaultUrlOptions;
   beforeEach(({ testCase }) => {
-    controllerConstants.set("posts", PostsController);
+    registerConstant("PostsController", PostsController);
     t = testCase as TestDefaultUrlOptions;
   });
 

@@ -1,9 +1,9 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { IntegrationTest, Session } from "./integration.js";
 import { Base } from "../../action-controller/base.js";
-import { controllerConstants } from "../http/request.js";
 import { DebugExceptions } from "../middleware/debug-exceptions.js";
 import { ShowExceptions } from "../middleware/show-exceptions.js";
 import type { MiddlewareFactory, MiddlewareStack } from "../middleware/stack.js";
@@ -198,10 +198,10 @@ describe("ActionDispatch::IntegrationTest", () => {
       this.resource("session");
     });
     app.app = IntegrationTest.buildApp(app.routes, useCookieStore);
-    controllerConstants.set("posts", PostsController);
-    controllerConstants.set("comments", CommentsController);
-    controllerConstants.set("admin/posts", AdminPostsController);
-    controllerConstants.set("sessions", SessionsController);
+    registerConstant("PostsController", PostsController);
+    registerConstant("CommentsController", CommentsController);
+    registerConstant("Admin::PostsController", AdminPostsController);
+    registerConstant("SessionsController", SessionsController);
   });
 
   describe("basic requests", () => {
@@ -661,7 +661,7 @@ describe("ActionDispatch::IntegrationTest", () => {
         this.get("/redirect-to-missing", { to: "redirector#index", as: "redirector" });
       });
       redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
-      controllerConstants.set("redirector", RedirectToMissingController);
+      registerConstant("RedirectorController", RedirectToMissingController);
 
       await redirectApp.get("/redirect-to-missing");
       redirectApp.assertResponse("redirect");
@@ -683,7 +683,7 @@ describe("ActionDispatch::IntegrationTest", () => {
         this.get("/redirect-to-missing2", { to: "redirector2#index", as: "redirector2" });
       });
       redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
-      controllerConstants.set("redirector2", RedirectToMissing2Controller);
+      registerConstant("Redirector2Controller", RedirectToMissing2Controller);
 
       await redirectApp.get("/redirect-to-missing2");
       redirectApp.assertResponse("redirect");

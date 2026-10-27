@@ -1,3 +1,4 @@
+import { ActionDispatch } from "../../namespaces.js";
 import { MockRequest, type RackEnv } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
 import { merge } from "@blazetrails/ruby-compat";
@@ -99,3 +100,4 @@ export class TestRequest extends Request {
     );
   }
 }
+ActionDispatch.TestRequest = TestRequest;

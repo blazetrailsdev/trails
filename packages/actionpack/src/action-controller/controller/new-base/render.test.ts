@@ -5,7 +5,6 @@ import { registerConstant } from "@blazetrails/ruby-compat";
 import { ActionNotFound } from "../../../abstract-controller/base.js";
 import { DoubleRenderError } from "../../../abstract-controller/rendering.js";
 import { Base } from "../../base.js";
-import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
@@ -82,9 +81,9 @@ class ChildRenderController extends BlankRenderController {
   }
 }
 
-controllerConstants.set("render/blank_render", BlankRenderController);
-controllerConstants.set("render/double_render", DoubleRenderController);
-controllerConstants.set("render/child_render", ChildRenderController);
+registerConstant("Render::BlankRenderController", BlankRenderController);
+registerConstant("Render::DoubleRenderController", DoubleRenderController);
+registerConstant("Render::ChildRenderController", ChildRenderController);
 
 class RenderTest extends Rack.TestCase {}
 

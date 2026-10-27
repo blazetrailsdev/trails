@@ -1,7 +1,7 @@
+import { camelize } from "@blazetrails/activesupport";
 import { underscore } from "@blazetrails/activesupport";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../../action-controller/base.js";
-import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import type { DispatchableControllerClass } from "../../../action-dispatch/routing/dispatcher.js";
 
 export class ContentController extends Base {}
@@ -73,8 +73,8 @@ for (const klass of [
   UsersController,
 ]) {
   registerConstant(klass.name, klass);
-  controllerConstants.set(
-    underscore(klass.name.replace(/Controller$/, "")),
+  registerConstant(
+    `${camelize(underscore(klass.name.replace(/Controller$/, "")))}Controller`,
     klass as unknown as DispatchableControllerClass,
   );
 }

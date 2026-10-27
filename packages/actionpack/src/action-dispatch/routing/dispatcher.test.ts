@@ -1,9 +1,11 @@
+import { camelize } from "@blazetrails/activesupport";
+import { registerConstant, isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "./route-set.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import { X_CASCADE } from "../constants.js";
 import { Response } from "../http/response.js";
-import { controllerConstants, Request } from "../http/request.js";
+import { Request } from "../http/request.js";
 import { Dispatcher, StaticDispatcher } from "./route-set.js";
 import type { RouterRequest } from "../journey/router.js";
 
@@ -43,12 +45,14 @@ describe("RouteDispatcher", () => {
   const registered: string[] = [];
 
   function registerController(controller: string, controllerClass: DispatchableControllerClass) {
-    controllerConstants.set(controller, controllerClass);
+    registerConstant(`${camelize(controller)}Controller`, controllerClass);
     registered.push(controller);
   }
 
   afterEach(() => {
-    for (const controller of registered.splice(0)) controllerConstants.delete(controller);
+    for (const controller of registered.splice(0))
+      if (isRegisteredConstant(`${camelize(controller)}Controller`))
+        rbModRemoveConst(Object, `${camelize(controller)}Controller`);
   });
 
   it("dispatches to a registered handler via RouteSet.serve", async () => {
@@ -175,7 +179,7 @@ describe("RouteDispatcher", () => {
       "posts",
       makeControllerClass(() => [200, {}, []]),
     );
-    controllerConstants.delete("posts");
+    rbModRemoveConst(Object, "PostsController");
     const res = await routes.router.serve(makeReq("/posts/index"));
     expect(res[0]).toBe(404);
   });
@@ -197,10 +201,10 @@ describe("Dispatcher over the controller constant table", () => {
   }
 
   beforeEach(() => {
-    controllerConstants.set("posts", PostsController as unknown as DispatchableControllerClass);
+    registerConstant("PostsController", PostsController as unknown as DispatchableControllerClass);
   });
   afterEach(() => {
-    controllerConstants.delete("posts");
+    if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
   });
 
   const reqFor = (params: Record<string, unknown>): RouterRequest => {

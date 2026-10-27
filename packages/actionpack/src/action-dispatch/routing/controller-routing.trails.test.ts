@@ -1,8 +1,10 @@
+import { camelize } from "@blazetrails/activesupport";
+import { registerConstant, isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { RouteSet } from "./route-set.js";
 import type { RackEnv } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
-import { controllerConstants, type Request } from "../http/request.js";
+import { type Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
@@ -26,12 +28,15 @@ beforeEach(() => {
     "api/v1/articles",
     "api/v1/posts",
   ]) {
-    controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+    registerConstant(
+      `${camelize(name)}Controller`,
+      StubController as unknown as DispatchableControllerClass,
+    );
   }
 });
 
 afterEach(() => {
-  controllerConstants.delete("posts");
+  if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
 });
 
 let capturedEnv: RackEnv = {};
@@ -246,8 +251,8 @@ describe("Controller routing integration", () => {
 
   it("call sets path parameters in env", async () => {
     const routes = new RouteSet();
-    controllerConstants.set(
-      "posts",
+    registerConstant(
+      "PostsController",
       CaptureEnvController as unknown as DispatchableControllerClass,
     );
     routes.draw(function () {

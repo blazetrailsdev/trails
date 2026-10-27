@@ -27,9 +27,9 @@ import {
   StringIO,
   Thread,
   Timeout,
+  registerConstant,
 } from "@blazetrails/ruby-compat";
 import "../../test-helpers/abstract-unit.js";
-import { controllerConstants } from "../../action-dispatch/http/request.js";
 import type { RackBody } from "../../action-dispatch/http/response.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
@@ -815,7 +815,7 @@ describe("LiveStreamRouterTest", () => {
     }
 
     static {
-      controllerConstants.set("live_stream_router_test/test", TestController);
+      registerConstant("LiveStreamRouterTest::TestController", TestController);
       this.routes.draw(function () {
         this.get("/test", { to: "live_stream_router_test/test#index" });
       });

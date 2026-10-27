@@ -1,7 +1,7 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertEqual, assertRaises } from "@blazetrails/activesupport";
-import { controllerConstants } from "../../http/request.js";
 import type { Mapper } from "../../routing/mapper.js";
 import { RouteSet } from "../../routing/route-set.js";
 import { IntegrationTest } from "../../testing/integration.js";
@@ -49,7 +49,7 @@ describe("RoutingConcernsTest", () => {
   let session: IntegrationTest;
 
   beforeAll(() => {
-    controllerConstants.set("reviews", ReviewsController);
+    registerConstant("ReviewsController", ReviewsController);
   });
 
   beforeEach(({ task }) => {

@@ -3,7 +3,6 @@ import { FixtureResolver } from "@blazetrails/actionview";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Mime } from "../../../action-dispatch/http/mime-type.js";
-import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
@@ -57,9 +56,9 @@ for (const [klass, name] of [
 ] as const) {
   Object.defineProperty(klass, "name", { value: name });
 }
-controllerConstants.set("content_type/base", BaseController);
-controllerConstants.set("content_type/implied", ImpliedController);
-controllerConstants.set("content_type/charset", CharsetController);
+registerConstant("ContentType::BaseController", BaseController);
+registerConstant("ContentType::ImpliedController", ImpliedController);
+registerConstant("ContentType::CharsetController", CharsetController);
 
 class ExplicitContentTypeTest extends Rack.TestCase {}
 

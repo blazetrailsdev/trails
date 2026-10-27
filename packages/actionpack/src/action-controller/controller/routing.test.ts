@@ -21,7 +21,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
-import { Request, controllerConstants } from "../../action-dispatch/http/request.js";
+import { Request } from "../../action-dispatch/http/request.js";
 import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
 import { RouteSet, type DrawCallback } from "../../action-dispatch/routing/route-set.js";
 import { RoutingError, UnknownHttpMethod, UrlGenerationError } from "../metal/exceptions.js";
@@ -43,8 +43,8 @@ class MilestonesController extends Base {
   }
 }
 registerConstant("MilestonesController", MilestonesController);
-controllerConstants.set(
-  "milestones",
+registerConstant(
+  "MilestonesController",
   MilestonesController as unknown as DispatchableControllerClass,
 );
 
