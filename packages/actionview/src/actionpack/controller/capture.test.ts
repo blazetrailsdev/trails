@@ -46,6 +46,8 @@ CaptureController.viewPaths([
       '<% contentFor("title", "Putting stuff in the title!") -%>\nGreat stuff!',
     "test/content-for-concatenated.tse":
       '<% contentFor("title", "Putting stuff ");\n   contentFor("title", "in the title!") -%>\nGreat stuff!',
+    "test/non-erb-block-content-for.builder":
+      'await contentFor("title", () => {\n  return "Putting stuff in the title!";\n});\nxml.append("Great stuff!");\n',
     "test/proper-block-detection.tse": "<%= todo %>",
     "layouts/talk_from_action.tse": '<title><%= title ?? yield("title") %></title>\n<%= yield -%>',
   }),
@@ -106,8 +108,7 @@ describe("CaptureTest", () => {
     expect(tc.response.body).toBe(tc.expectedContentForOutput());
   });
 
-  it.skip("non erb block content for", async () => {
-    // BLOCKED: port-builder-template-handler
+  it("non erb block content for", async () => {
     await tc.get("nonErbBlockContentFor");
     expect(tc.response.body).toBe(tc.expectedContentForOutput());
   });

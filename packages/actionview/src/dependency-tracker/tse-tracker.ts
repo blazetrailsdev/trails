@@ -1,4 +1,5 @@
 import { pluralize, singularize } from "@blazetrails/activesupport";
+import { StringScanner } from "@blazetrails/ruby-compat";
 import { parse } from "@blazetrails/tse-compiler";
 
 import type { PathSet } from "../path-set.js";
@@ -65,6 +66,11 @@ export class TSETracker {
   );
 
   static STRING = /(?<quote>['"`])(?<static>.*?)\k<quote>/su;
+
+  static RENDER_ARGUMENTS = new RegExp(
+    `(?:${this.STRING.source}|${this.VARIABLE_OR_METHOD_CHAIN.source})`,
+    "su",
+  );
 
   static supportsViewPaths(): boolean {
     return true;
@@ -146,11 +152,11 @@ export class TSETracker {
         if (options == null) continue;
 
         const renderType = Object.keys(options).find((key) => RENDER_TYPE_KEYS.includes(key))!;
-        const templates = this.renderCallTemplate(options[renderType]);
-        if (templates == null) continue;
-        const [template, objectTemplate] = templates;
+        const templates: string[] = [];
+        this.addDependencies(templates, options[renderType] ?? "", TSETracker.RENDER_ARGUMENTS);
+        if (templates.length === 0) continue;
 
-        if ("object" in options || "collection" in options || objectTemplate) {
+        if ("object" in options || "collection" in options) {
           if ("object" in options && "collection" in options) continue;
           if (!("partial" in options)) continue;
         }
@@ -164,7 +170,7 @@ export class TSETracker {
           dependencies.push(spacer.groups!.static);
         }
 
-        dependencies.push(template);
+        dependencies.push(...templates);
 
         const layout = TSETracker.STRING.exec(options.layout ?? "");
         if (
@@ -222,55 +228,76 @@ export class TSETracker {
     return options;
   }
 
-  private renderCallTemplate(node: string | null): [string, boolean] | null {
-    if (node == null) return null;
-    const objectTemplate = false;
-    let template: string;
-    const string = TSETracker.STRING.exec(node);
-    if (string?.index === 0 && string[0].length === node.length) {
-      const path = string.groups!.static;
-      if (string.groups!.quote === "`" && path.includes("${")) {
-        template = "";
-        let pos = 0;
-        while (pos < path.length) {
-          const interpolation = path.indexOf("${", pos);
-          if (interpolation < 0) {
-            template += path.slice(pos);
-            break;
-          }
-          template += path.slice(pos, interpolation);
-          let unmatchedBrackets = 1;
-          pos = interpolation + 2;
-          while (unmatchedBrackets > 0) {
-            if (pos >= path.length) return null;
-            if (path[pos] === "{") unmatchedBrackets += 1;
-            else if (path[pos] === "}") unmatchedBrackets -= 1;
-            pos += 1;
-          }
-          template += "*";
-        }
-      } else {
-        template = path.includes("/") ? path : `${this.directory}/${path}`;
-      }
-    } else {
-      const chain = TSETracker.VARIABLE_OR_METHOD_CHAIN.exec(node);
-      if (chain?.index !== 0) return null;
-      const callArguments = node.slice(chain[0].length).trimStart();
-      if (
-        callArguments.length > 0 &&
-        !(
-          callArguments.startsWith("(") &&
-          argumentList(callArguments.slice(1))[1] === callArguments.length - 2
-        )
-      ) {
-        return null;
-      }
-      const dependency = chain.groups!.dynamic;
-
-      template = `${pluralize(dependency)}/${singularize(dependency)}`;
+  /** @inventedArm if — CONVERGEABLE port-ruby-tracker-and-converge-tse-tracker-to-erb-tracker */
+  private addDependencies(renderDependencies: string[], arguments_: string, pattern: RegExp): void {
+    const match = pattern.exec(arguments_);
+    if (match?.index !== 0) return;
+    const rest = arguments_.slice(match[0].length).trimStart();
+    if (
+      rest.length > 0 &&
+      (match.groups!.static != null ||
+        !(rest.startsWith("(") && argumentList(rest.slice(1))[1] === rest.length - 2))
+    ) {
+      return;
     }
+    this.addDynamicDependency(renderDependencies, match.groups!.dynamic ?? null);
+    this.addStaticDependency(
+      renderDependencies,
+      match.groups!.static ?? null,
+      match.groups!.quote ?? null,
+    );
+  }
 
-    return [template, objectTemplate];
+  private addDynamicDependency(dependencies: string[], dependency: string | null): void {
+    if (dependency != null) {
+      dependencies.push(`${pluralize(dependency)}/${singularize(dependency)}`);
+    }
+  }
+
+  private addStaticDependency(
+    dependencies: string[],
+    dependency: string | null,
+    quoteType: string | null,
+  ): void {
+    if (quoteType === "`" && dependency!.includes("${")) {
+      const scanner = new StringScanner(dependency!);
+
+      let wildcardDependency = "";
+
+      while (!scanner.isEos()) {
+        if (scanner.scanUntil(/\$\{/) != null) {
+          let unmatchedBrackets = 1;
+          wildcardDependency += scanner.preMatch();
+
+          while (unmatchedBrackets > 0 && !scanner.isEos()) {
+            const found = scanner.scanUntil(/[{}]/);
+            if (found == null) return;
+
+            switch (scanner.matched()) {
+              case "{":
+                unmatchedBrackets += 1;
+                break;
+              case "}":
+                unmatchedBrackets -= 1;
+                break;
+            }
+          }
+
+          wildcardDependency += "*";
+        } else {
+          wildcardDependency += scanner.rest();
+          scanner.terminate();
+        }
+      }
+
+      dependencies.push(wildcardDependency);
+    } else if (dependency != null) {
+      if (dependency.includes("/")) {
+        dependencies.push(dependency);
+      } else {
+        dependencies.push(`${this.directory}/${dependency}`);
+      }
+    }
   }
 
   private explicitDependencies(): string[] {
