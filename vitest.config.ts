@@ -580,6 +580,9 @@ export default defineConfig({
             ...(ARCONN === "postgresql"
               ? []
               : ["packages/actioncable/src/subscription-adapter/postgresql.test.ts"]),
+            ...(process.env.REDIS_URL
+              ? []
+              : ["packages/actioncable/src/subscription-adapter/redis.test.ts"]),
             ...SHARED_EXCLUDE,
           ],
           globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],

@@ -102,7 +102,8 @@ export class Redis extends Base {
 prepend(Redis, ChannelPrefix);
 cattrAccessor.call(Redis, "redisConnector", {
   default: () => (config: Record<string, unknown>) => {
-    const conn = new IORedis(except(config, "adapter", "channelPrefix") as RedisOptions);
+    const options = except(config, "adapter", "channelPrefix");
+    const conn = new IORedis(options.url as string, options as RedisOptions);
     for (const command of ["subscribe", "unsubscribe"] as const) {
       const send = conn[command].bind(conn) as (...channel: string[]) => Promise<unknown>;
       conn[command] = (async (...channel: string[]) => {
