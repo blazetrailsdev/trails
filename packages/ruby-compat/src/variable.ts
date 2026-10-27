@@ -185,10 +185,6 @@ export function rbPathToClass(pathname: string): unknown {
   if (pend === 0 || pathname[0] === "#") {
     throw new ArgumentError(`can't retrieve anonymous class ${pathname}`);
   }
-  if (!RCLASS_CONST_TBL.has(pathname)) {
-    const generated = generatedClass(pathname);
-    if (generated !== undefined) return generated;
-  }
   while (p < pend) {
     if (RCLASS_CONST_TBL.has(pathname)) p = pend;
     while (p < pend && pathname[p] !== ":") p++;
@@ -210,6 +206,8 @@ export function rbPathToClass(pathname: string): unknown {
         ? (c as Record<string, unknown>)[id]
         : undefined;
     if (c === undefined) {
+      const generated = generatedClass(pathname);
+      if (generated !== undefined) return generated;
       throw new ArgumentError(`undefined class/module ${pathname.slice(0, p)}`);
     }
     if (c === null || (typeof c !== "object" && typeof c !== "function")) {

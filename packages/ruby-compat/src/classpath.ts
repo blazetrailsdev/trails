@@ -11,6 +11,7 @@
 export const classpaths = new WeakMap<object, { path: string; permanent: boolean }>();
 
 const pendingClassPaths: [() => unknown, string][] = [];
+let classPathsRegistered = false;
 const generatedClassPaths = new WeakMap<object, string>();
 const generatedClasses = new Map<string, () => unknown>();
 
@@ -18,14 +19,17 @@ const generatedClasses = new Map<string, () => unknown>();
  * Seats a package's generated table of the paths `RCLASS_SET_CLASSPATH`
  * (`vendor/ruby/v3.3.11/internal/class.h:258`) would have written, built by
  * `pnpm parity:class-paths` from `rails-api.json` (RFC 0205). Each class is
- * read through a thunk, resolved on the first lookup after its module has been
- * evaluated.
+ * read through a thunk on the first lookup after a registration. A table is
+ * imported last by its package entry, after every module it names has been
+ * evaluated, so a thunk still in TDZ then is retried only on the next
+ * registration, never on every lookup.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function registerClassPaths(entries: readonly [() => unknown, string][]): void {
   for (const [klass, path] of entries) {
     pendingClassPaths.push([klass, path]);
+    classPathsRegistered = true;
     generatedClasses.set(path, klass);
   }
 }
@@ -37,7 +41,8 @@ export function registerClassPaths(entries: readonly [() => unknown, string][]):
  * @noRailsEquivalent PERMANENT
  */
 export function generatedClassPath(klass: object): string | undefined {
-  if (pendingClassPaths.length > 0) {
+  if (classPathsRegistered) {
+    classPathsRegistered = false;
     let unresolved = 0;
     for (const entry of pendingClassPaths) {
       let value: unknown;
@@ -47,7 +52,10 @@ export function generatedClassPath(klass: object): string | undefined {
         pendingClassPaths[unresolved++] = entry;
         continue;
       }
-      if (typeof value === "function" && !generatedClassPaths.has(value)) {
+      if (
+        (typeof value === "function" || (typeof value === "object" && value !== null)) &&
+        !generatedClassPaths.has(value)
+      ) {
         generatedClassPaths.set(value, entry[1]);
       }
     }
@@ -86,7 +94,10 @@ export function classPathMismatches(): [string, string][] {
     } catch {
       continue;
     }
-    const seated = typeof klass === "function" ? classpaths.get(klass)?.path : undefined;
+    const seated =
+      typeof klass === "function" || (typeof klass === "object" && klass !== null)
+        ? classpaths.get(klass)?.path
+        : undefined;
     if (seated !== undefined && seated !== path) mismatches.push([seated, path]);
   }
   return mismatches;

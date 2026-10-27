@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classPathMismatches, registerClassPaths } from "./classpath.js";
-import { rbModName, rbModToS } from "./object.js";
+import { RCLASS_CONST_TBL, rbModName, rbModToS } from "./object.js";
 import { rbPathToClass } from "./variable.js";
 import { rbModConstSet } from "./include.js";
 
@@ -31,12 +31,42 @@ describe("rbModName over the generated class-path table", () => {
     expect(rbModName((() => class {})())).toBeNull();
   });
 
-  it("resolves a thunk whose binding is not yet initialized on a later lookup", () => {
-    registerClassPaths([[() => Later, "Deferred::Later"]]);
+  it("retries a thunk still in TDZ on the next registration, not on every lookup", () => {
+    let reads = 0;
+    registerClassPaths([
+      [
+        () => {
+          reads++;
+          return Later;
+        },
+        "Deferred::Later",
+      ],
+    ]);
     class Probe {}
     expect(rbModName(Probe)).toBe("Probe");
-
+    expect(rbModName(Probe)).toBe("Probe");
+    expect(reads).toBe(1);
     class Later {}
+    registerClassPaths([]);
+    expect(rbModName(Later)).toBe("Later");
+    registerClassPaths([[() => class {}, "Deferred::Other"]]);
     expect(rbModName(Later)).toBe("Deferred::Later");
+  });
+
+  it("seats a plain-object module", () => {
+    const Mod = {};
+    registerClassPaths([[() => Mod, "Outer::PlainModule"]]);
+    expect(rbModName(Mod)).toBe("Outer::PlainModule");
+    expect(rbPathToClass("Outer::PlainModule")).toBe(Mod);
+  });
+
+  it("walks the constant path before reading the generated table", () => {
+    class Inner {}
+    class Rebound {}
+    const Walked = { Inner: Rebound };
+    RCLASS_CONST_TBL.set("Walked", Walked);
+    registerClassPaths([[() => Inner, "Walked::Inner"]]);
+    expect(rbPathToClass("Walked::Inner")).toBe(Rebound);
+    RCLASS_CONST_TBL.delete("Walked");
   });
 });

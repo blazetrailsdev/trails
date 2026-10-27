@@ -133,6 +133,8 @@ export async function collectClassPaths(): Promise<Map<string, ClassPathEntry[]>
   const ruby = await readJson<Manifest>("rails-api.json");
   const ts = await readJson<Manifest>("ts-api.json");
   const byDir = new Map<string, ClassPathEntry[]>();
+  unexported.length = 0;
+  known.clear();
 
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
     const tsPkg = ts.packages[pkg];
@@ -235,9 +237,24 @@ async function checkSeatedPaths(dir: string): Promise<void> {
 async function main(): Promise<void> {
   const check = process.argv.includes("--check");
   const stale: string[] = [];
-  for (const [dir, entries] of await collectClassPaths()) {
-    if (entries.length === 0) continue;
+  const tables = await collectClassPaths();
+  for (const [dir, entries] of tables) {
     const target = path.join(ROOT_DIR, "packages", dir, "src", GENERATED);
+    if (entries.length === 0) {
+      const exists = await fs.access(target).then(
+        () => true,
+        () => false,
+      );
+      if (!exists) continue;
+      if (check) stale.push(`${path.relative(ROOT_DIR, target)} (no paired classes left)`);
+      else {
+        await fs.rm(target);
+        console.error(
+          `Removed ${path.relative(ROOT_DIR, target)}: drop its import from the entry.`,
+        );
+      }
+      continue;
+    }
     const next = await prettier.format(renderClassPaths(entries), {
       ...(await prettier.resolveConfig(target)),
       filepath: target,
@@ -259,7 +276,7 @@ async function main(): Promise<void> {
     process.exitCode = 1;
   }
   if (check) {
-    for (const [dir, entries] of await collectClassPaths()) {
+    for (const [dir, entries] of tables) {
       if (entries.length > 0) await checkSeatedPaths(dir);
     }
   }
