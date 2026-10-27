@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Base } from "../base.js";
+import { RubyTracker } from "../dependency-tracker/ruby-tracker.js";
 import { TSETracker } from "../dependency-tracker/tse-tracker.js";
 import { PathSet } from "../path-set.js";
 import { Template } from "../template.js";
@@ -80,32 +81,34 @@ describe("TSETracker interpolation holding an expression", () => {
 
     expect(new TSETracker("interpolation/_string", template, null).dependencies()).toEqual([]);
   });
+});
 
+describe("RubyTracker render call parsing", () => {
   it("skips a render call whose template is not a string or a variable/call read", () => {
     const template = {
       source: "<%= render (opts) + more %>",
-      handler: null,
+      handler: new TSE(),
     } as unknown as Template;
 
-    expect(new TSETracker("messages/show", template, null).dependencies()).toEqual([]);
+    expect(new RubyTracker("messages/show", template, null).dependencies()).toEqual([]);
   });
 
   it("does not scan a render inside a string literal", () => {
     const template = {
       source: '<%= t("please render later") %>',
-      handler: null,
+      handler: new TSE(),
     } as unknown as Template;
 
-    expect(new TSETracker("messages/show", template, null).dependencies()).toEqual([]);
+    expect(new RubyTracker("messages/show", template, null).dependencies()).toEqual([]);
   });
 
   it("scans a render inside a backtick interpolation", () => {
     const template = {
       source: '<%= `${render("messages/message")}` %>',
-      handler: null,
+      handler: new TSE(),
     } as unknown as Template;
 
-    expect(new TSETracker("messages/show", template, null).dependencies()).toEqual([
+    expect(new RubyTracker("messages/show", template, null).dependencies()).toEqual([
       "messages/message",
     ]);
   });

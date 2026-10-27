@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import "../base.js";
 import { DependencyTracker } from "../dependency-tracker.js";
+import { RubyTracker } from "../dependency-tracker/ruby-tracker.js";
 import { TSETracker } from "../dependency-tracker/tse-tracker.js";
 import { PathSet } from "../path-set.js";
 import { type TemplateHandler } from "../template/handlers.js";
@@ -309,7 +311,7 @@ describe("TSETrackerTest", () => {
 
 describe("RubyTrackerTests", () => {
   function makeTracker(name: string, template: FakeTemplate, viewPaths: PathSet | null = null) {
-    return new TSETracker(name, asTemplate(template), viewPaths);
+    return new RubyTracker(name, asTemplate(template), viewPaths);
   }
 
   it("dependencies skip unknown options", () => {
