@@ -127,12 +127,11 @@ export class ChannelGenerator extends NamedBase {
 
   /** @internal */
   private async importChannelInJavascriptEntrypoint(): Promise<void> {
-    const fileName = dasherize(this.fileName);
     this.appendToFile(
       "app/javascript/channels/index.js",
       (await this.isUsingJsRuntime())
-        ? `import "./${fileName}-channel"\n`
-        : `import "channels/${fileName}-channel"\n`,
+        ? `import "./${dasherize(this.fileName)}-channel"\n`
+        : `import "channels/${dasherize(this.fileName)}-channel"\n`,
     );
   }
 
@@ -142,7 +141,7 @@ export class ChannelGenerator extends NamedBase {
     if (await this.isUsingBun()) {
       await this.run("bun add @rails/actioncable");
     } else if (await this.isUsingNode()) {
-      await this.run("pnpm add @rails/actioncable");
+      await this.run("yarn add @rails/actioncable");
     }
   }
 

@@ -21,15 +21,16 @@ export class Connection extends ActionCable.Connection.Base {
 /** @missingRailsCall module_namespacing — CONVERGEABLE scaffold-controller-hooks-test-framework-and-engine-arms */
 const channel: Template = function (ext) {
   const root = "../".repeat(this.classPathParts.length);
-  const actions = this.actions.map((action) => `\n  ${action}(): void {\n  }\n`).join("");
+  const signature = ext === ".ts" ? "(): void" : "()";
+  const actions = this.actions.map((action) => `\n  ${action}${signature} {\n  }\n`).join("");
   return `import * as ApplicationCable from "${root || "./"}application-cable/channel${ext}";
 
 export class ${this.className().split("::").pop()}Channel extends ApplicationCable.Channel {
-  subscribed(): void {
+  subscribed${signature} {
     // this.streamFrom("some_channel");
   }
 
-  unsubscribed(): void {
+  unsubscribed${signature} {
     // Any cleanup needed when channel is unsubscribed
   }
 ${actions}}
