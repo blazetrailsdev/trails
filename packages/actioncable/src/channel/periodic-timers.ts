@@ -8,12 +8,10 @@ import {
   rbCSymbol,
   rbFSend,
   rbInspect,
-  rbModConstSet,
   rbObjClass,
   rbObjIsKindOf,
   rbObjIsProc,
 } from "@blazetrails/ruby-compat";
-import { Channel } from "../namespaces.js";
 
 type Callback = (this: unknown) => unknown;
 type PeriodicTimer = [Callback, { every: unknown }];
@@ -136,5 +134,3 @@ Object.defineProperty(PeriodicTimers, "ClassMethods", { value: ClassMethods });
   this.afterSubscribe(":startPeriodicTimers");
   this.afterUnsubscribe(":stopPeriodicTimers");
 });
-
-rbModConstSet(Channel, "PeriodicTimers", PeriodicTimers);

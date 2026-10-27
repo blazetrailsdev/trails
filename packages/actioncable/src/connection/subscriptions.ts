@@ -9,11 +9,10 @@ import {
   excBacktrace,
   hashDelete,
   rbInspect,
-  rbModConstSet,
   rbModGt,
   rbObjClassname,
 } from "@blazetrails/ruby-compat";
-import { ActionCable, Connection } from "../namespaces.js";
+import { Base } from "../channel/base.js";
 
 interface SubscriptionsConnection {
   logger: { error(message: string): unknown; info(message: string): unknown };
@@ -82,7 +81,6 @@ export class Subscriptions {
       idOptions.get("channel") as string,
     ) as SubscriptionClass | null;
 
-    const Base = (ActionCable.Channel as unknown as { Base: SubscriptionClass }).Base;
     if (subscriptionKlass != null && rbModGt(Base, subscriptionKlass)) {
       const subscription = new subscriptionKlass(this.connection, idKey, idOptions);
       this.subscriptions[idKey] = subscription;
@@ -135,5 +133,3 @@ export class Subscriptions {
     }
   }
 }
-
-rbModConstSet(Connection, "Subscriptions", Subscriptions);

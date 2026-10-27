@@ -4,13 +4,11 @@ import {
   defineModule,
   rbModAttrReader,
   rbModAttrWriter,
-  rbModConstSet,
   rbObjIvarGet,
   rbObjRespondTo,
   toS,
   filterMap,
 } from "@blazetrails/ruby-compat";
-import { Connection } from "../namespaces.js";
 
 interface IdentificationClass {
   prototype: object;
@@ -73,5 +71,3 @@ Object.defineProperty(Identification, "ClassMethods", { value: ClassMethods });
 ).included(null, function (this: IdentificationClass) {
   classAttribute.call(this, "identifiers", { default: new Set() });
 });
-
-rbModConstSet(Connection, "Identification", Identification);

@@ -1,6 +1,7 @@
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
 import {
+  generatedClass,
   isRegisteredConstant,
   rbModConstSet,
   regexpEscape,
@@ -202,11 +203,11 @@ export function constantize(camelCasedWord: string): unknown {
     const key = segments.slice(0, i).join("::");
     const value = isRegisteredConstant(key)
       ? registeredConstant(key)
-      : i > 1 &&
-          receiver != null &&
-          (typeof receiver === "object" || typeof receiver === "function")
-        ? (receiver as Record<string, unknown>)[segments[i - 1]]
-        : undefined;
+      : ((i > 1 &&
+        receiver != null &&
+        (typeof receiver === "object" || typeof receiver === "function")
+          ? (receiver as Record<string, unknown>)[segments[i - 1]]
+          : undefined) ?? generatedClass(key));
     if (value === undefined) {
       const { constMissing } = (receiver ?? {}) as {
         constMissing?: (name: string) => unknown;

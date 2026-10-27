@@ -3,11 +3,10 @@ import {
   defineModule,
   excBacktrace,
   rbFArray,
-  rbModConstSet,
   rbObjAsString,
   rbObjClass,
 } from "@blazetrails/ruby-compat";
-import { ActionCable, Connection } from "../namespaces.js";
+import { INTERNAL } from "../action-cable.js";
 
 type Callback = (message: unknown) => unknown;
 
@@ -57,7 +56,7 @@ function processInternalMessage(
       case "disconnect":
         this.logger.info(`Removing connection (${this.connectionIdentifier})`);
         this.close({
-          reason: ActionCable.INTERNAL.disconnectReasons.remote,
+          reason: INTERNAL.disconnectReasons.remote,
           reconnect: Object.hasOwn(message, "reconnect") ? message.reconnect : true,
         });
     }
@@ -86,5 +85,3 @@ export const InternalChannel = defineModule(
   },
 );
 extend(InternalChannel, Concern);
-
-rbModConstSet(Connection, "InternalChannel", InternalChannel);

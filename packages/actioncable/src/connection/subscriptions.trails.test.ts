@@ -1,42 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
-import { Channel } from "../namespaces.js";
+import { registerConstant } from "@blazetrails/ruby-compat";
+import { Base as ChannelBase } from "../channel/base.js";
 import { Subscriptions } from "./subscriptions.js";
 
 const events: string[] = [];
 
-class Base {
-  constructor(
-    public connection: unknown,
-    public identifier: string,
-    public params: { get(key: string): unknown },
-  ) {}
-
-  async subscribeToChannel(): Promise<void> {
+class Base extends ChannelBase {
+  override async subscribeToChannel(): Promise<void> {
     events.push(`subscribed ${this.identifier}`);
   }
 
-  async unsubscribeFromChannel(): Promise<void> {
+  override async unsubscribeFromChannel(): Promise<void> {
     await Promise.resolve();
     events.push(`unsubscribing ${this.identifier}`);
     await new Promise((resolve) => setTimeout(resolve, 5));
     events.push(`unsubscribed ${this.identifier}`);
   }
 
-  async performAction(data: unknown): Promise<void> {
+  override async performAction(data: unknown): Promise<void> {
     events.push(`perform ${JSON.stringify(data)}`);
   }
 }
-rbModConstSet(Channel, "Base", Base);
 
 class ChatChannel extends Base {}
 registerConstant("SubscriptionsTestChatChannel", ChatChannel);
-registerConstant("SubscriptionsTestBase", Base);
+registerConstant("SubscriptionsTestBase", ChannelBase);
 
 function buildConnection() {
   const logged: string[] = [];
   const rescued: unknown[] = [];
   const connection = {
+    identifiers: [],
     logger: {
       error: (message: string) => logged.push(message),
       info: (message: string) => logged.push(message),

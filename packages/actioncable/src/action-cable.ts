@@ -1,4 +1,3 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActionCable } from "./namespaces.js";
 
 export const INTERNAL = {
@@ -18,7 +17,7 @@ export const INTERNAL = {
   defaultMountPath: "/cable",
   protocols: Object.freeze(["actioncable-v1-json", "actioncable-unsupported"]),
 };
-rbModConstSet(ActionCable, "INTERNAL", INTERNAL);
+ActionCable.INTERNAL = INTERNAL;
 
 export function server(this: typeof ActionCable): unknown {
   return (this._server ??= new ActionCable.Server.Base());

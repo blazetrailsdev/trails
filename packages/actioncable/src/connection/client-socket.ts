@@ -1,6 +1,5 @@
 import Driver from "websocket-driver";
-import { ArgumentError, rbDeclareIvar, rbModConstSet } from "@blazetrails/ruby-compat";
-import { Connection } from "../namespaces.js";
+import { ArgumentError, rbDeclareIvar } from "@blazetrails/ruby-compat";
 import { Stream } from "./stream.js";
 
 type Env = Record<string, unknown>;
@@ -209,4 +208,3 @@ export class ClientSocket {
 }
 
 rbDeclareIvar(ClientSocket, "@stream", "_stream");
-rbModConstSet(Connection, "ClientSocket", ClientSocket);

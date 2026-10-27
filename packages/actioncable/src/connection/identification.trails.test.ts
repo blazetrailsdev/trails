@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { include } from "@blazetrails/ruby-compat";
 import { Identification } from "./identification.js";
-import { Authorization } from "./authorization.js";
+import { Authorization, UnauthorizedError } from "./authorization.js";
 
 interface ConnectionClass {
   identifiers: Set<string>;
@@ -54,9 +54,7 @@ describe("ActionCable::Connection::Identification and Authorization", () => {
 
   it("logs and raises on an unauthorized connection", () => {
     const connection = new UserConnection() as UserConnection & typeof Authorization;
-    expect(() => connection.rejectUnauthorizedConnection()).toThrow(
-      Authorization.UnauthorizedError,
-    );
+    expect(() => connection.rejectUnauthorizedConnection()).toThrow(UnauthorizedError);
     expect(connection.logged).toEqual(["An unauthorized connection attempt was rejected"]);
   });
 });

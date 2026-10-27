@@ -1,5 +1,4 @@
-import { NotImplementedError, Process, rbModConstSet } from "@blazetrails/ruby-compat";
-import { SubscriptionAdapter } from "../namespaces.js";
+import { NotImplementedError, Process } from "@blazetrails/ruby-compat";
 
 export interface AdapterServer {
   logger: unknown;
@@ -45,5 +44,3 @@ export class Base {
       : (cable.id = `ActionCable-PID-${Process.pid}`);
   }
 }
-
-rbModConstSet(SubscriptionAdapter, "Base", Base);

@@ -1,7 +1,5 @@
 import Driver from "websocket-driver";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
-import "../action-cable.js";
-import { ActionCable, Connection } from "../namespaces.js";
+import { INTERNAL } from "../action-cable.js";
 import { ClientSocket, driverRequest } from "./client-socket.js";
 
 type ClientSocketArgs = ConstructorParameters<typeof ClientSocket>;
@@ -13,7 +11,7 @@ export class WebSocket {
     env: ClientSocketArgs[0],
     eventTarget: ClientSocketArgs[1],
     eventLoop: ClientSocketArgs[2],
-    { protocols = ActionCable.INTERNAL.protocols }: { protocols?: readonly string[] } = {},
+    { protocols = INTERNAL.protocols }: { protocols?: readonly string[] } = {},
   ) {
     this._websocket = Driver.isWebSocket(driverRequest(env))
       ? new ClientSocket(env, eventTarget, eventLoop, protocols)
@@ -49,5 +47,3 @@ export class WebSocket {
     return this._websocket;
   }
 }
-
-rbModConstSet(Connection, "WebSocket", WebSocket);

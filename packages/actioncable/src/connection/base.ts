@@ -17,7 +17,6 @@ import {
   rbInspect,
   ArgumentError,
   rbClassInheritedP,
-  rbModConstSet,
   registerConstant,
   rbModName,
   rbObjId,
@@ -26,10 +25,10 @@ import {
   sprintf,
   toS,
 } from "@blazetrails/ruby-compat";
-import "../action-cable.js";
-import { ActionCable, Connection } from "../namespaces.js";
+import { INTERNAL } from "../action-cable.js";
+import { Connection } from "../namespaces.js";
 import type { Base as ServerBase } from "../server/base.js";
-import { Authorization } from "./authorization.js";
+import { Authorization, UnauthorizedError } from "./authorization.js";
 import { Callbacks } from "./callbacks.js";
 import {
   Identification,
@@ -145,7 +144,7 @@ export class Base {
     | boolean
     | undefined {
     this.transmit({
-      type: ActionCable.INTERNAL.messageTypes.disconnect,
+      type: INTERNAL.messageTypes.disconnect,
       reason,
       reconnect,
     });
@@ -167,7 +166,7 @@ export class Base {
 
   beat(): boolean | undefined {
     return this.transmit({
-      type: ActionCable.INTERNAL.messageTypes.ping,
+      type: INTERNAL.messageTypes.ping,
       message: Time.now().toI(),
     });
   }
@@ -236,16 +235,10 @@ export class Base {
       this.messageBuffer.processBang();
       return this.server.addConnection(this as never);
     } catch (e) {
-      if (
-        !(
-          e instanceof
-          (Authorization as unknown as { UnauthorizedError: typeof Error }).UnauthorizedError
-        )
-      )
-        throw e;
+      if (!(e instanceof UnauthorizedError)) throw e;
       if (this.websocket.isAlive())
         return this.close({
-          reason: ActionCable.INTERNAL.disconnectReasons.unauthorized,
+          reason: INTERNAL.disconnectReasons.unauthorized,
           reconnect: false,
         });
       return null;
@@ -268,7 +261,7 @@ export class Base {
 
   /** @internal */
   private sendWelcomeMessage(): boolean | undefined {
-    return this.transmit({ type: ActionCable.INTERNAL.messageTypes.welcome });
+    return this.transmit({ type: INTERNAL.messageTypes.welcome });
   }
 
   /** @internal */
@@ -301,8 +294,7 @@ export class Base {
 
   /** @internal */
   private respondToInvalidRequest(): [number, Record<string, string>, string[]] {
-    if (this.websocket.isAlive())
-      this.close({ reason: ActionCable.INTERNAL.disconnectReasons.invalidRequest });
+    if (this.websocket.isAlive()) this.close({ reason: INTERNAL.disconnectReasons.invalidRequest });
 
     this.logger.error(this.invalidRequestMessage());
     this.logger.info(this.finishedRequestMessage());
@@ -371,7 +363,7 @@ include(Base, Authorization);
 include(Base, Callbacks);
 include(Base, Rescuable);
 
-rbModConstSet(Connection, "Base", Base);
+Connection.Base = Base;
 
 /** @noRailsEquivalent PERMANENT */
 export function registerConnection(connection: typeof Base): void;

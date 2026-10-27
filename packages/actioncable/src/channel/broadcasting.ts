@@ -1,6 +1,6 @@
 import { Concern, extend, toParam } from "@blazetrails/activesupport";
-import { defineModule, rbModConstSet, rbObjClass, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { ActionCable, Channel } from "../namespaces.js";
+import { defineModule, rbObjClass, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ActionCable } from "../namespaces.js";
 
 interface BroadcastingClass {
   channelName: string;
@@ -50,5 +50,3 @@ export function broadcastTo(this: unknown, model: unknown, message: unknown): Pr
 export const Broadcasting = defineModule({ broadcastingFor, broadcastTo });
 extend(Broadcasting, Concern);
 Object.defineProperty(Broadcasting, "ClassMethods", { value: ClassMethods });
-
-rbModConstSet(Channel, "Broadcasting", Broadcasting);

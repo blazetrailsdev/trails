@@ -1,8 +1,8 @@
 /**
  * The Ruby class-path table (RFC 0205, story
  * derive-class-path-from-registered-namespaces): one checked-in module per
- * package, `src/class-paths.generated.ts`, mapping each exported TS class that
- * `parity:api` pairs with a Ruby class to that class's `fqn` in
+ * package, `src/class-paths.generated.ts`, mapping each exported TS class or
+ * module that `parity:api` pairs with a Ruby class or module to its `fqn` in
  * `output/rails-api.json`. ruby-compat's `rbModName` reads it after the
  * `classpaths` a `const_set` or a module-eval seat wrote, and before
  * `klass.name`.
@@ -21,7 +21,12 @@ import * as path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import * as prettier from "prettier";
-import { TOKEN_RENAMES, isRubyOnlyClass, rubyFileToTs } from "../parity/conventions.js";
+import {
+  TOKEN_RENAMES,
+  TS_CLASS_RENAMES,
+  isRubyOnlyClass,
+  rubyFileToTs,
+} from "../parity/conventions.js";
 import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { resolveTsClassForRuby } from "./compare.js";
 import { PACKAGE_DIR_OVERRIDES, ROOT_DIR, packageSrcDir } from "./config.js";
@@ -35,7 +40,13 @@ const GENERATED = "class-paths.generated.ts";
 const SKIPPED = new Set(["activerecord-test-support"]);
 
 interface Manifest {
-  packages: Record<string, { classes: Record<string, ClassInfo & { fqn?: string }> }>;
+  packages: Record<
+    string,
+    {
+      classes: Record<string, ClassInfo & { fqn?: string }>;
+      modules: Record<string, ClassInfo & { fqn?: string }>;
+    }
+  >;
 }
 
 export interface ClassPathEntry {
@@ -98,7 +109,9 @@ function isExported(source: string, name: string): boolean {
   return (
     new RegExp(`^export\\s+(?:default\\s+)?(?:abstract\\s+)?class\\s+${name}\\b`, "m").test(
       source,
-    ) || new RegExp(`^export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*;`, "m").test(source)
+    ) ||
+    new RegExp(`^export\\s+const\\s+${name}\\b`, "m").test(source) ||
+    new RegExp(`^export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*;`, "m").test(source)
   );
 }
 
@@ -144,23 +157,31 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     const srcRoot = path.join(ROOT_DIR, "packages", dir, "src");
     const subDir = path.relative(srcRoot, packageSrcDir(pkg));
 
-    const tsByFileName = new Map<string, ClassInfo>();
-    for (const cls of Object.values(tsPkg.classes)) {
-      if (cls.file) tsByFileName.set(`${cls.file}::${cls.name}`, cls);
-    }
-
     const paired = new Map<string, ClassPathEntry>();
+    const modules = new Set<string>();
     const ambiguous = new Set<string>();
-    for (const [fqn, info] of Object.entries(rubyPkg.classes)) {
-      if (!info.file || isRubyOnlyClass(fqn) || isSourceUnported(info.file, pkg)) continue;
-      const short = fqn.split("::").at(-1)!;
-      const tsCls = resolveTsClassForRuby(short, rubyFileToTs(info.file, pkg), tsByFileName);
-      const rubyPath = renameTokens(fqn);
-      if (!tsCls?.file || rubyPath === tsCls.name) continue;
-      const file = path.join(subDir, tsCls.file);
-      const key = `${file}::${tsCls.name}`;
-      if (paired.has(key) && paired.get(key)!.fqn !== rubyPath) ambiguous.add(key);
-      paired.set(key, { file, tsName: tsCls.name, fqn: rubyPath });
+    for (const kind of ["classes", "modules"] as const) {
+      const tsByFileName = new Map<string, ClassInfo>();
+      for (const cls of Object.values(tsPkg[kind] ?? {})) {
+        if (cls.file) tsByFileName.set(`${cls.file}::${cls.name}`, cls);
+      }
+      for (const [fqn, info] of Object.entries(rubyPkg[kind] ?? {})) {
+        if (!info.file || isRubyOnlyClass(fqn) || isSourceUnported(info.file, pkg)) continue;
+        // A module under a `TS_CLASS_RENAMES` segment (`AbstractController::Railties`)
+        // is spelled the trails way by its seat, which no table entry may contradict.
+        if (kind === "modules" && fqn.split("::").some((seg) => seg in TS_CLASS_RENAMES)) {
+          continue;
+        }
+        const short = fqn.split("::").at(-1)!;
+        const tsCls = resolveTsClassForRuby(short, rubyFileToTs(info.file, pkg), tsByFileName);
+        const rubyPath = renameTokens(fqn);
+        if (!tsCls?.file || rubyPath === tsCls.name) continue;
+        const file = path.join(subDir, tsCls.file);
+        const key = `${file}::${tsCls.name}`;
+        if (paired.has(key) && paired.get(key)!.fqn !== rubyPath) ambiguous.add(key);
+        paired.set(key, { file, tsName: tsCls.name, fqn: rubyPath });
+        if (kind === "modules") modules.add(key);
+      }
     }
 
     const excluded = await tsconfigExcludes(dir);
@@ -175,6 +196,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       if (!reachable.has(entry.file)) continue;
       const source = await fs.readFile(path.join(srcRoot, entry.file), "utf8");
       if (isExported(source, entry.tsName)) entries.push(entry);
+      else if (modules.has(key)) continue;
       else if (KNOWN_UNEXPORTED.has(entry.fqn)) known.add(entry.fqn);
       else unexported.push(`${dir}/src/${entry.file}: ${entry.tsName} (${entry.fqn})`);
     }

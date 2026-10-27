@@ -1,5 +1,4 @@
-import { defineModule, rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
-import { SubscriptionAdapter } from "../namespaces.js";
+import { defineModule, rbCallSuper } from "@blazetrails/ruby-compat";
 
 interface ChannelPrefixHost {
   server: { config: { cable: Record<string, unknown> } };
@@ -38,5 +37,3 @@ export const ChannelPrefix = defineModule(
   {},
   { channelWithPrefix },
 );
-
-rbModConstSet(SubscriptionAdapter, "ChannelPrefix", ChannelPrefix);

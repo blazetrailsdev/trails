@@ -4,8 +4,7 @@ import {
   extend,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { defineModule, include, rbModConstSet } from "@blazetrails/ruby-compat";
-import { Connection } from "../namespaces.js";
+import { defineModule, include } from "@blazetrails/ruby-compat";
 
 interface CallbacksClass {
   defineCallbacks(...names: Array<string | Record<string, unknown>>): void;
@@ -40,5 +39,3 @@ include(Callbacks, ASCallbacks);
   this.defineCallbacks("command");
 });
 Object.defineProperty(Callbacks, "ClassMethods", { value: ClassMethods });
-
-rbModConstSet(Connection, "Callbacks", Callbacks);

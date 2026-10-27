@@ -1,5 +1,4 @@
-import { rbModConstSet, rbObjClassname } from "@blazetrails/ruby-compat";
-import { Connection } from "../namespaces.js";
+import { rbObjClassname } from "@blazetrails/ruby-compat";
 
 interface MessageBufferConnection {
   logger: { error(message: string): unknown };
@@ -61,5 +60,3 @@ export class MessageBuffer {
     while (this.bufferedMessages.length !== 0) this.receive(this.bufferedMessages.shift()!);
   }
 }
-
-rbModConstSet(Connection, "MessageBuffer", MessageBuffer);
