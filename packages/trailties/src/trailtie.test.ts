@@ -93,14 +93,14 @@ describe("Trailtie", () => {
     runner: "runRunnerBlocks",
   } as const;
   for (const kind of ["generators", "console", "server", "runner"] as const) {
-    it(`${kind} block is executed when MyApp.load_${kind} is called`, () => {
+    it(`${kind} block is executed when MyApp.load_${kind} is called`, async () => {
       let ran = false;
       class T extends Trailtie {}
       Trailtie.register(T);
       T[kind](() => {
         ran = true;
       });
-      (T.instance()[RUNNERS[kind]] as (a: unknown) => void).call(T.instance(), {});
+      await (T.instance()[RUNNERS[kind]] as (a: unknown) => unknown).call(T.instance(), {});
       expect(ran).toBe(true);
     });
   }

@@ -455,7 +455,7 @@ describe("AppGenerator", () => {
     const configRu = fs.readFileSync(appPath("config.ts"), "utf-8");
     expect(configRu).toContain(`import "./config/environment.ts";`);
     expect(configRu).toContain("export default Trails.application;");
-    expect(configRu).toContain("Trails.application.loadServer();");
+    expect(configRu).toContain("await Trails.application.loadServer();");
   });
 
   it("invalid application name raises an error", async () => {

@@ -35,6 +35,7 @@ export function serverCommand(): Command {
       const root = Dir.pwd();
       await requireApplicationBang();
       const app = await Trails.initialize();
+      await app.loadServer();
       if (isLogToStdout(options)) logToStdout();
       await watchViews(app, root);
       const port = parseInt(options.port, 10);

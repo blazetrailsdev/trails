@@ -70,7 +70,10 @@ describe("trails server environment (trails)", () => {
     runOptions = [];
     runApps = [];
     Trails.logger = new BroadcastLogger(new Logger(null));
-    vi.spyOn(Trails, "initialize").mockResolvedValue({ app: () => () => [200, {}, []] } as never);
+    vi.spyOn(Trails, "initialize").mockResolvedValue({
+      app: () => () => [200, {}, []],
+      loadServer: async () => {},
+    } as never);
     vi.spyOn(Handler.Node, "run").mockImplementation((async (
       app: RackApp,
       options: Record<string, unknown>,
@@ -136,6 +139,39 @@ describe("trails server environment (trails)", () => {
     expect(env.TRAILS_ENV).toBe("");
   });
 
+  it("awaits the server blocks before it binds", async () => {
+    const order: string[] = [];
+    vi.spyOn(Trails, "initialize").mockResolvedValue({
+      app: () => () => [200, {}, []],
+      loadServer: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        order.push("loadServer");
+      },
+    } as never);
+    vi.mocked(Handler.Node.run).mockImplementation((async () => {
+      order.push("run");
+      return { address: () => null };
+    }) as never);
+
+    await serverCommand().parseAsync(["-e", "production"], { from: "user" });
+
+    expect(order).toEqual(["loadServer", "run"]);
+  });
+
+  it("does not bind when a server block rejects", async () => {
+    vi.spyOn(Trails, "initialize").mockResolvedValue({
+      app: () => () => [200, {}, []],
+      loadServer: async () => {
+        throw new Error("no database");
+      },
+    } as never);
+
+    await expect(
+      serverCommand().parseAsync(["-e", "production"], { from: "user" }),
+    ).rejects.toThrow("no database");
+    expect(runOptions).toEqual([]);
+  });
+
   describe("serves the application, not its middleware stack", () => {
     let app: Application;
 
@@ -183,6 +219,7 @@ describe("trails server environment (trails)", () => {
   function initializeWith(actionView: Record<string, unknown>, reloading: boolean): void {
     vi.spyOn(Trails, "initialize").mockResolvedValue({
       app: () => () => [200, {}, []],
+      loadServer: async () => {},
       config: { actionView, isReloadingEnabled: () => reloading },
     } as never);
   }

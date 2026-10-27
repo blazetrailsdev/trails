@@ -411,7 +411,7 @@ import "./config/environment.ts";
 
 export default Trails.application;
 
-Trails.application.loadServer();
+await Trails.application.loadServer();
 `,
     );
 
