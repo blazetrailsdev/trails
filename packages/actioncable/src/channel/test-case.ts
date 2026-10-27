@@ -187,7 +187,10 @@ export const ClassMethods: Omit<
   },
 };
 
-export interface Behavior extends Omit<TestHelper, "beforeSetup" | "afterTeardown"> {
+export interface Behavior extends Omit<
+  TestHelper,
+  "beforeSetup" | "afterTeardown" | "assertBroadcasts" | "assertBroadcastOn"
+> {
   readonly connection: ConnectionStub | null;
   readonly subscription: StubbedSubscription | null;
   /** @internal */
@@ -234,17 +237,31 @@ function transmissions(this: Host): unknown[] {
 async function assertBroadcasts(
   this: Host,
   streamOrObject: unknown,
-  ...args: [number, (() => unknown) | null | undefined]
+  args: number,
+  block: (() => unknown) | null = null,
 ): Promise<void> {
-  await rbCallSuper(this, assertBroadcasts, broadcastingFor.call(this, streamOrObject), ...args);
+  await rbCallSuper(
+    this,
+    assertBroadcasts,
+    broadcastingFor.call(this, streamOrObject),
+    args,
+    block,
+  );
 }
 
 async function assertBroadcastOn(
   this: Host,
   streamOrObject: unknown,
-  ...args: [unknown, (() => unknown) | null | undefined]
+  args: unknown,
+  block: (() => unknown) | null = null,
 ): Promise<void> {
-  await rbCallSuper(this, assertBroadcastOn, broadcastingFor.call(this, streamOrObject), ...args);
+  await rbCallSuper(
+    this,
+    assertBroadcastOn,
+    broadcastingFor.call(this, streamOrObject),
+    args,
+    block,
+  );
 }
 
 function assertNoStreams(this: Host): void {
@@ -334,6 +351,8 @@ export interface TestCase extends Behavior {
   unsubscribe: typeof unsubscribe;
   perform: typeof perform;
   transmissions: typeof transmissions;
+  assertBroadcasts: typeof assertBroadcasts;
+  assertBroadcastOn: typeof assertBroadcastOn;
   assertNoStreams: typeof assertNoStreams;
   assertHasStream: typeof assertHasStream;
   assertHasStreamFor: typeof assertHasStreamFor;

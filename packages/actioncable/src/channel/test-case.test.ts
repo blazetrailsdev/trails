@@ -9,10 +9,6 @@ import type { Broadcasting } from "./broadcasting.js";
 import { TestCase } from "./test-case.js";
 
 type Data = Record<string, unknown>;
-type Broadcasts = {
-  assertBroadcasts(streamOrObject: unknown, number: number, block: () => unknown): Promise<void>;
-  assertBroadcastOn(streamOrObject: unknown, data: unknown, block: () => unknown): Promise<void>;
-};
 type ChannelContext = TestContext & { testCase: TestCase };
 
 class TestTestChannel extends Base {}
@@ -287,25 +283,21 @@ describe("BroadcastsTestChannelTest", () => {
   beforeEach(({ testCase: t }: ChannelContext) => (t as BroadcastsTestChannelTest).setup());
 
   it("broadcast matchers included", async ({ testCase: t }: ChannelContext) => {
-    await (t as unknown as Broadcasts).assertBroadcastOn(
-      "broadcast_5",
-      { userId: 2017, text: "SOS" },
-      () => t.perform("broadcast", { message: "SOS" }),
+    await t.assertBroadcastOn("broadcast_5", { userId: 2017, text: "SOS" }, () =>
+      t.perform("broadcast", { message: "SOS" }),
     );
   });
 
   it("broadcast to object", async ({ testCase: t }: ChannelContext) => {
     const user = new User(2017 as never);
 
-    await (t as unknown as Broadcasts).assertBroadcasts(user, 1, () =>
-      t.perform("broadcastToUser", { text: "SOS" }),
-    );
+    await t.assertBroadcasts(user, 1, () => t.perform("broadcastToUser", { text: "SOS" }));
   });
 
   it("broadcast to object with data", async ({ testCase: t }: ChannelContext) => {
     const user = new User(2017 as never);
 
-    await (t as unknown as Broadcasts).assertBroadcastOn(user, { text: "SOS" }, () =>
+    await t.assertBroadcastOn(user, { text: "SOS" }, () =>
       t.perform("broadcastToUser", { message: "SOS" }),
     );
   });
