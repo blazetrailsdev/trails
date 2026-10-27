@@ -6803,6 +6803,11 @@ describe("native element access as the port of Hash#[] / Hash#[]=", () => {
     expect(method(`use(hashAref(h, k));`).callArgs![0].args).toEqual(["call:hashAref"]);
     expect(method(`use(h.k);`).callArgs![0].args).toEqual(["call:k"]);
   });
+
+  it("describes a native form argument as the Ruby call it spells", () => {
+    expect(method(`use(xs.filter((x) => x != null));`).callArgs![0].args).toEqual(["call:compact"]);
+    expect(method(`use(Math.trunc(n));`).callArgs![0].args).toEqual(["call:toI"]);
+  });
 });
 
 describe("callArgs", () => {

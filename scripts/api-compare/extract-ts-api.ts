@@ -7277,8 +7277,6 @@ function describeArg(node: ts.Expression, flags: string[]): string {
       if (!ts.isStringLiteralLike(sent)) return `call:${SEND_CALLEES_RUBY_NAME[sender]}`;
       return `call:${sent.text}`;
     }
-    // A native form passed as an argument pairs by the Ruby call it spells:
-    // `xs.filter((x) => x != null)` is `xs.compact`, `Math.trunc(n)` is `n.to_i`.
     if (expr.expression.getText() === "Math.trunc" && expr.arguments.length === 1) {
       return "call:toI";
     }

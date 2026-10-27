@@ -452,6 +452,14 @@ describe("significantMissingCalls", () => {
     expect(significantCallsForReceivers(receivers).has("first")).toBe(true);
   });
 
+  it("significantCallsForReceivers credits count/compact/merge/merge! the TS checker typed", () => {
+    const receivers = { count: ["expr"], compact: ["ivar"], merge: ["const"], "merge!": ["expr"] };
+    const typed = new Set(["count@typed", "compact@typed", "merge@typed", "merge!@typed"]);
+    const sig = significantCallsForReceivers(receivers, undefined, typed);
+    expect(["count", "compact", "merge", "merge!"].filter((c) => sig.has(c))).toEqual([]);
+    expect(significantCallsForReceivers(receivers).has("count")).toBe(true);
+  });
+
   it("significantCallsForReceivers still flags a positional-array name with no receiver proof at all", () => {
     const sig = significantCallsForReceivers({});
     expect(sig.has("first")).toBe(true);
