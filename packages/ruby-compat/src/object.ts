@@ -861,6 +861,8 @@ export function rbModMethodDefined(
  * shadow, for {@link rbCallSuper}. A function keeps the key it was first
  * installed under, as MRI's `super` searches by the method's `original_id`
  * (`vendor/ruby/v3.3.11/vm_insnhelper.c:4680`, `vm_search_super_method`).
+ * An accessor's `get` and `set` are seated one `half` at a time, as Ruby's
+ * `name` and `name=` are two methods.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -869,6 +871,7 @@ export function rbSeatSuper(
   key: string,
   method: unknown,
   descriptors: PropertyDescriptorMap,
+  half: "value" | "get" | "set" = "value",
 ): void {
   if (typeof method !== "function") return;
   let shadowed: unknown;
@@ -879,7 +882,7 @@ export function rbSeatSuper(
   ) {
     const desc = Object.getOwnPropertyDescriptor(link, key);
     if (desc) {
-      shadowed = desc.value;
+      shadowed = desc[half];
       break;
     }
   }

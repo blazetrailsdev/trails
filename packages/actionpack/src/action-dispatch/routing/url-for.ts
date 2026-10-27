@@ -12,7 +12,6 @@ import {
   hashDelete,
   include,
   isSymbol,
-  Module,
   rbFSend,
   rbModMethodDefined,
   symbolToS,
@@ -165,36 +164,32 @@ type UrlForIncluder = (new (...args: never[]) => unknown) & {
   _urlForModules?(): new (...args: never[]) => unknown;
 };
 
-export const UrlFor = new Module((mod) => {
-  extend(mod, Concern);
-  mod.include(PolymorphicRoutes);
+export const UrlFor = {
+  urlOptions,
+  urlFor,
+  fullUrlFor,
+  routeFor,
+  optimizeRoutesGeneration,
+  _withRoutes,
+  _routesContext,
+};
+extend(UrlFor, Concern);
+include(UrlFor, PolymorphicRoutes);
 
-  (
-    mod as unknown as { included(base: null, block: (this: UrlForIncluder) => void): void }
-  ).included(null, function (this: UrlForIncluder) {
-    if (!rbModMethodDefined(this, "defaultUrlOptions")) {
-      if (typeof this === "function") {
-        classAttribute.call(this, "defaultUrlOptions");
-      } else {
-        mattrWriter.call(this, "defaultUrlOptions");
-      }
-
-      this.defaultUrlOptions = {};
+(
+  UrlFor as unknown as { included(base: null, block: (this: UrlForIncluder) => void): void }
+).included(null, function (this: UrlForIncluder) {
+  if (!rbModMethodDefined(this, "defaultUrlOptions")) {
+    if (typeof this === "function") {
+      classAttribute.call(this, "defaultUrlOptions");
+    } else {
+      mattrWriter.call(this, "defaultUrlOptions");
     }
 
-    if (typeof this._urlForModules === "function") include(this, this._urlForModules());
-  });
+    this.defaultUrlOptions = {};
+  }
 
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      urlOptions,
-      urlFor,
-      fullUrlFor,
-      routeFor,
-      optimizeRoutesGeneration,
-      _withRoutes,
-      _routesContext,
-    });
-  });
+  if (typeof this._urlForModules === "function") include(this, this._urlForModules());
 });
+
 Routing.UrlFor = UrlFor;
