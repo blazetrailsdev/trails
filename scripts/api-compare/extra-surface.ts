@@ -1237,7 +1237,9 @@ export function countTsInternalNames(
   for (const c of [...classes, ...modules]) {
     if (c.file !== file) continue;
     count += [...c.instanceMethods, ...c.classMethods].filter(
-      (m) => isOwnMember(m) && !fileFunctionEntries.has(fileFunctionKey(m)),
+      (m) =>
+        isOwnMember(m) &&
+        !(c.synthesizedFileModule === true && fileFunctionEntries.has(fileFunctionKey(m))),
     ).length;
   }
   return count + (fileFunctions ?? []).filter(isInternal).length;

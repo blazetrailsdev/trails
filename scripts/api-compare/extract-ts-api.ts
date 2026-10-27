@@ -3392,13 +3392,20 @@ function returnsOwnClass(fn: ts.FunctionDeclaration, checker: ts.TypeChecker): b
       decl.end <= fn.end
     );
   };
-  const visit = (node: ts.Node): boolean => {
-    if (ts.isFunctionLike(node) || ts.isClassLike(node)) return false;
-    if (ts.isReturnStatement(node))
-      return node.expression !== undefined && isOwnClass(node.expression);
-    return ts.forEachChild(node, visit) === true;
+  const returned: ts.Expression[] = [];
+  let bareReturn = false;
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionLike(node) || ts.isClassLike(node)) return;
+    if (ts.isReturnStatement(node)) {
+      if (node.expression === undefined) bareReturn = true;
+      else returned.push(node.expression);
+      return;
+    }
+    ts.forEachChild(node, visit);
   };
-  return fn.body !== undefined && ts.forEachChild(fn.body, visit) === true;
+  if (fn.body === undefined) return false;
+  ts.forEachChild(fn.body, visit);
+  return !bareReturn && returned.length > 0 && returned.every(isOwnClass);
 }
 
 export function factoryClassMembers(

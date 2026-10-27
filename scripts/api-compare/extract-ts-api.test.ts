@@ -8129,6 +8129,48 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(info.modules["testing.ts:Testing"].synthesizedFileModule).toBe(true);
   });
 
+  it("does not read a function that returns a local class on one branch only as a mixin", () => {
+    const info = extractFromFiles("/p", {
+      "document.ts": `export class Document { css(): void {} }`,
+      "testing.ts": `
+        import { mattrAccessor } from "@blazetrails/activesupport";
+        import { Document } from "./document.js";
+        export const Testing = {} as { defaultHtmlVersion: string };
+        mattrAccessor.call(Testing, "defaultHtmlVersion");
+        export function htmlDocument(flag: boolean): typeof Document {
+          if (flag) {
+            class Local extends Document {}
+            return Local;
+          }
+          return Document;
+        }
+      `,
+    });
+    expect(info.modules["testing.ts:htmlDocument__mixin"]).toBeUndefined();
+    expect(info.modules["testing.ts:Testing"].synthesizedFileModule).toBe(true);
+  });
+
+  it("counts a class's internal method and a same-line internal file function as two", () => {
+    const method = (name: string, isStatic: boolean): MethodInfo => ({
+      name,
+      visibility: "public",
+      params: [],
+      isStatic,
+      line: 3,
+      file: "testing.ts",
+      internal: true,
+    });
+    const klass: ClassInfo = {
+      name: "Parser",
+      file: "testing.ts",
+      includes: [],
+      extends: [],
+      instanceMethods: [method("choose", false)],
+      classMethods: [],
+    };
+    expect(countTsInternalNames("testing.ts", [klass], [], [method("choose", false)], [])).toBe(2);
+  });
+
   it("counts a synthesized file module's own internal members once, beside its internal functions", () => {
     const fn = (name: string, line: number, internal: boolean): MethodInfo => ({
       name,
