@@ -187,10 +187,7 @@ export const ClassMethods: Omit<
   },
 };
 
-export interface Behavior extends Omit<
-  TestHelper,
-  "beforeSetup" | "afterTeardown" | "assertBroadcasts" | "assertBroadcastOn"
-> {
+export interface Behavior extends Omit<TestHelper, "beforeSetup" | "afterTeardown"> {
   readonly connection: ConnectionStub | null;
   readonly subscription: StubbedSubscription | null;
   /** @internal */
@@ -337,8 +334,6 @@ export interface TestCase extends Behavior {
   unsubscribe: typeof unsubscribe;
   perform: typeof perform;
   transmissions: typeof transmissions;
-  assertBroadcasts: typeof assertBroadcasts;
-  assertBroadcastOn: typeof assertBroadcastOn;
   assertNoStreams: typeof assertNoStreams;
   assertHasStream: typeof assertHasStream;
   assertHasStreamFor: typeof assertHasStreamFor;
