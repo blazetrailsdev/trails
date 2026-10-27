@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { aryDelete } from "./array.js";
 import { Enumerator } from "./enumerator.js";
 import { FrozenError } from "./frozen-error.js";
 import { KeyError } from "./key-error.js";
@@ -410,8 +411,14 @@ export function hashDelete<K, V, U = null>(
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#delete` (`vendor/ruby/v3.3.11/hash.c:2441`).
  */
 export function hashDelete(hash: object, key: unknown): unknown;
-/** @noRailsEquivalent PERMANENT — Ruby core `Hash#delete` (`vendor/ruby/v3.3.11/hash.c:2441`). */
+/**
+ * An Array receiver takes `Array#delete` (`vendor/ruby/v3.3.11/array.c:3973`), as Ruby's
+ * `delete` dispatches on the receiver.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#delete` (`vendor/ruby/v3.3.11/hash.c:2441`).
+ */
 export function hashDelete(hash: object, key: unknown, block?: (key: never) => unknown): unknown {
+  if (Array.isArray(hash))
+    return aryDelete<unknown, unknown>(hash, key, block as (item: unknown) => unknown) ?? null;
   if (hash instanceof Map) {
     if (hash.has(key)) {
       const val = hash.get(key);

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { warn } from "./kernel-warn.js";
+import { rbWarningSAref, rbWarningSAset, warn } from "./kernel-warn.js";
 import { stderr } from "./process-adapter.js";
 
 describe("Kernel#warn", () => {
@@ -31,5 +31,20 @@ describe("Kernel#warn", () => {
     warn("far", { uplevel: 1000 });
     expect(write).toHaveBeenLastCalledWith("warning: far\n");
     expect(() => warn("x", { uplevel: -1 })).toThrow("negative level (-1)");
+  });
+});
+
+describe("Warning.[]=", () => {
+  afterEach(() => rbWarningSAset(":deprecated", false));
+
+  it("enables a category so warn writes it, and answers the flag", () => {
+    const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
+    expect(rbWarningSAref(":deprecated")).toBe(false);
+    expect(rbWarningSAset(":deprecated", true)).toBe(true);
+    expect(rbWarningSAref(":deprecated")).toBe(true);
+    warn("old", { category: ":deprecated" });
+    expect(write).toHaveBeenCalledWith("old\n");
+    expect(() => rbWarningSAset(":nope", true)).toThrow("unknown category: :nope");
+    expect(() => rbWarningSAref("toString")).toThrow("unknown category: toString");
   });
 });

@@ -38,7 +38,8 @@ export function warn(
     location = /(?:\(|at )(?:file:\/\/)?([^()\s]+):(\d+):\d+\)?$/.exec(frame.trim());
   }
   if (category != null) {
-    if (!(category in WARNING_CATEGORIES)) throw new ArgumentError(`unknown category: ${category}`);
+    if (!Object.hasOwn(WARNING_CATEGORIES, category))
+      throw new ArgumentError(`unknown category: ${category}`);
     if (!WARNING_CATEGORIES[category]) return;
   }
   const str =
@@ -50,4 +51,29 @@ export function warn(
   stderr.write(
     str + (msgs as string[]).map((msg) => (msg.endsWith("\n") ? msg : `${msg}\n`)).join(""),
   );
+}
+
+/**
+ * `Warning.[]` (`vendor/ruby/v3.3.11/error.c:226-230` `rb_warning_s_aref`): whether
+ * `category` is enabled.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbWarningSAref(category: string): boolean {
+  if (!Object.hasOwn(WARNING_CATEGORIES, category))
+    throw new ArgumentError(`unknown category: ${category}`);
+  return WARNING_CATEGORIES[category];
+}
+
+/**
+ * `Warning.[]=` (`vendor/ruby/v3.3.11/error.c:241-251` `rb_warning_s_aset`): enables
+ * `category` for a truthy `flag`, disables it otherwise, and answers `flag`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbWarningSAset<T>(category: string, flag: T): T {
+  if (!Object.hasOwn(WARNING_CATEGORIES, category))
+    throw new ArgumentError(`unknown category: ${category}`);
+  WARNING_CATEGORIES[category] = flag != null && flag !== false;
+  return flag;
 }
