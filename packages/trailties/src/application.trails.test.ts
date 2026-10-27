@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { useInMemoryDatabaseUrl } from "./support/in-memory-database-url.js";
 import { Trailtie as BaseTrailtie } from "./trailtie.js";
 import { Trailtie as ActiveRecordTrailtie } from "./trailties/active-record.js";
@@ -199,5 +199,34 @@ describe("Application#requireEnvironmentBang", () => {
     } finally {
       FileUtils.rmRf(root);
     }
+  });
+});
+
+describe("Application server blocks", () => {
+  it("server registers the block on the application class", () => {
+    class ServerApp extends Application {}
+    Application.register(ServerApp);
+    const blk = () => {};
+    ServerApp.instance().server(blk);
+    expect(ServerApp.registeredBlocksFor("server")).toEqual([blk]);
+  });
+
+  it("run_server_blocks runs every railtie's blocks, then the application's", async () => {
+    class ServerOrderApp extends Application {}
+    Application.register(ServerOrderApp);
+    const app = ServerOrderApp.instance();
+    const ran: string[] = [];
+    const railtie = {
+      async runServerBlocks(given: unknown) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        ran.push(given === app ? "railtie" : "wrong app");
+      },
+    };
+    vi.spyOn(app, "railties").mockReturnValue([railtie] as never);
+    app.server(() => {
+      ran.push("application");
+    });
+    await app.loadServer();
+    expect(ran).toEqual(["railtie", "application"]);
   });
 });

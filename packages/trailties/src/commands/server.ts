@@ -35,8 +35,8 @@ export function serverCommand(): Command {
       const root = Dir.pwd();
       await requireApplicationBang();
       const app = await Trails.initialize();
-      await app.loadServer();
       if (isLogToStdout(options)) logToStdout();
+      await app.loadServer();
       await watchViews(app, root);
       const port = parseInt(options.port, 10);
       const railsApp = (env: RackEnv) => app.call(env);

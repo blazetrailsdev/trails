@@ -103,6 +103,40 @@ synchronous await. A Thor method on the cascade returning a promise where Thor
 returns a value is the designed shape, and a new command is not a new decision
 to argue.
 
+## Server blocks are awaited
+
+Rails runs `server` blocks synchronously: `config.ru` calls
+`Rails.application.load_server` (`railties/lib/rails/engine.rb:485-488`), which
+calls `run_server_blocks`. `Rails::Railtie#run_server_blocks`
+(`railtie.rb:288-290`) yields each registered block in turn, and
+`Rails::Application#run_server_blocks` (`application.rb:586-589`) runs every
+railtie's before its own. A block's I/O blocks the thread, so the server binds
+only after every block has returned.
+
+In trails a block that does I/O returns a promise. Dropping it would bind the
+server before the block finishes and turn its failure into an unhandled
+rejection. **The settled cascade is:**
+
+`Trailtie#runServerBlocks` → `Application#runServerBlocks` →
+`Engine#loadServer` → `trails server`.
+
+Two rules bound it:
+
+- **Each block is awaited before the next.** Ruby's `each` is sequential, so
+  the port is a `for` loop, never `Promise.all`; railties' blocks settle before
+  the application's.
+- **The other block kinds stay synchronous.** `console`, `runner`, `generators`
+  and `rake_tasks` blocks have no async caller yet; widening them is its own
+  decision when one appears.
+
+`trails server` calls `app.loadServer()` itself, after `log_to_stdout` and
+before it binds, which is where Rails reaches it through `config.ru`
+(`server_command.rb:32-41`). It moves into the rackup file when
+`port-server-command-onto-rails-command-base` lands.
+
+This is a genuine language shortcoming, ratified here: JS has no synchronous
+await. A server-block runner returning a promise is the designed shape.
+
 ## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
 
 `Rails::Autoloaders` (`railties/lib/rails/autoloaders.rb:12-28`) is a pair of

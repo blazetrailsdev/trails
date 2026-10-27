@@ -176,35 +176,6 @@ describe("Application", () => {
     });
   });
 
-  describe("server blocks", () => {
-    it("server registers the block on the application class", () => {
-      class ServerApp extends Application {}
-      Application.register(ServerApp);
-      const blk = () => {};
-      ServerApp.instance().server(blk);
-      expect(ServerApp.registeredBlocksFor("server")).toEqual([blk]);
-    });
-
-    it("run_server_blocks runs every railtie's blocks, then the application's", async () => {
-      class ServerOrderApp extends Application {}
-      Application.register(ServerOrderApp);
-      const app = ServerOrderApp.instance();
-      const ran: string[] = [];
-      const railtie = {
-        async runServerBlocks(given: unknown) {
-          await new Promise((resolve) => setTimeout(resolve, 5));
-          ran.push(given === app ? "railtie" : "wrong app");
-        },
-      };
-      vi.spyOn(app, "railties").mockReturnValue([railtie] as never);
-      app.server(() => {
-        ran.push("application");
-      });
-      await app.loadServer();
-      expect(ran).toEqual(["railtie", "application"]);
-    });
-  });
-
   describe("find_root", () => {
     it("walks parents looking for config.ts (trails' config.ru analog)", () => {
       installFs(new Set(["/", "/app", "/app/src", "/app/src/inner"]), new Set(["/app/config.ts"]));

@@ -91,3 +91,31 @@ describe("Engine.findRoot", () => {
     expect(Engine.findRoot(src)).toBe(new URL("../", import.meta.url).pathname.replace(/\/$/, ""));
   });
 });
+
+describe("Engine#loadServer awaits server blocks", () => {
+  const fixtureRoot = new URL("./__fixtures__/initializer-engine", import.meta.url).pathname;
+
+  it("awaits each server block, in registration order, before it resolves", async () => {
+    class AsyncServerEngine extends Engine {}
+    Engine.register(AsyncServerEngine, fixtureRoot);
+    const seen: string[] = [];
+    AsyncServerEngine.server(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      seen.push("first");
+    });
+    AsyncServerEngine.server(() => {
+      seen.push("second");
+    });
+    await AsyncServerEngine.instance().loadServer();
+    expect(seen).toEqual(["first", "second"]);
+  });
+
+  it("rejects with a server block's error", async () => {
+    class FailingServerEngine extends Engine {}
+    Engine.register(FailingServerEngine, fixtureRoot);
+    FailingServerEngine.server(async () => {
+      throw new Error("no database");
+    });
+    await expect(FailingServerEngine.instance().loadServer()).rejects.toThrow("no database");
+  });
+});
