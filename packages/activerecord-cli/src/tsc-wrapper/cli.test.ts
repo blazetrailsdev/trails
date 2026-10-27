@@ -13,6 +13,7 @@ import {
   getPreEmitDiagnostics,
   remapDiagnostics,
 } from "./ar-program.js";
+import { loadTimeZoneAwareAttributes } from "./cli.js";
 
 const createProgramWithArPlugin = createArTrailsProgram;
 const createBuilderWithArPlugin = createArSolutionBuilder;
@@ -871,5 +872,26 @@ describe("trails-tsc handleHelp", () => {
     expect(() => loadSchemaColumns(["--schema", mtsPath])).toThrow(/process\.exit\(1\)/);
     const combined = err.mock.calls.map((c) => String(c[0])).join("");
     expect(combined).toMatch(/extension ".mts" is not supported/);
+  });
+});
+
+describe("loadTimeZoneAwareAttributes", () => {
+  it("reads the railtie default, a literal override, and gives up on anything else", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-tz-"));
+    try {
+      fs.mkdirSync(path.join(root, "config", "initializers"), { recursive: true });
+      const app = path.join(root, "config", "application.ts");
+      fs.writeFileSync(app, "export class Blog extends Application {}\n");
+      expect(await loadTimeZoneAwareAttributes(root)).toBe(true);
+      fs.writeFileSync(
+        path.join(root, "config", "initializers", "tz.ts"),
+        "ActiveRecord.Base.timeZoneAwareAttributes = false;\n",
+      );
+      expect(await loadTimeZoneAwareAttributes(root)).toBe(false);
+      fs.writeFileSync(app, "this.config.activeRecord.timeZoneAwareTypes = [];\n");
+      expect(await loadTimeZoneAwareAttributes(root)).toBeUndefined();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });

@@ -63,6 +63,27 @@ export function loadSchemaColumns(args: string[]): SchemaColumns | undefined {
   return merged;
 }
 
+export async function loadTimeZoneAwareAttributes(appRoot: string): Promise<boolean | undefined> {
+  const configDir = path.join(appRoot, "config");
+  const initializers = path.join(configDir, "initializers");
+  const files = [path.join(configDir, "application.ts")];
+  const entries = await fs.promises.readdir(initializers).catch(() => [] as string[]);
+  for (const entry of entries.sort()) {
+    if (/\.[cm]?ts$/.test(entry)) files.push(path.join(initializers, entry));
+  }
+  let value: boolean | undefined = true;
+  for (const file of files) {
+    const text = await fs.promises.readFile(file, "utf8").catch(() => "");
+    if (/\btimeZoneAwareTypes\s*=/.test(text)) return undefined;
+    for (const m of text.matchAll(/\btimeZoneAwareAttributes\s*=\s*([^;\n]*)/g)) {
+      const literal = m[1].trim();
+      if (literal !== "true" && literal !== "false") return undefined;
+      value = literal === "true";
+    }
+  }
+  return value;
+}
+
 function loadSchemaFile(resolved: string): SchemaColumns | undefined {
   if (!fs.existsSync(resolved)) {
     process.stderr.write(
@@ -332,9 +353,16 @@ async function handleBuildMode(args: string[]): Promise<void> {
     const isDir = fs.existsSync(root) && fs.statSync(root).isDirectory();
     await buildConfiguredViews(isDir ? path.join(root, "tsconfig.json") : root);
   }
+  const firstRoot = rootConfigs[0];
+  const timeZoneAwareAttributes = await loadTimeZoneAwareAttributes(
+    (await fs.promises.stat(firstRoot).catch(() => null))?.isDirectory()
+      ? firstRoot
+      : path.dirname(firstRoot),
+  );
   const builder = createArSolutionBuilder(rootConfigs, {
     verbose,
     schemaColumnsByTable,
+    timeZoneAwareAttributes,
     onModel: reporter.onModel,
     onDiagnostic: (d) => {
       const out = pretty
@@ -430,6 +458,7 @@ export async function main(): Promise<void> {
   await buildConfiguredViews(configPath);
   const { program, host, configDiagnostics } = createArTrailsProgram(configPath, {
     schemaColumnsByTable,
+    timeZoneAwareAttributes: await loadTimeZoneAwareAttributes(path.dirname(configPath)),
     onModel: reporter.onModel,
   });
   reporter.flush();

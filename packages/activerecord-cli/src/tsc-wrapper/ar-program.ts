@@ -14,6 +14,7 @@ import { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-pl
 export interface CreateArTrailsProgramOptions {
   schemaColumnsByTable?: ArModelsPluginOptions["schemaColumnsByTable"];
   onModel?: ArModelsPluginOptions["onModel"];
+  timeZoneAwareAttributes?: boolean;
 }
 
 export interface ArRemapHost {
@@ -52,6 +53,7 @@ export function createArTrailsProgram(
     modelRegistry,
     schemaColumnsByTable: opts.schemaColumnsByTable,
     onModel: opts.onModel,
+    timeZoneAwareAttributes: opts.timeZoneAwareAttributes,
   });
 
   const deltaMap = new Map<string, readonly LineDelta[]>();
@@ -252,6 +254,7 @@ export interface CreateArSolutionBuilderOptions {
   onStatus?: (d: Diagnostic) => void;
   schemaColumnsByTable?: ArModelsPluginOptions["schemaColumnsByTable"];
   onModel?: ArModelsPluginOptions["onModel"];
+  timeZoneAwareAttributes?: boolean;
 }
 
 type Ts5Diagnostic = Parameters<NonNullable<TrailsBuildOptions["onDiagnostic"]>>[0];
@@ -274,6 +277,7 @@ export function createArSolutionBuilder(
           modelRegistry,
           schemaColumnsByTable: opts.schemaColumnsByTable,
           onModel: opts.onModel,
+          timeZoneAwareAttributes: opts.timeZoneAwareAttributes,
         }),
       ];
     },

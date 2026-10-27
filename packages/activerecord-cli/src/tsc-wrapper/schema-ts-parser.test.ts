@@ -139,7 +139,7 @@ describe("parseSchemaTs", () => {
     `;
     const result = parseSchemaTs(source, FILE);
     expect(result["settings"]).not.toHaveProperty("id");
-    expect(result["settings"]["key"]).toEqual({ type: "string", null: false });
+    expect(result["settings"]["key"]).toEqual({ type: "string", null: false, primaryKey: true });
   });
 
   it("id: 'integer' keeps its type; an id type the registry does not map stays the default", () => {
@@ -150,8 +150,8 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["counters"]["id"]).toEqual({ type: "integer", null: false });
-    expect(result["events"]["id"]).toEqual({ type: "bigint", null: false });
+    expect(result["counters"]["id"]).toEqual({ type: "integer", null: false, primaryKey: true });
+    expect(result["events"]["id"]).toEqual({ type: "bigint", null: false, primaryKey: true });
   });
 
   it("id: false → no id column synthesized", () => {
@@ -176,7 +176,7 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["tokens"]["id"]).toEqual({ type: "uuid", null: false });
+    expect(result["tokens"]["id"]).toEqual({ type: "uuid", null: false, primaryKey: true });
   });
 
   it("composite primaryKey: [...] → id: false, PK cols captured from body", () => {
@@ -191,8 +191,16 @@ describe("parseSchemaTs", () => {
     `;
     const result = parseSchemaTs(source, FILE);
     expect(result["taggings"]).not.toHaveProperty("id");
-    expect(result["taggings"]["tag_id"]).toEqual({ type: "integer", null: false });
-    expect(result["taggings"]["taggable_id"]).toEqual({ type: "integer", null: false });
+    expect(result["taggings"]["tag_id"]).toEqual({
+      type: "integer",
+      null: false,
+      primaryKey: true,
+    });
+    expect(result["taggings"]["taggable_id"]).toEqual({
+      type: "integer",
+      null: false,
+      primaryKey: true,
+    });
     expect(result["taggings"]["taggable_type"]).toEqual({ type: "string", null: true });
   });
 

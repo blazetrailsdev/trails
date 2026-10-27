@@ -146,7 +146,7 @@ export async function environment(
   options: EnvironmentOptions = {},
 ): Promise<void> {
   const sentinel = " extends Application {\n  static {\n";
-  const envFileSentinel = "Trails.application!.configure(function () {\n";
+  const envFileSentinel = "Trails.application.configure(function () {\n";
   assertNoRubySource(data);
 
   if (options.env == null) {

@@ -582,6 +582,12 @@ export class ${this.appConstBase()} extends Application {
 }
 
 Application.register(${this.appConstBase()}, import.meta.dirname);
+
+declare module "@blazetrails/trailties" {
+  interface ApplicationRegistry {
+    application: ${this.appConstBase()};
+  }
+}
 `,
     );
 
@@ -601,7 +607,7 @@ export default await Trails.initialize();
       "config/routes.ts",
       `import { Trails } from "@blazetrails/trailties";
 
-Trails.application!.routes().draw(function () {
+Trails.application.routes().draw(function () {
   // Define your application routes here.
   // Example:
   //   this.get("/posts", { to: "posts#index" });
@@ -661,7 +667,7 @@ import { join } from "node:path";
 import { days } from "@blazetrails/activesupport";
 import { Trails } from "@blazetrails/trailties";
 
-Trails.application!.configure(function () {
+Trails.application.configure(function () {
   // Settings specified here will take precedence over those in config/application.ts.
 
   // Make code changes take effect immediately without server restart.
@@ -772,7 +778,7 @@ ${
 import { isPresent } from "@blazetrails/activesupport";
 import { Trails } from "@blazetrails/trailties";
 
-Trails.application!.configure(function () {
+Trails.application.configure(function () {
   // Settings specified here will take precedence over those in config/application.ts.
 
   // While tests run files are not watched, reloading is not necessary.
@@ -836,7 +842,7 @@ ${
       `import { TaggedLogging } from "@blazetrails/activesupport";
 import { Trails } from "@blazetrails/trailties";
 
-Trails.application!.configure(function () {
+Trails.application.configure(function () {
   // Settings specified here will take precedence over those in config/application.ts.
 
   // Code is not reloaded between requests.
@@ -909,8 +915,8 @@ ${
 
   // Specify outgoing SMTP server. Remember to add smtp/* credentials via trails credentials edit.
   // this.config.actionMailer.smtpSettings = {
-  //   userName: Trails.application!.credentials.dig("smtp", "user_name"),
-  //   password: Trails.application!.credentials.dig("smtp", "password"),
+  //   userName: Trails.application.credentials.dig("smtp", "user_name"),
+  //   password: Trails.application.credentials.dig("smtp", "password"),
   //   address: "smtp.example.com",
   //   port: 587,
   //   authentication: "plain",
@@ -969,7 +975,7 @@ import { Trails } from "@blazetrails/trailties";
 // Configure parameters to be partially matched (e.g. passw matches password) and filtered from the log file.
 // Use this to limit dissemination of sensitive information.
 // See the ActiveSupport::ParameterFilter documentation for supported notations and behaviors.
-Trails.application!.config.filterParameters = Trails.application!.config.filterParameters.concat([
+Trails.application.config.filterParameters = Trails.application.config.filterParameters.concat([
   "passw", "email", "secret", "token", "_key", "crypt", "salt", "certificate", "otp", "ssn", "cvv", "cvc",
 ]);
 `,

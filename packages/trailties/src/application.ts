@@ -13,6 +13,7 @@ import {
 import {
   getFs,
   getPath,
+  Pathname,
   rbConstGet,
   RuntimeError,
   setSourceMapsSupport,
@@ -318,12 +319,12 @@ export class Application extends Engine {
   }
 
   async configFor(
-    name: string,
+    name: string | Pathname,
     { env = Trails.env.toString() }: { env?: string } = {},
   ): Promise<unknown> {
     const configDir = ((await this.paths().get("config")?.existent()) ?? [])[0];
-    const isPath = getPath().isAbsolute!(name);
-    const yaml = isPath ? name : `${configDir}/${name}`;
+    const isPath = name instanceof Pathname;
+    const yaml = name instanceof Pathname ? name : new Pathname(`${configDir}/${name}`);
     let ext: string | undefined;
     for (const e of isPath ? [""] : [".ts", ".js"]) {
       ext ??= (await getFs().exists(`${yaml}${e}`)) ? e : undefined;

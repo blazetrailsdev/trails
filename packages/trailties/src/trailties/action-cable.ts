@@ -15,7 +15,7 @@ import {
   safeConstantize,
   TopLevel,
 } from "@blazetrails/activesupport";
-import { File, block, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { File, Pathname, block, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Engine as BaseEngine } from "../engine.js";
 import { HealthController } from "../health-controller.js";
 
@@ -75,8 +75,8 @@ export class Engine extends BaseEngine {
       let hook: Promise<void> | undefined;
       onLoad("action_cable", function (this: Configuration) {
         hook = (async () => {
-          const configPath = (await app.config.paths().get("config/cable")!.first())!;
-          if (await File.isExist(configPath)) {
+          const configPath = new Pathname((await app.config.paths().get("config/cable")!.first())!);
+          if (await File.isExist(configPath.toString())) {
             this.cable = { ...((await app.configFor(configPath)) as OrderedOptions | null)?.toH() };
             await this.loadPubsubAdapter();
           }

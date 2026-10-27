@@ -22,6 +22,14 @@ import "./health-controller.js";
 import "./pwa-controller.js";
 
 let _application: Application | null = null;
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface ApplicationRegistry {}
+
+type RegisteredApplication = ApplicationRegistry extends { application: infer A }
+  ? A
+  : Application | null;
+
 let _cache: CacheStore | null = null;
 let _env: EnvironmentInquirer | undefined;
 let _backtraceCleaner: BacktraceCleaner | undefined;
@@ -45,12 +53,12 @@ export class Trails {
 
   declare static ActionMethods: typeof ActionMethods;
 
-  static get application(): Application | null {
-    if (_application) return _application;
+  static get application(): RegisteredApplication {
+    if (_application) return _application as RegisteredApplication;
     const klass = Application.appClass;
-    if (!klass) return null;
+    if (!klass) return null as RegisteredApplication;
     _application = klass.instance();
-    return _application;
+    return _application as RegisteredApplication;
   }
   static set application(app: Application | null) {
     _application = app;

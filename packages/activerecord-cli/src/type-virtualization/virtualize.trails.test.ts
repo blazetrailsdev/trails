@@ -67,8 +67,25 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/get title\(\): string;/);
     expect(text.match(/get title\(\): string;/g)?.length).toBe(1);
     expect(text).toMatch(/get body\(\): string;/);
-    expect(text).toMatch(/get published_at\(\):.*Temporal\.Instant.*Temporal\.PlainDateTime/);
+    expect(text).toMatch(/get published_at\(\):.*TimeWithZone.*ruby-compat"\)\.Time/);
     expect(text).toMatch(/get views\(\): number;/);
+  });
+
+  test("timeZoneAwareAttributes types a datetime column as the one type it holds", () => {
+    const src = "export class Post extends Base {}\n";
+    const columns = { posts: { created_at: { type: "datetime", null: false } } };
+    const aware = virtualize(src, "post.ts", {
+      schemaColumnsByTable: columns,
+      timeZoneAwareAttributes: true,
+    });
+    expect(aware.text).toMatch(
+      /get created_at\(\): import\("@blazetrails\/activesupport"\)\.TimeWithZone;/,
+    );
+    const naive = virtualize(src, "post.ts", {
+      schemaColumnsByTable: columns,
+      timeZoneAwareAttributes: false,
+    });
+    expect(naive.text).toMatch(/get created_at\(\): import\("@blazetrails\/ruby-compat"\)\.Time;/);
   });
 
   test("schemaColumnsByTable skips user-authored declares", () => {
@@ -91,6 +108,36 @@ describe("virtualize — deltas", () => {
     });
     expect(text).not.toMatch(/get id\(\):/);
     expect(text).toMatch(/get name\(\): string;/);
+  });
+
+  test("schemaColumnsByTable types `id` from an integer primary key", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: { posts: { id: { type: "bigint", null: false, primaryKey: true } } },
+    });
+    expect(text).toMatch(/get id\(\): number;/);
+  });
+
+  test("schemaColumnsByTable types `id` from a uuid primary key", () => {
+    const src = "export class Token extends Base {}\n";
+    const { text } = virtualize(src, "token.ts", {
+      schemaColumnsByTable: { tokens: { id: { type: "uuid", null: false, primaryKey: true } } },
+    });
+    expect(text).toMatch(/get id\(\): string;/);
+  });
+
+  test("schemaColumnsByTable types `id` as a tuple for a composite primary key", () => {
+    const src = "export class Tagging extends Base {}\n";
+    const { text } = virtualize(src, "tagging.ts", {
+      schemaColumnsByTable: {
+        taggings: {
+          taggable_type: "string",
+          tag_id: { type: "integer", null: false, primaryKey: true },
+          name: { type: "string", null: false, primaryKey: true },
+        },
+      },
+    });
+    expect(text).toMatch(/get id\(\): \[number, string\];/);
   });
 
   test("schemaColumnsByTable quotes non-identifier and reserved-word column names", () => {
@@ -262,9 +309,7 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/get updated_at\(\):.*Temporal\.PlainDateTime;/);
     expect(text).toMatch(/get starts_on\(\):.*Temporal\.PlainDate.*\| null/);
     expect(text).toMatch(/get duration\(\):.*Temporal\.Instant.*TimeWithZone;/);
-    expect(text).toMatch(
-      /get scheduled_at\(\): \(.*Temporal\.Instant.*Temporal\.PlainDateTime\) \| null/,
-    );
+    expect(text).toMatch(/get scheduled_at\(\): \(.*TimeWithZone.*ruby-compat"\)\.Time\) \| null/);
   });
 
   test("schemaColumnsByTable emits bigint for big_integer schema columns", () => {
@@ -892,7 +937,7 @@ describe("virtualize — attribute accessor pairs", () => {
       "}\n";
     const { text } = virtualize(src, "post.ts");
     expect(text).toMatch(/export interface Post \{/);
-    expect(text).toMatch(/get published_at\(\):.*Temporal\.Instant.*Temporal\.PlainDateTime;/);
+    expect(text).toMatch(/get published_at\(\):.*TimeWithZone.*ruby-compat"\)\.Time;/);
     expect(text).toMatch(/set published_at\(value: unknown\);/);
   });
 
