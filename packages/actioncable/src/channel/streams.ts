@@ -94,6 +94,7 @@ function streamFor(
   this.streamFrom(this.broadcastingFor(model), callback || block, { coder });
 }
 
+/** @inventedArm aryDelete — PERMANENT */
 async function stopStreamFrom(this: StreamsChannel, broadcasting: string): Promise<void> {
   const streams: Record<string, Handler> | string[] = this.streams;
   const callback = Array.isArray(streams)
