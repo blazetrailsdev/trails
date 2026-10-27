@@ -63,9 +63,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
     : [];
   for (const initializer of existent.sort()) await loadConfigInitializer(initializer);
   const application = TopLevel.Trails?.application;
-  if (application?.initialized()) {
-    await application.reloadRoutesUnlessLoaded();
-  } else if (application) {
+  if (application && (await application.reloadRoutesUnlessLoaded()) === false) {
     for (const ext of ["ts", "js"]) {
       const routes = path.join(cwd, `config/routes.${ext}`);
       if (await exists(routes)) {
