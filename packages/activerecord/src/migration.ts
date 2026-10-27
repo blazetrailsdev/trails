@@ -2153,5 +2153,3 @@ Migration.CheckPending = CheckPending;
 Migration.delegate = new Migration();
 ActiveRecord.Migration = Migration;
 ActiveRecord.IrreversibleMigration = IrreversibleMigration;
-
-ActiveRecord.IrreversibleMigration = IrreversibleMigration;
