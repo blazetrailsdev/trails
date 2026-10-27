@@ -46,6 +46,17 @@ Mirror, method by method and line by line:
   `CONVERGEABLE <story-id>`, where the story IS the receipt and the tag only
   points at it. `no-freeform-comments` strips anything else.
 - **Errors.** Same error class, same message string, same raise site.
+- **Speed.** A declaration or arm that exists only for a measured hot path
+  carries `@perf <measurement> — PERMANENT|CONVERGEABLE <story-id>`, the
+  measurement the number the bench showed (`100ns`, `2x`, `30%`), so a reader
+  and a gate can tell it from a deviation a language shortcoming forced.
+  `blazetrails/perf-tag-placement` holds the shape and reds a tag that
+  documents no declaration; `stale-story-references` reds one naming a landed
+  story. `@perf` exempts nothing: it is not a `@noRailsEquivalent`, does not
+  discharge `@inventedArm` or any call gate, and does not take a declaration
+  out of the `internal` or extra-surface counts. A perf helper stays out of
+  them only by being module-private (unexported), never by a `_` prefix or
+  this tag.
 
 **Only a genuine TypeScript language shortcoming can justify a deviation** —
 and even then, converge the shape as far as the language allows and keep the

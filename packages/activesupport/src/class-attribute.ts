@@ -61,7 +61,10 @@ export namespace ClassAttribute {
   }
 }
 
-/** @missingRailsName default — PERMANENT */
+/**
+ * @missingRailsName default — PERMANENT
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
+ */
 export function classAttribute(this: any, ...attrs: (string | ClassAttributeOptions)[]): void {
   const last = attrs[attrs.length - 1];
   const options: ClassAttributeOptions =

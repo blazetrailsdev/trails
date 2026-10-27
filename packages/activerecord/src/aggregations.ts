@@ -56,7 +56,10 @@ export const ClassMethods = {
   composedOf,
 };
 
-/** @internal */
+/**
+ * @internal
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
+ */
 function readerMethod(
   this: typeof Base,
   name: string,
@@ -90,7 +93,10 @@ function readerMethod(
   rbClearMethodCache();
 }
 
-/** @internal */
+/**
+ * @internal
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
+ */
 function writerMethod(
   this: typeof Base,
   name: string,

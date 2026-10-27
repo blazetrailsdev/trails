@@ -602,7 +602,10 @@ function isDefinedByAClassBody(klass: unknown, name: string): boolean {
   return false;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/**
+ * @noRailsEquivalent PERMANENT
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
+ */
 export function completeHalfAccessor(
   klass: unknown,
   name: string,

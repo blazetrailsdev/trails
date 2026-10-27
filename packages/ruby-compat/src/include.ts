@@ -297,6 +297,7 @@ export class Module<I extends object = Record<never, never>> {
    * installed as the method it names.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
    */
   include(mod: ModuleObject): this {
     rbClearMethodCache();
@@ -517,6 +518,7 @@ export class Module<I extends object = Record<never, never>> {
    * (vendor/ruby/v3.3.11/class.c:1189-1215).
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
    */
   appendFeatures(base: AnyClass | Module): void {
     rbClearMethodCache();
@@ -572,6 +574,7 @@ export class Module<I extends object = Record<never, never>> {
    * cannot be moved raises `TypeError`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
    */
   prependFeatures(base: AnyClass): void {
     rbClearMethodCache();
@@ -881,6 +884,7 @@ function linksOf(mod: Module): object[] {
   return [...(includerCarriers.get(mod) ?? []), ...singletons];
 }
 
+/** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */
 function relinkIncluders(mod: Module): void {
   rbClearMethodCache();
   const table = carrierOf(mod);
@@ -900,10 +904,14 @@ function relinkIncluders(mod: Module): void {
  * {@link methodCacheSerial} and is stale once it differs.
  *
  * @noRailsEquivalent PERMANENT
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
  */
 export let methodCacheSerial = 0;
 
-/** @noRailsEquivalent PERMANENT */
+/**
+ * @noRailsEquivalent PERMANENT
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
+ */
 export function rbClearMethodCache(): void {
   methodCacheSerial++;
 }
@@ -1533,6 +1541,7 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
  * skips one `klass` already has, so the module's own methods outrank them.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
  */
 export function rbModAppendFeatures(
   klass: AnyClass | object,
@@ -1969,6 +1978,7 @@ export function prepend(
  * installs, so only its enumerable members are prepended.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
  */
 export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
   rbClearMethodCache();
@@ -2028,6 +2038,7 @@ export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyCla
  * Usage:
  *   extend(Base, ConnectionHandlingMethods);
  *   // Now Base.connectedTo(...) works
+ * @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache
  */
 export function extend<T extends AnyClass | object>(
   klass: T,
