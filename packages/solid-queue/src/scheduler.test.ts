@@ -96,10 +96,12 @@ describe("SchedulerTest", () => {
     for (const scheduler of schedulers) await scheduler.start();
     await sleep(2);
     for (const scheduler of schedulers) await scheduler.stop();
-    await waitWhileWithTimeout(
-      1,
-      async () => (await Job.count()) !== (await RecurringExecution.count()),
-    );
+    let counts = "";
+    await waitWhileWithTimeout(1, async () => {
+      const previous = counts;
+      counts = `${await Job.count()}/${await RecurringExecution.count()}`;
+      return counts !== previous;
+    });
 
     expect(await Job.count()).toBe(await RecurringExecution.count());
     const runAtTimes = (await RecurringExecution.all().toArray())
