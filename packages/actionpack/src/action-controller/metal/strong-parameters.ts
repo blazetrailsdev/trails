@@ -106,11 +106,7 @@ export class UnfilteredParameters extends ArgumentError {
   }
 }
 
-export class InvalidParameterKey extends ArgumentError {
-  constructor(message?: string) {
-    super(message ?? "all keys must be Strings or Symbols");
-  }
-}
+export class InvalidParameterKey extends ArgumentError {}
 
 type OnUnpermitted = "log" | "raise" | false | null;
 

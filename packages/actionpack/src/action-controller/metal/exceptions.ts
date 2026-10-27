@@ -4,11 +4,7 @@ import { StandardError, excBacktrace, excSetBacktrace, include } from "@blazetra
 
 import type { RouteSetLike } from "../../abstract-controller/url-for.js";
 
-export class ActionControllerError extends StandardError {
-  constructor(msg?: string) {
-    super(msg ?? "");
-  }
-}
+export class ActionControllerError extends StandardError {}
 
 export class BadRequest extends ActionControllerError {
   constructor(msg?: string, errinfo?: Error | null) {

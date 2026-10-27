@@ -87,6 +87,9 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_dispatch/testing/assertions": () => import("./action-dispatch/testing/assertions.js"),
   "action_dispatch/testing/test_process": () => import("./action-dispatch/testing/test-process.js"),
   "action_dispatch/testing/integration": () => import("./action-dispatch/testing/integration.js"),
+  "action_dispatch/testing/test_request": () => import("./action-dispatch/testing/test-request.js"),
+  "action_dispatch/testing/assertion_response": () =>
+    import("./action-dispatch/testing/assertion-response.js"),
   "action_dispatch/routing/polymorphic_routes": () =>
     import("./action-dispatch/routing/polymorphic-routes.js"),
   "action_dispatch/routing/routes_proxy": () => import("./action-dispatch/routing/routes-proxy.js"),
