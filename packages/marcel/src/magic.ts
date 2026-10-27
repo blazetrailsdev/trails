@@ -12,7 +12,6 @@ import {
   StringIO,
   Encoding,
   encode,
-  rbModConstSet,
   b,
   rbEqual,
   rbStrInclude,
@@ -188,4 +187,4 @@ export class Magic {
     });
   }
 }
-rbModConstSet(MarcelSeat, "Magic", Magic);
+MarcelSeat.Magic = Magic;

@@ -1,6 +1,7 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError, Rational, rbModConstSet } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
+import { Timestamp } from "./timestamp.js";
 
 const TIME_AT_3_AVAILABLE = (() => {
   try {
@@ -13,16 +14,16 @@ const TIME_AT_3_AVAILABLE = (() => {
 
 const Unpacker = TIME_AT_3_AVAILABLE
   ? (payload: Uint8Array): RubyTime => {
-      const tv = MessagePack.Timestamp.fromMsgpackExt(payload);
+      const tv = Timestamp.fromMsgpackExt(payload);
       return RubyTime.at(tv.sec, tv.nsec, "nanosecond");
     }
   : (payload: Uint8Array): RubyTime => {
-      const tv = MessagePack.Timestamp.fromMsgpackExt(payload);
+      const tv = Timestamp.fromMsgpackExt(payload);
       return RubyTime.at(tv.sec, new Rational(tv.nsec, 1000));
     };
 
 const Packer = (time: RubyTime): Uint8Array => {
-  return MessagePack.Timestamp.toMsgpackExt(time.tvSec(), time.tvNsec);
+  return Timestamp.toMsgpackExt(time.tvSec(), time.tvNsec);
 };
 
 export const Time = { name: "MessagePack::Time", TIME_AT_3_AVAILABLE, Unpacker, Packer };

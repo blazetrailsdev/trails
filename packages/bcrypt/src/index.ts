@@ -1,5 +1,4 @@
 import { TopLevel } from "@blazetrails/activesupport";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Error, Errors } from "./error.js";
 import { Engine } from "./engine.js";
 import { Password } from "./password.js";
@@ -13,10 +12,10 @@ const BCrypt = { name: "BCrypt" } as {
   Engine: typeof Engine;
   Password: typeof Password;
 };
-rbModConstSet(BCrypt, "Error", Error);
-rbModConstSet(BCrypt, "Errors", Errors);
-rbModConstSet(BCrypt, "Engine", Engine);
-rbModConstSet(BCrypt, "Password", Password);
+BCrypt.Error = Error;
+BCrypt.Errors = Errors;
+BCrypt.Engine = Engine;
+BCrypt.Password = Password;
 TopLevel.BCrypt = BCrypt;
 
 import "./class-paths.generated.js";

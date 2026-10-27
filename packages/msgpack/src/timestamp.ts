@@ -1,5 +1,6 @@
-import { pack, rbEqual, rbModConstSet, rbObjClass, unpack } from "@blazetrails/ruby-compat";
+import { pack, rbEqual, rbObjClass, unpack } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
+import { MalformedFormatError } from "./unpacker.js";
 
 export class Timestamp {
   static readonly TYPE = -1;
@@ -33,7 +34,7 @@ export class Timestamp {
         return new this(sec, nsec);
       }
       default:
-        throw new MessagePack.MalformedFormatError(`Invalid timestamp data size: ${data.length}`);
+        throw new MalformedFormatError(`Invalid timestamp data size: ${data.length}`);
     }
   }
 
@@ -65,4 +66,4 @@ export class Timestamp {
   }
 }
 
-rbModConstSet(MessagePack, "Timestamp", Timestamp);
+MessagePack.Timestamp = Timestamp;

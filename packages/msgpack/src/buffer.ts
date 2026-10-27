@@ -3,7 +3,6 @@ import {
   EOFError,
   Hash,
   rbFSend,
-  rbModConstSet,
   rbObjClassname,
   rbObjIsKindOf,
   rbObjRespondTo,
@@ -696,4 +695,4 @@ export class Buffer {
   }
 }
 
-rbModConstSet(MessagePack, "Buffer", Buffer);
+MessagePack.Buffer = Buffer;

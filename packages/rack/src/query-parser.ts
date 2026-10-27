@@ -2,13 +2,11 @@ import {
   ArgumentError,
   bytes,
   include,
-  rbModConstSet,
   rbObjClassname,
   strNew,
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { BadRequest } from "./bad-request.js";
-import { Rack } from "./namespaces.js";
 export class ParameterTypeError extends TypeError {
   constructor(message: string) {
     super(message);
@@ -307,9 +305,3 @@ function unescape(string: string): string {
   }
   return strNew(decoded);
 }
-
-rbModConstSet(Rack, "QueryParser", QueryParser);
-rbModConstSet(QueryParser, "ParameterTypeError", ParameterTypeError);
-rbModConstSet(QueryParser, "InvalidParameterError", InvalidParameterError);
-rbModConstSet(QueryParser, "QueryLimitError", QueryLimitError);
-rbModConstSet(QueryParser, "Params", Params);
