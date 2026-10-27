@@ -3,6 +3,8 @@ import {
   ArgumentError,
   aryJoin,
   block as rbBlock,
+  type Block,
+  type Range,
   LocalJumpError,
   NotImplementedError,
   rbBlockGivenP,
@@ -23,6 +25,22 @@ export interface SelectorAssertionsHost {
   documentRootElement(): unknown;
 }
 
+type AssertDomArgument =
+  | string
+  | number
+  | boolean
+  | RegExp
+  | null
+  | undefined
+  | Html5Node
+  | NodeSet
+  | Html5DocumentFragment
+  | Record<string, unknown>
+  | Range<number>
+  | unknown[];
+
+type AssertDomBlock = ((selected: never) => unknown) & Omit<Block<unknown>, never>;
+
 export function cssSelect(this: SelectorAssertionsHost, ...args: unknown[]): NodeSet {
   if (args.length === 0) throw new ArgumentError("you at least need a selector argument");
 
@@ -33,10 +51,10 @@ export function cssSelect(this: SelectorAssertionsHost, ...args: unknown[]): Nod
 
 export function assertDom(
   this: SelectorAssertionsHost,
-  ...args: unknown[] | [...unknown[], (selected: NodeSet | Html5DocumentFragment) => void]
+  ...args: AssertDomArgument[] | [...AssertDomArgument[], AssertDomBlock]
 ): NodeSet | undefined {
   const block = rbBlockGivenP(args.at(-1))
-    ? (args.pop() as (s: NodeSet | Html5DocumentFragment) => void)
+    ? (args.pop() as unknown as (s: NodeSet | Html5DocumentFragment) => void)
     : null;
   this.selected ??= null;
 
@@ -80,7 +98,7 @@ export function assertDomEncoded(
       if (!block) throw new LocalJumpError("no block given (yield)");
       block(selected);
     } else {
-      assertDom.call(this, ":root", ...(block ? [rbBlock(block)] : []));
+      assertDom.call(this, ":root", ...((block ? [rbBlock(block)] : []) as [AssertDomBlock] | []));
     }
   });
 }
