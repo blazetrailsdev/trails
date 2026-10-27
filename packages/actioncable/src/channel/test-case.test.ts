@@ -64,7 +64,7 @@ describe("SubscriptionsTestChannelTest", () => {
   it("subscribe", async ({ testCase: t }: ChannelContext) => {
     await t.subscribe();
 
-    expect(t.subscription!.isConfirmed()).toBe(true);
+    expect(t.subscription!.isConfirmed()).toBeRubyTruthy();
     expect(t.subscription!.isRejected()).toBeFalsy();
     expect(t.connection!.transmissions.length).toBe(1);
     expect(hashAref(t.connection!.transmissions.at(-1)!, "type")).toBe(
@@ -105,7 +105,7 @@ describe("RejectionTestChannelTest", () => {
     await t.subscribe();
 
     expect(t.subscription!.isConfirmed()).toBeFalsy();
-    expect(t.subscription!.isRejected()).toBe(true);
+    expect(t.subscription!.isRejected()).toBeRubyTruthy();
     expect(t.connection!.transmissions.length).toBe(1);
     expect(hashAref(t.connection!.transmissions.at(-1)!, "type")).toBe(
       ActionCable.INTERNAL.messageTypes.rejection,
