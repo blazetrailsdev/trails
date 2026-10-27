@@ -71,6 +71,7 @@ export const TopLevel: {
         paths(): { get(path: string): { firstSync(): string | undefined } | undefined };
       };
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
+      routes(): { namedRoutes: { helperNames(): string[] } };
       envConfig(): Record<string, unknown>;
       executor: { wrap<T>(block: () => T): T };
       call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;

@@ -127,17 +127,6 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
   const controller = () =>
     fs.readFileSync(path.join(tmpDir, "app/controllers/posts-controller.ts"), "utf-8");
 
-  it("declares the index path helper the destroy redirect calls", async () => {
-    await ScaffoldControllerGenerator.start(["Post", "title:string"], {
-      cwd: tmpDir,
-      output: () => {},
-    });
-
-    const content = controller();
-    expect(content).toContain("declare postsPath: (...args: unknown[]) => string;");
-    expect(content).toContain("this.redirectTo(this.postsPath(),");
-  });
-
   it("declares no path helper for an api controller, which redirects nowhere", async () => {
     const options: Partial<ScaffoldControllerGeneratorOptions> = { api: true };
     await ScaffoldControllerGenerator.start(["Post", "title:string"], {

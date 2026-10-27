@@ -309,6 +309,7 @@ export class AppGenerator extends AppBase {
             "config",
             "db",
             ".trails/template-registry-augmentation.d.ts",
+            ".trails/routes-augmentation.d.ts",
             ".trails/views",
           ],
         },
