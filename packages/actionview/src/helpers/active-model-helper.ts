@@ -11,10 +11,6 @@ export interface ActiveModelInstanceTag {
   tag(type: string, options: Record<string, unknown>, ...args: unknown[]): unknown;
   errorWrapping(htmlTag: unknown): unknown;
   errorMessage(): unknown;
-  /** @internal */
-  isSelectMarkupHelper(type: string): boolean;
-  /** @internal */
-  isTagGenerateErrors(options: Record<string, unknown>): boolean;
 }
 
 type Host = ActiveModelInstanceTag & {
@@ -22,6 +18,8 @@ type Host = ActiveModelInstanceTag & {
   _methodName: string;
   _templateObject: unknown;
   isObjectHasErrors(): boolean;
+  isSelectMarkupHelper(type: string): boolean;
+  isTagGenerateErrors(options: Record<string, unknown>): boolean;
 };
 
 function object(this: Host): unknown {
@@ -87,17 +85,10 @@ function isTagGenerateErrors(this: Host, options: Record<string, unknown>): bool
 }
 
 export const ActiveModelInstanceTag = defineModule(
-  {
-    contentTag,
-    tag,
-    errorWrapping,
-    errorMessage,
-  },
+  Object.assign(
+    Object.defineProperty({}, "object", { get: object, enumerable: true, configurable: true }),
+    { contentTag, tag, errorWrapping, errorMessage },
+  ),
   {},
   { isObjectHasErrors, isSelectMarkupHelper, isTagGenerateErrors },
 );
-Object.defineProperty(ActiveModelInstanceTag, "object", {
-  get: object,
-  enumerable: true,
-  configurable: true,
-});
