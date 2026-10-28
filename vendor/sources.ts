@@ -418,8 +418,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/janko/image_processing.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:289 resolves image_processing (1.14.0),
-      // Active Storage's variant processor; RFC 0202 ports it.
       ref: "v1.14.0",
     },
     packages: [
