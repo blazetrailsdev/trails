@@ -1,4 +1,4 @@
-import { fetch, print, rtest, stdin as $stdin, stdout as $stdout } from "@blazetrails/ruby-compat";
+import { print, rtest, stdin as $stdin, stdout as $stdout } from "@blazetrails/ruby-compat";
 
 export class Basic {
   readonly prompt: string;
@@ -29,6 +29,6 @@ export class Basic {
 
   /** @internal */
   private isEcho(): unknown {
-    return fetch(this.options, "echo", true);
+    return Object.hasOwn(this.options, "echo") ? this.options.echo : true;
   }
 }

@@ -23,6 +23,7 @@ import {
   rbModConstDefined,
   rbModConstGet,
   rbModConstSet,
+  rbModName,
   rbModSingletonP,
   rbObjIsKindOf,
   rbObjIvarDefined,
@@ -209,7 +210,7 @@ export function defineHelpersModule(
 
 /** @internal */
 export function defaultHelperModuleBang(this: HelpersClass): void {
-  const helperPrefix = this.name.replace(/Controller$/, "");
+  const helperPrefix = rbModName(this)!.replace(/Controller$/, "");
   try {
     this.helper(helperPrefix);
   } catch (e) {

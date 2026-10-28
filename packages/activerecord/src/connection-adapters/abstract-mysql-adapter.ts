@@ -849,7 +849,7 @@ WHERE fk.referenced_column_name IS NOT NULL
   /** @missingRailsName config — PERMANENT */
   isStrictMode(): boolean | unknown {
     return (this.constructor as typeof AbstractMysqlAdapter).typeCastConfigToBoolean(
-      fetch(this._config, "strict", true),
+      Object.hasOwn(this._config, "strict") ? this._config.strict : true,
     );
   }
 
@@ -1193,7 +1193,10 @@ WHERE fk.referenced_column_name IS NOT NULL
   override async configureConnection(): Promise<void> {
     await super.configureConnection();
     const variables: Record<string, unknown> = {
-      ...(fetch(this._config, "variables", {}) as Record<string, unknown>),
+      ...((Object.hasOwn(this._config, "variables") ? this._config.variables : {}) as Record<
+        string,
+        unknown
+      >),
     };
 
     let waitTimeout = (this.constructor as typeof AbstractMysqlAdapter).typeCastConfigToInteger(

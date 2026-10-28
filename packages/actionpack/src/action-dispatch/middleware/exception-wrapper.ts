@@ -66,6 +66,7 @@ export type SourceExtract = {
 };
 
 export class ExceptionWrapper {
+  static SourceMapLocation = SourceMapLocation;
   declare static rescueResponses: Record<string, string | number>;
   declare static rescueTemplates: Record<string, string>;
   declare static wrapperExceptions: string[];

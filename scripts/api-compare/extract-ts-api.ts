@@ -7488,6 +7488,7 @@ function collectCalls(
     }
     if (checkerProvenKind(receiver) === "object") {
       if (form === "spread") hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.merge}`);
+      if (form === "fetch") hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.fetch}`);
       if (form === "assign" && assignSourceProven(receiver)) {
         hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.mergeBang}`);
         hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.update}`);

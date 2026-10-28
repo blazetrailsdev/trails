@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ORIGINAL_LOCALES } from "../test-helpers/abstract-unit.js";
 
-import { ActionController, Mime, SourceMapLocation } from "@blazetrails/actionpack";
+import { ActionController, ExceptionWrapper, Mime } from "@blazetrails/actionpack";
 
 import { Base } from "../base.js";
 import { Template } from "../template.js";
@@ -795,7 +795,10 @@ describe("CachedViewRenderTest", () => {
     );
     const erbBtl = ex.backtraceLocations()![0];
 
-    const translatingFrame = new SourceMapLocation(erbBtl, ex.template as Template);
+    const translatingFrame = new ExceptionWrapper.SourceMapLocation(
+      erbBtl,
+      ex.template as Template,
+    );
     const translatedSpot = translatingFrame.spot(ex.cause);
 
     assertEqual(6, translatedSpot!.firstColumn);
@@ -807,7 +810,10 @@ describe("CachedViewRenderTest", () => {
     );
     const erbBtl = ex.backtraceLocations()![0];
 
-    const translatingFrame = new SourceMapLocation(erbBtl, ex.template as Template);
+    const translatingFrame = new ExceptionWrapper.SourceMapLocation(
+      erbBtl,
+      ex.template as Template,
+    );
     const translatedSpot = translatingFrame.spot(ex.cause);
 
     assertEqual(8, translatedSpot!.firstColumn);
@@ -819,7 +825,10 @@ describe("CachedViewRenderTest", () => {
     );
     const erbBtl = ex.backtraceLocations()![0];
 
-    const translatingFrame = new SourceMapLocation(erbBtl, ex.template as Template);
+    const translatingFrame = new ExceptionWrapper.SourceMapLocation(
+      erbBtl,
+      ex.template as Template,
+    );
     const translatedSpot = translatingFrame.spot(ex.cause);
 
     expect(rbObjClass(translatedSpot!.firstColumn)).toBe(rbCInteger);

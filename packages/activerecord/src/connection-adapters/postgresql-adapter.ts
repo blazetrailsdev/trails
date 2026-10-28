@@ -1248,7 +1248,9 @@ export class PostgreSQLAdapter
 
     await this.setStandardConformingStrings();
 
-    const variables = fetch<SessionVariables>(this._config, "variables", {});
+    const variables = (
+      Object.hasOwn(this._config, "variables") ? this._config.variables : {}
+    ) as SessionVariables;
 
     await this.internalExecute("SET intervalstyle = iso_8601", "SCHEMA");
 
@@ -1268,7 +1270,9 @@ export class PostgreSQLAdapter
 
   /** @internal */
   async reconfigureConnectionTimezone(): Promise<void> {
-    const variables = fetch<SessionVariables>(this._config, "variables", {});
+    const variables = (
+      Object.hasOwn(this._config, "variables") ? this._config.variables : {}
+    ) as SessionVariables;
 
     if (rtest(variables["timezone"])) return;
 
