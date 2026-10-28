@@ -9,13 +9,12 @@ import {
   dasherize,
   underscore,
 } from "@blazetrails/activesupport";
-import { Hash, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { include, Module, rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { Base, type ViewContextClass } from "./base.js";
 import { DetailsKey, type LookupContext } from "./lookup-context.js";
 import { Renderer } from "./renderer.js";
 import { Template } from "./template.js";
-import { ActionView } from "./namespaces.js";
 import { ViewPaths } from "./view-paths.js";
 
 type I18nConfig = InstanceType<typeof I18n.Config>;
@@ -42,7 +41,6 @@ export class I18nProxy extends I18n.Config {
     this.lookupContext.locale = value as string | null;
   }
 }
-rbModConstSet(ActionView, "I18nProxy", I18nProxy);
 
 export interface RenderOptions {
   template?: string;

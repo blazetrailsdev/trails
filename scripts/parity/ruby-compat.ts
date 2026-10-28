@@ -118,9 +118,9 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   string,
   { tsExport: string; receiver: ReceiverKind }
 >([
-  ["Array#compact", { tsExport: "compact", receiver: "array" }],
-  ["Array#count", { tsExport: "aryCount", receiver: "array" }],
   ["Array#delete", { tsExport: "aryDelete", receiver: "array" }],
+  // `LazilyDefineAttributes#==` (`activemodel/lib/active_model/validations/acceptance.rb`)
+  // makes `included_modules.include?` a Ruby `==` test, which `aryIncludes` keeps.
   ["Array#include?", { tsExport: "aryIncludes", receiver: "array" }],
   ["Array#join", { tsExport: "aryJoin", receiver: "array" }],
   ["Array#reduce", { tsExport: "reduce", receiver: "array" }],

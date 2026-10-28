@@ -35,6 +35,8 @@ import type { ClassInfo } from "@blazetrails/parity/types";
 const run = promisify(execFile);
 const OUTPUT_DIR = path.join(ROOT_DIR, "scripts/api-compare/output");
 const GENERATED = "class-paths.generated.ts";
+/** The table for the classes in files the package build excludes, which those files import. */
+const EXCLUDED_GENERATED = "class-paths.excluded.generated.ts";
 
 /** The api-compare packages whose classes are not loaded from the package entry. */
 const SKIPPED = new Set(["activerecord-test-support"]);
@@ -54,6 +56,10 @@ export interface ClassPathEntry {
   file: string;
   tsName: string;
   fqn: string;
+  /** The entry sits in a file the build excludes (`src/test-case.ts`), so its own table holds it. */
+  excluded?: boolean;
+  /** The module is the file's own namespace object, which the file `include`s (`DateAndTime::Calculations`). */
+  namespace?: boolean;
 }
 
 async function readJson<T>(name: string): Promise<T> {
@@ -66,9 +72,25 @@ async function tsconfigExcludes(dir: string): Promise<string[]> {
   return (JSON.parse(raw) as { exclude?: string[] }).exclude ?? [];
 }
 
-/** trails spells a renamed token its own way in a constant too: `Handlers::ERB` is `Handlers::TSE`. */
+/**
+ * The `TS_CLASS_RENAMES` a class path takes: `Railtie` is `Trailtie`. The
+ * top-level `Rails` keeps its name, because a route's controller path
+ * (`rails/info#index`) resolves `Rails::InfoController` through the name
+ * `registerController` seats, and the others (`Name` is `ModelName`) dodge a
+ * JS identifier and keep Ruby's path.
+ */
+const BRAND_RENAMES = ["Railtie", "Railties"];
+
+/**
+ * trails spells a renamed token its own way in a constant too: `Handlers::ERB`
+ * is `Handlers::TSE`, and a `TS_CLASS_RENAMES` segment is renamed as
+ * `parity:api` matches it, so `Rails::Railtie` is `Rails::Trailtie`.
+ */
 function renameTokens(fqn: string): string {
-  let out = fqn;
+  let out = fqn
+    .split("::")
+    .map((seg) => (BRAND_RENAMES.includes(seg) ? TS_CLASS_RENAMES[seg] : seg))
+    .join("::");
   for (const [tok, to] of Object.entries(TOKEN_RENAMES)) {
     const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
     out = out
@@ -118,35 +140,21 @@ function isExported(source: string, name: string): boolean {
   );
 }
 
+/** A file that imports its own namespace (`import * as X from "./calculations.js"`) to `include` it. */
+function isSelfNamespace(source: string, file: string, tsName: string): boolean {
+  const base = path.basename(file, ".ts");
+  if (base.replace(/(?:^|-)(\w)/g, (_, c: string) => c.toUpperCase()) !== tsName) return false;
+  const self = `${base}.js`;
+  return new RegExp(
+    `^import\\s+\\*\\s+as\\s+\\w+\\s+from\\s+"\\./${self.replace(".", "\\.")}"`,
+    "m",
+  ).test(source);
+}
+
 /** Paired classes a table cannot import, which `--check` reports. */
 const unexported: string[] = [];
 /** Paired Ruby modules with no exported binding; reported, not gated. */
 const unexportedModules: string[] = [];
-const known = new Set<string>();
-
-/**
- * Only-shrink: paired classes that were already unexported when the table
- * landed. Exporting one (or moving it to the file that mirrors its `.rb`)
- * deletes its row here.
- */
-const KNOWN_UNEXPORTED = new Set([
-  "ActiveRecord::Associations::JoinDependency::Aliases::Table",
-  "ActiveRecord::Associations::JoinDependency::Aliases::Column",
-  "ActiveRecord::Migration::Compatibility::V6_1::PostgreSQLCompat",
-  "ActiveRecord::Migration::Compatibility::V6_0::ReferenceDefinition",
-  "ActiveRecord::Relation::StrictLoadingScope",
-  "Mime::Type::InvalidMimeType",
-  "ActionDispatch::Routing::Mapper::BacktraceCleaner",
-  "ActionController::TestRequest::ENCODER",
-  "Rack::Session::Cookie::Base64",
-  "Rack::Session::Cookie::Base64::JSON",
-  "Rack::Session::Cookie::Base64::ZipJSON",
-  "Rack::Session::Cookie::Identity",
-  "Rack::Session::Cookie::SessionId",
-  "Rack::Session::Encryptor::Error",
-  "Rack::Session::Encryptor::InvalidSignature",
-  "Rack::Session::Encryptor::InvalidMessage",
-]);
 
 export async function collectClassPaths(only?: string): Promise<Map<string, ClassPathEntry[]>> {
   const ruby = await readJson<Manifest>("rails-api.json");
@@ -154,7 +162,6 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
   const byDir = new Map<string, ClassPathEntry[]>();
   unexported.length = 0;
   unexportedModules.length = 0;
-  known.clear();
 
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
     const tsPkg = ts.packages[pkg];
@@ -175,11 +182,6 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       }
       for (const [fqn, info] of Object.entries(rubyPkg[kind] ?? {})) {
         if (!info.file || isRubyOnlyClass(fqn) || isSourceUnported(info.file, pkg)) continue;
-        // A module under a `TS_CLASS_RENAMES` segment (`AbstractController::Railties`)
-        // is spelled the trails way by its seat, which no table entry may contradict.
-        if (kind === "modules" && fqn.split("::").some((seg) => seg in TS_CLASS_RENAMES)) {
-          continue;
-        }
         const short = fqn.split("::").at(-1)!;
         const tsFile = rubyFileToTs(info.file, pkg);
         const rubyPath = renameTokens(fqn);
@@ -189,6 +191,12 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
           tsFile,
           tsByFileName,
         );
+        // A class Rails nests under its owner's name (`Template::Error`) may be
+        // spelled with the owner's short name in front (`TemplateError`).
+        tsCls ??=
+          kind === "classes"
+            ? tsByFileName.get(`${tsFile}::${fqn.split("::").at(-2)}${short}`)
+            : undefined;
         const fallback = tsCls === undefined && kind === "modules";
         if (fallback) tsCls = { file: tsFile, name: rubyShort };
         if (!tsCls?.file || rubyPath === tsCls.name) continue;
@@ -205,20 +213,52 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     const excluded = await tsconfigExcludes(dir);
     const reachable = await entryGraph(dir);
     const entries = byDir.get(dir) ?? [];
+    const byFqn = new Map([...paired.values()].map((e) => [`${e.file}::${e.fqn}`, e]));
+    const sources = new Map<string, string>();
+    const read = async (file: string) =>
+      sources.get(file) ??
+      sources.set(file, await fs.readFile(path.join(srcRoot, file), "utf8")).get(file)!;
+    // A class Ruby nests in another (`Rack::Session::Cookie::Base64::JSON`) is a
+    // static of its exported owner, so the table reads it off the owner.
+    const tsPath = async (entry: ClassPathEntry): Promise<string | null> => {
+      const source = await read(entry.file);
+      if (isExported(source, entry.tsName)) return entry.tsName;
+      const member = new RegExp(
+        `^\\s*(?:public\\s+)?static\\s+(?:readonly\\s+)?${entry.tsName}\\b|^\\s+export\\s+class\\s+${entry.tsName}\\b`,
+        "m",
+      ).exec(source);
+      if (!member) return null;
+      const owner = byFqn.get(`${entry.file}::${entry.fqn.split("::").slice(0, -1).join("::")}`);
+      // An owner `parity:api` pairs under another name (`Mime::Type` is `MimeType`)
+      // is the exported class the static sits in.
+      const enclosing = [
+        ...source.slice(0, member.index).matchAll(/^export\s+(?:abstract\s+)?class\s+(\w+)/gm),
+      ].at(-1)?.[1];
+      const ownerPath = owner ? await tsPath(owner) : (enclosing ?? null);
+      return ownerPath === null ? null : `${ownerPath}.${entry.tsName}`;
+    };
     for (const [key, entry] of paired) {
       if (ambiguous.has(key)) continue;
       const rel = path.join("src", entry.file);
-      if (excluded.some((glob) => path.matchesGlob(rel, glob) || rel.startsWith(`${glob}/`))) {
+      // A file the build leaves out by name is loaded by a test entry, and
+      // imports a table of its own; one left out by a glob is a test file.
+      const ownTable = excluded.includes(rel);
+      if (
+        !ownTable &&
+        excluded.some((glob) => path.matchesGlob(rel, glob) || rel.startsWith(`${glob}/`))
+      ) {
         continue;
       }
-      if (!reachable.has(entry.file)) continue;
-      const source = await fs.readFile(path.join(srcRoot, entry.file), "utf8");
-      if (isExported(source, entry.tsName)) entries.push(entry);
-      else if (fallbackModules.has(key)) continue;
+      if (!ownTable && !reachable.has(entry.file)) continue;
+      const source = await read(entry.file);
+      const reached = await tsPath(entry);
+      if (reached !== null) entries.push({ ...entry, tsName: reached, excluded: ownTable });
+      else if (modules.has(key) && isSelfNamespace(source, entry.file, entry.tsName)) {
+        entries.push({ ...entry, namespace: true });
+      } else if (fallbackModules.has(key)) continue;
       else if (modules.has(key)) {
         unexportedModules.push(`${dir}/src/${entry.file}: ${entry.tsName} (${entry.fqn})`);
-      } else if (KNOWN_UNEXPORTED.has(entry.fqn)) known.add(entry.fqn);
-      else unexported.push(`${dir}/src/${entry.file}: ${entry.tsName} (${entry.fqn})`);
+      } else unexported.push(`${dir}/src/${entry.file}: ${entry.tsName} (${entry.fqn})`);
     }
     byDir.set(dir, entries);
   }
@@ -239,7 +279,10 @@ export function renderClassPaths(entries: readonly ClassPathEntry[]): string {
     ...imports,
     "",
     "registerClassPaths([",
-    ...sorted.map((e) => `  [() => ${alias.get(e.file)}.${e.tsName}, ${JSON.stringify(e.fqn)}],`),
+    ...sorted.map(
+      (e) =>
+        `  [() => ${alias.get(e.file)}${e.namespace ? "" : `.${e.tsName}`}, ${JSON.stringify(e.fqn)}],`,
+    ),
     "]);",
     "",
   ].join("\n");
@@ -283,8 +326,12 @@ async function main(): Promise<void> {
   const only = at === -1 ? undefined : process.argv[at + 1];
   const stale: string[] = [];
   const tables = await collectClassPaths(only);
-  for (const [dir, entries] of tables) {
-    const target = path.join(ROOT_DIR, "packages", dir, "src", GENERATED);
+  const targets = [...tables].flatMap(([dir, entries]) => [
+    [dir, GENERATED, entries.filter((e) => !e.excluded)] as const,
+    [dir, EXCLUDED_GENERATED, entries.filter((e) => e.excluded)] as const,
+  ]);
+  for (const [dir, table, entries] of targets) {
+    const target = path.join(ROOT_DIR, "packages", dir, "src", table);
     if (entries.length === 0) {
       const exists = await fs.access(target).then(
         () => true,
@@ -318,11 +365,6 @@ async function main(): Promise<void> {
     console.error(
       `Classes paired with a Ruby class but not exported, so no table can name them:\n  ${unexported.join("\n  ")}`,
     );
-    process.exitCode = 1;
-  }
-  const gone = [...KNOWN_UNEXPORTED].filter((fqn) => !known.has(fqn));
-  if (check && only === undefined && gone.length > 0) {
-    console.error(`No longer reported — delete from KNOWN_UNEXPORTED:\n  ${gone.join("\n  ")}`);
     process.exitCode = 1;
   }
   if (check) {

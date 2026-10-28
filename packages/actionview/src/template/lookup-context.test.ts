@@ -16,10 +16,10 @@ import {
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
+import { I18nProxy } from "../rendering.js";
 import { DetailsKey, LookupContext } from "../lookup-context.js";
 import { PathSet } from "../path-set.js";
 import { FixtureResolver } from "../testing/resolvers.js";
-import { ActionView } from "../namespaces.js";
 import { MissingTemplate } from "./error.js";
 import { Template } from "../template.js";
 import { TSE } from "./handlers/tse.js";
@@ -128,14 +128,8 @@ describe("LookupContextTest", () => {
   });
 
   it("delegates changing the locale to the I18n configuration object if it contains a lookup_context object", () => {
-    const { I18nProxy } = ActionView as unknown as {
-      I18nProxy: new (
-        config: ReturnType<typeof I18n.config>,
-        lookupContext: LookupContext,
-      ) => ReturnType<typeof I18n.config>;
-    };
     try {
-      I18n.setConfig(new I18nProxy(I18n.config(), lookupContext));
+      I18n.setConfig(new I18nProxy(I18n.config(), lookupContext) as never);
       lookupContext.locale = ":pt";
       assertEqual("pt", I18n.locale());
       assertEqual(":pt", lookupContext.locale);

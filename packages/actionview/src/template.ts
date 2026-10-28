@@ -14,7 +14,6 @@ import {
   extend,
   LoadError,
   NotImplementedError,
-  rbModConstSet,
   rbInspect,
   rbModName,
   rbObjRespondTo,
@@ -542,8 +541,7 @@ export class Template {
 
 extend(Template, Handlers);
 
-rbModConstSet(ActionView, "Template", Template);
-rbModConstSet(Template, "Error", TemplateError);
+ActionView.Template = Template;
 
 type Parameter = [type: string, name?: string, defaultExpr?: string];
 

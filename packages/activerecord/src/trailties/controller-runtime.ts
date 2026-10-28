@@ -1,5 +1,5 @@
 import { attrInternal, Concern, extend, pluralize, toF } from "@blazetrails/activesupport";
-import { classModule, rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
+import { classModule, rbCallSuper } from "@blazetrails/ruby-compat";
 import { Railties } from "../namespaces.js";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
@@ -88,4 +88,4 @@ Object.assign(ControllerRuntime.prototype, {
   cleanupViewRuntime,
   appendInfoToPayload,
 });
-rbModConstSet(Railties, "ControllerRuntime", ControllerRuntime);
+Railties.ControllerRuntime = ControllerRuntime;

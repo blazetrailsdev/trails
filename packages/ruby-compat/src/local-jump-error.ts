@@ -9,5 +9,3 @@ import { StandardError } from "./standard-error.js";
  * inherits rather than defines.
  */
 export class LocalJumpError extends StandardError {}
-
-LocalJumpError.prototype.name = "LocalJumpError";

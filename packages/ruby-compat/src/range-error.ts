@@ -12,5 +12,3 @@ import { StandardError } from "./standard-error.js";
  * rather than defines.
  */
 export class RangeError extends StandardError {}
-
-RangeError.prototype.name = "RangeError";

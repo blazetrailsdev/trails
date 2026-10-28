@@ -6,7 +6,13 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers", "src/test", "src/test-case.ts"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/test-helpers",
+    "src/test",
+    "src/test-case.ts",
+    "src/class-paths.excluded.generated.ts"
+  ],
   "references": [
     { "path": "../builder" },
     { "path": "../ruby-compat" },

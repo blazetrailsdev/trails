@@ -52,5 +52,3 @@ export class NoMethodError extends NameError {
     return this.#privateCall;
   }
 }
-
-NoMethodError.prototype.name = "NoMethodError";

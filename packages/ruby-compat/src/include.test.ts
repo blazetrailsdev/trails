@@ -850,13 +850,10 @@ describe("Module#ancestors", () => {
 
   it("lists MRI's ancestors for a core class", () => {
     const names = (x: unknown) => rbModAncestors(rbObjClass(x)).map(rbModName).join(" ");
-    const named = (x: unknown) =>
-      rbModAncestors(rbObjClass(x))
-        .map(rbModName)
-        .filter((name) => name != null)
-        .join(" ");
     const dateTime = { [Symbol.toStringTag]: "Temporal.PlainDateTime" };
-    expect(named(dateTime)).toBe("DateTime Date Comparable Object Kernel BasicObject");
+    expect(names(dateTime)).toBe(
+      "DateTime Date DateAndTime::Calculations Comparable Object Kernel BasicObject",
+    );
     expect(names(1)).toBe("Integer Numeric Comparable Object Kernel BasicObject");
     expect(names(1.5)).toBe("Float Numeric Comparable Object Kernel BasicObject");
     expect(names(null)).toBe("NilClass Object Kernel BasicObject");
@@ -871,7 +868,9 @@ describe("Module#ancestors", () => {
     expect(yielded).toEqual(["a", 1, "b", 2]);
     expect(names(class {})).toBe("Class Module Object Kernel BasicObject");
     expect(names("s")).toBe("String Comparable Object Kernel BasicObject");
-    expect(named(new Date(0))).toBe("Time Comparable Object Kernel BasicObject");
+    expect(names(new Date(0))).toBe(
+      "Time DateAndTime::Calculations Comparable Object Kernel BasicObject",
+    );
     expect(rbModAncestors(rbCBasicObject)).toEqual([rbCBasicObject]);
   });
 

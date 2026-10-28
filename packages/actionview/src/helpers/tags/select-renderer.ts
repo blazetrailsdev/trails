@@ -1,14 +1,6 @@
 import { Tags } from "../../namespaces.js";
 import { isBlank, stringifyKeys, type SafeBuffer } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  block,
-  fetch,
-  hashDelete,
-  rtest,
-  toI,
-  rbModConstSet,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError, block, fetch, hashDelete, rtest, toI } from "@blazetrails/ruby-compat";
 
 import type { TagBuilder } from "../tag-helper.js";
 
@@ -113,4 +105,4 @@ export const SelectRenderer = {
   },
 };
 
-rbModConstSet(Tags, "SelectRenderer", SelectRenderer);
+Tags.SelectRenderer = SelectRenderer;

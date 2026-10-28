@@ -416,8 +416,8 @@ Encryption.eagerAutoload(() => {
   Encryption.autoload("Scheme");
 });
 
-export const Railties = { name: "ActiveRecord::Railties" } as {
+export const Railties = { name: "ActiveRecord::Trailties" } as {
   name: string;
   ControllerRuntime?: object;
 };
-rbModConstSet(ActiveRecord, "Railties", Railties);
+ActiveRecord.Railties = Railties;
