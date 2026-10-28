@@ -188,7 +188,10 @@ export class Info {
     }) as Promise<string>;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs join — PERMANENT
+   */
   protected decodeCommaSeparatedAsciiCharacters(encodedValue: string | undefined) {
     if (!encodedValue!.includes(",")) {
       return encodedValue;

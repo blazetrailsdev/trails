@@ -193,6 +193,7 @@ const RSPEC_MAP: Record<string, CanonicalKind> = {
   expect_to_eq: "equal",
   expect_not_to_eq: "notEqual",
   expect_to_eql: "equal",
+  expect_not_to_eql: "notEqual",
   expect_to_be: "equal",
   expect_not_to_be: "notEqual",
   expect_to_equal: "equal",
@@ -261,6 +262,9 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
   toThrow: "raises",
   toThrowError: "raises",
   toBeInstanceOf: "kindOf",
+  // `expect(x).toBeTypeOf("number")` is the port of RSpec's `be_a(Integer)` on a
+  // value JS holds as a primitive, where `toBeInstanceOf(Number)` is false.
+  toBeTypeOf: "kindOf",
   toBeExactInstanceOf: "instanceOf",
   toEqualRuby: "equal",
   toBeRubyTruthy: "truthy",

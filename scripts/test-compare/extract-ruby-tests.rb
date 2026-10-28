@@ -121,10 +121,12 @@ RUBY_COMPAT_LIBRARY_SPECS = {
 # `toHaveBeenCalled*` onto a canonical kind surfaces ~97 pre-existing port
 # divergences across activerecord/activesupport and is its own burndown.
 # `stubs` is NOT an expectation — it only installs a return value — and stays
-# uncounted.
+# uncounted. RSpec's `expect_any_instance_of(K).to receive` is the
+# `expect(obj).to receive` expectation set on every instance of `K`, so it
+# counts as one too; `allow_any_instance_of` only stubs, and does not.
 def assertion_method?(name)
   return false unless name
-  name == "expect" || name == "expects" ||
+  name == "expect" || name == "expects" || name == "expect_any_instance_of" ||
     name.match?(/\A(assert|refute)(_|\z)/) ||
     name.match?(/\A(must|wont)_/)
 end
@@ -2249,7 +2251,7 @@ class TestExtractor
     recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_block
     recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_arg
     return nil unless recv.is_a?(Array) &&
-      ((recv[0] == :fcall && ident_name(recv[1]) == "expect") ||
+      ((recv[0] == :fcall && %w[expect expect_any_instance_of].include?(ident_name(recv[1]))) ||
        (recv[0] == :vcall && ident_name(recv[1]) == "is_expected"))
     matcher = (positional_args(node[4]) || node[4])&.first
     matcher = matcher[1] if matcher.is_a?(Array) && matcher[0] == :method_add_block

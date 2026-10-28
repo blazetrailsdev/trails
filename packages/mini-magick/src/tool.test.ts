@@ -28,7 +28,7 @@ describe("MiniMagick::Tool", () => {
     it("strips the output", async () => {
       subject.append(imagePath());
       const output = await subject.call();
-      expect((output as string).endsWith("\n")).toBe(false);
+      expect(output).not.toEndWith("\n");
     });
 
     it("accepts a block, and yields stdin, stdout and exit status", async () => {
@@ -58,7 +58,7 @@ describe("MiniMagick::Tool", () => {
   describe("#command", () => {
     it("includes the executable and the arguments", () => {
       vi.spyOn(subject as Tool, "args", "get").mockReturnValue(["-list", "Command"]);
-      expect(subject.command()).toEqual(expect.arrayContaining(["identify", "-list", "Command"]));
+      expect(subject.command()).toInclude("identify", "-list", "Command");
     });
   });
 
