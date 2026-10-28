@@ -35,5 +35,8 @@ describe("Crass::Tokenizer", () => {
     expect(Tokenizer.tokenize("\u00d7*x", { preserveHacks: true })).toEqual([
       { node: "ident", pos: 0, raw: "\u00d7*x", value: "\u00d7x" },
     ]);
+    expect(Tokenizer.tokenize("\u00d7\\61*x", { preserveHacks: true })).toEqual([
+      { node: "ident", pos: 0, raw: "\u00d7\\61*x", value: "\u00d7ax" },
+    ]);
   });
 });

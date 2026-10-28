@@ -50,7 +50,7 @@ const RE_NON_PRINTABLE = /[\u0000-\u0008\u000b\u000e-\u001f\u007f]+/; // eslint-
 const RE_WHITESPACE = /[\n\t ]+/;
 const RE_CHAR = /[\s\S]/u;
 
-const RE_NAME = /[0-9A-Za-z_\u0080-\u{10ffff}-]+/uy;
+const RE_NAME = /[0-9A-Za-z_\u0080-\u{10ffff}-]+/u;
 const RE_NON_ASCII_START = /^[\u0080-\u{10ffff}]/u;
 
 const RE_NUMBER = /^[+-]?\d*(?:\.\d+)?(?:[eE][+-]?\d+)?/;
@@ -93,24 +93,29 @@ export class Tokenizer {
         let end = token[3] + start + 1;
         const nonAscii = token[0] === TokenType.Delim && RE_NON_ASCII_START.test(token[1]);
         if (nonAscii) {
-          let raw = "";
+          const s = new StringScanner(css.slice(tokenStart));
           let value = "";
-          end = tokenStart;
-          for (;;) {
-            RE_NAME.lastIndex = end;
-            const match = RE_NAME.exec(css);
+          while (!s.isEos()) {
+            const match = s.scan(RE_NAME);
             if (match !== null) {
-              raw += match[0];
-              value += match[0];
-            } else if (css[end] === "*" && this._options.preserveHacks) {
-              const char = [...css.slice(end + 1, end + 3)][0] ?? "";
-              raw += `*${char}`;
-              value += char;
+              value += match;
+              continue;
+            }
+
+            const char = s.peek(1);
+
+            if (char === "\\" && s.peek(2)[1] !== "\n") {
+              s.scan(RE_CHAR);
+              value += this.consumeEscaped(s);
+            } else if (char === "*" && this._options.preserveHacks) {
+              s.scan(RE_CHAR);
+              value += s.scan(RE_CHAR) ?? "";
             } else {
               break;
             }
-            end = tokenStart + raw.length;
           }
+          end = tokenStart + s.pos;
+          const raw = css.slice(tokenStart, end);
           created = { node: "ident", pos: created.pos, raw, value };
         }
         const adjacent = lastEnd === tokenStart;
