@@ -86,7 +86,7 @@ export class Shell {
     const duration = await Benchmark.realtime(async () => {
       value = await block();
     });
-    MiniMagick.logger.debug(format("[%.2fs] %s", duration, command));
+    MiniMagick.logger!.debug(format("[%.2fs] %s", duration, command));
     return value;
   }
 }

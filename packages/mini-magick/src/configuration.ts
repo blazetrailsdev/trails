@@ -7,8 +7,8 @@ export class Configuration {
   declare _cliEnv: unknown;
   declare _restrictedEnv: unknown;
   declare _timeout: unknown;
-  declare _logger: unknown;
-  declare _tmpdir: unknown;
+  declare _logger: Logger | null;
+  declare _tmpdir: string | null;
   declare _errors: unknown;
   declare _warnings: unknown;
 
@@ -104,7 +104,7 @@ export class Configuration {
     return base.graphicsmagick;
   }
 
-  configure(this: unknown, block?: (...args: unknown[]) => unknown) {
+  configure<T>(this: T, block: (config: T) => unknown) {
     return block(this);
   }
 }

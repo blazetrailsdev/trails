@@ -1,7 +1,8 @@
 import { File, RuntimeError, rbInspect, FileUtils, Tempfile } from "@blazetrails/ruby-compat";
+import type { TempfileBasename } from "@blazetrails/ruby-compat";
 
 export function imagePath(type: string = "default") {
-  let path: unknown;
+  let path: string;
   if (type !== "jpg_without_extension") {
     return File.join(
       File.expandPath("../fixtures", import.meta.dirname),
@@ -39,12 +40,14 @@ export function imagePath(type: string = "default") {
     );
   } else {
     path = randomPath();
-    FileUtils.cp(imagePath() as string | string[], path as string);
+    FileUtils.cp(imagePath(), path);
     return path;
   }
 }
 
-export function randomPath(basename: string | string[] = "") {
-  this._tempfile = Tempfile.open(basename);
-  return this._tempfile.path();
+let _tempfile: Tempfile;
+
+export function randomPath(basename: TempfileBasename = "") {
+  _tempfile = Tempfile.open(basename);
+  return _tempfile.path()!;
 }

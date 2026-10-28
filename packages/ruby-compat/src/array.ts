@@ -1,3 +1,4 @@
+import { IndexError } from "./index-error.js";
 import { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
@@ -274,6 +275,24 @@ export function pack(
   const str = res.join("");
   if (encInfo !== 0) return str;
   return Uint8Array.from(str, (c) => c.charCodeAt(0));
+}
+
+/**
+ * `rb_ary_fetch` (`vendor/ruby/v3.3.11/array.c:1961`) in its one-argument form:
+ * a negative index counts from the end, and one outside the array raises
+ * `IndexError` (`array.c:1981`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#fetch`.
+ */
+export function rbAryFetch<T>(ary: readonly T[], pos: number): T {
+  let idx = pos;
+  if (idx < 0) idx += ary.length;
+  if (idx < 0 || ary.length <= idx) {
+    throw new IndexError(
+      `index ${idx - (idx < 0 ? ary.length : 0)} outside of array bounds: ${-ary.length}...${ary.length}`,
+    );
+  }
+  return ary[idx];
 }
 
 /**

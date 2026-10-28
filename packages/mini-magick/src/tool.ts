@@ -10,6 +10,9 @@ import {
 } from "@blazetrails/ruby-compat";
 import { MiniMagick } from "./mini-magick.js";
 
+/** @noRailsEquivalent PERMANENT */
+export type CliTool = Tool & { [option: string]: (...args: unknown[]) => CliTool };
+
 export class Tool {
   declare _name: string;
   declare _args: string[];
@@ -35,11 +38,11 @@ export class Tool {
   static new(...args: unknown[]) {
     const block =
       typeof args[args.length - 1] === "function"
-        ? (args.pop() as (instance: Tool) => unknown)
+        ? (args.pop() as (instance: CliTool) => unknown)
         : undefined;
     const instance = new this(...(args as [string, Record<string, unknown>?]));
     if (block != null) {
-      block(instance);
+      block(instance as CliTool);
       return instance.call();
     } else {
       return instance;

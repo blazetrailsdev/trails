@@ -4,10 +4,8 @@ import { MiniMagick } from "./mini-magick.js";
 import { Shell } from "./shell.js";
 import "./test-helpers/spec-helper.js";
 import { imagePath } from "./test-helpers/support/helpers.js";
-import { Tool } from "./tool.js";
+import { Tool, type CliTool } from "./tool.js";
 import { beforeEach, expect, it, vi, describe, afterEach } from "vitest";
-
-type CliTool = Tool & { [option: string]: (...args: unknown[]) => CliTool };
 
 describe("MiniMagick::Tool", () => {
   let subject: CliTool;
@@ -59,7 +57,7 @@ describe("MiniMagick::Tool", () => {
 
   describe("#command", () => {
     it("includes the executable and the arguments", () => {
-      vi.spyOn(subject, "args", "get").mockReturnValue(["-list", "Command"]);
+      vi.spyOn(subject as Tool, "args", "get").mockReturnValue(["-list", "Command"]);
       expect(subject.command()).toEqual(expect.arrayContaining(["identify", "-list", "Command"]));
     });
   });

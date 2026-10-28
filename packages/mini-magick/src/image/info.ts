@@ -11,9 +11,10 @@ import {
   TypeError,
   excSetupMessage,
   JSON,
+  rbAryFetch,
 } from "@blazetrails/ruby-compat";
 import { Invalid } from "../mini-magick.js";
-import type { Tool } from "../tool.js";
+import type { CliTool } from "../tool.js";
 import { MiniMagick } from "../mini-magick.js";
 
 export class Info {
@@ -156,30 +157,30 @@ export class Info {
     return this._info[`raw:${value ?? ""}`];
   }
 
-  async signature() {
+  signature(): string | Promise<string> {
     if (!((this._info["signature"] ?? false) !== false))
-      this._info["signature"] = await this.get("%#");
-    return this._info["signature"];
+      return (async () => (this._info["signature"] = (await this.get("%#")) as string))();
+    return this._info["signature"] as string;
   }
 
   async data() {
     if (!((this._info["data"] ?? false) !== false))
       this._info["data"] = await (async () => {
-        const json = (await MiniMagick.convert((convert: Tool) => {
+        const json = (await MiniMagick.convert((convert: CliTool) => {
           convert.append(this.path());
           convert.append("json:");
         })) as string;
-        let data = JSON.parse(json);
+        let data: unknown = JSON.parse(json);
         if (Array.isArray(data)) {
-          data = fetch(data, 0);
+          data = rbAryFetch(data, 0);
         }
-        return fetch(data, "image");
+        return fetch(data as Record<string, unknown>, "image");
       })();
     return this._info["data"];
   }
 
-  identify(block?: (builder: Tool) => unknown): Promise<string> {
-    return MiniMagick.identify((builder: Tool) => {
+  identify(block?: (builder: CliTool) => unknown): Promise<string> {
+    return MiniMagick.identify((builder: CliTool) => {
       if (block != null) {
         block(builder);
       }

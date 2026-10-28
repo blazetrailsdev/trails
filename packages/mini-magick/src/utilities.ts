@@ -15,7 +15,9 @@ export function which(cmd: string) {
 }
 
 export function tempfile(extension: string, block?: (tempfile: Tempfile) => unknown) {
-  const tempfile = new Tempfile(["mini_magick", extension], MiniMagick.tmpdir, { binmode: true });
+  const tempfile = Tempfile.new(["mini_magick", extension], MiniMagick.tmpdir, {
+    binmode: true,
+  });
   if (block != null) {
     block(tempfile);
   }
