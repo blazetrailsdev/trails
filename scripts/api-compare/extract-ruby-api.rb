@@ -1163,10 +1163,6 @@ class ApiExtractor
     end
   end
 
-  # A class macro defined in the same class whose body is
-  # `define_method(<first param>) do … end` (mini_magick/image.rb:118-126,
-  # `def self.attribute(name, key = name.to_s)`): each later `attribute :width`
-  # defines `width`, recorded as that define_method would be.
   def record_define_method_macro(fqn, name, params_node, body)
     params = params_node.is_a?(Array) && params_node[0] == :paren ? params_node[1] : params_node
     first = params.is_a?(Array) && params[0] == :params && params[1].is_a?(Array) ? params[1][0] : nil
@@ -2579,7 +2575,6 @@ class ApiExtractor
     # `define_method(name)` passes the loop variable itself rather than
     # interpolating it (rfc4646.rb:33), so the member IS the method name.
     return member if node[0] == :var_ref && ident_name(node[1]) == loop_var
-    # `define_method(operator.tr('-', '_'))` (mini_magick/tool.rb:231-232).
     if node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :call &&
        ident_name(node[1][3]) == "tr"
       recv = node[1][1]
@@ -4008,9 +4003,6 @@ class ApiExtractor
     # additionally feeds `delegate(*CONST, to:)` expansion. Limit the general
     # case to pure symbol arrays so a hash/struct constant can't inject
     # phantom delegate targets.
-    # A `%w[...]` constant drives only a `CONST.each { define_method … }` loop
-    # (mini_magick/tool.rb:16-17, :231-236), never a delegate or option-key
-    # expansion, so it is kept apart from the symbol arrays.
     words = percent_array_members(unwrap_freeze(rhs), %w[w W])
     (@const_word_arrays[current_fqn] ||= {})[const[1]] = words if words
     qsyms = qsymbols_members(unwrap_freeze(rhs))
