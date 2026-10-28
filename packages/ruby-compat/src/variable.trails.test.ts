@@ -191,6 +191,29 @@ describe("rb_const_get", () => {
       expect(rbModConstGet(Sub, "IncludedCheck")).toBe(IncludedCheck);
     });
 
+    it("restarts a leading :: at Object", () => {
+      registerConstant("ConstGetOuter", Outer);
+      expect(rbModConstGet(Sub, "::ConstGetOuter::Inner")).toBe(Outer.Inner);
+    });
+
+    it("raises wrong constant name for a malformed path", () => {
+      expect(() => rbModConstGet(Sub, "")).toThrow("wrong constant name ");
+      registerConstant("ConstGetOuter", Outer);
+      expect(() => rbModConstGet(Sub, "ConstGetOuter::bar")).toThrow("wrong constant name bar");
+      expect(() => rbModConstGet(Sub, "Foo:Bar")).toThrow("wrong constant name Foo:Bar");
+    });
+
+    it("reads only the receiver's own table when inherit is false", () => {
+      class Base {
+        static Inherited = 1;
+      }
+      class Child extends Base {}
+      registerConstant("ConstGetChild", Child);
+      expect(rbModConstGet(Object, "ConstGetChild::Inherited")).toBe(1);
+      expect(() => rbModConstGet(Object, "ConstGetChild::Inherited", false)).toThrow(NameError);
+      unregisterConstant("ConstGetChild", Child);
+    });
+
     it("names the missing segment, not the path", () => {
       registerConstant("ConstGetOuter", Outer);
       let error: unknown;

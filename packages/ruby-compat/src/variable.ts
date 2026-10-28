@@ -30,6 +30,7 @@ import {
   rbCBasicObject,
   rbCSymbol,
   rbModName,
+  rbInspect,
   rbModToS,
 } from "./object.js";
 import { Range } from "./range.js";
@@ -381,12 +382,8 @@ export function rbModConstGet(mod: object, name: string, recur: unknown = true):
   const pend = path.length;
   let pbeg = 0;
   let p = 0;
-  let wrongName: string = name;
-  const wrong_name = (): never => {
-    throw new NameError(`wrong constant name ${wrongName}`, wrongName, { receiver: mod });
-  };
 
-  if (p >= pend) return wrong_name();
+  if (p >= pend) throw new NameError(`wrong constant name ${name}`, name, { receiver: mod });
 
   if (p + 2 < pend && path[0] === ":" && path[1] === ":") {
     mod = Object;
@@ -400,25 +397,25 @@ export function rbModConstGet(mod: object, name: string, recur: unknown = true):
   while (p < pend) {
     while (p < pend && path[p] !== ":") p++;
 
-    if (pbeg === p) return wrong_name();
+    if (pbeg === p) throw new NameError(`wrong constant name ${name}`, name, { receiver: mod });
 
     const id = path.slice(pbeg, p);
     const beglen = pbeg - top;
     const prefix = path.slice(top, p);
 
     if (p < pend && path[p] === ":") {
-      if (p + 2 >= pend || path[p + 1] !== ":") return wrong_name();
+      if (p + 2 >= pend || path[p + 1] !== ":")
+        throw new NameError(`wrong constant name ${name}`, name, { receiver: mod });
       p += 2;
       pbeg = p;
     }
 
     if (mod === null || (typeof mod !== "object" && typeof mod !== "function")) {
-      throw new TypeError(`${JSON.stringify(name)} does not refer to class/module`);
+      throw new TypeError(`${rbInspect(name)} does not refer to class/module`);
     }
 
     if (!/^[A-Z]\w*$/.test(id)) {
-      wrongName = id;
-      return wrong_name();
+      throw new NameError(`wrong constant name ${id}`, id, { receiver: mod });
     }
     if (RCLASS_CONST_TBL.has(prefix)) {
       mod = RCLASS_CONST_TBL.get(prefix) as object;
