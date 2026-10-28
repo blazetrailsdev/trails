@@ -313,7 +313,6 @@ export class ExceptionWrapper {
     return _idFor(this.exception);
   }
 
-  /** @internal */
   static SourceMapLocation = SourceMapLocation;
 
   get sourceExtracts(): SourceExtract[] {
