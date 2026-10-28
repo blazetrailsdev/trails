@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { GeneratorError } from "./generated-attribute.js";
+import { capture } from "@blazetrails/activesupport";
 import { Application } from "../application.js";
 import { Trails } from "../rails.js";
 import "../trailties/active-record.js";
@@ -45,7 +45,7 @@ function listFiles(root: string): string[] {
 function makeGen() {
   return {
     run: async (name: string, args: string[]) => {
-      await ModelGenerator.start([name, ...args], { cwd: tmpDir });
+      await ModelGenerator.start([name, ...args], { destinationRoot: tmpDir });
       return listFiles(tmpDir);
     },
   };
@@ -75,14 +75,14 @@ describe("ModelGeneratorTest", () => {
   });
 
   it("unknown attribute type raises GeneratedAttribute's error", async () => {
-    await expect(makeGen().run("User", ["name:unknown"])).rejects.toThrow(
-      new GeneratorError("Could not generate field 'name' with unknown type 'unknown'."),
+    expect(await capture("stderr", () => makeGen().run("User", ["name:unknown"]))).toContain(
+      "Could not generate field 'name' with unknown type 'unknown'.",
     );
   });
 
   it("unknown attribute index raises GeneratedAttribute's error", async () => {
-    await expect(makeGen().run("User", ["name:string:unknown"])).rejects.toThrow(
-      new GeneratorError("Could not generate field 'name' with unknown index 'unknown'."),
+    expect(await capture("stderr", () => makeGen().run("User", ["name:string:unknown"]))).toContain(
+      "Could not generate field 'name' with unknown index 'unknown'.",
     );
   });
 

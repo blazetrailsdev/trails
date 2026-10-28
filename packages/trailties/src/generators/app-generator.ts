@@ -2,6 +2,7 @@ import { File } from "@blazetrails/ruby-compat";
 import { TopLevel, camelize, parameterize, titleize, underscore } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
+import type { GeneratorConfig } from "./base.js";
 import { Trails } from "../rails.js";
 import { GeneratorError } from "./generated-attribute.js";
 import { type DatabaseName } from "./database.js";
@@ -94,13 +95,34 @@ export class AppGenerator extends AppBase {
   private _configTargetVersion: string | null = null;
   readonly sqliteDriver: SqliteDriver;
 
-  constructor(options: AppGeneratorOptions) {
-    const database = options.database
-      ? (DB_ALIAS[options.database] ?? options.database)
-      : undefined;
-    super({ ...options, appPath: options.appPath ?? options.cwd, database });
-    this.packageManager = options.packageManager ?? "pnpm";
-    this.sqliteDriver = options.sqliteDriver ?? "better-sqlite3";
+  static {
+    this.methodAdded("createRoot");
+    this.methodAdded("createRootFiles");
+    this.methodAdded("createAppFiles");
+    this.methodAdded("createBinFiles");
+    this.methodAdded("createDockerfiles");
+    this.methodAdded("createEslintFile");
+    this.methodAdded("createCifiles");
+    this.methodAdded("createConfigFiles");
+    this.methodAdded("createDbFiles");
+    this.methodAdded("createLibFiles");
+    this.methodAdded("createLogFiles");
+    this.methodAdded("createPublicFiles");
+    this.methodAdded("createTmpFiles");
+    this.methodAdded("createVendorFiles");
+    this.methodAdded("createTestFiles");
+    this.methodAdded("createSystemTestFiles");
+    this.methodAdded("createStorageFiles");
+  }
+
+  declare options: AppGeneratorOptions & AppBaseOptions;
+
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
+    if (this.options.database)
+      this.options.database = DB_ALIAS[this.options.database] ?? this.options.database;
+    this.packageManager = this.options.packageManager ?? "pnpm";
+    this.sqliteDriver = this.options.sqliteDriver ?? "better-sqlite3";
     if (!VALID_PACKAGE_MANAGERS.includes(this.packageManager)) {
       throw new GeneratorError(
         `Unknown package manager '${this.packageManager}'. Valid options: ${VALID_PACKAGE_MANAGERS.join(", ")}`,
@@ -159,32 +181,12 @@ export class AppGenerator extends AppBase {
         : "package-lock.json";
   }
 
-  async run(): Promise<string[]> {
+  createRoot(): void {
     this.isValidConst();
     const name = File.basename(this.appPath);
 
     this.say(`Creating new trails application: ${name}`);
     this.say("");
-
-    this.createRootFiles(name);
-    this.createBinFiles();
-    this.createConfigFiles(name);
-    this.createAppFiles(name);
-    this.createDbFiles();
-    this.createTestFiles();
-    if (this.dependsOnSystemTest()) this.systemTest();
-    this.createPublicFiles();
-    this.createDirectoryPlaceholders();
-
-    if (!this.options.skipDocker) {
-      this.createDockerFiles();
-    }
-    this.createEslintFile();
-    this.createCifiles();
-
-    this.say("");
-
-    return this.getCreatedFiles();
   }
 
   private railsGemfileEntries(names: string[]): Record<string, string> {
@@ -193,7 +195,8 @@ export class AppGenerator extends AppBase {
     );
   }
 
-  private createRootFiles(name: string): void {
+  createRootFiles(): void {
+    const name = File.basename(this.appPath);
     const dep = this.database.pkgDependency;
     const dbDep =
       this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3"
@@ -472,7 +475,7 @@ ${
     );
   }
 
-  private createBinFiles(): void {
+  createBinFiles(): void {
     const excludePattern = [this.skip("Eslint") ? /eslint/ : null].filter((p) => p != null);
 
     this.createFile(
@@ -559,7 +562,8 @@ process.exit(status ?? 1);
     return this._configTargetVersion ?? LOAD_DEFAULTS_VERSION;
   }
 
-  private createConfigFiles(name: string): void {
+  createConfigFiles(): void {
+    const name = File.basename(this.appPath);
     this.createFile(
       "config/application.ts",
       `import { Application } from "@blazetrails/trailties";
@@ -1026,7 +1030,8 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     );
   }
 
-  private createAppFiles(name: string): void {
+  createAppFiles(): void {
+    const name = File.basename(this.appPath);
     this.createFile(
       "app/controllers/application-controller.ts",
       tsModule({
@@ -1170,7 +1175,7 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     this.createFile("app/assets/images/.gitkeep", "");
   }
 
-  private createDbFiles(): void {
+  createDbFiles(): void {
     this.createFile("db/migrate/.gitkeep", "");
 
     this.createFile(
@@ -1181,6 +1186,10 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 //   await User.create({ name: "Admin", email: "admin@example.com" });
 `,
     );
+  }
+
+  createSystemTestFiles(): void {
+    if (this.dependsOnSystemTest()) this.systemTest();
   }
 
   /** @internal */
@@ -1201,7 +1210,7 @@ export class ApplicationSystemTestCase extends SystemTestCase {
     );
   }
 
-  private createTestFiles(): void {
+  createTestFiles(): void {
     this.createFile(
       "test/test-helper.ts",
       `import { TestCase } from "@blazetrails/activesupport/test-case";
@@ -1242,7 +1251,7 @@ export async function teardown(): Promise<void> {
     this.createFile("test/fixtures/files/.gitkeep", "");
   }
 
-  private createPublicFiles(): void {
+  createPublicFiles(): void {
     this.createFile(
       "public/404.html",
       `<!DOCTYPE html>
@@ -1359,18 +1368,29 @@ export async function teardown(): Promise<void> {
     this.createFile("public/favicon.ico", "");
   }
 
-  private createDirectoryPlaceholders(): void {
+  createLibFiles(): void {
     this.createFile("lib/tasks/.gitkeep", "");
+  }
+
+  createLogFiles(): void {
     this.createFile("log/.gitkeep", "");
-    if (!this.skipStorage()) {
-      this.createFile("storage/.gitkeep", "");
-    }
+  }
+
+  createTmpFiles(): void {
     this.createFile("tmp/.gitkeep", "");
     this.createFile("tmp/pids/.gitkeep", "");
+  }
+
+  createVendorFiles(): void {
     this.createFile("vendor/.gitkeep", "");
   }
 
-  private createDockerFiles(): void {
+  createStorageFiles(): void {
+    if (!this.skipStorage()) this.createFile("storage/.gitkeep", "");
+  }
+
+  createDockerfiles(): void {
+    if (this.options.skipDocker) return;
     this.createFile(
       "Dockerfile",
       `# syntax=docker/dockerfile:1
@@ -1439,12 +1459,12 @@ export default defineConfig([
     );
   }
 
-  private createEslintFile(): void {
+  createEslintFile(): void {
     if (this.skip("Eslint")) return;
     this.eslint();
   }
 
-  private createCifiles(): void {
+  createCifiles(): void {
     if (this.options.skipCi) return;
     this.build("cifiles");
   }

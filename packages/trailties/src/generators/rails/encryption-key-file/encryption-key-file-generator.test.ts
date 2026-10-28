@@ -25,7 +25,7 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-const build = () => new EncryptionKeyFileGenerator({ cwd: tmpDir });
+const build = () => new EncryptionKeyFileGenerator([], {}, { destinationRoot: tmpDir });
 
 describe("EncryptionKeyFileGeneratorTest", () => {
   it("add_key_file writes a hex key file at mode 0600 and is idempotent", () => {

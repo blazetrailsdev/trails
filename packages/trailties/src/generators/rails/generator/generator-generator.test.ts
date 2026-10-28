@@ -17,8 +17,8 @@ afterEach(() => {
 
 describe("GeneratorGeneratorTest", () => {
   it("generator_skeleton_is_created", () => {
-    const gen = new GeneratorGenerator({ cwd: tmpDir, name: "awesome" });
-    gen.run();
+    const gen = new GeneratorGenerator(["awesome"], {}, { destinationRoot: tmpDir });
+    gen.createGeneratorFiles();
     for (const p of [
       "lib/generators/awesome/USAGE",
       "lib/generators/awesome/templates/.keep",
@@ -34,8 +34,8 @@ describe("GeneratorGeneratorTest", () => {
   });
 
   it("namespaced_generator_skeleton", () => {
-    const gen = new GeneratorGenerator({ cwd: tmpDir, name: "rails/awesome" });
-    gen.run();
+    const gen = new GeneratorGenerator(["rails/awesome"], {}, { destinationRoot: tmpDir });
+    gen.createGeneratorFiles();
     const src = fs.readFileSync(
       path.join(tmpDir, "lib/generators/rails/awesome/awesome-generator.ts"),
       "utf-8",
@@ -44,10 +44,11 @@ describe("GeneratorGeneratorTest", () => {
   });
 
   it("generator_skeleton_is_created_without_file_name_namespace", async () => {
-    const created = await GeneratorGenerator.start(["awesome", "--namespace", "false"], {
-      cwd: tmpDir,
+    const gen = new GeneratorGenerator(["awesome"], ["--namespace", "false"], {
+      destinationRoot: tmpDir,
     });
-    expect(created).toEqual([
+    await gen.invokeAll();
+    expect(gen.getCreatedFiles()).toEqual([
       "lib/generators/USAGE",
       "lib/generators/templates/.keep",
       "lib/generators/awesome-generator.ts",
@@ -57,7 +58,7 @@ describe("GeneratorGeneratorTest", () => {
 
   it("namespaced_generator_skeleton_without_file_name_namespace", async () => {
     await GeneratorGenerator.start(["rails/awesome", "--namespace", "false"], {
-      cwd: tmpDir,
+      destinationRoot: tmpDir,
     });
     for (const p of ["lib/generators/rails/USAGE", "lib/generators/rails/templates/.keep"]) {
       expect(fs.existsSync(path.join(tmpDir, p))).toBe(true);

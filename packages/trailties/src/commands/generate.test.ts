@@ -17,7 +17,7 @@ describe("GenerateCommand", () => {
   });
 
   it("invokes the named generator with its raw args and switches", async () => {
-    const invoke = vi.spyOn(Generators, "invoke").mockResolvedValue([]);
+    const invoke = vi.spyOn(Generators, "invoke").mockResolvedValue();
     await createProgram().parseAsync(
       ["generate", "model", "Account", "name:string", "--no-migration", "--parent=Admin"],
       { from: "user" },

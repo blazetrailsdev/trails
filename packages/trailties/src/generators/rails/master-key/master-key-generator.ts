@@ -1,20 +1,16 @@
 import { Pathname } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
-import { GeneratorBase, type GeneratorOptions } from "../../base.js";
+import { GeneratorBase } from "../../base.js";
 import { EncryptionKeyFileGenerator } from "../encryption-key-file/encryption-key-file-generator.js";
 
 const MASTER_KEY_PATH = new Pathname("config/master.key");
 
 export class MasterKeyGenerator extends GeneratorBase {
-  constructor(options: GeneratorOptions) {
-    super(options);
-  }
-
-  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
-    const generator = new MasterKeyGenerator(config);
-    generator.addMasterKeyFile();
-    generator.ignoreMasterKeyFile();
-    return generator.getCreatedFiles();
+  static {
+    this.methodAdded("addMasterKeyFile");
+    this.methodAdded("addMasterKeyFileSilently");
+    this.methodAdded("ignoreMasterKeyFile");
+    this.methodAdded("ignoreMasterKeyFileSilently");
   }
 
   addMasterKeyFile(): void {
@@ -49,7 +45,7 @@ export class MasterKeyGenerator extends GeneratorBase {
   }
 
   private keyFileGenerator(): EncryptionKeyFileGenerator {
-    return new EncryptionKeyFileGenerator({ cwd: this.cwd, shell: this.shell });
+    return new EncryptionKeyFileGenerator([], this.options);
   }
 
   private keyIgnore(): string {

@@ -3,7 +3,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
-import { DevcontainerGenerator } from "./devcontainer-generator.js";
+import {
+  DevcontainerGenerator,
+  type DevcontainerGeneratorOptions,
+} from "./devcontainer-generator.js";
 import { Generators } from "../../../generators.js";
 let tmpDir: string;
 beforeEach(() => {
@@ -12,8 +15,13 @@ beforeEach(() => {
 afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
-type Opts = Partial<ConstructorParameters<typeof DevcontainerGenerator>[0]>;
-const run = (o: Opts = {}) => new DevcontainerGenerator({ cwd: tmpDir, ...o }).run();
+type Opts = Partial<DevcontainerGeneratorOptions>;
+const run = (o: Opts = {}) => {
+  const generator = new DevcontainerGenerator([], o, { destinationRoot: tmpDir });
+  generator.createDevcontainer();
+  generator.updateApplicationSystemTestCase();
+  generator.updateDatabaseYml();
+};
 const read = (rel: string) => fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 const exists = (rel: string) => fs.existsSync(path.join(tmpDir, rel));
 const dc = () => JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;

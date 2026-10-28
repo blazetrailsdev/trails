@@ -34,7 +34,7 @@ const read = (relativePath: string) => fs.readFileSync(path.join(tmpDir, relativ
 describe("ScaffoldGenerator (namespaced)", () => {
   it("names a namespaced scaffold's migration create_<table_name> and routes it under /admin/accounts", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-    const config = { cwd: tmpDir };
+    const config = { destinationRoot: tmpDir };
     await ScaffoldGenerator.start(["admin/account", "name:string"], config);
     const migration = fs
       .readdirSync(tmpDir, { recursive: true })
@@ -62,7 +62,7 @@ describe("ScaffoldGenerator (namespaced)", () => {
     expect(functionalTest).toContain("declare admin_accounts: FixtureSetAccessor<AdminAccount>;");
     expect(functionalTest).toContain('this["@admin_account"] = await this.admin_accounts("one");');
     expect(parseTs(functionalTest).diagnostics).toEqual([]);
-    const rerun = ScaffoldGenerator.start(["admin/account"], { ...config, force: true });
+    const rerun = ScaffoldGenerator.start(["admin/account", "--force"], config);
     await expect(rerun).resolves.toEqual(expect.any(Array));
   });
 });
@@ -71,9 +71,9 @@ describe("ScaffoldGenerator (routes)", () => {
   it("logs and writes the resource route with the mapper as this", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
     const output = await capture("stdout", () =>
-      ScaffoldGenerator.start(["post", "title:string"], { cwd: tmpDir }),
+      ScaffoldGenerator.start(["post", "title:string"], { destinationRoot: tmpDir }),
     );
-    expect(output).toMatch(/^ +route {2}this\.resources\("posts"\);$/m);
+    expect(output).toMatch(/^ +route +this\.resources\("posts"\);$/m);
     expect(read("config/routes.ts")).toBe(
       'Trails.application!.routes().draw(function () {\n  this.resources("posts");\n});\n',
     );
@@ -83,7 +83,7 @@ describe("ScaffoldGenerator (routes)", () => {
 describe("ScaffoldGenerator (views)", () => {
   it("emits Rails' scaffold copy and a record partial that show and index render", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-    await ScaffoldGenerator.start(["post", "title:string"], { cwd: tmpDir });
+    await ScaffoldGenerator.start(["post", "title:string"], { destinationRoot: tmpDir });
     const index = read("app/views/posts/index.html.tse");
     expect(index).toContain('<%= linkTo("Show this post", post) %>');
     expect(index).toContain("<%= render(post) %>");
@@ -109,11 +109,11 @@ describe("ScaffoldGenerator (type-check)", () => {
   it("emits a controller that trails-tsc builds against the scaffolded model", async () => {
     const tmpApps = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-scaffold-build-"));
     try {
-      await new AppGenerator({
-        cwd: tmpApps,
-        appPath: "blog",
-        database: "sqlite",
-      }).run();
+      await new AppGenerator(
+        ["blog"],
+        { database: "sqlite" },
+        { destinationRoot: tmpApps },
+      ).invokeAll();
       const appDir = path.join(tmpApps, "blog");
       const scope = path.join(appDir, "node_modules", "@blazetrails");
       fs.mkdirSync(scope, { recursive: true });
@@ -128,7 +128,7 @@ describe("ScaffoldGenerator (type-check)", () => {
         path.join(appDir, "node_modules", "@types", "node"),
       );
       await ScaffoldGenerator.start(["Post", "title:string", "body:text"], {
-        cwd: appDir,
+        destinationRoot: appDir,
       });
 
       fs.writeFileSync(

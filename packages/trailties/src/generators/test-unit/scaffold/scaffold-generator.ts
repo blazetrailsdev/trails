@@ -9,8 +9,8 @@ import {
 import { GeneratorError } from "../../generated-attribute.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 import { format, File } from "@blazetrails/ruby-compat";
-import { dasherize } from "../../base.js";
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import { dasherize, type GeneratorConfig, type GeneratorOptions } from "../../base.js";
+import { NamedBase } from "../../named-base.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 import { TEMPLATES } from "./templates.js";
 
@@ -24,15 +24,15 @@ export class ScaffoldGenerator extends NamedBase {
   declare controllerFileName: string;
   /** @internal */
   declare _controllerClassPath: string[];
-  declare options: NamedBaseOptions & ModelHelpersOptions & { api?: boolean; modelName?: string };
+  declare options: GeneratorOptions & ModelHelpersOptions & { api?: boolean; modelName?: string };
   /** @internal */
 
   /**
    * @inlinedFrom Rails::Generators::ModelHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/model_helpers.rb:26-45
    * @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26
    */
-  constructor(options: NamedBaseOptions) {
-    super(options);
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
     const controllerName = this.name;
     if (this.options.modelName != null) {
       this.name = this.options.modelName;
@@ -46,7 +46,7 @@ export class ScaffoldGenerator extends NamedBase {
       if (!ModelHelpers.skipWarn) {
         this.say(format(ModelHelpers.PLURAL_MODEL_NAME_WARN_MESSAGE, this.name, singular));
       }
-      this.name = (this.options as { name?: string }).name = singular;
+      this.name = args[0] = singular;
       this.assignNamesBang(this.name);
     }
     if (this.isInflectionImpossible(this.name)) {
@@ -68,7 +68,10 @@ export class ScaffoldGenerator extends NamedBase {
     this.checkClassCollision({ suffix: "ControllerTest" });
     this.classOption("api", { type: "boolean", desc: "Generate API functional tests" });
     this.classOption("systemTests", { type: "string", desc: "Skip system test files" });
-    this.commands().push("createTestFiles");
+
+    this.argument("attributes", { type: "array", default: [], banner: "field:type field:type" });
+
+    this.methodAdded("createTestFiles");
   }
 
   createTestFiles(): void {

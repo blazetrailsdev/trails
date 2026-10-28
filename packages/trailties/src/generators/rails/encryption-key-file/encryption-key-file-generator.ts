@@ -1,16 +1,13 @@
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { File, Pathname } from "@blazetrails/ruby-compat";
-import { GeneratorBase, type GeneratorOptions } from "../../base.js";
+import { GeneratorBase } from "../../base.js";
 
 export class EncryptionKeyFileGenerator extends GeneratorBase {
-  constructor(options: GeneratorOptions) {
-    super(options);
-  }
-
-  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
-    const generator = new EncryptionKeyFileGenerator(config);
-    generator.addKeyFile(args[0]);
-    return generator.getCreatedFiles();
+  static {
+    this.methodAdded("addKeyFile");
+    this.methodAdded("addKeyFileSilently");
+    this.methodAdded("ignoreKeyFile");
+    this.methodAdded("ignoreKeyFileSilently");
   }
 
   addKeyFile(keyPath: string | Pathname): void {

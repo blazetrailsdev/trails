@@ -48,12 +48,7 @@ function makeGen(
   database: AppDatabase = "sqlite",
   opts: { skipDocker?: boolean; [k: `skip${string}`]: boolean | undefined } = {},
 ) {
-  return new AppGenerator({
-    cwd: tmpDir,
-    appPath: "my-app",
-    database,
-    ...opts,
-  });
+  return new AppGenerator(["my-app"], { database, ...opts }, { destinationRoot: tmpDir });
 }
 
 function appPath(...segments: string[]) {
@@ -66,7 +61,7 @@ function exists(...segments: string[]) {
 
 describe("AppGenerator", () => {
   it("creates application directory structure", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
 
     expect(exists("package.json")).toBe(true);
     expect(exists("tsconfig.json")).toBe(true);
@@ -134,7 +129,7 @@ describe("AppGenerator", () => {
   });
 
   it("skips scaffolding for subsystems trails has no package for", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
 
     expect(exists("config/puma.ts")).toBe(false);
     expect(exists("config/cable.ts")).toBe(false);
@@ -146,19 +141,19 @@ describe("AppGenerator", () => {
   });
 
   it("keeps storage/ for a sqlite3 app with Active Storage skipped", async () => {
-    await makeGen("sqlite").run();
+    await makeGen("sqlite").invokeAll();
 
     expect(exists("storage/.gitkeep")).toBe(true);
   });
 
   it("skips storage/ for a non-sqlite3 app with Active Storage skipped", async () => {
-    await makeGen("postgres").run();
+    await makeGen("postgres").invokeAll();
 
     expect(exists("storage")).toBe(false);
   });
 
   it("writes the sqlite3 database under storage/", async () => {
-    await makeGen("sqlite").run();
+    await makeGen("sqlite").invokeAll();
 
     const config = fs.readFileSync(appPath("config/database.ts"), "utf-8");
     expect(config).toContain('database: "storage/development.sqlite3"');
@@ -167,7 +162,7 @@ describe("AppGenerator", () => {
   });
 
   it("does not ignore db/*.sqlite3 in the generated .gitignore", async () => {
-    await makeGen("sqlite").run();
+    await makeGen("sqlite").invokeAll();
 
     const gitignore = fs.readFileSync(appPath(".gitignore"), "utf-8");
     expect(gitignore).not.toContain("sqlite3");
@@ -175,7 +170,7 @@ describe("AppGenerator", () => {
   });
 
   it("emits each subsystem's scaffolding once its skip flag is off", async () => {
-    await makeGen("sqlite", UNPORTED).run();
+    await makeGen("sqlite", UNPORTED).invokeAll();
 
     expect(exists("config/cable.ts")).toBe(true);
     expect(exists("config/storage.ts")).toBe(true);
@@ -189,7 +184,7 @@ describe("AppGenerator", () => {
   });
 
   it("skip active job option", async () => {
-    await makeGen("sqlite", { ...UNPORTED, skipActiveJob: true }).run();
+    await makeGen("sqlite", { ...UNPORTED, skipActiveJob: true }).invokeAll();
 
     for (const env of ["production", "development", "test"]) {
       await assertFile(`my-app/config/environments/${env}.ts`, (content) => {
@@ -199,7 +194,7 @@ describe("AppGenerator", () => {
   });
 
   it("generates valid package.json", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.name).toBe("my-app");
     expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
@@ -236,7 +231,7 @@ describe("AppGenerator", () => {
   });
 
   it("emits prepare hook that builds .tse views", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.scripts.prepare).toBe("trails-tsc-views build --views app/views");
     expect(pkg.scripts.postinstall).toBeUndefined();
@@ -248,7 +243,7 @@ describe("AppGenerator", () => {
   });
 
   it("exports *.tse with types before default", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     const tseExport = pkg.exports["./*.tse"];
     expect(tseExport).toBeDefined();
@@ -259,7 +254,7 @@ describe("AppGenerator", () => {
   });
 
   it("tsconfig includes .trails alongside the app tree so augmentation participates in type-check", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
     const tsconfig = JSON.parse(fs.readFileSync(appPath("tsconfig.json"), "utf-8"));
     expect(tsconfig.include).toContain(".trails/template-registry-augmentation.d.ts");
     expect(tsconfig.include).toContain(".trails/views");
@@ -273,7 +268,7 @@ describe("AppGenerator", () => {
   });
 
   it("configures postgres database", async () => {
-    await makeGen("postgres").run();
+    await makeGen("postgres").invokeAll();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.dependencies.pg).toBeDefined();
     const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
@@ -281,7 +276,7 @@ describe("AppGenerator", () => {
   });
 
   it("configures mysql database", async () => {
-    await makeGen("mysql").run();
+    await makeGen("mysql").invokeAll();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.dependencies.mysql2).toBeDefined();
     const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
@@ -289,37 +284,37 @@ describe("AppGenerator", () => {
   });
 
   it("configures sqlite database by default", async () => {
-    await makeGen("sqlite").run();
+    await makeGen("sqlite").invokeAll();
     const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
     expect(dbConfig).toContain("sqlite3");
   });
 
   it("sqlite database config uses the sqlite3 adapter without a side-effect driver import", async () => {
-    await makeGen("sqlite").run();
+    await makeGen("sqlite").invokeAll();
     const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
     expect(dbConfig).toContain('adapter: "sqlite3"');
     expect(dbConfig).not.toContain("@blazetrails/activerecord/sqlite/");
   });
 
   it("--package-manager npm uses npm install in bin/setup", async () => {
-    const gen = new AppGenerator({
-      cwd: tmpDir,
-      appPath: "my-app",
-      packageManager: "npm",
-    });
-    await gen.run();
+    const gen = new AppGenerator(
+      ["my-app"],
+      { packageManager: "npm" },
+      { destinationRoot: tmpDir },
+    );
+    await gen.invokeAll();
     const setup = fs.readFileSync(appPath("bin/setup"), "utf-8");
     expect(setup).toContain("npm install");
     expect(setup).not.toContain("pnpm");
   });
 
   it("--package-manager yarn uses yarn in bin/setup and Dockerfile", async () => {
-    const gen = new AppGenerator({
-      cwd: tmpDir,
-      appPath: "my-app",
-      packageManager: "yarn",
-    });
-    await gen.run();
+    const gen = new AppGenerator(
+      ["my-app"],
+      { packageManager: "yarn" },
+      { destinationRoot: tmpDir },
+    );
+    await gen.invokeAll();
     const setup = fs.readFileSync(appPath("bin/setup"), "utf-8");
     expect(setup).toContain('system("yarn")');
     const dockerfile = fs.readFileSync(appPath("Dockerfile"), "utf-8");
@@ -328,12 +323,12 @@ describe("AppGenerator", () => {
   });
 
   it("--sqlite-driver node-sqlite omits better-sqlite3 dep", async () => {
-    const gen = new AppGenerator({
-      cwd: tmpDir,
-      appPath: "my-app",
-      sqliteDriver: "node-sqlite",
-    });
-    await gen.run();
+    const gen = new AppGenerator(
+      ["my-app"],
+      { sqliteDriver: "node-sqlite" },
+      { destinationRoot: tmpDir },
+    );
+    await gen.invokeAll();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
     const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
@@ -344,22 +339,21 @@ describe("AppGenerator", () => {
   it("rejects an unknown sqlite driver", () => {
     expect(
       () =>
-        new AppGenerator({
-          cwd: tmpDir,
-          appPath: "my-app",
-          sqliteDriver: "bogus-driver" as never,
-        }),
+        new AppGenerator(
+          ["my-app"],
+          { sqliteDriver: "bogus-driver" as never },
+          { destinationRoot: tmpDir },
+        ),
     ).toThrow(/Unknown SQLite driver/);
   });
 
   it("scaffolds the expo-sqlite adapter for --sqlite-driver expo-sqlite", async () => {
-    const gen = new AppGenerator({
-      cwd: tmpDir,
-      appPath: "my-app",
-      database: "sqlite",
-      sqliteDriver: "expo-sqlite",
-    });
-    await gen.run();
+    const gen = new AppGenerator(
+      ["my-app"],
+      { database: "sqlite", sqliteDriver: "expo-sqlite" },
+      { destinationRoot: tmpDir },
+    );
+    await gen.invokeAll();
     const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
     expect(dbConfig).toContain('adapter: "expo-sqlite"');
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
@@ -368,13 +362,13 @@ describe("AppGenerator", () => {
   });
 
   it("skips docker files when --skip-docker", async () => {
-    await makeGen("sqlite", { skipDocker: true }).run();
+    await makeGen("sqlite", { skipDocker: true }).invokeAll();
     expect(exists("Dockerfile")).toBe(false);
     expect(exists(".dockerignore")).toBe(false);
   });
 
   it("inclusion of eslint", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
     await assertGem("eslint");
     await assertFile(
       "my-app/config/environments/development.ts",
@@ -383,7 +377,7 @@ describe("AppGenerator", () => {
   });
 
   it("eslint is skipped if required", async () => {
-    await makeGen("sqlite", { skipEslint: true }).run();
+    await makeGen("sqlite", { skipEslint: true }).invokeAll();
 
     await assertNoGem("eslint");
     assertNoFile("my-app/bin/eslint");
@@ -397,20 +391,20 @@ describe("AppGenerator", () => {
   });
 
   it("inclusion of ci files", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
     await assertFile("my-app/.github/workflows/ci.yml");
     await assertFile("my-app/.github/dependabot.yml");
   });
 
   it("ci files are skipped if required", async () => {
-    await makeGen("sqlite", { skipCi: true }).run();
+    await makeGen("sqlite", { skipCi: true }).invokeAll();
 
     assertNoFile("my-app/.github/workflows/ci.yml");
     assertNoFile("my-app/.github/dependabot.yml");
   });
 
   it("generated files have no eslint warnings", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
     fs.symlinkSync(
       new URL("../../../../node_modules", import.meta.url).pathname,
       appPath("node_modules"),
@@ -426,7 +420,7 @@ describe("AppGenerator", () => {
   }, 60_000);
 
   it("includes app name in generated files", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
 
     const readme = fs.readFileSync(appPath("README.md"), "utf-8");
     expect(readme).toContain("my-app");
@@ -439,7 +433,7 @@ describe("AppGenerator", () => {
   });
 
   it("generates an application class that subclasses Application", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
 
     const appConfig = fs.readFileSync(appPath("config/application.ts"), "utf-8");
     expect(appConfig).toContain(`import { Application } from "@blazetrails/trailties";`);
@@ -457,40 +451,39 @@ describe("AppGenerator", () => {
   });
 
   it("invalid application name raises an error", async () => {
-    const gen = new AppGenerator({
-      cwd: tmpDir,
-      appPath: "43-things",
-      database: "sqlite",
-    });
-    await expect(gen.run()).rejects.toThrow(
+    const gen = new AppGenerator(
+      ["43-things"],
+      { database: "sqlite" },
+      { destinationRoot: tmpDir },
+    );
+    await expect(gen.invokeAll()).rejects.toThrow(
       "Invalid application name 43-things. Please give a name which does not start with numbers.",
     );
   });
 
   it("invalid application name is fixed", async () => {
-    const gen = new AppGenerator({
-      cwd: tmpDir,
-      appPath: "things-43",
-      database: "sqlite",
-    });
-    await gen.run();
+    const gen = new AppGenerator(
+      ["things-43"],
+      { database: "sqlite" },
+      { destinationRoot: tmpDir },
+    );
+    await gen.invokeAll();
     await assertFile("things-43/config/environment.ts", /Trails\.initialize\(\)/);
     await assertFile("things-43/config/application.ts", /^export class Things43 /m);
   });
 
   it("name option", async () => {
-    const gen = new AppGenerator({
-      cwd: tmpDir,
-      appPath: "app-dir",
-      name: "my-app",
-      database: "sqlite",
-    });
-    await gen.run();
+    const gen = new AppGenerator(
+      ["app-dir"],
+      { name: "my-app", database: "sqlite" },
+      { destinationRoot: tmpDir },
+    );
+    await gen.invokeAll();
     await assertFile("app-dir/config/application.ts", /^export class MyApp /m);
   });
 
   it("types drawRoutes against Mapper", async () => {
-    await makeGen().run();
+    await makeGen().invokeAll();
 
     const routes = fs.readFileSync(appPath("config/routes.ts"), "utf-8");
     expect(routes).toContain(`import { Trails } from "@blazetrails/trailties";`);
@@ -499,7 +492,7 @@ describe("AppGenerator", () => {
   });
 
   it("snapshots emitted TypeScript sources", async () => {
-    await makeGen("sqlite", UNPORTED).run();
+    await makeGen("sqlite", UNPORTED).invokeAll();
     const read = (...segs: string[]) => fs.readFileSync(appPath(...segs), "utf-8");
     expect(read("app/controllers/application-controller.ts")).toMatchSnapshot(
       "application-controller.ts",

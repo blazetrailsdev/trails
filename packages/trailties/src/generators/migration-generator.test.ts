@@ -5,7 +5,8 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
-import { MigrationGenerator } from "./migration-generator.js";
+import { MigrationGenerator } from "./active-record/migration/migration-generator.js";
+import { MigrationGenerator as RailsMigrationGenerator } from "./rails/migration/migration-generator.js";
 import * as Assertions from "./testing/assertions.js";
 import { migrationFileName as _migrationFileName } from "./testing/behavior.js";
 import { Application } from "../application.js";
@@ -42,8 +43,14 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function makeGen() {
-  return new MigrationGenerator({ cwd: tmpDir });
+function makeGen(destinationRoot = tmpDir) {
+  return {
+    run: async (name: string, args: string[], options: object = {}) => {
+      const gen = new MigrationGenerator([name, ...args], options, { destinationRoot });
+      await gen.createMigrationFile();
+      return gen.getCreatedFiles();
+    },
+  };
 }
 
 describe("MigrationGeneratorTest", () => {
@@ -80,7 +87,7 @@ describe("MigrationGeneratorTest", () => {
   });
 
   it("exit on failure", () => {
-    expect(MigrationGenerator.exitOnFailure).toBe(true);
+    expect(RailsMigrationGenerator.isExitOnFailure()).toBe(true);
   });
 
   it("add migration with attributes", async () => {
@@ -496,7 +503,7 @@ describe("MigrationGeneratorTest (JavaScript project)", () => {
   });
 
   function makeJsGen() {
-    return new MigrationGenerator({ cwd: jsTmpDir });
+    return makeGen(jsTmpDir);
   }
 
   function readJsMigration(files: string[]): string {

@@ -3,7 +3,7 @@ import { NamedBase } from "../../named-base.js";
 
 export class ResourceRouteGenerator extends NamedBase {
   static {
-    this.commands().push("addResourceRoute");
+    this.methodAdded("addResourceRoute");
   }
 
   async addResourceRoute(): Promise<void> {

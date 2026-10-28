@@ -1,7 +1,15 @@
 import { any } from "@blazetrails/activesupport";
-import { aryDelete, File, FileUtils, flatten, Hash, hashDelete } from "@blazetrails/ruby-compat";
+import {
+  aryDelete,
+  File,
+  rbObjDup,
+  FileUtils,
+  flatten,
+  Hash,
+  hashDelete,
+} from "@blazetrails/ruby-compat";
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
-import { GeneratorBase, type GeneratorOptions } from "../../../../base.js";
+import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
 import { TEMPLATES } from "../../../app/templates.js";
 
@@ -15,12 +23,21 @@ export interface ChangeGeneratorOptions extends GeneratorOptions {
 }
 
 export class ChangeGenerator extends GeneratorBase {
+  static {
+    this.classOption("to", { required: true, desc: "The database system to switch to." });
+
+    this.methodAdded("editDatabaseConfig");
+    this.methodAdded("editPackageJson");
+    this.methodAdded("editDockerfile");
+    this.methodAdded("editDevcontainerFiles");
+  }
+
   /** @internal */
   readonly appName: string;
   private _database?: Database;
 
-  constructor(options: ChangeGeneratorOptions) {
-    super(options);
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
 
     if (!(DATABASES as readonly string[]).includes((this.options as ChangeGeneratorOptions).to)) {
       throw new Error(
@@ -28,10 +45,10 @@ export class ChangeGenerator extends GeneratorBase {
       );
     }
 
-    const opt = { ...this.options } as ChangeGeneratorOptions;
+    const opt = rbObjDup(this.options) as ChangeGeneratorOptions;
     opt.database ||= opt.to;
     this.options = Object.freeze(opt);
-    this.appName = options.appName ?? File.basename(this.cwd);
+    this.appName = opt.appName ?? File.basename(this.destinationRoot);
   }
 
   /** @internal */
@@ -42,14 +59,6 @@ export class ChangeGenerator extends GeneratorBase {
       );
     }
     return this._database;
-  }
-
-  run(): string[] {
-    this.editDatabaseConfig();
-    this.editPackageJson();
-    this.editDockerfile();
-    this.editDevcontainerFiles();
-    return this.getCreatedFiles();
   }
 
   /** @missingRailsArgs template — PERMANENT */
@@ -70,7 +79,7 @@ export class ChangeGenerator extends GeneratorBase {
 
   editPackageJson(): void {
     if (!File.isExist(File.join(this.destinationRoot, "package.json"))) return;
-    const fullPath = File.join(this.cwd, "package.json");
+    const fullPath = File.join(this.destinationRoot, "package.json");
     const raw = File.read(fullPath);
     let pkg: { dependencies?: unknown } & Record<string, unknown>;
     try {
@@ -101,7 +110,7 @@ export class ChangeGenerator extends GeneratorBase {
 
   editDockerfile(): void {
     if (!File.isExist(File.join(this.destinationRoot, "Dockerfile"))) return;
-    const fullPath = File.join(this.cwd, "Dockerfile");
+    const fullPath = File.join(this.destinationRoot, "Dockerfile");
     const before = File.read(fullPath);
     let after = before.replace(
       dockerPackagesRegex(BASE_PACKAGES, (d) => d.basePackage),
@@ -116,7 +125,7 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   private writeOrUpdate(relativePath: string, content: string): void {
-    const full = File.join(this.cwd, relativePath);
+    const full = File.join(this.destinationRoot, relativePath);
     const existed = File.isExist(File.join(this.destinationRoot, relativePath));
     if (existed && File.read(full) === content) {
       this.sayStatus("identical", relativePath);
@@ -141,7 +150,7 @@ export class ChangeGenerator extends GeneratorBase {
   private editDevcontainerJson(): void {
     const rel = ".devcontainer/devcontainer.json";
     if (!File.isExist(File.join(this.destinationRoot, rel))) return;
-    const full = File.join(this.cwd, rel);
+    const full = File.join(this.destinationRoot, rel);
     let json: Record<string, unknown>;
     try {
       json = JSON.parse(File.read(full)) as Record<string, unknown>;
@@ -181,7 +190,7 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   private editComposeYaml(): void {
-    const composeYamlPath = File.expandPath(".devcontainer/compose.yaml", this.cwd);
+    const composeYamlPath = File.expandPath(".devcontainer/compose.yaml", this.destinationRoot);
     if (!File.isExist(composeYamlPath)) return;
 
     const composeConfig = YAML.loadFile(composeYamlPath) as Hash<string, any>;

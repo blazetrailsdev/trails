@@ -1,9 +1,18 @@
 import { stdout } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { ControllerGenerator } from "./controller-generator.js";
+import { Application } from "../../../application.js";
+import "../../../test-unit/trailtie.js";
+
+class ControllerGeneratorTestApp extends Application {}
+let ControllerGenerator: typeof import("./controller-generator.js").ControllerGenerator;
+
+beforeAll(async () => {
+  await ControllerGeneratorTestApp.instance().loadGenerators();
+  ({ ControllerGenerator } = await import("./controller-generator.js"));
+});
 
 let tmpDir: string;
 let lines: string[];
@@ -31,7 +40,14 @@ afterEach(() => {
 });
 
 function makeGen() {
-  return new ControllerGenerator({ cwd: tmpDir });
+  return {
+    run: async (name: string, args: string[]) => {
+      await ControllerGenerator.start([name, ...args], { destinationRoot: tmpDir });
+      return (fs.readdirSync(tmpDir, { recursive: true }) as string[]).filter((f) =>
+        fs.statSync(path.join(tmpDir, f)).isFile(),
+      );
+    },
+  };
 }
 
 function readFile(relativePath: string): string {
@@ -58,7 +74,7 @@ describe("ControllerGeneratorTest", () => {
 
   it("does not invoke helper if required", async () => {
     const gen = makeGen();
-    await gen.run("Account", ["foo"], { skipHelper: true });
+    await gen.run("Account", ["foo", "--no-helper"]);
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(false);
   });
 
@@ -72,7 +88,7 @@ describe("ControllerGeneratorTest", () => {
 
   it("does not invoke test framework if required", async () => {
     const gen = makeGen();
-    await gen.run("Account", ["foo"], { test: false });
+    await gen.run("Account", ["foo", "--no-test-framework"]);
     expect(fs.existsSync(path.join(tmpDir, "test/controllers/account-controller.test.ts"))).toBe(
       false,
     );
@@ -95,14 +111,14 @@ describe("ControllerGeneratorTest", () => {
 
   it("skip routes", async () => {
     const gen = makeGen();
-    await gen.run("Account", ["foo"], { skipRoutes: true });
+    await gen.run("Account", ["foo", "--skip-routes"]);
     const routes = readFile("config/routes.ts");
     expect(routes).not.toContain("account/foo");
   });
 
   it("skip routes prevents generating tests with routes", async () => {
     const gen = makeGen();
-    await gen.run("Account", ["foo"], { skipRoutes: true });
+    await gen.run("Account", ["foo", "--skip-routes"]);
     const testContent = readFile("test/controllers/account-controller.test.ts");
     expect(testContent).not.toMatch(/account_foo_(url|path)/);
   });
@@ -163,7 +179,7 @@ describe("ControllerGeneratorTest", () => {
 
   it("controller parent param", async () => {
     const gen = makeGen();
-    await gen.run("admin/dashboard", ["index"], { parent: "admin_controller" });
+    await gen.run("admin/dashboard", ["index", "--parent=admin_controller"]);
     const content = readFile("app/controllers/admin/dashboard-controller.ts");
     expect(content).toContain("class AdminDashboardController extends AdminController");
   });
@@ -197,7 +213,14 @@ describe("ControllerGeneratorTest (JavaScript project)", () => {
   });
 
   function makeJsGen() {
-    return new ControllerGenerator({ cwd: jsTmpDir });
+    return {
+      run: async (name: string, args: string[]) => {
+        await ControllerGenerator.start([name, ...args], { destinationRoot: jsTmpDir });
+        return (fs.readdirSync(jsTmpDir, { recursive: true }) as string[]).filter((f) =>
+          fs.statSync(path.join(jsTmpDir, f)).isFile(),
+        );
+      },
+    };
   }
 
   it("generates .js controller and test files", async () => {

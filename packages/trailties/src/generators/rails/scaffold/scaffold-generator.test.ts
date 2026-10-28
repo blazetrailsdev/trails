@@ -59,7 +59,7 @@ function listFiles(root: string): string[] {
 
 async function runGenerator(name: string, attributes: string[] = [], config: object = {}) {
   await ScaffoldGenerator.start([name, ...attributes], {
-    cwd: tmpDir,
+    destinationRoot: tmpDir,
     ...config,
   });
   return listFiles(tmpDir);
@@ -277,7 +277,7 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
 
   it("generates .js controller and model files", async () => {
     await ScaffoldGenerator.start(["Post", "title:string"], {
-      cwd: jsTmpDir,
+      destinationRoot: jsTmpDir,
     });
     const files = listFiles(jsTmpDir);
     expect(fs.existsSync(path.join(jsTmpDir, "app/controllers/posts-controller.js"))).toBe(true);
@@ -288,7 +288,7 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
 
   it("omits TypeScript annotations in controller", async () => {
     await ScaffoldGenerator.start(["Post", "title:string"], {
-      cwd: jsTmpDir,
+      destinationRoot: jsTmpDir,
     });
     const content = fs.readFileSync(
       path.join(jsTmpDir, "app/controllers/posts-controller.js"),

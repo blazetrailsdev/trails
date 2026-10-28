@@ -6,11 +6,9 @@ import type { ResourceGeneratorOptions } from "./rails/resource/resource-generat
 import { ScaffoldGenerator } from "./test-unit/scaffold/scaffold-generator.js";
 
 const build = (name: string, modelName?: string) =>
-  new ResourceGenerator({
-    cwd: "/nonexistent",
-    name,
-    modelName,
-  } as ResourceGeneratorOptions);
+  new ResourceGenerator([name], { modelName } as ResourceGeneratorOptions, {
+    destinationRoot: "/nonexistent",
+  });
 
 describe("applyResourceHelpers", () => {
   beforeEach(() => {
@@ -41,7 +39,7 @@ describe("applyResourceHelpers", () => {
   });
 
   it("ormClass raises without an :orm class option", () => {
-    const i = new ScaffoldGenerator({ cwd: "/nonexistent", name: "post" });
+    const i = new ScaffoldGenerator(["post"], {}, { destinationRoot: "/nonexistent" });
     expect(() => i.ormClass()).toThrow(
       "You need to have :orm as class option to invoke orm_class and orm_instance",
     );

@@ -24,12 +24,11 @@ async function generateApp(): Promise<string> {
   tmpDir = fs.mkdtempSync(
     path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "trails-vite-manifest-"),
   );
-  await new AppGenerator({
-    cwd: tmpDir,
-    appPath: "my-app",
-    database: "sqlite",
-    skipDocker: true,
-  }).run();
+  await new AppGenerator(
+    ["my-app"],
+    { database: "sqlite", skipDocker: true },
+    { destinationRoot: tmpDir },
+  ).invokeAll();
   return path.join(tmpDir, "my-app");
 }
 

@@ -59,7 +59,8 @@ afterEach(() => {
 });
 
 function generator(options: { quiet?: boolean; behavior?: "invoke" | "revoke" } = {}) {
-  return new TestGenerator({ cwd: root, ...options });
+  const { behavior, ...rest } = options;
+  return new TestGenerator([], rest, { destinationRoot: root, behavior });
 }
 
 function makeGen(): TestGenerator {

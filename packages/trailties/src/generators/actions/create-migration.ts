@@ -1,5 +1,5 @@
 import type { Basic } from "@blazetrails/thor/shell/basic";
-import { File, FileUtils, rbEqual } from "@blazetrails/ruby-compat";
+import { File, FileUtils, merge, rbEqual } from "@blazetrails/ruby-compat";
 import { migrationExists } from "../migration-lookup.js";
 
 export interface CreateMigrationHost {
@@ -102,7 +102,11 @@ export class CreateMigration {
   }
 
   private async onConflictBehavior(): Promise<string | undefined> {
-    const options = { ...this.base.options, ...this.config };
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- base.options is a Thor HashWithIndifferentAccess, so `merge` dispatches.
+    const options = merge(this.base.options as Record<string, unknown>, this.config) as {
+      force?: unknown;
+      skip?: unknown;
+    };
     if (await this.identical()) {
       this.sayStatus("identical", "blue", this.relativeExistingMigration());
       return this.existingMigration();

@@ -1,24 +1,16 @@
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
-import type { GeneratorOptions } from "../../base.js";
-
-export interface BenchmarkRunOptions {
-  reports?: string[];
-}
+import { NamedBase } from "../../named-base.js";
 
 export class BenchmarkGenerator extends NamedBase {
-  constructor(options: NamedBaseOptions) {
-    super(options);
+  static {
+    this.argument("reports", { type: "array", default: ["before", "after"] });
+    this.methodAdded("generateLayout");
   }
 
-  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
-    const generator = new BenchmarkGenerator({ ...config, name: args[0] ?? "" });
-    const reports = args.slice(1);
-    generator.run(reports.length > 0 ? { reports } : {});
-    return generator.getCreatedFiles();
-  }
+  declare reports: string[];
 
-  run(options: BenchmarkRunOptions = {}): string[] {
-    const reports = options.reports ?? ["before", "after"];
+  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
+  generateLayout(): void {
+    const reports = this.reports;
     const ext = this.ext();
     const filename = `script/benchmarks/${this.fileName}${ext}`;
     const reportLines = reports.map((r) => `  ${r}: () => {},`).join("\n");
@@ -38,6 +30,5 @@ for (const [name, fn] of Object.entries(reports)) {
 }
 `,
     );
-    return this.getCreatedFiles();
   }
 }

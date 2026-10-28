@@ -10,16 +10,20 @@ import {
 import { GeneratorError } from "../../generated-attribute.js";
 import { ModelHelpers } from "../../model-helpers.js";
 import { format } from "@blazetrails/ruby-compat";
-import { dasherize, parseColumns, type GeneratorBase } from "../../base.js";
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import {
+  dasherize,
+  type GeneratorBase,
+  type GeneratorConfig,
+  type GeneratorOptions,
+} from "../../base.js";
+import { NamedBase } from "../../named-base.js";
 import type { ModelHelpersOptions } from "../../model-helpers.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 import type { GeneratorClass } from "../../../generators.js";
 import { tsBody, tsField, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass, parentRefForRelative } from "../controller/controller-paths.js";
-import * as TSE from "../../tse/scaffold/scaffold-generator.js";
 
-export interface ScaffoldControllerGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {
+export interface ScaffoldControllerGeneratorOptions extends GeneratorOptions, ModelHelpersOptions {
   api?: boolean;
   skipRoutes?: boolean;
   test?: boolean;
@@ -44,8 +48,8 @@ export class ScaffoldControllerGenerator extends NamedBase {
    * @inlinedFrom Rails::Generators::ModelHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/model_helpers.rb:26-45
    * @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26
    */
-  constructor(options: ScaffoldControllerGeneratorOptions) {
-    super(options);
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
     const controllerName = this.name;
     if (this.options.modelName != null) {
       this.name = this.options.modelName;
@@ -59,7 +63,7 @@ export class ScaffoldControllerGenerator extends NamedBase {
       if (!ModelHelpers.skipWarn) {
         this.say(format(ModelHelpers.PLURAL_MODEL_NAME_WARN_MESSAGE, this.name, singular));
       }
-      this.name = (this.options as { name?: string }).name = singular;
+      this.name = args[0] = singular;
       this.assignNamesBang(this.name);
     }
     if (this.isInflectionImpossible(this.name)) {
@@ -75,15 +79,16 @@ export class ScaffoldControllerGenerator extends NamedBase {
     ModelHelpers.skipWarn = true;
   }
 
-  async run(): Promise<string[]> {
-    const { api, test = true, helper } = this.options;
+  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
+  createControllerFiles(): void {
+    const { api } = this.options;
     const modelClassName = this.className().split("::").join("");
     const singular = this.singularTableName();
     const controllerClassName = this.controllerClassName().split("::").join("") + "Controller";
     const controllerFileName = dasherize(this.controllerFilePath()) + "-controller";
     const ext = this.ext();
     const ts = this.isTypeScript();
-    const attrNames = parseColumns(this.options.attributes ?? []).map((c) => c.name);
+    const attrNames = this.attributes.map((a) => a.name);
     const modelPath = "../".repeat(this.controllerClassPath().length + 1) + "models/";
 
     this.createFile(
@@ -115,25 +120,6 @@ export class ScaffoldControllerGenerator extends NamedBase {
           : crudMethods.call(this, modelClassName, attrNames, ts),
       }),
     );
-
-    if (!api) {
-      this.createdFiles.push(
-        ...new TSE.ScaffoldGenerator({ ...this.options, behavior: this.behavior }).run(),
-      );
-    }
-
-    if (test) await this.invoke("test_unit:scaffold");
-
-    if (helper && !api) {
-      const helperFileName = dasherize(this.controllerFilePath()) + "-helper";
-      const helperConstName = this.controllerClassName().split("::").join("") + "Helper";
-      this.createFile(
-        `app/helpers/${helperFileName}${ext}`,
-        `export const ${helperConstName} = {\n};\n`,
-      );
-    }
-
-    return this.getCreatedFiles();
   }
 }
 
@@ -157,11 +143,33 @@ ScaffoldControllerGenerator.classOption("skipRoutes", {
   type: "boolean",
   desc: "Don't add routes to config/routes.rb.",
 });
+ScaffoldControllerGenerator.argument("attributes", {
+  type: "array",
+  default: [],
+  banner: "field:type field:type",
+});
+ScaffoldControllerGenerator.methodAdded("createControllerFiles");
+ScaffoldControllerGenerator.hookFor(
+  "templateEngine",
+  { as: "scaffold" },
+  function (this: GeneratorBase, templateEngine: GeneratorClass) {
+    if (!(this.options as ScaffoldControllerGeneratorOptions).api)
+      return this.invoke(templateEngine);
+  },
+);
 ScaffoldControllerGenerator.hookFor(
   "resourceRoute",
   { required: true },
   function (this: GeneratorBase, route: GeneratorClass) {
     if (!(this.options as ScaffoldControllerGeneratorOptions).skipRoutes) return this.invoke(route);
+  },
+);
+ScaffoldControllerGenerator.hookFor("testFramework", { as: "scaffold" });
+ScaffoldControllerGenerator.hookFor(
+  "helper",
+  { as: "scaffold" },
+  function (this: GeneratorBase, invoked: GeneratorClass) {
+    return this.invoke(invoked, [(this as ScaffoldControllerGenerator).controllerName]);
   },
 );
 

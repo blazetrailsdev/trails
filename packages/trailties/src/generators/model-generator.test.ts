@@ -64,7 +64,7 @@ function makeGen(config: object = {}) {
   return {
     run: async (name: string, args: string[], flags: string[] = []) => {
       await ModelGenerator.start([name, ...args, ...flags], {
-        cwd: tmpDir,
+        destinationRoot: tmpDir,
         ...config,
       });
       return listFiles(tmpDir);
@@ -266,16 +266,16 @@ describe("ModelGeneratorTest", () => {
 
   it("migration is skipped with skip option", async () => {
     await makeGen().run("Account", ["name:string", "age:integer"]);
-    const gen = makeGen({ skip: true });
-    await gen.run("Account", []);
+    const gen = makeGen();
+    await gen.run("Account", [], ["--skip"]);
     const output = lines.join("\n");
     assertMatch(/skip\s+db\/migrate\/\d+_create_accounts\.ts/, output);
   });
 
   it("migration is ignored as identical with skip option", async () => {
     await makeGen().run("Account", []);
-    const gen = makeGen({ skip: true });
-    await gen.run("Account", []);
+    const gen = makeGen();
+    await gen.run("Account", [], ["--skip"]);
     const output = lines.join("\n");
     assertMatch(/identical\s+db\/migrate\/\d+_create_accounts\.ts/, output);
   });
@@ -307,8 +307,8 @@ describe("ModelGeneratorTest", () => {
     const oldMigration = Dir.glob(
       `${destination.destinationRoot}/db/migrate/*_create_accounts.ts`,
     )[0];
-    const gen = makeGen({ force: true });
-    await gen.run("Account", []);
+    const gen = makeGen();
+    await gen.run("Account", [], ["--force"]);
     const error = lines.join("\n");
     assertNoMatch(/Another migration is already named create_accounts/, error);
     assertNoFile(oldMigration);
@@ -620,7 +620,7 @@ describe("ModelGenerator (JavaScript project)", () => {
     return {
       run: async (name: string, args: string[]) => {
         await ModelGenerator.start([name, ...args], {
-          cwd: jsTmpDir,
+          destinationRoot: jsTmpDir,
         });
         return listFiles(jsTmpDir);
       },

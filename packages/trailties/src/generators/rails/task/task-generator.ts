@@ -1,16 +1,16 @@
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
-
-export interface TaskRunOptions {
-  actions?: string[];
-}
+import { NamedBase } from "../../named-base.js";
 
 export class TaskGenerator extends NamedBase {
-  constructor(options: NamedBaseOptions) {
-    super(options);
+  static {
+    this.argument("actions", { type: "array", default: [], banner: "action action" });
+    this.methodAdded("createTaskFiles");
   }
 
-  run(options: TaskRunOptions = {}): string[] {
-    const actions = options.actions ?? [];
+  declare actions: string[];
+
+  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
+  createTaskFiles(): void {
+    const actions = this.actions;
     const ext = this.ext();
     const filename = `lib/tasks/${this.fileName}${ext}`;
     const actionLines = actions
@@ -18,6 +18,5 @@ export class TaskGenerator extends NamedBase {
       .join("\n");
 
     this.createFile(filename, `// namespace: ${this.fileName}\n\n${actionLines}`);
-    return this.getCreatedFiles();
   }
 }

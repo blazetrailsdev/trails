@@ -29,20 +29,21 @@ const read = (): Promise<string> =>
 
 describe("CredentialsGeneratorTest", () => {
   it("add_credentials_file writes encrypted credentials with secret_key_base", async () => {
-    await new CredentialsGenerator({ cwd: tmpDir }).addCredentialsFile();
+    await new CredentialsGenerator([], {}, { destinationRoot: tmpDir }).addCredentialsFile();
     const content = await read();
     expect(content).toContain("# aws:");
     expect(content).toMatch(/secret_key_base: [0-9a-f]{128}/);
   });
 
   it("add_credentials_file with skip_secret_key_base omits secret_key_base and is idempotent", async () => {
-    await new CredentialsGenerator({
-      cwd: tmpDir,
-      skipSecretKeyBase: true,
-    }).addCredentialsFile();
+    await new CredentialsGenerator(
+      [],
+      { skipSecretKeyBase: true },
+      { destinationRoot: tmpDir },
+    ).addCredentialsFile();
     expect(await read()).not.toContain("secret_key_base:");
     const before = fs.readFileSync(path.join(tmpDir, "config/credentials.yml.enc"));
-    await new CredentialsGenerator({ cwd: tmpDir }).addCredentialsFile();
+    await new CredentialsGenerator([], {}, { destinationRoot: tmpDir }).addCredentialsFile();
     expect(fs.readFileSync(path.join(tmpDir, "config/credentials.yml.enc"))).toEqual(before);
   });
 });

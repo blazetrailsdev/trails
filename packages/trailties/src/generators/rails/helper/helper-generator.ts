@@ -1,61 +1,35 @@
-import { GeneratorBase, type GeneratorOptions, dasherize } from "../../base.js";
-import { camelize, underscore } from "@blazetrails/activesupport";
+import { camelize } from "@blazetrails/activesupport";
+import { File } from "@blazetrails/ruby-compat";
+import { dasherize } from "../../base.js";
+import { NamedBase } from "../../named-base.js";
 
-export interface HelperRunOptions {
-  test?: boolean;
-}
+export class HelperGenerator extends NamedBase {
+  /** @internal */
+  private __fileName?: string;
 
-export class HelperGenerator extends GeneratorBase {
-  constructor(options: GeneratorOptions) {
-    super(options);
-  }
-
-  run(name: string, options: HelperRunOptions = {}): string[] {
-    const { test = true } = options;
-    const ext = this.ext();
-    const paths = helperPaths(name);
-
+  /**
+   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsArgs join — PERMANENT
+   */
+  createHelperFiles(): void {
+    const helperName = [...this.classPathParts, this.fileName].map((p) => camelize(p)).join("");
     this.createFile(
-      `app/helpers/${paths.helperFile}${ext}`,
-      `export const ${paths.helperName} = {\n};\n`,
+      File.join(
+        "app/helpers",
+        ...this.classPathParts.map((p) => dasherize(p)),
+        `${dasherize(this.fileName)}-helper${this.ext()}`,
+      ),
+      `export const ${helperName}Helper = {\n};\n`,
     );
+  }
 
-    if (test) {
-      const importPrefix = "../".repeat(paths.namespaceParts.length + 1);
-      this.createFile(
-        `test/helpers/${paths.helperFile}.test${ext}`,
-        `import { describe, it } from "vitest";
-import { ${paths.helperName} } from "${importPrefix}app/helpers/${paths.helperFile}.js";
-
-describe("${paths.helperName}", () => {
-  it("is defined", () => {
-    void ${paths.helperName};
-  });
-});
-`,
-      );
-    }
-    return this.getCreatedFiles();
+  /** @internal */
+  override get fileName(): string {
+    return (this.__fileName ??= super.fileName.replace(/_helper$/i, ""));
   }
 }
 
-export interface HelperPaths {
-  helperName: string;
-  helperFile: string;
-  namespaceParts: string[];
-}
-
-export function helperPaths(name: string): HelperPaths {
-  const stripped = name.replace(/[_-]?helper$/i, "");
-  const parts = stripped.split("/");
-  const leaf = parts[parts.length - 1];
-  const helperName =
-    parts.length > 1
-      ? parts.map((p) => camelize(underscore(p))).join("") + "Helper"
-      : camelize(underscore(leaf)) + "Helper";
-  const helperFile =
-    parts.length > 1
-      ? parts.map((p) => dasherize(underscore(p))).join("/") + "-helper"
-      : dasherize(underscore(leaf)) + "-helper";
-  return { helperName, helperFile, namespaceParts: parts };
-}
+Object.defineProperty(HelperGenerator, "name", { value: "Rails::Generators::HelperGenerator" });
+HelperGenerator.checkClassCollision({ suffix: "Helper" });
+HelperGenerator.methodAdded("createHelperFiles");
+HelperGenerator.hookFor("testFramework");

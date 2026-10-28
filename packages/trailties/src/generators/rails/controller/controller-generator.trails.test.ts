@@ -1,9 +1,18 @@
 import { stdout } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { ControllerGenerator } from "./controller-generator.js";
+import { Application } from "../../../application.js";
+import "../../../test-unit/trailtie.js";
+
+class ControllerGeneratorTestApp extends Application {}
+let ControllerGenerator: typeof import("./controller-generator.js").ControllerGenerator;
+
+beforeAll(async () => {
+  await ControllerGeneratorTestApp.instance().loadGenerators();
+  ({ ControllerGenerator } = await import("./controller-generator.js"));
+});
 
 let tmpDir: string;
 let lines: string[];
@@ -27,7 +36,14 @@ afterEach(() => {
 });
 
 function makeGen() {
-  return new ControllerGenerator({ cwd: tmpDir });
+  return {
+    run: async (name: string, args: string[]) => {
+      await ControllerGenerator.start([name, ...args], { destinationRoot: tmpDir });
+      return (fs.readdirSync(tmpDir, { recursive: true }) as string[]).filter((f) =>
+        fs.statSync(path.join(tmpDir, f)).isFile(),
+      );
+    },
+  };
 }
 
 describe("ControllerGenerator view and controller file naming", () => {
@@ -72,7 +88,7 @@ describe("ControllerGenerator view and controller file naming", () => {
 describe("ControllerGenerator --parent", () => {
   it("classifies a plural parent name, singularizing it as parent_class_name.classify does", async () => {
     const gen = makeGen();
-    await gen.run("admin/dashboard", ["index"], { parent: "admin_controllers" });
+    await gen.run("admin/dashboard", ["index", "--parent=admin_controllers"]);
     const controller = fs.readFileSync(
       path.join(tmpDir, "app/controllers/admin/dashboard-controller.ts"),
       "utf8",

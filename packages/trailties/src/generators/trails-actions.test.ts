@@ -13,7 +13,8 @@ const path: PathAdapter = {
   join: (...p) => p.filter(Boolean).join("/"),
   dirname: (p) => p.split("/").slice(0, -1).join("/") || "/",
   basename: (p) => p.split("/").pop()!,
-  resolve: (...p) => p.filter(Boolean).join("/"),
+  resolve: (...p) =>
+    p.filter(Boolean).reduce((acc, seg) => (seg.startsWith("/") ? seg : `${acc}/${seg}`), ""),
   extname: (p) => (p.lastIndexOf(".") >= 0 ? p.slice(p.lastIndexOf(".")) : ""),
   isAbsolute: (p) => p.startsWith("/"),
   sep: "/",
@@ -51,7 +52,7 @@ afterEach(() => {
 });
 
 function makeGen(): TestGenerator {
-  return new TestGenerator({ cwd: "/app" });
+  return new TestGenerator([], {}, { destinationRoot: "/app" });
 }
 
 describe("TrailsActions", () => {
