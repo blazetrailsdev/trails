@@ -93,10 +93,25 @@ export class Tokenizer {
         let end = token[3] + start + 1;
         const nonAscii = token[0] === TokenType.Delim && RE_NON_ASCII_START.test(token[1]);
         if (nonAscii) {
-          RE_NAME.lastIndex = tokenStart;
-          const name = RE_NAME.exec(css)![0];
-          created = { node: "ident", pos: created.pos, raw: name, value: name };
-          end = tokenStart + name.length;
+          let raw = "";
+          let value = "";
+          end = tokenStart;
+          for (;;) {
+            RE_NAME.lastIndex = end;
+            const match = RE_NAME.exec(css);
+            if (match !== null) {
+              raw += match[0];
+              value += match[0];
+            } else if (css[end] === "*" && this._options.preserveHacks) {
+              const char = [...css.slice(end + 1, end + 3)][0] ?? "";
+              raw += `*${char}`;
+              value += char;
+            } else {
+              break;
+            }
+            end = tokenStart + raw.length;
+          }
+          created = { node: "ident", pos: created.pos, raw, value };
         }
         const adjacent = lastEnd === tokenStart;
         const merged = adjacent ? this.mergeTokens(tokens.at(-1)!, created, afterName) : null;

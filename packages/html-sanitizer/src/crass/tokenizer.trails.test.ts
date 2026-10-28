@@ -30,4 +30,10 @@ describe("Crass::Tokenizer", () => {
       { node: ")", pos: 6, raw: ")" },
     ]);
   });
+
+  it("keeps the IE * hack inside a non-ASCII name, as consume_name does", () => {
+    expect(Tokenizer.tokenize("\u00d7*x", { preserveHacks: true })).toEqual([
+      { node: "ident", pos: 0, raw: "\u00d7*x", value: "\u00d7x" },
+    ]);
+  });
 });
