@@ -3,7 +3,13 @@ import { Configuration } from "./configuration.js";
 import { Utilities } from "./utilities.js";
 import { Tool, type CliTool } from "./tool.js";
 import "./image.js";
-import { extend, RuntimeError, StandardError, block as blockPass } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  RuntimeError,
+  StandardError,
+  block as blockPass,
+  rbBlockGivenP,
+} from "@blazetrails/ruby-compat";
 
 export function isImagemagick7() {
   if (MiniMagick.graphicsmagick != null && MiniMagick.graphicsmagick !== false) {
@@ -16,7 +22,9 @@ export function isImagemagick7() {
 }
 
 export async function cliVersion(): Promise<string | null> {
-  const output = await (MiniMagick.identify((x) => x.version()) as Promise<string>);
+  const output = await (MiniMagick.identify(
+    blockPass((x: CliTool) => x.version()),
+  ) as Promise<string>);
   return output.match(/\d+\.\d+\.\d+(-\d+)?/)?.[0] ?? null;
 }
 
@@ -29,8 +37,9 @@ export const MiniMagick = { version, isImagemagick7, cliVersion } as {
   Record<
     ToolName,
     (
-      options?: Record<string, unknown> | ((tool: CliTool) => unknown),
-      block?: (tool: CliTool) => unknown,
+      ...args:
+        | [Record<string, unknown>?, ((tool: CliTool) => unknown)?]
+        | [(tool: CliTool) => unknown]
     ) => unknown
   >;
 extend(MiniMagick, Configuration);
@@ -62,12 +71,16 @@ for (const tool of [
   "stream",
 ] as const) {
   MiniMagick[tool] = (
-    options: Record<string, unknown> | ((tool: CliTool) => unknown) = {},
-    block?: (tool: CliTool) => unknown,
+    ...args:
+      | [Record<string, unknown>?, ((tool: CliTool) => unknown)?]
+      | [(tool: CliTool) => unknown]
   ) => {
-    if (typeof options === "function") [options, block] = [{}, options];
+    const block = rbBlockGivenP(args.at(-1))
+      ? (args.pop() as (tool: CliTool) => unknown)
+      : undefined;
+    const options = (args[0] ?? {}) as Record<string, unknown>;
     const name = MiniMagick.isImagemagick7() && tool === "convert" ? "magick" : tool;
-    return block != null ? Tool.new(name, options, blockPass(block)) : Tool.new(name, options);
+    return Tool.new(name, options, block);
   };
 }
 export class Error extends RuntimeError {
