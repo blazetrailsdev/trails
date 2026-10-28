@@ -25,7 +25,8 @@ import {
   isModuleIncluded,
   eachWithObject,
 } from "@blazetrails/ruby-compat";
-import { ActiveRecord, Encryption } from "./namespaces.js";
+import { ActiveRecord } from "./namespaces.js";
+import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import type { EncryptedFixtureHost } from "./encryption/encrypted-fixtures.js";
 import { TableRows } from "./fixture-set/table-rows.js";
 import { File } from "./fixture-set/file.js";
@@ -404,7 +405,7 @@ export class Fixture {
 
   /** @inlinedFrom ActiveRecord::Encryption::EncryptedFixtures#initialize rails/v8.0.2/activerecord/lib/active_record/encryption/encrypted_fixtures.rb:6-11 */
   constructor(fixture: FixtureAttrs, modelClass: BaseClass | null) {
-    if (isModuleIncluded(new.target, Encryption.EncryptedFixtures)) {
+    if (isModuleIncluded(new.target, EncryptedFixtures)) {
       const encrypted = this as unknown as EncryptedFixtureHost;
       encrypted.cleanValues = {};
       encrypted.encryptFixtureData(fixture, modelClass);

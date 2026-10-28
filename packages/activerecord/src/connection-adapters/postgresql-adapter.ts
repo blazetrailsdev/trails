@@ -8,10 +8,10 @@ import {
   block,
   excSetupMessage,
   fetch,
-  rbModConstSet,
   rbObjRespondTo,
   setEnv,
   filterMap,
+  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import {
@@ -2126,6 +2126,7 @@ Type.register("uuid", Uuid, { adapter: "postgresql" });
 Type.register("vector", Vector, { adapter: "postgresql" });
 Type.register("xml", Xml, { adapter: "postgresql" });
 
-rbModConstSet(ConnectionAdapters, "PostgreSQLAdapter", PostgreSQLAdapter);
+ConnectionAdapters.PostgreSQLAdapter = PostgreSQLAdapter;
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQLAdapter", PostgreSQLAdapter);
 
 runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);

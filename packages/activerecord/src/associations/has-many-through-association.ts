@@ -12,7 +12,6 @@ import {
   rbEqual,
   rbFSend,
   rbDeclareIvar,
-  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import {
   exceptBang,
@@ -428,4 +427,4 @@ rbDeclareIvar(HasManyThroughAssociation, "@through_association", "_throughAssoci
 rbDeclareIvar(HasManyThroughAssociation, "@through_records", "_throughRecords");
 rbDeclareIvar(HasManyThroughAssociation, "@through_scope", "_throughScope");
 
-rbModConstSet(Associations, "HasManyThroughAssociation", HasManyThroughAssociation);
+Associations.HasManyThroughAssociation = HasManyThroughAssociation;

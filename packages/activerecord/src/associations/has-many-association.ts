@@ -6,7 +6,6 @@ import {
   rbEqual,
   rbFSend,
   toI,
-  rbModConstSet,
   eachSlice,
 } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
@@ -265,4 +264,4 @@ Object.assign(HasManyAssociation.prototype, {
 
 include(HasManyAssociation, ForeignAssociation);
 
-rbModConstSet(Associations, "HasManyAssociation", HasManyAssociation);
+Associations.HasManyAssociation = HasManyAssociation;

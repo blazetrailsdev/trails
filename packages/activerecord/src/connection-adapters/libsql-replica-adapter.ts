@@ -1,6 +1,5 @@
 /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
-import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { ConnectionAdapters } from "../namespaces.js";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { SqliteDriver } from "../sqlite-adapter.js";
 import { ConfigurationError } from "../errors.js";
 import { libsqlReplicaDriver, type SyncableSqliteConnection } from "../sqlite/libsql.js";
@@ -25,4 +24,4 @@ export class LibSQLReplicaAdapter extends SQLite3Adapter {
   }
 }
 
-rbModConstSet(ConnectionAdapters, "LibSQLReplicaAdapter", LibSQLReplicaAdapter);
+registerConstant("ActiveRecord::ConnectionAdapters::LibSQLReplicaAdapter", LibSQLReplicaAdapter);

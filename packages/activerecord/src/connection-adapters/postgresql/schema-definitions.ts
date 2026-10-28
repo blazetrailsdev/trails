@@ -1,5 +1,5 @@
 import { SchemaDumper } from "../../schema-dumper.js";
-import { ConnectionAdapters } from "../../namespaces.js";
+import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -274,7 +274,7 @@ export class TableDefinition extends AbstractTableDefinition {
     } = {},
   ) {
     super(conn, name, options);
-    this.unlogged = ConnectionAdapters.PostgreSQLAdapter.createUnloggedTables;
+    this.unlogged = PostgreSQLAdapter.createUnloggedTables;
   }
 
   exclusionConstraint(expression: string, options: ExclusionConstraintOptions = {}): this {

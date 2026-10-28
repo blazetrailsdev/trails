@@ -1,4 +1,4 @@
-import { include, rbDeclareIvar, rbModConstSet } from "@blazetrails/ruby-compat";
+import { include, rbDeclareIvar } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { HasOneAssociation } from "./has-one-association.js";
@@ -113,4 +113,4 @@ include(HasOneThroughAssociation, ThroughAssociation);
 rbDeclareIvar(HasOneThroughAssociation, "@through_reflection", "_throughReflection");
 rbDeclareIvar(HasOneThroughAssociation, "@through_association", "_throughAssociation");
 
-rbModConstSet(Associations, "HasOneThroughAssociation", HasOneThroughAssociation);
+Associations.HasOneThroughAssociation = HasOneThroughAssociation;

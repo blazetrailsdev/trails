@@ -1,10 +1,4 @@
-import {
-  Encoding,
-  forceEncoding,
-  rbModConstSet,
-  rbObjEncoding,
-  type Bytes,
-} from "@blazetrails/ruby-compat";
+import { Encoding, forceEncoding, rbObjEncoding, type Bytes } from "@blazetrails/ruby-compat";
 import { Autoload, extend, kernelArray as Array, type Extended } from "@blazetrails/activesupport";
 
 import { Aes256Gcm as AesGcmCipher } from "./cipher/aes256-gcm.js";
@@ -89,5 +83,5 @@ extend(Cipher, Autoload);
 Cipher.eagerAutoload(() => {
   Cipher.autoload("Aes256Gcm");
 });
-rbModConstSet(Encryption, "Cipher", Cipher);
-rbModConstSet(Cipher, "Aes256Gcm", AesGcmCipher);
+Encryption.Cipher = Cipher;
+Cipher.Aes256Gcm = AesGcmCipher;
