@@ -7,7 +7,13 @@ import {
 
 import { Attr } from "../xml/attr.js";
 import { NodeSet } from "../xml/node-set.js";
-import { ArgumentError, RuntimeError, include, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  RuntimeError,
+  include,
+  rbModConstSet,
+  rbObjClassname,
+} from "@blazetrails/ruby-compat";
 import { DocumentFragment } from "./document-fragment.js";
 import { HTML5 } from "../namespaces.js";
 import * as Searchable from "../xml/searchable.js";
@@ -141,7 +147,8 @@ export class Node {
     return this;
   }
 
-  coerce(data: Node | DocumentFragment | NodeSet | string): Node | NodeSet {
+  /** @internal */
+  protected coerce(data: Node | DocumentFragment | NodeSet | string): Node | NodeSet {
     if (data instanceof NodeSet) return data;
     if (data instanceof DocumentFragment) return new NodeSet(data.document, data.children);
     if (typeof data === "string") {
@@ -158,7 +165,7 @@ export class Node {
     if (data instanceof Node) return data;
 
     throw new ArgumentError(
-      `Requires a Node, NodeSet or String argument, and cannot accept a ${(data as object).constructor.name}.\n(You probably want to select a node from the Document with at() or search(), or create a new Node via Node.new().)\n`,
+      `Requires a Node, NodeSet or String argument, and cannot accept a ${rbObjClassname(data)}.\n(You probably want to select a node from the Document with at() or search(), or create a new Node via Node.new().)\n`,
     );
   }
 

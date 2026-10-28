@@ -63,3 +63,12 @@ describe("Nokogiri::XML::Node#coerce", () => {
     expect(circle.namespaceURI).toBe("http://www.w3.org/2000/svg");
   });
 });
+
+describe("Nokogiri::XML::Node#coerce on nil", () => {
+  it("raises the Nokogiri ArgumentError", () => {
+    const fragment = HTML5.DocumentFragment.parse("<b>x</b>");
+    expect(() => fragment.children[0].before(null as unknown as string)).toThrow(
+      "cannot accept a NilClass",
+    );
+  });
+});
