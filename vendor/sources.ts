@@ -841,6 +841,38 @@ export const SOURCES: readonly UpstreamSource[] = [
       },
     ],
   },
+  {
+    name: "mail",
+    origin: {
+      type: "git",
+      url: "https://github.com/mikel/mail.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:339 resolves mail (2.8.1), which
+      // ActionMailer depends on. The packaged gem ships no specs, so the tag
+      // is cloned. Not enrolled until packages/mail/src exists (RFC 0204).
+      ref: "2.8.1",
+    },
+    packages: [],
+  },
+  {
+    name: "mini_mime",
+    origin: {
+      type: "git",
+      url: "https://github.com/discourse/mini_mime.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:355 resolves mini_mime (1.1.5).
+      ref: "v1.1.5",
+    },
+    packages: [],
+  },
+  {
+    name: "net-smtp",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby/net-smtp.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:394 resolves net-smtp (0.5.1).
+      ref: "v0.5.1",
+    },
+    packages: [],
+  },
 ];
 
 /**
