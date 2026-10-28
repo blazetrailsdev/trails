@@ -1,5 +1,5 @@
-import { ConnectionAdapters } from "../namespaces.js";
 /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
+import { ConnectionAdapters } from "../namespaces.js";
 import {
   extend,
   hasKey,
