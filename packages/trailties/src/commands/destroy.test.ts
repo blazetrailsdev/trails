@@ -5,8 +5,13 @@ import * as os from "node:os";
 import { createProgram } from "../cli.js";
 import { destroyCommand } from "./destroy.js";
 import { lookupBang } from "../command/behavior.js";
+import { Application } from "../application.js";
+import "../trailties/active-record.js";
+
+class DestroyCommandTestApp extends Application {}
 
 await lookupBang();
+await DestroyCommandTestApp.instance().loadGenerators();
 
 let tmpDir: string;
 let originalCwd: string;

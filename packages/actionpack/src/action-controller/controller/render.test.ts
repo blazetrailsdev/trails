@@ -1206,7 +1206,7 @@ describe("LiveHeadRenderTest", () => {
       configurable: true,
       get: responseBody.get,
       set(this: LiveTestController, body: string) {
-        Live.instanceMethod("responseBody")!.set!.call(this, body);
+        Object.getOwnPropertyDescriptor(Live, "responseBody")!.set!.call(this, body);
       },
     });
   });

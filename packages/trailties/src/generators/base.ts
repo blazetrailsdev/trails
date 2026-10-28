@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Thor::Base includes Thor::Invocation and Thor::Shell (`thor/v1.3.2/lib/thor/base.rb:30-34`); the class/interface merge is how those mixins surface on the type side. */
 import {
   camelize,
   constantize,
@@ -7,18 +8,12 @@ import {
   humanize,
 } from "@blazetrails/activesupport";
 import {
-  ArgumentError,
   File,
   NameError,
-  NoMethodError,
   rbObjRespondTo,
-  FileUtils,
   getFs,
   include,
   hashDelete,
-  rbInspect,
-  regexpEscape,
-  RuntimeError,
   isRegisteredConstant,
 } from "@blazetrails/ruby-compat";
 import { Generators, type GeneratorClass } from "../generators.js";
@@ -27,28 +22,31 @@ import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
 import * as ThorActions from "@blazetrails/thor/actions";
-import { fromSuperclass } from "@blazetrails/thor/base";
+import type { BaseConfig } from "@blazetrails/thor/base";
+import { Group } from "@blazetrails/thor/group";
+import type { Invocation } from "@blazetrails/thor/invocation";
+import type { Command } from "@blazetrails/thor/command";
+import type { Argument, ArgumentOptions } from "@blazetrails/thor/parser/argument";
+import type { Option, OptionOptions } from "@blazetrails/thor/parser/option";
+import type { Shell as ShellHost } from "@blazetrails/thor/shell";
+import type { Basic } from "@blazetrails/thor/shell/basic";
 
 export interface GeneratorOptions {
-  cwd: string;
-  output: (msg: string) => void;
-  quiet?: boolean;
   force?: boolean;
   skip?: boolean;
   pretend?: boolean;
-  behavior?: "invoke" | "revoke" | "force" | "skip";
+  quiet?: boolean;
+  skipNamespace?: boolean;
+  skipCollisionCheck?: boolean;
 }
 
-export interface ClassOptionConfig {
-  type?: "boolean" | "string" | "numeric" | "array";
-  default?: unknown;
-  desc?: string;
-  aliases?: string | string[];
-  enum?: readonly string[];
-  banner?: string;
-  required?: boolean;
-  group?: string;
+export interface GeneratorConfig extends BaseConfig {
+  destinationRoot?: string | null;
+  behavior?: "invoke" | "revoke" | "force" | "skip" | null;
+  shell?: Basic | null;
 }
+
+export type ClassOptionConfig = OptionOptions & { group?: string };
 
 export interface HookForOptions extends ClassOptionConfig {
   in?: string;
@@ -61,27 +59,50 @@ type HookYield = (
   klass: GeneratorClass,
   command?: string | null,
 ) => unknown;
-type HookExec = (this: GeneratorBase, klass: GeneratorClass) => unknown;
+type HookExec = (this: never, klass: GeneratorClass) => unknown;
 
 export type HookBlock = HookYield | HookExec;
 
-type Invocations = Map<unknown, string[]>;
+type GroupStatics = {
+  argument(name: string, options?: ArgumentOptions & { optional?: unknown }): void;
+  arguments(): Argument[];
+  removeArgument(...names: unknown[]): void;
+  removeClassOption(...names: string[]): void;
+  commands(): Record<string, Command>;
+  allCommands(): Record<string, Command>;
+  removeCommand(...names: unknown[]): void;
+  noCommands<T>(block: () => T): T;
+  classOption(name: string, options?: OptionOptions): Option;
+  classOptions(): Record<string, Option>;
+  invokeFromOption(...names: unknown[]): void;
+  removeInvocation(...names: string[]): void;
+  addRuntimeOptionsBang(): void;
+  strictArgsPositionBang(): void;
+  methodAdded(meth: string): void;
+  namespace(name?: string | null): string;
+  start(givenArgs?: string[], config?: GeneratorConfig): Promise<unknown>;
+  sourcePaths: typeof ThorActions.ClassMethods.sourcePaths;
+  sourcePathsForSearch: typeof ThorActions.ClassMethods.sourcePathsForSearch;
+  prepareForInvocation(name: unknown, value: unknown): unknown;
+  fromSuperclass(method: string, defaultValue?: unknown): unknown;
+};
 
-type GeneratorConstructor = Pick<typeof GeneratorBase, "classOptions"> &
-  (new (options: GeneratorOptions & { name: string; attributes: string[] }) => GeneratorBase);
+export interface GeneratorBase extends Invocation, GeneratorActionsState {
+  shell: ShellHost["shell"];
+  say: ShellHost["say"];
+  sayStatus: ShellHost["sayStatus"];
+}
 
-export abstract class GeneratorBase implements GeneratorActionsState {
-  declare private static _classOptions: Record<string, ClassOptionConfig>;
-  declare private static _hooks: Record<string, [string | undefined, string | undefined]>;
-  declare private static _invocations: Record<string, boolean>;
-  declare private static _invocationBlocks: Record<string, HookBlock>;
-  declare private static _commands: string[];
+export abstract class GeneratorBase extends (Group as unknown as (abstract new (
+  args?: unknown[],
+  localOptions?: unknown,
+  config?: GeneratorConfig,
+) => Group) &
+  GroupStatics) {
   declare static _sourcePaths?: string[];
   declare static _sourceRoot?: string | null;
-
-  declare static sourcePaths: typeof ThorActions.ClassMethods.sourcePaths;
-  declare static sourcePathsForSearch: typeof ThorActions.ClassMethods.sourcePathsForSearch;
-  declare static addRuntimeOptionsBang: typeof ThorActions.ClassMethods.addRuntimeOptionsBang;
+  /** @internal */
+  declare static _hooks?: Record<string, [string | undefined, string | undefined]>;
 
   static {
     include(this as unknown as new (...args: unknown[]) => unknown, ThorActions.Actions);
@@ -98,6 +119,11 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     });
 
     this.addRuntimeOptionsBang();
+    this.strictArgsPositionBang();
+  }
+
+  static isExitOnFailure(): boolean {
+    return false;
   }
 
   static async sourceRoot(path: string | null = null): Promise<string | null | undefined> {
@@ -120,24 +146,14 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     return File.dirname(/^\/[A-Za-z]:/.test(path) ? path.slice(1) : path);
   }
 
-  cwd: string;
   /** @internal */
   declare _destinationStack: string[];
   declare destinationRoot: string;
-  output: (msg: string) => void;
-  options: GeneratorOptions;
-  behavior: "invoke" | "revoke";
-  protected createdFiles: string[] = [];
+  declare options: GeneratorOptions;
+  declare args: unknown[];
+  declare behavior: "invoke" | "revoke";
   pendingGenerators: Array<{ what: string; args: string[] }> = [];
   afterInstallCallbacks: Array<() => void | Promise<void>> = [];
-  private _initializer?: [
-    unknown[],
-    unknown[] | Record<string, unknown>,
-    GeneratorOptions & { invocations?: Invocations },
-  ];
-  private _invocations?: Invocations;
-  /** @noRailsEquivalent PERMANENT */
-  parentOptions?: Record<string, unknown>;
 
   _sourcePaths?: string[];
 
@@ -145,71 +161,30 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   declare sourcePaths: typeof ThorActions.sourcePaths;
   declare findInSourcePaths: typeof ThorActions.findInSourcePaths;
   declare apply: OmitThisParameter<typeof ThorActions.apply>;
+  declare inRoot: <T>(block: () => T | Promise<T>) => Promise<T>;
+  declare injectIntoFile: (destination: string, ...args: unknown[]) => unknown;
+  declare emptyDirectory: OmitThisParameter<typeof ThorActions.Actions.emptyDirectory>;
+  declare createFile: OmitThisParameter<typeof ThorActions.Actions.createFile>;
+  declare appendToFile: OmitThisParameter<typeof ThorActions.Actions.appendToFile>;
   /** @internal */
   declare protected _cleanupOptionsAndSet: ThorActions.ActionsHost["_cleanupOptionsAndSet"];
 
-  log = Actions.log;
-  generate = Actions.generate;
+  environment = Actions.environment;
+  application = Actions.application;
   git = Actions.git;
+  vendor = Actions.vendor;
+  lib = Actions.lib;
+  rakefile = Actions.rakefile;
+  initializer = Actions.initializer;
+  generate = Actions.generate;
   afterInstall = Actions.afterInstall;
   rake = Actions.rake;
+  route = Actions.route;
+  readme = Actions.readme;
+  log = Actions.log;
   executeCommand = Actions.executeCommand;
 
   pkg = TrailsActions.pkg;
-  route = TrailsActions.route;
-  environment = TrailsActions.environment;
-  application = TrailsActions.environment;
-  initializer = TrailsActions.initializer;
-
-  constructor(options: GeneratorOptions) {
-    this.cwd = options.cwd;
-    this.destinationRoot = options.cwd;
-    this.output = options.output;
-    const opts: Record<string, unknown> = { ...options };
-    for (const [name, option] of Object.entries(
-      (this.constructor as typeof GeneratorBase).classOptions(),
-    )) {
-      if (option.default != null && opts[name] === undefined) opts[name] = option.default;
-    }
-    switch (String(options.behavior)) {
-      case "force":
-      case "skip":
-        this._cleanupOptionsAndSet(opts, options.behavior!);
-        this.behavior = "invoke";
-        break;
-      case "revoke":
-        this.behavior = "revoke";
-        break;
-      default:
-        this.behavior = "invoke";
-    }
-    this.options = opts as unknown as GeneratorOptions;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  say(message: unknown = "", _color: string | null = null): void {
-    if (this.isQuiet()) return;
-
-    this.output(String(message));
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  sayStatus(status: unknown, message: unknown, logStatus: string | boolean = true): void {
-    if (this.isQuiet() || logStatus === false) return;
-    const spaces = "  ";
-    const statusText = String(status).padStart(12);
-    const margin = " ".repeat(statusText.length) + spaces;
-
-    const text = String(message)
-      .replace(/(\r\n|\r|\n)$/, "")
-      .replace(/\n(?=[^])/g, `\n${margin}`);
-    this.output(`${statusText}${spaces}${text}`);
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  isQuiet(): boolean {
-    return !!this.options.quiet;
-  }
 
   static hookFor(...names: Array<string | HookForOptions | HookBlock>): void {
     const block = typeof names.at(-1) === "function" ? (names.pop() as HookBlock) : undefined;
@@ -238,7 +213,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       const klass = this;
 
       Object.defineProperty(this, `${name}Generator`, {
-        value: function (this: typeof GeneratorBase) {
+        value: function (this: GroupStatics) {
           const value = this.classOptions()[name].default;
           return Generators.findByNamespace(klass.generatorName()!, value as string);
         },
@@ -247,12 +222,13 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       });
 
       this.hooks()[name] = [inBase as string | undefined, asHook as string | undefined];
-      this.invokeFromOption(name, options, block);
+      if (block !== undefined) this.invokeFromOption(name, options, block);
+      else this.invokeFromOption(name, options);
     }
   }
 
   static removeHookFor(...names: string[]): void {
-    this.removeInvocation(...names);
+    (this as unknown as GroupStatics).removeInvocation(...names);
 
     for (const name of names) {
       if (!rbObjRespondTo(this, `${name}Generator`)) {
@@ -270,398 +246,12 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  static removeClassOption(...names: string[]): void {
-    for (const name of names) delete this.classOptions()[name];
-  }
-
-  static classOption(name: string, options: ClassOptionConfig = {}): void {
+  static classOption(name: string, options: ClassOptionConfig = {}): Option {
     if (!("desc" in options))
       options.desc = `Indicates when to generate ${humanize(_underscore(name)).toLowerCase()}`;
-    options.aliases = this.defaultAliasesForOption(name, options);
+    options.aliases = this.defaultAliasesForOption(name, options) as OptionOptions["aliases"];
     options.default = this.defaultValueForOption(name, options);
-    this.classOptions()[name] = options;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  static classOptions(): Record<string, ClassOptionConfig> {
-    if (!Object.hasOwn(this, "_classOptions")) {
-      const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
-      this._classOptions = { ...(superclass.classOptions?.() ?? {}) };
-    }
-    return this._classOptions;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  static classOptionsHelp(output: (msg: string) => void): void {
-    const rows = Object.entries(this.classOptions()).map(([name, option]) => {
-      const sw = `--${dasherize(name)}`;
-      const aliases = [option.aliases ?? []].flat();
-      let usage =
-        option.type === "boolean"
-          ? `[${sw}], [--no-${dasherize(name)}], [--skip-${dasherize(name)}]`
-          : `[${sw}=${_underscore(name).toUpperCase()}]`;
-      if (aliases.length) usage = `${aliases.join(", ")}, ${usage}`;
-      const notes = [option.desc ?? ""];
-      if (option.type !== "boolean" && option.default != null)
-        notes.push(`Default: ${String(option.default)}`);
-      if (option.enum) notes.push(`Possible values: ${option.enum.join(", ")}`);
-      return [usage, notes] as const;
-    });
-    if (rows.length === 0) return;
-    const width = Math.max(...rows.map(([usage]) => usage.length));
-    output("Options:");
-    for (const [usage, notes] of rows) {
-      output(`  ${usage.padEnd(width)}  # ${notes[0]}`);
-      for (const note of notes.slice(1)) output(`  ${"".padEnd(width)}  # ${note}`);
-    }
-  }
-
-  static async start(
-    this: Pick<typeof GeneratorBase, "classOptions"> &
-      (new (options: GeneratorOptions & { name: string; attributes: string[] }) => GeneratorBase),
-    givenArgs: string[],
-    config: GeneratorOptions,
-  ): Promise<string[]> {
-    return GeneratorBase.dispatch.call(this, null, [...givenArgs], null, config);
-  }
-
-  /**
-   * @missingRailsCall help — CONVERGEABLE generator-dispatch-help-mappings-arm
-   * @missingRailsArgs new — CONVERGEABLE generator-base-thor-initialize-arguments-and-options-parse
-   */
-  private static async dispatch(
-    this: GeneratorConstructor,
-    command: string | null,
-    givenArgs: unknown[],
-    givenOpts: unknown[] | Record<string, unknown> | null,
-    config: GeneratorOptions & { invocations?: Invocations },
-    block?: (instance: GeneratorBase) => void,
-  ): Promise<string[]> {
-    if (["-h", "-?", "--help", "-D"].includes(givenArgs[0] as string)) {
-      (this as unknown as typeof GeneratorBase).classOptionsHelp(config.output);
-      return [];
-    }
-
-    const argumentsList: unknown[] = [];
-    for (const item of givenArgs) {
-      if (typeof item === "string" && /^-/.test(item)) break;
-      argumentsList.push(item);
-    }
-    const args = argumentsList;
-    const opts = givenOpts ?? givenArgs.slice(argumentsList.length);
-
-    const { invocations, ...rest } = config;
-    let toParse = args;
-    let options: Record<string, unknown>;
-    if (Array.isArray(opts)) {
-      const arrayOptions = opts as string[];
-      options = {};
-      const switches = new Map<string, [string, ClassOptionConfig]>();
-      for (const [name, option] of Object.entries(this.classOptions())) {
-        switches.set(`--${dasherize(name)}`, [name, option]);
-        for (const alias of [option.aliases ?? []].flat()) switches.set(alias, [name, option]);
-      }
-      const remaining: string[] = [];
-      for (let i = 0; i < arrayOptions.length; i++) {
-        const match = /^(--?[^=]+)(?:=([^]*))?$/.exec(arrayOptions[i]);
-        if (!match) {
-          remaining.push(arrayOptions[i]);
-          continue;
-        }
-        let sw = match[1].replace(/_/g, "-");
-        let value: unknown = match[2];
-        if (!switches.has(sw)) {
-          const negated = /^--(?:no|skip)-(.+)$/.exec(sw);
-          if (negated && switches.get(`--${negated[1]}`)?.[1].type === "boolean") {
-            sw = `--${negated[1]}`;
-            value = false;
-          } else {
-            remaining.push(arrayOptions[i]);
-            continue;
-          }
-        }
-        const [name, option] = switches.get(sw)!;
-        if (option.type === "boolean") {
-          if (value === undefined && /^(true|false)$/.test(arrayOptions[i + 1] ?? ""))
-            value = arrayOptions[++i];
-          value = value === undefined || value === true || value === "true";
-        } else if (option.type === "array") {
-          const values = value === undefined ? [] : [value];
-          while (i + 1 < arrayOptions.length && !arrayOptions[i + 1].startsWith("-"))
-            values.push(arrayOptions[++i]);
-          value = values;
-        } else if (value === undefined) value = arrayOptions[++i];
-        if (option.type === "numeric") value = Number(value);
-        if (option.enum && !option.enum.includes(value as string))
-          throw new Error(
-            `Expected '${sw}' to be one of ${option.enum.join(", ")}; got ${rbInspect(value)}`,
-          );
-        options[name] = value;
-      }
-      toParse = [...args, ...remaining];
-    } else {
-      options = opts;
-    }
-    const nonAssignedRequired = Object.entries(this.classOptions())
-      .filter(
-        ([name, option]) => option.required && option.default == null && options[name] == null,
-      )
-      .map(([name]) => `--${dasherize(name)}`);
-    if (nonAssignedRequired.length > 0)
-      throw new Error(
-        `No value provided for required options '${nonAssignedRequired.join("', '")}'`,
-      );
-
-    const attributes = Array.isArray(toParse[1]) ? toParse[1] : [];
-    if (!Array.isArray(toParse[1])) {
-      for (const value of toParse.slice(1)) {
-        if (typeof value === "string" && /^-{1,2}\S+/.test(value)) break;
-        attributes.push(value);
-      }
-    }
-    const instance = new this({
-      ...rest,
-      ...options,
-      name: (toParse[0] as string | undefined) ?? "",
-      attributes: attributes as string[],
-    });
-    if (args.length > 0) args[0] = (instance.options as { name?: unknown }).name ?? args[0];
-    instance._initializer = [args, opts, config];
-    instance._invocations = invocations ?? new Map();
-    block?.(instance);
-
-    if (command != null) {
-      await instance.invokeCommand(
-        (this as unknown as typeof GeneratorBase).allCommands().includes(command) ? command : null,
-      );
-    } else {
-      await instance.invokeAll();
-    }
-    return instance.getCreatedFiles();
-  }
-
-  protected static commands(): string[] {
-    if (!Object.hasOwn(this, "_commands")) this._commands = [];
-    return this._commands;
-  }
-
-  private static allCommands(): string[] {
-    const commands: string[] = [];
-    for (
-      let proto: GeneratorBase = this.prototype;
-      proto !== GeneratorBase.prototype;
-      proto = Object.getPrototypeOf(proto) as GeneratorBase
-    )
-      commands.unshift(...(proto.constructor as typeof GeneratorBase).commands());
-    const run = (this.prototype as { run?: unknown }).run;
-    if (typeof run === "function" && run !== ThorActions.run) commands.push("run");
-    for (const name of Object.keys(this.invocations()))
-      commands.push(
-        `_invokeFromOption${name.charAt(0).toUpperCase()}${name.slice(1).replace(/\W/g, "_")}`,
-      );
-    return commands;
-  }
-
-  private static invocations(): Record<string, boolean> {
-    if (!Object.hasOwn(this, "_invocations")) {
-      const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
-      this._invocations = { ...(superclass.invocations?.() ?? {}) };
-    }
-    return this._invocations;
-  }
-
-  private static invocationBlocks(): Record<string, HookBlock> {
-    if (!Object.hasOwn(this, "_invocationBlocks")) {
-      const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
-      this._invocationBlocks = { ...(superclass.invocationBlocks?.() ?? {}) };
-    }
-    return this._invocationBlocks;
-  }
-
-  private static invokeFromOption(name: string, options: HookForOptions, block?: HookBlock): void {
-    const verbose =
-      "verbose" in options ? (options as { verbose?: string | boolean }).verbose! : "white";
-
-    if (!Object.hasOwn(this.classOptions(), name)) {
-      throw new ArgumentError(
-        `You have to define the option ${rbInspect(name)} before setting invoke_from_option.`,
-      );
-    }
-
-    this.invocations()[name] = true;
-    if (block) this.invocationBlocks()[name] = block;
-
-    Object.defineProperty(
-      this.prototype,
-      `_invokeFromOption${name.charAt(0).toUpperCase()}${name.slice(1).replace(/\W/g, "_")}`,
-      {
-        async value(this: GeneratorBase): Promise<void> {
-          const options = this.options as unknown as Record<string, unknown>;
-          if (!(options[name] != null && options[name] !== false)) return;
-
-          let value = options[name];
-          if (value === true) value = _underscore(name);
-          const ctor = this.constructor as typeof GeneratorBase;
-          const klass = await ctor.prepareForInvocation(name, value);
-
-          if (klass) {
-            this.sayStatus("invoke", value, verbose);
-            const block = ctor.invocationBlocks()[name];
-            await this._invokeForClassMethod(klass, null, block);
-          } else {
-            this.sayStatus("error", `${String(value)} [not found]`, "red");
-          }
-        },
-        configurable: true,
-        writable: true,
-      },
-    );
-  }
-
-  private static removeInvocation(...names: string[]): void {
-    for (const name of names) {
-      delete this.classOptions()[name];
-      delete this.invocations()[name];
-      delete this.invocationBlocks()[name];
-    }
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  async invoke(
-    name: string | GeneratorClass | null = null,
-    ...args: unknown[]
-  ): Promise<string[] | void> {
-    if (name == null) {
-      console.warn(
-        "[Thor] Calling invoke() without argument is deprecated. Please use invoke_all instead.",
-      );
-      return this.invokeAll();
-    }
-
-    if (Array.isArray(args[0]) || args[0] == null) args.unshift(null);
-    const [sentCommand, givenArgs, givenOpts, givenConfig] = args as [
-      string | null,
-      unknown[] | null | undefined,
-      unknown[] | Record<string, unknown> | null | undefined,
-      Partial<GeneratorOptions> | null | undefined,
-    ];
-
-    const [klass, command] = await this._retrieveClassAndCommand(name, sentCommand);
-    if (!klass) throw new RuntimeError(`Missing Thor class for invoke ${String(name)}`);
-    if (!(klass === (GeneratorBase as unknown) || klass.prototype instanceof GeneratorBase)) {
-      throw new RuntimeError(
-        `Expected Thor class, got ${String((klass as { name?: string }).name ?? klass)}`,
-      );
-    }
-
-    const [parsedArgs, parsedOpts, config] = this._parseInitializationOptions(
-      givenArgs ?? null,
-      givenOpts ?? null,
-      givenConfig ?? null,
-    );
-    return GeneratorBase.dispatch.call(
-      klass as unknown as GeneratorConstructor,
-      command,
-      parsedArgs,
-      parsedOpts,
-      config,
-      (instance) => {
-        instance.parentOptions = this.options as unknown as Record<string, unknown>;
-      },
-    );
-  }
-
-  /**
-   * @missingRailsArgs run — CONVERGEABLE generator-base-thor-initialize-arguments-and-options-parse
-   * @noRailsEquivalent PERMANENT
-   */
-  async invokeCommand(command: string | null): Promise<void> {
-    if (command == null) throw new NoMethodError("undefined method `name' for nil", "name");
-    const current = this._invocations!.get(this.constructor) ?? [];
-    this._invocations!.set(this.constructor, current);
-
-    if (!current.includes(command)) {
-      current.push(command);
-      const method = (this as unknown as Record<string, (...a: unknown[]) => unknown>)[command];
-      if (command === "run") {
-        const { name, attributes } = this.options as unknown as {
-          name: string;
-          attributes: string[];
-        };
-        await method.call(this, name, attributes);
-      } else {
-        await method.call(this);
-      }
-    }
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  async invokeAll(): Promise<void> {
-    for (const command of (this.constructor as typeof GeneratorBase).allCommands())
-      await this.invokeCommand(command);
-  }
-
-  private async _retrieveClassAndCommand(
-    name: string | GeneratorClass | null,
-    sentCommand: string | null = null,
-  ): Promise<[GeneratorClass | null, string | null]> {
-    const ctor = this.constructor as typeof GeneratorBase;
-    if (name == null) {
-      return [ctor as unknown as GeneratorClass, null];
-    } else if (typeof name === "string" && ctor.allCommands().includes(name)) {
-      return [ctor as unknown as GeneratorClass, name];
-    } else {
-      const klass = await ctor.prepareForInvocation(null, name);
-      return [klass, sentCommand];
-    }
-  }
-
-  private _parseInitializationOptions(
-    args: unknown[] | null,
-    opts: unknown[] | Record<string, unknown> | null,
-    config: Partial<GeneratorOptions> | null,
-  ): [
-    unknown[],
-    unknown[] | Record<string, unknown>,
-    GeneratorOptions & { invocations?: Invocations },
-  ] {
-    const [storedArgs, storedOpts, storedConfig] = this._initializer!;
-
-    args ??= [...storedArgs];
-    opts ??= Array.isArray(storedOpts) ? [...storedOpts] : { ...storedOpts };
-
-    config ??= {};
-    const merged = { ...storedConfig, ...this._sharedConfiguration(), ...config };
-
-    return [args, opts, merged];
-  }
-
-  private _sharedConfiguration(): { invocations: Invocations } {
-    return { invocations: this._invocations! };
-  }
-
-  /** @missingRailsCall with_padding — CONVERGEABLE generator-invoke-for-class-method-with-padding */
-  private async _invokeForClassMethod(
-    klass: GeneratorClass,
-    command: string | null = null,
-    block?: HookBlock,
-  ): Promise<void> {
-    if (block) {
-      switch (block.length) {
-        case 3:
-          await (block as HookYield)(this, klass, command);
-          break;
-        case 2:
-          await (block as HookYield)(this, klass);
-          break;
-        case 1:
-          await (block as HookExec).call(this, klass);
-          break;
-      }
-    } else {
-      await this.invoke(klass, command);
-    }
+    return super.classOption(name, options);
   }
 
   protected classCollisions(...classNames: Array<string | string[]>): void {
@@ -765,12 +355,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     return GeneratorBase;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE rebase-generator-base-onto-thor-group
-   */
-  static fromSuperclass = fromSuperclass;
-
   /** @internal */
   protected static async defaultGeneratorRoot(): Promise<string | undefined> {
     const path = File.expandPath(
@@ -782,19 +366,19 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   /** @internal */
   static hooks(): Record<string, [string | undefined, string | undefined]> {
-    if (!Object.hasOwn(this, "_hooks")) {
-      const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
-      this._hooks = { ...(superclass.hooks?.() ?? {}) };
+    if (!Object.hasOwn(this, "_hooks") || this._hooks == null) {
+      this._hooks = this.fromSuperclass("hooks", {}) as Record<
+        string,
+        [string | undefined, string | undefined]
+      >;
     }
     return this._hooks;
   }
 
   /** @internal */
-  static async prepareForInvocation(
-    name: string | null,
-    value: unknown,
-  ): Promise<GeneratorClass | null> {
-    if (typeof value !== "string") return value as GeneratorClass | null;
+  static async prepareForInvocation(name: string | null, value: unknown): Promise<unknown> {
+    const thorPrepareForInvocation = super.prepareForInvocation.bind(this);
+    if (typeof value !== "string") return thorPrepareForInvocation(name, value);
 
     let constants: [string | undefined, string | undefined] | undefined;
     let klass: GeneratorClass | null;
@@ -808,111 +392,16 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     } else if ((klass = await Generators.findByNamespace(value))) {
       return klass;
     } else {
-      return null;
+      return thorPrepareForInvocation(name, value);
     }
   }
 
   protected isTypeScript(): boolean {
-    return File.isExist(File.join(this.cwd, "tsconfig.json"));
+    return File.isExist(File.join(this.destinationRoot, "tsconfig.json"));
   }
 
   protected ext(): string {
     return this.isTypeScript() ? ".ts" : ".js";
-  }
-
-  protected createFile(relativePath: string, content: string, options?: { mode?: number }): string {
-    const fullPath = File.join(this.cwd, relativePath);
-    if (this.behavior === "revoke") {
-      this.output(`      remove  ${relativePath}`);
-      if (!this.options.pretend && File.isExist(fullPath)) FileUtils.rmRf(fullPath);
-      return relativePath;
-    }
-    let status = "create";
-    if (File.isExist(fullPath)) {
-      if (File.read(fullPath) === content) {
-        this.sayStatus("identical", relativePath);
-        this.createdFiles.push(relativePath);
-        return relativePath;
-      }
-      if (this.options.force) {
-        status = "force";
-      } else if (this.options.skip) {
-        this.sayStatus("skip", relativePath);
-        return relativePath;
-      } else {
-        this.sayStatus("conflict", relativePath);
-        status = "force";
-      }
-    }
-    if (!this.options.pretend) {
-      FileUtils.mkdirP(File.dirname(fullPath));
-      File.write(fullPath, content);
-      if (options?.mode !== undefined) File.chmod(options.mode, fullPath);
-    }
-    Generators.addGeneratedFile(fullPath);
-    this.createdFiles.push(relativePath);
-    this.output(`${status.padStart(12)}  ${relativePath}`);
-    return relativePath;
-  }
-
-  protected emptyDirectory(destination: string, config: { verbose?: boolean } = {}): string {
-    const verbose = config.verbose ?? true;
-    const fullPath = File.join(this.cwd, destination);
-    if (this.behavior === "revoke") {
-      this.sayStatus("remove", destination, verbose);
-      if (!this.options.pretend && File.isExist(fullPath)) FileUtils.rmRf(fullPath);
-      return destination;
-    }
-    if (File.isExist(fullPath)) {
-      this.sayStatus("exist", destination, verbose);
-    } else {
-      if (!this.options.pretend) FileUtils.mkdirP(fullPath);
-      this.sayStatus("create", destination, verbose);
-    }
-    return fullPath;
-  }
-
-  protected appendToFile(relativePath: string, content: string): void {
-    const fullPath = File.join(this.cwd, relativePath);
-    if (this.behavior === "revoke") {
-      this.revokeInjection(relativePath, `(${regexpEscape(content)})([^]*)(${"$"})`, "$2$3");
-      return;
-    }
-    if (!File.isExist(fullPath)) {
-      this.createFile(relativePath, content);
-      return;
-    }
-    File.open(fullPath, "a", (file) => file.write(content));
-    this.output(`      append  ${relativePath}`);
-  }
-
-  protected revokeInjection(relativePath: string, pattern: string, content: string): void {
-    const fullPath = File.join(this.cwd, relativePath);
-    this.output(`    subtract  ${relativePath}`);
-    if (!File.isExist(fullPath)) return;
-    const existing = File.read(fullPath);
-    const updated = existing.replace(new RegExp(pattern, "g"), content);
-    if (!this.options.pretend) File.write(fullPath, updated);
-  }
-
-  protected readFile(relativePath: string): string {
-    return File.read(File.join(this.cwd, relativePath));
-  }
-
-  protected fileExists(relativePath: string): boolean {
-    return File.isExist(File.join(this.cwd, relativePath));
-  }
-
-  protected removeFile(relativePath: string): boolean {
-    const fullPath = File.join(this.cwd, relativePath);
-    if (!File.isExist(fullPath)) return false;
-    File.delete(fullPath);
-    this.output(`      remove  ${relativePath}`);
-    return true;
-  }
-
-  getCreatedFiles(): string[] {
-    return [...this.createdFiles];
   }
 }
 

@@ -32,10 +32,9 @@ export const DEFAULT_PARSERS: ParameterParsers = {
   },
 };
 
-export class ParseError extends Error {
+export class ParseError extends StandardError {
   constructor(message?: string) {
     super(message);
-    this.name = "ActionDispatch::Http::Parameters::ParseError";
   }
 }
 

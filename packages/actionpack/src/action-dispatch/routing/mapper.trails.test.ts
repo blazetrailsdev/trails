@@ -1,3 +1,5 @@
+import { camelize } from "@blazetrails/activesupport";
+import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Engine } from "@blazetrails/trailties/engine";
@@ -11,11 +13,10 @@ import {
   type MountableApp,
 } from "./mapper.js";
 import { RouteSet } from "./route-set.js";
-import { controllerConstants } from "../http/request.js";
-import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { deprecator } from "../deprecator.js";
+import { Base, registerController } from "../../action-controller/base.js";
 
 function fakeRequest(): ConstraintsRequest & Request {
   return {
@@ -403,7 +404,7 @@ describe("Mapper#mount", () => {
 });
 
 describe("Mapper block receivers", () => {
-  class StubController {
+  class StubController extends Base {
     static actionEncodingTemplate(): null {
       return null;
     }
@@ -413,12 +414,14 @@ describe("Mapper block receivers", () => {
 
   beforeAll(() => {
     for (const name of names) {
-      controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+      registerController(`${camelize(name)}Controller`, StubController);
     }
   });
 
   afterAll(() => {
-    for (const name of names) controllerConstants.delete(name);
+    for (const name of names)
+      if (isRegisteredConstant(`${camelize(name)}Controller`))
+        rbModRemoveConst(Object, `${camelize(name)}Controller`);
   });
 
   it("binds a nested constraints block to the mapper, as draw binds its own", () => {

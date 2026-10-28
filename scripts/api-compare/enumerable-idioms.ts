@@ -204,6 +204,11 @@ export const TYPED_NATIVE_FORM = {
   drop: "drop@typed",
   valuesAt: "values_at@typed",
   transformValues: "transform_values@typed",
+  count: "count@typed",
+  compact: "compact@typed",
+  merge: "merge@typed",
+  mergeBang: "merge!@typed",
+  update: "update@typed",
 } as const;
 
 /**

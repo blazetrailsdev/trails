@@ -1,3 +1,4 @@
+import { camelize } from "@blazetrails/activesupport";
 import { beforeAll, beforeEach, describe, it, expect } from "vitest";
 import {
   assertEqual,
@@ -8,11 +9,10 @@ import {
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { MockRequest } from "@blazetrails/rack";
-import { controllerConstants } from "../../http/request.js";
-import type { DispatchableControllerClass } from "../../routing/dispatcher.js";
 import { RouteSet, type DrawCallback } from "../../routing/route-set.js";
+import { Base, registerController } from "../../../action-controller/base.js";
 
-class StubController {
+class StubController extends Base {
   static actionEncodingTemplate(): null {
     return null;
   }
@@ -20,7 +20,7 @@ class StubController {
 
 beforeAll(() => {
   for (const name of ["posts", "late", "seed"]) {
-    controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+    registerController(`${camelize(name)}Controller`, StubController);
   }
 });
 

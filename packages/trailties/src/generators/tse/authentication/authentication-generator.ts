@@ -2,18 +2,17 @@ import { GeneratorBase } from "../../base.js";
 import { TEMPLATES } from "./templates.js";
 
 export class AuthenticationGenerator extends GeneratorBase {
-  createFiles(): void {
-    this.template("app/views/passwords/new.html.erb");
-    this.template("app/views/passwords/edit.html.erb");
-    this.template("app/views/sessions/new.html.erb");
+  static {
+    this.methodAdded("createFiles");
   }
 
-  run(): string[] {
-    this.createFiles();
-    return this.getCreatedFiles();
+  async createFiles(): Promise<void> {
+    await this.template("app/views/passwords/new.html.erb");
+    await this.template("app/views/passwords/edit.html.erb");
+    await this.template("app/views/sessions/new.html.erb");
   }
 
-  private template(file: string): void {
-    this.createFile(file.replace(/\.erb$/, ".tse"), TEMPLATES[file]);
+  private async template(file: string): Promise<void> {
+    await this.createFile(file.replace(/\.erb$/, ".tse"), TEMPLATES[file]);
   }
 }

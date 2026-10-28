@@ -4,50 +4,44 @@ import { SecureRandom } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 
 export interface CredentialsGeneratorOptions extends GeneratorOptions {
-  contentPath?: string;
-  keyPath?: string;
   skipSecretKeyBase?: boolean;
 }
 
 export class CredentialsGenerator extends GeneratorBase {
-  readonly contentPath: string;
-  readonly keyPath: string;
-  readonly skipSecretKeyBase: boolean;
+  static {
+    this.argument("contentPath", { default: "config/credentials.yml.enc" });
+    this.argument("keyPath", { default: "config/master.key" });
+    this.classOption("skipSecretKeyBase", { type: "boolean" });
+    this.methodAdded("addCredentialsFile");
+  }
+
+  declare options: CredentialsGeneratorOptions;
+  declare contentPath: string;
+  declare keyPath: string;
   private memoSecretKeyBase: string | null = null;
 
-  constructor(options: CredentialsGeneratorOptions) {
-    super(options);
-    this.contentPath = options.contentPath ?? "config/credentials.yml.enc";
-    this.keyPath = options.keyPath ?? "config/master.key";
-    this.skipSecretKeyBase = options.skipSecretKeyBase ?? false;
-  }
-
-  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
-    const generator = new CredentialsGenerator(config);
-    await generator.addCredentialsFile();
-    return generator.getCreatedFiles();
-  }
-
   async addCredentialsFile(): Promise<void> {
-    if (this.fileExists(this.contentPath)) return;
-    this.say(`Adding ${this.contentPath} to store encrypted credentials.`);
-    this.say("");
-    const content = this.renderTemplate();
-    await this.encryptedFile().write(content);
-    this.say("The following content has been encrypted with the Rails master key:");
-    this.say("");
-    this.say(content, "on_green");
-    this.say("");
-    this.say("You can edit encrypted credentials with `bin/rails credentials:edit`.");
-    this.say("");
+    await this.inRoot(async () => {
+      if (File.isExist(File.join(this.destinationRoot, this.contentPath))) return;
+      this.say(`Adding ${this.contentPath} to store encrypted credentials.`);
+      this.say("");
+      const content = this.renderTemplate();
+      await this.encryptedFile().write(content);
+      this.say("The following content has been encrypted with the Rails master key:");
+      this.say("");
+      this.say(content, "on_green");
+      this.say("");
+      this.say("You can edit encrypted credentials with `bin/rails credentials:edit`.");
+      this.say("");
+    });
   }
 
   private encryptedFile(): EncryptedFile {
-    const contentPath = File.join(this.cwd, this.contentPath);
+    const contentPath = File.join(this.destinationRoot, this.contentPath);
     FileUtils.mkdirP(File.dirname(contentPath));
     return new EncryptedFile({
       contentPath,
-      keyPath: File.join(this.cwd, this.keyPath),
+      keyPath: File.join(this.destinationRoot, this.keyPath),
       envKey: "RAILS_MASTER_KEY",
       raiseIfMissingKey: true,
     });
@@ -67,7 +61,7 @@ export class CredentialsGenerator extends GeneratorBase {
       "#   access_key_id: 123",
       "#   secret_access_key: 345",
     ];
-    if (!this.skipSecretKeyBase) {
+    if (!this.options.skipSecretKeyBase) {
       lines.push(
         "",
         "# Used as the base secret for all MessageVerifiers in Rails, including the one protecting cookies.",

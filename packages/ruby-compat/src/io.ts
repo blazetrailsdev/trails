@@ -536,6 +536,39 @@ class EAGAINWaitReadable extends Errno.EAGAIN {
 }
 
 /**
+ * `IO::WaitWritable` (`vendor/ruby/v3.3.11/io.c:15387`), the module
+ * `IO::EAGAINWaitWritable` includes (`io.c:15393`), so `rescue
+ * IO::WaitWritable` catches it.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO::WaitWritable`.
+ */
+const WaitWritable = {
+  [Symbol.hasInstance](error: unknown): boolean {
+    return error instanceof EAGAINWaitWritable;
+  },
+};
+
+/**
+ * `IO::EAGAINWaitWritable` (`vendor/ruby/v3.3.11/io.c:15392`), the
+ * `Errno::EAGAIN` `write_nonblock` raises when a write would block.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO::EAGAINWaitWritable`.
+ */
+class EAGAINWaitWritable extends Errno.EAGAIN {
+  constructor(mesg?: string) {
+    super(mesg);
+    this.name = "IO::EAGAINWaitWritable";
+  }
+}
+
+/** A non-IO source `IO.copy_stream` accepts (`vendor/ruby/v3.3.11/io.c:13176-13189`). */
+export interface CopyStreamSource {
+  toPath?(): string;
+  toIo?(): IO;
+  readpartial?(maxlen: number): Uint8Array;
+}
+
+/**
  * `IO` (`vendor/ruby/v3.3.11/io.c:15371` `rb_cIO`), the sliver of it trails calls.
  *
  * Rails writes a credentials file through this class —
@@ -551,6 +584,18 @@ class EAGAINWaitReadable extends Errno.EAGAIN {
 export class IO {
   /** @noRailsEquivalent PERMANENT */
   static readonly EAGAINWaitReadable = EAGAINWaitReadable;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly WaitWritable = WaitWritable;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly EAGAINWaitWritable = EAGAINWaitWritable;
+  /**
+   * `IO::EWOULDBLOCKWaitWritable` (`vendor/ruby/v3.3.11/io.c:15400`), the
+   * same class as {@link IO.EAGAINWaitWritable} where `EAGAIN == EWOULDBLOCK`,
+   * as on every platform Node runs on.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static readonly EWOULDBLOCKWaitWritable = EAGAINWaitWritable;
 
   /**
    * `vendor/ruby/v3.3.11/file.c:7848` — `File::Constants::NULL`, which `IO`
@@ -818,12 +863,32 @@ export class IO {
    * whatever either stream's encoding. It answers the byte total
    * (`io.c:13392`).
    *
+   * A source that answers `to_path` (a `File`, a `Tempfile`) is read
+   * through its `to_io` (`rb_io_check_io`, `io.c:13186-13189`); any other
+   * (a `StringIO`) goes through `copy_stream_fallback_body` (`io.c:13088`),
+   * which `readpartial`s 16 KiB at a time until `EOFError` (`io.c:13096`).
+   *
    * @noRailsEquivalent PERMANENT — Ruby core `IO.copy_stream`
    * (`vendor/ruby/v3.3.11/io.c:13365`).
    */
-  static copyStream(src: IO, dst: IO): number {
-    const buf = new Uint8Array(1024 * 16);
+  static copyStream(src: IO | CopyStreamSource, dst: { write(data: Uint8Array): unknown }): number {
     let total = 0;
+    const source = src as CopyStreamSource;
+    if (typeof source.toPath === "function" && typeof source.toIo === "function") {
+      src = source.toIo();
+    } else if (!(src instanceof IO)) {
+      try {
+        for (;;) {
+          const chunk = src.readpartial!(1024 * 16);
+          dst.write(chunk);
+          total += chunk.length;
+        }
+      } catch (error) {
+        if (error instanceof EOFError) return total;
+        throw error;
+      }
+    }
+    const buf = new Uint8Array(1024 * 16);
     for (;;) {
       const ss = getFs().readSync(src.fd, buf, 0, buf.length, src._pos);
       if (ss <= 0) return total;

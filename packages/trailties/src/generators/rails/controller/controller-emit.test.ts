@@ -27,12 +27,14 @@ function read(rel: string): string {
   return fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 }
 
+async function runController(name: string, actions: string[], options: object = {}) {
+  const gen = new ControllerGenerator([name, ...actions], options, { destinationRoot: tmpDir });
+  await gen.invokeAll();
+}
+
 describe("ControllerGenerator emit", () => {
   it("matches snapshot for simple controller", async () => {
-    await new ControllerGenerator({ cwd: tmpDir, output: () => {} }).run("Account", [
-      "index",
-      "show",
-    ]);
+    await runController("Account", ["index", "show"]);
     const src = read("app/controllers/account-controller.ts");
     expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);
@@ -40,13 +42,9 @@ describe("ControllerGenerator emit", () => {
   });
 
   it("matches snapshot for namespaced controller with parent", async () => {
-    await new ControllerGenerator({ cwd: tmpDir, output: () => {} }).run(
-      "admin/dashboard",
-      ["index"],
-      {
-        parent: "admin_controller",
-      },
-    );
+    await runController("admin/dashboard", ["index"], {
+      parent: "admin_controller",
+    });
     const src = read("app/controllers/admin/dashboard-controller.ts");
     expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);

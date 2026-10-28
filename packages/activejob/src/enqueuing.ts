@@ -61,6 +61,7 @@ export async function performAllLater(...jobs: unknown[]): Promise<null> {
             job.enqueueError = e;
           }
         }
+        // eslint-disable-next-line blazetrails/ruby-compat-native-required -- isSuccessfullyEnqueued answers unknown, which count_iter_i reads with Ruby truthiness
         return aryCount(adapterJobs, (job) => job.isSuccessfullyEnqueued());
       }
     });

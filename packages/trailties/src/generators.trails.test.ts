@@ -1,3 +1,4 @@
+import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
@@ -28,7 +29,7 @@ async function generatorDirectories(): Promise<string[]> {
     const files = entries.filter((e) => !isDir(e));
     out.push(...files.filter(isGenerator).map(() => namespace.join(":")));
     for (const entry of entries.filter(isDir)) {
-      await walk(path.join(dir, entry), [...namespace, entry.replace(/-/g, "_")]);
+      await walk(path.join(dir, entry), [...namespace, entry]);
     }
   };
   await walk(root, []);
@@ -44,18 +45,15 @@ describe("GeneratorsTest", () => {
 
   it("find by namespace reaches a generator nested under db:system", async () => {
     const klass = await Generators.findByNamespace("change", "rails:db:system");
-    expect(klass?.namespace).toEqual("rails:db:system:change");
+    expect(klass?.namespace()).toEqual("rails:db:system:change");
   });
 
   it("invoke runs the generator it found", async () => {
     const tmpDir = fs.mkdtempSync(nodePath.join(os.tmpdir(), "trails-generators-"));
     fs.writeFileSync(nodePath.join(tmpDir, "tsconfig.json"), "{}");
     try {
-      const created = await Generators.invoke("rails:helper", ["Account"], {
-        cwd: tmpDir,
-        output: () => {},
-      });
-      expect(created).toContain("app/helpers/account-helper.ts");
+      await Generators.invoke("rails:helper", ["Account"], { destinationRoot: tmpDir });
+      expect(fs.existsSync(nodePath.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(true);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -63,7 +61,9 @@ describe("GeneratorsTest", () => {
 
   it("every generator directory is reachable as a trails generate subcommand", async () => {
     for (const dir of await generatorDirectories()) {
-      expect((await Generators.findByNamespace(`rails:${dir}`))?.namespace).toEqual(`rails:${dir}`);
+      expect((await Generators.findByNamespace(`rails:${dir}`))?.namespace()).toEqual(
+        `rails:${dir}`,
+      );
     }
   });
 
@@ -80,17 +80,17 @@ describe("GeneratorsTest", () => {
 
   it("trails generate passes declared class options through to the generator", async () => {
     const seen: unknown[] = [];
-    const auth = vi.spyOn(AuthenticationGenerator.prototype, "run").mockImplementation(function (
-      this: AuthenticationGenerator,
-    ) {
-      seen.push(this.options.api);
-      return Promise.resolve([]);
-    });
-    const gen = vi.spyOn(GeneratorGenerator.prototype, "run").mockImplementation(function (
+    const auth = vi
+      .spyOn(AuthenticationGenerator.prototype, "invokeAll")
+      .mockImplementation(function (this: AuthenticationGenerator) {
+        seen.push(this.options.api);
+        return Promise.resolve([]);
+      });
+    const gen = vi.spyOn(GeneratorGenerator.prototype, "invokeAll").mockImplementation(function (
       this: GeneratorGenerator,
     ) {
       seen.push(this.options.namespace);
-      return [];
+      return Promise.resolve([]);
     });
     try {
       await createProgram().parseAsync(["generate", "authentication", "--api"], { from: "user" });
@@ -105,12 +105,9 @@ describe("GeneratorsTest", () => {
   });
 
   it("a lookup-registered subcommand advertises its generator's class options", async () => {
-    const lines: string[] = [];
-    await Generators.invoke("generator", ["--help"], {
-      cwd: "/tmp",
-      output: (line) => lines.push(line),
-    });
-    const help = lines.join("\n");
+    const help = await capture("stdout", () =>
+      Generators.invoke("generator", ["--help"], { destinationRoot: "/tmp" }),
+    );
     expect(help).toMatch(
       /\[--namespace\], \[--no-namespace\], \[--skip-namespace\]\s+# Namespace generator/,
     );
@@ -121,14 +118,17 @@ describe("GeneratorsTest", () => {
     vi.resetModules();
     const { Generators: fresh } = await import("./generators.js");
     await fresh.findByNamespace("rails:helper");
-    expect(fresh.subclasses().map((k) => k.namespace)).toEqual(["rails:helper"]);
+    expect(fresh.subclasses().map((k) => k.namespace())).toEqual(["rails:helper"]);
   });
 
   it("an enum class option rejects an undeclared value with Thor's message", async () => {
     const devcontainer = (await Generators.findByNamespace("devcontainer"))!;
-    await expect(
-      devcontainer.start(["--database", "oracle"], { cwd: "/tmp", output: () => {} }),
-    ).rejects.toThrow(`Expected '--database' to be one of ${DATABASES.join(", ")}; got "oracle"`);
+    const { capture: freshCapture } = await import("@blazetrails/activesupport");
+    expect(
+      await freshCapture("stderr", () =>
+        devcontainer.start(["--database", "oracle"], { destinationRoot: "/tmp" }),
+      ),
+    ).toContain(`Expected '--database' to be one of ${DATABASES.join(", ")}; got oracle`);
   });
 });
 
@@ -137,7 +137,7 @@ describe("Generators.findByNamespace fallbacks and context", () => {
     Generators.fallbacks()["remarkable"] = "rails";
     try {
       const klass = await Generators.findByNamespace("model", "remarkable");
-      expect(klass?.namespace).toBe("rails:model");
+      expect(klass?.namespace()).toBe("rails:model");
     } finally {
       delete Generators.fallbacks()["remarkable"];
     }
@@ -147,7 +147,7 @@ describe("Generators.findByNamespace fallbacks and context", () => {
     Generators.fallbacks()["remarkable"] = "rails";
     try {
       const klass = await Generators.findByNamespace("remarkable", "rails", "model");
-      expect(klass?.namespace).toBe("rails:model");
+      expect(klass?.namespace()).toBe("rails:model");
     } finally {
       delete Generators.fallbacks()["remarkable"];
     }

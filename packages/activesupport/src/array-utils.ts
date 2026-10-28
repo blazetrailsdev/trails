@@ -4,7 +4,14 @@ import { camelize, pluralize, singularize, underscore } from "./inflector.js";
 import * as XmlMini from "./xml-mini.js";
 import { rbInspect as inspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { ARRAY_METHOD_TABLE, eachSlice } from "@blazetrails/ruby-compat";
-import { isSymbol, rbEqq, rbObjClassname, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  isSymbol,
+  rbObjIsKindOf,
+  rbObjClass,
+  rbObjClassname,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 
 export function wrap<T>(object: T | T[] | null | undefined): T[] {
   if (object === null || object === undefined) return [];
@@ -200,14 +207,7 @@ export function toXml(
   options.builder ??= new XmlMini.IndentedXmlStringBuilder("", options.indent);
   options.root ??= (() => {
     const first = self[0];
-    if (
-      rbObjClassname(first) !== "Hash" &&
-      self.every((e) =>
-        typeof first === "object" && first !== null
-          ? rbEqq(first.constructor, e)
-          : rbObjClassname(e) === rbObjClassname(first),
-      )
-    ) {
+    if (rbObjClass(first) !== Hash && self.every((e) => rbObjIsKindOf(e, rbObjClass(first)))) {
       const underscored = underscore(rbObjClassname(first));
       return pluralize(underscored).replaceAll("/", "_");
     } else {

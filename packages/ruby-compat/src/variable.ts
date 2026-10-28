@@ -154,12 +154,14 @@ export function rbFBinding<T extends object>(self: T): T {
 
 /**
  * Empties the table `registerConstant` (`vendor/ruby/v3.3.11/variable.c:3674`
- * `rb_const_set` on `rb_cObject`) fills.
+ * `rb_const_set` on `rb_cObject`) fills, down to the core classes seated at
+ * load, which no teardown removes from `rb_cObject`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function resetConstants(): void {
   RCLASS_CONST_TBL.clear();
+  for (const [name, value] of _coreConstants) RCLASS_CONST_TBL.set(name, value);
 }
 
 /**
@@ -432,3 +434,5 @@ registerConstant("Struct", Struct);
 registerConstant("Symbol", rbCSymbol);
 
 registerConstant("Rational", Rational);
+
+const _coreConstants = [...RCLASS_CONST_TBL];

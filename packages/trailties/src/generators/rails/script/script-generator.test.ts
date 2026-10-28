@@ -16,25 +16,16 @@ afterEach(() => {
 });
 
 describe("ScriptGeneratorTest", () => {
-  it("generate_script", () => {
-    const gen = new ScriptGenerator({
-      cwd: tmpDir,
-      output: () => {},
-      name: "my_script",
-    });
-    const files = gen.run();
-    expect(files).toContain("script/my_script.ts");
+  it("generate_script", async () => {
+    const gen = new ScriptGenerator(["my_script"], {}, { destinationRoot: tmpDir });
+    await gen.generateScript();
     const content = fs.readFileSync(path.join(tmpDir, "script/my_script.ts"), "utf-8");
     expect(content).toMatch(/"\.\.\/config\/environment\.ts"/);
   });
 
-  it("generate_script_with_folder", () => {
-    const gen = new ScriptGenerator({
-      cwd: tmpDir,
-      output: () => {},
-      name: "my_folder/my_script",
-    });
-    gen.run();
+  it("generate_script_with_folder", async () => {
+    const gen = new ScriptGenerator(["my_folder/my_script"], {}, { destinationRoot: tmpDir });
+    await gen.generateScript();
     const content = fs.readFileSync(path.join(tmpDir, "script/my_folder/my_script.ts"), "utf-8");
     expect(content).toMatch(/"\.\.\/\.\.\/config\/environment\.ts"/);
   });

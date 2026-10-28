@@ -16,15 +16,10 @@ afterEach(() => {
 });
 
 describe("TaskGeneratorTest", () => {
-  it("task is created", () => {
-    const gen = new TaskGenerator({
-      cwd: tmpDir,
-      output: () => {},
-      name: "feeds",
-    });
-    const files = gen.run({ actions: ["foo", "bar"] });
+  it("task is created", async () => {
+    const gen = new TaskGenerator(["feeds", "foo", "bar"], {}, { destinationRoot: tmpDir });
+    await gen.createTaskFiles();
     const taskPath = "lib/tasks/feeds.ts";
-    expect(files).toContain(taskPath);
     const content = fs.readFileSync(path.join(tmpDir, taskPath), "utf-8");
     expect(content).toMatch(/namespace: feeds/);
     expect(content).toMatch(/export async function foo\(\)/);

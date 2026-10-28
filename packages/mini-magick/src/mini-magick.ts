@@ -1,7 +1,7 @@
 import { version } from "./version.js";
 import { Configuration } from "./configuration.js";
 import { Utilities } from "./utilities.js";
-import { Tool } from "./tool.js";
+import { Tool, type CliTool } from "./tool.js";
 import "./image.js";
 import { extend, RuntimeError, StandardError } from "@blazetrails/ruby-compat";
 
@@ -16,9 +16,7 @@ export function isImagemagick7() {
 }
 
 export async function cliVersion(): Promise<string | null> {
-  const output = await (MiniMagick.identify((x: Tool) =>
-    (x as unknown as { version(): Tool }).version(),
-  ) as Promise<string>);
+  const output = await (MiniMagick.identify((x) => x.version()) as Promise<string>);
   return output.match(/\d+\.\d+\.\d+(-\d+)?/)?.[0] ?? null;
 }
 
@@ -29,15 +27,15 @@ export const MiniMagick = { version, isImagemagick7, cliVersion } as {
   _imagemagick7?: boolean;
 } & Configuration &
   Record<
-    CliTool,
+    ToolName,
     (
-      options?: Record<string, unknown> | ((tool: Tool) => unknown),
-      block?: (tool: Tool) => unknown,
+      options?: Record<string, unknown> | ((tool: CliTool) => unknown),
+      block?: (tool: CliTool) => unknown,
     ) => unknown
   >;
 extend(MiniMagick, Configuration);
 
-type CliTool =
+type ToolName =
   | "animate"
   | "compare"
   | "composite"
@@ -64,8 +62,8 @@ for (const tool of [
   "stream",
 ] as const) {
   MiniMagick[tool] = (
-    options: Record<string, unknown> | ((tool: Tool) => unknown) = {},
-    block?: (tool: Tool) => unknown,
+    options: Record<string, unknown> | ((tool: CliTool) => unknown) = {},
+    block?: (tool: CliTool) => unknown,
   ) => {
     if (typeof options === "function") [options, block] = [{}, options];
     const name = MiniMagick.isImagemagick7() && tool === "convert" ? "magick" : tool;

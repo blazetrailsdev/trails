@@ -1452,12 +1452,8 @@ type CallableMethods<M extends object> = {
 
 export type Included<M extends object> = CallableMethods<M extends Module<infer I> ? I : M>;
 
-function isClass(klass: object): klass is AnyClass {
-  return typeof klass === "function";
-}
-
 function isClassReceiver(klass: object): klass is AnyClass {
-  return isClass(klass) && !Object.hasOwn(klass, classModule);
+  return typeof klass === "function" && !Object.hasOwn(klass, classModule);
 }
 
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
@@ -1617,7 +1613,11 @@ export function rbModAppendFeatures(
         }
         installed.add(key);
         descriptors[key] = { ...modDesc, configurable: true, enumerable: false };
-        if (typeof key === "string") rbSeatSuper(klass.prototype, key, modDesc.value, descriptors);
+        if (typeof key === "string") {
+          rbSeatSuper(klass.prototype, key, modDesc.value, descriptors);
+          rbSeatSuper(klass.prototype, key, modDesc.get, descriptors, "get");
+          rbSeatSuper(klass.prototype, key, modDesc.set, descriptors, "set");
+        }
       }
       ancestor = Object.getPrototypeOf(ancestor) as object | null;
     }

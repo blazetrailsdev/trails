@@ -5,7 +5,6 @@ import type { AssociationReflection } from "../reflection.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
 import {
-  aryCount,
   aryDelete,
   Hash,
   include,
@@ -223,7 +222,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     switch (method) {
       case "destroy":
         if (scope.model.primaryKey != null) {
-          count = aryCount((await scope.destroyAll()) as Base[], (r) => r.isDestroyed());
+          count = ((await scope.destroyAll()) as Base[]).filter((r) => r.isDestroyed()).length;
         } else {
           for (const r of (await scope.toArray()) as Base[]) await r._runDestroyCallbacks();
           count = await scope.deleteAll();

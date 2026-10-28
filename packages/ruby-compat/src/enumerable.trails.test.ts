@@ -245,6 +245,12 @@ describe("Enumerable", () => {
     expect(Enumerable.prototype.select).toBe(Enumerable.prototype.findAll);
   });
 
+  it("select over a wrapped Set keeps the RTEST elements, and answers to_a without a block", () => {
+    const set = new Set([1, 0, null, 2]);
+    expect(new Enumerable(set).select((i) => i)).toEqual([1, 0, 2]);
+    expect(new Enumerable(set).select()).toEqual([1, 0, null, 2]);
+  });
+
   it("isInclude asks rb_equal of each element and stops at the first hit", () => {
     const eq = { equals: (other: unknown) => other === "x" };
     const bag = new Bag([1, eq, 3]);

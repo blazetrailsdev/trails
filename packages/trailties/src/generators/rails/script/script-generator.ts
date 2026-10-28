@@ -1,23 +1,23 @@
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import { NamedBase } from "../../named-base.js";
 
 export class ScriptGenerator extends NamedBase {
-  constructor(options: NamedBaseOptions) {
-    super(options);
+  static {
+    this.methodAdded("generateScript");
   }
 
-  run(): string[] {
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  async generateScript(): Promise<void> {
     const ext = this.ext();
     const filename = `script/${this.filePath()}${ext}`;
     const upDots = "../".repeat(this.depth());
 
-    this.createFile(
+    await this.createFile(
       filename,
       `import "${upDots}config/environment${ext}";
 
 // Your code goes here
 `,
     );
-    return this.getCreatedFiles();
   }
 
   private depth(): number {

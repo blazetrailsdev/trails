@@ -7,3 +7,4 @@ export { HTML5 } from "./html5.js";
 export { type VendorMethods } from "./namespaces.js";
 export { DEFAULT_ALLOWED_TAGS, DEFAULT_ALLOWED_ATTRIBUTES } from "./config.js";
 export { ActionView } from "./rails-html-sanitizer.js";
+export { Crass } from "./crass.js";

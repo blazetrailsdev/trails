@@ -242,16 +242,4 @@ describe("report-key-reads", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
       ),
     ).toContain("encoders:identity,get");
   });
-
-  it("a module's initialize hook is read as [initialize]", () => {
-    const out = tsKeyReads(
-      `const initialize = Symbol();
-       class Shell { static [initialize](config: { shell?: unknown }) { return config.shell; } }
-       mod[initialize] = function* (config: { invocations?: unknown }) { return config.invocations; };`,
-    );
-    expect(out.get("[initialize]")!.map((b) => [...b.reads.keys()])).toEqual([
-      ["config"],
-      ["config"],
-    ]);
-  });
 });

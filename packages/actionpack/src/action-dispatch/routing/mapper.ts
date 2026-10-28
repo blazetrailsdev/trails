@@ -34,7 +34,7 @@ import {
   hashAref,
   hashAset,
   include,
-  Module,
+  rbCallSuper,
   RFC2396_PARSER,
   rbFArray,
   rbInspect,
@@ -1649,23 +1649,14 @@ export class Mapper {
 
     app.routes().defineMountedHelper(name, scriptNamer);
 
-    extend(
-      app.routes(),
-      new Module((mod) => {
-        mod.defineMethod("isOptimizeRoutesGeneration", () => false);
-
-        mod.defineMethod(
-          "findScriptName",
-          function (this: RouteSet, options: Record<string, unknown>): string {
-            if ("scriptName" in options && isPresent(options.scriptName)) {
-              return mod.superMethod(this, "findScriptName")!(options) as string;
-            } else {
-              return scriptNamer(options);
-            }
-          },
-        );
-      }),
-    );
+    const findScriptName = function (this: RouteSet, options: Record<string, unknown>): string {
+      if ("scriptName" in options && isPresent(options.scriptName)) {
+        return rbCallSuper(this, findScriptName, options) as string;
+      } else {
+        return scriptNamer(options);
+      }
+    };
+    extend(app.routes(), { isOptimizeRoutesGeneration: () => false, findScriptName });
   }
 
   /**

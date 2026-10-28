@@ -1,23 +1,20 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
-import { GeneratorBase, type GeneratorOptions } from "../../base.js";
+import { GeneratorBase } from "../../base.js";
 import { EncryptionKeyFileGenerator } from "../encryption-key-file/encryption-key-file-generator.js";
 
-const MASTER_KEY_PATH = "config/master.key";
+const MASTER_KEY_PATH = new Pathname("config/master.key");
 
 export class MasterKeyGenerator extends GeneratorBase {
-  constructor(options: GeneratorOptions) {
-    super(options);
+  static {
+    this.methodAdded("addMasterKeyFile");
+    this.methodAdded("addMasterKeyFileSilently");
+    this.methodAdded("ignoreMasterKeyFile");
+    this.methodAdded("ignoreMasterKeyFileSilently");
   }
 
-  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
-    const generator = new MasterKeyGenerator(config);
-    generator.addMasterKeyFile();
-    generator.ignoreMasterKeyFile();
-    return generator.getCreatedFiles();
-  }
-
-  addMasterKeyFile(): void {
-    if (!this.fileExists(MASTER_KEY_PATH)) {
+  async addMasterKeyFile(): Promise<void> {
+    if (!MASTER_KEY_PATH.isExist()) {
       const key = EncryptedFile.generateKey();
 
       this.log(`Adding ${MASTER_KEY_PATH} to store the master encryption key: ${key}`);
@@ -29,26 +26,26 @@ export class MasterKeyGenerator extends GeneratorBase {
       );
 
       this.log("");
-      this.addMasterKeyFileSilently(key);
+      await this.addMasterKeyFileSilently(key);
       this.log("");
     }
   }
 
-  addMasterKeyFileSilently(key?: string): void {
-    if (this.fileExists(MASTER_KEY_PATH)) return;
-    this.keyFileGenerator().addKeyFileSilently(MASTER_KEY_PATH, key);
+  async addMasterKeyFileSilently(key?: string): Promise<void> {
+    if (MASTER_KEY_PATH.isExist()) return;
+    await this.keyFileGenerator().addKeyFileSilently(MASTER_KEY_PATH, key);
   }
 
-  ignoreMasterKeyFile(): void {
-    this.keyFileGenerator().ignoreKeyFile(MASTER_KEY_PATH, this.keyIgnore());
+  async ignoreMasterKeyFile(): Promise<void> {
+    await this.keyFileGenerator().ignoreKeyFile(MASTER_KEY_PATH, this.keyIgnore());
   }
 
-  ignoreMasterKeyFileSilently(): void {
-    this.keyFileGenerator().ignoreKeyFileSilently(MASTER_KEY_PATH, this.keyIgnore());
+  async ignoreMasterKeyFileSilently(): Promise<void> {
+    await this.keyFileGenerator().ignoreKeyFileSilently(MASTER_KEY_PATH, this.keyIgnore());
   }
 
   private keyFileGenerator(): EncryptionKeyFileGenerator {
-    return new EncryptionKeyFileGenerator({ cwd: this.cwd, output: this.output });
+    return new EncryptionKeyFileGenerator([], this.options);
   }
 
   private keyIgnore(): string {

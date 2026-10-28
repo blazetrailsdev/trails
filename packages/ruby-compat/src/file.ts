@@ -118,6 +118,19 @@ function toGid(g: number | null): number {
 }
 
 /**
+ * The keyword hash `rb_scan_open_args` scans off `File.open`'s arguments
+ * (`vendor/ruby/v3.3.11/io.c:8088`), as far as `rb_io_extract_modeenc` reads
+ * it: `mode:` (`io.c:6923`), `binmode:` (`io.c:6834`), `perm:` and
+ * `external_encoding:`.
+ */
+export interface FileOpenOpt {
+  mode?: string;
+  binmode?: boolean;
+  perm?: number;
+  externalEncoding?: Encoding | string;
+}
+
+/**
  * `File` (`vendor/ruby/v3.3.11/file.c:7354` `rb_cFile`), the sliver of it trails calls.
  *
  * Rails reaches the filesystem through this class — `File.exist?(key)` in
@@ -469,26 +482,32 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.open`
    * (`vendor/ruby/v3.3.11/io.c:8148`).
    */
-  static open(
-    fileName: string,
-    mode?: string,
-    opt?: { perm?: number; externalEncoding?: Encoding | string },
-  ): File;
-  static open<T>(fileName: string, mode: string | undefined, block: (file: File) => T): T;
+  static open(fileName: string, mode?: string | FileOpenOpt, opt?: FileOpenOpt): File;
   static open<T>(
     fileName: string,
-    mode: string | undefined,
-    opt: { perm?: number; externalEncoding?: Encoding | string },
+    mode: string | FileOpenOpt | undefined,
     block: (file: File) => T,
   ): T;
   static open<T>(
     fileName: string,
-    mode: string = "r",
-    blockOrOpt?: ((file: File) => T) | { perm?: number; externalEncoding?: Encoding | string },
+    mode: string | FileOpenOpt | undefined,
+    opt: FileOpenOpt,
+    block: (file: File) => T,
+  ): T;
+  static open<T>(
+    fileName: string,
+    mode: string | FileOpenOpt = "r",
+    blockOrOpt?: ((file: File) => T) | FileOpenOpt,
     optBlock?: (file: File) => T,
   ): T | File {
     const block = typeof blockOrOpt === "function" ? blockOrOpt : optBlock;
-    const opt = typeof blockOrOpt === "function" ? undefined : blockOrOpt;
+    let opt = typeof blockOrOpt === "function" ? undefined : blockOrOpt;
+    if (typeof mode === "object") {
+      opt = mode;
+      mode = opt.mode ?? "r";
+      if (opt.binmode === true)
+        mode = mode.replace(/^[^:]*/, (m) => (m.includes("b") ? m : `${m}b`));
+    }
     const colon = mode.indexOf(":");
     const estr = colon === -1 ? null : mode.slice(colon + 1);
     const vmode = colon === -1 ? mode : mode.slice(0, colon);

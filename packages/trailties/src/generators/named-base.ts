@@ -8,22 +8,22 @@ import {
 } from "@blazetrails/activesupport";
 
 import { ActiveRecord } from "@blazetrails/activerecord";
-import { GeneratorBase, type GeneratorOptions } from "./base.js";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { GeneratorBase, type GeneratorConfig } from "./base.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 
-export interface NamedBaseOptions extends GeneratorOptions {
-  name: string;
-  attributes?: string[];
-}
-
 export class NamedBase extends GeneratorBase {
-  name: string;
-  attributes: GeneratedAttribute[];
+  static {
+    this.argument("name", { type: "string" });
+  }
+
+  declare name: string;
+  declare attributes: GeneratedAttribute[];
   classPathParts!: string[];
   /** @internal */
-  fileName!: string;
+  protected _fileName!: string;
   /** @internal */
-  private _tableName?: string;
+  protected _tableName?: string;
   /** @internal */
   private _singularTableName?: string;
   /** @internal */
@@ -31,11 +31,10 @@ export class NamedBase extends GeneratorBase {
   /** @internal */
   private _fixtureFileName?: string;
 
-  constructor(options: NamedBaseOptions) {
-    super(options);
-    this.name = options.name;
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
     this.assignNamesBang(this.name);
-    this.attributes = (options.attributes ?? []).map((a) => GeneratedAttribute.parse(a));
+    if (rbObjRespondTo(this, "attributes")) this.parseAttributesBang();
   }
 
   singularName = (): string => this.fileName;
@@ -150,7 +149,12 @@ export class NamedBase extends GeneratorBase {
   assignNamesBang(name: string): void {
     this.classPathParts = name.includes("/") ? name.split("/") : name.split("::");
     this.classPathParts = this.classPathParts.map((p) => underscore(p));
-    this.fileName = this.classPathParts.pop()!;
+    this._fileName = this.classPathParts.pop()!;
+  }
+
+  /** @internal */
+  get fileName(): string {
+    return this._fileName;
   }
 
   regularClassPath(): string[] {
@@ -168,7 +172,14 @@ export class NamedBase extends GeneratorBase {
   }
 
   /** @internal */
-  private isPluralizeTableNames(): boolean {
+  private parseAttributesBang(): void {
+    this.attributes = ((this.attributes as unknown as string[] | null) ?? []).map((attr) =>
+      GeneratedAttribute.parse(attr),
+    );
+  }
+
+  /** @internal */
+  protected isPluralizeTableNames(): boolean {
     return ActiveRecord.Base == null || ActiveRecord.Base.pluralizeTableNames;
   }
 
@@ -185,6 +196,6 @@ export class NamedBase extends GeneratorBase {
       configurable: true,
       writable: true,
     });
-    this.commands().push("checkClassCollision");
+    this.methodAdded("checkClassCollision");
   }
 }

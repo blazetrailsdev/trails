@@ -1,8 +1,10 @@
 import type { HttpSocket } from "./http-adapter.js";
 import { ArgumentError } from "./argument-error.js";
 import { EOFError } from "./eof-error.js";
+import { Errno } from "./errno.js";
 import { IO } from "./io.js";
 import { IOError } from "./io-error.js";
+import { rbInspect, rbObjAsString } from "./object.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { getProcessAdapter } from "./process-adapter.js";
 
@@ -30,6 +32,9 @@ export class BasicSocket extends IO {
   private _readClosed = false;
   private _writeClosed = false;
   private _waiting: (() => void)[] = [];
+  private _peerGone = false;
+  private _hostError: Error | null = null;
+  private _writeWaiting: (() => void)[] = [];
 
   /** @noRailsEquivalent PERMANENT */
   constructor(socket: HttpSocket) {
@@ -52,14 +57,18 @@ export class BasicSocket extends IO {
       this._eof = true;
       this._wake();
     });
-    socket.on("error", () => {
+    socket.on("error", (error) => {
+      this._hostError = error;
       this._eof = true;
       this._wake();
     });
     socket.on("close", () => {
       this._eof = true;
       this._wake();
+      this._peerGone = true;
+      this._wakeWriters();
     });
+    socket.on("drain", () => this._wakeWriters());
   }
 
   /**
@@ -171,6 +180,86 @@ export class BasicSocket extends IO {
     return buffer.length;
   }
 
+  /**
+   * `IO#write_nonblock` (`vendor/ruby/v3.3.11/io.rb:120`, `io.c:3666`
+   * `io_write_nonblock`). A `buf` that is not a String is sent `to_s` first
+   * (`rb_obj_as_string`, `io.c:3671-3672`); then a non-boolean `exception`
+   * raises `ArgumentError` (`rb_bool_expected`, `io.c:3673`, `object.c:3320-3335`), and an
+   * empty `buf` answers 0 without regard to room, as a zero-length
+   * `write(2)` does (`io.c:3682-3699`). The socket's write queue below its high-water mark
+   * stands in for the kernel's send buffer: as many bytes as fit there are
+   * written and their count answered, which is short when `buf` does not
+   * fit (`io.rb:76-79`). With no room it raises `IO::EAGAINWaitWritable`
+   * ("write would block", `io.c:3693`), or answers `:wait_writable` under
+   * `exception: false` (`io.c:3690`). Once the peer has gone the write fails
+   * whatever `exception` says (`io.c:3696`), with the host's own error when
+   * the socket reported one — its `code` makes it `Errno::EPIPE` or
+   * `Errno::ECONNRESET` to a `rescue` — and otherwise `Errno::EPIPE`, what
+   * `write(2)` answers on a connection that has been closed.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  writeNonblock(
+    buf: unknown,
+    { exception = true }: { exception?: boolean } = {},
+  ): number | "wait_writable" {
+    const str: string | Uint8Array = rbObjAsString(buf);
+    if (exception !== true && exception !== false) {
+      throw new ArgumentError(`expected true or false as exception: ${rbInspect(exception)}`);
+    }
+    if (this._closed || this._writeClosed) throw new IOError("closed stream");
+    if (this._peerGone) throw this._hostError ?? new Errno.EPIPE();
+    const bytes = typeof str === "string" ? new TextEncoder().encode(str) : str;
+    if (bytes.length === 0) return 0;
+    const room = this._socket.writableHighWaterMark - this._socket.writableLength;
+    if (room <= 0) {
+      if (!exception) return "wait_writable";
+      throw new IO.EAGAINWaitWritable("write would block");
+    }
+    const written = Math.min(room, bytes.length);
+    this._socket.write(bytes.subarray(0, written));
+    return written;
+  }
+
+  /**
+   * `IO#wait_writable` (`vendor/ruby/v3.3.11/io.c:9766` `io_wait_writable`):
+   * resolves with the socket once a write would not block — at once while
+   * the write queue is below its high-water mark, otherwise when it drains
+   * or the peer goes, as `select(2)` reports a reset socket writable — or
+   * with `nil` once `timeout` seconds pass first (`io.c:9710-9716`). A
+   * closed write side raises `IOError` (`rb_io_check_writable`, `io.c:9771`),
+   * then a negative timeout `ArgumentError` (`rb_time_interval`,
+   * `io.c:1445-1446`, `time.c:2852`), both before any wait; a socket closed
+   * during the wait raises after it (`io.c:1451-1458`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async waitWritable(timeout: number | null = null): Promise<this | null> {
+    if (this._closed || this._writeClosed) throw new IOError("closed stream");
+    if (timeout !== null && timeout < 0)
+      throw new ArgumentError("time interval must not be negative");
+    const full = this._socket.writableLength >= this._socket.writableHighWaterMark;
+    if (full && !this._peerGone) {
+      const ready = await new Promise<boolean>((resolve) => {
+        const wake = (): void => {
+          if (timer !== null) clearTimeout(timer);
+          resolve(true);
+        };
+        const timer =
+          timeout === null
+            ? null
+            : setTimeout(() => {
+                this._writeWaiting.splice(this._writeWaiting.indexOf(wake), 1);
+                resolve(false);
+              }, timeout * 1000);
+        this._writeWaiting.push(wake);
+      });
+      if (this._closed) throw new IOError("closed stream");
+      if (!ready) return null;
+    }
+    return this;
+  }
+
   /** @noRailsEquivalent PERMANENT */
   override isClosed(): boolean {
     return this._closed;
@@ -238,6 +327,10 @@ export class BasicSocket extends IO {
       this._socket.resume();
     }
     return out;
+  }
+
+  private _wakeWriters(): void {
+    for (const wake of this._writeWaiting.splice(0)) wake();
   }
 
   private _wake(): void {

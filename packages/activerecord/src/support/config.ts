@@ -1,7 +1,7 @@
 /** @internal */
 
 import { getEnv } from "@blazetrails/activesupport";
-import { RUN_TOKEN_ENV, slotDatabaseName } from "./run-token.js";
+import { RUN_TOKEN_ENV, runDatabasePrefix } from "./run-token.js";
 
 export type TestAdapterName = "sqlite" | "postgres" | "mysql";
 
@@ -58,7 +58,7 @@ function applySlot(database: string, read: EnvReader): string {
   const slot = slotNumber(read);
   const runToken = present(read, RUN_TOKEN_ENV);
   if (runToken === undefined) return slot > 1 ? `${database}_${slot}` : database;
-  return slotDatabaseName(database, runToken, slot);
+  return `${runDatabasePrefix(database, runToken)}${slot}`;
 }
 
 export function ownsSlotDatabase(read: EnvReader = getEnv): boolean {

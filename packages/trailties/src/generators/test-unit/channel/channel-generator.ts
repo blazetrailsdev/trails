@@ -1,22 +1,17 @@
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import { NamedBase } from "../../named-base.js";
 import { TEMPLATES } from "./templates.js";
 
 export class ChannelGenerator extends NamedBase {
   static {
     this.checkClassCollision({ suffix: "ChannelTest" });
-    this.commands().push("createTestFiles");
+    this.methodAdded("createTestFiles");
   }
 
-  constructor(options: NamedBaseOptions) {
-    super(options);
-    this.fileName = this.fileName.replace(/_channel$/i, "");
-  }
-
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions */
-  createTestFiles(): void {
-    this.createFile(
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  async createTestFiles(): Promise<void> {
+    await this.createFile(
       File.join(
         "test/channels",
         ...this.classPathParts,
@@ -24,6 +19,13 @@ export class ChannelGenerator extends NamedBase {
       ),
       TEMPLATES.channel_test.call(this, this.ext()),
     );
+  }
+
+  /** @internal */
+  private __fileName?: string;
+
+  override get fileName(): string {
+    return (this.__fileName ??= super.fileName.replace(/_channel$/i, ""));
   }
 }
 

@@ -97,6 +97,7 @@ import {
   applyTokenRenames,
   rubyFileToTs,
   overriddenRubyFiles,
+  hasRubyFileTsOverride,
   rubyMethodToTs,
   rubyMethodToTsIgnoringSkip,
   scopedSkipMirrorName,
@@ -1229,12 +1230,18 @@ export function countTsInternalNames(
   const isInternal = (m: MethodInfo): boolean =>
     m.internal === true && m.declaredIn === undefined && !m.name.startsWith("_");
   const functionNames = new Set((fileFunctions ?? []).map((fn) => fn.name));
+  const fileFunctionKey = (m: MethodInfo): string => `${m.name}:${m.line}:${m.isStatic === true}`;
+  const fileFunctionEntries = new Set((fileFunctions ?? []).map(fileFunctionKey));
   const isOwnMember = (m: MethodInfo): boolean =>
     isInternal(m) && !(m.bodyless === true && functionNames.has(m.name));
   let count = internalConstants.filter((n) => !n.startsWith("_")).length;
   for (const c of [...classes, ...modules]) {
     if (c.file !== file) continue;
-    count += [...c.instanceMethods, ...c.classMethods].filter(isOwnMember).length;
+    count += [...c.instanceMethods, ...c.classMethods].filter(
+      (m) =>
+        isOwnMember(m) &&
+        !(c.synthesizedFileModule === true && fileFunctionEntries.has(fileFunctionKey(m))),
+    ).length;
   }
   return count + (fileFunctions ?? []).filter(isInternal).length;
 }
@@ -1513,9 +1520,6 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  * which is also how the symbol import resolves at every site in the repo,
  * since the binding is imported under that bare name.
  *
- * `[initialize]` is the third: a MODULE's `def initialize`, reached through the
- * includer's `super` (`initializeIncludedModules`), credited off the manifest.
- *
  * The string-named `included` / `extended` / `inherited` methods are a
  * different thing and stay drift: `SKIP_GROUPS` in `scripts/parity/conventions.ts`
  * marks them `tsMirrorIsDrift`, and a bracketed name never collides with a
@@ -1524,7 +1528,6 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
 export const CONCERN_HOOK_MEMBERS = {
   included: "[included]",
   extended: "[extended]",
-  initialize: "[initialize]",
 } as const;
 
 /** `included do ... end` — activemodel/lib/active_model/api.rb:65. */
@@ -1552,15 +1555,6 @@ export function concernHookNames(rubySource: string): Set<string> {
   }
   if (SELF_EXTENDED_RE.test(rubySource)) names.add(CONCERN_HOOK_MEMBERS.extended);
   return names;
-}
-
-/** The `.rb` files in which a MODULE defines `initialize` (type/serialize_cast_value.rb:41-44). */
-export function moduleInitializeFiles(pkg: PackageInfo): Set<string> {
-  const files = new Set<string>();
-  for (const mod of Object.values(pkg.modules)) {
-    if (mod.file && mod.instanceMethods.some((m) => m.name === "initialize")) files.add(mod.file);
-  }
-  return files;
 }
 
 /** Key into the `concernHooks` map: one entry per (package, Ruby file). */
@@ -1595,7 +1589,6 @@ export async function loadConcernHooks(
     if (filterPkg !== null && pkg !== filterPkg) continue;
     const libDir = libPaths[pkg];
     if (libDir === undefined) continue;
-    const initializeFiles = moduleInitializeFiles(rubyPkg);
     for (const rubyFile of rubyFilesOf(rubyPkg)) {
       let source: string | undefined;
       for (const dir of [libDir, ...(extraPaths[pkg] ?? [])]) {
@@ -1608,7 +1601,6 @@ export async function loadConcernHooks(
       }
       if (source === undefined) continue;
       const names = concernHookNames(source);
-      if (initializeFiles.has(rubyFile)) names.add(CONCERN_HOOK_MEMBERS.initialize);
       if (names.size > 0) hooks.set(concernHookKey(pkg, rubyFile), names);
     }
   }
@@ -2247,7 +2239,6 @@ export function inlinedModuleMembers(
         if (m.name === "initialize" && hostDefinesInitialize) continue;
         const sameFileOwners = definedByRubyFile.get(host.file)?.get(m.name);
         if (sameFileOwners !== undefined && [...sameFileOwners].some((o) => o !== host)) continue;
-        if (m.name === "initialize" && moduleBodies?.has(CONCERN_HOOK_MEMBERS.initialize)) continue;
         if (m.name === "initialize" && taggedByTsFile.get(hostTs)?.has(fqn) === true) continue;
         if (
           (m.calls ?? []).includes("super") &&
@@ -2531,6 +2522,12 @@ function buildPackageReport(
 
   const rubyFileByTsFile = new Map<string, string>();
   for (const rf of rubyFileNames) rubyFileByTsFile.set(rubyFileToTs(rf, pkg), rf);
+  const rubyFileByPathMirror = new Map<string, string>();
+  for (const rf of rubyFileNames) {
+    if (!hasRubyFileTsOverride(rf, pkg)) rubyFileByPathMirror.set(rubyFileToTs(rf, pkg, false), rf);
+  }
+  const foldsOntoPathMirror = (rubyFile: string, tsFile: string): boolean =>
+    hasRubyFileTsOverride(rubyFile, pkg) && rubyFileByPathMirror.has(tsFile);
 
   const rubyModuleConstants = new Set<string>();
   for (const fqn of Object.keys(rubyPkg.modules)) {
@@ -2608,9 +2605,11 @@ function buildPackageReport(
     const fileConsts = Object.keys(tsFileConstants[expectedTs] ?? {}).filter(
       (n) => !internalConsts.has(n),
     );
-    result.totalInternal += countTsInternalNames(expectedTs, classes, modules, fileFns, [
-      ...internalConsts,
-    ]);
+    if (!(rubyFile !== null && foldsOntoPathMirror(rubyFile, expectedTs))) {
+      result.totalInternal += countTsInternalNames(expectedTs, classes, modules, fileFns, [
+        ...internalConsts,
+      ]);
+    }
     if (classes.length === 0 && modules.length === 0 && !fileFns && fileConsts.length === 0)
       continue;
 
@@ -2698,6 +2697,12 @@ function buildPackageReport(
 
     if (rubyFile !== null) {
       for (const hook of concernHooks.get(concernHookKey(pkg, rubyFile)) ?? []) allowed.add(hook);
+    }
+
+    if (rubyFile !== null && foldsOntoPathMirror(rubyFile, expectedTs)) {
+      for (const name of allowedNamesForRubyFile(rubyFileByPathMirror.get(expectedTs)!)) {
+        allowed.add(name);
+      }
     }
 
     // `compare_range.rb` declares `CompareWithRange`: the container synthesized

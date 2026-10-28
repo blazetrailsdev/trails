@@ -15,12 +15,12 @@ import {
 } from "@blazetrails/rack";
 import { Base } from "../../action-controller/base.js";
 import { FEATURE_POLICY } from "../constants.js";
-import { controllerConstants } from "../http/request.js";
 import type { MiddlewareFactory } from "../middleware/stack.js";
 import { Middleware, PermissionsPolicy } from "../http/permissions-policy.js";
 import { RouteSet } from "../routing/route-set.js";
 import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
+import { registerController } from "../../action-controller/base.js";
 
 describe("PermissionsPolicyTest", () => {
   it("mappings", () => {
@@ -149,7 +149,7 @@ describe("PermissionsPolicyIntegrationTest", () => {
       this.head("ok");
     }
   }
-  controllerConstants.set("permissions_policy_integration_test/policy", PolicyController);
+  registerController("PermissionsPolicyIntegrationTest::PolicyController", PolicyController);
 
   const ROUTES = new RouteSet();
   ROUTES.draw(function () {
@@ -275,8 +275,8 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
     middleware.use(Lint as MiddlewareFactory);
   });
 
-  controllerConstants.set(
-    "permissions_policy_with_helpers_integration_test/policy",
+  registerController(
+    "PermissionsPolicyWithHelpersIntegrationTest::PolicyController",
     PolicyController,
   );
 

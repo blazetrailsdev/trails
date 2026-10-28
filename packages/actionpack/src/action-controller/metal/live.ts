@@ -16,13 +16,13 @@ import {
   ThreadError,
   excBacktrace,
   isSymbol,
+  rbCallSuper,
   rbObjClassname,
   rbObjRespondTo,
   stringDelete,
   toEnum,
   toS,
 } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/ruby-compat/include";
 import { Concern, IsolatedExecutionState, Notifications, extend } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
 import { Base } from "../base.js";
@@ -230,7 +230,7 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
     IsolatedExecutionState.shareWith(t1);
 
     try {
-      await Live.superMethod(this, "process")!(name);
+      await rbCallSuper(this, process, name);
     } catch (e) {
       const resp = this.response;
       if (resp.committed) {
@@ -263,7 +263,7 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
 }
 
 export function responseBody(this: LiveControllerHost, body: unknown): void {
-  Live.superMethod(this, "responseBody=")!(body);
+  rbCallSuper(this, responseBody, body);
   if (this.response) this.response.close();
 }
 
@@ -332,7 +332,7 @@ export function liveThreadPoolExecutor(): CachedThreadPool {
 
 export function makeResponseBang(this: object, request: Request): DispatchResponse {
   if ((request.getHeader("SERVER_PROTOCOL") ?? request.getHeader("HTTP_VERSION")) === "HTTP/1.0") {
-    return ClassMethods.superMethod(this, "makeResponseBang")!(request) as DispatchResponse;
+    return rbCallSuper(this, makeResponseBang, request) as DispatchResponse;
   } else {
     const res = new Response();
     res.request = request;
@@ -340,9 +340,7 @@ export function makeResponseBang(this: object, request: Request): DispatchRespon
   }
 }
 
-export const ClassMethods: Module = new Module((mod) => {
-  mod.defineMethod("makeResponseBang", makeResponseBang);
-});
+export const ClassMethods = { makeResponseBang };
 
 /** @internal */
 export function logError(this: LiveControllerHost, exception: Error): void {
@@ -361,22 +359,22 @@ export function logError(this: LiveControllerHost, exception: Error): void {
   });
 }
 
-export const Live = new Module((mod) => {
-  extend(mod, Concern);
+function _responseBodyReader(this: LiveControllerHost): unknown {
+  return rbCallSuper(this, _responseBodyReader);
+}
 
-  mod.defineMethod("process", process);
-  mod.moduleEval((m) => {
-    Object.defineProperty(m, "responseBody", {
-      configurable: true,
-      get(this: LiveControllerHost) {
-        return mod.superMethod(this, "responseBody")!();
-      },
-      set: responseBody,
-    });
-  });
-  mod.defineMethod("sendStream", sendStream);
-  mod.defineMethod("newControllerThread", newControllerThread);
-  mod.defineMethod("cleanUpThreadLocals", cleanUpThreadLocals);
-  mod.defineMethod("logError", logError);
-}) as Module & { ClassMethods: Module };
-Live.ClassMethods = ClassMethods;
+export const Live = {
+  ClassMethods,
+  process,
+  sendStream,
+  newControllerThread,
+  cleanUpThreadLocals,
+  logError,
+};
+Object.defineProperty(Live, "responseBody", {
+  configurable: true,
+  enumerable: true,
+  get: _responseBodyReader,
+  set: responseBody,
+});
+extend(Live, Concern);

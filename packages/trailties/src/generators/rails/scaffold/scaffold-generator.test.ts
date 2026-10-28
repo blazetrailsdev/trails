@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -40,6 +41,9 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
+  vi.spyOn(stdout, "write").mockImplementation(
+    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
+  );
   setupRoutes();
 });
 
@@ -55,8 +59,7 @@ function listFiles(root: string): string[] {
 
 async function runGenerator(name: string, attributes: string[] = [], config: object = {}) {
   await ScaffoldGenerator.start([name, ...attributes], {
-    cwd: tmpDir,
-    output: (m) => lines.push(m),
+    destinationRoot: tmpDir,
     ...config,
   });
   return listFiles(tmpDir);
@@ -258,7 +261,6 @@ describe("ScaffoldGeneratorTest", () => {
 
 describe("ScaffoldGeneratorTest (JavaScript project)", () => {
   let jsTmpDir: string;
-  let jsLines: string[];
 
   beforeEach(() => {
     jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
@@ -267,7 +269,6 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
       path.join(jsTmpDir, "config/routes.ts"),
       "Trails.application!.routes().draw(function () {\n});\n",
     );
-    jsLines = [];
   });
 
   afterEach(() => {
@@ -276,8 +277,7 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
 
   it("generates .js controller and model files", async () => {
     await ScaffoldGenerator.start(["Post", "title:string"], {
-      cwd: jsTmpDir,
-      output: (m) => jsLines.push(m),
+      destinationRoot: jsTmpDir,
     });
     const files = listFiles(jsTmpDir);
     expect(fs.existsSync(path.join(jsTmpDir, "app/controllers/posts-controller.js"))).toBe(true);
@@ -288,8 +288,7 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
 
   it("omits TypeScript annotations in controller", async () => {
     await ScaffoldGenerator.start(["Post", "title:string"], {
-      cwd: jsTmpDir,
-      output: (m) => jsLines.push(m),
+      destinationRoot: jsTmpDir,
     });
     const content = fs.readFileSync(
       path.join(jsTmpDir, "app/controllers/posts-controller.js"),

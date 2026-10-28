@@ -1,3 +1,4 @@
+import { capture } from "@blazetrails/activesupport";
 import { Hash } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
@@ -57,25 +58,31 @@ beforeEach(() => {
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
-function run(to: string, opts: { appName?: string; output?: (m: string) => void } = {}) {
-  return new ChangeGenerator({
-    cwd: tmpDir,
-    output: opts.output ?? (() => {}),
-    to,
-    appName: opts.appName ?? "tmp",
-  }).run();
+function invokeAll(generator: ChangeGenerator): void {
+  generator.editDatabaseConfig();
+  generator.editPackageJson();
+  generator.editDockerfile();
+  generator.editDevcontainerFiles();
+}
+
+function run(to: string, opts: { appName?: string } = {}) {
+  invokeAll(
+    new ChangeGenerator([], { to, appName: opts.appName ?? "tmp" }, { destinationRoot: tmpDir }),
+  );
 }
 
 type ComposeConfig = Hash<string, Hash<string, Hash<string, string[]>>>;
 describe("ChangeGeneratorTest", () => {
   it("change to invalid database", () => {
-    expect(() => new ChangeGenerator({ cwd: tmpDir, output: () => {}, to: "invalid-db" })).toThrow(
+    expect(
+      () => new ChangeGenerator([], { to: "invalid-db" }, { destinationRoot: tmpDir }),
+    ).toThrow(
       /Invalid value for --to option\. Supported preconfigurations are: mysql, postgresql, sqlite3, mariadb-mysql\./,
     );
   });
 
   it("appName defaults to basename of cwd", () => {
-    new ChangeGenerator({ cwd: tmpDir, output: () => {}, to: "postgresql" }).run();
+    invokeAll(new ChangeGenerator([], { to: "postgresql" }, { destinationRoot: tmpDir }));
     expect(read("config/database.ts")).toContain(
       `database: "${path.basename(tmpDir)}_development"`,
     );
@@ -164,12 +171,11 @@ describe("ChangeGeneratorTest", () => {
     expect(read("Dockerfile")).toBe("RUN apt-get install -y build-essential gitlab-cli\n");
   });
 
-  it("editDockerfile is a no-op when no DB package lines match", () => {
+  it("editDockerfile is a no-op when no DB package lines match", async () => {
     write("Dockerfile", "FROM node:22-slim\nRUN echo hello\n");
-    const calls: string[] = [];
-    run("mysql", { output: (m) => calls.push(m) });
+    const output = await capture("stdout", () => run("mysql"));
     expect(read("Dockerfile")).toBe("FROM node:22-slim\nRUN echo hello\n");
-    expect(calls.some((m) => m.includes("Dockerfile"))).toBe(false);
+    expect(output).not.toContain("Dockerfile");
   });
 
   describe("editDevcontainerFiles", () => {

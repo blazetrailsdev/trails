@@ -6,7 +6,7 @@ import { ResourceRouteGenerator } from "./resource-route-generator.js";
 
 let tmpDir: string;
 const mk = (name: string, actions?: string[]): ResourceRouteGenerator =>
-  new ResourceRouteGenerator({ cwd: tmpDir, output: () => {}, name, actions } as never);
+  new ResourceRouteGenerator([name], { actions }, { destinationRoot: tmpDir });
 const read = (): string => fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf-8");
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-route-"));

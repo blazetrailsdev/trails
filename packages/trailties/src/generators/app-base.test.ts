@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 
 class T extends AppBase {}
-const build = (o: Partial<AppBaseOptions> = {}) =>
-  new T({ cwd: "/work", output: () => {}, appPath: "blog", ...o });
+const build = ({ appPath = "blog", ...o }: Partial<AppBaseOptions> = {}) =>
+  new T([appPath], o, { destinationRoot: "/work" });
 
 describe("AppBase", () => {
   it("defaults: sqlite3, keeps, system tests, destinationRoot joins cwd+appPath", () => {
@@ -13,7 +13,6 @@ describe("AppBase", () => {
     expect(g.keeps()).toBe(true);
     expect(g.dependsOnSystemTest()).toBe(true);
     expect(g.destinationRoot).toBe("/work/blog");
-    expect(g.cwd).toBe("/work/blog");
     expect(build({ appPath: "/abs/blog" }).destinationRoot).toBe("/abs/blog");
   });
 

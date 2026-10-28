@@ -191,15 +191,20 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
       log("No migrations found in db/migrate/.");
       return;
     }
-    // Migration output goes to stdout (Rails' Migration#write is `puts`), and
-    // the browser has no process — so the shim's stdout is pointed at this
-    // CLI's output buffer for the duration of the run. Any adapter the host
-    // already registered (e.g. the Node one under test) is restored after.
+    await withStdout(() => fn(migrationContext));
+  }
+
+  // Migration and generator output goes to stdout (Rails' Migration#write is
+  // `puts`, Thor's shell writes to $stdout), and the browser has no process, so
+  // the shim's stdout is pointed at this CLI's output buffer for the duration of
+  // the run. Any adapter the host already registered (e.g. the Node one under
+  // test) is restored after.
+  async function withStdout(fn: () => Promise<unknown>): Promise<void> {
     const prevAdapter = processAdapterConfig.adapter === null ? null : getProcessAdapter();
     registerProcessAdapter(browserProcessAdapter);
     stdoutSink = (chunk) => log(chunk.replace(/\n$/, ""));
     try {
-      await fn(migrationContext);
+      await fn();
     } finally {
       stdoutSink = () => {};
       if (prevAdapter) registerProcessAdapter(prevAdapter);
@@ -219,8 +224,8 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
         dropUserTables(adapter, deps.getTables);
         deps.clearMigrations();
 
-        const gen = new VfsAppGenerator({ vfs, output: log, appPath: name, database: "sqlite" });
-        await gen.run();
+        const gen = new VfsAppGenerator({ vfs, appPath: name, database: "sqlite" });
+        await withStdout(() => gen.run());
       },
 
       generate: async (args) => {
@@ -235,13 +240,15 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
         }
 
         if (type === "model") {
-          const gen = new VfsModelGenerator({ vfs, output: log, name, attributes: columnArgs });
-          await gen.createMigrationFile();
-          gen.createModelFile();
-          gen.createModuleFile();
+          const gen = new VfsModelGenerator({ vfs, name, attributes: columnArgs });
+          await withStdout(async () => {
+            await gen.createMigrationFile();
+            await gen.createModelFile();
+            await gen.createModuleFile();
+          });
         } else if (type === "migration") {
-          const gen = new VfsMigrationGenerator({ vfs, output: log });
-          await gen.run(name, columnArgs);
+          const gen = new VfsMigrationGenerator({ vfs });
+          await withStdout(() => gen.run(name, columnArgs));
         } else {
           throw new Error(`Unknown generator: ${type}. Available: model, migration`);
         }

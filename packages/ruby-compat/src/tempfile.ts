@@ -26,6 +26,7 @@ export type TempfileBasename = string | [string, string];
  */
 export interface TempfileOptions {
   encoding?: Encoding | string;
+  binmode?: boolean;
 }
 
 /**
@@ -66,7 +67,7 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
    */
   static new(
     basename: TempfileBasename = "",
-    tmpdir?: string,
+    tmpdir?: string | null,
     options: TempfileOptions = {},
   ): Tempfile {
     return new Tempfile(openExclusive(basename, tmpdir, options), options);
@@ -300,12 +301,12 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
  */
 function openExclusive(
   basename: TempfileBasename = "",
-  tmpdir?: string,
+  tmpdir?: string | null,
   options: TempfileOptions = {},
 ): File {
   let tmpfile: File | null = null;
   createTmpname(basename, tmpdir, {}, (path) => {
-    tmpfile = File.open(path, "wx+", { perm: 0o600 });
+    tmpfile = File.open(path, { mode: "wx+", perm: 0o600, binmode: options.binmode });
     if (options.encoding != null) tmpfile.setEncoding(options.encoding);
   });
   return tmpfile!;

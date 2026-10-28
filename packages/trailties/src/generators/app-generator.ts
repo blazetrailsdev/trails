@@ -2,6 +2,7 @@ import { File } from "@blazetrails/ruby-compat";
 import { TopLevel, camelize, parameterize, titleize, underscore } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
+import type { GeneratorConfig } from "./base.js";
 import { Trails } from "../rails.js";
 import { GeneratorError } from "./generated-attribute.js";
 import { type DatabaseName } from "./database.js";
@@ -50,12 +51,12 @@ export class ActionMethods {
   }
 
   /** @internal */
-  protected template(source: string, destination: string): void {
-    this.generator["template"](source, destination);
+  protected async template(source: string, destination: string): Promise<void> {
+    await this.generator["template"](source, destination);
   }
 
   /** @internal */
-  protected emptyDirectory(destination: string, config: { verbose?: boolean } = {}): string {
+  protected emptyDirectory(destination: string, config: { verbose?: boolean } = {}): unknown {
     return this.generator["emptyDirectory"](destination, config);
   }
 
@@ -63,12 +64,12 @@ export class ActionMethods {
   protected emptyDirectoryWithKeepFile(
     destination: string,
     config: { verbose?: boolean } = {},
-  ): string | null {
+  ): Promise<unknown> {
     return this.generator["emptyDirectoryWithKeepFile"](destination, config);
   }
 
   /** @internal */
-  protected createFile(relativePath: string, content: string): string {
+  protected createFile(relativePath: string, content: string): unknown {
     return this.generator["createFile"](relativePath, content);
   }
 
@@ -82,10 +83,10 @@ export class ActionMethods {
 Trails.ActionMethods = ActionMethods;
 
 export class AppBuilder extends ActionMethods {
-  cifiles(): void {
-    this.emptyDirectory(".github/workflows");
-    this.template("github/ci.yml", ".github/workflows/ci.yml");
-    this.template("github/dependabot.yml", ".github/dependabot.yml");
+  async cifiles(): Promise<void> {
+    await this.emptyDirectory(".github/workflows");
+    await this.template("github/ci.yml", ".github/workflows/ci.yml");
+    await this.template("github/dependabot.yml", ".github/dependabot.yml");
   }
 }
 
@@ -94,13 +95,34 @@ export class AppGenerator extends AppBase {
   private _configTargetVersion: string | null = null;
   readonly sqliteDriver: SqliteDriver;
 
-  constructor(options: AppGeneratorOptions) {
-    const database = options.database
-      ? (DB_ALIAS[options.database] ?? options.database)
-      : undefined;
-    super({ ...options, appPath: options.appPath ?? options.cwd, database });
-    this.packageManager = options.packageManager ?? "pnpm";
-    this.sqliteDriver = options.sqliteDriver ?? "better-sqlite3";
+  static {
+    this.methodAdded("createRoot");
+    this.methodAdded("createRootFiles");
+    this.methodAdded("createAppFiles");
+    this.methodAdded("createBinFiles");
+    this.methodAdded("createDockerfiles");
+    this.methodAdded("createEslintFile");
+    this.methodAdded("createCifiles");
+    this.methodAdded("createConfigFiles");
+    this.methodAdded("createDbFiles");
+    this.methodAdded("createLibFiles");
+    this.methodAdded("createLogFiles");
+    this.methodAdded("createPublicFiles");
+    this.methodAdded("createTmpFiles");
+    this.methodAdded("createVendorFiles");
+    this.methodAdded("createTestFiles");
+    this.methodAdded("createSystemTestFiles");
+    this.methodAdded("createStorageFiles");
+  }
+
+  declare options: AppGeneratorOptions & AppBaseOptions;
+
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
+    if (this.options.database)
+      this.options.database = DB_ALIAS[this.options.database] ?? this.options.database;
+    this.packageManager = this.options.packageManager ?? "pnpm";
+    this.sqliteDriver = this.options.sqliteDriver ?? "better-sqlite3";
     if (!VALID_PACKAGE_MANAGERS.includes(this.packageManager)) {
       throw new GeneratorError(
         `Unknown package manager '${this.packageManager}'. Valid options: ${VALID_PACKAGE_MANAGERS.join(", ")}`,
@@ -159,32 +181,12 @@ export class AppGenerator extends AppBase {
         : "package-lock.json";
   }
 
-  async run(): Promise<string[]> {
+  async createRoot(): Promise<void> {
     this.isValidConst();
     const name = File.basename(this.appPath);
 
-    this.output(`Creating new trails application: ${name}`);
-    this.output("");
-
-    this.createRootFiles(name);
-    this.createBinFiles();
-    this.createConfigFiles(name);
-    this.createAppFiles(name);
-    this.createDbFiles();
-    this.createTestFiles();
-    if (this.dependsOnSystemTest()) this.systemTest();
-    this.createPublicFiles();
-    this.createDirectoryPlaceholders();
-
-    if (!this.options.skipDocker) {
-      this.createDockerFiles();
-    }
-    this.createEslintFile();
-    this.createCifiles();
-
-    this.output("");
-
-    return this.getCreatedFiles();
+    this.say(`Creating new trails application: ${name}`);
+    this.say("");
   }
 
   private railsGemfileEntries(names: string[]): Record<string, string> {
@@ -193,7 +195,8 @@ export class AppGenerator extends AppBase {
     );
   }
 
-  private createRootFiles(name: string): void {
+  async createRootFiles(): Promise<void> {
+    const name = File.basename(this.appPath);
     const dep = this.database.pkgDependency;
     const dbDep =
       this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3"
@@ -201,7 +204,7 @@ export class AppGenerator extends AppBase {
           ? { "expo-sqlite": "^15.0.0" }
           : {}
         : { [dep.name]: dep.version };
-    this.createFile(
+    await this.createFile(
       "package.json",
       JSON.stringify(
         {
@@ -269,7 +272,7 @@ export class AppGenerator extends AppBase {
 
     if (this.options.dev && this.packageManager === "pnpm") {
       const overrides = this.railsGemfileEntries(Object.keys(this.railsDevPackages()));
-      this.createFile(
+      await this.createFile(
         "pnpm-workspace.yaml",
         [
           "overrides:",
@@ -284,7 +287,7 @@ export class AppGenerator extends AppBase {
       );
     }
 
-    this.createFile(
+    await this.createFile(
       "tsconfig.json",
       JSON.stringify(
         {
@@ -318,7 +321,7 @@ export class AppGenerator extends AppBase {
       ) + "\n",
     );
 
-    this.createFile(
+    await this.createFile(
       ".gitignore",
       `/node_modules/
 /dist/
@@ -344,7 +347,7 @@ export class AppGenerator extends AppBase {
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       ".gitattributes",
       `# Mark the database schema as having been generated.
 db/schema.ts linguist-generated
@@ -353,9 +356,9 @@ db/schema.ts linguist-generated
 `,
     );
 
-    this.createFile(".node-version", "24.16.0\n");
+    await this.createFile(".node-version", "24.16.0\n");
 
-    this.createFile(
+    await this.createFile(
       "README.md",
       `# ${name}
 
@@ -402,7 +405,7 @@ built module raises \`LoadError\`.
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "config.ts",
       `// This file is used by Rack-based servers to start the application.
 import { Trails } from "@blazetrails/trailties";
@@ -415,7 +418,7 @@ await Trails.application.loadServer();
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "vite.config.ts",
       `/// <reference types="vitest/config" />
 import { fileURLToPath } from "node:url";
@@ -472,10 +475,10 @@ ${
     );
   }
 
-  private createBinFiles(): void {
+  async createBinFiles(): Promise<void> {
     const excludePattern = [this.skip("Eslint") ? /eslint/ : null].filter((p) => p != null);
 
-    this.createFile(
+    await this.createFile(
       "bin/trails",
       `#!/usr/bin/env node
 import { join } from "node:path";
@@ -484,11 +487,11 @@ import { setAppPath } from "@blazetrails/trailties/app-path";
 setAppPath(join(import.meta.dirname, "../config/application.ts"));
 await import("@blazetrails/trailties/commands");
 `,
-      { mode: 0o755 },
+      { perm: 0o755 },
     );
 
     if (!excludePattern.some((p) => p.test("bin/eslint"))) {
-      this.createFile(
+      await this.createFile(
         "bin/eslint",
         `#!/usr/bin/env node
 import { spawnSync } from "node:child_process";
@@ -504,11 +507,11 @@ const { status } = spawnSync(
 );
 process.exit(status ?? 1);
 `,
-        { mode: 0o755 },
+        { perm: 0o755 },
       );
     }
 
-    this.createFile(
+    await this.createFile(
       "bin/setup",
       `#!/usr/bin/env node
 import { execSync } from "node:child_process";
@@ -534,10 +537,10 @@ mkdirSync("tmp/pids", { recursive: true });
 
 console.log("\\n== Done! ==");
 `,
-      { mode: 0o755 },
+      { perm: 0o755 },
     );
 
-    this.createFile(
+    await this.createFile(
       "bin/dev",
       `#!/usr/bin/env node
 import { spawnSync } from "node:child_process";
@@ -551,7 +554,7 @@ const { status } = spawnSync(
 );
 process.exit(status ?? 1);
 `,
-      { mode: 0o755 },
+      { perm: 0o755 },
     );
   }
 
@@ -559,8 +562,9 @@ process.exit(status ?? 1);
     return this._configTargetVersion ?? LOAD_DEFAULTS_VERSION;
   }
 
-  private createConfigFiles(name: string): void {
-    this.createFile(
+  async createConfigFiles(): Promise<void> {
+    const name = File.basename(this.appPath);
+    await this.createFile(
       "config/application.ts",
       `import { Application } from "@blazetrails/trailties";
 
@@ -592,7 +596,7 @@ declare module "@blazetrails/trailties" {
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "config/environment.ts",
       `import { Trails } from "@blazetrails/trailties";
 
@@ -604,7 +608,7 @@ export default await Trails.initialize();
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "config/routes.ts",
       `import { Trails } from "@blazetrails/trailties";
 
@@ -623,10 +627,10 @@ Trails.application.routes().draw(function () {
 `,
     );
 
-    this.databaseYml();
+    await this.databaseYml();
 
     if (!this.skip("ActionCable")) {
-      this.createFile(
+      await this.createFile(
         "config/cable.ts",
         `export default {
   development: {
@@ -645,7 +649,7 @@ Trails.application.routes().draw(function () {
     }
 
     if (!this.skip("ActiveStorage")) {
-      this.createFile(
+      await this.createFile(
         "config/storage.ts",
         `export default {
   local: {
@@ -661,7 +665,7 @@ Trails.application.routes().draw(function () {
       );
     }
 
-    this.createFile(
+    await this.createFile(
       "config/environments/development.ts",
       `import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -769,7 +773,7 @@ ${
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "config/environments/test.ts",
       `// The test environment is used exclusively to run your application's
 // test suite. You never need to work with it otherwise. Remember that
@@ -838,7 +842,7 @@ ${
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "config/environments/production.ts",
       `import { TaggedLogging } from "@blazetrails/activesupport";
 import { Trails } from "@blazetrails/trailties";
@@ -950,7 +954,7 @@ ${
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "config/initializers/content-security-policy.ts",
       `// Define an application-wide content security policy.
 // See the Securing Trails Guide for more information:
@@ -967,7 +971,7 @@ ${
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "config/initializers/filter-parameter-logging.ts",
       `// Be sure to restart your server when you modify this file.
 
@@ -982,7 +986,7 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "config/initializers/inflections.ts",
       `// Add new inflection rules using the following format:
 //
@@ -997,7 +1001,7 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "config/initializers/permissions-policy.ts",
       `// Define an application-wide HTTP permissions policy.
 //
@@ -1012,7 +1016,7 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "config/locales/en.json",
       JSON.stringify(
         {
@@ -1026,8 +1030,9 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     );
   }
 
-  private createAppFiles(name: string): void {
-    this.createFile(
+  async createAppFiles(): Promise<void> {
+    const name = File.basename(this.appPath);
+    await this.createFile(
       "app/controllers/application-controller.ts",
       tsModule({
         imports: [{ from: "@blazetrails/actionpack", named: { ActionController: "named" } }],
@@ -1041,9 +1046,9 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
       }),
     );
 
-    this.createFile("app/controllers/concerns/.gitkeep", "");
+    await this.createFile("app/controllers/concerns/.gitkeep", "");
 
-    this.createFile(
+    await this.createFile(
       "app/models/application-record.ts",
       tsModule({
         imports: [{ from: "@blazetrails/activerecord", named: { Base: "named" } }],
@@ -1055,19 +1060,19 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
       }),
     );
 
-    this.createFile("app/models/concerns/.gitkeep", "");
+    await this.createFile("app/models/concerns/.gitkeep", "");
 
-    this.createFile(
+    await this.createFile(
       "app/helpers/application-helper.ts",
       tsModule({ declarations: [tsRaw(`export const ApplicationHelper = {\n};`)] }),
     );
 
     if (!this.skip("ActiveJob")) {
-      this.template("app/jobs/application_job.ts", "app/jobs/application-job.ts");
+      await this.template("app/jobs/application_job.ts", "app/jobs/application-job.ts");
     }
 
     if (!this.skip("ActionMailer")) {
-      this.createFile(
+      await this.createFile(
         "app/mailers/application-mailer.ts",
         tsModule({
           declarations: [
@@ -1087,18 +1092,18 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     }
 
     if (!this.skip("ActionCable")) {
-      this.createFile(
+      await this.createFile(
         "app/channels/application-cable/connection.ts",
         tsModule({ declarations: [tsClass({ name: "Connection", body: [] })] }),
       );
 
-      this.createFile(
+      await this.createFile(
         "app/channels/application-cable/channel.ts",
         tsModule({ declarations: [tsClass({ name: "Channel", body: [] })] }),
       );
     }
 
-    this.createFile(
+    await this.createFile(
       "app/views/layouts/application.html.tse",
       `<!DOCTYPE html>
 <html>
@@ -1131,7 +1136,7 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     );
 
     if (!this.skip("ActionMailer")) {
-      this.createFile(
+      await this.createFile(
         "app/views/layouts/mailer.html.tse",
         `<!DOCTYPE html>
 <html>
@@ -1148,14 +1153,14 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 `,
       );
 
-      this.createFile(
+      await this.createFile(
         "app/views/layouts/mailer.text.tse",
         `<%= yield %>
 `,
       );
     }
 
-    this.createFile(
+    await this.createFile(
       "app/assets/stylesheets/application.css",
       `/*
  * This is a manifest file that'll be compiled into application.css,
@@ -1167,13 +1172,13 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 `,
     );
 
-    this.createFile("app/assets/images/.gitkeep", "");
+    await this.createFile("app/assets/images/.gitkeep", "");
   }
 
-  private createDbFiles(): void {
-    this.createFile("db/migrate/.gitkeep", "");
+  async createDbFiles(): Promise<void> {
+    await this.createFile("db/migrate/.gitkeep", "");
 
-    this.createFile(
+    await this.createFile(
       "db/seeds.ts",
       `// Seed your database here.
 // Example:
@@ -1183,11 +1188,15 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     );
   }
 
-  /** @internal */
-  private systemTest(): void {
-    this.createFile("test/system/.keep", "");
+  async createSystemTestFiles(): Promise<void> {
+    if (this.dependsOnSystemTest()) await this.systemTest();
+  }
 
-    this.createFile(
+  /** @internal */
+  private async systemTest(): Promise<void> {
+    await this.createFile("test/system/.keep", "");
+
+    await this.createFile(
       "test/application-system-test-case.ts",
       `import "./test-helper.ts";
 import { SystemTestCase } from "@blazetrails/actionpack";
@@ -1201,8 +1210,8 @@ export class ApplicationSystemTestCase extends SystemTestCase {
     );
   }
 
-  private createTestFiles(): void {
-    this.createFile(
+  async createTestFiles(): Promise<void> {
+    await this.createFile(
       "test/test-helper.ts",
       `import { TestCase } from "@blazetrails/activesupport/test-case";
 import { env, setEnv } from "@blazetrails/ruby-compat";
@@ -1218,7 +1227,7 @@ TestCase.fixtures(":all");
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "test/global-setup.ts",
       `import { Base } from "@blazetrails/activerecord";
 import { env, setEnv } from "@blazetrails/ruby-compat";
@@ -1235,15 +1244,15 @@ export async function teardown(): Promise<void> {
 `,
     );
 
-    this.createFile("test/models/.gitkeep", "");
-    this.createFile("test/controllers/.gitkeep", "");
-    this.createFile("test/helpers/.gitkeep", "");
-    this.createFile("test/integration/.gitkeep", "");
-    this.createFile("test/fixtures/files/.gitkeep", "");
+    await this.createFile("test/models/.gitkeep", "");
+    await this.createFile("test/controllers/.gitkeep", "");
+    await this.createFile("test/helpers/.gitkeep", "");
+    await this.createFile("test/integration/.gitkeep", "");
+    await this.createFile("test/fixtures/files/.gitkeep", "");
   }
 
-  private createPublicFiles(): void {
-    this.createFile(
+  async createPublicFiles(): Promise<void> {
+    await this.createFile(
       "public/404.html",
       `<!DOCTYPE html>
 <html>
@@ -1279,7 +1288,7 @@ export async function teardown(): Promise<void> {
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "public/422.html",
       `<!DOCTYPE html>
 <html>
@@ -1315,7 +1324,7 @@ export async function teardown(): Promise<void> {
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "public/500.html",
       `<!DOCTYPE html>
 <html>
@@ -1350,28 +1359,39 @@ export async function teardown(): Promise<void> {
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       "public/robots.txt",
       `# See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
 `,
     );
 
-    this.createFile("public/favicon.ico", "");
+    await this.createFile("public/favicon.ico", "");
   }
 
-  private createDirectoryPlaceholders(): void {
-    this.createFile("lib/tasks/.gitkeep", "");
-    this.createFile("log/.gitkeep", "");
-    if (!this.skipStorage()) {
-      this.createFile("storage/.gitkeep", "");
-    }
-    this.createFile("tmp/.gitkeep", "");
-    this.createFile("tmp/pids/.gitkeep", "");
-    this.createFile("vendor/.gitkeep", "");
+  async createLibFiles(): Promise<void> {
+    await this.createFile("lib/tasks/.gitkeep", "");
   }
 
-  private createDockerFiles(): void {
-    this.createFile(
+  async createLogFiles(): Promise<void> {
+    await this.createFile("log/.gitkeep", "");
+  }
+
+  async createTmpFiles(): Promise<void> {
+    await this.createFile("tmp/.gitkeep", "");
+    await this.createFile("tmp/pids/.gitkeep", "");
+  }
+
+  async createVendorFiles(): Promise<void> {
+    await this.createFile("vendor/.gitkeep", "");
+  }
+
+  async createStorageFiles(): Promise<void> {
+    if (!this.skipStorage()) await this.createFile("storage/.gitkeep", "");
+  }
+
+  async createDockerfiles(): Promise<void> {
+    if (this.options.skipDocker) return;
+    await this.createFile(
       "Dockerfile",
       `# syntax=docker/dockerfile:1
 
@@ -1404,7 +1424,7 @@ CMD ["npx", "trails", "server"]
 `,
     );
 
-    this.createFile(
+    await this.createFile(
       ".dockerignore",
       `# See https://docs.docker.com/engine/reference/builder/#dockerignore-file
 .git
@@ -1417,8 +1437,8 @@ dist
     );
   }
 
-  eslint(): void {
-    this.createFile(
+  async eslint(): Promise<void> {
+    await this.createFile(
       "eslint.config.mjs",
       `// Recommended JavaScript and TypeScript styling for trails
 import js from "@eslint/js";
@@ -1439,18 +1459,18 @@ export default defineConfig([
     );
   }
 
-  private createEslintFile(): void {
+  async createEslintFile(): Promise<void> {
     if (this.skip("Eslint")) return;
-    this.eslint();
+    await this.eslint();
   }
 
-  private createCifiles(): void {
+  async createCifiles(): Promise<void> {
     if (this.options.skipCi) return;
-    this.build("cifiles");
+    await this.build("cifiles");
   }
 
-  databaseYml(): void {
-    this.template(this.database.template, "config/database.ts");
+  async databaseYml(): Promise<void> {
+    await this.template(this.database.template, "config/database.ts");
   }
 
   /** @internal */
@@ -1458,8 +1478,8 @@ export default defineConfig([
     return TopLevel.AppBuilder !== undefined ? TopLevel.AppBuilder : AppBuilder;
   }
 
-  private template(source: string, destination: string): void {
-    this.createFile(
+  private async template(source: string, destination: string): Promise<void> {
+    await this.createFile(
       destination,
       TEMPLATES[source]({
         appName: this.appName(),

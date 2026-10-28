@@ -1,3 +1,4 @@
+import { Basic } from "@blazetrails/thor/shell/basic";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
@@ -44,7 +45,7 @@ describe("migration", () => {
 
   it("migrationTemplate prepends migration_number, sets assigns, and renders", async () => {
     const host = {
-      output: () => undefined,
+      shell: new Basic(),
       options: {},
       migrationNumber: "",
       migrationFileName: "",

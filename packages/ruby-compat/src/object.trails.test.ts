@@ -1496,3 +1496,11 @@ describe("rbFSend writer cache", () => {
     expect(p._x).toEqual(["defined", 2]);
   });
 });
+
+describe("a Hash subclass", () => {
+  it("is a kind of Hash, as Ruby's is_a?(Hash) answers", () => {
+    class Sub extends Hash<unknown, unknown> {}
+    expect(rbObjIsKindOf(new Sub(), Hash)).toBe(true);
+    expect(rbObjIsKindOf({}, Hash)).toBe(true);
+  });
+});

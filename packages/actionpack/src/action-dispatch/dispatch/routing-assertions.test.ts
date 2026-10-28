@@ -1,3 +1,4 @@
+import { camelize } from "@blazetrails/activesupport";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   Assertion,
@@ -13,14 +14,13 @@ import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import { Base } from "../../action-controller/base.js";
 import { TestCase } from "../../action-controller/test-case.js";
-import { controllerConstants } from "../http/request.js";
 import type { MiddlewareFactory, MiddlewareStack, RackApp } from "../middleware/stack.js";
-import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import type { Request } from "../http/request.js";
 import type { MountableApp, RouteOptions } from "../routing/mapper.js";
 import { RouteSet } from "../routing/route-set.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
+import { registerController } from "../../action-controller/base.js";
 
 class ArticlesController extends Base {}
 class BooksController extends Base {}
@@ -48,7 +48,7 @@ beforeAll(() => {
     block_books: BlockBooksController,
     query_books: QueryBooksController,
   })) {
-    controllerConstants.set(name, klass as unknown as DispatchableControllerClass);
+    registerController(`${camelize(name)}Controller`, klass);
   }
 });
 

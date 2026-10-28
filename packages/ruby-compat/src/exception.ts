@@ -23,7 +23,34 @@ export interface Exception {
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-Exception.prototype.name = "Exception";
+const declaredNames = new WeakMap<object, unknown>();
+
+/**
+ * `rb_class_name` (`vendor/ruby/v3.3.11/variable.c:483`) of the exception's
+ * class, which Ruby reads off the constant path. A JS `Error` reads `name`
+ * for its stack header, so it is answered from the same path, then from a
+ * name a class or an ancestor seated on its prototype.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+Object.defineProperty(Exception.prototype, "name", {
+  configurable: true,
+  get(this: Exception) {
+    const klass = this.constructor;
+    let seated: object | null = klass;
+    while (seated !== null && !declaredNames.has(seated)) seated = Object.getPrototypeOf(seated);
+    return (
+      classpaths.get(klass)?.path ??
+      generatedClassPath(klass) ??
+      (seated === null ? undefined : declaredNames.get(seated)) ??
+      (klass.name || "Exception")
+    );
+  },
+  set(this: Exception, value: unknown) {
+    if (Object.hasOwn(this, "constructor")) declaredNames.set(this.constructor, value);
+    else Object.defineProperty(this, "name", { value, writable: true, configurable: true });
+  },
+});
 
 /**
  * `exc_to_s` (`vendor/ruby/v3.3.11/error.c:1463`): the message, or the class

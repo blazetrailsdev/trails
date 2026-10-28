@@ -14,13 +14,11 @@ afterEach(() => {
 
 async function generatedLayout(): Promise<string> {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-layout-"));
-  await new AppGenerator({
-    cwd: tmpDir,
-    output: () => {},
-    appPath: "blog",
-    database: "sqlite",
-    skipDocker: true,
-  }).run();
+  await new AppGenerator(
+    ["blog"],
+    { database: "sqlite", skipDocker: true },
+    { destinationRoot: tmpDir },
+  ).invokeAll();
   return fs.readFileSync(
     path.join(tmpDir, "blog", "app", "views", "layouts", "application.html.tse"),
     "utf-8",

@@ -24,7 +24,6 @@ import {
   ArgumentError,
   b,
   KeyError,
-  merge,
   rbModAttrReader,
   rbObjIvarSet,
   RuntimeError,
@@ -75,7 +74,7 @@ declare module "./metal.js" {
   interface Metal extends Included<(typeof Testing)["Functional"]> {}
 }
 
-Live.aliasMethod("originalNewControllerThread", "newControllerThread");
+Object.assign(Live, { originalNewControllerThread: Live.newControllerThread });
 
 export async function newControllerThread(
   this: LiveControllerHost,
@@ -84,12 +83,12 @@ export async function newControllerThread(
   await block();
 }
 
-Live.aliasMethod("originalCleanUpThreadLocals", "cleanUpThreadLocals");
+Object.assign(Live, { originalCleanUpThreadLocals: Live.cleanUpThreadLocals });
 
 export function cleanUpThreadLocals(this: LiveControllerHost, ..._args: unknown[]): void {}
 
-Live.defineMethod("newControllerThread", newControllerThread);
-Live.defineMethod("cleanUpThreadLocals", cleanUpThreadLocals);
+Live.newControllerThread = newControllerThread as unknown as typeof Live.newControllerThread;
+Live.cleanUpThreadLocals = cleanUpThreadLocals;
 
 LiveBuffer.queueSize = null;
 
@@ -734,8 +733,7 @@ export class TestRequest extends AbstractTestRequest {
    */
   override paramsParsers(): ParameterParsers {
     const base = super.paramsParsers();
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- the receiver is super's return, which the call gate cannot prove a Hash
-    return merge<unknown>(base, this._customParamParsers) as ParameterParsers;
+    return { ...base, ...this._customParamParsers } as ParameterParsers;
   }
 }
 

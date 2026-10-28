@@ -1,9 +1,9 @@
-import { dasherize } from "../../base.js";
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
-import { MigrationGenerator } from "../../migration-generator.js";
+import { dasherize, type GeneratorOptions } from "../../base.js";
+import { NamedBase } from "../../named-base.js";
+import { MigrationGenerator } from "../migration/migration-generator.js";
 import { camelize, classify } from "@blazetrails/activesupport";
 
-export interface ModelGeneratorOptions extends NamedBaseOptions {
+export interface ModelGeneratorOptions extends GeneratorOptions {
   migration?: boolean;
   timestamps?: boolean;
   parent?: string;
@@ -15,44 +15,47 @@ export class ModelGenerator extends NamedBase {
   declare options: ModelGeneratorOptions;
 
   static {
+    this.argument("attributes", {
+      type: "array",
+      default: [],
+      banner: "field[:type][:index] field[:type][:index]",
+    });
+
     this.checkClassCollision();
-    this.commands().push("createMigrationFile", "createModelFile", "createModuleFile");
+
+    this.methodAdded("createMigrationFile");
+    this.methodAdded("createModelFile");
+    this.methodAdded("createModuleFile");
   }
 
   protected createMigrationGenerator(): MigrationGenerator {
-    return new MigrationGenerator({
-      cwd: this.cwd,
-      output: this.output,
-      behavior: this.behavior,
-      pretend: this.options.pretend,
-      force: this.options.force,
-      skip: this.options.skip,
-    });
+    return new MigrationGenerator(
+      [`create_${this.tableName()}`],
+      Object.fromEntries(this.options as unknown as Iterable<[string, unknown]>),
+      {
+        destinationRoot: this.destinationRoot,
+        shell: this.shell,
+        behavior: this.behavior,
+      },
+    );
   }
 
   async createMigrationFile(): Promise<void> {
     if (this.isSkipMigrationCreation()) return;
     const attributes = this.attributes;
-    const { timestamps, primaryKeyType, indexes } = this.options;
+    const { indexes } = this.options;
     if (indexes === false) {
       for (const a of attributes) {
         if (a.reference() && !a.hasIndex()) delete a.attrOptions.index;
       }
     }
 
-    const tableName = this.tableName();
     const migGen = this.createMigrationGenerator();
-
-    const migOptions = { timestamps, primaryKeyType };
-    const migFiles = await migGen.run(
-      `create_${tableName}`,
-      this.options.attributes ?? [],
-      migOptions,
-    );
-    this.createdFiles.push(...migFiles);
+    migGen.attributes = attributes;
+    await migGen.createMigrationFile();
   }
 
-  createModelFile(): void {
+  async createModelFile(): Promise<void> {
     const regularClassPath = this.regularClassPath();
     const className = [...regularClassPath, this.fileName].map((part) => camelize(part)).join("");
     const fileName = dasherize(this.filePath());
@@ -92,7 +95,7 @@ export class ModelGenerator extends NamedBase {
     const staticBlock = bodyLines.length > 0 ? `\n  static {\n${bodyLines.join("\n")}\n  }\n` : "";
     const ext = this.ext();
 
-    this.createFile(
+    await this.createFile(
       `app/models/${fileName}${ext}`,
       `${importPath}
 
@@ -105,13 +108,13 @@ ${staticBlock}}
     );
   }
 
-  createModuleFile(): void {
+  async createModuleFile(): Promise<void> {
     const regularClassPath = this.regularClassPath();
     if (regularClassPath.length === 0) return;
     const ext = this.ext();
 
     if (this.behavior === "invoke") {
-      this.createFile(
+      await this.createFile(
         `app/models/${regularClassPath.map((part) => dasherize(part)).join("/")}${ext}`,
         `export const ${regularClassPath.map((part) => camelize(part)).join("")} = {
   tableNamePrefix(): string {

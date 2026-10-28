@@ -1,8 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { ControllerGenerator } from "./controller-generator.js";
+import { Application } from "../../../application.js";
+import "../../../test-unit/trailtie.js";
+
+class ControllerGeneratorTestApp extends Application {}
+let ControllerGenerator: typeof import("./controller-generator.js").ControllerGenerator;
+
+beforeAll(async () => {
+  await ControllerGeneratorTestApp.instance().loadGenerators();
+  ({ ControllerGenerator } = await import("./controller-generator.js"));
+});
 
 let tmpDir: string;
 let lines: string[];
@@ -11,6 +21,9 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
+  vi.spyOn(stdout, "write").mockImplementation(
+    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
+  );
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
@@ -23,7 +36,14 @@ afterEach(() => {
 });
 
 function makeGen() {
-  return new ControllerGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
+  return {
+    run: async (name: string, args: string[]) => {
+      await ControllerGenerator.start([name, ...args], { destinationRoot: tmpDir });
+      return (fs.readdirSync(tmpDir, { recursive: true }) as string[]).filter((f) =>
+        fs.statSync(path.join(tmpDir, f)).isFile(),
+      );
+    },
+  };
 }
 
 describe("ControllerGenerator view and controller file naming", () => {
@@ -68,7 +88,7 @@ describe("ControllerGenerator view and controller file naming", () => {
 describe("ControllerGenerator --parent", () => {
   it("classifies a plural parent name, singularizing it as parent_class_name.classify does", async () => {
     const gen = makeGen();
-    await gen.run("admin/dashboard", ["index"], { parent: "admin_controllers" });
+    await gen.run("admin/dashboard", ["index", "--parent=admin_controllers"]);
     const controller = fs.readFileSync(
       path.join(tmpDir, "app/controllers/admin/dashboard-controller.ts"),
       "utf8",

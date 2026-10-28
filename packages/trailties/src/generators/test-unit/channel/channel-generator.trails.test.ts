@@ -5,7 +5,7 @@ import { ChannelGenerator } from "./channel-generator.js";
 async function generate(name: string): Promise<string> {
   const root = Dir.mktmpdir();
   File.write(File.join(root, "tsconfig.json"), "{}");
-  await ChannelGenerator.start([name], { cwd: root, output: () => {} });
+  await ChannelGenerator.start([name], { destinationRoot: root });
   return root;
 }
 

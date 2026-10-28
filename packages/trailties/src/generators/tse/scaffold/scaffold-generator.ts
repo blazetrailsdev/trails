@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { GeneratorError } from "../../generated-attribute.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
-import type { GeneratorOptions } from "../../base.js";
+import type { GeneratorOptions, GeneratorConfig } from "../../base.js";
 import { format, File } from "@blazetrails/ruby-compat";
 import { Base } from "../../tse.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
@@ -19,6 +19,13 @@ export interface ScaffoldGenerator
   extends Included<typeof ResourceHelpers>, Included<typeof ModelHelpers> {}
 
 export class ScaffoldGenerator extends Base {
+  static {
+    this.argument("attributes", { type: "array", default: [], banner: "field:type field:type" });
+
+    this.methodAdded("createRootFolder");
+    this.methodAdded("copyViewFiles");
+  }
+
   /** @internal */
   declare controllerName: string;
   /** @internal */
@@ -32,8 +39,8 @@ export class ScaffoldGenerator extends Base {
    * @inlinedFrom Rails::Generators::ModelHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/model_helpers.rb:26-45
    * @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26
    */
-  constructor(options: ConstructorParameters<typeof Base>[0]) {
-    super(options);
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
     const controllerName = this.name;
     if (this.options.modelName != null) {
       this.name = this.options.modelName;
@@ -47,7 +54,7 @@ export class ScaffoldGenerator extends Base {
       if (!ModelHelpers.skipWarn) {
         this.say(format(ModelHelpers.PLURAL_MODEL_NAME_WARN_MESSAGE, this.name, singular));
       }
-      this.name = (this.options as { name?: string }).name = singular;
+      this.name = args[0] = singular;
       this.assignNamesBang(this.name);
     }
     if (this.isInflectionImpossible(this.name)) {
@@ -63,32 +70,26 @@ export class ScaffoldGenerator extends Base {
     ModelHelpers.skipWarn = true;
   }
 
-  createRootFolder(): void {
-    this.emptyDirectory(File.join("app/views", dasherize(this.controllerFilePath())));
+  async createRootFolder(): Promise<void> {
+    await this.emptyDirectory(File.join("app/views", dasherize(this.controllerFilePath())));
   }
 
-  copyViewFiles(): void {
+  async copyViewFiles(): Promise<void> {
     const viewDirectory = dasherize(this.controllerFilePath());
     for (const view of this.availableViews()) {
       for (const format of this.formats()) {
         const filename = this.filenameWithExtensions(view, format);
-        this.createFile(
+        await this.createFile(
           File.join("app/views", viewDirectory, filename),
           TEMPLATES[filename].call(this),
         );
       }
     }
 
-    this.createFile(
+    await this.createFile(
       File.join("app/views", viewDirectory, `_${this.singularName()}.html.tse`),
       TEMPLATES["partial.html.tse"].call(this),
     );
-  }
-
-  run(): string[] {
-    this.createRootFolder();
-    this.copyViewFiles();
-    return this.getCreatedFiles();
   }
 
   private availableViews(): string[] {

@@ -1,8 +1,50 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir, File, env } from "@blazetrails/ruby-compat";
+import { capture } from "@blazetrails/activesupport";
+import type { GeneratorBase, GeneratorConfig } from "../base.js";
 import { GeneratedAttribute } from "../generated-attribute.js";
+
+type GeneratorClassHost = {
+  start(givenArgs?: string[], config?: GeneratorConfig): Promise<unknown>;
+  new (args?: unknown[], localOptions?: unknown, config?: GeneratorConfig): GeneratorBase;
+};
 
 export interface BehaviorHost {
   destinationRoot: string;
+  defaultArguments?: string[];
+  generatorClass?: GeneratorClassHost;
+  /** @internal */
+  _generator?: GeneratorBase;
+}
+
+export async function runGenerator(
+  this: BehaviorHost,
+  args: string[] = this.defaultArguments ?? [],
+  config: GeneratorConfig = {},
+): Promise<unknown> {
+  if (!(args.includes("--no-skip-bundle") || args.includes("--dev")))
+    args = [...args, "--skip-bundle"];
+  if (!(args.includes("--no-skip-bootsnap") || args.includes("--skip-bootsnap")))
+    args = [...args, "--skip-bootsnap"];
+
+  if (env["RAILS_LOG_TO_STDOUT"] === "true") {
+    return this.generatorClass!.start(args, { destinationRoot: this.destinationRoot, ...config });
+  } else {
+    return capture("stdout", () =>
+      this.generatorClass!.start(args, { destinationRoot: this.destinationRoot, ...config }),
+    );
+  }
+}
+
+export function generator(
+  this: BehaviorHost,
+  args: unknown[] = this.defaultArguments ?? [],
+  options: unknown = {},
+  config: GeneratorConfig = {},
+): GeneratorBase {
+  return (this._generator ??= new this.generatorClass!(args, options, {
+    destinationRoot: this.destinationRoot,
+    ...config,
+  }));
 }
 
 export function createGeneratedAttribute(

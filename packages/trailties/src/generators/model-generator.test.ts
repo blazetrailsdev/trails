@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -36,6 +37,9 @@ beforeEach(async () => {
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   destination.destinationRoot = tmpDir;
   lines = [];
+  vi.spyOn(stdout, "write").mockImplementation(
+    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
+  );
   Trails.application = ModelGeneratorTestApp.instance();
   oldBelongsToRequiredByDefault = Trails.application.config.activeRecord.belongsToRequiredByDefault;
   Trails.application.config.activeRecord.belongsToRequiredByDefault = true;
@@ -60,8 +64,7 @@ function makeGen(config: object = {}) {
   return {
     run: async (name: string, args: string[], flags: string[] = []) => {
       await ModelGenerator.start([name, ...args, ...flags], {
-        cwd: tmpDir,
-        output: (m) => lines.push(m),
+        destinationRoot: tmpDir,
         ...config,
       });
       return listFiles(tmpDir);
@@ -263,16 +266,16 @@ describe("ModelGeneratorTest", () => {
 
   it("migration is skipped with skip option", async () => {
     await makeGen().run("Account", ["name:string", "age:integer"]);
-    const gen = makeGen({ skip: true });
-    await gen.run("Account", []);
+    const gen = makeGen();
+    await gen.run("Account", [], ["--skip"]);
     const output = lines.join("\n");
     assertMatch(/skip\s+db\/migrate\/\d+_create_accounts\.ts/, output);
   });
 
   it("migration is ignored as identical with skip option", async () => {
     await makeGen().run("Account", []);
-    const gen = makeGen({ skip: true });
-    await gen.run("Account", []);
+    const gen = makeGen();
+    await gen.run("Account", [], ["--skip"]);
     const output = lines.join("\n");
     assertMatch(/identical\s+db\/migrate\/\d+_create_accounts\.ts/, output);
   });
@@ -287,12 +290,9 @@ describe("ModelGeneratorTest", () => {
 
   it("migration error is not shown on revoke", async () => {
     await makeGen().run("Account", []);
-    const captured: string[] = [];
-    await makeGen({ output: (m: string) => captured.push(m), behavior: "revoke" }).run(
-      "Account",
-      [],
-    );
-    const error = captured.join("\n");
+    lines = [];
+    await makeGen({ behavior: "revoke" }).run("Account", []);
+    const error = lines.join("\n");
     assertNoMatch(/Another migration is already named create_accounts/, error);
   });
 
@@ -307,8 +307,8 @@ describe("ModelGeneratorTest", () => {
     const oldMigration = Dir.glob(
       `${destination.destinationRoot}/db/migrate/*_create_accounts.ts`,
     )[0];
-    const gen = makeGen({ force: true });
-    await gen.run("Account", []);
+    const gen = makeGen();
+    await gen.run("Account", [], ["--force"]);
     const error = lines.join("\n");
     assertNoMatch(/Another migration is already named create_accounts/, error);
     assertNoFile(oldMigration);
@@ -607,11 +607,9 @@ export class Message extends ApplicationRecord {
 
 describe("ModelGenerator (JavaScript project)", () => {
   let jsTmpDir: string;
-  let jsLines: string[];
 
   beforeEach(() => {
     jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
-    jsLines = [];
   });
 
   afterEach(() => {
@@ -622,8 +620,7 @@ describe("ModelGenerator (JavaScript project)", () => {
     return {
       run: async (name: string, args: string[]) => {
         await ModelGenerator.start([name, ...args], {
-          cwd: jsTmpDir,
-          output: (m) => jsLines.push(m),
+          destinationRoot: jsTmpDir,
         });
         return listFiles(jsTmpDir);
       },

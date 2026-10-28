@@ -1091,6 +1091,14 @@ export function extractFromProgram(
       if (constructSigs.length === 0) return;
 
       const instanceType = constructSigs[0].getReturnType();
+      const returnedClass = instanceType.getSymbol()?.declarations?.[0];
+      if (
+        returnedClass !== undefined &&
+        returnedClass.getSourceFile() !== sourceFile &&
+        !returnsOwnClass(node, checker)
+      ) {
+        return;
+      }
       const mixinKey = `${relPath}:${node.name.text}__mixin`;
       const mixinMethods: MethodInfo[] = [];
 
@@ -1643,7 +1651,6 @@ export function extractFromProgram(
             ? hostInfo.file
             : path.relative(srcDir, from.getSourceFile().fileName).replace(/\\/g, "/");
         for (const m of methods) {
-          if (m.name === "[initialize]") continue;
           if (hostInfo.instanceMethods.some((existing) => existing.name === m.name)) continue;
           hostInfo.instanceMethods.push({
             ...m,
@@ -3361,6 +3368,45 @@ function isInternalCallableRef(expr: ts.Expression, checker: ts.TypeChecker): bo
  * `extractClass` so member shape (arity, visibility, calls, JSDoc tags) matches
  * every other class in the manifest.
  */
+function returnsOwnClass(fn: ts.FunctionDeclaration, checker: ts.TypeChecker): boolean {
+  const isOwnClass = (expr: ts.Expression): boolean => {
+    while (
+      ts.isParenthesizedExpression(expr) ||
+      ts.isAsExpression(expr) ||
+      ts.isSatisfiesExpression(expr) ||
+      ts.isNonNullExpression(expr)
+    ) {
+      expr = expr.expression;
+    }
+    if (ts.isClassExpression(expr)) return true;
+    if (!ts.isIdentifier(expr)) return false;
+    const decl = checker.getSymbolAtLocation(expr)?.valueDeclaration;
+    return (
+      decl !== undefined &&
+      (ts.isClassDeclaration(decl) ||
+        (ts.isVariableDeclaration(decl) &&
+          decl.initializer !== undefined &&
+          ts.isClassExpression(decl.initializer))) &&
+      decl.pos >= fn.pos &&
+      decl.end <= fn.end
+    );
+  };
+  const returned: ts.Expression[] = [];
+  let bareReturn = false;
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionLike(node) || ts.isClassLike(node)) return;
+    if (ts.isReturnStatement(node)) {
+      if (node.expression === undefined) bareReturn = true;
+      else returned.push(node.expression);
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  if (fn.body === undefined) return false;
+  ts.forEachChild(fn.body, visit);
+  return !bareReturn && returned.length > 0 && returned.every(isOwnClass);
+}
+
 export function factoryClassMembers(
   fn: ts.FunctionDeclaration,
   checker: ts.TypeChecker,
@@ -4061,9 +4107,6 @@ function unwrapAssertions(expr: ts.Expression): ts.Expression {
  * - `new Module((mod) => { delegate.call(mod, "m", { to: "target" }) })` — every
  *   literal name `delegate` is handed with the block's own parameter as `self`
  *   (Ruby's `delegate :m, to: :target` in a module body).
- * - `new Module((mod) => { mod[initialize] = function () {} })` — the module's
- *   `def initialize` (`Thor::Shell#initialize`, thor/shell.rb:44-48), recorded
- *   as `[initialize]`, the name a class's `static [initialize]` is recorded by.
  */
 export function harvestModuleInstanceMethods(
   init: ts.Expression,
@@ -4092,25 +4135,6 @@ export function harvestModuleInstanceMethods(
   const visit = (node: ts.Node): void => {
     if (ts.isFunctionLike(node) && node !== block) return;
     ts.forEachChild(node, visit);
-    const hook = moduleInitializeHook(node, mod.text);
-    if (hook !== undefined) {
-      const calls = extractCalls(hook.body);
-      const callSeq = extractCallSeq(hook.body);
-      const callArgs = extractCallArgs(hook.body);
-      const skeleton = extractSkeleton(hook.body);
-      out.push({
-        name: "[initialize]",
-        visibility: "public",
-        params: extractParameters(hook.parameters),
-        line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
-        file,
-        ...(calls !== undefined ? { calls } : {}),
-        ...(callSeq !== undefined ? { callSeq } : {}),
-        ...(callArgs !== undefined ? { callArgs } : {}),
-        ...(skeleton !== undefined ? { skeleton } : {}),
-      });
-      return;
-    }
     if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return;
     const receiver = node.expression.expression;
     if (
@@ -4272,35 +4296,6 @@ function sameFileObjectLiteral(expr: ts.Expression): ts.ObjectLiteralExpression 
   return undefined;
 }
 
-function moduleInitializeHook(node: ts.Node, mod: string): ts.FunctionExpression | undefined {
-  if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
-    return undefined;
-  }
-  if (!ts.isElementAccessExpression(node.left) || !ts.isFunctionExpression(node.right)) {
-    return undefined;
-  }
-  let receiver: ts.Expression = node.left.expression;
-  while (ts.isParenthesizedExpression(receiver) || ts.isAsExpression(receiver)) {
-    receiver = receiver.expression;
-  }
-  if (!ts.isIdentifier(receiver) || receiver.text !== mod) return undefined;
-  const key = node.left.argumentExpression;
-  return ts.isIdentifier(key) && key.text === "initialize" ? node.right : undefined;
-}
-
-/**
- * `{ [initialize]() {} }`: a plain-object module's `def initialize`
- * (`DatabaseStatements#initialize`, abstract/database_statements.rb:6-9),
- * recorded as `[initialize]` like a class's `static [initialize]`.
- */
-function isInitializeHookName(name: ts.PropertyName): name is ts.ComputedPropertyName {
-  return (
-    ts.isComputedPropertyName(name) &&
-    ts.isIdentifier(name.expression) &&
-    name.expression.text === "initialize"
-  );
-}
-
 export function harvestObjectLiteralMethods(
   obj: ts.ObjectLiteralExpression,
   checker: ts.TypeChecker,
@@ -4343,11 +4338,9 @@ export function harvestObjectLiteralMethods(
     if (
       ts.isMethodDeclaration(prop) &&
       prop.name &&
-      (ts.isIdentifier(prop.name) ||
-        ts.isStringLiteral(prop.name) ||
-        isInitializeHookName(prop.name))
+      (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name))
     ) {
-      mname = ts.isComputedPropertyName(prop.name) ? "[initialize]" : prop.name.text;
+      mname = prop.name.text;
       params = extractParameters(prop.parameters);
       optionKeys = extractOptionKeys(prop.parameters, checker);
       optionReads = extractOptionReads(prop.parameters, prop.body);
@@ -7331,6 +7324,10 @@ function describeArg(node: ts.Expression, flags: string[]): string {
       if (!ts.isStringLiteralLike(sent)) return `call:${SEND_CALLEES_RUBY_NAME[sender]}`;
       return `call:${sent.text}`;
     }
+    if (expr.expression.getText() === "Math.trunc" && expr.arguments.length === 1) {
+      return "call:toI";
+    }
+    if (nativeValueForms(expr).includes("compact")) return "call:compact";
     const name = callSiteName(expr);
     return name === undefined ? "?" : `call:${name}`;
   }
@@ -7488,6 +7485,13 @@ function collectCalls(
     const tails = form === "spread" ? spreadReceiverNames(receiver) : [receiverTailName(receiver)];
     for (const tail of tails) {
       if (tail !== undefined) hashForms.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
+    }
+    if (checkerProvenKind(receiver) === "object") {
+      if (form === "spread") hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.merge}`);
+      if (form === "assign" && assignSourceProven(receiver)) {
+        hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.mergeBang}`);
+        hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.update}`);
+      }
     }
   };
   const visit = (n: ts.Node): void => {
@@ -7833,6 +7837,23 @@ function setRoundTripForms(operand: ts.Expression | undefined): string[] {
  * `any` / `unknown` proves neither, since a trails `Relation` answers `size` /
  * `except` itself. Every member of a union has to agree.
  */
+/** A callback whose result the checker types `boolean`, so JS and Ruby truthiness agree. */
+function isBooleanCallback(fn: ts.Expression | undefined): boolean {
+  const result = fn && callbackResult(fn);
+  const checker = currentChecker;
+  if (result === undefined || checker === undefined) return false;
+  const type = checker.getTypeAtLocation(result);
+  const parts = type.isUnion() ? type.types : [type];
+  return parts.every((t) => (t.flags & ts.TypeFlags.BooleanLike) !== 0);
+}
+
+/** `Object.assign(h, other)` with exactly one source the checker proves a plain object. */
+function assignSourceProven(target: ts.Expression): boolean {
+  const call = target.parent;
+  if (!ts.isCallExpression(call) || call.arguments.length !== 2) return false;
+  return checkerProvenKind(call.arguments[1]) === "object";
+}
+
 function checkerProvenKind(expr: ts.Expression): "sized" | "object" | undefined {
   const checker = currentChecker;
   if (checker === undefined) return undefined;
@@ -7933,7 +7954,10 @@ function nativeValueForms(n: ts.Node): string[] {
     return ts.isCallExpression(counted) &&
       ts.isPropertyAccessExpression(counted.expression) &&
       counted.expression.name.text === "filter"
-      ? ["count"]
+      ? checkerProvenKind(counted.expression.expression) === "sized" &&
+        isBooleanCallback(counted.arguments[0])
+        ? ["count", TYPED_NATIVE_FORM.count]
+        : ["count"]
       : [];
   }
   if (ts.isConditionalExpression(n)) {
@@ -8034,7 +8058,10 @@ function nativeValueForms(n: ts.Node): string[] {
       return args.length === 0 ? [method] : [];
     case "filter": {
       const [param] = callbackParams(first) ?? [];
-      return param !== undefined && isNotNullTest(callbackResult(first), param) ? ["compact"] : [];
+      if (param === undefined || !isNotNullTest(callbackResult(first), param)) return [];
+      return checkerProvenKind(n.expression.expression) === "sized"
+        ? ["compact", TYPED_NATIVE_FORM.compact]
+        : ["compact"];
     }
     case "map": {
       const params = callbackParams(first);

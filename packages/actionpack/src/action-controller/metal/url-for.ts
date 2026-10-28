@@ -1,10 +1,8 @@
 import { ActionController } from "../../namespaces.js";
 import type { Request } from "../../action-dispatch/http/request.js";
-import { Concern, Module, extend } from "@blazetrails/activesupport";
-import {
-  UrlFor as AbstractControllerUrlFor,
-  urlOptions as routingUrlOptions,
-} from "../../action-dispatch/routing/url-for.js";
+import { Concern, extend } from "@blazetrails/activesupport";
+import { include, rbCallSuper } from "@blazetrails/ruby-compat";
+import { UrlFor as AbstractControllerUrlFor } from "../../action-dispatch/routing/url-for.js";
 import type { UrlForHost as RoutingUrlForHost } from "../../action-dispatch/routing/url-for.js";
 
 export interface UrlForHost extends RoutingUrlForHost {
@@ -19,7 +17,7 @@ export function urlOptions(this: UrlForHost): Record<string, unknown> {
     port: this.request.optionalPort,
     protocol: this.request.protocol,
     _recall: this.request.pathParameters,
-    ...routingUrlOptions.call(this),
+    ...(rbCallSuper(this, urlOptions) as Record<string, unknown>),
   });
 
   let sameOrigin: boolean;
@@ -47,11 +45,8 @@ export function urlOptions(this: UrlForHost): Record<string, unknown> {
   }
 }
 
-export const UrlFor: Module<{ urlOptions: typeof urlOptions }> = new Module((mod) => {
-  extend(mod, Concern);
-  mod.include(AbstractControllerUrlFor);
-
-  mod.defineMethod("urlOptions", urlOptions);
-});
+export const UrlFor = { urlOptions };
+extend(UrlFor, Concern);
+include(UrlFor, AbstractControllerUrlFor);
 
 ActionController.UrlFor = UrlFor;

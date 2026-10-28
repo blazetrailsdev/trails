@@ -19,8 +19,7 @@ afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 describe("ResourceGenerator (--actions)", () => {
   it("still routes the resource, as Thor re-parses the raw switch against resource_route's own options", async () => {
     await ResourceGenerator.start(["account", "--actions", "index", "new"], {
-      cwd: tmpDir,
-      output: () => {},
+      destinationRoot: tmpDir,
     });
     const routes = fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf-8");
     expect(routes).toContain('this.resources("accounts");');

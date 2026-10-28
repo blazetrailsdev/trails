@@ -8,7 +8,7 @@ export function appTemplateCommand(): Command {
     .description("Apply the template supplied by <location>")
     .argument("<location>", "Template file (.mjs/.js/.ts)")
     .action(async (location: string) => {
-      const gen = new AppGenerator({ cwd: Dir.pwd(), output: console.log });
+      const gen = new AppGenerator([Dir.pwd()]);
       (await gen.sourcePaths()).push(Dir.pwd());
       await gen.apply(File.expandPath(location), { verbose: false });
       for (const { what, args } of gen.pendingGenerators) {

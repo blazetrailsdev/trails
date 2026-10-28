@@ -1,6 +1,5 @@
 import {
   TypeError,
-  compact,
   groupBy,
   isSymbol,
   rbEqual,
@@ -168,8 +167,10 @@ export class DatabaseConfigurations {
       dbConfigs.push(this.environmentUrlConfig(this.defaultEnv(), "primary", {}));
     }
 
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- parity:api:calls:args pairs this argument by the Ruby call name
-    return this.mergeDbEnvironmentVariables(this.defaultEnv(), compact(dbConfigs));
+    return this.mergeDbEnvironmentVariables(
+      this.defaultEnv(),
+      dbConfigs.filter((c) => c != null),
+    );
   }
 
   /** @internal */

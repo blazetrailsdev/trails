@@ -1,9 +1,9 @@
 import { File } from "@blazetrails/ruby-compat";
-import { dasherize } from "../../base.js";
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import { dasherize, type GeneratorOptions } from "../../base.js";
+import { NamedBase } from "../../named-base.js";
 import { TEMPLATES } from "./templates.js";
 
-export interface JobGeneratorOptions extends NamedBaseOptions {
+export interface JobGeneratorOptions extends GeneratorOptions {
   queue?: string;
   parent?: string;
 }
@@ -24,32 +24,27 @@ export class JobGenerator extends NamedBase {
     });
     this.checkClassCollision({ suffix: "Job" });
     this.hookFor("testFramework");
-    this.commands().push("createJobFile");
+    this.methodAdded("createJobFile");
   }
 
   /** @internal */
   private _applicationJobFileName?: string;
 
-  constructor(options: JobGeneratorOptions) {
-    super(options);
-    this.fileName = this.fileName.replace(/_job$/i, "");
-  }
-
   /**
-   * @missingRailsCall template — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions
-   * @missingRailsCall in_root — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions
+   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
+   * @missingRailsCall in_root — CONVERGEABLE converge-generators-onto-thor-template
    */
-  createJobFile(): void {
-    this.createFile(
+  async createJobFile(): Promise<void> {
+    await this.createFile(
       File.join("app/jobs", ...this.classPathParts, `${dasherize(this.fileName)}-job${this.ext()}`),
       TEMPLATES.job.call(this, this.ext()),
     );
 
     if (
       this.behavior === "invoke" &&
-      !File.isExist(File.join(this.cwd, this.applicationJobFileName()))
+      !File.isExist(File.join(this.destinationRoot, this.applicationJobFileName()))
     ) {
-      this.createFile(this.applicationJobFileName(), TEMPLATES.application_job.call(this));
+      await this.createFile(this.applicationJobFileName(), TEMPLATES.application_job.call(this));
     }
   }
 
@@ -63,6 +58,13 @@ export class JobGenerator extends NamedBase {
    */
   private applicationJobFileName(): string {
     return (this._applicationJobFileName ??= `app/jobs/application-job${this.ext()}`);
+  }
+
+  /** @internal */
+  private __fileName?: string;
+
+  override get fileName(): string {
+    return (this.__fileName ??= super.fileName.replace(/_job$/i, ""));
   }
 }
 

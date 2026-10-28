@@ -6,11 +6,19 @@ class PairedSocket implements HttpSocket {
   peer!: PairedSocket;
   private _listeners = new Map<string, Listener[]>();
   private _destroyed = false;
+  writableLength = 0;
+  writableHighWaterMark = 16 * 1024;
 
   write(chunk: string | Uint8Array): boolean {
     const bytes = typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
-    queueMicrotask(() => this.peer.emit("data", bytes));
-    return true;
+    this.writableLength += bytes.length;
+    const full = this.writableLength >= this.writableHighWaterMark;
+    queueMicrotask(() => {
+      this.peer.emit("data", bytes);
+      this.writableLength -= bytes.length;
+      if (full && this.writableLength === 0) this.emit("drain");
+    });
+    return !full;
   }
 
   end(): void {

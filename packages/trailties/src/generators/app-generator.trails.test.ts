@@ -24,12 +24,11 @@ describe("AppGenerator (trails-only)", () => {
     const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
     const root = fs.mkdtempSync(path.join(packageDir, "tmp-plain-node-"));
     try {
-      await new AppGenerator({
-        cwd: root,
-        output: () => {},
-        appPath: "my-app",
-        database: "sqlite",
-      }).run();
+      await new AppGenerator(
+        ["my-app"],
+        { database: "sqlite" },
+        { destinationRoot: root },
+      ).invokeAll();
       const app = path.join(root, "my-app");
       const node = (args: string[], cwd = app) =>
         spawnSync(getProcessAdapter().execPath!(), args, {
@@ -63,12 +62,11 @@ describe("AppGenerator (trails-only)", () => {
   }, 120_000);
 
   it("builds with trails-tsc against db/schema.ts so models need no declares", async () => {
-    await new AppGenerator({
-      cwd: tmpDir,
-      output: () => {},
-      appPath: "my-app",
-      database: "sqlite",
-    }).run();
+    await new AppGenerator(
+      ["my-app"],
+      { database: "sqlite" },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
 
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
     expect(pkg.scripts.build).toBe("trails-tsc --schema db/schema.ts");
@@ -77,13 +75,11 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("--dev points every @blazetrails package at the local checkout", async () => {
-    await new AppGenerator({
-      cwd: tmpDir,
-      output: () => {},
-      appPath: "my-app",
-      database: "sqlite",
-      dev: true,
-    }).run();
+    await new AppGenerator(
+      ["my-app"],
+      { database: "sqlite", dev: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
 
     const trailties = File.join(Generators.RAILS_DEV_PATH, "packages", "trailties");
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
@@ -96,12 +92,11 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("without --dev keeps the version entries and writes no pnpm-workspace.yaml", async () => {
-    await new AppGenerator({
-      cwd: tmpDir,
-      output: () => {},
-      appPath: "my-app",
-      database: "sqlite",
-    }).run();
+    await new AppGenerator(
+      ["my-app"],
+      { database: "sqlite" },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
 
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
     expect(pkg.dependencies["@blazetrails/trailties"]).toBe("*");
@@ -109,14 +104,11 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("guards each namespaced environment setting the way the Rails templates do", async () => {
-    await new AppGenerator({
-      cwd: tmpDir,
-      output: () => {},
-      appPath: "my-app",
-      database: "sqlite",
-      api: true,
-      skipActiveRecord: true,
-    }).run();
+    await new AppGenerator(
+      ["my-app"],
+      { database: "sqlite", api: true, skipActiveRecord: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
 
     const read = (env: string) =>
       File.read(File.join(tmpDir, "my-app", "config", "environments", `${env}.ts`));
@@ -132,7 +124,7 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("generates an app with Active Job on unless --skip-active-job is passed", async () => {
-    await new AppGenerator({ cwd: tmpDir, output: () => {}, appPath: "my-app" }).run();
+    await new AppGenerator(["my-app"], {}, { destinationRoot: tmpDir }).invokeAll();
 
     expect(File.isExist(File.join(tmpDir, "my-app", "app", "jobs", "application-job.ts"))).toBe(
       true,
@@ -141,24 +133,23 @@ describe("AppGenerator (trails-only)", () => {
       File.read(File.join(tmpDir, "my-app", "config", "environments", "development.ts")),
     ).toMatch(/this\.config\.activeJob\.verboseEnqueueLogs = true;/);
 
-    await new AppGenerator({
-      cwd: tmpDir,
-      output: () => {},
-      appPath: "skipped-app",
-      skipActiveJob: true,
-    }).run();
+    await new AppGenerator(
+      ["skipped-app"],
+      { skipActiveJob: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
     expect(File.isExist(File.join(tmpDir, "skipped-app", "app", "jobs"))).toBe(false);
   });
 
   it("keeps skipEslint nil when not passed, distinct from an explicit false", () => {
     const build = (o: { skipEslint?: boolean } = {}) =>
-      new AppGenerator({ cwd: tmpDir, output: () => {}, appPath: "my-app", ...o });
+      new AppGenerator(["my-app"], { ...o }, { destinationRoot: tmpDir });
     expect(build().options.skipEslint).toBeUndefined();
     expect(build({ skipEslint: false }).options.skipEslint).toBe(false);
   });
 
   it("writes bin/eslint executable, as bin/trails is", async () => {
-    await new AppGenerator({ cwd: tmpDir, output: () => {}, appPath: "my-app" }).run();
+    await new AppGenerator(["my-app"], {}, { destinationRoot: tmpDir }).invokeAll();
     expect(File.stat(File.join(tmpDir, "my-app", "bin", "eslint")).mode & 0o777).toBe(0o755);
   });
 
@@ -166,13 +157,11 @@ describe("AppGenerator (trails-only)", () => {
     const ci = async (opts: Record<string, unknown>): Promise<string> => {
       const dir = File.join(tmpDir, SecureRandom.hex(4));
       FileUtils.mkdirP(dir);
-      await new AppGenerator({
-        cwd: dir,
-        output: () => {},
-        appPath: "my-app",
-        database: "postgresql",
-        ...opts,
-      }).run();
+      await new AppGenerator(
+        ["my-app"],
+        { database: "postgresql", ...opts },
+        { destinationRoot: dir },
+      ).invokeAll();
       return File.read(File.join(dir, "my-app", ".github", "workflows", "ci.yml"));
     };
 
@@ -187,17 +176,16 @@ describe("AppGenerator (trails-only)", () => {
   it("dispatches cifiles through a top-level AppBuilder when one is defined", async () => {
     const calls: string[] = [];
     TopLevel.AppBuilder = class extends AppBuilder {
-      override cifiles(): void {
+      override async cifiles(): Promise<void> {
         calls.push("cifiles", (this as unknown as { appPath: string }).appPath);
       }
     };
     try {
-      await new AppGenerator({
-        cwd: tmpDir,
-        output: () => {},
-        appPath: "my-app",
-        database: "sqlite",
-      }).run();
+      await new AppGenerator(
+        ["my-app"],
+        { database: "sqlite" },
+        { destinationRoot: tmpDir },
+      ).invokeAll();
     } finally {
       delete TopLevel.AppBuilder;
     }
@@ -206,23 +194,22 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("includes ActionMethods into a top-level AppBuilder that does not subclass trails' AppBuilder", async () => {
-    let kept: string | null = null;
+    let kept: unknown = null;
     TopLevel.AppBuilder = class {
-      cifiles(this: {
-        emptyDirectory(d: string): string;
-        emptyDirectoryWithKeepFile(d: string): string | null;
-      }): void {
-        this.emptyDirectory("custom-ci");
-        kept = this.emptyDirectoryWithKeepFile("custom-keep");
+      async cifiles(this: {
+        emptyDirectory(d: string): unknown;
+        emptyDirectoryWithKeepFile(d: string): Promise<unknown>;
+      }): Promise<void> {
+        await this.emptyDirectory("custom-ci");
+        kept = await this.emptyDirectoryWithKeepFile("custom-keep");
       }
     };
     try {
-      await new AppGenerator({
-        cwd: tmpDir,
-        output: () => {},
-        appPath: "my-app",
-        database: "sqlite",
-      }).run();
+      await new AppGenerator(
+        ["my-app"],
+        { database: "sqlite" },
+        { destinationRoot: tmpDir },
+      ).invokeAll();
     } finally {
       delete TopLevel.AppBuilder;
     }

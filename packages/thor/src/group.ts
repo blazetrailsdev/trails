@@ -100,7 +100,7 @@ export class Group {
       Object.defineProperty(this.prototype, meth, {
         value: async function (this: Instance) {
           const self = this.constructor as GroupClass;
-          const prepared = self.prepareForInvocation(null, name);
+          const prepared = await self.prepareForInvocation(null, name);
           const [klass, command = null] = Array.isArray(prepared) ? prepared : [prepared];
 
           if (rtest(klass)) {
@@ -144,7 +144,7 @@ export class Group {
           let value = this.options[name];
           if (value === true) value = name;
           const self = this.constructor as GroupClass;
-          const prepared = self.prepareForInvocation(name, value);
+          const prepared = await self.prepareForInvocation(name, value);
           const [klass, command = null] = Array.isArray(prepared) ? prepared : [prepared];
 
           if (rtest(klass)) {

@@ -41,6 +41,7 @@ describe("AuthenticationGenerator", () => {
   it("the generated app type-checks under --strict", async () => {
     registerChildProcessAdapter("trailties-auth-strict-test", {
       spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
+      system: async () => ({ pid: 1, status: 0, signal: null }),
     });
     childProcessAdapterConfig.adapter = "trailties-auth-strict-test";
     const appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-auth-strict-"));
@@ -50,7 +51,7 @@ describe("AuthenticationGenerator", () => {
         fs.mkdirSync(path.dirname(path.join(appDir, rel)), { recursive: true });
         fs.writeFileSync(path.join(appDir, rel), content);
       }
-      await new AuthenticationGenerator({ cwd: appDir, output: () => {} }).run();
+      await new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
 
       const configPath = path.join(appDir, "tsconfig.json");
       const program = api
@@ -73,6 +74,7 @@ describe("AuthenticationGenerator pending generators", () => {
   it("re-running replaces create_users and create_sessions without a conflict", async () => {
     registerChildProcessAdapter("trailties-auth-rerun-test", {
       spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
+      system: async () => ({ pid: 1, status: 0, signal: null }),
     });
     childProcessAdapterConfig.adapter = "trailties-auth-rerun-test";
     const appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-auth-rerun-"));
@@ -81,7 +83,8 @@ describe("AuthenticationGenerator pending generators", () => {
         fs.mkdirSync(path.dirname(path.join(appDir, rel)), { recursive: true });
         fs.writeFileSync(path.join(appDir, rel), content);
       }
-      const generate = () => new AuthenticationGenerator({ cwd: appDir, output: () => {} }).run();
+      const generate = () =>
+        new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
       await generate();
       await expect(generate()).resolves.toBeDefined();
 
@@ -104,6 +107,7 @@ describe("AuthenticationGenerator enable_bcrypt", () => {
   it("adds the bcrypt gem port and requires it from config/application.ts", async () => {
     registerChildProcessAdapter("trailties-auth-bcrypt-test", {
       spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
+      system: async () => ({ pid: 1, status: 0, signal: null }),
     });
     childProcessAdapterConfig.adapter = "trailties-auth-bcrypt-test";
     const appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-auth-bcrypt-"));
@@ -116,8 +120,8 @@ describe("AuthenticationGenerator enable_bcrypt", () => {
         fs.mkdirSync(path.dirname(path.join(appDir, rel)), { recursive: true });
         fs.writeFileSync(path.join(appDir, rel), content);
       }
-      await new AuthenticationGenerator({ cwd: appDir, output: () => {} }).run();
-      await new AuthenticationGenerator({ cwd: appDir, output: () => {} }).run();
+      await new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
+      await new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
 
       const json = JSON.parse(fs.readFileSync(path.join(appDir, "package.json"), "utf-8"));
       expect(json.dependencies["@blazetrails/bcrypt"]).toBe("*");

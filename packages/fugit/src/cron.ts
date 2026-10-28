@@ -885,8 +885,7 @@ export class Frequency {
       dmin: new Duration(this.deltaMin).deflate().toPlainS(),
       dmax: new Duration(this.deltaMax).deflate().toPlainS(),
       ocs: this.occurrences,
-      // eslint-disable-next-line blazetrails/ruby-compat-native-required -- parity:api:calls:args pairs this argument by the Ruby call name
-      spn: new Duration(toI(this.span) as number).deflate().toPlainS(),
+      spn: new Duration(Math.trunc(this.span)).deflate().toPlainS(),
       spnys: Math.trunc(this.spanYears),
       yocs: Math.trunc(this.yearlyOccurrences),
     })

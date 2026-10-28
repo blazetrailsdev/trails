@@ -16,7 +16,6 @@ import {
   concernHookNames,
   concernHookKey,
   inlinedModuleMembers,
-  moduleInitializeFiles,
 } from "./extra-surface.js";
 import type { TaggedEntry, TaggedSummary } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
@@ -2133,9 +2132,7 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
 
   it("drops host-interface members that inheritance.ts does not declare", () => {
     const info = extract(FILES);
-    const mixin = info.modules["inheritance.ts:stiClassFor__mixin"];
-    expect(mixin?.synthesizedMixin).toBe(true);
-    expect(mixin.instanceMethods.find((m) => m.name === "toSlug")?.declaredIn).toBe("base.ts");
+    expect(info.modules["inheritance.ts:stiClassFor__mixin"]).toBeUndefined();
 
     const names = collectTsFileNames(
       "inheritance.ts",
@@ -2170,10 +2167,6 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
 
   it("drops the synthetic constructor entry of a class base.ts declares", () => {
     const info = extract(FILES);
-    const ctor = info.modules["inheritance.ts:stiClassFor__mixin"].instanceMethods.find(
-      (m) => m.name === "constructor",
-    );
-    expect(ctor?.declaredIn).toBe("base.ts");
 
     const names = collectTsFileNames(
       "inheritance.ts",
@@ -5004,30 +4997,6 @@ describe("buildReport — members Ruby supplies without a def in the mapped file
       }),
     ).toEqual({ "type/other.ts": ["serializeCastValue"] });
   });
-
-  it("finds the files in which a module defines initialize", () => {
-    expect([...moduleInitializeFiles(ruby.packages.activemodel)]).toEqual([
-      "type/serialize_cast_value.rb",
-    ]);
-  });
-
-  it("does not report a host constructor as inlined once the module twin carries [initialize]", () => {
-    const { classes, modules } = ruby.packages.activemodel;
-    const byShort = new Map([["SerializeCastValue", ["ActiveModel::Type::SerializeCastValue"]]]);
-    const inlined = (twin: string[]) =>
-      inlinedModuleMembers(
-        "activemodel",
-        classes,
-        modules,
-        byShort,
-        new Map([
-          ["type/value.ts", new Set(["constructor"])],
-          ["type/serialize-cast-value.ts", new Set(twin)],
-        ]),
-      ).map((f) => f.tsName);
-    expect(inlined([])).toEqual(["constructor"]);
-    expect(inlined(["[initialize]"])).toEqual([]);
-  });
 });
 
 describe("buildReport — --package does not scope the stale-tag check", () => {
@@ -5200,5 +5169,65 @@ describe("buildReport — DelegateClass resolution", () => {
     });
     const f = report.packages[0].extraFiles.find((x) => x.tsFile === "locking/optimistic.ts");
     expect(f!.extras.map((e) => e.name)).toEqual(["cast"]);
+  });
+});
+
+describe("buildReport — a RUBY_FILE_TS_OVERRIDES row onto a path-mirrored file", () => {
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      actionview: {
+        classes: {
+          "ActionView::DependencyTracker::ERBTracker": rubyClass({
+            name: "ERBTracker",
+            file: "dependency_tracker/erb_tracker.rb",
+            instance: [method("dependencies"), method("render_dependencies", true)],
+          }),
+          "ActionView::DependencyTracker::RubyTracker": rubyClass({
+            name: "RubyTracker",
+            file: "dependency_tracker/ruby_tracker.rb",
+            instance: [method("dependencies"), method("explicit_dependencies", true)],
+          }),
+        },
+        modules: {},
+      },
+    },
+  };
+  const ts: ApiManifest = {
+    source: "typescript",
+    generatedAt: "",
+    packages: {
+      actionview: {
+        classes: {
+          "dependency-tracker/tse-tracker.ts:TSETracker": {
+            name: "TSETracker",
+            file: "dependency-tracker/tse-tracker.ts",
+            includes: [],
+            extends: [],
+            instanceMethods: [
+              method("dependencies"),
+              method("renderDependencies", true),
+              method("explicitDependencies", true),
+            ],
+            classMethods: [],
+          },
+        },
+        modules: {},
+      },
+    },
+  };
+
+  it("reports neither class's names as moved and counts internal once", () => {
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const pkg = report.packages[0];
+    expect(pkg.totalMoved).toBe(0);
+    expect(pkg.extraFiles).toEqual([]);
+    expect(pkg.totalInternal).toBe(2);
   });
 });

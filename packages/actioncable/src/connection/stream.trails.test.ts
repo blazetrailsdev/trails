@@ -58,7 +58,7 @@ describe("ActionCable::Connection::Stream", () => {
     const { io, socket, stream } = setup();
     stream.hijackRackSocket();
     let raise: Error = new EOFError("end of file reached");
-    io.write = () => {
+    io.writeNonblock = () => {
       throw raise;
     };
     stream.write("x");
@@ -69,6 +69,18 @@ describe("ActionCable::Connection::Stream", () => {
     expect(socket.gone).toBe(3);
     raise = new Error("boom");
     expect(() => stream.write("x")).toThrow("boom");
+  });
+
+  it("queues what a short write leaves and flushes it once the io is writable", async () => {
+    const { peer, stream } = setup();
+    stream.hijackRackSocket();
+    const big = new Uint8Array(20 * 1024).map((_, i) => i % 251);
+    expect(stream.write(big)).toBe(20 * 1024);
+    expect(stream.write("tail")).toBe(4);
+    await tick();
+    await tick();
+    expect(peer.read()).toEqual(new Uint8Array([...big, ...new TextEncoder().encode("tail")]));
+    expect(stream.flushWriteBuffer()).toBe(true);
   });
 
   it("writes through stream.send when given", () => {

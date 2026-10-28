@@ -40,14 +40,12 @@ import type { helperMethod, HelpersClassMethods } from "../../abstract-controlle
 export class InvalidAuthenticityToken extends ActionControllerError {
   constructor(message?: string) {
     super(message ?? "ActionController::InvalidAuthenticityToken");
-    this.name = "ActionController::InvalidAuthenticityToken";
   }
 }
 
 export class InvalidCrossOriginRequest extends ActionControllerError {
   constructor(message?: string) {
     super(message ?? "ActionController::InvalidCrossOriginRequest");
-    this.name = "ActionController::InvalidCrossOriginRequest";
   }
 }
 

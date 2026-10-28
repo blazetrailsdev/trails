@@ -1,22 +1,17 @@
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import { NamedBase } from "../../named-base.js";
 import { TEMPLATES } from "./templates.js";
 
 export class JobGenerator extends NamedBase {
   static {
     this.checkClassCollision({ suffix: "JobTest" });
-    this.commands().push("createTestFile");
+    this.methodAdded("createTestFile");
   }
 
-  constructor(options: NamedBaseOptions) {
-    super(options);
-    this.fileName = this.fileName.replace(/_job$/i, "");
-  }
-
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions */
-  createTestFile(): void {
-    this.createFile(
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  async createTestFile(): Promise<void> {
+    await this.createFile(
       File.join(
         "test/jobs",
         ...this.classPathParts,
@@ -24,6 +19,14 @@ export class JobGenerator extends NamedBase {
       ),
       TEMPLATES.unit_test.call(this, this.ext()),
     );
+  }
+
+  /** @internal */
+  private __fileName?: string;
+
+  /** @internal */
+  override get fileName(): string {
+    return (this.__fileName ??= super.fileName.replace(/_job$/i, ""));
   }
 }
 

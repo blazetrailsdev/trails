@@ -2,16 +2,15 @@ import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { include } from "@blazetrails/activesupport";
+import { capture, include } from "@blazetrails/activesupport";
 import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
-import {
-  ScaffoldControllerGenerator,
-  type ScaffoldControllerGeneratorOptions,
-} from "./scaffold-controller-generator.js";
-import { ActionController, RouteSet, controllerConstants } from "@blazetrails/actionpack";
+import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { registerController } from "@blazetrails/actionpack";
 
 afterEach(() => {
-  controllerConstants.delete("posts");
+  if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
 });
 
 describe("ScaffoldControllerGenerator (dispatch)", () => {
@@ -26,7 +25,7 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
     routes.draw(function () {
       this.resources("posts");
     });
-    controllerConstants.set("posts", PostsController as never);
+    registerController("PostsController", PostsController as never);
 
     const [status, , body] = await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/posts/new" });
 
@@ -51,7 +50,7 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
       this.resources("posts");
     });
     include(PostsController, routes.urlHelpers());
-    controllerConstants.set("posts", PostsController as never);
+    registerController("PostsController", PostsController as never);
 
     const [status, headers] = await routes.call({
       REQUEST_METHOD: "DELETE",
@@ -76,11 +75,10 @@ describe("ScaffoldControllerGenerator (class collisions)", () => {
   });
   afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
-  const collision = (name: string) =>
-    ScaffoldControllerGenerator.start([name], { cwd: tmpDir, output: () => {} }).then(
-      () => null,
-      (e: Error) => e.message,
-    );
+  const collision = async (name: string) =>
+    (await capture("stderr", () =>
+      ScaffoldControllerGenerator.start([name], { destinationRoot: tmpDir }),
+    )) || null;
 
   it("checks only the namespace's own constants, as const_defined?(name, false) does", async () => {
     class Parent {
@@ -128,11 +126,8 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
     fs.readFileSync(path.join(tmpDir, "app/controllers/posts-controller.ts"), "utf-8");
 
   it("declares no path helper for an api controller, which redirects nowhere", async () => {
-    const options: Partial<ScaffoldControllerGeneratorOptions> = { api: true };
-    await ScaffoldControllerGenerator.start(["Post", "title:string"], {
-      cwd: tmpDir,
-      output: () => {},
-      ...options,
+    await ScaffoldControllerGenerator.start(["Post", "title:string", "--api"], {
+      destinationRoot: tmpDir,
     });
 
     expect(controller()).not.toContain("postsPath");
@@ -140,8 +135,7 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
 
   it("returns params.expect's permitted Parameters with no cast", async () => {
     await ScaffoldControllerGenerator.start(["Post", "title:string"], {
-      cwd: tmpDir,
-      output: () => {},
+      destinationRoot: tmpDir,
     });
 
     const content = controller();

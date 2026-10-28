@@ -36,6 +36,18 @@ export class Pathname {
     return this.path;
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:259` `path_sub_ext`, which keeps an extension of one character, a bare `.` (`:274-276`) */
+  subExt(repl: string): Pathname {
+    const ext = File.extname(this.path);
+    const str2 = this.path.slice(0, this.path.length - (ext.length <= 1 ? 0 : ext.length));
+    return new (this.constructor as typeof Pathname)(str2 + repl);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:873` `path_exist_p` */
+  isExist(): boolean {
+    return File.isExist(this.path);
+  }
+
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:647` `path_open` */
   open(...args: unknown[]): unknown {
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as (file: File) => unknown) : undefined;

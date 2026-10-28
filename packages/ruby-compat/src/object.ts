@@ -8,7 +8,7 @@ import { rbCheckStringType, rbErrorArity, stringValue } from "./string/support.j
 import { rbPlus } from "./numeric.js";
 import { BINARY_METHOD_TABLE, STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
-import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
+import { cmp, rbCmpint, rubyClass } from "./comparable.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
@@ -101,13 +101,11 @@ export function rbObjClass(obj: unknown): Klass {
 /**
  * `rb_obj_classname` (`vendor/ruby/v3.3.11/variable.c:498`): the
  * {@link rbModToS} of the class {@link rbObjClass} answers, which is how Ruby
- * interpolates `obj.class`, or the {@link rubyClass} brand.
+ * interpolates `obj.class`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbObjClassname(x: unknown): string {
-  const branded = typeof x === "object" && x !== null ? (x as Comparable)[rubyClass] : null;
-  if (branded != null) return branded;
   return rbModToS(rbObjClass(x));
 }
 
@@ -861,6 +859,8 @@ export function rbModMethodDefined(
  * shadow, for {@link rbCallSuper}. A function keeps the key it was first
  * installed under, as MRI's `super` searches by the method's `original_id`
  * (`vendor/ruby/v3.3.11/vm_insnhelper.c:4680`, `vm_search_super_method`).
+ * An accessor's `get` and `set` are seated one `half` at a time, as Ruby's
+ * `name` and `name=` are two methods.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -869,6 +869,7 @@ export function rbSeatSuper(
   key: string,
   method: unknown,
   descriptors: PropertyDescriptorMap,
+  half: "value" | "get" | "set" = "value",
 ): void {
   if (typeof method !== "function") return;
   let shadowed: unknown;
@@ -878,8 +879,8 @@ export function rbSeatSuper(
     link = Object.getPrototypeOf(link) as object | null
   ) {
     const desc = Object.getOwnPropertyDescriptor(link, key);
-    if (desc) {
-      shadowed = desc.value;
+    if (desc && (half === "value" || desc[half] !== undefined)) {
+      shadowed = desc[half];
       break;
     }
   }

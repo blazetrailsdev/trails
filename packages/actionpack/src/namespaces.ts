@@ -28,7 +28,12 @@ import type { MissingController, Request } from "./action-dispatch/http/request.
 import type { Assertions } from "./action-dispatch/testing/assertions.js";
 import type { TestProcess } from "./action-dispatch/testing/test-process.js";
 import type { TestResponse } from "./action-dispatch/testing/test-response.js";
-import type { Session as IntegrationSession } from "./action-dispatch/testing/integration.js";
+import type {
+  IntegrationTest,
+  Session as IntegrationSession,
+} from "./action-dispatch/testing/integration.js";
+import type { TestRequest as DispatchTestRequest } from "./action-dispatch/testing/test-request.js";
+import type { AssertionResponse } from "./action-dispatch/testing/assertion-response.js";
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
 import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
 import type { ActionableExceptions } from "./action-dispatch/middleware/actionable-exceptions.js";
@@ -82,6 +87,9 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_dispatch/testing/assertions": () => import("./action-dispatch/testing/assertions.js"),
   "action_dispatch/testing/test_process": () => import("./action-dispatch/testing/test-process.js"),
   "action_dispatch/testing/integration": () => import("./action-dispatch/testing/integration.js"),
+  "action_dispatch/testing/test_request": () => import("./action-dispatch/testing/test-request.js"),
+  "action_dispatch/testing/assertion_response": () =>
+    import("./action-dispatch/testing/assertion-response.js"),
   "action_dispatch/routing/polymorphic_routes": () =>
     import("./action-dispatch/routing/polymorphic-routes.js"),
   "action_dispatch/routing/routes_proxy": () => import("./action-dispatch/routing/routes-proxy.js"),
@@ -105,8 +113,11 @@ export const ActionDispatch = {
   MissingController: typeof MissingController;
   Routing: typeof Routing;
   Assertions: typeof Assertions;
+  IntegrationTest: typeof IntegrationTest;
   TestProcess: typeof TestProcess;
+  TestRequest: typeof DispatchTestRequest;
   TestResponse: typeof TestResponse;
+  AssertionResponse: typeof AssertionResponse;
   Integration: { name: string; Session: typeof IntegrationSession };
   Session: typeof Session;
   Http: typeof Http;
@@ -123,8 +134,11 @@ ActionDispatch.eagerAutoload(() => {
 ActionDispatch.autoloadUnder("testing", () => {
   ActionDispatch.autoload("Assertions");
   ActionDispatch.autoload("Integration");
+  ActionDispatch.autoload("IntegrationTest", "action_dispatch/testing/integration");
   ActionDispatch.autoload("TestProcess");
+  ActionDispatch.autoload("TestRequest");
   ActionDispatch.autoload("TestResponse");
+  ActionDispatch.autoload("AssertionResponse");
 });
 
 export const Routing = { name: "ActionDispatch::Routing", loadPath } as AutoloadModule & {

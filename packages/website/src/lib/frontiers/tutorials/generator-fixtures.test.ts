@@ -6,19 +6,16 @@ import { AppGenerator, ModelGenerator } from "@blazetrails/trailties/generators"
 import { fixtures } from "./generator-fixtures.js";
 
 let tmpDir: string;
-let output: string[];
 
 function makeModelGen(cwd: string) {
-  return new ModelGenerator({ cwd, output: (m) => output.push(m) });
+  return new ModelGenerator({ cwd });
 }
 
 beforeAll(async () => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-fixtures-"));
-  output = [];
 
   const appGen = new AppGenerator({
     cwd: tmpDir,
-    output: (m) => output.push(m),
     appPath: "docs",
     database: "sqlite",
   });
@@ -65,7 +62,6 @@ describe("generator fixtures", () => {
     let files: string[];
 
     beforeAll(() => {
-      output = [];
       const gen = makeModelGen(appDir());
       files = gen.run("User", ["name:string", "email:string"]);
     });
@@ -97,7 +93,6 @@ describe("generator fixtures", () => {
     let files: string[];
 
     beforeAll(() => {
-      output = [];
       const gen = makeModelGen(appDir());
       files = gen.run("Folder", ["name:string", "user_id:integer", "parent_id:integer"]);
     });
@@ -126,7 +121,6 @@ describe("generator fixtures", () => {
     let files: string[];
 
     beforeAll(() => {
-      output = [];
       const gen = makeModelGen(appDir());
       files = gen.run("Document", [
         "title:string",
@@ -171,7 +165,6 @@ describe("generator fixtures", () => {
     }
 
     beforeAll(() => {
-      output = [];
       const cwd = appDir();
       artistFiles = makeModelGen(cwd).run("Artist", ["name:string", "bio:text"]);
       albumFiles = makeModelGen(cwd).run("Album", [
@@ -247,7 +240,6 @@ describe("generator fixtures", () => {
     }
 
     beforeAll(() => {
-      output = [];
       const cwd = appDir();
       accountFiles = makeModelGen(cwd).run("Account", ["name:string", "balance:decimal"]);
       categoryFiles = makeModelGen(cwd).run("Category", ["name:string", "parent_id:integer"]);
@@ -339,7 +331,7 @@ describe("exported fixtures", () => {
     }
     const name = parts[2];
     const args = parts.slice(3);
-    const gen = new ModelGenerator({ cwd, output: () => {} });
+    const gen = new ModelGenerator({ cwd });
     return gen.run(name, args);
   }
 

@@ -32,8 +32,16 @@ const APP_CTRL_EMPTY = `import { ActionController } from "@blazetrails/actionpac
 let tmpDir: string;
 const read = (rel: string) => fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 const exists = (rel: string) => fs.existsSync(path.join(tmpDir, rel));
-const makeGen = (options: { api?: boolean } = {}) =>
-  new AuthenticationGenerator({ cwd: tmpDir, output: () => {}, ...options });
+const listFiles = (root: string): string[] =>
+  (fs.readdirSync(root, { recursive: true }) as string[])
+    .filter((f) => fs.statSync(path.join(root, f)).isFile())
+    .sort();
+const makeGen = (options: { api?: boolean } = {}) => ({
+  run: async () => {
+    await new AuthenticationGenerator([], options, { destinationRoot: tmpDir }).invokeAll();
+    return listFiles(tmpDir);
+  },
+});
 const withActionCableEngine = async (block: () => Promise<unknown>) => {
   const oldValue = TopLevel.ActionCable;
   TopLevel.ActionCable = { Engine: class Engine {} };
@@ -59,6 +67,10 @@ beforeEach(() => {
       spawned.push([cmd, ...args]);
       return { status: 0, signal: null, stdout: "", stderr: "" };
     },
+    system: async (command) => {
+      spawned.push(command.split(" "));
+      return { pid: 1, status: 0, signal: null };
+    },
   });
   childProcessAdapterConfig.adapter = "trailties-auth-test";
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-auth-"));
@@ -83,7 +95,7 @@ describe("AuthenticationGenerator", () => {
   });
 
   it("--api still templates the mailer, its views and its preview", async () => {
-    await AuthenticationGenerator.start(["--api"], { cwd: tmpDir, output: () => {} });
+    await AuthenticationGenerator.start(["--api"], { destinationRoot: tmpDir });
     expect(exists("app/mailers/passwords-mailer.ts")).toBe(true);
     for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
     for (const rel of TEMPLATE_ENGINE_VIEWS) expect(exists(rel), rel).toBe(false);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Enumerator, toEnum } from "./enumerator.js";
+import { eachSlice } from "./enumerable.js";
 import { block } from "./hash.js";
 import { StopIteration } from "./stop-iteration.js";
 import { rbFSend } from "./object.js";
@@ -72,5 +73,28 @@ describe("Array#each with no block (rb_ary_each's RETURN_SIZED_ENUMERATOR, vendo
     expect([...(rbFSend(["a", "b"], "each") as Iterable<unknown>)]).toEqual(["a", "b"]);
     const own = { each: (block?: unknown) => `own:${typeof block}` };
     expect(rbFSend(own, "each")).toBe("own:undefined");
+  });
+});
+
+describe("Enumerator over an each that answers a promise", () => {
+  const asyncReceiver = {
+    each(block: (i: number) => void): Promise<void> {
+      return Promise.resolve().then(() => [1, 2, 3].forEach((i) => block(i)));
+    },
+  };
+
+  it("toA answers a promise of the slices", async () => {
+    await expect(eachSlice(asyncReceiver, 2).toA()).resolves.toEqual([[1, 2], [3]]);
+  });
+
+  it("yields the slices under for await", async () => {
+    const slices: number[][] = [];
+    for await (const slice of eachSlice(asyncReceiver, 2)) slices.push(slice);
+    expect(slices).toEqual([[1, 2], [3]]);
+  });
+
+  it("sizes a sliced enumerator through enum_size", () => {
+    expect(eachSlice([1, 2, 3], 2).size()).toBe(2);
+    expect(eachSlice(asyncReceiver, 2).size()).toBeNull();
   });
 });

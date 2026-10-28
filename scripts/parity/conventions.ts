@@ -362,6 +362,7 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `ARUNIT_ENTRY_NAMES`, both declared in connection.ts, which already imports
   // from config.ts — porting it to config.ts would CREATE an import cycle.
   "activerecord-test-support:config.rb": "connection.ts",
+  "actionview:dependency_tracker/ruby_tracker.rb": "dependency-tracker/tse-tracker.ts",
 };
 
 /** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */

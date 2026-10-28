@@ -3,13 +3,13 @@ import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotat
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { IntegrationTest, Session } from "./integration.js";
 import { Base } from "../../action-controller/base.js";
-import { controllerConstants } from "../http/request.js";
 import { DebugExceptions } from "../middleware/debug-exceptions.js";
 import { ShowExceptions } from "../middleware/show-exceptions.js";
 import type { MiddlewareFactory, MiddlewareStack } from "../middleware/stack.js";
 import { CookieStore } from "../middleware/session/cookie-store.js";
 import { assertEqual, HashWithIndifferentAccess, include } from "@blazetrails/activesupport";
 import { SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
+import { registerController } from "../../action-controller/base.js";
 
 const Generator = new KeyGenerator("a".repeat(64), { iterations: 2 });
 const Rotations = new RotationConfiguration();
@@ -198,10 +198,10 @@ describe("ActionDispatch::IntegrationTest", () => {
       this.resource("session");
     });
     app.app = IntegrationTest.buildApp(app.routes, useCookieStore);
-    controllerConstants.set("posts", PostsController);
-    controllerConstants.set("comments", CommentsController);
-    controllerConstants.set("admin/posts", AdminPostsController);
-    controllerConstants.set("sessions", SessionsController);
+    registerController("PostsController", PostsController);
+    registerController("CommentsController", CommentsController);
+    registerController("Admin::PostsController", AdminPostsController);
+    registerController("SessionsController", SessionsController);
   });
 
   describe("basic requests", () => {
@@ -661,7 +661,7 @@ describe("ActionDispatch::IntegrationTest", () => {
         this.get("/redirect-to-missing", { to: "redirector#index", as: "redirector" });
       });
       redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
-      controllerConstants.set("redirector", RedirectToMissingController);
+      registerController("RedirectorController", RedirectToMissingController);
 
       await redirectApp.get("/redirect-to-missing");
       redirectApp.assertResponse("redirect");
@@ -683,7 +683,7 @@ describe("ActionDispatch::IntegrationTest", () => {
         this.get("/redirect-to-missing2", { to: "redirector2#index", as: "redirector2" });
       });
       redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
-      controllerConstants.set("redirector2", RedirectToMissing2Controller);
+      registerController("Redirector2Controller", RedirectToMissing2Controller);
 
       await redirectApp.get("/redirect-to-missing2");
       redirectApp.assertResponse("redirect");

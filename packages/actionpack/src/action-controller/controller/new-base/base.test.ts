@@ -2,8 +2,8 @@ import { registerConstant } from "@blazetrails/ruby-compat";
 import { assertEqual } from "@blazetrails/activesupport";
 import { beforeEach, describe, it } from "vitest";
 import { Base } from "../../base.js";
-import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../base.js";
 
 registerConstant("Dispatching", { name: "Dispatching" });
 registerConstant("Dispatching::Submodule", { name: "Dispatching::Submodule" });
@@ -67,7 +67,7 @@ for (const [klass, name] of [
 ] as const) {
   Object.defineProperty(klass, "name", { value: name });
 }
-controllerConstants.set("dispatching/simple", SimpleController);
+registerController("Dispatching::SimpleController", SimpleController);
 
 class BaseTest extends Rack.TestCase {}
 

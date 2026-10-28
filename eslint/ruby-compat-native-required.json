@@ -1,4 +1,10 @@
 {
+  "aryCount": {
+    "member": "aryCount",
+    "native": "xs.filter(fn).length",
+    "maxArgs": 2,
+    "kinds": ["array"]
+  },
   "aryIncludes": {
     "member": "aryIncludes",
     "native": "xs.includes(x)",
@@ -11,7 +17,8 @@
     "native": "xs.join(sep)",
     "maxArgs": 2,
     "kinds": ["array"],
-    "elements": ["string", "number"]
+    "elements": ["string", "number"],
+    "symbolAliases": ["ExplainOption"]
   },
   "compact": {
     "member": "compact",

@@ -1,11 +1,16 @@
+import { camelize } from "@blazetrails/activesupport";
+import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "./route-set.js";
-import type { DispatchableControllerClass } from "./dispatcher.js";
 import { X_CASCADE } from "../constants.js";
 import { Response } from "../http/response.js";
-import { controllerConstants, Request } from "../http/request.js";
+import { Request } from "../http/request.js";
 import { Dispatcher, StaticDispatcher } from "./route-set.js";
 import type { RouterRequest } from "../journey/router.js";
+import {
+  Base,
+  registerController as registerControllerClass,
+} from "../../action-controller/base.js";
 
 function makeReq(path: string, method = "GET"): RouterRequest {
   const req = new Request({
@@ -20,8 +25,8 @@ function makeReq(path: string, method = "GET"): RouterRequest {
 
 function makeControllerClass(
   body: (action: string, req: RouterRequest) => [number, Record<string, string>, string[]],
-): DispatchableControllerClass {
-  return class {
+): typeof Base {
+  return class extends Base {
     static actionEncodingTemplate(): null {
       return null;
     }
@@ -36,19 +41,21 @@ function makeControllerClass(
     ): Promise<[number, Record<string, string>, string[]]> {
       return body(action, req as unknown as RouterRequest);
     }
-  } as unknown as DispatchableControllerClass;
+  };
 }
 
 describe("RouteDispatcher", () => {
   const registered: string[] = [];
 
-  function registerController(controller: string, controllerClass: DispatchableControllerClass) {
-    controllerConstants.set(controller, controllerClass);
+  function registerController(controller: string, controllerClass: typeof Base) {
+    registerControllerClass(`${camelize(controller)}Controller`, controllerClass);
     registered.push(controller);
   }
 
   afterEach(() => {
-    for (const controller of registered.splice(0)) controllerConstants.delete(controller);
+    for (const controller of registered.splice(0))
+      if (isRegisteredConstant(`${camelize(controller)}Controller`))
+        rbModRemoveConst(Object, `${camelize(controller)}Controller`);
   });
 
   it("dispatches to a registered handler via RouteSet.serve", async () => {
@@ -175,14 +182,14 @@ describe("RouteDispatcher", () => {
       "posts",
       makeControllerClass(() => [200, {}, []]),
     );
-    controllerConstants.delete("posts");
+    rbModRemoveConst(Object, "PostsController");
     const res = await routes.router.serve(makeReq("/posts/index"));
     expect(res[0]).toBe(404);
   });
 });
 
 describe("Dispatcher over the controller constant table", () => {
-  class PostsController {
+  class PostsController extends Base {
     static actionEncodingTemplate(): null {
       return null;
     }
@@ -197,10 +204,10 @@ describe("Dispatcher over the controller constant table", () => {
   }
 
   beforeEach(() => {
-    controllerConstants.set("posts", PostsController as unknown as DispatchableControllerClass);
+    registerControllerClass("PostsController", PostsController);
   });
   afterEach(() => {
-    controllerConstants.delete("posts");
+    if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
   });
 
   const reqFor = (params: Record<string, unknown>): RouterRequest => {

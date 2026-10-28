@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
-import { MigrationGenerator } from "./migration-generator.js";
+import { MigrationGenerator } from "./active-record/migration/migration-generator.js";
+import { MigrationGenerator as RailsMigrationGenerator } from "./rails/migration/migration-generator.js";
 import * as Assertions from "./testing/assertions.js";
 import { migrationFileName as _migrationFileName } from "./testing/behavior.js";
 import { Application } from "../application.js";
@@ -26,6 +28,9 @@ beforeEach(() => {
   destination.destinationRoot = tmpDir;
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
+  vi.spyOn(stdout, "write").mockImplementation(
+    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
+  );
   Trails.application = MigrationGeneratorTestApp.instance();
   oldBelongsToRequiredByDefault = Trails.application.config.activeRecord.belongsToRequiredByDefault;
   Trails.application.config.activeRecord.belongsToRequiredByDefault = true;
@@ -38,8 +43,14 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function makeGen() {
-  return new MigrationGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
+function makeGen(destinationRoot = tmpDir) {
+  return {
+    run: async (name: string, args: string[], options: object = {}) => {
+      const gen = new MigrationGenerator([name, ...args], options, { destinationRoot });
+      await gen.createMigrationFile();
+      return fs.readdirSync(path.join(destinationRoot, "db/migrate")).map((f) => `db/migrate/${f}`);
+    },
+  };
 }
 
 describe("MigrationGeneratorTest", () => {
@@ -76,7 +87,7 @@ describe("MigrationGeneratorTest", () => {
   });
 
   it("exit on failure", () => {
-    expect(MigrationGenerator.exitOnFailure).toBe(true);
+    expect(RailsMigrationGenerator.isExitOnFailure()).toBe(true);
   });
 
   it("add migration with attributes", async () => {
@@ -482,11 +493,9 @@ describe("MigrationGeneratorTest", () => {
 
 describe("MigrationGeneratorTest (JavaScript project)", () => {
   let jsTmpDir: string;
-  let jsLines: string[];
 
   beforeEach(() => {
     jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
-    jsLines = [];
   });
 
   afterEach(() => {
@@ -494,7 +503,7 @@ describe("MigrationGeneratorTest (JavaScript project)", () => {
   });
 
   function makeJsGen() {
-    return new MigrationGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
+    return makeGen(jsTmpDir);
   }
 
   function readJsMigration(files: string[]): string {

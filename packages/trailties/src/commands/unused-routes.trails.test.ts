@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, onTestFinished, vi } from "vitest";
 import { ActionController, ActionView, type Journey } from "@blazetrails/actionpack";
 import { Base } from "@blazetrails/activerecord";
+import { capture } from "@blazetrails/activesupport";
 import {
   env,
   getFs,
@@ -172,11 +173,23 @@ describe("UnusedRoutesCommand", () => {
     );
     await Trails.initialize();
 
-    const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    await createProgram().parseAsync(["routes", "-u"], { from: "user" });
-    const output = log.mock.calls.map((args) => args.join(" ")).join("\n");
+    const output = await capture(":stdout", () =>
+      createProgram().parseAsync(["routes", "-u"], { from: "user" }),
+    );
     expect(output).toMatch(/^Found 1 unused route:$/m);
     expect(output).toMatch(/legacy GET\s+\/legacy\(\.:format\)\s+legacy#index/);
     expect(exit).toHaveBeenCalledWith(1);
   }, 15_000);
+});
+
+describe("unusedRoutesCommand", () => {
+  it("hands its flags to Thor unparsed", async () => {
+    const { UnusedRoutesCommand } = await import("./unused-routes.js");
+    const perform = vi.spyOn(UnusedRoutesCommand, "perform").mockResolvedValue();
+    onTestFinished(() => perform.mockRestore());
+    await createProgram().parseAsync(["unused_routes", "--controller", "Posts", "-g", "x"], {
+      from: "user",
+    });
+    expect(perform).toHaveBeenCalledWith("unused_routes", ["--controller", "Posts", "-g", "x"], {});
+  });
 });

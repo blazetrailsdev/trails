@@ -27,7 +27,6 @@ import {
   newRunToken,
   ownRunDatabases,
   runDatabasePrefix,
-  slotDatabaseName,
   staleRunDatabases,
 } from "./run-token.js";
 import { quoteTableName as quoteMysqlTableName } from "../connection-adapters/mysql/quoting.js";
@@ -189,7 +188,7 @@ const pgAdapter: DbTemplateAdapter = {
     }
 
     for (let slot = 1; slot <= slotCount(); slot++) {
-      const slotDb = slotDatabaseName(base, runToken, slot);
+      const slotDb = `${runDatabasePrefix(base, runToken)}${slot}`;
       await admin.query(
         `CREATE DATABASE ${quotePgTableName(slotDb)} TEMPLATE ${quotePgTableName(templateDb)}`,
       );
@@ -249,7 +248,7 @@ const mysqlAdapter: DbTemplateAdapter = {
       staleRunDatabases(baseDb, runToken, await mysqlDatabaseNames(admin)),
     );
     for (let slot = 1; slot <= n; slot++) {
-      const slotDb = slotDatabaseName(baseDb, runToken, slot);
+      const slotDb = `${runDatabasePrefix(baseDb, runToken)}${slot}`;
       await admin.query(
         `CREATE DATABASE ${quoteMysqlTableName(slotDb)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
       );
@@ -258,7 +257,10 @@ const mysqlAdapter: DbTemplateAdapter = {
 
     await Promise.all(
       Array.from({ length: n }, (_, i) => i + 1).map(async (slot) => {
-        const slotSettings = withDatabase(settings, slotDatabaseName(baseDb, runToken, slot));
+        const slotSettings = withDatabase(
+          settings,
+          `${runDatabasePrefix(baseDb, runToken)}${slot}`,
+        );
         const { adapter, pool } = await pooledTemplateAdapter({
           adapter: "mysql2",
           ...driverConfig(slotSettings),

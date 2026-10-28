@@ -6,8 +6,6 @@ import {
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
 import { GeneratorBase } from "./base.js";
-import { optimizeIndentation } from "./actions.js";
-import { GeneratorError } from "./generated-attribute.js";
 
 class TestGenerator extends GeneratorBase {}
 
@@ -15,7 +13,8 @@ const path: PathAdapter = {
   join: (...p) => p.filter(Boolean).join("/"),
   dirname: (p) => p.split("/").slice(0, -1).join("/") || "/",
   basename: (p) => p.split("/").pop()!,
-  resolve: (...p) => p.filter(Boolean).join("/"),
+  resolve: (...p) =>
+    p.filter(Boolean).reduce((acc, seg) => (seg.startsWith("/") ? seg : `${acc}/${seg}`), ""),
   extname: (p) => (p.lastIndexOf(".") >= 0 ? p.slice(p.lastIndexOf(".")) : ""),
   isAbsolute: (p) => p.startsWith("/"),
   sep: "/",
@@ -52,8 +51,8 @@ afterEach(() => {
   fsAdapterConfig.adapter = previousAdapter;
 });
 
-function makeGen(output: (m: string) => void = () => {}): TestGenerator {
-  return new TestGenerator({ cwd: "/app", output });
+function makeGen(): TestGenerator {
+  return new TestGenerator([], {}, { destinationRoot: "/app" });
 }
 
 describe("TrailsActions", () => {
@@ -115,189 +114,5 @@ describe("TrailsActions", () => {
       };
       expect(json.devDependencies.vitest).toBe("^3.0.0");
     });
-  });
-
-  describe("route", () => {
-    const draw = `import { Trails } from "@blazetrails/trailties";\n\nTrails.application!.routes().draw(function () {\n`;
-
-    it("injects code after the drawRoutes sentinel", async () => {
-      files.set("/app/config/routes.ts", `${draw}  this.get("up");\n});\n`);
-      await makeGen().route(`this.resources("posts");`);
-      expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  this.resources("posts");\n  this.get("up");\n});\n`,
-      );
-    });
-
-    it("does not inject code that is already present", async () => {
-      files.set("/app/config/routes.ts", `${draw}});\n`);
-      await makeGen().route(`this.resources("posts");`);
-      await makeGen().route(`this.resources("posts");`);
-      expect(files.get("/app/config/routes.ts")).toBe(`${draw}  this.resources("posts");\n});\n`);
-    });
-
-    it("raises Thor's missing-file error unless pretending", async () => {
-      await expect(makeGen().route(`this.resources("posts");`)).rejects.toThrow(
-        new GeneratorError("The file /app/config/routes.ts does not appear to exist"),
-      );
-      const pretend = new TestGenerator({ cwd: "/app", output: () => {}, pretend: true });
-      await expect(pretend.route(`this.resources("posts");`)).resolves.toBeUndefined();
-      expect(files.has("/app/config/routes.ts")).toBe(false);
-    });
-
-    it("wraps code in the given namespaces", async () => {
-      files.set("/app/config/routes.ts", `${draw}});\n`);
-      await makeGen().route(`this.resources("posts");`, { namespace: ["admin", "blog"] });
-      expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  this.namespace("admin", () => {\n    this.namespace("blog", () => {\n      this.resources("posts");\n    });\n  });\n});\n`,
-      );
-    });
-
-    it("injects into an existing namespace block", async () => {
-      files.set(
-        "/app/config/routes.ts",
-        `${draw}  this.namespace("admin", () => {\n    this.resources("users");\n  });\n});\n`,
-      );
-      await makeGen().route(`this.resources("posts");`, { namespace: "admin" });
-      expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  this.namespace("admin", () => {\n    this.resources("posts");\n    this.resources("users");\n  });\n});\n`,
-      );
-    });
-
-    it("route with namespace option revokes route without breaking existing namespace blocks", async () => {
-      const revoke = new TestGenerator({ cwd: "/app", output: () => {}, behavior: "revoke" });
-      files.set("/app/config/routes.ts", `${draw}});\n`);
-      await makeGen().route(
-        optimizeIndentation(
-          `this.namespace("baz", () => {
-  this.get("foo1");
-  this.namespace("qux", () => {
-    this.get("foo2");
-    this.namespace("hoge", () => {
-      this.get("foo3");
-    });
-  });
-  this.get("bar1");
-});`,
-          0,
-        ).trimEnd(),
-      );
-
-      await revoke.route(`this.get("foo2");`, { namespace: ["baz", "qux"] });
-      expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  this.namespace("baz", () => {
-    this.get("foo1");
-    this.namespace("qux", () => {
-      this.namespace("hoge", () => {
-        this.get("foo3");
-      });
-    });
-    this.get("bar1");
-  });
-});\n`,
-      );
-
-      await revoke.route(`this.get("foo3");`, { namespace: ["baz", "qux", "hoge"] });
-      expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  this.namespace("baz", () => {
-    this.get("foo1");
-    this.get("bar1");
-  });
-});\n`,
-      );
-    });
-  });
-
-  describe("environment", () => {
-    const app = `export class MyApp extends Application {\n  static {\n    this.config.loadDefaults("8.0");\n  }\n}\n`;
-    const env = `Trails.application.configure(function () {\n  this.config.eagerLoad = false;\n});\n`;
-
-    it("injects code into application.ts after the class sentinel by default", async () => {
-      files.set("/app/config/application.ts", app);
-      await makeGen().environment(`this.config.logLevel = "debug";`);
-      expect(files.get("/app/config/application.ts")).toBe(
-        `export class MyApp extends Application {\n  static {\n    this.config.logLevel = "debug";\n    this.config.loadDefaults("8.0");\n  }\n}\n`,
-      );
-    });
-
-    it("application is an alias of environment", async () => {
-      files.set("/app/config/application.ts", app);
-      await makeGen().application(`this.config.logLevel = "debug";`);
-      expect(files.get("/app/config/application.ts")).toContain(
-        `  static {\n    this.config.logLevel = "debug";\n`,
-      );
-    });
-
-    it("injects after every occurrence of the sentinel, as Thor's gsub! does", async () => {
-      files.set("/app/config/environments/production.ts", `${env}${env}`);
-      await makeGen().environment(`this.config.logLevel = "warn";`, { env: "production" });
-      expect(
-        files.get("/app/config/environments/production.ts")!.match(/this\.config\.logLevel/g),
-      ).toHaveLength(2);
-    });
-
-    it("rejects env names containing path separators or traversal segments", async () => {
-      await expect(makeGen().environment(`x: 1,`, { env: "../evil" })).rejects.toThrow(
-        /environment name must match/,
-      );
-      await expect(makeGen().environment(`x: 1,`, { env: "prod/extra" })).rejects.toThrow(
-        /environment name must match/,
-      );
-    });
-
-    it("with env option targets each env-specific config file", async () => {
-      files.set("/app/config/environments/production.ts", env);
-      files.set("/app/config/environments/test.ts", env);
-      await makeGen().environment(`this.config.logLevel = "warn";`, {
-        env: ["production", "test"],
-      });
-      for (const name of ["production", "test"]) {
-        expect(files.get(`/app/config/environments/${name}.ts`)).toBe(
-          `Trails.application.configure(function () {\n  this.config.logLevel = "warn";\n  this.config.eagerLoad = false;\n});\n`,
-        );
-      }
-    });
-  });
-
-  describe("initializer", () => {
-    it("writes the file under config/initializers/", async () => {
-      await makeGen().initializer("my-config.ts", `export const myConfig = { enabled: true };\n`);
-      expect(files.get("/app/config/initializers/my-config.ts")).toBe(
-        `export const myConfig = { enabled: true };\n`,
-      );
-      expect(dirs.has("/app/config/initializers")).toBe(true);
-    });
-
-    it("appends a trailing newline when missing", async () => {
-      await makeGen().initializer("x.ts", "export const x = 1;");
-      expect(files.get("/app/config/initializers/x.ts")).toBe("export const x = 1;\n");
-    });
-
-    it("rejects Ruby-shape source via assertNoRubySource", async () => {
-      await expect(makeGen().initializer("bad.rb", "class Foo\nend\n")).rejects.toThrow(
-        /Ruby-like source/,
-      );
-    });
-
-    it("rejects filenames containing path separators or .. segments", async () => {
-      await expect(makeGen().initializer("../evil.ts", "export {};")).rejects.toThrow(/leaf name/);
-      await expect(makeGen().initializer("nested/x.ts", "export {};")).rejects.toThrow(/leaf name/);
-    });
-
-    it("rejects empty, ., and .. filenames", async () => {
-      await expect(makeGen().initializer("", "export {};")).rejects.toThrow(/leaf name/);
-      await expect(makeGen().initializer(".", "export {};")).rejects.toThrow(/leaf name/);
-      await expect(makeGen().initializer("..", "export {};")).rejects.toThrow(/leaf name/);
-    });
-  });
-
-  it('optimizeIndentation interpolates a nil value as Ruby\'s "#{nil}\\n" does', () => {
-    expect(optimizeIndentation(null)).toBe("\n");
-    expect(optimizeIndentation(undefined)).toBe("\n");
-    expect(optimizeIndentation("  a\n    b\n", 2)).toBe("  a\n    b\n");
-  });
-
-  it("route and environment reject Ruby-shape source", async () => {
-    await expect(makeGen().route("class Foo\nend")).rejects.toThrow(/Ruby-like source/);
-    await expect(makeGen().environment("class Foo\nend")).rejects.toThrow(/Ruby-like source/);
   });
 });
