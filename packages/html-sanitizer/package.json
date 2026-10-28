@@ -22,6 +22,7 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@csstools/css-tokenizer": "4.0.2",
     "sanitize-html": "^2.13.0"
   },
   "devDependencies": {

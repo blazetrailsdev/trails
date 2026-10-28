@@ -5171,3 +5171,63 @@ describe("buildReport — DelegateClass resolution", () => {
     expect(f!.extras.map((e) => e.name)).toEqual(["cast"]);
   });
 });
+
+describe("buildReport — a RUBY_FILE_TS_OVERRIDES row onto a path-mirrored file", () => {
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      actionview: {
+        classes: {
+          "ActionView::DependencyTracker::ERBTracker": rubyClass({
+            name: "ERBTracker",
+            file: "dependency_tracker/erb_tracker.rb",
+            instance: [method("dependencies"), method("render_dependencies", true)],
+          }),
+          "ActionView::DependencyTracker::RubyTracker": rubyClass({
+            name: "RubyTracker",
+            file: "dependency_tracker/ruby_tracker.rb",
+            instance: [method("dependencies"), method("explicit_dependencies", true)],
+          }),
+        },
+        modules: {},
+      },
+    },
+  };
+  const ts: ApiManifest = {
+    source: "typescript",
+    generatedAt: "",
+    packages: {
+      actionview: {
+        classes: {
+          "dependency-tracker/tse-tracker.ts:TSETracker": {
+            name: "TSETracker",
+            file: "dependency-tracker/tse-tracker.ts",
+            includes: [],
+            extends: [],
+            instanceMethods: [
+              method("dependencies"),
+              method("renderDependencies", true),
+              method("explicitDependencies", true),
+            ],
+            classMethods: [],
+          },
+        },
+        modules: {},
+      },
+    },
+  };
+
+  it("reports neither class's names as moved and counts internal once", () => {
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const pkg = report.packages[0];
+    expect(pkg.totalMoved).toBe(0);
+    expect(pkg.extraFiles).toEqual([]);
+    expect(pkg.totalInternal).toBe(2);
+  });
+});
