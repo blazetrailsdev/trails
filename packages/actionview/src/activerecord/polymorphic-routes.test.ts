@@ -16,7 +16,6 @@ import {
   extend,
   include,
   NoMethodError,
-  rbModConstSet,
   rbObjSingletonClass,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -85,14 +84,12 @@ registerConstant("Weblog", Weblog);
 
 class Post extends Base {
   static {
-    rbModConstSet(Weblog, "Post", this);
     this.tableName = "projects";
   }
 }
 
 class Blog extends Base {
   static {
-    rbModConstSet(Weblog, "Blog", this);
     this.tableName = "projects";
   }
 }
