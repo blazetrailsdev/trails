@@ -467,14 +467,21 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * its package's generated table holds (RFC 0205), else the name its
  * definition gave it, or `nil` while it is anonymous.
  *
+ * A class expression with no identifier is Ruby's `Class.new`, which JS names
+ * after the binding it is assigned to. Like Ruby, that names the class only
+ * when the binding is a constant name (`Foo = Class.new`), not a local
+ * (`klass = Class.new`).
+ *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModName(klass: object): string | null {
-  return (
-    classpaths.get(klass)?.path ??
-    generatedClassPath(klass) ??
-    ((klass as { name?: string | null }).name || null)
-  );
+  const path = classpaths.get(klass)?.path ?? generatedClassPath(klass);
+  if (path !== undefined) return path;
+  const name = (klass as { name?: string | null }).name;
+  if (!name) return null;
+  if (typeof klass !== "function" || /^[\p{Lu}\p{Lt}]/u.test(name)) return name;
+  const source = Function.prototype.toString.call(klass);
+  return /^class(?:\s|\/\*[\s\S]*?\*\/|\/\/.*)*(?:extends\b|\{)/.test(source) ? null : name;
 }
 
 /**
