@@ -209,6 +209,7 @@ export const TYPED_NATIVE_FORM = {
   merge: "merge@typed",
   mergeBang: "merge!@typed",
   update: "update@typed",
+  fetch: "fetch@typed",
 } as const;
 
 /**

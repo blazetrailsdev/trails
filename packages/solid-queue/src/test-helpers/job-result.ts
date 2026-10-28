@@ -19,10 +19,6 @@ registerConstant("JobResult", JobResult);
 registerModel(JobResult);
 
 export class StoreResultJob extends ApplicationJob {
-  static toString(): string {
-    return "StoreResultJob";
-  }
-
   static {
     this.queueAs("background");
   }

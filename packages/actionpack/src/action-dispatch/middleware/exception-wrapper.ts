@@ -313,6 +313,8 @@ export class ExceptionWrapper {
     return _idFor(this.exception);
   }
 
+  static SourceMapLocation = SourceMapLocation;
+
   get sourceExtracts(): SourceExtract[] {
     return this.backtrace.map((trace) => this.extractSource(trace));
   }
