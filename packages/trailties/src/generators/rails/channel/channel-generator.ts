@@ -63,7 +63,7 @@ export class ChannelGenerator extends NamedBase {
 
   /**
    * @internal
-   * @missingRailsCall copy_file — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions
+   * @missingRailsCall copy_file — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
    */
   private createSharedChannelFiles(): void {
     if (this.behavior !== "invoke") return;
@@ -80,7 +80,7 @@ export class ChannelGenerator extends NamedBase {
 
   /**
    * @internal
-   * @missingRailsCall template — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions
+   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
    */
   private createChannelFile(): void {
     this.createFile(
@@ -95,7 +95,7 @@ export class ChannelGenerator extends NamedBase {
 
   /**
    * @internal
-   * @missingRailsCall template — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions
+   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
    */
   private createSharedChannelJavascriptFiles(): void {
     this.createFile("app/javascript/channels/index.js", TEMPLATES["javascript/index.js"]());
@@ -104,7 +104,7 @@ export class ChannelGenerator extends NamedBase {
 
   /**
    * @internal
-   * @missingRailsCall js_template — CONVERGEABLE converge-generator-base-file-actions-onto-thor-actions
+   * @missingRailsCall js_template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
    */
   private async createChannelJavascriptFile(): Promise<void> {
     const channelJsPath = File.join(
