@@ -191,8 +191,6 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
           tsFile,
           tsByFileName,
         );
-        // A class Rails nests under its owner's name (`Template::Error`) may be
-        // spelled with the owner's short name in front (`TemplateError`).
         tsCls ??=
           kind === "classes"
             ? tsByFileName.get(`${tsFile}::${fqn.split("::").at(-2)}${short}`)
@@ -218,8 +216,6 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     const read = async (file: string) =>
       sources.get(file) ??
       sources.set(file, await fs.readFile(path.join(srcRoot, file), "utf8")).get(file)!;
-    // A class Ruby nests in another (`Rack::Session::Cookie::Base64::JSON`) is a
-    // static of its exported owner, so the table reads it off the owner.
     const tsPath = async (entry: ClassPathEntry): Promise<string | null> => {
       const source = await read(entry.file);
       if (isExported(source, entry.tsName)) return entry.tsName;
@@ -229,8 +225,6 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       ).exec(source);
       if (!member) return null;
       const owner = byFqn.get(`${entry.file}::${entry.fqn.split("::").slice(0, -1).join("::")}`);
-      // An owner `parity:api` pairs under another name (`Mime::Type` is `MimeType`)
-      // is the exported class the static sits in.
       const enclosing = [
         ...source.slice(0, member.index).matchAll(/^export\s+(?:abstract\s+)?class\s+(\w+)/gm),
       ].at(-1)?.[1];
@@ -240,8 +234,6 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     for (const [key, entry] of paired) {
       if (ambiguous.has(key)) continue;
       const rel = path.join("src", entry.file);
-      // A file the build leaves out by name is loaded by a test entry, and
-      // imports a table of its own; one left out by a glob is a test file.
       const ownTable = excluded.includes(rel);
       if (
         !ownTable &&
