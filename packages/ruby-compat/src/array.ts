@@ -85,7 +85,7 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * words with (`vendor/msgpack/v1.8.0/lib/msgpack/bigint.rb:8`), and the `q>` `MessagePack::Timestamp`
  * packs a timestamp96's seconds with (`vendor/msgpack/v1.8.0/lib/msgpack/timestamp.rb:65`), and the `v`
  * `Rack::Session::Encryptor` packs its padding length with (`vendor/rack-session/v2.1.0/lib/rack/session/encryptor.rb:173`): `C`, `l`,
- * `L`, `q`, `Q` and `v` through `pack_integer` (`pack.c:477-551`), `E` (`pack.c:575-583`), and `@` growing or shrinking to
+ * `L`, `q`, `Q`, `S` (`pack.c:483-487`) and `v` through `pack_integer` (`pack.c:477-551`), `E` (`pack.c:575-583`), and `@` growing or shrinking to
  * an absolute byte position (`pack.c:617-639`). Every other directive is a
  * separate port, so each reaches `unknown_directive` (`pack.c:761`) here, and
  * of the modifiers only `<` / `>` (`pack.c:268-277`) are ported.
@@ -208,10 +208,11 @@ export function pack(
       type === "L" ||
       type === "q" ||
       type === "Q" ||
+      type === "S" ||
       type === "v"
     ) {
       const integerSize =
-        type === "C" ? 1 : type === "v" ? 2 : type === "q" || type === "Q" ? 8 : 4;
+        type === "C" ? 1 : type === "v" || type === "S" ? 2 : type === "q" || type === "Q" ? 8 : 4;
       const bigendianP =
         type === "v" ? false : explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
       while (len-- > 0) {
@@ -318,7 +319,7 @@ export function unpack1(
  * `String#unpack1` (`vendor/ruby/v3.3.11/pack.c:1621` `pack_unpack1`), which is
  * `pack_unpack_internal` (`pack.c:936`) in `UNPACK_1` mode: the first item
  * the format pushes, or nil when none does. Narrowed to the directives
- * {@link pack} answers bytes for — `C`, `l`, `L`, `q`, `Q` and `v` through `unpack_integer`
+ * {@link pack} answers bytes for — `C`, `l`, `L`, `q`, `Q`, `S` (`pack.c:1189`) and `v` through `unpack_integer`
  * (`pack.c:1177-1281`), `E` (`pack.c:1306-1315`), and `@` moving to an
  * absolute byte position (`pack.c:1531-1535`) — plus the `<` / `>` modifiers
  * (`pack.c:1014-1023`). Every other directive reaches `unknown_directive`.
@@ -423,11 +424,12 @@ function packUnpackInternal(
       type === "L" ||
       type === "q" ||
       type === "Q" ||
+      type === "S" ||
       type === "v"
     ) {
       const signedP = type === "l" || type === "q";
       const integerSize =
-        type === "C" ? 1 : type === "v" ? 2 : type === "q" || type === "Q" ? 8 : 4;
+        type === "C" ? 1 : type === "v" || type === "S" ? 2 : type === "q" || type === "Q" ? 8 : 4;
       const bigendianP =
         type === "v" ? false : explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
       if (len > Math.floor((send - s) / integerSize)) len = Math.floor((send - s) / integerSize);

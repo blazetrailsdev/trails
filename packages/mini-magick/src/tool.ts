@@ -76,8 +76,8 @@ export class Tool {
 
   async call(
     { ...options }: Record<string, unknown> = {},
-    block?: (stdout: string, stderr: string, status: number | null) => unknown,
-  ): Promise<string> {
+    block?: (stdout: string | Uint8Array, stderr: string, status: number | null) => unknown,
+  ): Promise<string | Uint8Array> {
     options = { ...this._options, ...options };
     if (block != null) {
       options.warnings = false;

@@ -28,7 +28,7 @@ describe("MiniMagick::Tool", () => {
     it("strips the output", async () => {
       subject.append(imagePath());
       const output = await subject.call();
-      expect(output.endsWith("\n")).toBe(false);
+      expect((output as string).endsWith("\n")).toBe(false);
     });
 
     it("accepts a block, and yields stdin, stdout and exit status", async () => {

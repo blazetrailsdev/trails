@@ -12,7 +12,7 @@ import {
 import { TimeoutError, Error } from "./mini-magick.js";
 import { MiniMagick } from "./mini-magick.js";
 
-type ShellResult = [stdout: string, stderr: string, status: number | null];
+type ShellResult = [stdout: string | Uint8Array, stderr: string, status: number | null];
 
 export class Shell {
   static toString(): string {
