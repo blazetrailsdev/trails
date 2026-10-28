@@ -101,6 +101,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "globalid",
   "i18n",
   "marcel",
+  "mini-magick",
   "msgpack",
   "mysql2",
   "pg",
