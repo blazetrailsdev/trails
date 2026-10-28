@@ -420,6 +420,7 @@ export function rbConstGetFrom(klass: object, id: string): unknown {
  * (`object.c:2478-2486`).
  *
  * @inventedArm if — PERMANENT
+ * @inventedArm generatedClass — PERMANENT
  * @noRailsEquivalent PERMANENT
  */
 export function rbModConstGet(mod: object, name: string, recur: unknown = true): unknown {
