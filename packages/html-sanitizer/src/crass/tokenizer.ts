@@ -50,8 +50,8 @@ const RE_NON_PRINTABLE = /[\u0000-\u0008\u000b\u000e-\u001f\u007f]+/; // eslint-
 const RE_WHITESPACE = /[\n\t ]+/;
 const RE_CHAR = /[\s\S]/u;
 
-const RE_NAME_START = /^[\u0080-\u{10ffff}]/u;
-const RE_NAME_END = /[\u0080-\u{10ffff}]$/u;
+const RE_NON_ASCII_START = /^[\u0080-\u{10ffff}]/u;
+const RE_NON_ASCII_END = /[\u0080-\u{10ffff}]$/u;
 
 const RE_NUMBER = /^[+-]?\d*(?:\.\d+)?(?:[eE][+-]?\d+)?/;
 
@@ -104,7 +104,7 @@ export class Tokenizer {
     if (simple !== undefined) return { node: simple, pos, raw };
     const valued = VALUE_TOKENS[type];
     if (valued !== undefined) {
-      if (type === TokenType.Delim && RE_NAME_START.test(raw)) {
+      if (type === TokenType.Delim && RE_NON_ASCII_START.test(raw)) {
         return { node: "ident", pos, raw, value: raw };
       }
       return { node: valued, pos, raw, value: data!.value };
@@ -153,8 +153,8 @@ export class Tokenizer {
   /** @noRailsEquivalent PERMANENT */
   private mergeTokens(first: Node, second: Node): Node | null {
     const raw = first.raw + second.raw;
-    const nameEnd = RE_NAME_END.test(first.raw);
-    if (second.node === "ident" && (nameEnd || RE_NAME_START.test(second.raw))) {
+    const nameEnd = RE_NON_ASCII_END.test(first.raw);
+    if (second.node === "ident" && (nameEnd || RE_NON_ASCII_START.test(second.raw))) {
       switch (first.node) {
         case "ident":
         case "at_keyword":
