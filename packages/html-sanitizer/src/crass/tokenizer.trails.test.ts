@@ -19,4 +19,24 @@ describe("Crass::Tokenizer", () => {
       value: "zoom",
     });
   });
+
+  it("reads digits and url after a non-ASCII code point as one name, as consume_name does", () => {
+    expect(Tokenizer.tokenize("\u00d71")).toEqual([
+      { node: "ident", pos: 0, raw: "\u00d71", value: "\u00d71" },
+    ]);
+    expect(Tokenizer.tokenize("\u00d7url(x)")).toEqual([
+      { node: "function", pos: 0, raw: "\u00d7url(", value: "\u00d7url" },
+      { node: "ident", pos: 5, raw: "x", value: "x" },
+      { node: ")", pos: 6, raw: ")" },
+    ]);
+  });
+
+  it("keeps the IE * hack inside a non-ASCII name, as consume_name does", () => {
+    expect(Tokenizer.tokenize("\u00d7*x", { preserveHacks: true })).toEqual([
+      { node: "ident", pos: 0, raw: "\u00d7*x", value: "\u00d7x" },
+    ]);
+    expect(Tokenizer.tokenize("\u00d7\\61*x", { preserveHacks: true })).toEqual([
+      { node: "ident", pos: 0, raw: "\u00d7\\61*x", value: "\u00d7ax" },
+    ]);
+  });
 });

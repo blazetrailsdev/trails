@@ -109,11 +109,6 @@ function translateTokens(tokens: Node | Node[] | null): unknown[] {
   return translated;
 }
 
-// PERMANENT-SKIP: Crass's tokenizer (tokenizer.rb RE_NAME_START) reads every
-const PERMANENT_SKIPS = new Set([
-  "\\- red0 -red --red -\\-red\\ blue 0red -0red \u0000red _Red .red rêd r\\êd \x7f\x80\x81",
-]);
-
 async function loadCssTests(filename: string): Promise<unknown[]> {
   const path = new URL(`./css-parsing-tests/${filename}`, import.meta.url).pathname;
   return JSON.parse(await getFs().readFile(path, "utf8")) as unknown[];
@@ -131,13 +126,10 @@ const declarationList = await loadCssTests("declaration_list.json");
 describe("CSS Parsing Tests", () => {
   describe("component_value_list", () => {
     for (const [css, expected] of eachSlice2(componentValueList)) {
-      (PERMANENT_SKIPS.has(css) ? it.skip : it)(
-        `should parse: ${css.replaceAll("\n", "\\n")}`,
-        () => {
-          const parser = new Parser(css);
-          expect(translateTokens(parser.parseComponentValues())).toEqual(expected);
-        },
-      );
+      it(`should parse: ${css.replaceAll("\n", "\\n")}`, () => {
+        const parser = new Parser(css);
+        expect(translateTokens(parser.parseComponentValues())).toEqual(expected);
+      });
     }
   });
 
