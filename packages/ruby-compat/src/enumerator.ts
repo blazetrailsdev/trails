@@ -143,17 +143,30 @@ export class Enumerator<T = unknown, E = unknown> {
    *
    * @noRailsEquivalent PERMANENT
    */
-  withIndex(offset: number | null = null, block?: (value: T, idx: number) => unknown): unknown {
-    if (!block) return new Enumerator(this, "withIndex", [offset], () => this.size());
-    let memo: number;
+  withIndex(offset?: number | null): Enumerator<[T, number], E>;
+  /** @noRailsEquivalent PERMANENT */
+  withIndex(offset: number | null, block: (value: T, idx: number) => unknown): unknown;
+  /** @noRailsEquivalent PERMANENT */
+  withIndex(offset: bigint, block: (value: T, idx: bigint) => unknown): unknown;
+  /** @noRailsEquivalent PERMANENT */
+  withIndex(
+    offset: number | bigint | null = null,
+    block?: (value: T, idx: never) => unknown,
+  ): unknown {
+    if (!block)
+      return new Enumerator<[T, number], E>(this, "withIndex", [offset], () => this.size());
+    let memo: number | bigint;
     if (offset == null) memo = 0;
-    else if (typeof offset === "number" && !Number.isFinite(offset)) {
-      throw new FloatDomainError(String(offset));
+    else if (typeof offset === "bigint") memo = offset;
+    else if (typeof offset === "number") {
+      if (!Number.isFinite(offset)) throw new FloatDomainError(String(offset));
+      memo = Math.trunc(offset);
     } else memo = num2long(offset);
     return this.each((...argv: unknown[]) => {
-      const idx = memo++;
-      if (argv.length <= 1) return block(argv[0] as T, idx);
-      return block(argv as T, idx);
+      const idx = memo;
+      memo = typeof memo === "bigint" ? memo + 1n : memo + 1;
+      if (argv.length <= 1) return block(argv[0] as T, idx as never);
+      return block(argv as T, idx as never);
     });
   }
 

@@ -123,7 +123,7 @@ describe("Enumerator#with_index (enumerator_with_index, vendor/ruby/v3.3.11/enum
   it("carries the receiver's size through each_with_index, each_with_object and with_index", () => {
     expect(eachWithIndex([1, 2]).size()).toBe(2);
     expect(eachWithObject([1, 2], {}).size()).toBe(2);
-    expect((eachWithIndex([1, 2]).withIndex() as Enumerator).size()).toBe(2);
+    expect(eachWithIndex([1, 2]).withIndex().size()).toBe(2);
   });
 
   it("converts the offset with rb_to_int", () => {
@@ -133,5 +133,11 @@ describe("Enumerator#with_index (enumerator_with_index, vendor/ruby/v3.3.11/enum
     expect(() => e.withIndex("1" as unknown as number, () => {})).toThrow(
       "no implicit conversion of String into Integer",
     );
+  });
+
+  it("keeps an Integer offset past long as a bigint", () => {
+    const seen: unknown[] = [];
+    eachWithIndex(["x"]).withIndex(10n ** 25n, (_pair, i) => seen.push(i));
+    expect(seen).toEqual([10n ** 25n]);
   });
 });
