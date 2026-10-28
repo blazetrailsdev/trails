@@ -3,6 +3,8 @@ import { rbBlockGivenP } from "./hash.js";
 import { rbFSend, rtest } from "./object.js";
 import type { Enumerated } from "./enumerable.js";
 import { StopIteration } from "./stop-iteration.js";
+import { FloatDomainError } from "./float-domain-error.js";
+import { num2long } from "./string/support.js";
 
 /**
  * `Enumerator::Yielder` (`vendor/ruby/v3.3.11/enumerator.c:1335` `yielder_init`).
@@ -136,13 +138,18 @@ export class Enumerator<T = unknown, E = unknown> {
    * `enumerator_with_index` (`vendor/ruby/v3.3.11/enumerator.c:676`), over
    * `enumerator_with_index_i` (`:642`), which packs a multi-value yield into
    * one Array before the index. Block-less, it answers an enumerator over
-   * itself, without `enumerator_enum_size`.
+   * itself sized by `enumerator_enum_size`. The offset goes through `rb_to_int`,
+   * whose Float arm (`flo_to_i`) raises `FloatDomainError` for a non-finite value.
    *
    * @noRailsEquivalent PERMANENT
    */
   withIndex(offset: number | null = null, block?: (value: T, idx: number) => unknown): unknown {
-    if (!block) return toEnum(this, "withIndex", offset);
-    let memo = offset == null ? 0 : Math.trunc(offset);
+    if (!block) return new Enumerator(this, "withIndex", [offset], () => this.size());
+    let memo: number;
+    if (offset == null) memo = 0;
+    else if (typeof offset === "number" && !Number.isFinite(offset)) {
+      throw new FloatDomainError(String(offset));
+    } else memo = num2long(offset);
     return this.each((...argv: unknown[]) => {
       const idx = memo++;
       if (argv.length <= 1) return block(argv[0] as T, idx);

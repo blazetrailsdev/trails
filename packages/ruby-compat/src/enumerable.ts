@@ -489,6 +489,8 @@ export function eachWithIndex<T, E = unknown>(
     return new Enumerator<[T, number], E>(
       { eachWithIndex: (block: (i: T, n: number) => unknown) => eachWithIndex(obj, block) },
       "eachWithIndex",
+      [],
+      () => enumSize(obj),
     );
   }
   let n = 0;
@@ -536,6 +538,7 @@ export function eachWithObject<T, M, E = unknown>(
       },
       "eachWithObject",
       [memo],
+      () => enumSize(obj),
     );
   }
   return rbBlockCall(

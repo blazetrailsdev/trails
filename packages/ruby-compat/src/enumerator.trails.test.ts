@@ -3,6 +3,7 @@ import { Enumerator, toEnum } from "./enumerator.js";
 import { eachSlice, eachWithIndex, eachWithObject } from "./enumerable.js";
 import { block } from "./hash.js";
 import { StopIteration } from "./stop-iteration.js";
+import { FloatDomainError } from "./float-domain-error.js";
 import { rbFSend } from "./object.js";
 
 describe("Enumerator", () => {
@@ -117,5 +118,20 @@ describe("Enumerator#with_index (enumerator_with_index, vendor/ruby/v3.3.11/enum
       [["x", 0], 5],
       [["y", 1], 6],
     ]);
+  });
+
+  it("carries the receiver's size through each_with_index, each_with_object and with_index", () => {
+    expect(eachWithIndex([1, 2]).size()).toBe(2);
+    expect(eachWithObject([1, 2], {}).size()).toBe(2);
+    expect((eachWithIndex([1, 2]).withIndex() as Enumerator).size()).toBe(2);
+  });
+
+  it("converts the offset with rb_to_int", () => {
+    const e = eachWithIndex([1]);
+    expect(() => e.withIndex(NaN, () => {})).toThrow(FloatDomainError);
+    expect(() => e.withIndex(Infinity, () => {})).toThrow("Infinity");
+    expect(() => e.withIndex("1" as unknown as number, () => {})).toThrow(
+      "no implicit conversion of String into Integer",
+    );
   });
 });
