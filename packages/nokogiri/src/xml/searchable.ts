@@ -11,12 +11,24 @@ export interface SearchableHost {
   readonly document: unknown;
   readonly _node: unknown;
   css(...args: unknown[]): NodeSet;
+  /** @internal */
+  extractParams: typeof extractParams;
+  /** @internal */
+  cssInternal: typeof cssInternal;
+  /** @internal */
+  cssRulesToXpath: typeof cssRulesToXpath;
+  /** @internal */
+  xpathQueryFromCssRule: typeof xpathQueryFromCssRule;
+  /** @internal */
+  xpathInternal: typeof xpathInternal;
+  /** @internal */
+  xpathImpl: typeof xpathImpl;
 }
 
 export function css(this: SearchableHost, ...args: unknown[]): NodeSet {
-  const [rules, handler, ns] = extractParams.call(this, args);
+  const [rules, handler, ns] = this.extractParams(args);
 
-  return cssInternal.call(this, this, rules, handler, ns);
+  return this.cssInternal(this, rules, handler, ns);
 }
 
 export function atCss(this: SearchableHost, ...args: unknown[]): Node | undefined {
@@ -61,7 +73,7 @@ export function cssInternal(
   handler: unknown,
   ns: Record<string, string>,
 ): NodeSet {
-  return xpathInternal(node, cssRulesToXpath.call(this, rules, ns), handler, ns, null);
+  return this.xpathInternal(node, this.cssRulesToXpath(rules, ns), handler, ns, null);
 }
 
 /** @internal */
@@ -70,7 +82,7 @@ export function cssRulesToXpath(
   rules: string[],
   ns: Record<string, string>,
 ): string[] {
-  return rules.map((rule) => xpathQueryFromCssRule.call(this, rule, ns));
+  return rules.map((rule) => this.xpathQueryFromCssRule(rule, ns));
 }
 
 /** @internal */
@@ -97,6 +109,7 @@ export function xpathQueryFromCssRule(
 
 /** @internal */
 export function xpathInternal(
+  this: SearchableHost,
   node: SearchableHost,
   paths: string[],
   handler: unknown,
@@ -106,16 +119,17 @@ export function xpathInternal(
   const document = node.document;
   if (document == null) return new NodeSet(document);
 
-  if (paths.length === 1) return xpathImpl(node, paths[0], handler, ns, binds);
+  if (paths.length === 1) return this.xpathImpl(node, paths[0], handler, ns, binds);
 
   return paths.reduce(
-    (combined, path) => combined.plus(xpathImpl(node, path, handler, ns, binds)),
+    (combined, path) => combined.plus(this.xpathImpl(node, path, handler, ns, binds)),
     new NodeSet(document),
   );
 }
 
 /** @internal */
 export function xpathImpl(
+  this: SearchableHost,
   node: SearchableHost,
   path: string,
   handler: unknown,
