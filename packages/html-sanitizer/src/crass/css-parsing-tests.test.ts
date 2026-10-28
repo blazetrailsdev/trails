@@ -4,6 +4,21 @@ import { getFs } from "@blazetrails/ruby-compat";
 import { Parser } from "./parser.js";
 import type { Node } from "./tokenizer.js";
 
+const PUNCTUATION: Record<string, string> = {
+  cdc: "-->",
+  cdo: "<!--",
+  colon: ":",
+  column: "||",
+  comma: ",",
+  dash_match: "|=",
+  include_match: "~=",
+  prefix_match: "^=",
+  semicolon: ";",
+  substring_match: "*=",
+  suffix_match: "$=",
+  whitespace: " ",
+};
+
 function translateTokens(tokens: Node | Node[] | null): unknown[] {
   if (tokens == null) return [];
 
@@ -13,6 +28,11 @@ function translateTokens(tokens: Node | Node[] | null): unknown[] {
   for (const token of tokens) {
     const value = token.value;
     let result: unknown;
+
+    if (Object.hasOwn(PUNCTUATION, token.node)) {
+      translated.push(PUNCTUATION[token.node]);
+      continue;
+    }
 
     switch (token.node) {
       case "at_rule":
@@ -35,24 +55,6 @@ function translateTokens(tokens: Node | Node[] | null): unknown[] {
       case "bad_url":
         result = ["error", "bad-url"];
         break;
-      case "cdc":
-        result = "-->";
-        break;
-      case "cdo":
-        result = "<!--";
-        break;
-      case "colon":
-        result = ":";
-        break;
-      case "column":
-        result = "||";
-        break;
-      case "comma":
-        result = ",";
-        break;
-      case "dash_match":
-        result = "|=";
-        break;
       case "delim":
         result = value;
         break;
@@ -74,20 +76,11 @@ function translateTokens(tokens: Node | Node[] | null): unknown[] {
       case "ident":
         result = ["ident", value];
         break;
-      case "include_match":
-        result = "~=";
-        break;
       case "number":
         result = ["number", token.repr, value, token.type];
         break;
       case "percentage":
         result = ["percentage", token.repr, value, token.type];
-        break;
-      case "prefix_match":
-        result = "^=";
-        break;
-      case "semicolon":
-        result = ";";
         break;
       case "simple_block":
         result = [token.start + token.end, ...translateTokens(value)];
@@ -95,20 +88,11 @@ function translateTokens(tokens: Node | Node[] | null): unknown[] {
       case "string":
         result = ["string", value];
         break;
-      case "substring_match":
-        result = "*=";
-        break;
-      case "suffix_match":
-        result = "$=";
-        break;
       case "unicode_range":
         result = ["unicode-range", token.start, token.end];
         break;
       case "url":
         result = ["url", value];
-        break;
-      case "whitespace":
-        result = " ";
         break;
       case "}":
       case "]":

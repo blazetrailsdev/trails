@@ -283,30 +283,6 @@ export class Parser {
     return Object.assign({ node: type }, properties);
   }
 
-  parseComponentValue(input: TokenScanner | Node[] = this.tokens): Node {
-    if (!(input instanceof TokenScanner)) input = new TokenScanner(input);
-
-    while (input.peek() != null && input.peek()!.node === "whitespace") {
-      input.consume();
-    }
-
-    if (input.peek() == null) {
-      return this.createNode("error", { value: "empty" });
-    }
-
-    const value = this.consumeComponentValue(input)!;
-
-    while (input.peek() != null && input.peek()!.node === "whitespace") {
-      input.consume();
-    }
-
-    if (input.peek() == null) {
-      return value;
-    } else {
-      return this.createNode("error", { value: "extra-input" });
-    }
-  }
-
   parseComponentValues(input: TokenScanner | Node[] = this.tokens): Node[] {
     if (!(input instanceof TokenScanner)) input = new TokenScanner(input);
     const tokens: Node[] = [];
@@ -317,27 +293,6 @@ export class Parser {
     }
 
     return tokens;
-  }
-
-  parseDeclaration(input: TokenScanner | Node[] = this.tokens): Node {
-    if (!(input instanceof TokenScanner)) input = new TokenScanner(input);
-
-    while (input.peek() != null && input.peek()!.node === "whitespace") {
-      input.consume();
-    }
-
-    if (input.peek() == null) {
-      return this.createNode("error", { value: "empty" });
-    } else if (input.peek()!.node !== "ident") {
-      return this.createNode("error", { value: "invalid" });
-    }
-
-    const decl = this.consumeDeclaration(input);
-    if (decl != null) {
-      return decl;
-    }
-
-    return this.createNode("error", { value: "invalid" });
   }
 
   parseDeclarations(

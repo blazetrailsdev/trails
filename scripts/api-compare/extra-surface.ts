@@ -2699,10 +2699,6 @@ function buildPackageReport(
       for (const hook of concernHooks.get(concernHookKey(pkg, rubyFile)) ?? []) allowed.add(hook);
     }
 
-    // A Ruby file folded onto another's TS file by `RUBY_FILE_TS_OVERRIDES`
-    // (`ruby_tracker.rb` onto `tse-tracker.ts`, the port of `erb_tracker.rb`)
-    // shares that file with the class the path mirrors, so the mirrored file's
-    // names are faithful here too, not moved.
     if (rubyFile !== null && foldsOntoPathMirror(rubyFile, expectedTs)) {
       for (const name of allowedNamesForRubyFile(rubyFileByPathMirror.get(expectedTs)!)) {
         allowed.add(name);
