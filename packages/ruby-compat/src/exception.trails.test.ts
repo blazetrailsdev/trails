@@ -51,3 +51,12 @@ describe("Exception#message", () => {
     expect(new Inner().message).toBe("Outer::Inner");
   });
 });
+
+describe("Exception#name", () => {
+  it("inherits a name seated on an ancestor's prototype", () => {
+    class SeatedError extends StandardError {}
+    SeatedError.prototype.name = "Seated::Error";
+    class ChildError extends SeatedError {}
+    expect(new ChildError().name).toBe("Seated::Error");
+  });
+});

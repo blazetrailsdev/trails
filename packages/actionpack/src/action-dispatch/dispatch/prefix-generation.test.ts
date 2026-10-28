@@ -9,13 +9,13 @@ import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import { Base } from "../../action-controller/base.js";
-import { controllerConstants } from "../http/request.js";
 import type { MountableApp } from "../routing/mapper.js";
 import { RouteSet } from "../routing/route-set.js";
 import type { RoutesProxyInstance } from "../routing/routes-proxy.js";
 import { UrlFor } from "../routing/url-for.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
+import { registerController } from "../../action-controller/base.js";
 
 TopLevel.Trails = { Engine, Trailtie } as unknown as typeof TopLevel.Trails;
 
@@ -152,7 +152,7 @@ describe("WithMountedEngine", () => {
   }
   include(InsideEngineGeneratingController, BlogEngine.routes().urlHelpers());
   include(InsideEngineGeneratingController, RailsApplication.routes().mountedHelpers());
-  controllerConstants.set("inside_engine_generating", InsideEngineGeneratingController);
+  registerController("InsideEngineGeneratingController", InsideEngineGeneratingController);
 
   class OutsideEngineGeneratingController extends Base {
     async index(): Promise<void> {
@@ -186,7 +186,7 @@ describe("WithMountedEngine", () => {
   }
   include(OutsideEngineGeneratingController, BlogEngine.routes().mountedHelpers());
   include(OutsideEngineGeneratingController, RailsApplication.routes().urlHelpers());
-  controllerConstants.set("outside_engine_generating", OutsideEngineGeneratingController);
+  registerController("OutsideEngineGeneratingController", OutsideEngineGeneratingController);
 
   class EngineObject {
     constructor(_kw: { kw: unknown }) {}
@@ -482,7 +482,7 @@ describe("EngineMountedAtRoot", () => {
   }
   include(PostsController, BlogEngine.routes().urlHelpers());
   include(PostsController, RailsApplication.routes().mountedHelpers());
-  controllerConstants.set("posts", PostsController);
+  registerController("PostsController", PostsController);
 
   class EngineMountedAtRoot extends IntegrationTest {
     override get app(): unknown {

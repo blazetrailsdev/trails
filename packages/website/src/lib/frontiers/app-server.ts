@@ -6,8 +6,10 @@
  */
 
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { RouteSet, ActionController, controllerConstants } from "@blazetrails/actionpack";
-import type { DispatchableControllerClass, DrawCallback } from "@blazetrails/actionpack";
+import { RouteSet, ActionController } from "@blazetrails/actionpack";
+import { camelize } from "@blazetrails/activesupport";
+import type { DrawCallback } from "@blazetrails/actionpack";
+import { registerController } from "@blazetrails/actionpack";
 
 export interface AppServerDeps {
   executeCode: (code: string) => Promise<unknown>;
@@ -20,8 +22,7 @@ export interface AppServer {
   drawRoutes: (fn: DrawCallback) => void;
 }
 
-type ControllerClass = DispatchableControllerClass &
-  (new () => InstanceType<typeof ActionController.Base>);
+type ControllerClass = typeof ActionController.Base;
 
 export function createAppServer(_deps: AppServerDeps): AppServer {
   const routeSet = new RouteSet();
@@ -42,7 +43,7 @@ export function createAppServer(_deps: AppServerDeps): AppServer {
     },
 
     registerController(name: string, controllerClass: ControllerClass) {
-      controllerConstants.set(name, controllerClass);
+      registerController(`${camelize(name)}Controller`, controllerClass);
     },
 
     drawRoutes(fn: DrawCallback) {

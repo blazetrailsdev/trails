@@ -5,12 +5,12 @@ import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
 import { SERVER_TIMING } from "../constants.js";
-import { controllerConstants } from "../http/request.js";
 import type { MiddlewareFactory } from "../middleware/stack.js";
 import { ServerTiming } from "../middleware/server-timing.js";
 import { RouteSet } from "../routing/route-set.js";
 import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
+import { registerController } from "../../action-controller/base.js";
 
 describe("ServerTimingTest", () => {
   class TestController extends Base {
@@ -29,7 +29,7 @@ describe("ServerTimingTest", () => {
       });
     }
   }
-  controllerConstants.set("server_timing_test/test", TestController);
+  registerController("ServerTimingTest::TestController", TestController);
 
   let middlewares: MiddlewareFactory[];
   let headerName: string;

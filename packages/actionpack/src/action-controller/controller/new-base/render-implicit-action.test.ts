@@ -6,8 +6,8 @@ import { assert, assertEqual, assertRaises } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
 import { File, registerConstant } from "@blazetrails/ruby-compat";
 import { ActionNotFound } from "../../../abstract-controller/base.js";
-import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../base.js";
 
 registerConstant("RenderImplicitAction", { name: "RenderImplicitAction" });
 
@@ -29,7 +29,7 @@ class SimpleController extends ApplicationController {
 Object.defineProperty(SimpleController, "name", {
   value: "RenderImplicitAction::SimpleController",
 });
-controllerConstants.set("render_implicit_action/simple", SimpleController);
+registerController("RenderImplicitAction::SimpleController", SimpleController);
 
 class RenderImplicitActionTest extends Rack.TestCase {}
 

@@ -3,7 +3,6 @@ import { FlashHash } from "../../action-dispatch/middleware/flash.js";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { Base } from "../base.js";
-import { controllerConstants } from "../../action-dispatch/http/request.js";
 import { Flash } from "../../action-dispatch/middleware/flash.js";
 import { Cookies } from "../../action-dispatch/middleware/cookies.js";
 import { CookieStore } from "../../action-dispatch/middleware/session/cookie-store.js";
@@ -26,6 +25,7 @@ import { rbObjAsString } from "@blazetrails/ruby-compat";
 import { Metal } from "../metal.js";
 import { TestCase } from "../test-case.js";
 import { Flash as ControllerFlash } from "../metal/flash.js";
+import { registerController } from "../base.js";
 
 class TestController extends Base {
   static {
@@ -374,7 +374,7 @@ async function withTestRouteSet(block: (tc: IntegrationTest) => Promise<void>): 
     middleware.use(Flash as unknown as MiddlewareFactory);
     middleware.delete(ShowExceptions as MiddlewareFactory);
   });
-  controllerConstants.set("flash_integration_test", FlashIntegrationTestController);
+  registerController("FlashIntegrationTestController", FlashIntegrationTestController);
   await block(tc);
 }
 

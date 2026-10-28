@@ -37,6 +37,8 @@ import {
   transformValues,
   filterMap,
   rbModConstSet,
+  ArgumentError,
+  IndexError,
 } from "@blazetrails/ruby-compat";
 import { coderTag, type Psych } from "@blazetrails/ruby-compat/psych";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
@@ -70,7 +72,6 @@ export class ParameterMissing extends KeyError {
 
   constructor(param: string, keys: string[] | null = null) {
     super(`param is missing or the value is empty or invalid: ${param}`);
-    this.name = "ActionController::ParameterMissing";
     this.param = param;
     this.keys = keys;
   }
@@ -83,37 +84,25 @@ export class ParameterMissing extends KeyError {
 }
 include(ParameterMissing, Correctable);
 
-export class ExpectedParameterMissing extends ParameterMissing {
-  constructor(param: string, keys: string[] | null = null) {
-    super(param, keys);
-    this.name = "ExpectedParameterMissing";
-  }
-}
+export class ExpectedParameterMissing extends ParameterMissing {}
 
-export class UnpermittedParameters extends Error {
+export class UnpermittedParameters extends IndexError {
   readonly params: string[];
 
   constructor(params: string[]) {
     const s = params.length > 1 ? "s" : "";
     super(`found unpermitted parameter${s}: ${params.map((e) => `:${e}`).join(", ")}`);
-    this.name = "UnpermittedParameters";
     this.params = params;
   }
 }
 
-export class UnfilteredParameters extends Error {
+export class UnfilteredParameters extends ArgumentError {
   constructor() {
     super("unable to convert unpermitted parameters to hash");
-    this.name = "UnfilteredParameters";
   }
 }
 
-export class InvalidParameterKey extends Error {
-  constructor(message?: string) {
-    super(message ?? "all keys must be Strings or Symbols");
-    this.name = "InvalidParameterKey";
-  }
-}
+export class InvalidParameterKey extends ArgumentError {}
 
 type OnUnpermitted = "log" | "raise" | false | null;
 

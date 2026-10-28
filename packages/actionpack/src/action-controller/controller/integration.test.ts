@@ -1,3 +1,4 @@
+import { camelize } from "@blazetrails/activesupport";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { assertEqual } from "@blazetrails/activesupport";
@@ -33,7 +34,6 @@ import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
-import { controllerConstants } from "../../action-dispatch/http/request.js";
 import { X_CASCADE } from "../../action-dispatch/constants.js";
 import { Metal } from "../metal.js";
 import { MimeType } from "../../action-dispatch/http/mime-type.js";
@@ -43,6 +43,7 @@ import {
 } from "../../action-dispatch/testing/test-helpers/page-dump-helper.js";
 import type { MountableApp, RouteOptions } from "../../action-dispatch/routing/mapper.js";
 import { CookieAssertions, SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
+import { registerController } from "../base.js";
 
 TopLevel.Trails = { Engine, Trailtie } as unknown as typeof TopLevel.Trails;
 
@@ -913,8 +914,8 @@ describe("ApplicationIntegrationTest", () => {
 
     static {
       include(TestController, SharedTestRoutes.urlHelpers());
-      controllerConstants.set("application_integration_test/metal", MetalController);
-      controllerConstants.set("application_integration_test/test", TestController);
+      registerController("ApplicationIntegrationTest::MetalController", MetalController);
+      registerController("ApplicationIntegrationTest::TestController", TestController);
       this.routes.draw(function () {
         this.get("", { to: "application_integration_test/test#index", as: "empty_string" });
 
@@ -1014,7 +1015,7 @@ describe("EnvironmentFilterIntegrationTest", () => {
     }
 
     static {
-      controllerConstants.set("environment_filter_integration_test/test", TestController);
+      registerController("EnvironmentFilterIntegrationTest::TestController", TestController);
       this.routes.draw(function () {
         this.match("/post", { to: "environment_filter_integration_test/test#post", via: ":post" });
       });
@@ -1051,7 +1052,10 @@ describe("ControllerWithHeadersMethodIntegrationTest", () => {
 
   it("doesn't call controller's headers method", async ({ task }) => {
     t = new IntegrationTest(task.name);
-    controllerConstants.set("controller_with_headers_method_integration_test/test", TestController);
+    registerController(
+      "ControllerWithHeadersMethodIntegrationTest::TestController",
+      TestController,
+    );
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         this.get("/ok", { to: "controller_with_headers_method_integration_test/test#index" });
@@ -1112,8 +1116,8 @@ describe("UrlOptionsIntegrationTest", () => {
     static {
       include(FooController, SharedTestRoutes.urlHelpers());
       include(BarController, SharedTestRoutes.urlHelpers());
-      controllerConstants.set("url_options_integration_test/foo", FooController);
-      controllerConstants.set("url_options_integration_test/bar", BarController);
+      registerController("UrlOptionsIntegrationTest::FooController", FooController);
+      registerController("UrlOptionsIntegrationTest::BarController", BarController);
       this.routes.draw(function () {
         this.defaultUrlOptions = { host: "foo.com" };
 
@@ -1200,7 +1204,7 @@ describe("HeadWithStatusActionIntegrationTest", () => {
     }
 
     static {
-      controllerConstants.set("head_with_status_action_integration_test/foo", FooController);
+      registerController("HeadWithStatusActionIntegrationTest::FooController", FooController);
       this.routes.draw(function () {
         this.get("/foo/status", { to: "head_with_status_action_integration_test/foo#status" });
       });
@@ -1232,7 +1236,7 @@ describe("IntegrationWithRoutingTest", () => {
   it("with routing resets session", async ({ task }) => {
     t = new IntegrationWithRoutingTest(task.name);
     const klassNamespace = underscore(IntegrationWithRoutingTest.name);
-    controllerConstants.set(`${klassNamespace}/foo`, FooController);
+    registerController(`${camelize(`${klassNamespace}/foo`)}Controller`, FooController);
 
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
@@ -1522,7 +1526,7 @@ describe("IntegrationFileUploadTest", () => {
     }
 
     static {
-      controllerConstants.set("integration_file_upload_test/integration", IntegrationController);
+      registerController("IntegrationFileUploadTest::IntegrationController", IntegrationController);
       this.routes.draw(function () {
         this.post("test_file_upload", {
           to: "integration_file_upload_test/integration#test_file_upload",
@@ -1589,7 +1593,7 @@ describe("PageDumpIntegrationTest", () => {
     }
 
     static {
-      controllerConstants.set("page_dump_integration_test/foo", FooController);
+      registerController("PageDumpIntegrationTest::FooController", FooController);
       this.routes.draw(function () {
         this.get("/", { to: "page_dump_integration_test/foo#index" });
         this.get("/redirect", { to: "page_dump_integration_test/foo#redirect" });

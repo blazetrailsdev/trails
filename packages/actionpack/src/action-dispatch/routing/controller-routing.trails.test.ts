@@ -1,12 +1,14 @@
+import { camelize } from "@blazetrails/activesupport";
+import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { RouteSet } from "./route-set.js";
 import type { RackEnv } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
-import { controllerConstants, type Request } from "../http/request.js";
-import type { DispatchableControllerClass } from "./dispatcher.js";
+import { type Request } from "../http/request.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
+import { Base, registerController } from "../../action-controller/base.js";
 
-class StubController {
+class StubController extends Base {
   static actionEncodingTemplate(): null {
     return null;
   }
@@ -26,17 +28,17 @@ beforeEach(() => {
     "api/v1/articles",
     "api/v1/posts",
   ]) {
-    controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+    registerController(`${camelize(name)}Controller`, StubController);
   }
 });
 
 afterEach(() => {
-  controllerConstants.delete("posts");
+  if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
 });
 
 let capturedEnv: RackEnv = {};
 
-class CaptureEnvController {
+class CaptureEnvController extends Base {
   static actionEncodingTemplate(): null {
     return null;
   }
@@ -246,10 +248,7 @@ describe("Controller routing integration", () => {
 
   it("call sets path parameters in env", async () => {
     const routes = new RouteSet();
-    controllerConstants.set(
-      "posts",
-      CaptureEnvController as unknown as DispatchableControllerClass,
-    );
+    registerController("PostsController", CaptureEnvController);
     routes.draw(function () {
       this.get("/posts/:id", { to: "posts#show" });
     });

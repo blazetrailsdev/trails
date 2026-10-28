@@ -8,11 +8,11 @@ import {
 } from "@blazetrails/ruby-compat";
 import { assert, assertEqual, assertNil } from "@blazetrails/activesupport";
 import { Base } from "../../../action-controller/base.js";
-import { controllerConstants } from "../../http/request.js";
 import { deprecator } from "../../deprecator.js";
 import { IntegrationTest } from "../../testing/integration.js";
 import type { RouteSet } from "../../routing/route-set.js";
 import "../../../test-helpers/abstract-unit.js";
+import { registerController } from "../../../action-controller/base.js";
 
 interface UploadedFile {
   originalFilename: string;
@@ -61,7 +61,7 @@ describe("MultipartParamsParsingTest", () => {
       });
     }
   }
-  controllerConstants.set("multipart_params_parsing_test/test", TestController);
+  registerController("MultipartParamsParsingTest::TestController", TestController);
 
   const FIXTURE_PATH = File.expandPath(
     "../../../test-helpers/fixtures/multipart",

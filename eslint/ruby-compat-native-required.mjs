@@ -21,6 +21,11 @@
  * receiver to the element kinds the native form agrees on: `Set` / `includes`
  * identity is `eql?` / `==` only for a `string`, `number`, `boolean` or `null`
  * element (`array.c:5342` `ary_make_hash`, `object.c:147` `rb_equal`).
+ * `symbolAliases` names `string` aliases that hold a Ruby Symbol (`":analyze"`):
+ * TypeScript erases `type ExplainOption = string`, so a receiver declared as
+ * an Array of one is read from its declaration and left alone, because
+ * `ary_join_1` (`array.c:2778`) sends each element `to_s`, which drops the
+ * colon `.join` keeps.
  *
  * The listed set is `ruby-compat-native-required.json`, only-grow: a
  * substitution sweep adds its helpers in the same PR. A site that must keep
@@ -95,11 +100,39 @@ function elementsAre(checker, type, allowed) {
   });
 }
 
+function declaredElementName(typeNode) {
+  if (typeNode === undefined) return undefined;
+  if (ts.isTypeOperatorNode(typeNode)) return declaredElementName(typeNode.type);
+  let element;
+  if (ts.isArrayTypeNode(typeNode)) element = typeNode.elementType;
+  else if (ts.isTypeReferenceNode(typeNode) && typeNode.typeArguments?.length === 1) {
+    element = typeNode.typeArguments[0];
+  }
+  return element !== undefined && ts.isTypeReferenceNode(element)
+    ? ts.isQualifiedName(element.typeName)
+      ? element.typeName.right.text
+      : element.typeName.text
+    : undefined;
+}
+
+function declaresSymbolElements(checker, tsNode, aliases) {
+  if (!ts.isIdentifier(tsNode)) return false;
+  const decl = checker.getSymbolAtLocation(tsNode)?.valueDeclaration;
+  if (decl === undefined || !("type" in decl)) return false;
+  return aliases.includes(declaredElementName(decl.type));
+}
+
 function receiverIsNative(services, node, entry) {
   const program = services.program;
   const checker = program.getTypeChecker();
   const tsNode = services.esTreeNodeToTSNodeMap.get(node);
   if (tsNode === undefined) return false;
+  if (
+    entry.symbolAliases !== undefined &&
+    declaresSymbolElements(checker, tsNode, entry.symbolAliases)
+  ) {
+    return false;
+  }
   const type = checker.getTypeAtLocation(tsNode);
   const parts = type.isUnion() ? type.types : [type];
   const kinds = parts.map((part) => nativeKind(checker, program, part, entry.member));

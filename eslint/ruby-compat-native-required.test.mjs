@@ -72,6 +72,15 @@ tester.run("ruby-compat-native-required", rule, {
       code: 'import { uniq } from "@blazetrails/ruby-compat";\ndeclare const xs: (string | number[])[]; uniq(xs);',
       filename,
     },
+    // `symbolAliases`: Symbol elements join through `to_s`, which drops the colon
+    {
+      code: 'import { aryJoin } from "@blazetrails/ruby-compat";\ntype ExplainOption = string;\nfunction f(options: ExplainOption[]) { return aryJoin(options, " "); }',
+      filename,
+    },
+    {
+      code: 'import { aryJoin } from "@blazetrails/ruby-compat";\nnamespace DS { export type ExplainOption = string; }\nfunction f(options: DS.ExplainOption[]) { return aryJoin(options, " "); }',
+      filename,
+    },
     {
       code: 'import { hashDelete } from "./elsewhere";\ndeclare const h: Record<string, number>; hashDelete(h, "a");',
       filename,
@@ -88,6 +97,11 @@ tester.run("ruby-compat-native-required", rule, {
     invalid("declare const t: [number, string]; hashDelete(t, 0);"),
     invalid("hashDelete('abc' as unknown as string, 'length');"),
     invalid("hashDelete(1 as unknown as number, 'a');"),
+    {
+      code: 'import { aryJoin } from "@blazetrails/ruby-compat";\nfunction f(options: string[]) { return aryJoin(options, " "); }',
+      filename,
+      errors: [{ messageId: "nativeRequired" }],
+    },
   ],
 });
 

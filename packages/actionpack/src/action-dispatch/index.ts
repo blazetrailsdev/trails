@@ -25,7 +25,7 @@ export {
   UrlFor,
 } from "./routing/index.js";
 
-export { Request, MissingController, controllerConstants } from "./http/request.js";
+export { Request, MissingController } from "./http/request.js";
 export { Response, type CookieOptions } from "./http/response.js";
 export {
   Parameters,

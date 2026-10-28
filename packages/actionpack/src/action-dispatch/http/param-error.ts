@@ -9,7 +9,6 @@ import { ParseError } from "./parameters.js";
 export class ParamError extends ParseError {
   constructor(message?: string) {
     super(message);
-    this.name = "ActionDispatch::ParamError";
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -32,23 +31,12 @@ export class ParamError extends ParseError {
   }
 }
 
-export class ParameterTypeError extends ParamError {
-  constructor(message?: string) {
-    super(message);
-    this.name = "ActionDispatch::ParameterTypeError";
-  }
-}
+export class ParameterTypeError extends ParamError {}
 
-export class InvalidParameterError extends ParamError {
-  constructor(message?: string) {
-    super(message);
-    this.name = "ActionDispatch::InvalidParameterError";
-  }
-}
+export class InvalidParameterError extends ParamError {}
 
 export class ParamsTooDeepError extends ParamError {
   constructor(message: string = "ActionDispatch::ParamsTooDeepError") {
     super(message);
-    this.name = "ActionDispatch::ParamsTooDeepError";
   }
 }

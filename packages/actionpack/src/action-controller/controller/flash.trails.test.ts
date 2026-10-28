@@ -6,12 +6,12 @@ import { ActionNotFound } from "../../abstract-controller/base.js";
 import { Base } from "../base.js";
 import { Metal } from "../metal.js";
 import { Flash } from "../metal/flash.js";
-import { controllerConstants } from "../../action-dispatch/http/request.js";
 import { CookieStore } from "../../action-dispatch/middleware/session/cookie-store.js";
 import { ShowExceptions } from "../../action-dispatch/middleware/show-exceptions.js";
 import type { MiddlewareFactory } from "../../action-dispatch/middleware/stack.js";
 import { IntegrationTest, Session } from "../../action-dispatch/testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
+import { registerController } from "../base.js";
 
 class NoticesController extends Base {
   async create(): Promise<void> {
@@ -54,7 +54,7 @@ describe("add_flash_types readers", () => {
       middleware.use(CookieStore as MiddlewareFactory, { key: "_session" });
       middleware.delete(ShowExceptions as MiddlewareFactory);
     });
-    controllerConstants.set("notices", NoticesController);
+    registerController("NoticesController", NoticesController);
 
     await t.post("/notices");
     t.assertResponse("redirect");

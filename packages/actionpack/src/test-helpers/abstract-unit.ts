@@ -33,7 +33,7 @@ import { Metal } from "../action-controller/metal.js";
 import { RoutingError } from "../action-controller/metal/exceptions.js";
 import { TestCase as ActionControllerTestCase } from "../action-controller/test-case.js";
 import { deprecator } from "../action-dispatch/deprecator.js";
-import { controllerConstants, Request } from "../action-dispatch/http/request.js";
+import { Request } from "../action-dispatch/http/request.js";
 import type { Response } from "../action-dispatch/http/response.js";
 import { ActionableExceptions } from "../action-dispatch/middleware/actionable-exceptions.js";
 import { Callbacks } from "../action-dispatch/middleware/callbacks.js";
@@ -60,6 +60,7 @@ import {
 } from "../action-dispatch/testing/integration.js";
 import { TestProcess } from "../action-dispatch/testing/test-process.js";
 import { SystemTestCase } from "../action-dispatch/system-test-case.js";
+import { registerController } from "../action-controller/base.js";
 
 export const ActionPackTestSuiteUtils = {
   async requireHelpers(helpersDirs: string | string[]): Promise<void> {
@@ -482,10 +483,10 @@ export class CommentsController extends ResourcesController {}
 export class AccountsController extends ResourcesController {}
 export class ImagesController extends ResourcesController {}
 
-controllerConstants.set("resources", ResourcesController);
-controllerConstants.set("comments", CommentsController);
-controllerConstants.set("accounts", AccountsController);
-controllerConstants.set("images", ImagesController);
+registerController("ResourcesController", ResourcesController);
+registerController("CommentsController", CommentsController);
+registerController("AccountsController", AccountsController);
+registerController("ImagesController", ImagesController);
 
 type SetCookieAttributes = Record<string, string | true>;
 

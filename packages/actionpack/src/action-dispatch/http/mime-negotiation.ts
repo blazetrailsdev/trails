@@ -9,7 +9,6 @@ import { ActionDispatch } from "../../namespaces.js";
 const RESCUABLE_MIME_FORMAT_ERRORS = [BadRequest, ParseError] as const;
 
 export class InvalidType extends MimeType.InvalidMimeType {}
-InvalidType.prototype.name = "ActionDispatch::Http::MimeNegotiation::InvalidType";
 
 export interface MimeNegotiationHost {
   getHeader(key: string): unknown;
