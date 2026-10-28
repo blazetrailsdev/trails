@@ -2,22 +2,8 @@
   {
     "package": "activesupport",
     "tsFile": "code-generator.ts",
-    "rubyName": "define_cached_method",
-    "call": "fetch",
-    "reason": "`@methods.fetch(as) do` (code_generator.rb:19) is read as a Map `get` with an early return; CONVERGEABLE converge-code-generator-encrypted-config-file-update-checker-calls"
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "code-generator.ts",
     "rubyName": "execute",
     "call": "class_eval",
     "reason": "`@owner.class_eval(source)` (code_generator.rb:75) applies the collected sources as functions over the owner prototype or Module#moduleEval; CONVERGEABLE converge-code-generator-encrypted-config-file-update-checker-calls"
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "code-generator.ts",
-    "rubyName": "execute",
-    "call": "each_value",
-    "reason": "`@namespaces.each_value` (code_generator.rb:70) iterates the Map with `for…of values()`; CONVERGEABLE converge-code-generator-encrypted-config-file-update-checker-calls"
   }
 ]
