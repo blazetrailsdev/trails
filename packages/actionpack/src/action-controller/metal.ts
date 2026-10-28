@@ -16,10 +16,10 @@ import {
 import {
   rbCheckArrayType,
   rbFSend,
+  rbModName,
   rbModSingletonP,
   rbObjDup,
   rbObjRespondTo,
-  rbModName,
 } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,

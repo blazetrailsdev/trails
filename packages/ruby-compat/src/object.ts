@@ -472,6 +472,10 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * when the binding is a constant name (`Foo = Class.new`), not a local
  * (`klass = Class.new`).
  *
+ * A minifier that mangles class names is out of scope, as it is for every
+ * reader of `name`. A bundle keeps its classes named by preserving names
+ * (esbuild `keepNames`) or by seating them.
+ *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModName(klass: object): string | null {

@@ -10,6 +10,7 @@ import {
   isRegisteredConstant,
   rbConstGet,
   rbModConstGet,
+  rbModConstMissing,
   rbModConstants,
   rbPathToClass,
   registerConstant,
@@ -190,6 +191,13 @@ describe("rb_const_get", () => {
     }
     expect(error!.receiver()).toBe(Sub);
     expect(error!.constantName).toBe("ConstGetMissing");
+    let topLevel: NameError | undefined;
+    try {
+      rbModConstMissing(null, "ConstGetMissing");
+    } catch (e) {
+      topLevel = e as NameError;
+    }
+    expect(topLevel.receiver()).toBe(Object);
   });
 
   describe("rb_mod_const_get", () => {
