@@ -3,13 +3,17 @@ import { Configuration } from "./configuration.js";
 import { Utilities } from "./utilities.js";
 import { Tool, type CliTool } from "./tool.js";
 import "./image.js";
+import type { Block } from "@blazetrails/ruby-compat";
 import {
   extend,
   RuntimeError,
   StandardError,
   block as blockPass,
   rbBlockGivenP,
+  rbSetClassPathString,
 } from "@blazetrails/ruby-compat";
+
+type BlockPass<F> = F & Pick<Block<unknown>, keyof Block<unknown>>;
 
 export function isImagemagick7() {
   if (MiniMagick.graphicsmagick != null && MiniMagick.graphicsmagick !== false) {
@@ -38,8 +42,8 @@ export const MiniMagick = { version, isImagemagick7, cliVersion } as {
     ToolName,
     (
       ...args:
-        | [Record<string, unknown>?, ((tool: CliTool) => unknown)?]
-        | [(tool: CliTool) => unknown]
+        | [Record<string, unknown>?, BlockPass<(tool: CliTool) => unknown>?]
+        | [BlockPass<(tool: CliTool) => unknown>]
     ) => unknown
   >;
 extend(MiniMagick, Configuration);
@@ -72,31 +76,23 @@ for (const tool of [
 ] as const) {
   MiniMagick[tool] = (
     ...args:
-      | [Record<string, unknown>?, ((tool: CliTool) => unknown)?]
-      | [(tool: CliTool) => unknown]
+      | [Record<string, unknown>?, BlockPass<(tool: CliTool) => unknown>?]
+      | [BlockPass<(tool: CliTool) => unknown>]
   ) => {
     const block = rbBlockGivenP(args.at(-1))
-      ? (args.pop() as (tool: CliTool) => unknown)
+      ? (args.pop() as BlockPass<(tool: CliTool) => unknown>)
       : undefined;
     const options = (args[0] ?? {}) as Record<string, unknown>;
     const name = MiniMagick.isImagemagick7() && tool === "convert" ? "magick" : tool;
     return Tool.new(name, options, block);
   };
 }
-export class Error extends RuntimeError {
-  static toString(): string {
-    return "MiniMagick::Error";
-  }
-}
-export class Invalid extends StandardError {
-  static toString(): string {
-    return "MiniMagick::Invalid";
-  }
-}
-export class TimeoutError extends Error {
-  static toString(): string {
-    return "MiniMagick::TimeoutError";
-  }
-}
+export class Error extends RuntimeError {}
+export class Invalid extends StandardError {}
+export class TimeoutError extends Error {}
+
+rbSetClassPathString(Error, { name: "MiniMagick" }, "Error");
+rbSetClassPathString(Invalid, { name: "MiniMagick" }, "Invalid");
+rbSetClassPathString(TimeoutError, { name: "MiniMagick" }, "TimeoutError");
 
 import "./class-paths.generated.js";

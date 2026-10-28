@@ -2999,6 +2999,43 @@ describe(
       ]);
     });
 
+    it("credits a CONST.each define_method loop over a %w constant, renamed by tr", () => {
+      const m = metaMethods(`
+      class Tool
+        CREATION_OPERATORS = %w[xc radial-gradient]
+
+        CREATION_OPERATORS.each do |operator|
+          define_method(operator.tr('-', '_')) do |value = nil|
+            self
+          end
+        end
+      end
+    `);
+      expect(m["Tool"].map((x) => [x.name, x.notes])).toEqual([
+        ["xc", "define_method"],
+        ["radial_gradient", "define_method"],
+      ]);
+    });
+
+    it("credits each call of a same-class define_method macro", () => {
+      const m = metaMethods(`
+      class Image
+        def self.attribute(name, key = name.to_s)
+          define_method(name) do |*args|
+            @info[key, *args]
+          end
+        end
+
+        attribute :type, "format"
+        attribute :width
+      end
+    `);
+      expect(m["Image"].map((x) => [x.name, x.notes])).toEqual([
+        ["type", "define_method"],
+        ["width", "define_method"],
+      ]);
+    });
+
     it("records both block-less define_method shapes exactly once", () => {
       // Bare command (action_view/layouts.rb:311's shape) and parenthesized
       // (rack/utils.rb:183's). The block forms below must not be recorded twice

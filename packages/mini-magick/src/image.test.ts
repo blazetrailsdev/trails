@@ -221,8 +221,7 @@ describe("MiniMagick::Image", () => {
       expect(image.path).toBeTypeOf("string");
     });
 
-    // BLOCKED: mini-magick-image-ctor-block-async-combine-options
-    it.skip("accepts a block which it passes on to #combine_options", async () => {
+    it("accepts a block which it passes on to #combine_options", async () => {
       const image = new Image(subject.path, null, (b) => b.resize("100x100!"));
       expect(await image.dimensions()).toEqual([100, 100]);
     });
@@ -481,13 +480,13 @@ describe("MiniMagick::Image", () => {
 
   it("has attributes", async () => {
     expect(await subject.type()).toMatch(/^[A-Z]+$/m);
-    expect(await subject.width()).toBeTypeOf("number");
-    expect(await subject.height()).toBeTypeOf("number");
+    expect(await subject.width()).toBeTypeOfAnd("number", "nonzero");
+    expect(await subject.height()).toBeTypeOfAnd("number", "nonzero");
     expect(await subject.dimensions()).toSatisfy((xs: unknown[]) =>
       xs.every((x) => typeof x === "number"),
     );
-    expect(await subject.size()).toBeTypeOf("number");
-    expect(await subject.humanSize()).toBeTypeOf("string");
+    expect(await subject.size()).toBeTypeOfAnd("number", "nonzero");
+    expect(await subject.humanSize()).toBeTypeOfAnd("string", "nonempty");
     expect(await subject.colorspace()).toBeTypeOf("string");
     expect(await subject.resolution()).toSatisfy((xs: unknown[]) =>
       xs.every((x) => typeof x === "number"),

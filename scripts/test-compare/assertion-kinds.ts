@@ -265,6 +265,7 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
   // `expect(x).toBeTypeOf("number")` is the port of RSpec's `be_a(Integer)` on a
   // value JS holds as a primitive, where `toBeInstanceOf(Number)` is false.
   toBeTypeOf: "kindOf",
+  toBeTypeOfAnd: "kindOf",
   toBeExactInstanceOf: "instanceOf",
   toEqualRuby: "equal",
   toBeRubyTruthy: "truthy",
