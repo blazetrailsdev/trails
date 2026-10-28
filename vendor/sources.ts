@@ -841,6 +841,33 @@ export const SOURCES: readonly UpstreamSource[] = [
       },
     ],
   },
+  {
+    name: "mail",
+    origin: {
+      type: "git",
+      url: "https://github.com/mikel/mail.git",
+      ref: "2.8.1",
+    },
+    packages: [],
+  },
+  {
+    name: "mini_mime",
+    origin: {
+      type: "git",
+      url: "https://github.com/discourse/mini_mime.git",
+      ref: "v1.1.5",
+    },
+    packages: [],
+  },
+  {
+    name: "net-smtp",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby/net-smtp.git",
+      ref: "v0.5.1",
+    },
+    packages: [],
+  },
 ];
 
 /**

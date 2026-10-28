@@ -48,6 +48,10 @@
       "ref": "v2.24.0",
       "sha": "85990602c6fdb40489138e80080ca508200c7137"
     },
+    "mail": {
+      "ref": "2.8.1",
+      "sha": "b6b6cb737d47a85ddc720fda0e6b991e99224848"
+    },
     "marcel": {
       "ref": "v1.0.4",
       "sha": "cdf0e659c87f81e5d2b393cff3569f870bd71c47"
@@ -55,6 +59,10 @@
     "mini_magick": {
       "ref": "v5.2.0",
       "sha": "34433dc21cd4df544b33e67c111ff0ea36312d34"
+    },
+    "mini_mime": {
+      "ref": "v1.1.5",
+      "sha": "ad29352bf7b8fa547ea3058f2e97f3e8496f034a"
     },
     "minitest": {
       "ref": "v5.27.0",
@@ -67,6 +75,10 @@
     "mysql2": {
       "ref": "0.5.6",
       "sha": "43ea8af635f5e23f054294ef7759320d47f30e5f"
+    },
+    "net-smtp": {
+      "ref": "v0.5.1",
+      "sha": "a0075eb8a74910bd05566f0a208589263bce7597"
     },
     "nokogiri": {
       "ref": "v1.18.3",
