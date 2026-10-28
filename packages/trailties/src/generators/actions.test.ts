@@ -273,6 +273,22 @@ describe("ActionsTest", () => {
     return lines.join("");
   }
 
+  it("readme", async () => {
+    File.write(File.join(root, "README.md"), "Get your application up and running.\n");
+    TestGenerator.sourceRoot(root);
+    const { gen, lines } = generator();
+    await gen.readme("README.md");
+    expect(lines.join("")).toMatch("application up and running");
+  });
+
+  it("readme with quiet", async () => {
+    File.write(File.join(root, "README.md"), "Get your application up and running.\n");
+    TestGenerator.sourceRoot(root);
+    const { gen, lines } = generator({ quiet: true });
+    await gen.readme("README.md");
+    expect(lines.join("")).not.toMatch("application up and running");
+  });
+
   it("log", () => {
     expect(action(false, "YES")).toBe("YES\n");
   });
