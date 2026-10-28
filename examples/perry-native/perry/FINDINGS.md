@@ -57,7 +57,7 @@ rows are that build's behaviour; each wall's own section says what changed.
 | `05-model` — an `ActiveRecord` model class, no connection         | ok   | **MEM**     | killed at 12GB after 261s                      |
 | `06-sqlite` — `better-sqlite3`                                    | ok   | **ok\***    | 8s, 30MB — shimmed, see below                  |
 | `06b-crud` — one model, real connection, full CRUD                | ok   | **MEM**     | 891 modules; killed in codegen at 61/891       |
-| `06d-adapter-read` — adapter reads rows, no model layer           | ok   | _not run_   | 1133 modules collected; see below              |
+| `06d-adapter-read` — adapter reads rows, no model layer           | ok   | _not run_   | 1133 modules; walls 8+10+11 fixed, wall 9 open |
 | `07-boot` — full framework boot                                   | ok   | **MEM**     | killed at 12GB after 689s                      |
 
 Every rung runs correctly under Node, so no failure here is a broken program.
@@ -697,7 +697,7 @@ under `systemd-run MemoryMax=20G`, peak read from the scope's cgroup
 | 04-activesupport     | 429     | **MEM**          | 3.76 GiB | links; wall 7                             |
 | 05-model             | ~700    | **MEM** (12GB)   | 8.14 GiB | runs; `[05] Trail function`               |
 | 06b-crud             | 891     | **MEM** @ 61/891 | 8.63 GiB | wall 8 cleared; now `establishConnection` |
-| 06d-adapter-read     | 1133    | never run        | 8.91 GiB | wall 8 cleared; walls 9-11 (sqlite ext)   |
+| 06d-adapter-read     | 1133    | never run        | 8.91 GiB | walls 8+10+11 cleared; wall 9 open        |
 
 **Nothing fails to compile any more.** Peak is linear at roughly 8 MiB per
 module, and parallelism is nearly free: 04b costs 2.87 GiB serial and 3.37 GiB
@@ -931,14 +931,16 @@ same-named classes, neither explicitly imported, where the first/last-writer
 disagreement survives) is unexamined. `Base` is declared in at least nine
 trails packages.
 
-## Walls 9-11: three sqlite-ext defects, and the mask that hid them
+## Walls 9-11: two sqlite-ext defects, and the module bug that hid them
 
 06d-adapter-read is not blocked by another instance of wall 8. It is blocked by
-three independent defects in Perry's **own** better-sqlite3 extension, plus a
-fourth bug that made all of them illegible. Finding them took eleven refuted
-hypotheses, every one of them mine and every one from reading source instead of
-running a probe; every confirmed fact below came from a probe with a Node
-control on identical source. The ratio is the lesson.
+two independent defects in Perry's **own** better-sqlite3 extension, plus a
+module-system bug (wall 11) that made both of them illegible. Finding them took
+nineteen refuted hypotheses, every one of them mine and nearly every one from
+reading source instead of running a probe; every confirmed fact below came from
+a probe with a Node control on identical source. The ratio is the lesson - and
+the one hypothesis that did land came from a probe that separated a
+whole-namespace read from a per-member one.
 
 **It is not N-API interop.** Perry ships `crates/perry-ext-better-sqlite3`, so
 `import Database from "better-sqlite3"` never reaches the real addon. The
@@ -983,7 +985,14 @@ A fourth, smaller gap: the dynamic dispatch claims only `prepare`, `exec`,
 `close`, `raw`, `run`, `get`, `all` - so `iterate`, `pluck`, `expand`,
 `columns`, `bind` and `safeIntegers` fail on an erased receiver.
 
-### Wall 10 - `stmt.run()` on a row-returning statement returns `undefined`
+### Wall 10 - `stmt.run()` on a row-returning statement returns `undefined` (FIXED upstream)
+
+**Fixed and merged** as [#13335](https://github.com/PerryTS/perry/pull/13335),
+`cb85e924`, with `test-files/test_gap_sqlite_run_row_returning.ts`. The merge
+also carried a second divergence found while fixing it: `changes` came from the
+connection's running counter, so `CREATE TABLE` straight after an `INSERT`
+reported `changes: 1` where better-sqlite3 reports `0`. It is now a
+`total_changes` delta.
 
 ```
 const s = db.prepare("select 1 as one");
@@ -1014,39 +1023,70 @@ swallow-to-sentinel pattern is everywhere in this ext: `js_sqlite_open` and
 `nanbox_handle_inline` maps only `0` to `null` - so a failed open or prepare
 produces a valid-looking, unusable handle.
 
-### Wall 11 (the mask) - a leaf class loses its own method, silently
+### Wall 11 (the mask) - ROOT-CAUSED AND FIXED: a module that namespace-imports itself
 
 Every failure above reported `TypeError: setQuery is not a function`, with the
 real error destroyed. `abstract-adapter.ts:1857` calls `ex.setQuery` after
-`ex instanceof StatementInvalid` passes, and the method is absent.
-
-Instrumented at four points, the method is missing **at construction**; the
-later `activeRecordError.stack = ...` write is innocent:
+`ex instanceof StatementInvalid` passes, and the method is absent - missing
+already **at construction**, so the later `activeRecordError.stack = ...` write
+is innocent:
 
 ```
 [m1] in ctor: typeof this.setQuery=undefined proto-has=false
-[m3] before stack write: undefined     [m4] after: undefined
-```
-
-The prototype chain shows only the leaf affected:
-
-```
 node:  StatementInvalid:[constructor,setQuery] -> AdapterError:[constructor,connectionPool] -> ...
 perry: StatementInvalid:[constructor]          -> AdapterError:[constructor,connectionPool] -> ...
 ```
 
-`Object.getPrototypeOf(si) === StatementInvalid.prototype` is `true`, so this is
-not a duplicate class and **not** a wall-8 name collision - there is exactly one
-`StatementInvalid` in the monorepo. Every other class in the five-deep chain
-kept its members. `QueryAborted`, its subclass, inherits the hole.
+**The cause is a self-referential namespace import.** A module that does
 
-A minimal five-deep `Error` chain with a `prototype.name` mutation does **not**
-reproduce it (`probe/db-read/errchain.ts` matches Node), so chain depth is not
-the trigger. The open hypothesis, under test in `probe/db-read/prune.ts`, is
-dead-method pruning: `setQuery`'s only call site is a `catch (ex)` receiver
-narrowed by `instanceof`, never a statically-typed one.
+```ts
+import * as Mod from "./this-module.js"; // its own path
+```
 
-Nothing upstream matches, across eight search phrasings.
+bound the **whole-namespace value** to `undefined` during its own
+initialisation - silently, exit 0, no diagnostic. Two causes, one per half of
+the module lifecycle, and both had to be fixed:
+
+1. `@__perry_ns_<prefix>` was emitted only for a module that **another** module
+   namespace-imports, or that is a dynamic-import target. A self-importing
+   module got no namespace global at all.
+2. The namespace populator ran at the **tail** of `__init`, after the body that
+   reads it.
+
+Per-member reads (`Mod.f()`) always worked, which is why this hid for so long:
+only the whole value was wrong - and the whole value is exactly what a mixin
+helper needs, because it enumerates the namespace it is handed.
+
+`activesupport/src/core-ext/date-and-time/calculations.ts:9` self-imports, and
+line 487 does `include(RubyTime, DateAndTimeCalculations)`. ruby-compat's
+`include` calls `Object.getOwnPropertyNames(mod)`, so it threw at module-init
+time and `import { include } from "@blazetrails/activesupport"` - two lines -
+aborted any program:
+
+```
+TypeError: Cannot convert undefined or null to object
+    at include (<anonymous>)
+```
+
+Because trails installs prototype members **through**
+`include(Class, moduleNamespace)`, this is also the whole of wall 11's original
+silent symptom: handed an undefined namespace, `include` installed nothing, so
+`StatementInvalid.prototype.setQuery` never existed. **The two symptoms were
+always one bug**, differing only in whether the caller checked its argument.
+With the fix, `[k2] typeof setQuery = function` and
+`[k4] SI.prototype names = ["constructor","setQuery"]`.
+
+Minimisation: 1134 modules (direct import) -> 462 (4 local files + the real
+`include`) -> 459 (two lines) -> **1 module, 3 lines**.
+
+Fixed upstream in [PR 13436](https://github.com/PerryTS/perry/pull/13436),
+with `test-files/test_gap_self_namespace_import.ts`. It is the static-import
+counterpart of #10160, which fixed the same populator-ordering bug for
+_dynamic_ imports. Verified red/green by rebuilding with the patch reverted,
+not by inference; a whole-namespace read of _another_ module is unchanged.
+
+The nine self-imports in trails need no change - the pattern is valid ESM and
+the compiler now supports it.
 
 ### Corrections to earlier entries in this file
 
@@ -1057,8 +1097,9 @@ Nothing upstream matches, across eight search phrasings.
   version query _is_ the path; the collision just is not why it fails. Markers
   placed inside `getDatabaseVersion`/`queryValue` never fired even so - those
   are mixin functions spliced onto the prototype
-  (`abstract/database-statements.ts:1014`), which may be the same
-  member-attachment family as wall 11.
+  (`abstract/database-statements.ts:1014`) - and that guess was right: they are
+  spliced by `include`, which wall 11 handed an `undefined` namespace, so they
+  were never attached at all.
 - A sqlite handle is **not** a primitive. `typeof` is `object`, and a property
   write persists per-instance across a function boundary and an array
   round-trip, so `ReceiverKind::Number`/`can_own_properties` is irrelevant. The
@@ -1073,7 +1114,93 @@ Nothing upstream matches, across eight search phrasings.
 `can_own_properties`; spread-into-native-table; deep `Error` chain +
 `prototype.name` mutation; class-field receiver; field x spread crossed;
 large-graph scale; `.stack` write forcing a shape transition; static-vs-dynamic
-dispatch path. All eleven match Node exactly.
+dispatch path; dead-method pruning; module cycles (4-module cycle, `.js`
+specifiers, mixed `.js`/`.ts` spellings, the heritage-cast shape); upstream
+#12818/#12957/#12958 as the same family. All match Node exactly.
+
+**Module count was never the trigger.** The earlier "fails at >=533 modules"
+framing in this file was wrong, and is retracted: 1,205 generated real modules
+built around a working case solve facts in 0.8s and run correctly. Count was a
+proxy for "large enough to contain activesupport", and activesupport is where
+the self-import lives. The mixed-`.js`/`.ts` cycle probe did reproduce Node's
+TDZ `ReferenceError` exactly - that is parity, not a defect.
+
+### RETRACTED - the "no facts" abort path is not unsound at scale
+
+This file previously recorded a separate bug here: that
+`PERRY_FACTS_MAX_WORK=1` turned two working programs into crashing ones, with
+
+```
+TypeError: Cannot convert undefined or null to object
+    at include (<anonymous>)
+```
+
+and concluded "a program that runs with facts must not stop running without
+them: the bound is a performance valve, and taking it changes behaviour."
+
+**That was a mis-attribution, and it is retracted.** The crash signature is
+wall 11's - the self-referential namespace import - and whole-program facts
+were only masking it. Re-run on the [PR 13436](https://github.com/PerryTS/perry/pull/13436)
+build with the bound still at `PERRY_FACTS_MAX_WORK=1`:
+
+| program                          | modules | facts aborted, before    | facts aborted, after                    |
+| -------------------------------- | ------- | ------------------------ | --------------------------------------- |
+| `probe/db-read/errors-direct.ts` | 533     | **crashes** at `include` | runs, `RUN_RC=0`, correct               |
+| `probe/db-read/protomiss.ts`     | 1147    | **crashes** at `include` | runs, `RUN_RC=0`, `setQuery = function` |
+
+`crates/perry/src/commands/compile/program_facts.rs:101-116` and
+`perry-wpfacts/src/lib.rs:455` - "Over budget: claim nothing (sound), keep the
+shapes for the dump" - behave as documented. Aborting facts remains the
+workaround for the wpfacts cost below, and it now produces a working binary:
+1.5s at 533 modules and 4.6s at 1147, against 948.4s for a full solve.
+
+The lesson for this file: a crash that appears only in one configuration is
+evidence about masking, not about that configuration being unsound.
+
+### Separate bug - an unresolved relative import compiles, runs, and binds a boolean
+
+`perry/probe/db-read/repro-unresolved.ts`, six lines, no dependencies:
+
+```ts
+import { Thing } from "./definitely-does-not-exist.ts";
+const t = new Thing();
+```
+
+|                      | node                                   | perry                    |
+| -------------------- | -------------------------------------- | ------------------------ |
+| load                 | `ERR_MODULE_NOT_FOUND`, refuses to run | compiles, `COMPILE_RC=0` |
+| `new Thing()`        | never reached                          | succeeds                 |
+| `t instanceof Thing` | -                                      | **false**                |
+| prototype            | -                                      | bare `Object.prototype`  |
+| `typeof Thing`       | -                                      | **`"boolean"`**          |
+| process exit         | non-zero                               | **0**                    |
+
+Perry prints exactly one warning (`Could not resolve import ...`) among 18
+lines of output, then builds a program that exits 0 - so CI passes.
+
+`crates/perry/src/commands/compile/collect_modules.rs:1906` already
+hard-errors this case for `import * as X` (#629), on the grounds that an empty
+namespace stub is "worse than a compile-time failure because the user has no
+idea their namespace is empty", but keeps warn-and-continue for named imports
+because "those produce more pointed runtime errors at the actual missing
+binding". The table above is the counter-example: there is no pointed error,
+the binding is a boolean, `instanceof` lies, and the process succeeds.
+
+**Proposed fix**: gate on the specifier's shape rather than the import kind -
+hard-error whenever `resolve::attempted_relative_import_path(...)` returns
+`Some`, i.e. a relative specifier absent from disk, which nothing in stdlib, an
+ext, `compilePackages` or a global can ever back. Bare specifiers keep
+warn-and-continue, since those may legitimately resolve to non-file backing.
+
+This also explains the `betterSqlite3Driver`-is-a-boolean observation from
+earlier in this investigation: that probe used a subpath Node could not resolve
+either, so the import was simply unresolved. It was not evidence about handles.
+
+It cost two probe cycles here, because a bad import looks exactly like a
+catastrophic codegen bug. When writing a probe: check `[ -f ]` on a relative
+import first, require the Node control to succeed before reading the Perry
+side, and read the compiler's warnings rather than only lines matching
+`^Error`.
 
 ### Separate bug - `in` disagrees with `Object.keys` on a handle
 
@@ -1089,15 +1216,19 @@ bag and the `in` operator does not.
 
 ### Upstream filings from this round
 
-| Issue                                                  | Subject                                                                       | State                   |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------- | ----------------------- |
-| [12978](https://github.com/PerryTS/perry/issues/12978) | constraint check compares a type parameter's `TypeVar`, not its instantiation | filed                   |
-| [12979](https://github.com/PerryTS/perry/issues/12979) | contributor docs cannot produce a working from-source build                   | filed                   |
-| [12990](https://github.com/PerryTS/perry/pull/12990)   | **PR** — lift a TDZ check out of a spread call's member callee                | **merged** `ccad647e7a` |
-| [12889](https://github.com/PerryTS/perry/issues/12889) | parentless class emits a `super` construct (pre-existing report we closed)    | **closed** by 13001     |
-| [13001](https://github.com/PerryTS/perry/pull/13001)   | **PR** — no live heritage for a class that extends nothing                    | **merged** `71a8beb530` |
-| [13009](https://github.com/PerryTS/perry/pull/13009)   | **PR** — three `cargo test` failures on `main` (CI, not our rung)             | **merged** `ce79cdac2f` |
-| [13091](https://github.com/PerryTS/perry/pull/13091)   | **PR** — follow an import+export hop when classifying a namespace             | **merged** `22ad61bd`   |
+| Issue                                                  | Subject                                                                             | State                   |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------- | ----------------------- |
+| [12978](https://github.com/PerryTS/perry/issues/12978) | constraint check compares a type parameter's `TypeVar`, not its instantiation       | filed                   |
+| [12979](https://github.com/PerryTS/perry/issues/12979) | contributor docs cannot produce a working from-source build                         | filed                   |
+| [12990](https://github.com/PerryTS/perry/pull/12990)   | **PR** — lift a TDZ check out of a spread call's member callee                      | **merged** `ccad647e7a` |
+| [12889](https://github.com/PerryTS/perry/issues/12889) | parentless class emits a `super` construct (pre-existing report we closed)          | **closed** by 13001     |
+| [13001](https://github.com/PerryTS/perry/pull/13001)   | **PR** — no live heritage for a class that extends nothing                          | **merged** `71a8beb530` |
+| [13009](https://github.com/PerryTS/perry/pull/13009)   | **PR** — three `cargo test` failures on `main` (CI, not our rung)                   | **merged** `ce79cdac2f` |
+| [13091](https://github.com/PerryTS/perry/pull/13091)   | **PR** — follow an import+export hop when classifying a namespace                   | **merged** `22ad61bd`   |
+| [13436](https://github.com/PerryTS/perry/pull/13436)   | **PR** — a module that namespace-imports itself sees its own namespace (wall 11)    | **draft**               |
+| [12818](https://github.com/PerryTS/perry/issues/12818) | verified fixed on `34099d2c`/0.5.1663; its own repro passes — maintainers can close | to comment              |
+| [12957](https://github.com/PerryTS/perry/issues/12957) | verified fixed on `34099d2c`                                                        | to comment              |
+| [12958](https://github.com/PerryTS/perry/issues/12958) | verified fixed on `34099d2c`                                                        | to comment              |
 
 Both re-verified against `main` @ `20fde48d` immediately before filing, and
 both duplicate-searched first. 12978's reproducer is the 23-line
