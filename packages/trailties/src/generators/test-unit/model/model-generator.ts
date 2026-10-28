@@ -1,9 +1,9 @@
 import { File } from "@blazetrails/ruby-compat";
-import { dasherize } from "../../base.js";
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import { dasherize, type GeneratorOptions } from "../../base.js";
+import { NamedBase } from "../../named-base.js";
 import { TEMPLATES } from "./templates.js";
 
-export interface ModelGeneratorOptions extends NamedBaseOptions {
+export interface ModelGeneratorOptions extends GeneratorOptions {
   fixture?: boolean;
   fixtureReplacement?: string | null;
 }
@@ -22,8 +22,11 @@ export class ModelGenerator extends NamedBase {
   ];
 
   static {
+    this.argument("attributes", { type: "array", default: [], banner: "field:type field:type" });
+
     this.checkClassCollision({ suffix: "Test" });
-    this.commands().push("createTestFile", "createFixtureFile");
+
+    this.methodAdded("createTestFile");
   }
 
   /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
@@ -64,3 +67,4 @@ export class ModelGenerator extends NamedBase {
 Object.defineProperty(ModelGenerator, "name", { value: "TestUnit::Generators::ModelGenerator" });
 ModelGenerator.classOption("fixture", { type: "boolean" });
 ModelGenerator.hookFor("fixtureReplacement");
+ModelGenerator.methodAdded("createFixtureFile");

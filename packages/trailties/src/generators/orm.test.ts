@@ -10,11 +10,7 @@ class ORMWithGeneratorsActiveModel {
 const ORMWithoutGenerators = {};
 
 function generator(name: string, options: { orm?: string } = {}) {
-  return new ScaffoldControllerGenerator({
-    cwd: "/nonexistent",
-    name,
-    ...options,
-  });
+  return new ScaffoldControllerGenerator([name], options, { destinationRoot: "/nonexistent" });
 }
 
 describe("ScaffoldOrmTest", () => {

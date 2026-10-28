@@ -20,8 +20,7 @@ export function generateCommand(): Command {
         await Actions.bootApplicationBang();
         await Actions.loadGenerators();
       }
-      const gen = new MigrationGenerator({ cwd: Dir.pwd() });
-      await gen.run(name, columns);
+      await MigrationGenerator.start([name, ...columns], { destinationRoot: Dir.pwd() });
     });
 
   const help = async (): Promise<void> => {
@@ -46,7 +45,7 @@ export function generateCommand(): Command {
       }
 
       await Generators.invoke(generator, args, {
-        cwd: Dir.pwd(),
+        destinationRoot: Dir.pwd(),
         behavior: "invoke",
       });
     });

@@ -1,9 +1,9 @@
 import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
-import { GeneratorBase, type GeneratorOptions } from "../../base.js";
+import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import { MigrationGenerator } from "../../migration-generator.js";
-import { AuthenticationGenerator as TseAuthenticationGenerator } from "../../tse/authentication/authentication-generator.js";
+import type { GeneratorClass } from "../../../generators.js";
 import { TEMPLATES } from "./templates.js";
 
 export interface AuthenticationGeneratorOptions extends GeneratorOptions {
@@ -18,33 +18,30 @@ export class AuthenticationGenerator extends GeneratorBase {
       type: "boolean",
       desc: "Generate API-only controllers and models, with no view templates",
     });
+
+    this.hookFor(
+      "templateEngine",
+      { as: "authentication" },
+      function (this: GeneratorBase, templateEngine: GeneratorClass) {
+        if (!(this.options as AuthenticationGeneratorOptions).api)
+          return this.invoke(templateEngine);
+      },
+    );
+
+    this.methodAdded("createAuthenticationFiles");
+    this.methodAdded("configureApplicationController");
+    this.methodAdded("configureAuthenticationRoutes");
+    this.methodAdded("enableBcrypt");
+    this.methodAdded("addMigrations");
   }
 
-  constructor(options: AuthenticationGeneratorOptions) {
-    super(options);
-  }
-
-  async run(): Promise<string[]> {
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
     if (!this.isTypeScript())
       throw new Error("AuthenticationGenerator currently emits TypeScript only.");
-    if (!this.options.api) {
-      const templateEngine = new TseAuthenticationGenerator({
-        cwd: this.cwd,
-        shell: this.shell,
-        behavior: this.behavior,
-        pretend: this.options.pretend,
-      });
-      this.createdFiles.push(...templateEngine.run());
-    }
-    this.createAuthenticationFiles();
-    this.configureApplicationController();
-    await this.configureAuthenticationRoutes();
-    await this.enableBcrypt();
-    await this.addMigrations();
-    return this.getCreatedFiles();
   }
 
-  private createAuthenticationFiles(): void {
+  createAuthenticationFiles(): void {
     this.template("app/models/session.rb");
     this.template("app/models/user.rb");
     this.template("app/models/current.rb");
@@ -76,10 +73,10 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.createFile(destination, TEMPLATES[file]);
   }
 
-  private configureApplicationController(): void {
+  configureApplicationController(): void {
     const file = "app/controllers/application-controller.ts";
     if (!File.isExist(File.join(this.destinationRoot, file))) return;
-    const full = File.join(this.cwd, file);
+    const full = File.join(this.destinationRoot, file);
     let src = File.read(full);
     const mixin = src.includes("include(this, Authentication)") ? "" : STATIC_INIT;
     const hasAuth = /import\s*\{[^}]*\bAuthentication\b[^}]*\}\s*from\s*["'][^"']+["']/.test(src);
@@ -95,15 +92,15 @@ export class AuthenticationGenerator extends GeneratorBase {
   }
 
   /** @missingRailsArgs route — PERMANENT */
-  private async configureAuthenticationRoutes(): Promise<void> {
+  async configureAuthenticationRoutes(): Promise<void> {
     await this.route(`this.resources("passwords", { param: "token" });`);
     await this.route(`this.resource("session");`);
   }
 
   /** @missingRailsCall execute_command — CONVERGEABLE converge-generators-actions-generate-onto-rails-command */
-  private async enableBcrypt(): Promise<void> {
+  async enableBcrypt(): Promise<void> {
     if (!File.isExist(File.join(this.destinationRoot, "package.json"))) return;
-    const full = File.join(this.cwd, "package.json");
+    const full = File.join(this.destinationRoot, "package.json");
     const json = JSON.parse(File.read(full));
     if (!json.dependencies?.["bcryptjs"] || !json.dependencies?.["@blazetrails/bcrypt"]) {
       json.dependencies = { ...json.dependencies, bcryptjs: "*", "@blazetrails/bcrypt": "*" };
@@ -116,7 +113,7 @@ export class AuthenticationGenerator extends GeneratorBase {
 
     const application = "config/application.ts";
     if (!File.isExist(File.join(this.destinationRoot, application))) return;
-    const appFull = File.join(this.cwd, application);
+    const appFull = File.join(this.destinationRoot, application);
     const src = File.read(appFull);
     if (src.includes(BCRYPT_IMPORT)) return;
     const frameworks = 'import "@blazetrails/trailties/all";\n';
@@ -128,7 +125,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     );
   }
 
-  private async addMigrations(): Promise<void> {
+  async addMigrations(): Promise<void> {
     this.generate(
       "migration CreateUsers email_address:string!:uniq password_digest:string! --force",
     );
@@ -142,14 +139,11 @@ export class AuthenticationGenerator extends GeneratorBase {
     for (const { what, args } of this.pendingGenerators.splice(0)) {
       const [namespace, ...words] = [...what.split(/\s+/), ...args].filter(Boolean);
       if (namespace !== "migration") continue;
-      this.createdFiles.push(
-        ...(await MigrationGenerator.start(words, {
-          cwd: this.cwd,
-          shell: this.shell,
-          behavior: this.behavior,
-          pretend: this.options.pretend,
-        })),
-      );
+      await MigrationGenerator.start(words, {
+        destinationRoot: this.destinationRoot,
+        shell: this.shell,
+        behavior: this.behavior,
+      });
     }
   }
 }

@@ -21,7 +21,7 @@ afterEach(() => {
 
 describe("EncryptedFileGeneratorTest", () => {
   it("add_encrypted_file_silently round-trips template and is idempotent", async () => {
-    const gen = new EncryptedFileGenerator({ cwd: tmpDir });
+    const gen = new EncryptedFileGenerator([], {}, { destinationRoot: tmpDir });
     await gen.addEncryptedFileSilently("config/secret.yml.enc", "config/secret.key");
     const file = new EncryptedFile({
       contentPath: path.join(tmpDir, "config/secret.yml.enc"),

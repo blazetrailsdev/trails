@@ -1,19 +1,23 @@
-import { GeneratorBase, type GeneratorOptions, dasherize } from "../../base.js";
+import { dasherize, type GeneratorOptions } from "../../base.js";
+import { NamedBase } from "../../named-base.js";
 import { camelize, underscore } from "@blazetrails/activesupport";
 
-export interface HelperRunOptions {
+export interface HelperGeneratorOptions extends GeneratorOptions {
   test?: boolean;
 }
 
-export class HelperGenerator extends GeneratorBase {
-  constructor(options: GeneratorOptions) {
-    super(options);
+export class HelperGenerator extends NamedBase {
+  static {
+    this.checkClassCollision({ suffix: "Helper" });
+    this.methodAdded("createHelperFiles");
   }
 
-  run(name: string, options: HelperRunOptions = {}): string[] {
-    const { test = true } = options;
+  declare options: HelperGeneratorOptions;
+
+  createHelperFiles(): void {
+    const test = this.options.test ?? true;
     const ext = this.ext();
-    const paths = helperPaths(name);
+    const paths = helperPaths(this.name);
 
     this.createFile(
       `app/helpers/${paths.helperFile}${ext}`,
@@ -35,7 +39,6 @@ describe("${paths.helperName}", () => {
 `,
       );
     }
-    return this.getCreatedFiles();
   }
 }
 

@@ -1,8 +1,9 @@
+import type { GeneratorOptions } from "../../base.js";
 import { camelize } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import { NamedBase } from "../../named-base.js";
 
-export interface GeneratorGeneratorOptions extends NamedBaseOptions {
+export interface GeneratorGeneratorOptions extends GeneratorOptions {
   namespace?: boolean;
 }
 
@@ -10,14 +11,18 @@ export class GeneratorGenerator extends NamedBase {
   declare options: GeneratorGeneratorOptions;
 
   static {
+    this.checkClassCollision({ suffix: "Generator" });
+
     this.classOption("namespace", {
       type: "boolean",
       default: true,
       desc: "Namespace generator under lib/generators/name",
     });
+
+    this.methodAdded("createGeneratorFiles");
   }
 
-  run(): string[] {
+  createGeneratorFiles(): void {
     const dir = this.generatorDir();
     const ext = this.ext();
     const className = camelize(this.fileName);
@@ -28,14 +33,9 @@ export class GeneratorGenerator extends NamedBase {
       File.join(dir, `${this.fileName}-generator${ext}`),
       `import { NamedBase } from "@blazetrails/trailties/generators";
 
-export class ${className}Generator extends NamedBase {
-  run(): string[] {
-    return this.getCreatedFiles();
-  }
-}
+export class ${className}Generator extends NamedBase {}
 `,
     );
-    return this.getCreatedFiles();
   }
 
   private generatorDir(): string {

@@ -12,12 +12,15 @@ beforeEach(() => {
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
+async function generate(name: string): Promise<string[]> {
+  const gen = new MigrationGenerator([name], {}, { destinationRoot: tmpDir });
+  await gen.createMigrationFile();
+  return gen.getCreatedFiles();
+}
+
 describe("MigrationGeneratorTest", () => {
   it("migration", async () => {
-    const files = await new MigrationGenerator({
-      cwd: tmpDir,
-      name: "add_title_to_posts",
-    }).run();
+    const files = await generate("add_title_to_posts");
     expect(files[0]).toMatch(/^db\/migrate\/\d+_add_title_to_posts\.ts$/);
     const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
     expect(content).toContain("class AddTitleToPosts extends Migration.get(8.0)");
@@ -25,15 +28,13 @@ describe("MigrationGeneratorTest", () => {
   });
 
   it("migrations generated simultaneously", async () => {
-    const a = await new MigrationGenerator({ cwd: tmpDir, name: "first" }).run();
-    const b = await new MigrationGenerator({ cwd: tmpDir, name: "second" }).run();
+    const a = await generate("first");
+    const b = await generate("second");
     expect(a[0]).not.toBe(b[0]);
   });
 
   it("migration with invalid file name", async () => {
-    await expect(new MigrationGenerator({ cwd: tmpDir, name: "x:y" }).run()).rejects.toThrow(
-      /Illegal name/,
-    );
+    await expect(generate("x:y")).rejects.toThrow(/Illegal name/);
   });
 
   it("exit on failure", () => {

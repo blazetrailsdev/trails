@@ -80,7 +80,7 @@ async function invoke(this: InvocationHost, name: unknown = null, ...args: unkno
   let command: unknown, opts: unknown, config: unknown;
   [command, args, opts, config] = args as [unknown, unknown[], unknown, unknown];
 
-  const retrieved = this._retrieveClassAndCommand(name, command);
+  const retrieved = await this._retrieveClassAndCommand(name, command);
   const klass = retrieved[0];
   command = retrieved[1];
   if (!rtest(klass)) throw new RuntimeError(`Missing Thor class for invoke ${rbObjAsString(name)}`);
@@ -129,18 +129,18 @@ function _sharedConfiguration(this: Invocation): Record<string, unknown> {
 }
 
 /** @internal */
-function _retrieveClassAndCommand(
+async function _retrieveClassAndCommand(
   this: Invocation,
   name: unknown,
   sentCommand: unknown = null,
-): [unknown, unknown] {
+): Promise<[unknown, unknown]> {
   const self = this.constructor as unknown as InvocationClass;
   if (name == null) {
     return [self, null];
   } else if (rtest(self.allCommands()[toS(name)])) {
     return [self, toS(name)];
   } else {
-    const prepared = self.prepareForInvocation(null, name);
+    const prepared = await self.prepareForInvocation(null, name);
     const [klass, command] = Array.isArray(prepared) ? prepared : [prepared];
     return [klass, rtest(command) ? command : sentCommand];
   }

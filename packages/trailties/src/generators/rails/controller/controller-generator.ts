@@ -1,5 +1,5 @@
-import { GeneratorBase, type GeneratorOptions } from "../../base.js";
-import { underscore } from "@blazetrails/activesupport";
+import type { GeneratorOptions, GeneratorConfig } from "../../base.js";
+import { NamedBase } from "../../named-base.js";
 import {
   actionMethod,
   controllerPathHelpers,
@@ -7,38 +7,47 @@ import {
   parentRefForRelative,
 } from "./controller-paths.js";
 
-export interface ControllerRunOptions {
-  skipHelper?: boolean;
+export interface ControllerGeneratorOptions extends GeneratorOptions {
   skipRoutes?: boolean;
-  test?: boolean;
+  helper?: boolean;
   parent?: string;
+  skipHelper?: boolean;
+  test?: boolean;
 }
 
-export class ControllerGenerator extends GeneratorBase {
-  private actions: string[] = [];
-  private classPath: string[] = [];
-  private _namedBaseFileName = "";
-  private _fileName?: string;
+export class ControllerGenerator extends NamedBase {
+  static {
+    this.argument("actions", { type: "array", default: [], banner: "action action" });
+    this.classOption("skipRoutes", {
+      type: "boolean",
+      desc: "Don't add routes to config/routes.rb.",
+    });
+    this.classOption("helper", { type: "boolean" });
+    this.classOption("parent", {
+      type: "string",
+      default: "ApplicationController",
+      desc: "The parent class for the generated controller",
+    });
 
-  constructor(options: GeneratorOptions) {
-    super(options);
+    this.checkClassCollision({ suffix: "Controller" });
+
+    this.methodAdded("createControllerFiles");
+    this.methodAdded("addRoutes");
   }
 
-  async run(
-    name: string,
-    actions: string[],
-    options: ControllerRunOptions = {},
-  ): Promise<string[]> {
-    const {
-      skipHelper = false,
-      skipRoutes = false,
-      test = true,
-      parent = "ApplicationController",
-    } = options;
-    this.options = { ...this.options, skipRoutes } as GeneratorOptions;
-    this.actions = actions;
-    const paths = controllerPathHelpers(name);
-    this.assignNamesBang(name);
+  declare options: ControllerGeneratorOptions;
+  declare actions: string[];
+
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
+    this.fileName = this.removePossibleSuffix(this.fileName);
+  }
+
+  createControllerFiles(): void {
+    const { skipHelper = false, test = true } = this.options;
+    const parent = this.parentClassName();
+    const actions = this.actions;
+    const paths = controllerPathHelpers(this.name);
     const ts = this.isTypeScript();
     const ext = this.ext();
     const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
@@ -49,8 +58,6 @@ export class ControllerGenerator extends GeneratorBase {
       methods: actions.map((a) => actionMethod(a, ts)),
     });
     this.createFile(`app/controllers/${paths.controllerFile}${ext}`, source);
-
-    await this.addRoutes();
 
     if (test) {
       const importPrefix = "../".repeat(depth + 2);
@@ -82,33 +89,23 @@ ${cases}
     if (actions.length === 0) {
       this.createFile(`app/views/${paths.viewBase}/.keep`, "");
     }
-
-    return this.getCreatedFiles();
   }
 
-  private async addRoutes(): Promise<void> {
-    if ((this.options as ControllerRunOptions).skipRoutes) return;
+  async addRoutes(): Promise<void> {
+    if (this.options.skipRoutes) return;
     if (this.actions.length === 0) return;
     const routingCode = this.actions
-      .map((action) => `this.get(${JSON.stringify(`${this.fileName()}/${action}`)});`)
+      .map((action) => `this.get(${JSON.stringify(`${this.fileName}/${action}`)});`)
       .join("\n");
     await this.route(routingCode, { namespace: this.regularClassPath() });
   }
 
-  private assignNamesBang(name: string): void {
-    this.classPath = controllerPathHelpers(name).namespaceParts.map((p) => underscore(p));
-    this._namedBaseFileName = this.classPath.pop()!;
-    this._fileName = undefined;
+  /** @internal */
+  private parentClassName(): string {
+    return this.options.parent!;
   }
 
-  private regularClassPath(): string[] {
-    return this.classPath;
-  }
-
-  private fileName(): string {
-    return (this._fileName ??= this.removePossibleSuffix(this._namedBaseFileName));
-  }
-
+  /** @internal */
   private removePossibleSuffix(name: string): string {
     return name.replace(/_?controller$/i, "");
   }

@@ -27,7 +27,13 @@ afterEach(() => {
 });
 
 function makeGen() {
-  return new ControllerGenerator({ cwd: tmpDir });
+  return {
+    run: async (name: string, actions: string[], options: object = {}) => {
+      const gen = new ControllerGenerator([name, ...actions], options, { destinationRoot: tmpDir });
+      await gen.invokeAll();
+      return gen.getCreatedFiles();
+    },
+  };
 }
 
 describe("ControllerGenerator view and controller file naming", () => {

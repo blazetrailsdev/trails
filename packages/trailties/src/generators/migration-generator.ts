@@ -1,9 +1,9 @@
 import { File, getFs, rbFBinding, strNew, TSE } from "@blazetrails/ruby-compat";
-import { GeneratorBase, GeneratorOptions } from "./base.js";
+import type { GeneratorOptions } from "./base.js";
+import { NamedBase } from "./named-base.js";
 import { migrationTemplate } from "./migration.js";
 import { nextMigrationNumber } from "./active-record/migration.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
-import { Base } from "@blazetrails/activerecord";
 import {
   camelize,
   foreignKey,
@@ -12,7 +12,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 
-export interface MigrationRunOptions {
+export interface MigrationGeneratorOptions extends GeneratorOptions {
   timestamps?: boolean;
   primaryKeyType?: string;
 }
@@ -29,38 +29,42 @@ function kwargs(...options: Array<string | undefined>): string {
   return pairs === "" ? "" : `, { ${pairs.slice(2)} }`;
 }
 
-export class MigrationGenerator extends GeneratorBase {
+export class MigrationGenerator extends NamedBase {
+  static {
+    this.argument("attributes", {
+      type: "array",
+      default: [],
+      banner: "field[:type][:index] field[:type][:index]",
+    });
+
+    this.classOption("timestamps", { type: "boolean" });
+    this.classOption("primaryKeyType", { type: "string", desc: "The type for primary key" });
+
+    this.methodAdded("createMigrationFile");
+  }
+
   declare ["constructor"]: typeof MigrationGenerator;
+  declare options: MigrationGeneratorOptions;
   migrationNumber = "";
   migrationFileName = "";
   migrationClassName = "";
-
-  constructor(options: GeneratorOptions) {
-    super(options);
-  }
 
   static exitOnFailure = true;
 
   static nextMigrationNumber = nextMigrationNumber;
 
-  private attributes: GeneratedAttribute[] = [];
-  private runOptions: MigrationRunOptions = {};
   private migrationTemplate = "migration.ts";
   private migrationAction: string | undefined;
-  private tableName = "";
   private joinTables: string[] = [];
 
-  async run(name: string, args: string[], options: MigrationRunOptions = {}): Promise<string[]> {
+  async createMigrationFile(): Promise<void> {
+    const name = this.name;
     if (!/^\w+$/.test(name)) {
       throw new Error(
         `Illegal migration name: ${name} (only letters, numbers, and underscores allowed)`,
       );
     }
 
-    this.runOptions = options;
-    this.attributes = args
-      .filter((arg) => !arg.startsWith("-"))
-      .map((arg) => GeneratedAttribute.parse(arg));
     this.setLocalAssignsBang(underscore(name));
     const source = File.expandPath(await this.findInSourcePaths(this.migrationTemplate));
 
@@ -77,11 +81,10 @@ export class MigrationGenerator extends GeneratorBase {
       File.join("db/migrate", `${underscore(name)}${this.ext()}`),
     );
     if (file) this.createdFiles.push(this.relativeToOriginalDestinationRoot(file));
-    return this.getCreatedFiles();
   }
 
   protected createTableMigration(): string {
-    const table = this.tableName;
+    const table = this.tableName();
     const colLines: string[] = [];
     for (const attribute of this.attributes) {
       if (attribute.passwordDigest()) {
@@ -98,7 +101,7 @@ export class MigrationGenerator extends GeneratorBase {
         );
       }
     }
-    if (this.runOptions.timestamps ?? true) colLines.push("      t.timestamps();");
+    if (this.options.timestamps ?? true) colLines.push("      t.timestamps();");
     const parts = [
       `    await this.createTable("${table}"${kwargs(this.primaryKeyType())}, (t) => {\n${colLines.join("\n")}\n    });`,
     ];
@@ -116,7 +119,7 @@ export class MigrationGenerator extends GeneratorBase {
   }
 
   protected migration(): string {
-    const table = this.tableName;
+    const table = this.tableName();
     const lines: string[] = [];
     if (this.migrationAction === "add") {
       for (const attribute of this.attributes) {
@@ -182,12 +185,12 @@ export class MigrationGenerator extends GeneratorBase {
   }
 
   private primaryKeyType(): string | undefined {
-    const keyType = this.runOptions.primaryKeyType;
+    const keyType = this.options.primaryKeyType;
     if (keyType) return `, id: "${keyType}"`;
   }
 
   private foreignKeyType(): string | undefined {
-    const keyType = this.runOptions.primaryKeyType;
+    const keyType = this.options.primaryKeyType;
     if (keyType) return `, type: "${keyType}"`;
   }
 
@@ -196,7 +199,7 @@ export class MigrationGenerator extends GeneratorBase {
     let m: RegExpMatchArray | null;
     if ((m = fileName.match(/^(add)_.*_to_(.*)/) ?? fileName.match(/^(remove)_.*?_from_(.*)/))) {
       this.migrationAction = m[1];
-      this.tableName = this.normalizeTableName(m[2]);
+      this._tableName = this.normalizeTableName(m[2]);
     } else if (/join_table/.test(fileName)) {
       if (this.attributes.length === 2) {
         this.migrationAction = "join";
@@ -206,7 +209,7 @@ export class MigrationGenerator extends GeneratorBase {
         this.setIndexNames();
       }
     } else if ((m = fileName.match(/^create_(.+)/))) {
-      this.tableName = this.normalizeTableName(m[1]);
+      this._tableName = this.normalizeTableName(m[1]);
       this.migrationTemplate = "create_table_migration.ts";
     }
   }
@@ -227,10 +230,6 @@ export class MigrationGenerator extends GeneratorBase {
 
   private normalizeTableName(tableName: string): string {
     return this.isPluralizeTableNames() ? pluralize(tableName) : singularize(tableName);
-  }
-
-  private isPluralizeTableNames(): boolean {
-    return Base.pluralizeTableNames;
   }
 }
 

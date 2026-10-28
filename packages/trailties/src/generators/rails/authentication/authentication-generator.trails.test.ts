@@ -51,7 +51,7 @@ describe("AuthenticationGenerator", () => {
         fs.mkdirSync(path.dirname(path.join(appDir, rel)), { recursive: true });
         fs.writeFileSync(path.join(appDir, rel), content);
       }
-      await new AuthenticationGenerator({ cwd: appDir }).run();
+      await new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
 
       const configPath = path.join(appDir, "tsconfig.json");
       const program = api
@@ -83,7 +83,8 @@ describe("AuthenticationGenerator pending generators", () => {
         fs.mkdirSync(path.dirname(path.join(appDir, rel)), { recursive: true });
         fs.writeFileSync(path.join(appDir, rel), content);
       }
-      const generate = () => new AuthenticationGenerator({ cwd: appDir }).run();
+      const generate = () =>
+        new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
       await generate();
       await expect(generate()).resolves.toBeDefined();
 
@@ -119,8 +120,8 @@ describe("AuthenticationGenerator enable_bcrypt", () => {
         fs.mkdirSync(path.dirname(path.join(appDir, rel)), { recursive: true });
         fs.writeFileSync(path.join(appDir, rel), content);
       }
-      await new AuthenticationGenerator({ cwd: appDir }).run();
-      await new AuthenticationGenerator({ cwd: appDir }).run();
+      await new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
+      await new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
 
       const json = JSON.parse(fs.readFileSync(path.join(appDir, "package.json"), "utf-8"));
       expect(json.dependencies["@blazetrails/bcrypt"]).toBe("*");

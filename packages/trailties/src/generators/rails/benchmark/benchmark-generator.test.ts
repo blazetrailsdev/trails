@@ -23,13 +23,13 @@ afterEach(() => {
 
 describe("BenchmarkGeneratorTest", () => {
   it("generate benchmark", () => {
-    const gen = new BenchmarkGenerator({
-      cwd: tmpDir,
-      name: "my_benchmark",
-    });
-    const files = gen.run();
-    expect(files).toContain("script/benchmarks/my_benchmark.ts");
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    const gen = new BenchmarkGenerator(["my_benchmark"], {}, { destinationRoot: tmpDir });
+    gen.generateLayout();
+    expect(gen.getCreatedFiles()).toContain("script/benchmarks/my_benchmark.ts");
+    const content = fs.readFileSync(
+      path.join(tmpDir, "script/benchmarks/my_benchmark.ts"),
+      "utf-8",
+    );
     expect(content).toContain("before: () => {}");
     expect(content).toContain("after: () => {}");
     expect(content).toContain("performance.now()");

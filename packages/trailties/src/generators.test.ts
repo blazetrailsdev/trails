@@ -24,7 +24,7 @@ describe("GeneratorsTest", () => {
       fs.existsSync(nodePath.join(GENERATORS_PATH, "rails", "helper", "helper-generator.ts")),
     ).toBeTruthy();
     const klass = (await Generators.findByNamespace("rails:helper"))!;
-    const config = { cwd: "/tmp" };
+    const config = { destinationRoot: "/tmp" };
     const start = vi.spyOn(klass, "start").mockResolvedValue([]);
     await Generators.invoke("rails:helper", ["Account"], config);
     expect(start).toHaveBeenCalledWith(["Account"], config);
@@ -35,7 +35,7 @@ describe("GeneratorsTest", () => {
     const name = "unknown";
     let output = "";
     await expect(
-      Generators.invoke(name, [], { cwd: "/tmp" }).catch((e: Error) => {
+      Generators.invoke(name, [], { destinationRoot: "/tmp" }).catch((e: Error) => {
         output = e.message;
         throw e;
       }),
@@ -51,13 +51,13 @@ describe("GeneratorsTest", () => {
   it("find by namespace", async () => {
     const klass = await Generators.findByNamespace("rails:model");
     expect(klass).toBeTruthy();
-    expect(klass!.namespace).toEqual("rails:model");
+    expect(klass!.namespace()).toEqual("rails:model");
   });
 
   it("find by namespace with base", async () => {
     const klass = await Generators.findByNamespace("model", "rails");
     expect(klass).toBeTruthy();
-    expect(klass!.namespace).toEqual("rails:model");
+    expect(klass!.namespace()).toEqual("rails:model");
   });
 
   it("rails generators help with builtin information", async () => {
@@ -65,7 +65,7 @@ describe("GeneratorsTest", () => {
     /* eslint-disable no-regex-spaces -- the indent width is `print_list`'s, verbatim from generators_test.rb:141-144 */
     expect(output).toMatch(/Rails:/);
     expect(output).toMatch(/^  model$/m);
-    expect(output).toMatch(/^  scaffold_controller$/m);
+    expect(output).toMatch(/^  scaffold-controller$/m);
     expect(output).not.toMatch(/^  app$/m);
     /* eslint-enable no-regex-spaces */
   });

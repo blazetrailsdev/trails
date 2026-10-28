@@ -31,7 +31,13 @@ afterEach(() => {
 });
 
 function makeGen() {
-  return new ControllerGenerator({ cwd: tmpDir });
+  return {
+    run: async (name: string, actions: string[], options: object = {}) => {
+      const gen = new ControllerGenerator([name, ...actions], options, { destinationRoot: tmpDir });
+      await gen.invokeAll();
+      return gen.getCreatedFiles();
+    },
+  };
 }
 
 function readFile(relativePath: string): string {
@@ -197,7 +203,15 @@ describe("ControllerGeneratorTest (JavaScript project)", () => {
   });
 
   function makeJsGen() {
-    return new ControllerGenerator({ cwd: jsTmpDir });
+    return {
+      run: async (name: string, actions: string[], options: object = {}) => {
+        const gen = new ControllerGenerator([name, ...actions], options, {
+          destinationRoot: jsTmpDir,
+        });
+        await gen.invokeAll();
+        return gen.getCreatedFiles();
+      },
+    };
   }
 
   it("generates .js controller and test files", async () => {

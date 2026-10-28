@@ -26,10 +26,10 @@ export function newCommand(): Command {
     )
     .option("--skip-git", "Skip git init")
     .option("--skip-install", "Skip dependency installation")
-    .option("--skip-docker", AppGenerator.classOptions().skipDocker.desc)
-    .option("--skip-eslint", AppGenerator.classOptions().skipEslint.desc)
+    .option("--skip-docker", AppGenerator.classOptions().skipDocker.description ?? undefined)
+    .option("--skip-eslint", AppGenerator.classOptions().skipEslint.description ?? undefined)
     .option("--no-skip-eslint")
-    .option("--dev", AppGenerator.classOptions().dev.desc)
+    .option("--dev", AppGenerator.classOptions().dev.description ?? undefined)
     .action(async (name: string, options) => {
       const pm = options.packageManager as PackageManager;
       const driver = options.sqliteDriver as SqliteDriver;
@@ -48,18 +48,20 @@ export function newCommand(): Command {
       }
 
       const cwd = Dir.pwd();
-      const gen = new AppGenerator({
-        cwd,
-        appPath: name,
-        name: options.name,
-        database: options.database,
-        packageManager: pm,
-        sqliteDriver: driver,
-        skipDocker: options.skipDocker,
-        skipEslint: options.skipEslint,
-        dev: options.dev,
-      });
-      await gen.run();
+      const gen = new AppGenerator(
+        [name],
+        {
+          name: options.name,
+          database: options.database,
+          packageManager: pm,
+          sqliteDriver: driver,
+          skipDocker: options.skipDocker,
+          skipEslint: options.skipEslint,
+          dev: options.dev,
+        },
+        { destinationRoot: cwd },
+      );
+      await gen.invokeAll();
 
       const appDir = File.join(cwd, name);
 

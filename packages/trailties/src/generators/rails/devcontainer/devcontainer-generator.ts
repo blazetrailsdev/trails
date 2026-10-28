@@ -1,6 +1,6 @@
 import { File } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
-import { GeneratorBase, type GeneratorOptions } from "../../base.js";
+import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../database.js";
 import { Generators } from "../../../generators.js";
 export type SqliteDriver = "better-sqlite3" | "node-sqlite" | "expo-sqlite";
@@ -65,16 +65,21 @@ export class DevcontainerGenerator extends GeneratorBase {
       default: null,
       desc: "Skip Solid Cache, Queue, and Cable setup",
     });
+
+    this.methodAdded("createDevcontainer");
+    this.methodAdded("updateApplicationSystemTestCase");
+    this.methodAdded("updateDatabaseYml");
   }
 
+  declare options: DevcontainerGeneratorOptions;
   readonly opts: ResolvedOptions;
   private _dependencies?: string[];
   private _volumes?: string[];
   /** @internal */
   readonly database: Database;
 
-  constructor(options: DevcontainerGeneratorOptions) {
-    super(options);
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
     const { appName, database, redis, systemTest, activeStorage, node, dev, kamal } = this
       .options as Required<DevcontainerGeneratorOptions>;
     if (!(DATABASES as readonly string[]).includes(database))
@@ -88,34 +93,39 @@ export class DevcontainerGenerator extends GeneratorBase {
       node,
       dev,
       kamal,
-      sqliteDriver: options.sqliteDriver ?? "better-sqlite3",
-      nodeVersion: options.nodeVersion ?? "24.16.0",
+      sqliteDriver: this.options.sqliteDriver ?? "better-sqlite3",
+      nodeVersion: this.options.nodeVersion ?? "24.16.0",
     };
     this.database = Database.build(database);
   }
 
-  run(): string[] {
+  createDevcontainer(): void {
     this.createFile(".devcontainer/devcontainer.json", this.devcontainerJson());
     this.createFile(".devcontainer/Dockerfile", this.dockerfileContent());
     this.createFile(".devcontainer/compose.yaml", this.composeYaml());
+  }
+
+  updateApplicationSystemTestCase(): void {
     this.gsubFile(
       "test/application_system_test_case.ts",
       /^\s*drivenBy\b.*$/m,
       this.systemTestConfiguration(),
       this.opts.systemTest,
     );
+  }
+
+  updateDatabaseYml(): void {
     this.gsubFile(
       "config/database.ts",
       /host:\s*"localhost"/g,
       'host: process.env.DB_HOST ?? "localhost"',
       this.opts.database !== "sqlite3",
     );
-    return this.getCreatedFiles();
   }
 
   private gsubFile(rel: string, re: RegExp, replacement: string, enabled: boolean): void {
     if (!enabled || !File.isExist(File.join(this.destinationRoot, rel))) return;
-    const full = File.join(this.cwd, rel);
+    const full = File.join(this.destinationRoot, rel);
     File.write(full, File.read(full).replace(re, replacement));
     this.sayStatus("update", rel);
   }
@@ -222,7 +232,7 @@ services:
 
     this._dependencies = [];
 
-    const options = this.options as DevcontainerGeneratorOptions;
+    const options = this.options;
     if (options.systemTest) this._dependencies.push("selenium");
     if (options.redis) this._dependencies.push("redis");
     if (this.database.service) this._dependencies.push(this.database.name);
@@ -234,7 +244,7 @@ services:
 
     this._volumes = [];
 
-    const options = this.options as DevcontainerGeneratorOptions;
+    const options = this.options;
     if (options.redis) this._volumes.push("redis-data");
     if (this.database.volume) this._volumes.push(this.database.volume);
 

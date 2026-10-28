@@ -58,24 +58,31 @@ beforeEach(() => {
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
+function invokeAll(generator: ChangeGenerator): void {
+  generator.editDatabaseConfig();
+  generator.editPackageJson();
+  generator.editDockerfile();
+  generator.editDevcontainerFiles();
+}
+
 function run(to: string, opts: { appName?: string } = {}) {
-  return new ChangeGenerator({
-    cwd: tmpDir,
-    to,
-    appName: opts.appName ?? "tmp",
-  }).run();
+  invokeAll(
+    new ChangeGenerator([], { to, appName: opts.appName ?? "tmp" }, { destinationRoot: tmpDir }),
+  );
 }
 
 type ComposeConfig = Hash<string, Hash<string, Hash<string, string[]>>>;
 describe("ChangeGeneratorTest", () => {
   it("change to invalid database", () => {
-    expect(() => new ChangeGenerator({ cwd: tmpDir, to: "invalid-db" })).toThrow(
+    expect(
+      () => new ChangeGenerator([], { to: "invalid-db" }, { destinationRoot: tmpDir }),
+    ).toThrow(
       /Invalid value for --to option\. Supported preconfigurations are: mysql, postgresql, sqlite3, mariadb-mysql\./,
     );
   });
 
   it("appName defaults to basename of cwd", () => {
-    new ChangeGenerator({ cwd: tmpDir, to: "postgresql" }).run();
+    invokeAll(new ChangeGenerator([], { to: "postgresql" }, { destinationRoot: tmpDir }));
     expect(read("config/database.ts")).toContain(
       `database: "${path.basename(tmpDir)}_development"`,
     );

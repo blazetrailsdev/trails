@@ -1,7 +1,7 @@
 import { Dir, File, include, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
 import { Generators } from "../generators.js";
-import { GeneratorBase, type GeneratorOptions } from "./base.js";
+import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "./base.js";
 import { Database, type DatabaseName } from "./database.js";
 
 type Skip =
@@ -44,13 +44,14 @@ export const OPTION_IMPLICATIONS: Record<string, ReadonlyArray<keyof AppBaseOpti
 };
 
 export abstract class AppBase extends GeneratorBase {
-  readonly appPath: string;
-  readonly options: AppBaseOptions;
+  declare appPath: string;
+  declare options: AppBaseOptions;
   private _database?: Database;
   /** @internal */
   private _builder?: object;
 
   static {
+    this.argument("appPath", { type: "string" });
     this.classOption("skipDocker", {
       type: "boolean",
       default: null,
@@ -115,12 +116,13 @@ export abstract class AppBase extends GeneratorBase {
     });
   }
 
-  constructor(options: AppBaseOptions) {
-    super(options);
-    this.appPath = options.appPath;
-    this.destinationRoot = File.expandPath(options.appPath, options.cwd);
-    this.cwd = this.destinationRoot;
-    this.options = this.deduceImpliedOptions({ ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...options });
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
+    this.destinationRoot = File.expandPath(this.appPath, this.destinationRoot);
+    this.options = this.deduceImpliedOptions({
+      ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS,
+      ...Object.fromEntries(this.options as unknown as Iterable<[string, unknown]>),
+    } as unknown as AppBaseOptions);
   }
 
   /** @internal */

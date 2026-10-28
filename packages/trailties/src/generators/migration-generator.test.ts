@@ -42,8 +42,14 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function makeGen() {
-  return new MigrationGenerator({ cwd: tmpDir });
+function makeGen(destinationRoot = tmpDir) {
+  return {
+    run: async (name: string, args: string[], options: object = {}) => {
+      const gen = new MigrationGenerator([name, ...args], options, { destinationRoot });
+      await gen.createMigrationFile();
+      return gen.getCreatedFiles();
+    },
+  };
 }
 
 describe("MigrationGeneratorTest", () => {
@@ -496,7 +502,7 @@ describe("MigrationGeneratorTest (JavaScript project)", () => {
   });
 
   function makeJsGen() {
-    return new MigrationGenerator({ cwd: jsTmpDir });
+    return makeGen(jsTmpDir);
   }
 
   function readJsMigration(files: string[]): string {

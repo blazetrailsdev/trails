@@ -1,6 +1,6 @@
 import { File } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
-import { GeneratorBase, type GeneratorOptions } from "../../base.js";
+import { GeneratorBase } from "../../base.js";
 
 const DEFAULT_TEMPLATE = `# aws:
 #   access_key_id: 123
@@ -9,14 +9,8 @@ const DEFAULT_TEMPLATE = `# aws:
 `;
 
 export class EncryptedFileGenerator extends GeneratorBase {
-  constructor(options: GeneratorOptions) {
-    super(options);
-  }
-
-  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
-    const generator = new EncryptedFileGenerator(config);
-    await generator.addEncryptedFileSilently(args[0], args[1]);
-    return generator.getCreatedFiles();
+  static {
+    this.methodAdded("addEncryptedFileSilently");
   }
 
   async addEncryptedFileSilently(
@@ -26,8 +20,8 @@ export class EncryptedFileGenerator extends GeneratorBase {
   ): Promise<void> {
     if (File.isExist(File.join(this.destinationRoot, filePath))) return;
     const file = new EncryptedFile({
-      contentPath: File.join(this.cwd, filePath),
-      keyPath: File.join(this.cwd, keyPath),
+      contentPath: File.join(this.destinationRoot, filePath),
+      keyPath: File.join(this.destinationRoot, keyPath),
       envKey: "RAILS_MASTER_KEY",
       raiseIfMissingKey: true,
     });

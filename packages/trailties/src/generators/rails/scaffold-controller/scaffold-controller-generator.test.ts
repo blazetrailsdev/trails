@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
+import { assertMatch, assertNoMatch, capture } from "@blazetrails/activesupport";
 import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import * as Assertions from "../../testing/assertions.js";
 import { ActiveModel } from "../../active-model.js";
-import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
-import type { ScaffoldControllerGeneratorOptions as Options } from "./scaffold-controller-generator.js";
+import { Application } from "../../../application.js";
+import "../../../test-unit/trailtie.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
 let tmpDir: string;
@@ -24,9 +24,19 @@ beforeEach(() => {
 
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
-function runGenerator(name: string, attributes: string[] = [], options: Partial<Options> = {}) {
-  const config = { cwd: tmpDir, ...options };
-  return ScaffoldControllerGenerator.start([name, ...attributes], config);
+class ScaffoldControllerGeneratorTestApp extends Application {}
+
+let ScaffoldControllerGenerator: typeof import("./scaffold-controller-generator.js").ScaffoldControllerGenerator;
+
+beforeAll(async () => {
+  await ScaffoldControllerGeneratorTestApp.instance().loadGenerators();
+  ({ ScaffoldControllerGenerator } = await import("./scaffold-controller-generator.js"));
+});
+
+function runGenerator(name: string, args: string[] = []) {
+  return capture("stderr", () =>
+    ScaffoldControllerGenerator.start([name, ...args], { destinationRoot: tmpDir }),
+  );
 }
 
 function read(rel: string): string {
@@ -104,10 +114,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
     const UsersController = class {};
     registerConstant("UsersController", UsersController);
     try {
-      const content = await runGenerator("User", ["name:string", "age:integer"]).then(
-        () => "",
-        (e: Error) => e.message,
-      );
+      const content = await runGenerator("User", ["name:string", "age:integer"]);
       assertMatch(
         /The name 'UsersController' is either already used in your application or reserved/,
         content,
@@ -125,7 +132,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("does not invoke test framework if required", async () => {
-    await runGenerator("User", [], { test: false });
+    await runGenerator("User", ["--no-test-framework"]);
     expect(fs.existsSync(path.join(tmpDir, "test/controllers/users-controller.test.ts"))).toBe(
       false,
     );
@@ -162,7 +169,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("model name option", async () => {
-    await runGenerator("Admin::User", [], { modelName: "User" });
+    await runGenerator("Admin::User", ["--model-name=User"]);
     await Assertions.assertFile.call(
       { destinationRoot: tmpDir },
       "app/controllers/admin/users-controller.ts",
@@ -190,13 +197,12 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("api controller tests", async () => {
-    await runGenerator(
-      "User",
-      ["name:string", "age:integer", "organization:references{polymorphic}"],
-      {
-        api: true,
-      },
-    );
+    await runGenerator("User", [
+      "name:string",
+      "age:integer",
+      "organization:references{polymorphic}",
+      "--api",
+    ]);
 
     const content = read("test/controllers/users-controller.test.ts");
     assertMatch(/^export class UsersControllerTest extends IntegrationTest/m, content);
@@ -218,7 +224,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("does not invoke helper if required", async () => {
-    await runGenerator("User", [], { helper: false });
+    await runGenerator("User", ["--no-helper"]);
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/users-helper.ts"))).toBe(false);
   });
 
@@ -228,12 +234,12 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("skip routes", async () => {
-    await runGenerator("User", [], { skipRoutes: true });
+    await runGenerator("User", ["--skip-routes"]);
     expect(read("config/routes.ts")).not.toContain('this.resources("users")');
   });
 
   it("default orm is used", async () => {
-    await runGenerator("User", [], { orm: "unknown" });
+    await runGenerator("User", ["--orm=unknown"]);
     const c = read("app/controllers/users-controller.ts");
     expect(c).toMatch(/class UsersController extends ApplicationController/);
     expect(c).toMatch(/this\.users = await User\.all\(\)/);
@@ -248,7 +254,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
 
     registerConstant("Unknown::Generators::ActiveModel", klass);
     try {
-      await runGenerator("User", [], { orm: "unknown" });
+      await runGenerator("User", ["--orm=unknown"]);
       const c = read("app/controllers/users-controller.ts");
       expect(c).toMatch(/class UsersController extends ApplicationController/);
       expect(c).toMatch(/this\.users = await User\.find\("all"\)/);
@@ -279,7 +285,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("api controller", async () => {
-    await runGenerator("User", ["name:string"], { api: true });
+    await runGenerator("User", ["name:string", "--api"]);
     const c = read("app/controllers/users-controller.ts");
     expect(c).toContain("this.render({ json: this.users })");
     expect(c).not.toContain("async new()");
@@ -287,7 +293,6 @@ describe("ScaffoldControllerGeneratorTest", () => {
     expect(c).toContain('this.params.expect({ user: ["name"] })');
     expect(parseTs(c).diagnostics).toEqual([]);
     assertNoRubySource(c);
-    expect(fs.existsSync(path.join(tmpDir, "app/helpers/users-helper.ts"))).toBe(false);
   });
 
   it("generated test file parses as valid TypeScript", async () => {

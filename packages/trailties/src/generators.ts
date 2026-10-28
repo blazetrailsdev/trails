@@ -1,24 +1,22 @@
 import { dasherize, deepMergeBang, underscore } from "@blazetrails/activesupport";
 import { Dir, File, LoadError, getPath, regexpEscape } from "@blazetrails/ruby-compat";
-import type { GeneratorBase, GeneratorOptions } from "./generators/base.js";
+import type { GeneratorBase, GeneratorConfig } from "./generators/base.js";
 import type {
   AfterGenerateCallback,
   Generators as GeneratorsConfiguration,
 } from "./configuration.js";
 
-export type GeneratorClass = Omit<typeof GeneratorBase, "prototype" | "start"> & {
+export type GeneratorClass = Omit<typeof GeneratorBase, "prototype"> & {
   readonly prototype: GeneratorBase;
   readonly name: string;
-  namespace: string;
-  start(args: string[], config: GeneratorOptions): Promise<string[]>;
 };
 
 const HIDDEN_FROM_LISTING = [
   "app",
   "plugin",
-  "encrypted_file",
-  "encryption_key_file",
-  "master_key",
+  "encrypted-file",
+  "encryption-key-file",
+  "master-key",
   "credentials",
   "db:system:change",
 ];
@@ -68,7 +66,7 @@ export class Generators {
       orm: false,
       resourceController: "controller",
       resourceRoute: true,
-      scaffoldController: "scaffold_controller",
+      scaffoldController: "scaffold-controller",
       systemTests: null,
       testFramework: null,
       templateEngine: "tse",
@@ -164,12 +162,13 @@ export class Generators {
     return [...new Set(paths)];
   }
 
+  /** @inventedArm map — PERMANENT */
   static async findByNamespace(
     name: string,
     base: string | null = null,
     context: string | null = null,
   ): Promise<GeneratorClass | null> {
-    const lookups: string[] = [];
+    let lookups: string[] = [];
     if (base != null) lookups.push(`${base}:${name}`);
     if (context != null) lookups.push(`${name}:${context}`);
 
@@ -181,9 +180,10 @@ export class Generators {
       lookups.push(name);
     }
 
+    lookups = lookups.map((namespace) => dasherize(underscore(namespace)));
     await Generators.lookup(lookups);
 
-    const namespaces = new Map(Generators.subclasses().map((k) => [k.namespace, k]));
+    const namespaces = new Map(Generators.subclasses().map((k) => [k.namespace(), k]));
     for (const namespace of lookups) {
       const klass = namespaces.get(namespace);
       if (klass) return klass;
@@ -198,8 +198,8 @@ export class Generators {
   static async invoke(
     namespace: string,
     args: string[],
-    config: GeneratorOptions,
-  ): Promise<string[]> {
+    config: GeneratorConfig = {},
+  ): Promise<void> {
     const names = namespace.split(":");
     const name = names.pop()!;
     const klass = await Generators.findByNamespace(name, names.length ? names.join(":") : null);
@@ -209,9 +209,9 @@ export class Generators {
           "Run `bin/trails generate --help` for more options.\n",
       );
     }
-    const files = await klass.start(args, config);
+    if (args.length === 0 && klass.arguments().some((a) => a.isRequired())) args.push("--help");
+    await klass.start(args, config);
     if (config.behavior === "invoke") Generators.runAfterGenerateCallback();
-    return files;
   }
 
   static addGeneratedFile(file: string): string {
@@ -221,11 +221,11 @@ export class Generators {
 
   static async publicNamespaces(): Promise<string[]> {
     await Generators.lookupBang();
-    return Generators.subclasses().map((k) => k.namespace);
+    return Generators.subclasses().map((k) => k.namespace());
   }
 
   static hiddenNamespaces(): string[] {
-    return (_hiddenNamespaces ??= ["rails", "resource_route", "devcontainer"]);
+    return (_hiddenNamespaces ??= ["rails", "resource-route", "devcontainer"]);
   }
 
   static hideNamespaces(...namespaces: string[]): void {
@@ -343,10 +343,7 @@ async function requireGenerator(base: URL, path: string): Promise<void> {
   for (const value of Object.values(mod)) {
     if (typeof value === "function" && value.prototype instanceof GeneratorBase) {
       const klass = value as unknown as GeneratorClass;
-      Object.defineProperty(klass, "namespace", {
-        value: namespace.map((piece) => underscore(piece.replace(/-/g, "_"))).join(":"),
-        configurable: true,
-      });
+      klass.namespace(namespace.join(":"));
       _subclasses ??= [];
       if (!_subclasses.includes(klass)) _subclasses.push(klass);
       return;

@@ -1,7 +1,7 @@
 import { File } from "@blazetrails/ruby-compat";
 
 export interface TrailsActionsHost {
-  cwd: string;
+  destinationRoot: string;
   log(...args: unknown[]): void;
 }
 
@@ -19,7 +19,7 @@ export async function pkg(
   if (name.trim() === "") {
     throw new Error(`package name must be non-empty, got ${JSON.stringify(name)}`);
   }
-  const pkgPath = File.join(this.cwd, "package.json");
+  const pkgPath = File.join(this.destinationRoot, "package.json");
   const raw = await File.readAsync(pkgPath);
   const parsed: unknown = JSON.parse(raw);
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {

@@ -51,7 +51,16 @@ export class MigrationGenerator extends NamedBase {
 
   static nextMigrationNumber = nextMigrationNumber;
 
-  async run(): Promise<string[]> {
+  static {
+    this.argument("attributes", {
+      type: "array",
+      default: [],
+      banner: "field[:type][:index] field[:type][:index]",
+    });
+    this.methodAdded("createMigrationFile");
+  }
+
+  async createMigrationFile(): Promise<void> {
     if (!/^\w+$/.test(this.name)) {
       throw new Error(`Illegal name for a migration: ${this.name}`);
     }
@@ -61,6 +70,5 @@ export class MigrationGenerator extends NamedBase {
       File.join("db/migrate", `${this.fileName}${this.ext()}`),
     );
     if (file) this.createdFiles.push(this.relativeToOriginalDestinationRoot(file));
-    return this.getCreatedFiles();
   }
 }

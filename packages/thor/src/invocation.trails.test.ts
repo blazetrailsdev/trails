@@ -111,9 +111,9 @@ describe("Thor::Invocation", () => {
 
   it("invoke retrieves a command of the current class by name", async () => {
     const a = build(A);
-    expect(a._retrieveClassAndCommand("two")).toEqual([A, "two"]);
-    expect(a._retrieveClassAndCommand(null)).toEqual([A, null]);
-    expect(a._retrieveClassAndCommand(B, "hello")).toEqual([B, "hello"]);
+    expect(await a._retrieveClassAndCommand("two")).toEqual([A, "two"]);
+    expect(await a._retrieveClassAndCommand(null)).toEqual([A, null]);
+    expect(await a._retrieveClassAndCommand(B, "hello")).toEqual([B, "hello"]);
   });
 
   it("invoke_with_padding restores the padding once the invocation settles", async () => {

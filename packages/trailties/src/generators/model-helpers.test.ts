@@ -5,7 +5,9 @@ import { GeneratorError } from "./generated-attribute.js";
 import { ModelGenerator, type ModelGeneratorOptions } from "./rails/model/model-generator.js";
 
 const build = (name: string, forcePlural?: boolean) =>
-  new ModelGenerator({ cwd: "/nonexistent", name, forcePlural } as ModelGeneratorOptions);
+  new ModelGenerator([name], { forcePlural } as ModelGeneratorOptions, {
+    destinationRoot: "/nonexistent",
+  });
 
 describe("normalizeModelName", () => {
   beforeEach(() => {
