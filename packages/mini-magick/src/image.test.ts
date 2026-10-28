@@ -223,7 +223,7 @@ describe("MiniMagick::Image", () => {
     });
 
     // BLOCKED: mini-magick-image-spec-remaining-fails
-    it.fails("accepts a block which it passes on to #combine_options", async () => {
+    it.skip("accepts a block which it passes on to #combine_options", async () => {
       const image = new Image(subject.path, null, (b) => b.resize("100x100!"));
       expect(await image.dimensions()).toEqual([100, 100]);
     });

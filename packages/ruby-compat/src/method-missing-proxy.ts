@@ -33,6 +33,7 @@ export const PROTOCOL_PROBES = new Set([
   "asymmetricMatch",
   "$$typeof",
   "nodeType",
+  "hasAttribute",
   "isBlank",
   "isEmpty",
   "empty",
