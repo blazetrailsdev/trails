@@ -1073,7 +1073,8 @@ export function rbModAttrWriter(klass: { prototype: object }, ...argv: string[])
  * `vendor/ruby/v3.3.11/symbol.c:862`, bound at `vendor/ruby/v3.3.11/string.c:12212`)
  * and `Symbol#to_sym` (`vendor/ruby/v3.3.11/symbol.rb:8`). A JS string spells
  * both receivers and answers the Symbol's colon spelling (`":name"`); no other
- * core receiver defines `to_sym`, so the send raises `NoMethodError`. It is
+ * core receiver defines `to_sym`, so the send dispatches to a receiver's own
+ * `toSym` and otherwise raises `NoMethodError`. It is
  * the send, where {@link stringToSym} is `rb_str_intern` on a known String,
  * as `toI` is to `rbStrToI`.
  *
@@ -1082,6 +1083,8 @@ export function rbModAttrWriter(klass: { prototype: object }, ...argv: string[])
 export function toSym(obj: unknown): string {
   if (typeof obj === "string") return stringToSym(obj);
   if (obj == null) throw new NoMethodError("undefined method 'to_sym' for nil", "to_sym");
+  const own = (obj as { toSym?: unknown }).toSym;
+  if (typeof own === "function") return own.call(obj) as string;
   throw new NoMethodError(
     `undefined method 'to_sym' for an instance of ${rbObjClassname(obj)}`,
     "to_sym",
