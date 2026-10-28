@@ -46,7 +46,6 @@ import {
   rbDefineInspectCustom,
   rbEnsure,
   rbFSend,
-  rbModConstSet,
   toI,
   rbObjAsString as toS,
   Thread,
@@ -2138,4 +2137,4 @@ include(AbstractAdapter, {
   bindParamsLength,
 });
 
-rbModConstSet(ConnectionAdapters, "AbstractAdapter", AbstractAdapter);
+ConnectionAdapters.AbstractAdapter = AbstractAdapter;

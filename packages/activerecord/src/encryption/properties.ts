@@ -1,4 +1,5 @@
 import { Encryption } from "../namespaces.js";
+import { Message } from "./message.js";
 import {
   BigDecimal,
   eachPair,
@@ -16,14 +17,13 @@ import {
   type Bytes,
 } from "@blazetrails/ruby-compat";
 import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
-import type { Message } from "./message.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Properties {
   static get ALLOWED_VALUE_CLASSES(): unknown[] {
     return [
       rbCString,
-      Encryption.Message,
+      Message,
       rbCNumeric,
       rbCInteger,
       rbCFloat,

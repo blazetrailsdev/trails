@@ -2,7 +2,8 @@ import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
-import { ActiveRecord, Associations } from "../namespaces.js";
+import { ActiveRecord } from "../namespaces.js";
+import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import type { AssociationReflection, ThroughReflection } from "../reflection.js";
 import { kernelArray, safeConstantize, tryCall } from "@blazetrails/activesupport";
 import {
@@ -130,7 +131,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   scope(): any {
     let scope: any;
     if (this.disableJoins) {
-      return Associations.DisableJoinsAssociationScope.create().scope(this);
+      return DisableJoinsAssociationScope.create().scope(this);
     } else if ((scope = this.klass.currentScope()) && tryCall(scope, "proxyAssociation") === this) {
       return scope.spawn();
     } else if ((scope = this.klass.globalCurrentScope())) {
@@ -144,7 +145,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   associationScope(): any {
     if (this.klass) {
       return (this._cachedScope ||= this.disableJoins
-        ? Associations.DisableJoinsAssociationScope.scope(this)
+        ? DisableJoinsAssociationScope.scope(this)
         : AssociationScope.scope(this));
     }
   }

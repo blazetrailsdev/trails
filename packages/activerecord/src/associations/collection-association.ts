@@ -19,7 +19,7 @@ import {
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
-import { Associations } from "../namespaces.js";
+import { CollectionProxy } from "./collection-proxy.js";
 import { NotImplementedError, RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
 
@@ -526,9 +526,6 @@ export abstract class CollectionAssociation extends Association {
       if (reloaded instanceof Promise) reloaded.catch(() => {});
     }
 
-    const CollectionProxy = Associations.CollectionProxy as unknown as {
-      create(klass: typeof Base, association: CollectionAssociation): AssociationProxy;
-    };
     this._proxy ??= CollectionProxy.create(this.klass, this);
     this._proxy.resetScope();
     return this._proxy;

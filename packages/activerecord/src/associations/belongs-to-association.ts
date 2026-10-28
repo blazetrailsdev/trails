@@ -5,7 +5,6 @@ import {
   rbFCaller,
   rbFSend,
   rbObjAsString,
-  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
@@ -225,4 +224,4 @@ export class BelongsToAssociation extends SingularAssociation {
   }
 }
 
-rbModConstSet(Associations, "BelongsToAssociation", BelongsToAssociation);
+Associations.BelongsToAssociation = BelongsToAssociation;
