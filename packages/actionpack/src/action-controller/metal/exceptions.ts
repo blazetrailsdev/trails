@@ -64,11 +64,7 @@ export class MethodNotAllowed extends ActionControllerError {
   }
 }
 
-export class NotImplemented extends MethodNotAllowed {
-  constructor(...allowedMethods: string[]) {
-    super(...allowedMethods);
-  }
-}
+export class NotImplemented extends MethodNotAllowed {}
 
 export class MissingFile extends ActionControllerError {}
 

@@ -911,11 +911,7 @@ Request.prototype.parameterFilterFor = _parameterFilterFor as (
 export async function* emptyRackBody(): RackBody {}
 
 /** @noRailsEquivalent PERMANENT */
-export class MissingController extends NameError {
-  constructor(message: string, constantName?: string) {
-    super(message, constantName);
-  }
-}
+export class MissingController extends NameError {}
 
 export class PASS_NOT_FOUND {
   /** @internal */

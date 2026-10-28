@@ -84,11 +84,7 @@ export class ParameterMissing extends KeyError {
 }
 include(ParameterMissing, Correctable);
 
-export class ExpectedParameterMissing extends ParameterMissing {
-  constructor(param: string, keys: string[] | null = null) {
-    super(param, keys);
-  }
-}
+export class ExpectedParameterMissing extends ParameterMissing {}
 
 export class UnpermittedParameters extends IndexError {
   readonly params: string[];

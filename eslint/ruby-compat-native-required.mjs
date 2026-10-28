@@ -109,7 +109,9 @@ function declaredElementName(typeNode) {
     element = typeNode.typeArguments[0];
   }
   return element !== undefined && ts.isTypeReferenceNode(element)
-    ? element.typeName.getText()
+    ? ts.isQualifiedName(element.typeName)
+      ? element.typeName.right.text
+      : element.typeName.text
     : undefined;
 }
 

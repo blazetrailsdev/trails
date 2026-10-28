@@ -78,6 +78,10 @@ tester.run("ruby-compat-native-required", rule, {
       filename,
     },
     {
+      code: 'import { aryJoin } from "@blazetrails/ruby-compat";\nnamespace DS { export type ExplainOption = string; }\nfunction f(options: DS.ExplainOption[]) { return aryJoin(options, " "); }',
+      filename,
+    },
+    {
       code: 'import { hashDelete } from "./elsewhere";\ndeclare const h: Record<string, number>; hashDelete(h, "a");',
       filename,
     },

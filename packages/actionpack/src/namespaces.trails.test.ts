@@ -10,3 +10,10 @@ describe("ActionDispatch autoload_under testing", () => {
     }
   });
 });
+
+describe("ActionDispatch::MissingController", () => {
+  it("reads its Ruby path from its seat", async () => {
+    const { MissingController } = await import("./action-dispatch/http/request.js");
+    expect(new MissingController("x").name).toBe("ActionDispatch::MissingController");
+  });
+});
