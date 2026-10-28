@@ -1,13 +1,13 @@
+import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
 import { ModelHelpers } from "./model-helpers.js";
 import { ResourceGenerator } from "./rails/resource/resource-generator.js";
 import type { ResourceGeneratorOptions } from "./rails/resource/resource-generator.js";
 import { ScaffoldGenerator } from "./test-unit/scaffold/scaffold-generator.js";
 
-const build = (name: string, modelName?: string, output: (m: string) => void = () => {}) =>
+const build = (name: string, modelName?: string) =>
   new ResourceGenerator({
     cwd: "/nonexistent",
-    output,
     name,
     modelName,
   } as ResourceGeneratorOptions);
@@ -35,14 +35,13 @@ describe("applyResourceHelpers", () => {
     expect(k.controllerFilePath()).toBe("admin/posts");
   });
 
-  it("does not re-run plural warn on modelName override", () => {
-    const messages: string[] = [];
-    build("posts", "comments", (m) => messages.push(m));
-    expect(messages.filter((m) => m.includes("recognized as a plural"))).toHaveLength(1);
+  it("does not re-run plural warn on modelName override", async () => {
+    const output = await capture("stdout", () => build("posts", "comments"));
+    expect(output.match(/recognized as a plural/g)).toHaveLength(1);
   });
 
   it("ormClass raises without an :orm class option", () => {
-    const i = new ScaffoldGenerator({ cwd: "/nonexistent", output: () => {}, name: "post" });
+    const i = new ScaffoldGenerator({ cwd: "/nonexistent", name: "post" });
     expect(() => i.ormClass()).toThrow(
       "You need to have :orm as class option to invoke orm_class and orm_instance",
     );

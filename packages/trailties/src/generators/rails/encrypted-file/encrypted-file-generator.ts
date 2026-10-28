@@ -32,6 +32,6 @@ export class EncryptedFileGenerator extends GeneratorBase {
       raiseIfMissingKey: true,
     });
     await file.write(template);
-    this.output(`      create  ${filePath}`);
+    this.sayStatus("create", filePath);
   }
 }

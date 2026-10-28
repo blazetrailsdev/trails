@@ -29,10 +29,13 @@ import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
 import * as ThorActions from "@blazetrails/thor/actions";
 import { fromSuperclass } from "@blazetrails/thor/base";
+import { Base as ThorBase, Shell } from "@blazetrails/thor/shell";
+import type { Shell as ShellHost } from "@blazetrails/thor/shell";
+import type { Basic } from "@blazetrails/thor/shell/basic";
 
 export interface GeneratorOptions {
   cwd: string;
-  output: (msg: string) => void;
+  shell?: Basic | null;
   quiet?: boolean;
   force?: boolean;
   skip?: boolean;
@@ -85,6 +88,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   declare static addRuntimeOptionsBang: typeof ThorActions.ClassMethods.addRuntimeOptionsBang;
 
   static {
+    include(this as unknown as new (...args: unknown[]) => unknown, Shell);
     include(this as unknown as new (...args: unknown[]) => unknown, ThorActions.Actions);
 
     this.classOption("skipNamespace", {
@@ -125,7 +129,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   /** @internal */
   declare _destinationStack: string[];
   declare destinationRoot: string;
-  output: (msg: string) => void;
   options: GeneratorOptions;
   behavior: "invoke" | "revoke";
   protected createdFiles: string[] = [];
@@ -142,6 +145,9 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   _sourcePaths?: string[];
 
+  declare shell: ShellHost["shell"];
+  declare say: ShellHost["say"];
+  declare sayStatus: ShellHost["sayStatus"];
   declare relativeToOriginalDestinationRoot: typeof ThorActions.relativeToOriginalDestinationRoot;
   declare sourcePaths: typeof ThorActions.sourcePaths;
   declare findInSourcePaths: typeof ThorActions.findInSourcePaths;
@@ -171,7 +177,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   constructor(options: GeneratorOptions) {
     this.cwd = options.cwd;
     this.destinationRoot = options.cwd;
-    this.output = options.output;
     const opts: Record<string, unknown> = { ...options };
     for (const [name, option] of Object.entries(
       (this.constructor as typeof GeneratorBase).classOptions(),
@@ -191,31 +196,9 @@ export abstract class GeneratorBase implements GeneratorActionsState {
         this.behavior = "invoke";
     }
     this.options = opts as unknown as GeneratorOptions;
-  }
 
-  /** @noRailsEquivalent PERMANENT */
-  say(message: unknown = "", _color: string | null = null): void {
-    if (this.isQuiet()) return;
-
-    this.output(String(message));
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  sayStatus(status: unknown, message: unknown, logStatus: string | boolean = true): void {
-    if (this.isQuiet() || logStatus === false) return;
-    const spaces = "  ";
-    const statusText = String(status).padStart(12);
-    const margin = " ".repeat(statusText.length) + spaces;
-
-    const text = String(message)
-      .replace(/(\r\n|\r|\n)$/, "")
-      .replace(/\n(?=[^])/g, `\n${margin}`);
-    this.output(`${statusText}${spaces}${text}`);
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  isQuiet(): boolean {
-    return !!this.options.quiet;
+    this.shell = options.shell!;
+    if (rbObjRespondTo(this.shell, "base")) this.shell.base ||= this as unknown as Basic["base"];
   }
 
   static hookFor(...names: Array<string | HookForOptions | HookBlock>): void {
@@ -300,7 +283,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  static classOptionsHelp(output: (msg: string) => void): void {
+  static classOptionsHelp(shell: Basic): void {
     const rows = Object.entries(this.classOptions()).map(([name, option]) => {
       const sw = `--${dasherize(name)}`;
       const aliases = [option.aliases ?? []].flat();
@@ -317,10 +300,10 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     });
     if (rows.length === 0) return;
     const width = Math.max(...rows.map(([usage]) => usage.length));
-    output("Options:");
+    shell.say("Options:");
     for (const [usage, notes] of rows) {
-      output(`  ${usage.padEnd(width)}  # ${notes[0]}`);
-      for (const note of notes.slice(1)) output(`  ${"".padEnd(width)}  # ${note}`);
+      shell.say(`  ${usage.padEnd(width)}  # ${notes[0]}`);
+      for (const note of notes.slice(1)) shell.say(`  ${"".padEnd(width)}  # ${note}`);
     }
   }
 
@@ -330,6 +313,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     givenArgs: string[],
     config: GeneratorOptions,
   ): Promise<string[]> {
+    config.shell ||= new ThorBase.shell!();
     return GeneratorBase.dispatch.call(this, null, [...givenArgs], null, config);
   }
 
@@ -346,7 +330,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     block?: (instance: GeneratorBase) => void,
   ): Promise<string[]> {
     if (["-h", "-?", "--help", "-D"].includes(givenArgs[0] as string)) {
-      (this as unknown as typeof GeneratorBase).classOptionsHelp(config.output);
+      (this as unknown as typeof GeneratorBase).classOptionsHelp(config.shell!);
       return [];
     }
 
@@ -644,8 +628,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     return [args, opts, merged];
   }
 
-  private _sharedConfiguration(): { invocations: Invocations } {
-    return { invocations: this._invocations! };
+  private _sharedConfiguration(): { invocations: Invocations; shell: Basic } {
+    return { invocations: this._invocations!, shell: this.shell };
   }
 
   /** @missingRailsCall with_padding — CONVERGEABLE generator-invoke-for-class-method-with-padding */
@@ -835,7 +819,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     const relativePath = destination.toString();
     const fullPath = File.join(this.cwd, relativePath);
     if (this.behavior === "revoke") {
-      this.output(`      remove  ${relativePath}`);
+      this.sayStatus("remove", relativePath);
       if (!this.options.pretend && File.isExist(fullPath)) FileUtils.rmRf(fullPath);
       return relativePath;
     }
@@ -863,7 +847,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     }
     Generators.addGeneratedFile(fullPath);
     this.createdFiles.push(relativePath);
-    this.output(`${status.padStart(12)}  ${relativePath}`);
+    this.sayStatus(status, relativePath);
     return relativePath;
   }
 
@@ -895,12 +879,12 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       return;
     }
     File.open(fullPath, "a", (file) => file.write(content));
-    this.output(`      append  ${relativePath}`);
+    this.sayStatus("append", relativePath);
   }
 
   protected revokeInjection(relativePath: string, pattern: string, content: string): void {
     const fullPath = File.join(this.cwd, relativePath);
-    this.output(`    subtract  ${relativePath}`);
+    this.sayStatus("subtract", relativePath);
     if (!File.isExist(fullPath)) return;
     const existing = File.read(fullPath);
     const updated = existing.replace(new RegExp(pattern, "g"), content);

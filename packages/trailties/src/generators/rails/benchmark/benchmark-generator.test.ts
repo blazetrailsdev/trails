@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -11,6 +12,9 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-bench-"));
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
+  vi.spyOn(stdout, "write").mockImplementation(
+    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
+  );
 });
 
 afterEach(() => {
@@ -21,7 +25,6 @@ describe("BenchmarkGeneratorTest", () => {
   it("generate benchmark", () => {
     const gen = new BenchmarkGenerator({
       cwd: tmpDir,
-      output: (m) => lines.push(m),
       name: "my_benchmark",
     });
     const files = gen.run();

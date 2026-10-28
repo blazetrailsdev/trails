@@ -1,3 +1,4 @@
+import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -33,7 +34,7 @@ const read = (relativePath: string) => fs.readFileSync(path.join(tmpDir, relativ
 describe("ScaffoldGenerator (namespaced)", () => {
   it("names a namespaced scaffold's migration create_<table_name> and routes it under /admin/accounts", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-    const config = { cwd: tmpDir, output: () => {} };
+    const config = { cwd: tmpDir };
     await ScaffoldGenerator.start(["admin/account", "name:string"], config);
     const migration = fs
       .readdirSync(tmpDir, { recursive: true })
@@ -69,12 +70,10 @@ describe("ScaffoldGenerator (namespaced)", () => {
 describe("ScaffoldGenerator (routes)", () => {
   it("logs and writes the resource route with the mapper as this", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-    const lines: string[] = [];
-    await ScaffoldGenerator.start(["post", "title:string"], {
-      cwd: tmpDir,
-      output: (line: string) => lines.push(line),
-    });
-    expect(lines).toContain('       route  this.resources("posts");');
+    const output = await capture("stdout", () =>
+      ScaffoldGenerator.start(["post", "title:string"], { cwd: tmpDir }),
+    );
+    expect(output).toMatch(/^ +route {2}this\.resources\("posts"\);$/m);
     expect(read("config/routes.ts")).toBe(
       'Trails.application!.routes().draw(function () {\n  this.resources("posts");\n});\n',
     );
@@ -84,7 +83,7 @@ describe("ScaffoldGenerator (routes)", () => {
 describe("ScaffoldGenerator (views)", () => {
   it("emits Rails' scaffold copy and a record partial that show and index render", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-    await ScaffoldGenerator.start(["post", "title:string"], { cwd: tmpDir, output: () => {} });
+    await ScaffoldGenerator.start(["post", "title:string"], { cwd: tmpDir });
     const index = read("app/views/posts/index.html.tse");
     expect(index).toContain('<%= linkTo("Show this post", post) %>');
     expect(index).toContain("<%= render(post) %>");
@@ -112,7 +111,6 @@ describe("ScaffoldGenerator (type-check)", () => {
     try {
       await new AppGenerator({
         cwd: tmpApps,
-        output: () => {},
         appPath: "blog",
         database: "sqlite",
       }).run();
@@ -131,7 +129,6 @@ describe("ScaffoldGenerator (type-check)", () => {
       );
       await ScaffoldGenerator.start(["Post", "title:string", "body:text"], {
         cwd: appDir,
-        output: () => {},
       });
 
       fs.writeFileSync(

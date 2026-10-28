@@ -18,7 +18,7 @@ beforeAll(async () => {
 });
 
 let tmpDir: string;
-const opts = (extra: object = {}): any => ({ cwd: tmpDir, output: () => {}, ...extra });
+const opts = (extra: object = {}): any => ({ cwd: tmpDir, ...extra });
 const host = () => ({ destinationRoot: tmpDir }) as never;
 const routes = (): string => fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf-8");
 beforeEach(() => {

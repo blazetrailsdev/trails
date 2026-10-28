@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -27,6 +28,9 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
   destination.destinationRoot = tmpDir;
   lines = [];
+  vi.spyOn(stdout, "write").mockImplementation(
+    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
+  );
 });
 
 afterEach(() => {
@@ -46,7 +50,6 @@ function makeGen(
 ) {
   return new AppGenerator({
     cwd: tmpDir,
-    output: (m) => lines.push(m),
     appPath: "my-app",
     database,
     ...opts,
@@ -301,7 +304,6 @@ describe("AppGenerator", () => {
   it("--package-manager npm uses npm install in bin/setup", async () => {
     const gen = new AppGenerator({
       cwd: tmpDir,
-      output: (m) => lines.push(m),
       appPath: "my-app",
       packageManager: "npm",
     });
@@ -314,7 +316,6 @@ describe("AppGenerator", () => {
   it("--package-manager yarn uses yarn in bin/setup and Dockerfile", async () => {
     const gen = new AppGenerator({
       cwd: tmpDir,
-      output: (m) => lines.push(m),
       appPath: "my-app",
       packageManager: "yarn",
     });
@@ -329,7 +330,6 @@ describe("AppGenerator", () => {
   it("--sqlite-driver node-sqlite omits better-sqlite3 dep", async () => {
     const gen = new AppGenerator({
       cwd: tmpDir,
-      output: (m) => lines.push(m),
       appPath: "my-app",
       sqliteDriver: "node-sqlite",
     });
@@ -346,7 +346,6 @@ describe("AppGenerator", () => {
       () =>
         new AppGenerator({
           cwd: tmpDir,
-          output: (m) => lines.push(m),
           appPath: "my-app",
           sqliteDriver: "bogus-driver" as never,
         }),
@@ -356,7 +355,6 @@ describe("AppGenerator", () => {
   it("scaffolds the expo-sqlite adapter for --sqlite-driver expo-sqlite", async () => {
     const gen = new AppGenerator({
       cwd: tmpDir,
-      output: (m) => lines.push(m),
       appPath: "my-app",
       database: "sqlite",
       sqliteDriver: "expo-sqlite",
@@ -461,7 +459,6 @@ describe("AppGenerator", () => {
   it("invalid application name raises an error", async () => {
     const gen = new AppGenerator({
       cwd: tmpDir,
-      output: (m) => lines.push(m),
       appPath: "43-things",
       database: "sqlite",
     });
@@ -473,7 +470,6 @@ describe("AppGenerator", () => {
   it("invalid application name is fixed", async () => {
     const gen = new AppGenerator({
       cwd: tmpDir,
-      output: (m) => lines.push(m),
       appPath: "things-43",
       database: "sqlite",
     });
@@ -485,7 +481,6 @@ describe("AppGenerator", () => {
   it("name option", async () => {
     const gen = new AppGenerator({
       cwd: tmpDir,
-      output: (m) => lines.push(m),
       appPath: "app-dir",
       name: "my-app",
       database: "sqlite",

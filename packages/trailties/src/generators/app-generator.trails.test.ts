@@ -26,7 +26,6 @@ describe("AppGenerator (trails-only)", () => {
     try {
       await new AppGenerator({
         cwd: root,
-        output: () => {},
         appPath: "my-app",
         database: "sqlite",
       }).run();
@@ -65,7 +64,6 @@ describe("AppGenerator (trails-only)", () => {
   it("builds with trails-tsc against db/schema.ts so models need no declares", async () => {
     await new AppGenerator({
       cwd: tmpDir,
-      output: () => {},
       appPath: "my-app",
       database: "sqlite",
     }).run();
@@ -79,7 +77,6 @@ describe("AppGenerator (trails-only)", () => {
   it("--dev points every @blazetrails package at the local checkout", async () => {
     await new AppGenerator({
       cwd: tmpDir,
-      output: () => {},
       appPath: "my-app",
       database: "sqlite",
       dev: true,
@@ -98,7 +95,6 @@ describe("AppGenerator (trails-only)", () => {
   it("without --dev keeps the version entries and writes no pnpm-workspace.yaml", async () => {
     await new AppGenerator({
       cwd: tmpDir,
-      output: () => {},
       appPath: "my-app",
       database: "sqlite",
     }).run();
@@ -111,7 +107,6 @@ describe("AppGenerator (trails-only)", () => {
   it("guards each namespaced environment setting the way the Rails templates do", async () => {
     await new AppGenerator({
       cwd: tmpDir,
-      output: () => {},
       appPath: "my-app",
       database: "sqlite",
       api: true,
@@ -132,7 +127,7 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("generates an app with Active Job on unless --skip-active-job is passed", async () => {
-    await new AppGenerator({ cwd: tmpDir, output: () => {}, appPath: "my-app" }).run();
+    await new AppGenerator({ cwd: tmpDir, appPath: "my-app" }).run();
 
     expect(File.isExist(File.join(tmpDir, "my-app", "app", "jobs", "application-job.ts"))).toBe(
       true,
@@ -143,7 +138,6 @@ describe("AppGenerator (trails-only)", () => {
 
     await new AppGenerator({
       cwd: tmpDir,
-      output: () => {},
       appPath: "skipped-app",
       skipActiveJob: true,
     }).run();
@@ -152,13 +146,13 @@ describe("AppGenerator (trails-only)", () => {
 
   it("keeps skipEslint nil when not passed, distinct from an explicit false", () => {
     const build = (o: { skipEslint?: boolean } = {}) =>
-      new AppGenerator({ cwd: tmpDir, output: () => {}, appPath: "my-app", ...o });
+      new AppGenerator({ cwd: tmpDir, appPath: "my-app", ...o });
     expect(build().options.skipEslint).toBeUndefined();
     expect(build({ skipEslint: false }).options.skipEslint).toBe(false);
   });
 
   it("writes bin/eslint executable, as bin/trails is", async () => {
-    await new AppGenerator({ cwd: tmpDir, output: () => {}, appPath: "my-app" }).run();
+    await new AppGenerator({ cwd: tmpDir, appPath: "my-app" }).run();
     expect(File.stat(File.join(tmpDir, "my-app", "bin", "eslint")).mode & 0o777).toBe(0o755);
   });
 
@@ -168,7 +162,6 @@ describe("AppGenerator (trails-only)", () => {
       FileUtils.mkdirP(dir);
       await new AppGenerator({
         cwd: dir,
-        output: () => {},
         appPath: "my-app",
         database: "postgresql",
         ...opts,
@@ -194,7 +187,6 @@ describe("AppGenerator (trails-only)", () => {
     try {
       await new AppGenerator({
         cwd: tmpDir,
-        output: () => {},
         appPath: "my-app",
         database: "sqlite",
       }).run();
@@ -219,7 +211,6 @@ describe("AppGenerator (trails-only)", () => {
     try {
       await new AppGenerator({
         cwd: tmpDir,
-        output: () => {},
         appPath: "my-app",
         database: "sqlite",
       }).run();

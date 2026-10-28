@@ -19,7 +19,6 @@ describe("ScriptGeneratorTest", () => {
   it("generate_script", () => {
     const gen = new ScriptGenerator({
       cwd: tmpDir,
-      output: () => {},
       name: "my_script",
     });
     const files = gen.run();
@@ -31,7 +30,6 @@ describe("ScriptGeneratorTest", () => {
   it("generate_script_with_folder", () => {
     const gen = new ScriptGenerator({
       cwd: tmpDir,
-      output: () => {},
       name: "my_folder/my_script",
     });
     gen.run();

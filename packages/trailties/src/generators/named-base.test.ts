@@ -3,7 +3,7 @@ import { Base } from "@blazetrails/activerecord";
 import { ScaffoldControllerGenerator } from "./rails/scaffold-controller/scaffold-controller-generator.js";
 
 function generator(name: string, options: { modelName?: string } = {}) {
-  return new ScaffoldControllerGenerator({ cwd: "/", output: () => {}, name, ...options });
+  return new ScaffoldControllerGenerator({ cwd: "/", name, ...options });
 }
 
 describe("NamedBase", () => {

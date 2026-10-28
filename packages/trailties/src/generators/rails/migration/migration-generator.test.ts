@@ -16,7 +16,6 @@ describe("MigrationGeneratorTest", () => {
   it("migration", async () => {
     const files = await new MigrationGenerator({
       cwd: tmpDir,
-      output: () => {},
       name: "add_title_to_posts",
     }).run();
     expect(files[0]).toMatch(/^db\/migrate\/\d+_add_title_to_posts\.ts$/);
@@ -26,15 +25,15 @@ describe("MigrationGeneratorTest", () => {
   });
 
   it("migrations generated simultaneously", async () => {
-    const a = await new MigrationGenerator({ cwd: tmpDir, output: () => {}, name: "first" }).run();
-    const b = await new MigrationGenerator({ cwd: tmpDir, output: () => {}, name: "second" }).run();
+    const a = await new MigrationGenerator({ cwd: tmpDir, name: "first" }).run();
+    const b = await new MigrationGenerator({ cwd: tmpDir, name: "second" }).run();
     expect(a[0]).not.toBe(b[0]);
   });
 
   it("migration with invalid file name", async () => {
-    await expect(
-      new MigrationGenerator({ cwd: tmpDir, output: () => {}, name: "x:y" }).run(),
-    ).rejects.toThrow(/Illegal name/);
+    await expect(new MigrationGenerator({ cwd: tmpDir, name: "x:y" }).run()).rejects.toThrow(
+      /Illegal name/,
+    );
   });
 
   it("exit on failure", () => {

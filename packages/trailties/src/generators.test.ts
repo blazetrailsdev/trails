@@ -24,7 +24,7 @@ describe("GeneratorsTest", () => {
       fs.existsSync(nodePath.join(GENERATORS_PATH, "rails", "helper", "helper-generator.ts")),
     ).toBeTruthy();
     const klass = (await Generators.findByNamespace("rails:helper"))!;
-    const config = { cwd: "/tmp", output: () => {} };
+    const config = { cwd: "/tmp" };
     const start = vi.spyOn(klass, "start").mockResolvedValue([]);
     await Generators.invoke("rails:helper", ["Account"], config);
     expect(start).toHaveBeenCalledWith(["Account"], config);
@@ -35,7 +35,7 @@ describe("GeneratorsTest", () => {
     const name = "unknown";
     let output = "";
     await expect(
-      Generators.invoke(name, [], { cwd: "/tmp", output: () => {} }).catch((e: Error) => {
+      Generators.invoke(name, [], { cwd: "/tmp" }).catch((e: Error) => {
         output = e.message;
         throw e;
       }),

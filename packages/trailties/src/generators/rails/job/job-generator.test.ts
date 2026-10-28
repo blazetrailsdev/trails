@@ -23,7 +23,7 @@ afterEach(() => {
 async function runGenerator(args: string[]): Promise<string> {
   const root = Dir.mktmpdir();
   File.write(File.join(root, "tsconfig.json"), "{}");
-  await JobGenerator.start(args, { cwd: root, output: () => {} });
+  await JobGenerator.start(args, { cwd: root });
   return root;
 }
 

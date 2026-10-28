@@ -16,7 +16,6 @@ export function destroyCommand(): Command {
 
       await Generators.invoke(generator, args, {
         cwd: Dir.pwd(),
-        output: console.log,
         behavior: "revoke",
       });
     });

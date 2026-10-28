@@ -13,8 +13,7 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 type Opts = Partial<ConstructorParameters<typeof DevcontainerGenerator>[0]>;
-const run = (o: Opts = {}) =>
-  new DevcontainerGenerator({ cwd: tmpDir, output: () => {}, ...o }).run();
+const run = (o: Opts = {}) => new DevcontainerGenerator({ cwd: tmpDir, ...o }).run();
 const read = (rel: string) => fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 const exists = (rel: string) => fs.existsSync(path.join(tmpDir, rel));
 const dc = () => JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;

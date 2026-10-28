@@ -163,8 +163,8 @@ export class AppGenerator extends AppBase {
     this.isValidConst();
     const name = File.basename(this.appPath);
 
-    this.output(`Creating new trails application: ${name}`);
-    this.output("");
+    this.say(`Creating new trails application: ${name}`);
+    this.say("");
 
     this.createRootFiles(name);
     this.createBinFiles();
@@ -182,7 +182,7 @@ export class AppGenerator extends AppBase {
     this.createEslintFile();
     this.createCifiles();
 
-    this.output("");
+    this.say("");
 
     return this.getCreatedFiles();
   }

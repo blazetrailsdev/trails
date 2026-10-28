@@ -1,3 +1,4 @@
+import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -46,7 +47,6 @@ describe("DestroyCommand", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await Generators.invoke("scaffold", ["Post", "title:string"], {
       cwd: tmpDir,
-      output: () => {},
     });
     const generated = listFiles(tmpDir);
     expect(generated).toContain("app/views/posts/index.html.tse");
@@ -69,19 +69,19 @@ describe("DestroyCommand", () => {
       path.join(tmpDir, "config", "routes.ts"),
       "Trails.application!.routes().draw(function () {\n});\n",
     );
-    await Generators.invoke("scaffold", ["Post"], { cwd: tmpDir, output: () => {} });
+    await Generators.invoke("scaffold", ["Post"], { cwd: tmpDir });
     const generated = listFiles(tmpDir);
     const routes = fs.readFileSync(path.join(tmpDir, "config", "routes.ts"), "utf-8");
 
-    const lines: string[] = [];
-    await Generators.invoke("scaffold", ["Post"], {
-      cwd: tmpDir,
-      output: (m) => lines.push(m),
-      behavior: "revoke",
-      pretend: true,
-    });
+    const output = await capture("stdout", () =>
+      Generators.invoke("scaffold", ["Post"], {
+        cwd: tmpDir,
+        behavior: "revoke",
+        pretend: true,
+      }),
+    );
 
-    expect(lines).toContain("      remove  app/models/post.ts");
+    expect(output).toMatch(/^ +remove {2}app\/models\/post\.ts$/m);
     expect(listFiles(tmpDir)).toEqual(generated);
     expect(fs.readFileSync(path.join(tmpDir, "config", "routes.ts"), "utf-8")).toBe(routes);
   });

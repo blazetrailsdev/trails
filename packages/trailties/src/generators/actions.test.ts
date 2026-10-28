@@ -9,7 +9,7 @@ import {
   setEnv,
   type ChildProcessAdapter,
 } from "@blazetrails/ruby-compat";
-import { assertEqual, assertMock, Mock } from "@blazetrails/activesupport";
+import { assertEqual, assertMock, capture, Mock } from "@blazetrails/activesupport";
 import { GeneratorBase } from "./base.js";
 import * as Assertions from "./testing/assertions.js";
 
@@ -59,13 +59,11 @@ afterEach(() => {
 });
 
 function generator(options: { quiet?: boolean; behavior?: "invoke" | "revoke" } = {}) {
-  const lines: string[] = [];
-  const gen = new TestGenerator({ cwd: root, output: (m) => lines.push(`${m}\n`), ...options });
-  return { gen, lines };
+  return new TestGenerator({ cwd: root, ...options });
 }
 
 function makeGen(): TestGenerator {
-  return generator().gen;
+  return generator();
 }
 
 function assertFile(
@@ -250,7 +248,7 @@ describe("ActionsTest", () => {
     await makeGen().route(
       'this.namespace("baz", () => {\n  this.get("foo1");\n  this.namespace("qux", () => {\n    this.get("foo2");\n    this.namespace("hoge", () => {\n      this.get("foo3");\n    });\n  });\n  this.get("bar1");\n});',
     );
-    const revoke = generator({ behavior: "revoke" }).gen;
+    const revoke = generator({ behavior: "revoke" });
     await revoke.route('this.get("foo2");', { namespace: ["baz", "qux"] });
     await assertRoutes(
       'this.namespace("baz", () => {\n  this.get("foo1");\n  this.namespace("qux", () => {\n    this.namespace("hoge", () => {\n      this.get("foo3");\n    });\n  });\n  this.get("bar1");\n});',
@@ -267,41 +265,42 @@ describe("ActionsTest", () => {
     expect(gen.pendingGenerators).toEqual([{ what: "scaffold", args: ["Post", "title:string"] }]);
   });
 
-  function action(quiet: boolean, ...args: unknown[]): string {
-    const { gen, lines } = generator({ quiet });
-    gen.log(...args);
-    return lines.join("");
+  function action(quiet: boolean, ...args: unknown[]): Promise<string> {
+    const gen = generator({ quiet });
+    return capture("stdout", () => gen.log(...args));
   }
 
   it("readme", async () => {
     File.write(File.join(root, "README.md"), "Get your application up and running.\n");
     TestGenerator.sourceRoot(root);
-    const { gen, lines } = generator();
-    await gen.readme("README.md");
-    expect(lines.join("")).toMatch("application up and running");
+    const gen = generator();
+    expect(await capture("stdout", () => gen.readme("README.md"))).toMatch(
+      "application up and running",
+    );
   });
 
   it("readme with quiet", async () => {
     File.write(File.join(root, "README.md"), "Get your application up and running.\n");
     TestGenerator.sourceRoot(root);
-    const { gen, lines } = generator({ quiet: true });
-    await gen.readme("README.md");
-    expect(lines.join("")).not.toMatch("application up and running");
+    const gen = generator({ quiet: true });
+    expect(await capture("stdout", () => gen.readme("README.md"))).not.toMatch(
+      "application up and running",
+    );
   });
 
-  it("log", () => {
-    expect(action(false, "YES")).toBe("YES\n");
+  it("log", async () => {
+    expect(await action(false, "YES")).toBe("YES\n");
   });
 
-  it("log with status", () => {
-    expect(action(false, "yes", "YES")).toBe("         yes  YES\n");
+  it("log with status", async () => {
+    expect(await action(false, "yes", "YES")).toBe("         yes  YES\n");
   });
 
-  it("log with quiet", () => {
-    expect(action(true, "YES")).toBe("");
+  it("log with quiet", async () => {
+    expect(await action(true, "YES")).toBe("");
   });
 
-  it("log with status with quiet", () => {
-    expect(action(true, "yes", "YES")).toBe("");
+  it("log with status with quiet", async () => {
+    expect(await action(true, "yes", "YES")).toBe("");
   });
 });

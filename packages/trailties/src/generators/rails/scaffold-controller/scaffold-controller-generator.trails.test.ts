@@ -79,7 +79,7 @@ describe("ScaffoldControllerGenerator (class collisions)", () => {
   afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
   const collision = (name: string) =>
-    ScaffoldControllerGenerator.start([name], { cwd: tmpDir, output: () => {} }).then(
+    ScaffoldControllerGenerator.start([name], { cwd: tmpDir }).then(
       () => null,
       (e: Error) => e.message,
     );
@@ -133,7 +133,6 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
     const options: Partial<ScaffoldControllerGeneratorOptions> = { api: true };
     await ScaffoldControllerGenerator.start(["Post", "title:string"], {
       cwd: tmpDir,
-      output: () => {},
       ...options,
     });
 
@@ -143,7 +142,6 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
   it("returns params.expect's permitted Parameters with no cast", async () => {
     await ScaffoldControllerGenerator.start(["Post", "title:string"], {
       cwd: tmpDir,
-      output: () => {},
     });
 
     const content = controller();

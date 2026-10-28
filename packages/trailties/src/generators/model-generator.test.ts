@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -36,6 +37,9 @@ beforeEach(async () => {
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   destination.destinationRoot = tmpDir;
   lines = [];
+  vi.spyOn(stdout, "write").mockImplementation(
+    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
+  );
   Trails.application = ModelGeneratorTestApp.instance();
   oldBelongsToRequiredByDefault = Trails.application.config.activeRecord.belongsToRequiredByDefault;
   Trails.application.config.activeRecord.belongsToRequiredByDefault = true;
@@ -61,7 +65,6 @@ function makeGen(config: object = {}) {
     run: async (name: string, args: string[], flags: string[] = []) => {
       await ModelGenerator.start([name, ...args, ...flags], {
         cwd: tmpDir,
-        output: (m) => lines.push(m),
         ...config,
       });
       return listFiles(tmpDir);
@@ -287,12 +290,9 @@ describe("ModelGeneratorTest", () => {
 
   it("migration error is not shown on revoke", async () => {
     await makeGen().run("Account", []);
-    const captured: string[] = [];
-    await makeGen({ output: (m: string) => captured.push(m), behavior: "revoke" }).run(
-      "Account",
-      [],
-    );
-    const error = captured.join("\n");
+    lines = [];
+    await makeGen({ behavior: "revoke" }).run("Account", []);
+    const error = lines.join("\n");
     assertNoMatch(/Another migration is already named create_accounts/, error);
   });
 
@@ -607,11 +607,9 @@ export class Message extends ApplicationRecord {
 
 describe("ModelGenerator (JavaScript project)", () => {
   let jsTmpDir: string;
-  let jsLines: string[];
 
   beforeEach(() => {
     jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
-    jsLines = [];
   });
 
   afterEach(() => {
@@ -623,7 +621,6 @@ describe("ModelGenerator (JavaScript project)", () => {
       run: async (name: string, args: string[]) => {
         await ModelGenerator.start([name, ...args], {
           cwd: jsTmpDir,
-          output: (m) => jsLines.push(m),
         });
         return listFiles(jsTmpDir);
       },

@@ -1,3 +1,4 @@
+import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, vi } from "vitest";
 import { Dir, File, FileUtils, SecureRandom } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
@@ -6,7 +7,7 @@ import { Generators, type GeneratorClass } from "../generators.js";
 class Host extends GeneratorBase {}
 
 describe("GeneratorBase#relativeToOriginalDestinationRoot", () => {
-  const base = new Host({ cwd: "/app", output: () => {} });
+  const base = new Host({ cwd: "/app" });
 
   it("strips the destination root and its leading dot", () => {
     expect(base.relativeToOriginalDestinationRoot("/app/db/migrate/1_x.ts")).toBe(
@@ -69,7 +70,6 @@ describe("GeneratorBase runtime options (Thor's add_runtime_options!)", () => {
     }
     await RecordingGenerator.start(["post", "title:string", "--pretend", "-f", "-q", "-s"], {
       cwd: "/app",
-      output: () => {},
     });
     expect(seen!.attributes).toEqual(["title:string"]);
     expect(seen!.options).toMatchObject({ pretend: true, force: true, quiet: true, skip: true });
@@ -83,20 +83,25 @@ describe("GeneratorBase#createFile conflict behavior (Thor's CreateFile#invoke!)
     }
   }
 
-  it("keeps a changed file under behavior: :skip, reports identical files, and forces through a conflict", () => {
+  it("keeps a changed file under behavior: :skip, reports identical files, and forces through a conflict", async () => {
     const cwd = File.join(Dir.tmpdir(), `trails-create-file-${SecureRandom.hex(8)}`);
-    const lines: string[] = [];
-    const make = (opts: Partial<GeneratorOptions> = {}) =>
-      new Writer({ cwd, output: (m) => lines.push(m), ...opts });
+    const make = (opts: Partial<GeneratorOptions> = {}) => new Writer({ cwd, ...opts });
     try {
-      make().write("one ✓\n");
-      make({ behavior: "skip" }).write("two\n");
-      make({ behavior: "skip" }).write("one ✓\n");
-      expect(File.read(File.join(cwd, "app/x.ts"))).toBe("one ✓\n");
-      make({ behavior: "force" }).write("two\n");
-      make().write("three\n");
+      const output = await capture("stdout", () => {
+        make().write("one ✓\n");
+        make({ behavior: "skip" }).write("two\n");
+        make({ behavior: "skip" }).write("one ✓\n");
+        expect(File.read(File.join(cwd, "app/x.ts"))).toBe("one ✓\n");
+        make({ behavior: "force" }).write("two\n");
+        make().write("three\n");
+      });
       expect(File.read(File.join(cwd, "app/x.ts"))).toBe("three\n");
-      expect(lines.map((l) => l.trim())).toEqual([
+      expect(
+        output
+          .trimEnd()
+          .split("\n")
+          .map((l) => l.trim()),
+      ).toEqual([
         "create  app/x.ts",
         "skip  app/x.ts",
         "identical  app/x.ts",
@@ -150,18 +155,17 @@ describe("GeneratorBase.hookFor", () => {
     const find = vi
       .spyOn(Generators, "findByNamespace")
       .mockResolvedValue(HookedGenerator as unknown as GeneratorClass);
-    const lines: string[] = [];
+    let output: string;
     try {
-      await InvokingGenerator.start(["Account", "--test-framework=test_unit"], {
-        cwd: "/tmp",
-        output: (m) => lines.push(m),
-      });
+      output = await capture("stdout", () =>
+        InvokingGenerator.start(["Account", "--test-framework=test_unit"], { cwd: "/tmp" }),
+      );
       expect(find).toHaveBeenCalledWith("test_unit", "rails", "invoking");
     } finally {
       find.mockRestore();
     }
     expect(ran).toEqual(["own:Account", "hooked:Account"]);
-    expect(lines).toContain("      invoke  test_unit");
+    expect(output).toMatch(/^ +invoke {2}test_unit$/m);
   });
 
   it("skips the hook when the option is unset, and reports a hook that does not resolve", async () => {
@@ -170,20 +174,20 @@ describe("GeneratorBase.hookFor", () => {
         this.hookFor("testFramework");
       }
     }
-    const lines: string[] = [];
-    await SilentGenerator.start(["Account"], { cwd: "/tmp", output: (m) => lines.push(m) });
-    expect(lines).toEqual([]);
+    expect(await capture("stdout", () => SilentGenerator.start(["Account"], { cwd: "/tmp" }))).toBe(
+      "",
+    );
 
     const find = vi.spyOn(Generators, "findByNamespace").mockResolvedValue(null);
+    let output: string;
     try {
-      await SilentGenerator.start(["Account", "-t", "nope"], {
-        cwd: "/tmp",
-        output: (m) => lines.push(m),
-      });
+      output = await capture("stdout", () =>
+        SilentGenerator.start(["Account", "-t", "nope"], { cwd: "/tmp" }),
+      );
     } finally {
       find.mockRestore();
     }
-    expect(lines).toEqual(["       error  nope [not found]"]);
+    expect(output).toBe("       error  nope [not found]\n");
   });
 
   it("raises when a required class option has neither a value nor a default", async () => {
@@ -192,11 +196,11 @@ describe("GeneratorBase.hookFor", () => {
         this.classOption("widget", { type: "string", required: true });
       }
     }
+    await expect(RequiredGenerator.start(["Account"], { cwd: "/tmp" })).rejects.toThrow(
+      "No value provided for required options '--widget'",
+    );
     await expect(
-      RequiredGenerator.start(["Account"], { cwd: "/tmp", output: () => {} }),
-    ).rejects.toThrow("No value provided for required options '--widget'");
-    await expect(
-      RequiredGenerator.start(["Account", "--widget=x"], { cwd: "/tmp", output: () => {} }),
+      RequiredGenerator.start(["Account", "--widget=x"], { cwd: "/tmp" }),
     ).resolves.toEqual([]);
   });
 
@@ -213,7 +217,7 @@ describe("GeneratorBase.hookFor", () => {
       .spyOn(Generators, "findByNamespace")
       .mockResolvedValue(HookedGenerator as unknown as GeneratorClass);
     try {
-      await BlockGenerator.start(["Account", "-t", "test_unit"], { cwd: "/tmp", output: () => {} });
+      await BlockGenerator.start(["Account", "-t", "test_unit"], { cwd: "/tmp" });
     } finally {
       find.mockRestore();
     }
@@ -234,7 +238,7 @@ describe("GeneratorBase.hookFor", () => {
       .spyOn(Generators, "findByNamespace")
       .mockResolvedValue(HookedGenerator as unknown as GeneratorClass);
     try {
-      await ExecGenerator.start(["Account", "-t", "test_unit"], { cwd: "/tmp", output: () => {} });
+      await ExecGenerator.start(["Account", "-t", "test_unit"], { cwd: "/tmp" });
     } finally {
       find.mockRestore();
     }
@@ -279,7 +283,7 @@ describe("GeneratorBase.hookFor", () => {
       .spyOn(Generators, "findByNamespace")
       .mockResolvedValue(ArgsHookedGenerator as unknown as GeneratorClass);
     try {
-      await ResourceLikeGenerator.start(["Account"], { cwd: "/tmp", output: () => {} });
+      await ResourceLikeGenerator.start(["Account"], { cwd: "/tmp" });
     } finally {
       find.mockRestore();
     }
@@ -300,9 +304,9 @@ describe("GeneratorBase.hookFor", () => {
         n === "nope" ? null : (HookedGenerator as unknown as GeneratorClass),
       );
     try {
-      await expect(
-        Invoker.start(["Account", "-t", "x"], { cwd: "/tmp", output: () => {} }),
-      ).rejects.toThrow("Missing Thor class for invoke nope");
+      await expect(Invoker.start(["Account", "-t", "x"], { cwd: "/tmp" })).rejects.toThrow(
+        "Missing Thor class for invoke nope",
+      );
     } finally {
       find.mockRestore();
     }
@@ -329,7 +333,6 @@ describe("GeneratorBase.hookFor", () => {
     try {
       await ModelLikeGenerator.start(["Account", "-t", "test_unit", "--fixture-replacement=fab"], {
         cwd: "/tmp",
-        output: () => {},
       });
     } finally {
       find.mockRestore();
@@ -355,7 +358,7 @@ describe("GeneratorBase.hookFor", () => {
       .spyOn(Generators, "findByNamespace")
       .mockResolvedValue(OnceGenerator as unknown as GeneratorClass);
     try {
-      await TwiceGenerator.start(["Account", "-t", "x"], { cwd: "/tmp", output: () => {} });
+      await TwiceGenerator.start(["Account", "-t", "x"], { cwd: "/tmp" });
     } finally {
       find.mockRestore();
     }
@@ -385,7 +388,7 @@ describe("GeneratorBase.hookFor", () => {
       .spyOn(Generators, "findByNamespace")
       .mockResolvedValue(CommandsGenerator as unknown as GeneratorClass);
     try {
-      await Caller.start(["Account", "--orm=x", "-t", "y"], { cwd: "/tmp", output: () => {} });
+      await Caller.start(["Account", "--orm=x", "-t", "y"], { cwd: "/tmp" });
     } finally {
       find.mockRestore();
     }
@@ -418,10 +421,10 @@ describe("GeneratorBase.hookFor", () => {
       .spyOn(Generators, "findByNamespace")
       .mockResolvedValue(ChildGenerator as unknown as GeneratorClass);
     try {
-      await ParentGenerator.start(["Account", "-t", "x"], { cwd: "/tmp", output: () => {} });
+      await ParentGenerator.start(["Account", "-t", "x"], { cwd: "/tmp" });
       expect(parent).toMatchObject({ testFramework: "x" });
 
-      const instance = new ParentGenerator({ cwd: "/tmp", output: () => {} });
+      const instance = new ParentGenerator({ cwd: "/tmp" });
       await expect(instance.invoke(NotAGenerator as unknown as GeneratorClass, [])).rejects.toThrow(
         "Expected Thor class, got NotAGenerator",
       );
@@ -445,9 +448,9 @@ describe("GeneratorBase.hookFor", () => {
       .spyOn(Generators, "findByNamespace")
       .mockResolvedValue(Target as unknown as GeneratorClass);
     try {
-      await expect(
-        Caller.start(["Account", "--orm=x"], { cwd: "/tmp", output: () => {} }),
-      ).rejects.toThrow("undefined method `name' for nil");
+      await expect(Caller.start(["Account", "--orm=x"], { cwd: "/tmp" })).rejects.toThrow(
+        "undefined method `name' for nil",
+      );
     } finally {
       find.mockRestore();
     }

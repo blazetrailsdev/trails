@@ -50,7 +50,6 @@ export function newCommand(): Command {
       const cwd = Dir.pwd();
       const gen = new AppGenerator({
         cwd,
-        output: console.log,
         appPath: name,
         name: options.name,
         database: options.database,

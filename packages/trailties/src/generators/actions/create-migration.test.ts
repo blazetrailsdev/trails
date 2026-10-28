@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { Basic } from "@blazetrails/thor/shell/basic";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -34,7 +36,7 @@ function makeMigration(
   const numbered = `${dir}/${next}_${path.basename(destinationPath)}`;
   const fileName = path.basename(destinationPath).replace(/\.rb$/, "");
   const host = {
-    output: (m: string) => s.log.push(m),
+    shell: new Basic(),
     options: generatorOptions,
     migrationFileName: fileName,
     relativeToOriginalDestinationRoot: (p: string) =>
@@ -47,6 +49,9 @@ describe("CreateMigration", () => {
   let s: Store;
   beforeEach(() => {
     s = install();
+    vi.spyOn(stdout, "write").mockImplementation(
+      (chunk) => s.log.push(String(chunk).replace(/\n$/, "")) > 0,
+    );
   });
   afterEach(() => {
     fs.rmSync(ROOT, { recursive: true, force: true });

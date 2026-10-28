@@ -22,7 +22,7 @@ export class ModelGenerator extends NamedBase {
   protected createMigrationGenerator(): MigrationGenerator {
     return new MigrationGenerator({
       cwd: this.cwd,
-      output: this.output,
+      shell: this.shell,
       behavior: this.behavior,
       pretend: this.options.pretend,
       force: this.options.force,

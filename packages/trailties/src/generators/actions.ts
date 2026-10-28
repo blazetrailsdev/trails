@@ -5,7 +5,6 @@ import { createFile } from "@blazetrails/thor/actions/create-file";
 import { gsubFile } from "@blazetrails/thor/actions/file-manipulation";
 
 export interface ActionsHost {
-  output: (msg: string) => void;
   options: { quiet?: boolean };
   behavior: "invoke" | "revoke";
   say(message: unknown, color?: string | null): void;

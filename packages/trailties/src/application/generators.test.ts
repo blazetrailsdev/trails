@@ -113,7 +113,6 @@ describe("GeneratorsTest", () => {
     return capture(":stdout", () =>
       RailsGenerators.invoke(namespace, rest, {
         cwd: appRoot,
-        output: console.log,
         behavior: "invoke",
       }),
     );

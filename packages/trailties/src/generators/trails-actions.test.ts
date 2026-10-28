@@ -50,8 +50,8 @@ afterEach(() => {
   fsAdapterConfig.adapter = previousAdapter;
 });
 
-function makeGen(output: (m: string) => void = () => {}): TestGenerator {
-  return new TestGenerator({ cwd: "/app", output });
+function makeGen(): TestGenerator {
+  return new TestGenerator({ cwd: "/app" });
 }
 
 describe("TrailsActions", () => {

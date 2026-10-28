@@ -25,7 +25,6 @@ describe("ScaffoldGenerator emit", () => {
   it("matches snapshot for the controller and validates as TS without Ruby", async () => {
     await ScaffoldGenerator.start(["Post", "title:string", "views:integer"], {
       cwd: tmpDir,
-      output: () => {},
     });
     const src = read("app/controllers/posts-controller.ts");
     expect(src).toMatchSnapshot();

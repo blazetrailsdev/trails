@@ -20,7 +20,7 @@ export function generateCommand(): Command {
         await Actions.bootApplicationBang();
         await Actions.loadGenerators();
       }
-      const gen = new MigrationGenerator({ cwd: Dir.pwd(), output: console.log });
+      const gen = new MigrationGenerator({ cwd: Dir.pwd() });
       await gen.run(name, columns);
     });
 
@@ -47,7 +47,6 @@ export function generateCommand(): Command {
 
       await Generators.invoke(generator, args, {
         cwd: Dir.pwd(),
-        output: console.log,
         behavior: "invoke",
       });
     });
