@@ -207,9 +207,7 @@ export class ForeignKeyDefinition {
 
     return (
       (toTable == null || toTable.toString() === this.toTable) &&
-      (validate == null ||
-        validate ===
-          (Object.hasOwn(this.options, "validate") ? this.options.validate : validate)) &&
+      (validate == null || validate === fetch(this.options, "validate", validate)) &&
       Object.entries(sliced).every(([k, v]) => {
         const mine = toStrings((this.options as Record<string, unknown>)[k]);
         const theirs = toStrings(v);
