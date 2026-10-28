@@ -119,7 +119,9 @@ export class Tokenizer {
           created = { node: "ident", pos: created.pos, raw, value };
         }
         const adjacent = lastEnd === tokenStart;
-        const merged = adjacent ? this.mergeTokens(tokens.at(-1)!, created, afterName) : null;
+        const merged: Node | null = adjacent
+          ? this.mergeTokens(tokens.at(-1)!, created, afterName)
+          : null;
         if (merged !== null) {
           tokens[tokens.length - 1] = merged;
         } else {
