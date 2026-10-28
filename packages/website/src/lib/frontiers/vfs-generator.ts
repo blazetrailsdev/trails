@@ -68,34 +68,26 @@ function toBytes(content: string): Bytes {
 const directories = new WeakMap<VirtualFS, Set<string>>();
 
 function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
-  // Required on FsAdapter, like its sync twin. Both overloads are carried: an
-  // encoding yields the string, its absence the bytes, and a missing path
-  // rejects the way the Node adapter's does rather than reading as empty.
-  function readFile(path: string, encoding: "utf-8" | "utf8"): Promise<string>;
-  function readFile(path: string): Promise<Bytes>;
-  function readFile(path: string, encoding?: "utf-8" | "utf8"): Promise<string | Bytes> {
-    const template = TEMPLATES[path];
-    const entry = template !== undefined ? { content: template } : vfs.read(path);
-    if (entry === null) {
-      return Promise.reject(
-        Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
-          code: "ENOENT",
-        }),
-      );
-    }
-    return Promise.resolve(encoding === undefined ? toBytes(entry.content) : entry.content);
-  }
-
-  // The sync twin, with the same two overloads and the same refusal: a
-  // missing path throws ENOENT, as the Node adapter does and as MRI's
-  // `File.read` raises, rather than reading as an empty file.
+  // Both overloads are carried: an encoding yields the string, its absence
+  // the bytes, and a missing path throws (readFile rejects) the way the Node
+  // adapter's does rather than reading as empty.
   function readFileSync(path: string, encoding: "utf-8" | "utf8" | "latin1"): string;
   function readFileSync(path: string): Bytes;
   function readFileSync(path: string, encoding?: "utf-8" | "utf8" | "latin1"): string | Bytes {
     const template = TEMPLATES[path];
     const entry = template !== undefined ? { content: template } : vfs.read(path);
-    if (entry === null) throw errno("ENOENT", "open", path);
+    if (entry === null) {
+      throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
+        code: "ENOENT",
+      });
+    }
     return encoding === undefined ? toBytes(entry.content) : entry.content;
+  }
+
+  function readFile(path: string, encoding: "utf-8" | "utf8"): Promise<string>;
+  function readFile(path: string): Promise<Bytes>;
+  function readFile(path: string, encoding?: "utf-8" | "utf8"): Promise<string | Bytes> {
+    return settle(() => (encoding === undefined ? readFileSync(path) : readFileSync(path, encoding)));
   }
 
   function errno(code: string, syscall: string, path: string): Error {
