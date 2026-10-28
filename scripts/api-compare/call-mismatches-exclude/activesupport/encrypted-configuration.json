@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "encrypted-configuration.ts",
-    "rubyName": "validate!",
-    "call": "each_key",
-    "reason": "`each_key { key.to_sym rescue NoMethodError }` (encrypted_configuration.rb:70-74) is a `typeof key !== \"string\"` loop over the keys; CONVERGEABLE converge-code-generator-encrypted-config-file-update-checker-calls"
-  }
-]

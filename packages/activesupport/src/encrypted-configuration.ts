@@ -1,4 +1,4 @@
-import { rbObjId, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { eachKey, NoMethodError, rbObjId, rbObjRespondTo, toSym } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { EncryptedFile, MissingContentError } from "./encrypted-file.js";
 import { presence } from "./core-ext/object/blank.js";
@@ -77,10 +77,14 @@ export class EncryptedConfiguration extends EncryptedFile {
   }
 
   async validateBang(): Promise<void> {
-    const hash = this.deserialize(await this.read());
-    for (const key of hash instanceof Map ? hash.keys() : Object.keys(hash)) {
-      if (typeof key !== "string") throw new InvalidKeyError(this.contentPath, key);
-    }
+    eachKey(this.deserialize(await this.read()) as Record<string, unknown>, (key) => {
+      try {
+        toSym(key);
+      } catch (e) {
+        if (e instanceof NoMethodError) throw new InvalidKeyError(this.contentPath, key);
+        throw e;
+      }
+    });
   }
 
   async config(): Promise<Record<string, unknown>> {

@@ -4,6 +4,6 @@
     "tsFile": "code-generator.ts",
     "rubyName": "execute",
     "call": "class_eval",
-    "reason": "`@owner.class_eval(source)` (code_generator.rb:75) applies the collected sources as functions over the owner prototype or Module#moduleEval; CONVERGEABLE converge-code-generator-encrypted-config-file-update-checker-calls"
+    "reason": "`@owner.class_eval(source_string)` (code_generator.rb:75) evaluates Ruby source text; trails has no string eval (CLAUDE.md § \"Templates are precompiled\"), so the sources are functions applied to the owner prototype or through Module#moduleEval; CONVERGEABLE converge-code-generator-encrypted-config-file-update-checker-calls"
   }
 ]
