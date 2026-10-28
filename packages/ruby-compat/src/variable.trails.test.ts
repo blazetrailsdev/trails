@@ -2,8 +2,10 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { include, Module, rbModConstSet } from "./include.js";
 import { NameError } from "./name-error.js";
-import { rbModName, rbModToS, rbSetClassPathString } from "./object.js";
+import { rbCSymbol, rbModName, rbModToS, rbSetClassPathString } from "./object.js";
 import { TypeError } from "./type-error.js";
+import { Exception } from "./exception.js";
+import { Range } from "./range.js";
 import {
   isRegisteredConstant,
   rbConstGet,
@@ -12,6 +14,7 @@ import {
   rbPathToClass,
   registerConstant,
   registeredConstant,
+  resetConstants,
   unregisterConstant,
 } from "./variable.js";
 
@@ -350,5 +353,22 @@ describe("rbModDeprecateConstant", () => {
     class Http {}
     expect(() => rbModDeprecateConstant(Http, "GONE")).toThrow(NameError);
     expect(() => rbModDeprecateConstant(Http, "GONE")).toThrow("constant Http::GONE not defined");
+  });
+});
+
+describe("resetConstants", () => {
+  it("keeps the core classes Psych::ClassLoader reads seated", () => {
+    const core = [
+      ["Object", Object],
+      ["Exception", Exception],
+      ["Range", Range],
+      ["Regexp", RegExp],
+      ["Symbol", rbCSymbol],
+    ] as const;
+    for (const [name, klass] of core) expect(rbPathToClass(name)).toBe(klass);
+    registerConstant("Table::Reset", class Reset {});
+    resetConstants();
+    expect(isRegisteredConstant("Table::Reset")).toBe(false);
+    for (const [name, klass] of core) expect(rbPathToClass(name)).toBe(klass);
   });
 });

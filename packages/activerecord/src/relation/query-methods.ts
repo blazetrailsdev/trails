@@ -24,6 +24,7 @@ import {
   uniq,
   TypeError,
   filterMap,
+  rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import {
@@ -547,7 +548,7 @@ function unscopeBang(this: QueryMethodsHost, ...args: UnscopeArg[]): any {
       }
       assertModifiableBang.call(this);
       delete this._values[name];
-    } else if (rbObjClassname(scope) === "Hash") {
+    } else if (rbObjIsKindOf(scope, Hash)) {
       for (const [key, targetValue] of Object.entries(scope as object)) {
         if (key !== ":where") {
           throw new ArgumentError("Hash arguments in .unscope(*args) must have :where as the key.");
