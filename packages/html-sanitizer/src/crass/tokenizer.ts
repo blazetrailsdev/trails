@@ -50,8 +50,8 @@ const RE_NON_PRINTABLE = /[\u0000-\u0008\u000b\u000e-\u001f\u007f]+/; // eslint-
 const RE_WHITESPACE = /[\n\t ]+/;
 const RE_CHAR = /[\s\S]/u;
 
+const RE_NAME = /[0-9A-Za-z_\u0080-\u{10ffff}-]+/uy;
 const RE_NON_ASCII_START = /^[\u0080-\u{10ffff}]/u;
-const RE_NON_ASCII_END = /[\u0080-\u{10ffff}]$/u;
 
 const RE_NUMBER = /^[+-]?\d*(?:\.\d+)?(?:[eE][+-]?\d+)?/;
 
@@ -82,17 +82,43 @@ export class Tokenizer {
       return pos;
     };
 
-    for (const token of tokenize({ css, unicodeRangesAllowed: true })) {
-      if (token[0] === TokenType.EOF) break;
-      if (token[0] === TokenType.Comment && !this._options.preserveComments) continue;
-      const created = this.createToken(token, charPos(token[2]));
-      const merged = lastEnd === token[2] ? this.mergeTokens(tokens.at(-1)!, created) : null;
-      if (merged !== null) {
-        tokens[tokens.length - 1] = merged;
-      } else {
-        tokens.push(created);
+    let start = 0;
+    let afterName = false;
+    restart: for (;;) {
+      for (const token of tokenize({ css: css.slice(start), unicodeRangesAllowed: true })) {
+        if (token[0] === TokenType.EOF) break restart;
+        if (token[0] === TokenType.Comment && !this._options.preserveComments) continue;
+        const tokenStart = token[2] + start;
+        let created = this.createToken(token, charPos(tokenStart));
+        let end = token[3] + start + 1;
+        const nonAscii = token[0] === TokenType.Delim && RE_NON_ASCII_START.test(token[1]);
+        if (nonAscii) {
+          RE_NAME.lastIndex = tokenStart;
+          const name = RE_NAME.exec(css)![0];
+          created = { node: "ident", pos: created.pos, raw: name, value: name };
+          end = tokenStart + name.length;
+        }
+        const adjacent = lastEnd === tokenStart;
+        const merged = adjacent ? this.mergeTokens(tokens.at(-1)!, created, afterName) : null;
+        if (merged !== null) {
+          tokens[tokens.length - 1] = merged;
+        } else {
+          tokens.push(created);
+        }
+        afterName = nonAscii || (afterName && adjacent && merged !== null);
+        const last = tokens.at(-1)!;
+        if (afterName && last.node === "ident" && css[end] === "(") {
+          tokens[tokens.length - 1] = { ...last, node: "function", raw: `${last.raw}(` };
+          end++;
+          afterName = false;
+        }
+        lastEnd = end;
+        if (nonAscii) {
+          start = end;
+          continue restart;
+        }
       }
-      lastEnd = token[3] + 1;
+      break;
     }
     return tokens;
   }
@@ -103,12 +129,7 @@ export class Tokenizer {
     const simple = SIMPLE_TOKENS[type];
     if (simple !== undefined) return { node: simple, pos, raw };
     const valued = VALUE_TOKENS[type];
-    if (valued !== undefined) {
-      if (type === TokenType.Delim && RE_NON_ASCII_START.test(raw)) {
-        return { node: "ident", pos, raw, value: raw };
-      }
-      return { node: valued, pos, raw, value: data!.value };
-    }
+    if (valued !== undefined) return { node: valued, pos, raw, value: data!.value };
 
     switch (type) {
       case TokenType.Comment:
@@ -151,17 +172,20 @@ export class Tokenizer {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  private mergeTokens(first: Node, second: Node): Node | null {
+  private mergeTokens(first: Node, second: Node, afterName: boolean): Node | null {
     const raw = first.raw + second.raw;
-    const nameEnd = RE_NON_ASCII_END.test(first.raw);
-    if (second.node === "ident" && (nameEnd || RE_NON_ASCII_START.test(second.raw))) {
+    const name = second.node === "ident" || (afterName && second.node === "function");
+    if (name && (afterName || RE_NON_ASCII_START.test(second.raw))) {
       switch (first.node) {
         case "ident":
+          return { ...second, pos: first.pos, raw, value: first.value + second.value };
         case "at_keyword":
         case "hash":
-          return { ...first, raw, value: first.value + second.value };
+          if (second.node === "ident") return { ...first, raw, value: first.value + second.value };
+          break;
         case "dimension":
-          return { ...first, raw, unit: first.unit + second.value };
+          if (second.node === "ident") return { ...first, raw, unit: first.unit + second.value };
+          break;
         case "number":
           return { ...first, node: "dimension", raw, unit: second.value };
         case "delim":
@@ -172,12 +196,6 @@ export class Tokenizer {
             return { ...second, node: "hash", pos: first.pos, raw, type: "id" };
           }
       }
-    }
-    if (first.node === "ident" && nameEnd) {
-      if (second.node === "function") {
-        return { ...second, pos: first.pos, raw, value: first.value + second.value };
-      }
-      if (second.node === "(") return { ...first, node: "function", raw };
     }
     if (first.node !== "delim") return null;
     const match = MATCH_TOKENS[first.value + (second.node === "delim" ? second.value : second.raw)];
