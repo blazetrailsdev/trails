@@ -181,3 +181,15 @@ describe("UnusedRoutesCommand", () => {
     expect(exit).toHaveBeenCalledWith(1);
   }, 15_000);
 });
+
+describe("unusedRoutesCommand", () => {
+  it("hands its flags to Thor unparsed", async () => {
+    const { UnusedRoutesCommand } = await import("./unused-routes.js");
+    const perform = vi.spyOn(UnusedRoutesCommand, "perform").mockResolvedValue();
+    onTestFinished(() => perform.mockRestore());
+    await createProgram().parseAsync(["unused_routes", "--controller", "Posts", "-g", "x"], {
+      from: "user",
+    });
+    expect(perform).toHaveBeenCalledWith("unused_routes", ["--controller", "Posts", "-g", "x"], {});
+  });
+});

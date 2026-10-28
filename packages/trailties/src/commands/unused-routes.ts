@@ -150,7 +150,7 @@ export function unusedRoutesCommand(): Command {
   const cmd = new Command(klass.commandName());
   cmd.argument("[args...]").allowUnknownOption().helpOption(false);
   cmd.action(async (_args: string[], _options: object, command: Command) => {
-    await klass.perform(klass.commandName(), command.args);
+    await klass.perform(klass.commandName(), command.args, {});
   });
 
   return cmd;

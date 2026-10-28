@@ -192,7 +192,7 @@ export function dbconsoleCommand(): Command {
   cmd.description("Start a console for the database specified in config/database.yml");
   cmd.argument("[args...]").allowUnknownOption().helpOption(false);
   cmd.action(async (_args: string[], _options: object, command: Command) => {
-    await klass.perform(klass.commandName(), command.args);
+    await klass.perform(klass.commandName(), command.args, {});
   });
 
   return cmd;

@@ -45,7 +45,7 @@ export class Base extends Thor {
     hiddenCommands().push(this);
   }
 
-  static async perform(command: string, args: string[], config: BaseConfig = {}): Promise<void> {
+  static async perform(command: string, args: string[], config: BaseConfig): Promise<void> {
     if (HELP_MAPPINGS.has(args[0])) {
       [command, args] = ["help", [command]];
       if (rbObjMethod(this.prototype, "help").arity() === 0) args.length = 0;
