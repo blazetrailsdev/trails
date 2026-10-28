@@ -97,12 +97,10 @@
     "byFile": {}
   },
   "trailties": {
-    "total": 7,
+    "total": 3,
     "byFile": {
       "application.rb": 1,
-      "generators/actions.rb": 2,
       "generators/actions/create_migration.rb": 1,
-      "generators/base.rb": 2,
       "initializable.rb": 1
     }
   }
