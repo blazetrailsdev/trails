@@ -276,10 +276,12 @@ export class Image {
             rbFSend(convert, opt, val);
           }
           convert.append(inputPath);
+          let yielded: unknown;
           if (block != null) {
-            block(convert);
+            yielded = block(convert);
           }
           convert.append(newPath);
+          return yielded;
         }),
       );
       if (this._tempfile != null) {
@@ -388,13 +390,15 @@ export class Image {
     await this._info._pending;
     await MiniMagick.mogrify(
       blockPass((builder: CliTool) => {
+        let yielded: unknown;
         if (block != null) {
-          block(builder);
+          yielded = block(builder);
         }
         if (builder.args.includes("-format")) {
           throw new Error("you must call #format on a MiniMagick::Image directly");
         }
         builder.append(page != null ? `${this.path}[${page}]` : this.path);
+        return yielded;
       }),
     );
     this._info.clear();

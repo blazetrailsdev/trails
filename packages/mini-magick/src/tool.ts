@@ -51,8 +51,7 @@ export class Tool {
       : undefined;
     const instance = new this(...(args as [string, Record<string, unknown>?]));
     if (block != null) {
-      block(instance as CliTool);
-      return instance.call();
+      return Promise.resolve(block(instance as CliTool)).then(() => instance.call());
     } else {
       return instance;
     }
