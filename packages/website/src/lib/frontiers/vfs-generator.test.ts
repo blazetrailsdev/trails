@@ -61,6 +61,31 @@ describe("the VFS FsAdapter's readFile", () => {
   });
 });
 
+describe("the VFS FsAdapter's readFileSync", () => {
+  test("returns the content as a string when an encoding is given", () => {
+    const fs = vfsFs({ "/app/models/post.ts": "export class Post {}" });
+
+    expect(fs.readFileSync("/app/models/post.ts", "utf-8")).toBe("export class Post {}");
+  });
+
+  test("returns bytes that decode through toString when no encoding is given", () => {
+    const fs = vfsFs({ "/app/models/post.ts": "export class Post {}" });
+
+    const bytes = fs.readFileSync("/app/models/post.ts");
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.toString("utf8")).toBe("export class Post {}");
+  });
+
+  test("throws ENOENT for a path the VFS does not hold, rather than reading as empty", () => {
+    const fs = vfsFs({ "/app/models/empty.ts": "" });
+
+    expect(fs.readFileSync("/app/models/empty.ts", "utf-8")).toBe("");
+    expect(() => fs.readFileSync("/app/models/missing.ts", "utf-8")).toThrow(
+      expect.objectContaining({ code: "ENOENT" }),
+    );
+  });
+});
+
 describe("the VFS FsAdapter's async verbs", () => {
   const tree = (): Record<string, string> => ({
     "/app/models/post.ts": "post",

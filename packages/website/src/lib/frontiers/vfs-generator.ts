@@ -86,6 +86,18 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
     return Promise.resolve(encoding === undefined ? toBytes(entry.content) : entry.content);
   }
 
+  // The sync twin, with the same two overloads and the same refusal: a
+  // missing path throws ENOENT, as the Node adapter does and as MRI's
+  // `File.read` raises, rather than reading as an empty file.
+  function readFileSync(path: string, encoding: "utf-8" | "utf8" | "latin1"): string;
+  function readFileSync(path: string): Bytes;
+  function readFileSync(path: string, encoding?: "utf-8" | "utf8" | "latin1"): string | Bytes {
+    const template = TEMPLATES[path];
+    const entry = template !== undefined ? { content: template } : vfs.read(path);
+    if (entry === null) throw errno("ENOENT", "open", path);
+    return encoding === undefined ? toBytes(entry.content) : entry.content;
+  }
+
   function errno(code: string, syscall: string, path: string): Error {
     return Object.assign(new Error(`${code}: ${syscall} '${path}'`), { code });
   }
@@ -190,9 +202,7 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   }
 
   return {
-    readFileSync(path: string): string {
-      return vfs.read(path)?.content ?? "";
-    },
+    readFileSync,
     readFile,
     writeFileSync,
     writeFile: (path: string, data: string | Uint8Array) => settle(() => writeFileSync(path, data)),
