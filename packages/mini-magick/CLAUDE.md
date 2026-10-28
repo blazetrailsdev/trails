@@ -38,3 +38,9 @@ constructor cannot await, so the constructor seats its promise on
 does, and a failed block rejects that read rather than going unhandled.
 
 Ruled by the repo owner on 2026-10-28 (converge, not `PERMANENT-SKIP`).
+
+For the same reason `Tool.new` awaits its block's result before `call`
+(`tool.rb:30-38`), and `Image#mogrify` / `#format` hand the user block's
+result back to it: Ruby's `yield` finishes before the command runs, so a read
+the block makes (`subject.type` in `image_spec.rb:271-274`) sees the file as
+it was, never a half-written one.
