@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ArgumentError, STDOUT, rbGvSet } from "@blazetrails/ruby-compat";
+import { ArgumentError, STDOUT, rbGvSet, rbModName } from "@blazetrails/ruby-compat";
 import { HELP_MAPPINGS } from "./base.js";
-import { Command, HiddenCommand } from "./command.js";
+import { Command, DynamicCommand, HiddenCommand } from "./command.js";
+import { HashWithIndifferentAccess } from "./core-ext/hash-with-indifferent-access.js";
 import { AmbiguousCommandError, UndefinedCommandError } from "./error.js";
 import { Thor, type ThorClass } from "./thor.js";
 
@@ -458,5 +459,38 @@ describe("Thor", () => {
       rbGvSet("$thor_runner", true);
       expect(script.banner(zoo)).toBe(`${b} script:zoo`);
     });
+  });
+});
+
+describe("Thor class paths", () => {
+  it("reads each command class's Ruby path through rbModName after its JS name changes", () => {
+    const cases: [object, string][] = [
+      [Command, "Thor::Command"],
+      [HiddenCommand, "Thor::HiddenCommand"],
+      [DynamicCommand, "Thor::DynamicCommand"],
+      [HashWithIndifferentAccess, "Thor::CoreExt::HashWithIndifferentAccess"],
+    ];
+    for (const [klass, path] of cases) {
+      const original = Object.getOwnPropertyDescriptor(klass, "name")!;
+      Object.defineProperty(klass, "name", { value: "Renamed", configurable: true });
+      try {
+        expect(rbModName(klass)).toBe(path);
+      } finally {
+        Object.defineProperty(klass, "name", original);
+      }
+    }
+  });
+
+  it("seats each command class and its Task alias as a constant on Thor", () => {
+    const thor = Thor as unknown as Record<string, unknown>;
+    expect(thor.Command).toBe(Command);
+    expect(thor.Task).toBe(Command);
+    expect(thor.HiddenCommand).toBe(HiddenCommand);
+    expect(thor.HiddenTask).toBe(HiddenCommand);
+    expect(thor.DynamicCommand).toBe(DynamicCommand);
+    expect(thor.DynamicTask).toBe(DynamicCommand);
+    expect((thor.CoreExt as Record<string, unknown>).HashWithIndifferentAccess).toBe(
+      HashWithIndifferentAccess,
+    );
   });
 });
