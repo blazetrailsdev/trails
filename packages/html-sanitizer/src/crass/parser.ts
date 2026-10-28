@@ -6,7 +6,7 @@ export interface StringifyOptions {
 }
 
 export class Parser {
-  static BLOCK_END_TOKENS: Record<string, string> = {
+  static readonly BLOCK_END_TOKENS: Readonly<Record<string, string>> = {
     "{": "}",
     "[": "]",
     "(": ")",
@@ -237,8 +237,8 @@ export class Parser {
       tokens: [input.current],
     };
 
-    fn.tokens.push(
-      ...input.collect(() => {
+    fn.tokens = fn.tokens.concat(
+      input.collect(() => {
         let token: Node | null;
         while ((token = input.consume())) {
           if (token.node === ")") break;
@@ -264,8 +264,8 @@ export class Parser {
       tokens: [input.current],
     };
 
-    block.tokens.push(
-      ...input.collect(() => {
+    block.tokens = block.tokens.concat(
+      input.collect(() => {
         let token: Node | null;
         while ((token = input.consume())) {
           if (token.node === endToken) break;

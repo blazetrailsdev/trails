@@ -1,3 +1,4 @@
+import { StringScanner } from "@blazetrails/ruby-compat";
 import { TokenType, tokenize, type CSSToken } from "@csstools/css-tokenizer";
 
 export interface Node {
@@ -43,6 +44,11 @@ const MATCH_TOKENS: Record<string, string> = {
   "*=": "substring_match",
   "||": "column",
 };
+
+const RE_HEX = /[0-9A-Fa-f]{1,6}/;
+const RE_NON_PRINTABLE = /[\u0000-\u0008\u000b\u000e-\u001f\u007f]+/; // eslint-disable-line no-control-regex
+const RE_WHITESPACE = /[\n\t ]+/;
+const RE_CHAR = /[\s\S]/u;
 
 const RE_NUMBER = /^[+-]?\d*(?:\.\d+)?(?:[eE][+-]?\d+)?/;
 
@@ -108,15 +114,13 @@ export class Tokenizer {
         return { node: "hash", pos, raw, type: data!.type, value: data!.value };
       case TokenType.BadString:
         return { node: "bad_string", pos, raw, error: true, value: raw.slice(1) };
-      case TokenType.BadURL: {
-        const inner = raw.replace(/^[^(]*\(\s*/, "").replace(/\)$/, "");
-        const bad = /\s+|["'(\\]|[^\P{Cc}\t\n\f\r\u0080-\u009f]/u.exec(inner);
-        const value =
-          bad === null ? inner : inner.slice(0, bad.index) + inner.slice(bad.index + bad[0].length);
-        if (bad !== null && !/^\s/.test(bad[0]))
-          return { node: "bad_url", pos, raw, error: true, value };
-        return { node: "bad_url", pos, raw, value };
-      }
+      case TokenType.BadURL:
+        return {
+          node: "bad_url",
+          pos,
+          raw,
+          ...this.consumeUrl(new StringScanner(raw.slice(raw.indexOf("(") + 1))),
+        };
       case TokenType.UnicodeRange:
         return {
           node: "unicode_range",
@@ -153,6 +157,78 @@ export class Tokenizer {
       return { ...second, pos: first.pos, raw: `*${second.raw}` };
     }
     return null;
+  }
+
+  private consumeBadUrl(s: StringScanner): string {
+    let text = "";
+
+    while (!s.isEos()) {
+      const char = s.scan(RE_CHAR)!;
+
+      if (char === "\\" && s.peek(1) !== "\n" && !s.isEos()) {
+        text += this.consumeEscaped(s);
+      } else if (char === ")") {
+        break;
+      } else {
+        text += char;
+      }
+    }
+
+    return text;
+  }
+
+  private consumeEscaped(s: StringScanner): string {
+    if (s.isEos()) return "\ufffd";
+
+    const hexStr = s.scan(RE_HEX);
+    if (hexStr != null) {
+      if (RE_WHITESPACE.test(s.peek(1))) s.scan(RE_CHAR);
+
+      const codepoint = parseInt(hexStr, 16);
+
+      if (codepoint === 0 || (codepoint >= 0xd800 && codepoint <= 0xdfff) || codepoint > 0x10ffff) {
+        return "\ufffd";
+      } else {
+        return String.fromCodePoint(codepoint);
+      }
+    }
+
+    return s.scan(RE_CHAR)!;
+  }
+
+  private consumeUrl(s: StringScanner): { error?: true; value: string } {
+    let value = "";
+
+    s.scan(RE_WHITESPACE);
+
+    while (!s.isEos()) {
+      const char = s.scan(RE_CHAR)!;
+
+      if (char === ")") {
+        break;
+      } else if (RE_WHITESPACE.test(char)) {
+        s.scan(RE_WHITESPACE);
+
+        if (s.isEos() || s.peek(1) === ")") {
+          s.scan(RE_CHAR);
+          break;
+        } else {
+          return { value: value + this.consumeBadUrl(s) };
+        }
+      } else if (char === '"' || char === "'" || char === "(" || RE_NON_PRINTABLE.test(char)) {
+        return { error: true, value: value + this.consumeBadUrl(s) };
+      } else if (char === "\\") {
+        if (s.peek(1) !== "\n" && !s.isEos()) {
+          value += this.consumeEscaped(s);
+        } else {
+          return { error: true, value: value + this.consumeBadUrl(s) };
+        }
+      } else {
+        value += char;
+      }
+    }
+
+    return { value };
   }
 
   private preprocess(input: string): string {
