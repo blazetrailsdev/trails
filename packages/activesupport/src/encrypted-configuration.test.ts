@@ -5,7 +5,14 @@ import {
   InvalidContentError,
   InvalidKeyError,
 } from "./encrypted-configuration.js";
-import { assertEqual, assertMatch, assertNoMatch, assertRaise } from "./testing/assertions.js";
+import {
+  assert,
+  assertEqual,
+  assertMatch,
+  assertNot,
+  assertNoMatch,
+  assertRaise,
+} from "./testing/assertions.js";
 
 describe("EncryptedConfigurationTest", () => {
   let tmpdir: string;
@@ -40,10 +47,10 @@ describe("EncryptedConfigurationTest", () => {
     await credentials.config();
     const creds = credentials as unknown as Record<string, any>;
 
-    assertEqual(true, creds.something.get("good"));
-    assertEqual(false, creds.something.get("bad"));
-    assertEqual(true, creds.something.good);
-    assertEqual(false, creds.something.bad);
+    assert(creds.something.get("good"));
+    assertNot(creds.something.get("bad"));
+    assert(creds.something.good);
+    assertNot(creds.something.bad);
     assertEqual("bar", credentials.dig("something", "nested", "foo"));
     assertEqual("bar", creds.something.nested.foo);
     assertEqual(["something"], creds.keys());

@@ -531,6 +531,26 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'type/string_test.rb:41 `assert_not_same s, type.deserialize(s)` — the same missing identity (CLAUDE.md, "Ruby Strings are JS string primitives")',
     },
   ],
+  "activesupport:encrypted_configuration_test.rb › EncryptedConfigurationTest › raises helpful error when loading invalid content with unsupported keys":
+    [
+      {
+        kind: "assert_raise",
+        value: null,
+        as: null,
+        reason:
+          "encrypted_configuration_test.rb:104 `Key '42.0' is invalid` — YAML `42.0` loads as a JS number, which is the number `42`; `2.0` and `2` are one JS number, so no Float key renders as `42.0`",
+      },
+    ],
+  "activesupport:encrypted_configuration_test.rb › EncryptedConfigurationTest › raises helpful error when validating invalid content with unsupported keys":
+    [
+      {
+        kind: "assert_raise",
+        value: null,
+        as: null,
+        reason:
+          "encrypted_configuration_test.rb:122 `Key '42.0' is invalid` — YAML `42.0` loads as a JS number, which is the number `42`; `2.0` and `2` are one JS number, so no Float key renders as `42.0`",
+      },
+    ],
   "activesupport:core_ext/module_test.rb › ModuleTest › delegation arity to self class": [
     {
       kind: "assert_equal",
