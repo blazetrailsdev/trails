@@ -143,11 +143,15 @@ export class Enumerator<T = unknown, E = unknown> {
    *
    * @noRailsEquivalent PERMANENT
    */
-  withIndex(offset?: number | null): Enumerator<[T, number], E>;
+  withIndex(offset?: null): Enumerator<[T, number], E>;
+  /** @noRailsEquivalent PERMANENT */
+  withIndex(offset: number): Enumerator<[T, number | bigint], E>;
   /** @noRailsEquivalent PERMANENT */
   withIndex(offset: bigint): Enumerator<[T, bigint], E>;
   /** @noRailsEquivalent PERMANENT */
-  withIndex(offset: number | null, block: (value: T, idx: number) => unknown): unknown;
+  withIndex(offset: null, block: (value: T, idx: number) => unknown): unknown;
+  /** @noRailsEquivalent PERMANENT */
+  withIndex(offset: number, block: (value: T, idx: number | bigint) => unknown): unknown;
   /** @noRailsEquivalent PERMANENT */
   withIndex(offset: bigint, block: (value: T, idx: bigint) => unknown): unknown;
   /** @noRailsEquivalent PERMANENT */
@@ -156,7 +160,9 @@ export class Enumerator<T = unknown, E = unknown> {
     block?: (value: T, idx: never) => unknown,
   ): unknown {
     if (!block)
-      return new Enumerator<[T, number], E>(this, "withIndex", [offset], () => this.size());
+      return new Enumerator<[T, number | bigint], E>(this, "withIndex", [offset], () =>
+        this.size(),
+      );
     let memo: number | bigint;
     if (offset == null) memo = 0;
     else if (typeof offset === "bigint") memo = offset;
