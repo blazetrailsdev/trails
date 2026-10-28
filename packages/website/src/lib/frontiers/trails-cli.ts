@@ -224,8 +224,8 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
         dropUserTables(adapter, deps.getTables);
         deps.clearMigrations();
 
-        const gen = new VfsAppGenerator({ vfs, appPath: name, database: "sqlite" });
-        await withStdout(() => gen.run());
+        const gen = new VfsAppGenerator([name], { database: "sqlite", skipDocker: true }, { vfs });
+        await withStdout(() => gen.invokeAll());
       },
 
       generate: async (args) => {
@@ -240,15 +240,19 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
         }
 
         if (type === "model") {
-          const gen = new VfsModelGenerator({ vfs, name, attributes: columnArgs });
+          const gen = new VfsModelGenerator(
+            [name, ...columnArgs],
+            { migration: true, timestamps: true },
+            { vfs },
+          );
           await withStdout(async () => {
             await gen.createMigrationFile();
             await gen.createModelFile();
             await gen.createModuleFile();
           });
         } else if (type === "migration") {
-          const gen = new VfsMigrationGenerator({ vfs });
-          await withStdout(() => gen.run(name, columnArgs));
+          const gen = new VfsMigrationGenerator([name, ...columnArgs], {}, { vfs });
+          await withStdout(() => gen.createMigrationFile());
         } else {
           throw new Error(`Unknown generator: ${type}. Available: model, migration`);
         }

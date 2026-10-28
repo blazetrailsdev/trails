@@ -35,7 +35,7 @@ function stubVfs(files: Record<string, string>): VirtualFS {
  * installs — not a copy of it reached through an export widened for the test.
  */
 function vfsFs(files: Record<string, string>) {
-  new VfsMigrationGenerator({ vfs: stubVfs(files) });
+  new VfsMigrationGenerator(["create_posts"], {}, { vfs: stubVfs(files) });
   return getFs();
 }
 
@@ -58,6 +58,53 @@ describe("the VFS FsAdapter's readFile", () => {
     const fs = vfsFs({});
 
     await expect(fs.readFile("/app/models/missing.ts", "utf-8")).rejects.toThrow(/ENOENT/);
+  });
+});
+
+describe("the VFS FsAdapter's readFileSync", () => {
+  test("returns the content as a string when an encoding is given", () => {
+    const fs = vfsFs({ "/app/models/post.ts": "export class Post {}" });
+
+    expect(fs.readFileSync("/app/models/post.ts", "utf-8")).toBe("export class Post {}");
+  });
+
+  test("returns bytes that decode through toString when no encoding is given", () => {
+    const fs = vfsFs({ "/app/models/post.ts": "export class Post {}" });
+
+    const bytes = fs.readFileSync("/app/models/post.ts");
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.toString("utf8")).toBe("export class Post {}");
+  });
+
+  test("throws ENOENT for a path the VFS does not hold, rather than reading as empty", () => {
+    const fs = vfsFs({ "/app/models/empty.ts": "" });
+
+    expect(fs.readFileSync("/app/models/empty.ts", "utf-8")).toBe("");
+    expect(() => fs.readFileSync("/app/models/missing.ts", "utf-8")).toThrow(
+      expect.objectContaining({ code: "ENOENT" }),
+    );
+  });
+
+  test("decodes the stored bytes as latin1 when latin1 is asked for, as Node does", () => {
+    const fs = vfsFs({ "/app/models/cafe.ts": "café" });
+
+    expect(fs.readFileSync("/app/models/cafe.ts", "latin1")).toBe("cafÃ©");
+  });
+
+  test("throws EISDIR for a directory, not ENOENT", () => {
+    const fs = vfsFs({ "/app/models/post.ts": "post" });
+
+    expect(() => fs.readFileSync("/app/models", "utf-8")).toThrow(
+      expect.objectContaining({ code: "EISDIR" }),
+    );
+  });
+
+  test("throws ENOENT for a path named like an Object.prototype member", () => {
+    const fs = vfsFs(Object.create(null) as Record<string, string>);
+
+    expect(() => fs.readFileSync("toString", "utf-8")).toThrow(
+      expect.objectContaining({ code: "ENOENT" }),
+    );
   });
 });
 

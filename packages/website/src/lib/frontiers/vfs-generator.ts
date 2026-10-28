@@ -3,7 +3,6 @@ import {
   ModelGenerator,
   MigrationGenerator,
 } from "@blazetrails/trailties/generators";
-import type { AppDatabase } from "@blazetrails/trailties/generators";
 import { ActiveSupport } from "@blazetrails/activesupport";
 import {
   registerFsAdapter,
@@ -68,22 +67,32 @@ function toBytes(content: string): Bytes {
 const directories = new WeakMap<VirtualFS, Set<string>>();
 
 function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
-  // Required on FsAdapter, like its sync twin. Both overloads are carried: an
-  // encoding yields the string, its absence the bytes, and a missing path
-  // rejects the way the Node adapter's does rather than reading as empty.
+  // Both overloads are carried: an encoding yields the string, its absence
+  // the bytes, and a missing path throws (readFile rejects) the way the Node
+  // adapter's does rather than reading as empty.
+  function readFileSync(path: string, encoding: "utf-8" | "utf8" | "latin1"): string;
+  function readFileSync(path: string): Bytes;
+  function readFileSync(path: string, encoding?: "utf-8" | "utf8" | "latin1"): string | Bytes {
+    const file = content(path);
+    if (file === null) {
+      if (isDirectory(path)) throw errno("EISDIR", "read", path);
+      throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
+        code: "ENOENT",
+      });
+    }
+    const bytes = toBytes(file);
+    if (encoding === undefined) return bytes;
+    return encoding === "latin1"
+      ? Array.from(bytes, (byte) => String.fromCharCode(byte)).join("")
+      : file;
+  }
+
   function readFile(path: string, encoding: "utf-8" | "utf8"): Promise<string>;
   function readFile(path: string): Promise<Bytes>;
   function readFile(path: string, encoding?: "utf-8" | "utf8"): Promise<string | Bytes> {
-    const template = TEMPLATES[path];
-    const entry = template !== undefined ? { content: template } : vfs.read(path);
-    if (entry === null) {
-      return Promise.reject(
-        Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
-          code: "ENOENT",
-        }),
-      );
-    }
-    return Promise.resolve(encoding === undefined ? toBytes(entry.content) : entry.content);
+    return settle(() =>
+      encoding === undefined ? readFileSync(path) : readFileSync(path, encoding),
+    );
   }
 
   function errno(code: string, syscall: string, path: string): Error {
@@ -108,7 +117,7 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   }
 
   function content(path: string): string | null {
-    return TEMPLATES[path] ?? vfs.read(path)?.content ?? null;
+    return Object.hasOwn(TEMPLATES, path) ? TEMPLATES[path] : (vfs.read(path)?.content ?? null);
   }
 
   function existsSync(path: string): boolean {
@@ -190,9 +199,7 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   }
 
   return {
-    readFileSync(path: string): string {
-      return vfs.read(path)?.content ?? "";
-    },
+    readFileSync,
     readFile,
     writeFileSync,
     writeFile: (path: string, data: string | Uint8Array) => settle(() => writeFileSync(path, data)),
@@ -225,9 +232,14 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   };
 }
 
-export interface VfsGeneratorOptions {
-  vfs: VirtualFS;
-}
+/**
+ * A generator's Thor config, plus the virtual filesystem it writes to. The
+ * destination root is always the VFS root.
+ */
+export type VfsGeneratorConfig = Omit<
+  NonNullable<ConstructorParameters<typeof MigrationGenerator>[2]>,
+  "destinationRoot"
+> & { vfs: VirtualFS };
 
 function ensureVfsAdapter(vfs: VirtualFS): void {
   registerFsAdapter("vfs", createVfsFsAdapter(vfs), posixPath);
@@ -249,12 +261,9 @@ export class VfsMigrationGenerator extends MigrationGenerator {
     void this.sourceRoot(MIGRATION_SOURCE_ROOT);
   }
 
-  constructor(
-    options: VfsGeneratorOptions &
-      Pick<ConstructorParameters<typeof MigrationGenerator>[0], "shell">,
-  ) {
-    ensureVfsAdapter(options.vfs);
-    super({ cwd: "/", shell: options.shell });
+  constructor(args: unknown[], localOptions: unknown, config: VfsGeneratorConfig) {
+    ensureVfsAdapter(config.vfs);
+    super(args, localOptions, { ...config, destinationRoot: "/" });
     applyVfsOverrides(this);
   }
 }
@@ -262,38 +271,26 @@ export class VfsMigrationGenerator extends MigrationGenerator {
 export class VfsModelGenerator extends ModelGenerator {
   private _vfs: VirtualFS;
 
-  constructor(options: VfsGeneratorOptions & { name: string; attributes: string[] }) {
-    ensureVfsAdapter(options.vfs);
-    super({
-      cwd: "/",
-      name: options.name,
-      attributes: options.attributes,
-      migration: true,
-      timestamps: true,
-    });
-    this._vfs = options.vfs;
+  constructor(args: unknown[], localOptions: unknown, config: VfsGeneratorConfig) {
+    ensureVfsAdapter(config.vfs);
+    super(args, localOptions, { ...config, destinationRoot: "/" });
+    this._vfs = config.vfs;
     applyVfsOverrides(this);
   }
 
   protected override createMigrationGenerator(): MigrationGenerator {
-    return new VfsMigrationGenerator({ vfs: this._vfs, shell: this.shell });
+    return new VfsMigrationGenerator(
+      [`create_${this.tableName()}`],
+      Object.fromEntries(this.options as unknown as Iterable<[string, unknown]>),
+      { vfs: this._vfs, shell: this.shell, behavior: this.behavior },
+    );
   }
 }
 
-export interface VfsAppGeneratorOptions extends VfsGeneratorOptions {
-  appPath: string;
-  database?: AppDatabase;
-}
-
 export class VfsAppGenerator extends AppGenerator {
-  constructor(options: VfsAppGeneratorOptions) {
-    ensureVfsAdapter(options.vfs);
-    super({
-      cwd: "/",
-      appPath: options.appPath,
-      database: options.database,
-      skipDocker: true,
-    });
+  constructor(args: unknown[], localOptions: unknown, config: VfsGeneratorConfig) {
+    ensureVfsAdapter(config.vfs);
+    super(args, localOptions, { ...config, destinationRoot: "/" });
     applyVfsOverrides(this);
   }
 }
