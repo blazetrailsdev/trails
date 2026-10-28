@@ -214,6 +214,15 @@ describe("rb_const_get", () => {
       unregisterConstant("ConstGetChild", Child);
     });
 
+    it("answers the receiver's own constant before a top-level seat", () => {
+      class Own {
+        static TopCheck = class {};
+      }
+      registerConstant("TopCheck::Inner", TopCheck);
+      expect(rbModConstGet(Own, "TopCheck")).toBe(Own.TopCheck);
+      unregisterConstant("TopCheck::Inner", TopCheck);
+    });
+
     it("names the missing segment, not the path", () => {
       registerConstant("ConstGetOuter", Outer);
       let error: unknown;

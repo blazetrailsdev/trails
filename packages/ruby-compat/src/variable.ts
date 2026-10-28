@@ -251,9 +251,9 @@ export function rbConstMissing(klass: object): void {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModConstMissing(klass: { name?: string } | null, name: string): never {
+export function rbModConstMissing(klass: object | null, name: string): never {
   if (klass != null && klass !== globalThis && klass !== Object) {
-    throw new NameError(`uninitialized constant ${rbModToS(klass as never)}::${name}`, name, {
+    throw new NameError(`uninitialized constant ${rbModName(klass)}::${name}`, name, {
       receiver: klass,
     });
   } else {
@@ -366,15 +366,60 @@ export function rbModConstants(mod: object, inherit: unknown = true): string[] {
 }
 
 /**
- * `rb_mod_const_get` (`vendor/ruby/v3.3.11/object.c:2423-2510`),
- * `Module#const_get(name, inherit = true)` of a name that may be a `::` path:
- * a leading `::` restarts at `Object`, each segment must be constant-shaped or
- * `wrong constant name` is raised, the first segment is read by
- * {@link rbConstGet} and each later one by `rb_const_get_from`. The top-level
- * table seats a constant under its full path and not every prefix of it, so a
- * path walked from `Object` reads a seated prefix whole, as
- * {@link rbPathToClass} does, and falls back to the generated class-path table.
+ * `rb_const_get_at` (`vendor/ruby/v3.3.11/variable.c:3222`): `klass`'s own
+ * constant table alone, the read `Module#const_get(name, false)` makes. A miss
+ * goes to `rb_const_missing` (`vendor/ruby/v3.3.11/variable.c:2346`).
  *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbConstGetAt(klass: object, id: string): unknown {
+  if (Object.hasOwn(klass, id)) {
+    rbConstWarnIfDeprecated(klass, id);
+    return (klass as Record<string, unknown>)[id];
+  }
+  if (klass === Object && RCLASS_CONST_TBL.has(id)) return RCLASS_CONST_TBL.get(id);
+  const { constMissing } = klass as { constMissing?: (name: string) => unknown };
+  if (constMissing !== undefined) return constMissing.call(klass, id);
+  return rbModConstMissing(klass, id);
+}
+
+/**
+ * `rb_const_get_from` (`vendor/ruby/v3.3.11/variable.c:3204`): `rb_const_get_0`
+ * with `exclude`, so `rb_const_search` (`variable.c:3190-3201`) walks `klass`
+ * and its ancestors but not `Object`, unless `klass` is `Object` itself.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbConstGetFrom(klass: object, id: string): unknown {
+  if (klass === Object) return rbConstGet(klass, id);
+  if (id in klass) {
+    let tmp: object | null = klass;
+    while (tmp !== null && !Object.hasOwn(tmp, id)) tmp = Object.getPrototypeOf(tmp) as object;
+    if (tmp !== null) rbConstWarnIfDeprecated(tmp, id);
+    return (klass as Record<string, unknown>)[id];
+  }
+  if (typeof klass === "function") {
+    for (const tmp of rbModAncestors(klass as unknown as { prototype: object })) {
+      if (tmp === Object) break;
+      if (Object.hasOwn(tmp, id)) {
+        rbConstWarnIfDeprecated(tmp, id);
+        return (tmp as Record<string, unknown>)[id];
+      }
+    }
+  }
+  const { constMissing } = klass as { constMissing?: (name: string) => unknown };
+  if (constMissing !== undefined) return constMissing.call(klass, id);
+  return rbModConstMissing(klass, id);
+}
+
+/**
+ * `rb_mod_const_get` (`vendor/ruby/v3.3.11/object.c:2423-2510`),
+ * `Module#const_get(name, inherit = true)` of a name that may be a `::` path.
+ * A `const_missing` override is reached through the lookup helpers' miss arm,
+ * which is `rb_method_basic_definition_p(CLASS_OF(mod), id_const_missing)`
+ * (`object.c:2478-2486`).
+ *
+ * @inventedArm if — PERMANENT
  * @noRailsEquivalent PERMANENT
  */
 export function rbModConstGet(mod: object, name: string, recur: unknown = true): unknown {
@@ -390,22 +435,23 @@ export function rbModConstGet(mod: object, name: string, recur: unknown = true):
     p += 2;
     pbeg = p;
   }
-  const fromObject = mod === Object;
-  const top = pbeg;
-  if (RCLASS_CONST_TBL.has(path.slice(top))) return RCLASS_CONST_TBL.get(path.slice(top));
+  if (RCLASS_CONST_TBL.has(path.slice(pbeg)) && !(path.slice(pbeg).split("::")[0] in mod)) {
+    return RCLASS_CONST_TBL.get(path.slice(pbeg));
+  }
 
   while (p < pend) {
     while (p < pend && path[p] !== ":") p++;
 
     if (pbeg === p) throw new NameError(`wrong constant name ${name}`, name, { receiver: mod });
 
-    const id = path.slice(pbeg, p);
-    const beglen = pbeg - top;
-    const prefix = path.slice(top, p);
+    const len = p - pbeg;
+    const beglen = pbeg;
+    const part = path.slice(beglen, beglen + len);
 
     if (p < pend && path[p] === ":") {
-      if (p + 2 >= pend || path[p + 1] !== ":")
+      if (p + 2 >= pend || path[p + 1] !== ":") {
         throw new NameError(`wrong constant name ${name}`, name, { receiver: mod });
+      }
       p += 2;
       pbeg = p;
     }
@@ -414,47 +460,17 @@ export function rbModConstGet(mod: object, name: string, recur: unknown = true):
       throw new TypeError(`${rbInspect(name)} does not refer to class/module`);
     }
 
-    if (!/^[A-Z]\w*$/.test(id)) {
-      throw new NameError(`wrong constant name ${id}`, id, { receiver: mod });
-    }
-    if (RCLASS_CONST_TBL.has(prefix)) {
-      mod = RCLASS_CONST_TBL.get(prefix) as object;
-      continue;
-    }
-    if (fromObject) {
-      const generated = generatedClass(prefix);
-      if (generated !== undefined && !(id in mod)) {
-        mod = generated as object;
-        continue;
-      }
+    if (!/^[A-Z]\w*$/.test(part)) {
+      throw new NameError(`wrong constant name ${part}`, part, { receiver: mod });
     }
 
-    if (beglen === 0 && recur !== null && recur !== false) {
-      mod = rbConstGet(mod, id) as object;
-      continue;
-    }
-    let tmp: object | null = null;
     if (recur === null || recur === false) {
-      if (Object.hasOwn(mod, id)) tmp = mod;
-    } else if (id in mod) {
-      tmp = mod;
-      while (tmp !== null && !Object.hasOwn(tmp, id)) tmp = Object.getPrototypeOf(tmp) as object;
-    } else if (typeof mod === "function") {
-      for (const anc of rbModAncestors(mod as unknown as { prototype: object })) {
-        if (anc === Object) break;
-        if (Object.hasOwn(anc, id)) {
-          tmp = anc;
-          break;
-        }
-      }
+      mod = rbConstGetAt(mod, part) as object;
+    } else if (beglen === 0) {
+      mod = rbConstGet(mod, part) as object;
+    } else {
+      mod = rbConstGetFrom(mod, part) as object;
     }
-    if (tmp !== null) {
-      rbConstWarnIfDeprecated(tmp, id);
-      mod = (tmp as Record<string, object>)[id];
-      continue;
-    }
-    const { constMissing } = mod as { constMissing?: (name: string) => object };
-    mod = constMissing !== undefined ? constMissing.call(mod, id) : rbModConstMissing(mod, id);
   }
 
   return mod;
