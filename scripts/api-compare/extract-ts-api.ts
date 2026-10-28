@@ -7488,7 +7488,6 @@ function collectCalls(
     }
     if (checkerProvenKind(receiver) === "object") {
       if (form === "spread") hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.merge}`);
-      if (form === "fetch") hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.fetch}`);
       if (form === "assign" && assignSourceProven(receiver)) {
         hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.mergeBang}`);
         hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.update}`);
@@ -7497,6 +7496,16 @@ function collectCalls(
   };
   const visit = (n: ts.Node): void => {
     for (const [form, receiver] of nativeHashForms(n)) addHashForm(form, receiver);
+    if (
+      !skipHoistedClosures &&
+      ts.isConditionalExpression(n) &&
+      nativeHashForms(n).some(
+        ([form, receiver]) => form === "fetch" && checkerProvenKind(receiver!) === "object",
+      ) &&
+      readCannotBeUndefined(unwrapped(n.whenTrue))
+    ) {
+      hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.fetch}`);
+    }
     if (!skipHoistedClosures) {
       for (const form of nativeValueForms(n)) names.add(`${NATIVE_FORM_PREFIX}${form}`);
     }
@@ -7853,6 +7862,21 @@ function assignSourceProven(target: ts.Expression): boolean {
   const call = target.parent;
   if (!ts.isCallExpression(call) || call.arguments.length !== 2) return false;
   return checkerProvenKind(call.arguments[1]) === "object";
+}
+
+/**
+ * Whether the checker proves a read cannot answer `undefined`, so an
+ * `Object.hasOwn(h, "k") ? h.k : d` agrees with ruby-compat's `fetch`, whose
+ * `hasKey` reads an own `undefined` as a missing key.
+ */
+function readCannotBeUndefined(expr: ts.Expression): boolean {
+  const checker = currentChecker;
+  if (checker === undefined) return false;
+  const type = checker.getTypeAtLocation(expr);
+  const parts = type.isUnion() ? type.types : [type];
+  const loose =
+    ts.TypeFlags.Undefined | ts.TypeFlags.Void | ts.TypeFlags.Any | ts.TypeFlags.Unknown;
+  return parts.every((t) => !(t.flags & loose));
 }
 
 function checkerProvenKind(expr: ts.Expression): "sized" | "object" | undefined {
