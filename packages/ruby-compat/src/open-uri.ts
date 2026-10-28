@@ -28,7 +28,11 @@ export interface Meta {
 }
 
 const Meta = {
-  /** `Meta.init` (`vendor/ruby/v3.3.11/lib/open-uri.rb:437-451`). */
+  /**
+   * `Meta.init` (`vendor/ruby/v3.3.11/lib/open-uri.rb:437-451`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   init(obj: object, src: Meta | null = null): void {
     extend(obj, Meta);
     Object.assign(obj, { baseUri: null, meta: {}, metas: {} });
@@ -39,7 +43,11 @@ const Meta = {
       for (const [name, values] of Object.entries(src.metas)) meta.metaAddField2(name, values);
     }
   },
-  /** `Meta#meta_add_field2` (`vendor/ruby/v3.3.11/lib/open-uri.rb:491-496`). */
+  /**
+   * `Meta#meta_add_field2` (`vendor/ruby/v3.3.11/lib/open-uri.rb:491-496`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   metaAddField2(this: Meta, name: string, values: string[]): void {
     name = name.toLowerCase();
     this.metas[name] = values;
@@ -47,7 +55,11 @@ const Meta = {
   },
 };
 
-/** `OpenURI::Buffer` (`vendor/ruby/v3.3.11/lib/open-uri.rb:401-426`). */
+/**
+ * `OpenURI::Buffer` (`vendor/ruby/v3.3.11/lib/open-uri.rb:401-426`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 class Buffer {
   static StringMax = 10240;
   declare _io: StringIO | Tempfile;
@@ -68,23 +80,24 @@ class Buffer {
     if (this._io instanceof StringIO && Buffer.StringMax < this._size) {
       const io = Tempfile.new("open-uri");
       io.binmode();
-      if (isMeta(this._io)) Meta.init(io, this._io);
+      if (typeof (this._io as Partial<Meta>).metaAddField2 === "function")
+        Meta.init(io, this._io as StringIO & Meta);
       io.write(this._io.string());
       this._io = io;
     }
   }
 
   get io(): OpenUriIO {
-    if (!isMeta(this._io)) Meta.init(this._io);
+    if (typeof (this._io as Partial<Meta>).metaAddField2 !== "function") Meta.init(this._io);
     return this._io as OpenUriIO;
   }
 }
 
-function isMeta(obj: object): obj is Meta {
-  return typeof (obj as Partial<Meta>).metaAddField2 === "function";
-}
-
-/** `OpenURI::HTTPError` (`vendor/ruby/v3.3.11/lib/open-uri.rb:380-386`). */
+/**
+ * `OpenURI::HTTPError` (`vendor/ruby/v3.3.11/lib/open-uri.rb:380-386`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 class HTTPError extends StandardError {
   readonly io: unknown;
 
@@ -94,7 +107,11 @@ class HTTPError extends StandardError {
   }
 }
 
-/** `OpenURI::HTTPRedirect` (`vendor/ruby/v3.3.11/lib/open-uri.rb:390-396`). */
+/**
+ * `OpenURI::HTTPRedirect` (`vendor/ruby/v3.3.11/lib/open-uri.rb:390-396`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 class HTTPRedirect extends HTTPError {
   readonly uri: Generic;
 
@@ -104,10 +121,18 @@ class HTTPRedirect extends HTTPError {
   }
 }
 
-/** `OpenURI::TooManyRedirects` (`vendor/ruby/v3.3.11/lib/open-uri.rb:398`). */
+/**
+ * `OpenURI::TooManyRedirects` (`vendor/ruby/v3.3.11/lib/open-uri.rb:398`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 class TooManyRedirects extends HTTPError {}
 
-/** `catch(:open_uri_redirect)` / `throw` (`vendor/ruby/v3.3.11/lib/open-uri.rb:217,375`). */
+/**
+ * `catch(:open_uri_redirect)` / `throw` (`vendor/ruby/v3.3.11/lib/open-uri.rb:217,375`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 class OpenUriRedirect {
   constructor(readonly uri: Generic) {}
 }
@@ -124,11 +149,19 @@ export interface OpenRead {
 }
 
 const OpenRead = {
-  /** `OpenRead#open` (`vendor/ruby/v3.3.11/lib/open-uri.rb:749-751`). */
+  /**
+   * `OpenRead#open` (`vendor/ruby/v3.3.11/lib/open-uri.rb:749-751`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   open(this: Generic, ...rest: unknown[]): Promise<unknown> {
     return OpenURI.openUri(this, ...rest);
   },
-  /** `OpenRead#read` (`vendor/ruby/v3.3.11/lib/open-uri.rb:757-763`). */
+  /**
+   * `OpenRead#read` (`vendor/ruby/v3.3.11/lib/open-uri.rb:757-763`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   read(this: Generic & OpenRead, options: OpenUriOptions = {}): Promise<string | Uint8Array> {
     return this.open(
       options,
@@ -153,7 +186,11 @@ const OpenRead = {
  * @noRailsEquivalent PERMANENT
  */
 export const OpenURI = {
-  /** `OpenURI::Options` (`vendor/ruby/v3.3.11/lib/open-uri.rb:96-112`). */
+  /**
+   * `OpenURI::Options` (`vendor/ruby/v3.3.11/lib/open-uri.rb:96-112`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   Options: {
     ":proxy": true,
     ":proxy_http_basic_authentication": true,
@@ -172,7 +209,11 @@ export const OpenURI = {
     ":max_redirects": 64,
   } as OpenUriOptions,
 
-  /** `OpenURI.check_options` (`vendor/ruby/v3.3.11/lib/open-uri.rb:114-121`). */
+  /**
+   * `OpenURI.check_options` (`vendor/ruby/v3.3.11/lib/open-uri.rb:114-121`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   checkOptions(options: OpenUriOptions): void {
     for (const k of Object.keys(options)) {
       if (!k.startsWith(":")) continue;
@@ -182,7 +223,11 @@ export const OpenURI = {
     }
   },
 
-  /** `OpenURI.scan_open_optional_arguments` (`vendor/ruby/v3.3.11/lib/open-uri.rb:123-131`). */
+  /**
+   * `OpenURI.scan_open_optional_arguments` (`vendor/ruby/v3.3.11/lib/open-uri.rb:123-131`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   scanOpenOptionalArguments(...rest: unknown[]): [unknown, unknown, unknown[]] {
     let mode: unknown, perm: unknown;
     if (rest.length !== 0 && (typeof rest[0] === "string" || Number.isInteger(rest[0]))) {
@@ -198,6 +243,8 @@ export const OpenURI = {
    * `OpenURI.open_uri` (`vendor/ruby/v3.3.11/lib/open-uri.rb:133-173`). The
    * `rb`-mode encoding and the `:encoding` option are scanned and checked but
    * not applied, since a String carries no encoding tag here.
+   *
+   * @noRailsEquivalent PERMANENT
    */
   async openUri(name: Generic | string, ...rest: unknown[]): Promise<unknown> {
     const blk = rbBlockGivenP(rest.at(-1)) ? (rest.pop() as (io: OpenUriIO) => unknown) : undefined;
@@ -245,6 +292,8 @@ export const OpenURI = {
    * `OpenURI.open_loop` (`vendor/ruby/v3.3.11/lib/open-uri.rb:175-248`), from
    * its redirect loop (`open-uri.rb:213`); the proxy scan before it has no
    * `Net::HTTP` to configure.
+   *
+   * @noRailsEquivalent PERMANENT
    */
   async openLoop(uri: Generic, options: OpenUriOptions): Promise<OpenUriIO> {
     const uriSet: Record<string, boolean> = {};
@@ -290,7 +339,11 @@ export const OpenURI = {
     return io;
   },
 
-  /** `OpenURI.redirectable?` (`vendor/ruby/v3.3.11/lib/open-uri.rb:250-259`). */
+  /**
+   * `OpenURI.redirectable?` (`vendor/ruby/v3.3.11/lib/open-uri.rb:250-259`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   isRedirectable(uri1: Generic, uri2: Generic): boolean {
     return (
       uri1.scheme!.toLowerCase() === uri2.scheme!.toLowerCase() ||
@@ -302,6 +355,8 @@ export const OpenURI = {
    * `OpenURI.open_http` (`vendor/ruby/v3.3.11/lib/open-uri.rb:264-378`), with
    * `fetch` standing in for `Net::HTTP#request`; `redirect: "manual"` leaves
    * the redirect to `open_loop`, as `Net::HTTP` does.
+   *
+   * @noRailsEquivalent PERMANENT
    */
   async openHttp(
     buf: Buffer,
@@ -356,11 +411,17 @@ export const OpenURI = {
     }
   },
 
+  /** @noRailsEquivalent PERMANENT */
   HTTPError,
+  /** @noRailsEquivalent PERMANENT */
   HTTPRedirect,
+  /** @noRailsEquivalent PERMANENT */
   TooManyRedirects,
+  /** @noRailsEquivalent PERMANENT */
   Buffer,
+  /** @noRailsEquivalent PERMANENT */
   Meta,
+  /** @noRailsEquivalent PERMANENT */
   OpenRead,
 };
 
@@ -370,7 +431,11 @@ declare module "./uri/http.js" {
   }
 }
 
-/** `URI::HTTP#buffer_open` (`vendor/ruby/v3.3.11/lib/open-uri.rb:769-771`). */
+/**
+ * `URI::HTTP#buffer_open` (`vendor/ruby/v3.3.11/lib/open-uri.rb:769-771`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 HTTP.prototype.bufferOpen = function (
   this: HTTP,
   buf: Buffer,
