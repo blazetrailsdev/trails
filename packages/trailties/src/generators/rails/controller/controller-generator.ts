@@ -43,6 +43,7 @@ export class ControllerGenerator extends NamedBase {
     this.fileName = this.removePossibleSuffix(this.fileName);
   }
 
+  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
   createControllerFiles(): void {
     const { skipHelper = false, test = true } = this.options;
     const parent = this.parentClassName();

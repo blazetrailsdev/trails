@@ -5,6 +5,7 @@ export class ScriptGenerator extends NamedBase {
     this.methodAdded("generateScript");
   }
 
+  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
   generateScript(): void {
     const ext = this.ext();
     const filename = `script/${this.filePath()}${ext}`;

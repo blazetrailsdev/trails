@@ -8,6 +8,7 @@ export class TaskGenerator extends NamedBase {
 
   declare actions: string[];
 
+  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
   createTaskFiles(): void {
     const actions = this.actions;
     const ext = this.ext();

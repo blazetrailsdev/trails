@@ -116,8 +116,12 @@ export abstract class AppBase extends GeneratorBase {
     });
   }
 
-  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
-    super(args, localOptions, config);
+  constructor(
+    positionalArgv: unknown[] = [],
+    optionArgv: unknown = {},
+    config: GeneratorConfig = {},
+  ) {
+    super(positionalArgv, optionArgv, config);
     this.destinationRoot = File.expandPath(this.appPath, this.destinationRoot);
     this.options = this.deduceImpliedOptions({
       ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS,

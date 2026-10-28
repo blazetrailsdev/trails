@@ -8,6 +8,7 @@ export class BenchmarkGenerator extends NamedBase {
 
   declare reports: string[];
 
+  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
   generateLayout(): void {
     const reports = this.reports;
     const ext = this.ext();

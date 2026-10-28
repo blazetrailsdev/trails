@@ -99,6 +99,10 @@ export class DevcontainerGenerator extends GeneratorBase {
     this.database = Database.build(database);
   }
 
+  /**
+   * @missingRailsCall empty_directory — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   */
   createDevcontainer(): void {
     this.createFile(".devcontainer/devcontainer.json", this.devcontainerJson());
     this.createFile(".devcontainer/Dockerfile", this.dockerfileContent());
@@ -114,6 +118,7 @@ export class DevcontainerGenerator extends GeneratorBase {
     );
   }
 
+  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
   updateDatabaseYml(): void {
     this.gsubFile(
       "config/database.ts",

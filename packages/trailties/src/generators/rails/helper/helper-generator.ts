@@ -14,6 +14,7 @@ export class HelperGenerator extends NamedBase {
 
   declare options: HelperGeneratorOptions;
 
+  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
   createHelperFiles(): void {
     const test = this.options.test ?? true;
     const ext = this.ext();
