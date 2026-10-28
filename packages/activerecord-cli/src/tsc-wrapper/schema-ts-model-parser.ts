@@ -9,38 +9,29 @@ import {
   strLiteral,
   objPropValue,
   parseCreateTable,
+  synthesizePk,
   walkBody,
 } from "./schema-ts-parser.js";
-
-const DEFAULT_PK_TYPE = "bigint";
 
 function isFalse(node: ts.Expression | undefined): boolean {
   return !!node && node.kind === ts.SyntaxKind.FalseKeyword;
 }
 
 /** @internal */
-function synthesizePk(opts: ts.ObjectLiteralExpression | undefined): {
+function primaryKeyFor(opts: ts.ObjectLiteralExpression | undefined): {
   primaryKey: string | string[] | null;
   idColumn: { name: string; type: string } | null;
 } {
-  if (!opts) {
-    return { primaryKey: "id", idColumn: { name: "id", type: DEFAULT_PK_TYPE } };
-  }
-
-  const idVal = objPropValue(opts, "id");
-  const pkVal = objPropValue(opts, "primaryKey");
-
+  const pkVal = opts && objPropValue(opts, "primaryKey");
   if (pkVal && ts.isArrayLiteralExpression(pkVal)) {
     const names = pkVal.elements
       .map((el) => strLiteral(el))
       .filter((n): n is string => n !== undefined);
     return { primaryKey: names, idColumn: null };
   }
-  if (isFalse(idVal)) return { primaryKey: null, idColumn: null };
-  if (strLiteral(idVal) === "uuid") {
-    return { primaryKey: "id", idColumn: { name: "id", type: "uuid" } };
-  }
-  return { primaryKey: "id", idColumn: { name: "id", type: DEFAULT_PK_TYPE } };
+  const pk = synthesizePk(opts);
+  if (!pk) return { primaryKey: null, idColumn: null };
+  return { primaryKey: pk.name, idColumn: { name: pk.name, type: pk.col.type } };
 }
 
 /** @internal */
@@ -136,7 +127,7 @@ function visitTables(
     const parsed = parseCreateTable(node);
     if (parsed) {
       const { name, opts, arrowBody } = parsed;
-      const { primaryKey, idColumn } = synthesizePk(opts);
+      const { primaryKey, idColumn } = primaryKeyFor(opts);
       tables.push({
         name,
         primaryKey,

@@ -42,7 +42,7 @@ describe("virtualize — deltas", () => {
       "}\n";
     const { deltas } = virtualize(src, "post.ts");
     expect(deltas).toHaveLength(1);
-    expect(deltas[0].lineCount).toBe(7);
+    expect(deltas[0].lineCount).toBe(37);
   });
 
   test("no deltas when no class matches Base", () => {
@@ -930,7 +930,7 @@ describe("virtualize — include() interface bridge", () => {
 });
 
 describe("virtualize — attribute accessor pairs", () => {
-  test("an attribute member is a get/set pair whose writer takes the raw value", () => {
+  test("an attribute member is a get/set pair whose writer takes what the type casts", () => {
     const src =
       "export class Post extends Base {\n" +
       '  static { this.attribute("published_at", "datetime"); }\n' +
@@ -938,7 +938,131 @@ describe("virtualize — attribute accessor pairs", () => {
     const { text } = virtualize(src, "post.ts");
     expect(text).toMatch(/export interface Post \{/);
     expect(text).toMatch(/get published_at\(\):.*TimeWithZone.*date"\)\.Time;/);
-    expect(text).toMatch(/set published_at\(value: unknown\);/);
+    expect(text).toMatch(/set published_at\(value: .*date"\)\.Time \| string\);/);
+  });
+
+  test("an integer column's writer takes a number, a string or a bigint", () => {
+    const { text } = virtualize("export class Post extends Base {}\n", "post.ts", {
+      schemaColumnsByTable: { posts: { views: { type: "integer", null: false } } },
+    });
+    expect(text).toMatch(/set views\(value: number \| string \| bigint\);/);
+  });
+
+  test("a nullable column's writer takes null", () => {
+    const { text } = virtualize("export class Post extends Base {}\n", "post.ts", {
+      schemaColumnsByTable: { posts: { archived: { type: "boolean", null: true } } },
+    });
+    expect(text).toMatch(/set archived\(value: boolean \| null \| string \| number\);/);
+  });
+
+  test("an enum attribute's writer takes its labels and mapped values", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static {\n    this.enum("status", { draft: 0, archived: 1 });\n  }\n' +
+      "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: { posts: { status: { type: "integer", null: true } } },
+    });
+    expect(text).toMatch(/get status\(\): "draft" \| "archived" \| null;/);
+    expect(text).toMatch(/set status\(value: "draft" \| "archived" \| 0 \| 1 \| null\);/);
+  });
+
+  test("a type the registry does not know keeps an unknown writer", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("money", "money"); }\n' +
+      "}\n";
+    expect(virtualize(src, "post.ts").text).toMatch(/set money\(value: unknown\);/);
+  });
+
+  test("a serialized column is typed unknown, not as its storage column", () => {
+    const src =
+      "export class Rfc extends Base {\n" +
+      '  static { this.serialize("tags", { coder: JsonArray }); }\n' +
+      "}\n";
+    const { text } = virtualize(src, "rfc.ts", {
+      schemaColumnsByTable: { rfcs: { tags: { type: "text", null: true } } },
+    });
+    expect(text).toMatch(/get tags\(\): unknown;/);
+    expect(text).toMatch(/set tags\(value: unknown\);/);
+  });
+
+  test("a named primary key with the default type is a PrimaryKeyValue", () => {
+    const { text } = virtualize("export class Region extends Base {}\n", "region.ts", {
+      schemaColumnsByTable: { regions: { code: { type: "bigint", null: false, primaryKey: 0 } } },
+    });
+    expect(text).toMatch(/get code\(\): import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/);
+  });
+});
+
+describe("virtualize — dirty attribute methods", () => {
+  const run = (body: string, extra = ""): string =>
+    virtualize(
+      `export class Story extends Base {\n${extra}  static {\n${body}  }\n}\n`,
+      "story.ts",
+      { schemaColumnsByTable: { stories: { title: { type: "string", null: false } } } },
+    ).text;
+
+  test("a column gets the dirty and query methods ActiveModel::Dirty defines", () => {
+    const text = run("");
+    expect(text).toMatch(/titleWas\(\): string;/);
+    expect(text).toMatch(/titleChanged\(options\?: .*\): boolean \| undefined;/);
+    expect(text).toMatch(/titleChange\(\): \[string, string\] \| null;/);
+    expect(text).toMatch(/titleWillChange\(\): unknown;/);
+    expect(text).toMatch(/titlePreviouslyWas\(\): string;/);
+    expect(text).toMatch(/restoreTitle\(\): void;/);
+    expect(text).toMatch(/clearTitleChange\(\): void;/);
+  });
+
+  test("a column gets the methods ActiveRecord::AttributeMethods::Dirty defines", () => {
+    const text = run("");
+    expect(text).toMatch(/titleBeforeLastSave\(\): string;/);
+    expect(text).toMatch(/savedChangeToTitle\(\): \[string, string\] \| null;/);
+    expect(text).toMatch(/isSavedChangeToTitle\(options\?: .*\): boolean \| undefined;/);
+    expect(text).toMatch(/isWillSaveChangeToTitle\(options\?: .*\): boolean \| undefined;/);
+    expect(text).toMatch(/titleChangeToBeSaved\(\): \[string, string\] \| null;/);
+    expect(text).toMatch(/titleInDatabase\(\): string;/);
+  });
+
+  test("an alias gets the family under its own name", () => {
+    const text = run('    this.aliasAttribute("heading", "title");\n');
+    expect(text).toMatch(/headingWas\(\): string;/);
+    expect(text).toMatch(/savedChangeToHeading\(\): \[string, string\] \| null;/);
+  });
+
+  test("an enum-narrowed attribute's methods use the narrowed type", () => {
+    const text = run(
+      '    this.attribute("status", "string");\n    this.enum("status", ["open", "closed"]);\n',
+    );
+    expect(text).toMatch(/statusWas\(\): "open" \| "closed";/);
+  });
+
+  test("a member the class declares wins", () => {
+    const text = run("", "  declare titleWas: () => number;\n");
+    expect(text).not.toMatch(/titleWas\(\)/);
+    expect(text).toMatch(/titleChanged\(/);
+  });
+
+  test("a serialized column has its attribute methods typed unknown", () => {
+    const text = run('    this.serialize("title", { coder: JsonArray });\n');
+    expect(text).toMatch(/get title\(\): unknown;/);
+    expect(text).toMatch(/titleWas\(\): unknown;/);
+  });
+
+  test("an enum over a serialized column reads as its labels", () => {
+    const text = run(
+      '    this.serialize("title", { coder: JsonArray });\n    this.enum("title", ["a", "b"]);\n',
+    );
+    expect(text).toMatch(/get title\(\): "a" \| "b";/);
+  });
+
+  test("a negative mapped enum value is a writer input", () => {
+    const text = run('    this.enum("title", { hidden: -1, shown: 1 });\n');
+    expect(text).toMatch(/set title\(value: "hidden" \| "shown" \| -1 \| 1\);/);
+  });
+
+  test("an association gets no dirty methods", () => {
+    expect(run('    this.belongsTo("author");\n')).not.toMatch(/authorWas/);
   });
 
   test("a default-exported class keeps the plain declare form", () => {
@@ -1076,7 +1200,7 @@ describe("virtualize — aliasAttribute", () => {
   test("aliases a schema column", () => {
     const text = run('    this.aliasAttribute("prNumber", "pr_number");\n');
     expect(text).toMatch(/get prNumber\(\): number;/);
-    expect(text).toMatch(/set prNumber\(value: unknown\);/);
+    expect(text).toMatch(/set prNumber\(value: number \| string \| bigint\);/);
   });
 
   test("aliases an attribute() call", () => {

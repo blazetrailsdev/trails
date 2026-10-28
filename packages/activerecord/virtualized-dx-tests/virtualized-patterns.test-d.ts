@@ -76,6 +76,14 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     expectTypeOf(u.admin).toBeBoolean();
   });
 
+  it("an attribute writer takes what the type casts, and nothing else", () => {
+    const u = new User({ name: "dean", email: "d@example.com", admin: false });
+    u.admin = "1";
+    // @ts-expect-error a boolean attribute does not cast an object
+    u.admin = { any: "thing" };
+    expectTypeOf(u.adminWas()).toBeBoolean();
+  });
+
   it("big_integer attribute resolves to bigint", () => {
     const r = new BigRecord({ score: 2n ** 62n });
     expectTypeOf(r.score).toEqualTypeOf<bigint>();

@@ -14,7 +14,22 @@ export class Article extends Base {
 }
 export interface Article {
   get status(): "draft" | "published";
-  set status(value: unknown);
+  set status(value: "draft" | "published" | 0 | 1);
+  statusPreviouslyChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  statusChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  statusChange(): ["draft" | "published", "draft" | "published"] | null;
+  statusWillChange(): unknown;
+  statusWas(): "draft" | "published";
+  statusPreviousChange(): ["draft" | "published", "draft" | "published"] | null;
+  statusPreviouslyWas(): "draft" | "published";
+  restoreStatus(): void;
+  clearStatusChange(): void;
+  isSavedChangeToStatus(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  savedChangeToStatus(): ["draft" | "published", "draft" | "published"] | null;
+  statusBeforeLastSave(): "draft" | "published";
+  isWillSaveChangeToStatus(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  statusChangeToBeSaved(): ["draft" | "published", "draft" | "published"] | null;
+  statusInDatabase(): "draft" | "published";
 }
 
 
