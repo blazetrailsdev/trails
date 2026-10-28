@@ -9,7 +9,7 @@ export interface PkgOptions {
   dev?: boolean;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json */
 export async function pkg(
   this: TrailsActionsHost,
   name: string,

@@ -187,7 +187,7 @@ describe("AuthenticationGenerator", () => {
     write("package.json", '{ "dependencies": { "@blazetrails/activerecord": "*" } }');
     await makeGen().run();
     expect(JSON.parse(read("package.json")).dependencies.bcryptjs).toBe("*");
-    expect(spawned).toContainEqual(["bin/pnpm", "install", "--silent"]);
+    expect(spawned).toContainEqual(["pnpm", "install", "--silent"]);
   });
 
   it("does not silently overwrite an existing file", async () => {

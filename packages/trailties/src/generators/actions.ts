@@ -1,4 +1,4 @@
-import { env as ENV, File, Gem, regexpEscape } from "@blazetrails/ruby-compat";
+import { env as ENV, File, Gem, regexpEscape, Shellwords } from "@blazetrails/ruby-compat";
 import { chomp, indent, stripHeredoc } from "@blazetrails/activesupport";
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
 import { createFile } from "@blazetrails/thor/actions/create-file";
@@ -266,7 +266,11 @@ export function executeCommand(
     abortOnFailure: options.abortOnFailure,
   };
   return this.inRoot(() =>
-    run.call(this as unknown as ThorActionsHost, `${sudo}bin/${executor} ${command}`, config),
+    run.call(
+      this as unknown as ThorActionsHost,
+      `${sudo}${Shellwords.escape(Gem.ruby())} bin/${executor} ${command}`,
+      config,
+    ),
   );
 }
 
