@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Enumerator, toEnum } from "./enumerator.js";
-import { eachSlice } from "./enumerable.js";
+import { eachSlice, eachWithIndex, eachWithObject } from "./enumerable.js";
 import { block } from "./hash.js";
 import { StopIteration } from "./stop-iteration.js";
 import { rbFSend } from "./object.js";
@@ -96,5 +96,26 @@ describe("Enumerator over an each that answers a promise", () => {
   it("sizes a sliced enumerator through enum_size", () => {
     expect(eachSlice([1, 2, 3], 2).size()).toBe(2);
     expect(eachSlice(asyncReceiver, 2).size()).toBeNull();
+  });
+});
+
+describe("Enumerator#with_index (enumerator_with_index, vendor/ruby/v3.3.11/enumerator.c:676)", () => {
+  it("packs each_with_object's two values and answers the memo", () => {
+    const memo = eachWithObject(["a", "b"], {} as Record<string, number>).withIndex(
+      null,
+      ([key, hash]: [string, Record<string, number>], i: number) => {
+        hash[key] = i;
+      },
+    );
+    expect(memo).toEqual({ a: 0, b: 1 });
+  });
+
+  it("starts from the offset over a block-less each_with_index", () => {
+    const seen: unknown[] = [];
+    eachWithIndex(["x", "y"]).withIndex(5, (pair, i) => seen.push([pair, i]));
+    expect(seen).toEqual([
+      [["x", 0], 5],
+      [["y", 1], 6],
+    ]);
   });
 });

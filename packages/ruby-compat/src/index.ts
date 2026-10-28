@@ -89,6 +89,7 @@ export {
   rbCSymbol,
   rbCTime,
   rbCTrueClass,
+  rbCProc,
   rbObjClass,
   rbClassOf,
   rbObjIsProc,

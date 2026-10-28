@@ -133,6 +133,24 @@ export class Enumerator<T = unknown, E = unknown> {
   }
 
   /**
+   * `enumerator_with_index` (`vendor/ruby/v3.3.11/enumerator.c:676`), over
+   * `enumerator_with_index_i` (`:642`), which packs a multi-value yield into
+   * one Array before the index. Block-less, it answers an enumerator over
+   * itself, without `enumerator_enum_size`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  withIndex(offset: number | null = null, block?: (value: T, idx: number) => unknown): unknown {
+    if (!block) return toEnum(this, "withIndex", offset);
+    let memo = offset == null ? 0 : Math.trunc(offset);
+    return this.each((...argv: unknown[]) => {
+      const idx = memo++;
+      if (argv.length <= 1) return block(argv[0] as T, idx);
+      return block(argv as T, idx);
+    });
+  }
+
+  /**
    * `enumerator_size` (`vendor/ruby/v3.3.11/enumerator.c:1245`): the size block
    * `to_enum` was given, called with the recorded arguments, else `nil`.
    *

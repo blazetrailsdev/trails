@@ -357,7 +357,11 @@ export const rbCFloat = rbDefineClass("Float", rbCNumeric);
  * @noRailsEquivalent PERMANENT
  */
 export const rbCArray = rbDefineClass("Array");
-const rbCProc = rbDefineClass("Proc");
+/**
+ * `rb_cProc` (`vendor/ruby/v3.3.11/proc.c:4290`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCProc = rbDefineClass("Proc");
 
 const SPECIAL_CONST_CLASSES: ReadonlySet<unknown> = new Set([
   rbCNilClass,
