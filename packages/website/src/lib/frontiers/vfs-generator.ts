@@ -87,7 +87,9 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   function readFile(path: string, encoding: "utf-8" | "utf8"): Promise<string>;
   function readFile(path: string): Promise<Bytes>;
   function readFile(path: string, encoding?: "utf-8" | "utf8"): Promise<string | Bytes> {
-    return settle(() => (encoding === undefined ? readFileSync(path) : readFileSync(path, encoding)));
+    return settle(() =>
+      encoding === undefined ? readFileSync(path) : readFileSync(path, encoding),
+    );
   }
 
   function errno(code: string, syscall: string, path: string): Error {
