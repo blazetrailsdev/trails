@@ -197,7 +197,7 @@ describe("rb_const_get", () => {
     } catch (e) {
       topLevel = e as NameError;
     }
-    expect(topLevel.receiver()).toBe(Object);
+    expect(topLevel?.receiver()).toBe(Object);
   });
 
   describe("rb_mod_const_get", () => {
