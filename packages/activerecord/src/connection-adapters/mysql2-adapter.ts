@@ -1,3 +1,4 @@
+import { ConnectionAdapters } from "../namespaces.js";
 import mysql from "mysql2/promise";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
@@ -388,4 +389,5 @@ Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql2" });
 
 include(Mysql2Adapter, Mysql2DatabaseStatements);
 
+ConnectionAdapters.Mysql2Adapter = Mysql2Adapter;
 registerConstant("ActiveRecord::ConnectionAdapters::Mysql2Adapter", Mysql2Adapter);

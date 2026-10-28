@@ -1,3 +1,4 @@
+import { ConnectionAdapters } from "../namespaces.js";
 /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
 import {
   extend,
@@ -53,4 +54,5 @@ for (const name of ["ADAPTER_NAME", "TYPE_MAP", "EXTENDED_TYPE_MAPS"] as const) 
   rbModConstSet(LibSQLRemoteAdapter, name, SQLite3Adapter[name]);
 }
 
+ConnectionAdapters.LibSQLRemoteAdapter = LibSQLRemoteAdapter;
 registerConstant("ActiveRecord::ConnectionAdapters::LibSQLRemoteAdapter", LibSQLRemoteAdapter);

@@ -1,3 +1,4 @@
+import { ActiveRecord } from "../namespaces.js";
 import { singularize } from "@blazetrails/activesupport";
 import { formatter, SpellChecker } from "@blazetrails/did-you-mean";
 import { ActiveRecordError, ConfigurationError } from "../errors.js";
@@ -403,3 +404,30 @@ export class CollectionIdsAssignmentError extends ActiveRecordError {
     this.name = "CollectionIdsAssignmentError";
   }
 }
+
+ActiveRecord.InverseOfAssociationRecursiveError = InverseOfAssociationRecursiveError;
+ActiveRecord.HasManyThroughAssociationNotFoundError = HasManyThroughAssociationNotFoundError;
+ActiveRecord.HasManyThroughAssociationPolymorphicSourceError =
+  HasManyThroughAssociationPolymorphicSourceError;
+ActiveRecord.HasManyThroughAssociationPolymorphicThroughError =
+  HasManyThroughAssociationPolymorphicThroughError;
+ActiveRecord.HasManyThroughAssociationPointlessSourceTypeError =
+  HasManyThroughAssociationPointlessSourceTypeError;
+ActiveRecord.HasOneThroughCantAssociateThroughCollection =
+  HasOneThroughCantAssociateThroughCollection;
+ActiveRecord.HasOneAssociationPolymorphicThroughError = HasOneAssociationPolymorphicThroughError;
+ActiveRecord.HasManyThroughSourceAssociationNotFoundError =
+  HasManyThroughSourceAssociationNotFoundError;
+ActiveRecord.ThroughCantAssociateThroughHasOneOrManyReflection =
+  ThroughCantAssociateThroughHasOneOrManyReflection;
+ActiveRecord.HasManyThroughCantAssociateThroughHasOneOrManyReflection =
+  HasManyThroughCantAssociateThroughHasOneOrManyReflection;
+ActiveRecord.HasOneThroughCantAssociateThroughHasOneOrManyReflection =
+  HasOneThroughCantAssociateThroughHasOneOrManyReflection;
+ActiveRecord.AmbiguousSourceReflectionForThroughAssociation =
+  AmbiguousSourceReflectionForThroughAssociation;
+ActiveRecord.ThroughNestedAssociationsAreReadonly = ThroughNestedAssociationsAreReadonly;
+ActiveRecord.HasManyThroughNestedAssociationsAreReadonly =
+  HasManyThroughNestedAssociationsAreReadonly;
+ActiveRecord.HasOneThroughNestedAssociationsAreReadonly =
+  HasOneThroughNestedAssociationsAreReadonly;

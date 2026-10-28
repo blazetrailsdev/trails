@@ -61,7 +61,7 @@ type AdapterInstrumenter = {
     block: (payload: EventPayload) => Promise<T>,
   ): Promise<T>;
 };
-import { ActiveRecord } from "../namespaces.js";
+import { ActiveRecord, ConnectionAdapters } from "../namespaces.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { BoundSchemaReflection } from "./schema-cache.js";
 import { NullPool, removeConnectionFromThreadCache } from "./abstract/connection-pool.js";
@@ -2136,3 +2136,5 @@ include(AbstractAdapter, {
   indexNameLength,
   bindParamsLength,
 });
+
+ConnectionAdapters.AbstractAdapter = AbstractAdapter;
