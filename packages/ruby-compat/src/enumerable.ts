@@ -79,8 +79,7 @@ function rbBlockCall<T, E, R>(
   let each: unknown;
   try {
     if (typeof (obj as Partial<Each<T, E>>).each === "function") {
-      each = (obj as Each<T, E>).each(((...argv: T[]) =>
-        block(argv.length <= 1 ? argv[0] : (argv as T))) as (i: T) => unknown);
+      each = (obj as Each<T, E>).each(block);
     } else if (awaiting) {
       const it = (obj as Iterable<T>)[Symbol.iterator]();
       for (let step = it.next(); !step.done; step = it.next()) {
@@ -344,13 +343,6 @@ export function find<T, E = unknown>(
  * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`.
  * @noRailsEquivalent PERMANENT
  */
-export function map<T, E = unknown>(obj: Iterable<T> | Each<T, E>): Enumerated<E, T[]>;
-/** @noRailsEquivalent PERMANENT */
-export function map<T, R, E = unknown>(
-  obj: Iterable<T> | Each<T, E>,
-  block: (i: T) => R,
-): Enumerated<E, R[]>;
-/** @noRailsEquivalent PERMANENT */
 export function map<T, R, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
   block?: (i: T) => R,
@@ -485,14 +477,16 @@ export function eachWithIndex<T, E = unknown>(
   block: (i: T, n: number) => unknown,
 ): Enumerated<E, Iterable<T> | Each<T, E>>;
 /** @noRailsEquivalent PERMANENT */
-export function eachWithIndex<T, E = unknown>(obj: Iterable<T> | Each<T, E>): Enumerator<T, E>;
+export function eachWithIndex<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+): Enumerator<[T, number], E>;
 /** @noRailsEquivalent PERMANENT */
 export function eachWithIndex<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
   block?: (i: T, n: number) => unknown,
 ): unknown {
   if (!block) {
-    return new Enumerator<T, E>(
+    return new Enumerator<[T, number], E>(
       { eachWithIndex: (block: (i: T, n: number) => unknown) => eachWithIndex(obj, block) },
       "eachWithIndex",
     );
@@ -1296,7 +1290,7 @@ export class Enumerable<T = unknown, E = unknown> {
   }
 
   map<T, R, E = unknown>(this: Each<T, E>, block?: (i: T) => R) {
-    return map(this, block!);
+    return map(this, block);
   }
 
   groupBy<T, K, E = unknown>(this: Each<T, E>, block?: (i: T) => K) {

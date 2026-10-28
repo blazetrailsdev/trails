@@ -43,7 +43,6 @@ export {
   eachWithIndex,
   sortBy,
   filterMap,
-  findAll,
   groupBy,
   isAll,
   isAny,
