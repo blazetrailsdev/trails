@@ -33,14 +33,15 @@ run in line. In trails that run is an awaited child process and a JS
 constructor cannot await, so the constructor seats its promise on
 `Info#_pending`, and every later operation on the image awaits it first:
 `Info#identify` and `#data`, and `Image#identify`, `#mogrify`, `#format`,
-`#composite`, `#write`, `#get_pixels` and `#to_blob` (async for this reason). A read made right after
+`#composite` (for its other image and mask too), `#write`, `#get_pixels` (after its map check), `#to_blob` and `#destroy!` (both async for this reason). A read made right after
 `new Image(path, null, block)` therefore sees the block's changes, as Ruby's
 does, and a failed block rejects that read rather than going unhandled.
 
 Ruled by the repo owner on 2026-10-28 (converge, not `PERMANENT-SKIP`).
 
-For the same reason `Tool.new` awaits its block's result before `call`
-(`tool.rb:30-38`), and `Image#mogrify` / `#format` hand the user block's
-result back to it: Ruby's `yield` finishes before the command runs, so a read
-the block makes (`subject.type` in `image_spec.rb:271-274`) sees the file as
-it was, never a half-written one.
+For the same reason `Tool.new` awaits its block before `call`
+(`tool.rb:30-38`), and `Image#mogrify`, `#format` and `#composite` await the
+user block inside theirs before the `-format` guard and the output path
+(`image.rb:411-418,565-572`): Ruby's `yield` finishes first, so a read the
+block makes (`subject.type`, `image_spec.rb:271-274`) sees the file as it
+was, and options it adds land before the path.

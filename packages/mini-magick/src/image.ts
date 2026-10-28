@@ -224,10 +224,10 @@ export class Image {
   }
 
   async getPixels(map: string = "RGB") {
-    await this._info._pending;
     if (!["RGB", "RGBA"].includes(map)) {
       throw new ArgumentError("Invalid map value");
     }
+    await this._info._pending;
     const convert = MiniMagick.convert() as CliTool;
     convert.append(this.path);
     convert.depth(8);
@@ -271,21 +271,19 @@ export class Image {
       let inputPath = this.path;
       if (page != null && this.isLayer() == null) inputPath += `[${page}]`;
       await MiniMagick.convert(
-        blockPass((convert: CliTool) => {
+        blockPass(async (convert: CliTool) => {
           for (const [opt, val] of Object.entries(readOpts)) {
             rbFSend(convert, opt, val);
           }
           convert.append(inputPath);
-          let yielded: unknown;
           if (block != null) {
-            yielded = block(convert);
+            await block(convert);
           }
           convert.append(newPath);
-          return yielded;
         }),
       );
       if (this._tempfile != null) {
-        this.destroyBang();
+        await this.destroyBang();
         this._tempfile = newTempfile;
       } else if (!(this.path === newPath || this.isLayer() != null)) {
         File.delete(this.path);
@@ -343,12 +341,14 @@ export class Image {
     block?: (composite: CliTool) => unknown,
   ) {
     await this._info._pending;
+    await otherImage._info._pending;
+    await mask?._info._pending;
     if (outputExtension === undefined) outputExtension = (await this.type()).toLowerCase();
     const outputTempfile = Utilities.tempfile(`.${outputExtension}`);
     await MiniMagick.composite(
-      blockPass((composite: CliTool) => {
+      blockPass(async (composite: CliTool) => {
         if (block != null) {
-          block(composite);
+          await block(composite);
         }
         composite.append(otherImage.path);
         composite.append(this.path);
@@ -364,7 +364,8 @@ export class Image {
   }
 
   /** @missingRailsName sub — PERMANENT */
-  destroyBang() {
+  async destroyBang() {
+    await this._info._pending;
     if (this._tempfile != null) {
       if (this._tempfile.path()!.endsWith(".mpc")) {
         FileUtils.rmF(this._tempfile.path()!.replace(/mpc$/m, "cache"));
@@ -389,16 +390,14 @@ export class Image {
   async mogrify(page: number | null = null, block?: (builder: CliTool) => unknown) {
     await this._info._pending;
     await MiniMagick.mogrify(
-      blockPass((builder: CliTool) => {
-        let yielded: unknown;
+      blockPass(async (builder: CliTool) => {
         if (block != null) {
-          yielded = block(builder);
+          await block(builder);
         }
         if (builder.args.includes("-format")) {
           throw new Error("you must call #format on a MiniMagick::Image directly");
         }
         builder.append(page != null ? `${this.path}[${page}]` : this.path);
-        return yielded;
       }),
     );
     this._info.clear();
