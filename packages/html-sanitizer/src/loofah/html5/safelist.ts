@@ -276,4 +276,7 @@ export const SafeList = {
   ALLOWED_ELEMENTS_WITH_LIBXML2,
 };
 
+/** @deprecated */
+export const WhiteList = SafeList;
+
 MetaHelpers.addDowncasedSetMembersToAllSetConstants(SafeList);

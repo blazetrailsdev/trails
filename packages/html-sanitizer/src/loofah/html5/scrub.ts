@@ -3,7 +3,7 @@ import { usesLibxml, type Html5Document, type Html5Node } from "@blazetrails/nok
 
 import { Crass } from "../../crass.js";
 import type { Node as CrassNode } from "../../crass/tokenizer.js";
-import { LibxmlWorkarounds } from "../libxml2-workarounds.js";
+import { LibxmlWorkarounds } from "./libxml2-workarounds.js";
 import { SafeList } from "./safelist.js";
 
 type Attr = Html5Node["attributeNodes"][number];
@@ -18,12 +18,6 @@ const CSS_WHITESPACE = " ";
 const CSS_PROPERTY_STRING_WITHOUT_EMBEDDED_QUOTES = /^(["'])?[^"']+\1$/;
 const DATA_ATTRIBUTE_NAME = /^data-[\w-]+$/;
 
-const TABLE_FOR_ESCAPE_HTML__: Record<string, string> = {
-  "<": "&lt;",
-  ">": "&gt;",
-  "&": "&amp;",
-};
-
 export const Scrub = {
   CONTROL_CHARACTERS,
   CSS_KEYWORDISH,
@@ -32,7 +26,6 @@ export const Scrub = {
   CSS_WHITESPACE,
   CSS_PROPERTY_STRING_WITHOUT_EMBEDDED_QUOTES,
   DATA_ATTRIBUTE_NAME,
-  TABLE_FOR_ESCAPE_HTML__,
 
   isAllowedElement(elementName: string): boolean {
     return SafeList.ALLOWED_ELEMENTS_WITH_LIBXML2.has(elementName);
@@ -227,7 +220,13 @@ export const Scrub = {
     return (node.document as Html5Document).createCdata(escapedText);
   },
 
+  TABLE_FOR_ESCAPE_HTML__: {
+    "<": "&lt;",
+    ">": "&gt;",
+    "&": "&amp;",
+  } as Record<string, string>,
+
   escapeTags(string: string): string {
-    return string.replace(/[<>&]/g, (m) => TABLE_FOR_ESCAPE_HTML__[m]);
+    return string.replace(/[<>&]/g, (m) => this.TABLE_FOR_ESCAPE_HTML__[m]);
   },
 };

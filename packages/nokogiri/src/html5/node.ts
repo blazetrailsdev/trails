@@ -1,4 +1,9 @@
-import { defaultTreeAdapter, serializeOuter, type DefaultTreeAdapterMap } from "parse5";
+import {
+  defaultTreeAdapter,
+  parseFragment,
+  serializeOuter,
+  type DefaultTreeAdapterMap,
+} from "parse5";
 
 import { Attr } from "../xml/attr.js";
 import type { NodeSet } from "../xml/node-set.js";
@@ -76,8 +81,10 @@ export class Node {
   }
 
   get content(): string {
-    if (this._node.nodeName === "#text") return (this._node as { value: string }).value;
+    if (this._node.nodeName === "#text") return (this._node as unknown as { value: string }).value;
     if (this._node.nodeName === "#comment") return (this._node as { data: string }).data;
+    if (this._node.nodeName === "#cdata-section")
+      return (this._node as unknown as { value: string }).value;
     return this.children.map((child) => child.content).join("");
   }
 
@@ -111,12 +118,11 @@ export class Node {
     return attr;
   }
 
-  before(nodeOrTags: Node): this {
-    defaultTreeAdapter.insertBefore(
-      this._node.parentNode as Parse5Parent,
-      nodeOrTags._node,
-      this._node,
-    );
+  before(nodeOrTags: Node | string): this {
+    const parent = this._node.parentNode as Parse5Parent;
+    const nodes =
+      typeof nodeOrTags === "string" ? parseFragment(nodeOrTags).childNodes : [nodeOrTags._node];
+    for (const node of nodes) defaultTreeAdapter.insertBefore(parent, node, this._node);
     return this;
   }
 
@@ -126,6 +132,7 @@ export class Node {
   }
 
   toString(): string {
+    if (this._node.nodeName === "#cdata-section") return `<![CDATA[${this.content}]]>`;
     return serializeOuter(this._node);
   }
 }

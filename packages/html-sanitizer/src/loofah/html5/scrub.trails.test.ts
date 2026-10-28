@@ -18,3 +18,14 @@ describe("Loofah::HTML5::Scrub", () => {
     expect(fragment.toString()).toBe('<img src="data:image/png;base64,AA">');
   });
 });
+
+describe("Loofah::HTML5::Scrub.cdata_escape", () => {
+  it("builds a CDATA node holding the escaped text", () => {
+    const fragment = HTML5.DocumentFragment.parse("<b>x</b>");
+    const cdata = fragment.document.createCdata("<i>&</i>");
+    const escaped = Scrub.cdataEscape(cdata);
+    fragment.children[0].before(escaped);
+    expect(escaped.text).toBe("&lt;i&gt;&amp;&lt;/i&gt;");
+    expect(fragment.children[0].toString()).toBe("<![CDATA[&lt;i&gt;&amp;&lt;/i&gt;]]>");
+  });
+});
