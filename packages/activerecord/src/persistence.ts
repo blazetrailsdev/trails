@@ -8,7 +8,7 @@ import {
   rbObjAsString,
   rbObjSingletonClass,
   rtest,
-  eachPair,
+  eachWithObject,
   eachWithIndex,
   rbCallSuper,
 } from "@blazetrails/ruby-compat";
@@ -598,12 +598,14 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   });
 
   const updateConstraints = this._queryConstraintsHash();
-  const h: Record<string, unknown> = {};
-  eachPair(attributes, (k, v) => {
-    h[k] = this._attributes.writeCastValue(k, v);
-    this.clearAttributeChange(k);
-  });
-  attributes = h;
+  attributes = eachWithObject(
+    Object.entries(attributes),
+    {} as Record<string, unknown>,
+    ([k, v], h) => {
+      h[k] = this._attributes.writeCastValue(k, v);
+      this.clearAttributeChange(k);
+    },
+  );
 
   const affectedRows = await this.constructor._updateRecord(attributes, updateConstraints);
 

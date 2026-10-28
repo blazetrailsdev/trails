@@ -18,6 +18,7 @@ import {
   toS,
   toSym,
   eachWithObject,
+  eachWithIndex,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { Result } from "../result.js";
@@ -434,19 +435,21 @@ export class JoinDependency {
   /** @internal */
   private aliases(): Aliases {
     return (this._aliasesCache ??= new Aliases(
-      [...this.joinRoot].map((joinPart, i) => {
-        let columnNames: string[];
-        if (joinPart === this.joinRoot && !rtest(this.joinRootAlias)) {
-          const primaryKey = this.joinRoot.primaryKey;
-          columnNames = primaryKey != null ? [primaryKey] : [];
-        } else {
-          columnNames = joinPart.columnNames();
-        }
-        const columns = columnNames.map(
-          (columnName, j) => new Aliases.Column(columnName, `t${i}_r${j}`),
-        );
-        return new Aliases.Table(joinPart, columns);
-      }),
+      eachWithIndex(this.joinRoot)
+        .toA()
+        .map(([joinPart, i]) => {
+          let columnNames: string[];
+          if (joinPart === this.joinRoot && !rtest(this.joinRootAlias)) {
+            const primaryKey = this.joinRoot.primaryKey;
+            columnNames = primaryKey != null ? [primaryKey] : [];
+          } else {
+            columnNames = joinPart.columnNames();
+          }
+          const columns = eachWithIndex(columnNames)
+            .toA()
+            .map(([columnName, j]) => new Aliases.Column(columnName, `t${i}_r${j}`));
+          return new Aliases.Table(joinPart, columns);
+        }),
     ));
   }
 
