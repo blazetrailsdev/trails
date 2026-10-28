@@ -133,3 +133,13 @@ describe("Time.at with a Duration", () => {
     expect(seconds(1.5)).not.toBeInstanceOf(rbCInteger);
   });
 });
+
+describe("rb_obj_classname without a brand", () => {
+  it("answers the generated class path of Duration, Scalar and TimeWithZone", async () => {
+    const { rbObjClassname } = await import("@blazetrails/ruby-compat");
+    const { TimeZone } = await import("./values/time-zone.js");
+    expect(rbObjClassname(days(1))).toBe("ActiveSupport::Duration");
+    expect(rbObjClassname(new Scalar(1))).toBe("ActiveSupport::Duration::Scalar");
+    expect(rbObjClassname(TimeZone.find("UTC")!.now())).toBe("ActiveSupport::TimeWithZone");
+  });
+});
