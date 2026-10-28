@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { generateModels } from "../model-codegen.js";
 import { parseSchemaForModels } from "./schema-ts-model-parser.js";
+import { parseSchemaTs } from "./schema-ts-parser.js";
 
 const FILE = "db/schema.ts";
 
@@ -39,6 +40,23 @@ describe("parseSchemaForModels", () => {
     const widgets = tableNamed(source, "widgets");
     expect(widgets.primaryKey).toBe("id");
     expect(widgets.columns).toContainEqual({ name: "id", type: "uuid" });
+  });
+
+  it("reads a named primary key and its declared type, as parseSchemaTs does", () => {
+    const source = `
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("meta", { primaryKey: "key", id: "string" }, (t) => {
+          t.text("value");
+        });
+      }
+    `;
+    const meta = tableNamed(source, "meta");
+    expect(meta.primaryKey).toBe("key");
+    expect(meta.columns).toEqual([
+      { name: "key", type: "string" },
+      { name: "value", type: "text" },
+    ]);
+    expect(parseSchemaTs(source, FILE)["meta"]?.["key"]?.type).toBe("string");
   });
 
   it("captures composite primary key column names from the literal array", () => {

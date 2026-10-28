@@ -25,6 +25,7 @@ export interface EnumCall {
   kind: "enum";
   attr: string;
   values: string[];
+  mappedValues: string[];
   options: RecordLiteral;
 }
 
@@ -64,6 +65,7 @@ export interface ClassInfo {
   abstract: boolean;
   dynamicTableName: boolean;
   skipSchemaColumns: Set<string>;
+  serializedColumns: Set<string>;
   tableName?: string;
 }
 
@@ -169,6 +171,7 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
     abstract: false,
     dynamicTableName: false,
     skipSchemaColumns: parseSkipColumns(cls, sourceFile),
+    serializedColumns: new Set(),
   };
 
   if (info.skip) return info;
@@ -178,6 +181,7 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
     if (ts.isClassStaticBlockDeclaration(member)) {
       for (const s of member.body.statements) {
         readStaticAssignment(s, info);
+        readSerializeCall(s, info);
         const call = readThisCall(s);
         if (call) info.calls.push(call);
       }
@@ -277,6 +281,16 @@ function recordExistingMember(m: ts.ClassElement, info: ClassInfo): void {
   if (!ts.isPropertyDeclaration(m)) return;
   if (isStatic && m.initializer) readStaticValue(name, m.initializer, info);
   if (!isStatic && m.type) info.existingMemberTypes.set(name, m.type.getText());
+}
+
+function readSerializeCall(stmt: ts.Statement, info: ClassInfo): void {
+  if (!ts.isExpressionStatement(stmt) || !ts.isCallExpression(stmt.expression)) return;
+  const callee = stmt.expression.expression;
+  if (!ts.isPropertyAccessExpression(callee)) return;
+  if (callee.expression.kind !== ts.SyntaxKind.ThisKeyword) return;
+  if (callee.name.text !== "serialize") return;
+  const [nameArg] = stmt.expression.arguments;
+  if (nameArg && ts.isStringLiteralLikeNode(nameArg)) info.serializedColumns.add(nameArg.text);
 }
 
 function readThisCall(stmt: ts.Statement): RuntimeCall | null {
@@ -389,8 +403,23 @@ function readEnumCall(call: ts.CallExpression): EnumCall | null {
     kind: "enum",
     attr: attrArg.text,
     values,
+    mappedValues: readEnumMappedValues(mapArg),
     options: readRecordLiteral(optsArg),
   };
+}
+
+function readEnumMappedValues(node: ts.Expression): string[] {
+  if (ts.isArrayLiteralExpression(node)) return node.elements.map((_, i) => String(i));
+  if (!ts.isObjectLiteralExpression(node)) return [];
+  const out: string[] = [];
+  for (const p of node.properties) {
+    if (!ts.isPropertyAssignment(p)) return [];
+    const v = p.initializer;
+    if (ts.isNumericLiteral(v)) out.push(v.text);
+    else if (ts.isStringLiteralLikeNode(v)) out.push(JSON.stringify(v.text));
+    else return [];
+  }
+  return [...new Set(out)];
 }
 
 function readEnumValues(node: ts.Expression): string[] | null {

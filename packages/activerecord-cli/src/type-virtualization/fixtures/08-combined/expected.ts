@@ -14,9 +14,39 @@ export class Post extends Base {
 }
 export interface Post {
   get title(): string;
-  set title(value: unknown);
+  set title(value: string | number | boolean);
+  titlePreviouslyChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  titleChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  titleChange(): [string, string] | null;
+  titleWillChange(): unknown;
+  titleWas(): string;
+  titlePreviousChange(): [string, string] | null;
+  titlePreviouslyWas(): string;
+  restoreTitle(): void;
+  clearTitleChange(): void;
+  isSavedChangeToTitle(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  savedChangeToTitle(): [string, string] | null;
+  titleBeforeLastSave(): string;
+  isWillSaveChangeToTitle(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  titleChangeToBeSaved(): [string, string] | null;
+  titleInDatabase(): string;
   get published(): boolean;
-  set published(value: unknown);
+  set published(value: boolean | string | number);
+  publishedPreviouslyChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  publishedChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  publishedChange(): [boolean, boolean] | null;
+  publishedWillChange(): unknown;
+  publishedWas(): boolean;
+  publishedPreviousChange(): [boolean, boolean] | null;
+  publishedPreviouslyWas(): boolean;
+  restorePublished(): void;
+  clearPublishedChange(): void;
+  isSavedChangeToPublished(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  savedChangeToPublished(): [boolean, boolean] | null;
+  publishedBeforeLastSave(): boolean;
+  isWillSaveChangeToPublished(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  publishedChangeToBeSaved(): [boolean, boolean] | null;
+  publishedInDatabase(): boolean;
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);
 }

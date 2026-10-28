@@ -15,7 +15,22 @@ export class Task extends Base {
 }
 export interface Task {
   get status(): "low" | "high";
-  set status(value: unknown);
+  set status(value: "low" | "high" | 0 | 1);
+  statusPreviouslyChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  statusChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  statusChange(): ["low" | "high", "low" | "high"] | null;
+  statusWillChange(): unknown;
+  statusWas(): "low" | "high";
+  statusPreviousChange(): ["low" | "high", "low" | "high"] | null;
+  statusPreviouslyWas(): "low" | "high";
+  restoreStatus(): void;
+  clearStatusChange(): void;
+  isSavedChangeToStatus(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  savedChangeToStatus(): ["low" | "high", "low" | "high"] | null;
+  statusBeforeLastSave(): "low" | "high";
+  isWillSaveChangeToStatus(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  statusChangeToBeSaved(): ["low" | "high", "low" | "high"] | null;
+  statusInDatabase(): "low" | "high";
 }
 
 declare module "@blazetrails/activerecord" {

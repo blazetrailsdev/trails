@@ -68,7 +68,8 @@ export function parseCreateTable(
   return { name, opts, arrowBody };
 }
 
-function synthesizePk(
+/** @internal */
+export function synthesizePk(
   opts: ts.ObjectLiteralExpression | undefined,
 ): { name: string; col: DumpColumnSchema } | null {
   if (!opts) return { name: "id", col: { type: DEFAULT_PK_TYPE, null: false, primaryKey: 0 } };

@@ -10,7 +10,7 @@ import type {
   EnumCall,
   AliasAttributeCall,
 } from "./walker.js";
-import { tsTypeFor } from "./type-registry.js";
+import { tsTypeFor, writerTsTypeFor } from "./type-registry.js";
 
 const INDENT = "  ";
 
@@ -55,7 +55,10 @@ export function synthesizeDeclares(
   const enumKeys = enumKeyUnions(info);
   const attributeTypes = new Map<string, NonNullable<RenderedLine["attribute"]>>();
   const emit = (l: RenderedLine): void => {
-    const keys = l.attribute && enumKeys.get(l.declaredName);
+    if (l.attribute?.dirty && info.serializedColumns.has(l.declaredName)) {
+      l = attributeLine(l.attribute.memberName, "unknown", l.declaredName);
+    }
+    const keys = l.attribute?.dirty && enumKeys.get(l.declaredName);
     if (keys) l = enumAttributeLine(l, keys);
     if (l.attribute) attributeTypes.set(l.declaredName, l.attribute);
     if (l.relationScope) relationScopeLines.push(l.relationScope);
@@ -66,6 +69,13 @@ export function synthesizeDeclares(
       );
     } else {
       out.push(l.text);
+    }
+    if (!l.attribute?.dirty) return;
+    for (const [name, signature] of dirtyMethods(l.declaredName, l.attribute.readerType)) {
+      if (info.existingMembers.has(name)) continue;
+      const member = renderDeclaredMemberName(name);
+      if (mergeAttributeInterface) interfaceLines.push(`${INDENT}${member}${signature};`);
+      else out.push(`${INDENT}declare ${member}: ${signature.replace(/\): /, ") => ")};`);
     }
   };
   const aliases = opts.classNameAliases;
@@ -118,7 +128,7 @@ export function synthesizeDeclares(
       const memberName = renderDeclaredMemberName(call.name);
       emit({
         ...attributeLine(memberName, readerType, call.name),
-        attribute: { memberName, readerType, writerType: target?.writerType },
+        attribute: { memberName, readerType, writerType: target?.writerType, dirty: true },
       });
       synthesizedInstanceNames.add(call.name);
       progressed = true;
@@ -127,19 +137,55 @@ export function synthesizeDeclares(
   return { classLines: out, interfaceLines, relationScopeLines };
 }
 
-function enumKeyUnions(info: ClassInfo): Map<string, string> {
-  const out = new Map<string, string>();
+function dirtyMethods(attr: string, type: string): [string, string][] {
+  const cap = attr.charAt(0).toUpperCase() + attr.slice(1);
+  const change = `[${type}, ${type}] | null`;
+  const options = "options?: { from?: unknown; to?: unknown }";
+  return [
+    [`${attr}PreviouslyChanged`, `(${options}): boolean | undefined`],
+    [`${attr}Changed`, `(${options}): boolean | undefined`],
+    [`${attr}Change`, `(): ${change}`],
+    [`${attr}WillChange`, `(): unknown`],
+    [`${attr}Was`, `(): ${type}`],
+    [`${attr}PreviousChange`, `(): ${change}`],
+    [`${attr}PreviouslyWas`, `(): ${type}`],
+    [`restore${cap}`, `(): void`],
+    [`clear${cap}Change`, `(): void`],
+    [`isSavedChangeTo${cap}`, `(${options}): boolean | undefined`],
+    [`savedChangeTo${cap}`, `(): ${change}`],
+    [`${attr}BeforeLastSave`, `(): ${type}`],
+    [`isWillSaveChangeTo${cap}`, `(${options}): boolean | undefined`],
+    [`${attr}ChangeToBeSaved`, `(): ${change}`],
+    [`${attr}InDatabase`, `(): ${type}`],
+  ];
+}
+
+function enumKeyUnions(info: ClassInfo): Map<string, { keys: string; values: string }> {
+  const out = new Map<string, { keys: string; values: string }>();
   for (const call of info.calls) {
     if (call.kind === "enum" && call.values.length > 0) {
-      out.set(call.attr, call.values.map((v) => JSON.stringify(v)).join(" | "));
+      out.set(call.attr, {
+        keys: call.values.map((v) => JSON.stringify(v)).join(" | "),
+        values: call.mappedValues.join(" | "),
+      });
     }
   }
   return out;
 }
 
-function enumAttributeLine(l: RenderedLine, keys: string): RenderedLine {
+function enumAttributeLine(
+  l: RenderedLine,
+  { keys, values }: { keys: string; values: string },
+): RenderedLine {
   const nullable = / \| null$/.test(l.attribute!.readerType);
-  return attributeLine(l.attribute!.memberName, nullable ? `${keys} | null` : keys, l.declaredName);
+  const suffix = nullable ? " | null" : "";
+  const writer = values ? `${keys} | ${values}` : "unknown";
+  return attributeLine(
+    l.attribute!.memberName,
+    `${keys}${suffix}`,
+    l.declaredName,
+    values ? `${writer}${suffix}` : writer,
+  );
 }
 
 function boundKnownTarget(
@@ -189,10 +235,13 @@ function renderSchemaColumnDeclares(
     if (col === "id") continue;
     if (composedCols?.has(col)) continue;
     if (info.skipSchemaColumns.has(col)) continue;
-    const tsType = isForeignKeyColumn(col, value)
+    const railsType = typeof value === "string" ? value : value.type;
+    const keyLike = isForeignKeyColumn(col, value) || isDefaultTypedPrimaryKey(value);
+    const tsType = keyLike
       ? `${AR_IMPORT}.PrimaryKeyValue`
       : renderSchemaValueType(value, opts.timeZoneAwareAttributes);
-    out.push(attributeLine(renderDeclaredMemberName(col), tsType, col));
+    const writerType = keyLike ? tsType : writerTsTypeFor(railsType, tsType);
+    out.push(attributeLine(renderDeclaredMemberName(col), tsType, col, writerType));
   }
   return out;
 }
@@ -211,6 +260,10 @@ function isForeignKeyColumn(col: string, value: SchemaColumnValue): boolean {
   if (col === "id" || !col.endsWith("_id")) return false;
   const type = typeof value === "string" ? value : value.type;
   return type === "integer" || type === "big_integer" || type === "bigint";
+}
+
+function isDefaultTypedPrimaryKey(value: SchemaColumnValue): boolean {
+  return typeof value !== "string" && value.primaryKey !== undefined && value.type === "bigint";
 }
 
 function renderSchemaValueType(value: SchemaColumnValue, timeZoneAware?: boolean): string {
@@ -312,7 +365,7 @@ interface RenderedLine {
   declaredName: string;
   isStatic: boolean;
   skipIfPresent: boolean;
-  attribute?: { memberName: string; readerType: string; writerType?: string };
+  attribute?: { memberName: string; readerType: string; writerType?: string; dirty?: boolean };
   relationScope?: string;
 }
 
@@ -351,7 +404,8 @@ function renderAttribute(
   if (call.name === "id") return [];
   const memberName = renderDeclaredMemberName(call.name);
   if (isForeignKeyColumn(call.name, call.railsType)) {
-    return [attributeLine(memberName, `${AR_IMPORT}.PrimaryKeyValue`, call.name)];
+    const pk = `${AR_IMPORT}.PrimaryKeyValue`;
+    return [attributeLine(memberName, pk, call.name, pk)];
   }
   const tsType = tsTypeFor(call.railsType, timeZoneAware);
   const rendered = nullable
@@ -359,7 +413,9 @@ function renderAttribute(
       ? `(${tsType}) | null`
       : `${tsType} | null`
     : tsType;
-  return [attributeLine(memberName, rendered, call.name)];
+  return [
+    attributeLine(memberName, rendered, call.name, writerTsTypeFor(call.railsType, rendered)),
+  ];
 }
 
 function renderCollectionAssoc(
@@ -492,10 +548,15 @@ function line(body: string, declaredName: string, isStatic: boolean): RenderedLi
   };
 }
 
-function attributeLine(memberName: string, readerType: string, declaredName: string): RenderedLine {
+function attributeLine(
+  memberName: string,
+  readerType: string,
+  declaredName: string,
+  writerType?: string,
+): RenderedLine {
   return {
     ...line(`declare ${memberName}: ${readerType};`, declaredName, false),
-    attribute: { memberName, readerType },
+    attribute: { memberName, readerType, writerType, dirty: true },
   };
 }
 
