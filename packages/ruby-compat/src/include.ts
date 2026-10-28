@@ -22,7 +22,7 @@
 
 import { methodCacheSerial, rbClearMethodCache } from "./method-cache.js";
 import { ArgumentError } from "./argument-error.js";
-import type { abort } from "./process-adapter.js";
+import { abort } from "./process-adapter.js";
 import type { kernelRand } from "./kernel-rand.js";
 import { NameError } from "./name-error.js";
 import { NoMethodError } from "./no-method-error.js";
@@ -2205,6 +2205,7 @@ export const Kernel = {
 } as KernelModule;
 
 classpaths.set(Kernel, { path: "Kernel", permanent: true });
+Kernel.abort = abort;
 classpaths.set(Enumerable, { path: "Enumerable", permanent: true });
 
 // `rb_mComparable` (`vendor/ruby/v3.3.11/compar.c:315`).

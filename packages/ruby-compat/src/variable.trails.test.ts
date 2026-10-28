@@ -17,6 +17,7 @@ import {
   resetConstants,
   unregisterConstant,
 } from "./variable.js";
+import { Hash } from "./hash.js";
 
 describe("rb_path_to_class", () => {
   class Widget {
@@ -91,6 +92,12 @@ describe("rb_path_to_class", () => {
     expect(() => rbPathToClass("PathShop::Widget::COUNT")).toThrow(
       new TypeError("PathShop::Widget::COUNT does not refer to class/module"),
     );
+  });
+
+  it("resolves a core class with no caller registration, across a reset", () => {
+    resetConstants();
+    expect(rbPathToClass("Array")).toBe(Array);
+    expect(rbPathToClass("Hash")).toBe(Hash);
   });
 
   it("refuses an empty or anonymous path", () => {
@@ -172,6 +179,17 @@ describe("rb_const_get", () => {
 
   it("raises NameError for a name nothing on the walk answers", () => {
     expect(() => rbConstGet(Sub, "ConstGetTopCheck")).toThrow(NameError);
+  });
+
+  it("carries the module as the NameError's receiver", () => {
+    let error: NameError | undefined;
+    try {
+      rbConstGet(Sub, "ConstGetMissing");
+    } catch (e) {
+      error = e as NameError;
+    }
+    expect(error!.receiver()).toBe(Sub);
+    expect(error!.constantName).toBe("ConstGetMissing");
   });
 
   describe("rb_mod_const_get", () => {

@@ -254,9 +254,9 @@ export function rbConstMissing(klass: object): void {
  */
 export function rbModConstMissing(klass: { name?: string } | null, name: string): never {
   if (klass != null && klass !== globalThis && klass !== Object) {
-    throw new NameError(`uninitialized constant ${klass.name}::${name}`, name);
+    throw new NameError(`uninitialized constant ${klass.name}::${name}`, name, { receiver: klass });
   } else {
-    throw new NameError(`uninitialized constant ${name}`, name);
+    throw new NameError(`uninitialized constant ${name}`, name, { receiver: klass });
   }
 }
 
