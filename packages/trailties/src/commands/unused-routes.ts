@@ -9,6 +9,7 @@ import { camelize, dasherize, safeConstantize, underscore } from "@blazetrails/a
 import { getPath } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
+import type { ThorClass } from "@blazetrails/thor";
 import { Command } from "commander";
 import { Actions } from "../command/actions.js";
 import { Base } from "../command/base.js";
@@ -90,20 +91,18 @@ export class RouteInfo {
 
 export class UnusedRoutesCommand extends Base {
   static {
+    const klass = this as unknown as ThorClass;
     this.hideCommandBang();
-    this.classOption("controller", {
+    klass.classOption("controller", {
       aliases: "-c",
       desc: "Filter by a specific controller, e.g. PostsController or Admin::PostsController.",
     });
-    this.classOption("grep", { aliases: "-g", desc: "Grep routes by a specific pattern." });
+    klass.classOption("grep", { aliases: "-g", desc: "Grep routes by a specific pattern." });
+    klass.methodAdded("perform");
   }
 
   /** @internal */
   private _routes: Journey.Route[] | null = null;
-
-  constructor(options: UnusedRoutesOptions) {
-    super(options);
-  }
 
   async perform(): Promise<void> {
     await Actions.bootApplicationBang();
@@ -138,7 +137,7 @@ export class UnusedRoutesCommand extends Base {
 
   /** @internal */
   private routesFilter(): RoutesFilter {
-    const options = this.options as UnusedRoutesOptions;
+    const options = this.options as unknown as UnusedRoutesOptions;
     const filter: RoutesFilter = {};
     if (options.controller !== undefined) filter.controller = options.controller;
     if (options.grep !== undefined) filter.grep = options.grep;
@@ -149,11 +148,9 @@ export class UnusedRoutesCommand extends Base {
 export function unusedRoutesCommand(): Command {
   const klass = UnusedRoutesCommand;
   const cmd = new Command(klass.commandName());
-  for (const [name, option] of Object.entries(klass.classOptions())) {
-    cmd.option([...[option.aliases ?? []].flat(), `--${name} <${name}>`].join(", "), option.desc);
-  }
-  cmd.action(async (options: UnusedRoutesOptions, command: Command) => {
-    await klass.perform(klass.commandName(), command.args, { options });
+  cmd.argument("[args...]").allowUnknownOption().helpOption(false);
+  cmd.action(async (_args: string[], _options: object, command: Command) => {
+    await klass.perform(klass.commandName(), command.args, {});
   });
 
   return cmd;

@@ -15,7 +15,9 @@ import {
   rbInspect,
   type Included,
 } from "@blazetrails/ruby-compat";
-import { Command, Option } from "commander";
+import type { ThorClass } from "@blazetrails/thor";
+import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
+import { Command } from "commander";
 import { environment } from "../command.js";
 import { APP_PATH } from "../app-path.js";
 import { Base } from "../command/base.js";
@@ -139,41 +141,42 @@ export interface DbconsoleCommand extends Included<typeof EnvironmentArgument> {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export class DbconsoleCommand extends Base {
-  declare options: DBConsoleOptions;
+  declare options: ThorOptions<Record<string, unknown> & DBConsoleOptions>;
 
   static {
+    const klass = this as unknown as ThorClass;
     include(this, EnvironmentArgument);
-    this.classOption("includePassword", {
+    klass.classOption("includePassword", {
       aliases: "-p",
       type: "boolean",
       desc: "Automatically provide the password from database.yml",
     });
-    this.classOption("mode", {
+    klass.classOption("mode", {
       enum: ["html", "list", "line", "column"],
       type: "string",
       desc: "Automatically put the sqlite3 database in the specified mode",
     });
-    this.classOption("header", { type: "boolean" });
-    this.classOption("database", {
+    klass.classOption("header", { type: "boolean" });
+    klass.classOption("database", {
       aliases: "--db",
       type: "string",
       desc: "Specify the database to use.",
     });
+    klass.methodAdded("perform");
   }
 
   /** @inlinedFrom Rails::Command::EnvironmentArgument#initialize rails/v8.0.2/railties/lib/rails/command/environment_argument.rb:16-26 */
-  constructor(options: DBConsoleOptions = {}) {
-    super(options);
+  constructor(...args: ConstructorParameters<typeof Base>) {
+    super(...args);
 
     this._environmentSpecified = isPresent(this.options.environment);
 
     if (!this._environmentSpecified) {
-      this.options = { ...this.options, environment: environment() };
+      this.options = this.options.merge({ environment: environment() });
     } else if (!this.availableEnvironments().includes(this.options.environment!)) {
-      this.options = {
-        ...this.options,
+      this.options = this.options.merge({
         environment: this.expandEnvironmentName(this.options.environment!),
-      };
+      });
     }
   }
 
@@ -183,19 +186,13 @@ export class DbconsoleCommand extends Base {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE vendor-thor-and-port-command-base-thor-surface */
 export function dbconsoleCommand(): Command {
   const klass = DbconsoleCommand;
   const cmd = new Command(klass.commandName());
   cmd.description("Start a console for the database specified in config/database.yml");
-  for (const [name, option] of Object.entries(klass.classOptions())) {
-    const flag = `--${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-    const long = option.type === "boolean" ? flag : `${flag} <${name}>`;
-    const opt = new Option([...[option.aliases ?? []].flat(), long].join(", "), option.desc);
-    cmd.addOption(option.enum ? opt.choices(option.enum) : opt);
-  }
-  cmd.action(async (options: DBConsoleOptions, command: Command) => {
-    await klass.perform(klass.commandName(), command.args, { options });
+  cmd.argument("[args...]").allowUnknownOption().helpOption(false);
+  cmd.action(async (_args: string[], _options: object, command: Command) => {
+    await klass.perform(klass.commandName(), command.args, {});
   });
 
   return cmd;

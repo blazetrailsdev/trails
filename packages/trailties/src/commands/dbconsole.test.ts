@@ -76,7 +76,7 @@ describe("Rails::DBConsoleTest", () => {
       DbconsoleCommand.prototype as unknown as { availableEnvironments(): string[] },
       "availableEnvironments",
     ).mockReturnValue(["development", "test"]);
-    expect(new DbconsoleCommand({ environment: "dev" }).options.environment).toMatch("development");
+    expect(new DbconsoleCommand([], ["-e", "dev"]).options.environment).toMatch("development");
   });
 
   it("unknown command line client", async () => {

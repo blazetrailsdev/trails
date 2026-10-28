@@ -1,5 +1,6 @@
 import { Dir, File, defineModule, included, setEnv } from "@blazetrails/ruby-compat";
 import { requireApplicationBang } from "./actions.js";
+import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./base.js";
 
 interface EnvironmentArgumentHost {
@@ -13,7 +14,7 @@ interface EnvironmentArgumentHost {
 export const EnvironmentArgument = defineModule(
   {
     [included](base: typeof Base): void {
-      base.classOption("environment", {
+      (base as unknown as ThorClass).classOption("environment", {
         aliases: "-e",
         type: "string",
         desc: `The environment to run \`${base.commandName()}\` in (e.g. test / development / production).`,

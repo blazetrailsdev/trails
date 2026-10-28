@@ -22,7 +22,7 @@ export function routesCommand(): Command {
     .option("-u, --unused", "Print unused routes.")
     .action(async (options) => {
       if (options.unused) {
-        await new UnusedRoutesCommand(options).perform();
+        await new UnusedRoutesCommand([], options).perform();
         return;
       }
       await Actions.bootApplicationBang();

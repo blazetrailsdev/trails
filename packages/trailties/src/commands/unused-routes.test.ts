@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { createProgram } from "../cli.js";
+import type { ThorClass } from "@blazetrails/thor";
 import { lookupBang } from "../command/behavior.js";
+import { UnusedRoutesCommand } from "./unused-routes.js";
 
 await lookupBang();
 
@@ -23,10 +25,10 @@ describe("UnusedRoutesCommand", () => {
   });
 
   it("has the class options UnusedRoutesCommand declares", () => {
-    const program = createProgram();
-    const cmd = program.commands.find((c) => c.name() === "unused_routes");
-    const longs = cmd?.options.map((o) => o.long);
-    expect(longs).toEqual(expect.arrayContaining(["--controller", "--grep"]));
+    const options = (UnusedRoutesCommand as unknown as ThorClass).classOptions();
+    expect(Object.values(options).map((o) => o.switchName)).toEqual(
+      expect.arrayContaining(["--controller", "--grep"]),
+    );
   });
 
   it("routes gains the -u/--unused class option", () => {
