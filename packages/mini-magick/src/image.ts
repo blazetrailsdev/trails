@@ -39,7 +39,7 @@ export interface Image {
   colorspace(...args: unknown[]): Promise<string>;
   exif(...args: unknown[]): Promise<Record<string, string>>;
   resolution(...args: unknown[]): Promise<number[]>;
-  signature(...args: unknown[]): unknown;
+  signature(...args: unknown[]): string | Promise<string>;
   data(...args: unknown[]): Promise<Record<string, unknown>>;
 }
 

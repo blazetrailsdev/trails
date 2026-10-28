@@ -67,7 +67,7 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
    */
   static new(
     basename: TempfileBasename = "",
-    tmpdir?: string,
+    tmpdir?: string | null,
     options: TempfileOptions = {},
   ): Tempfile {
     return new Tempfile(openExclusive(basename, tmpdir, options), options);
@@ -301,7 +301,7 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
  */
 function openExclusive(
   basename: TempfileBasename = "",
-  tmpdir?: string,
+  tmpdir?: string | null,
   options: TempfileOptions = {},
 ): File {
   let tmpfile: File | null = null;

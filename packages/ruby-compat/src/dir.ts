@@ -388,7 +388,7 @@ export class Dir {
     options: TmpnameOptions = {},
     block?: (path: string) => T,
   ): string | T {
-    let base: string | undefined = undefined;
+    let base: string | null | undefined = undefined;
     const path = createTmpname(
       prefixSuffix ?? "d",
       tmpdir ?? undefined,
@@ -600,13 +600,13 @@ export interface TmpnameOptions {
  */
 export function createTmpname(
   basename: TempfileBasename,
-  tmpdir: string | undefined,
+  tmpdir: string | null | undefined,
   { maxTry = null, ...opts }: TmpnameOptions,
   block: (
     path: string,
     n: number | null,
     opts: Record<string, unknown>,
-    origdir: string | undefined,
+    origdir: string | null | undefined,
   ) => void,
 ): string {
   const origdir = tmpdir;

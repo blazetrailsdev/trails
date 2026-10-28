@@ -233,6 +233,7 @@ export {
   uniq,
   unpack,
   unpack1,
+  rbAryFetch,
   sortByBang,
   ARRAY_METHOD_TABLE,
 } from "./array.js";

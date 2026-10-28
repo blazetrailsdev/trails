@@ -11,7 +11,7 @@ import {
   TypeError,
   excSetupMessage,
   JSON,
-  IndexError,
+  rbAryFetch,
 } from "@blazetrails/ruby-compat";
 import { Invalid } from "../mini-magick.js";
 import type { CliTool } from "../tool.js";
@@ -157,10 +157,10 @@ export class Info {
     return this._info[`raw:${value ?? ""}`];
   }
 
-  signature(): unknown {
+  signature(): string | Promise<string> {
     if (!((this._info["signature"] ?? false) !== false))
-      return (async () => (this._info["signature"] = await this.get("%#")))();
-    return this._info["signature"];
+      return (async () => (this._info["signature"] = (await this.get("%#")) as string))();
+    return this._info["signature"] as string;
   }
 
   async data() {
@@ -172,8 +172,7 @@ export class Info {
         })) as string;
         let data: unknown = JSON.parse(json);
         if (Array.isArray(data)) {
-          if (data.length === 0) throw new IndexError("index 0 outside of array bounds: -0...0");
-          data = data[0];
+          data = rbAryFetch(data, 0);
         }
         return fetch(data as Record<string, unknown>, "image");
       })();
