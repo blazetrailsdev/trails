@@ -140,4 +140,15 @@ describe("Enumerator#with_index (enumerator_with_index, vendor/ruby/v3.3.11/enum
     eachWithIndex(["x"]).withIndex(10n ** 25n, (_pair, i) => seen.push(i));
     expect(seen).toEqual([10n ** 25n]);
   });
+
+  it("advances an offset past the safe integer range as a bigint", () => {
+    const seen: unknown[] = [];
+    eachWithIndex(["x", "y"]).withIndex(2 ** 53, (_pair, i) => seen.push(i));
+    expect(seen).toEqual([2n ** 53n, 2n ** 53n + 1n]);
+    expect(
+      eachWithIndex(["x"])
+        .withIndex(10n ** 25n)
+        .toA(),
+    ).toEqual([[["x", 0], 10n ** 25n]]);
+  });
 });

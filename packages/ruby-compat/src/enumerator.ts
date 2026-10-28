@@ -145,6 +145,8 @@ export class Enumerator<T = unknown, E = unknown> {
    */
   withIndex(offset?: number | null): Enumerator<[T, number], E>;
   /** @noRailsEquivalent PERMANENT */
+  withIndex(offset: bigint): Enumerator<[T, bigint], E>;
+  /** @noRailsEquivalent PERMANENT */
   withIndex(offset: number | null, block: (value: T, idx: number) => unknown): unknown;
   /** @noRailsEquivalent PERMANENT */
   withIndex(offset: bigint, block: (value: T, idx: bigint) => unknown): unknown;
@@ -161,10 +163,16 @@ export class Enumerator<T = unknown, E = unknown> {
     else if (typeof offset === "number") {
       if (!Number.isFinite(offset)) throw new FloatDomainError(String(offset));
       memo = Math.trunc(offset);
+      if (!Number.isSafeInteger(memo)) memo = BigInt(memo);
     } else memo = num2long(offset);
     return this.each((...argv: unknown[]) => {
       const idx = memo;
-      memo = typeof memo === "bigint" ? memo + 1n : memo + 1;
+      memo =
+        typeof memo === "bigint"
+          ? memo + 1n
+          : Number.isSafeInteger(memo + 1)
+            ? memo + 1
+            : BigInt(memo) + 1n;
       if (argv.length <= 1) return block(argv[0] as T, idx as never);
       return block(argv as T, idx as never);
     });
