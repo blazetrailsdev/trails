@@ -63,6 +63,7 @@ export class Info {
     return (Object.keys(this._info).forEach((k) => delete this._info[k]), this._info);
   }
 
+  /** @missingRailsName info — PERMANENT */
   async cheapInfo(value: string) {
     try {
       if (Object.hasOwn(this._info, value)) {

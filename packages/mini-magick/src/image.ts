@@ -351,6 +351,7 @@ export class Image {
     return this.mogrify(frame, (builder) => builder.quality(100));
   }
 
+  /** @missingRailsName sub — PERMANENT */
   destroyBang() {
     if (this._tempfile != null) {
       if (this._tempfile.path()!.endsWith(".mpc")) {

@@ -85,3 +85,5 @@ export class TimeoutError extends Error {
     return "MiniMagick::TimeoutError";
   }
 }
+
+import "./class-paths.generated.js";

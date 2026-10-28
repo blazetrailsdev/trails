@@ -48,6 +48,7 @@ export const GATED_PACKAGES = [
   "fugit",
   "globalid",
   "marcel",
+  "mini-magick",
   "rack",
   "rails-dom-testing",
   "trailties",
