@@ -16,7 +16,6 @@ import {
 import {
   rbCheckArrayType,
   rbFSend,
-  rbModName,
   rbModSingletonP,
   rbObjDup,
   rbObjRespondTo,
@@ -173,7 +172,7 @@ export class Metal extends AbstractControllerBase {
     }
     return (this._controllerName = isAnonymous(this)
       ? null
-      : underscore(demodulize(rbModName(this)!).replace(/Controller$/, "")));
+      : underscore(demodulize(this.name).replace(/Controller$/, "")));
   }
 
   static makeResponseBang(request: Request): Response {

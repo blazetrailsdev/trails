@@ -18,7 +18,6 @@ import {
   isSymbol,
   Module,
   rbClassSuperclass,
-  rbModName,
   rbDeclareIvar,
   rbFSend,
   rbModConstDefined,
@@ -210,7 +209,7 @@ export function defineHelpersModule(
 
 /** @internal */
 export function defaultHelperModuleBang(this: HelpersClass): void {
-  const helperPrefix = rbModName(this)!.replace(/Controller$/, "");
+  const helperPrefix = this.name.replace(/Controller$/, "");
   try {
     this.helper(helperPrefix);
   } catch (e) {
