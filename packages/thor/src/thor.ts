@@ -16,6 +16,7 @@ import {
   rbInspect,
   rbObjAsString,
   rbObjRespondTo,
+  rbModConstSet,
   rbSetClassPathString,
   rtest,
   sort,
@@ -33,6 +34,7 @@ import type { Invocation } from "./invocation.js";
 import type { Shell } from "./shell.js";
 import { Actions, type ActionsHost } from "./actions.js";
 import { Command, DynamicCommand, HiddenCommand } from "./command.js";
+import { CoreExt, HashWithIndifferentAccess } from "./core-ext/hash-with-indifferent-access.js";
 import { AmbiguousTaskError } from "./error.js";
 import { Group, type GroupClass } from "./group.js";
 import { Argument } from "./parser/argument.js";
@@ -799,6 +801,11 @@ rbSetClassPathString(Argument, Thor, "Argument");
 rbSetClassPathString(Arguments, Thor, "Arguments");
 rbSetClassPathString(Option, Thor, "Option");
 rbSetClassPathString(Options, Thor, "Options");
+rbSetClassPathString(Command, Thor, "Command");
+rbSetClassPathString(HiddenCommand, Thor, "HiddenCommand");
+rbSetClassPathString(DynamicCommand, Thor, "DynamicCommand");
+rbModConstSet(Thor, "CoreExt", CoreExt);
+rbModConstSet(CoreExt, "HashWithIndifferentAccess", HashWithIndifferentAccess);
 
 Thor.defaultTask = Thor.defaultCommand;
 Thor.options = Thor.methodOptions;
