@@ -64,7 +64,7 @@ export class ActionMethods {
   protected emptyDirectoryWithKeepFile(
     destination: string,
     config: { verbose?: boolean } = {},
-  ): Promise<string | null> {
+  ): Promise<unknown> {
     return this.generator["emptyDirectoryWithKeepFile"](destination, config);
   }
 

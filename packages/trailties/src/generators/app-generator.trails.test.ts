@@ -194,11 +194,11 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("includes ActionMethods into a top-level AppBuilder that does not subclass trails' AppBuilder", async () => {
-    let kept: string | null = null;
+    let kept: unknown = null;
     TopLevel.AppBuilder = class {
       async cifiles(this: {
         emptyDirectory(d: string): unknown;
-        emptyDirectoryWithKeepFile(d: string): Promise<string | null>;
+        emptyDirectoryWithKeepFile(d: string): Promise<unknown>;
       }): Promise<void> {
         await this.emptyDirectory("custom-ci");
         kept = await this.emptyDirectoryWithKeepFile("custom-keep");

@@ -163,9 +163,9 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   declare apply: OmitThisParameter<typeof ThorActions.apply>;
   declare inRoot: <T>(block: () => T | Promise<T>) => Promise<T>;
   declare injectIntoFile: (destination: string, ...args: unknown[]) => unknown;
-  declare emptyDirectory: (destination: string, config?: Record<string, unknown>) => unknown;
-  declare createFile: (destination: string, ...args: unknown[]) => unknown;
-  declare appendToFile: (path: string, ...args: unknown[]) => unknown;
+  declare emptyDirectory: OmitThisParameter<typeof ThorActions.Actions.emptyDirectory>;
+  declare createFile: OmitThisParameter<typeof ThorActions.Actions.createFile>;
+  declare appendToFile: OmitThisParameter<typeof ThorActions.Actions.appendToFile>;
   /** @internal */
   declare protected _cleanupOptionsAndSet: ThorActions.ActionsHost["_cleanupOptionsAndSet"];
 

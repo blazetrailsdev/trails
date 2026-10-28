@@ -226,13 +226,13 @@ export abstract class AppBase extends GeneratorBase {
   protected async emptyDirectoryWithKeepFile(
     destination: string,
     config: { verbose?: boolean } = {},
-  ): Promise<string | null> {
+  ): Promise<unknown> {
     await this.emptyDirectory(destination, config);
     return await this.keepFile(destination);
   }
 
   /** @internal */
-  protected async keepFile(destination: string): Promise<string | null> {
-    return this.keeps() ? ((await this.createFile(`${destination}/.keep`, "")) as string) : null;
+  protected async keepFile(destination: string): Promise<unknown> {
+    return this.keeps() ? await this.createFile(`${destination}/.keep`, "") : null;
   }
 }
