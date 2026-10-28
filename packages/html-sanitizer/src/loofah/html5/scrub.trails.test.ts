@@ -29,3 +29,28 @@ describe("Loofah::HTML5::Scrub.cdata_escape", () => {
     expect(fragment.children[0].toString()).toBe("<![CDATA[&lt;i&gt;&amp;&lt;/i&gt;]]>");
   });
 });
+
+describe("Nokogiri::XML::Node#before", () => {
+  it("keeps a CDATA child when its parent serializes", () => {
+    const fragment = HTML5.DocumentFragment.parse("<div><b>x</b></div>");
+    const div = fragment.children[0];
+    div.children[0].before(fragment.document.createCdata("a<b"));
+    expect(div.toString()).toBe("<div><![CDATA[a<b]]><b>x</b></div>");
+  });
+
+  it("accepts markup, a DocumentFragment and a NodeSet", () => {
+    const fragment = HTML5.DocumentFragment.parse("<div><b>x</b></div>");
+    const b = fragment.children[0].children[0];
+    b.before("<i>1</i>");
+    b.before(HTML5.DocumentFragment.parse("<u>2</u>"));
+    b.before(HTML5.DocumentFragment.parse("<s>3</s>").css("s"));
+    expect(fragment.toString()).toBe("<div><i>1</i><u>2</u><s>3</s><b>x</b></div>");
+  });
+
+  it("refuses a second root on a document", () => {
+    const doc = HTML5.Document.parse("<p>x</p>");
+    expect(() => doc.root!.before("<p>y</p>")).toThrow(
+      "A document may not have multiple root nodes.",
+    );
+  });
+});

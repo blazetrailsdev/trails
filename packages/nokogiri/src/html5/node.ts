@@ -6,10 +6,10 @@ import {
 } from "parse5";
 
 import { Attr } from "../xml/attr.js";
-import type { NodeSet } from "../xml/node-set.js";
-import { include, rbModConstSet } from "@blazetrails/ruby-compat";
+import { NodeSet } from "../xml/node-set.js";
+import { ArgumentError, RuntimeError, include, rbModConstSet } from "@blazetrails/ruby-compat";
+import { DocumentFragment } from "./document-fragment.js";
 import { HTML5 } from "../namespaces.js";
-import "../xml/node-set.js";
 import * as Searchable from "../xml/searchable.js";
 
 type Parse5Node = DefaultTreeAdapterMap["childNode"];
@@ -118,12 +118,59 @@ export class Node {
     return attr;
   }
 
-  before(nodeOrTags: Node | string): this {
-    const parent = this._node.parentNode as Parse5Parent;
-    const nodes =
-      typeof nodeOrTags === "string" ? parseFragment(nodeOrTags).childNodes : [nodeOrTags._node];
-    for (const node of nodes) defaultTreeAdapter.insertBefore(parent, node, this._node);
+  get parent(): Node | null {
+    const parent = this._node.parentNode;
+    return parent ? new Node(parent as unknown as Parse5Node, this.document) : null;
+  }
+
+  addPreviousSibling(
+    nodeOrTags: Node | DocumentFragment | NodeSet | string,
+  ): Node | DocumentFragment | NodeSet | string {
+    if (
+      this.parent?._node.nodeName === "#document" &&
+      !(nodeOrTags instanceof Node && nodeOrTags.type === Node.COMMENT_NODE)
+    ) {
+      throw new ArgumentError("A document may not have multiple root nodes.");
+    }
+
+    return this.addSibling("previous", nodeOrTags);
+  }
+
+  before(nodeOrTags: Node | DocumentFragment | NodeSet | string): this {
+    this.addPreviousSibling(nodeOrTags);
     return this;
+  }
+
+  coerce(data: Node | DocumentFragment | NodeSet | string): Node | NodeSet {
+    if (data instanceof NodeSet) return data;
+    if (data instanceof DocumentFragment) return new NodeSet(data.document, data.children);
+    if (typeof data === "string") {
+      return new NodeSet(this.document, childNodes(parseFragment(data), this.document));
+    }
+    if (data instanceof Node) return data;
+
+    throw new ArgumentError(
+      `Requires a Node, NodeSet or String argument, and cannot accept a ${(data as object).constructor.name}.\n(You probably want to select a node from the Document with at() or search(), or create a new Node via Node.new().)\n`,
+    );
+  }
+
+  /** @internal */
+  private addSibling(
+    nextOrPrevious: "next" | "previous",
+    nodeOrTags: Node | DocumentFragment | NodeSet | string,
+  ): Node | NodeSet {
+    if (!this.parent) throw new RuntimeError("Cannot add sibling to a node with no parent");
+
+    const parent = this._node.parentNode as Parse5Parent;
+    const ref = nextOrPrevious === "next" ? _nextSibling(this._node) : this._node;
+
+    const coerced = this.parent.coerce(nodeOrTags);
+    const nodes = coerced instanceof NodeSet ? [...coerced] : [coerced];
+    for (const n of nodes) {
+      defaultTreeAdapter.detachNode(n._node);
+      defaultTreeAdapter.insertBefore(parent, n._node, ref as Parse5Node);
+    }
+    return coerced;
   }
 
   remove(): this {
@@ -132,12 +179,30 @@ export class Node {
   }
 
   toString(): string {
-    if (this._node.nodeName === "#cdata-section") return `<![CDATA[${this.content}]]>`;
-    return serializeOuter(this._node);
+    return serializeOuter(this._node, { treeAdapter: _cdataTreeAdapter });
   }
 }
 
 include(Node, Searchable);
+
+function _nextSibling(node: Parse5Node): Parse5Node | null {
+  const siblings = (node.parentNode as Parse5Parent).childNodes;
+  return siblings[siblings.indexOf(node) + 1] ?? null;
+}
+
+const _cdataRawTextParent = { tagName: "style", namespaceURI: "http://www.w3.org/1999/xhtml" };
+
+const _cdataTreeAdapter: typeof defaultTreeAdapter = {
+  ...defaultTreeAdapter,
+  isTextNode: (node): node is DefaultTreeAdapterMap["textNode"] =>
+    defaultTreeAdapter.isTextNode(node) || node.nodeName === ("#cdata-section" as string),
+  getTextNodeContent: (node) =>
+    node.nodeName === ("#cdata-section" as string) ? `<![CDATA[${node.value}]]>` : node.value,
+  getParentNode: (node) =>
+    node.nodeName === ("#cdata-section" as string)
+      ? (_cdataRawTextParent as unknown as Parse5Parent)
+      : defaultTreeAdapter.getParentNode(node),
+};
 rbModConstSet(HTML5, "Node", Node);
 
 /** @noRailsEquivalent PERMANENT */
