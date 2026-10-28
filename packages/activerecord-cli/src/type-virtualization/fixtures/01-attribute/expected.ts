@@ -25,7 +25,7 @@ export interface Post {
   titleChangeToBeSaved(): [string, string] | null;
   titleInDatabase(): string;
   get view_count(): number;
-  set view_count(value: number | string);
+  set view_count(value: number | string | bigint);
   view_countPreviouslyChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
   view_countChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
   view_countChange(): [number, number] | null;

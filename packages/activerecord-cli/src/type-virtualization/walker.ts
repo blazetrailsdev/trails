@@ -416,6 +416,12 @@ function readEnumMappedValues(node: ts.Expression): string[] {
     if (!ts.isPropertyAssignment(p)) return [];
     const v = p.initializer;
     if (ts.isNumericLiteral(v)) out.push(v.text);
+    else if (
+      ts.isPrefixUnaryExpression(v) &&
+      v.operator === ts.SyntaxKind.MinusToken &&
+      ts.isNumericLiteral(v.operand)
+    )
+      out.push(`-${v.operand.text}`);
     else if (ts.isStringLiteralLikeNode(v)) out.push(JSON.stringify(v.text));
     else return [];
   }

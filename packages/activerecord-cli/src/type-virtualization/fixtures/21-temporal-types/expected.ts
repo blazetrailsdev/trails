@@ -24,7 +24,7 @@ export interface Event {
   starts_atChangeToBeSaved(): [import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time, import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time] | null;
   starts_atInDatabase(): import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time;
   get starts_on(): import("@blazetrails/date").Temporal.PlainDate;
-  set starts_on(value: import("@blazetrails/date").Temporal.PlainDate | string);
+  set starts_on(value: import("@blazetrails/date").Temporal.PlainDate | string | { toDate(): unknown });
   starts_onPreviouslyChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
   starts_onChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
   starts_onChange(): [import("@blazetrails/date").Temporal.PlainDate, import("@blazetrails/date").Temporal.PlainDate] | null;

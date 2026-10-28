@@ -55,10 +55,10 @@ export function synthesizeDeclares(
   const enumKeys = enumKeyUnions(info);
   const attributeTypes = new Map<string, NonNullable<RenderedLine["attribute"]>>();
   const emit = (l: RenderedLine): void => {
-    if (l.attribute?.dirty && info.serializedColumns.has(l.declaredName)) {
+    if (l.attribute?.attributeMethods && info.serializedColumns.has(l.declaredName)) {
       l = attributeLine(l.attribute.memberName, "unknown", l.declaredName);
     }
-    const keys = l.attribute?.dirty && enumKeys.get(l.declaredName);
+    const keys = l.attribute?.attributeMethods && enumKeys.get(l.declaredName);
     if (keys) l = enumAttributeLine(l, keys);
     if (l.attribute) attributeTypes.set(l.declaredName, l.attribute);
     if (l.relationScope) relationScopeLines.push(l.relationScope);
@@ -70,8 +70,8 @@ export function synthesizeDeclares(
     } else {
       out.push(l.text);
     }
-    if (!l.attribute?.dirty) return;
-    for (const [name, signature] of dirtyMethods(l.declaredName, l.attribute.readerType)) {
+    if (!l.attribute?.attributeMethods) return;
+    for (const [name, signature] of attributeMethodFamily(l.declaredName, l.attribute.readerType)) {
       if (info.existingMembers.has(name)) continue;
       const member = renderDeclaredMemberName(name);
       if (mergeAttributeInterface) interfaceLines.push(`${INDENT}${member}${signature};`);
@@ -128,7 +128,12 @@ export function synthesizeDeclares(
       const memberName = renderDeclaredMemberName(call.name);
       emit({
         ...attributeLine(memberName, readerType, call.name),
-        attribute: { memberName, readerType, writerType: target?.writerType, dirty: true },
+        attribute: {
+          memberName,
+          readerType,
+          writerType: target?.writerType,
+          attributeMethods: true,
+        },
       });
       synthesizedInstanceNames.add(call.name);
       progressed = true;
@@ -137,7 +142,7 @@ export function synthesizeDeclares(
   return { classLines: out, interfaceLines, relationScopeLines };
 }
 
-function dirtyMethods(attr: string, type: string): [string, string][] {
+function attributeMethodFamily(attr: string, type: string): [string, string][] {
   const cap = attr.charAt(0).toUpperCase() + attr.slice(1);
   const change = `[${type}, ${type}] | null`;
   const options = "options?: { from?: unknown; to?: unknown }";
@@ -365,7 +370,12 @@ interface RenderedLine {
   declaredName: string;
   isStatic: boolean;
   skipIfPresent: boolean;
-  attribute?: { memberName: string; readerType: string; writerType?: string; dirty?: boolean };
+  attribute?: {
+    memberName: string;
+    readerType: string;
+    writerType?: string;
+    attributeMethods?: boolean;
+  };
   relationScope?: string;
 }
 
@@ -556,7 +566,7 @@ function attributeLine(
 ): RenderedLine {
   return {
     ...line(`declare ${memberName}: ${readerType};`, declaredName, false),
-    attribute: { memberName, readerType, writerType, dirty: true },
+    attribute: { memberName, readerType, writerType, attributeMethods: true },
   };
 }
 

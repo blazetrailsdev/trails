@@ -941,11 +941,11 @@ describe("virtualize — attribute accessor pairs", () => {
     expect(text).toMatch(/set published_at\(value: .*date"\)\.Time \| string\);/);
   });
 
-  test("an integer column's writer takes a number or a string", () => {
+  test("an integer column's writer takes a number, a string or a bigint", () => {
     const { text } = virtualize("export class Post extends Base {}\n", "post.ts", {
       schemaColumnsByTable: { posts: { views: { type: "integer", null: false } } },
     });
-    expect(text).toMatch(/set views\(value: number \| string\);/);
+    expect(text).toMatch(/set views\(value: number \| string \| bigint\);/);
   });
 
   test("a nullable column's writer takes null", () => {
@@ -1041,6 +1041,24 @@ describe("virtualize — dirty attribute methods", () => {
     const text = run("", "  declare titleWas: () => number;\n");
     expect(text).not.toMatch(/titleWas\(\)/);
     expect(text).toMatch(/titleChanged\(/);
+  });
+
+  test("a serialized column has its attribute methods typed unknown", () => {
+    const text = run('    this.serialize("title", { coder: JsonArray });\n');
+    expect(text).toMatch(/get title\(\): unknown;/);
+    expect(text).toMatch(/titleWas\(\): unknown;/);
+  });
+
+  test("an enum over a serialized column reads as its labels", () => {
+    const text = run(
+      '    this.serialize("title", { coder: JsonArray });\n    this.enum("title", ["a", "b"]);\n',
+    );
+    expect(text).toMatch(/get title\(\): "a" \| "b";/);
+  });
+
+  test("a negative mapped enum value is a writer input", () => {
+    const text = run('    this.enum("title", { hidden: -1, shown: 1 });\n');
+    expect(text).toMatch(/set title\(value: "hidden" \| "shown" \| -1 \| 1\);/);
   });
 
   test("an association gets no dirty methods", () => {
@@ -1182,7 +1200,7 @@ describe("virtualize — aliasAttribute", () => {
   test("aliases a schema column", () => {
     const text = run('    this.aliasAttribute("prNumber", "pr_number");\n');
     expect(text).toMatch(/get prNumber\(\): number;/);
-    expect(text).toMatch(/set prNumber\(value: number \| string\);/);
+    expect(text).toMatch(/set prNumber\(value: number \| string \| bigint\);/);
   });
 
   test("aliases an attribute() call", () => {
