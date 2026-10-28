@@ -54,3 +54,12 @@ describe("Nokogiri::XML::Node#before", () => {
     );
   });
 });
+
+describe("Nokogiri::XML::Node#coerce", () => {
+  it("parses markup in the parent's context", () => {
+    const fragment = HTML5.DocumentFragment.parse("<svg><rect></rect></svg>");
+    fragment.children[0].children[0].before("<circle></circle>");
+    const circle = fragment.children[0].children[0]._node as { namespaceURI?: string };
+    expect(circle.namespaceURI).toBe("http://www.w3.org/2000/svg");
+  });
+});

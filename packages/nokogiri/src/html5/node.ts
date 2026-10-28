@@ -145,7 +145,15 @@ export class Node {
     if (data instanceof NodeSet) return data;
     if (data instanceof DocumentFragment) return new NodeSet(data.document, data.children);
     if (typeof data === "string") {
-      return new NodeSet(this.document, childNodes(parseFragment(data), this.document));
+      return new NodeSet(
+        this.document,
+        childNodes(
+          this.isElement()
+            ? parseFragment(this._node as DefaultTreeAdapterMap["element"], data, {})
+            : parseFragment(data),
+          this.document,
+        ),
+      );
     }
     if (data instanceof Node) return data;
 
