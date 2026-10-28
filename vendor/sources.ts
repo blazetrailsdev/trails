@@ -414,6 +414,24 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "image_processing",
+    origin: {
+      type: "git",
+      url: "https://github.com/janko/image_processing.git",
+      ref: "v1.14.0",
+    },
+    packages: [
+      {
+        name: "image-processing",
+        libPath: "lib/image_processing",
+        libEntryFile: "lib/image_processing.rb",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "thor",
     origin: {
       type: "git",
