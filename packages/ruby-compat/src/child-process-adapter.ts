@@ -149,17 +149,20 @@ function spawnChild(
   args: string[],
   env: Record<string, string | undefined>,
   stdio: unknown,
-  read: (chunk: string) => void,
+  read: ((chunk: string) => void) | { bytes: (chunk: Uint8Array) => void },
   input?: string | Uint8Array,
   readErr?: (chunk: string) => void,
-  readBytes?: (chunk: Uint8Array) => void,
 ): Promise<WaitStatus> {
   return new Promise((resolve) => {
     const child = cp.spawn(file, args, { env, stdio });
     child.stdin?.on("error", () => {});
     child.stdin?.end(input);
-    if (readBytes === undefined) child.stdout?.setEncoding("utf8");
-    child.stdout?.on("data", readBytes ?? read);
+    if (typeof read === "function") {
+      child.stdout?.setEncoding("utf8");
+      child.stdout?.on("data", read);
+    } else {
+      child.stdout?.on("data", read.bytes);
+    }
     if (readErr !== undefined) {
       child.stderr?.setEncoding("utf8");
       child.stderr?.on("data", readErr);
@@ -233,13 +236,10 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         argv,
         env,
         ["pipe", "pipe", "pipe"],
-        () => {},
+        { bytes: (chunk) => stdoutChunks.push(chunk) },
         stdinData,
         (chunk) => {
           stderr += chunk;
-        },
-        (chunk) => {
-          stdoutChunks.push(chunk);
         },
       );
       const bytes = new Uint8Array(stdoutChunks.reduce((n, c) => n + c.length, 0));
@@ -250,7 +250,7 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
       }
       let stdout: string | Uint8Array;
       try {
-        stdout = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+        stdout = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
       } catch {
         stdout = bytes;
       }

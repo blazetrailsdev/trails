@@ -19,5 +19,8 @@ false against every other image, and `hash` is identity. A caller that needs
 content equality awaits `image.signature()` on both images first, which is
 the warm cache `==` then reads.
 
-Ruled by the repo owner on 2026-10-28. `Image#equals` and `#hash` cite this
-section, and `image.trails.test.ts` pins both arms.
+Ruled by the repo owner on 2026-10-28. `Image#equals` and `#hash` carry no
+receipt: their bodies make exactly Rails' calls with Rails' arms, so no gate
+flags them and no receipt tag applies, and a prose citation is stripped by
+`no-freeform-comments`. This section is the record, and `image.trails.test.ts`
+pins both arms.
