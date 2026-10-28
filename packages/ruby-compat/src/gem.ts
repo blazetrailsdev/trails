@@ -4,6 +4,7 @@ import { getOs } from "./os-adapter.js";
 import { RbConfig } from "./rb-config.js";
 
 let winPlatform: boolean | null = null;
+let ruby: string | null = null;
 
 /**
  * `vendor/ruby/v3.3.11/lib/rubygems.rb:11` — `Gem`, answering only the keys trails'
@@ -38,6 +39,21 @@ export const Gem = {
    */
   get path(): string[] {
     return [Gem.defaultDir];
+  },
+
+  /**
+   * `vendor/ruby/v3.3.11/lib/rubygems.rb:807` — `Gem.ruby`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem.ruby`.
+   */
+  ruby(): string {
+    if (ruby == null) {
+      ruby = RbConfig.ruby();
+
+      if (/\s/.test(ruby)) ruby = `"${ruby}"`;
+    }
+
+    return ruby;
   },
 
   /**

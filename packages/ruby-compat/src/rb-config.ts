@@ -42,4 +42,16 @@ export const RbConfig = {
       },
     };
   },
+
+  /**
+   * `vendor/ruby/v3.3.11/tool/mkconfig.rb:391` — `RbConfig.ruby`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `RbConfig.ruby`.
+   */
+  ruby(): string {
+    return File.join(
+      RbConfig.CONFIG["bindir"],
+      RbConfig.CONFIG["ruby_install_name"] + RbConfig.CONFIG["EXEEXT"],
+    );
+  },
 };

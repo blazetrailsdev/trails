@@ -196,6 +196,7 @@ export type {
 export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
 export { Gem } from "./gem.js";
 export { RbConfig } from "./rb-config.js";
+export { Shellwords } from "./shellwords.js";
 export {
   registerZlibAdapter,
   getZlib,

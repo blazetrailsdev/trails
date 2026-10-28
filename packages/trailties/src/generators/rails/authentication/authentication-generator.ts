@@ -1,5 +1,6 @@
 import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
+import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { MigrationGenerator } from "../../migration-generator.js";
 import { AuthenticationGenerator as TseAuthenticationGenerator } from "../../tse/authentication/authentication-generator.js";
@@ -38,7 +39,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.createAuthenticationFiles();
     this.configureApplicationController();
     await this.configureAuthenticationRoutes();
-    this.enableBcrypt();
+    await this.enableBcrypt();
     await this.addMigrations();
     return this.getCreatedFiles();
   }
@@ -99,7 +100,8 @@ export class AuthenticationGenerator extends GeneratorBase {
     await this.route(`this.resource("session");`);
   }
 
-  private enableBcrypt(): void {
+  /** @missingRailsCall execute_command — CONVERGEABLE converge-generators-actions-generate-onto-rails-command */
+  private async enableBcrypt(): Promise<void> {
     if (!File.isExist(File.join(this.destinationRoot, "package.json"))) return;
     const full = File.join(this.cwd, "package.json");
     const json = JSON.parse(File.read(full));
@@ -107,7 +109,10 @@ export class AuthenticationGenerator extends GeneratorBase {
       json.dependencies = { ...json.dependencies, bcryptjs: "*", "@blazetrails/bcrypt": "*" };
       File.write(full, JSON.stringify(json, null, 2) + "\n");
     }
-    this.executeCommand(json.packageManager?.split("@")[0] ?? "pnpm", "install --silent");
+    const command = `${json.packageManager?.split("@")[0] ?? "pnpm"} install --silent`;
+    await this.inRoot(() =>
+      run.call(this as unknown as ThorActionsHost, command, { verbose: false }),
+    );
 
     const application = "config/application.ts";
     if (!File.isExist(File.join(this.destinationRoot, application))) return;

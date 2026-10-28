@@ -146,21 +146,27 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   declare sourcePaths: typeof ThorActions.sourcePaths;
   declare findInSourcePaths: typeof ThorActions.findInSourcePaths;
   declare apply: OmitThisParameter<typeof ThorActions.apply>;
+  declare inRoot: <T>(block: () => T | Promise<T>) => Promise<T>;
+  declare injectIntoFile: (destination: string, ...args: unknown[]) => unknown;
   /** @internal */
   declare protected _cleanupOptionsAndSet: ThorActions.ActionsHost["_cleanupOptionsAndSet"];
 
-  log = Actions.log;
-  generate = Actions.generate;
+  environment = Actions.environment;
+  application = Actions.application;
   git = Actions.git;
+  vendor = Actions.vendor;
+  lib = Actions.lib;
+  rakefile = Actions.rakefile;
+  initializer = Actions.initializer;
+  generate = Actions.generate;
   afterInstall = Actions.afterInstall;
   rake = Actions.rake;
+  route = Actions.route;
+  readme = Actions.readme;
+  log = Actions.log;
   executeCommand = Actions.executeCommand;
 
   pkg = TrailsActions.pkg;
-  route = TrailsActions.route;
-  environment = TrailsActions.environment;
-  application = TrailsActions.environment;
-  initializer = TrailsActions.initializer;
 
   constructor(options: GeneratorOptions) {
     this.cwd = options.cwd;
