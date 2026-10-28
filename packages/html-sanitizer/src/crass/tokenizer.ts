@@ -50,6 +50,9 @@ const RE_NON_PRINTABLE = /[\u0000-\u0008\u000b\u000e-\u001f\u007f]+/; // eslint-
 const RE_WHITESPACE = /[\n\t ]+/;
 const RE_CHAR = /[\s\S]/u;
 
+const RE_NAME_START = /^[\u0080-\u{10ffff}]/u;
+const RE_NAME_END = /[\u0080-\u{10ffff}]$/u;
+
 const RE_NUMBER = /^[+-]?\d*(?:\.\d+)?(?:[eE][+-]?\d+)?/;
 
 export class Tokenizer {
@@ -100,7 +103,12 @@ export class Tokenizer {
     const simple = SIMPLE_TOKENS[type];
     if (simple !== undefined) return { node: simple, pos, raw };
     const valued = VALUE_TOKENS[type];
-    if (valued !== undefined) return { node: valued, pos, raw, value: data!.value };
+    if (valued !== undefined) {
+      if (type === TokenType.Delim && RE_NAME_START.test(raw)) {
+        return { node: "ident", pos, raw, value: raw };
+      }
+      return { node: valued, pos, raw, value: data!.value };
+    }
 
     switch (type) {
       case TokenType.Comment:
@@ -144,6 +152,8 @@ export class Tokenizer {
 
   /** @noRailsEquivalent PERMANENT */
   private mergeTokens(first: Node, second: Node): Node | null {
+    const name = this.mergeName(first, second);
+    if (name !== null) return name;
     if (first.node !== "delim") return null;
     const match = MATCH_TOKENS[first.value + (second.node === "delim" ? second.value : second.raw)];
     if (match !== undefined && (second.node === "delim" || second.raw === "=")) {
@@ -155,6 +165,38 @@ export class Tokenizer {
       (second.node === "ident" || second.node === "function")
     ) {
       return { ...second, pos: first.pos, raw: `*${second.raw}` };
+    }
+    return null;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  private mergeName(first: Node, second: Node): Node | null {
+    const raw = first.raw + second.raw;
+    const nameEnd = RE_NAME_END.test(first.raw);
+    if (second.node === "ident" && (nameEnd || RE_NAME_START.test(second.raw))) {
+      switch (first.node) {
+        case "ident":
+        case "at_keyword":
+        case "hash":
+          return { ...first, raw, value: first.value + second.value };
+        case "dimension":
+          return { ...first, raw, unit: first.unit + second.value };
+        case "number":
+          return { ...first, node: "dimension", raw, unit: second.value };
+        case "delim":
+          if (first.value === "-")
+            return { ...second, pos: first.pos, raw, value: `-${second.value}` };
+          if (first.value === "@") return { ...second, node: "at_keyword", pos: first.pos, raw };
+          if (first.value === "#") {
+            return { ...second, node: "hash", pos: first.pos, raw, type: "id" };
+          }
+      }
+    }
+    if (first.node === "ident" && nameEnd) {
+      if (second.node === "function") {
+        return { ...second, pos: first.pos, raw, value: first.value + second.value };
+      }
+      if (second.node === "(") return { ...first, node: "function", raw };
     }
     return null;
   }
