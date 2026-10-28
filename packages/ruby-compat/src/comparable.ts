@@ -17,7 +17,14 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
-import { rbCTime, rbInspect, rbObjClass, rbObjClassname, rbObjRespondTo } from "./object.js";
+import {
+  rbCTime,
+  rbInspect,
+  rbObjClass,
+  rbObjClassname,
+  rbObjRespondTo,
+  reopened,
+} from "./object.js";
 import { kDateP, rbEqual } from "./rb-equal.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 import { rbStrCmp } from "./string/support.js";
@@ -87,7 +94,7 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (b instanceof Number) b = b.valueOf();
   if (isComparable(a)) return a.compareTo(b) ?? null;
   if (isCmpSpelling(a)) return a.cmp(b) ?? null;
-  if (rbObjClass(a) === rbCTime && rbObjClass(b) === rbCTime) {
+  if (rbObjClass(a) === reopened(rbCTime) && rbObjClass(b) === reopened(rbCTime)) {
     if (typeof (a as { compare?: unknown }).compare === "function") {
       return (a as { compare(o: unknown): number | null }).compare(b) ?? null;
     }
