@@ -26,12 +26,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function runGenerator(args: string[], config: { behavior?: string } = {}): Promise<void> {
-  await ChannelGenerator.start(args, {
-    cwd: destinationRoot,
-    output: () => {},
-    ...config,
-  } as Parameters<typeof ChannelGenerator.start>[1]);
+async function runGenerator(
+  args: string[],
+  config: { behavior?: "invoke" | "revoke" } = {},
+): Promise<void> {
+  await ChannelGenerator.start(args, { destinationRoot, ...config });
 }
 
 function stubInstallJavascriptDependencies(): void {

@@ -1,24 +1,25 @@
 import { File } from "@blazetrails/ruby-compat";
 import type * as ThorActions from "@blazetrails/thor/actions";
-import { dasherize } from "../../base.js";
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import { dasherize, type GeneratorOptions } from "../../base.js";
+import { NamedBase } from "../../named-base.js";
 import { TEMPLATES } from "./templates.js";
 
-export interface ChannelGeneratorOptions extends NamedBaseOptions {
+export interface ChannelGeneratorOptions extends GeneratorOptions {
   assets?: boolean;
 }
 
 export class ChannelGenerator extends NamedBase {
   declare options: ChannelGeneratorOptions;
-  actions: string[];
+  declare actions: string[];
   declare run: OmitThisParameter<typeof ThorActions.run>;
   declare gsubFile: OmitThisParameter<typeof ThorActions.Actions.gsubFile>;
 
   static {
+    this.argument("actions", { type: "array", default: [], banner: "method method" });
     this.classOption("assets", { type: "boolean" });
     this.checkClassCollision({ suffix: "Channel" });
     this.hookFor("testFramework");
-    this.commands().push("createChannelFiles");
+    this.methodAdded("createChannelFiles");
   }
 
   /** @internal */
@@ -34,23 +35,17 @@ export class ChannelGenerator extends NamedBase {
   /** @internal */
   private _root?: string;
 
-  constructor(options: ChannelGeneratorOptions) {
-    super({ ...options, attributes: [] });
-    this.actions = options.attributes ?? [];
-    this.fileName = this.fileName.replace(/_channel$/i, "");
-  }
-
   async createChannelFiles(): Promise<void> {
-    this.createSharedChannelFiles();
-    this.createChannelFile();
+    await this.createSharedChannelFiles();
+    await this.createChannelFile();
 
     if (await this.isUsingJavascript()) {
       if (await this.isFirstSetupRequired()) {
-        this.createSharedChannelJavascriptFiles();
+        await this.createSharedChannelJavascriptFiles();
         await this.importChannelsInJavascriptEntrypoint();
 
         if (await this.isUsingImportmap()) {
-          this.pinJavascriptDependencies();
+          await this.pinJavascriptDependencies();
         } else if (await this.isUsingJsRuntime()) {
           await this.installJavascriptDependencies();
         }
@@ -63,16 +58,16 @@ export class ChannelGenerator extends NamedBase {
 
   /**
    * @internal
-   * @missingRailsCall copy_file — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsCall copy_file — CONVERGEABLE converge-generators-onto-thor-template
    */
-  private createSharedChannelFiles(): void {
+  private async createSharedChannelFiles(): Promise<void> {
     if (this.behavior !== "invoke") return;
 
-    this.createFile(
+    await this.createFile(
       `app/channels/application-cable/channel${this.ext()}`,
       TEMPLATES["application_cable/channel.rb"](),
     );
-    this.createFile(
+    await this.createFile(
       `app/channels/application-cable/connection${this.ext()}`,
       TEMPLATES["application_cable/connection.rb"](),
     );
@@ -80,10 +75,10 @@ export class ChannelGenerator extends NamedBase {
 
   /**
    * @internal
-   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
    */
-  private createChannelFile(): void {
-    this.createFile(
+  private async createChannelFile(): Promise<void> {
+    await this.createFile(
       File.join(
         "app/channels",
         ...this.classPathParts,
@@ -95,16 +90,19 @@ export class ChannelGenerator extends NamedBase {
 
   /**
    * @internal
-   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
    */
-  private createSharedChannelJavascriptFiles(): void {
-    this.createFile("app/javascript/channels/index.js", TEMPLATES["javascript/index.js"]());
-    this.createFile("app/javascript/channels/consumer.js", TEMPLATES["javascript/consumer.js"]());
+  private async createSharedChannelJavascriptFiles(): Promise<void> {
+    await this.createFile("app/javascript/channels/index.js", TEMPLATES["javascript/index.js"]());
+    await this.createFile(
+      "app/javascript/channels/consumer.js",
+      TEMPLATES["javascript/consumer.js"](),
+    );
   }
 
   /**
    * @internal
-   * @missingRailsCall js_template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsCall js_template — CONVERGEABLE converge-generators-onto-thor-template
    */
   private async createChannelJavascriptFile(): Promise<void> {
     const channelJsPath = File.join(
@@ -112,14 +110,17 @@ export class ChannelGenerator extends NamedBase {
       ...this.classPathParts,
       `${dasherize(this.fileName)}-channel`,
     );
-    this.createFile(`${channelJsPath}.js`, TEMPLATES["javascript/channel.js"].call(this, ".js"));
+    await this.createFile(
+      `${channelJsPath}.js`,
+      TEMPLATES["javascript/channel.js"].call(this, ".js"),
+    );
     if (!(await this.isUsingJsRuntime()))
       await this.gsubFile(`${channelJsPath}.js`, /\.\/consumer/, "channels/consumer");
   }
 
   /** @internal */
   private async importChannelsInJavascriptEntrypoint(): Promise<void> {
-    this.appendToFile(
+    await this.appendToFile(
       "app/javascript/application.js",
       (await this.isUsingJsRuntime()) ? `import "./channels"\n` : `import "channels"\n`,
     );
@@ -127,7 +128,7 @@ export class ChannelGenerator extends NamedBase {
 
   /** @internal */
   private async importChannelInJavascriptEntrypoint(): Promise<void> {
-    this.appendToFile(
+    await this.appendToFile(
       "app/javascript/channels/index.js",
       (await this.isUsingJsRuntime())
         ? `import "./${dasherize(this.fileName)}-channel"\n`
@@ -146,8 +147,8 @@ export class ChannelGenerator extends NamedBase {
   }
 
   /** @internal */
-  private pinJavascriptDependencies(): void {
-    this.appendToFile(
+  private async pinJavascriptDependencies(): Promise<void> {
+    await this.appendToFile(
       "config/importmap.rb",
       `pin "@rails/actioncable", to: "actioncable.esm.js"
 pin_all_from "app/javascript/channels", under: "channels"
@@ -192,6 +193,13 @@ pin_all_from "app/javascript/channels", under: "channels"
     return (this._usingImportmap ||= await File.isExistAsync(
       File.join(this.root(), "config/importmap.rb"),
     ));
+  }
+
+  /** @internal */
+  private __fileName?: string;
+
+  override get fileName(): string {
+    return (this.__fileName ??= super.fileName.replace(/_channel$/i, ""));
   }
 
   /** @internal */
