@@ -80,6 +80,9 @@ describe("EncryptedConfigurationTest", () => {
     await credentials.write("42: value");
     await assertRaise([InvalidKeyError], { match: invalidKey("42") }, () => credentials.config());
 
+    await credentials.write("42.0: value");
+    await assertRaise([InvalidKeyError], undefined, () => credentials.config());
+
     await credentials.write("Off: value");
     await assertRaise([InvalidKeyError], { match: invalidKey("false") }, () =>
       credentials.config(),
@@ -90,6 +93,9 @@ describe("EncryptedConfigurationTest", () => {
     await assertRaise([InvalidKeyError], { match: invalidKey("42") }, () =>
       credentials.validateBang(),
     );
+
+    await credentials.write("42.0: value");
+    await assertRaise([InvalidKeyError], undefined, () => credentials.validateBang());
 
     await credentials.write("Off: value");
     await assertRaise([InvalidKeyError], { match: invalidKey("false") }, () =>
