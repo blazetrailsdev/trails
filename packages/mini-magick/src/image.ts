@@ -48,11 +48,6 @@ export class Image {
   declare _path: string;
   declare _tempfile: Tempfile | null;
   declare _info: Info;
-
-  static toString(): string {
-    return "MiniMagick::Image";
-  }
-
   static read(
     stream: string | Uint8Array | StringIO<string | Uint8Array> | Tempfile | IO,
     ext: string | null = null,
@@ -150,7 +145,7 @@ export class Image {
     this._tempfile = tempfile;
     this._info = new Info(this._path);
     if (block != null) {
-      this.combineOptions(block);
+      (this._info._pending = this.combineOptions(block)).catch(() => {});
     }
     return new Proxy(this, {
       get(target, name, receiver) {
@@ -372,18 +367,20 @@ export class Image {
     return null;
   }
 
-  identify(block?: (builder: CliTool) => unknown): Promise<string> {
-    return MiniMagick.identify(
+  async identify(block?: (builder: CliTool) => unknown): Promise<string> {
+    await this._info._pending;
+    return (await MiniMagick.identify(
       blockPass((builder: CliTool) => {
         if (block != null) {
           block(builder);
         }
         builder.append(this.path);
       }),
-    ) as Promise<string>;
+    )) as string;
   }
 
   async mogrify(page: number | null = null, block?: (builder: CliTool) => unknown) {
+    await this._info._pending;
     await MiniMagick.mogrify(
       blockPass((builder: CliTool) => {
         if (block != null) {

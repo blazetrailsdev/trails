@@ -24,3 +24,16 @@ receipt: their bodies make exactly Rails' calls with Rails' arms, so no gate
 flags them and no receipt tag applies, and a prose citation is stripped by
 `no-freeform-comments`. This section is the record, and `image.trails.test.ts`
 pins both arms.
+
+## The constructor's block is awaited by the next run (`Image#initialize`'s `combine_options`)
+
+`Image#initialize` ends `combine_options(&block) if block`
+(`vendor/mini_magick/v5.2.0/lib/mini_magick/image.rb:149-155`), a `mogrify`
+run in line. In trails that run is an awaited child process and a JS
+constructor cannot await, so the constructor seats its promise on
+`Info#_pending`, and every later run on the image — `Info#identify`,
+`Image#identify`, `Image#mogrify` — awaits it first. A read made right after
+`new Image(path, null, block)` therefore sees the block's changes, as Ruby's
+does, and a failed block rejects that read rather than going unhandled.
+
+Ruled by the repo owner on 2026-10-28 (converge, not `PERMANENT-SKIP`).

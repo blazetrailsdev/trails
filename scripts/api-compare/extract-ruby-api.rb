@@ -465,6 +465,7 @@ class ApiExtractor
     # that pass is running, so a loop whose constant is STILL unresolvable is
     # dropped rather than parked again for nobody to replay.
     @pending_const_loops = []
+    @const_word_arrays = {}
     @replaying_const_loops = false
   end
 
@@ -988,6 +989,7 @@ class ApiExtractor
     target[:classMethods] << method_info
 
     maybe_update_module_file(fqn, target)
+    record_define_method_macro(fqn, name, find_params_defs(node), node[5])
 
     each_base_class_attribute(node[5]) { |call| process_method_add_arg(call) } if %w[extended included].include?(name)
     record_included_hook_mixins(target, node[5], find_params_defs(node)) if name == "included"
@@ -1156,7 +1158,40 @@ class ApiExtractor
       process_define_column_methods(args)
     when "module_function"
       process_module_function(args)
+    else
+      process_define_method_macro(cmd_name, args)
     end
+  end
+
+  # A class macro defined in the same class whose body is
+  # `define_method(<first param>) do … end` (mini_magick/image.rb:118-126,
+  # `def self.attribute(name, key = name.to_s)`): each later `attribute :width`
+  # defines `width`, recorded as that define_method would be.
+  def record_define_method_macro(fqn, name, params_node, body)
+    params = params_node.is_a?(Array) && params_node[0] == :paren ? params_node[1] : params_node
+    first = params.is_a?(Array) && params[0] == :params && params[1].is_a?(Array) ? params[1][0] : nil
+    param = first && ident_name(first)
+    return unless param
+    each_metaprogramming_call(body) do |kind, args, block_params, block_body|
+      next unless kind == "define_method"
+      list = positional_arg_list(args)
+      next unless list.is_a?(Array) && list[0].is_a?(Array) && list[0][0] == :var_ref &&
+                  ident_name(list[0][1]) == param
+      ((@define_method_macros ||= {})[fqn] ||= {})[name] = [block_params, block_body]
+    end
+  end
+
+  def process_define_method_macro(cmd_name, args)
+    fqn = current_fqn
+    macro = @define_method_macros&.dig(fqn, cmd_name)
+    return unless macro
+    target = @classes[fqn] || @modules[fqn]
+    name = leading_symbol_args(args).first
+    return unless target && name
+    params_node, body = macro
+    record_metaprogrammed_method(fqn, target, name, extract_params(params_node, method(:string_opener_at)),
+                                 "define_method", body: body, params_node: params_node)
+    maybe_update_module_file(fqn, target)
   end
 
   def process_fcall(node)
@@ -2485,7 +2520,8 @@ class ApiExtractor
     node = name_preserving_map_receiver(node) || node
     literal_array_members(node) ||
       resolve_const_symbol_array(const_name(node)) ||
-      resolve_const_symbol_hash_keys(const_name(node))
+      resolve_const_symbol_hash_keys(const_name(node)) ||
+      resolve_const_members(const_name(node), @const_word_arrays)
   end
 
   def name_preserving_map_receiver(node)
@@ -2543,6 +2579,18 @@ class ApiExtractor
     # `define_method(name)` passes the loop variable itself rather than
     # interpolating it (rfc4646.rb:33), so the member IS the method name.
     return member if node[0] == :var_ref && ident_name(node[1]) == loop_var
+    # `define_method(operator.tr('-', '_'))` (mini_magick/tool.rb:231-232).
+    if node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :call &&
+       ident_name(node[1][3]) == "tr"
+      recv = node[1][1]
+      return nil unless recv.is_a?(Array) && %i[var_ref vcall].include?(recv[0]) &&
+                        ident_name(recv[1]) == loop_var
+      list = positional_arg_list(node[2])
+      return nil unless list.is_a?(Array) && list.size == 2
+      from, to = list.map { |n| n.is_a?(Array) && n[0] == :string_literal ? string_literal_value(n) : nil }
+      return nil unless from && to
+      return member.tr(from, to)
+    end
     return nil unless [:string_literal, :dyna_symbol].include?(node[0])
     content = node[1]
     return nil unless content.is_a?(Array) && content[0] == :string_content
@@ -3960,6 +4008,11 @@ class ApiExtractor
     # additionally feeds `delegate(*CONST, to:)` expansion. Limit the general
     # case to pure symbol arrays so a hash/struct constant can't inject
     # phantom delegate targets.
+    # A `%w[...]` constant drives only a `CONST.each { define_method … }` loop
+    # (mini_magick/tool.rb:16-17, :231-236), never a delegate or option-key
+    # expansion, so it is kept apart from the symbol arrays.
+    words = percent_array_members(unwrap_freeze(rhs), %w[w W])
+    (@const_word_arrays[current_fqn] ||= {})[const[1]] = words if words
     qsyms = qsymbols_members(unwrap_freeze(rhs))
     unless const[1].include?("VALID_OPTIONS") || qsyms || pure_symbol_array?(unwrap_freeze(rhs))
       return
@@ -3975,6 +4028,10 @@ class ApiExtractor
   # `[:array, [[:@tstring_content, …]]]` shape, so the sigil is read back from
   # the source line of the first element.
   def qsymbols_members(node)
+    percent_array_members(node, %w[i I])
+  end
+
+  def percent_array_members(node, kinds)
     return nil unless node.is_a?(Array) && node[0] == :array
     elems = node[1]
     return nil unless elems.is_a?(Array) && !elems.empty? &&
@@ -3983,7 +4040,7 @@ class ApiExtractor
     text = @source_lines && @source_lines[line - 1]
     return nil unless text
     pct = text[0...col].rindex("%")
-    return nil unless pct && %w[i I].include?(text[pct + 1])
+    return nil unless pct && kinds.include?(text[pct + 1])
     elems.map { |e| e[1] }
   end
 

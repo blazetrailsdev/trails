@@ -7,10 +7,13 @@ import {
   rbFSend,
   rbConstWarnIfDeprecated,
   rbModDeprecateConstant,
+  rbSetClassPathString,
   rbBlockGivenP,
 } from "@blazetrails/ruby-compat";
 import type { Block } from "@blazetrails/ruby-compat";
 import { MiniMagick } from "./mini-magick.js";
+
+type BlockPass<F> = F & Pick<Block<unknown>, keyof Block<unknown>>;
 
 /** @noRailsEquivalent PERMANENT */
 export type CliTool = Tool & { [option: string]: (...args: unknown[]) => CliTool };
@@ -19,11 +22,6 @@ export class Tool {
   declare _name: string;
   declare _args: string[];
   declare _options: { [x: string]: unknown };
-
-  static toString(): string {
-    return "MiniMagick::Tool";
-  }
-
   static CREATION_OPERATORS: string[] = [
     "xc",
     "canvas",
@@ -37,7 +35,12 @@ export class Tool {
     "pango",
   ];
 
-  static new(...args: [...unknown[], Block<unknown>] | unknown[]) {
+  static new(
+    ...args:
+      | [string, Record<string, unknown>?]
+      | [string, BlockPass<(instance: CliTool) => unknown>]
+      | [string, Record<string, unknown>, BlockPass<(instance: CliTool) => unknown>?]
+  ) {
     const block = rbBlockGivenP(args.at(-1))
       ? (args.pop() as (instance: CliTool) => unknown)
       : undefined;
@@ -125,8 +128,17 @@ export class Tool {
     return this;
   }
 
-  stack(...args: [...unknown[], Block<unknown>] | unknown[]) {
-    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as (tool: this) => unknown) : undefined;
+  stack(
+    ...args:
+      | (string | Record<string, unknown> | Map<string, unknown>)[]
+      | [
+          ...(string | Record<string, unknown> | Map<string, unknown>)[],
+          BlockPass<(tool: CliTool) => unknown>,
+        ]
+  ) {
+    const block = rbBlockGivenP(args.at(-1))
+      ? (args.pop() as (tool: CliTool) => unknown)
+      : undefined;
     this.append("(");
     for (const value of args) {
       if (
@@ -141,7 +153,7 @@ export class Tool {
       }
     }
     if (block != null) {
-      block(this);
+      block(this as unknown as CliTool);
     }
     return this.append(")");
   }
@@ -234,10 +246,6 @@ export class Tool {
   ]) {
     const Name = tool[0].toUpperCase() + tool.slice(1);
     const klass = class extends Tool {
-      static toString(): string {
-        return `MiniMagick::Tool::${Name}`;
-      }
-
       constructor(...args: unknown[]) {
         super(tool, ...(args as [Record<string, unknown>?]));
       }
@@ -258,6 +266,7 @@ export class Tool {
       enumerable: true,
       configurable: true,
     });
+    rbSetClassPathString(klass, Tool, Name);
     rbModDeprecateConstant(Tool, Name);
   }
 }

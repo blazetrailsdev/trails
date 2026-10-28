@@ -171,6 +171,7 @@ export const ROWLESS_PACKAGES = [
   "fugit",
   "globalid",
   "marcel",
+  "mini-magick",
   "rack",
   "rack-session",
   "rack-test",
