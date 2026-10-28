@@ -667,7 +667,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sql;
   }
 
-  /** @missingRailsName config — PERMANENT */
   isSharedCache(): boolean {
     return anybits(
       (Object.hasOwn(this._config, "flags") ? this._config.flags : 0) as number,

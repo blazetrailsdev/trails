@@ -846,7 +846,6 @@ WHERE fk.referenced_column_name IS NOT NULL
     return [...orderColumns, super.columnsForDistinct(columns, orders as string[])].join(", ");
   }
 
-  /** @missingRailsName config — PERMANENT */
   isStrictMode(): boolean | unknown {
     return (this.constructor as typeof AbstractMysqlAdapter).typeCastConfigToBoolean(
       Object.hasOwn(this._config, "strict") ? this._config.strict : true,
