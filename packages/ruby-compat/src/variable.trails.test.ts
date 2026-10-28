@@ -138,7 +138,9 @@ describe("rb_const_get", () => {
   class Checks {}
   class LocalCheck {}
   class IncludedCheck {}
-  class TopCheck {}
+  class TopCheck {
+    static Nested = class {};
+  }
   rbModConstSet(Checks, "IncludedCheck", IncludedCheck);
   rbModConstSet(Checks, "LocalCheck", IncludedCheck);
 
@@ -216,11 +218,18 @@ describe("rb_const_get", () => {
 
     it("answers the receiver's own constant before a top-level seat", () => {
       class Own {
-        static TopCheck = class {};
+        static ConstGetTopCheck = class {};
       }
-      registerConstant("TopCheck::Inner", TopCheck);
-      expect(rbModConstGet(Own, "TopCheck")).toBe(Own.TopCheck);
-      unregisterConstant("TopCheck::Inner", TopCheck);
+      registerConstant("ConstGetTopCheck", TopCheck);
+      expect(rbModConstGet(Own, "ConstGetTopCheck")).toBe(Own.ConstGetTopCheck);
+      expect(rbModConstGet(Sub, "ConstGetTopCheck")).toBe(TopCheck);
+    });
+
+    it("reads a seated prefix of an unseated path", () => {
+      registerConstant("ConstGetOuter", Outer);
+      registerConstant("ConstGetOuter::Seated", TopCheck);
+      expect(rbModConstGet(Object, "ConstGetOuter::Seated::Nested")).toBe(TopCheck.Nested);
+      unregisterConstant("ConstGetOuter::Seated", TopCheck);
     });
 
     it("names the missing segment, not the path", () => {

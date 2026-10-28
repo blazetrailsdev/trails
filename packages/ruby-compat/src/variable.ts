@@ -464,7 +464,12 @@ export function rbModConstGet(mod: object, name: string, recur: unknown = true):
       throw new NameError(`wrong constant name ${part}`, part, { receiver: mod });
     }
 
-    if (recur === null || recur === false) {
+    const seat = path.slice(path.startsWith("::") ? 2 : 0, beglen + len);
+    if (!(part in mod) && (RCLASS_CONST_TBL.has(seat) || generatedClass(seat) !== undefined)) {
+      mod = (
+        RCLASS_CONST_TBL.has(seat) ? RCLASS_CONST_TBL.get(seat) : generatedClass(seat)
+      ) as object;
+    } else if (recur === null || recur === false) {
       mod = rbConstGetAt(mod, part) as object;
     } else if (beglen === 0) {
       mod = rbConstGet(mod, part) as object;
