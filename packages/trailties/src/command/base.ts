@@ -88,7 +88,7 @@ export class Base extends Thor {
         configurable: true,
       });
       klass.methodAdded(this.commandName());
-      return false;
+      return true;
     } else {
       if (!Object.hasOwn(this, "_usage") || klass._usage == null) klass._usage = meth;
       if (!Object.hasOwn(this, "_desc") || klass._desc == null) klass._desc = "";

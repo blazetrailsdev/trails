@@ -421,8 +421,6 @@ const COVERAGE_EXCLUDE = [
   "packages/*/virtualized-dx-tests/**",
 ];
 
-// thor's entry is thor.ts, not index.ts, and Vite reads the "@blazetrails/thor/"
-// key as a match for the bare specifier too, resolving it to the directory.
 const aliasEntries = [
   {
     find: /^@blazetrails\/thor$/,
