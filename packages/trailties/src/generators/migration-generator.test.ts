@@ -5,7 +5,8 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
-import { MigrationGenerator } from "./migration-generator.js";
+import { MigrationGenerator } from "./active-record/migration/migration-generator.js";
+import { MigrationGenerator as RailsMigrationGenerator } from "./rails/migration/migration-generator.js";
 import * as Assertions from "./testing/assertions.js";
 import { migrationFileName as _migrationFileName } from "./testing/behavior.js";
 import { Application } from "../application.js";
@@ -86,7 +87,7 @@ describe("MigrationGeneratorTest", () => {
   });
 
   it("exit on failure", () => {
-    expect(MigrationGenerator.exitOnFailure).toBe(true);
+    expect(RailsMigrationGenerator.isExitOnFailure()).toBe(true);
   });
 
   it("add migration with attributes", async () => {

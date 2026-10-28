@@ -501,7 +501,7 @@ describe("GeneratorBase.hookFor", () => {
 
 describe("GeneratorBase.defaultSourceRoot", () => {
   it("resolves base_name/generator_name/templates under base_root", async () => {
-    const { MigrationGenerator } = await import("./migration-generator.js");
+    const { MigrationGenerator } = await import("./active-record/migration/migration-generator.js");
     expect(await MigrationGenerator.sourceRoot()).toBe(
       File.join(MigrationGenerator.baseRoot(), "active-record", "migration", "templates"),
     );

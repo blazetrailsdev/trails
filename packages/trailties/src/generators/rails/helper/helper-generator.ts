@@ -1,47 +1,23 @@
-import { dasherize, type GeneratorOptions } from "../../base.js";
+import { dasherize } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import { camelize, underscore } from "@blazetrails/activesupport";
 
-export interface HelperGeneratorOptions extends GeneratorOptions {
-  test?: boolean;
-}
-
 export class HelperGenerator extends NamedBase {
-  static {
-    this.checkClassCollision({ suffix: "Helper" });
-    this.methodAdded("createHelperFiles");
-  }
-
-  declare options: HelperGeneratorOptions;
-
   /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
   createHelperFiles(): void {
-    const test = this.options.test ?? true;
-    const ext = this.ext();
     const paths = helperPaths(this.name);
 
     this.createFile(
-      `app/helpers/${paths.helperFile}${ext}`,
+      `app/helpers/${paths.helperFile}${this.ext()}`,
       `export const ${paths.helperName} = {\n};\n`,
     );
-
-    if (test) {
-      const importPrefix = "../".repeat(paths.namespaceParts.length + 1);
-      this.createFile(
-        `test/helpers/${paths.helperFile}.test${ext}`,
-        `import { describe, it } from "vitest";
-import { ${paths.helperName} } from "${importPrefix}app/helpers/${paths.helperFile}.js";
-
-describe("${paths.helperName}", () => {
-  it("is defined", () => {
-    void ${paths.helperName};
-  });
-});
-`,
-      );
-    }
   }
 }
+
+Object.defineProperty(HelperGenerator, "name", { value: "Rails::Generators::HelperGenerator" });
+HelperGenerator.checkClassCollision({ suffix: "Helper" });
+HelperGenerator.methodAdded("createHelperFiles");
+HelperGenerator.hookFor("testFramework");
 
 export interface HelperPaths {
   helperName: string;

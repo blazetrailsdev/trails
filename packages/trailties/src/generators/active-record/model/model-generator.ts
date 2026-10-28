@@ -1,6 +1,6 @@
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
-import { MigrationGenerator } from "../../migration-generator.js";
+import { MigrationGenerator } from "../migration/migration-generator.js";
 import { camelize, classify } from "@blazetrails/activesupport";
 
 export interface ModelGeneratorOptions extends GeneratorOptions {

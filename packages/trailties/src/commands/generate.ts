@@ -1,6 +1,6 @@
 import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
-import { MigrationGenerator } from "../generators/migration-generator.js";
+import { MigrationGenerator } from "../generators/active-record/migration/migration-generator.js";
 import { Generators } from "../generators.js";
 import { Actions } from "../command/actions.js";
 import { APP_PATH } from "../app-path.js";

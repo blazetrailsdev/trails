@@ -98,17 +98,21 @@ export class AppGenerator extends AppBase {
   static {
     this.methodAdded("createRoot");
     this.methodAdded("createRootFiles");
-    this.methodAdded("createBinFiles");
-    this.methodAdded("createConfigFiles");
     this.methodAdded("createAppFiles");
-    this.methodAdded("createDbFiles");
-    this.methodAdded("createTestFiles");
-    this.methodAdded("createSystemTestFiles");
-    this.methodAdded("createPublicFiles");
-    this.methodAdded("createDirectoryPlaceholders");
-    this.methodAdded("createDockerFiles");
+    this.methodAdded("createBinFiles");
+    this.methodAdded("createDockerfiles");
     this.methodAdded("createEslintFile");
     this.methodAdded("createCifiles");
+    this.methodAdded("createConfigFiles");
+    this.methodAdded("createDbFiles");
+    this.methodAdded("createLibFiles");
+    this.methodAdded("createLogFiles");
+    this.methodAdded("createPublicFiles");
+    this.methodAdded("createTmpFiles");
+    this.methodAdded("createVendorFiles");
+    this.methodAdded("createTestFiles");
+    this.methodAdded("createSystemTestFiles");
+    this.methodAdded("createStorageFiles");
   }
 
   declare options: AppGeneratorOptions & AppBaseOptions;
@@ -1184,7 +1188,6 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     );
   }
 
-  /** @internal */
   createSystemTestFiles(): void {
     if (this.dependsOnSystemTest()) this.systemTest();
   }
@@ -1365,18 +1368,28 @@ export async function teardown(): Promise<void> {
     this.createFile("public/favicon.ico", "");
   }
 
-  createDirectoryPlaceholders(): void {
+  createLibFiles(): void {
     this.createFile("lib/tasks/.gitkeep", "");
+  }
+
+  createLogFiles(): void {
     this.createFile("log/.gitkeep", "");
-    if (!this.skipStorage()) {
-      this.createFile("storage/.gitkeep", "");
-    }
+  }
+
+  createTmpFiles(): void {
     this.createFile("tmp/.gitkeep", "");
     this.createFile("tmp/pids/.gitkeep", "");
+  }
+
+  createVendorFiles(): void {
     this.createFile("vendor/.gitkeep", "");
   }
 
-  createDockerFiles(): void {
+  createStorageFiles(): void {
+    if (!this.skipStorage()) this.createFile("storage/.gitkeep", "");
+  }
+
+  createDockerfiles(): void {
     if (this.options.skipDocker) return;
     this.createFile(
       "Dockerfile",

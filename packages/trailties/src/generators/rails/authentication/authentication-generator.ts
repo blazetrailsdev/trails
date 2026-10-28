@@ -2,7 +2,7 @@ import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
-import { MigrationGenerator } from "../../migration-generator.js";
+import { MigrationGenerator } from "../../active-record/migration/migration-generator.js";
 import type { GeneratorClass } from "../../../generators.js";
 import { TEMPLATES } from "./templates.js";
 

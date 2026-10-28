@@ -1,9 +1,9 @@
 import { File, getFs, rbFBinding, strNew, TSE } from "@blazetrails/ruby-compat";
-import type { GeneratorOptions } from "./base.js";
-import { NamedBase } from "./named-base.js";
-import { migrationTemplate } from "./migration.js";
-import { nextMigrationNumber } from "./active-record/migration.js";
-import { GeneratedAttribute } from "./generated-attribute.js";
+import type { GeneratorOptions } from "../../base.js";
+import { NamedBase } from "../../named-base.js";
+import { migrationTemplate } from "../../migration.js";
+import { nextMigrationNumber } from "../migration.js";
+import { GeneratedAttribute } from "../../generated-attribute.js";
 import {
   camelize,
   foreignKey,
@@ -48,8 +48,6 @@ export class MigrationGenerator extends NamedBase {
   migrationNumber = "";
   migrationFileName = "";
   migrationClassName = "";
-
-  static exitOnFailure = true;
 
   static nextMigrationNumber = nextMigrationNumber;
 

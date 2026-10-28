@@ -24,16 +24,6 @@ describe("HelperGeneratorTest", () => {
     expect(c).toContain("AccountHelper");
   });
 
-  it("invokes default test framework", () => {
-    makeGen("Account").createHelperFiles();
-    expect(fs.existsSync(path.join(tmpDir, "test/helpers/account-helper.test.ts"))).toBe(true);
-  });
-
-  it("does not invoke test framework if required", () => {
-    makeGen("Account", { test: false }).createHelperFiles();
-    expect(fs.existsSync(path.join(tmpDir, "test/helpers/account-helper.test.ts"))).toBe(false);
-  });
-
   it("strips a trailing helper suffix", () => {
     makeGen("account_helper").createHelperFiles();
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(true);
@@ -59,7 +49,6 @@ describe("HelperGeneratorTest", () => {
       gen.createHelperFiles();
       const files = gen.getCreatedFiles();
       expect(files).toContain("app/helpers/posts-helper.js");
-      expect(files).toContain("test/helpers/posts-helper.test.js");
     } finally {
       fs.rmSync(jsDir, { recursive: true, force: true });
     }
