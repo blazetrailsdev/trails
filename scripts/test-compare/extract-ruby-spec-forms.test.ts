@@ -38,6 +38,11 @@ describe("Ruby extractor minitest spec forms", () => {
         r.must_be :<, 3
       end
 
+      it "any instance expectations" do
+        expect_any_instance_of(Foo).to receive(:bar)
+        allow_any_instance_of(Foo).to receive(:baz)
+      end
+
       it "expect receivers" do
         expect(r).must_equal 1
         expect(r).must_be :<=, 2
@@ -54,6 +59,10 @@ describe("Ruby extractor minitest spec forms", () => {
 
   it("keeps must_be with an operand as an operator", () => {
     expect(cases["operators"]).toEqual({ count: 1, kinds: ["must_be"] });
+  });
+
+  it("counts expect_any_instance_of as a receive expectation and allow_any_instance_of as none", () => {
+    expect(cases["any instance expectations"]).toEqual({ count: 1, kinds: ["expect_to_receive"] });
   });
 
   it("does not count the expect receiver of a must_* call", () => {

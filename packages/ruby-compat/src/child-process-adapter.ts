@@ -62,7 +62,10 @@ export interface ChildProcessAdapter {
    * Runs the child with stdin, stdout and stderr on three pipes, as
    * `Open3.popen3` wires them (`vendor/ruby/v3.3.11/lib/open3.rb:218-235`),
    * writes `stdinData` to stdin and closes it (`open3.rb:670-675`), and
-   * resolves with what it wrote to each. With no `args`, `command` is a command
+   * resolves with what it wrote to each. Stdout is a String when its bytes are
+   * valid UTF-8, and otherwise those bytes: Ruby's `o.read` keeps the bytes of
+   * a String whose encoding is broken (`vendor/ruby/v3.3.11/lib/open3.rb:665`),
+   * and a JS string cannot hold them. With no `args`, `command` is a command
    * line for `/bin/sh -c`; with `args` it is the program, exec'd with that argv
    * and no shell, as {@link ChildProcessAdapter.system} spawns it.
    */
@@ -71,7 +74,7 @@ export interface ChildProcessAdapter {
     env: Record<string, string | undefined>,
     args: string[] | null,
     stdinData: string | Uint8Array,
-  ): Promise<[stdout: string, stderr: string, status: WaitStatus]>;
+  ): Promise<[stdout: string | Uint8Array, stderr: string, status: WaitStatus]>;
 }
 
 const registry = new Map<string, ChildProcessAdapter>();
@@ -120,7 +123,7 @@ type NodeSpawnSyncResult = {
 
 type NodeReadable = {
   setEncoding(encoding: string): void;
-  on(event: "data", listener: (chunk: string) => void): void;
+  on(event: "data", listener: ((chunk: string) => void) | ((chunk: Uint8Array) => void)): void;
 };
 
 type NodeChild = {
@@ -146,7 +149,7 @@ function spawnChild(
   args: string[],
   env: Record<string, string | undefined>,
   stdio: unknown,
-  read: (chunk: string) => void,
+  read: ((chunk: string) => void) | { bytes: (chunk: Uint8Array) => void },
   input?: string | Uint8Array,
   readErr?: (chunk: string) => void,
 ): Promise<WaitStatus> {
@@ -154,8 +157,12 @@ function spawnChild(
     const child = cp.spawn(file, args, { env, stdio });
     child.stdin?.on("error", () => {});
     child.stdin?.end(input);
-    child.stdout?.setEncoding("utf8");
-    child.stdout?.on("data", read);
+    if (typeof read === "function") {
+      child.stdout?.setEncoding("utf8");
+      child.stdout?.on("data", read);
+    } else {
+      child.stdout?.on("data", read.bytes);
+    }
     if (readErr !== undefined) {
       child.stderr?.setEncoding("utf8");
       child.stderr?.on("data", readErr);
@@ -220,7 +227,7 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
       return [output, status];
     },
     async capture3(command, env, args, stdinData) {
-      let stdout = "";
+      const stdoutChunks: Uint8Array[] = [];
       let stderr = "";
       const [file, argv] = args == null ? ["/bin/sh", ["-c", command]] : [command, args];
       const status = await spawnChild(
@@ -229,14 +236,24 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         argv,
         env,
         ["pipe", "pipe", "pipe"],
-        (chunk) => {
-          stdout += chunk;
-        },
+        { bytes: (chunk) => stdoutChunks.push(chunk) },
         stdinData,
         (chunk) => {
           stderr += chunk;
         },
       );
+      const bytes = new Uint8Array(stdoutChunks.reduce((n, c) => n + c.length, 0));
+      let offset = 0;
+      for (const chunk of stdoutChunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.length;
+      }
+      let stdout: string | Uint8Array;
+      try {
+        stdout = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+      } catch {
+        stdout = bytes;
+      }
       return [stdout, stderr, status];
     },
   };

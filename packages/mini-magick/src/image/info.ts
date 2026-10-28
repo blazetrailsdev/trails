@@ -12,6 +12,7 @@ import {
   excSetupMessage,
   JSON,
   rbAryFetch,
+  block as blockPass,
 } from "@blazetrails/ruby-compat";
 import { Invalid } from "../mini-magick.js";
 import type { CliTool } from "../tool.js";
@@ -63,6 +64,7 @@ export class Info {
     return (Object.keys(this._info).forEach((k) => delete this._info[k]), this._info);
   }
 
+  /** @missingRailsName info — PERMANENT */
   async cheapInfo(value: string) {
     try {
       if (Object.hasOwn(this._info, value)) {
@@ -166,10 +168,12 @@ export class Info {
   async data() {
     if (!((this._info["data"] ?? false) !== false))
       this._info["data"] = await (async () => {
-        const json = (await MiniMagick.convert((convert: CliTool) => {
-          convert.append(this.path());
-          convert.append("json:");
-        })) as string;
+        const json = (await MiniMagick.convert(
+          blockPass((convert: CliTool) => {
+            convert.append(this.path());
+            convert.append("json:");
+          }),
+        )) as string;
         let data: unknown = JSON.parse(json);
         if (Array.isArray(data)) {
           data = rbAryFetch(data, 0);
@@ -180,15 +184,20 @@ export class Info {
   }
 
   identify(block?: (builder: CliTool) => unknown): Promise<string> {
-    return MiniMagick.identify((builder: CliTool) => {
-      if (block != null) {
-        block(builder);
-      }
-      builder.append(this.path());
-    }) as Promise<string>;
+    return MiniMagick.identify(
+      blockPass((builder: CliTool) => {
+        if (block != null) {
+          block(builder);
+        }
+        builder.append(this.path());
+      }),
+    ) as Promise<string>;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs join — PERMANENT
+   */
   protected decodeCommaSeparatedAsciiCharacters(encodedValue: string | undefined) {
     if (!encodedValue!.includes(",")) {
       return encodedValue;

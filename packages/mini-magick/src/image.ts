@@ -18,7 +18,7 @@ import {
   Pathname,
   FileUtils,
   URI,
-  block,
+  block as blockPass,
   matchOperator,
   rbObjAsString,
 } from "@blazetrails/ruby-compat";
@@ -73,12 +73,14 @@ export class Image {
   ) {
     return (async (image: Image) => {
       const outputPath = image.path.replace(/\.\w+$/m, `.${format}`);
-      await MiniMagick.convert((convert: CliTool) => {
-        convert.size(`${columns}x${rows}`);
-        convert.depth(depth);
-        convert.append(`${map}:${image.path}`);
-        convert.append(outputPath);
-      });
+      await MiniMagick.convert(
+        blockPass((convert: CliTool) => {
+          convert.size(`${columns}x${rows}`);
+          convert.depth(depth);
+          convert.append(`${map}:${image.path}`);
+          convert.append(outputPath);
+        }),
+      );
       image._path = image._info._path = outputPath;
       return image;
     })(this.read(blob, ".dat"));
@@ -99,7 +101,9 @@ export class Image {
       if (ext == null) ext = File.extname(uri.path ?? "").replace(/:.*/, "");
       return uri.open(
         options,
-        block((file: Tempfile | StringIO<string | Uint8Array>) => this.read(file, ext as string)),
+        blockPass((file: Tempfile | StringIO<string | Uint8Array>) =>
+          this.read(file, ext as string),
+        ),
       ) as Promise<Image>;
     } else {
       pathname = pathOrUrl instanceof Pathname ? pathOrUrl : new Pathname(pathOrUrl);
@@ -268,16 +272,18 @@ export class Image {
       }
       let inputPath = this.path;
       if (page != null && this.isLayer() == null) inputPath += `[${page}]`;
-      await MiniMagick.convert((convert: CliTool) => {
-        for (const [opt, val] of Object.entries(readOpts)) {
-          rbFSend(convert, opt, val);
-        }
-        convert.append(inputPath);
-        if (block != null) {
-          block(convert);
-        }
-        convert.append(newPath);
-      });
+      await MiniMagick.convert(
+        blockPass((convert: CliTool) => {
+          for (const [opt, val] of Object.entries(readOpts)) {
+            rbFSend(convert, opt, val);
+          }
+          convert.append(inputPath);
+          if (block != null) {
+            block(convert);
+          }
+          convert.append(newPath);
+        }),
+      );
       if (this._tempfile != null) {
         this.destroyBang();
         this._tempfile = newTempfile;
@@ -314,10 +320,12 @@ export class Image {
   async write(outputTo: string | Pathname | IO | StringIO<string | Uint8Array>) {
     if (typeof outputTo === "string" || outputTo instanceof Pathname) {
       if (this.isLayer() != null) {
-        return await MiniMagick.convert((builder: CliTool) => {
-          builder.append(this.path);
-          builder.append(outputTo);
-        });
+        return await MiniMagick.convert(
+          blockPass((builder: CliTool) => {
+            builder.append(this.path);
+            builder.append(outputTo);
+          }),
+        );
       } else if (this.path !== String(outputTo)) {
         return FileUtils.copyFile(this.path, String(outputTo));
       }
@@ -335,15 +343,17 @@ export class Image {
   ) {
     if (outputExtension === undefined) outputExtension = (await this.type()).toLowerCase();
     const outputTempfile = Utilities.tempfile(`.${outputExtension}`);
-    await MiniMagick.composite((composite: CliTool) => {
-      if (block != null) {
-        block(composite);
-      }
-      composite.append(otherImage.path);
-      composite.append(this.path);
-      if (mask != null) composite.append(mask.path);
-      composite.append(outputTempfile.path());
-    });
+    await MiniMagick.composite(
+      blockPass((composite: CliTool) => {
+        if (block != null) {
+          block(composite);
+        }
+        composite.append(otherImage.path);
+        composite.append(this.path);
+        if (mask != null) composite.append(mask.path);
+        composite.append(outputTempfile.path());
+      }),
+    );
     return new Image(outputTempfile.path()!, outputTempfile);
   }
 
@@ -351,6 +361,7 @@ export class Image {
     return this.mogrify(frame, (builder) => builder.quality(100));
   }
 
+  /** @missingRailsName sub — PERMANENT */
   destroyBang() {
     if (this._tempfile != null) {
       if (this._tempfile.path()!.endsWith(".mpc")) {
@@ -362,24 +373,28 @@ export class Image {
   }
 
   identify(block?: (builder: CliTool) => unknown): Promise<string> {
-    return MiniMagick.identify((builder: CliTool) => {
-      if (block != null) {
-        block(builder);
-      }
-      builder.append(this.path);
-    }) as Promise<string>;
+    return MiniMagick.identify(
+      blockPass((builder: CliTool) => {
+        if (block != null) {
+          block(builder);
+        }
+        builder.append(this.path);
+      }),
+    ) as Promise<string>;
   }
 
   async mogrify(page: number | null = null, block?: (builder: CliTool) => unknown) {
-    await MiniMagick.mogrify((builder: CliTool) => {
-      if (block != null) {
-        block(builder);
-      }
-      if (builder.args.includes("-format")) {
-        throw new Error("you must call #format on a MiniMagick::Image directly");
-      }
-      builder.append(page != null ? `${this.path}[${page}]` : this.path);
-    });
+    await MiniMagick.mogrify(
+      blockPass((builder: CliTool) => {
+        if (block != null) {
+          block(builder);
+        }
+        if (builder.args.includes("-format")) {
+          throw new Error("you must call #format on a MiniMagick::Image directly");
+        }
+        builder.append(page != null ? `${this.path}[${page}]` : this.path);
+      }),
+    );
     this._info.clear();
     return this;
   }

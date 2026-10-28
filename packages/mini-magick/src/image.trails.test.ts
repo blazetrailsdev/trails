@@ -12,5 +12,8 @@ describe("MiniMagick::Image signature cache", () => {
     const signature = await cold;
     expect(image.signature()).toEqual(signature);
     expect(rbHash(image)).toEqual(rbHash(signature));
+    const other = new Image(imagePath());
+    await other.signature();
+    expect(image.equals(other)).toBe(true);
   });
 });

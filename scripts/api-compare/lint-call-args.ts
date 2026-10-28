@@ -122,6 +122,7 @@ export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
   "globalid",
   "i18n",
   "marcel",
+  "mini-magick",
   "rack",
   "rack-session",
   "rack-test",

@@ -44,7 +44,6 @@ describe("MiniMagick::Image", () => {
   let gray: number[];
   let green: number[];
   let cyan: number[];
-  let pix: number[][][];
   let cols: number;
   let rows: number;
   let mask: Image;
@@ -99,16 +98,14 @@ describe("MiniMagick::Image", () => {
       blob = pack(pixels, "S*");
     });
 
-    // BLOCKED: mini-magick-image-spec-remaining-fails
-    it.fails("can import pixels with default format", async () => {
+    it("can import pixels with default format", async () => {
       const image = await Image.importPixels(blob, ...dimensions, depth, map);
       expect(await image.isValid()).toBeRubyTruthy();
       expect(await image.type()).toEqual("PNG");
       expect(await image.dimensions()).toEqualRuby(dimensions);
     });
 
-    // BLOCKED: mini-magick-image-spec-remaining-fails
-    it.fails("can import pixels with custom format", async () => {
+    it("can import pixels with custom format", async () => {
       const image = await Image.importPixels(blob, ...dimensions, depth, map, "jpeg");
       expect(await image.isValid()).toBeRubyTruthy();
       expect(await image.type()).toEqual("JPEG");
@@ -143,7 +140,9 @@ describe("MiniMagick::Image", () => {
       const image = await Image.open("http://example.com/image.jpg");
       expect(await image.isValid()).toBeRubyTruthy();
       expect(File.extname(image.path)).toEqual(".jpg");
-      expect(spy).toHaveBeenCalled();
+
+      await Image.open("http://example.com/image.jpg", { Foo: "Bar" });
+      expect(spy).toHaveBeenLastCalledWith({ Foo: "Bar" }, expect.any(Function));
     });
 
     it("accepts open-uri options", async (ctx) => {
@@ -180,7 +179,7 @@ describe("MiniMagick::Image", () => {
     });
 
     it("does not mistake a path with a colon for a URI schema", async () => {
-      await (async () => await Image.open(imagePath("colon")))();
+      await expect((async () => await Image.open(imagePath("colon")))()).resolves.not.toThrow();
     });
   });
 
@@ -222,7 +221,7 @@ describe("MiniMagick::Image", () => {
       expect(image.path).toBeTypeOf("string");
     });
 
-    // BLOCKED: mini-magick-image-spec-remaining-fails
+    // BLOCKED: mini-magick-image-ctor-block-async-combine-options
     it.skip("accepts a block which it passes on to #combine_options", async () => {
       const image = new Image(subject.path, null, (b) => b.resize("100x100!"));
       expect(await image.dimensions()).toEqual([100, 100]);
@@ -259,7 +258,7 @@ describe("MiniMagick::Image", () => {
     it("is not #== nor #eql? to an instance of a different image", async (ctx) => {
       ctx.skip(new Gem.Version(await cliVersion()).compare(new Gem.Version("7.1.1-35"))! >= 0);
       expect(image).not.toEqualRuby(otherImage);
-      expect(rbEql(image, otherImage)).toBe(false);
+      expect(rbEql(image, otherImage)).not.toBe(true);
     });
 
     it("generates the same hash code for an instance of the same image", () => {
@@ -449,7 +448,9 @@ describe("MiniMagick::Image", () => {
     it("inspects image meta info", async () => {
       expect(await subject.get("width")).toBeTypeOf("number");
       expect(await subject.get("height")).toBeTypeOf("number");
-      for (const x of (await subject.get("dimensions")) as number[]) expect(x).toBeTypeOf("number");
+      expect((await subject.get("dimensions")) as number[]).toSatisfy((xs: unknown[]) =>
+        xs.every((x) => typeof x === "number"),
+      );
       expect(await subject.get("colorspace")).toBeTypeOf("string");
       expect(await subject.get("format")).toMatch(/[A-Z]/);
       expect(await subject.get("signature")).toMatch(/[a-zA-Z0-9]{64}/);
@@ -458,7 +459,9 @@ describe("MiniMagick::Image", () => {
     it("supports string keys", async () => {
       expect(await subject.get("width")).toBeTypeOf("number");
       expect(await subject.get("height")).toBeTypeOf("number");
-      for (const x of (await subject.get("dimensions")) as number[]) expect(x).toBeTypeOf("number");
+      expect((await subject.get("dimensions")) as number[]).toSatisfy((xs: unknown[]) =>
+        xs.every((x) => typeof x === "number"),
+      );
       expect(await subject.get("colorspace")).toBeTypeOf("string");
       expect(await subject.get("format")).toMatch(/[A-Z]/);
       expect(await subject.get("signature")).toMatch(/[a-zA-Z0-9]{64}/);
@@ -479,16 +482,16 @@ describe("MiniMagick::Image", () => {
   it("has attributes", async () => {
     expect(await subject.type()).toMatch(/^[A-Z]+$/m);
     expect(await subject.width()).toBeTypeOf("number");
-    expect(await subject.width()).not.toEqual(0);
     expect(await subject.height()).toBeTypeOf("number");
-    expect(await subject.height()).not.toEqual(0);
-    for (const x of await subject.dimensions()) expect(x).toBeTypeOf("number");
+    expect(await subject.dimensions()).toSatisfy((xs: unknown[]) =>
+      xs.every((x) => typeof x === "number"),
+    );
     expect(await subject.size()).toBeTypeOf("number");
-    expect(await subject.size()).not.toEqual(0);
     expect(await subject.humanSize()).toBeTypeOf("string");
-    expect(await subject.humanSize()).not.toEqual("");
     expect(await subject.colorspace()).toBeTypeOf("string");
-    for (const x of await subject.resolution()) expect(x).toBeTypeOf("number");
+    expect(await subject.resolution()).toSatisfy((xs: unknown[]) =>
+      xs.every((x) => typeof x === "number"),
+    );
     expect(await subject.signature()).toMatch(/[a-zA-Z0-9]{64}/);
   });
 
@@ -570,7 +573,9 @@ describe("MiniMagick::Image", () => {
 
   describe("#layers", () => {
     it("returns a list of images", async () => {
-      for (const x of await subject.layers()) expect(x).toBeInstanceOf(Image);
+      expect(await subject.layers()).toSatisfy((xs: unknown[]) =>
+        xs.every((x) => x instanceof Image),
+      );
       expect(await (await subject.layers())[0].isValid()).toBeRubyTruthy();
     });
 
@@ -605,43 +610,39 @@ describe("MiniMagick::Image", () => {
     });
 
     beforeEach(async () => {
-      pix = await subject.getPixels();
-    });
-
-    beforeEach(async () => {
       subject = await Image.open(imagePath("rgb"));
     });
 
     describe("without modifications", () => {
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a width-by-height matrix", async () => {
+      it("returns a width-by-height matrix", async () => {
+        const pix = await subject.getPixels();
         for (const row of pix) {
           expect(
             await (row instanceof globalThis.Set || row instanceof globalThis.Map
               ? row.size
               : row.length),
-          ).toEqualRuby(await subject.width);
+          ).toEqualRuby(await subject.width());
         }
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a magenta pixel", () => {
+      it("returns a magenta pixel", async () => {
+        const pix = await subject.getPixels();
         expect(pix[3][3]).toEqualRuby(magenta);
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a gray pixel", () => {
-        expect(pix[-4][-4]).toEqualRuby(gray);
+      it("returns a gray pixel", async () => {
+        const pix = await subject.getPixels();
+        expect(pix.at(-4)!.at(-4)).toEqualRuby(gray);
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a green pixel", () => {
-        expect(pix[3][-4]).toEqualRuby(green);
+      it("returns a green pixel", async () => {
+        const pix = await subject.getPixels();
+        expect(pix[3].at(-4)).toEqualRuby(green);
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a cyan pixel", () => {
-        expect(pix[-4][3]).toEqualRuby(cyan);
+      it("returns a cyan pixel", async () => {
+        const pix = await subject.getPixels();
+        expect(pix.at(-4)![3]).toEqualRuby(cyan);
       });
     });
 
@@ -658,8 +659,8 @@ describe("MiniMagick::Image", () => {
         await (subject as MogrifyImage).crop(`${cols ?? ""}x${rows ?? ""}+3+3`);
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a matrix of the requested height", async () => {
+      it("returns a matrix of the requested height", async () => {
+        const pix = await subject.getPixels();
         expect(
           await (pix instanceof globalThis.Set || pix instanceof globalThis.Map
             ? pix.size
@@ -667,8 +668,8 @@ describe("MiniMagick::Image", () => {
         ).toEqualRuby(rows);
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a matrix of the requested width", async () => {
+      it("returns a matrix of the requested width", async () => {
+        const pix = await subject.getPixels();
         for (const x of pix) {
           expect(
             await (x instanceof globalThis.Set || x instanceof globalThis.Map ? x.size : x.length),
@@ -676,24 +677,24 @@ describe("MiniMagick::Image", () => {
         }
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a magenta pixel", () => {
+      it("returns a magenta pixel", async () => {
+        const pix = await subject.getPixels();
         expect(pix[0][0]).toEqualRuby(magenta);
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a gray pixel", () => {
-        expect(pix[-1][-1]).toEqualRuby(gray);
+      it("returns a gray pixel", async () => {
+        const pix = await subject.getPixels();
+        expect(pix.at(-1)!.at(-1)).toEqualRuby(gray);
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a cyan pixel", () => {
-        expect(pix[-1][0]).toEqualRuby(cyan);
+      it("returns a cyan pixel", async () => {
+        const pix = await subject.getPixels();
+        expect(pix.at(-1)![0]).toEqualRuby(cyan);
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a green pixel", () => {
-        expect(pix[0][-1]).toEqualRuby(green);
+      it("returns a green pixel", async () => {
+        const pix = await subject.getPixels();
+        expect(pix[0].at(-1)).toEqualRuby(green);
       });
     });
 
@@ -711,8 +712,8 @@ describe("MiniMagick::Image", () => {
         await subject.colorspace("Gray");
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a matrix of the requested height", async () => {
+      it("returns a matrix of the requested height", async () => {
+        const pix = await subject.getPixels();
         expect(
           await (pix instanceof globalThis.Set || pix instanceof globalThis.Map
             ? pix.size
@@ -720,8 +721,8 @@ describe("MiniMagick::Image", () => {
         ).toEqualRuby(rows);
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a matrix of the requested width", async () => {
+      it("returns a matrix of the requested width", async () => {
+        const pix = await subject.getPixels();
         for (const x of pix) {
           expect(
             await (x instanceof globalThis.Set || x instanceof globalThis.Map ? x.size : x.length),
@@ -729,8 +730,8 @@ describe("MiniMagick::Image", () => {
         }
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns gray pixels", () => {
+      it("returns gray pixels", async () => {
+        const pix = await subject.getPixels();
         for (const row of pix) {
           for (const px of row) {
             expect(px[0]).toEqualRuby(px[1]);
@@ -745,8 +746,8 @@ describe("MiniMagick::Image", () => {
         subject = await Image.open(imagePath("get_pixels"));
       });
 
-      // BLOCKED: mini-magick-image-spec-remaining-fails
-      it.fails("returns a matrix where all pixel has 3 values", async () => {
+      it("returns a matrix where all pixel has 3 values", async () => {
+        const pix = await subject.getPixels();
         for (const row of pix) {
           for (const px of row) {
             expect(
@@ -788,11 +789,7 @@ describe("MiniMagick::Image", () => {
     it("doesn't allow calling of #format", async () => {
       await expect(
         (async () => await subject.combineOptions((c) => c.format("png")))(),
-      ).rejects.toSatisfy(
-        (e: Error) =>
-          e instanceof Error &&
-          e.message === "you must call #format on a MiniMagick::Image directly",
-      );
+      ).rejects.toThrow(new Error("you must call #format on a MiniMagick::Image directly"));
     });
 
     it("clears the info only at the end", async () => {

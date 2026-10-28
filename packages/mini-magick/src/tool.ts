@@ -7,7 +7,9 @@ import {
   rbFSend,
   rbConstWarnIfDeprecated,
   rbModDeprecateConstant,
+  rbBlockGivenP,
 } from "@blazetrails/ruby-compat";
+import type { Block } from "@blazetrails/ruby-compat";
 import { MiniMagick } from "./mini-magick.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -35,11 +37,10 @@ export class Tool {
     "pango",
   ];
 
-  static new(...args: unknown[]) {
-    const block =
-      typeof args[args.length - 1] === "function"
-        ? (args.pop() as (instance: CliTool) => unknown)
-        : undefined;
+  static new(...args: [...unknown[], Block<unknown>] | unknown[]) {
+    const block = rbBlockGivenP(args.at(-1))
+      ? (args.pop() as (instance: CliTool) => unknown)
+      : undefined;
     const instance = new this(...(args as [string, Record<string, unknown>?]));
     if (block != null) {
       block(instance as CliTool);
@@ -76,8 +77,8 @@ export class Tool {
 
   async call(
     { ...options }: Record<string, unknown> = {},
-    block?: (stdout: string, stderr: string, status: number | null) => unknown,
-  ): Promise<string> {
+    block?: (stdout: string | Uint8Array, stderr: string, status: number | null) => unknown,
+  ): Promise<string | Uint8Array> {
     options = { ...this._options, ...options };
     if (block != null) {
       options.warnings = false;
@@ -124,11 +125,8 @@ export class Tool {
     return this;
   }
 
-  stack(...args: unknown[]) {
-    const block =
-      typeof args[args.length - 1] === "function"
-        ? (args.pop() as (tool: this) => unknown)
-        : undefined;
+  stack(...args: [...unknown[], Block<unknown>] | unknown[]) {
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as (tool: this) => unknown) : undefined;
     this.append("(");
     for (const value of args) {
       if (
