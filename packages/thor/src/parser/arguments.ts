@@ -12,7 +12,6 @@ import {
   rbInspect,
   rbModName,
   rbObjAsString,
-  rbObjClassname,
   rbObjDup,
   rbObjIsKindOf,
   rbObjNotMatch,
@@ -128,7 +127,7 @@ export class Arguments {
 
   /** @internal */
   protected parseHash(name: string): unknown {
-    if (rbObjClassname(this.peek()) === "Hash") return this.shift();
+    if (rbObjIsKindOf(this.peek(), Hash)) return this.shift();
     const hash = Object.create(null) as Record<string, string>;
 
     while (rtest(this.isCurrentIsValue()) && (this.peek() as string).includes(":")) {
@@ -200,7 +199,7 @@ export class Arguments {
 
   /** @internal */
   protected validateEnumValueBang(name: string, value: unknown, message: string): void {
-    if (rbObjClassname(this.switches) !== "Hash") return;
+    if (!rbObjIsKindOf(this.switches, Hash)) return;
 
     const switch_ = (this.switches as Record<string, Argument>)[name];
 
