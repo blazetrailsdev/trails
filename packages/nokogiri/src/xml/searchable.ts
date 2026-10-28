@@ -53,7 +53,8 @@ function isHash(param: unknown): param is Record<string, unknown> {
   return param != null && Object.getPrototypeOf(param) === Object.prototype;
 }
 
-function cssInternal(
+/** @internal */
+export function cssInternal(
   this: SearchableHost,
   node: SearchableHost,
   rules: string[],
@@ -72,7 +73,12 @@ export function cssRulesToXpath(
   return rules.map((rule) => xpathQueryFromCssRule.call(this, rule, ns));
 }
 
-function xpathQueryFromCssRule(this: SearchableHost, rule: string, ns: Record<string, string>) {
+/** @internal */
+export function xpathQueryFromCssRule(
+  this: SearchableHost,
+  rule: string,
+  ns: Record<string, string>,
+) {
   return aryJoin(
     (
       this.constructor as unknown as { IMPLIED_XPATH_CONTEXTS: readonly string[] }
@@ -108,7 +114,8 @@ export function xpathInternal(
   );
 }
 
-function xpathImpl(
+/** @internal */
+export function xpathImpl(
   node: SearchableHost,
   path: string,
   handler: unknown,
