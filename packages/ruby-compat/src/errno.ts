@@ -25,8 +25,6 @@ export class SystemCallError extends StandardError {
   }
 }
 
-SystemCallError.prototype.name = "SystemCallError";
-
 /**
  * `Errno::ENOTTY`, one of the classes `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`)
  * defines under `Errno` with its `Errno` constant. `syserr_initialize`

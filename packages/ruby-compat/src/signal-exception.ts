@@ -10,8 +10,6 @@ import { Exception } from "./exception.js";
  */
 export class SignalException extends Exception {}
 
-SignalException.prototype.name = "SignalException";
-
 /**
  * Ruby's core `Interrupt` (`vendor/ruby/v3.3.11/error.c:3319`
  * `rb_eInterrupt`), the `SignalException` raised for `SIGINT`.
@@ -20,5 +18,3 @@ SignalException.prototype.name = "SignalException";
  * rather than defines.
  */
 export class Interrupt extends SignalException {}
-
-Interrupt.prototype.name = "Interrupt";

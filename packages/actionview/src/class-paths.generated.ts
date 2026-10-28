@@ -256,6 +256,7 @@ registerClassPaths([
   [() => m90.StrictLocalsError, "ActionView::StrictLocalsError"],
   [() => m90.SyntaxErrorInTemplate, "ActionView::SyntaxErrorInTemplate"],
   [() => m89.Template, "ActionView::Template"],
+  [() => m90.TemplateError, "ActionView::Template::Error"],
   [() => m91.Handlers, "ActionView::Template::Handlers"],
   [() => m92.Html, "ActionView::Template::Handlers::Html"],
   [() => m93.Raw, "ActionView::Template::Handlers::Raw"],

@@ -41,5 +41,4 @@ export class FrozenError extends RuntimeError {
   }
 }
 
-FrozenError.prototype.name = "FrozenError";
 FrozenError.prototype.message = "FrozenError";

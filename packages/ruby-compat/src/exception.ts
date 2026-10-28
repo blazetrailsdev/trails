@@ -29,7 +29,8 @@ const declaredNames = new WeakMap<object, unknown>();
  * `rb_class_name` (`vendor/ruby/v3.3.11/variable.c:483`) of the exception's
  * class, which Ruby reads off the constant path. A JS `Error` reads `name`
  * for its stack header, so it is answered from the same path, then from a
- * name a class or an ancestor seated on its prototype.
+ * name the class itself seated on its prototype, then its JS name. An
+ * ancestor's name is never read: Ruby names the receiver's own class.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -37,12 +38,10 @@ Object.defineProperty(Exception.prototype, "name", {
   configurable: true,
   get(this: Exception) {
     const klass = this.constructor;
-    let seated: object | null = klass;
-    while (seated !== null && !declaredNames.has(seated)) seated = Object.getPrototypeOf(seated);
     return (
       classpaths.get(klass)?.path ??
       generatedClassPath(klass) ??
-      (seated === null ? undefined : declaredNames.get(seated)) ??
+      declaredNames.get(klass) ??
       (klass.name || "Exception")
     );
   },

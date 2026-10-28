@@ -12,5 +12,3 @@ import { StandardError } from "./standard-error.js";
  * inherits rather than defines.
  */
 export class ArgumentError extends StandardError {}
-
-ArgumentError.prototype.name = "ArgumentError";

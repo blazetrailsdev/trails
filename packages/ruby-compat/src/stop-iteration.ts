@@ -7,5 +7,3 @@ import { IndexError } from "./index-error.js";
  * @noRailsEquivalent PERMANENT
  */
 export class StopIteration extends IndexError {}
-
-StopIteration.prototype.name = "StopIteration";

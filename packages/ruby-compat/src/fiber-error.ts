@@ -9,5 +9,3 @@ import { StandardError } from "./standard-error.js";
  * rather than defines.
  */
 export class FiberError extends StandardError {}
-
-FiberError.prototype.name = "FiberError";
