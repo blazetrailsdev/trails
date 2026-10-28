@@ -87,8 +87,8 @@ describe("GeneratorBase runtime options (Thor's add_runtime_options!)", () => {
 
 describe("GeneratorBase#createFile conflict behavior (Thor's CreateFile#invoke!)", () => {
   class Writer extends GeneratorBase {
-    write(content: string): void {
-      this.createFile("app/x.ts", content);
+    async write(content: string): Promise<void> {
+      await this.createFile("app/x.ts", content);
     }
   }
 
@@ -97,13 +97,13 @@ describe("GeneratorBase#createFile conflict behavior (Thor's CreateFile#invoke!)
     const make = (config: GeneratorConfig = {}) =>
       new Writer([], {}, { destinationRoot: cwd, ...config });
     try {
-      const output = await capture("stdout", () => {
-        make().write("one ✓\n");
-        make({ behavior: "skip" }).write("two\n");
-        make({ behavior: "skip" }).write("one ✓\n");
+      const output = await capture("stdout", async () => {
+        await make().write("one ✓\n");
+        await make({ behavior: "skip" }).write("two\n");
+        await make({ behavior: "skip" }).write("one ✓\n");
         expect(File.read(File.join(cwd, "app/x.ts"))).toBe("one ✓\n");
-        make({ behavior: "force" }).write("two\n");
-        make().write("three\n");
+        await make({ behavior: "force" }).write("two\n");
+        await make().write("three\n");
       });
       expect(File.read(File.join(cwd, "app/x.ts"))).toBe("three\n");
       expect(

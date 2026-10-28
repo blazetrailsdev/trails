@@ -18,37 +18,36 @@ function makeGen(name: string, options: object = {}, cwd = tmpDir) {
 }
 
 describe("HelperGeneratorTest", () => {
-  it("helper", () => {
-    makeGen("Account").createHelperFiles();
+  it("helper", async () => {
+    await makeGen("Account").createHelperFiles();
     const c = fs.readFileSync(path.join(tmpDir, "app/helpers/account-helper.ts"), "utf-8");
     expect(c).toContain("AccountHelper");
   });
 
-  it("strips a trailing helper suffix", () => {
-    makeGen("account_helper").createHelperFiles();
+  it("strips a trailing helper suffix", async () => {
+    await makeGen("account_helper").createHelperFiles();
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper-helper.ts"))).toBe(false);
   });
 
-  it("strips a trailing dashed helper suffix", () => {
-    makeGen("account-helper").createHelperFiles();
+  it("strips a trailing dashed helper suffix", async () => {
+    await makeGen("account-helper").createHelperFiles();
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper-helper.ts"))).toBe(false);
   });
 
-  it("nested namespace", () => {
-    makeGen("admin/account").createHelperFiles();
+  it("nested namespace", async () => {
+    await makeGen("admin/account").createHelperFiles();
     const c = fs.readFileSync(path.join(tmpDir, "app/helpers/admin/account-helper.ts"), "utf-8");
     expect(c).toContain("AdminAccountHelper");
   });
 
-  it("generates .js helper for JS projects", () => {
+  it("generates .js helper for JS projects", async () => {
     const jsDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-helper-js-"));
     try {
       const gen = makeGen("Posts", {}, jsDir);
-      gen.createHelperFiles();
-      const files = gen.getCreatedFiles();
-      expect(files).toContain("app/helpers/posts-helper.js");
+      await gen.createHelperFiles();
+      expect(fs.existsSync(path.join(jsDir, "app/helpers/posts-helper.js"))).toBe(true);
     } finally {
       fs.rmSync(jsDir, { recursive: true, force: true });
     }

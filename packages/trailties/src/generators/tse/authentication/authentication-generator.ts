@@ -6,13 +6,13 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.methodAdded("createFiles");
   }
 
-  createFiles(): void {
-    this.template("app/views/passwords/new.html.erb");
-    this.template("app/views/passwords/edit.html.erb");
-    this.template("app/views/sessions/new.html.erb");
+  async createFiles(): Promise<void> {
+    await this.template("app/views/passwords/new.html.erb");
+    await this.template("app/views/passwords/edit.html.erb");
+    await this.template("app/views/sessions/new.html.erb");
   }
 
-  private template(file: string): void {
-    this.createFile(file.replace(/\.erb$/, ".tse"), TEMPLATES[file]);
+  private async template(file: string): Promise<void> {
+    await this.createFile(file.replace(/\.erb$/, ".tse"), TEMPLATES[file]);
   }
 }

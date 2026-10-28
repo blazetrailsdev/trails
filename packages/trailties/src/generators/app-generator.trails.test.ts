@@ -176,7 +176,7 @@ describe("AppGenerator (trails-only)", () => {
   it("dispatches cifiles through a top-level AppBuilder when one is defined", async () => {
     const calls: string[] = [];
     TopLevel.AppBuilder = class extends AppBuilder {
-      override cifiles(): void {
+      override async cifiles(): Promise<void> {
         calls.push("cifiles", (this as unknown as { appPath: string }).appPath);
       }
     };
@@ -194,14 +194,14 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("includes ActionMethods into a top-level AppBuilder that does not subclass trails' AppBuilder", async () => {
-    let kept: string | null = null;
+    let kept: unknown = null;
     TopLevel.AppBuilder = class {
-      cifiles(this: {
-        emptyDirectory(d: string): string;
-        emptyDirectoryWithKeepFile(d: string): string | null;
-      }): void {
-        this.emptyDirectory("custom-ci");
-        kept = this.emptyDirectoryWithKeepFile("custom-keep");
+      async cifiles(this: {
+        emptyDirectory(d: string): unknown;
+        emptyDirectoryWithKeepFile(d: string): Promise<unknown>;
+      }): Promise<void> {
+        await this.emptyDirectory("custom-ci");
+        kept = await this.emptyDirectoryWithKeepFile("custom-keep");
       }
     };
     try {

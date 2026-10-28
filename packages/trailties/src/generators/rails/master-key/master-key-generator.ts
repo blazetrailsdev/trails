@@ -13,7 +13,7 @@ export class MasterKeyGenerator extends GeneratorBase {
     this.methodAdded("ignoreMasterKeyFileSilently");
   }
 
-  addMasterKeyFile(): void {
+  async addMasterKeyFile(): Promise<void> {
     if (!MASTER_KEY_PATH.isExist()) {
       const key = EncryptedFile.generateKey();
 
@@ -26,22 +26,22 @@ export class MasterKeyGenerator extends GeneratorBase {
       );
 
       this.log("");
-      this.addMasterKeyFileSilently(key);
+      await this.addMasterKeyFileSilently(key);
       this.log("");
     }
   }
 
-  addMasterKeyFileSilently(key?: string): void {
+  async addMasterKeyFileSilently(key?: string): Promise<void> {
     if (MASTER_KEY_PATH.isExist()) return;
-    this.keyFileGenerator().addKeyFileSilently(MASTER_KEY_PATH, key);
+    await this.keyFileGenerator().addKeyFileSilently(MASTER_KEY_PATH, key);
   }
 
-  ignoreMasterKeyFile(): void {
-    this.keyFileGenerator().ignoreKeyFile(MASTER_KEY_PATH, this.keyIgnore());
+  async ignoreMasterKeyFile(): Promise<void> {
+    await this.keyFileGenerator().ignoreKeyFile(MASTER_KEY_PATH, this.keyIgnore());
   }
 
-  ignoreMasterKeyFileSilently(): void {
-    this.keyFileGenerator().ignoreKeyFileSilently(MASTER_KEY_PATH, this.keyIgnore());
+  async ignoreMasterKeyFileSilently(): Promise<void> {
+    await this.keyFileGenerator().ignoreKeyFileSilently(MASTER_KEY_PATH, this.keyIgnore());
   }
 
   private keyFileGenerator(): EncryptionKeyFileGenerator {

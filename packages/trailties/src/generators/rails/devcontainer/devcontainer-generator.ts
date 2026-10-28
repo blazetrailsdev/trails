@@ -100,13 +100,13 @@ export class DevcontainerGenerator extends GeneratorBase {
   }
 
   /**
-   * @missingRailsCall empty_directory — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
-   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsCall empty_directory — CONVERGEABLE converge-generators-onto-thor-template
+   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
    */
-  createDevcontainer(): void {
-    this.createFile(".devcontainer/devcontainer.json", this.devcontainerJson());
-    this.createFile(".devcontainer/Dockerfile", this.dockerfileContent());
-    this.createFile(".devcontainer/compose.yaml", this.composeYaml());
+  async createDevcontainer(): Promise<void> {
+    await this.createFile(".devcontainer/devcontainer.json", this.devcontainerJson());
+    await this.createFile(".devcontainer/Dockerfile", this.dockerfileContent());
+    await this.createFile(".devcontainer/compose.yaml", this.composeYaml());
   }
 
   updateApplicationSystemTestCase(): void {
@@ -118,7 +118,7 @@ export class DevcontainerGenerator extends GeneratorBase {
     );
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
   updateDatabaseYml(): void {
     this.gsubFile(
       "config/database.ts",

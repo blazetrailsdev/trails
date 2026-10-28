@@ -74,9 +74,9 @@ export class ScaffoldGenerator extends NamedBase {
     this.methodAdded("createTestFiles");
   }
 
-  createTestFiles(): void {
+  async createTestFiles(): Promise<void> {
     const templateFile = this.options.api ? "api_functional_test" : "functional_test";
-    this.createFile(
+    await this.createFile(
       File.join(
         "test/controllers",
         ...this.controllerClassPath(),

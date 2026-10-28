@@ -53,10 +53,9 @@ export class ModelGenerator extends NamedBase {
     const migGen = this.createMigrationGenerator();
     migGen.attributes = attributes;
     await migGen.createMigrationFile();
-    this.createdFiles.push(...migGen.getCreatedFiles());
   }
 
-  createModelFile(): void {
+  async createModelFile(): Promise<void> {
     const regularClassPath = this.regularClassPath();
     const className = [...regularClassPath, this.fileName].map((part) => camelize(part)).join("");
     const fileName = dasherize(this.filePath());
@@ -96,7 +95,7 @@ export class ModelGenerator extends NamedBase {
     const staticBlock = bodyLines.length > 0 ? `\n  static {\n${bodyLines.join("\n")}\n  }\n` : "";
     const ext = this.ext();
 
-    this.createFile(
+    await this.createFile(
       `app/models/${fileName}${ext}`,
       `${importPath}
 
@@ -109,13 +108,13 @@ ${staticBlock}}
     );
   }
 
-  createModuleFile(): void {
+  async createModuleFile(): Promise<void> {
     const regularClassPath = this.regularClassPath();
     if (regularClassPath.length === 0) return;
     const ext = this.ext();
 
     if (this.behavior === "invoke") {
-      this.createFile(
+      await this.createFile(
         `app/models/${regularClassPath.map((part) => dasherize(part)).join("/")}${ext}`,
         `export const ${regularClassPath.map((part) => camelize(part)).join("")} = {
   tableNamePrefix(): string {

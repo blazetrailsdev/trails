@@ -22,10 +22,9 @@ afterEach(() => {
 });
 
 describe("BenchmarkGeneratorTest", () => {
-  it("generate benchmark", () => {
+  it("generate benchmark", async () => {
     const gen = new BenchmarkGenerator(["my_benchmark"], {}, { destinationRoot: tmpDir });
-    gen.generateLayout();
-    expect(gen.getCreatedFiles()).toContain("script/benchmarks/my_benchmark.ts");
+    await gen.generateLayout();
     const content = fs.readFileSync(
       path.join(tmpDir, "script/benchmarks/my_benchmark.ts"),
       "utf-8",

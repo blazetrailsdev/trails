@@ -10,7 +10,7 @@ export class EncryptionKeyFileGenerator extends GeneratorBase {
     this.methodAdded("ignoreKeyFileSilently");
   }
 
-  addKeyFile(keyPath: string | Pathname): void {
+  async addKeyFile(keyPath: string | Pathname): Promise<void> {
     keyPath = new Pathname(keyPath);
 
     if (!keyPath.isExist()) {
@@ -25,21 +25,24 @@ export class EncryptionKeyFileGenerator extends GeneratorBase {
       );
 
       this.log("");
-      this.addKeyFileSilently(keyPath, key);
+      await this.addKeyFileSilently(keyPath, key);
       this.log("");
     }
   }
 
-  addKeyFileSilently(keyPath: string | Pathname, key?: string): void {
-    this.createFile(keyPath, key ?? EncryptedFile.generateKey(), { mode: 0o600 });
+  async addKeyFileSilently(keyPath: string | Pathname, key?: string): Promise<void> {
+    await this.createFile(keyPath.toString(), key ?? EncryptedFile.generateKey(), { perm: 0o600 });
   }
 
-  ignoreKeyFile(keyPath: string | Pathname, ignore: string = this.keyIgnore(keyPath)): void {
+  async ignoreKeyFile(
+    keyPath: string | Pathname,
+    ignore: string = this.keyIgnore(keyPath),
+  ): Promise<void> {
     if (File.isExist(".gitignore")) {
       if (!File.read(".gitignore").includes(ignore)) {
         this.log(`Ignoring ${keyPath} so it won't end up in Git history:`);
         this.log("");
-        this.appendToFile(".gitignore", ignore);
+        await this.appendToFile(".gitignore", ignore);
         this.log("");
       }
     } else {
@@ -49,11 +52,11 @@ export class EncryptionKeyFileGenerator extends GeneratorBase {
     }
   }
 
-  ignoreKeyFileSilently(
+  async ignoreKeyFileSilently(
     keyPath: string | Pathname,
     ignore: string = this.keyIgnore(keyPath),
-  ): void {
-    if (File.isExist(".gitignore")) this.appendToFile(".gitignore", ignore);
+  ): Promise<void> {
+    if (File.isExist(".gitignore")) await this.appendToFile(".gitignore", ignore);
   }
 
   private keyIgnore = (keyPath: string | Pathname): string => `\n/${keyPath}\n`;

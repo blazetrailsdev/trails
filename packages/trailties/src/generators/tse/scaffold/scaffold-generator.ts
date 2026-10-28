@@ -70,23 +70,23 @@ export class ScaffoldGenerator extends Base {
     ModelHelpers.skipWarn = true;
   }
 
-  createRootFolder(): void {
-    this.emptyDirectory(File.join("app/views", dasherize(this.controllerFilePath())));
+  async createRootFolder(): Promise<void> {
+    await this.emptyDirectory(File.join("app/views", dasherize(this.controllerFilePath())));
   }
 
-  copyViewFiles(): void {
+  async copyViewFiles(): Promise<void> {
     const viewDirectory = dasherize(this.controllerFilePath());
     for (const view of this.availableViews()) {
       for (const format of this.formats()) {
         const filename = this.filenameWithExtensions(view, format);
-        this.createFile(
+        await this.createFile(
           File.join("app/views", viewDirectory, filename),
           TEMPLATES[filename].call(this),
         );
       }
     }
 
-    this.createFile(
+    await this.createFile(
       File.join("app/views", viewDirectory, `_${this.singularName()}.html.tse`),
       TEMPLATES["partial.html.tse"].call(this),
     );

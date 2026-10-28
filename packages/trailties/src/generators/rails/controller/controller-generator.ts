@@ -52,10 +52,10 @@ export class ControllerGenerator extends NamedBase {
   private __fileName?: string;
 
   /**
-   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
    * @missingRailsArgs join — PERMANENT
    */
-  createControllerFiles(): void {
+  async createControllerFiles(): Promise<void> {
     const parent = this.parentClassName();
     const actions = this.actions;
     const ts = this.isTypeScript();
@@ -66,7 +66,7 @@ export class ControllerGenerator extends NamedBase {
       parent: parentRefForRelative(parent, depth, this.ext()),
       methods: actions.map((a) => actionMethod(a, ts)),
     });
-    this.createFile(
+    await this.createFile(
       File.join(
         "app/controllers",
         ...this.classPathParts.map((p) => dasherize(p)),

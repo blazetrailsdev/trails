@@ -9,9 +9,9 @@ export class JobGenerator extends NamedBase {
     this.methodAdded("createTestFile");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
-  createTestFile(): void {
-    this.createFile(
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  async createTestFile(): Promise<void> {
+    await this.createFile(
       File.join(
         "test/jobs",
         ...this.classPathParts,

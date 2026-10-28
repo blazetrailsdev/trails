@@ -8,8 +8,8 @@ export class TaskGenerator extends NamedBase {
 
   declare actions: string[];
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
-  createTaskFiles(): void {
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  async createTaskFiles(): Promise<void> {
     const actions = this.actions;
     const ext = this.ext();
     const filename = `lib/tasks/${this.fileName}${ext}`;
@@ -17,6 +17,6 @@ export class TaskGenerator extends NamedBase {
       .map((a) => `// TODO\nexport async function ${a}(): Promise<void> {}\n`)
       .join("\n");
 
-    this.createFile(filename, `// namespace: ${this.fileName}\n\n${actionLines}`);
+    await this.createFile(filename, `// namespace: ${this.fileName}\n\n${actionLines}`);
   }
 }

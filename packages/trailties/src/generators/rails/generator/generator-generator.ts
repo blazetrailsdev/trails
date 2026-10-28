@@ -22,14 +22,14 @@ export class GeneratorGenerator extends NamedBase {
     this.methodAdded("createGeneratorFiles");
   }
 
-  createGeneratorFiles(): void {
+  async createGeneratorFiles(): Promise<void> {
     const dir = this.generatorDir();
     const ext = this.ext();
     const className = camelize(this.fileName);
 
-    this.createFile(File.join(dir, "USAGE"), `Description:\n    Explain the generator\n`);
-    this.createFile(File.join(dir, "templates/.keep"), "");
-    this.createFile(
+    await this.createFile(File.join(dir, "USAGE"), `Description:\n    Explain the generator\n`);
+    await this.createFile(File.join(dir, "templates/.keep"), "");
+    await this.createFile(
       File.join(dir, `${this.fileName}-generator${ext}`),
       `import { NamedBase } from "@blazetrails/trailties/generators";
 
