@@ -1,6 +1,6 @@
 import { Attribute, RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { isPlainObject } from "@blazetrails/activesupport";
-import { eachWithIndex, Range } from "@blazetrails/ruby-compat";
+import { eachWithIndex, findAll, Range } from "@blazetrails/ruby-compat";
 import { RangeError as ARRangeError } from "./errors.js";
 import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
@@ -26,10 +26,10 @@ export class PartialQuery extends Query {
   constructor(values: unknown[]) {
     super("");
     this._values = values;
-    this._indexes = values
-      .map((thing, i): [unknown, number] => [thing, i])
-      .filter(([thing]) => thing instanceof Substitute)
-      .map(([, i]) => i);
+    this._indexes = findAll(
+      eachWithIndex(values),
+      ([thing, _i]: [unknown, number]) => thing instanceof Substitute,
+    ).map((pair) => pair.at(-1) as number);
   }
 
   override sqlFor(binds: unknown[], connection: unknown): string {
