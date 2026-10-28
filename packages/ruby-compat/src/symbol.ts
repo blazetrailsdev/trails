@@ -41,7 +41,12 @@ export function symbolToS(sym: string): string {
   return sym.slice(1);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/**
+ * `String#to_sym` (`vendor/ruby/v3.3.11/symbol.c:862` `rb_str_intern`): the
+ * Symbol is the string with its leading colon.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 export function stringToSym(value: string): string {
   return value.startsWith(":") ? value : `:${value}`;
 }

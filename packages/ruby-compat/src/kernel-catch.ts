@@ -121,12 +121,16 @@ function rbThrowObj(tag: unknown, value: unknown): never {
   throw new VmThrowData(tag);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/**
+ * `Kernel#catch` (`vendor/ruby/v3.3.11/vm_eval.c:2342` `rb_f_catch`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 export function kernelCatch<T>(block: (tag: object) => T): T | unknown;
 /** @noRailsEquivalent PERMANENT */
 export function kernelCatch<T>(tag: unknown, block: (tag: unknown) => T): T | unknown;
 /**
- * `Kernel#catch` (`vendor/ruby/v3.3.11/vm_eval.c:2331-2336` `rb_f_catch`): the tag
+ * `Kernel#catch` (`vendor/ruby/v3.3.11/vm_eval.c:2342` `rb_f_catch`): the tag
  * defaults to a fresh `Object.new`, and a missing block raises
  * `LocalJumpError` at `catch_i`'s `rb_yield_0`.
  *

@@ -4,7 +4,8 @@
  * gave a class or module, and whether it is permanent. Only ruby-compat writes
  * it, for a `const_set` a Rails body makes and for a module-eval namespace
  * seat; every other class's path comes from its package's generated table
- * ({@link registerClassPaths}).
+ * ({@link registerClassPaths}). `rb_class_path`
+ * (`vendor/ruby/v3.3.11/variable.c:364`) reads it.
  *
  * @noRailsEquivalent PERMANENT
  */
