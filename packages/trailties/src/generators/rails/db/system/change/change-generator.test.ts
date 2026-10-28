@@ -58,22 +58,22 @@ beforeEach(() => {
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
-function invokeAll(generator: ChangeGenerator): void {
-  generator.editDatabaseConfig();
+async function invokeAll(generator: ChangeGenerator): Promise<void> {
+  await generator.editDatabaseConfig();
   generator.editPackageJson();
   generator.editDockerfile();
   generator.editDevcontainerFiles();
 }
 
 function run(to: string, opts: { appName?: string } = {}) {
-  invokeAll(
+  return invokeAll(
     new ChangeGenerator([], { to, appName: opts.appName ?? "tmp" }, { destinationRoot: tmpDir }),
   );
 }
 
 type ComposeConfig = Hash<string, Hash<string, Hash<string, string[]>>>;
 describe("ChangeGeneratorTest", () => {
-  it("change to invalid database", () => {
+  it("change to invalid database", async () => {
     expect(
       () => new ChangeGenerator([], { to: "invalid-db" }, { destinationRoot: tmpDir }),
     ).toThrow(
@@ -81,15 +81,15 @@ describe("ChangeGeneratorTest", () => {
     );
   });
 
-  it("appName defaults to basename of cwd", () => {
-    invokeAll(new ChangeGenerator([], { to: "postgresql" }, { destinationRoot: tmpDir }));
+  it("appName defaults to basename of cwd", async () => {
+    await invokeAll(new ChangeGenerator([], { to: "postgresql" }, { destinationRoot: tmpDir }));
     expect(read("config/database.ts")).toContain(
       `database: "${path.basename(tmpDir)}_development"`,
     );
   });
 
-  it("change to postgresql", () => {
-    run("postgresql");
+  it("change to postgresql", async () => {
+    await run("postgresql");
     const cfg = read("config/database.ts");
     expect(cfg).toContain('adapter: "postgresql"');
     expect(cfg).toContain('database: "tmp_development"');
@@ -101,8 +101,8 @@ describe("ChangeGeneratorTest", () => {
     expect(dockerfile).toContain("curl libvips postgresql-client");
   });
 
-  it("change to mysql", () => {
-    run("mysql");
+  it("change to mysql", async () => {
+    await run("mysql");
     const cfg = read("config/database.ts");
     expect(cfg).toContain('adapter: "mysql2"');
     expect(cfg).toContain('database: "tmp_development"');
@@ -114,60 +114,60 @@ describe("ChangeGeneratorTest", () => {
     expect(dockerfile).toContain("curl default-mysql-client libvips");
   });
 
-  it("change to sqlite3", () => {
+  it("change to sqlite3", async () => {
     write("package.json", JSON.stringify({ dependencies: { pg: "^8.19.0" } }) + "\n");
-    run("sqlite3");
+    await run("sqlite3");
     expect(read("config/database.ts")).toContain("storage/development.sqlite3");
     const pkg = JSON.parse(read("package.json"));
     expect(pkg.dependencies["better-sqlite3"]).toBe("^12.6.2");
     expect(pkg.dependencies.pg).toBeUndefined();
   });
 
-  it("change to mariadb", () => {
-    run("mariadb-mysql");
+  it("change to mariadb", async () => {
+    await run("mariadb-mysql");
     expect(read("config/database.ts")).toContain('adapter: "mysql2"');
     expect(JSON.parse(read("package.json")).dependencies.mysql2).toBe("^3.18.2");
     expect(read("Dockerfile")).toContain("default-libmysqlclient-dev");
   });
 
-  it("change from versioned dep to other versioned dep", () => {
-    run("postgresql");
-    run("mysql");
+  it("change from versioned dep to other versioned dep", async () => {
+    await run("postgresql");
+    await run("mysql");
     const pkg = JSON.parse(read("package.json"));
     expect(pkg.dependencies.mysql2).toBe("^3.18.2");
     expect(pkg.dependencies.pg).toBeUndefined();
   });
 
-  it("no Dockerfile is a no-op", () => {
+  it("no Dockerfile is a no-op", async () => {
     fs.rmSync(path.join(tmpDir, "Dockerfile"));
-    run("mysql");
+    await run("mysql");
     expect(exists("Dockerfile")).toBe(false);
     expect(exists("config/database.ts")).toBe(true);
   });
 
-  it("editPackageJson throws on unparseable JSON", () => {
+  it("editPackageJson throws on unparseable JSON", async () => {
     write("package.json", "{ this is not json");
-    expect(() => run("mysql")).toThrow(/Could not parse .*package\.json/);
+    await expect(run("mysql")).rejects.toThrow(/Could not parse .*package\.json/);
   });
 
-  it("editDatabaseConfig fallback honors isTypeScript()", () => {
+  it("editDatabaseConfig fallback honors isTypeScript()", async () => {
     fs.rmSync(path.join(tmpDir, "tsconfig.json"));
-    run("postgresql");
+    await run("postgresql");
     expect(exists("config/database.js")).toBe(true);
     expect(exists("config/database.ts")).toBe(false);
   });
 
-  it("editDockerfile prefers longest-match alternation", () => {
+  it("editDockerfile prefers longest-match alternation", async () => {
     write("Dockerfile", "RUN apt-get install -y build-essential git libpq-dev\n");
-    run("mysql");
+    await run("mysql");
     expect(read("Dockerfile")).toBe(
       "RUN apt-get install -y build-essential default-libmysqlclient-dev git\n",
     );
   });
 
-  it("editDockerfile does not match inside a longer word token", () => {
+  it("editDockerfile does not match inside a longer word token", async () => {
     write("Dockerfile", "RUN apt-get install -y build-essential gitlab-cli\n");
-    run("postgresql");
+    await run("postgresql");
     expect(read("Dockerfile")).toBe("RUN apt-get install -y build-essential gitlab-cli\n");
   });
 
@@ -205,14 +205,14 @@ describe("ChangeGeneratorTest", () => {
       write(".devcontainer/compose.yaml", toYaml(compose));
     }
 
-    it("editDevcontainerFiles skipped when no .devcontainer dir", () => {
-      run("postgresql");
+    it("editDevcontainerFiles skipped when no .devcontainer dir", async () => {
+      await run("postgresql");
       expect(exists(".devcontainer/devcontainer.json")).toBe(false);
     });
 
-    it("change to postgresql adds service, volume, DB_HOST, feature", () => {
+    it("change to postgresql adds service, volume, DB_HOST, feature", async () => {
       seedDevcontainer("sqlite3", false);
-      run("postgresql");
+      await run("postgresql");
       const dc = JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
       expect((dc.containerEnv as Record<string, string>).DB_HOST).toBe("postgres");
       expect(
@@ -230,9 +230,9 @@ describe("ChangeGeneratorTest", () => {
       expect(railsApp.get("depends_on")).toContain("postgres");
     });
 
-    it("change to sqlite3 removes service, volume, DB_HOST, swaps feature", () => {
+    it("change to sqlite3 removes service, volume, DB_HOST, swaps feature", async () => {
       seedDevcontainer("postgres", true);
-      run("sqlite3");
+      await run("sqlite3");
       const dc = JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
       expect(dc.containerEnv).toBeUndefined();
       expect(
@@ -250,18 +250,18 @@ describe("ChangeGeneratorTest", () => {
       expect(railsApp.get("depends_on")).toBeUndefined();
     });
 
-    it("editDevcontainerJson throws on unparseable JSON", () => {
+    it("editDevcontainerJson throws on unparseable JSON", async () => {
       write(".devcontainer/devcontainer.json", "{ not json");
-      expect(() => run("postgresql")).toThrow(/Could not parse .*devcontainer\.json/);
+      await expect(run("postgresql")).rejects.toThrow(/Could not parse .*devcontainer\.json/);
     });
 
-    it("non-DB depends_on entries are preserved when swapping database", () => {
+    it("non-DB depends_on entries are preserved when swapping database", async () => {
       seedDevcontainer("postgres", true);
       const composePath = ".devcontainer/compose.yaml";
       const compose = YAML.load(read(composePath)) as ComposeConfig;
       compose.get("services")!.get("rails-app")!.get("depends_on")!.push("selenium", "redis");
       write(composePath, toYaml(compose));
-      run("mysql");
+      await run("mysql");
       const cm = YAML.load(read(composePath)) as ComposeConfig;
       const railsApp = cm.get("services")!.get("rails-app")!;
       expect(railsApp.get("depends_on")).toContain("mysql");
@@ -270,9 +270,9 @@ describe("ChangeGeneratorTest", () => {
       expect(railsApp.get("depends_on")).not.toContain("postgres");
     });
 
-    it("change from mysql to postgresql swaps service and feature", () => {
+    it("change from mysql to postgresql swaps service and feature", async () => {
       seedDevcontainer("mysql", true);
-      run("postgresql");
+      await run("postgresql");
       const cm = YAML.load(read(".devcontainer/compose.yaml")) as ComposeConfig;
       expect(cm.get("services")!.get("mysql")).toBeUndefined();
       expect(cm.get("services")!.get("postgres")).toBeDefined();

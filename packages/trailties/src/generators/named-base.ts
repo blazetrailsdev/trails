@@ -9,7 +9,6 @@ import {
 
 import { ActiveRecord } from "@blazetrails/activerecord";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import * as ThorActions from "@blazetrails/thor/actions";
 import { GeneratorBase, type GeneratorConfig } from "./base.js";
 import { Generators } from "../generators.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
@@ -43,13 +42,7 @@ export class NamedBase extends GeneratorBase {
 
   async template(source: string, ...args: unknown[]): Promise<string> {
     return this.insideTemplate(async () =>
-      Generators.addGeneratedFile(
-        (await ThorActions.Actions.template.call(
-          this as unknown as ThisParameterType<typeof ThorActions.Actions.template>,
-          source,
-          ...args,
-        )) as string,
-      ),
+      Generators.addGeneratedFile((await super.template(source, ...args)) as string),
     );
   }
 
