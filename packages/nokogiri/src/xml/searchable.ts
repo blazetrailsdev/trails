@@ -16,7 +16,7 @@ export interface SearchableHost {
 export function css(this: SearchableHost, ...args: unknown[]): NodeSet {
   const [rules, handler, ns] = extractParams.call(this, args);
 
-  return cssInternal(this, rules, handler, ns);
+  return cssInternal.call(this, this, rules, handler, ns);
 }
 
 export function atCss(this: SearchableHost, ...args: unknown[]): Node | undefined {
@@ -54,31 +54,32 @@ function isHash(param: unknown): param is Record<string, unknown> {
 }
 
 function cssInternal(
+  this: SearchableHost,
   node: SearchableHost,
   rules: string[],
   handler: unknown,
   ns: Record<string, string>,
 ): NodeSet {
-  return xpathInternal(node, cssRulesToXpath(node, rules, ns), handler, ns, null);
+  return xpathInternal(node, cssRulesToXpath.call(this, rules, ns), handler, ns, null);
 }
 
 /** @internal */
 export function cssRulesToXpath(
-  node: SearchableHost,
+  this: SearchableHost,
   rules: string[],
   ns: Record<string, string>,
 ): string[] {
-  return rules.map((rule) => xpathQueryFromCssRule(node, rule, ns));
+  return rules.map((rule) => xpathQueryFromCssRule.call(this, rule, ns));
 }
 
-function xpathQueryFromCssRule(node: SearchableHost, rule: string, ns: Record<string, string>) {
+function xpathQueryFromCssRule(this: SearchableHost, rule: string, ns: Record<string, string>) {
   return aryJoin(
     (
-      node.constructor as unknown as { IMPLIED_XPATH_CONTEXTS: readonly string[] }
+      this.constructor as unknown as { IMPLIED_XPATH_CONTEXTS: readonly string[] }
     ).IMPLIED_XPATH_CONTEXTS.map((impliedXpathContext) => {
       const visitor = new XPathVisitor({
         builtins: BuiltinsConfig.OPTIMAL,
-        doctype: (node.document as { xpathDoctype(): XPathVisitor["doctype"] }).xpathDoctype(),
+        doctype: (this.document as { xpathDoctype(): XPathVisitor["doctype"] }).xpathDoctype(),
         prefix: impliedXpathContext,
         namespaces: ns,
       });

@@ -43,7 +43,7 @@ export class NodeSet implements Iterable<Node> {
 
   css(...args: unknown[]): NodeSet {
     const [rules, handler, ns] = extractParams.call(this as unknown as SearchableHost, args);
-    const paths = cssRulesToXpath(this as unknown as SearchableHost, rules, ns);
+    const paths = cssRulesToXpath.call(this as unknown as SearchableHost, rules, ns);
 
     return this._list.reduce(
       (set, node) =>
