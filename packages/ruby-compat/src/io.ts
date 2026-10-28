@@ -561,6 +561,13 @@ class EAGAINWaitWritable extends Errno.EAGAIN {
   }
 }
 
+/** A non-IO source `IO.copy_stream` accepts (`vendor/ruby/v3.3.11/io.c:13176-13189`). */
+export interface CopyStreamSource {
+  toPath?(): string;
+  toIo?(): IO;
+  readpartial?(maxlen: number): Uint8Array;
+}
+
 /**
  * `IO` (`vendor/ruby/v3.3.11/io.c:15371` `rb_cIO`), the sliver of it trails calls.
  *
@@ -856,12 +863,32 @@ export class IO {
    * whatever either stream's encoding. It answers the byte total
    * (`io.c:13392`).
    *
+   * A source that answers `to_path` (a `File`, a `Tempfile`) is read
+   * through its `to_io` (`rb_io_check_io`, `io.c:13186-13189`); any other
+   * (a `StringIO`) goes through `copy_stream_fallback_body` (`io.c:13088`),
+   * which `readpartial`s 16 KiB at a time until `EOFError` (`io.c:13096`).
+   *
    * @noRailsEquivalent PERMANENT — Ruby core `IO.copy_stream`
    * (`vendor/ruby/v3.3.11/io.c:13365`).
    */
-  static copyStream(src: IO, dst: IO): number {
-    const buf = new Uint8Array(1024 * 16);
+  static copyStream(src: IO | CopyStreamSource, dst: { write(data: Uint8Array): unknown }): number {
     let total = 0;
+    const source = src as CopyStreamSource;
+    if (typeof source.toPath === "function" && typeof source.toIo === "function") {
+      src = source.toIo();
+    } else if (!(src instanceof IO)) {
+      try {
+        for (;;) {
+          const chunk = src.readpartial!(1024 * 16);
+          dst.write(chunk);
+          total += chunk.length;
+        }
+      } catch (error) {
+        if (error instanceof EOFError) return total;
+        throw error;
+      }
+    }
+    const buf = new Uint8Array(1024 * 16);
     for (;;) {
       const ss = getFs().readSync(src.fd, buf, 0, buf.length, src._pos);
       if (ss <= 0) return total;

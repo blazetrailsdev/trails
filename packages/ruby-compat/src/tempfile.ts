@@ -26,6 +26,7 @@ export type TempfileBasename = string | [string, string];
  */
 export interface TempfileOptions {
   encoding?: Encoding | string;
+  binmode?: boolean;
 }
 
 /**
@@ -305,7 +306,7 @@ function openExclusive(
 ): File {
   let tmpfile: File | null = null;
   createTmpname(basename, tmpdir, {}, (path) => {
-    tmpfile = File.open(path, "wx+", { perm: 0o600 });
+    tmpfile = File.open(path, { mode: "wx+", perm: 0o600, binmode: options.binmode });
     if (options.encoding != null) tmpfile.setEncoding(options.encoding);
   });
   return tmpfile!;
