@@ -35,7 +35,7 @@ export class ChannelGenerator extends NamedBase {
   private _root?: string;
 
   constructor(options: ChannelGeneratorOptions) {
-    super(options);
+    super({ ...options, attributes: [] });
     this.actions = options.attributes ?? [];
     this.fileName = this.fileName.replace(/_channel$/i, "");
   }
