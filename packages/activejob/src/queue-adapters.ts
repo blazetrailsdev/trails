@@ -1,5 +1,5 @@
 import { camelize } from "@blazetrails/activesupport";
-import { rbModConstGet, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbModConstGet } from "@blazetrails/ruby-compat";
 import { ActiveJob, QueueAdapters } from "./namespaces.js";
 import "./queue-adapters/abstract-adapter.js";
 import "./queue-adapters/async-adapter.js";
@@ -18,4 +18,4 @@ export function lookup(name: string): unknown {
 }
 Object.assign(QueueAdapters, { lookup });
 
-rbModConstSet(ActiveJob, "QueueAdapters", QueueAdapters);
+ActiveJob.QueueAdapters = QueueAdapters;

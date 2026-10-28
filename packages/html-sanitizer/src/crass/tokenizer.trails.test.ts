@@ -3,6 +3,16 @@ import { describe, expect, it } from "vitest";
 import { Tokenizer } from "./tokenizer.js";
 
 describe("Crass::Tokenizer", () => {
+  it("marks a \\ that starts no valid escape as an error delim, as tokenizer.rb does", () => {
+    expect(Tokenizer.tokenize("a\\\nx")[1]).toEqual({
+      node: "delim",
+      pos: 1,
+      raw: "\\",
+      error: true,
+      value: "\\",
+    });
+  });
+
   it("reads a bad url as consume_url / consume_bad_url do", () => {
     expect(Tokenizer.tokenize('url(a b"c)')[0]).toMatchObject({ error: true, value: "a bc" });
     expect(Tokenizer.tokenize('url(\\41 "x)')[0]).toMatchObject({ error: true, value: "Ax" });

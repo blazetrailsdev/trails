@@ -969,13 +969,15 @@ export async function executeGroupedCalculation(
         )) as ColumnType;
     });
 
-    const hashRows = (calculatedData.castValues(keyTypes) as unknown[][]).map((row) => {
-      const hash: Record<string, unknown> = {};
-      for (const [i, colName] of calculatedData.columns.entries()) {
-        hash[colName] = row[i];
-      }
-      return hash;
-    });
+    const hashRows = (calculatedData.castValues(keyTypes) as unknown[][]).map(
+      (row) =>
+        eachWithObject(calculatedData.columns, {} as Record<string, unknown>).withIndex(
+          null,
+          ([colName, hash]: [string, Record<string, unknown>], i: number) => {
+            hash[colName] = row[i];
+          },
+        ) as Record<string, unknown>,
+    );
 
     let type: unknown;
     if (fn !== "count") {

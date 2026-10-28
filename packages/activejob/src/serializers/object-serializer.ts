@@ -1,10 +1,4 @@
-import {
-  NotImplementedError,
-  rbModConstSet,
-  rbModName,
-  rbObjIsKindOf,
-  update,
-} from "@blazetrails/ruby-compat";
+import { NotImplementedError, rbModName, rbObjIsKindOf, update } from "@blazetrails/ruby-compat";
 import { ActiveJob, Serializers } from "../namespaces.js";
 
 export class ObjectSerializer {
@@ -52,4 +46,4 @@ export class ObjectSerializer {
     throw new NotImplementedError();
   }
 }
-rbModConstSet(Serializers, "ObjectSerializer", ObjectSerializer);
+Serializers.ObjectSerializer = ObjectSerializer;

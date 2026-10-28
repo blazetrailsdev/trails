@@ -16,7 +16,6 @@ import {
   Hash,
   rbFArray,
   rbInspect,
-  rbModConstSet,
   rbModName,
   rbObjAsString,
   rbObjClass,
@@ -31,6 +30,7 @@ import {
   tally,
 } from "@blazetrails/ruby-compat";
 import { verboseEnqueueLogs } from "./active-job.js";
+import { Base } from "./base.js";
 import { ActiveJob } from "./namespaces.js";
 
 interface LoggedJob {
@@ -240,7 +240,7 @@ export class LogSubscriber extends BaseLogSubscriber {
 
   /** @internal */
   override get logger(): Logger | null {
-    return ActiveJob.Base.logger as Logger | null;
+    return Base.logger as Logger | null;
   }
 
   protected override info(progname: string | null = null, block?: () => string): boolean | null {
@@ -304,7 +304,5 @@ LogSubscriber.subscribeLogLevel("perform", "info");
 LogSubscriber.subscribeLogLevel("enqueue_retry", "info");
 LogSubscriber.subscribeLogLevel("retry_stopped", "error");
 LogSubscriber.subscribeLogLevel("discard", "error");
-
-rbModConstSet(ActiveJob, "LogSubscriber", LogSubscriber);
 
 LogSubscriber.attachTo("active_job");

@@ -1,5 +1,6 @@
 import { Concern, ExecutionContext, extend, Rescuable } from "@blazetrails/activesupport";
-import { classModule, include, NotImplementedError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { classModule, include, NotImplementedError } from "@blazetrails/ruby-compat";
+import { Callbacks } from "./callbacks.js";
 import { ActiveJob } from "./namespaces.js";
 
 type JobData = Record<string, unknown>;
@@ -28,7 +29,7 @@ export class ClassMethods {
 
   /** @internal */
   static async execute(this: ExecutionClass, jobData: JobData): Promise<unknown> {
-    return ActiveJob.Callbacks.runCallbacks("execute", async () => {
+    return Callbacks.runCallbacks("execute", async () => {
       const job = this.deserialize(jobData) as ExecutionJob;
       return job.performNow();
     });
@@ -69,4 +70,4 @@ extend(Execution, Concern);
 include(Execution, Rescuable);
 Object.defineProperty(Execution, "ClassMethods", { value: ClassMethods });
 
-rbModConstSet(ActiveJob, "Execution", Execution);
+ActiveJob.Execution = Execution;

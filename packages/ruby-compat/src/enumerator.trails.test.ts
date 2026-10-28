@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { Enumerator, toEnum } from "./enumerator.js";
-import { eachSlice } from "./enumerable.js";
+import { eachSlice, eachWithIndex, eachWithObject } from "./enumerable.js";
 import { block } from "./hash.js";
 import { StopIteration } from "./stop-iteration.js";
+import { FloatDomainError } from "./float-domain-error.js";
 import { rbFSend } from "./object.js";
 
 describe("Enumerator", () => {
@@ -96,5 +97,58 @@ describe("Enumerator over an each that answers a promise", () => {
   it("sizes a sliced enumerator through enum_size", () => {
     expect(eachSlice([1, 2, 3], 2).size()).toBe(2);
     expect(eachSlice(asyncReceiver, 2).size()).toBeNull();
+  });
+});
+
+describe("Enumerator#with_index (enumerator_with_index, vendor/ruby/v3.3.11/enumerator.c:676)", () => {
+  it("packs each_with_object's two values and answers the memo", () => {
+    const memo = eachWithObject(["a", "b"], {} as Record<string, number>).withIndex(
+      null,
+      ([key, hash]: [string, Record<string, number>], i: number) => {
+        hash[key] = i;
+      },
+    );
+    expect(memo).toEqual({ a: 0, b: 1 });
+  });
+
+  it("starts from the offset over a block-less each_with_index", () => {
+    const seen: unknown[] = [];
+    eachWithIndex(["x", "y"]).withIndex(5, (pair, i) => seen.push([pair, i]));
+    expect(seen).toEqual([
+      [["x", 0], 5],
+      [["y", 1], 6],
+    ]);
+  });
+
+  it("carries the receiver's size through each_with_index, each_with_object and with_index", () => {
+    expect(eachWithIndex([1, 2]).size()).toBe(2);
+    expect(eachWithObject([1, 2], {}).size()).toBe(2);
+    expect(eachWithIndex([1, 2]).withIndex().size()).toBe(2);
+  });
+
+  it("converts the offset with rb_to_int", () => {
+    const e = eachWithIndex([1]);
+    expect(() => e.withIndex(NaN, () => {})).toThrow(FloatDomainError);
+    expect(() => e.withIndex(Infinity, () => {})).toThrow("Infinity");
+    expect(() => e.withIndex("1" as unknown as number, () => {})).toThrow(
+      "no implicit conversion of String into Integer",
+    );
+  });
+
+  it("keeps an Integer offset past long as a bigint", () => {
+    const seen: unknown[] = [];
+    eachWithIndex(["x"]).withIndex(10n ** 25n, (_pair, i) => seen.push(i));
+    expect(seen).toEqual([10n ** 25n]);
+  });
+
+  it("advances an offset past the safe integer range as a bigint", () => {
+    const seen: unknown[] = [];
+    eachWithIndex(["x", "y"]).withIndex(2 ** 53, (_pair, i) => seen.push(i));
+    expect(seen).toEqual([2n ** 53n, 2n ** 53n + 1n]);
+    expect(
+      eachWithIndex(["x"])
+        .withIndex(10n ** 25n)
+        .toA(),
+    ).toEqual([[["x", 0], 10n ** 25n]]);
   });
 });

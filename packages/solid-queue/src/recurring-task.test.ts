@@ -16,40 +16,24 @@ import { JobBuffer } from "./test-helpers/add-to-buffer-job.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
 
 class JobWithoutArguments extends ApplicationJob {
-  static toString(): string {
-    return "SolidQueue::RecurringTaskTest::JobWithoutArguments";
-  }
-
   perform(): void {
     JobBuffer.add("job_without_arguments");
   }
 }
 
 class JobWithRegularHashArguments extends ApplicationJob {
-  static toString(): string {
-    return "SolidQueue::RecurringTaskTest::JobWithRegularHashArguments";
-  }
-
   perform(value: unknown, options: { value: unknown }): void {
     JobBuffer.add([value, options.value]);
   }
 }
 
 class JobWithKeywordArgument extends ApplicationJob {
-  static toString(): string {
-    return "SolidQueue::RecurringTaskTest::JobWithKeywordArgument";
-  }
-
   perform(value: unknown, { value_kwarg }: { value_kwarg: unknown }): void {
     JobBuffer.add([value, value_kwarg]);
   }
 }
 
 class JobWithMultipleTypeArguments extends ApplicationJob {
-  static toString(): string {
-    return "SolidQueue::RecurringTaskTest::JobWithMultipleTypeArguments";
-  }
-
   perform(value: unknown, ...rest: { value?: unknown; value_kwarg?: unknown }[]): void {
     const kwargs = rest.at(-1) ?? {};
     const options = rest.length > 1 ? rest[0] : {};
@@ -58,10 +42,6 @@ class JobWithMultipleTypeArguments extends ApplicationJob {
 }
 
 class JobWithPriority extends ApplicationJob {
-  static toString(): string {
-    return "SolidQueue::RecurringTaskTest::JobWithPriority";
-  }
-
   static {
     this.queueWithPriority(10);
   }
@@ -72,10 +52,6 @@ class JobWithPriority extends ApplicationJob {
 }
 
 class JobUsingAsyncAdapter extends ApplicationJob {
-  static toString(): string {
-    return "SolidQueue::RecurringTaskTest::JobUsingAsyncAdapter";
-  }
-
   static {
     this.setQueueAdapter("async");
   }
@@ -93,7 +69,7 @@ for (const job of [
   JobWithPriority,
   JobUsingAsyncAdapter,
 ]) {
-  registerConstant(String(job), job);
+  registerConstant(`SolidQueue::RecurringTaskTest::${job.name}`, job);
 }
 
 const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));

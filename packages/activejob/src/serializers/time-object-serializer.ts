@@ -1,6 +1,5 @@
 import type { Temporal } from "@blazetrails/date";
 import { DateTime } from "@blazetrails/date";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
@@ -23,4 +22,4 @@ export class TimeObjectSerializer extends ObjectSerializer {
     return super.serialize({ value: rbTime.iso8601(TimeObjectSerializer.NANO_PRECISION) });
   }
 }
-rbModConstSet(Serializers, "TimeObjectSerializer", TimeObjectSerializer);
+Serializers.TimeObjectSerializer = TimeObjectSerializer;

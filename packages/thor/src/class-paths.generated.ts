@@ -39,6 +39,7 @@ registerClassPaths([
   [() => m6.Base, "Thor::Base"],
   [() => m6.ClassMethods, "Thor::Base::ClassMethods"],
   [() => m7.Command, "Thor::Command"],
+  [() => m8.CoreExt, "Thor::CoreExt"],
   [() => m8.HashWithIndifferentAccess, "Thor::CoreExt::HashWithIndifferentAccess"],
   [() => m7.DynamicCommand, "Thor::DynamicCommand"],
   [() => m9.Error, "Thor::Error"],

@@ -1,5 +1,5 @@
 import { Concern, extend, Notifications } from "@blazetrails/activesupport";
-import { block, defineModule, rbCallSuper, rbModConstSet } from "@blazetrails/ruby-compat";
+import { block, defineModule, rbCallSuper } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 
 interface InstrumentationJob {
@@ -83,5 +83,3 @@ Concern.included.call(Instrumentation as never, null, function (this: Instrument
     }),
   );
 });
-
-rbModConstSet(ActiveJob, "Instrumentation", Instrumentation);

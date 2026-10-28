@@ -2,7 +2,7 @@ import { XmlDocument as LibXmlDocument, XmlParseError } from "libxml2-wasm";
 import { include } from "@blazetrails/ruby-compat";
 
 import type { NodeSet } from "./node-set.js";
-import { Searchable } from "./searchable.js";
+import * as Searchable from "./searchable.js";
 import { XmlNode } from "./node.js";
 import { type Readable, readSource } from "../readable.js";
 import { SyntaxError } from "./syntax-error.js";

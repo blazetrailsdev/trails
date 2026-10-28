@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { rbModConstants, rbWarningSAset, stderr } from "@blazetrails/ruby-compat";
+import { rbModConstants, rbModName, rbWarningSAset, stderr } from "@blazetrails/ruby-compat";
 import { Tool } from "./tool.js";
 
 describe("MiniMagick::Tool deprecated constants", () => {
@@ -12,7 +12,7 @@ describe("MiniMagick::Tool deprecated constants", () => {
     rbWarningSAset(":deprecated", true);
     const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
     const Convert = (Tool as unknown as Record<string, typeof Tool>).Convert;
-    expect(String(Convert)).toBe("MiniMagick::Tool::Convert");
+    expect(rbModName(Convert)).toBe("MiniMagick::Tool::Convert");
     expect(Object.getPrototypeOf(Convert)).toBe(Tool);
     expect(write.mock.calls).toEqual([["constant MiniMagick::Tool::Convert is deprecated\n"]]);
   });

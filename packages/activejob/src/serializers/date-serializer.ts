@@ -1,6 +1,6 @@
 import type { Temporal } from "@blazetrails/date";
 import { Date, dNewByFrags } from "@blazetrails/date";
-import { hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
@@ -25,4 +25,4 @@ export class DateSerializer extends ObjectSerializer {
     return Date;
   }
 }
-rbModConstSet(Serializers, "DateSerializer", DateSerializer);
+Serializers.DateSerializer = DateSerializer;

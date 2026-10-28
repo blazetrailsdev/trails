@@ -22,6 +22,7 @@ import { Parser as CssParser } from "./css/parser.js";
 import { SelectorCache } from "./css/selector-cache.js";
 import { Tokenizer as CssTokenizer } from "./css/tokenizer.js";
 import { XPathVisitor } from "./css/xpath-visitor.js";
+export { usesLibxml } from "./version/info.js";
 import { xpathFor } from "./css.js";
 export const HTML5 = { Document: Html5Document, DocumentFragment: Html5DocumentFragment };
 export type { Html5Document, Html5DocumentFragment, Html5Node };

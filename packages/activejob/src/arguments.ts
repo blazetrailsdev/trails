@@ -22,7 +22,6 @@ import {
   rbHashSRuby2KeywordsHash,
   rbHashSRuby2KeywordsHashP,
   rbInspect,
-  rbModConstSet,
   rbModName,
   rbObjClass,
   rbObjIsKindOf,
@@ -53,7 +52,7 @@ export class DeserializationError extends StandardError {
     excSetBacktrace(this, excBacktrace(errinfo as Error));
   }
 }
-rbModConstSet(ActiveJob, "DeserializationError", DeserializationError);
+ActiveJob.DeserializationError = DeserializationError;
 
 export class SerializationError extends ArgumentError {
   static toString(): string {
@@ -65,7 +64,7 @@ export class SerializationError extends ArgumentError {
     this.name = "ActiveJob::SerializationError";
   }
 }
-rbModConstSet(ActiveJob, "SerializationError", SerializationError);
+ActiveJob.SerializationError = SerializationError;
 
 type Enumerable = Iterable<unknown> | Record<string, unknown>;
 
@@ -280,4 +279,4 @@ function convertToGlobalIdHash(argument: GlobalIDModel): Record<string, unknown>
 }
 
 export const Arguments = { serialize, deserialize, OBJECT_SERIALIZER_KEY };
-rbModConstSet(ActiveJob, "Arguments", Arguments);
+ActiveJob.Arguments = Arguments;

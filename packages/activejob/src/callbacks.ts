@@ -4,12 +4,7 @@ import {
   extend,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import {
-  defineModule,
-  include,
-  rbModConstSet,
-  rbObjSingletonClass,
-} from "@blazetrails/ruby-compat";
+import { defineModule, include, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 
 interface CallbacksClass {
@@ -61,4 +56,4 @@ Concern.included.call(Callbacks as never, null, function (this: CallbacksClass) 
   this.defineCallbacks("enqueue", { skipAfterCallbacksIfTerminated: true });
 });
 
-rbModConstSet(ActiveJob, "Callbacks", Callbacks);
+ActiveJob.Callbacks = Callbacks;

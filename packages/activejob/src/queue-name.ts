@@ -5,13 +5,7 @@ import {
   mattrAccessor,
   presence,
 } from "@blazetrails/activesupport";
-import {
-  aryJoin,
-  classModule,
-  rbModConstSet,
-  rbObjClass,
-  rbObjIsProc,
-} from "@blazetrails/ruby-compat";
+import { aryJoin, classModule, rbObjClass, rbObjIsProc } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 
 interface QueueNameClass {
@@ -84,4 +78,4 @@ Object.defineProperty(QueueName, "ClassMethods", { value: ClassMethods });
   classAttribute.call(this, "queueNamePrefix");
 });
 
-rbModConstSet(ActiveJob, "QueueName", QueueName);
+ActiveJob.QueueName = QueueName;

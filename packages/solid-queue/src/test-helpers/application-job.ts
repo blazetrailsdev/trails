@@ -15,9 +15,5 @@ export class ApplicationJob extends Base {
   declare static limitsConcurrency: typeof ConcurrencyControlsClassMethods.limitsConcurrency;
   declare concurrencyLimit: number | null;
   declare concurrencyKey: typeof ConcurrencyControls.prototype.concurrencyKey;
-
-  static toString(): string {
-    return "ApplicationJob";
-  }
 }
 registerConstant("ApplicationJob", ApplicationJob);

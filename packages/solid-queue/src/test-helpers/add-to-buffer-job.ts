@@ -10,10 +10,6 @@ export const JobBuffer = {
 };
 
 export class AddToBufferJob extends ApplicationJob {
-  static toString(): string {
-    return "AddToBufferJob";
-  }
-
   static {
     this.queueAs("background");
   }

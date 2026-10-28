@@ -1,5 +1,5 @@
 import { constantize } from "@blazetrails/activesupport";
-import { Module, hashAref, rbModConstSet, rbModName } from "@blazetrails/ruby-compat";
+import { Module, hashAref, rbModName } from "@blazetrails/ruby-compat";
 import { ActiveJob, Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
@@ -23,4 +23,4 @@ export class ModuleSerializer extends ObjectSerializer {
     return Module;
   }
 }
-rbModConstSet(Serializers, "ModuleSerializer", ModuleSerializer);
+Serializers.ModuleSerializer = ModuleSerializer;

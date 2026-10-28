@@ -4,6 +4,7 @@ import {
   File,
   Location,
   Pathname,
+  rbInspect,
   rbObjClassname,
   rbObjRespondTo,
   toEnum,
@@ -306,12 +307,14 @@ export class ExceptionWrapper {
   }
 
   exceptionInspect(): string {
-    return `#<${this.exceptionClassName}: ${this.message}>`;
+    return rbInspect(this.exception);
   }
 
   exceptionId(): number {
     return _idFor(this.exception);
   }
+
+  static SourceMapLocation = SourceMapLocation;
 
   get sourceExtracts(): SourceExtract[] {
     return this.backtrace.map((trace) => this.extractSource(trace));

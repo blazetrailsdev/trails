@@ -10,13 +10,11 @@ import {
   block as rbBlock,
   defineModule,
   rbCallSuper,
-  rbModConstSet,
   rbModName,
   rbObjClass,
   rbObjRespondTo,
   STDOUT,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
 
 interface TaggedLike {
   tagged(...tags: unknown[]): unknown;
@@ -73,5 +71,3 @@ Concern.included.call(Logging as never, null, function (this: LoggingClass) {
     }),
   );
 });
-
-rbModConstSet(ActiveJob, "Logging", Logging);

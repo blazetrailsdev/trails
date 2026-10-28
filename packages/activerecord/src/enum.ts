@@ -21,6 +21,7 @@ import {
   toS,
   rbClassSuperclass,
   rbObjRespondTo,
+  eachWithIndex,
 } from "@blazetrails/ruby-compat";
 import {
   isDangerousAttributeMethod,
@@ -260,10 +261,11 @@ export function _enum(
     suffix =
       suffix != null && suffix !== false ? (suffix === true ? `_${name}` : `_${suffix}`) : null;
 
-    const pairs: [string, EnumValue][] = rbObjRespondTo(values, "eachPair")
+    const pairs: Iterable<[string, EnumValue]> = rbObjRespondTo(values, "eachPair")
       ? Object.entries(values as Record<string, EnumValue>)
-      : (values as string[]).map((label, value) => [label, value]);
-    pairs.forEach(([label, value]) => {
+      : (eachWithIndex(values as string[]) as Iterable<[string, EnumValue]>);
+    let label: string, value: EnumValue;
+    for ([label, value] of pairs) {
       enumValues.set(label, value);
       label = toS(label);
 
@@ -290,7 +292,7 @@ export function _enum(
           instanceMethods,
         );
       }
-    });
+    }
   });
   if (scopes) this.detectNegativeEnumConditionsBang(valueMethodNames);
 

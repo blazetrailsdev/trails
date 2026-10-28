@@ -9,7 +9,6 @@ import {
   rbObjMethod,
   rbObjMethods,
   rbObjRespondTo,
-  rbSetClassPathString,
   regexpEscape,
   rtest,
   sort,
@@ -270,7 +269,6 @@ export class Command extends Struct.new(
     );
   }
 }
-rbSetClassPathString(Command, { name: "Thor" }, "Command");
 export const Task = Command;
 
 export class HiddenCommand extends Command {
@@ -278,7 +276,6 @@ export class HiddenCommand extends Command {
     return true;
   }
 }
-rbSetClassPathString(HiddenCommand, { name: "Thor" }, "HiddenCommand");
 export const HiddenTask = HiddenCommand;
 
 export class DynamicCommand extends Command {
@@ -301,5 +298,6 @@ export class DynamicCommand extends Command {
     }
   }
 }
-rbSetClassPathString(DynamicCommand, { name: "Thor" }, "DynamicCommand");
 export const DynamicTask = DynamicCommand;
+
+import "./class-paths.generated.js";

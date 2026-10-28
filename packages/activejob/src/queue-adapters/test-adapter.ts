@@ -3,13 +3,13 @@ import {
   cmp,
   fetch,
   rbCmpint,
-  rbModConstSet,
   rbObjClass,
   rbObjIsProc,
   rtest,
   toS,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob, QueueAdapters } from "../namespaces.js";
+import { Base } from "../base.js";
+import { QueueAdapters } from "../namespaces.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 
 interface TestAdapterJob {
@@ -91,7 +91,7 @@ export class TestAdapter extends AbstractAdapter {
   ): Promise<unknown> {
     if (perform) {
       this.performedJobs.push(jobData);
-      return await ActiveJob.Base.execute(job.serialize());
+      return await Base.execute(job.serialize());
     } else {
       this.enqueuedJobs.push(jobData);
       return this.enqueuedJobs;
@@ -139,4 +139,4 @@ export class TestAdapter extends AbstractAdapter {
     return (job: unknown) => kernelArray(filter).includes(rbObjClass(job));
   }
 }
-rbModConstSet(QueueAdapters, "TestAdapter", TestAdapter);
+QueueAdapters.TestAdapter = TestAdapter;

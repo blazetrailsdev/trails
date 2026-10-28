@@ -1,5 +1,5 @@
 import type { PermittedAttributes } from "@blazetrails/activemodel";
-import { NoMethodError, extend, rbModConstSet } from "@blazetrails/ruby-compat";
+import { NoMethodError, extend } from "@blazetrails/ruby-compat";
 import type { HasManyThroughAssociation } from "./has-many-through-association.js";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
@@ -508,4 +508,4 @@ for (const name of delegateMethods) {
   });
 }
 
-rbModConstSet(Associations, "CollectionProxy", CollectionProxy);
+Associations.CollectionProxy = CollectionProxy;

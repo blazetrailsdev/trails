@@ -23,8 +23,10 @@ import {
   rbObjRespondTo,
   slice,
   isModuleIncluded,
+  eachWithObject,
 } from "@blazetrails/ruby-compat";
-import { ActiveRecord, Encryption } from "./namespaces.js";
+import { ActiveRecord } from "./namespaces.js";
+import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import type { EncryptedFixtureHost } from "./encryption/encrypted-fixtures.js";
 import { TableRows } from "./fixture-set/table-rows.js";
 import { File } from "./fixture-set/file.js";
@@ -360,8 +362,7 @@ export class FixtureSet {
 
     if (yamlFiles.length === 0) throw new ArgumentError(`No fixture files found for ${this.name}`);
 
-    const fixtures: Record<string, Fixture> = {};
-    for (const file of yamlFiles) {
+    return eachWithObject(yamlFiles, {} as Record<string, Fixture>, (file, fixtures) => {
       File.open(file, (fh) => {
         if (this.modelClass == null && fh.modelClass) this.setModelClass(fh.modelClass as string);
         if (this.modelClass == null) this.setModelClass(this.defaultFixtureModelClass());
@@ -370,8 +371,7 @@ export class FixtureSet {
           fixtures[fixtureName] = new Fixture(row as FixtureAttrs, this.modelClass);
         });
       });
-    }
-    return fixtures;
+    });
   }
 
   private defaultFixtureModelClass(): BaseClass | null {
@@ -405,7 +405,7 @@ export class Fixture {
 
   /** @inlinedFrom ActiveRecord::Encryption::EncryptedFixtures#initialize rails/v8.0.2/activerecord/lib/active_record/encryption/encrypted_fixtures.rb:6-11 */
   constructor(fixture: FixtureAttrs, modelClass: BaseClass | null) {
-    if (isModuleIncluded(new.target, Encryption.EncryptedFixtures)) {
+    if (isModuleIncluded(new.target, EncryptedFixtures)) {
       const encrypted = this as unknown as EncryptedFixtureHost;
       encrypted.cleanValues = {};
       encrypted.encryptFixtureData(fixture, modelClass);

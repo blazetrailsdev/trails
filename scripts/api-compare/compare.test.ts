@@ -460,6 +460,13 @@ describe("significantMissingCalls", () => {
     expect(significantCallsForReceivers(receivers).has("count")).toBe(true);
   });
 
+  it("significantCallsForReceivers credits a fetch the TS checker typed", () => {
+    const receivers = { fetch: ["ivar"] };
+    const sig = significantCallsForReceivers(receivers, undefined, new Set(["fetch@typed"]));
+    expect(sig.has("fetch")).toBe(false);
+    expect(significantCallsForReceivers(receivers).has("fetch")).toBe(true);
+  });
+
   it("significantCallsForReceivers still flags a positional-array name with no receiver proof at all", () => {
     const sig = significantCallsForReceivers({});
     expect(sig.has("first")).toBe(true);

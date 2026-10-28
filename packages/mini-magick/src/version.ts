@@ -5,12 +5,8 @@ export function version() {
 }
 
 export class VERSION {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
-
-  static toString(): string {
-    return "MiniMagick::VERSION";
-  }
-
   static MAJOR: unknown = 5;
 
   static MINOR: unknown = 2;

@@ -1,16 +1,12 @@
-import { rbModConstSet, registerConstant, registeredConstant } from "@blazetrails/ruby-compat";
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
-
-const Sharded = (registeredConstant("Sharded") as object | undefined) ?? {};
-registerConstant("Sharded", Sharded);
 
 /** @missingRailsArgs has_many — CONVERGEABLE port-destroy-association-async-test-and-flip-models */
 export class ShardedBlogPostDestroyAsync extends Base {
   static _tableName = "sharded_blog_posts";
   static {
-    registerModel(rbModConstSet(Sharded, "BlogPostDestroyAsync", this));
+    registerModel("Sharded::BlogPostDestroyAsync", this);
   }
 
   static {

@@ -6,7 +6,7 @@ import {
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
 import { ActiveSupport, Executor, Logger, minutes, seconds } from "@blazetrails/activesupport";
-import { RuntimeError, StringIO, registerConstant } from "@blazetrails/ruby-compat";
+import { RuntimeError, StringIO, rbModName, registerConstant } from "@blazetrails/ruby-compat";
 import {
   Job,
   Process,
@@ -21,24 +21,16 @@ import { AddToBufferJob, JobBuffer } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
 
-class ExpectedTestError extends RuntimeError {
-  static toString(): string {
-    return "ExpectedTestError";
-  }
-}
+class ExpectedTestError extends RuntimeError {}
 registerConstant("ExpectedTestError", ExpectedTestError);
 
 class RaisingJob extends ApplicationJob {
-  static toString(): string {
-    return "RaisingJob";
-  }
-
   static {
     this.queueAs("background");
   }
 
   perform(raising: new (message: string) => Error, _identifier: string): void {
-    throw new raising(`This is a ${String(raising)} exception`);
+    throw new raising(`This is a ${rbModName(raising)} exception`);
   }
 }
 
