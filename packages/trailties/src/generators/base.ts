@@ -174,6 +174,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   pkg = TrailsActions.pkg;
 
+  /** @inlinedFrom Thor::Shell#initialize thor/v1.3.2/lib/thor/shell.rb:44-48 */
   constructor(options: GeneratorOptions) {
     this.cwd = options.cwd;
     this.destinationRoot = options.cwd;
