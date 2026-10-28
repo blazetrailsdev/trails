@@ -299,3 +299,5 @@ export class DynamicCommand extends Command {
   }
 }
 export const DynamicTask = DynamicCommand;
+
+import "./class-paths.generated.js";

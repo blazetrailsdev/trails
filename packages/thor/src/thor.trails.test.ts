@@ -480,4 +480,17 @@ describe("Thor class paths", () => {
       }
     }
   });
+
+  it("seats each command class and its Task alias as a constant on Thor", () => {
+    const thor = Thor as unknown as Record<string, unknown>;
+    expect(thor.Command).toBe(Command);
+    expect(thor.Task).toBe(Command);
+    expect(thor.HiddenCommand).toBe(HiddenCommand);
+    expect(thor.HiddenTask).toBe(HiddenCommand);
+    expect(thor.DynamicCommand).toBe(DynamicCommand);
+    expect(thor.DynamicTask).toBe(DynamicCommand);
+    expect((thor.CoreExt as Record<string, unknown>).HashWithIndifferentAccess).toBe(
+      HashWithIndifferentAccess,
+    );
+  });
 });

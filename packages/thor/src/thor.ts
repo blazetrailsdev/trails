@@ -801,9 +801,12 @@ rbSetClassPathString(Argument, Thor, "Argument");
 rbSetClassPathString(Arguments, Thor, "Arguments");
 rbSetClassPathString(Option, Thor, "Option");
 rbSetClassPathString(Options, Thor, "Options");
-rbSetClassPathString(Command, Thor, "Command");
-rbSetClassPathString(HiddenCommand, Thor, "HiddenCommand");
-rbSetClassPathString(DynamicCommand, Thor, "DynamicCommand");
+rbModConstSet(Thor, "Command", Command);
+rbModConstSet(Thor, "Task", Command);
+rbModConstSet(Thor, "HiddenCommand", HiddenCommand);
+rbModConstSet(Thor, "HiddenTask", HiddenCommand);
+rbModConstSet(Thor, "DynamicCommand", DynamicCommand);
+rbModConstSet(Thor, "DynamicTask", DynamicCommand);
 rbModConstSet(Thor, "CoreExt", CoreExt);
 rbModConstSet(CoreExt, "HashWithIndifferentAccess", HashWithIndifferentAccess);
 
