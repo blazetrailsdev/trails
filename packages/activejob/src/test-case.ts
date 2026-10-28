@@ -1,6 +1,6 @@
 import { runLoadHooks } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import { include, rbModConstSet } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 import { TestHelper } from "./test-helper.js";
 
@@ -15,4 +15,4 @@ export interface TestCase extends Omit<TestHelper, "beforeSetup" | "afterTeardow
 include(TestCase, TestHelper);
 
 runLoadHooks("active_job_test_case", TestCase);
-rbModConstSet(ActiveJob, "TestCase", TestCase);
+ActiveJob.TestCase = TestCase;

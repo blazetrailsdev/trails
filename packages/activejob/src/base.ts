@@ -12,7 +12,6 @@ import {
   rbHashSRuby2KeywordsHash,
   ArgumentError,
   rbClassInheritedP,
-  rbModConstSet,
   registerConstant,
   rbModName,
   rbObjClass,
@@ -141,7 +140,7 @@ include(Base, Instrumentation);
 include(Base, Logging);
 include(Base, Timezones);
 include(Base, Translation);
-rbModConstSet(ActiveJob, "Base", Base);
+ActiveJob.Base = Base;
 
 /** @noRailsEquivalent PERMANENT */
 export function registerJob(job: typeof Base): void;

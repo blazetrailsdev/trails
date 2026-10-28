@@ -1,6 +1,5 @@
 import { Concern, extend, useZone } from "@blazetrails/activesupport";
-import { block as rbBlock, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
+import { block as rbBlock } from "@blazetrails/ruby-compat";
 
 interface TimezonesJob {
   timezone: string | null;
@@ -20,5 +19,3 @@ Concern.included.call(Timezones as never, null, function (this: TimezonesClass) 
     }),
   );
 });
-
-rbModConstSet(ActiveJob, "Timezones", Timezones);

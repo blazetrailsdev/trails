@@ -1,4 +1,4 @@
-import { Range, valuesAt, rbModConstSet } from "@blazetrails/ruby-compat";
+import { Range, valuesAt } from "@blazetrails/ruby-compat";
 import { ActiveJob, Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
@@ -31,4 +31,4 @@ export class RangeSerializer extends ObjectSerializer {
     return Range;
   }
 }
-rbModConstSet(Serializers, "RangeSerializer", RangeSerializer);
+Serializers.RangeSerializer = RangeSerializer;

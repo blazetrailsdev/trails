@@ -4,6 +4,7 @@ import {
   File,
   Location,
   Pathname,
+  rbInspect,
   rbObjClassname,
   rbObjRespondTo,
   toEnum,
@@ -306,7 +307,7 @@ export class ExceptionWrapper {
   }
 
   exceptionInspect(): string {
-    return `#<${this.exceptionClassName}: ${this.message}>`;
+    return rbInspect(this.exception);
   }
 
   exceptionId(): number {

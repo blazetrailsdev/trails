@@ -24,7 +24,6 @@ import {
   rbEqual,
   rbGetKwargs,
   rbInspect,
-  rbModConstSet,
   rbModName,
   rbObjClass,
   rbObjDup,
@@ -33,8 +32,10 @@ import {
   toF,
   toS,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob, QueueAdapters } from "./namespaces.js";
-import type { TestAdapter } from "./queue-adapters/test-adapter.js";
+import { Base } from "./base.js";
+import { Arguments } from "./arguments.js";
+import { TestAdapter } from "./queue-adapters/test-adapter.js";
+import { ActiveJob } from "./namespaces.js";
 import { ClassMethods as QueueAdapterClassMethods } from "./queue-adapter.js";
 
 type Payload = Record<string, unknown>;
@@ -96,7 +97,7 @@ extend(TestQueueAdapter, Concern);
 });
 
 onLoad("active_job", () => {
-  include(ActiveJob.Base, TestQueueAdapter);
+  include(Base, TestQueueAdapter);
 });
 
 export async function beforeSetup(this: TestHelper): Promise<unknown> {
@@ -108,7 +109,7 @@ export async function beforeSetup(this: TestHelper): Promise<unknown> {
     ) {
       klass.enableTestAdapter(queueAdapterSpecificToThisTestClass);
     } else if (klass._queueAdapter == null) {
-      klass.enableTestAdapter(new QueueAdapters.TestAdapter());
+      klass.enableTestAdapter(new TestAdapter());
     }
   }
 
@@ -403,7 +404,7 @@ export async function performEnqueuedJobs(
 }
 
 export function queueAdapter(): unknown {
-  return ActiveJob.Base.queueAdapter;
+  return Base.queueAdapter;
 }
 
 /** @internal */
@@ -417,7 +418,7 @@ export function requireActiveJobTestAdapterBang(this: TestHelper, method: string
 
 /** @internal */
 export function isUsingTestAdapter(this: TestHelper): boolean {
-  return this.queueAdapter() instanceof QueueAdapters.TestAdapter;
+  return this.queueAdapter() instanceof TestAdapter;
 }
 
 /** @internal */
@@ -534,7 +535,7 @@ export async function deserializeArgsForAssertion(job: Payload): Promise<Payload
     newJob[":at"] = Time.at(newJob[":at"] as number);
   }
   if (newJob[":args"] != null && newJob[":args"] !== false) {
-    newJob[":args"] = await ActiveJob.Arguments.deserialize(newJob[":args"] as unknown[]);
+    newJob[":args"] = await Arguments.deserialize(newJob[":args"] as unknown[]);
   }
   return newJob;
 }
@@ -557,8 +558,8 @@ export async function instantiateJob(
  * @missingRailsArgs descendants — PERMANENT
  */
 export function queueAdapterChangedJobs(): TestQueueAdapterClass[] {
-  const descendants = DescendantsTracker.descendants(ActiveJob.Base);
-  descendants.push(ActiveJob.Base);
+  const descendants = DescendantsTracker.descendants(Base);
+  descendants.push(Base);
   return descendants.filter((klass) =>
     Object.hasOwn(klass, "__class_attr__queueAdapter"),
   ) as unknown as TestQueueAdapterClass[];
@@ -643,4 +644,4 @@ Object.assign(TestHelper.prototype, {
   queueAdapterChangedJobs,
   validateOption,
 });
-rbModConstSet(ActiveJob, "TestHelper", TestHelper);
+ActiveJob.TestHelper = TestHelper;

@@ -1,5 +1,5 @@
 import { Time } from "@blazetrails/date";
-import { hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 import { TimeObjectSerializer } from "./time-object-serializer.js";
 
@@ -17,4 +17,4 @@ export class TimeSerializer extends TimeObjectSerializer {
     return Time;
   }
 }
-rbModConstSet(Serializers, "TimeSerializer", TimeSerializer);
+Serializers.TimeSerializer = TimeSerializer;

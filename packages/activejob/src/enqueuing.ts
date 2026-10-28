@@ -5,7 +5,6 @@ import {
   flatten,
   groupBy,
   rbBlockGivenP,
-  rbModConstSet,
   rbObjIsKindOf,
   rbObjRespondTo,
   StandardError,
@@ -18,7 +17,7 @@ export class EnqueueError extends StandardError {
     return "ActiveJob::EnqueueError";
   }
 }
-rbModConstSet(ActiveJob, "EnqueueError", EnqueueError);
+ActiveJob.EnqueueError = EnqueueError;
 
 interface QueueAdapterLike {
   enqueue(job: unknown): unknown;
@@ -142,4 +141,4 @@ extend(Enqueuing, Concern);
 );
 Object.defineProperty(Enqueuing, "ClassMethods", { value: ClassMethods });
 
-rbModConstSet(ActiveJob, "Enqueuing", Enqueuing);
+ActiveJob.Enqueuing = Enqueuing;

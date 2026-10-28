@@ -111,7 +111,10 @@ export class EncryptedConfiguration extends EncryptedFile {
     return h;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName config — CONVERGEABLE converge-code-generator-encrypted-config-file-update-checker-calls
+   */
   private get options(): OrderedOptions | null {
     if (this._config === null) return null;
     return (this._options ??= this.deepTransform(this._config) as OrderedOptions);

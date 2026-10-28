@@ -1,5 +1,5 @@
 import { Concern, classAttribute, extend, mattrAccessor } from "@blazetrails/activesupport";
-import { classModule, rbModConstSet, rbObjIsProc } from "@blazetrails/ruby-compat";
+import { classModule, rbObjIsProc } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 
 interface QueuePriorityClass {
@@ -53,4 +53,4 @@ Object.defineProperty(QueuePriority, "ClassMethods", { value: ClassMethods });
   });
 });
 
-rbModConstSet(ActiveJob, "QueuePriority", QueuePriority);
+ActiveJob.QueuePriority = QueuePriority;

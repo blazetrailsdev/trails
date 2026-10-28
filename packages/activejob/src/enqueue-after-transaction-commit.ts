@@ -1,5 +1,5 @@
 import { squish, TopLevel } from "@blazetrails/activesupport";
-import { rbCallSuper, rbModConstSet, rbModName, rbObjClass } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rbModName, rbObjClass } from "@blazetrails/ruby-compat";
 import { deprecator } from "./deprecator.js";
 import { ActiveJob } from "./namespaces.js";
 
@@ -58,4 +58,4 @@ async function rawEnqueue(this: EnqueueAfterTransactionCommitJob): Promise<unkno
 }
 
 export const EnqueueAfterTransactionCommit = { rawEnqueue };
-rbModConstSet(ActiveJob, "EnqueueAfterTransactionCommit", EnqueueAfterTransactionCommit);
+ActiveJob.EnqueueAfterTransactionCommit = EnqueueAfterTransactionCommit;
