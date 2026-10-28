@@ -26,7 +26,6 @@ import {
   rbObjRespondTo,
   rbFSend,
   rbObjClassname,
-  rubyClass,
 } from "@blazetrails/ruby-compat";
 import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
@@ -119,8 +118,6 @@ export class Duration {
   static readonly PARTS = PARTS;
 
   readonly parts: DurationParts;
-
-  readonly [rubyClass] = "ActiveSupport::Duration";
 
   /** @internal */
   private readonly _partKeys: readonly (keyof DurationParts)[];
@@ -794,8 +791,6 @@ export class Scalar {
       return null;
     }
   }
-
-  readonly [rubyClass] = "ActiveSupport::Duration::Scalar";
 
   equals = cmpEquals;
 

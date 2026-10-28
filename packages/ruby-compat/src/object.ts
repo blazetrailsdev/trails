@@ -8,7 +8,7 @@ import { rbCheckStringType, rbErrorArity, stringValue } from "./string/support.j
 import { rbPlus } from "./numeric.js";
 import { BINARY_METHOD_TABLE, STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
-import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
+import { cmp, rbCmpint, rubyClass } from "./comparable.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
@@ -101,13 +101,11 @@ export function rbObjClass(obj: unknown): Klass {
 /**
  * `rb_obj_classname` (`vendor/ruby/v3.3.11/variable.c:498`): the
  * {@link rbModToS} of the class {@link rbObjClass} answers, which is how Ruby
- * interpolates `obj.class`, or the {@link rubyClass} brand.
+ * interpolates `obj.class`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbObjClassname(x: unknown): string {
-  const branded = typeof x === "object" && x !== null ? (x as Comparable)[rubyClass] : null;
-  if (branded != null) return branded;
   return rbModToS(rbObjClass(x));
 }
 

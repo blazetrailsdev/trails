@@ -12,6 +12,7 @@ import {
   rbObjIsKindOf,
   rtest,
   symbolToS,
+  Hash,
 } from "@blazetrails/ruby-compat";
 import { deprecationWarning } from "../base.js";
 import { Argument, type ArgumentOptions } from "./argument.js";
@@ -76,11 +77,7 @@ export class Option extends Argument {
       type = "boolean";
     } else if (rbObjIsKindOf(value, rbCNumeric)) {
       type = "numeric";
-    } else if (
-      rbObjClassname(value) === "Hash" ||
-      Array.isArray(value) ||
-      typeof value === "string"
-    ) {
+    } else if (rbObjIsKindOf(value, Hash) || Array.isArray(value) || typeof value === "string") {
       type = rbObjClassname(value).toLowerCase();
     }
 
@@ -172,7 +169,7 @@ export class Option extends Argument {
     } else if (isSymbol(this.default)) {
       defaultType = "string";
     } else if (
-      rbObjClassname(this.default) === "Hash" ||
+      rbObjIsKindOf(this.default, Hash) ||
       Array.isArray(this.default) ||
       typeof this.default === "string"
     ) {

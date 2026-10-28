@@ -17,15 +17,22 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
-import { rbInspect, rbObjClassname, rbObjRespondTo } from "./object.js";
+import {
+  rbCTime,
+  rbInspect,
+  rbObjClass,
+  rbObjClassname,
+  rbObjRespondTo,
+  reopened,
+} from "./object.js";
 import { kDateP, rbEqual } from "./rb-equal.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 import { rbStrCmp } from "./string/support.js";
 
 /**
- * The Ruby class name `rb_obj_class` reports in `rb_cmperr`'s message — Ruby's
- * `Date::Infinity`, which no JS `constructor.name` can spell. A JS `Symbol`
- * because it is a brand, not a Ruby Symbol value.
+ * Marks a `Temporal.ZonedDateTime` that `DateTime#to_datetime` answers, so
+ * `rbObjClass` reports `DateTime` for it where a Temporal value has no class
+ * of its own. A JS `Symbol` because it is a brand, not a Ruby Symbol value.
  * @noRailsEquivalent PERMANENT — the brand standing in for `rb_obj_class`
  * (`vendor/ruby/v3.3.11/compar.c:28`); Ruby core, not Rails.
  */
@@ -38,7 +45,6 @@ export const rubyClass = Symbol.for("@blazetrails/ruby-compat:rubyClass");
  */
 export interface Comparable {
   compareTo(other: unknown): number | null;
-  readonly [rubyClass]?: string;
 }
 
 /**
@@ -88,7 +94,7 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (b instanceof Number) b = b.valueOf();
   if (isComparable(a)) return a.compareTo(b) ?? null;
   if (isCmpSpelling(a)) return a.cmp(b) ?? null;
-  if (rbObjClassname(a) === "Time" && rbObjClassname(b) === "Time") {
+  if (rbObjClass(a) === reopened(rbCTime) && rbObjClass(b) === reopened(rbCTime)) {
     if (typeof (a as { compare?: unknown }).compare === "function") {
       return (a as { compare(o: unknown): number | null }).compare(b) ?? null;
     }

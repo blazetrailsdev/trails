@@ -2039,3 +2039,11 @@ describe("Date#hour, #min, #sec (d_lite_zero, private)", () => {
     );
   });
 });
+
+describe("Date::Infinity class path", () => {
+  it("is pathed under Date", async () => {
+    const { rbObjClassname } = await import("@blazetrails/ruby-compat");
+    const { DateInfinity } = await import("./date.js");
+    expect(rbObjClassname(new DateInfinity())).toBe("Date::Infinity");
+  });
+});

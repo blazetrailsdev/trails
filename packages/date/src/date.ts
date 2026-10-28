@@ -20,6 +20,7 @@ import {
   rbObjIsKindOf,
   rbDbl2num,
   rbDefineAllocFunc,
+  rbSetClassPathString,
   rubyClass,
   TEMPORAL_METHOD_TABLE,
 } from "@blazetrails/ruby-compat";
@@ -4247,8 +4248,6 @@ export class DateInfinity {
     return null;
   }
 
-  readonly [rubyClass] = "Date::Infinity";
-
   lessThan = lessThan;
 
   lessThanOrEqual = lessThanOrEqual;
@@ -6851,3 +6850,4 @@ for (const seat of ["Temporal.Instant", "Date"]) {
 
 registerConstant("Date", Date);
 registerConstant("DateTime", DateTime);
+rbSetClassPathString(DateInfinity, Date, "Infinity");
