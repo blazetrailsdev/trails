@@ -3,7 +3,7 @@ import { Configuration } from "./configuration.js";
 import { Utilities } from "./utilities.js";
 import { Tool, type CliTool } from "./tool.js";
 import "./image.js";
-import { extend, RuntimeError, StandardError } from "@blazetrails/ruby-compat";
+import { extend, RuntimeError, StandardError, block as blockPass } from "@blazetrails/ruby-compat";
 
 export function isImagemagick7() {
   if (MiniMagick.graphicsmagick != null && MiniMagick.graphicsmagick !== false) {
@@ -67,7 +67,7 @@ for (const tool of [
   ) => {
     if (typeof options === "function") [options, block] = [{}, options];
     const name = MiniMagick.isImagemagick7() && tool === "convert" ? "magick" : tool;
-    return Tool.new(name, options, block);
+    return block != null ? Tool.new(name, options, blockPass(block)) : Tool.new(name, options);
   };
 }
 export class Error extends RuntimeError {

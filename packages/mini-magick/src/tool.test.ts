@@ -1,5 +1,5 @@
 import type {} from "@blazetrails/vitest-matchers";
-import { File } from "@blazetrails/ruby-compat";
+import { File, block } from "@blazetrails/ruby-compat";
 import { MiniMagick } from "./mini-magick.js";
 import { Shell } from "./shell.js";
 import "./test-helpers/spec-helper.js";
@@ -48,9 +48,12 @@ describe("MiniMagick::Tool", () => {
 
   describe(".new", () => {
     it("accepts a block, and immediately executes the command", async () => {
-      const output = await Tool.new("identify", (builder: Tool) => {
-        builder.append(imagePath("gif"));
-      });
+      const output = await Tool.new(
+        "identify",
+        block((builder: Tool) => {
+          builder.append(imagePath("gif"));
+        }),
+      );
       expect(output).toMatch("GIF");
     });
   });
@@ -132,10 +135,12 @@ describe("MiniMagick::Tool", () => {
 
   describe("#stack", () => {
     it("it surrounds added arguments with parentheses", () => {
-      subject.stack((stack: Tool) => {
-        stack.append("foo");
-        stack.append("bar");
-      });
+      subject.stack(
+        block((stack: Tool) => {
+          stack.append("foo");
+          stack.append("bar");
+        }),
+      );
       expect(subject.args).toEqual(["(", "foo", "bar", ")"]);
     });
 
