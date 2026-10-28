@@ -14,11 +14,12 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  defineModule,
+  include,
   BigDecimal,
   eachPair,
   Hash,
   hashAref,
-  Module,
   rbInspect,
 } from "@blazetrails/ruby-compat";
 import { CaptureHelper, capture, type CaptureHelperHost } from "./capture-helper.js";
@@ -782,12 +783,11 @@ function createTagBuilderProxy(viewContext: TagHelperHost): TagBuilder {
   });
 }
 
-export const TagHelper = new Module((mod) => {
-  mod.include(CaptureHelper);
-  mod.include(OutputSafetyHelper);
+export const TagHelper = defineModule(
+  { tag, contentTag, tokenList, classNames, cdataSection, escapeOnce },
+  {},
+  { buildTagValues, tagBuilder },
+);
 
-  mod.moduleEval((m) => {
-    Object.assign(m, { tag, contentTag, tokenList, classNames, cdataSection, escapeOnce });
-    Object.assign(m, { buildTagValues, tagBuilder });
-  });
-});
+include(TagHelper, CaptureHelper);
+include(TagHelper, OutputSafetyHelper);

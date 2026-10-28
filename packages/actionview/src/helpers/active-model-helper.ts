@@ -1,9 +1,9 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { defineModule, rbCallSuper, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { ActionView } from "../namespaces.js";
 
-export const ActiveModelHelper = new Module();
+export const ActiveModelHelper = defineModule({});
 
 export interface ActiveModelInstanceTag {
   object: unknown;
@@ -22,21 +22,18 @@ type Host = ActiveModelInstanceTag & {
   isTagGenerateErrors(options: Record<string, unknown>): boolean;
 };
 
-export const ActiveModelInstanceTag = new Module();
-
 function object(this: Host): unknown {
   if (this._activeModelObject == null || this._activeModelObject === false) {
-    const object = ActiveModelInstanceTag.superMethod(this, "object")!();
-    this._activeModelObject = rbObjRespondTo(object, "toModel")
-      ? (object as { toModel(): unknown }).toModel()
-      : object;
+    const superObject = rbCallSuper(this, object);
+    this._activeModelObject = rbObjRespondTo(superObject, "toModel")
+      ? (superObject as { toModel(): unknown }).toModel()
+      : superObject;
   }
   return this._activeModelObject;
 }
 
 function contentTag(this: Host, type: string, options: unknown, ...args: unknown[]): unknown {
-  const _super = () =>
-    ActiveModelInstanceTag.superMethod(this, "contentTag")!(type, options, ...args);
+  const _super = () => rbCallSuper(this, contentTag, type, options, ...args);
   return this.isSelectMarkupHelper(type) ? _super() : this.errorWrapping(_super());
 }
 
@@ -46,7 +43,7 @@ function tag(
   options: Record<string, unknown>,
   ...args: unknown[]
 ): unknown {
-  const _super = () => ActiveModelInstanceTag.superMethod(this, "tag")!(type, options, ...args);
+  const _super = () => rbCallSuper(this, tag, type, options, ...args);
   return this.isTagGenerateErrors(options) ? this.errorWrapping(_super()) : _super();
 }
 
@@ -87,8 +84,18 @@ function isTagGenerateErrors(this: Host, options: Record<string, unknown>): bool
   return options["type"] !== "hidden";
 }
 
-ActiveModelInstanceTag.moduleEval((m) => {
-  Object.defineProperty(m, "object", { get: object, configurable: true });
-  Object.assign(m, { contentTag, tag, errorWrapping, errorMessage });
-  Object.assign(m, { isObjectHasErrors, isSelectMarkupHelper, isTagGenerateErrors });
+export const ActiveModelInstanceTag = defineModule(
+  {
+    contentTag,
+    tag,
+    errorWrapping,
+    errorMessage,
+  },
+  {},
+  { isObjectHasErrors, isSelectMarkupHelper, isTagGenerateErrors },
+);
+Object.defineProperty(ActiveModelInstanceTag, "object", {
+  get: object,
+  enumerable: true,
+  configurable: true,
 });
