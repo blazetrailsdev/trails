@@ -16,7 +16,7 @@ import { isBlank, isPresent, toParam } from "@blazetrails/activesupport";
 
 import { ActiveModelInstanceTag } from "../active-model-helper.js";
 import { FormTagHelper, type FormTagHelperHost } from "../form-tag-helper.js";
-import { TagHelper } from "../tag-helper.js";
+import { TagHelper, contentTag, tag } from "../tag-helper.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModelInstanceTag, TagHelper, FormTagHelper` (tags/base.rb:7); the class/interface merge is how the mixins surface on the type side.
 export class Base {
@@ -65,6 +65,25 @@ export class Base {
   render(): unknown {
     // @nie disposition=keep-as-strategy-hook rails=actionview/lib/action_view/helpers/tags/base.rb:31
     throw new NotImplementedError("Subclasses must implement a render method");
+  }
+
+  /** @inlinedFrom ActionView::Helpers::ActiveModelInstanceTag#content_tag rails/v8.0.2/actionview/lib/action_view/helpers/active_model_helper.rb:20-22 */
+  contentTag(type: string, options: unknown, ...args: unknown[]): unknown {
+    const _super = () =>
+      (contentTag as (this: unknown, ...a: unknown[]) => unknown).call(
+        this,
+        type,
+        options,
+        ...args,
+      );
+    return this.isSelectMarkupHelper(type) ? _super() : this.errorWrapping(_super());
+  }
+
+  /** @inlinedFrom ActionView::Helpers::ActiveModelInstanceTag#tag rails/v8.0.2/actionview/lib/action_view/helpers/active_model_helper.rb:24-26 */
+  tag(type: string, options: Record<string, unknown>, ...args: unknown[]): unknown {
+    const _super = () =>
+      (tag as (this: unknown, ...a: unknown[]) => unknown).call(this, type, options, ...args);
+    return this.isTagGenerateErrors(options) ? this.errorWrapping(_super()) : _super();
   }
 
   protected value(): unknown {

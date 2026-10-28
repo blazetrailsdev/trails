@@ -11,6 +11,10 @@ export interface ActiveModelInstanceTag {
   tag(type: string, options: Record<string, unknown>, ...args: unknown[]): unknown;
   errorWrapping(htmlTag: unknown): unknown;
   errorMessage(): unknown;
+  /** @internal */
+  isSelectMarkupHelper(type: string): boolean;
+  /** @internal */
+  isTagGenerateErrors(options: Record<string, unknown>): boolean;
 }
 
 type Host = ActiveModelInstanceTag & {
@@ -18,8 +22,6 @@ type Host = ActiveModelInstanceTag & {
   _methodName: string;
   _templateObject: unknown;
   isObjectHasErrors(): boolean;
-  isSelectMarkupHelper(type: string): boolean;
-  isTagGenerateErrors(options: Record<string, unknown>): boolean;
 };
 
 function object(this: Host): unknown {
