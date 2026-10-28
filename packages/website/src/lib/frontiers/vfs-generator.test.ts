@@ -84,6 +84,28 @@ describe("the VFS FsAdapter's readFileSync", () => {
       expect.objectContaining({ code: "ENOENT" }),
     );
   });
+
+  test("decodes the stored bytes as latin1 when latin1 is asked for, as Node does", () => {
+    const fs = vfsFs({ "/app/models/cafe.ts": "café" });
+
+    expect(fs.readFileSync("/app/models/cafe.ts", "latin1")).toBe("cafÃ©");
+  });
+
+  test("throws EISDIR for a directory, not ENOENT", () => {
+    const fs = vfsFs({ "/app/models/post.ts": "post" });
+
+    expect(() => fs.readFileSync("/app/models", "utf-8")).toThrow(
+      expect.objectContaining({ code: "EISDIR" }),
+    );
+  });
+
+  test("throws ENOENT for a path named like an Object.prototype member", () => {
+    const fs = vfsFs(Object.create(null) as Record<string, string>);
+
+    expect(() => fs.readFileSync("toString", "utf-8")).toThrow(
+      expect.objectContaining({ code: "ENOENT" }),
+    );
+  });
 });
 
 describe("the VFS FsAdapter's async verbs", () => {

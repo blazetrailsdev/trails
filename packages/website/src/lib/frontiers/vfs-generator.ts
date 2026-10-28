@@ -74,14 +74,18 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   function readFileSync(path: string, encoding: "utf-8" | "utf8" | "latin1"): string;
   function readFileSync(path: string): Bytes;
   function readFileSync(path: string, encoding?: "utf-8" | "utf8" | "latin1"): string | Bytes {
-    const template = TEMPLATES[path];
-    const entry = template !== undefined ? { content: template } : vfs.read(path);
-    if (entry === null) {
+    const file = content(path);
+    if (file === null) {
+      if (isDirectory(path)) throw errno("EISDIR", "read", path);
       throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
         code: "ENOENT",
       });
     }
-    return encoding === undefined ? toBytes(entry.content) : entry.content;
+    const bytes = toBytes(file);
+    if (encoding === undefined) return bytes;
+    return encoding === "latin1"
+      ? Array.from(bytes, (byte) => String.fromCharCode(byte)).join("")
+      : file;
   }
 
   function readFile(path: string, encoding: "utf-8" | "utf8"): Promise<string>;
@@ -114,7 +118,7 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   }
 
   function content(path: string): string | null {
-    return TEMPLATES[path] ?? vfs.read(path)?.content ?? null;
+    return Object.hasOwn(TEMPLATES, path) ? TEMPLATES[path] : (vfs.read(path)?.content ?? null);
   }
 
   function existsSync(path: string): boolean {
