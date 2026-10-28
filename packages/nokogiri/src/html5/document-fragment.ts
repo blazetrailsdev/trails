@@ -23,10 +23,8 @@ export class DocumentFragment {
     return new DocumentFragment(document, parseFragment(tags));
   }
 
-  private _children?: Node[];
-
   get children(): Node[] {
-    return (this._children ??= childNodes(this._node, this.document));
+    return childNodes(this._node, this.document);
   }
 
   css(...args: unknown[]): NodeSet {

@@ -2,7 +2,7 @@ import { defaultTreeAdapter, parse, type DefaultTreeAdapterMap } from "parse5";
 import { ArgumentError, include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { readSource, type Readable } from "../readable.js";
-import { childNodes, type Node } from "./node.js";
+import { childNodes, Node } from "./node.js";
 import type { NodeSet } from "../xml/node-set.js";
 import * as Searchable from "../xml/searchable.js";
 import { XPathVisitor } from "../css/xpath-visitor.js";
@@ -78,6 +78,13 @@ export class Document {
   get root(): Node | null {
     const root = childNodes(this._node, this).find((node) => node.isElement());
     return root ?? null;
+  }
+
+  createCdata(string: string): Node {
+    return new Node(
+      { nodeName: "#cdata-section", value: string, parentNode: null } as unknown as Node["_node"],
+      this,
+    );
   }
 
   xpathDoctype(): XPathVisitor["doctype"] {
