@@ -2,6 +2,7 @@ import {
   abort,
   aryDelete,
   extend,
+  fetch,
   File,
   FileUtils,
   getFs,
@@ -266,7 +267,7 @@ export async function apply(
   path: string,
   config: { verbose?: unknown } = {},
 ): Promise<void> {
-  const verbose = Object.hasOwn(config, "verbose") ? config.verbose : true;
+  const verbose = fetch(config, "verbose", true);
   const isUri = /^https?:\/\//m.test(path);
   if (!isUri) path = await this.findInSourcePaths(path);
 
