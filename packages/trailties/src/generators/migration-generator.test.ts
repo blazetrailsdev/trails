@@ -48,7 +48,7 @@ function makeGen(destinationRoot = tmpDir) {
     run: async (name: string, args: string[], options: object = {}) => {
       const gen = new MigrationGenerator([name, ...args], options, { destinationRoot });
       await gen.createMigrationFile();
-      return gen.getCreatedFiles();
+      return fs.readdirSync(path.join(destinationRoot, "db/migrate")).map((f) => `db/migrate/${f}`);
     },
   };
 }

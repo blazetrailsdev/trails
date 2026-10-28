@@ -5,13 +5,13 @@ export class ScriptGenerator extends NamedBase {
     this.methodAdded("generateScript");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
-  generateScript(): void {
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  async generateScript(): Promise<void> {
     const ext = this.ext();
     const filename = `script/${this.filePath()}${ext}`;
     const upDots = "../".repeat(this.depth());
 
-    this.createFile(
+    await this.createFile(
       filename,
       `import "${upDots}config/environment${ext}";
 

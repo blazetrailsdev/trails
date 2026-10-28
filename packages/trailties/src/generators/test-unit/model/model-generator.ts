@@ -29,9 +29,9 @@ export class ModelGenerator extends NamedBase {
     this.methodAdded("createTestFile");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
-  createTestFile(): void {
-    this.createFile(
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  async createTestFile(): Promise<void> {
+    await this.createFile(
       File.join(
         "test/models",
         ...this.classPathParts,
@@ -41,13 +41,13 @@ export class ModelGenerator extends NamedBase {
     );
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
-  createFixtureFile(): void {
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  async createFixtureFile(): Promise<void> {
     if (
       (this.options as ModelGeneratorOptions).fixture &&
       (this.options as ModelGeneratorOptions).fixtureReplacement == null
     ) {
-      this.createFile(
+      await this.createFile(
         File.join("test/fixtures", ...this.classPathParts, `${this.fixtureFileName()}.yml`),
         TEMPLATES.fixtures.call(this),
       );

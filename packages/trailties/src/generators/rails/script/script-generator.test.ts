@@ -16,18 +16,16 @@ afterEach(() => {
 });
 
 describe("ScriptGeneratorTest", () => {
-  it("generate_script", () => {
+  it("generate_script", async () => {
     const gen = new ScriptGenerator(["my_script"], {}, { destinationRoot: tmpDir });
-    gen.generateScript();
-    const files = gen.getCreatedFiles();
-    expect(files).toContain("script/my_script.ts");
+    await gen.generateScript();
     const content = fs.readFileSync(path.join(tmpDir, "script/my_script.ts"), "utf-8");
     expect(content).toMatch(/"\.\.\/config\/environment\.ts"/);
   });
 
-  it("generate_script_with_folder", () => {
+  it("generate_script_with_folder", async () => {
     const gen = new ScriptGenerator(["my_folder/my_script"], {}, { destinationRoot: tmpDir });
-    gen.generateScript();
+    await gen.generateScript();
     const content = fs.readFileSync(path.join(tmpDir, "script/my_folder/my_script.ts"), "utf-8");
     expect(content).toMatch(/"\.\.\/\.\.\/config\/environment\.ts"/);
   });

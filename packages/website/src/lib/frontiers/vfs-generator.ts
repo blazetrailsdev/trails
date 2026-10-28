@@ -234,21 +234,11 @@ function ensureVfsAdapter(vfs: VirtualFS): void {
   ActiveSupport.fsAdapter = "vfs";
 }
 
-function applyVfsOverrides(
-  instance: MigrationGenerator | ModelGenerator | AppGenerator,
-  vfs: VirtualFS,
-): void {
+function applyVfsOverrides(instance: MigrationGenerator | ModelGenerator | AppGenerator): void {
   Object.defineProperties(instance, {
     isTypeScript: {
       value() {
         return true;
-      },
-    },
-    createFile: {
-      value(relativePath: string, content: string, _options?: { mode?: number }) {
-        vfs.write(relativePath, content);
-        this.createdFiles.push(relativePath);
-        this.sayStatus("create", relativePath);
       },
     },
   });
@@ -265,7 +255,7 @@ export class VfsMigrationGenerator extends MigrationGenerator {
   ) {
     ensureVfsAdapter(options.vfs);
     super({ cwd: "/", shell: options.shell });
-    applyVfsOverrides(this, options.vfs);
+    applyVfsOverrides(this);
   }
 }
 
@@ -282,7 +272,7 @@ export class VfsModelGenerator extends ModelGenerator {
       timestamps: true,
     });
     this._vfs = options.vfs;
-    applyVfsOverrides(this, options.vfs);
+    applyVfsOverrides(this);
   }
 
   protected override createMigrationGenerator(): MigrationGenerator {
@@ -304,6 +294,6 @@ export class VfsAppGenerator extends AppGenerator {
       database: options.database,
       skipDocker: true,
     });
-    applyVfsOverrides(this, options.vfs);
+    applyVfsOverrides(this);
   }
 }

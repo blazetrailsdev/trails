@@ -12,15 +12,15 @@ export class ControllerGenerator extends Base {
   declare actions: string[];
 
   /**
-   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
    * @missingRailsArgs join — PERMANENT
    */
-  copyViewFiles(): void {
+  async copyViewFiles(): Promise<void> {
     const basePath = File.join("app/views", controllerPathHelpers(this.name).viewBase);
-    this.emptyDirectory(basePath);
+    await this.emptyDirectory(basePath);
     for (const action of this.actions) {
       for (const format of this.formats()) {
-        this.createFile(File.join(basePath, this.filenameWithExtensions(action, format)), "");
+        await this.createFile(File.join(basePath, this.filenameWithExtensions(action, format)), "");
       }
     }
   }

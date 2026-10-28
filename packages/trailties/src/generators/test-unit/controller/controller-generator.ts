@@ -13,15 +13,15 @@ export class ControllerGenerator extends NamedBase {
 
   declare actions: string[];
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
-  createTestFiles(): void {
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  async createTestFiles(): Promise<void> {
     const paths = controllerPathHelpers(this.name);
     const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
     const importPrefix = "../".repeat(depth + 2);
     const cases = this.actions
       .map((a) => `  it("${a}", () => {\n    // TODO: test ${a} action\n  });`)
       .join("\n\n");
-    this.createFile(
+    await this.createFile(
       `test/controllers/${paths.controllerFile}.test${this.ext()}`,
       `import { describe, it, expect } from "vitest";
 import { ${paths.className} } from "${importPrefix}app/controllers/${paths.controllerFile}.js";

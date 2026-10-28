@@ -31,11 +31,11 @@ export class JobGenerator extends NamedBase {
   private _applicationJobFileName?: string;
 
   /**
-   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
-   * @missingRailsCall in_root — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
+   * @missingRailsCall in_root — CONVERGEABLE converge-generators-onto-thor-template
    */
-  createJobFile(): void {
-    this.createFile(
+  async createJobFile(): Promise<void> {
+    await this.createFile(
       File.join("app/jobs", ...this.classPathParts, `${dasherize(this.fileName)}-job${this.ext()}`),
       TEMPLATES.job.call(this, this.ext()),
     );
@@ -44,7 +44,7 @@ export class JobGenerator extends NamedBase {
       this.behavior === "invoke" &&
       !File.isExist(File.join(this.destinationRoot, this.applicationJobFileName()))
     ) {
-      this.createFile(this.applicationJobFileName(), TEMPLATES.application_job.call(this));
+      await this.createFile(this.applicationJobFileName(), TEMPLATES.application_job.call(this));
     }
   }
 

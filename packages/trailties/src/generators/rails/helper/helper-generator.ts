@@ -8,12 +8,12 @@ export class HelperGenerator extends NamedBase {
   private __fileName?: string;
 
   /**
-   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
    * @missingRailsArgs join — PERMANENT
    */
-  createHelperFiles(): void {
+  async createHelperFiles(): Promise<void> {
     const helperName = [...this.classPathParts, this.fileName].map((p) => camelize(p)).join("");
-    this.createFile(
+    await this.createFile(
       File.join(
         "app/helpers",
         ...this.classPathParts.map((p) => dasherize(p)),

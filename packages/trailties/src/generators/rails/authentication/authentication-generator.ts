@@ -41,27 +41,27 @@ export class AuthenticationGenerator extends GeneratorBase {
       throw new Error("AuthenticationGenerator currently emits TypeScript only.");
   }
 
-  createAuthenticationFiles(): void {
-    this.template("app/models/session.rb");
-    this.template("app/models/user.rb");
-    this.template("app/models/current.rb");
+  async createAuthenticationFiles(): Promise<void> {
+    await this.template("app/models/session.rb");
+    await this.template("app/models/user.rb");
+    await this.template("app/models/current.rb");
 
-    this.template("app/controllers/sessions_controller.rb");
-    this.template("app/controllers/concerns/authentication.rb");
-    this.template("app/controllers/passwords_controller.rb");
+    await this.template("app/controllers/sessions_controller.rb");
+    await this.template("app/controllers/concerns/authentication.rb");
+    await this.template("app/controllers/passwords_controller.rb");
 
     if (TopLevel.ActionCable?.Engine !== undefined)
-      this.template("app/channels/application_cable/connection.rb");
+      await this.template("app/channels/application_cable/connection.rb");
 
-    this.template("app/mailers/passwords_mailer.rb");
+    await this.template("app/mailers/passwords_mailer.rb");
 
-    this.template("app/views/passwords_mailer/reset.html.erb");
-    this.template("app/views/passwords_mailer/reset.text.erb");
+    await this.template("app/views/passwords_mailer/reset.html.erb");
+    await this.template("app/views/passwords_mailer/reset.text.erb");
 
-    this.template("test/mailers/previews/passwords_mailer_preview.rb");
+    await this.template("test/mailers/previews/passwords_mailer_preview.rb");
   }
 
-  private template(file: string): void {
+  private async template(file: string): Promise<void> {
     const destination = file
       .replace(/\.rb$/, ".ts")
       .replace(/\.erb$/, ".tse")
@@ -70,7 +70,7 @@ export class AuthenticationGenerator extends GeneratorBase {
       this.sayStatus("skip", `${destination} (already exists)`);
       return;
     }
-    this.createFile(destination, TEMPLATES[file]);
+    await this.createFile(destination, TEMPLATES[file]);
   }
 
   configureApplicationController(): void {

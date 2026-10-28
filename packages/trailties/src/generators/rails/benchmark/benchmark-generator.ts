@@ -8,14 +8,14 @@ export class BenchmarkGenerator extends NamedBase {
 
   declare reports: string[];
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
-  generateLayout(): void {
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  async generateLayout(): Promise<void> {
     const reports = this.reports;
     const ext = this.ext();
     const filename = `script/benchmarks/${this.fileName}${ext}`;
     const reportLines = reports.map((r) => `  ${r}: () => {},`).join("\n");
 
-    this.createFile(
+    await this.createFile(
       filename,
       `// Any benchmarking setup goes here...
 

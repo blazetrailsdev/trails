@@ -79,8 +79,8 @@ export class ScaffoldControllerGenerator extends NamedBase {
     ModelHelpers.skipWarn = true;
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
-  createControllerFiles(): void {
+  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  async createControllerFiles(): Promise<void> {
     const { api } = this.options;
     const modelClassName = this.className().split("::").join("");
     const singular = this.singularTableName();
@@ -91,7 +91,7 @@ export class ScaffoldControllerGenerator extends NamedBase {
     const attrNames = this.attributes.map((a) => a.name);
     const modelPath = "../".repeat(this.controllerClassPath().length + 1) + "models/";
 
-    this.createFile(
+    await this.createFile(
       `app/controllers/${controllerFileName}${ext}`,
       emitControllerClass({
         className: controllerClassName,

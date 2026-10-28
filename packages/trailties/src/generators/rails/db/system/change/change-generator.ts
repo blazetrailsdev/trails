@@ -136,7 +136,6 @@ export class ChangeGenerator extends GeneratorBase {
     if (existed) {
       this.sayStatus("update", relativePath);
     } else {
-      this.createdFiles.push(relativePath);
       this.sayStatus("create", relativePath);
     }
   }

@@ -66,7 +66,7 @@ export class MigrationGenerator extends NamedBase {
     this.setLocalAssignsBang(underscore(name));
     const source = File.expandPath(await this.findInSourcePaths(this.migrationTemplate));
 
-    const file = await migrationTemplate(
+    await migrationTemplate(
       this,
       async () => {
         const erb = new TSE(strNew(Array.from(await getFs().readFile(source))), {
@@ -78,7 +78,6 @@ export class MigrationGenerator extends NamedBase {
       },
       File.join("db/migrate", `${underscore(name)}${this.ext()}`),
     );
-    if (file) this.createdFiles.push(this.relativeToOriginalDestinationRoot(file));
   }
 
   protected createTableMigration(): string {

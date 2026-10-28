@@ -11,12 +11,9 @@ import {
   File,
   NameError,
   rbObjRespondTo,
-  FileUtils,
-  Pathname,
   getFs,
   include,
   hashDelete,
-  regexpEscape,
   isRegisteredConstant,
 } from "@blazetrails/ruby-compat";
 import { Generators, type GeneratorClass } from "../generators.js";
@@ -155,7 +152,6 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   declare options: GeneratorOptions;
   declare args: unknown[];
   declare behavior: "invoke" | "revoke";
-  protected createdFiles: string[] = [];
   pendingGenerators: Array<{ what: string; args: string[] }> = [];
   afterInstallCallbacks: Array<() => void | Promise<void>> = [];
 
@@ -167,6 +163,9 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   declare apply: OmitThisParameter<typeof ThorActions.apply>;
   declare inRoot: <T>(block: () => T | Promise<T>) => Promise<T>;
   declare injectIntoFile: (destination: string, ...args: unknown[]) => unknown;
+  declare emptyDirectory: (destination: string, config?: Record<string, unknown>) => unknown;
+  declare createFile: (destination: string, ...args: unknown[]) => unknown;
+  declare appendToFile: (path: string, ...args: unknown[]) => unknown;
   /** @internal */
   declare protected _cleanupOptionsAndSet: ThorActions.ActionsHost["_cleanupOptionsAndSet"];
 
@@ -403,90 +402,6 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
 
   protected ext(): string {
     return this.isTypeScript() ? ".ts" : ".js";
-  }
-
-  protected createFile(
-    destination: string | Pathname,
-    content: string,
-    options?: { mode?: number },
-  ): string {
-    const relativePath = destination.toString();
-    const fullPath = File.join(this.destinationRoot, relativePath);
-    if (this.behavior === "revoke") {
-      this.sayStatus("remove", relativePath);
-      if (!this.options.pretend && File.isExist(fullPath)) FileUtils.rmRf(fullPath);
-      return relativePath;
-    }
-    let status = "create";
-    if (File.isExist(fullPath)) {
-      if (File.read(fullPath) === content) {
-        this.sayStatus("identical", relativePath);
-        this.createdFiles.push(relativePath);
-        return relativePath;
-      }
-      if (this.options.force) {
-        status = "force";
-      } else if (this.options.skip) {
-        this.sayStatus("skip", relativePath);
-        return relativePath;
-      } else {
-        this.sayStatus("conflict", relativePath);
-        status = "force";
-      }
-    }
-    if (!this.options.pretend) {
-      FileUtils.mkdirP(File.dirname(fullPath));
-      File.write(fullPath, content);
-      if (options?.mode !== undefined) File.chmod(options.mode, fullPath);
-    }
-    Generators.addGeneratedFile(fullPath);
-    this.createdFiles.push(relativePath);
-    this.sayStatus(status, relativePath);
-    return relativePath;
-  }
-
-  protected emptyDirectory(destination: string, config: { verbose?: boolean } = {}): string {
-    const verbose = config.verbose ?? true;
-    const fullPath = File.join(this.destinationRoot, destination);
-    if (this.behavior === "revoke") {
-      this.sayStatus("remove", destination, verbose);
-      if (!this.options.pretend && File.isExist(fullPath)) FileUtils.rmRf(fullPath);
-      return destination;
-    }
-    if (File.isExist(fullPath)) {
-      this.sayStatus("exist", destination, verbose);
-    } else {
-      if (!this.options.pretend) FileUtils.mkdirP(fullPath);
-      this.sayStatus("create", destination, verbose);
-    }
-    return fullPath;
-  }
-
-  protected appendToFile(relativePath: string, content: string): void {
-    const fullPath = File.join(this.destinationRoot, relativePath);
-    if (this.behavior === "revoke") {
-      this.revokeInjection(relativePath, `(${regexpEscape(content)})([^]*)(${"$"})`, "$2$3");
-      return;
-    }
-    if (!File.isExist(fullPath)) {
-      this.createFile(relativePath, content);
-      return;
-    }
-    File.open(fullPath, "a", (file) => file.write(content));
-    this.sayStatus("append", relativePath);
-  }
-
-  protected revokeInjection(relativePath: string, pattern: string, content: string): void {
-    const fullPath = File.join(this.destinationRoot, relativePath);
-    this.sayStatus("subtract", relativePath);
-    if (!File.isExist(fullPath)) return;
-    const existing = File.read(fullPath);
-    const updated = existing.replace(new RegExp(pattern, "g"), content);
-    if (!this.options.pretend) File.write(fullPath, updated);
-  }
-
-  getCreatedFiles(): string[] {
-    return [...this.createdFiles];
   }
 }
 

@@ -16,9 +16,9 @@ afterEach(() => {
 });
 
 describe("GeneratorGeneratorTest", () => {
-  it("generator_skeleton_is_created", () => {
+  it("generator_skeleton_is_created", async () => {
     const gen = new GeneratorGenerator(["awesome"], {}, { destinationRoot: tmpDir });
-    gen.createGeneratorFiles();
+    await gen.createGeneratorFiles();
     for (const p of [
       "lib/generators/awesome/USAGE",
       "lib/generators/awesome/templates/.keep",
@@ -33,9 +33,9 @@ describe("GeneratorGeneratorTest", () => {
     expect(src).toMatch(/class AwesomeGenerator extends NamedBase/);
   });
 
-  it("namespaced_generator_skeleton", () => {
+  it("namespaced_generator_skeleton", async () => {
     const gen = new GeneratorGenerator(["rails/awesome"], {}, { destinationRoot: tmpDir });
-    gen.createGeneratorFiles();
+    await gen.createGeneratorFiles();
     const src = fs.readFileSync(
       path.join(tmpDir, "lib/generators/rails/awesome/awesome-generator.ts"),
       "utf-8",
@@ -48,11 +48,13 @@ describe("GeneratorGeneratorTest", () => {
       destinationRoot: tmpDir,
     });
     await gen.invokeAll();
-    expect(gen.getCreatedFiles()).toEqual([
+    for (const file of [
       "lib/generators/USAGE",
       "lib/generators/templates/.keep",
       "lib/generators/awesome-generator.ts",
-    ]);
+    ]) {
+      expect(fs.existsSync(path.join(tmpDir, file))).toBe(true);
+    }
     expect(fs.existsSync(path.join(tmpDir, "lib/generators/awesome-generator.ts"))).toBe(true);
   });
 

@@ -243,8 +243,8 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
           const gen = new VfsModelGenerator({ vfs, name, attributes: columnArgs });
           await withStdout(async () => {
             await gen.createMigrationFile();
-            gen.createModelFile();
-            gen.createModuleFile();
+            await gen.createModelFile();
+            await gen.createModuleFile();
           });
         } else if (type === "migration") {
           const gen = new VfsMigrationGenerator({ vfs });
