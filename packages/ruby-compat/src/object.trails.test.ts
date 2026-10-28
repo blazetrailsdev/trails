@@ -1498,10 +1498,8 @@ describe("rbFSend writer cache", () => {
 });
 
 describe("a Hash subclass", () => {
-  it("is a kind of Hash, as Ruby's is_a?(Hash) answers", async () => {
-    const { Hash } = await import("./hash.js");
-    const { rbObjIsKindOf } = await import("./include.js");
-    class Sub extends Hash {}
+  it("is a kind of Hash, as Ruby's is_a?(Hash) answers", () => {
+    class Sub extends Hash<unknown, unknown> {}
     expect(rbObjIsKindOf(new Sub(), Hash)).toBe(true);
     expect(rbObjIsKindOf({}, Hash)).toBe(true);
   });
