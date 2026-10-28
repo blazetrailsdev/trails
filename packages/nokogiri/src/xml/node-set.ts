@@ -10,8 +10,8 @@ import { XML } from "../namespaces.js";
 import { Namespace } from "./namespace.js";
 
 import type { Node } from "../html5/node.js";
+import * as Searchable from "./searchable.js";
 import {
-  Searchable,
   cssRulesToXpath,
   extractParams,
   xpathInternal,

@@ -168,7 +168,7 @@ also puts rule 1 under a gate.
 | `Set` (`#add`, `#delete`, `#has`, `#clear`, `#subtract`)                | `lib/set.rb:243,316,393,511,529,609`                                     | `activerecord/src/associations/preloader/association.ts` (`LoaderRecords`' `@keys_to_load = Set.new` and `subtract`, `preloader/association.rb:64,88`)                                                                                                                                                                                                                                                        |
 | `rbDefineInspectCustom`                                                 | `io.c:9023` `rb_p` (prints `rb_inspect`)                                 | `activerecord/src/connection-adapters/abstract/connection-pool.ts`, `abstract-adapter.ts`, `encryption/cipher/aes256-gcm.ts`                                                                                                                                                                                                                                                                                  |
 
-### Core classes are class objects; `Symbol` is not one
+### Core classes are class objects; `Symbol` is seated but classifies nothing
 
 `rbObjClass` answers `Object#class` as a class object. `NilClass`, `TrueClass`,
 `FalseClass`, `Numeric`, `Integer`, `Float`, `String`, `Class`, `Proc`, `Time`,
@@ -176,11 +176,21 @@ also puts rule 1 under a gate.
 `rb_define_class`; `Hash`, `Module`, `Kernel` and `Enumerable` are the exports
 of those names. `include.ts` wires their MRI included modules.
 
-`Symbol` has no seat. A Ruby Symbol is a bare JS string everywhere except the
-call sites that keep its colon to tell it from a String, so no reading of a
-value can answer "is a Symbol": a classifier keyed on the colon would call
-`"::1"` and `"::Float::NAN"` Symbols. `rbObjClass` answers `String` for every
-string, and a call site that discriminates uses `isSymbol`.
+`Symbol` is seated as a constant, `rbCSymbol` (`string.c:12290`,
+`rb_define_class("Symbol", rb_cObject)`), so `rbPathToClass("Symbol")` answers
+it: `Psych::ClassLoader#symbolize` calls its `symbol` reader, which is
+`path2class("Symbol")` (`ext/psych/lib/psych/class_loader.rb:31-43,51-56`), and
+`ClassLoader::Restricted#find` raises `DisallowedClass` unless `'Symbol'` is
+permitted (`:92-98`). No JS value is an instance of it. A Ruby Symbol is a bare
+JS string everywhere except the call sites that keep its colon to tell it from
+a String, so no reading of a value can answer "is a Symbol": a classifier keyed
+on the colon would call `"::1"` and `"::Float::NAN"` Symbols. `rbObjClass`
+answers `String` for every string, and a call site that discriminates uses
+`isSymbol`; `rbObjIsKindOf(obj, rbCSymbol)` is that same `isSymbol` reading.
+
+| Seat        | MRI                           | Called by                                                                                            |
+| ----------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `rbCSymbol` | `string.c:12290` `rb_cSymbol` | `ruby-compat/src/variable.ts` (`registerConstant("Symbol", …)`, read by `Psych::ClassLoader#symbol`) |
 
 ### Keyword arguments are a flagged trailing hash
 

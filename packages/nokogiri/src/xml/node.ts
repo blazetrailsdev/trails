@@ -11,7 +11,7 @@ import { XML } from "../namespaces.js";
 
 import type { NodeSet } from "./node-set.js";
 import "./node-set.js";
-import { Searchable } from "./searchable.js";
+import * as Searchable from "./searchable.js";
 
 export interface AttrNode {
   nodeName: string;

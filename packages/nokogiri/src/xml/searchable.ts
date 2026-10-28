@@ -1,8 +1,7 @@
 import { aryJoin } from "@blazetrails/ruby-compat";
 
 import type { Node } from "../html5/node.js";
-import type { NodeSet } from "./node-set.js";
-import { XML } from "../namespaces.js";
+import { NodeSet } from "./node-set.js";
 import { xpathFor } from "../css.js";
 import { BuiltinsConfig, XPathVisitor } from "../css/xpath-visitor.js";
 import { usesLibxml } from "../version/info.js";
@@ -23,8 +22,6 @@ export function css(this: SearchableHost, ...args: unknown[]): NodeSet {
 export function atCss(this: SearchableHost, ...args: unknown[]): Node | undefined {
   return this.css(...args).first();
 }
-
-export const Searchable = { css, atCss };
 
 /** @internal */
 export function extractParams(
@@ -100,13 +97,13 @@ export function xpathInternal(
   binds: Record<string, unknown> | null,
 ): NodeSet {
   const document = node.document;
-  if (document == null) return new XML.NodeSet(document);
+  if (document == null) return new NodeSet(document);
 
   if (paths.length === 1) return xpathImpl(node, paths[0], handler, ns, binds);
 
   return paths.reduce(
     (combined, path) => combined.plus(xpathImpl(node, path, handler, ns, binds)),
-    new XML.NodeSet(document),
+    new NodeSet(document),
   );
 }
 

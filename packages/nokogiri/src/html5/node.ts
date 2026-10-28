@@ -5,7 +5,7 @@ import type { NodeSet } from "../xml/node-set.js";
 import { include, rbModConstSet } from "@blazetrails/ruby-compat";
 import { HTML5 } from "../namespaces.js";
 import "../xml/node-set.js";
-import { Searchable } from "../xml/searchable.js";
+import * as Searchable from "../xml/searchable.js";
 
 type Parse5Node = DefaultTreeAdapterMap["childNode"];
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
