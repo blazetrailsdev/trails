@@ -24,7 +24,9 @@ export class CreateMigration {
     public destination: string,
     public data: MigrationRenderer,
     public config: CreateMigrationConfig = {},
-  ) {}
+  ) {
+    this.config = { verbose: true, ...config };
+  }
 
   get migrationDir(): string {
     return File.dirname(this.destination);
@@ -135,8 +137,11 @@ export class CreateMigration {
     File.write(this.destination, await this.render());
   }
 
-  private sayStatus(status: string, color: string, message?: string): void {
-    if (this.config.verbose === false) return;
-    this.base.shell.sayStatus(status, message ?? this.relativeDestination(), color);
+  private sayStatus(
+    status: string,
+    color: string,
+    message: string = this.relativeDestination(),
+  ): void {
+    if (this.config.verbose) this.base.shell.sayStatus(status, message, color);
   }
 }
