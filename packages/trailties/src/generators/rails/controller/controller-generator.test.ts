@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -19,6 +20,9 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
+  vi.spyOn(stdout, "write").mockImplementation(
+    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
+  );
   setupRoutes();
 });
 
@@ -27,7 +31,7 @@ afterEach(() => {
 });
 
 function makeGen() {
-  return new ControllerGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
+  return new ControllerGenerator({ cwd: tmpDir });
 }
 
 function readFile(relativePath: string): string {
@@ -178,7 +182,6 @@ describe("ControllerGeneratorTest", () => {
 
 describe("ControllerGeneratorTest (JavaScript project)", () => {
   let jsTmpDir: string;
-  let jsLines: string[];
 
   beforeEach(() => {
     jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
@@ -187,7 +190,6 @@ describe("ControllerGeneratorTest (JavaScript project)", () => {
       path.join(jsTmpDir, "config/routes.ts"),
       "Trails.application!.routes().draw(function () {\n});\n",
     );
-    jsLines = [];
   });
 
   afterEach(() => {
@@ -195,7 +197,7 @@ describe("ControllerGeneratorTest (JavaScript project)", () => {
   });
 
   function makeJsGen() {
-    return new ControllerGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
+    return new ControllerGenerator({ cwd: jsTmpDir });
   }
 
   it("generates .js controller and test files", async () => {

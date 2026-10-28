@@ -1,3 +1,4 @@
+import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
@@ -53,7 +54,6 @@ describe("GeneratorsTest", () => {
     try {
       const created = await Generators.invoke("rails:helper", ["Account"], {
         cwd: tmpDir,
-        output: () => {},
       });
       expect(created).toContain("app/helpers/account-helper.ts");
     } finally {
@@ -105,12 +105,9 @@ describe("GeneratorsTest", () => {
   });
 
   it("a lookup-registered subcommand advertises its generator's class options", async () => {
-    const lines: string[] = [];
-    await Generators.invoke("generator", ["--help"], {
-      cwd: "/tmp",
-      output: (line) => lines.push(line),
-    });
-    const help = lines.join("\n");
+    const help = await capture("stdout", () =>
+      Generators.invoke("generator", ["--help"], { cwd: "/tmp" }),
+    );
     expect(help).toMatch(
       /\[--namespace\], \[--no-namespace\], \[--skip-namespace\]\s+# Namespace generator/,
     );
@@ -126,9 +123,9 @@ describe("GeneratorsTest", () => {
 
   it("an enum class option rejects an undeclared value with Thor's message", async () => {
     const devcontainer = (await Generators.findByNamespace("devcontainer"))!;
-    await expect(
-      devcontainer.start(["--database", "oracle"], { cwd: "/tmp", output: () => {} }),
-    ).rejects.toThrow(`Expected '--database' to be one of ${DATABASES.join(", ")}; got "oracle"`);
+    await expect(devcontainer.start(["--database", "oracle"], { cwd: "/tmp" })).rejects.toThrow(
+      `Expected '--database' to be one of ${DATABASES.join(", ")}; got "oracle"`,
+    );
   });
 });
 

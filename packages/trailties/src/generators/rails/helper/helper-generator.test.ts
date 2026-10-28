@@ -14,7 +14,7 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
 function makeGen(cwd = tmpDir) {
-  return new HelperGenerator({ cwd, output: () => {} });
+  return new HelperGenerator({ cwd });
 }
 
 describe("HelperGeneratorTest", () => {
@@ -55,7 +55,7 @@ describe("HelperGeneratorTest", () => {
   it("generates .js helper for JS projects", () => {
     const jsDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-helper-js-"));
     try {
-      const files = new HelperGenerator({ cwd: jsDir, output: () => {} }).run("Posts");
+      const files = new HelperGenerator({ cwd: jsDir }).run("Posts");
       expect(files).toContain("app/helpers/posts-helper.js");
       expect(files).toContain("test/helpers/posts-helper.test.js");
     } finally {

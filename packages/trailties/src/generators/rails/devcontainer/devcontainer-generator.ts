@@ -117,7 +117,7 @@ export class DevcontainerGenerator extends GeneratorBase {
     if (!enabled || !File.isExist(File.join(this.destinationRoot, rel))) return;
     const full = File.join(this.cwd, rel);
     File.write(full, File.read(full).replace(re, replacement));
-    this.output(`      update  ${rel}`);
+    this.sayStatus("update", rel);
   }
 
   private dockerfileContent(): string {

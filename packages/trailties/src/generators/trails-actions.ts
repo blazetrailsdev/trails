@@ -2,7 +2,7 @@ import { File } from "@blazetrails/ruby-compat";
 
 export interface TrailsActionsHost {
   cwd: string;
-  output: (msg: string) => void;
+  log(...args: unknown[]): void;
 }
 
 export interface PkgOptions {
@@ -46,5 +46,5 @@ export async function pkg(
   deps[name] = version;
   json[key] = deps;
   await File.writeAsync(pkgPath, JSON.stringify(json, null, 2) + "\n");
-  this.output(`         pkg  ${name}`);
+  this.log("pkg", name);
 }

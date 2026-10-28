@@ -19,7 +19,6 @@ describe("TaskGeneratorTest", () => {
   it("task is created", () => {
     const gen = new TaskGenerator({
       cwd: tmpDir,
-      output: () => {},
       name: "feeds",
     });
     const files = gen.run({ actions: ["foo", "bar"] });

@@ -26,7 +26,6 @@ async function generateApp(): Promise<string> {
   );
   await new AppGenerator({
     cwd: tmpDir,
-    output: () => {},
     appPath: "my-app",
     database: "sqlite",
     skipDocker: true,

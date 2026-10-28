@@ -22,7 +22,7 @@ afterEach(() => {
 describe("MasterKeyGeneratorTest", () => {
   it("add_master_key_file + ignore_master_key_file write key and labelled gitignore entry", () => {
     fs.writeFileSync(path.join(tmpDir, ".gitignore"), "node_modules\n");
-    const gen = new MasterKeyGenerator({ cwd: tmpDir, output: () => {} });
+    const gen = new MasterKeyGenerator({ cwd: tmpDir });
     gen.addMasterKeyFile();
     gen.ignoreMasterKeyFile();
     expect(fs.readFileSync(path.join(tmpDir, "config/master.key"), "utf-8")).toMatch(/^[0-9a-f]+$/);

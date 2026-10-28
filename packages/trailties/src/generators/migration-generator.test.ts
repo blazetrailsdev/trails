@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -26,6 +27,9 @@ beforeEach(() => {
   destination.destinationRoot = tmpDir;
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
+  vi.spyOn(stdout, "write").mockImplementation(
+    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
+  );
   Trails.application = MigrationGeneratorTestApp.instance();
   oldBelongsToRequiredByDefault = Trails.application.config.activeRecord.belongsToRequiredByDefault;
   Trails.application.config.activeRecord.belongsToRequiredByDefault = true;
@@ -39,7 +43,7 @@ afterEach(() => {
 });
 
 function makeGen() {
-  return new MigrationGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
+  return new MigrationGenerator({ cwd: tmpDir });
 }
 
 describe("MigrationGeneratorTest", () => {
@@ -482,11 +486,9 @@ describe("MigrationGeneratorTest", () => {
 
 describe("MigrationGeneratorTest (JavaScript project)", () => {
   let jsTmpDir: string;
-  let jsLines: string[];
 
   beforeEach(() => {
     jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
-    jsLines = [];
   });
 
   afterEach(() => {
@@ -494,7 +496,7 @@ describe("MigrationGeneratorTest (JavaScript project)", () => {
   });
 
   function makeJsGen() {
-    return new MigrationGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
+    return new MigrationGenerator({ cwd: jsTmpDir });
   }
 
   function readJsMigration(files: string[]): string {

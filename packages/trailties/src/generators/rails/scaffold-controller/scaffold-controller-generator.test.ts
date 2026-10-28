@@ -25,7 +25,7 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
 function runGenerator(name: string, attributes: string[] = [], options: Partial<Options> = {}) {
-  const config = { cwd: tmpDir, output: () => {}, ...options };
+  const config = { cwd: tmpDir, ...options };
   return ScaffoldControllerGenerator.start([name, ...attributes], config);
 }
 

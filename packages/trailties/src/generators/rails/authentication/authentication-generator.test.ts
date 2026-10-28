@@ -33,7 +33,7 @@ let tmpDir: string;
 const read = (rel: string) => fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 const exists = (rel: string) => fs.existsSync(path.join(tmpDir, rel));
 const makeGen = (options: { api?: boolean } = {}) =>
-  new AuthenticationGenerator({ cwd: tmpDir, output: () => {}, ...options });
+  new AuthenticationGenerator({ cwd: tmpDir, ...options });
 const withActionCableEngine = async (block: () => Promise<unknown>) => {
   const oldValue = TopLevel.ActionCable;
   TopLevel.ActionCable = { Engine: class Engine {} };
@@ -87,7 +87,7 @@ describe("AuthenticationGenerator", () => {
   });
 
   it("--api still templates the mailer, its views and its preview", async () => {
-    await AuthenticationGenerator.start(["--api"], { cwd: tmpDir, output: () => {} });
+    await AuthenticationGenerator.start(["--api"], { cwd: tmpDir });
     expect(exists("app/mailers/passwords-mailer.ts")).toBe(true);
     for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
     for (const rel of TEMPLATE_ENGINE_VIEWS) expect(exists(rel), rel).toBe(false);

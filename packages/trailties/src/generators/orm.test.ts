@@ -12,7 +12,6 @@ const ORMWithoutGenerators = {};
 function generator(name: string, options: { orm?: string } = {}) {
   return new ScaffoldControllerGenerator({
     cwd: "/nonexistent",
-    output: () => {},
     name,
     ...options,
   });

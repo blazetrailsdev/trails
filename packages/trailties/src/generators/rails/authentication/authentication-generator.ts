@@ -30,7 +30,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     if (!this.options.api) {
       const templateEngine = new TseAuthenticationGenerator({
         cwd: this.cwd,
-        output: this.output,
+        shell: this.shell,
         behavior: this.behavior,
         pretend: this.options.pretend,
       });
@@ -70,7 +70,7 @@ export class AuthenticationGenerator extends GeneratorBase {
       .replace(/\.erb$/, ".tse")
       .replace(/[^/]+(?=\/|\.)/g, (segment) => segment.replace(/_/g, "-"));
     if (File.isExist(File.join(this.destinationRoot, destination))) {
-      this.output(`      skip  ${destination} (already exists)`);
+      this.sayStatus("skip", `${destination} (already exists)`);
       return;
     }
     this.createFile(destination, TEMPLATES[file]);
@@ -145,7 +145,7 @@ export class AuthenticationGenerator extends GeneratorBase {
       this.createdFiles.push(
         ...(await MigrationGenerator.start(words, {
           cwd: this.cwd,
-          output: this.output,
+          shell: this.shell,
           behavior: this.behavior,
           pretend: this.options.pretend,
         })),

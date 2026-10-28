@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 
 class T extends AppBase {}
-const build = (o: Partial<AppBaseOptions> = {}) =>
-  new T({ cwd: "/work", output: () => {}, appPath: "blog", ...o });
+const build = (o: Partial<AppBaseOptions> = {}) => new T({ cwd: "/work", appPath: "blog", ...o });
 
 describe("AppBase", () => {
   it("defaults: sqlite3, keeps, system tests, destinationRoot joins cwd+appPath", () => {

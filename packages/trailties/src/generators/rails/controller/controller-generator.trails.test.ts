@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -11,6 +12,9 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
+  vi.spyOn(stdout, "write").mockImplementation(
+    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
+  );
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
@@ -23,7 +27,7 @@ afterEach(() => {
 });
 
 function makeGen() {
-  return new ControllerGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
+  return new ControllerGenerator({ cwd: tmpDir });
 }
 
 describe("ControllerGenerator view and controller file naming", () => {

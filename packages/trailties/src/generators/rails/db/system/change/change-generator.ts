@@ -119,16 +119,16 @@ export class ChangeGenerator extends GeneratorBase {
     const full = File.join(this.cwd, relativePath);
     const existed = File.isExist(File.join(this.destinationRoot, relativePath));
     if (existed && File.read(full) === content) {
-      this.output(`   identical  ${relativePath}`);
+      this.sayStatus("identical", relativePath);
       return;
     }
     FileUtils.mkdirP(File.dirname(full));
     File.write(full, content);
     if (existed) {
-      this.output(`      update  ${relativePath}`);
+      this.sayStatus("update", relativePath);
     } else {
       this.createdFiles.push(relativePath);
-      this.output(`      create  ${relativePath}`);
+      this.sayStatus("create", relativePath);
     }
   }
 

@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { stdout } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -14,6 +15,9 @@ beforeEach(() => {
   pwd = Dir.pwd();
   Dir.chdir(tmpDir);
   lines = [];
+  vi.spyOn(stdout, "write").mockImplementation(
+    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
+  );
 });
 
 afterEach(() => {
@@ -21,7 +25,7 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-const build = () => new EncryptionKeyFileGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
+const build = () => new EncryptionKeyFileGenerator({ cwd: tmpDir });
 
 describe("EncryptionKeyFileGeneratorTest", () => {
   it("add_key_file writes a hex key file at mode 0600 and is idempotent", () => {

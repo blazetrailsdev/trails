@@ -49,7 +49,7 @@ export class MasterKeyGenerator extends GeneratorBase {
   }
 
   private keyFileGenerator(): EncryptionKeyFileGenerator {
-    return new EncryptionKeyFileGenerator({ cwd: this.cwd, output: this.output });
+    return new EncryptionKeyFileGenerator({ cwd: this.cwd, shell: this.shell });
   }
 
   private keyIgnore(): string {

@@ -45,7 +45,7 @@ function listFiles(root: string): string[] {
 function makeGen() {
   return {
     run: async (name: string, args: string[]) => {
-      await ModelGenerator.start([name, ...args], { cwd: tmpDir, output: () => {} });
+      await ModelGenerator.start([name, ...args], { cwd: tmpDir });
       return listFiles(tmpDir);
     },
   };

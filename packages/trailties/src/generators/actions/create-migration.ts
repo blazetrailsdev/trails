@@ -1,9 +1,10 @@
+import type { Basic } from "@blazetrails/thor/shell/basic";
 import { File, FileUtils, rbEqual } from "@blazetrails/ruby-compat";
 import { migrationExists } from "../migration-lookup.js";
 
 export interface CreateMigrationHost {
   behavior?: "invoke" | "revoke";
-  output: (msg: string) => void;
+  shell: Basic;
   options: { force?: boolean; skip?: boolean; pretend?: boolean };
   migrationFileName: string;
   relativeToOriginalDestinationRoot(p: string): string;
@@ -134,8 +135,8 @@ export class CreateMigration {
     File.write(this.destination, await this.render());
   }
 
-  private sayStatus(status: string, _color: string, message?: string): void {
+  private sayStatus(status: string, color: string, message?: string): void {
     if (this.config.verbose === false) return;
-    this.base.output(`      ${status}  ${message ?? this.relativeDestination()}`);
+    this.base.shell.sayStatus(status, message ?? this.relativeDestination(), color);
   }
 }

@@ -227,7 +227,6 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
 
 export interface VfsGeneratorOptions {
   vfs: VirtualFS;
-  output: (msg: string) => void;
 }
 
 function ensureVfsAdapter(vfs: VirtualFS): void {
@@ -249,7 +248,7 @@ function applyVfsOverrides(
       value(relativePath: string, content: string, _options?: { mode?: number }) {
         vfs.write(relativePath, content);
         this.createdFiles.push(relativePath);
-        this.output(`      create  ${relativePath}`);
+        this.sayStatus("create", relativePath);
       },
     },
   });
@@ -260,34 +259,34 @@ export class VfsMigrationGenerator extends MigrationGenerator {
     void this.sourceRoot(MIGRATION_SOURCE_ROOT);
   }
 
-  constructor(options: VfsGeneratorOptions) {
+  constructor(
+    options: VfsGeneratorOptions &
+      Pick<ConstructorParameters<typeof MigrationGenerator>[0], "shell">,
+  ) {
     ensureVfsAdapter(options.vfs);
-    super({ cwd: "/", output: options.output });
+    super({ cwd: "/", shell: options.shell });
     applyVfsOverrides(this, options.vfs);
   }
 }
 
 export class VfsModelGenerator extends ModelGenerator {
   private _vfs: VirtualFS;
-  private _vfsOutput: (msg: string) => void;
 
   constructor(options: VfsGeneratorOptions & { name: string; attributes: string[] }) {
     ensureVfsAdapter(options.vfs);
     super({
       cwd: "/",
-      output: options.output,
       name: options.name,
       attributes: options.attributes,
       migration: true,
       timestamps: true,
     });
     this._vfs = options.vfs;
-    this._vfsOutput = options.output;
     applyVfsOverrides(this, options.vfs);
   }
 
   protected override createMigrationGenerator(): MigrationGenerator {
-    return new VfsMigrationGenerator({ vfs: this._vfs, output: this._vfsOutput });
+    return new VfsMigrationGenerator({ vfs: this._vfs, shell: this.shell });
   }
 }
 
@@ -301,7 +300,6 @@ export class VfsAppGenerator extends AppGenerator {
     ensureVfsAdapter(options.vfs);
     super({
       cwd: "/",
-      output: options.output,
       appPath: options.appPath,
       database: options.database,
       skipDocker: true,
