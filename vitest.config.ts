@@ -341,7 +341,6 @@ const alias = {
   "@blazetrails/date": path.resolve(__dirname, "packages/date/src/index.ts"),
   "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/src/index.ts"),
   "@blazetrails/thor/": path.resolve(__dirname, "packages/thor/src") + "/",
-  "@blazetrails/thor": path.resolve(__dirname, "packages/thor/src/thor.ts"),
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
   "@blazetrails/builder": path.resolve(__dirname, "packages/builder/src/builder.ts"),
@@ -422,9 +421,19 @@ const COVERAGE_EXCLUDE = [
   "packages/*/virtualized-dx-tests/**",
 ];
 
+// thor's entry is thor.ts, not index.ts, and Vite reads the "@blazetrails/thor/"
+// key as a match for the bare specifier too, resolving it to the directory.
+const aliasEntries = [
+  {
+    find: /^@blazetrails\/thor$/,
+    replacement: path.resolve(__dirname, "packages/thor/src/thor.ts"),
+  },
+  ...Object.entries(alias).map(([find, replacement]) => ({ find, replacement })),
+];
+
 const otherResolve = {
   alias: [
-    ...Object.entries(alias).map(([find, replacement]) => ({ find, replacement })),
+    ...aliasEntries,
     { find: /^eslint$/, replacement: path.resolve(__dirname, "node_modules/eslint/lib/api.js") },
   ],
 };
@@ -441,7 +450,7 @@ const otherSetupFiles = [
 ];
 
 export default defineConfig({
-  resolve: { alias },
+  resolve: { alias: aliasEntries },
   test: {
     globals: true,
     // MUST live at the ROOT config: vitest 3's shared fork pool sizes itself
@@ -489,7 +498,7 @@ export default defineConfig({
         // SQLite is file-backed too: globalSetup builds one on-disk template and
         // each fork restores it into its own private `.sqlite` clone stamped into
         // AR_TEST_WORKER_DB (see support/sqlite-template.ts).
-        resolve: { alias },
+        resolve: { alias: aliasEntries },
         test: {
           name: "activerecord",
           include: [
@@ -540,7 +549,7 @@ export default defineConfig({
         // SQLite driver wrappers + driver-binding tests: pure unit tests, no
         // AR setup (see SQLITE_DRIVER_TESTS). Excluded from the "activerecord"
         // project above so they don't load the connection bootstrap.
-        resolve: { alias },
+        resolve: { alias: aliasEntries },
         test: {
           name: "sqlite-drivers",
           include: SQLITE_DRIVER_TESTS,

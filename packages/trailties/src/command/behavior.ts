@@ -1,4 +1,6 @@
 import { LoadError, regexpEscape } from "@blazetrails/ruby-compat";
+import { Base as ThorBase } from "@blazetrails/thor/shell";
+import { Basic } from "@blazetrails/thor/shell/basic";
 import type { Command as Program } from "commander";
 
 type CommandFactory = () => Program;
@@ -20,6 +22,10 @@ const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory>>> = {
   encrypted: async () => (await import("../commands/encrypted.js")).encryptedCommand,
   dev: async () => (await import("../commands/dev.js")).devCommand,
 };
+
+export function noColorBang(): void {
+  ThorBase.shell = Basic;
+}
 
 let _subclasses: CommandFactory[] | undefined;
 
