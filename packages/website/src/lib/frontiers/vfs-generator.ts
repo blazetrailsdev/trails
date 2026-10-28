@@ -3,7 +3,6 @@ import {
   ModelGenerator,
   MigrationGenerator,
 } from "@blazetrails/trailties/generators";
-import type { AppDatabase } from "@blazetrails/trailties/generators";
 import { ActiveSupport } from "@blazetrails/activesupport";
 import {
   registerFsAdapter,
@@ -233,9 +232,14 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   };
 }
 
-export interface VfsGeneratorOptions {
-  vfs: VirtualFS;
-}
+/**
+ * A generator's Thor config, plus the virtual filesystem it writes to. The
+ * destination root is always the VFS root.
+ */
+export type VfsGeneratorConfig = Omit<
+  NonNullable<ConstructorParameters<typeof MigrationGenerator>[2]>,
+  "destinationRoot"
+> & { vfs: VirtualFS };
 
 function ensureVfsAdapter(vfs: VirtualFS): void {
   registerFsAdapter("vfs", createVfsFsAdapter(vfs), posixPath);
@@ -257,12 +261,9 @@ export class VfsMigrationGenerator extends MigrationGenerator {
     void this.sourceRoot(MIGRATION_SOURCE_ROOT);
   }
 
-  constructor(
-    options: VfsGeneratorOptions &
-      Pick<ConstructorParameters<typeof MigrationGenerator>[0], "shell">,
-  ) {
-    ensureVfsAdapter(options.vfs);
-    super({ cwd: "/", shell: options.shell });
+  constructor(args: unknown[], localOptions: unknown, config: VfsGeneratorConfig) {
+    ensureVfsAdapter(config.vfs);
+    super(args, localOptions, { ...config, destinationRoot: "/" });
     applyVfsOverrides(this);
   }
 }
@@ -270,38 +271,26 @@ export class VfsMigrationGenerator extends MigrationGenerator {
 export class VfsModelGenerator extends ModelGenerator {
   private _vfs: VirtualFS;
 
-  constructor(options: VfsGeneratorOptions & { name: string; attributes: string[] }) {
-    ensureVfsAdapter(options.vfs);
-    super({
-      cwd: "/",
-      name: options.name,
-      attributes: options.attributes,
-      migration: true,
-      timestamps: true,
-    });
-    this._vfs = options.vfs;
+  constructor(args: unknown[], localOptions: unknown, config: VfsGeneratorConfig) {
+    ensureVfsAdapter(config.vfs);
+    super(args, localOptions, { ...config, destinationRoot: "/" });
+    this._vfs = config.vfs;
     applyVfsOverrides(this);
   }
 
   protected override createMigrationGenerator(): MigrationGenerator {
-    return new VfsMigrationGenerator({ vfs: this._vfs, shell: this.shell });
+    return new VfsMigrationGenerator(
+      [`create_${this.tableName()}`],
+      Object.fromEntries(this.options as unknown as Iterable<[string, unknown]>),
+      { vfs: this._vfs, shell: this.shell, behavior: this.behavior },
+    );
   }
 }
 
-export interface VfsAppGeneratorOptions extends VfsGeneratorOptions {
-  appPath: string;
-  database?: AppDatabase;
-}
-
 export class VfsAppGenerator extends AppGenerator {
-  constructor(options: VfsAppGeneratorOptions) {
-    ensureVfsAdapter(options.vfs);
-    super({
-      cwd: "/",
-      appPath: options.appPath,
-      database: options.database,
-      skipDocker: true,
-    });
+  constructor(args: unknown[], localOptions: unknown, config: VfsGeneratorConfig) {
+    ensureVfsAdapter(config.vfs);
+    super(args, localOptions, { ...config, destinationRoot: "/" });
     applyVfsOverrides(this);
   }
 }

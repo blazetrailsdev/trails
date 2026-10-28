@@ -35,7 +35,7 @@ function stubVfs(files: Record<string, string>): VirtualFS {
  * installs — not a copy of it reached through an export widened for the test.
  */
 function vfsFs(files: Record<string, string>) {
-  new VfsMigrationGenerator({ vfs: stubVfs(files) });
+  new VfsMigrationGenerator(["create_posts"], {}, { vfs: stubVfs(files) });
   return getFs();
 }
 

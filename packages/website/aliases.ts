@@ -23,6 +23,14 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/activerecord/connection-adapters", "../activerecord/src/connection-adapters.ts"],
   ["@blazetrails/activerecord", "../activerecord/src/index.ts"],
   ["@blazetrails/rack", "../rack/src/index.ts"],
+  [
+    "@blazetrails/actionview/rails-dom-testing/assertions",
+    "../actionview/src/rails-dom-testing/assertions.ts",
+  ],
+  [
+    "@blazetrails/actionview/rails-dom-testing/testing",
+    "../actionview/src/rails-dom-testing/testing.ts",
+  ],
   ["@blazetrails/actionview", "../actionview/src/index.ts"],
   ["@blazetrails/tse-compiler", "../tse-compiler/src/index.ts"],
   ["@blazetrails/actionpack", "../actionpack/src/index.ts"],
