@@ -1,7 +1,6 @@
 import { Concern, extend } from "@blazetrails/activesupport";
 import { withLocale } from "@blazetrails/i18n";
-import { block as rbBlock, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
+import { block as rbBlock } from "@blazetrails/ruby-compat";
 
 interface TranslationJob {
   locale: string | null;
@@ -21,5 +20,3 @@ Concern.included.call(Translation as never, null, function (this: TranslationCla
     }),
   );
 });
-
-rbModConstSet(ActiveJob, "Translation", Translation);

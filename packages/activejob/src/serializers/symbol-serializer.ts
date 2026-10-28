@@ -1,4 +1,4 @@
-import { hashAref, rbCSymbol, rbModConstSet, symbolToS, toSym } from "@blazetrails/ruby-compat";
+import { hashAref, rbCSymbol, symbolToS, toSym } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
@@ -20,4 +20,4 @@ export class SymbolSerializer extends ObjectSerializer {
     return rbCSymbol;
   }
 }
-rbModConstSet(Serializers, "SymbolSerializer", SymbolSerializer);
+Serializers.SymbolSerializer = SymbolSerializer;

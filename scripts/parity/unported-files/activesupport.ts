@@ -104,13 +104,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
       "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
   },
   {
-    pattern: "/file_update_checker.rb",
-    testFile: "/file_update_checker_test.rb",
-    package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
-  },
-  {
     pattern: "evented_file_update_checker.rb",
     testFile: "evented_file_update_checker_test.rb",
     package: "activesupport",
@@ -140,19 +133,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "testing/parallelize_executor.rb",
-    package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
-  },
-  {
-    pattern: "encrypted_configuration.rb",
-    testFile: "encrypted_configuration_test.rb",
-    package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
-  },
-  {
-    pattern: "code_generator.rb",
     package: "activesupport",
     reason:
       "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",

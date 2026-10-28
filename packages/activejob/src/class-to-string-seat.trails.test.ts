@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as ActiveSupportExports from "@blazetrails/activesupport";
 import { Delegator, ExecutionWrapper, Executor } from "@blazetrails/activesupport";
-import { rbModToS, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { rbModName, rbModToS, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import * as ActiveJobExports from "./index.js";
 import { Base } from "./base.js";
 
@@ -36,5 +36,16 @@ describe("class-to-string-seat", () => {
     expect(seated).toContain(Base);
     expect(seated).toContain(ActiveSupportExports.Duration);
     for (const klass of seated) expect(String(klass)).toBe(rbModToS(klass));
+  });
+
+  it("answers rbModName with the constant path for every seated class", () => {
+    const seated = (
+      Object.values({ ...ActiveSupportExports, ...ActiveJobExports }) as unknown[]
+    ).filter(
+      (v): v is abstract new (...args: never) => unknown =>
+        typeof v === "function" && Object.hasOwn(v, "toString"),
+    );
+    const mismatches = seated.filter((klass) => rbModName(klass) !== String(klass));
+    expect(mismatches.map((k) => `${rbModName(k)} != ${String(k)}`)).toEqual([]);
   });
 });

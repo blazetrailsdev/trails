@@ -4,10 +4,10 @@ import {
   hashAref,
   rtest,
   rbInspect,
-  rbModConstSet,
   rbModName,
   rbObjClass,
 } from "@blazetrails/ruby-compat";
+import { Arguments, SerializationError } from "./arguments.js";
 import { ActiveJob, Serializers, type SerializerLike } from "./namespaces.js";
 import { SymbolSerializer } from "./serializers/symbol-serializer.js";
 import { DurationSerializer } from "./serializers/duration-serializer.js";
@@ -37,15 +37,13 @@ Serializers._additionalSerializers = new Set();
 export function serialize(argument: unknown): unknown {
   const serializer = [...serializers()].find((s) => s.isSerialize(argument));
   if (!serializer) {
-    throw new ActiveJob.SerializationError(
-      `Unsupported argument type: ${rbModName(rbObjClass(argument))}`,
-    );
+    throw new SerializationError(`Unsupported argument type: ${rbModName(rbObjClass(argument))}`);
   }
   return serializer.serialize(argument);
 }
 
 export function deserialize(argument: Record<string, unknown> | Map<string, unknown>): unknown {
-  const serializerName = hashAref(argument, ActiveJob.Arguments.OBJECT_SERIALIZER_KEY);
+  const serializerName = hashAref(argument, Arguments.OBJECT_SERIALIZER_KEY);
   if (!rtest(serializerName)) {
     throw new ArgumentError(
       `Serializer name is not present in the argument: ${rbInspect(argument)}`,
@@ -82,5 +80,5 @@ addSerializers(
   RangeSerializer,
   BigDecimalSerializer,
 );
-rbModConstSet(ActiveJob, "Serializers", Serializers);
+ActiveJob.Serializers = Serializers;
 export { Serializers };

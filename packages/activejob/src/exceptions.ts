@@ -5,7 +5,6 @@ import {
   Kernel,
   rbBlockGivenP,
   rbInspect,
-  rbModConstSet,
   rbObjClass,
   slice,
   RuntimeError,
@@ -219,4 +218,4 @@ extend(Exceptions, Concern);
 );
 Object.defineProperty(Exceptions, "ClassMethods", { value: ClassMethods });
 
-rbModConstSet(ActiveJob, "Exceptions", Exceptions);
+ActiveJob.Exceptions = Exceptions;

@@ -1,4 +1,4 @@
-import { BigDecimal, hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
+import { BigDecimal, hashAref } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
@@ -20,4 +20,4 @@ export class BigDecimalSerializer extends ObjectSerializer {
     return BigDecimal;
   }
 }
-rbModConstSet(Serializers, "BigDecimalSerializer", BigDecimalSerializer);
+Serializers.BigDecimalSerializer = BigDecimalSerializer;

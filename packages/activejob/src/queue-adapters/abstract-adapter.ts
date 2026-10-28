@@ -1,4 +1,4 @@
-import { NotImplementedError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { QueueAdapters } from "../namespaces.js";
 
 export class AbstractAdapter {
@@ -14,4 +14,4 @@ export class AbstractAdapter {
     throw new NotImplementedError();
   }
 }
-rbModConstSet(QueueAdapters, "AbstractAdapter", AbstractAdapter);
+QueueAdapters.AbstractAdapter = AbstractAdapter;

@@ -2,14 +2,14 @@ import { getEnv } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import {
   ImmediateExecutor,
-  rbModConstSet,
   ScheduledTask,
   SecureRandom,
   ThreadPoolExecutor,
   toF,
   toI,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob, QueueAdapters } from "../namespaces.js";
+import { Base } from "../base.js";
+import { QueueAdapters } from "../namespaces.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 
 interface AsyncAdapterJob {
@@ -67,7 +67,7 @@ export class JobWrapper {
   }
 
   perform(): Promise<unknown> {
-    return ActiveJob.Base.execute(this._jobData);
+    return Base.execute(this._jobData);
   }
 }
 
@@ -124,6 +124,6 @@ export class Scheduler {
     return this.immediate ? this._immediateExecutor : this._asyncExecutor;
   }
 }
-rbModConstSet(QueueAdapters, "AsyncAdapter", AsyncAdapter);
-rbModConstSet(AsyncAdapter, "JobWrapper", JobWrapper);
-rbModConstSet(AsyncAdapter, "Scheduler", Scheduler);
+QueueAdapters.AsyncAdapter = AsyncAdapter;
+AsyncAdapter.JobWrapper = JobWrapper;
+AsyncAdapter.Scheduler = Scheduler;

@@ -13,7 +13,6 @@ import {
   classModule,
   rbCModule,
   rbClassSuperclass,
-  rbModConstSet,
   rbModName,
   rbObjClass,
   rbObjIsKindOf,
@@ -111,4 +110,4 @@ Object.defineProperty(QueueAdapter, "ClassMethods", { value: ClassMethods });
   },
 );
 
-rbModConstSet(ActiveJob, "QueueAdapter", QueueAdapter);
+ActiveJob.QueueAdapter = QueueAdapter;
