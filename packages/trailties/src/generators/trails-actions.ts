@@ -1,39 +1,15 @@
-import { getFs, getPath, type FsAdapter } from "@blazetrails/ruby-compat";
-import { regexpEscape } from "@blazetrails/ruby-compat";
-import { assertNoRubySource } from "../template-builder/no-ruby-source.js";
-import { GeneratorError } from "./generated-attribute.js";
-import { optimizeIndentation, rebaseIndentation } from "./actions.js";
-
-type AsyncFs = FsAdapter & {
-  readFile: NonNullable<FsAdapter["readFile"]>;
-  writeFile: NonNullable<FsAdapter["writeFile"]>;
-  mkdir: NonNullable<FsAdapter["mkdir"]>;
-};
-
-async function requireAsyncFs(needs: ReadonlyArray<keyof AsyncFs>): Promise<AsyncFs> {
-  const fs = getFs();
-  for (const m of needs) {
-    if (typeof (fs as unknown as Record<string, unknown>)[m] !== "function") {
-      throw new Error(
-        `FsAdapter is missing required async method ${JSON.stringify(m)}; ` +
-          `this action needs ${needs.map((n) => `async ${n}`).join(" + ")}`,
-      );
-    }
-  }
-  return fs as AsyncFs;
-}
+import { File } from "@blazetrails/ruby-compat";
 
 export interface TrailsActionsHost {
   cwd: string;
   output: (msg: string) => void;
-  behavior?: "invoke" | "revoke";
-  options?: { pretend?: boolean };
 }
 
 export interface PkgOptions {
   dev?: boolean;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export async function pkg(
   this: TrailsActionsHost,
   name: string,
@@ -43,10 +19,8 @@ export async function pkg(
   if (name.trim() === "") {
     throw new Error(`package name must be non-empty, got ${JSON.stringify(name)}`);
   }
-  const fs = await requireAsyncFs(["readFile", "writeFile"]);
-  const path = getPath();
-  const pkgPath = path.join(this.cwd, "package.json");
-  const raw = await fs.readFile(pkgPath, "utf-8");
+  const pkgPath = File.join(this.cwd, "package.json");
+  const raw = await File.readAsync(pkgPath);
   const parsed: unknown = JSON.parse(raw);
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     const actual = parsed === null ? "null" : Array.isArray(parsed) ? "array" : typeof parsed;
@@ -71,199 +45,6 @@ export async function pkg(
   );
   deps[name] = version;
   json[key] = deps;
-  await fs.writeFile(pkgPath, JSON.stringify(json, null, 2) + "\n");
+  await File.writeAsync(pkgPath, JSON.stringify(json, null, 2) + "\n");
   this.output(`         pkg  ${name}`);
-}
-
-export interface RouteOptions {
-  namespace?: string | string[] | null;
-}
-
-export async function route(
-  this: TrailsActionsHost,
-  routingCode: string,
-  { namespace: namespaceOption }: RouteOptions = {},
-): Promise<void> {
-  assertNoRubySource(routingCode);
-  const namespace = namespaceOption == null ? [] : ([] as string[]).concat(namespaceOption);
-  let namespacePattern = routeNamespacePattern(namespace);
-  routingCode = [...namespace]
-    .reverse()
-    .reduce(
-      (code, name) =>
-        `this.namespace(${JSON.stringify(name)}, () => {\n${rebaseIndentation(code, 2)}});`,
-      routingCode,
-    );
-
-  this.output(`       route  ${summarize(routingCode)}`);
-
-  const namespaceMatch = await matchFile(this, "config/routes.ts", namespacePattern);
-  if (namespaceMatch) {
-    const captures = namespaceMatch
-      .slice(1)
-      .filter((c): c is string => c != null)
-      .map((c) => c.length);
-    const baseIndent = captures[0];
-    const existingBlockIndent = captures.length > 1 ? captures.at(-1) : undefined;
-    routingCode = rebaseIndentation(routingCode, baseIndent + 2);
-    if (existingBlockIndent !== undefined) {
-      routingCode = routingCode.replace(
-        new RegExp(`^[ ]{0,${existingBlockIndent}}\\S.+\\n?`, "gm"),
-        "",
-      );
-    }
-    namespacePattern = new RegExp(regexpEscape(namespaceMatch[0]));
-  }
-
-  await injectIntoFile(this, "config/routes.ts", routingCode, { after: namespacePattern });
-
-  if (this.behavior === "revoke" && namespace.length > 0 && namespaceMatch) {
-    const emptyBlockPattern = new RegExp(
-      `(${namespacePattern.source})((?:\\s*\\}\\);\\n){1,${namespace.length}})`,
-    );
-    await gsubFile(this, "config/routes.ts", emptyBlockPattern, (matched) => {
-      let [beginning, ending] = emptyBlockPattern.exec(matched)!.slice(1);
-      let stripped: string;
-      while (
-        ending !== "" &&
-        (stripped = beginning.replace(/^[ ]*this\.namespace\(.+ \{\n\s*(?![^])/m, "")) !== beginning
-      ) {
-        beginning = stripped;
-        ending = ending.replace(/^\s*\}\);\n/, "");
-      }
-      return beginning + ending;
-    });
-  }
-}
-
-export interface EnvironmentOptions {
-  env?: string | string[] | null;
-}
-
-export async function environment(
-  this: TrailsActionsHost,
-  data: string,
-  options: EnvironmentOptions = {},
-): Promise<void> {
-  const sentinel = " extends Application {\n  static {\n";
-  const envFileSentinel = "Trails.application.configure(function () {\n";
-  assertNoRubySource(data);
-
-  if (options.env == null) {
-    await injectIntoFile(this, "config/application.ts", optimizeIndentation(data, 4), {
-      after: sentinel,
-    });
-  } else {
-    for (const env of ([] as string[]).concat(options.env)) {
-      if (!/^[a-z0-9_-]+$/i.test(env)) {
-        throw new Error(`environment name must match /^[a-z0-9_-]+$/i, got ${JSON.stringify(env)}`);
-      }
-      await injectIntoFile(this, `config/environments/${env}.ts`, optimizeIndentation(data, 2), {
-        after: envFileSentinel,
-      });
-    }
-  }
-}
-
-export async function initializer(
-  this: TrailsActionsHost,
-  filename: string,
-  content: string,
-): Promise<void> {
-  if (
-    filename === "" ||
-    filename === "." ||
-    filename === ".." ||
-    filename.includes("/") ||
-    filename.includes("\\")
-  ) {
-    throw new Error(`initializer filename must be a leaf name, got ${JSON.stringify(filename)}`);
-  }
-  assertNoRubySource(content);
-  const fs = await requireAsyncFs(["mkdir", "writeFile"]);
-  const path = getPath();
-  const dir = path.join(this.cwd, "config/initializers");
-  await fs.mkdir(dir, { recursive: true });
-  const dest = path.join(dir, filename);
-  await fs.writeFile(dest, content.endsWith("\n") ? content : content + "\n");
-  this.output(`      create  config/initializers/${filename}`);
-}
-
-function routeNamespacePattern(namespace: string[]): RegExp {
-  const pattern = namespace
-    .map((name, i) => [name, i] as const)
-    .reverse()
-    .reduce<string | null>((pattern, [name, i]) => {
-      const cumulativeMargin = `\\${i + 1}[ ]{2}`;
-      const blankOrIndentedLine = `^[ ]*\\n|^${cumulativeMargin}.*\\n`;
-      return `(?:(?:${blankOrIndentedLine})*?^(${cumulativeMargin})this\\.namespace\\(${regexpEscape(JSON.stringify(name))}, \\(\\) => \\{\\n${pattern ?? ""})?`;
-    }, null);
-  return new RegExp(
-    `^([ ]*).+\\.routes\\(\\)\\.draw\\(function \\(\\) \\{[ ]*\\n${pattern ?? ""}`,
-    "m",
-  );
-}
-
-async function matchFile(
-  host: TrailsActionsHost,
-  relPath: string,
-  pattern: RegExp,
-): Promise<RegExpMatchArray | null> {
-  const fs = await requireAsyncFs(["readFile"]);
-  const full = getPath().join(host.cwd, relPath);
-  if (!(await fs.exists(full))) return null;
-  return (await fs.readFile(full, "utf-8")).match(pattern);
-}
-
-async function injectIntoFile(
-  host: TrailsActionsHost,
-  relPath: string,
-  replacement: string,
-  { after }: { after: string | RegExp },
-): Promise<void> {
-  const fs = await requireAsyncFs(["exists", "readFile", "writeFile"]);
-  const full = getPath().join(host.cwd, relPath);
-  if (host.behavior === "revoke") {
-    const content = await fs.readFile(full, "utf-8");
-    const flag = typeof after === "string" ? regexpEscape(after) : after.source;
-    const regexp = new RegExp(`(${flag})([^]*)(${regexpEscape(replacement)})`, "g");
-    if (!host.options?.pretend) await fs.writeFile(full, content.replace(regexp, "$1$2"));
-    return;
-  }
-  if (await fs.exists(full)) {
-    const content = await fs.readFile(full, "utf-8");
-    if (content.includes(replacement)) return;
-    const flag =
-      typeof after === "string"
-        ? new RegExp(regexpEscape(after), "g")
-        : new RegExp(after.source, after.flags.includes("g") ? after.flags : `${after.flags}g`);
-    if (!host.options?.pretend)
-      await fs.writeFile(
-        full,
-        content.replace(flag, (match) => match + replacement),
-      );
-  } else if (!host.options?.pretend) {
-    throw new GeneratorError(`The file ${full} does not appear to exist`);
-  }
-}
-
-async function gsubFile(
-  host: TrailsActionsHost,
-  relPath: string,
-  flag: RegExp,
-  block: (match: string) => string,
-): Promise<void> {
-  const fs = await requireAsyncFs(["readFile", "writeFile"]);
-  const full = getPath().join(host.cwd, relPath);
-  if (host.options?.pretend) return;
-  const content = await fs.readFile(full, "utf-8");
-  await fs.writeFile(
-    full,
-    content.replace(new RegExp(flag.source, `${flag.flags.replace("g", "")}g`), block),
-  );
-}
-
-function summarize(s: string): string {
-  const flat = s.replace(/\s+/g, " ").trim();
-  return flat.length > 60 ? flat.slice(0, 57) + "..." : flat;
 }

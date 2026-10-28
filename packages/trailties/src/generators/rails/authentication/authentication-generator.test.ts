@@ -59,6 +59,10 @@ beforeEach(() => {
       spawned.push([cmd, ...args]);
       return { status: 0, signal: null, stdout: "", stderr: "" };
     },
+    system: async (command) => {
+      spawned.push(command.split(" "));
+      return { pid: 1, status: 0, signal: null };
+    },
   });
   childProcessAdapterConfig.adapter = "trailties-auth-test";
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-auth-"));
@@ -183,7 +187,7 @@ describe("AuthenticationGenerator", () => {
     write("package.json", '{ "dependencies": { "@blazetrails/activerecord": "*" } }');
     await makeGen().run();
     expect(JSON.parse(read("package.json")).dependencies.bcryptjs).toBe("*");
-    expect(spawned).toContainEqual(["pnpm", "install", "--silent"]);
+    expect(spawned).toContainEqual(["bin/pnpm", "install", "--silent"]);
   });
 
   it("does not silently overwrite an existing file", async () => {

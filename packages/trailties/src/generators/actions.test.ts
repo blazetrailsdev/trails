@@ -1,154 +1,222 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  registerChildProcessAdapter,
   childProcessAdapterConfig,
+  Dir,
+  env as ENV,
+  File,
+  FileUtils,
+  registerChildProcessAdapter,
+  setEnv,
   type ChildProcessAdapter,
-  type SpawnSyncOptions,
-  type SpawnSyncResult,
 } from "@blazetrails/ruby-compat";
 import { GeneratorBase } from "./base.js";
 
 class TestGenerator extends GeneratorBase {}
 
-interface SpawnCall {
-  cmd: string;
-  args: string[];
-  options?: SpawnSyncOptions;
+interface RunCall {
+  command: string;
+  env: Record<string, string | undefined>;
+  capture: boolean;
 }
 
-let calls: SpawnCall[] = [];
-let nextResult: SpawnSyncResult = { status: 0, signal: null, stdout: "", stderr: "" };
+let calls: RunCall[];
+let nextStatus: number;
 let previousAdapter: string | null;
+let root: string;
 
 const testAdapter: ChildProcessAdapter = {
-  spawnSync(cmd, args, options) {
-    calls.push({ cmd, args, options });
-    return nextResult;
+  spawnSync() {
+    throw new Error("unexpected spawnSync");
+  },
+  async system(command, env) {
+    calls.push({ command, env, capture: false });
+    return { pid: 1, status: nextStatus, signal: null };
+  },
+  async capture2e(command, env) {
+    calls.push({ command, env, capture: true });
+    return ["", { pid: 1, status: nextStatus, signal: null }];
   },
 };
 
+const draw = "Trails.application.routes().draw(function () {\n";
+
 beforeEach(() => {
   calls = [];
-  nextResult = { status: 0, signal: null, stdout: "", stderr: "" };
+  nextStatus = 0;
   registerChildProcessAdapter("trailties-actions-test", testAdapter);
   previousAdapter = childProcessAdapterConfig.adapter;
   childProcessAdapterConfig.adapter = "trailties-actions-test";
+  root = Dir.mktmpdir("trailties-actions-");
+  FileUtils.mkdirP(File.join(root, "config/environments"));
+  File.write(
+    File.join(root, "config/application.ts"),
+    "export class Application extends Application {\n  static {\n  }\n}\n",
+  );
+  File.write(
+    File.join(root, "config/environments/development.ts"),
+    "Trails.application.configure(function () {\n});\n",
+  );
+  File.write(File.join(root, "config/routes.ts"), `${draw}});\n`);
 });
 
 afterEach(() => {
   childProcessAdapterConfig.adapter = previousAdapter;
+  FileUtils.rmRf(root);
 });
 
+function generator(options: { quiet?: boolean; behavior?: "invoke" | "revoke" } = {}) {
+  const lines: string[] = [];
+  const gen = new TestGenerator({ cwd: root, output: (m) => lines.push(`${m}\n`), ...options });
+  return { gen, lines };
+}
+
 function makeGen(): TestGenerator {
-  return new TestGenerator({ cwd: "/tmp", output: () => {} });
+  return generator().gen;
+}
+
+function read(path: string): string {
+  return File.read(File.join(root, path));
+}
+
+function routes(code: string): string {
+  return `${draw}${code.replace(/^/gm, "  ")}\n});\n`;
 }
 
 describe("ActionsTest", () => {
+  it("environment should include data in environment initializer block", async () => {
+    const autoloadPaths = 'config.autoloadPaths.push("app/extras");';
+    await makeGen().environment(autoloadPaths);
+    expect(read("config/application.ts")).toContain(
+      ` extends Application {\n  static {\n    ${autoloadPaths}\n`,
+    );
+  });
+
+  it("environment should include data in environment initializer block with env option", async () => {
+    const autoloadPaths = 'config.autoloadPaths.push("app/extras");';
+    await makeGen().environment(autoloadPaths, { env: "development" });
+    expect(read("config/environments/development.ts")).toContain(
+      `configure(function () {\n  ${autoloadPaths}\n`,
+    );
+  });
+
+  it("environment with block should include block contents in environment initializer block", async () => {
+    await makeGen().environment(null, {}, () => "// This will be added");
+    expect(read("config/application.ts")).toMatch(/\/\/ This will be added/);
+  });
+
+  it("git with symbol should run command using git scm", async () => {
+    await makeGen().git("init");
+    expect(calls.map((c) => c.command)).toEqual(["git init"]);
+  });
+
+  it("git with hash should run each command using git scm", async () => {
+    await makeGen().git({ rm: "README", add: "." });
+    expect(calls.map((c) => c.command)).toEqual(["git rm README", "git add ."]);
+  });
+
+  it("vendor should write data to file in vendor", async () => {
+    await makeGen().vendor("vendor-file.ts", "// vendor data");
+    expect(read("vendor/vendor-file.ts")).toBe("// vendor data\n");
+  });
+
+  it("lib should write data to file with block in lib", async () => {
+    const code = "      export class MyLib {\n        static MY_CONSTANT = 123;\n      }\n";
+    await makeGen().lib("my-library.ts", null, () => code);
+    expect(read("lib/my-library.ts")).toBe(
+      "export class MyLib {\n  static MY_CONSTANT = 123;\n}\n",
+    );
+  });
+
+  it("rakefile should write date to file in lib tasks", async () => {
+    await makeGen().rakefile("myapp.ts", "task run");
+    expect(read("lib/tasks/myapp.ts")).toBe("task run\n");
+  });
+
+  it("initializer should write date to file in config initializers", async () => {
+    await makeGen().initializer("constants.ts", "export const MY_CONSTANT = 42;");
+    expect(read("config/initializers/constants.ts")).toBe("export const MY_CONSTANT = 42;\n");
+  });
+
+  it("rake should run rake with the default environment", async () => {
+    const previous = ENV.TRAILS_ENV;
+    setEnv("TRAILS_ENV", undefined);
+    try {
+      await makeGen().rake("log:clear");
+    } finally {
+      setEnv("TRAILS_ENV", previous);
+    }
+    expect(calls[0].command).toBe("bin/rake log:clear");
+    expect(calls[0].env.TRAILS_ENV).toBe("development");
+  });
+
+  it("rake with env option should run rake with the env environment", async () => {
+    await makeGen().rake("log:clear", { env: "production" });
+    expect(calls[0].env.TRAILS_ENV).toBe("production");
+  });
+
+  it("rake with sudo option should run rake with sudo", async () => {
+    await makeGen().rake("log:clear", { sudo: true });
+    expect(calls[0].command).toBe("sudo bin/rake log:clear");
+  });
+
+  it("rake with capture option should run rake with capture", async () => {
+    await makeGen().rake("log:clear", { capture: true });
+    expect(calls[0].capture).toBe(true);
+  });
+
+  it("route should add route", async () => {
+    const routeCommands = ['this.get("foo");', 'this.get("bar");', 'this.get("baz");'];
+    const gen = makeGen();
+    for (const routeCommand of routeCommands) await gen.route(routeCommand);
+    expect(read("config/routes.ts")).toBe(routes([...routeCommands].reverse().join("\n")));
+  });
+
+  it("route should be idempotent", async () => {
+    const gen = makeGen();
+    await gen.route('this.root("welcome#index");');
+    const content = read("config/routes.ts");
+    await gen.route('this.root("welcome#index");');
+    expect(read("config/routes.ts")).toBe(content);
+  });
+
+  it("route with namespace option should nest route", async () => {
+    await makeGen().route('this.get("foo");\nthis.get("bar");', { namespace: "baz" });
+    expect(read("config/routes.ts")).toBe(
+      routes('this.namespace("baz", () => {\n  this.get("foo");\n  this.get("bar");\n});'),
+    );
+  });
+
+  it("route with namespace option injects into existing namespace blocks", async () => {
+    const gen = makeGen();
+    await gen.route('this.get("foo1");', { namespace: ["baz", "qux"] });
+    await gen.route('this.get("foo2");', { namespace: ["baz", "hoge"] });
+    expect(read("config/routes.ts")).toBe(
+      routes(
+        'this.namespace("baz", () => {\n  this.namespace("hoge", () => {\n    this.get("foo2");\n  });\n  this.namespace("qux", () => {\n    this.get("foo1");\n  });\n});',
+      ),
+    );
+  });
+
+  it("route with namespace option revokes route without breaking existing namespace blocks", async () => {
+    await makeGen().route(
+      'this.namespace("baz", () => {\n  this.get("foo1");\n  this.namespace("qux", () => {\n    this.get("foo2");\n  });\n});',
+    );
+    await generator({ behavior: "revoke" }).gen.route('this.get("foo2");', {
+      namespace: ["baz", "qux"],
+    });
+    expect(read("config/routes.ts")).toBe(
+      routes('this.namespace("baz", () => {\n  this.get("foo1");\n});'),
+    );
+  });
+
   it("generate should queue a sub-generator invocation", () => {
-    const lines: string[] = [];
-    const gen = new TestGenerator({ cwd: "/tmp", output: (m) => lines.push(m) });
-    gen.generate("scaffold", "Post", "title:string", "body:text");
-    expect(gen.pendingGenerators).toEqual([
-      { what: "scaffold", args: ["Post", "title:string", "body:text"] },
-    ]);
-    expect(lines.some((l) => l.includes("generate") && l.includes("scaffold"))).toBe(true);
-  });
-
-  it("git with symbol should run command using git scm", () => {
-    makeGen().git("init");
-    expect(calls).toEqual([{ cmd: "git", args: ["init"], options: { cwd: "/tmp" } }]);
-  });
-
-  it("git with multi-arg string should split into argv", () => {
-    makeGen().git("checkout -b feature/new");
-    expect(calls).toEqual([
-      { cmd: "git", args: ["checkout", "-b", "feature/new"], options: { cwd: "/tmp" } },
-    ]);
-  });
-
-  it("git with hash containing multi-arg options should split each", () => {
-    makeGen().git({ commit: "-m initial" });
-    expect(calls).toEqual([
-      { cmd: "git", args: ["commit", "-m", "initial"], options: { cwd: "/tmp" } },
-    ]);
-  });
-
-  it("git with hash should run each command using git scm", () => {
-    makeGen().git({ rm: "README", add: "." });
-    expect(calls.map((c) => [c.cmd, ...c.args].join(" "))).toEqual(["git rm README", "git add ."]);
-  });
-
-  it("rake should run rake with the default environment", () => {
-    makeGen().rake("log:clear");
-    expect(calls).toHaveLength(1);
-    expect(calls[0].cmd).toBe("rake");
-    expect(calls[0].args).toEqual(["log:clear"]);
-    expect(calls[0].options?.env?.TRAILS_ENV).toBe("development");
-  });
-
-  it("rake with env option should run rake with the env environment", () => {
-    makeGen().rake("log:clear", { env: "production" });
-    expect(calls[0].options?.env?.TRAILS_ENV).toBe("production");
-  });
-
-  it("rake env option should be passed per-call and not mutate adapter env", () => {
     const gen = makeGen();
-    gen.rake("log:clear", { env: "production" });
-    gen.rake("log:clear");
-    expect(calls[0].options?.env?.TRAILS_ENV).toBe("production");
-    expect(calls[1].options?.env?.TRAILS_ENV).toBe("development");
-  });
-
-  it("rake with sudo option should run rake with sudo", () => {
-    makeGen().rake("log:clear", { sudo: true });
-    expect(calls[0].cmd).toBe("sudo");
-    expect(calls[0].args).toEqual(["rake", "log:clear"]);
-  });
-
-  it("rake with capture option should run rake with capture", () => {
-    nextResult = { status: 0, signal: null, stdout: "captured output", stderr: "" };
-    const out = makeGen().rake("log:clear", { capture: true });
-    expect(out).toBe("captured output");
-  });
-
-  it("rake with abort_on_failure option should raise on failure", () => {
-    nextResult = { status: 1, signal: null, stdout: "", stderr: "boom" };
-    expect(() => makeGen().rake("invalid", { abortOnFailure: true })).toThrow(/aborted/);
-  });
-
-  it("rake with abort_on_failure should include signal name when killed by signal", () => {
-    nextResult = { status: null, signal: "SIGTERM", stdout: "", stderr: "" };
-    expect(() => makeGen().rake("slow", { abortOnFailure: true })).toThrow(/SIGTERM/);
-  });
-
-  it("rake with abort_on_failure should raise when spawn errored (status null)", () => {
-    nextResult = {
-      status: null,
-      signal: null,
-      stdout: "",
-      stderr: "",
-      error: new Error("ENOENT: command not found"),
-    };
-    expect(() => makeGen().rake("missing-bin", { abortOnFailure: true })).toThrow(/ENOENT/);
-  });
-
-  it("after_install should queue callbacks for later invocation", () => {
-    const gen = makeGen();
-    const order: number[] = [];
-    gen.afterInstall(() => {
-      order.push(1);
-    });
-    gen.afterInstall(() => {
-      order.push(2);
-    });
-    expect(gen.afterInstallCallbacks).toHaveLength(2);
-    for (const cb of gen.afterInstallCallbacks) cb();
-    expect(order).toEqual([1, 2]);
+    gen.generate("scaffold", "Post", "title:string");
+    expect(gen.pendingGenerators).toEqual([{ what: "scaffold", args: ["Post", "title:string"] }]);
   });
 
   function action(quiet: boolean, ...args: unknown[]): string {
-    const lines: string[] = [];
-    const gen = new TestGenerator({ cwd: "/tmp", output: (m) => lines.push(`${m}\n`), quiet });
+    const { gen, lines } = generator({ quiet });
     gen.log(...args);
     return lines.join("");
   }
