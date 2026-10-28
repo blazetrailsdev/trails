@@ -1,4 +1,4 @@
-import { serializeOuter, type DefaultTreeAdapterMap } from "parse5";
+import { defaultTreeAdapter, serializeOuter, type DefaultTreeAdapterMap } from "parse5";
 
 import { Attr } from "../xml/attr.js";
 import type { NodeSet } from "../xml/node-set.js";
@@ -47,6 +47,7 @@ export class Node {
   get type(): number {
     if (this._node.nodeName === "#text") return Node.TEXT_NODE;
     if (this._node.nodeName === "#comment") return Node.COMMENT_NODE;
+    if (this._node.nodeName === "#cdata-section") return Node.CDATA_SECTION_NODE;
     if ("tagName" in this._node) return Node.ELEMENT_NODE;
     return 0;
   }
@@ -84,10 +85,8 @@ export class Node {
     return this.content;
   }
 
-  private _children?: Node[];
-
   get children(): Node[] {
-    return (this._children ??= childNodes(this._node as Parse5Parent, this.document));
+    return childNodes(this._node as Parse5Parent, this.document);
   }
 
   get(name: string): string | null {
@@ -95,9 +94,35 @@ export class Node {
     return attrs.find((attr) => attr.name === name)?.value ?? null;
   }
 
+  get attributes(): Record<string, Attr> {
+    return Object.fromEntries(this.attributeNodes.map((attr) => [attr.nodeName, attr]));
+  }
+
   get attributeNodes(): Attr[] {
     const attrs = (this._node as { attrs?: Parse5Attr[] }).attrs ?? [];
-    return attrs.map((attr) => new Attr(attr, this.document));
+    return attrs.map(
+      (attr) => new Attr(attr, this.document, this._node as { attrs: Parse5Attr[] }),
+    );
+  }
+
+  removeAttribute(name: string): Attr | undefined {
+    const attr = this.attributes[name];
+    attr?.remove();
+    return attr;
+  }
+
+  before(nodeOrTags: Node): this {
+    defaultTreeAdapter.insertBefore(
+      this._node.parentNode as Parse5Parent,
+      nodeOrTags._node,
+      this._node,
+    );
+    return this;
+  }
+
+  remove(): this {
+    defaultTreeAdapter.detachNode(this._node);
+    return this;
   }
 
   toString(): string {

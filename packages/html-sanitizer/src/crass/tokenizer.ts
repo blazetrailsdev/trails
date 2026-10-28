@@ -33,7 +33,6 @@ const VALUE_TOKENS: Partial<Record<TokenType, string>> = {
   [TokenType.AtKeyword]: "at_keyword",
   [TokenType.String]: "string",
   [TokenType.URL]: "url",
-  [TokenType.Delim]: "delim",
 };
 
 const MATCH_TOKENS: Record<string, string> = {
@@ -161,6 +160,9 @@ export class Tokenizer {
           raw,
           value: raw.slice(2, raw.endsWith("*/") ? -2 : undefined),
         };
+      case TokenType.Delim:
+        if (raw === "\\") return { node: "delim", pos, raw, error: true, value: data!.value };
+        return { node: "delim", pos, raw, value: data!.value };
       case TokenType.Hash:
         return { node: "hash", pos, raw, type: data!.type, value: data!.value };
       case TokenType.BadString:
