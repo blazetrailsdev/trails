@@ -129,7 +129,7 @@ describe("LookupContextTest", () => {
 
   it("delegates changing the locale to the I18n configuration object if it contains a lookup_context object", () => {
     try {
-      I18n.setConfig(new I18nProxy(I18n.config(), lookupContext) as never);
+      I18n.setConfig(new I18nProxy(I18n.config(), lookupContext));
       lookupContext.locale = ":pt";
       assertEqual("pt", I18n.locale());
       assertEqual(":pt", lookupContext.locale);
