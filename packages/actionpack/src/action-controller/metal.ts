@@ -19,6 +19,7 @@ import {
   rbModSingletonP,
   rbObjDup,
   rbObjRespondTo,
+  rbModName,
 } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
@@ -172,7 +173,7 @@ export class Metal extends AbstractControllerBase {
     }
     return (this._controllerName = isAnonymous(this)
       ? null
-      : underscore(demodulize(this.name).replace(/Controller$/, "")));
+      : underscore(demodulize(rbModName(this)!).replace(/Controller$/, "")));
   }
 
   static makeResponseBang(request: Request): Response {
