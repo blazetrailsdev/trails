@@ -1,4 +1,10 @@
-import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
+import {
+  Date as RubyDate,
+  DateTime as RubyDateTime,
+  Temporal,
+  Time as RubyTime,
+} from "@blazetrails/date";
+import { getutc } from "../date-time/calculations.js";
 import { include, TopLevel } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
@@ -9,6 +15,7 @@ import { actsLike } from "../object/acts-like.js";
 
 export type DateOrTime =
   | Temporal.PlainDate
+  | RubyDateTime
   | Temporal.PlainDateTime
   | Temporal.ZonedDateTime
   | Date
@@ -40,7 +47,13 @@ export function inTimeZone<T extends DateOrTime>(
 function timeWithZone(dateOrTime: DateOrTime, time: TimeLike | null, zone: TimeZone): TimeWithZone {
   if (time !== null) {
     return new TimeWithZone(
-      time instanceof RubyTime ? (time.isUtc() ? time : time.getutc()) : asInstant(time),
+      time instanceof RubyTime
+        ? time.isUtc()
+          ? time
+          : time.getutc()
+        : time instanceof RubyDateTime
+          ? getutc(time)
+          : asInstant(time),
       zone,
     );
   }
@@ -48,7 +61,7 @@ function timeWithZone(dateOrTime: DateOrTime, time: TimeLike | null, zone: TimeZ
   return zone.local(date.year, date.month, date.day);
 }
 
-function asInstant(time: Exclude<TimeLike, RubyTime>): Temporal.Instant {
+function asInstant(time: Exclude<TimeLike, RubyTime | RubyDateTime>): Temporal.Instant {
   if (time instanceof Temporal.ZonedDateTime) return time.toInstant();
   if (time instanceof Temporal.PlainDateTime) return time.toZonedDateTime("UTC").toInstant();
   return time instanceof Temporal.Instant ? time : instantFrom(time);
@@ -56,6 +69,7 @@ function asInstant(time: Exclude<TimeLike, RubyTime>): Temporal.Instant {
 
 type TimeLike =
   | Date
+  | RubyDateTime
   | Temporal.Instant
   | Temporal.PlainDateTime
   | Temporal.ZonedDateTime

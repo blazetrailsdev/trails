@@ -3,6 +3,7 @@ import { assertMatch, assertRaise } from "@blazetrails/activesupport/testing/ass
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import { toFs as dateTimeToFs } from "@blazetrails/activesupport/core-ext/date-time/conversions";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { DateTime } from "@blazetrails/date";
 import { GeneratedAttribute } from "../../lib/generators/generated-attribute.js";
 import { Error } from "../../lib/generators/base.js";
 import {
@@ -131,7 +132,7 @@ describe("GeneratedAttribute", () => {
 
   it("test_default_value_is_datetime", () => {
     for (const attributeType of ["datetime", "timestamp", "time"]) {
-      assertFieldDefaultValue(attributeType, dateTimeToFs(Temporal.Now.plainDateTimeISO(), "db"));
+      assertFieldDefaultValue(attributeType, dateTimeToFs(DateTime.now(), "db"));
     }
   });
 

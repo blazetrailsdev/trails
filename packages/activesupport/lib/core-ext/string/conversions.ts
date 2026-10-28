@@ -35,9 +35,7 @@ export function toDate(str: string): Temporal.PlainDate | undefined {
   return undefined;
 }
 
-export function toDatetime(
-  str: string,
-): Temporal.PlainDateTime | Temporal.ZonedDateTime | undefined {
+export function toDatetime(str: string): DateTime | undefined {
   if (!isBlank(str)) return DateTime.parse(str, false);
   return undefined;
 }

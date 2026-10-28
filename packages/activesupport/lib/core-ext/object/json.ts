@@ -384,7 +384,8 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
   if (value instanceof RubyDateTime) return DateTime.asJson(value, options);
   if (value instanceof RubyDate) return Date.asJson(value, options);
   if (value instanceof Temporal.PlainDate) return Date.asJson(value, options);
-  if (value instanceof Temporal.PlainDateTime) return DateTime.asJson(value, options);
+  if (value instanceof RubyDateTime || value instanceof Temporal.PlainDateTime)
+    return DateTime.asJson(value, options);
   if (value instanceof BigDecimalValue) return BigDecimal.asJson(value, options);
   if (isStruct(value)) return Struct.asJson(value, options);
   if (value instanceof RegExp) return Regexp.asJson(value, options);

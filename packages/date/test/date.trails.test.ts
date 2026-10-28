@@ -723,7 +723,7 @@ describe("Date", () => {
 
   it("round-trips %T through strptime and strftime", () => {
     const parsed = RubyDateTime.strptime("2008-03-01T06:07:08.5", "%FT%T.%N");
-    expect(strftime(parsed, "%FT%T.%20N")).toBe("2008-03-01T06:07:08.50000000000000000000");
+    expect(parsed.strftime("%FT%T.%20N")).toBe("2008-03-01T06:07:08.50000000000000000000");
   });
 
   it("honours the width prefix ahead of every directive, as date_strftime does", () => {
@@ -996,7 +996,6 @@ describe("Date", () => {
 
   it("raises from the seat for a day past Temporal's range, decoded nth and all", () => {
     expect(() => RubyDate.jd(2n ** 70n)).toThrow(RubyDate.Error);
-    expect(() => RubyDateTime.jd(2n ** 70n, 1, 2, 3)).toThrow(RubyDate.Error);
 
     expect(dNewByFrags({ jd: 2n ** 70n }).toS()).toBe("3232350070754114273-01-08");
     expect(dtNewByFrags({ jd: 2n ** 70n, hour: 1, min: 2, sec: 3 }).toS()).toBe(
@@ -1158,39 +1157,6 @@ describe("DateTime", () => {
     );
   });
 
-  it("carries the offset into the default return too, not only the gem-shaped one", () => {
-    const zoned = RubyDateTime.parse("2008-03-01T06:00:00+09:00");
-    expect(zoned).toBeInstanceOf(Temporal.ZonedDateTime);
-    expect((zoned as Temporal.ZonedDateTime).offset).toBe("+09:00");
-    expect(strftime(zoned, "%Y-%m-%dT%H:%M:%S%:z")).toBe("2008-03-01T06:00:00+09:00");
-
-    const plain = RubyDateTime.parse("2008-03-01T06:00:00");
-    expect(plain).toBeInstanceOf(Temporal.PlainDateTime);
-    expect(strftime(plain, "%Y-%m-%dT%H:%M:%S%:z")).toBe("2008-03-01T06:00:00+00:00");
-
-    expect(
-      strftime(RubyDateTime.strptime("2008-03-01T06:00:00+09:00"), "%Y-%m-%dT%H:%M:%S%:z"),
-    ).toBe("2008-03-01T06:00:00+09:00");
-  });
-
-  it("truncates a sub-minute offset in the seat, as of2str's own spelling does", () => {
-    expect(RubyDate._parse("2008-03-01T06:00:00-00:44:30").offset).toBe(-2670);
-    expect(gemDateTime("2008-03-01T06:00:00-00:44:30").zone).toBe("-00:44");
-    const seat = RubyDateTime.parse("2008-03-01T06:00:00-00:44:30");
-    expect(seat).toBeInstanceOf(Temporal.ZonedDateTime);
-    expect((seat as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
-      "2008-03-01T06:00:00",
-    );
-  });
-
-  it("names the exact instant of a sub-minute offset, as the gem-shaped object does", () => {
-    const seat = RubyDateTime.parse("2008-03-01T06:00:00-00:44:30") as Temporal.ZonedDateTime;
-    expect(Number(seat.epochNanoseconds / 1000000000n)).toBe(1204353870);
-
-    const gem = gemDateTime("2008-03-01T06:00:00-00:44:30");
-    expect(gem.offset.mul(86400).toI()).toBe(-2670);
-  });
-
   it("toTime names the exact instant of a sub-minute offset, as datetime_to_time's Time.new does", () => {
     const t = gemDateTime("1883-11-18T12:00:00-04:56:02").toTime();
     expect(t.toI()).toBe(-2717651038);
@@ -1211,7 +1177,7 @@ describe("DateTime", () => {
   });
 
   it("defaults to +00:00 when the source named no zone", () => {
-    expect(strftime(RubyDateTime.parse("2008-07-02"), "%Y-%m-%dT%H:%M:%S %z")).toBe(
+    expect(RubyDateTime.parse("2008-07-02").strftime("%Y-%m-%dT%H:%M:%S %z")).toBe(
       "2008-07-02T00:00:00 +0000",
     );
     expect(gemDateTime("2008-07-02").zone).toBe("+00:00");
@@ -1278,7 +1244,7 @@ describe("DateTime", () => {
     const datetime = gemDateTime("2008-03-01T06:00:00.123456789+09:00");
     expect(datetime.strftime("%N")).toBe("123456789");
     expect(datetime.secFraction).toEqual(new Rational(123456789, 1000000000));
-    expect(strftime(RubyDateTime.parse("2008-03-01T06:00:00.9999999999"), "%N")).toBe("999999999");
+    expect(RubyDateTime.parse("2008-03-01T06:00:00.9999999999").strftime("%N")).toBe("999999999");
   });
 
   it("rounds the fractional second to a nanosecond, where Time#nsec truncates", () => {
@@ -1387,41 +1353,39 @@ describe("DateTime", () => {
   });
 
   it("builds from a jd, an ordinal, a civil or a commercial date with a time of day and a start", () => {
-    const iso = (v: Temporal.PlainDateTime | Temporal.ZonedDateTime) =>
-      v instanceof Temporal.ZonedDateTime ? v.toString({ timeZoneName: "never" }) : v.toString();
+    const iso = (v: RubyDateTime) => v.iso8601();
 
-    expect(iso(RubyDateTime.jd(2451944))).toBe("2001-02-03T00:00:00");
+    expect(iso(RubyDateTime.jd(2451944))).toBe("2001-02-03T00:00:00+00:00");
     expect(iso(RubyDateTime.jd(2451944, 4, 5, 6, "+7"))).toBe("2001-02-03T04:05:06+07:00");
     expect(iso(RubyDateTime.jd(2299160, 0, 0, 0, 0, RubyDate.GREGORIAN))).toBe(
-      "1582-10-14T00:00:00",
+      "1582-10-14T00:00:00+00:00",
     );
-    expect(iso(RubyDateTime.jd(2299160))).toBe("1582-10-04T00:00:00");
+    expect(iso(RubyDateTime.jd(2299160))).toBe("1582-10-04T00:00:00+00:00");
     expect(iso(RubyDateTime.ordinal(2001, 34, 4, 5, 6, "+7"))).toBe("2001-02-03T04:05:06+07:00");
     expect(iso(RubyDateTime.ordinal(1582, 355, 1, 2, 3, 0, RubyDate.GREGORIAN))).toBe(
-      "1582-12-21T01:02:03",
+      "1582-12-21T01:02:03+00:00",
     );
     expect(iso(RubyDateTime.civil(2001, 2, 3, 4, 5, 6, "+7"))).toBe("2001-02-03T04:05:06+07:00");
     expect(iso(RubyDateTime.commercial(2001, 5, 6, 4, 5, 6, "+7"))).toBe(
       "2001-02-03T04:05:06+07:00",
     );
     expect(iso(RubyDateTime.commercial(1582, 41, 4, 0, 0, 0, 0, RubyDate.GREGORIAN))).toBe(
-      "1582-10-14T00:00:00",
+      "1582-10-14T00:00:00+00:00",
     );
-    expect(iso(RubyDateTime.commercial(1582, 41, 4))).toBe("1582-10-21T00:00:00");
+    expect(iso(RubyDateTime.commercial(1582, 41, 4))).toBe("1582-10-21T00:00:00+00:00");
 
-    expect(iso(RubyDateTime.jd(2451944.5))).toBe("2001-02-03T12:00:00");
-    expect(iso(RubyDateTime.jd(2451944, 1.5))).toBe("2001-02-03T01:30:00");
+    expect(iso(RubyDateTime.jd(2451944.5))).toBe("2001-02-03T12:00:00+00:00");
+    expect(iso(RubyDateTime.jd(2451944, 1.5))).toBe("2001-02-03T01:30:00+00:00");
     expect(() => RubyDateTime.jd(2451944, 1.5, 0)).toThrow("invalid fraction");
     expect(() => RubyDateTime.jd(2451944.5, 0)).toThrow("invalid fraction");
-    expect(iso(RubyDateTime.jd(new Rational(1, 2)))).toBe("-004712-01-01T12:00:00");
-    expect(iso(RubyDateTime.ordinal(2001, 34.5))).toBe("2001-02-03T12:00:00");
+    expect(iso(RubyDateTime.jd(new Rational(1, 2)))).toBe("-4712-01-01T12:00:00+00:00");
+    expect(iso(RubyDateTime.ordinal(2001, 34.5))).toBe("2001-02-03T12:00:00+00:00");
     expect(() => RubyDateTime.ordinal(2001, 34.5, 0)).toThrow("invalid fraction");
-    expect(iso(RubyDateTime.commercial(2001, 5, 6.5))).toBe("2001-02-03T12:00:00");
+    expect(iso(RubyDateTime.commercial(2001, 5, 6.5))).toBe("2001-02-03T12:00:00+00:00");
 
-    expect(iso(RubyDateTime.jd(2451944, 24))).toBe("2001-02-04T00:00:00");
+    expect(iso(RubyDateTime.jd(2451944, 24))).toBe("2001-02-04T00:00:00+00:00");
     const half = RubyDateTime.jd(2451944, 0, 0, 0.5);
-    expect(half).toBeInstanceOf(Temporal.PlainDateTime);
-    expect((half as Temporal.PlainDateTime).millisecond).toBe(500);
+    expect(half.secFraction).toEqual(new Rational(1, 2));
   });
 
   it("takes a start argument after the offset, and keeps the time of day across new_start", () => {
@@ -1438,9 +1402,9 @@ describe("DateTime", () => {
     const west = new RubyDateTime(1582, 10, 15, 23, 30, 0, "-02:00");
     expect([east.jd, west.jd]).toEqual([2299161, 2299161]);
     expect([east.isJulian, west.isJulian]).toEqual([true, false]);
-    expect(
-      RubyDateTime.parse("1582-10-10T06:30:00+02:00", true, RubyDate.GREGORIAN).toString(),
-    ).toBe("1582-10-10T06:30:00+02:00[+02:00]");
+    expect(RubyDateTime.parse("1582-10-10T06:30:00+02:00", true, RubyDate.GREGORIAN).toS()).toBe(
+      "1582-10-10T06:30:00+02:00",
+    );
     expect(() => RubyDateTime.parse("1582-10-10T06:30:00+02:00")).toThrow(RubyDate.Error);
   });
 
@@ -1465,32 +1429,28 @@ describe("Time", () => {
 
   it("hands to_datetime's seat the whole second, the sub-second and the offset apart", () => {
     const dt = new RubyTime(2008, 3, 1, 6, 0, 7.456789, 3600).toDatetime();
-    expect((dt as Temporal.ZonedDateTime).offset).toBe("+01:00");
-    expect((dt as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
-      "2008-03-01T06:00:07.456788999",
-    );
+    expect(dt.zone).toBe("+01:00");
+    expect(dt.strftime("%FT%T.%N")).toBe("2008-03-01T06:00:07.456788999");
 
     const west = new RubyTime(2008, 3, 1, 6, 0, 7.456789, -1800).toDatetime();
-    expect((west as Temporal.ZonedDateTime).offset).toBe("-00:30");
-    expect((west as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
-      "2008-03-01T06:00:07.456788999",
-    );
+    expect(west.zone).toBe("-00:30");
+    expect(west.strftime("%FT%T.%N")).toBe("2008-03-01T06:00:07.456788999");
   });
 
   it("rolls a 60th second into the next minute, as ::Time does", () => {
     const t = RubyTime.utc(2015, 6, 30, 23, 59, 60);
     expect(t.sec).toBe(0);
     expect(t.strftime("%Y-%m-%d %H:%M:%S")).toBe("2015-07-01 00:00:00");
-    expect(t.toDatetime().toString()).toBe("2015-07-01T00:00:00");
+    expect(t.toDatetime().toS()).toBe("2015-07-01T00:00:00+00:00");
     expect(() => RubyTime.utc(2015, 6, 30, 23, 59, 61)).toThrow(ArgumentError);
   });
 
   it("keeps the day the offset carries across midnight", () => {
-    expect(new RubyTime(2008, 3, 1, 23, 30, 0, 3600).toDatetime().toString()).toBe(
-      "2008-03-01T23:30:00+01:00[+01:00]",
+    expect(new RubyTime(2008, 3, 1, 23, 30, 0, 3600).toDatetime().toS()).toBe(
+      "2008-03-01T23:30:00+01:00",
     );
-    expect(new RubyTime(2008, 3, 1, 0, 30, 0, -3600).toDatetime().toString()).toBe(
-      "2008-03-01T00:30:00-01:00[-01:00]",
+    expect(new RubyTime(2008, 3, 1, 0, 30, 0, -3600).toDatetime().toS()).toBe(
+      "2008-03-01T00:30:00-01:00",
     );
   });
 });
@@ -1871,7 +1831,7 @@ describe("the instance formatters", () => {
   });
 
   it("takes n digits of fractional seconds through iso8601_timediv", () => {
-    const d2 = new RubyDateTime(RubyDateTime.parse("2001-02-03T04:05:06.123456"));
+    const d2 = RubyDateTime.parse("2001-02-03T04:05:06.123456");
     expect(d2.iso8601(3)).toBe("2001-02-03T04:05:06.123+00:00");
     expect(d2.iso8601(9)).toBe("2001-02-03T04:05:06.123456000+00:00");
     expect(d2.xmlschema(3)).toBe("2001-02-03T04:05:06.123+00:00");
@@ -1971,7 +1931,6 @@ describe("Marshal over Date", () => {
       expect(rbObjIsKindOf(seat, rbCDateTime)).toBe(true);
       expect(rbObjIsKindOf(seat, rbCTime)).toBe(false);
     }
-    expect(Object.keys(zoned)).toEqual([]);
   });
 });
 

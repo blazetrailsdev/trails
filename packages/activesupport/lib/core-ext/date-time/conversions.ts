@@ -1,26 +1,49 @@
 import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { DateTime as RubyDateTime, Temporal, Time, cCivilToJd } from "@blazetrails/date";
-import { secFraction } from "../../time-ext.js";
 import { DATE_FORMATS } from "../time/conversions.js";
 import { TimeZone } from "../../values/time-zone.js";
 import { isUtc, secondsSinceMidnight, utcOffset } from "./calculations.js";
 
-type DateTime = Temporal.PlainDateTime | Temporal.ZonedDateTime;
+type DateTime = RubyDateTime;
 
 export function toFs(datetime: DateTime, format = "default"): string {
   const formatter = DATE_FORMATS[format];
   if (formatter != null) {
     return typeof formatter === "function"
       ? String(formatter(datetime))
-      : new RubyDateTime(datetime).strftime(formatter);
+      : datetime.strftime(formatter);
   }
-  return new RubyDateTime(datetime).toS();
+  return datetime.toS();
 }
 
 export const toFormattedS = toFs;
 
 for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
-  Object.assign(TEMPORAL_METHOD_TABLE[seat], { toFs, toFormattedS, usec });
+  Object.assign(TEMPORAL_METHOD_TABLE[seat], {
+    toFs: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime, format?: string) =>
+      toFs(new RubyDateTime(self), format),
+    toFormattedS: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime, format?: string) =>
+      toFormattedS(new RubyDateTime(self), format),
+    usec: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime) => usec(new RubyDateTime(self)),
+  });
+}
+
+declare module "@blazetrails/date" {
+  interface DateTime {
+    toFs(format?: string): string;
+    toFormattedS(format?: string): string;
+    usec(): number;
+  }
+}
+
+for (const [name, fn] of Object.entries({ toFs, toFormattedS, usec })) {
+  Object.defineProperty(RubyDateTime.prototype, name, {
+    value: function (this: RubyDateTime, ...args: unknown[]): unknown {
+      return (fn as (datetime: RubyDateTime, ...rest: unknown[]) => unknown)(this, ...args);
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 export function formattedOffset(
@@ -37,7 +60,7 @@ export function readableInspect(datetime: DateTime): string {
 }
 
 export function defaultInspect(datetime: DateTime): string {
-  return new RubyDateTime(datetime).inspect();
+  return datetime.inspect();
 }
 
 export function civilFromFormat(
@@ -69,7 +92,7 @@ export function civilFromFormat(
 }
 
 export function toF(datetime: DateTime): number {
-  return secondsSinceUnixEpoch(datetime) + secFraction(datetime);
+  return secondsSinceUnixEpoch(datetime) + datetime.secFraction.toF();
 }
 
 export function toI(datetime: DateTime): number {
@@ -77,18 +100,18 @@ export function toI(datetime: DateTime): number {
 }
 
 export function usec(datetime: DateTime): number {
-  return Math.trunc(secFraction(datetime) * 1_000_000);
+  return datetime.secFraction.mul(1_000_000).toI();
 }
 
 export function nsec(datetime: DateTime): number {
-  return Math.trunc(secFraction(datetime) * 1_000_000_000);
+  return datetime.secFraction.mul(1_000_000_000).toI();
 }
 
 export function offsetInSeconds(datetime: DateTime): number {
-  return new RubyDateTime(datetime).offset.mul(86400).toI();
+  return datetime.offset.mul(86400).toI();
 }
 
 export function secondsSinceUnixEpoch(datetime: DateTime): number {
-  const jd = cCivilToJd(datetime.year, datetime.month, datetime.day);
+  const jd = cCivilToJd(Number(datetime.year), datetime.month, datetime.day);
   return (jd - 2440588) * 86400 - offsetInSeconds(datetime) + secondsSinceMidnight(datetime);
 }

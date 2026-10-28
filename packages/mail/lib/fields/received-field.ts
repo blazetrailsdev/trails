@@ -1,4 +1,3 @@
-import { strftime } from "@blazetrails/date";
 import { rbObjAsString } from "@blazetrails/ruby-compat";
 import { ReceivedElement } from "../elements/received-element.js";
 import { Utilities } from "../utilities.js";
@@ -27,7 +26,7 @@ export class ReceivedField extends NamedStructuredField {
     const dateTime = this.dateTime();
     if (dateTime != null) {
       return (
-        strftime(dateTime, "%a, %d %b %Y %H:%M:%S ") + strftime(dateTime, "%:z").replaceAll(":", "")
+        dateTime.strftime("%a, %d %b %Y %H:%M:%S ") + dateTime.strftime("%:z").replaceAll(":", "")
       );
     }
     return null;

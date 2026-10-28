@@ -1,15 +1,11 @@
 import { rbClearMethodCache } from "@blazetrails/ruby-compat";
-import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
 import { formattedOffset as dateTimeFormattedOffset } from "../date-time/conversions.js";
 import { ordinalize } from "../../inflector.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
 
-type DateFormatsReceiver =
-  | RubyTime
-  | TimeWithZone
-  | Temporal.PlainDateTime
-  | Temporal.ZonedDateTime;
+type DateFormatsReceiver = RubyTime | TimeWithZone | RubyDateTime;
 
 export const DATE_FORMATS: Record<string, string | ((time: DateFormatsReceiver) => string)> = {
   db: "%Y-%m-%d %H:%M:%S",
@@ -22,9 +18,7 @@ export const DATE_FORMATS: Record<string, string | ((time: DateFormatsReceiver) 
   long: "%B %d, %Y %H:%M",
   long_ordinal: (time) => {
     const dayFormat = ordinalize(time.day);
-    return (
-      time instanceof RubyTime || time instanceof TimeWithZone ? time : new RubyDateTime(time)
-    ).strftime(`%B ${dayFormat}, %Y %H:%M`);
+    return time.strftime(`%B ${dayFormat}, %Y %H:%M`);
   },
   rfc822: (time) => {
     const offsetFormat =
@@ -33,20 +27,10 @@ export const DATE_FORMATS: Record<string, string | ((time: DateFormatsReceiver) 
         : time instanceof TimeWithZone
           ? time.formattedOffset(false)
           : dateTimeFormattedOffset(time, false);
-    return (
-      time instanceof RubyTime || time instanceof TimeWithZone ? time : new RubyDateTime(time)
-    ).strftime(`%a, %d %b %Y %H:%M:%S ${offsetFormat}`);
+    return time.strftime(`%a, %d %b %Y %H:%M:%S ${offsetFormat}`);
   },
-  rfc2822: (time) =>
-    (time instanceof RubyTime || time instanceof TimeWithZone
-      ? time
-      : new RubyDateTime(time)
-    ).rfc2822(),
-  iso8601: (time) =>
-    (time instanceof RubyTime || time instanceof TimeWithZone
-      ? time
-      : new RubyDateTime(time)
-    ).iso8601(),
+  rfc2822: (time) => time.rfc2822(),
+  iso8601: (time) => time.iso8601(),
 };
 
 export function toFs(date: RubyTime, format: string = "default"): string {

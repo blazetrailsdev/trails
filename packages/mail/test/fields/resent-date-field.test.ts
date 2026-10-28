@@ -1,4 +1,4 @@
-import { DateTime, strftime, Temporal } from "@blazetrails/date";
+import { DateTime } from "@blazetrails/date";
 import { describe, expect, it, vi } from "vitest";
 import { ResentDateField } from "../../lib/fields/resent-date-field.js";
 
@@ -8,7 +8,7 @@ describe("Mail::ResentDateField", () => {
   });
   it("should be able to tell the time", () => {
     expect(new ResentDateField("12 Aug 2009 00:00:02 GMT").dateTime()!.constructor).toEqual(
-      Temporal.PlainDateTime,
+      DateTime,
     );
   });
   it("should accept a string without the field name", () => {
@@ -24,7 +24,7 @@ describe("Mail::ResentDateField", () => {
     const t = new ResentDateField();
     expect(spy).toHaveBeenCalled();
     expect(t.name).toEqual("Resent-Date");
-    expect(String(t.dateTime())).toEqual(String(DateTime.parse(strftime(now, "%FT%T%:z"))));
+    expect(String(t.dateTime())).toEqual(String(DateTime.parse(now.strftime("%FT%T%:z"))));
     spy.mockRestore();
   });
 });

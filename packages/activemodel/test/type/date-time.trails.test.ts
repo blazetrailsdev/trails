@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import { plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import * as Types from "../../lib/index.js";
@@ -229,10 +229,10 @@ describe("DateTimeType cast and serialize coverage", () => {
   });
 
   it("a DateTime passes through cast and is truncated to the precision", () => {
-    const pdt = plainDateTime("2026-04-26T14:23:55.123456");
+    const pdt = DateTime.civil(2026, 4, 26, 14, 23, new Rational(55123456, 1000000));
     expect(type.cast(pdt)).toBe(pdt);
     const result = new Types.DateTimeType({ precision: 3 }).cast(pdt) as unknown;
-    expect((result as Temporal.PlainDateTime).toString()).toBe("2026-04-26T14:23:55.123");
+    expect((result as DateTime).strftime("%FT%T.%N")).toBe("2026-04-26T14:23:55.123000000");
   });
 
   it("has name 'datetime'", () => {

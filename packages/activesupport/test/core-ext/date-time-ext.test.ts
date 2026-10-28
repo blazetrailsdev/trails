@@ -2,7 +2,6 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import {
   Date as RubyDate,
   DateTime,
-  DateTime as RubyDateTime,
   Temporal,
   Time,
   resetLocalTimeZoneId,
@@ -97,16 +96,8 @@ function withDateCurrent<T>(today: Temporal.PlainDate, fn: () => T): T {
   }
 }
 
-function withFrozen<T>(
-  now: Time | Temporal.ZonedDateTime | Temporal.PlainDateTime,
-  fn: () => T,
-): T {
-  const instant =
-    now instanceof Time
-      ? now.toZonedDateTime().toInstant()
-      : now instanceof Temporal.PlainDateTime
-        ? now.toZonedDateTime("UTC").toInstant()
-        : now.toInstant();
+function withFrozen<T>(now: Time | DateTime, fn: () => T): T {
+  const instant = (now instanceof Time ? now : now.toTime()).toZonedDateTime().toInstant();
   setFrozenTime(new Date(instant.epochMilliseconds));
   try {
     return fn();
@@ -136,7 +127,7 @@ function dt(
   hour = 0,
   min = 0,
   sec: number | Rational = 0,
-): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+): DateTime {
   return DateTime.civil(year, month, day, hour, min, sec);
 }
 
@@ -221,14 +212,14 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("to date", () => {
-    expect(new RubyDateTime(DateTime.civil(2005, 2, 21, 14, 30, 0)).toDate().toString()).toBe(
+    expect(DateTime.civil(2005, 2, 21, 14, 30, 0).toDate().toString()).toBe(
       new RubyDate(2005, 2, 21).toDate().toString(),
     );
   });
 
   it("to datetime", () => {
     const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10");
-    const result = toTime(dt);
+    const result = toTime(new DateTime(dt));
     expect(result.toZonedDateTime().epochNanoseconds).toBe(
       dt.toZonedDateTime("UTC").epochNanoseconds,
     );
@@ -262,7 +253,7 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("to time preserves fractional seconds", () => {
     const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10.5");
-    const result = toTime(dt);
+    const result = toTime(new DateTime(dt));
     expect(result.usec).toBe(500000);
   });
 
@@ -401,22 +392,22 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("xmlschema", () => {
-    expect(new RubyDateTime(DateTime.civil(1880, 2, 28, 15, 15, 10)).xmlschema()).toMatch(
+    expect(DateTime.civil(1880, 2, 28, 15, 15, 10).xmlschema()).toMatch(
       /^1880-02-28T15:15:10\+00:?00$/,
     );
-    expect(new RubyDateTime(DateTime.civil(1980, 2, 28, 15, 15, 10)).xmlschema()).toMatch(
+    expect(DateTime.civil(1980, 2, 28, 15, 15, 10).xmlschema()).toMatch(
       /^1980-02-28T15:15:10\+00:?00$/,
     );
-    expect(new RubyDateTime(DateTime.civil(2080, 2, 28, 15, 15, 10)).xmlschema()).toMatch(
+    expect(DateTime.civil(2080, 2, 28, 15, 15, 10).xmlschema()).toMatch(
       /^2080-02-28T15:15:10\+00:?00$/,
     );
-    expect(new RubyDateTime(DateTime.civil(1880, 2, 28, 15, 15, 10, -0.25)).xmlschema()).toMatch(
+    expect(DateTime.civil(1880, 2, 28, 15, 15, 10, -0.25).xmlschema()).toMatch(
       /^1880-02-28T15:15:10-06:?00$/,
     );
-    expect(new RubyDateTime(DateTime.civil(1980, 2, 28, 15, 15, 10, -0.25)).xmlschema()).toMatch(
+    expect(DateTime.civil(1980, 2, 28, 15, 15, 10, -0.25).xmlschema()).toMatch(
       /^1980-02-28T15:15:10-06:?00$/,
     );
-    expect(new RubyDateTime(DateTime.civil(2080, 2, 28, 15, 15, 10, -0.25)).xmlschema()).toMatch(
+    expect(DateTime.civil(2080, 2, 28, 15, 15, 10, -0.25).xmlschema()).toMatch(
       /^2080-02-28T15:15:10-06:?00$/,
     );
   });
@@ -583,14 +574,12 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("current without time zone", () => {
-    expect(current()).toBeInstanceOf(
-      new Date().getTimezoneOffset() === 0 ? Temporal.PlainDateTime : Temporal.ZonedDateTime,
-    );
+    expect(current()).toBeInstanceOf(DateTime);
   });
 
   it("current with time zone", () => {
     withEnvTz("US/Eastern", () => {
-      expect(current()).toBeInstanceOf(Temporal.ZonedDateTime);
+      expect(current()).toBeInstanceOf(DateTime);
     });
   });
 
@@ -712,17 +701,13 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("usec", () => {
-    expect(usec(Temporal.PlainDateTime.from({ year: 2000, month: 1, day: 1 }))).toBe(0);
-    expect(
-      usec(Temporal.PlainDateTime.from({ year: 2000, month: 1, day: 1, millisecond: 500 })),
-    ).toBe(500000);
+    expect(usec(DateTime.civil(2000))).toBe(0);
+    expect(usec(DateTime.civil(2000, 1, 1, 0, 0, new Rational(1, 2)))).toBe(500000);
   });
 
   it("nsec", () => {
-    expect(nsec(Temporal.PlainDateTime.from({ year: 2000, month: 1, day: 1 }))).toBe(0);
-    expect(
-      nsec(Temporal.PlainDateTime.from({ year: 2000, month: 1, day: 1, millisecond: 500 })),
-    ).toBe(500000000);
+    expect(nsec(DateTime.civil(2000))).toBe(0);
+    expect(nsec(DateTime.civil(2000, 1, 1, 0, 0, new Rational(1, 2)))).toBe(500000000);
   });
 
   it("subsec", () => {
@@ -815,14 +800,12 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("since", () => {
     const receiver = dt(2005, 2, 22, 10, 10, 10);
-    expect(since(receiver, 1).toString()).toBe(dt(2005, 2, 22, 10, 10, 11).toString());
-    expect(since(receiver, 3600).toString()).toBe(dt(2005, 2, 22, 11, 10, 10).toString());
-    expect(since(receiver, 86400 * 2).toString()).toBe(dt(2005, 2, 24, 10, 10, 10).toString());
-    expect(since(receiver, 86400 * 2 + 3600 + 25).toString()).toBe(
-      dt(2005, 2, 24, 11, 10, 35).toString(),
-    );
-    expect(since(receiver, 1.333).toString()).not.toBe(dt(2005, 2, 22, 10, 10, 11).toString());
-    expect(since(receiver, 1.667).toString()).not.toBe(dt(2005, 2, 22, 10, 10, 12).toString());
+    expect(since(receiver, 1).toS()).toBe(dt(2005, 2, 22, 10, 10, 11).toS());
+    expect(since(receiver, 3600).toS()).toBe(dt(2005, 2, 22, 11, 10, 10).toS());
+    expect(since(receiver, 86400 * 2).toS()).toBe(dt(2005, 2, 24, 10, 10, 10).toS());
+    expect(since(receiver, 86400 * 2 + 3600 + 25).toS()).toBe(dt(2005, 2, 24, 11, 10, 35).toS());
+    expect(since(receiver, 1.333).inspect()).not.toBe(dt(2005, 2, 22, 10, 10, 11).inspect());
+    expect(since(receiver, 1.667).inspect()).not.toBe(dt(2005, 2, 22, 10, 10, 12).inspect());
   });
 
   it("advance", () => {

@@ -45,7 +45,7 @@ import {
   UnderscoresToDashes,
 } from "../../lib/inflector-test-cases.js";
 import { SafeBuffer, htmlSafe, isHtmlSafe } from "../../lib/core-ext/string/output-safety.js";
-import { NoMethodError, Range, rbFSend, resetConstants } from "@blazetrails/ruby-compat";
+import { NoMethodError, Range, Rational, rbFSend, resetConstants } from "@blazetrails/ruby-compat";
 import { endsWith, startsWith } from "../../lib/core-ext/string/starts-ends-with.js";
 import { htmlEscape, htmlEscapeOnce, xmlNameEscape } from "../../lib/core-ext/tse/util.js";
 import {
@@ -456,19 +456,21 @@ describe("StringConversionsTest", () => {
     });
   });
   it("string to datetime", () => {
-    expect(String(toDatetime("2039-02-27 23:50"))).toEqual("2039-02-27T23:50:00");
-    expect(String(toDatetime("2039-02-27T23:50:19.275038-04:00"))).toEqual(
-      "2039-02-27T23:50:19.275038-04:00[-04:00]",
+    expect(toDatetime("2039-02-27 23:50")!.toS()).toEqual(
+      DateTime.civil(2039, 2, 27, 23, 50).toS(),
+    );
+    expect(toDatetime("2039-02-27T23:50:19.275038-04:00")!.inspect()).toEqual(
+      DateTime.civil(2039, 2, 27, 23, 50, new Rational(19275038, 1000000), "-04:00").inspect(),
     );
     expect(toDatetime("")).toBeUndefined();
   });
   it("partial string to datetime", () => {
     const now = DateTime.now();
-    expect(String(toDatetime("23:50"))).toBe(
-      String(DateTime.civil(now.year, now.month, now.day, 23, 50)),
+    expect(toDatetime("23:50")!.toS()).toBe(
+      DateTime.civil(Number(now.year), now.month, now.day, 23, 50).toS(),
     );
-    expect(String(toDatetime("23:50 -0400"))).toBe(
-      String(DateTime.civil(now.year, now.month, now.day, 23, 50, 0, "-04:00")),
+    expect(toDatetime("23:50 -0400")!.toS()).toBe(
+      DateTime.civil(Number(now.year), now.month, now.day, 23, 50, 0, "-04:00").toS(),
     );
   });
   it("string to date", () => {

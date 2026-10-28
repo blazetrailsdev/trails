@@ -88,6 +88,7 @@ export function travel(
 export function travelTo(
   dateOrTime:
     | Temporal.PlainDate
+    | DateTime
     | Temporal.PlainDateTime
     | Temporal.ZonedDateTime
     | globalThis.Date
@@ -134,14 +135,15 @@ export function travelTo(
       : Time.at(new Rational(Temporal.Instant.from(dateOrTime).epochNanoseconds, 1_000_000_000n));
   } else {
     now = dateOrTime;
-    if (!(now instanceof Time))
+    if (now instanceof DateTime) now = toTime(now);
+    else if (now instanceof Temporal.PlainDateTime || now instanceof Temporal.ZonedDateTime)
+      now = toTime(new DateTime(now));
+    else if (!(now instanceof Time))
       now = Time.at(
         new Rational(
           now instanceof globalThis.Date
             ? BigInt(now.getTime()) * 1_000_000n
-            : now instanceof Temporal.Instant
-              ? now.epochNanoseconds
-              : toTime(now).toZonedDateTime().epochNanoseconds,
+            : now.epochNanoseconds,
           1_000_000_000n,
         ),
       );

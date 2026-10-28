@@ -346,6 +346,7 @@ export {
 export * from "./time-ext.js";
 import "./core-ext/date/calculations.js";
 import "./core-ext/time/calculations.js";
+import "./core-ext/date-time/acts-like.js";
 import "./core-ext/date-time/calculations.js";
 import "./core-ext/date-time/compatibility.js";
 import "./core-ext/date/zones.js";

@@ -1714,7 +1714,7 @@ export class Time extends rbCTime {
     return new Date(SEAT, nth, cCivilToJd(ry, m, d, Date.GREGORIAN), Date.ITALY).toDate();
   }
 
-  toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  toDatetime(): DateTime {
     const y = this.year;
     const m = this.mon;
     const d = this.day;
@@ -1739,7 +1739,7 @@ export class Time extends rbCTime {
       sf,
       of,
       Date.ITALY,
-    ).toDatetime();
+    );
   }
 
   /**

@@ -10,7 +10,6 @@ import {
   lessThanOrEqual,
   max,
   min,
-  rubyClass,
 } from "../lib/comparable.js";
 
 describe("<=>", () => {
@@ -65,7 +64,6 @@ describe("<=>", () => {
 });
 
 class Sign {
-  readonly [rubyClass] = "Sign";
   constructor(readonly value: number) {}
   compareTo(other: unknown): number | null {
     return other instanceof Sign ? cmp(this.value, other.value) : null;

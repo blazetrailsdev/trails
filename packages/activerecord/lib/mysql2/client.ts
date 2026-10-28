@@ -349,7 +349,7 @@ function cast(
             val = val.newOffset(0);
           }
         }
-        return val.toDatetime();
+        return val;
       }
       const msec = Number((tokens[7] ?? "").padEnd(6, "0"));
       let val = Time[queryOptions.databaseTimezone!](year, month, day, hour, min, sec, msec);

@@ -10,14 +10,13 @@ import { instantFrom } from "../../temporal.js";
 import { currentTime } from "../../time-travel.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { zone as timeZone } from "../../time-zone-config.js";
-import { secFraction } from "../../time-ext.js";
 import * as date from "../date/calculations.js";
 import { toDatetime as stringToDatetime } from "../string/conversions.js";
 import { nsec, toI } from "./conversions.js";
 
-type DateTime = Temporal.PlainDateTime | Temporal.ZonedDateTime;
+type DateTime = RubyDateTime;
 
-export function current(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+export function current(): DateTime {
   const zone = timeZone();
   if (zone) {
     return new TimeWithZone(instantFrom(currentTime()), zone).toDatetime();
@@ -34,7 +33,7 @@ export function current(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
 }
 
 export function secondsSinceMidnight(datetime: DateTime): number {
-  const self = new RubyDateTime(datetime);
+  const self = datetime;
   return self.sec + self.min * 60 + self.hour * 3600;
 }
 
@@ -43,7 +42,7 @@ export function secondsUntilEndOfDay(datetime: DateTime): number {
 }
 
 export function subsec(datetime: DateTime): number {
-  return secFraction(datetime);
+  return datetime.secFraction.toF();
 }
 
 interface ChangeOptions {
@@ -60,7 +59,7 @@ interface ChangeOptions {
 }
 
 export function change(datetime: DateTime, options: ChangeOptions): DateTime {
-  const self = new RubyDateTime(datetime);
+  const self = datetime;
 
   let newFraction: Rational;
   const newNsec = options.nsec;
@@ -127,7 +126,7 @@ export function advance(datetime: DateTime, options: AdvanceOptions): DateTime {
     options.hours = (options.hours ?? 0) + 24 * partialDays;
   }
 
-  const d = date.advance(new RubyDateTime(datetime).toDate(), options);
+  const d = date.advance(datetime.toDate(), options);
   const datetimeAdvancedByDate = change(datetime, { year: d.year, month: d.month, day: d.day });
   const secondsToAdvance =
     (options.seconds ?? 0) + (options.minutes ?? 0) * 60 + (options.hours ?? 0) * 3600;
@@ -147,7 +146,7 @@ export function since(
   datetime: DateTime,
   seconds: number | Rational | { toR(): Rational },
 ): DateTime {
-  return new RubyDateTime(datetime).plus(rational(seconds, 86400)).toDatetime();
+  return datetime.plus(rational(seconds, 86400));
 }
 
 export { since as in };
@@ -207,7 +206,7 @@ export function endOfMinute(datetime: DateTime): DateTime {
 export const atEndOfMinute = endOfMinute;
 
 export function localtime(datetime: DateTime, utcOffset: number | string | null = null): Time {
-  const utc = new RubyDateTime(datetime).newOffset(0);
+  const utc = datetime.newOffset(0);
 
   return Time.utc(
     Number(utc.year),
@@ -222,7 +221,7 @@ export function localtime(datetime: DateTime, utcOffset: number | string | null 
 export const getlocal = localtime;
 
 export function utc(datetime: DateTime): Time {
-  const utc = new RubyDateTime(datetime).newOffset(0);
+  const utc = datetime.newOffset(0);
 
   return Time.utc(
     Number(utc.year),
@@ -241,11 +240,11 @@ export const getutc = utc;
 export const gmtime = utc;
 
 export function isUtc(datetime: DateTime): boolean {
-  return new RubyDateTime(datetime).offset.isZero();
+  return datetime.offset.isZero();
 }
 
 export function utcOffset(datetime: DateTime): number {
-  return new RubyDateTime(datetime).offset.mul(86400).toI();
+  return datetime.offset.mul(86400).toI();
 }
 
 export function compare(datetime: DateTime, other: unknown): number | null {
@@ -262,7 +261,7 @@ export function compare(datetime: DateTime, other: unknown): number | null {
     other instanceof Temporal.Instant
   ) {
     try {
-      const asDatetime: Temporal.PlainDateTime | Temporal.ZonedDateTime | undefined =
+      const asDatetime: DateTime | undefined =
         typeof other === "string"
           ? stringToDatetime(other)
           : other instanceof Time || other instanceof TimeWithZone || other instanceof RubyDate
@@ -274,32 +273,49 @@ export function compare(datetime: DateTime, other: unknown): number | null {
                 : // boundary: the `Time` seat again, on the `to_datetime` arm.
                   other instanceof globalThis.Date
                   ? Time.at(new Rational(BigInt(other.getTime()), 1000n)).toDatetime()
-                  : other;
+                  : new RubyDateTime(other);
       if (asDatetime === undefined) return null;
-      return new RubyDateTime(datetime).cmp(new RubyDateTime(asDatetime));
+      return datetime.cmp(asDatetime);
     } catch {
       return null;
     }
   } else {
-    return new RubyDateTime(datetime).cmp(other);
+    return datetime.cmp(other);
   }
 }
 
 for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
-  Object.assign(TEMPORAL_METHOD_TABLE[seat], { isUtc, getutc, getlocal, nsec, change });
+  Object.assign(TEMPORAL_METHOD_TABLE[seat], {
+    isUtc: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime) => isUtc(new RubyDateTime(self)),
+    getutc: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime) =>
+      getutc(new RubyDateTime(self)),
+    getlocal: (
+      self: Temporal.PlainDateTime | Temporal.ZonedDateTime,
+      utcOffset?: number | string | null,
+    ) => getlocal(new RubyDateTime(self), utcOffset),
+    nsec: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime) => nsec(new RubyDateTime(self)),
+    change: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime, options: ChangeOptions) =>
+      change(new RubyDateTime(self), options),
+  });
 }
 
 declare module "@blazetrails/date" {
   interface DateTime {
     change(options: ChangeOptions): DateTime;
+    isUtc(): boolean;
+    getutc(): Time;
+    getlocal(utcOffset?: number | string | null): Time;
+    nsec(): number;
   }
 }
 
-Object.defineProperty(RubyDateTime.prototype, "change", {
-  value: function (this: RubyDateTime, options: ChangeOptions): DateTime {
-    return change(this.toDatetime(), options);
-  },
-  writable: true,
-  configurable: true,
-});
+for (const [name, fn] of Object.entries({ isUtc, getutc, getlocal, nsec, change })) {
+  Object.defineProperty(RubyDateTime.prototype, name, {
+    value: function (this: RubyDateTime, ...args: unknown[]): unknown {
+      return (fn as (datetime: RubyDateTime, ...rest: unknown[]) => unknown)(this, ...args);
+    },
+    writable: true,
+    configurable: true,
+  });
+}
 rbClearMethodCache();

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
   beginningOfDay,
   middleOfDay,
@@ -1178,23 +1178,19 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("to datetime", () => {
-    const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10");
+    const dt = DateTime.civil(2005, 2, 22, 10, 10, 10);
     const result = toTime(dt);
-    expect(result.toZonedDateTime().epochNanoseconds).toBe(
-      dt.toZonedDateTime("UTC").epochNanoseconds,
-    );
+    expect(result.toF()).toBe(RubyTime.utc(2005, 2, 22, 10, 10, 10).toF());
   });
 
   it("to time", () => {
-    const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10");
+    const dt = DateTime.civil(2005, 2, 22, 10, 10, 10);
     const result = toTime(dt);
-    expect(result.toZonedDateTime().epochNanoseconds).toBe(
-      dt.toZonedDateTime("UTC").epochNanoseconds,
-    );
+    expect(result.toF()).toBe(RubyTime.utc(2005, 2, 22, 10, 10, 10).toF());
   });
 
   it("to time preserves fractional seconds", () => {
-    const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10.5");
+    const dt = DateTime.civil(2005, 2, 22, 10, 10, 10.5);
     const result = toTime(dt);
     expect(result.usec).toBe(500000);
   });

@@ -62,7 +62,8 @@ function checkStepDomain(step: number): void {
 function objSucc<T>(v: T): T {
   if (typeof v === "string") return succ(v) as T;
   if (typeof v === "number") return (v + 1) as T;
-  const o = v as { add?: (d: { days: number }) => T };
+  const o = v as { succ?: () => T; add?: (d: { days: number }) => T };
+  if (typeof o?.succ === "function") return o.succ();
   if (typeof o?.add === "function") return o.add({ days: 1 });
   throw new TypeError(`can't iterate from ${(v as object)?.constructor?.name ?? String(v)}`);
 }

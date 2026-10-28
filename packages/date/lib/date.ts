@@ -22,7 +22,6 @@ import {
   rbDbl2num,
   rbDefineAllocFunc,
   rbSetClassPathString,
-  rubyClass,
   TEMPORAL_METHOD_TABLE,
 } from "@blazetrails/ruby-compat";
 import { rbWarning } from "./rb-warning.js";
@@ -5669,8 +5668,8 @@ export class Date extends rbCDate {
     return plainDateFromJd(encodeJd(this.nth, this.mLocalJd()), this.sg);
   }
 
-  toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return new DateTime(SEAT, this.nth, this.mJd(), 0, new Rational(0, 1), 0, this.sg).toDatetime();
+  toDatetime(): DateTime {
+    return new DateTime(SEAT, this.nth, this.mJd(), 0, new Rational(0, 1), 0, this.sg);
   }
 
   inspect(): string {
@@ -6014,7 +6013,7 @@ export class DateTime extends DateWithoutParseStatics {
     this.#of = rof;
     if (fr2 instanceof Rational ? !fr2.isZero() : fr2 !== 0) {
       const [jd, df, sf] = addFrac(this.#getCJd(), this.#getCDf(), fr2);
-      return new DateTime(SEAT, nth, jd, df, sf, rof, sg) as this;
+      return new new.target(SEAT, nth, jd, df, sf, rof, sg) as this;
     }
   }
 
@@ -6045,7 +6044,7 @@ export class DateTime extends DateWithoutParseStatics {
     second?: number | Rational,
     offset?: number | Rational | string,
     start?: number,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  ): DateTime {
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     const rof = offset === undefined ? 0 : val2off(offset);
     if (second !== undefined) checkNumeric(second, "second");
@@ -6093,7 +6092,7 @@ export class DateTime extends DateWithoutParseStatics {
       dfLocalToUtc(localDf, rof),
       fr2,
     );
-    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
+    return new this(SEAT, nth, rjd2, df, sf, rof, sg);
   }
 
   static ordinal(
@@ -6104,7 +6103,7 @@ export class DateTime extends DateWithoutParseStatics {
     second?: number | Rational,
     offset?: number | Rational | string,
     start?: number,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  ): DateTime {
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     const rof = offset === undefined ? 0 : val2off(offset);
     if (second !== undefined) checkNumeric(second, "second");
@@ -6155,7 +6154,7 @@ export class DateTime extends DateWithoutParseStatics {
       dfLocalToUtc(localDf, rof),
       fr2,
     );
-    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
+    return new this(SEAT, nth, rjd2, df, sf, rof, sg);
   }
 
   static civil(
@@ -6167,8 +6166,8 @@ export class DateTime extends DateWithoutParseStatics {
     second?: number | Rational,
     offset?: number | Rational | string,
     start?: number,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return new DateTime(year, month, mday, hour, minute, second, offset, start).toDatetime();
+  ): DateTime {
+    return new this(year, month, mday, hour, minute, second, offset, start);
   }
 
   static commercial(
@@ -6180,7 +6179,7 @@ export class DateTime extends DateWithoutParseStatics {
     second?: number | Rational,
     offset?: number | Rational | string,
     start?: number,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  ): DateTime {
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     const rof = offset === undefined ? 0 : val2off(offset);
     if (second !== undefined) checkNumeric(second, "second");
@@ -6232,7 +6231,7 @@ export class DateTime extends DateWithoutParseStatics {
       dfLocalToUtc(localDf, rof),
       fr2,
     );
-    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
+    return new this(SEAT, nth, rjd2, df, sf, rof, sg);
   }
 
   static weeknum(
@@ -6245,7 +6244,7 @@ export class DateTime extends DateWithoutParseStatics {
     second?: number | Rational,
     offset?: number | Rational | string,
     start?: number,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  ): DateTime {
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     const rof = offset === undefined ? 0 : val2off(offset);
     const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
@@ -6291,7 +6290,7 @@ export class DateTime extends DateWithoutParseStatics {
       dfLocalToUtc(localDf, rof),
       fr2,
     );
-    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
+    return new this(SEAT, nth, rjd2, df, sf, rof, sg);
   }
 
   static nthKday(
@@ -6304,7 +6303,7 @@ export class DateTime extends DateWithoutParseStatics {
     second?: number | Rational,
     offset?: number | Rational | string,
     start?: number,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  ): DateTime {
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     const rof = offset === undefined ? 0 : val2off(offset);
     const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
@@ -6350,10 +6349,10 @@ export class DateTime extends DateWithoutParseStatics {
       dfLocalToUtc(localDf, rof),
       fr2,
     );
-    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
+    return new this(SEAT, nth, rjd2, df, sf, rof, sg);
   }
 
-  static now(start = DEFAULT_SG): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  static now(start = DEFAULT_SG): DateTime {
     const sg = start;
     const tm = Temporal.Now.zonedDateTimeISO();
 
@@ -6377,15 +6376,7 @@ export class DateTime extends DateWithoutParseStatics {
 
     const rjd = cCivilToJd(ry, m, d, GREGORIAN);
     const df = timeToDf(h, min, s);
-    return new DateTime(
-      SEAT,
-      nth,
-      jdLocalToUtc(rjd, df, of),
-      dfLocalToUtc(df, of),
-      sf,
-      of,
-      sg,
-    ).toDatetime();
+    return new this(SEAT, nth, jdLocalToUtc(rjd, df, of), dfLocalToUtc(df, of), sf, of, sg);
   }
 
   static parse(
@@ -6393,47 +6384,31 @@ export class DateTime extends DateWithoutParseStatics {
     comp = true,
     start = DEFAULT_SG,
     opt?: ParseOpt,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._parse(str, comp, opt), val2sg(start)).toDatetime();
+  ): DateTime {
+    return dtNewByFrags(Date._parse(str, comp, opt), val2sg(start));
   }
 
-  static iso8601(
-    str = JULIAN_EPOCH_DATETIME,
-    start = DEFAULT_SG,
-    opt?: ParseOpt,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._iso8601(str, opt), val2sg(start)).toDatetime();
+  static iso8601(str = JULIAN_EPOCH_DATETIME, start = DEFAULT_SG, opt?: ParseOpt): DateTime {
+    return dtNewByFrags(Date._iso8601(str, opt), val2sg(start));
   }
 
-  static rfc3339(
-    str = JULIAN_EPOCH_DATETIME,
-    start = DEFAULT_SG,
-    opt?: ParseOpt,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._rfc3339(str, opt), val2sg(start)).toDatetime();
+  static rfc3339(str = JULIAN_EPOCH_DATETIME, start = DEFAULT_SG, opt?: ParseOpt): DateTime {
+    return dtNewByFrags(Date._rfc3339(str, opt), val2sg(start));
   }
 
-  static xmlschema(
-    str = JULIAN_EPOCH_DATETIME,
-    start = DEFAULT_SG,
-    opt?: ParseOpt,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._xmlschema(str, opt), val2sg(start)).toDatetime();
+  static xmlschema(str = JULIAN_EPOCH_DATETIME, start = DEFAULT_SG, opt?: ParseOpt): DateTime {
+    return dtNewByFrags(Date._xmlschema(str, opt), val2sg(start));
   }
 
   static rfc2822(
     str = JULIAN_EPOCH_DATETIME_RFC3339,
     start = DEFAULT_SG,
     opt?: ParseOpt,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._rfc2822(str, opt), val2sg(start)).toDatetime();
+  ): DateTime {
+    return dtNewByFrags(Date._rfc2822(str, opt), val2sg(start));
   }
 
-  static rfc822(
-    str = JULIAN_EPOCH_DATETIME_RFC3339,
-    start = DEFAULT_SG,
-    opt?: ParseOpt,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  static rfc822(str = JULIAN_EPOCH_DATETIME_RFC3339, start = DEFAULT_SG, opt?: ParseOpt): DateTime {
     return DateTime.rfc2822(str, start, opt);
   }
 
@@ -6441,28 +6416,20 @@ export class DateTime extends DateWithoutParseStatics {
     str = JULIAN_EPOCH_DATETIME_HTTPDATE,
     start = DEFAULT_SG,
     opt?: ParseOpt,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._httpdate(str, opt), val2sg(start)).toDatetime();
+  ): DateTime {
+    return dtNewByFrags(Date._httpdate(str, opt), val2sg(start));
   }
 
-  static jisx0301(
-    str = JULIAN_EPOCH_DATETIME,
-    start = DEFAULT_SG,
-    opt?: ParseOpt,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._jisx0301(str, opt), val2sg(start)).toDatetime();
+  static jisx0301(str = JULIAN_EPOCH_DATETIME, start = DEFAULT_SG, opt?: ParseOpt): DateTime {
+    return dtNewByFrags(Date._jisx0301(str, opt), val2sg(start));
   }
 
   static override _strptime(str: string, fmt = "%FT%T%z"): DateParts | null {
     return Date._strptime(str, fmt);
   }
 
-  static strptime(
-    str = JULIAN_EPOCH_DATETIME,
-    fmt = "%FT%T%z",
-    start = DEFAULT_SG,
-  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._strptime(str, fmt), val2sg(start)).toDatetime();
+  static strptime(str = JULIAN_EPOCH_DATETIME, fmt = "%FT%T%z", start = DEFAULT_SG): DateTime {
+    return dtNewByFrags(Date._strptime(str, fmt), val2sg(start));
   }
 
   /** @internal */
@@ -6676,26 +6643,8 @@ export class DateTime extends DateWithoutParseStatics {
     return new Date(SEAT, this.nth, this.mLocalJd(), this.start).toDate();
   }
 
-  toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    const [h, min, s] = dfToTime(this.mLocalDf());
-    const ns = Number(this.#sf.numerator / this.#sf.denominator);
-    const plain = this.toDate().toPlainDateTime({
-      hour: h,
-      minute: min,
-      second: s,
-      millisecond: Math.floor(ns / 1000000),
-      microsecond: Math.floor(ns / 1000) % 1000,
-      nanosecond: ns % 1000,
-    });
-    if (this.#of === 0) return plain;
-    const zoned =
-      this.#of % 60 !== 0
-        ? new SubMinuteOffsetZonedDateTime(
-            plain.toZonedDateTime("UTC").toInstant().subtract({ seconds: this.#of }),
-            this.#of,
-          )
-        : plain.toZonedDateTime(of2str(this.#of));
-    return Object.defineProperty(zoned, rubyClass, { value: "DateTime" });
+  toDatetime(): DateTime {
+    return this;
   }
 
   get hour(): number {

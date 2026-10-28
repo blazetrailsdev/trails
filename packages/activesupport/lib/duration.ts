@@ -6,7 +6,7 @@
  *   `Temporal.Instant` for them. The default reference is `Time.current`.
  */
 
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
   cmp,
   equals as cmpEquals,
@@ -580,7 +580,7 @@ export function years(n: number): Duration {
   return Duration.years(n);
 }
 
-type DateTime = Temporal.PlainDateTime | Temporal.ZonedDateTime;
+type DateTime = RubyDateTime;
 type DurationReceiver =
   | Date
   | Temporal.Instant
@@ -626,8 +626,8 @@ function applyDurationToDate(
   return time;
 }
 
-function isDateTime(t: unknown): t is Temporal.PlainDateTime | Temporal.ZonedDateTime {
-  return t instanceof Temporal.PlainDateTime || t instanceof Temporal.ZonedDateTime;
+function isDateTime(t: unknown): t is RubyDateTime {
+  return t instanceof RubyDateTime;
 }
 
 function dateOrTimeSince(

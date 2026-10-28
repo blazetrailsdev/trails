@@ -134,10 +134,10 @@ describe("TestDateArith", () => {
     d2 = d.succ();
     expect(d.equals(d2.minus(1))).toBe(true);
 
-    d = new DateTime(DateTime.now());
+    d = DateTime.now();
     d2 = d.next();
     expect(d.equals(d2.minus(1))).toBe(true);
-    d = new DateTime(DateTime.now());
+    d = DateTime.now();
     d2 = d.succ();
     expect(d.equals(d2.minus(1))).toBe(true);
   });

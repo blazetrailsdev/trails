@@ -104,6 +104,7 @@ const SECONDS_PER_DAY = 86400;
 
 type TimeLike =
   | Time
+  | DateTime
   | Temporal.Instant
   | Temporal.PlainDateTime
   | Temporal.PlainDate
@@ -177,7 +178,7 @@ export class TimeWithZone {
   private _incorporateUtcOffset(time: Time | Temporal.PlainDate, offset: number): Time {
     if (time instanceof Temporal.PlainDate) {
       return this._transferTimeValuesToUtcConstructor(
-        new DateTime(time.toPlainDateTime()).plus(rational(offset, SECONDS_PER_DAY)).toDatetime(),
+        new DateTime(time.toPlainDateTime()).plus(rational(offset, SECONDS_PER_DAY)),
       );
     }
     return time.plus(offset);
@@ -200,6 +201,16 @@ export class TimeWithZone {
 
   private _transferTimeValuesToUtcConstructor(time: TimeLike): Time {
     if (time instanceof Time && time.isUtc()) return time;
+    if (time instanceof DateTime) {
+      return Time.utc(
+        Number(time.year),
+        time.month,
+        time.day,
+        time.hour,
+        time.min,
+        time.secFraction.add(time.sec),
+      );
+    }
     const values =
       time instanceof Time
         ? time.toZonedDateTime().toPlainDateTime()
@@ -570,6 +581,7 @@ export class TimeWithZone {
       | Date
       | Temporal.Instant
       | Time
+      | DateTime
       | Temporal.PlainDateTime
       | Temporal.ZonedDateTime,
   ): number;
@@ -581,11 +593,15 @@ export class TimeWithZone {
       | Date
       | Temporal.Instant
       | Time
+      | DateTime
       | Temporal.PlainDateTime
       | Temporal.ZonedDateTime,
   ): TimeWithZone | number {
     if (arg instanceof Time) {
       return this.getutc().minus(arg.getutc()) as number;
+    }
+    if (arg instanceof DateTime) {
+      return this.getutc().minus(arg.toTime().getutc()) as number;
     }
     if (arg instanceof Temporal.PlainDateTime || arg instanceof Temporal.ZonedDateTime) {
       const otherNs =
@@ -880,8 +896,8 @@ export class TimeWithZone {
     );
   }
 
-  toDatetime(): Temporal.ZonedDateTime {
-    return this._zoned;
+  toDatetime(): DateTime {
+    return this.utc().toDatetime().newOffset(rational(this.utcOffset, 86_400));
   }
 
   private durationOfVariableLength(obj: unknown): boolean {

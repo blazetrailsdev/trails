@@ -1,4 +1,4 @@
-import { DateTime, strftime } from "@blazetrails/date";
+import { DateTime } from "@blazetrails/date";
 import { ArgumentError, rbModName, rbObjAsString, warn } from "@blazetrails/ruby-compat";
 import { ReceivedParser } from "../parsers/received-parser.js";
 import { Utilities } from "../utilities.js";
@@ -19,7 +19,7 @@ export class ReceivedElement {
   }
 
   toString(..._args: unknown[]): string {
-    const dateTime = this.dateTime == null ? "" : strftime(this.dateTime, "%Y-%m-%dT%H:%M:%S%:z");
+    const dateTime = this.dateTime == null ? "" : this.dateTime.strftime("%Y-%m-%dT%H:%M:%S%:z");
     return `${rbObjAsString(this.info)}; ${dateTime}`;
   }
 

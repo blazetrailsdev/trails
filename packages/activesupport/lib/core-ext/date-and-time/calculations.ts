@@ -1,4 +1,9 @@
-import { Temporal, Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
+import {
+  Temporal,
+  Date as RubyDate,
+  DateTime as RubyDateTime,
+  Time as RubyTime,
+} from "@blazetrails/date";
 import * as date from "../date/calculations.js";
 import * as dateTime from "../date-time/calculations.js";
 import * as time from "../../time-ext.js";
@@ -12,7 +17,7 @@ export type DateOrTime = Temporal.PlainDate | RubyDate | Date;
 
 export type Comparable = DateOrTime | DateTime | TimeWithZone | Temporal.Instant;
 
-type DateTime = Temporal.PlainDateTime | Temporal.ZonedDateTime;
+type DateTime = RubyDateTime;
 
 export type DateOrInstant = Temporal.PlainDate | RubyDate | Temporal.Instant;
 
@@ -40,8 +45,7 @@ function advance(
   if (this instanceof RubyTime) {
     return (this as unknown as { advance(options: unknown): RubyTime }).advance(options);
   }
-  if (this instanceof Temporal.PlainDateTime || this instanceof Temporal.ZonedDateTime)
-    return dateTime.advance(this, options);
+  if (this instanceof RubyDateTime) return dateTime.advance(this, options);
   const self = receiver(this);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return self instanceof Date ? time.advance(self, options) : date.advance(self, options);
@@ -50,9 +54,6 @@ function advance(
 function toDate(this: Receiver): Temporal.PlainDate {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   if (this instanceof Date) return time.toDate(this);
-  if (this instanceof Temporal.PlainDateTime || this instanceof Temporal.ZonedDateTime) {
-    return this.toPlainDate();
-  }
   return this instanceof RubyDate || this instanceof RubyTime
     ? this.toDate()
     : (this as Temporal.PlainDate);
@@ -68,7 +69,7 @@ function wday(this: Receiver): number {
 
 function classCurrent(this: Receiver): Comparable | RubyTime {
   if (this instanceof RubyTime) return RubyTime.current();
-  if (this instanceof Temporal.PlainDateTime || this instanceof Temporal.ZonedDateTime) {
+  if (this instanceof RubyDateTime) {
     return dateTime.current();
   }
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
@@ -85,6 +86,7 @@ function toInstant(dateOrTime: Comparable | RubyTime): Temporal.Instant {
   if (dateOrTime instanceof TimeWithZone) return dateOrTime.utc().toZonedDateTime().toInstant();
   if (dateOrTime instanceof RubyTime) return dateOrTime.toZonedDateTime().toInstant();
   if (dateOrTime instanceof Temporal.Instant) return dateOrTime;
+  if (dateOrTime instanceof RubyDateTime) return dateOrTime.toTime().toZonedDateTime().toInstant();
   if (dateOrTime instanceof Temporal.PlainDateTime)
     return dateOrTime.toZonedDateTime("UTC").toInstant();
   if (dateOrTime instanceof Temporal.ZonedDateTime) return dateOrTime.toInstant();
@@ -104,8 +106,7 @@ function change(
   },
 ): Result {
   if (this instanceof RubyTime) return this.change(options);
-  if (this instanceof Temporal.PlainDateTime || this instanceof Temporal.ZonedDateTime)
-    return dateTime.change(this, options);
+  if (this instanceof RubyDateTime) return dateTime.change(this, options);
   const self = receiver(this);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return self instanceof Date ? time.change(self, options) : date.change(self, options);
@@ -364,8 +365,7 @@ export function daysToWeekStart(this: Receiver, startDay: string = date.beginnin
 
 export function beginningOfWeek(this: Receiver, startDay: string = date.beginningOfWeek()): Result {
   const result = daysAgo.call(this, daysToWeekStart.call(this, startDay));
-  if (result instanceof Temporal.PlainDateTime || result instanceof Temporal.ZonedDateTime)
-    return dateTime.beginningOfDay(result);
+  if (result instanceof RubyDateTime) return dateTime.beginningOfDay(result);
   return actsLike.call(this, "time")
     ? result instanceof RubyTime
       ? result.midnight()
@@ -436,8 +436,7 @@ export function prevOccurring(this: Receiver, dayOfWeek: string): Result {
 
 /** @internal */
 function firstHour(this: Receiver, dateOrTime: Result): Result {
-  if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
-    return dateTime.beginningOfDay(dateOrTime);
+  if (dateOrTime instanceof RubyDateTime) return dateTime.beginningOfDay(dateOrTime);
   return actsLike.call(dateOrTime, "time")
     ? dateOrTime instanceof RubyTime
       ? dateOrTime.beginningOfDay()
@@ -447,8 +446,7 @@ function firstHour(this: Receiver, dateOrTime: Result): Result {
 
 /** @internal */
 function lastHour(this: Receiver, dateOrTime: Result): Result {
-  if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
-    return dateTime.endOfDay(dateOrTime);
+  if (dateOrTime instanceof RubyDateTime) return dateTime.endOfDay(dateOrTime);
   return actsLike.call(dateOrTime, "time")
     ? dateOrTime instanceof RubyTime
       ? dateOrTime.endOfDay()
