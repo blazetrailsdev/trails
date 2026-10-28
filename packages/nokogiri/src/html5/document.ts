@@ -4,7 +4,7 @@ import { ArgumentError, include, rbObjRespondTo } from "@blazetrails/ruby-compat
 import { readSource, type Readable } from "../readable.js";
 import { childNodes, type Node } from "./node.js";
 import type { NodeSet } from "../xml/node-set.js";
-import { Searchable } from "../xml/searchable.js";
+import * as Searchable from "../xml/searchable.js";
 import { XPathVisitor } from "../css/xpath-visitor.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
