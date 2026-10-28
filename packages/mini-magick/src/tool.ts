@@ -14,6 +14,16 @@ import type { Block } from "@blazetrails/ruby-compat";
 import { MiniMagick } from "./mini-magick.js";
 
 type BlockPass<F> = F & Pick<Block<unknown>, keyof Block<unknown>>;
+type Arg =
+  | string
+  | number
+  | bigint
+  | boolean
+  | symbol
+  | null
+  | undefined
+  | Record<string, unknown>
+  | (object & { apply?: never });
 
 /** @noRailsEquivalent PERMANENT */
 export type CliTool = Tool & { [option: string]: (...args: unknown[]) => CliTool };
@@ -35,12 +45,7 @@ export class Tool {
     "pango",
   ];
 
-  static new(
-    ...args:
-      | [string, Record<string, unknown>?]
-      | [string, BlockPass<(instance: CliTool) => unknown>]
-      | [string, Record<string, unknown>, BlockPass<(instance: CliTool) => unknown>?]
-  ) {
+  static new(...args: Arg[] | [...Arg[], BlockPass<(instance: CliTool) => unknown> | undefined]) {
     const block = rbBlockGivenP(args.at(-1))
       ? (args.pop() as (instance: CliTool) => unknown)
       : undefined;
@@ -128,14 +133,7 @@ export class Tool {
     return this;
   }
 
-  stack(
-    ...args:
-      | (string | Record<string, unknown> | Map<string, unknown>)[]
-      | [
-          ...(string | Record<string, unknown> | Map<string, unknown>)[],
-          BlockPass<(tool: CliTool) => unknown>,
-        ]
-  ) {
+  stack(...args: Arg[] | [...Arg[], BlockPass<(tool: CliTool) => unknown>]) {
     const block = rbBlockGivenP(args.at(-1))
       ? (args.pop() as (tool: CliTool) => unknown)
       : undefined;

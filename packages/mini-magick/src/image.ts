@@ -172,7 +172,8 @@ export class Image {
     return rbHash(this.signature());
   }
 
-  toBlob() {
+  async toBlob() {
+    await this._info._pending;
     return File.binread(this.path);
   }
 
@@ -223,6 +224,7 @@ export class Image {
   }
 
   async getPixels(map: string = "RGB") {
+    await this._info._pending;
     if (!["RGB", "RGBA"].includes(map)) {
       throw new ArgumentError("Invalid map value");
     }
@@ -256,6 +258,7 @@ export class Image {
     readOpts: Record<string, unknown> = {},
     block?: (convert: CliTool) => unknown,
   ) {
+    await this._info._pending;
     let newTempfile: Tempfile | null = null,
       newPath: string;
     try {
@@ -313,6 +316,7 @@ export class Image {
   }
 
   async write(outputTo: string | Pathname | IO | StringIO<string | Uint8Array>) {
+    await this._info._pending;
     if (typeof outputTo === "string" || outputTo instanceof Pathname) {
       if (this.isLayer() != null) {
         return await MiniMagick.convert(
@@ -336,6 +340,7 @@ export class Image {
     mask: Image | null = null,
     block?: (composite: CliTool) => unknown,
   ) {
+    await this._info._pending;
     if (outputExtension === undefined) outputExtension = (await this.type()).toLowerCase();
     const outputTempfile = Utilities.tempfile(`.${outputExtension}`);
     await MiniMagick.composite(

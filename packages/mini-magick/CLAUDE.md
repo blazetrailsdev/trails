@@ -31,8 +31,9 @@ pins both arms.
 (`vendor/mini_magick/v5.2.0/lib/mini_magick/image.rb:149-155`), a `mogrify`
 run in line. In trails that run is an awaited child process and a JS
 constructor cannot await, so the constructor seats its promise on
-`Info#_pending`, and every later run on the image — `Info#identify`,
-`Image#identify`, `Image#mogrify` — awaits it first. A read made right after
+`Info#_pending`, and every later operation on the image awaits it first:
+`Info#identify` and `#data`, and `Image#identify`, `#mogrify`, `#format`,
+`#composite`, `#write`, `#get_pixels` and `#to_blob` (async for this reason). A read made right after
 `new Image(path, null, block)` therefore sees the block's changes, as Ruby's
 does, and a failed block rejects that read rather than going unhandled.
 

@@ -162,6 +162,7 @@ export class Info {
   }
 
   async data() {
+    await this._pending;
     if (!((this._info["data"] ?? false) !== false))
       this._info["data"] = await (async () => {
         const json = (await MiniMagick.convert(
