@@ -97,6 +97,7 @@ import {
   applyTokenRenames,
   rubyFileToTs,
   overriddenRubyFiles,
+  hasRubyFileTsOverride,
   rubyMethodToTs,
   rubyMethodToTsIgnoringSkip,
   scopedSkipMirrorName,
@@ -2521,6 +2522,12 @@ function buildPackageReport(
 
   const rubyFileByTsFile = new Map<string, string>();
   for (const rf of rubyFileNames) rubyFileByTsFile.set(rubyFileToTs(rf, pkg), rf);
+  const rubyFileByPathMirror = new Map<string, string>();
+  for (const rf of rubyFileNames) {
+    if (!hasRubyFileTsOverride(rf, pkg)) rubyFileByPathMirror.set(rubyFileToTs(rf, pkg, false), rf);
+  }
+  const foldsOntoPathMirror = (rubyFile: string, tsFile: string): boolean =>
+    hasRubyFileTsOverride(rubyFile, pkg) && rubyFileByPathMirror.has(tsFile);
 
   const rubyModuleConstants = new Set<string>();
   for (const fqn of Object.keys(rubyPkg.modules)) {
@@ -2598,9 +2605,11 @@ function buildPackageReport(
     const fileConsts = Object.keys(tsFileConstants[expectedTs] ?? {}).filter(
       (n) => !internalConsts.has(n),
     );
-    result.totalInternal += countTsInternalNames(expectedTs, classes, modules, fileFns, [
-      ...internalConsts,
-    ]);
+    if (!(rubyFile !== null && foldsOntoPathMirror(rubyFile, expectedTs))) {
+      result.totalInternal += countTsInternalNames(expectedTs, classes, modules, fileFns, [
+        ...internalConsts,
+      ]);
+    }
     if (classes.length === 0 && modules.length === 0 && !fileFns && fileConsts.length === 0)
       continue;
 
@@ -2688,6 +2697,16 @@ function buildPackageReport(
 
     if (rubyFile !== null) {
       for (const hook of concernHooks.get(concernHookKey(pkg, rubyFile)) ?? []) allowed.add(hook);
+    }
+
+    // A Ruby file folded onto another's TS file by `RUBY_FILE_TS_OVERRIDES`
+    // (`ruby_tracker.rb` onto `tse-tracker.ts`, the port of `erb_tracker.rb`)
+    // shares that file with the class the path mirrors, so the mirrored file's
+    // names are faithful here too, not moved.
+    if (rubyFile !== null && foldsOntoPathMirror(rubyFile, expectedTs)) {
+      for (const name of allowedNamesForRubyFile(rubyFileByPathMirror.get(expectedTs)!)) {
+        allowed.add(name);
+      }
     }
 
     // `compare_range.rb` declares `CompareWithRange`: the container synthesized

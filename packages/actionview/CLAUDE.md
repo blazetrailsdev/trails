@@ -14,6 +14,10 @@ three tests, and only those, instead: a `<%#` comment is not searched for `rende
 `render` call whose options fail `render_call_options` is skipped, and a String
 `spacerTemplate:` is a dependency ahead of the partial.
 
+`parity:api` measures `ruby_tracker.rb` against `TSETracker` through a
+`RUBY_FILE_TS_OVERRIDES` row: its pass admits `erb_tracker.rb`'s names, so
+neither class's members read as moved.
+
 The tracker reads render calls from `@blazetrails/tse-compiler`'s `parse`
 node list, not the raw source: a `<%#` comment is its own node kind and is
 never searched, and a `%>` closes a tag exactly where the compiler closes it.
