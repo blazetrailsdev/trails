@@ -1,12 +1,6 @@
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
-import {
-  generatedClass,
-  isRegisteredConstant,
-  regexpEscape,
-  registeredConstant,
-  rbModConstSet,
-} from "@blazetrails/ruby-compat";
+import { regexpEscape, rbModConstGet, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import * as Inflector from "./inflector.js";
 import { I18n } from "./i18n.js";
@@ -186,41 +180,8 @@ export function deconstantize(path: string): string {
   return "";
 }
 
-function isValidConstantPath(path: string): boolean {
-  if (path.length === 0) return false;
-  return path.split("::").every((segment) => /^[A-Z]\w*$/.test(segment));
-}
-
 export function constantize(camelCasedWord: string): unknown {
-  const path = camelCasedWord.startsWith("::") ? camelCasedWord.slice(2) : camelCasedWord;
-  if (!isValidConstantPath(path)) {
-    throw new NameError(`wrong constant name ${camelCasedWord}`);
-  }
-  if (isRegisteredConstant(path)) return registeredConstant(path);
-  const segments = path.split("::");
-  let receiver: unknown = Object;
-  for (let i = 1; i <= segments.length; i++) {
-    const key = segments.slice(0, i).join("::");
-    const value = isRegisteredConstant(key)
-      ? registeredConstant(key)
-      : ((i > 1 &&
-        receiver != null &&
-        (typeof receiver === "object" || typeof receiver === "function")
-          ? (receiver as Record<string, unknown>)[segments[i - 1]]
-          : undefined) ?? generatedClass(key));
-    if (value === undefined) {
-      const { constMissing } = (receiver ?? {}) as {
-        constMissing?: (name: string) => unknown;
-      };
-      if (constMissing !== undefined) {
-        receiver = constMissing.call(receiver, segments[i - 1]);
-        continue;
-      }
-      throw new NameError(`uninitialized constant ${key}`, segments[i - 1], { receiver });
-    }
-    receiver = value;
-  }
-  return receiver;
+  return rbModConstGet(Object, camelCasedWord);
 }
 
 export function safeConstantize(camelCasedWord: string): unknown {
