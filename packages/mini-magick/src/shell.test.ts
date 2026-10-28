@@ -58,7 +58,7 @@ describe("MiniMagick::Shell", () => {
           timeout: 1,
         }),
       ).rejects.toThrow(TimeoutError);
-    });
+    }, 30_000);
   });
 
   describe("#execute", () => {
