@@ -3,7 +3,7 @@ import { NameError } from "@blazetrails/ruby-compat/name-error";
 import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { StopIteration } from "@blazetrails/ruby-compat/stop-iteration";
 import { constantize, safeConstantize } from "./inflector.js";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 
 describe("constantize resolves core exception classes", () => {
   it("answers ruby-compat's NotImplementedError", () => {
@@ -26,6 +26,7 @@ describe("constantize walks seated constants like Object.const_get", () => {
 
   it("names only the path up to the unresolved segment", () => {
     registerConstant("Foo", Foo);
+    rbModConstSet(Foo, "Bar", Bar);
     let error: unknown;
     try {
       constantize("Foo::Bar::Baz::Qux");
