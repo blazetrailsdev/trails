@@ -365,46 +365,6 @@ export function rbModConstants(mod: object, inherit: unknown = true): string[] {
 }
 
 /**
- * `rb_const_get_at` (`vendor/ruby/v3.3.11/variable.c:3222`): `klass`'s own
- * constant table alone, for `const_get(name, false)`.
- */
-function rbConstGetAt(klass: object, id: string): unknown {
-  if (Object.hasOwn(klass, id)) {
-    rbConstWarnIfDeprecated(klass, id);
-    return (klass as Record<string, unknown>)[id];
-  }
-  const { constMissing } = klass as { constMissing?: (name: string) => unknown };
-  if (constMissing !== undefined) return constMissing.call(klass, id);
-  return rbModConstMissing(klass, id);
-}
-
-/**
- * `rb_const_get_from` (`vendor/ruby/v3.3.11/variable.c:3204`): `klass` and its
- * ancestors with `exclude` set, so a later `::` segment never reaches the
- * top-level table.
- */
-function rbConstGetFrom(klass: object, id: string): unknown {
-  if (id in klass) {
-    let tmp: object | null = klass;
-    while (tmp !== null && !Object.hasOwn(tmp, id)) tmp = Object.getPrototypeOf(tmp) as object;
-    if (tmp !== null) rbConstWarnIfDeprecated(tmp, id);
-    return (klass as Record<string, unknown>)[id];
-  }
-  if (typeof klass === "function") {
-    for (const tmp of rbModAncestors(klass as unknown as { prototype: object })) {
-      if (tmp === Object) break;
-      if (Object.hasOwn(tmp, id)) {
-        rbConstWarnIfDeprecated(tmp, id);
-        return (tmp as Record<string, unknown>)[id];
-      }
-    }
-  }
-  const { constMissing } = klass as { constMissing?: (name: string) => unknown };
-  if (constMissing !== undefined) return constMissing.call(klass, id);
-  return rbModConstMissing(klass, id);
-}
-
-/**
  * `rb_mod_const_get` (`vendor/ruby/v3.3.11/object.c:2423-2510`),
  * `Module#const_get(name, inherit = true)` of a name that may be a `::` path:
  * a leading `::` restarts at `Object`, each segment must be constant-shaped or
@@ -472,13 +432,32 @@ export function rbModConstGet(mod: object, name: string, recur: unknown = true):
       }
     }
 
-    if (recur === null || recur === false) {
-      mod = rbConstGetAt(mod, id) as object;
-    } else if (beglen === 0) {
+    if (beglen === 0 && recur !== null && recur !== false) {
       mod = rbConstGet(mod, id) as object;
-    } else {
-      mod = rbConstGetFrom(mod, id) as object;
+      continue;
     }
+    let tmp: object | null = null;
+    if (recur === null || recur === false) {
+      if (Object.hasOwn(mod, id)) tmp = mod;
+    } else if (id in mod) {
+      tmp = mod;
+      while (tmp !== null && !Object.hasOwn(tmp, id)) tmp = Object.getPrototypeOf(tmp) as object;
+    } else if (typeof mod === "function") {
+      for (const anc of rbModAncestors(mod as unknown as { prototype: object })) {
+        if (anc === Object) break;
+        if (Object.hasOwn(anc, id)) {
+          tmp = anc;
+          break;
+        }
+      }
+    }
+    if (tmp !== null) {
+      rbConstWarnIfDeprecated(tmp, id);
+      mod = (tmp as Record<string, object>)[id];
+      continue;
+    }
+    const { constMissing } = mod as { constMissing?: (name: string) => object };
+    mod = constMissing !== undefined ? constMissing.call(mod, id) : rbModConstMissing(mod, id);
   }
 
   return mod;
