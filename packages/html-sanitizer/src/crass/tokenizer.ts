@@ -152,25 +152,6 @@ export class Tokenizer {
 
   /** @noRailsEquivalent PERMANENT */
   private mergeTokens(first: Node, second: Node): Node | null {
-    const name = this.mergeName(first, second);
-    if (name !== null) return name;
-    if (first.node !== "delim") return null;
-    const match = MATCH_TOKENS[first.value + (second.node === "delim" ? second.value : second.raw)];
-    if (match !== undefined && (second.node === "delim" || second.raw === "=")) {
-      return { node: match, pos: first.pos, raw: first.raw + second.raw };
-    }
-    if (
-      this._options.preserveHacks &&
-      first.value === "*" &&
-      (second.node === "ident" || second.node === "function")
-    ) {
-      return { ...second, pos: first.pos, raw: `*${second.raw}` };
-    }
-    return null;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  private mergeName(first: Node, second: Node): Node | null {
     const raw = first.raw + second.raw;
     const nameEnd = RE_NAME_END.test(first.raw);
     if (second.node === "ident" && (nameEnd || RE_NAME_START.test(second.raw))) {
@@ -197,6 +178,18 @@ export class Tokenizer {
         return { ...second, pos: first.pos, raw, value: first.value + second.value };
       }
       if (second.node === "(") return { ...first, node: "function", raw };
+    }
+    if (first.node !== "delim") return null;
+    const match = MATCH_TOKENS[first.value + (second.node === "delim" ? second.value : second.raw)];
+    if (match !== undefined && (second.node === "delim" || second.raw === "=")) {
+      return { node: match, pos: first.pos, raw: first.raw + second.raw };
+    }
+    if (
+      this._options.preserveHacks &&
+      first.value === "*" &&
+      (second.node === "ident" || second.node === "function")
+    ) {
+      return { ...second, pos: first.pos, raw: `*${second.raw}` };
     }
     return null;
   }
