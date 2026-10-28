@@ -7,11 +7,10 @@ import {
   Range,
   rbModName,
   rbObjAsString,
+  rbObjClassname,
   rbObjRespondTo,
   rbStrDump,
   rtest,
-  Hash,
-  rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
 
 export interface ArgumentOptions {
@@ -87,7 +86,7 @@ export class Argument {
     if (
       Array.isArray(this.default) ||
       typeof this.default === "string" ||
-      rbObjIsKindOf(this.default, Hash)
+      rbObjClassname(this.default) === "Hash"
     ) {
       return !isEmpty(this.default as object);
     } else {
@@ -114,7 +113,7 @@ export class Argument {
         Array.isArray(this.enum) ||
         this.enum instanceof Range ||
         this.enum instanceof Set ||
-        rbObjIsKindOf(this.enum, Hash)
+        rbObjClassname(this.enum) === "Hash"
       )
     ) {
       throw new ArgumentError("An argument cannot have an enum other than an enumerable.");

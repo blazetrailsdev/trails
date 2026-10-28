@@ -2,7 +2,7 @@ import { ArgumentError } from "./argument-error.js";
 import { classpaths } from "./classpath.js";
 import { Encoding } from "./encoding.js";
 import { Hash } from "./hash.js";
-import { Module, extend, prepend, rbGetAllocFunc, rbObjIsKindOf } from "./include.js";
+import { Module, extend, prepend, rbGetAllocFunc } from "./include.js";
 
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
@@ -17,7 +17,6 @@ import {
   rbModSingletonP,
   rbModToS,
   rbObjAsString,
-  rbCClass,
   rbObjClass,
   rbObjClassname,
   rbObjInstanceVariables,
@@ -137,7 +136,7 @@ interface LoadArg {
 function tObjectP(obj: unknown): obj is object {
   return (
     obj instanceof Set ||
-    (Object.prototype.toString.call(obj) === "[object Object]" && !rbObjIsKindOf(obj, Hash))
+    (Object.prototype.toString.call(obj) === "[object Object]" && rbObjClassname(obj) !== "Hash")
   );
 }
 
@@ -649,7 +648,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
     }
     if (hasiv) wByte(TYPE_IVAR, arg);
 
-    if (typeof obj === "function" && rbObjClass(obj) === rbCClass) {
+    if (typeof obj === "function" && rbObjClassname(obj) === "Class") {
       if (rbModSingletonP(obj)) {
         throw new TypeError("singleton class can't be dumped");
       }
@@ -702,7 +701,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
           }
         }
       }
-    } else if (obj instanceof Map || rbObjIsKindOf(obj, Hash)) {
+    } else if (obj instanceof Map || rbObjClassname(obj) === "Hash") {
       wUclass(obj as object, obj instanceof Hash ? Hash : obj instanceof Map ? Map : Object, arg);
       if (obj instanceof Hash && obj.isCompareByIdentity()) {
         wByte(TYPE_UCLASS, arg);
@@ -1079,7 +1078,7 @@ function rCopyIvar(v: object, data: unknown): object {
 function path2class(path: string): AnyClass {
   const v = rbPathToClass(path);
 
-  if (!(typeof v === "function" && rbObjClass(v) === rbCClass)) {
+  if (!(typeof v === "function" && rbObjClassname(v) === "Class")) {
     throw new ArgumentError(`${path} does not refer to class`);
   }
   return v as AnyClass;
@@ -1205,7 +1204,7 @@ function rObjectFor(
         let m = rbPathToClass(path);
         if (extmod === null) extmod = [];
 
-        if (typeof m === "function" && rbObjClass(m) === rbCClass) {
+        if (typeof m === "function" && rbObjClassname(m) === "Class") {
           v = rObject0(arg, null, null);
           const c = Object.getPrototypeOf(v) as object | null;
           if (c !== (m as AnyClass).prototype) {

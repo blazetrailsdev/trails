@@ -9,6 +9,7 @@ import {
   rbEnsure,
   rbEqual,
   rbObjAsString as toS,
+  rbObjClassname,
   rtest,
   stderr as $stderr,
   stdout as $stdout,
@@ -16,7 +17,6 @@ import {
   symbolToS,
   type StdStream,
   uniq,
-  rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
 import * as LineEditor from "../line-editor.js";
 import { ColumnPrinter, type ColumnPrinterOptions } from "./column-printer.js";
@@ -75,10 +75,9 @@ export class Basic {
 
   ask(statement: unknown, ...args: unknown[]): Promise<unknown> {
     const last = args.at(-1);
-    const options = (rbObjIsKindOf(last, Hash) || last instanceof Hash ? args.pop() : {}) as Record<
-      string,
-      unknown
-    >;
+    const options = (
+      rbObjClassname(last) === "Hash" || last instanceof Hash ? args.pop() : {}
+    ) as Record<string, unknown>;
     const color = args[0] ?? null;
 
     if (rtest(options.limitedTo)) {

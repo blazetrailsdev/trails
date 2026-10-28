@@ -5,12 +5,11 @@ import {
   rbInspect,
   rbModName,
   rbObjAsString,
+  rbObjClassname,
   rbObjDup,
   rbObjNotMatch,
   rbObjRespondTo,
   rtest,
-  Hash,
-  rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
 import {
   HashWithIndifferentAccess,
@@ -61,7 +60,7 @@ export class Options extends Arguments {
           return `--${key}`;
         } else if (Array.isArray(value)) {
           return `--${key} ${value.map((v) => rbInspect(v)).join(" ")}`;
-        } else if (rbObjIsKindOf(value, Hash)) {
+        } else if (rbObjClassname(value) === "Hash") {
           return `--${key} ${Object.entries(value as Record<string, unknown>)
             .map(([k, v]) => `${k}:${rbObjAsString(v)}`)
             .join(" ")}`;
