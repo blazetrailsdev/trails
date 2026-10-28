@@ -62,7 +62,7 @@ type HookYield = (
   klass: GeneratorClass,
   command?: string | null,
 ) => unknown;
-type HookExec = (this: GeneratorBase, klass: GeneratorClass) => unknown;
+type HookExec = (this: never, klass: GeneratorClass) => unknown;
 
 export type HookBlock = HookYield | HookExec;
 

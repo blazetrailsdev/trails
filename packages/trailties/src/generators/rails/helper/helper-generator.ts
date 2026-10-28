@@ -1,16 +1,31 @@
+import { camelize } from "@blazetrails/activesupport";
+import { File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
-import { camelize, underscore } from "@blazetrails/activesupport";
 
 export class HelperGenerator extends NamedBase {
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
-  createHelperFiles(): void {
-    const paths = helperPaths(this.name);
+  /** @internal */
+  private __fileName?: string;
 
+  /**
+   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsArgs join — PERMANENT
+   */
+  createHelperFiles(): void {
+    const helperName = [...this.classPathParts, this.fileName].map((p) => camelize(p)).join("");
     this.createFile(
-      `app/helpers/${paths.helperFile}${this.ext()}`,
-      `export const ${paths.helperName} = {\n};\n`,
+      File.join(
+        "app/helpers",
+        ...this.classPathParts.map((p) => dasherize(p)),
+        `${dasherize(this.fileName)}-helper${this.ext()}`,
+      ),
+      `export const ${helperName}Helper = {\n};\n`,
     );
+  }
+
+  /** @internal */
+  override get fileName(): string {
+    return (this.__fileName ??= super.fileName.replace(/_helper$/i, ""));
   }
 }
 
@@ -18,24 +33,3 @@ Object.defineProperty(HelperGenerator, "name", { value: "Rails::Generators::Help
 HelperGenerator.checkClassCollision({ suffix: "Helper" });
 HelperGenerator.methodAdded("createHelperFiles");
 HelperGenerator.hookFor("testFramework");
-
-export interface HelperPaths {
-  helperName: string;
-  helperFile: string;
-  namespaceParts: string[];
-}
-
-export function helperPaths(name: string): HelperPaths {
-  const stripped = name.replace(/[_-]?helper$/i, "");
-  const parts = stripped.split("/");
-  const leaf = parts[parts.length - 1];
-  const helperName =
-    parts.length > 1
-      ? parts.map((p) => camelize(underscore(p))).join("") + "Helper"
-      : camelize(underscore(leaf)) + "Helper";
-  const helperFile =
-    parts.length > 1
-      ? parts.map((p) => dasherize(underscore(p))).join("/") + "-helper"
-      : dasherize(underscore(leaf)) + "-helper";
-  return { helperName, helperFile, namespaceParts: parts };
-}

@@ -21,7 +21,7 @@ export class NamedBase extends GeneratorBase {
   declare attributes: GeneratedAttribute[];
   classPathParts!: string[];
   /** @internal */
-  fileName!: string;
+  protected _fileName!: string;
   /** @internal */
   protected _tableName?: string;
   /** @internal */
@@ -149,7 +149,12 @@ export class NamedBase extends GeneratorBase {
   assignNamesBang(name: string): void {
     this.classPathParts = name.includes("/") ? name.split("/") : name.split("::");
     this.classPathParts = this.classPathParts.map((p) => underscore(p));
-    this.fileName = this.classPathParts.pop()!;
+    this._fileName = this.classPathParts.pop()!;
+  }
+
+  /** @internal */
+  get fileName(): string {
+    return this._fileName;
   }
 
   regularClassPath(): string[] {

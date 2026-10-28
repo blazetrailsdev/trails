@@ -1,4 +1,5 @@
-import type { GeneratorBase, GeneratorOptions, GeneratorConfig } from "../../base.js";
+import { File } from "@blazetrails/ruby-compat";
+import { dasherize, type GeneratorOptions } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 import { NamedBase } from "../../named-base.js";
 import {
@@ -15,29 +16,64 @@ export interface ControllerGeneratorOptions extends GeneratorOptions {
 }
 
 export class ControllerGenerator extends NamedBase {
-  declare options: ControllerGeneratorOptions;
-  declare actions: string[];
+  static {
+    Object.defineProperty(this, "name", { value: "Rails::Generators::ControllerGenerator" });
 
-  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
-    super(args, localOptions, config);
-    this.fileName = this.removePossibleSuffix(this.fileName);
+    this.argument("actions", { type: "array", default: [], banner: "action action" });
+    this.classOption("skipRoutes", {
+      type: "boolean",
+      desc: "Don't add routes to config/routes.rb.",
+    });
+    this.classOption("helper", { type: "boolean" });
+    this.classOption("parent", {
+      type: "string",
+      default: "ApplicationController",
+      desc: "The parent class for the generated controller",
+    });
+
+    this.checkClassCollision({ suffix: "Controller" });
+
+    this.methodAdded("createControllerFiles");
+    this.methodAdded("addRoutes");
+
+    this.hookFor(
+      "templateEngine",
+      "testFramework",
+      "helper",
+      function (this: ControllerGenerator, generator: GeneratorClass) {
+        return this.invoke(generator, [this.removePossibleSuffix(this.name), this.actions]);
+      },
+    );
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions */
+  declare options: ControllerGeneratorOptions;
+  declare actions: string[];
+  /** @internal */
+  private __fileName?: string;
+
+  /**
+   * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
+   * @missingRailsArgs join — PERMANENT
+   */
   createControllerFiles(): void {
     const parent = this.parentClassName();
     const actions = this.actions;
-    const paths = controllerPathHelpers(this.name);
     const ts = this.isTypeScript();
-    const ext = this.ext();
-    const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
+    const depth = this.classPathParts.length;
 
     const source = emitControllerClass({
-      className: paths.className,
+      className: controllerPathHelpers(this.name).className,
       parent: parentRefForRelative(parent, depth, this.ext()),
       methods: actions.map((a) => actionMethod(a, ts)),
     });
-    this.createFile(`app/controllers/${paths.controllerFile}${ext}`, source);
+    this.createFile(
+      File.join(
+        "app/controllers",
+        ...this.classPathParts.map((p) => dasherize(p)),
+        `${dasherize(this.fileName)}-controller${this.ext()}`,
+      ),
+      source,
+    );
   }
 
   async addRoutes(): Promise<void> {
@@ -55,34 +91,12 @@ export class ControllerGenerator extends NamedBase {
   }
 
   /** @internal */
-  removePossibleSuffix(name: string): string {
+  override get fileName(): string {
+    return (this.__fileName ??= this.removePossibleSuffix(super.fileName));
+  }
+
+  /** @internal */
+  protected removePossibleSuffix(name: string): string {
     return name.replace(/_?controller$/i, "");
   }
 }
-
-Object.defineProperty(ControllerGenerator, "name", {
-  value: "Rails::Generators::ControllerGenerator",
-});
-ControllerGenerator.argument("actions", { type: "array", default: [], banner: "action action" });
-ControllerGenerator.classOption("skipRoutes", {
-  type: "boolean",
-  desc: "Don't add routes to config/routes.rb.",
-});
-ControllerGenerator.classOption("helper", { type: "boolean" });
-ControllerGenerator.classOption("parent", {
-  type: "string",
-  default: "ApplicationController",
-  desc: "The parent class for the generated controller",
-});
-ControllerGenerator.checkClassCollision({ suffix: "Controller" });
-ControllerGenerator.methodAdded("createControllerFiles");
-ControllerGenerator.methodAdded("addRoutes");
-ControllerGenerator.hookFor(
-  "templateEngine",
-  "testFramework",
-  "helper",
-  function (this: GeneratorBase, generator: GeneratorClass) {
-    const self = this as ControllerGenerator;
-    return this.invoke(generator, [self.removePossibleSuffix(self.name), self.actions]);
-  },
-);

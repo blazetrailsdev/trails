@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { HelperGenerator, helperPaths } from "./helper-generator.js";
+import { HelperGenerator } from "./helper-generator.js";
 
 let tmpDir: string;
 
@@ -52,16 +52,5 @@ describe("HelperGeneratorTest", () => {
     } finally {
       fs.rmSync(jsDir, { recursive: true, force: true });
     }
-  });
-});
-
-describe("helperPaths", () => {
-  it("derives canonical names", () => {
-    expect(helperPaths("Account")).toMatchObject({
-      helperName: "AccountHelper",
-      helperFile: "account-helper",
-    });
-    expect(helperPaths("admin/account").helperName).toBe("AdminAccountHelper");
-    expect(helperPaths("account_helper").helperFile).toBe("account-helper");
   });
 });

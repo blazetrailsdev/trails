@@ -1,5 +1,5 @@
 import { File } from "@blazetrails/ruby-compat";
-import { dasherize, type GeneratorConfig, type GeneratorOptions } from "../../base.js";
+import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import { TEMPLATES } from "./templates.js";
 
@@ -30,11 +30,6 @@ export class JobGenerator extends NamedBase {
   /** @internal */
   private _applicationJobFileName?: string;
 
-  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
-    super(args, localOptions, config);
-    this.fileName = this.fileName.replace(/_job$/i, "");
-  }
-
   /**
    * @missingRailsCall template — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
    * @missingRailsCall in_root — CONVERGEABLE converge-generator-base-create-file-onto-thor-actions
@@ -63,6 +58,13 @@ export class JobGenerator extends NamedBase {
    */
   private applicationJobFileName(): string {
     return (this._applicationJobFileName ??= `app/jobs/application-job${this.ext()}`);
+  }
+
+  /** @internal */
+  private __fileName?: string;
+
+  override get fileName(): string {
+    return (this.__fileName ??= super.fileName.replace(/_job$/i, ""));
   }
 }
 
