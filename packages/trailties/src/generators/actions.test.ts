@@ -9,18 +9,13 @@ import {
   setEnv,
   type ChildProcessAdapter,
 } from "@blazetrails/ruby-compat";
+import { assertEqual, assertMock, Mock } from "@blazetrails/activesupport";
 import { GeneratorBase } from "./base.js";
+import * as Assertions from "./testing/assertions.js";
 
 class TestGenerator extends GeneratorBase {}
 
-interface RunCall {
-  command: string;
-  env: Record<string, string | undefined>;
-  capture: boolean;
-}
-
-let calls: RunCall[];
-let nextStatus: number;
+let mock: Mock | null;
 let previousAdapter: string | null;
 let root: string;
 
@@ -29,20 +24,19 @@ const testAdapter: ChildProcessAdapter = {
     throw new Error("unexpected spawnSync");
   },
   async system(command, env) {
-    calls.push({ command, env, capture: false });
-    return { pid: 1, status: nextStatus, signal: null };
+    mock!.call(command, { env: { TRAILS_ENV: env.TRAILS_ENV }, capture: false });
+    return { pid: 1, status: 0, signal: null };
   },
   async capture2e(command, env) {
-    calls.push({ command, env, capture: true });
-    return ["", { pid: 1, status: nextStatus, signal: null }];
+    mock!.call(command, { env: { TRAILS_ENV: env.TRAILS_ENV }, capture: true });
+    return ["", { pid: 1, status: 0, signal: null }];
   },
 };
 
 const draw = "Trails.application.routes().draw(function () {\n";
 
 beforeEach(() => {
-  calls = [];
-  nextStatus = 0;
+  mock = null;
   registerChildProcessAdapter("trailties-actions-test", testAdapter);
   previousAdapter = childProcessAdapterConfig.adapter;
   childProcessAdapterConfig.adapter = "trailties-actions-test";
@@ -74,115 +68,172 @@ function makeGen(): TestGenerator {
   return generator().gen;
 }
 
+function assertFile(
+  relative: string,
+  ...contents: Array<string | RegExp | ((read: string) => unknown)>
+) {
+  return Assertions.assertFile.call({ destinationRoot: root }, relative, ...contents);
+}
+
+function assertInitializer(name: string, ...contents: Array<string | RegExp>) {
+  return Assertions.assertInitializer.call({ destinationRoot: root }, name, ...contents);
+}
+
 function read(path: string): string {
   return File.read(File.join(root, path));
 }
 
-function routes(code: string): string {
-  return `${draw}${code.replace(/^/gm, "  ")}\n});\n`;
+function escape(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function assertRuns(
+  commands: string | string[],
+  config: Record<string, unknown> | null,
+  block: () => Promise<unknown>,
+): Promise<void> {
+  const configMatcher =
+    config &&
+    ((actualConfig: Record<string, unknown>) => {
+      assertEqual(config, Object.fromEntries(Object.keys(config).map((k) => [k, actualConfig[k]])));
+      return true;
+    });
+
+  mock = new Mock();
+
+  for (const command of ([] as string[]).concat(commands)) {
+    const commandMatcher = escape(command).replace(/^sudo /, "^sudo .*");
+    const args = [new RegExp(`${commandMatcher}$`), configMatcher ?? (() => true)];
+    mock.expect("call", null, args);
+  }
+
+  await block();
+
+  assertMock(mock);
+}
+
+function assertRoutes(...routeCommands: string[]): Promise<void> {
+  const routeRegexps = routeCommands.map(
+    (routeCommand) =>
+      new RegExp(
+        `^${escape(draw)}(?:[ ]{2}.+\\n|\\n)*${escape(routeCommand.replace(/^/gm, "  "))}\\n(?:[ ]{2}.+\\n|\\n)*\\}\\);\\n`,
+      ),
+  );
+  return assertFile("config/routes.ts", ...routeRegexps);
 }
 
 describe("ActionsTest", () => {
   it("environment should include data in environment initializer block", async () => {
     const autoloadPaths = 'config.autoloadPaths.push("app/extras");';
     await makeGen().environment(autoloadPaths);
-    expect(read("config/application.ts")).toContain(
-      ` extends Application {\n  static {\n    ${autoloadPaths}\n`,
+    await assertFile(
+      "config/application.ts",
+      new RegExp(` extends Application \\{\\n  static \\{\\n    ${escape(autoloadPaths)}\\n`),
     );
   });
 
   it("environment should include data in environment initializer block with env option", async () => {
     const autoloadPaths = 'config.autoloadPaths.push("app/extras");';
     await makeGen().environment(autoloadPaths, { env: "development" });
-    expect(read("config/environments/development.ts")).toContain(
-      `configure(function () {\n  ${autoloadPaths}\n`,
+    await assertFile(
+      "config/environments/development.ts",
+      new RegExp(`configure\\(function \\(\\) \\{\\n  ${escape(autoloadPaths)}\\n`),
     );
   });
 
   it("environment with block should include block contents in environment initializer block", async () => {
-    await makeGen().environment(null, {}, () => "// This will be added");
-    expect(read("config/application.ts")).toMatch(/\/\/ This will be added/);
+    await makeGen().environment(null, {}, () => {
+      void "// This won't be added";
+      return "// This will be added";
+    });
+    await assertFile("config/application.ts", (content) => {
+      expect(content).toMatch(/\/\/ This will be added/);
+      expect(content).not.toMatch(/\/\/ This won't be added/);
+    });
   });
 
   it("git with symbol should run command using git scm", async () => {
-    await makeGen().git("init");
-    expect(calls.map((c) => c.command)).toEqual(["git init"]);
+    await assertRuns("git init", null, () => makeGen().git("init"));
   });
 
   it("git with hash should run each command using git scm", async () => {
-    await makeGen().git({ rm: "README", add: "." });
-    expect(calls.map((c) => c.command)).toEqual(["git rm README", "git add ."]);
+    await assertRuns(["git rm README", "git add ."], null, () =>
+      makeGen().git({ rm: "README", add: "." }),
+    );
   });
 
   it("vendor should write data to file in vendor", async () => {
     await makeGen().vendor("vendor-file.ts", "// vendor data");
-    expect(read("vendor/vendor-file.ts")).toBe("// vendor data\n");
+    await assertFile("vendor/vendor-file.ts", "// vendor data\n");
   });
 
   it("lib should write data to file with block in lib", async () => {
     const code = "      export class MyLib {\n        static MY_CONSTANT = 123;\n      }\n";
     await makeGen().lib("my-library.ts", null, () => code);
-    expect(read("lib/my-library.ts")).toBe(
-      "export class MyLib {\n  static MY_CONSTANT = 123;\n}\n",
-    );
+    await assertFile("lib/my-library.ts", "export class MyLib {\n  static MY_CONSTANT = 123;\n}\n");
   });
 
   it("rakefile should write date to file in lib tasks", async () => {
     await makeGen().rakefile("myapp.ts", "task run");
-    expect(read("lib/tasks/myapp.ts")).toBe("task run\n");
+    await assertFile("lib/tasks/myapp.ts", "task run\n");
   });
 
   it("initializer should write date to file in config initializers", async () => {
     await makeGen().initializer("constants.ts", "export const MY_CONSTANT = 42;");
-    expect(read("config/initializers/constants.ts")).toBe("export const MY_CONSTANT = 42;\n");
+    await assertInitializer("constants.ts", "export const MY_CONSTANT = 42;\n");
   });
 
   it("rake should run rake with the default environment", async () => {
     const previous = ENV.TRAILS_ENV;
-    setEnv("TRAILS_ENV", undefined);
-    try {
-      await makeGen().rake("log:clear");
-    } finally {
-      setEnv("TRAILS_ENV", previous);
-    }
-    expect(calls[0].command).toBe("bin/rake log:clear");
-    expect(calls[0].env.TRAILS_ENV).toBe("development");
+    await assertRuns("rake log:clear", { env: { TRAILS_ENV: "development" } }, async () => {
+      setEnv("TRAILS_ENV", undefined);
+      try {
+        await makeGen().rake("log:clear");
+      } finally {
+        setEnv("TRAILS_ENV", previous);
+      }
+    });
   });
 
   it("rake with env option should run rake with the env environment", async () => {
-    await makeGen().rake("log:clear", { env: "production" });
-    expect(calls[0].env.TRAILS_ENV).toBe("production");
+    await assertRuns("rake log:clear", { env: { TRAILS_ENV: "production" } }, () =>
+      makeGen().rake("log:clear", { env: "production" }),
+    );
   });
 
   it("rake with sudo option should run rake with sudo", async () => {
-    await makeGen().rake("log:clear", { sudo: true });
-    expect(calls[0].command).toBe("sudo bin/rake log:clear");
+    await assertRuns("sudo rake log:clear", null, () =>
+      makeGen().rake("log:clear", { sudo: true }),
+    );
   });
 
   it("rake with capture option should run rake with capture", async () => {
-    await makeGen().rake("log:clear", { capture: true });
-    expect(calls[0].capture).toBe(true);
+    await assertRuns("rake log:clear", { capture: true }, () =>
+      makeGen().rake("log:clear", { capture: true }),
+    );
   });
 
   it("route should add route", async () => {
     const routeCommands = ['this.get("foo");', 'this.get("bar");', 'this.get("baz");'];
     const gen = makeGen();
     for (const routeCommand of routeCommands) await gen.route(routeCommand);
-    expect(read("config/routes.ts")).toBe(routes([...routeCommands].reverse().join("\n")));
+    await assertRoutes(...routeCommands);
   });
 
   it("route should be idempotent", async () => {
     const gen = makeGen();
-    await gen.route('this.root("welcome#index");');
+    const routeCommand = 'this.root("welcome#index");';
+    await gen.route(routeCommand);
+    await assertRoutes(routeCommand);
     const content = read("config/routes.ts");
-    await gen.route('this.root("welcome#index");');
-    expect(read("config/routes.ts")).toBe(content);
+    await gen.route(routeCommand);
+    await assertFile("config/routes.ts", content);
   });
 
   it("route with namespace option should nest route", async () => {
     await makeGen().route('this.get("foo");\nthis.get("bar");', { namespace: "baz" });
-    expect(read("config/routes.ts")).toBe(
-      routes('this.namespace("baz", () => {\n  this.get("foo");\n  this.get("bar");\n});'),
+    await assertRoutes(
+      'this.namespace("baz", () => {\n  this.get("foo");\n  this.get("bar");\n});',
     );
   });
 
@@ -190,22 +241,23 @@ describe("ActionsTest", () => {
     const gen = makeGen();
     await gen.route('this.get("foo1");', { namespace: ["baz", "qux"] });
     await gen.route('this.get("foo2");', { namespace: ["baz", "hoge"] });
-    expect(read("config/routes.ts")).toBe(
-      routes(
-        'this.namespace("baz", () => {\n  this.namespace("hoge", () => {\n    this.get("foo2");\n  });\n  this.namespace("qux", () => {\n    this.get("foo1");\n  });\n});',
-      ),
+    await assertRoutes(
+      'this.namespace("baz", () => {\n  this.namespace("hoge", () => {\n    this.get("foo2");\n  });\n  this.namespace("qux", () => {\n    this.get("foo1");\n  });\n});',
     );
   });
 
   it("route with namespace option revokes route without breaking existing namespace blocks", async () => {
     await makeGen().route(
-      'this.namespace("baz", () => {\n  this.get("foo1");\n  this.namespace("qux", () => {\n    this.get("foo2");\n  });\n});',
+      'this.namespace("baz", () => {\n  this.get("foo1");\n  this.namespace("qux", () => {\n    this.get("foo2");\n    this.namespace("hoge", () => {\n      this.get("foo3");\n    });\n  });\n  this.get("bar1");\n});',
     );
-    await generator({ behavior: "revoke" }).gen.route('this.get("foo2");', {
-      namespace: ["baz", "qux"],
-    });
-    expect(read("config/routes.ts")).toBe(
-      routes('this.namespace("baz", () => {\n  this.get("foo1");\n});'),
+    const revoke = generator({ behavior: "revoke" }).gen;
+    await revoke.route('this.get("foo2");', { namespace: ["baz", "qux"] });
+    await assertRoutes(
+      'this.namespace("baz", () => {\n  this.get("foo1");\n  this.namespace("qux", () => {\n    this.namespace("hoge", () => {\n      this.get("foo3");\n    });\n  });\n  this.get("bar1");\n});',
+    );
+    await revoke.route('this.get("foo3");', { namespace: ["baz", "qux", "hoge"] });
+    await assertRoutes(
+      'this.namespace("baz", () => {\n  this.get("foo1");\n  this.get("bar1");\n});',
     );
   });
 
