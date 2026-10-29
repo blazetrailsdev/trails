@@ -26,7 +26,6 @@ export function directory(this: ActionsHost, source: string, ...args: unknown[])
 }
 
 export class Directory extends EmptyDirectory {
-  declare base: DirectoryBase;
   source: Promise<string>;
   /** @internal */
   private _block: Block | undefined;
@@ -50,7 +49,7 @@ export class Directory extends EmptyDirectory {
 
   override async invokeBang(): Promise<unknown> {
     await this.source;
-    await this.base.emptyDirectory(this.givenDestination, this.config);
+    await (this.base as DirectoryBase).emptyDirectory(this.givenDestination, this.config);
     return this.executeBang();
   }
 
@@ -58,7 +57,10 @@ export class Directory extends EmptyDirectory {
     return this.executeBang();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall directory? — CONVERGEABLE call-gate-credits-is-directory-async
+   */
   protected async executeBang(): Promise<unknown> {
     const source = await this.source;
     let lookup = escapeGlobs(source);
@@ -76,16 +78,16 @@ export class Directory extends EmptyDirectory {
       if (/\.empty_directory$/.test(fileSource)) {
         const dirname = File.dirname(fileDestination).replace(/\/\.$/, "");
         if (dirname === this.givenDestination) continue;
-        await this.base.emptyDirectory(dirname, this.config);
+        await (this.base as DirectoryBase).emptyDirectory(dirname, this.config);
       } else if (RegExp(`${TEMPLATE_EXTNAME}$`).test(fileSource)) {
-        await this.base.template(
+        await (this.base as DirectoryBase).template(
           fileSource,
           fileDestination.slice(0, -3),
           this.config,
           ...(this._block ? [this._block] : []),
         );
       } else {
-        await this.base.copyFile(
+        await (this.base as DirectoryBase).copyFile(
           fileSource,
           fileDestination,
           this.config,

@@ -32,13 +32,13 @@ export class Open3 {
   static async capture2e(
     ...cmd: [command: string] | [env: Record<string, string | null>, command: string]
   ): Promise<[string, InstanceType<typeof Process.Status>]> {
-    const [command, env] = rbExecargNew(cmd);
+    const [command, env, args] = rbExecargNew(cmd);
     const adapter = getChildProcess();
     if (adapter.capture2e === undefined) {
       throw new NotImplementedError("spawn() function is unimplemented on this machine");
     }
 
-    const [outerr, status] = await adapter.capture2e(command, env);
+    const [outerr, status] = await adapter.capture2e(command, env, args);
     if (status.error !== undefined) throw status.error;
     return [outerr, new Process.Status(status)];
   }

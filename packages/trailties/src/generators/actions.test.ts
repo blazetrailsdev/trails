@@ -23,12 +23,18 @@ const testAdapter: ChildProcessAdapter = {
   spawnSync() {
     throw new Error("unexpected spawnSync");
   },
-  async system(command, env) {
-    mock!.call(command, { env: { TRAILS_ENV: env.TRAILS_ENV }, capture: false });
+  async system(command, env, args) {
+    mock!.call(args == null ? command : [command, ...args].join(" "), {
+      env: { TRAILS_ENV: env.TRAILS_ENV },
+      capture: false,
+    });
     return { pid: 1, status: 0, signal: null };
   },
-  async capture2e(command, env) {
-    mock!.call(command, { env: { TRAILS_ENV: env.TRAILS_ENV }, capture: true });
+  async capture2e(command, env, args) {
+    mock!.call(args == null ? command : [command, ...args].join(" "), {
+      env: { TRAILS_ENV: env.TRAILS_ENV },
+      capture: true,
+    });
     return ["", { pid: 1, status: 0, signal: null }];
   },
 };
