@@ -220,6 +220,10 @@ const alias = {
   "@blazetrails/arel/src": path.resolve(__dirname, "packages/arel/src"),
   "@blazetrails/arel": path.resolve(__dirname, "packages/arel/src/index.ts"),
   "@blazetrails/activemodel": path.resolve(__dirname, "packages/activemodel/src/index.ts"),
+  "@blazetrails/activerecord/destroy-association-async-job": path.resolve(
+    __dirname,
+    "packages/activerecord/src/destroy-association-async-job.ts",
+  ),
   "@blazetrails/activerecord/fixtures.js": path.resolve(
     __dirname,
     "packages/activerecord/src/fixtures.ts",

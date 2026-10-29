@@ -49,7 +49,11 @@ export class DestroyAssociationAsyncJob extends JobBase {
     ensuringOwnerWasMethod: string | null,
   ): Promise<unknown> {
     return (
-      !owner || (ensuringOwnerWasMethod != null && (await rbFSend(owner, ensuringOwnerWasMethod)))
+      !owner ||
+      (ensuringOwnerWasMethod != null &&
+        !([null, undefined, false] as unknown[]).includes(
+          await rbFSend(owner, ensuringOwnerWasMethod),
+        ))
     );
   }
 }

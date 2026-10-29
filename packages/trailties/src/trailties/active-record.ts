@@ -6,6 +6,8 @@ import { prepend } from "@blazetrails/ruby-compat/include";
 import { Callbacks } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
 import { Fixture } from "@blazetrails/activerecord/fixtures.js";
+import "@blazetrails/activerecord/destroy-association-async-job";
+import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import {
   ActiveRecordError,
   AsynchronousQueriesTracker,
@@ -276,8 +278,8 @@ export class Trailtie extends BaseTrailtie {
         include(base as never, ControllerRuntime);
       });
 
-      onLoad("active_job", (base: unknown) => {
-        include(base as never, JobRuntime);
+      onLoad("active_job", (base: typeof ActiveJobBase) => {
+        include(base, JobRuntime);
       });
     });
 
