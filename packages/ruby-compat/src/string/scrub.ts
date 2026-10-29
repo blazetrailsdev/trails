@@ -23,7 +23,10 @@ export function scrub(
   while (i < b.length) {
     const len = sequenceLength(b, i);
     if (len > 0) {
-      result += new TextDecoder().decode(Uint8Array.from(b.slice(i, i + len)));
+      // `ignoreBOM`: a default decoder strips a leading U+FEFF, and each
+      // sequence is decoded on its own, so every one in `str` would go. MRI
+      // keeps every valid sequence byte for byte.
+      result += new TextDecoder("utf-8", { ignoreBOM: true }).decode(Uint8Array.from(b.slice(i, i + len)));
       i += len;
       continue;
     }

@@ -998,6 +998,8 @@ describe("STRING_METHOD_TABLE", () => {
     const rows: Row[] = [
       ["aé", "scrub", [], { res: { s: "aé" }, recv: { s: "aé" } }],
       ["abc", "scrub", ["?"], { res: { s: "abc" }, recv: { s: "abc" } }],
+      // `"a\u{feff}b".scrub` — MRI keeps the byte-order mark.
+      ["a\u{feff}b", "scrub", [], { res: { s: "a\u{feff}b" }, recv: { s: "a\u{feff}b" } }],
     ];
     for (const [recv, method, args, want] of rows) expect(send(recv, method, args)).toEqual(want);
   });
