@@ -33,9 +33,9 @@ export class Stream {
   private socketObject: SocketObject;
   private streamSend: StreamSend | null;
   private rackHijackIo: Io | null;
-  private _writeLock: Mutex;
-  private _writeHead: Uint8Array | null;
-  private _writeBuffer: Queue<Data>;
+  private writeLock: Mutex;
+  private writeHead: Uint8Array | null;
+  private writeBuffer: Queue<Data>;
 
   constructor(eventLoop: EventLoop, socket: SocketObject) {
     this.eventLoop = eventLoop;
@@ -43,10 +43,10 @@ export class Stream {
     this.streamSend = (socket.env["stream.send"] as StreamSend | undefined) ?? null;
 
     this.rackHijackIo = null;
-    this._writeLock = new Mutex();
+    this.writeLock = new Mutex();
 
-    this._writeHead = null;
-    this._writeBuffer = new Queue();
+    this.writeHead = null;
+    this.writeBuffer = new Queue();
   }
 
   each(callback: StreamSend): StreamSend {
@@ -69,9 +69,9 @@ export class Stream {
       }
 
       const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
-      if (this._writeLock.tryLock()) {
+      if (this.writeLock.tryLock()) {
         try {
-          if (this._writeHead == null && this._writeBuffer.isEmpty()) {
+          if (this.writeHead == null && this.writeBuffer.isEmpty()) {
             const written = this.rackHijackIo!.writeNonblock(data, { exception: false });
 
             switch (written) {
@@ -80,18 +80,18 @@ export class Stream {
               case bytes.length:
                 return bytes.length;
               default:
-                this._writeHead = bytes.subarray(written, bytes.length);
+                this.writeHead = bytes.subarray(written, bytes.length);
                 this.eventLoop.writesPending(this.rackHijackIo!);
 
                 return bytes.length;
             }
           }
         } finally {
-          this._writeLock.unlock();
+          this.writeLock.unlock();
         }
       }
 
-      void this._writeBuffer.push(data);
+      void this.writeBuffer.push(data);
       this.eventLoop.writesPending(this.rackHijackIo!);
 
       return bytes.length;
@@ -103,24 +103,25 @@ export class Stream {
     }
   }
 
+  /** @missingRailsArgs pop — PERMANENT */
   flushWriteBuffer(): boolean {
-    return this._writeLock.synchronize(() => {
+    return this.writeLock.synchronize(() => {
       for (;;) {
-        if (this._writeHead == null) {
-          if (this._writeBuffer.isEmpty()) return true;
-          const data = this._writeBuffer.pop(true);
-          this._writeHead = typeof data === "string" ? new TextEncoder().encode(data) : data;
+        if (this.writeHead == null) {
+          if (this.writeBuffer.isEmpty()) return true;
+          const data = this.writeBuffer.pop(true);
+          this.writeHead = typeof data === "string" ? new TextEncoder().encode(data) : data;
         }
 
-        const written = this.rackHijackIo!.writeNonblock(this._writeHead, { exception: false });
+        const written = this.rackHijackIo!.writeNonblock(this.writeHead, { exception: false });
         switch (written) {
           case "wait_writable":
             return false;
-          case this._writeHead.length:
-            this._writeHead = null;
+          case this.writeHead.length:
+            this.writeHead = null;
             break;
           default:
-            this._writeHead = this._writeHead.subarray(written, this._writeHead.length);
+            this.writeHead = this.writeHead.subarray(written, this.writeHead.length);
             return false;
         }
       }
@@ -148,6 +149,6 @@ export class Stream {
   }
 }
 
-rbDeclareIvar(Stream, "@write_lock", "_writeLock");
-rbDeclareIvar(Stream, "@write_head", "_writeHead");
-rbDeclareIvar(Stream, "@write_buffer", "_writeBuffer");
+rbDeclareIvar(Stream, "@write_lock", "writeLock");
+rbDeclareIvar(Stream, "@write_head", "writeHead");
+rbDeclareIvar(Stream, "@write_buffer", "writeBuffer");
