@@ -267,7 +267,7 @@ export class Delegation {
     return withRecords(this, (records) => RECORD_DELEGATES.length(records) as number);
   }
 
-  each(this: DelegationHost, fn: (record: Base, index: number) => void): Base[] | Promise<Base[]> {
+  each(this: DelegationHost, fn: (record: Base) => void): Base[] | Promise<Base[]> {
     return withRecords(this, (records) => RECORD_DELEGATES.each(records, fn) as Base[]);
   }
 

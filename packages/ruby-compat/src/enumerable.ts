@@ -48,7 +48,7 @@ const iterBreak = Symbol("rb_iter_break");
  */
 function rbBlockCall<T, E, R>(
   obj: Iterable<T> | Each<T, E>,
-  block: (i: T) => unknown,
+  block: (i: T, argv: unknown[]) => unknown,
   result: () => R,
   awaiting = false,
 ): Enumerated<E, R> {
@@ -58,12 +58,12 @@ function rbBlockCall<T, E, R>(
   };
   if (awaiting && typeof (obj as Partial<Each<T, E>>).each === "function") {
     let pending: PromiseLike<unknown> | null = null;
-    const rest: T[] = [];
+    const rest: [T, unknown[]][] = [];
     return rbBlockCall(
       obj,
-      (i) => {
-        if (pending) return void rest.push(i);
-        const r = block(i);
+      (i, argv) => {
+        if (pending) return void rest.push([i, argv]);
+        const r = block(i, argv);
         if (r != null && typeof (r as PromiseLike<unknown>).then === "function") {
           pending = r as PromiseLike<unknown>;
         }
@@ -73,7 +73,7 @@ function rbBlockCall<T, E, R>(
         const awaited = pending;
         return (async () => {
           await awaited;
-          for (const i of rest) await block(i);
+          for (const [i, argv] of rest) await block(i, argv);
           return result();
         })();
       },
@@ -83,23 +83,25 @@ function rbBlockCall<T, E, R>(
   try {
     if (typeof (obj as Partial<Each<T, E>>).each === "function") {
       each = (obj as Each<T, E>).each(((...argv: T[]) =>
-        block(argv.length === 0 ? (null as T) : argv.length === 1 ? argv[0] : (argv as T))) as (
-        i: T,
-      ) => void);
+        block(
+          argv.length === 0 ? (null as T) : argv.length === 1 ? argv[0] : (argv as T),
+          argv,
+        )) as (i: T) => void);
     } else if (awaiting) {
       const it = (obj as Iterable<T>)[Symbol.iterator]();
       for (let step = it.next(); !step.done; step = it.next()) {
-        const r = block(step.value);
+        const r = block(step.value, [step.value]);
         if (r != null && typeof (r as PromiseLike<unknown>).then === "function") {
           each = (async () => {
             await r;
-            for (let step = it.next(); !step.done; step = it.next()) await block(step.value);
+            for (let step = it.next(); !step.done; step = it.next())
+              await block(step.value, [step.value]);
           })();
           break;
         }
       }
     } else {
-      for (const i of obj as Iterable<T>) block(i);
+      for (const i of obj as Iterable<T>) block(i, [i]);
     }
   } catch (e) {
     return rescue(e) as Enumerated<E, R>;
@@ -346,26 +348,38 @@ export function find<T, E = unknown>(
 }
 
 /**
- * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`.
+ * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`,
+ * whose `collect_i` (`:606`) yields the values `each` yielded as they are
+ * (`rb_yield_values2`), unpacked. With no block it answers the enumerator
+ * `RETURN_SIZED_ENUMERATOR` builds.
  * @noRailsEquivalent PERMANENT
  */
-export function map<T, R, E = unknown>(
-  obj: Iterable<T> | Each<T, E>,
-  block: (i: T) => R,
+export function map<A extends unknown[], R, E = unknown>(
+  obj: Enumerator<A, E>,
+  block: (...args: A) => R,
 ): Enumerated<E, R[]>;
 /** @noRailsEquivalent PERMANENT */
-export function map<T, E = unknown>(obj: Iterable<T> | Each<T, E>): Enumerated<E, T[]>;
+export function map<T, R, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T, ...rest: never[]) => R,
+): Enumerated<E, R[]>;
+/** @noRailsEquivalent PERMANENT */
+export function map<T, E = unknown>(obj: Iterable<T> | Each<T, E>): Enumerator<T, E>;
 /** @noRailsEquivalent PERMANENT */
 export function map<T, R, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
-  block?: (i: T) => R,
-): Enumerated<E, R[] | T[]> {
-  if (!block) return enumToA(obj);
+  block?: (...args: never[]) => R,
+): unknown {
+  if (!block) {
+    return new Enumerator<T, E>({ map: (block: (i: T) => R) => map(obj, block) }, "map", [], () =>
+      enumSize(obj),
+    );
+  }
   const ary: R[] = [];
   return rbBlockCall(
     obj,
-    (i) => {
-      ary.push(block(i));
+    (_i, argv) => {
+      ary.push((block as (...args: unknown[]) => R)(...argv));
     },
     () => ary,
   );
@@ -1305,6 +1319,8 @@ export class Enumerable<T = unknown, E = unknown> {
     return enumFindAll(this, block);
   }
 
+  map<T, E = unknown>(this: Each<T, E>): Enumerator<T, E>;
+  map<T, R, E = unknown>(this: Each<T, E>, block: (i: T) => R): Enumerated<E, R[]>;
   map<T, R, E = unknown>(this: Each<T, E>, block?: (i: T) => R) {
     return block ? map(this, block) : map(this);
   }

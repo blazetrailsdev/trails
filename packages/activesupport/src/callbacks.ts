@@ -787,8 +787,9 @@ export class CallbackChain {
     return this.chain;
   }
 
-  each(fn: (cb: Callback) => void): void {
+  each(fn: (cb: Callback) => void): Callback[] {
     for (const callback of this.chain) fn(callback);
+    return this.chain;
   }
 
   index(o: Callback): number {

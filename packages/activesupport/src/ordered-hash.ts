@@ -26,7 +26,7 @@ export class OrderedHash<K, V> extends Hash<K, V> {
   encodeWith(coder: YAML.Coder): void {
     coder.representSeq(
       "!omap",
-      map<[K, V], Hash<K, V>>(this, ([k, v]) => new Hash<K, V>().set(k, v)),
+      map(this, (k: K, v: V) => new Hash<K, V>().set(k, v)),
     );
   }
 

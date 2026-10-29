@@ -436,7 +436,7 @@ export class JoinDependency {
   /** @internal */
   private aliases(): Aliases {
     return (this._aliasesCache ??= new Aliases(
-      map(eachWithIndex(this.joinRoot), ([joinPart, i]) => {
+      map(eachWithIndex(this.joinRoot), (joinPart, i) => {
         let columnNames: string[];
         if (joinPart === this.joinRoot && !rtest(this.joinRootAlias)) {
           const primaryKey = this.joinRoot.primaryKey;
@@ -446,7 +446,7 @@ export class JoinDependency {
         }
         const columns = map(
           eachWithIndex(columnNames),
-          ([columnName, j]) => new Aliases.Column(columnName, `t${i}_r${j}`),
+          (columnName, j) => new Aliases.Column(columnName, `t${i}_r${j}`),
         );
         return new Aliases.Table(joinPart, columns);
       }),

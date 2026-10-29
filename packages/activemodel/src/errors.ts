@@ -39,8 +39,9 @@ export class Errors<TBase extends object = object> {
   private _errors: ActiveModelError[] = [];
   private _base: TBase | null;
 
-  each(fn: (error: ActiveModelError) => void): void {
+  each(fn: (error: ActiveModelError) => void): ActiveModelError[] {
     for (const error of this._errors) fn(error);
+    return this._errors;
   }
 
   clear(): void {

@@ -35,8 +35,10 @@ export class File {
     this.file = file;
   }
 
-  each(block: (row: [string, unknown]) => void): void {
-    for (const row of this.rows()) block(row);
+  each(block: (row: [string, unknown]) => void): [string, unknown][] {
+    const rows = this.rows();
+    for (const row of rows) block(row);
+    return rows;
   }
 
   get modelClass(): unknown {
