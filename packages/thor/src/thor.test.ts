@@ -33,7 +33,7 @@ function h(options: Opts): Record<string, unknown> {
   return Object.fromEntries(options);
 }
 
-function r(result: unknown): unknown {
+function r(result: unknown): unknown[] {
   return (result as unknown[]).map((x) => (x instanceof Map ? h(x as Opts) : x));
 }
 
@@ -62,80 +62,53 @@ describe("Thor", () => {
 
   describe("#method_option", () => {
     it("sets options to the next method to be invoked", async () => {
-      const [, options] = (await myScript.start(["foo", "bar", "--force"])) as [unknown, Opts];
-      expect(h(options)).toEqual({ force: true });
+      const [, options] = r(await myScript.start(["foo", "bar", "--force"]));
+      expect(options).toEqual({ force: true });
     });
 
     describe(":lazy_default", () => {
       it("is absent when option is not specified", async () => {
-        const [, options] = (await myScript.start(["with_optional"])) as [unknown, Opts];
-        expect(h(options)).toEqual({});
+        const [, options] = r(await myScript.start(["with_optional"]));
+        expect(options).toEqual({});
       });
 
       it("sets a default that can be overridden for strings", async () => {
-        let [, options] = (await myScript.start(["with_optional", "--lazy"])) as [unknown, Opts];
-        expect(h(options)).toEqual({ lazy: "yes" });
+        let [, options] = r(await myScript.start(["with_optional", "--lazy"]));
+        expect(options).toEqual({ lazy: "yes" });
 
-        [, options] = (await myScript.start(["with_optional", "--lazy", "yesyes!"])) as [
-          unknown,
-          Opts,
-        ];
-        expect(h(options)).toEqual({ lazy: "yesyes!" });
+        [, options] = r(await myScript.start(["with_optional", "--lazy", "yesyes!"]));
+        expect(options).toEqual({ lazy: "yesyes!" });
       });
 
       it("sets a default that can be overridden for numerics", async () => {
-        let [, options] = (await myScript.start(["with_optional", "--lazy-numeric"])) as [
-          unknown,
-          Opts,
-        ];
-        expect(h(options)).toEqual({ lazy_numeric: 42 });
+        let [, options] = r(await myScript.start(["with_optional", "--lazy-numeric"]));
+        expect(options).toEqual({ lazy_numeric: 42 });
 
-        [, options] = (await myScript.start(["with_optional", "--lazy-numeric", "20000"])) as [
-          unknown,
-          Opts,
-        ];
-        expect(h(options)).toEqual({ lazy_numeric: 20_000 });
+        [, options] = r(await myScript.start(["with_optional", "--lazy-numeric", "20000"]));
+        expect(options).toEqual({ lazy_numeric: 20_000 });
       });
 
       it("sets a default that can be overridden for arrays", async () => {
-        let [, options] = (await myScript.start(["with_optional", "--lazy-array"])) as [
-          unknown,
-          Opts,
-        ];
-        expect(h(options)).toEqual({ lazy_array: ["eat", "at", "joes"] });
+        let [, options] = r(await myScript.start(["with_optional", "--lazy-array"]));
+        expect(options).toEqual({ lazy_array: ["eat", "at", "joes"] });
 
-        [, options] = (await myScript.start([
-          "with_optional",
-          "--lazy-array",
-          "hello",
-          "there",
-        ])) as [unknown, Opts];
-        expect(h(options)).toEqual({ lazy_array: ["hello", "there"] });
+        [, options] = r(await myScript.start(["with_optional", "--lazy-array", "hello", "there"]));
+        expect(options).toEqual({ lazy_array: ["hello", "there"] });
       });
 
       it("sets a default that can be overridden for hashes", async () => {
-        let [, options] = (await myScript.start(["with_optional", "--lazy-hash"])) as [
-          unknown,
-          Opts,
-        ];
-        expect(h(options)).toEqual({ lazy_hash: { swedish: "meatballs" } });
+        let [, options] = r(await myScript.start(["with_optional", "--lazy-hash"]));
+        expect(options).toEqual({ lazy_hash: { swedish: "meatballs" } });
 
-        [, options] = (await myScript.start([
-          "with_optional",
-          "--lazy-hash",
-          "polish:sausage",
-        ])) as [unknown, Opts];
-        expect(h(options)).toEqual({ lazy_hash: { polish: "sausage" } });
+        [, options] = r(await myScript.start(["with_optional", "--lazy-hash", "polish:sausage"]));
+        expect(options).toEqual({ lazy_hash: { polish: "sausage" } });
       });
     });
 
     describe("when :for is supplied", () => {
       it("updates an already defined command", async () => {
-        const [, options] = (await myChildScript.start(["animal", "horse", "--other=fish"])) as [
-          unknown,
-          Opts,
-        ];
-        expect(h(options).other).toEqual("fish");
+        const [, options] = r(await myChildScript.start(["animal", "horse", "--other=fish"]));
+        expect((options as Record<string, unknown>).other).toEqual("fish");
       });
 
       describe("and the target is on the parent class", () => {
@@ -622,15 +595,15 @@ describe("Thor", () => {
 
     it("overwrites default options if called on the method scope", async () => {
       const args = ["zoo", "--force", "--param", "feathers"];
-      const options = (await myChildScript.start(args)) as Opts;
-      expect(h(options)).toEqual({ force: true, param: "feathers" });
+      const options = h((await myChildScript.start(args)) as Opts);
+      expect(options).toEqual({ force: true, param: "feathers" });
     });
 
     it("allows default options to be merged with method options", async () => {
       const args = ["animal", "bird", "--force", "--param", "1.0", "--other", "tweets"];
-      const [arg, options] = (await myChildScript.start(args)) as [unknown, Opts];
+      const [arg, options] = r(await myChildScript.start(args));
       expect(arg).toEqual("bird");
-      expect(h(options)).toEqual({ force: true, param: 1.0, other: "tweets" });
+      expect(options).toEqual({ force: true, param: 1.0, other: "tweets" });
     });
   });
 
