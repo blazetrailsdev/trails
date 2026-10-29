@@ -165,6 +165,29 @@ describe("Thor::Actions", () => {
         );
       });
 
+      it("doesn't removes the root path from the absolute path only if it is only the partial name of the directory", () => {
+        const r = counter();
+        r.destinationRoot = "/app";
+        expect(r.relativeToOriginalDestinationRoot("/application/project")).toBe(
+          "/application/project",
+        );
+      });
+
+      it("removes the root path from the absolute path only once", () => {
+        const r = counter();
+        r.destinationRoot = "/app";
+        expect(r.relativeToOriginalDestinationRoot("/app/app/project")).toBe("app/project");
+      });
+
+      it("does not fail with files containing regexp characters", () => {
+        const runner = new MyCounter(
+          [1],
+          {},
+          { destinationRoot: File.join(destinationRoot, "fo[o-b]ar") },
+        );
+        expect(runner.relativeToOriginalDestinationRoot("bar")).toBe("bar");
+      });
+
       describe("#source_paths_for_search", () => {
         it("add source_root to source_paths_for_search", async () => {
           expect(await MyCounter.sourcePathsForSearch()).toContain(fixtures);
