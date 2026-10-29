@@ -345,6 +345,10 @@ const alias = {
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
   "@blazetrails/builder": path.resolve(__dirname, "packages/builder/src/builder.ts"),
   "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/src/marcel.ts"),
+  "@blazetrails/image-processing": path.resolve(
+    __dirname,
+    "packages/image-processing/src/image-processing.ts",
+  ),
   "@blazetrails/chronic": path.resolve(__dirname, "packages/chronic/src/chronic.ts"),
   "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/src/index.ts"),
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/src/et-orbi.ts"),

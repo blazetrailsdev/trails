@@ -925,6 +925,7 @@ jobs:
           packages/html-sanitizer
           packages/i18n
           packages/marcel
+          packages/image-processing
           packages/mini-magick
           packages/msgpack
           packages/nokogiri
@@ -1161,6 +1162,7 @@ jobs:
           packages/globalid
           packages/i18n
           packages/marcel
+          packages/image-processing
           packages/mini-magick
           packages/msgpack
           packages/nokogiri

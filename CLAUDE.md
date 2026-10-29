@@ -1770,6 +1770,7 @@ the capability, in a different place. Each is decided here, and each but
 | `builder/xmlbase.rb`                                  | Proxy (misses only)   |
 | `mini_magick/tool.rb`                                 | Proxy                 |
 | `mini_magick/image.rb`                                | Proxy (ungated)       |
+| `image_processing/chainable.rb`                       | Proxy (thenable)      |
 
 Rules that apply across the table:
 
@@ -1798,6 +1799,12 @@ Rules that apply across the table:
 - A `Proxy (misses only)` row reaches `method_missing` only for a name the
   object does not already answer, so a builder tag named `constructor`,
   `toString` or `append` is written `xml.tagBang(name)`, Ruby's `tag!`.
+- `image_processing/chainable.rb`'s Proxy answers `then` with `call()`, so
+  `await builder` runs the pipeline. JS awaits anything with a `then`:
+  returning a builder from an `async` function, or resolving a promise with
+  one, runs it too, and with no source that raises "source file is not
+  provided" (`pipeline.rb:11`). `catch`, `finally`, `constructor`, `toJSON`
+  and every symbol are never queued.
 - A "named method, no trap" row answers only an explicit `methodMissing` call.
   A "nothing" row with a dispatch-dependent Rails test is a gap, filed against
   its package; the rows are decided per class, not ratified.
