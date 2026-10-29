@@ -954,6 +954,9 @@ importers:
       '@blazetrails/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@blazetrails/image-processing':
+        specifier: workspace:*
+        version: link:../../packages/image-processing
       '@blazetrails/marcel':
         specifier: workspace:*
         version: link:../../packages/marcel
