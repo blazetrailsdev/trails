@@ -75,7 +75,7 @@ export class ChannelGenerator extends NamedBase {
 
   /**
    * @internal
-   * @missingRailsCall module_namespacing — CONVERGEABLE scaffold-controller-hooks-test-framework-and-engine-arms
+   * @missingRailsCall module_namespacing — CONVERGEABLE generators-port-module-namespacing
    */
   private async createChannelFile(): Promise<void> {
     await this.template(
@@ -145,6 +145,13 @@ pin_all_from "app/javascript/channels", under: "channels"
   }
 
   /** @internal */
+  private __fileName?: string;
+
+  override get fileName(): string {
+    return (this.__fileName ??= super.fileName.replace(/_channel$/i, ""));
+  }
+
+  /** @internal */
   private async isFirstSetupRequired(): Promise<boolean> {
     return !(await File.isExistAsync(File.join(this.root(), "app/javascript/channels/index.js")));
   }
@@ -181,13 +188,6 @@ pin_all_from "app/javascript/channels", under: "channels"
     return (this._usingImportmap ||= await File.isExistAsync(
       File.join(this.root(), "config/importmap.rb"),
     ));
-  }
-
-  /** @internal */
-  private __fileName?: string;
-
-  override get fileName(): string {
-    return (this.__fileName ??= super.fileName.replace(/_channel$/i, ""));
   }
 
   /** @internal */
