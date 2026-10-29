@@ -1,0 +1,17 @@
+<% const signature = this.isTypeScript() ? "(): void" : "()"; -%>
+import * as ApplicationCable from "<%= "../".repeat(this.classPathParts.length) || "./" %>application-cable/channel<%= this.ext() %>";
+
+export class <%= this.className().split("::").pop() %>Channel extends ApplicationCable.Channel {
+  subscribed<%= signature %> {
+    // this.streamFrom("some_channel");
+  }
+
+  unsubscribed<%= signature %> {
+    // Any cleanup needed when channel is unsubscribed
+  }
+<% for (const action of this.actions) { -%>
+
+  <%= action %><%= signature %> {
+  }
+<% } -%>
+}
