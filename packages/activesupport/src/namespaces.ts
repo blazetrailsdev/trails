@@ -81,6 +81,12 @@ export const TopLevel: {
     Engine: abstract new (...args: never[]) => unknown;
     Trailtie: abstract new (...args: never[]) => unknown;
     root(): string | null | undefined;
+    configuration: {
+      generators(): {
+        options: { get(namespace: unknown): Record<string, unknown> | undefined };
+        orm?(): unknown;
+      };
+    } | null;
   };
   ActionDispatch?: {
     Request: new (env: Record<string, unknown>) => {

@@ -1249,13 +1249,30 @@ export function extractFromProgram(
     // A top-level call on the file's own synthesized module (`mattrAccessor.call(Serializers, …)`
     // in serializers.ts) cannot resolve until that module is synthesized below, so it retries.
     const deferredAttributeCalls: ClassAttributeCall[] = [];
+    // A module seated as an exported `const` with no functions of its own (active_storage.rb's
+    // `module ActiveStorage`, all `mattr_accessor`s) is synthesized from its macro calls.
+    const fileConsts = new Set(
+      sourceFile.statements
+        .filter(
+          (st): st is ts.VariableStatement =>
+            ts.isVariableStatement(st) &&
+            (st.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false),
+        )
+        .flatMap((st) => st.declarationList.declarations)
+        .map((decl) => decl.name)
+        .filter(ts.isIdentifier)
+        .map((name) => name.text),
+    );
     const creditAttribute = (attr: ClassAttributeCall, retry: boolean): boolean => {
       const target =
         [attr.enclosing, attr.receiver]
           .filter((n): n is string => n !== undefined)
           .map((n) => `${relPath}:${n}`)
           .find((key) => info.classes[key] || info.modules[key]) ??
-        (attr.enclosingSeatsModule === true ? `${relPath}:${attr.enclosing}` : undefined);
+        (attr.enclosingSeatsModule === true ? `${relPath}:${attr.enclosing}` : undefined) ??
+        (retry && attr.receiver !== undefined && fileConsts.has(attr.receiver)
+          ? `${relPath}:${attr.receiver}`
+          : undefined);
       if (target === undefined) {
         if (!retry && attr.enclosing === undefined && attr.receiver !== undefined) {
           deferredAttributeCalls.push(attr);
@@ -1264,7 +1281,7 @@ export function extractFromProgram(
       }
       if (!info.classes[target] && !info.modules[target]) {
         info.modules[target] = {
-          name: attr.enclosing!,
+          name: attr.enclosing ?? attr.receiver!,
           file: relPath,
           includes: [],
           extends: [],

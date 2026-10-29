@@ -1,0 +1,16 @@
+name: ActiveStorage media binaries
+description: >-
+  Install the binaries ActiveStorage's analyzers and previewers shell out to:
+  ffprobe / ffmpeg (video_analyzer.rb, audio_analyzer.rb, video_previewer.rb),
+  mutool (mupdf_previewer.rb) and pdftoppm (poppler_pdf_previewer.rb).
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        command -v ffprobe >/dev/null && command -v mutool >/dev/null && command -v pdftoppm >/dev/null \
+          || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg mupdf-tools poppler-utils; }
+        ffprobe -version | head -1
+        ffmpeg -version | head -1
+        mutool -v 2>&1 | head -1
+        pdftoppm -v 2>&1 | head -1

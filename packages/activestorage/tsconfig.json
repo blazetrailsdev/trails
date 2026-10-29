@@ -12,6 +12,7 @@
     { "path": "../activerecord" },
     { "path": "../activesupport" },
     { "path": "../marcel" },
-    { "path": "../ruby-compat" }
+    { "path": "../ruby-compat" },
+    { "path": "../trailties" }
   ]
 }

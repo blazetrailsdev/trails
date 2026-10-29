@@ -31,5 +31,8 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "devDependencies": {
+    "@blazetrails/trailties": "workspace:*"
   }
 }

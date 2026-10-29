@@ -1254,6 +1254,7 @@ jobs:
       # double-run across the two legs.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
+      - uses: ./.github/actions/activestorage-media-binaries
       - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 }}
@@ -1291,6 +1292,7 @@ jobs:
       # Trailing slash for the reason given on `sqlite-tests`. The CLI package
       # is excluded: it owns no `inMemoryDb()` guards, so it has nothing this
       # lane can check.
+      - uses: ./.github/actions/activestorage-media-binaries
       - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: sqlite3_mem
@@ -1571,6 +1573,7 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
+      - uses: ./.github/actions/activestorage-media-binaries
       - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: postgresql
@@ -1719,6 +1722,7 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
+      - uses: ./.github/actions/activestorage-media-binaries
       - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/
         env:
           ARCONN: mysql2
@@ -1797,6 +1801,7 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
+      - uses: ./.github/actions/activestorage-media-binaries
       - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: mysql2
@@ -1857,6 +1862,7 @@ jobs:
             CREATE USER IF NOT EXISTS 'rails'@'localhost';
             GRANT ALL PRIVILEGES ON *.* TO 'rails'@'localhost';
             FLUSH PRIVILEGES;"
+      - uses: ./.github/actions/activestorage-media-binaries
       - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/
         env:
           ARCONN: mysql2
