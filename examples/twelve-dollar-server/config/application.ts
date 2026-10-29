@@ -45,7 +45,7 @@ export class TwelveDollarServer extends Application {
       ETag,
       TempfileReaper,
     ]) {
-      this.config.middleware.delete(middleware as never);
+      this.config.middleware.delete(middleware);
     }
   }
 }
