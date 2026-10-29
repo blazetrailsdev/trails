@@ -695,13 +695,8 @@ describe("ImageProcessing::MiniMagick", () => {
   describe("#limits", () => {
     it("adds resource limits", async () => {
       const pipeline = MiniMagick.limits({ width: 1 }).source(portrait);
-      let exception: unknown;
-      await expect(
-        pipeline.call().catch((e: unknown) => {
-          exception = e;
-          throw e;
-        }),
-      ).rejects.toThrow(MiniMagickError);
+      const exception = await pipeline.call().catch((e: unknown) => e);
+      expect(exception).toBeInstanceOf(MiniMagickError);
       expect((exception as Error).message).toContain("limit");
     });
   });

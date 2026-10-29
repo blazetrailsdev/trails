@@ -134,13 +134,12 @@ class Processor extends BaseProcessor {
     }
     const {
       mask = null,
-      mode: modeOption = null,
       gravity = null,
       offset = null,
       args = null,
       ...options
     } = kwargs as Options;
-    let mode = modeOption;
+    let { mode = null } = kwargs as Options;
     if (overlay === ":none") return this.magick.composite();
 
     if (Object.hasOwn(options, "compose")) {
