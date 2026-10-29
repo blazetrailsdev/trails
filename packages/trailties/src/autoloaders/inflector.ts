@@ -1,13 +1,15 @@
 import { camelize } from "@blazetrails/activesupport";
 
-const overrides: Record<string, string> = {};
+const _overrides: Record<string, string> = {};
 
 export const Inflector = {
   camelize(basename: string, _abspath: string): string {
-    return (Object.hasOwn(overrides, basename) ? overrides[basename] : null) ?? camelize(basename);
+    return (
+      (Object.hasOwn(_overrides, basename) ? _overrides[basename] : null) ?? camelize(basename)
+    );
   },
 
-  inflect(newOverrides: Record<string, string>): void {
-    Object.assign(overrides, newOverrides);
+  inflect(overrides: Record<string, string>): void {
+    Object.assign(_overrides, overrides);
   },
 };
