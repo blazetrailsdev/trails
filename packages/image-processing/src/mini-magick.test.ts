@@ -44,6 +44,11 @@ describe("ImageProcessing::MiniMagick", () => {
     expect(magick.args).toContain("-thumbnail");
   });
 
+  it("accepts geometry", async () => {
+    const pipeline = MiniMagick.source(portrait);
+    await assertDimensions([300, 400], await pipeline.loader({ geometry: "400x400" }).call());
+  });
+
   it("auto orients by default", async () => {
     let result = await MiniMagick.call(fixtureImage("rotated.jpg"));
     await assertDimensions([600, 800], result);
