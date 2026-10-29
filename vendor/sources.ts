@@ -459,10 +459,8 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/rake",
         libEntryFile: "lib/rake.rb",
         testPath: "test",
-        // The port has not landed: there is no packages/rake workspace for
-        // the comparators to key on.
-        compareApi: false,
-        compareTests: false,
+        compareApi: true,
+        compareTests: true,
       },
     ],
   },

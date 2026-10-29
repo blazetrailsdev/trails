@@ -211,6 +211,7 @@ export const MANIFEST_PACKAGES = [
   "thor",
   "mail",
   "mini-mime",
+  "rake",
 ] as const;
 
 /**

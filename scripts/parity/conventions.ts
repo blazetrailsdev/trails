@@ -714,6 +714,53 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "`multitask` without a thread pool (tasks RFC 0211-rake-gem-port): Node's " +
+      "event loop already runs a `MultiTask`'s awaited prerequisites concurrently, " +
+      "so `Rake::ThreadPool` (thread_pool.rb), `Rake::Promise` (promise.rb), " +
+      "`Rake::CpuCounter` (cpu_counter.rb) and `Rake::ThreadHistoryDisplay` " +
+      "(thread_history_display.rb) are not ported. PERMANENT.",
+    names: [
+      "initialize",
+      "future",
+      "join",
+      "gather_history",
+      "history",
+      "statistics",
+      "process_queue_item",
+      "safe_thread_count",
+      "start_thread",
+      "stat",
+      "__queue__",
+      "recorder",
+      "recorder=",
+      "value",
+      "work",
+      "chore",
+      "result?",
+      "error?",
+      "complete?",
+      "discard",
+      "count",
+      "count_with_default",
+      "count_via_java_runtime",
+      "count_via_win32",
+      "count_via_cpuinfo",
+      "count_via_sysctl",
+      "run",
+      "resolve_command",
+      "look_for_command",
+      "in_path_command",
+      "stats",
+      "items",
+      "threads",
+      "show",
+      "rename",
+    ],
+    rubyFiles: ["thread_pool.rb", "promise.rb", "cpu_counter.rb", "thread_history_display.rb"],
+    packages: ["rake"],
+  },
+  {
+    reason:
       "`Integer#xchr` and `String#to_xs` (builder xchar.rb:161-198) are the " +
       "`else` arm of `if String.method_defined?(:encode)` (:97), a Ruby 1.8 " +
       "fallback that no Ruby since 1.9 loads. Scoped to builder's xchar.rb.",

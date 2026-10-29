@@ -941,6 +941,7 @@ jobs:
           packages/msgpack
           packages/nokogiri
           packages/raabro
+          packages/rake
           packages/ruby-compat
           packages/tzinfo
           packages/vitest-matchers
@@ -1184,6 +1185,7 @@ jobs:
           packages/rack
           packages/rack-session
           packages/rack-test
+          packages/rake
           packages/actionpack
           packages/actionview
           packages/trailties

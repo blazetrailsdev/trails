@@ -1,0 +1,30 @@
+{
+  "name": "@blazetrails/rake",
+  "version": "0.1.0",
+  "description": "Port of the rake gem: a make-like build utility",
+  "type": "module",
+  "main": "dist/rake.js",
+  "types": "dist/rake.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/rake.d.ts",
+      "default": "./dist/rake.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
