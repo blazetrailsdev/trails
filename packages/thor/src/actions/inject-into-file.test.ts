@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Dir, File, FileUtils, include, stdout } from "@blazetrails/ruby-compat";
-import { Actions, type ActionsHost } from "../actions.js";
-import { Group, type GroupClass } from "../group.js";
+import { Dir, File, FileUtils, stdout } from "@blazetrails/ruby-compat";
+import { type ActionsHost } from "../actions.js";
+import type { GroupClass } from "../group.js";
+import { MyCounter as MyCounterFixture } from "../test-helpers/fixtures/group.js";
 import { WARNINGS } from "./inject-into-file.js";
 
 let destinationRoot: string;
@@ -9,18 +10,8 @@ let destinationRoot: string;
 type CounterInstance = ActionsHost & {
   insertIntoFile(destination: string, ...args: unknown[]): Promise<unknown>;
 };
-type ActionsClass = Pick<GroupClass, "argument"> & {
-  addRuntimeOptionsBang(): void;
-} & (new (...args: unknown[]) => CounterInstance);
-const MyCounter = class MyCounter extends Group {
-  static {
-    const klass = this as unknown as ActionsClass;
-    include(this, Actions);
-    klass.addRuntimeOptionsBang();
-    klass.argument("first", { type: "numeric" });
-    klass.argument("second", { type: "numeric", default: 2 });
-  }
-} as unknown as ActionsClass;
+type ActionsClass = Pick<GroupClass, "argument"> & (new (...args: unknown[]) => CounterInstance);
+const MyCounter = MyCounterFixture as unknown as ActionsClass;
 
 async function capture(_stream: string, block: () => unknown): Promise<string> {
   let result = "";
