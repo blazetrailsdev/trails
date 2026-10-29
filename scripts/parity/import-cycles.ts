@@ -19,7 +19,7 @@
  *
  * Each such edge can throw `Cannot access 'X' before initialization` when the
  * graph is entered at the wrong module. `import-cycles-mark.json` lists every
- * edge allowed today, each converged by the story it names. The list only
+ * edge allowed today, keyed by its ends and the names it reads, each converged by the story it names. The list only
  * shrinks: an edge not on it reds the gate, a listed edge that no longer
  * exists reds it as stale, `--tighten` drops the stale rows, and there is no
  * reseed. `--list` prints every hazard with the names it reads and the line of
@@ -194,7 +194,6 @@ function isReference(id: ts.Identifier): boolean {
       ts.isFunctionExpression(p) ||
       ts.isClassDeclaration(p) ||
       ts.isClassExpression(p) ||
-      ts.isLabeledStatement(p) ||
       ts.isJsxAttribute(p)) &&
     p.name === id
   ) {
@@ -218,6 +217,25 @@ function declaresInStatements(statements: readonly ts.Statement[], text: string)
   );
 }
 
+/** Whether a `var` in `body`, outside any nested function, binds `text`. */
+function hoistsVar(body: ts.Node, text: string): boolean {
+  let found = false;
+  const visit = (n: ts.Node): void => {
+    if (found || ts.isFunctionLike(n)) return;
+    if (
+      ts.isVariableDeclarationList(n) &&
+      !(n.flags & ts.NodeFlags.BlockScoped) &&
+      n.declarations.some((d) => bindsName(d.name, text))
+    ) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(n, visit);
+  };
+  ts.forEachChild(body, visit);
+  return found;
+}
+
 /** Whether a declaration between `id` and the module scope binds its name. */
 function isShadowed(id: ts.Identifier): boolean {
   const text = id.text;
@@ -225,6 +243,7 @@ function isShadowed(id: ts.Identifier): boolean {
     const p = n.parent;
     if (ts.isFunctionLike(p)) {
       if (p.parameters.some((param) => bindsName(param.name, text))) return true;
+      if ("body" in p && p.body && hoistsVar(p.body, text)) return true;
       if ((ts.isFunctionExpression(p) || ts.isClassExpression(p)) && p.name?.text === text) {
         return true;
       }
@@ -477,7 +496,7 @@ export async function measureEdges(root = ROOT_DIR): Promise<Edge[]> {
 }
 
 export function edgeKey(e: Edge): string {
-  return `${e.from} -> ${e.to}`;
+  return `${e.from} -> ${e.to} [${e.evalNames.join(", ")}]`;
 }
 
 /** The listed edges that still exist; the list never gains a row. */
