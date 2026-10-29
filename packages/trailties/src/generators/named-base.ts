@@ -34,6 +34,7 @@ export class NamedBase extends GeneratorBase {
   /** @internal */
   private _insideTemplate: boolean | null = null;
   private _namespacedClassPath?: string[];
+  private _filePath?: string;
 
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
     super(args, localOptions, config);
@@ -103,13 +104,22 @@ export class NamedBase extends GeneratorBase {
   ): string {
     return camelize(`new_${this.singularRouteName()}_${type}`, "lower");
   }
-  filePath = (): string => [...this.classPath(), this.fileName].join("/");
+  filePath = (): string => (this._filePath ??= [...this.classPath(), this.fileName].join("/"));
+  /** @internal */
+  protected classPath = (): string[] =>
+    this.isInsideTemplate() || !this.isNamespaced()
+      ? this.regularClassPath()
+      : this.namespacedClassPath();
+  regularClassPath = (): string[] => this.classPathParts;
+  /** @internal */
+  protected namespacedClassPath = (): string[] =>
+    (this._namespacedClassPath ??= [...this.namespaceDirs(), ...this.classPathParts]);
   className = (): string => [...this.classPath(), this.fileName].map((s) => camelize(s)).join("::");
   i18nScope = (): string => this.filePath().replace(/\//g, ".");
   tableName = (): string =>
     (this._tableName ??= (() => {
       const base = this.isPluralizeTableNames() ? this.pluralName() : this.singularName();
-      return [...this.classPathParts, base].join("_");
+      return [...this.classPath(), base].join("_");
     })());
   singularTableName = (): string =>
     (this._singularTableName ??= this.isPluralizeTableNames()
@@ -182,22 +192,6 @@ export class NamedBase extends GeneratorBase {
   /** @internal */
   get fileName(): string {
     return this._fileName;
-  }
-
-  /** @internal */
-  protected classPath(): string[] {
-    return this.isInsideTemplate() || !this.isNamespaced()
-      ? this.regularClassPath()
-      : this.namespacedClassPath();
-  }
-
-  regularClassPath(): string[] {
-    return this.classPathParts;
-  }
-
-  /** @internal */
-  protected namespacedClassPath(): string[] {
-    return (this._namespacedClassPath ??= [...this.namespaceDirs(), ...this.classPathParts]);
   }
 
   attributesNames(): string[] {
