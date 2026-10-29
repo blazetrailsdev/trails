@@ -28,7 +28,7 @@ export function directory(this: ActionsHost, source: string, ...args: unknown[])
 export class Directory extends EmptyDirectory {
   source: Promise<string>;
   /** @internal */
-  private block: Block | undefined;
+  private _block: Block | undefined;
 
   constructor(
     base: DirectoryBase,
@@ -44,7 +44,7 @@ export class Directory extends EmptyDirectory {
     resolved.catch(() => {});
     super(base, destination, { recursive: true, ...config });
     this.source = resolved;
-    this.block = block;
+    this._block = block;
   }
 
   override async invokeBang(): Promise<unknown> {
@@ -84,14 +84,14 @@ export class Directory extends EmptyDirectory {
           fileSource,
           fileDestination.slice(0, -3),
           this.config,
-          ...(this.block ? [this.block] : []),
+          ...(this._block ? [this._block] : []),
         );
       } else {
         await (this.base as DirectoryBase).copyFile(
           fileSource,
           fileDestination,
           this.config,
-          ...(this.block ? [this.block] : []),
+          ...(this._block ? [this._block] : []),
         );
       }
     }
