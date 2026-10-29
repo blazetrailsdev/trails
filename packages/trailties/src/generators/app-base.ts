@@ -31,7 +31,6 @@ export type AppBaseOptions = GeneratorOptions & {
 };
 
 const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
-  skipActionCable: true,
   skipActionMailer: true,
   skipActiveStorage: true,
 };
@@ -154,6 +153,44 @@ export abstract class AppBase extends GeneratorBase {
   get database(): Database {
     if (!this._database) this._database = Database.build(this.options.database ?? "sqlite3");
     return this._database;
+  }
+
+  private _requiredRailties?: Record<string, boolean>;
+
+  /** @internal */
+  requiredRailties(): Record<string, boolean> {
+    return (this._requiredRailties ??= {
+      "@blazetrails/trailties/trailties/active-model": true,
+      "@blazetrails/trailties/trailties/active-job": !this.options.skipActiveJob,
+      "@blazetrails/trailties/trailties/active-record": !this.options.skipActiveRecord,
+      "@blazetrails/trailties/trailties/active-storage": !this.options.skipActiveStorage,
+      "@blazetrails/trailties/trailties/action-controller": true,
+      "@blazetrails/trailties/trailties/action-mailer": !this.options.skipActionMailer,
+      "@blazetrails/trailties/trailties/action-mailbox": !this.options.skipActionMailbox,
+      "@blazetrails/trailties/trailties/action-text": !this.options.skipActionText,
+      "@blazetrails/trailties/trailties/action-view": true,
+      "@blazetrails/trailties/trailties/action-cable": !this.options.skipActionCable,
+      "@blazetrails/trailties/test-unit/trailtie": !this.options.skipTest,
+    });
+  }
+
+  includeAllRailties(): boolean {
+    return Object.values(this.requiredRailties()).every((required) => required);
+  }
+
+  /** @internal */
+  railsRequireStatement(): string {
+    if (this.includeAllRailties()) {
+      return `import "@blazetrails/trailties/all";`;
+    } else {
+      const requireStatements = Object.entries(this.requiredRailties()).map(
+        ([railtie, required]) => `${!required ? "// " : ""}import "${railtie}";`,
+      );
+
+      return `import "@blazetrails/trailties/rails";
+// Pick the frameworks you want:
+${requireStatements.join("\n")}`;
+    }
   }
 
   skip(what: Skip): boolean {

@@ -48,13 +48,6 @@ export class ApplicationRecord extends Base {
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > channel.ts 1`] = `
-"export class Channel {
-
-}
-"
-`;
-
 exports[`AppGenerator > snapshots emitted TypeScript sources > config.ts 1`] = `
 "// This file is used by Rack-based servers to start the application.
 import { Trails } from "@blazetrails/trailties";
@@ -70,7 +63,6 @@ await Trails.application.loadServer();
 exports[`AppGenerator > snapshots emitted TypeScript sources > config/application.ts 1`] = `
 "import { Application } from "@blazetrails/trailties";
 
-// Load the framework trailties this application uses.
 import "@blazetrails/trailties/all";
 
 export class MyApp extends Application {
@@ -108,7 +100,8 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > config/cable.ts 1
   },
   production: {
     adapter: "redis",
-    url: process.env.REDIS_URL || "redis://localhost:6379/1",
+    url: process.env.REDIS_URL ?? "redis://localhost:6379/1",
+    channelPrefix: "my_app_production",
   },
 };
 "
@@ -143,13 +136,6 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > config/storage.ts
     root: "tmp/storage",
   },
 };
-"
-`;
-
-exports[`AppGenerator > snapshots emitted TypeScript sources > connection.ts 1`] = `
-"export class Connection {
-
-}
 "
 `;
 

@@ -13,6 +13,18 @@
       "default": "./dist/server/index.js"
     },
     "./all": "./dist/all.js",
+    "./rails": {
+      "types": "./dist/rails.d.ts",
+      "default": "./dist/rails.js"
+    },
+    "./trailties/*": {
+      "types": "./dist/trailties/*.d.ts",
+      "default": "./dist/trailties/*.js"
+    },
+    "./test-unit/trailtie": {
+      "types": "./dist/test-unit/trailtie.d.ts",
+      "default": "./dist/test-unit/trailtie.js"
+    },
     "./app-path": {
       "types": "./dist/app-path.d.ts",
       "default": "./dist/app-path.js"

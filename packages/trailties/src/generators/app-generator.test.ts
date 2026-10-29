@@ -132,7 +132,6 @@ describe("AppGenerator", () => {
     await makeGen().invokeAll();
 
     expect(exists("config/puma.ts")).toBe(false);
-    expect(exists("config/cable.ts")).toBe(false);
     expect(exists("config/storage.ts")).toBe(false);
     expect(exists("app/mailers")).toBe(false);
     expect(exists("app/channels")).toBe(false);
@@ -176,11 +175,25 @@ describe("AppGenerator", () => {
     expect(exists("config/storage.ts")).toBe(true);
     expect(exists("app/jobs/application-job.ts")).toBe(true);
     expect(exists("app/mailers/application-mailer.ts")).toBe(true);
-    expect(exists("app/channels/application-cable/connection.ts")).toBe(true);
-    expect(exists("app/channels/application-cable/channel.ts")).toBe(true);
     expect(exists("app/views/layouts/mailer.html.tse")).toBe(true);
     expect(exists("app/views/layouts/mailer.text.tse")).toBe(true);
     expect(exists("storage/.gitkeep")).toBe(true);
+  });
+
+  it("generator if skip action cable is given", async () => {
+    await makeGen("sqlite", { skipActionCable: true }).invokeAll();
+    await assertFile("my-app/config/application.ts", (content) => {
+      expect(content).toMatch(
+        /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/action-cable";/m,
+      );
+    });
+    expect(exists("config/cable.ts")).toBe(false);
+    await assertFile("my-app/package.json", (content) => {
+      assertNoMatch(/@blazetrails\/actioncable/, content);
+    });
+    await assertFile("my-app/config/environments/development.ts", (content) => {
+      assertNoMatch(/actionCable/, content);
+    });
   });
 
   it("skip active job option", async () => {
@@ -501,8 +514,6 @@ describe("AppGenerator", () => {
     expect(read("app/helpers/application-helper.ts")).toMatchSnapshot("application-helper.ts");
     expect(read("app/jobs/application-job.ts")).toMatchSnapshot("application-job.ts");
     expect(read("app/mailers/application-mailer.ts")).toMatchSnapshot("application-mailer.ts");
-    expect(read("app/channels/application-cable/connection.ts")).toMatchSnapshot("connection.ts");
-    expect(read("app/channels/application-cable/channel.ts")).toMatchSnapshot("channel.ts");
     expect(read("config/application.ts")).toMatchSnapshot("config/application.ts");
     expect(read("config/routes.ts")).toMatchSnapshot("config/routes.ts");
     expect(read("config/cable.ts")).toMatchSnapshot("config/cable.ts");

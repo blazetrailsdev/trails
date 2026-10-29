@@ -45,7 +45,40 @@ export class StreamEventLoop {
   }
 
   attach(io: Io, stream: Stream): void {
-    this._map.set(io, { value: null!, interests: "r" });
+    const selectWritable = (monitor: Monitor) => {
+      void (async () => {
+        while (!this._stopping && this._map.get(io) === monitor && monitor.interests === "rw") {
+          let stream: Stream | null = null;
+          try {
+            await io.waitWritable();
+            if (this._map.get(io) !== monitor) break;
+            stream = monitor.value;
+
+            if (stream.flushWriteBuffer()) {
+              monitor.interests = "r";
+            }
+          } catch {
+            try {
+              (stream ?? monitor.value).close();
+            } catch {
+              this._map.delete(io);
+            }
+          }
+        }
+      })();
+    };
+    let interests: "r" | "rw" = "r";
+    this._map.set(io, {
+      value: null!,
+      get interests() {
+        return interests;
+      },
+      set interests(value) {
+        const selectingWritable = interests === "rw";
+        interests = value;
+        if (value === "rw" && !selectingWritable) selectWritable(this);
+      },
+    });
     this._map.get(io)!.value = stream;
     const monitor = this._map.get(io)!;
     void (async () => {
@@ -83,29 +116,7 @@ export class StreamEventLoop {
   writesPending(io: Io): void {
     const monitor = this._map.get(io);
     if (monitor != null) {
-      const selectingWritable = monitor.interests === "rw";
       monitor.interests = "rw";
-      if (selectingWritable) return;
-      void (async () => {
-        while (!this._stopping && this._map.get(io) === monitor && monitor.interests === "rw") {
-          let stream: Stream | null = null;
-          try {
-            await io.waitWritable();
-            if (this._map.get(io) !== monitor) break;
-            stream = monitor.value;
-
-            if (stream.flushWriteBuffer()) {
-              monitor.interests = "r";
-            }
-          } catch {
-            try {
-              (stream ?? monitor.value).close();
-            } catch {
-              this._map.delete(io);
-            }
-          }
-        }
-      })();
     }
   }
 

@@ -103,6 +103,10 @@ export class Stream {
     }
   }
 
+  /**
+   * @missingRailsArgs pop — PERMANENT
+   * @missingRailsName writeHead — PERMANENT
+   */
   flushWriteBuffer(): boolean {
     return this._writeLock.synchronize(() => {
       for (;;) {

@@ -242,6 +242,7 @@ export class AppGenerator extends AppBase {
               "@blazetrails/actionview",
               "@blazetrails/trailties",
               ...(this.skip("ActiveJob") ? [] : ["@blazetrails/activejob"]),
+              ...(this.skip("ActionCable") ? [] : ["@blazetrails/actioncable"]),
             ]),
             ...dbDep,
           },
@@ -568,8 +569,7 @@ process.exit(status ?? 1);
       "config/application.ts",
       `import { Application } from "@blazetrails/trailties";
 
-// Load the framework trailties this application uses.
-import "@blazetrails/trailties/all";
+${this.railsRequireStatement()}
 
 export class ${this.appConstBase()} extends Application {
   static {
@@ -641,7 +641,8 @@ Trails.application.routes().draw(function () {
   },
   production: {
     adapter: "redis",
-    url: process.env.REDIS_URL || "redis://localhost:6379/1",
+    url: process.env.REDIS_URL ?? "redis://localhost:6379/1",
+    channelPrefix: "${this.appName()}_production",
   },
 };
 `,
@@ -1088,18 +1089,6 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
             }),
           ],
         }),
-      );
-    }
-
-    if (!this.skip("ActionCable")) {
-      await this.createFile(
-        "app/channels/application-cable/connection.ts",
-        tsModule({ declarations: [tsClass({ name: "Connection", body: [] })] }),
-      );
-
-      await this.createFile(
-        "app/channels/application-cable/channel.ts",
-        tsModule({ declarations: [tsClass({ name: "Channel", body: [] })] }),
       );
     }
 
