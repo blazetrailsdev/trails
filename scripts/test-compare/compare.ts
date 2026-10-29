@@ -177,9 +177,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   }
 
   if (pkg === "mail") {
-    // Specs are reported relative to `spec`, so each repeats the gem's
-    // `lib/mail` root as a leading `mail/`; drop it so
-    // `mail/encodings/base64_spec.rb` lands on `encodings/base64.test.ts`.
+    // Specs repeat the gem's `lib/mail` root as a leading `mail/`; drop it.
     const rest = rubyFile.replace(/^mail\//, "");
     const dir = path.dirname(rest).replace(/_/g, "-");
     const tsFile =

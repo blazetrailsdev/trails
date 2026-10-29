@@ -176,10 +176,7 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // @blazetrails/ruby-compat exports it as `pack(ary, fmt)` and the Ruby
   // receiver is TS argument 1.
   "pack",
-  // Ruby core `String#unpack` (`vendor/ruby/v3.3.11/pack.c:1611`) —
-  // `str.unpack("M*").first` (vendor/mail/2.8.1/lib/mail/encodings/quoted_printable.rb:19).
-  // `pack`'s twin: @blazetrails/ruby-compat exports it as `unpack(str, fmt)`
-  // and the Ruby receiver is TS argument 1.
+  // Ruby core `String#unpack` (`vendor/ruby/v3.3.11/pack.c:1611`), `pack`'s twin.
   "unpack",
   // Ruby core `Enumerable#min` in its no-argument receiver form —
   // `[limit_value, count].compact.min`. JS's `Math.min(...values)` takes the
