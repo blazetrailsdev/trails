@@ -1,5 +1,6 @@
 import { include, type Included } from "@blazetrails/ruby-compat";
 import { Chainable, chainableProxy, type Options } from "./chainable.js";
+import { ImageProcessing } from "./namespaces.js";
 import { Pipeline } from "./pipeline.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -42,3 +43,4 @@ export class Builder {
 }
 
 include(Builder, Chainable);
+ImageProcessing.Builder = Builder;
