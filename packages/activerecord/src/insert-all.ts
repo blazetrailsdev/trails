@@ -221,7 +221,7 @@ export class InsertAll {
 
       return new Enumerable(this.keysIncludingTimestamps()).map<string, T>((key) =>
         block(key, attributes[key]),
-      ) as T[];
+      );
     });
   }
 

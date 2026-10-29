@@ -133,19 +133,19 @@ export function pluck<T, K extends keyof T>(
   if (many(keys)) {
     return map(collection, (element) =>
       keys.map((key) => hashAref(element as object, key) as T[K]),
-    ) as T[K][][];
+    );
   } else {
     const key = keys[0];
-    return map(collection, (element) => hashAref(element as object, key) as T[K]) as T[K][];
+    return map(collection, (element) => hashAref(element as object, key) as T[K]);
   }
 }
 
 export function maximum<T, R>(collection: Iterable<T> | Each<T>, key: (item: T) => R): R | null {
-  return max(map(collection, key) as R[]);
+  return max(map(collection, key));
 }
 
 export function minimum<T, R>(collection: Iterable<T> | Each<T>, key: (item: T) => R): R | null {
-  return min(map(collection, key) as R[]);
+  return min(map(collection, key));
 }
 
 export function compactBlank<T>(collection: Iterable<T> | Each<T>): T[] {
