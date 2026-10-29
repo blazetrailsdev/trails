@@ -37,3 +37,15 @@ The same as the Rails app:
 - **Pragmas**: WAL, `synchronous=NORMAL`, `foreign_keys=ON`, plus 512 MiB `mmap_size` and a 64 MiB page
   cache, from `config/database.ts`.
 - **Unused middleware removed** in `config/application.ts`, the same list as the Rails app.
+
+## Local measurement
+
+One core, against the Rails app this ports, on the same machine (2026-10-28). Each server was pinned to
+one core with `taskset -c 3` and started from a fresh seed copy, and passed `test/test.sh` (42/42) first.
+`ab -k -c 16 -n 10000` ran on four other cores, after a 5,000-request warm-up per path. Each figure is
+the mean of three runs. CPU µs/req is 1,000,000 / req/s, since the pinned core was saturated.
+
+|                                                        | `GET /posts/250000`      | `GET /feed`              |
+| ------------------------------------------------------ | ------------------------ | ------------------------ |
+| Rails 8.1.4, Ruby 4.0.5 + YJIT, Puma 8.0.2 (3 threads) | 1,180 req/s, ~850 µs/req | 946 req/s, ~1,060 µs/req |
+| trails, Node.js 24.21.0                                | 527 req/s, ~1,900 µs/req | 406 req/s, ~2,460 µs/req |
