@@ -799,6 +799,16 @@ describe("rbProcCall", () => {
     expect(rbProcCall(app, "bob")).toBe("hi bob");
   });
 
+  it("calls a class's static call with the class as self", () => {
+    class Endpoint {
+      static greeting = "hi ";
+      static call(name: string) {
+        return this.greeting + name;
+      }
+    }
+    expect(rbProcCall(Endpoint, "bob")).toBe("hi bob");
+  });
+
   it("sends call to a receiver without one, reaching method_missing", () => {
     const ghost = {
       methodMissing(name: string, ...args: unknown[]) {
