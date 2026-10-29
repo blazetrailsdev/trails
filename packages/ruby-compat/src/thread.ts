@@ -26,6 +26,7 @@ let _current: AsyncContext<Thread> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
 let _threadIdCounter = 0;
 const _threads = new Set<Thread>();
+/** @perf 3x — PERMANENT */
 const _locations = new WeakMap<object, Error>();
 
 /** @perf 2x — PERMANENT */
@@ -42,12 +43,6 @@ function _creationFrame(): Error {
   return error;
 }
 
-/** @perf 3x — PERMANENT */
-function _location(error: Error): string | null {
-  const frame = error.stack?.split("\n")[3] ?? "";
-  const location = /\(?((?:file:\/\/)?[^\s()]+):(\d+):\d+\)?$/.exec(frame);
-  return location ? `${location[1]}:${location[2]}` : null;
-}
 const _wakeups = new WeakMap<object, (() => void) | true>();
 const _locals = new WeakMap<object, Map<string, unknown>>();
 const _variables = new WeakMap<object, Map<string, unknown>>();
@@ -391,9 +386,9 @@ export class Thread<R = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#to_s` (`vendor/ruby/v3.3.11/thread.c:3473`).
    */
   toString(): string {
-    const frame = _locations.get(this);
-    const at = frame ? _location(frame) : null;
-    const location = at != null ? ` ${at}` : "";
+    const frame = _locations.get(this)?.stack?.split("\n")[3] ?? "";
+    const at = /\(?((?:file:\/\/)?[^\s()]+):(\d+):\d+\)?$/.exec(frame);
+    const location = at ? ` ${at[1]}:${at[2]}` : "";
     const name = this.name != null ? `@${this.name}` : "";
     const cname = this.constructor.name;
     return `#<${cname}:0x${this.id.toString(16).padStart(16, "0")}${name}${location} ${this.status}>`;

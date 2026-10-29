@@ -23,4 +23,24 @@ describe("Thread (trails)", () => {
       Error.stackTraceLimit = limit;
     }
   });
+
+  it("formats the creation frame only when to_s reads it", () => {
+    const v8 = Error as { prepareStackTrace?: (error: Error, frames: unknown[]) => unknown };
+    const prepare = v8.prepareStackTrace;
+    let calls = 0;
+    v8.prepareStackTrace = (error, frames) => {
+      calls++;
+      return prepare
+        ? prepare(error, frames)
+        : `${String(error)}\n${frames.map((f) => `    at ${String(f)}`).join("\n")}`;
+    };
+    try {
+      const thread = spawn();
+      expect(calls).toBe(0);
+      expect(String(thread)).toMatch(/thread\.trails\.test\.ts:5 dead>$/);
+      expect(calls).toBe(1);
+    } finally {
+      v8.prepareStackTrace = prepare;
+    }
+  });
 });
