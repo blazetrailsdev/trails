@@ -30,12 +30,13 @@ const _locations = new WeakMap<object, string>();
 
 /** @perf 2x — PERMANENT */
 function _creationFrame(): string {
-  const limit = Error.stackTraceLimit;
-  Error.stackTraceLimit = 3;
+  const v8 = Error as { stackTraceLimit?: number };
+  const limit = v8.stackTraceLimit;
+  v8.stackTraceLimit = 3;
   try {
     return new Error().stack?.split("\n")[3] ?? "";
   } finally {
-    Error.stackTraceLimit = limit;
+    v8.stackTraceLimit = limit;
   }
 }
 const _wakeups = new WeakMap<object, (() => void) | true>();
