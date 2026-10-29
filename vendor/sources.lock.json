@@ -124,6 +124,10 @@
       "ref": "v1.6.2",
       "sha": "9160d49020b57828ea536ffedc9cac8fef98ee59"
     },
+    "rake": {
+      "ref": "v13.2.1",
+      "sha": "d84f6ef7f3540a1d0e95fabe451ea3a16157791b"
+    },
     "ruby": {
       "ref": "v3_3_11",
       "sha": "1f2d15125a2dc701e1822ed2900eb17899500ec7"

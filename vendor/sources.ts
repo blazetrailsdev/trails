@@ -446,6 +446,24 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "rake",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby/rake.git",
+      ref: "v13.2.1",
+    },
+    packages: [
+      {
+        name: "rake",
+        libPath: "lib/rake",
+        libEntryFile: "lib/rake.rb",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "thor",
     origin: {
       type: "git",
