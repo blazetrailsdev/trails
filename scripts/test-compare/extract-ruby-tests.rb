@@ -2813,6 +2813,9 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
   if pkg_name == "activerecord"
     arel_dir = File.join(pkg_dir, "arel")
     test_files.reject! { |f| f.start_with?(arel_dir) }
+    # `test/activejob/` sits beside `test/cases/` and is recorded as
+    # `../activejob/<file>`; rubyToConventionTs strips that prefix.
+    test_files.concat(Dir.glob(File.join(pkg_dir, "..", "activejob", "*_test.rb")))
   end
 
   if pkg_name == "actiondispatch"
