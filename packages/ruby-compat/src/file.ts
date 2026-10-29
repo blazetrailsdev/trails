@@ -320,7 +320,8 @@ export class File extends IO {
   }
 
   /**
-   * {@link File.isDirectory} over the backend's async `stat`.
+   * {@link File.isDirectory} over the backend's async `stat`: any failed stat
+   * answers `false`, as `rb_file_directory_p` does (`file.c:1622`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.directory?`
    * (`vendor/ruby/v3.3.11/file.c:1615`).

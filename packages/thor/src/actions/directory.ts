@@ -19,16 +19,16 @@ export function directory(this: ActionsHost, source: string, ...args: unknown[])
     string,
     unknown
   >;
-  const destination = (args[0] as string | undefined) || source;
+  const destination = (args[0] as string | undefined) ?? source;
   return this.action(
-    new Directory(this as DirectoryBase, source, destination || source, config, block),
+    new Directory(this as DirectoryBase, source, destination ?? source, config, block),
   );
 }
 
 export class Directory extends EmptyDirectory {
   source: Promise<string>;
   /** @internal */
-  private _block: Block | undefined;
+  private block: Block | undefined;
 
   constructor(
     base: DirectoryBase,
@@ -44,7 +44,7 @@ export class Directory extends EmptyDirectory {
     resolved.catch(() => {});
     super(base, destination, { recursive: true, ...config });
     this.source = resolved;
-    this._block = block;
+    this.block = block;
   }
 
   override async invokeBang(): Promise<unknown> {
@@ -64,7 +64,7 @@ export class Directory extends EmptyDirectory {
   protected async executeBang(): Promise<unknown> {
     const source = await this.source;
     let lookup = escapeGlobs(source);
-    lookup = this.config["recursive"] ? File.join(lookup, "**") : lookup;
+    lookup = rtest(this.config["recursive"]) ? File.join(lookup, "**") : lookup;
     lookup = this.fileLevelLookup(lookup);
 
     const files = sort(await this.files(lookup));
@@ -84,14 +84,14 @@ export class Directory extends EmptyDirectory {
           fileSource,
           fileDestination.slice(0, -3),
           this.config,
-          ...(this._block ? [this._block] : []),
+          ...(this.block ? [this.block] : []),
         );
       } else {
         await (this.base as DirectoryBase).copyFile(
           fileSource,
           fileDestination,
           this.config,
-          ...(this._block ? [this._block] : []),
+          ...(this.block ? [this.block] : []),
         );
       }
     }
