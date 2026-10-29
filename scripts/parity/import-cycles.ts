@@ -277,6 +277,14 @@ function isShadowed(id: ts.Identifier): boolean {
   return false;
 }
 
+/** Whether a function or arrow expression is called where it is written. */
+function isInvokedInPlace(fn: ts.Node): boolean {
+  if (!ts.isFunctionExpression(fn) && !ts.isArrowFunction(fn)) return false;
+  let callee: ts.Node = fn;
+  while (ts.isParenthesizedExpression(callee.parent)) callee = callee.parent;
+  return ts.isCallExpression(callee.parent) && callee.parent.expression === callee;
+}
+
 /** Whether a read at `node` runs while the module body is evaluated. */
 function isModuleEvalTime(node: ts.Node): boolean {
   for (let n: ts.Node = node; n.parent; n = n.parent) {
@@ -292,6 +300,7 @@ function isModuleEvalTime(node: ts.Node): boolean {
     ) {
       if ("name" in p && p.name === n) continue;
       if (ts.isDecorator(n)) continue;
+      if (isInvokedInPlace(p)) continue;
       return false;
     }
     if (ts.isPropertyDeclaration(p) && p.initializer === n) {

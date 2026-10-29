@@ -102,6 +102,13 @@ describe("import-cycles scanFile", () => {
   it("does not read a label spelled like an import as the import", () => {
     expect(scanA([IMPORT_B, "B: { break B; }"])).toEqual([]);
   });
+
+  it("counts a read inside a function invoked where it is written", () => {
+    const [e] = scanA([IMPORT_B, "const x = (() => B)();"]);
+    expect([...e.evalNames]).toEqual(["B"]);
+    const [f] = scanA([IMPORT_B, "const y = () => B;"]);
+    expect([...f.evalNames]).toEqual([]);
+  });
 });
 
 describe("import-cycles makeResolver", () => {
