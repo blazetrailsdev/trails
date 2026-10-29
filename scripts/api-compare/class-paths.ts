@@ -312,6 +312,82 @@ async function checkSeatedPaths(dir: string): Promise<void> {
   }
 }
 
+/**
+ * ruby-compat's core classes, which have no Rails counterpart in
+ * `rails-api.json`: each row is `[path, file, binding, MRI site]`, the site
+ * the `Init_*` `rb_define_class` (or `boot_defclass`) call that names the
+ * class, relative to `vendor/ruby/<version>/`. `file` is null for a JS
+ * global standing in for the class.
+ */
+export const CORE_CLASSES: readonly [string, string | null, string, string][] = [
+  ["ArgumentError", "argument-error.ts", "ArgumentError", "error.c:3323"],
+  ["Array", null, "Array", "array.c:8605"],
+  ["BasicObject", "object.ts", "rbCBasicObject", "class.c:893"],
+  ["EOFError", "eof-error.ts", "EOFError", "io.c:15343"],
+  ["EncodingError", "encoding-error.ts", "EncodingError", "error.c:3371"],
+  ["Exception", "exception.ts", "Exception", "error.c:3294"],
+  ["FiberError", "fiber-error.ts", "FiberError", "cont.c:3532"],
+  ["FloatDomainError", "float-domain-error.ts", "FloatDomainError", "numeric.c:6155"],
+  ["FrozenError", "frozen-error.ts", "FrozenError", "error.c:3366"],
+  ["Hash", "hash.ts", "Hash", "hash.c:7182"],
+  ["IOError", "io-error.ts", "IOError", "io.c:15342"],
+  ["IndexError", "index-error.ts", "IndexError", "error.c:3324"],
+  ["Interrupt", "signal-exception.ts", "Interrupt", "error.c:3319"],
+  ["KeyError", "key-error.ts", "KeyError", "error.c:3325"],
+  ["LoadError", "load-error.ts", "LoadError", "error.c:3342"],
+  ["LocalJumpError", "local-jump-error.ts", "LocalJumpError", "proc.c:4326"],
+  ["NameError", "name-error.ts", "NameError", "error.c:3348"],
+  ["NoMethodError", "no-method-error.ts", "NoMethodError", "error.c:3360"],
+  ["NotImplementedError", "not-implemented-error.ts", "NotImplementedError", "error.c:3346"],
+  ["Object", null, "Object", "class.c:894"],
+  ["Range", "range.ts", "Range", "range.c:2636"],
+  ["RangeError", "range-error.ts", "RangeError", "error.c:3329"],
+  ["Rational", "rational.ts", "Rational", "rational.c:2759"],
+  ["Regexp", null, "RegExp", "re.c:4752"],
+  ["RuntimeError", "runtime-error.ts", "RuntimeError", "error.c:3365"],
+  ["SignalException", "signal-exception.ts", "SignalException", "error.c:3318"],
+  ["StandardError", "standard-error.ts", "StandardError", "error.c:3321"],
+  ["StopIteration", "stop-iteration.ts", "StopIteration", "enumerator.c:4578"],
+  ["Struct", "struct.ts", "Struct", "struct.c:2176"],
+  ["Symbol", "object.ts", "rbCSymbol", "string.c:12290"],
+  ["SystemCallError", "errno.ts", "SystemCallError", "error.c:3380"],
+  ["ThreadError", "thread-error.ts", "ThreadError", "thread.c:5451"],
+  ["TypeError", "type-error.ts", "TypeError", "error.c:3322"],
+  ["ZeroDivisionError", "rational.ts", "ZeroDivisionError", "numeric.c:6154"],
+];
+
+/** Reds a `CORE_CLASSES` row whose MRI site does not name its class. */
+async function checkCoreSites(): Promise<string[]> {
+  const ruby = path.join(ROOT_DIR, "vendor/ruby/v3.3.11");
+  const bad: string[] = [];
+  for (const [fqn, , , site] of CORE_CLASSES) {
+    const [file, line] = site.split(":");
+    const source = await fs.readFile(path.join(ruby, file), "utf8").catch(() => null);
+    if (source === null) continue;
+    if (!source.split("\n")[Number(line) - 1]?.includes(`"${fqn}"`)) bad.push(`${fqn} ${site}`);
+  }
+  return bad;
+}
+
+export function renderCoreClassPaths(): string {
+  const files = [...new Set(CORE_CLASSES.flatMap(([, file]) => (file ? [file] : [])))].sort();
+  const alias = new Map(files.map((file, i) => [file, `m${i}`]));
+  return [
+    'import { registerClassPaths } from "./classpath.js";',
+    ...files.map(
+      (file) => `import * as ${alias.get(file)} from "./${file.replace(/\.ts$/, ".js")}";`,
+    ),
+    "",
+    "registerClassPaths([",
+    ...CORE_CLASSES.map(
+      ([fqn, file, binding]) =>
+        `  [() => ${file ? `${alias.get(file)}.` : ""}${binding}, ${JSON.stringify(fqn)}],`,
+    ),
+    "]);",
+    "",
+  ].join("\n");
+}
+
 async function main(): Promise<void> {
   const check = process.argv.includes("--check");
   const at = process.argv.indexOf("--package");
@@ -322,6 +398,21 @@ async function main(): Promise<void> {
     [dir, GENERATED, entries.filter((e) => !e.excluded)] as const,
     [dir, EXCLUDED_GENERATED, entries.filter((e) => e.excluded)] as const,
   ]);
+  if (only === undefined || only === "ruby-compat") {
+    const target = path.join(ROOT_DIR, "packages/ruby-compat/src", GENERATED);
+    const next = await prettier.format(renderCoreClassPaths(), {
+      ...(await prettier.resolveConfig(target)),
+      filepath: target,
+    });
+    if ((await fs.readFile(target, "utf8").catch(() => null)) !== next) {
+      if (check) stale.push(path.relative(ROOT_DIR, target));
+      else await fs.writeFile(target, next);
+    }
+    for (const row of await checkCoreSites()) {
+      console.error(`CORE_CLASSES row's MRI site does not define the class: ${row}`);
+      process.exitCode = 1;
+    }
+  }
   for (const [dir, table, entries] of targets) {
     const target = path.join(ROOT_DIR, "packages", dir, "src", table);
     if (entries.length === 0) {

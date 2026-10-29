@@ -75,7 +75,7 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
 
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
   await loadControllers(this.paths());
-  registerModel(await loadModels(this.paths()));
+  await loadModels(this.paths());
   await loadJobs(this.paths());
   await loadChannels(this.paths());
 });
@@ -316,19 +316,26 @@ async function collectAppClasses<T extends abstract new (...args: never[]) => un
 }
 
 /** @noRailsEquivalent PERMANENT */
-async function loadModels(paths: Root): Promise<(typeof Base)[]> {
-  const out: (typeof Base)[] = [];
+async function loadModels(paths: Root): Promise<void> {
   const node = paths.get("app/models");
-  if (!node) return out;
+  if (!node) return;
 
+  const out: [string, typeof Base][] = [];
   for (const dir of await node.existentDirectories()) {
-    await collectModels(dir, true, out);
+    await collectModels(dir, "", out);
   }
-  return out;
+  for (const [prefix, model] of out) {
+    if (prefix) registerModel(`${prefix}${model.name}`, model);
+    else registerModel(model);
+  }
 }
 
 /** @internal */
-async function collectModels(dir: string, root: boolean, out: (typeof Base)[]): Promise<void> {
+async function collectModels(
+  dir: string,
+  prefix: string,
+  out: [string, typeof Base][],
+): Promise<void> {
   const fs = getFs();
   const p = getPath();
   if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
@@ -336,8 +343,10 @@ async function collectModels(dir: string, root: boolean, out: (typeof Base)[]): 
   for (const entry of await fs.readdir(dir)) {
     const full = p.join(dir, entry);
     if ((await fs.stat(full)).isDirectory()) {
-      if (root && entry === "concerns") continue;
-      await collectModels(full, false, out);
+      if (prefix === "" && entry === "concerns") continue;
+      const namespace = `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}`;
+      if (!isRegisteredConstant(namespace)) registerConstant(namespace, {});
+      await collectModels(full, `${namespace}::`, out);
       continue;
     }
     if (!/\.(?:ts|js)$/.test(entry) || /\.d\.ts$/.test(entry)) continue;
@@ -346,9 +355,9 @@ async function collectModels(dir: string, root: boolean, out: (typeof Base)[]): 
       if (
         typeof value === "function" &&
         value.prototype instanceof Base &&
-        !out.includes(value as typeof Base)
+        !out.some(([, model]) => model === value)
       ) {
-        out.push(value as typeof Base);
+        out.push([prefix, value as typeof Base]);
       }
     }
   }

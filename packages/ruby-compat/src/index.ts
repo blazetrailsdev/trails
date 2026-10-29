@@ -510,4 +510,5 @@ export {
 
 import { Kernel } from "./include.js";
 import { kernelRand } from "./kernel-rand.js";
+import "./class-paths.generated.js";
 Kernel.rand = kernelRand;
