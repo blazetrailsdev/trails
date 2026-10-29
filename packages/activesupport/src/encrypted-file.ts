@@ -124,7 +124,6 @@ export class EncryptedFile {
     await this.writing(await this.readOrEmpty(), block);
   }
 
-  /** @missingRailsArgs chomp — PERMANENT */
   private async writing(
     contents: string,
     block: (tmpPath: string) => void | Promise<void>,

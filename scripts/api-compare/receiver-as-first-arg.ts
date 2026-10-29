@@ -39,6 +39,11 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   "to_sym",
   "strip",
   "rstrip",
+  // Ruby core `String#chomp` (`vendor/ruby/v3.3.11/string.c:9786`) and
+  // `String#force_encoding` (`:10922`), exported by @blazetrails/ruby-compat as
+  // `chomp(str)` / `forceEncoding(str, enc)`.
+  "chomp",
+  "force_encoding",
   "round",
   "tr",
   "each_with_index",

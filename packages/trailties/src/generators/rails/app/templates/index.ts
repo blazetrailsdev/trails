@@ -1,4 +1,4 @@
-import type { Database } from "../../database.js";
+import type { Database } from "../../../database.js";
 
 export interface DatabaseTemplateLocals {
   appName: string;

@@ -1,8 +1,19 @@
-import { Dir, File, include, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  Errno,
+  File,
+  LoadError,
+  env,
+  include,
+  rbFSend,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
+import { Error as ThorError } from "@blazetrails/thor/error";
 import { Trails } from "../rails.js";
 import { Generators } from "../generators.js";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "./base.js";
 import { Database, type DatabaseName } from "./database.js";
+import { GeneratorError } from "./generated-attribute.js";
 
 type Skip =
   | "ActiveRecord"
@@ -24,6 +35,7 @@ export type AppBaseOptions = GeneratorOptions & {
   appPath: string;
   name?: string;
   database?: DatabaseName;
+  template?: string;
   api?: boolean;
   devcontainer?: boolean;
   dev?: boolean;
@@ -45,12 +57,18 @@ export const OPTION_IMPLICATIONS: Record<string, ReadonlyArray<keyof AppBaseOpti
 export abstract class AppBase extends GeneratorBase {
   declare appPath: string;
   declare options: AppBaseOptions;
+  declare railsTemplate?: string;
   private _database?: Database;
   /** @internal */
   private _builder?: object;
 
   static {
     this.argument("appPath", { type: "string" });
+    this.classOption("template", {
+      type: "string",
+      aliases: "-m",
+      desc: "Path to some application template (can be a filesystem path or URL)",
+    });
     this.classOption("skipDocker", {
       type: "boolean",
       default: null,
@@ -121,7 +139,6 @@ export abstract class AppBase extends GeneratorBase {
     config: GeneratorConfig = {},
   ) {
     super(positionalArgv, optionArgv, config);
-    this.destinationRoot = File.expandPath(this.appPath, this.destinationRoot);
     this.options = this.deduceImpliedOptions({
       ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS,
       ...Object.fromEntries(this.options as unknown as Iterable<[string, unknown]>),
@@ -257,6 +274,33 @@ ${requireStatements.join("\n")}`;
       }
     }
     return out as unknown as AppBaseOptions;
+  }
+
+  async applyRailsTemplate(): Promise<void> {
+    try {
+      if (this.railsTemplate != null) await this.apply(this.railsTemplate);
+    } catch (e) {
+      if (e instanceof ThorError || e instanceof LoadError || e instanceof Errno.ENOENT) {
+        throw new GeneratorError(
+          `The template [${this.railsTemplate}] could not be loaded. Error: ${(e as Error).message}`,
+        );
+      }
+      throw e;
+    }
+  }
+
+  setDefaultAccessorsBang(): void {
+    this.destinationRoot = File.expandPath(this.appPath, this.destinationRoot);
+
+    if (typeof this.options.template === "string" && !/^https?:\/\//.test(this.options.template)) {
+      const interpolated = this.options.template.replace(
+        /\$(\w+)|\$\{(\w+)\}|%(\w+)%/g,
+        (m, a, b, c) => env[a ?? b ?? c] ?? m,
+      );
+      this.railsTemplate = File.expandPath(interpolated);
+    } else {
+      this.railsTemplate = this.options.template;
+    }
   }
 
   /** @internal */

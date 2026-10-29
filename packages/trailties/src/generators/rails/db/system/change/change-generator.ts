@@ -11,7 +11,7 @@ import {
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
-import { TEMPLATES } from "../../../app/templates.js";
+import { TEMPLATES } from "../../../app/templates/index.js";
 
 const BASE_PACKAGES = ["curl", "libvips"];
 const BUILD_PACKAGES = ["build-essential", "git"];
