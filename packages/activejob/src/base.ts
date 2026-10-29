@@ -142,6 +142,13 @@ include(Base, Timezones);
 include(Base, Translation);
 ActiveJob.Base = Base;
 
+const _jobs = new Map<string, typeof Base>();
+
+/** @noRailsEquivalent PERMANENT */
+export function registeredJob(name: string): typeof Base | undefined {
+  return _jobs.get(name);
+}
+
 /** @noRailsEquivalent PERMANENT */
 export function registerJob(job: typeof Base): void;
 export function registerJob(name: string, job: typeof Base): void;
@@ -164,10 +171,17 @@ export function registerJob(
       `registerJob expects a ActiveJob::Base subclass, got ${String(job?.name ?? job)}`,
     );
   }
-  if (typeof nameOrJob === "string") return registerConstant(nameOrJob, job);
+  if (typeof nameOrJob === "string") {
+    _jobs.set(nameOrJob, job);
+    return registerConstant(nameOrJob, job);
+  }
+  _jobs.set(job.name, job);
   registerConstant(job.name, job);
   const qualified = rbModName(job)!;
-  if (qualified !== job.name) registerConstant(qualified, job);
+  if (qualified !== job.name) {
+    _jobs.set(qualified, job);
+    registerConstant(qualified, job);
+  }
 }
 
 runLoadHooks("active_job", Base);

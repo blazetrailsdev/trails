@@ -343,6 +343,13 @@ include(Base, Rescuable);
 
 Channel.Base = Base;
 
+const _channels = new Map<string, typeof Base>();
+
+/** @noRailsEquivalent PERMANENT */
+export function registeredChannel(name: string): typeof Base | undefined {
+  return _channels.get(name);
+}
+
 /** @noRailsEquivalent PERMANENT */
 export function registerChannel(channel: typeof Base): void;
 export function registerChannel(name: string, channel: typeof Base): void;
@@ -366,10 +373,17 @@ export function registerChannel(
       `registerChannel expects an ActionCable::Channel::Base subclass, got ${String(channel?.name ?? channel)}`,
     );
   }
-  if (typeof nameOrChannel === "string") return registerConstant(nameOrChannel, channel);
+  if (typeof nameOrChannel === "string") {
+    _channels.set(nameOrChannel, channel);
+    return registerConstant(nameOrChannel, channel);
+  }
+  _channels.set(channel.name, channel);
   registerConstant(channel.name, channel);
   const qualified = rbModName(channel)!;
-  if (qualified !== channel.name) registerConstant(qualified, channel);
+  if (qualified !== channel.name) {
+    _channels.set(qualified, channel);
+    registerConstant(qualified, channel);
+  }
 }
 
 runLoadHooks("action_cable_channel", Base);

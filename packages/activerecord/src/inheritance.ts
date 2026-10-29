@@ -8,7 +8,6 @@ import {
   included,
   isPlainObject,
   isPresent,
-  safeConstantize,
 } from "@blazetrails/activesupport";
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import {
@@ -19,6 +18,7 @@ import {
   rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import { demodulize } from "@blazetrails/activesupport";
+import { registeredModel } from "./associations.js";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 
 export interface Inheritance {
@@ -41,7 +41,9 @@ export const Inheritance = {
  */
 export function computeType(baseClass: typeof Base, typeName: string): typeof Base {
   if (typeName.startsWith("::")) {
-    return constantize(typeName) as typeof Base;
+    const constant = registeredModel(typeName.slice(2));
+    if (constant == null) throw new NameError(`uninitialized constant ${typeName}`, typeName);
+    return constant;
   } else {
     const klass = baseClass as typeof Base & { _typeCandidatesCache: Map<string, string> };
     if (!Object.hasOwn(klass, "_typeCandidatesCache")) {
@@ -49,10 +51,7 @@ export function computeType(baseClass: typeof Base, typeName: string): typeof Ba
     }
     const typeCandidate = klass._typeCandidatesCache.get(typeName);
     let typeConstant: typeof Base | null | undefined;
-    if (
-      typeCandidate != null &&
-      (typeConstant = safeConstantize(typeCandidate) as typeof Base | null | undefined) != null
-    ) {
+    if (typeCandidate != null && (typeConstant = registeredModel(typeCandidate)) != null) {
       return typeConstant;
     }
 
@@ -64,7 +63,7 @@ export function computeType(baseClass: typeof Base, typeName: string): typeof Ba
     candidates.push(typeName);
 
     for (const candidate of candidates) {
-      const constant = safeConstantize(candidate) as typeof Base | null | undefined;
+      const constant = registeredModel(candidate);
       if (constant != null && candidate === rbModName(constant)) {
         klass._typeCandidatesCache.set(typeName, candidate);
         return constant;

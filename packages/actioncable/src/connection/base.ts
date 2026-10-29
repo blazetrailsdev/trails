@@ -365,6 +365,13 @@ include(Base, Rescuable);
 
 Connection.Base = Base;
 
+const _connections = new Map<string, typeof Base>();
+
+/** @noRailsEquivalent PERMANENT */
+export function registeredConnection(name: string): typeof Base | undefined {
+  return _connections.get(name);
+}
+
 /** @noRailsEquivalent PERMANENT */
 export function registerConnection(connection: typeof Base): void;
 export function registerConnection(name: string, connection: typeof Base): void;
@@ -388,10 +395,17 @@ export function registerConnection(
       `registerConnection expects an ActionCable::Connection::Base subclass, got ${String(connection?.name ?? connection)}`,
     );
   }
-  if (typeof nameOrConnection === "string") return registerConstant(nameOrConnection, connection);
+  if (typeof nameOrConnection === "string") {
+    _connections.set(nameOrConnection, connection);
+    return registerConstant(nameOrConnection, connection);
+  }
+  _connections.set(connection.name, connection);
   registerConstant(connection.name, connection);
   const qualified = rbModName(connection)!;
-  if (qualified !== connection.name) registerConstant(qualified, connection);
+  if (qualified !== connection.name) {
+    _connections.set(qualified, connection);
+    registerConstant(qualified, connection);
+  }
 }
 
 runLoadHooks("action_cable_connection", Base);
