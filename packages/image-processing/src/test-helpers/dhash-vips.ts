@@ -1,3 +1,4 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import Vips from "wasm-vips";
 
 type Image = InstanceType<Awaited<ReturnType<typeof Vips>>["Image"]>;
@@ -28,7 +29,7 @@ export const IDHash = {
     const [sizeA, sizeB] = [a, b].map((x) => (integerSize(x) <= 32 ? 8 : 16));
     if (sizeA === 8 && sizeB === 8) return IDHash.distance3(a, b);
     if (sizeA !== sizeB) {
-      throw new globalThis.Error(
+      throw new RuntimeError(
         `fingerprints were taken with different \`power\` param: ${sizeA} and ${sizeB}`,
       );
     }

@@ -1,4 +1,10 @@
-import { NoMethodError, PROTOCOL_PROBES, rbBlockGivenP, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  isPlainHash,
+  NoMethodError,
+  PROTOCOL_PROBES,
+  rbBlockGivenP,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import { Builder } from "./builder.js";
 
 export type Operation = [string, unknown[]] | [string, unknown[], (...args: never[]) => unknown];
@@ -60,6 +66,8 @@ export const Chainable = {
         return rbFSend(builder, name) as ChainableHost;
       } else if (Array.isArray(argument)) {
         return rbFSend(builder, name, ...argument) as ChainableHost;
+      } else if (isPlainHash(argument)) {
+        return rbFSend(builder, name, argument) as ChainableHost;
       } else {
         return rbFSend(builder, name, argument) as ChainableHost;
       }
@@ -117,7 +125,11 @@ export const Chainable = {
   /** @internal */
   methodMissing(this: ChainableHost, name: string, ...args: unknown[]): unknown {
     if (/^is[A-Z]/.test(name)) {
-      throw new NoMethodError(`undefined method '${name}' for ${this}`, name, args);
+      throw new NoMethodError(
+        `undefined method '${name}' for an instance of ${this.constructor.name}`,
+        name,
+        args,
+      );
     }
     if (name.endsWith("Bang")) {
       return (rbFSend(this, name.slice(0, -"Bang".length), ...args) as ChainableHost).call();
