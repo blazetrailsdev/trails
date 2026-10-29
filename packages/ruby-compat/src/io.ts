@@ -1537,7 +1537,7 @@ export class PipeIO extends IO {
   private readonly _pipe: PipeBuffer;
   private _closed = false;
 
-  /** @internal */
+  /** @noRailsEquivalent PERMANENT */
   constructor(pipe: PipeBuffer, vmode: "r" | "w") {
     super(-1, null, vmode);
     this.binmode();
@@ -1582,10 +1582,10 @@ export class PipeIO extends IO {
     buf: Uint8Array | null = null,
     { exception = true }: { exception?: boolean } = {},
   ): Uint8Array | "wait_readable" | null {
+    if (len < 0) throw new ArgumentError(`negative length ${len} given`);
     if (exception !== true && exception !== false) {
       throw new ArgumentError(`expected true or false as exception: ${rbInspect(exception)}`);
     }
-    if (len < 0) throw new ArgumentError(`negative length ${len} given`);
     this._checkReadable();
     if (len === 0) return new Uint8Array(0);
     if (this._pipe.length === 0) {
