@@ -74,8 +74,9 @@ describe("Thor::Actions::Directory", () => {
 
   describe("#invoke!", () => {
     it("raises an error if the source does not exist", async () => {
-      await expect(invokeBang("unknown")).rejects.toThrow(Error);
-      await expect(invokeBang("unknown")).rejects.toThrow(
+      const error = await invokeBang("unknown").catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(Error);
+      expect(String((error as Error).message)).toMatch(
         /Could not find "unknown" in any of your source paths/,
       );
     });
