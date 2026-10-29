@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import { RACK_TEMPFILES } from "./constants.js";
 import { BodyProxy } from "./body-proxy.js";
 import type { RackApp } from "./mock-request.js";
@@ -16,7 +16,7 @@ export class TempfileReaper {
 
     let response: [number, RackHeaders, any];
     try {
-      response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
+      response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
     } catch (e) {
       env[RACK_TEMPFILES]?.forEach((tempfile: any) => tempfile.closeBang());
       throw e;

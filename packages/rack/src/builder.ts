@@ -4,7 +4,7 @@ import {
   RuntimeError,
   rbBlockGivenP,
   rbFBinding,
-  rbFSend,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
 
@@ -63,7 +63,7 @@ export class Builder {
     options: Record<string, unknown> = {},
   ): RackApp {
     const builder = new this(null, options);
-    const binding = rbFSend(BUILDER_TOPLEVEL_BINDING, "call", builder) as Builder;
+    const binding = rbProcCall(BUILDER_TOPLEVEL_BINDING, builder) as Builder;
     const source =
       `(function (builder) { "use strict"; ${builderScript}\n})` +
       `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
@@ -135,7 +135,7 @@ export class Builder {
   }
 
   async call(env: Record<string, any>): Promise<any> {
-    return rbFSend(this.toApp(), "call", env);
+    return rbProcCall(this.toApp(), env);
   }
 
   /**
@@ -151,7 +151,7 @@ export class Builder {
       if (this._freezeApp) Object.freeze(x);
       return x;
     }, app);
-    if (this._warmupBlock) rbFSend(this._warmupBlock, "call", app);
+    if (this._warmupBlock) rbProcCall(this._warmupBlock, app);
     return app;
   }
 

@@ -1,4 +1,4 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Resolver } from "./database-selector/resolver.js";
 import type { ResolverContext } from "./database-selector/resolver.js";
@@ -40,7 +40,7 @@ export class DatabaseSelector {
 
     return this.selectDatabase(
       request,
-      () => rbFSend(this.app, "call", env) as ReturnType<typeof this.app>,
+      () => rbProcCall(this.app, env) as ReturnType<typeof this.app>,
     );
   }
 

@@ -7,7 +7,7 @@ import {
   SERVER_NAME,
   SERVER_PORT,
 } from "./constants.js";
-import { ArgumentError, rbFSend, regexpEscape } from "@blazetrails/ruby-compat";
+import { ArgumentError, regexpEscape, rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
 type Mapping = [string | null, string, RegExp, RackApp | { call: RackApp }];
@@ -84,7 +84,7 @@ export class URLMap {
         env[SCRIPT_NAME] = scriptName + location;
         env[PATH_INFO] = rest;
 
-        return await (rbFSend(app, "call", env) as ReturnType<RackApp>);
+        return await (rbProcCall(app, env) as ReturnType<RackApp>);
       }
 
       return [404, { [CONTENT_TYPE]: "text/plain", "x-cascade": "pass" }, [`Not Found: ${path}`]];

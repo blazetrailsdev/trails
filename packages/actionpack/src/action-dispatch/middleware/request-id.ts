@@ -1,4 +1,4 @@
-import { SecureRandom, rbFSend } from "@blazetrails/ruby-compat";
+import { SecureRandom, rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
 
@@ -22,7 +22,7 @@ export class RequestId {
   async call(env: RackEnv): Promise<RackResponse> {
     const req = new Request(env);
     req.requestId = this.makeRequestId(req.getHeader(this.envHeader) as string | undefined);
-    const [status, headers, body] = await (rbFSend(this.app, "call", env) as ReturnType<
+    const [status, headers, body] = await (rbProcCall(this.app, env) as ReturnType<
       typeof this.app
     >);
     headers[this.header.toLowerCase()] = req.requestId!;

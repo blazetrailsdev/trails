@@ -2579,6 +2579,19 @@ describe("body call capture", () => {
     expect(calls("dispatch")).toEqual(["@invoked:rbFSend", "rbFSend"]);
   });
 
+  it("records rbProcCall as a call to Ruby's call", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        call(env: object) {
+          return rbProcCall(this.app, env);
+        }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "call")!.calls).toEqual(
+      expect.arrayContaining(["rbProcCall", "call"]),
+    );
+  });
+
   it("marks a call INVOKED on another object with the foreign-read prefix", () => {
     // `details.digest(x)` runs a member of `details`, not the same-file method
     // `digest` — the closure must not union that one's call-set (RFC 0108).

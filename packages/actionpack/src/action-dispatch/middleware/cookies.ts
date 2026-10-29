@@ -19,6 +19,7 @@ import {
   symbolToS,
   rbFSend,
   type Block,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
@@ -640,7 +641,7 @@ export class Cookies {
 
   async call(env: RackEnv): Promise<RackResponse> {
     const request = new ActionDispatch.Request(env) as CookiesRequest;
-    let response: RackResponse | Response = await (rbFSend(this.app, "call", env) as ReturnType<
+    let response: RackResponse | Response = await (rbProcCall(this.app, env) as ReturnType<
       typeof this.app
     >);
 

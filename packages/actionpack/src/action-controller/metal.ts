@@ -15,7 +15,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   rbCheckArrayType,
-  rbFSend,
+  rbProcCall,
   rbModSingletonP,
   rbObjDup,
   rbObjRespondTo,
@@ -216,13 +216,12 @@ export class Metal extends AbstractControllerBase {
     res: Response,
   ): Promise<RackResponse> {
     if (this.middlewareStack.isAny()) {
-      return await (rbFSend(
+      return await (rbProcCall(
         this.middlewareStack.build(name, async () => {
           const controller = new this();
           await controller.dispatch(name, req, res);
           return controller.toA();
         }),
-        "call",
         req.env,
       ) as Promise<RackResponse>);
     } else {

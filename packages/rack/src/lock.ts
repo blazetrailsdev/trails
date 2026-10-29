@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { BodyProxy } from "./body-proxy.js";
 
@@ -31,7 +31,7 @@ export class Lock {
     this.mutex.lock();
     let returned: [number, RackHeaders, any] | undefined;
     try {
-      const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
+      const response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
       response.push(new BodyProxy(response.pop(), () => this.unlock()));
       returned = response;
       return returned;

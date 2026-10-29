@@ -5,7 +5,6 @@ import {
   rbCheckArrayType,
   each,
   rbEqual,
-  rbFSend,
   rbInspect,
   rbObjClassname,
   rbObjRespondTo,
@@ -22,6 +21,7 @@ import {
   Encoding,
   URI,
   toEnum,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import {
@@ -200,7 +200,7 @@ export class Wrapper {
     if (this.env == null) throw new LintError("No env given");
     this.checkEnvironment(this.env);
 
-    this._response = await (rbFSend(this._app, "call", this.env) as ReturnType<RackApp>);
+    this._response = await (rbProcCall(this._app, this.env) as ReturnType<RackApp>);
     if (!Array.isArray(this._response)) {
       throw new LintError(`response is not an Array, but ${rbObjClassname(this._response)}`);
     }

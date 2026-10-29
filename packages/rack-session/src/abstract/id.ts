@@ -7,11 +7,11 @@ import {
   SecureRandom,
   verbose,
   rbInspect as inspect,
-  rbFSend,
   rbObjClassname,
   KeyError,
   registerConstant,
   eachPair,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { RACK_ERRORS, Request, Raw } from "@blazetrails/rack";
@@ -381,7 +381,7 @@ export class Persisted {
   async context(env: RackEnv, app: RackApp | undefined = this.app): Promise<RackResponse> {
     const req = this.makeRequest(env);
     await this.prepareSession(req);
-    const [status, headers, body] = await (rbFSend(app, "call", req.env) as Promise<RackResponse>);
+    const [status, headers, body] = await (rbProcCall(app, req.env) as Promise<RackResponse>);
     const res = new Raw(status, headers);
     await this.commitSession(req, res);
     return [status, headers, body];

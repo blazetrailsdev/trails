@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { File, rbFSend, rbStrSub } from "@blazetrails/ruby-compat";
+import { File, rbStrSub, rbProcCall } from "@blazetrails/ruby-compat";
 import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { BodyProxy } from "./body-proxy.js";
@@ -24,7 +24,7 @@ export class Sendfile {
   }
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
+    const response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
     const [, headers, body] = response;
 
     if (body && typeof body.toPath === "function") {

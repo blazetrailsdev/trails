@@ -1,6 +1,6 @@
 import type { RackHeaders } from "./index.js";
 import { SERVER_PROTOCOL, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
-import { Process, sprintf, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Process, sprintf, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
@@ -23,7 +23,7 @@ export class CommonLogger {
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const beganAt = clockTime();
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
+    const response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
     const [status, headers, body] = response;
 
     response[2] = new BodyProxy(body, () => {

@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
@@ -24,7 +24,7 @@ export class Cascade {
 
     for (const app of this.apps) {
       if (lastBody && typeof lastBody.close === "function") lastBody.close();
-      result = await rbFSend(app, "call", env);
+      result = await rbProcCall(app, env);
       if (!Object.hasOwn(this.cascadeFor, Number(result[0]))) return result;
       lastBody = result[2];
     }

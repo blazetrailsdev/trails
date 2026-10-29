@@ -37,6 +37,7 @@ import {
   CLASS_METHOD_TABLE,
   OBJECT_METHOD_TABLE,
   rbFSend,
+  rbProcCall,
   ENUMERABLE_METHOD_TABLE,
   rbModAttrReader,
   rbModAttrWriter,
@@ -780,6 +781,47 @@ describe("rbFSend", () => {
       delete OBJECT_METHOD_TABLE.isProbe;
     }
     expect(() => rbFSend(3, ":probe?", 4)).toThrow(NoMethodError);
+  });
+});
+
+describe("rbProcCall", () => {
+  it("applies a proc to the arguments", () => {
+    expect(rbProcCall((a: number, b: number) => a + b, 1, 2)).toBe(3);
+  });
+
+  it("calls a receiver's own call with the receiver as self", () => {
+    const app = {
+      prefix: "hi ",
+      call(name: string) {
+        return this.prefix + name;
+      },
+    };
+    expect(rbProcCall(app, "bob")).toBe("hi bob");
+  });
+
+  it("calls a class's static call with the class as self", () => {
+    class Endpoint {
+      static greeting = "hi ";
+      static call(name: string) {
+        return this.greeting + name;
+      }
+    }
+    expect(rbProcCall(Endpoint, "bob")).toBe("hi bob");
+  });
+
+  it("sends call to a receiver without one, reaching method_missing", () => {
+    const ghost = {
+      methodMissing(name: string, ...args: unknown[]) {
+        return [name, ...args];
+      },
+    };
+    expect(rbProcCall(ghost, 1)).toEqual(["call", 1]);
+  });
+
+  it("raises NoMethodError for a receiver that answers no call", () => {
+    expect(() => rbProcCall(3)).toThrow(NoMethodError);
+    expect(() => rbProcCall(3)).toThrow("undefined method 'call' for an instance of Integer");
+    expect(() => rbProcCall(null)).toThrow("undefined method 'call' for nil");
   });
 });
 

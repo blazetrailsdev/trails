@@ -22,10 +22,10 @@ import {
   Encoding,
   type Generic,
   isSymbol,
-  rbFSend,
   rbObjRespondTo,
   RFC2396Parser,
   StringIO,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 import { Lint } from "./lint.js";
 import { MockResponse } from "./mock-response.js";
@@ -101,7 +101,7 @@ export class MockRequest {
     const errors = env[RACK_ERRORS];
     let body: any;
     try {
-      const result = await (rbFSend(app, "call", env) as ReturnType<RackApp>);
+      const result = await (rbProcCall(app, env) as ReturnType<RackApp>);
       const [status, headers, b] = result;
       body = b;
       return new MockResponse(status, headers, body, errors);

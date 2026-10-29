@@ -19,7 +19,7 @@ import {
   rbIntegerTypeP,
   rbPlus,
 } from "./numeric.js";
-import { rbCheckFuncall, rbFSend } from "./object.js";
+import { rbCheckFuncall, rbFSend, rbProcCall } from "./object.js";
 import { Enumerator } from "./enumerator.js";
 import { Rational } from "./rational.js";
 import { checkArity } from "./string/support.js";
@@ -356,7 +356,7 @@ export function find<T, E = unknown>(
     },
     () => {
       if (memo.cnt) return memo.v1;
-      if (ifNone != null) return rbFSend(ifNone, "call");
+      if (ifNone != null) return rbProcCall(ifNone);
       return null;
     },
   );

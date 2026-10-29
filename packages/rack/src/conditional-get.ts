@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { BodyProxy } from "./body-proxy.js";
 import { REQUEST_METHOD, ETAG, CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
@@ -15,10 +15,10 @@ export class ConditionalGet {
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const method = env[REQUEST_METHOD];
     if (method !== "GET" && method !== "HEAD") {
-      return rbFSend(this.app, "call", env) as ReturnType<RackApp>;
+      return rbProcCall(this.app, env) as ReturnType<RackApp>;
     }
 
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
+    const response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
     const [status, headers, body] = response;
 
     if (status === 200 && this.fresh(env, headers)) {

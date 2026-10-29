@@ -115,9 +115,14 @@ const SEND_CALLEES_RUBY_NAME: Record<string, string> = {
 };
 /**
  * ruby-compat's `Kernel#load` (`rb_f_load`, vendor/ruby/v3.3.11/load.c:903),
- * which is a call to Ruby's `load`.
+ * which is a call to Ruby's `load`, and `rbProcCall`, Ruby's
+ * `callable.call(*args)` (`rb_proc_call`, vendor/ruby/v3.3.11/proc.c:990),
+ * which is a call to Ruby's `call`.
  */
-const KERNEL_CALLEES = new Map([["rbFLoad", "load"]]);
+const KERNEL_CALLEES = new Map([
+  ["rbFLoad", "load"],
+  ["rbProcCall", "call"],
+]);
 const OPTION_READER_METHODS = new Set(["fetch", "get", "has", "delete", "hasOwnProperty"]);
 const OPTION_COPY_FUNCTIONS = new Set(["slice", "except", "merge", "rbObjDup", "rbObjClone"]);
 
