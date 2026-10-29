@@ -45,10 +45,12 @@ export class StreamEventLoop {
   }
 
   attach(io: Io, stream: Stream): void {
-    this._map.set(io, { value: stream, interests: "r" });
+    this._map.set(io, { value: null!, interests: "r" });
+    this._map.get(io)!.value = stream;
     const monitor = this._map.get(io)!;
     void (async () => {
       while (!this._stopping && this._map.get(io) === monitor) {
+        const stream = monitor.value;
         try {
           await io.waitReadable();
           if (this._map.get(io) !== monitor) break;
