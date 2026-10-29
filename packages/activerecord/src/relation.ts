@@ -253,25 +253,6 @@ const ENUMERABLE_DELEGATES = {
 /** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
 const _PROXY_TARGET: unique symbol = Symbol("relationProxyTarget");
 
-/** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
-const _accessorsByPrototype = new WeakMap<object, Set<string | symbol>>();
-
-/** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
-function _accessorNames(proto: object): Set<string | symbol> {
-  let names = _accessorsByPrototype.get(proto);
-  if (!names) {
-    names = new Set();
-    for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
-      for (const key of Reflect.ownKeys(o)) {
-        const descriptor = Object.getOwnPropertyDescriptor(o, key)!;
-        if (descriptor.get || descriptor.set) names.add(key);
-      }
-    }
-    _accessorsByPrototype.set(proto, names);
-  }
-  return names;
-}
-
 /** @perf 4x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
 function _setOnTarget(
   target: Record<string | symbol, unknown>,
@@ -1709,22 +1690,16 @@ export class Relation<T extends Base, G extends boolean = false> {
     if (Object.isFrozen(source) || Object.getOwnPropertySymbols(source).length > 0) {
       return rbObjClone(this);
     }
-    const proto = Object.getPrototypeOf(source);
-    const accessors = _accessorNames(proto);
-    const copy = Object.create(proto);
+    const copy = Object.create(null);
     for (const key of Reflect.ownKeys(source)) {
       const descriptor = Object.getOwnPropertyDescriptor(source, key)!;
-      if (
-        descriptor.writable &&
-        descriptor.enumerable &&
-        descriptor.configurable &&
-        !accessors.has(key)
-      ) {
+      if (descriptor.writable && descriptor.enumerable && descriptor.configurable) {
         copy[key] = descriptor.value;
       } else {
         Object.defineProperty(copy, key, descriptor);
       }
     }
+    Object.setPrototypeOf(copy, Object.getPrototypeOf(source));
     const clone = isModuleIncluded(this.constructor, ClassSpecificRelation)
       ? new Proxy(copy, CLASS_SPECIFIC_RELATION_HANDLER)
       : copy;

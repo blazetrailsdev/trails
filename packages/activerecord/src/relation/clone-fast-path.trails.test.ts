@@ -51,6 +51,33 @@ describe("a class-specific relation's Proxy", () => {
   });
 });
 
+describe("Relation#clone copying fields", () => {
+  fixtures(["posts"]);
+
+  it("copies a field a prototype accessor shadows after an earlier clone, without running it", () => {
+    const relation = Post.where({ id: 1 });
+    relation.limit(1);
+    const proto = Object.getPrototypeOf(relation) as object;
+    const calls: unknown[] = [];
+    Object.defineProperty(proto, "_delegateToModel", {
+      configurable: true,
+      get() {
+        return false;
+      },
+      set(value: unknown) {
+        calls.push(value);
+      },
+    });
+    try {
+      const copy = relation.limit(2);
+      expect(calls).toEqual([]);
+      expect(Object.hasOwn(copy, "_delegateToModel")).toBe(true);
+    } finally {
+      Reflect.deleteProperty(proto, "_delegateToModel");
+    }
+  });
+});
+
 describe("instantiate", () => {
   fixtures(["posts"]);
 
