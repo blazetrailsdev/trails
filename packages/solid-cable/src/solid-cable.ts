@@ -72,9 +72,13 @@ export const SolidCable = {
 
   /** @noRailsEquivalent PERMANENT */
   async loadCableConfig(): Promise<void> {
+    if (TopLevel.Trails?.application == null) {
+      loadedCableConfig = null;
+      return;
+    }
     try {
       loadedCableConfig = {
-        config: (await TopLevel.Trails!.application!.configFor("cable")) as CableConfig,
+        config: (await TopLevel.Trails.application.configFor("cable")) as CableConfig,
       };
     } catch (error) {
       loadedCableConfig = { error };
