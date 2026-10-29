@@ -350,7 +350,10 @@ export function find<T, E = unknown>(
 /**
  * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`,
  * whose `collect_i` (`:606`) yields the values `each` yielded as they are
- * (`rb_yield_values2`), unpacked. With no block it answers the enumerator
+ * (`rb_yield_values2`), unpacked; a lone Array reaching a block that takes
+ * more than one parameter is splatted across them, as
+ * `vm_callee_setup_block_arg_arg0_splat` does (`vendor/ruby/v3.3.11/vm_insnhelper.c:4807`).
+ * With no block it answers the enumerator
  * `RETURN_SIZED_ENUMERATOR` builds.
  * @noRailsEquivalent PERMANENT
  */
@@ -379,7 +382,8 @@ export function map<T, R, E = unknown>(
   return rbBlockCall(
     obj,
     (_i, argv) => {
-      ary.push((block as (...args: unknown[]) => R)(...argv));
+      const args = argv.length === 1 && Array.isArray(argv[0]) && block.length > 1 ? argv[0] : argv;
+      ary.push((block as (...args: unknown[]) => R)(...args));
     },
     () => ary,
   );

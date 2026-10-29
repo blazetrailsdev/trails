@@ -16,6 +16,7 @@ import {
   findAll,
   first,
   groupBy,
+  map,
   partition,
   reduce,
   sum,
@@ -484,6 +485,34 @@ const receivers: [string, (items: unknown[]) => Iterable<unknown> | Bag | LazyBa
   ["a generator", (items) => gen(items)],
   ["an each-answerer", (items) => new Bag(items)],
 ];
+
+describe("rb_enum_values_pack over a multi-value each", () => {
+  const multi = {
+    each(block: (...args: unknown[]) => void) {
+      block(1, 2);
+      block(3);
+      block();
+      return this;
+    },
+  };
+
+  it("packs what each yields for a member that reads one value", () => {
+    expect(findAll(multi, () => true)).toEqual([[1, 2], 3, null]);
+  });
+
+  it("map forwards the yielded values unpacked", () => {
+    expect(map(multi, (a: unknown, b?: unknown) => [a, b])).toEqual([
+      [1, 2],
+      [3, undefined],
+      [undefined, undefined],
+    ]);
+  });
+
+  it("map splats a yielded pair across a two-parameter block", () => {
+    const h = new Hash<string, number>().set("a", 1);
+    expect(map(h, (k: string, v: number) => `${k}${v}`)).toEqual(["a1"]);
+  });
+});
 
 describe("Enumerable free functions over any receiver", () => {
   for (const [kind, build] of receivers) {
