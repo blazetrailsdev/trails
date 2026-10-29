@@ -5,6 +5,7 @@ import {
   isMonOwned,
   KERNEL_METHODS,
   Mutex,
+  count,
   PROTOCOL_PROBES,
   rbDefineInspectCustom,
   rbObjDup,
@@ -14,7 +15,6 @@ import {
   Thread,
   ThreadPoolExecutor,
 } from "@blazetrails/ruby-compat";
-import { count } from "@blazetrails/ruby-compat/enumerable";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";

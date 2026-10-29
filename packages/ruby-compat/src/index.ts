@@ -35,6 +35,7 @@ export type { Comparable } from "./comparable.js";
 export {
   AsyncEnumerable,
   Enumerable,
+  count,
   eachSlice,
   eachCons,
   minBy,
