@@ -13,6 +13,7 @@ import {
   Base,
   ConnectionPool,
   ControllerRuntime,
+  JobRuntime,
   LogSubscriber,
   QueryCache,
   SchemaReflection,
@@ -273,6 +274,10 @@ export class Trailtie extends BaseTrailtie {
     this.initializer("active_record.log_runtime", () => {
       onLoad("action_controller", (base: unknown) => {
         include(base as never, ControllerRuntime);
+      });
+
+      onLoad("active_job", (base: unknown) => {
+        include(base as never, JobRuntime);
       });
     });
 

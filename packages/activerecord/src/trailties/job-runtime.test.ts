@@ -1,45 +1,62 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { Notifications } from "@blazetrails/activesupport";
+import { Base as JobBase } from "@blazetrails/activejob";
 import { include } from "@blazetrails/ruby-compat";
 import { JobRuntime } from "./job-runtime.js";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
-class Instrumentation {
-  instrument(_operation: string, _payload: Record<string, unknown> = {}, block?: () => unknown) {
-    return block?.();
+class TestJob extends JobBase {
+  async perform(): Promise<void> {
+    RuntimeRegistry.setSqlRuntime(RuntimeRegistry.sqlRuntime() + 42.0);
   }
 }
-class Job extends Instrumentation {}
-include(Job, JobRuntime);
+include(TestJob, JobRuntime);
+
+async function notificationPayload(): Promise<Record<string, unknown> | null> {
+  let payload: Record<string, unknown> | null = null;
+  const subscriber = Notifications.subscribe("perform.active_job", (event: never) => {
+    payload = (event as { payload: Record<string, unknown> }).payload;
+  });
+
+  await new TestJob().performNow();
+
+  Notifications.unsubscribe(subscriber);
+
+  return payload;
+}
 
 describe("JobRuntimeTest", () => {
-  beforeEach(() => RuntimeRegistry.reset());
+  it("job notification payload includes db_runtime", async () => {
+    RuntimeRegistry.setSqlRuntime(0.0);
 
-  it("sets dbRuntime in payload for perform operations", () => {
-    const payload: Record<string, unknown> = {};
-    new Job().instrument("perform", payload, () => {
-      RuntimeRegistry.setSqlRuntime(RuntimeRegistry.sqlRuntime() + 5.0);
-      RuntimeRegistry.setQueriesCount(RuntimeRegistry.queriesCount() + 1);
-    });
-    expect(payload["dbRuntime"]).toBe(5.0);
+    expect((await notificationPayload())!["dbRuntime"]).toBe(42);
   });
 
-  it("does not set dbRuntime for non-perform operations", () => {
-    const payload: Record<string, unknown> = {};
-    new Job().instrument("enqueue", payload, () => {});
-    expect(payload["dbRuntime"]).toBeUndefined();
-  });
+  it("db_runtime tracks database runtime for job only", async () => {
+    RuntimeRegistry.setSqlRuntime(100.0);
 
-  it("returns the block result for perform", () => {
-    const result = new Job().instrument("perform", {}, () => "done");
-    expect(result).toBe("done");
+    expect((await notificationPayload())!["dbRuntime"]).toBe(42.0);
+    expect(RuntimeRegistry.sqlRuntime()).toBe(142.0);
   });
+});
 
-  it("returns the block result for non-perform", () => {
-    const result = new Job().instrument("enqueue", {}, () => 42);
-    expect(result).toBe(42);
-  });
+describe("JobRuntime#instrument", () => {
+  it("delegates both arms to the host's instrument", async () => {
+    class Host {
+      instrument(
+        _operation: string,
+        _payload: Record<string, unknown> = {},
+        block?: () => unknown,
+      ) {
+        return block?.();
+      }
+    }
+    const spy = vi.spyOn(Host.prototype, "instrument");
+    class Job extends Host {}
+    include(Job, JobRuntime);
 
-  it("returns undefined when no block given", () => {
-    expect(new Job().instrument("perform", {})).toBeUndefined();
+    await new Job().instrument("perform", {}, () => "done");
+    new Job().instrument("enqueue", {}, () => 1);
+    expect(spy.mock.calls.map((c) => c[0])).toEqual(["perform", "enqueue"]);
   });
 });

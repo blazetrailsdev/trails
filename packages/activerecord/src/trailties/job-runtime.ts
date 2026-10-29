@@ -9,9 +9,9 @@ function instrument(
   block?: () => unknown,
 ): unknown {
   if (operation === "perform" && block) {
-    return rbCallSuper(this, instrument, operation, payload, () => {
+    return rbCallSuper(this, instrument, operation, payload, async () => {
       const dbRuntimeBeforePerform = RuntimeRegistry.sqlRuntime();
-      const result = block();
+      const result = await block();
       payload["dbRuntime"] = RuntimeRegistry.sqlRuntime() - dbRuntimeBeforePerform;
       return result;
     });

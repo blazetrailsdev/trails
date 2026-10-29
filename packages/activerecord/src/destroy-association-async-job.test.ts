@@ -11,6 +11,13 @@ class UndefinedConstantAsync extends Base {
   }
 }
 
+class UnloadableBaseAsync extends Base {
+  static _tableName = "essays";
+  static {
+    this.destroyAssociationAsyncJob = "UnloadableBaseJob";
+  }
+}
+
 class UnusedBelongsToAsync extends Base {
   static _tableName = "essays";
   static {
@@ -57,6 +64,13 @@ describe("DestroyAssociationAsyncJobTest", () => {
     expect((error as Error).message).toMatch(
       /destroy_association_async_job: uninitialized constant UndefinedConstantJob/,
     );
+  });
+
+  // PERMANENT-SKIP: Rails' `autoload :UnloadableBaseJob` defers evaluating a class
+  it.skip("destroy_association_async_job error shows a missing parent job class, as if ActiveJob were missing", () => {
+    expect(() =>
+      UnloadableBaseAsync.belongsTo("essayDestroyAsync", { dependent: "destroyAsync" }),
+    ).toThrow(/destroy_association_async_job: uninitialized constant PretendActiveJobIsNotPresent/);
   });
 
   it("belongs_to dependent destroy_async requires destroy_association_async_job", () => {

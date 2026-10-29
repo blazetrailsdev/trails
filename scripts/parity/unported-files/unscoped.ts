@@ -140,12 +140,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "ruby-compat-pathname-join-and-file-join-to-path.",
   },
   {
-    pattern: "destroy_association_async_job.rb", // no test counterpart
-    reason:
-      "ActiveJob subclass that backs `dependent: :destroy_async`. Trails has not " +
-      "ported ActiveJob; async destroy is out of scope until a job framework lands.",
-  },
-  {
     pattern: "adapters/trilogy",
     testFile: "adapters/trilogy/",
     reason:
