@@ -1,4 +1,10 @@
-import { rbFSend, rbObjRespondTo, ArgumentError, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  warn,
+  rbFSend,
+  rbObjRespondTo,
+  ArgumentError,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import WasmVips from "wasm-vips";
 import { Chainable, chainableProxy } from "./chainable.js";
 import { Error } from "./image-processing.js";
@@ -36,6 +42,7 @@ const SAVE_OPTIONS = "keep background page_height profile strip";
 /** @noRailsEquivalent PERMANENT */
 const INTROSPECT_OPTIONAL_INPUT: Record<string, string[]> = Object.fromEntries(
   Object.entries({
+    analyzeload: LOAD_OPTIONS,
     csvload: `skip lines whitespace separator ${LOAD_OPTIONS}`,
     gifload: `n page ${LOAD_OPTIONS}`,
     heifload: `page n thumbnail unlimited ${LOAD_OPTIONS}`,
@@ -47,6 +54,7 @@ const INTROSPECT_OPTIONAL_INPUT: Record<string, string[]> = Object.fromEntries(
     radload: LOAD_OPTIONS,
     svgload: `dpi scale unlimited stylesheet high_bitdepth ${LOAD_OPTIONS}`,
     tiffload: `page n autorotate subifd unlimited ${LOAD_OPTIONS}`,
+    uhdrload: `shrink ${LOAD_OPTIONS}`,
     vipsload: LOAD_OPTIONS,
     webpload: `page n scale ${LOAD_OPTIONS}`,
     csvsave: `separator ${SAVE_OPTIONS}`,
@@ -58,7 +66,9 @@ const INTROSPECT_OPTIONAL_INPUT: Record<string, string[]> = Object.fromEntries(
     pngsave: `compression interlace filter palette Q dither bitdepth effort ${SAVE_OPTIONS}`,
     ppmsave: `format ascii bitdepth ${SAVE_OPTIONS}`,
     radsave: SAVE_OPTIONS,
+    rawsave: SAVE_OPTIONS,
     tiffsave: `compression Q predictor tile tile_width tile_height pyramid miniswhite bitdepth resunit xres yres bigtiff properties region_shrink level lossless depth subifd premultiply ${SAVE_OPTIONS}`,
+    uhdrsave: `Q gainmap_scale_factor ${SAVE_OPTIONS}`,
     vipssave: SAVE_OPTIONS,
     webpsave: `Q lossless exact preset smart_subsample near_lossless alpha_q min_size kmin kmax effort target_size mixed smart_deblock passes ${SAVE_OPTIONS}`,
   }).map(([operation, names]) => [operation, names.split(" ")]),
@@ -115,8 +125,7 @@ function imageSet(image: Image, name: string, value: unknown): void {
 function imageSetType(image: Image, gtype: number, name: string, value: unknown): void {
   switch (gtype) {
     case vips.Utils.typeFromName("gint"):
-    case vips.Utils.typeFromName("gboolean"):
-      return image.setInt(name, Number(value));
+      return image.setInt(name, value as number);
     case vips.Utils.typeFromName("gdouble"):
       return image.setDouble(name, value as number);
     case vips.Utils.typeFromName("gchararray"):
@@ -134,7 +143,7 @@ function imageSetType(image: Image, gtype: number, name: string, value: unknown)
     case vips.Utils.typeFromName("VipsImage"):
       return image.setImage(name, value as Image);
     default:
-      throw new TypeError(`unsupported gtype for set ${gtype}`);
+      warn(`unimplemented gtype for set: ${gtype}`);
   }
 }
 
