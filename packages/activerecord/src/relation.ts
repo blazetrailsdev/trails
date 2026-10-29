@@ -250,11 +250,48 @@ const ENUMERABLE_DELEGATES = {
   compactBlank,
 };
 
+/** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
+const _PROXY_TARGET = Symbol("relationProxyTarget");
+
+/** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
+const _accessorsByPrototype = new WeakMap<object, Set<string | symbol>>();
+
+/** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
+function _accessorNames(proto: object): Set<string | symbol> {
+  let names = _accessorsByPrototype.get(proto);
+  if (!names) {
+    names = new Set();
+    for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
+      for (const key of Reflect.ownKeys(o)) {
+        const descriptor = Object.getOwnPropertyDescriptor(o, key)!;
+        if (descriptor.get || descriptor.set) names.add(key);
+      }
+    }
+    _accessorsByPrototype.set(proto, names);
+  }
+  return names;
+}
+
+/** @perf 4x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
+function _setOnTarget(target: object, prop: string | symbol, value: unknown): boolean {
+  return Reflect.set(target, prop, value);
+}
+
+/** @perf 4x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
+function _definePropertyOnTarget(
+  target: object,
+  prop: string | symbol,
+  descriptor: PropertyDescriptor,
+): boolean {
+  return Reflect.defineProperty(target, prop, descriptor);
+}
+
 const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
   get(target: any, prop: string | symbol, receiver: any) {
+    if (prop === _PROXY_TARGET) return target;
     if (prop === Symbol.iterator && !target._isRecordsSynchronous) return undefined;
     const value = Reflect.get(target, prop, receiver);
-    if (typeof prop === "symbol" || Reflect.has(target, prop) || value !== undefined) {
+    if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
       return value;
     }
     if (/^(0|[1-9]\d*)$/.test(prop)) {
@@ -276,6 +313,8 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
     }
     return value;
   },
+  set: _setOnTarget,
+  defineProperty: _definePropertyOnTarget,
   has(target: any, prop: string | symbol) {
     if (prop === Symbol.iterator && !target._isRecordsSynchronous) return false;
     if (Reflect.has(target, prop)) return true;
@@ -1653,8 +1692,33 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this;
   }
 
+  /** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
   clone(): Relation<T, G> {
-    return rbObjClone(this);
+    const source = (this as any)[_PROXY_TARGET] ?? this;
+    if (Object.isFrozen(source) || Object.getOwnPropertySymbols(source).length > 0) {
+      return rbObjClone(this);
+    }
+    const proto = Object.getPrototypeOf(source);
+    const accessors = _accessorNames(proto);
+    const copy = Object.create(proto);
+    for (const key of Reflect.ownKeys(source)) {
+      const descriptor = Object.getOwnPropertyDescriptor(source, key)!;
+      if (
+        descriptor.writable &&
+        descriptor.enumerable &&
+        descriptor.configurable &&
+        !accessors.has(key)
+      ) {
+        copy[key] = descriptor.value;
+      } else {
+        Object.defineProperty(copy, key, descriptor);
+      }
+    }
+    const clone = isModuleIncluded(this.constructor, ClassSpecificRelation)
+      ? new Proxy(copy, CLASS_SPECIFIC_RELATION_HANDLER)
+      : copy;
+    clone.initializeCopy(this);
+    return clone;
   }
 
   _execScope(...args: unknown[]): unknown {
