@@ -1,7 +1,16 @@
 import { Image as MiniMagickImage } from "@blazetrails/mini-magick/image";
 import type { CliTool } from "@blazetrails/mini-magick/tool";
-import { ArgumentError, block, Dir, File, Tempfile } from "@blazetrails/ruby-compat";
-import { beforeEach, describe, expect, it } from "vitest";
+import {
+  ArgumentError,
+  block,
+  Dir,
+  File,
+  Pathname,
+  stderr,
+  Tempfile,
+} from "@blazetrails/ruby-compat";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Error as MiniMagickError } from "@blazetrails/mini-magick";
 import { Error as ImageProcessingError } from "./image-processing.js";
 import { MiniMagick as ImageProcessingMiniMagick } from "./mini-magick.js";
 import {
@@ -523,6 +532,196 @@ describe("ImageProcessing::MiniMagick", () => {
       const transparent = await pipeline.rotateBang(45, { background: "transparent" });
       const fallback = await pipeline.rotateBang(45, { background: "rgba(255,255,255,0.0)" });
       await assertSimilar(transparent, fallback);
+    });
+  });
+
+  describe("#composite", () => {
+    let pipeline: Pipeline;
+
+    beforeEach(() => {
+      pipeline = MiniMagick.source(portrait);
+    });
+
+    const args = async (p: Promise<PathLike>) => ((await p) as unknown as CliTool).args;
+
+    it("generates the correct composite command", async () => {
+      const result = await pipeline.compositeBang(landscape, {
+        mode: "over",
+        gravity: "north-west",
+        offset: [0, 0],
+      });
+      await assertSimilar(fixtureImage("composited.jpg"), result);
+    });
+
+    it("accepts String, Pathname and #path object for overlay", async () => {
+      let magick = await args(pipeline.composite(landscape).call(null, { save: false }));
+      expect(magick).toContain(landscape.path());
+
+      magick = await args(pipeline.composite(landscape.path()).call(null, { save: false }));
+      expect(magick).toContain(landscape.path());
+
+      magick = await args(
+        pipeline.composite(new Pathname(landscape.path()!)).call(null, { save: false }),
+      );
+      expect(magick).toContain(landscape.path());
+
+      await expect(pipeline.compositeBang(null)).rejects.toThrow(ArgumentError);
+    });
+
+    it("accepts String, Pathname and #path object for mask", async () => {
+      let magick = await args(
+        pipeline.composite(landscape, { mask: landscape }).call(null, { save: false }),
+      );
+      expect(magick).toContain(portrait.path());
+
+      magick = await args(
+        pipeline.composite(landscape, { mask: landscape.path() }).call(null, { save: false }),
+      );
+      expect(magick).toContain(landscape.path());
+
+      magick = await args(
+        pipeline
+          .composite(landscape, { mask: new Pathname(landscape.path()!) })
+          .call(null, { save: false }),
+      );
+      expect(magick).toContain(landscape.path());
+
+      await expect(pipeline.compositeBang(landscape, { mask: {} })).rejects.toThrow(ArgumentError);
+    });
+
+    it("accepts :mode", async () => {
+      const magick = await args(
+        pipeline.composite(landscape, { mode: "Over" }).call(null, { save: false }),
+      );
+      expect(magick.slice(3)).toEqual(["-compose", "Over", "-composite"]);
+    });
+
+    it("accepts deprecated :compose", async () => {
+      const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
+      try {
+        const magick = await args(
+          pipeline.composite(landscape, { compose: "Over" }).call(null, { save: false }),
+        );
+        expect(magick.slice(3)).toEqual(["-compose", "Over", "-composite"]);
+        expect(write.mock.calls.map((c) => String(c[0])).join("")).toMatch(/renamed/);
+      } finally {
+        write.mockRestore();
+      }
+    });
+
+    it("accepts :gravity", async () => {
+      const magick = await args(
+        pipeline.composite(landscape, { gravity: "Center" }).call(null, { save: false }),
+      );
+      expect(magick.slice(3)).toEqual(["-gravity", "Center", "-composite"]);
+    });
+
+    it("accepts :offset", async () => {
+      const magick = await args(
+        pipeline.composite(landscape, { offset: [5, -15] }).call(null, { save: false }),
+      );
+      expect(magick.slice(3)).toEqual(["-geometry", "+5-15", "-composite"]);
+    });
+
+    it("accepts deprecated :geometry", async () => {
+      const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
+      try {
+        const magick = await args(
+          pipeline.composite(landscape, { geometry: "+0+0" }).call(null, { save: false }),
+        );
+        expect(magick.slice(3)).toEqual(["-geometry", "+0+0", "-composite"]);
+        expect(write.mock.calls.map((c) => String(c[0])).join("")).toMatch(/deprecated/);
+      } finally {
+        write.mockRestore();
+      }
+    });
+
+    it("accepts :args", async () => {
+      const magick = await args(
+        pipeline.composite(landscape, { mode: "blend", args: "50,50" }).call(null, { save: false }),
+      );
+      expect(magick.slice(3)).toEqual([
+        "-compose",
+        "blend",
+        "-define",
+        "compose:args=50,50",
+        "-composite",
+      ]);
+    });
+
+    it("accepts a block", async () => {
+      const magick = await args(
+        pipeline
+          .composite(
+            landscape,
+            block((m: CliTool) => m.negate()),
+          )
+          .call(null, { save: false }),
+      );
+      expect(magick.slice(3)).toEqual(["-negate", "-composite"]);
+    });
+
+    it("has default behaviour without arguments", async () => {
+      const result1 = await pipeline.append(landscape.path()).compositeBang();
+      const result2 = await pipeline.compositeBang(landscape.path());
+
+      await assertSimilar(result1, result2);
+    });
+  });
+
+  describe("#define", () => {
+    it("adds -define options from a Hash", async () => {
+      const magick = (await MiniMagick.source(portrait)
+        .define({ png: { compression_level: 8, format: "png8" } })
+        .call(null, { save: false })) as unknown as CliTool;
+
+      expect(magick.args.slice(2)).toEqual([
+        "-define",
+        "png:compression-level=8",
+        "-define",
+        "png:format=png8",
+      ]);
+    });
+
+    it("adds -define options from a String", async () => {
+      const magick = (await MiniMagick.source(portrait)
+        .define("png:compression-level=8")
+        .call(null, { save: false })) as unknown as CliTool;
+
+      expect(magick.args.slice(2)).toEqual(["-define", "png:compression-level=8"]);
+    });
+  });
+
+  describe("#limits", () => {
+    it("adds resource limits", async () => {
+      const pipeline = MiniMagick.limits({ width: 1 }).source(portrait);
+      let exception: unknown;
+      await expect(
+        pipeline.call().catch((e: unknown) => {
+          exception = e;
+          throw e;
+        }),
+      ).rejects.toThrow(MiniMagickError);
+      expect((exception as Error).message).toContain("limit");
+    });
+  });
+
+  describe("#append", () => {
+    it("appends CLI arguments", async () => {
+      const actual = await MiniMagick.append("-resize", "400x400").call(portrait);
+      const expected = Tempfile.new(["result", ".jpg"], null, { binmode: true });
+      await MiniMagick.convertShim((cmd) => {
+        cmd.append(portrait.path()!);
+        cmd.resize("400x400");
+        cmd.append(expected.path()!);
+      });
+
+      await assertSimilar(expected, actual);
+    });
+
+    it("still supports -append", async () => {
+      const result = await MiniMagick.append("wizard:").append().call(portrait);
+      await assertDimensions([600, 1440], result);
     });
   });
 });
