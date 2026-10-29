@@ -73,7 +73,8 @@ export const TopLevel: {
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
       routes(): { namedRoutes: { helperNames(): string[] } };
       envConfig(): Record<string, unknown>;
-      executor: { wrap<T>(block: () => T): T };
+      executor: { wrap<T>(block: () => T): T; runBang(): unknown };
+      configFor(name: string): Promise<unknown>;
       call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
     } | null;
     Application: abstract new (...args: never[]) => unknown;
