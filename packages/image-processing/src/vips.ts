@@ -112,7 +112,7 @@ function vipsForeignFindLoad(filename: string): string | null {
 
 /** @noRailsEquivalent PERMANENT */
 function vipsForeignFindSave(filename: string): string | null {
-  const suffix = /\.[^./]*$/.exec(filename)?.[0].toLowerCase() ?? "";
+  const suffix = /\.[^./[]*(?=(\[.*\])?$)/.exec(filename)?.[0].toLowerCase() ?? "";
   return SAVER_SUFFIXES[suffix] ?? null;
 }
 
