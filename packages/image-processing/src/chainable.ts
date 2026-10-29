@@ -5,7 +5,8 @@ import {
   rbBlockGivenP,
   rbFSend,
 } from "@blazetrails/ruby-compat";
-import { Builder } from "./builder.js";
+import type { Builder } from "./builder.js";
+import { ImageProcessing } from "./namespaces.js";
 
 export type Operation = [string, unknown[]] | [string, unknown[], (...args: never[]) => unknown];
 
@@ -93,7 +94,7 @@ export const Chainable = {
 
   branch(this: ChainableHost, newOptions: Record<string, unknown> = {}): Builder {
     let options: Options;
-    if (this instanceof Builder) {
+    if (this instanceof ImageProcessing.Builder!) {
       options = this.options;
     } else {
       options = { ...DEFAULT_OPTIONS, processor: this.Processor };
@@ -119,7 +120,7 @@ export const Chainable = {
       }
     }
 
-    return new Builder(Object.freeze(merged) as Options);
+    return new ImageProcessing.Builder!(Object.freeze(merged) as Options);
   },
 
   /** @internal */

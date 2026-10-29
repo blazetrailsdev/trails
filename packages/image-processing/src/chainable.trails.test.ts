@@ -1,7 +1,7 @@
 import { Tempfile } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import "./image-processing.js";
-import { Stub, StubProcessor } from "./test-helpers/stub-processor.js";
+import { Stub, StubImage, StubProcessor } from "./test-helpers/stub-processor.js";
 import { fixtureImage } from "./test-helpers/test-helper.js";
 
 const Vips = Stub;
@@ -23,7 +23,7 @@ describe("Chainable as a thenable Proxy", () => {
 
   it("passes save: false through to the processor's accumulator", async () => {
     const result = await Vips.invert().call(fixtureImage("portrait.jpg").path(), { save: false });
-    expect(result.operations).toEqual([["invert", []]]);
+    expect((result as unknown as StubImage).operations).toEqual([["invert", []]]);
   });
 
   it("rejects an unknown call keyword as Ruby's call(save: true) does", async () => {
