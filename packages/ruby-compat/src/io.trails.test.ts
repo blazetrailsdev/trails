@@ -8,6 +8,9 @@ import { IO, STDOUT, printf, puts } from "./io.js";
 import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 import { stderr, stdout } from "./process-adapter.js";
 import { b } from "./string/b.js";
+import { ArgumentError } from "./argument-error.js";
+import { EOFError } from "./eof-error.js";
+import { IOError } from "./io-error.js";
 
 describe("IO", () => {
   it("binwrite writes the string and answers its byte count", () => {
@@ -404,5 +407,108 @@ describe("printf", () => {
     const io = { write: (string: string) => written.push(string) };
     expect(printf.call(io, "%-5s|%3d", "é", 7)).toBeNull();
     expect(written).toEqual(["é    |  7"]);
+  });
+});
+
+describe("TestIO", () => {
+  const text = (bytes: unknown) => new TextDecoder().decode(bytes as Uint8Array);
+
+  it("test_write_nonblock", () => {
+    const [r, w] = IO.pipe();
+    w.writeNonblock(1);
+    w.close();
+    expect(text(r.read())).toBe("1");
+  });
+
+  it("test_read_nonblock_with_not_empty_buffer", () => {
+    const [r, w] = IO.pipe();
+    w.write("foob");
+    w.close();
+    const s = new TextEncoder().encode("01234567");
+    expect(text(r.readNonblock(5, s))).toBe("foob");
+  });
+
+  it("test_write_nonblock_simple_no_exceptions", () => {
+    const [r, w] = IO.pipe();
+    w.writeNonblock("1", { exception: false });
+    w.close();
+    expect(text(r.read())).toBe("1");
+  });
+
+  it("test_read_nonblock_error", () => {
+    const [r] = IO.pipe();
+    expect(() => r.readNonblock(4096)).toThrow(IO.EAGAINWaitReadable);
+  });
+
+  it("test_read_nonblock_invalid_exception", () => {
+    const [r] = IO.pipe();
+    expect(() => r.readNonblock(4096, null, { exception: 1 as never })).toThrow(ArgumentError);
+  });
+
+  it("test_read_nonblock_no_exceptions", () => {
+    const [r, w] = IO.pipe();
+    expect(r.readNonblock(4096, null, { exception: false })).toBe("wait_readable");
+    w.puts("HI!");
+    expect(text(r.readNonblock(4096, null, { exception: false }))).toBe("HI!\n");
+    w.close();
+    expect(r.readNonblock(4096, null, { exception: false })).toBeNull();
+  });
+
+  it("test_write_nonblock_error", () => {
+    const [, w] = IO.pipe();
+    expect(() => {
+      for (;;) w.writeNonblock("a".repeat(100000));
+    }).toThrow(IO.EAGAINWaitWritable);
+  });
+
+  it("test_write_nonblock_invalid_exception", () => {
+    const [, w] = IO.pipe();
+    expect(() => w.writeNonblock(4096, { exception: 1 as never })).toThrow(ArgumentError);
+  });
+
+  it("test_write_nonblock_no_exceptions", () => {
+    const [, w] = IO.pipe();
+    let ret: number | string;
+    do ret = w.writeNonblock("a".repeat(100000), { exception: false });
+    while (typeof ret === "number");
+    expect(ret).toBe("wait_writable");
+  });
+
+  it("wait_readable resolves on a write and on a timeout", async () => {
+    const [r, w] = IO.pipe();
+    expect(await r.waitReadable(0.01)).toBeNull();
+    const waiting = r.waitReadable(1);
+    w.write("x");
+    expect(await waiting).toBe(r);
+    expect(() => r.readNonblock(0)).not.toThrow();
+  });
+
+  it("raises EOFError once the writer is closed", () => {
+    const [r, w] = IO.pipe();
+    w.close();
+    expect(() => r.readNonblock(1)).toThrow(EOFError);
+  });
+
+  it("wait_readable raises IOError when the reader is closed during the wait", async () => {
+    const [r] = IO.pipe();
+    const waiting = r.waitReadable();
+    r.close();
+    await expect(waiting).rejects.toThrow(IOError);
+  });
+
+  it("read raises EAGAINWaitReadable where io_read would block", () => {
+    const [r, w] = IO.pipe();
+    w.write("ab");
+    expect(() => r.read(4)).toThrow(IO.EAGAINWaitReadable);
+    expect(() => r.read()).toThrow(IO.EAGAINWaitReadable);
+    w.close();
+    expect(text(r.read(4))).toBe("ab");
+    expect(r.read(4)).toBeNull();
+  });
+
+  it("read(0) answers an empty buffer at end of file", () => {
+    const [r, w] = IO.pipe();
+    w.close();
+    expect(r.read(0)).toEqual(new Uint8Array(0));
   });
 });

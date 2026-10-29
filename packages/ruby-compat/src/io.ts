@@ -1,4 +1,4 @@
-import { rtest } from "./object.js";
+import { rbInspect, rbObjAsString, rtest } from "./object.js";
 import { ConverterNotFoundError } from "./converter-not-found-error.js";
 import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 import { Encoding } from "./encoding.js";
@@ -935,6 +935,26 @@ export class IO {
   }
 
   /**
+   * `IO.pipe` (`vendor/ruby/v3.3.11/io.c:11828` `rb_io_s_pipe`): a reader and a
+   * writer over one in-process byte buffer standing in for the kernel's pipe,
+   * whose capacity (Linux's default 64KiB) bounds what `write_nonblock` takes
+   * before `IO::EAGAINWaitWritable`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO.pipe`
+   * (`vendor/ruby/v3.3.11/io.c:11828`).
+   */
+  static pipe(): [PipeIO, PipeIO] {
+    const pipe: PipeBuffer = {
+      chunks: [],
+      length: 0,
+      readerClosed: false,
+      writerClosed: false,
+      waiting: [],
+    };
+    return [new PipeIO(pipe, "r"), new PipeIO(pipe, "w")];
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/io.c:13365` `rb_io_s_copy_stream`, in the IO-to-IO form
    * `Entry_#copy_file` calls (`vendor/ruby/v3.3.11/lib/fileutils.rb:2280`). With no
    * `src_length` and no `src_offset`, `nogvl_copy_stream_read_write`
@@ -1496,3 +1516,232 @@ export const STDOUT: IO = prepStdio(stdout, 1, "w", IO, "<STDOUT>");
  * @noRailsEquivalent PERMANENT — Ruby core `STDERR` (`vendor/ruby/v3.3.11/io.c:15588`).
  */
 export const STDERR: IO = prepStdio(stderr, 2, "w", IO, "<STDERR>");
+
+const PIPE_CAPACITY = 64 * 1024;
+
+interface PipeBuffer {
+  chunks: Uint8Array[];
+  length: number;
+  readerClosed: boolean;
+  writerClosed: boolean;
+  waiting: (() => void)[];
+}
+
+/**
+ * One end of an {@link IO.pipe}: the reader opened `"r"`, the writer `"w"`,
+ * as `rb_io_s_pipe` opens them (`vendor/ruby/v3.3.11/io.c:11845-11858`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO` over a `pipe(2)` descriptor.
+ */
+export class PipeIO extends IO {
+  private readonly _pipe: PipeBuffer;
+  private _closed = false;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(pipe: PipeBuffer, vmode: "r" | "w") {
+    super(-1, null, vmode);
+    this.binmode();
+    this._pipe = pipe;
+  }
+
+  /**
+   * `IO#read` (`vendor/ruby/v3.3.11/io.c:3731` `io_read`) over the bytes
+   * written so far: all of them with no length, else at most `length`, and
+   * `nil` once the writer is closed and the buffer is empty. Where `io_read`
+   * would block — the writer still open and fewer than `length` bytes (or, with
+   * no length, end of file not yet reached) — a JS caller cannot be parked, so
+   * it raises `IO::EAGAINWaitReadable`; {@link waitReadable} is the wait. `str`
+   * is filled up to its own length, since a `Uint8Array` cannot be resized.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  override read(): string | Uint8Array;
+  override read(length: null, str?: Uint8Array | null): string | Uint8Array;
+  override read(length: number, str?: Uint8Array | null): Uint8Array | null;
+  override read(length: number | null, str?: Uint8Array | null): string | Uint8Array | null;
+  override read(length?: number | null, str?: Uint8Array | null): string | Uint8Array | null {
+    this._checkReadable();
+    if (!this._pipe.writerClosed && (length == null || this._pipe.length < length)) {
+      throw new IO.EAGAINWaitReadable("read would block");
+    }
+    if (length == null) length = this._pipe.length;
+    else if (this._pipe.length === 0 && length > 0) {
+      if (str) str.fill(0);
+      return null;
+    }
+    const out = this._shift(length);
+    if (str) str.set(out.subarray(0, str.length));
+    return out;
+  }
+
+  /**
+   * `IO#read_nonblock` (`vendor/ruby/v3.3.11/io.rb:62`, `io.c:3611`
+   * `io_read_nonblock`): at most `len` of the bytes written so far. A
+   * non-boolean `exception` raises `ArgumentError`. With none buffered it
+   * raises `IO::EAGAINWaitReadable` ("read would block", `io.c:3648`), or
+   * answers `:wait_readable` (`io.c:3647`); once the writer is closed it
+   * raises `EOFError`, or answers `nil` (`io.c:3656-3659`). `buf` is filled
+   * up to its own length and zeroed at end of file, as `BasicSocket`'s
+   * is: a `Uint8Array` cannot be resized to the bytes read.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  readNonblock(
+    len: number,
+    buf: Uint8Array | null = null,
+    { exception = true }: { exception?: boolean } = {},
+  ): Uint8Array | "wait_readable" | null {
+    if (len < 0) throw new ArgumentError(`negative length ${len} given`);
+    if (exception !== true && exception !== false) {
+      throw new ArgumentError(`expected true or false as exception: ${rbInspect(exception)}`);
+    }
+    this._checkReadable();
+    if (len === 0) return new Uint8Array(0);
+    if (this._pipe.length === 0) {
+      if (!this._pipe.writerClosed) {
+        if (!exception) return "wait_readable";
+        throw new IO.EAGAINWaitReadable("read would block");
+      }
+      if (buf) buf.fill(0);
+      if (!exception) return null;
+      throw new EOFError("end of file reached");
+    }
+    const out = this._shift(len);
+    if (buf) buf.set(out.subarray(0, buf.length));
+    return out;
+  }
+
+  /**
+   * `IO#wait_readable` (`vendor/ruby/v3.3.11/io.c:9742` `io_wait_readable`):
+   * resolves with the reader once a byte or end of file can be read, or with
+   * `nil` once `timeout` seconds pass first (`io.c:9710-9716`). A reader
+   * closed during the wait raises `IOError` (`io.c:1451-1458`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async waitReadable(timeout: number | null = null): Promise<this | null> {
+    this._checkReadable();
+    if (timeout !== null && timeout < 0)
+      throw new ArgumentError("time interval must not be negative");
+    if (this._pipe.length > 0 || this._pipe.writerClosed) return this;
+    const ready = await new Promise<boolean>((resolve) => {
+      const wake = (): void => {
+        if (timer !== null) clearTimeout(timer);
+        resolve(true);
+      };
+      const timer =
+        timeout === null
+          ? null
+          : setTimeout(() => {
+              this._pipe.waiting.splice(this._pipe.waiting.indexOf(wake), 1);
+              resolve(false);
+            }, timeout * 1000);
+      this._pipe.waiting.push(wake);
+    });
+    if (this._closed) throw new IOError("closed stream");
+    return ready ? this : null;
+  }
+
+  /**
+   * `IO#write` (`vendor/ruby/v3.3.11/io.c:2263` `io_write_m`); a pipe whose
+   * reader is closed raises `Errno::EPIPE`, as `write(2)` does.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  override write(string: string | Uint8Array): number {
+    this._checkWritable();
+    const bytes = typeof string === "string" ? new TextEncoder().encode(string) : string;
+    this._push(bytes);
+    return bytes.length;
+  }
+
+  /**
+   * `IO#write_nonblock` (`vendor/ruby/v3.3.11/io.rb:120`, `io.c:3666`
+   * `io_write_nonblock`): `buf` is sent `to_s` (`io.c:3671-3672`), a
+   * non-boolean `exception` raises `ArgumentError` (`io.c:3673`), and as many
+   * bytes as the pipe has room for are written. With no room it raises
+   * `IO::EAGAINWaitWritable` ("write would block", `io.c:3693`), or answers
+   * `:wait_writable` (`io.c:3690`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  writeNonblock(
+    buf: unknown,
+    { exception = true }: { exception?: boolean } = {},
+  ): number | "wait_writable" {
+    const str: string | Uint8Array = rbObjAsString(buf);
+    if (exception !== true && exception !== false) {
+      throw new ArgumentError(`expected true or false as exception: ${rbInspect(exception)}`);
+    }
+    this._checkWritable();
+    const bytes = typeof str === "string" ? new TextEncoder().encode(str) : str;
+    if (bytes.length === 0) return 0;
+    const room = PIPE_CAPACITY - this._pipe.length;
+    if (room <= 0) {
+      if (!exception) return "wait_writable";
+      throw new IO.EAGAINWaitWritable("write would block");
+    }
+    const written = Math.min(room, bytes.length);
+    this._push(bytes.slice(0, written));
+    return written;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  override isClosed(): boolean {
+    return this._closed;
+  }
+
+  /**
+   * `IO#close` (`vendor/ruby/v3.3.11/io.c:5777`): closing the writer is end of
+   * file to the reader; closing the reader drops what it had not read.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  override close(): null {
+    if (this._closed) return null;
+    this._closed = true;
+    if (this.mode & FMODE_WRITABLE) {
+      this._pipe.writerClosed = true;
+    } else {
+      this._pipe.readerClosed = true;
+      this._pipe.chunks = [];
+      this._pipe.length = 0;
+    }
+    for (const wake of this._pipe.waiting.splice(0)) wake();
+    return null;
+  }
+
+  private _checkReadable(): void {
+    if (this._closed) throw new IOError("closed stream");
+    if (!(this.mode & FMODE_READABLE)) throw new IOError("not opened for reading");
+  }
+
+  private _checkWritable(): void {
+    if (this._closed) throw new IOError("closed stream");
+    if (!(this.mode & FMODE_WRITABLE)) throw new IOError("not opened for writing");
+    if (this._pipe.readerClosed) throw new Errno.EPIPE();
+  }
+
+  private _push(bytes: Uint8Array): void {
+    if (bytes.length === 0) return;
+    this._pipe.chunks.push(bytes);
+    this._pipe.length += bytes.length;
+    for (const wake of this._pipe.waiting.splice(0)) wake();
+  }
+
+  private _shift(length: number): Uint8Array {
+    const pipe = this._pipe;
+    const out = new Uint8Array(Math.min(length, pipe.length));
+    let n = 0;
+    while (n < out.length) {
+      const chunk = pipe.chunks[0];
+      const take = Math.min(chunk.length, out.length - n);
+      out.set(chunk.subarray(0, take), n);
+      n += take;
+      if (take === chunk.length) pipe.chunks.shift();
+      else pipe.chunks[0] = chunk.subarray(take);
+    }
+    pipe.length -= n;
+    return out;
+  }
+}
