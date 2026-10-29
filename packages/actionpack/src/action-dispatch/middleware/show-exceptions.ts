@@ -1,4 +1,4 @@
-import { excBacktrace, rbFSend, stderr } from "@blazetrails/ruby-compat";
+import { excBacktrace, stderr, rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_LENGTH, CONTENT_TYPE } from "@blazetrails/rack";
 import type { BacktraceCleaner } from "@blazetrails/activesupport";
@@ -19,7 +19,7 @@ export class ShowExceptions {
 
   async call(env: RackEnv): Promise<RackResponse> {
     try {
-      return await (rbFSend(this.app, "call", env) as Promise<RackResponse>);
+      return await (rbProcCall(this.app, env) as Promise<RackResponse>);
     } catch (error) {
       const exception = error instanceof Error ? error : new Error(String(error));
       const request = new Request(env);
@@ -50,11 +50,7 @@ export class ShowExceptions {
       this.fallbackToHtmlFormatIfInvalidMimeType(request);
       request.pathInfo = `/${status}`;
       request.requestMethod = "GET";
-      const response = await (rbFSend(
-        this.exceptionsApp,
-        "call",
-        request.env,
-      ) as Promise<RackResponse>);
+      const response = await (rbProcCall(this.exceptionsApp, request.env) as Promise<RackResponse>);
       return response[1][X_CASCADE] === "pass" ? this.passResponse(status) : response;
     } catch (failsafeError) {
       stderr.write(

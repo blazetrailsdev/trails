@@ -1,4 +1,4 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Logger as ASLogger } from "@blazetrails/activesupport";
 
@@ -31,12 +31,12 @@ export class SilenceRequest {
       if (logger.silenceAsync) {
         return logger.silenceAsync(
           ERROR_LEVEL,
-          () => rbFSend(this.app, "call", env) as ReturnType<typeof this.app>,
+          () => rbProcCall(this.app, env) as ReturnType<typeof this.app>,
         );
       }
       let pending: Promise<RackResponse> | undefined;
       logger.silence(ERROR_LEVEL, () => {
-        pending = rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+        pending = rbProcCall(this.app, env) as ReturnType<typeof this.app>;
       });
       if (!pending) {
         throw new Error(
@@ -45,6 +45,6 @@ export class SilenceRequest {
       }
       return pending;
     }
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    return rbProcCall(this.app, env) as ReturnType<typeof this.app>;
   }
 }

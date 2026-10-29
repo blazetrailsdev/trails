@@ -1,4 +1,4 @@
-import { Exception, StandardError, rbFSend } from "@blazetrails/ruby-compat";
+import { Exception, StandardError, rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackHeaders, RackResponse, RackBody } from "./index.js";
 import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";
@@ -80,11 +80,7 @@ export class Events {
     let response: BufferedResponse | undefined;
     try {
       let status: number, headers: RackHeaders;
-      [status, headers, body] = await (rbFSend(
-        this.app,
-        "call",
-        request.env,
-      ) as ReturnType<RackApp>);
+      [status, headers, body] = await (rbProcCall(this.app, request.env) as ReturnType<RackApp>);
       response = this.makeResponse(status, headers, body);
       this.onCommit(request, response);
     } catch (e) {

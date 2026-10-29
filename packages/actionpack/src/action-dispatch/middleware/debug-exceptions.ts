@@ -1,4 +1,11 @@
-import { fetch, rbInspect, rbObjRespondTo, rtest, stderr, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  rbInspect,
+  rbObjRespondTo,
+  rtest,
+  stderr,
+  rbProcCall,
+} from "@blazetrails/ruby-compat";
 import {
   camelize,
   HASH_CONVERSIONS,
@@ -178,7 +185,7 @@ export class DebugExceptions {
 
   async call(env: RackEnv): Promise<RackResponse> {
     try {
-      const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+      const response = await (rbProcCall(this.app, env) as ReturnType<typeof this.app>);
       const [, headers, body] = response;
 
       if (headers[X_CASCADE] === "pass") {

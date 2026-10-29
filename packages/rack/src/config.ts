@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
 export class Config {
@@ -13,6 +13,6 @@ export class Config {
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     this.block(env);
-    return rbFSend(this.app, "call", env) as ReturnType<RackApp>;
+    return rbProcCall(this.app, env) as ReturnType<RackApp>;
   }
 }

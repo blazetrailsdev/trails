@@ -33,6 +33,7 @@ import {
   rbStrSend,
   toI,
   aryDelete,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 import {
   Dir,
@@ -2123,7 +2124,7 @@ export class CheckPending {
       }
     });
 
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    return rbProcCall(this.app, env) as ReturnType<typeof this.app>;
   }
 
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {

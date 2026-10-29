@@ -1645,7 +1645,10 @@ direct property read becomes a prototype walk plus a table lookup. By
 repo-owner ruling on 2026-10-20:
 
 **Write the member call directly.** Wherever the name is known where the call
-is written, spell it — `app.call(env)`, with `app` typed. An `rbFSend` with a
+is written, spell it — `app.call(env)`, with `app` typed. Where the
+receiver may be a proc (a Rack app, a block, a callable option), Ruby's
+`x.call(...)` is `rbProcCall(x, ...)`: it applies a function directly and
+calls anything else's own `call`, and the call gates credit it as `call`. An `rbFSend` with a
 string literal for a name, or one standing in for a cast the author did not
 want to write, is a direct call with the types discarded. This is not a
 preference between shapes: it is the answer at nearly every call site in the

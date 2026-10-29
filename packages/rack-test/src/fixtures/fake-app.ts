@@ -7,7 +7,7 @@ import {
   type RackEnv,
   type RackResponse,
 } from "@blazetrails/rack";
-import { rbFSend, rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect, rbProcCall } from "@blazetrails/ruby-compat";
 
 /** @internal */
 type FakeResponse = [number, Record<string, string | string[]>, string[]];
@@ -180,7 +180,7 @@ export class InputRewinder {
   async call(env: RackEnv): Promise<RackResponse> {
     const input = env["rack.input"] as { rewind(): void } | undefined;
     try {
-      return await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+      return await (rbProcCall(this.app, env) as ReturnType<typeof this.app>);
     } finally {
       if (input) {
         input.rewind();

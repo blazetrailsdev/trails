@@ -18,11 +18,11 @@ import {
   type Generic,
   hashAref,
   hashAset,
-  rbFSend,
   rbInspect,
   rbStrSend,
   stringSplit,
   URI,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 import { Head, MethodOverride, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { RoutesHelpers } from "../abstract-controller/trailties/routes-helpers.js";
@@ -127,7 +127,7 @@ export class RoutedRackApp {
   }
 
   call(env: RackEnv): Promise<RackResponse> {
-    return rbFSend(this._app, "call", env) as Promise<RackResponse>;
+    return rbProcCall(this._app, env) as Promise<RackResponse>;
   }
 
   config(): Config {

@@ -5,7 +5,7 @@ import {
   StringIO,
   TCPSocket,
   Thread,
-  rbFSend,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 import type { HttpRequest, HttpResponse, HttpServer, HttpSocket } from "@blazetrails/ruby-compat";
 import {
@@ -97,11 +97,7 @@ export class Node {
       if (env[RACK_IS_HIJACK]) env[RACK_HIJACK] = release;
 
       try {
-        const [status, headers, body] = await (rbFSend(
-          this.app,
-          "call",
-          env,
-        ) as Promise<RackResponse>);
+        const [status, headers, body] = await (rbProcCall(this.app, env) as Promise<RackResponse>);
         try {
           if (hijacked) return;
           const partial = headers[RACK_HIJACK];
@@ -206,11 +202,7 @@ export class Node {
           return io!;
         };
 
-        const [status, headers, body] = await (rbFSend(
-          this.app,
-          "call",
-          env,
-        ) as Promise<RackResponse>);
+        const [status, headers, body] = await (rbProcCall(this.app, env) as Promise<RackResponse>);
         try {
           if (hijacked) return;
           const partial = headers[RACK_HIJACK] as unknown;

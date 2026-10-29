@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
@@ -13,7 +13,7 @@ export class ContentType {
   }
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
+    const response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
     const [status, headers] = response;
     if (!Object.hasOwn(STATUS_WITH_NO_ENTITY_BODY, status)) {
       if (!headers[CONTENT_TYPE]) {

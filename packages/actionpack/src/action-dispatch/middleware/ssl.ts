@@ -1,6 +1,6 @@
 import type { RackEnv, RackHeaders, RackResponse } from "@blazetrails/rack";
 import { CONTENT_TYPE, RELEASE, SET_COOKIE } from "@blazetrails/rack";
-import { fetch, Gem, rbFSend, toI } from "@blazetrails/ruby-compat";
+import { fetch, Gem, toI, rbProcCall } from "@blazetrails/ruby-compat";
 import { LOCATION, STRICT_TRANSPORT_SECURITY } from "../constants.js";
 import { Request } from "../http/request.js";
 
@@ -72,17 +72,13 @@ export class SSL {
     const request = new Request(env);
 
     if (request.ssl) {
-      const [status, headers, body] = await (rbFSend(
-        this.app,
-        "call",
-        env,
-      ) as Promise<RackResponse>);
+      const [status, headers, body] = await (rbProcCall(this.app, env) as Promise<RackResponse>);
       this.setHstsHeaderBang(headers);
       if (this.secureCookies && !this.exclude(request)) this.flagCookiesAsSecureBang(headers);
       return [status, headers, body];
     } else {
       if (!this.exclude(request)) return this.redirectToHttps(request);
-      return rbFSend(this.app, "call", env) as Promise<RackResponse>;
+      return rbProcCall(this.app, env) as Promise<RackResponse>;
     }
   }
 

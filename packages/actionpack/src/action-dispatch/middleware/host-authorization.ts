@@ -2,7 +2,7 @@ import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { isBlank, type Logger } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import { Request } from "../http/request.js";
-import { IPAddr, regexpEscape, rbEqq, rbFSend, rtest } from "@blazetrails/ruby-compat";
+import { IPAddr, regexpEscape, rbEqq, rtest, rbProcCall } from "@blazetrails/ruby-compat";
 import { DebugView } from "./debug-view.js";
 
 /** @internal */
@@ -126,18 +126,18 @@ export class HostAuthorization {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    if (this.permissions.empty()) return rbFSend(this.app, "call", env) as Promise<RackResponse>;
+    if (this.permissions.empty()) return rbProcCall(this.app, env) as Promise<RackResponse>;
 
     const request = new Request(env);
     const blocked = this.blockedHosts(request);
 
     if (blocked.length === 0 || this.isExcluded(request)) {
       this.markAsAuthorized(request);
-      return rbFSend(this.app, "call", env) as Promise<RackResponse>;
+      return rbProcCall(this.app, env) as Promise<RackResponse>;
     }
 
     env["action_dispatch.blocked_hosts"] = blocked;
-    return rbFSend(this.responseApp, "call", env) as Promise<RackResponse>;
+    return rbProcCall(this.responseApp, env) as Promise<RackResponse>;
   }
 
   /** @internal */

@@ -1,4 +1,4 @@
-import { fetch, rbFSend } from "@blazetrails/ruby-compat";
+import { fetch, rbProcCall } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { TopLevel } from "@blazetrails/activesupport";
 
@@ -30,10 +30,7 @@ export class ShardSelector {
 
     const shard = this.selectedShard(request);
 
-    return this.setShard(
-      shard,
-      () => rbFSend(this.app, "call", env) as ReturnType<typeof this.app>,
-    );
+    return this.setShard(shard, () => rbProcCall(this.app, env) as ReturnType<typeof this.app>);
   }
 
   /** @internal */

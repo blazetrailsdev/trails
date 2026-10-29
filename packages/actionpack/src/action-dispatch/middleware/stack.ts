@@ -3,7 +3,7 @@ import {
   deleteAt,
   rbInspect,
   rbBlockGivenP,
-  rbFSend,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 import { Notifications } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
@@ -73,7 +73,7 @@ export class InstrumentationProxy {
     return Notifications.instrument(
       InstrumentationProxy.EVENT_NAME,
       this._payload,
-      () => rbFSend(this._middleware, "call", env) as Promise<RackResponse>,
+      () => rbProcCall(this._middleware, env) as Promise<RackResponse>,
     );
   }
 }

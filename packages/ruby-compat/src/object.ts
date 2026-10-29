@@ -571,13 +571,17 @@ export function rbObjIsProc(proc: unknown): proc is AnyFunction {
 /**
  * Ruby's `callable.call(*args)`: `rb_proc_call` (`vendor/ruby/v3.3.11/proc.c:990`)
  * applies a proc to the arguments, where JS `Function.prototype.call` would
- * take the first as `this`; any other receiver answers its own `call`.
+ * take the first as `this`; any other receiver answers its own `call`, and one
+ * with no `call` member is sent `call`, so it reaches `method_missing` or
+ * raises `NoMethodError` as {@link rbFSend} does.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbProcCall(callable: unknown, ...args: unknown[]): unknown {
   if (rbObjIsProc(callable)) return callable(...args);
-  return (callable as { call(...a: unknown[]): unknown }).call(...args);
+  const call = (callable as { call?: unknown } | null | undefined)?.call;
+  if (typeof call === "function") return (call as AnyFunction).apply(callable, args);
+  return sendInternal(args.length + 1, ["call", ...args], callable);
 }
 
 /**

@@ -1,11 +1,11 @@
 import type { RackHeaders } from "./index.js";
 import {
   File,
-  rbFSend,
   rbInspect,
   rbObjClass,
   rbObjId,
   rbObjRespondTo,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 import { chomp } from "@blazetrails/ruby-compat";
 
@@ -415,7 +415,7 @@ export class ShowExceptions {
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     try {
-      return await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
+      return await (rbProcCall(this.app, env) as ReturnType<RackApp>);
     } catch (e: any) {
       const exceptionString = this.dumpException(e);
 

@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import { clockTime } from "./utils.js";
 import type { RackApp } from "./mock-request.js";
 
@@ -15,7 +15,7 @@ export class Runtime {
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const startTime = clockTime();
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
+    const response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
     const [, headers] = response;
     const requestTime = clockTime() - startTime;
 

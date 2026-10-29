@@ -9,10 +9,10 @@ import {
   ArgumentError,
   hashDelete,
   isEmpty,
-  rbFSend,
   rbObjIsProc,
   rbObjRespondTo,
   URI,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 
 export { Endpoint } from "./endpoint.js";
@@ -93,7 +93,7 @@ export class Redirect<B = unknown> extends Endpoint {
   }
 
   path(params: Record<string, string>, request: Request): string {
-    return rbFSend(this.block, "call", params, request) as string;
+    return rbProcCall(this.block, params, request) as string;
   }
 
   inspect(): string {

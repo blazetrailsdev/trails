@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { ArgumentError, StringIO, URI, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
+import { ArgumentError, StringIO, URI, rbObjDup, rbProcCall } from "@blazetrails/ruby-compat";
 import type { Generic } from "@blazetrails/ruby-compat";
 import {
   GET,
@@ -49,7 +49,7 @@ export class Recursive {
   async _call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     this.scriptName = env[SCRIPT_NAME];
     try {
-      return await (rbFSend(this.app, "call", {
+      return await (rbProcCall(this.app, {
         ...env,
         [RACK_RECURSIVE_INCLUDE]: this.include.bind(this),
       }) as ReturnType<RackApp>);
@@ -78,6 +78,6 @@ export class Recursive {
       CONTENT_TYPE: "",
       [RACK_INPUT]: new StringIO(""),
     };
-    return rbFSend(this.app, "call", newEnv) as ReturnType<RackApp>;
+    return rbProcCall(this.app, newEnv) as ReturnType<RackApp>;
   }
 }

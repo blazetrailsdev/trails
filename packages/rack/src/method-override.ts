@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { ArgumentError, rbFSend, toS, upcase } from "@blazetrails/ruby-compat";
+import { ArgumentError, toS, upcase, rbProcCall } from "@blazetrails/ruby-compat";
 import { REQUEST_METHOD, RACK_METHODOVERRIDE_ORIGINAL_METHOD, RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
@@ -31,7 +31,7 @@ export class MethodOverride {
         env[REQUEST_METHOD] = method;
       }
     }
-    return rbFSend(this.app, "call", env) as ReturnType<RackApp>;
+    return rbProcCall(this.app, env) as ReturnType<RackApp>;
   }
 
   private methodOverride(env: Record<string, any>): string | null {

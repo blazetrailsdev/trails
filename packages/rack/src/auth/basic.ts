@@ -1,6 +1,6 @@
 import type { RackApp } from "../mock-request.js";
 import type { RackHeaders } from "../index.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import { AbstractHandler } from "./abstract/handler.js";
 import { AbstractRequest } from "./abstract/request.js";
 
@@ -17,7 +17,7 @@ export class Basic extends AbstractHandler {
     if (await this.isValid(auth)) {
       env["REMOTE_USER"] = auth.username();
 
-      return rbFSend(this.app, "call", env) as ReturnType<RackApp>;
+      return rbProcCall(this.app, env) as ReturnType<RackApp>;
     }
 
     return this.unauthorized();

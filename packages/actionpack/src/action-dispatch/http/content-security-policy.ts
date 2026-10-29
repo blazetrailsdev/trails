@@ -2,8 +2,8 @@ import {
   ArgumentError,
   RuntimeError,
   hashDelete,
-  rbFSend,
   rbInspect,
+  rbProcCall,
 } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackHeaders, RackResponse } from "@blazetrails/rack";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
@@ -53,7 +53,7 @@ export class Middleware {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    const response = await (rbProcCall(this.app, env) as ReturnType<typeof this.app>);
     const [status, headers] = response;
 
     if (status === 304) return response;

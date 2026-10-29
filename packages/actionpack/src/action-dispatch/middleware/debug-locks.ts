@@ -1,5 +1,5 @@
 import { Dependencies, type ShareLockThreadInfo } from "@blazetrails/activesupport";
-import { rbFSend, rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect, rbProcCall } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
@@ -24,7 +24,7 @@ export class DebugLocks {
       }
     }
 
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    return rbProcCall(this.app, env) as ReturnType<typeof this.app>;
   }
 
   /** @internal */

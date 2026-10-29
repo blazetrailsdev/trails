@@ -1,4 +1,4 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import {
   Callbacks as ASCallbacks,
   include,
@@ -32,7 +32,7 @@ export class Callbacks {
     let error: unknown = null;
     await this.runCallbacks("call", async () => {
       try {
-        result = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+        result = await (rbProcCall(this.app, env) as ReturnType<typeof this.app>);
       } catch (e) {
         error = e;
       }
