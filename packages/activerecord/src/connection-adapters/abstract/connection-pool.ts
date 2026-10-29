@@ -14,6 +14,7 @@ import {
   Thread,
   ThreadPoolExecutor,
 } from "@blazetrails/ruby-compat";
+import { count } from "@blazetrails/ruby-compat/enumerable";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
@@ -601,6 +602,7 @@ export class ConnectionPool implements ReapablePool {
     return this._available?.numWaiting() ?? 0;
   }
 
+  /** @missingRailsName connections — PERMANENT */
   stat(): {
     size: number;
     connections: number;
@@ -613,9 +615,9 @@ export class ConnectionPool implements ReapablePool {
     return {
       size: this.size,
       connections: this._connections!.length,
-      busy: this._connections!.filter((c) => c.isInUse() && c.owner!.isAlive()).length,
-      dead: this._connections!.filter((c) => c.isInUse() && !c.owner!.isAlive()).length,
-      idle: this._connections!.filter((c) => !c.isInUse()).length,
+      busy: count(this._connections!, (c: DatabaseAdapter) => c.isInUse() && c.owner!.isAlive()),
+      dead: count(this._connections!, (c: DatabaseAdapter) => c.isInUse() && !c.owner!.isAlive()),
+      idle: count(this._connections!, (c: DatabaseAdapter) => !c.isInUse()),
       waiting: this.numWaitingInQueue(),
       checkoutTimeout: this.checkoutTimeout,
     };
