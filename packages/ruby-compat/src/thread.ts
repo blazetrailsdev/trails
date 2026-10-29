@@ -33,11 +33,13 @@ function _creationFrame(): string {
   const v8 = Error as { stackTraceLimit?: number };
   const limit = v8.stackTraceLimit;
   v8.stackTraceLimit = 3;
+  let error: Error;
   try {
-    return new Error().stack?.split("\n")[3] ?? "";
+    error = new Error();
   } finally {
     v8.stackTraceLimit = limit;
   }
+  return error.stack?.split("\n")[3] ?? "";
 }
 const _wakeups = new WeakMap<object, (() => void) | true>();
 const _locals = new WeakMap<object, Map<string, unknown>>();
