@@ -8,6 +8,7 @@ import {
   rbGetKwargs,
   rbInspect,
   rbFSend,
+  rbObjAsString,
   rbObjRespondTo,
   ArgumentError,
   warn,
@@ -70,11 +71,11 @@ class Processor extends BaseProcessor {
   }
 
   resizeToLimit(width: unknown, height: unknown, options: Options = {}): CliTool {
-    return this.thumbnail(`${width}x${height}>`, options);
+    return this.thumbnail(`${rbObjAsString(width)}x${rbObjAsString(height)}>`, options);
   }
 
   resizeToFit(width: unknown, height: unknown, options: Options = {}): CliTool {
-    return this.thumbnail(`${width}x${height}`, options);
+    return this.thumbnail(`${rbObjAsString(width)}x${rbObjAsString(height)}`, options);
   }
 
   resizeToFill(
@@ -82,10 +83,10 @@ class Processor extends BaseProcessor {
     height: unknown,
     { gravity = "Center", ...options }: Options = {},
   ): CliTool {
-    this.thumbnail(`${width}x${height}^`, options);
+    this.thumbnail(`${rbObjAsString(width)}x${rbObjAsString(height)}^`, options);
     this.magick.gravity(gravity);
     this.magick.background(this.color("transparent"));
-    return this.magick.extent(`${width}x${height}`);
+    return this.magick.extent(`${rbObjAsString(width)}x${rbObjAsString(height)}`);
   }
 
   resizeAndPad(
@@ -93,14 +94,14 @@ class Processor extends BaseProcessor {
     height: unknown,
     { background = "transparent", gravity = "Center", ...options }: Options = {},
   ): CliTool {
-    this.thumbnail(`${width}x${height}`, options);
+    this.thumbnail(`${rbObjAsString(width)}x${rbObjAsString(height)}`, options);
     this.magick.background(this.color(background));
     this.magick.gravity(gravity);
-    return this.magick.extent(`${width}x${height}`);
+    return this.magick.extent(`${rbObjAsString(width)}x${rbObjAsString(height)}`);
   }
 
   resizeToCover(width: unknown, height: unknown, options: Options = {}): CliTool {
-    return this.thumbnail(`${width}x${height}^`, options);
+    return this.thumbnail(`${rbObjAsString(width)}x${rbObjAsString(height)}^`, options);
   }
 
   crop(...args: unknown[]): CliTool {

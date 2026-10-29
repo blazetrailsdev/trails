@@ -9,7 +9,7 @@ const ABSOLUTE_PATH = /^\//;
 
 /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:1511` `rb_cPathname` */
 export class Pathname {
-  private readonly path: string;
+  private readonly _path: string;
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:97` `path_initialize`, whose `RB_TYPE_P(arg, T_STRING)` arm and `StringValue` (`:100-107`) take a binary String too */
   constructor(arg: string | Uint8Array | { toPath(): string }) {
@@ -17,35 +17,35 @@ export class Pathname {
       typeof arg === "string" || arg instanceof Uint8Array ? arg : arg.toPath(),
     );
     if (str.includes("\0")) throw new ArgumentError("pathname contains null byte");
-    this.path = str;
+    this._path = str;
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:139` `path_eq` */
   equals(other: unknown): boolean {
     if (!(other instanceof Pathname)) return false;
-    return this.path === other.path;
+    return this._path === other._path;
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:215` `path_to_s`, aliased `to_path` */
   toString(): string {
-    return this.path;
+    return this._path;
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:215` `path_to_s` */
   toPath(): string {
-    return this.path;
+    return this._path;
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:259` `path_sub_ext`, which keeps an extension of one character, a bare `.` (`:274-276`) */
   subExt(repl: string): Pathname {
-    const ext = File.extname(this.path);
-    const str2 = this.path.slice(0, this.path.length - (ext.length <= 1 ? 0 : ext.length));
+    const ext = File.extname(this._path);
+    const str2 = this._path.slice(0, this._path.length - (ext.length <= 1 ? 0 : ext.length));
     return new (this.constructor as typeof Pathname)(str2 + repl);
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:873` `path_exist_p` */
   isExist(): boolean {
-    return File.isExist(this.path);
+    return File.isExist(this._path);
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:647` `path_open` */
@@ -90,7 +90,7 @@ export class Pathname {
   }
 
   private cleanpathAggressive(): Pathname {
-    const path = this.path;
+    const path = this._path;
     const names: string[] = [];
     let pre = path;
     let r: [string, string] | null;
@@ -136,7 +136,7 @@ export class Pathname {
   }
 
   private cleanpathConservative(): Pathname {
-    const path = this.path;
+    const path = this._path;
     const names: string[] = [];
     let pre = path;
     let r: [string, string] | null;
@@ -165,13 +165,13 @@ export class Pathname {
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:233` */
   isAbsolute(): boolean {
-    return ABSOLUTE_PATH.test(this.path);
+    return ABSOLUTE_PATH.test(this._path);
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:356` `+` */
   plusOp(other: Pathname | string): Pathname {
     if (!(other instanceof Pathname)) other = new Pathname(other);
-    return new Pathname(this.plus(this.path, other.toString()));
+    return new Pathname(this.plus(this._path, other.toString()));
   }
 
   private plus(path1: string, path2: string): string {

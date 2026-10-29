@@ -1,7 +1,7 @@
 export { ArgumentError } from "./argument-error.js";
 export { ConverterNotFoundError } from "./converter-not-found-error.js";
 export { DelegateClass, Delegator, SimpleDelegator } from "./delegate.js";
-export { Dir } from "./dir.js";
+export { createTmpname, Dir } from "./dir.js";
 export { EncodingError } from "./encoding-error.js";
 export { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 export { UndefinedConversionError } from "./undefined-conversion-error.js";
