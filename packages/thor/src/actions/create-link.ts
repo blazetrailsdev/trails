@@ -18,7 +18,7 @@ export class CreateLink extends CreateFile {
     return (await this.isExists()) && (await File.isIdenticalAsync(source, this.destination));
   }
 
-  override async invokeBang(): Promise<unknown> {
+  override async invokeBang(): Promise<string> {
     await this.invokeWithConflictCheck(async () => {
       await FileUtils.mkdirPAsync(File.dirname(this.destination));
       if (this.config["symbolic"] == null) this.config["symbolic"] = true;

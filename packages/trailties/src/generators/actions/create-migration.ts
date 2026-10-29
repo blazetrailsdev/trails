@@ -37,10 +37,10 @@ export class CreateMigration extends CreateFile {
     );
   }
 
-  override async invokeBang(): Promise<string | undefined> {
-    if (rtest(this.isPretend())) return (await super.invokeBang()) as string;
+  override async invokeBang(): Promise<string> {
+    if (rtest(this.isPretend())) return super.invokeBang();
 
-    const invokedFile = (await super.invokeBang()) as string;
+    const invokedFile = await super.invokeBang();
     return (await getFs().exists(this.destination))
       ? invokedFile
       : this.relativeExistingMigration();
