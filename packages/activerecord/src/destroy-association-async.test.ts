@@ -15,7 +15,7 @@ import {
 } from "@blazetrails/activesupport";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
-import { include, regexpEscape, registerConstant } from "@blazetrails/ruby-compat";
+import { include, rbEqual, regexpEscape, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import type { TestCase } from "./cases/test-case.js";
 import { RecordNotFound, Rollback } from "./errors.js";
@@ -199,10 +199,8 @@ describe("DestroyAssociationAsyncTest", () => {
       await book.tags.push(tag, tag2);
       await book.saveBang();
 
-      const job1Args = (jobArgs: R) =>
-        JSON.stringify(jobArgs[0].associationIds) === JSON.stringify([tag.id]);
-      const job2Args = (jobArgs: R) =>
-        JSON.stringify(jobArgs[0].associationIds) === JSON.stringify([tag2.id]);
+      const job1Args = (jobArgs: R) => rbEqual(jobArgs[0].associationIds, [tag.id]);
+      const job2Args = (jobArgs: R) => rbEqual(jobArgs[0].associationIds, [tag2.id]);
 
       await t.assertEnqueuedWith({ job: DestroyAssociationAsyncJob, args: job1Args }, () =>
         t.assertEnqueuedWith({ job: DestroyAssociationAsyncJob, args: job2Args }, () =>
