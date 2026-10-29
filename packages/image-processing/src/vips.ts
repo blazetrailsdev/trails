@@ -1,4 +1,10 @@
-import { rbFSend, rbObjRespondTo, ArgumentError, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  warn,
+  rbFSend,
+  rbObjRespondTo,
+  ArgumentError,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import WasmVips from "wasm-vips";
 import { Chainable, chainableProxy } from "./chainable.js";
 import { Error } from "./image-processing.js";
@@ -30,6 +36,117 @@ function addAlpha(image: Image): Image {
   return image.bandjoin(maxAlpha);
 }
 
+const LOAD_OPTIONS = "memory access fail_on revalidate flags fail sequential disc";
+const SAVE_OPTIONS = "keep background page_height profile strip";
+
+/** @noRailsEquivalent PERMANENT */
+const INTROSPECT_OPTIONAL_INPUT: Record<string, string[]> = Object.fromEntries(
+  Object.entries({
+    analyzeload: LOAD_OPTIONS,
+    csvload: `skip lines whitespace separator ${LOAD_OPTIONS}`,
+    gifload: `n page ${LOAD_OPTIONS}`,
+    heifload: `page n thumbnail unlimited ${LOAD_OPTIONS}`,
+    jpegload: `shrink autorotate unlimited ${LOAD_OPTIONS}`,
+    jxlload: `page n ${LOAD_OPTIONS}`,
+    matrixload: LOAD_OPTIONS,
+    pngload: `unlimited ${LOAD_OPTIONS}`,
+    ppmload: LOAD_OPTIONS,
+    radload: LOAD_OPTIONS,
+    svgload: `dpi scale unlimited stylesheet high_bitdepth ${LOAD_OPTIONS}`,
+    tiffload: `page n autorotate subifd unlimited ${LOAD_OPTIONS}`,
+    uhdrload: `shrink ${LOAD_OPTIONS}`,
+    vipsload: LOAD_OPTIONS,
+    webpload: `page n scale ${LOAD_OPTIONS}`,
+    csvsave: `separator ${SAVE_OPTIONS}`,
+    gifsave: `dither effort bitdepth interframe_maxerror reuse interpalette_maxerror interlace keep_duplicate_frames ${SAVE_OPTIONS}`,
+    heifsave: `Q bitdepth lossless compression effort subsample_mode encoder tune ${SAVE_OPTIONS}`,
+    jpegsave: `Q optimize_coding interlace trellis_quant overshoot_deringing optimize_scans quant_table subsample_mode restart_interval ${SAVE_OPTIONS}`,
+    jxlsave: `tier distance effort lossless Q bitdepth ${SAVE_OPTIONS}`,
+    matrixsave: SAVE_OPTIONS,
+    pngsave: `compression interlace filter palette Q dither bitdepth effort ${SAVE_OPTIONS}`,
+    ppmsave: `format ascii bitdepth ${SAVE_OPTIONS}`,
+    radsave: SAVE_OPTIONS,
+    rawsave: SAVE_OPTIONS,
+    tiffsave: `compression Q predictor tile tile_width tile_height pyramid miniswhite bitdepth resunit xres yres bigtiff properties region_shrink level lossless depth subifd premultiply ${SAVE_OPTIONS}`,
+    uhdrsave: `Q gainmap_scale_factor ${SAVE_OPTIONS}`,
+    vipssave: SAVE_OPTIONS,
+    webpsave: `Q lossless exact preset smart_subsample near_lossless alpha_q min_size kmin kmax effort target_size mixed smart_deblock passes ${SAVE_OPTIONS}`,
+  }).map(([operation, names]) => [operation, names.split(" ")]),
+);
+
+const SAVER_SUFFIXES: Record<string, string> = {
+  ".csv": "csvsave",
+  ".gif": "gifsave",
+  ".heic": "heifsave",
+  ".heif": "heifsave",
+  ".avif": "heifsave",
+  ".jpg": "jpegsave",
+  ".jpeg": "jpegsave",
+  ".jpe": "jpegsave",
+  ".jxl": "jxlsave",
+  ".mat": "matrixsave",
+  ".png": "pngsave",
+  ".ppm": "ppmsave",
+  ".pgm": "ppmsave",
+  ".pbm": "ppmsave",
+  ".pfm": "ppmsave",
+  ".pnm": "ppmsave",
+  ".hdr": "radsave",
+  ".tif": "tiffsave",
+  ".tiff": "tiffsave",
+  ".v": "vipssave",
+  ".vips": "vipssave",
+  ".webp": "webpsave",
+};
+
+/** @noRailsEquivalent PERMANENT */
+function vipsForeignFindLoad(filename: string): string | null {
+  try {
+    const loader = vips.Image.newFromFile(filename).getString("vips-loader");
+    return Object.hasOwn(INTROSPECT_OPTIONAL_INPUT, loader) ? loader : null;
+  } catch (error) {
+    if (error instanceof WebAssembly.Exception) return null;
+    throw error;
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+function vipsForeignFindSave(filename: string): string | null {
+  const suffix = /\.[^./[]*(?=(\[.*\])?$)/.exec(filename)?.[0].toLowerCase() ?? "";
+  return SAVER_SUFFIXES[suffix] ?? null;
+}
+
+/** @noRailsEquivalent PERMANENT */
+function imageSet(image: Image, name: string, value: unknown): void {
+  imageSetType(image, image.getTypeof(name), name, value);
+}
+
+/** @noRailsEquivalent PERMANENT */
+function imageSetType(image: Image, gtype: number, name: string, value: unknown): void {
+  switch (gtype) {
+    case vips.Utils.typeFromName("gint"):
+      return image.setInt(name, value as number);
+    case vips.Utils.typeFromName("gdouble"):
+      return image.setDouble(name, value as number);
+    case vips.Utils.typeFromName("gchararray"):
+    case vips.Utils.typeFromName("VipsRefString"):
+      return image.setString(name, value as string);
+    case vips.Utils.typeFromName("VipsBlob"):
+      return image.setBlob(
+        name,
+        typeof value === "string" ? new TextEncoder().encode(value) : (value as Uint8Array),
+      );
+    case vips.Utils.typeFromName("VipsArrayInt"):
+      return image.setArrayInt(name, value as number[]);
+    case vips.Utils.typeFromName("VipsArrayDouble"):
+      return image.setArrayDouble(name, value as number[]);
+    case vips.Utils.typeFromName("VipsImage"):
+      return image.setImage(name, value as Image);
+    default:
+      warn(`unimplemented gtype for set: ${gtype}`);
+  }
+}
+
 class Processor extends BaseProcessor {
   declare readonly image: Image | string;
 
@@ -46,7 +163,6 @@ class Processor extends BaseProcessor {
     24,
   );
 
-  /** @missingRailsCall select_valid_loader_options — CONVERGEABLE image-processing-vips-loader-saver-option-introspection */
   static loadImage(
     pathOrImage: string | Image,
     { loader = null, autorot = true, ...options }: Options = {},
@@ -60,6 +176,7 @@ class Processor extends BaseProcessor {
       if (loader != null && loader !== false) {
         image = rbFSend(vips.Image, `${loader}load`, path, options) as Image;
       } else {
+        options = Processor.Utils.selectValidLoaderOptions(path, options);
         image = vips.Image.newFromFile(path, options);
       }
     }
@@ -74,7 +191,6 @@ class Processor extends BaseProcessor {
     return true;
   }
 
-  /** @missingRailsCall select_valid_saver_options — CONVERGEABLE image-processing-vips-loader-saver-option-introspection */
   static saveImage(
     image: Image,
     path: string,
@@ -85,6 +201,7 @@ class Processor extends BaseProcessor {
     if (saver != null && saver !== false) {
       return rbFSend(image, `${saver}save`, path, options);
     } else {
+      options = Processor.Utils.selectValidSaverOptions(path, options);
       return image.writeToFile(path, options);
     }
   }
@@ -194,6 +311,24 @@ class Processor extends BaseProcessor {
     return image.composite([overlayImage], mode as Parameters<Image["composite"]>[1], options);
   }
 
+  set(...args: [string, unknown]): Image {
+    const image = this.image as Image;
+    imageSet(image, ...args);
+    return image;
+  }
+
+  setType(...args: [number, string, unknown]): Image {
+    const image = this.image as Image;
+    imageSetType(image, ...args);
+    return image;
+  }
+
+  setValue(...args: [string, unknown]): Image {
+    const image = this.image as Image;
+    imageSet(image, ...args);
+    return image;
+  }
+
   remove(...args: Parameters<Image["remove"]>): Image {
     const image = this.image as Image;
     image.remove(...args);
@@ -250,6 +385,26 @@ class Processor extends BaseProcessor {
 
     return vips.Image.newFromFile(path);
   }
+
+  static Utils = {
+    selectValidLoaderOptions(sourcePath: string, options: Options): Options {
+      const loader = vipsForeignFindLoad(sourcePath);
+      return loader != null ? Processor.Utils.selectValidOptions(loader, options) : options;
+    },
+
+    selectValidSaverOptions(destinationPath: string, options: Options): Options {
+      const saver = vipsForeignFindSave(destinationPath);
+      return saver != null ? Processor.Utils.selectValidOptions(saver, options) : options;
+    },
+
+    selectValidOptions(operationName: string, options: Options): Options {
+      const operationOptions = INTROSPECT_OPTIONAL_INPUT[operationName];
+
+      return Object.fromEntries(
+        Object.entries(options).filter(([name]) => operationOptions.includes(name)),
+      );
+    },
+  };
 }
 
 const ImageProcessingVips = {
