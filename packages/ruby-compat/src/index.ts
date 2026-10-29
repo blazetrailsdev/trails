@@ -16,7 +16,7 @@ export {
   registerClassPaths,
 } from "./classpath.js";
 export { CGI } from "./cgi.js";
-export { IO, STDERR, STDOUT, print, printf, puts } from "./io.js";
+export { IO, PipeIO, STDERR, STDOUT, print, printf, puts } from "./io.js";
 export { IOError } from "./io-error.js";
 export {
   cmp,

@@ -1,8 +1,8 @@
+import { runLoadHooks } from "@blazetrails/activesupport";
 import { Base, registerModel, type Relation } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
 import { SolidCable } from "./solid-cable.js";
 
-/** @missingRailsCall connectsTo — CONVERGEABLE solid-cable-record-connects-to-at-load */
 export class Record extends Base {
   static {
     this.abstractClass = true;
@@ -18,6 +18,7 @@ export class Record extends Base {
 }
 
 registerModel("SolidCable::Record", Record);
+runLoadHooks("solid_cable_record", Record);
 
 declare module "@blazetrails/activerecord" {
   // eslint-disable-next-line unused-imports/no-unused-vars
