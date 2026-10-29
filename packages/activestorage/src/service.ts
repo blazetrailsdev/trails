@@ -151,7 +151,7 @@ export class Service {
 
   /** @internal */
   protected serviceName(): string {
-    return (rbModName(this.constructor) ?? "").split("::")[2].replaceAll("Service", "");
+    return rbModName(this.constructor)!.split("::")[2].replaceAll("Service", "");
   }
 
   /** @internal */
