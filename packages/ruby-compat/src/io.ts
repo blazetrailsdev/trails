@@ -1547,7 +1547,11 @@ export class PipeIO extends IO {
   /**
    * `IO#read` (`vendor/ruby/v3.3.11/io.c:3731` `io_read`) over the bytes
    * written so far: all of them with no length, else at most `length`, and
-   * `nil` once the writer is closed and the buffer is empty.
+   * `nil` once the writer is closed and the buffer is empty. Where `io_read`
+   * would block — the writer still open and fewer than `length` bytes (or, with
+   * no length, end of file not yet reached) — a JS caller cannot be parked, so
+   * it raises `IO::EAGAINWaitReadable`; {@link waitReadable} is the wait. `str`
+   * is filled up to its own length, since a `Uint8Array` cannot be resized.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -1557,8 +1561,11 @@ export class PipeIO extends IO {
   override read(length: number | null, str?: Uint8Array | null): string | Uint8Array | null;
   override read(length?: number | null, str?: Uint8Array | null): string | Uint8Array | null {
     this._checkReadable();
+    if (!this._pipe.writerClosed && (length == null || this._pipe.length < length)) {
+      throw new IO.EAGAINWaitReadable("read would block");
+    }
     if (length == null) length = this._pipe.length;
-    else if (this._pipe.length === 0 && length > 0 && this._pipe.writerClosed) {
+    else if (this._pipe.length === 0 && length > 0) {
       if (str) str.fill(0);
       return null;
     }
@@ -1573,7 +1580,9 @@ export class PipeIO extends IO {
    * non-boolean `exception` raises `ArgumentError`. With none buffered it
    * raises `IO::EAGAINWaitReadable` ("read would block", `io.c:3648`), or
    * answers `:wait_readable` (`io.c:3647`); once the writer is closed it
-   * raises `EOFError`, or answers `nil` (`io.c:3656-3659`).
+   * raises `EOFError`, or answers `nil` (`io.c:3656-3659`). `buf` is filled
+   * up to its own length and zeroed at end of file, as `BasicSocket`'s
+   * is: a `Uint8Array` cannot be resized to the bytes read.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -1605,7 +1614,8 @@ export class PipeIO extends IO {
   /**
    * `IO#wait_readable` (`vendor/ruby/v3.3.11/io.c:9742` `io_wait_readable`):
    * resolves with the reader once a byte or end of file can be read, or with
-   * `nil` once `timeout` seconds pass first (`io.c:9710-9716`).
+   * `nil` once `timeout` seconds pass first (`io.c:9710-9716`). A reader
+   * closed during the wait raises `IOError` (`io.c:1451-1458`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -1692,12 +1702,12 @@ export class PipeIO extends IO {
     this._closed = true;
     if (this.mode & FMODE_WRITABLE) {
       this._pipe.writerClosed = true;
-      for (const wake of this._pipe.waiting.splice(0)) wake();
     } else {
       this._pipe.readerClosed = true;
       this._pipe.chunks = [];
       this._pipe.length = 0;
     }
+    for (const wake of this._pipe.waiting.splice(0)) wake();
     return null;
   }
 

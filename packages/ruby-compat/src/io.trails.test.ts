@@ -10,6 +10,7 @@ import { stderr, stdout } from "./process-adapter.js";
 import { b } from "./string/b.js";
 import { ArgumentError } from "./argument-error.js";
 import { EOFError } from "./eof-error.js";
+import { IOError } from "./io-error.js";
 
 describe("IO", () => {
   it("binwrite writes the string and answers its byte count", () => {
@@ -486,5 +487,22 @@ describe("TestIO", () => {
     const [r, w] = IO.pipe();
     w.close();
     expect(() => r.readNonblock(1)).toThrow(EOFError);
+  });
+
+  it("wait_readable raises IOError when the reader is closed during the wait", async () => {
+    const [r] = IO.pipe();
+    const waiting = r.waitReadable();
+    r.close();
+    await expect(waiting).rejects.toThrow(IOError);
+  });
+
+  it("read raises EAGAINWaitReadable where io_read would block", () => {
+    const [r, w] = IO.pipe();
+    w.write("ab");
+    expect(() => r.read(4)).toThrow(IO.EAGAINWaitReadable);
+    expect(() => r.read()).toThrow(IO.EAGAINWaitReadable);
+    w.close();
+    expect(text(r.read(4))).toBe("ab");
+    expect(r.read(4)).toBeNull();
   });
 });
