@@ -158,6 +158,42 @@ export function pack(
     return ary[idx++];
   };
 
+  /** `hex_table` (`vendor/ruby/v3.3.11/pack.c:839`). */
+  const hexTable = "0123456789ABCDEF";
+
+  /**
+   * `qpencode` (`vendor/ruby/v3.3.11/pack.c:842`), less MRI's 1024-byte buffer flush.
+   */
+  function qpencode(str: string[], s: Uint8Array, len: number): void {
+    const buff: string[] = [];
+    let n = 0;
+    let prev = -1;
+
+    for (const c of s) {
+      if (c > 126 || (c < 32 && c !== 0x0a && c !== 0x09) || c === 0x3d) {
+        buff.push("=", hexTable[c >> 4], hexTable[c & 0x0f]);
+        n += 3;
+        prev = -1;
+      } else if (c === 0x0a) {
+        if (prev === 0x20 || prev === 0x09) buff.push("=", "\n");
+        buff.push("\n");
+        n = 0;
+        prev = c;
+      } else {
+        buff.push(String.fromCharCode(c));
+        n++;
+        prev = c;
+      }
+      if (n > len) {
+        buff.push("=", "\n");
+        n = 0;
+        prev = 0x0a;
+      }
+    }
+    if (n > 0) buff.push("=", "\n");
+    str.push(buff.join(""));
+  }
+
   while (p < pend) {
     const type = fmt[p++];
 
@@ -304,46 +340,6 @@ export function pack(
   return Uint8Array.from(str, (c) => c.charCodeAt(0));
 }
 
-/** `hex_table` (`vendor/ruby/v3.3.11/pack.c:839`). */
-const hexTable = "0123456789ABCDEF";
-
-/** `qpencode` (`vendor/ruby/v3.3.11/pack.c:842`), less MRI's 1024-byte buffer flush. */
-function qpencode(str: string[], s: Uint8Array, len: number): void {
-  const buff: string[] = [];
-  let n = 0;
-  let prev = -1;
-
-  for (const c of s) {
-    if (c > 126 || (c < 32 && c !== 0x0a && c !== 0x09) || c === 0x3d) {
-      buff.push("=", hexTable[c >> 4], hexTable[c & 0x0f]);
-      n += 3;
-      prev = -1;
-    } else if (c === 0x0a) {
-      if (prev === 0x20 || prev === 0x09) buff.push("=", "\n");
-      buff.push("\n");
-      n = 0;
-      prev = c;
-    } else {
-      buff.push(String.fromCharCode(c));
-      n++;
-      prev = c;
-    }
-    if (n > len) {
-      buff.push("=", "\n");
-      n = 0;
-      prev = 0x0a;
-    }
-  }
-  if (n > 0) buff.push("=", "\n");
-  str.push(buff.join(""));
-}
-
-/** `hex2num` (`vendor/ruby/v3.3.11/pack.c:895`). */
-function hex2num(c: number): number {
-  const n = parseInt(String.fromCharCode(c), 36);
-  return Number.isNaN(n) || n >= 16 ? -1 : n;
-}
-
 /**
  * `rb_ary_fetch` (`vendor/ruby/v3.3.11/array.c:1961`) in its one-argument form:
  * a negative index counts from the end, and one outside the array raises
@@ -448,6 +444,14 @@ function packUnpackInternal(
   const ptr = typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
   const send = ptr.length;
   if (offset > send) throw new ArgumentError("offset outside of string");
+
+  /**
+   * `hex2num` (`vendor/ruby/v3.3.11/pack.c:895`).
+   */
+  function hex2num(c: number): number {
+    const n = parseInt(String.fromCharCode(c), 36);
+    return Number.isNaN(n) || n >= 16 ? -1 : n;
+  }
   let s = offset;
   let p = 0;
   const pend = fmt.length;

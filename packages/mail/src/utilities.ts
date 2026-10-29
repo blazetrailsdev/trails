@@ -1,6 +1,7 @@
 import { Encoding, isAsciiOnly, pack, rbObjEncoding, unpack } from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
 
+/** @noRailsEquivalent PERMANENT */
 function gsubBytes(string: Uint8Array, re: RegExp, replacement: string): Uint8Array {
   const scanned = Array.from(string, (c) => String.fromCharCode(c))
     .join("")
