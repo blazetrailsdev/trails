@@ -17,16 +17,19 @@ interface Stream {
   flushWriteBuffer(): boolean;
 }
 
+interface Monitor {
+  value: Stream;
+  interests: "r" | "rw";
+}
+
 export class StreamEventLoop {
   private _executor: ThreadPoolExecutor | null;
-  private _map: Map<Io, Stream>;
-  private _interests: Map<Io, "r" | "rw">;
+  private _map: Map<Io, Monitor>;
   private _stopping: boolean;
 
   constructor() {
     this._executor = null;
     this._map = new Map();
-    this._interests = new Map();
     this._stopping = false;
   }
 
@@ -42,13 +45,13 @@ export class StreamEventLoop {
   }
 
   attach(io: Io, stream: Stream): void {
-    this._map.set(io, stream);
-    this._interests.set(io, "r");
+    this._map.set(io, { value: stream, interests: "r" });
+    const monitor = this._map.get(io)!;
     void (async () => {
-      while (!this._stopping && this._map.get(io) === stream) {
+      while (!this._stopping && this._map.get(io) === monitor) {
         try {
           await io.waitReadable();
-          if (this._map.get(io) !== stream) break;
+          if (this._map.get(io) !== monitor) break;
 
           const incoming = io.readNonblock(4096, null, { exception: false });
           if (incoming === "wait_readable") {
@@ -71,22 +74,22 @@ export class StreamEventLoop {
 
   detach(io: Io, _stream: Stream): void {
     this._map.delete(io);
-    this._interests.delete(io);
     io.close();
   }
 
   writesPending(io: Io): void {
-    const stream = this._map.get(io);
-    if (!stream || this._interests.get(io) === "rw") return;
-    this._interests.set(io, "rw");
+    const monitor = this._map.get(io);
+    if (monitor == null || monitor.interests === "rw") return;
+    monitor.interests = "rw";
+    const stream = monitor.value;
     void (async () => {
       try {
-        while (!this._stopping && this._map.get(io) === stream) {
+        while (!this._stopping && this._map.get(io) === monitor) {
           await io.waitWritable();
-          if (this._map.get(io) !== stream) break;
+          if (this._map.get(io) !== monitor) break;
 
           if (stream.flushWriteBuffer()) {
-            this._interests.set(io, "r");
+            monitor.interests = "r";
             break;
           }
         }
@@ -95,7 +98,6 @@ export class StreamEventLoop {
           stream.close();
         } catch {
           this._map.delete(io);
-          this._interests.delete(io);
         }
       }
     })();
