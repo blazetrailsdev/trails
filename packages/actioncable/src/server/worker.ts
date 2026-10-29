@@ -10,31 +10,17 @@ import {
   type Block,
   ThreadPoolExecutor,
   excBacktrace,
-  isPlainHash,
   rbBlockGivenP,
   rbFSend,
   rbObjClassname,
   rbObjRespondTo,
+  rbScanArgs,
 } from "@blazetrails/ruby-compat";
 import { ActionCable } from "../namespaces.js";
 import { ActiveRecordConnectionManagement } from "./worker/active-record-connection-management.js";
 
 interface Logger {
   error(message: unknown): unknown;
-}
-
-/** @noRailsEquivalent PERMANENT */
-function splitArgs(
-  args: unknown[],
-): [unknown[], { connection?: unknown } | null, Block<unknown> | undefined] {
-  const tail = args.at(-1);
-  const block = rbBlockGivenP(tail) ? (args.pop(), tail) : undefined;
-  const last = args.at(-1);
-  const options =
-    isPlainHash(last) && Object.hasOwn(last, "connection")
-      ? (args.pop() as { connection?: unknown })
-      : null;
-  return [args, options, block];
 }
 
 export class Worker {
@@ -78,13 +64,15 @@ export class Worker {
   }
 
   asyncExec(receiver: unknown, ...args: unknown[] | [...unknown[], Block<unknown>]): unknown {
-    const [rest, options, block] = splitArgs(args);
-    if (!options) throw new ArgumentError("missing keyword: :connection");
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as Block<unknown>) : undefined;
+    const [rest, kw] = rbScanArgs<{ connection?: unknown }>(args);
+    if (!Object.hasOwn(kw, "connection")) throw new ArgumentError("missing keyword: :connection");
+    const { connection } = kw;
     return this.asyncInvoke(
       receiver,
       "instanceExec",
       ...rest,
-      { connection: options.connection },
+      { connection },
       ...(block ? [block] : []),
     );
   }
@@ -94,8 +82,8 @@ export class Worker {
     method: string,
     ...args: unknown[] | [...unknown[], Block<unknown>]
   ): unknown {
-    const [rest, options, block] = splitArgs(args);
-    const connection = options ? options.connection : receiver;
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as Block<unknown>) : undefined;
+    const [rest, { connection = receiver }] = rbScanArgs<{ connection?: unknown }>(args);
     return this._executor.post(() =>
       this.invoke(receiver, method, ...rest, { connection }, ...(block ? [block] : [])),
     );
@@ -106,9 +94,11 @@ export class Worker {
     method: string,
     ...args: unknown[] | [...unknown[], Block<unknown>]
   ): Promise<unknown> {
-    const [rest, options, block] = splitArgs(args);
-    if (!options) throw new ArgumentError("missing keyword: :connection");
-    return this.work(options.connection, async () => {
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as Block<unknown>) : undefined;
+    const [rest, kw] = rbScanArgs<{ connection?: unknown }>(args);
+    if (!Object.hasOwn(kw, "connection")) throw new ArgumentError("missing keyword: :connection");
+    const { connection } = kw;
+    return this.work(connection, async () => {
       try {
         return await rbFSend(receiver, method, ...rest, ...(block ? [block] : []));
       } catch (e) {
