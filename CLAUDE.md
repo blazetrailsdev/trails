@@ -1157,23 +1157,31 @@ the way JavaScript reaches it. Ruled by the repo owner on 2026-10-28.
   named by an STI `type` or polymorphic `_type` column, a `class_name:` or a
   GlobalID is found through `registerModel`. A routed controller is found
   through `registerController`, a job through `registerJob`, and a channel or
-  connection through `registerChannel` / `registerConnection`. Each reader
-  calls its domain's registry directly. A domain with no registry gets one of
-  the same shape, never a generic constant lookup.
+  connection through `registerChannel` / `registerConnection`. Today each
+  `registerX` returns `void` and writes through `registerConstant`, so it has
+  no read side yet: a reader such as `compute_type`
+  (`vendor/rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:255-261`)
+  converts only once its package adds a name → class read beside its
+  `registerX`, over that registry's own map. A domain with no registry gets one
+  of the same shape, never a generic constant lookup.
 - **"Rails calls `const_get` here" is not a reason to keep one.** No
   `constantize`, `safeConstantize`, `rbModConstGet`, `rbModConstDefined`,
   `rbModConstants`, `rbPathToClass` or `registeredConstant` call is added
   outside ruby-compat, and every existing one is debt. `registerConstant` and
   the top-level constant table are being deleted (RFC 0205).
-- **Class-path tables are for printing a name, and ideally nothing else.**
-  They answer class → Ruby name for `rbModName` / `rbInspect` / exception
-  text. They are not a name → class lookup: `generatedClass` is debt like the
-  rest of this list. They are ruby-compat internals. The generated
-  `class-paths*.generated.ts` file each package carries is the one place
-  outside ruby-compat that calls `registerClassPaths`. Hand-written code
-  outside ruby-compat never calls `registerClassPaths`, `generatedClass`,
+- **Class-path tables answer class → Ruby name, and nothing else.** That
+  direction is output: `rbModName`, `rbInspect` and exception text, and every
+  Rails body that reads a class's `name` to build a string, such as
+  `compute_type`'s candidate names (`inheritance.rb:255-261`), an STI `type`
+  value or an i18n key. They are never a name → class lookup: `generatedClass`
+  is debt like the rest of this list. They are ruby-compat internals. The
+  generated `class-paths*.generated.ts` file each package carries is the one
+  place outside ruby-compat that calls `registerClassPaths`; the hand-written
+  row in `actionpack/src/action-controller/metal/strong-parameters.ts` is debt,
+  to move into actionpack's generated table. Hand-written code outside
+  ruby-compat never calls `registerClassPaths`, `generatedClass`,
   `generatedClassPath` or reads `classpaths`; it reaches a Ruby name only
-  through `rbModName` / `rbInspect`, for display.
+  through `rbModName` / `rbInspect`.
 
 This supersedes the 2026-10-27 ruling in RFC 0205 that replaced the `registerX`
 APIs with a class-path table filled by a boot scan.
