@@ -7,6 +7,22 @@
       "unsignedFloat"
     ],
     "packages/activerecord/src/connection-handling.ts": ["_connection", "connection"],
-    "packages/activesupport/src/core-ext/benchmark.ts": ["_ms", "ms"]
+    "packages/activesupport/src/core-ext/benchmark.ts": ["_ms", "ms"],
+    "packages/mail/src/check-delivery-params.ts": [
+      "_check",
+      "_checkAddr",
+      "_checkFrom",
+      "_checkMessage",
+      "_checkTo",
+      "_none",
+      "_validateSmtpAddr",
+      "check",
+      "checkAddr",
+      "checkFrom",
+      "checkMessage",
+      "checkTo",
+      "none",
+      "validateSmtpAddr"
+    ]
   }
 }

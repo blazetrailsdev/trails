@@ -101,6 +101,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "fugit",
   "globalid",
   "i18n",
+  "mail",
   "marcel",
   "mini-magick",
   "msgpack",

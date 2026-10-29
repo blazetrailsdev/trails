@@ -218,6 +218,7 @@ describe("vendor/sources.ts", () => {
       "et-orbi",
       "fugit",
       "chronic",
+      "mail",
     ]);
     expect(apiComparePackages()).toContain("i18n");
     expect(Object.keys(libPathsManifest())).toContain("i18n");
@@ -397,6 +398,7 @@ describe("vendor/sources.ts", () => {
         "fugit",
         "globalid",
         "i18n",
+        "mail",
         "marcel",
         "mini-magick",
         "msgpack",
@@ -453,6 +455,7 @@ describe("vendor/sources.ts", () => {
         "fugit",
         "globalid",
         "i18n",
+        "mail",
         "marcel",
         "mini-magick",
         "msgpack",

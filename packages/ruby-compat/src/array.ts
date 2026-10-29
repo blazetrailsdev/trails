@@ -15,7 +15,9 @@ import {
   rtest,
   toS,
 } from "./object.js";
+import { Base64 } from "./base64.js";
 import { Range } from "./range.js";
+import { b } from "./string/b.js";
 import { num2long } from "./string/support.js";
 import { TypeError } from "./type-error.js";
 
@@ -28,7 +30,10 @@ const endstr = "sSiIlLqQjJ";
 /** `BIGENDIAN_P()` (`vendor/ruby/v3.3.11/pack.c:58-75`): the host byte order. */
 const BIGENDIAN_P = new Uint8Array(new Uint16Array([1]).buffer)[0] === 0;
 
-/** `b64_table` (`vendor/ruby/v3.3.11/pack.c:789`). */
+/** `uu_table` (`vendor/ruby/v3.3.11/pack.c:785`). */
+const uuTable = "`!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_";
+
+/** `b64_table` (`vendor/ruby/v3.3.11/pack.c:787`). */
 const b64Table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /** `unknown_directive` (`vendor/ruby/v3.3.11/pack.c:160`). */
@@ -37,16 +42,23 @@ function unknownDirective(mode: string, type: string, fmt: string): never {
 }
 
 /**
- * `encodes` (`vendor/ruby/v3.3.11/pack.c:791`) for `type == 'm'` — `len` bytes of `s0`
- * as Base64, plus the trailing newline `tailLf` asks for. MRI's `buff_size`
- * flush has no analogue: a JS array grows.
+ * `encodes` (`vendor/ruby/v3.3.11/pack.c:791`) — `len` bytes of `s0` as Base64
+ * (`type == 'm'`) or uuencoded (`type == 'u'`), plus the trailing newline
+ * `tailLf` asks for. MRI's `buff_size` flush has no analogue: a JS array grows.
  */
-function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): void {
+function encodes(str: string[], s0: Uint8Array, len: number, type: string, tailLf: number): void {
   const buff: string[] = [];
-  const trans = b64Table;
-  const padding = "=";
+  const trans = type === "u" ? uuTable : b64Table;
+  let padding: string;
   const s = s0;
   let i = 0;
+
+  if (type === "u") {
+    buff.push(String.fromCharCode(len + 32));
+    padding = "`";
+  } else {
+    padding = "=";
+  }
 
   while (len >= 3) {
     buff.push(trans[0o77 & (s[i] >> 2)]);
@@ -86,7 +98,10 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * packs a timestamp96's seconds with (`vendor/msgpack/v1.8.0/lib/msgpack/timestamp.rb:65`), and the `v`
  * `Rack::Session::Encryptor` packs its padding length with (`vendor/rack-session/v2.1.0/lib/rack/session/encryptor.rb:173`): `C`, `l`,
  * `L`, `q`, `Q`, `S` (`pack.c:483-487`) and `v` through `pack_integer` (`pack.c:477-551`), `E` (`pack.c:575-583`), and `@` growing or shrinking to
- * an absolute byte position (`pack.c:617-639`). Every other directive is a
+ * an absolute byte position (`pack.c:617-639`), and to `u` (`pack.c:662-691`,
+ * uuencoded, its String read as its UTF-8 bytes) and `M` (`pack.c:693-698`,
+ * quoted-printable over `qpencode`), which the mail gem's
+ * `UnixToUnix` and `QuotedPrintable` encode with. Every other directive is a
  * separate port, so each reaches `unknown_directive` (`pack.c:761`) here, and
  * of the modifiers only `<` / `>` (`pack.c:268-277`) are ported.
  *
@@ -142,6 +157,42 @@ export function pack(
     if (idx >= ary.length) throw new ArgumentError(toofew);
     return ary[idx++];
   };
+
+  /** `hex_table` (`vendor/ruby/v3.3.11/pack.c:839`). */
+  const hexTable = "0123456789ABCDEF";
+
+  /**
+   * `qpencode` (`vendor/ruby/v3.3.11/pack.c:842`), less MRI's 1024-byte buffer flush.
+   */
+  function qpencode(str: string[], s: Uint8Array, len: number): void {
+    const buff: string[] = [];
+    let n = 0;
+    let prev = -1;
+
+    for (const c of s) {
+      if (c > 126 || (c < 32 && c !== 0x0a && c !== 0x09) || c === 0x3d) {
+        buff.push("=", hexTable[c >> 4], hexTable[c & 0x0f]);
+        n += 3;
+        prev = -1;
+      } else if (c === 0x0a) {
+        if (prev === 0x20 || prev === 0x09) buff.push("=", "\n");
+        buff.push("\n");
+        n = 0;
+        prev = c;
+      } else {
+        buff.push(String.fromCharCode(c));
+        n++;
+        prev = c;
+      }
+      if (n > len) {
+        buff.push("=", "\n");
+        n = 0;
+        prev = 0x0a;
+      }
+    }
+    if (n > 0) buff.push("=", "\n");
+    str.push(buff.join(""));
+  }
 
   while (p < pend) {
     const type = fmt[p++];
@@ -250,24 +301,35 @@ export function pack(
       res.push(len > 0 ? str + "\0".repeat(len) : str.slice(0, str.length + len));
       continue;
     }
-    if (type !== "m") unknownDirective("pack", type, fmt);
+    if (type === "M") {
+      const from = nextfrom() as string | Uint8Array;
+      if (len <= 1) len = 72;
+      qpencode(res, from instanceof Uint8Array ? from : b(String(from)), len);
+      continue;
+    }
+    if (type !== "m" && type !== "u") unknownDirective("pack", type, fmt);
 
     const from = nextfrom() as string | Uint8Array;
-    const s = from instanceof Uint8Array ? from : new Uint8Array(from.length);
-    if (typeof from === "string")
+    let s: Uint8Array;
+    if (from instanceof Uint8Array) s = from;
+    else if (type === "u") s = b(from);
+    else {
+      s = new Uint8Array(from.length);
       for (let i = 0; i < from.length; i++) s[i] = from.charCodeAt(i) & 0xff;
+    }
     let ptr = 0;
     let plen = s.length;
 
-    if (len === 0) {
-      encodes(res, s.subarray(ptr), plen, 0);
+    if (len === 0 && type === "m") {
+      encodes(res, s.subarray(ptr), plen, type, 0);
       continue;
     }
     if (len <= 2) len = 45;
+    else if (len > 63 && type === "u") len = 63;
     else len = Math.floor(len / 3) * 3;
     while (plen > 0) {
       const todo = plen > len ? len : plen;
-      encodes(res, s.subarray(ptr), todo, 1);
+      encodes(res, s.subarray(ptr), todo, type, 1);
       plen -= todo;
       ptr += todo;
     }
@@ -345,7 +407,7 @@ export function unpack1(
   str: string | Uint8Array,
   fmt: string,
   { offset = 0 }: { offset?: number } = {},
-): number | bigint | string | null {
+): number | bigint | string | Uint8Array | null {
   const ary = packUnpackInternal(str, fmt, UNPACK_1, offset);
   return ary.length > 0 ? ary[0] : null;
 }
@@ -353,7 +415,9 @@ export function unpack1(
 /**
  * `String#unpack` (`vendor/ruby/v3.3.11/pack.c:1611` `pack_unpack`):
  * `pack_unpack_internal` in `UNPACK_ARRAY` mode, every item the format
- * pushes. The directives are {@link unpack1}'s.
+ * pushes. The directives are {@link unpack1}'s, plus `u` (`pack.c:1362`),
+ * `m` (`pack.c:1417`) and `M` (`pack.c:1498`), each pushing an ASCII-8BIT
+ * String, a `Uint8Array`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -361,7 +425,7 @@ export function unpack(
   str: string | Uint8Array,
   fmt: string,
   { offset = 0 }: { offset?: number } = {},
-): (number | bigint | string)[] {
+): (number | bigint | string | Uint8Array)[] {
   return packUnpackInternal(str, fmt, UNPACK_ARRAY, offset);
 }
 
@@ -374,12 +438,20 @@ function packUnpackInternal(
   fmt: string,
   mode: number,
   offset: number,
-): (number | bigint | string)[] {
-  const ary: (number | bigint | string)[] = [];
+): (number | bigint | string | Uint8Array)[] {
+  const ary: (number | bigint | string | Uint8Array)[] = [];
   if (offset < 0) throw new ArgumentError("offset can't be negative");
   const ptr = typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
   const send = ptr.length;
   if (offset > send) throw new ArgumentError("offset outside of string");
+
+  /**
+   * `hex2num` (`vendor/ruby/v3.3.11/pack.c:895`).
+   */
+  function hex2num(c: number): number {
+    const n = parseInt(String.fromCharCode(c), 36);
+    return Number.isNaN(n) || n >= 16 ? -1 : n;
+  }
   let s = offset;
   let p = 0;
   const pend = fmt.length;
@@ -485,6 +557,72 @@ function packUnpackInternal(
     if (type === "@") {
       if (len > send) throw new ArgumentError("@ outside of string");
       s = len;
+      continue;
+    }
+    if (type === "u") {
+      const buf = new Uint8Array(Math.floor(((send - s) * 3) / 4));
+      let optr = 0;
+      let total = 0;
+      const uuChar = (): number =>
+        s < send && ptr[s] >= 0x20 && ptr[s] < 0x61 ? (ptr[s++] - 0x20) & 0o77 : 0;
+      while (s < send && ptr[s] > 0x20 && ptr[s] < 0x61) {
+        let n = (ptr[s++] - 0x20) & 0o77;
+        total += n;
+        if (total > buf.length) {
+          n -= total - buf.length;
+          total = buf.length;
+        }
+        while (n > 0) {
+          const mlen = n > 3 ? 3 : n;
+          const a = uuChar();
+          const bb = uuChar();
+          const c = uuChar();
+          const d = uuChar();
+          const hunk = [(a << 2) | (bb >> 4), (bb << 4) | (c >> 2), (c << 6) | d];
+          for (let i = 0; i < mlen; i++) buf[optr++] = hunk[i] & 0xff;
+          n -= mlen;
+        }
+        if (s < send && ptr[s] !== 0x0d && ptr[s] !== 0x0a) s++;
+        if (s < send && ptr[s] === 0x0d) s++;
+        if (s < send && ptr[s] === 0x0a) s++;
+      }
+      ary.push(buf.slice(0, total));
+      if (mode === UNPACK_1) return ary;
+      continue;
+    }
+    if (type === "m") {
+      let src = "";
+      for (let i = s; i < send; i++) src += String.fromCharCode(ptr[i]);
+      const decoded = len === 0 ? Base64.strictDecode64(src) : Base64.decode64(src);
+      ary.push(Uint8Array.from(decoded, (c) => c.charCodeAt(0)));
+      s = send;
+      if (mode === UNPACK_1) return ary;
+      continue;
+    }
+    if (type === "M") {
+      const buf: number[] = [];
+      let ss = s;
+      while (s < send) {
+        if (ptr[s] === 0x3d) {
+          if (++s === send) break;
+          if (s + 1 < send && ptr[s] === 0x0d && ptr[s + 1] === 0x0a) s++;
+          if (ptr[s] !== 0x0a) {
+            const c1 = hex2num(ptr[s]);
+            if (c1 === -1) break;
+            if (++s === send) break;
+            const c2 = hex2num(ptr[s]);
+            if (c2 === -1) break;
+            buf.push((c1 << 4) | c2);
+          }
+        } else {
+          buf.push(ptr[s]);
+        }
+        s++;
+        ss = s;
+      }
+      ary.push(Uint8Array.from([...buf, ...ptr.subarray(ss, send)]));
+      s = send;
+      if (mode === UNPACK_1) return ary;
       continue;
     }
     unknownDirective("unpack", type, fmt);

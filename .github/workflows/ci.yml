@@ -933,6 +933,7 @@ jobs:
           packages/globalid
           packages/html-sanitizer
           packages/i18n
+          packages/mail
           packages/marcel
           packages/image-processing
           packages/mini-magick
@@ -1170,6 +1171,7 @@ jobs:
           packages/fugit
           packages/globalid
           packages/i18n
+          packages/mail
           packages/marcel
           packages/image-processing
           packages/mini-magick

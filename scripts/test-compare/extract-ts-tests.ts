@@ -47,6 +47,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "ruby-compat",
     "thor",
     "mini-magick",
+    "mail",
   ];
   const packageAliases: Record<string, string> = {};
   const result: Record<string, string[]> = {};

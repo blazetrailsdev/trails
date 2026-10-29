@@ -209,6 +209,7 @@ export const MANIFEST_PACKAGES = [
   "pg",
   "sqlite3",
   "thor",
+  "mail",
 ] as const;
 
 /**
