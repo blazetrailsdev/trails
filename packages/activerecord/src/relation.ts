@@ -273,8 +273,18 @@ function _accessorNames(proto: object): Set<string | symbol> {
 }
 
 /** @perf 4x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
-function _setOnTarget(target: object, prop: string | symbol, value: unknown): boolean {
-  return Reflect.set(target, prop, value);
+function _setOnTarget(
+  target: Record<string | symbol, unknown>,
+  prop: string | symbol,
+  value: unknown,
+  receiver: object,
+): boolean {
+  const descriptor = Object.getOwnPropertyDescriptor(target, prop);
+  if (descriptor?.writable) {
+    target[prop] = value;
+    return true;
+  }
+  return Reflect.set(target, prop, value, receiver);
 }
 
 /** @perf 4x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */

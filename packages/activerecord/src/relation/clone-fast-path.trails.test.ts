@@ -35,6 +35,22 @@ describe("Relation#clone on a class-specific relation", () => {
   });
 });
 
+describe("a class-specific relation's Proxy", () => {
+  fixtures(["posts"]);
+
+  it("runs a setter supplied through extending with the relation as its receiver", () => {
+    const receivers: unknown[] = [];
+    const relation = Post.all().extending({
+      set seenBy(_value: unknown) {
+        receivers.push(this);
+      },
+    });
+    (relation as unknown as { seenBy: unknown }).seenBy = 1;
+    expect(receivers).toHaveLength(1);
+    expect(receivers[0]).toBe(relation);
+  });
+});
+
 describe("instantiate", () => {
   fixtures(["posts"]);
 
