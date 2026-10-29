@@ -681,7 +681,6 @@ export class NamedRouteCollection {
    * (vendor/ruby/v3.3.11/class.c:1179-1215).
    *
    * @internal
-   * @noRailsEquivalent PERMANENT
    */
   _appendIncluder(
     proto: object,
