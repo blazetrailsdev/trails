@@ -574,6 +574,9 @@ importers:
 
   packages/image-processing:
     dependencies:
+      '@blazetrails/mini-magick':
+        specifier: workspace:*
+        version: link:../mini-magick
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

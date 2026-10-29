@@ -22,7 +22,8 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@blazetrails/ruby-compat": "workspace:*"
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/mini-magick": "workspace:*"
   },
   "engines": {
     "node": ">=24"
@@ -30,5 +31,13 @@
   "devDependencies": {
     "@blazetrails/vitest-matchers": "workspace:*",
     "wasm-vips": "0.0.19"
+  },
+  "peerDependencies": {
+    "wasm-vips": "0.0.19"
+  },
+  "peerDependenciesMeta": {
+    "wasm-vips": {
+      "optional": true
+    }
   }
 }
