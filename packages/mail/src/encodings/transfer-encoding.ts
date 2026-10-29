@@ -3,7 +3,6 @@ import { Encodings } from "../encodings.js";
 
 export class TransferEncoding {
   static readonly NAME: string = "";
-
   static readonly PRIORITY: number = -1;
 
   static canTransport(enc: typeof TransferEncoding | null): boolean {
@@ -27,23 +26,24 @@ export class TransferEncoding {
   }
 
   static negotiate(
-    messageEncoding: string,
-    sourceEncoding: string,
+    messageEncoding: string | typeof TransferEncoding | null,
+    sourceEncoding: string | typeof TransferEncoding | null,
     str: string,
     allowedEncodings: (typeof TransferEncoding)[] | null = null,
   ): typeof TransferEncoding | null {
-    const messageEnc = Encodings.getEncoding(messageEncoding) ?? Encodings.getEncoding("8bit");
-    const sourceEnc = Encodings.getEncoding(sourceEncoding);
+    messageEncoding =
+      Encodings.getEncoding(messageEncoding as string) ?? Encodings.getEncoding("8bit");
+    sourceEncoding = Encodings.getEncoding(sourceEncoding as string);
 
     if (
-      messageEnc &&
-      sourceEnc &&
-      messageEnc.canTransport(sourceEnc) &&
-      sourceEnc.isCompatibleInput(str)
+      messageEncoding &&
+      sourceEncoding &&
+      messageEncoding.canTransport(sourceEncoding) &&
+      sourceEncoding.isCompatibleInput(str)
     ) {
-      return sourceEnc;
+      return sourceEncoding;
     } else {
-      return this.renegotiate(messageEnc!, sourceEnc, str, allowedEncodings);
+      return this.renegotiate(messageEncoding!, sourceEncoding, str, allowedEncodings);
     }
   }
 

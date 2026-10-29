@@ -1,5 +1,4 @@
 import "./class-paths.generated.js";
-export * as Constants from "./constants.js";
 export { Encodings, UnknownEncodingType } from "./encodings.js";
 export { TransferEncoding } from "./encodings/transfer-encoding.js";
 export { Identity } from "./encodings/identity.js";
