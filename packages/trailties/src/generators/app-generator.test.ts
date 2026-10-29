@@ -182,7 +182,11 @@ describe("AppGenerator", () => {
 
   it("generator if skip action cable is given", async () => {
     await makeGen("sqlite", { skipActionCable: true }).invokeAll();
-
+    await assertFile("my-app/config/application.ts", (content) => {
+      expect(content).toMatch(
+        /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/action-cable";/m,
+      );
+    });
     expect(exists("config/cable.ts")).toBe(false);
     await assertFile("my-app/package.json", (content) => {
       assertNoMatch(/@blazetrails\/actioncable/, content);

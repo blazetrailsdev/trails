@@ -569,8 +569,7 @@ process.exit(status ?? 1);
       "config/application.ts",
       `import { Application } from "@blazetrails/trailties";
 
-// Load the framework trailties this application uses.
-import "@blazetrails/trailties/all";
+${this.railsRequireStatement()}
 
 export class ${this.appConstBase()} extends Application {
   static {
