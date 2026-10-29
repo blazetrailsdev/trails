@@ -11,7 +11,7 @@ import { JWT } from "../../../lib/jwt.ts";
 import { Current } from "../../models/current.ts";
 
 interface Host extends ActionController.API {
-  renderError(message: string, status: string): Promise<void>;
+  renderError(message: string | null, status: string): Promise<void>;
   decodeToken(token: string): unknown;
   isValidPayload(payload: unknown): payload is { sub: string; username: string };
 }
