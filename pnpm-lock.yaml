@@ -1032,6 +1032,9 @@ importers:
       '@blazetrails/image-processing':
         specifier: workspace:*
         version: link:../../packages/image-processing
+      '@blazetrails/mail':
+        specifier: workspace:*
+        version: link:../../packages/mail
       '@blazetrails/marcel':
         specifier: workspace:*
         version: link:../../packages/marcel

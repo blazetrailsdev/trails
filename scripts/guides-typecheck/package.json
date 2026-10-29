@@ -35,6 +35,7 @@
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/i18n": "workspace:*",
     "@blazetrails/marcel": "workspace:*",
+    "@blazetrails/mail": "workspace:*",
     "@blazetrails/image-processing": "workspace:*",
     "@blazetrails/mini-magick": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
