@@ -4,7 +4,6 @@ import {
   RuntimeError,
   rbBlockGivenP,
   rbFBinding,
-  rbFSend,
   rbProcCall,
 } from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
@@ -136,7 +135,7 @@ export class Builder {
   }
 
   async call(env: Record<string, any>): Promise<any> {
-    return rbFSend(this.toApp(), "call", env);
+    return rbProcCall(this.toApp(), env);
   }
 
   /**

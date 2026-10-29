@@ -8,7 +8,7 @@ import {
   type Extended,
   type Included,
 } from "@blazetrails/activesupport";
-import { File, getFs, getPath, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { File, getFs, getPath, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack,
   type DrawCallback,
@@ -248,7 +248,7 @@ export class Engine extends Trailtie {
 
   call(env: RackEnv): Promise<RackResponse> {
     const req = this.buildRequest(env);
-    return rbFSend(this.app(), "call", req.env) as Promise<RackResponse>;
+    return rbProcCall(this.app(), req.env) as Promise<RackResponse>;
   }
 
   envConfig(): Record<string, unknown> {
