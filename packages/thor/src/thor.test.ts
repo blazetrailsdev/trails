@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ArgumentError, isEmpty } from "@blazetrails/ruby-compat";
+import { ArgumentError, isEmpty, rbGvSet } from "@blazetrails/ruby-compat";
+import type { Command } from "./command.js";
 import type { Base as ThorBase } from "./base.js";
 import { UndefinedCommandError } from "./error.js";
 import { Base } from "./shell.js";
@@ -12,6 +13,7 @@ import {
   MyClassOptionScript,
   MyOptionScript,
   MyScript,
+  PackageNameScript,
   Scripts,
 } from "./test-helpers/fixtures/script.js";
 import { Thor, type ThorClass } from "./thor.js";
@@ -24,6 +26,20 @@ const myScript = MyScript as unknown as ThorClass;
 const myChildScript = MyChildScript as unknown as ThorClass;
 const scriptsMyScript = Scripts.MyScript as unknown as ThorClass;
 const myClassOptionScript = MyClassOptionScript as unknown as ThorClass;
+
+type Opts = Map<string, unknown>;
+
+function h(options: Opts): Record<string, unknown> {
+  return Object.fromEntries(options);
+}
+
+function r(result: unknown): unknown {
+  return (result as unknown[]).map((x) => (x instanceof Map ? h(x as Opts) : x));
+}
+
+function double(name: string): Command {
+  return { name } as Command;
+}
 
 function assertEmpty(obj: string): void {
   if (!isEmpty(obj)) throw new globalThis.Error(`Expected ${JSON.stringify(obj)} to be empty.`);
@@ -42,6 +58,600 @@ async function assertNoOutputToStderr(block: () => unknown): Promise<void> {
 describe("Thor", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe("#method_option", () => {
+    it("sets options to the next method to be invoked", async () => {
+      const [, options] = (await myScript.start(["foo", "bar", "--force"])) as [unknown, Opts];
+      expect(h(options)).toEqual({ force: true });
+    });
+
+    describe(":lazy_default", () => {
+      it("is absent when option is not specified", async () => {
+        const [, options] = (await myScript.start(["with_optional"])) as [unknown, Opts];
+        expect(h(options)).toEqual({});
+      });
+
+      it("sets a default that can be overridden for strings", async () => {
+        let [, options] = (await myScript.start(["with_optional", "--lazy"])) as [unknown, Opts];
+        expect(h(options)).toEqual({ lazy: "yes" });
+
+        [, options] = (await myScript.start(["with_optional", "--lazy", "yesyes!"])) as [
+          unknown,
+          Opts,
+        ];
+        expect(h(options)).toEqual({ lazy: "yesyes!" });
+      });
+
+      it("sets a default that can be overridden for numerics", async () => {
+        let [, options] = (await myScript.start(["with_optional", "--lazy-numeric"])) as [
+          unknown,
+          Opts,
+        ];
+        expect(h(options)).toEqual({ lazy_numeric: 42 });
+
+        [, options] = (await myScript.start(["with_optional", "--lazy-numeric", "20000"])) as [
+          unknown,
+          Opts,
+        ];
+        expect(h(options)).toEqual({ lazy_numeric: 20_000 });
+      });
+
+      it("sets a default that can be overridden for arrays", async () => {
+        let [, options] = (await myScript.start(["with_optional", "--lazy-array"])) as [
+          unknown,
+          Opts,
+        ];
+        expect(h(options)).toEqual({ lazy_array: ["eat", "at", "joes"] });
+
+        [, options] = (await myScript.start([
+          "with_optional",
+          "--lazy-array",
+          "hello",
+          "there",
+        ])) as [unknown, Opts];
+        expect(h(options)).toEqual({ lazy_array: ["hello", "there"] });
+      });
+
+      it("sets a default that can be overridden for hashes", async () => {
+        let [, options] = (await myScript.start(["with_optional", "--lazy-hash"])) as [
+          unknown,
+          Opts,
+        ];
+        expect(h(options)).toEqual({ lazy_hash: { swedish: "meatballs" } });
+
+        [, options] = (await myScript.start([
+          "with_optional",
+          "--lazy-hash",
+          "polish:sausage",
+        ])) as [unknown, Opts];
+        expect(h(options)).toEqual({ lazy_hash: { polish: "sausage" } });
+      });
+    });
+
+    describe("when :for is supplied", () => {
+      it("updates an already defined command", async () => {
+        const [, options] = (await myChildScript.start(["animal", "horse", "--other=fish"])) as [
+          unknown,
+          Opts,
+        ];
+        expect(h(options).other).toEqual("fish");
+      });
+
+      describe("and the target is on the parent class", () => {
+        it("updates an already defined command", async () => {
+          const args = ["example_default_command", "my_param", "--new-option=verified"];
+          const options = (await scriptsMyScript.start(args)) as Opts;
+          expect(h(options).new_option).toEqual("verified");
+        });
+
+        it("adds a command to the command list if the updated command is on the parent class", () => {
+          expect(scriptsMyScript.commands()["example_default_command"]).toBeTruthy();
+        });
+
+        it("clones the parent command", () => {
+          expect(scriptsMyScript.commands()["example_default_command"]).not.toBe(
+            myChildScript.commands()["example_default_command"],
+          );
+        });
+      });
+    });
+  });
+
+  describe("#default_command", () => {
+    it("sets a default command", () => {
+      expect(myScript.defaultCommand()).toEqual("example_default_command");
+    });
+
+    it("invokes the default command if no command is specified", async () => {
+      expect(await myScript.start([])).toEqual("default command");
+    });
+
+    it("invokes the default command if no command is specified even if switches are given", async () => {
+      expect(h((await myScript.start(["--with", "option"])) as Opts)).toEqual({ with: "option" });
+    });
+
+    it("inherits the default command from parent", () => {
+      expect(myChildScript.defaultCommand()).toEqual("example_default_command");
+    });
+  });
+
+  describe("#stop_on_unknown_option!", () => {
+    const myScript = class extends Thor {
+      static {
+        const klass = this as unknown as ThorClass;
+        klass.classOption("verbose", { type: "boolean" });
+        klass.classOption("mode", { type: "string" });
+
+        klass.stopOnUnknownOptionBang("exec");
+
+        klass.desc("exec", "Run a command");
+        (this as unknown as ThorClass).methodAdded("exec");
+
+        klass.desc("boring", "An ordinary command");
+        (this as unknown as ThorClass).methodAdded("boring");
+      }
+      declare options: ThorBase["options"];
+      exec(...args: unknown[]) {
+        return [this.options, args];
+      }
+      boring(...args: unknown[]) {
+        return [this.options, args];
+      }
+    } as unknown as ThorClass;
+
+    it("passes remaining args to command when it encounters a non-option", async () => {
+      expect(r(await myScript.start(["exec", "command", "--verbose"]))).toEqual([
+        {},
+        ["command", "--verbose"],
+      ]);
+    });
+
+    it("passes remaining args to command when it encounters an unknown option", async () => {
+      expect(r(await myScript.start(["exec", "--foo", "command", "--bar"]))).toEqual([
+        {},
+        ["--foo", "command", "--bar"],
+      ]);
+    });
+
+    it("still accepts options that are given before non-options", async () => {
+      expect(r(await myScript.start(["exec", "--verbose", "command", "--foo"]))).toEqual([
+        { verbose: true },
+        ["command", "--foo"],
+      ]);
+    });
+
+    it("still accepts options that require a value", async () => {
+      expect(r(await myScript.start(["exec", "--mode", "rashly", "command"]))).toEqual([
+        { mode: "rashly" },
+        ["command"],
+      ]);
+    });
+
+    it("still passes everything after -- to command", async () => {
+      expect(r(await myScript.start(["exec", "--", "--verbose"]))).toEqual([{}, ["--verbose"]]);
+    });
+
+    it("still passes everything after -- to command, complex", async () => {
+      expect(
+        r(
+          await myScript.start([
+            "exec",
+            "command",
+            "--mode",
+            "z",
+            "again",
+            "--",
+            "--verbose",
+            "more",
+          ]),
+        ),
+      ).toEqual([{}, ["command", "--mode", "z", "again", "--", "--verbose", "more"]]);
+    });
+
+    it("does not affect ordinary commands", async () => {
+      expect(r(await myScript.start(["boring", "command", "--verbose"]))).toEqual([
+        { verbose: true },
+        ["command"],
+      ]);
+    });
+
+    describe("when provided with multiple command names", () => {
+      const klass = class extends Thor {
+        static {
+          (this as unknown as ThorClass).stopOnUnknownOptionBang("foo", "bar");
+        }
+      } as unknown as ThorClass;
+      it("affects all specified commands", () => {
+        expect(klass.isStopOnUnknownOption(double("foo"))).toBe(true);
+        expect(klass.isStopOnUnknownOption(double("bar"))).toBe(true);
+        expect(klass.isStopOnUnknownOption(double("baz"))).toBe(false);
+      });
+    });
+
+    describe("when invoked several times", () => {
+      const klass = class extends Thor {
+        static {
+          (this as unknown as ThorClass).stopOnUnknownOptionBang("foo");
+          (this as unknown as ThorClass).stopOnUnknownOptionBang("bar");
+        }
+      } as unknown as ThorClass;
+      it("affects all specified commands", () => {
+        expect(klass.isStopOnUnknownOption(double("foo"))).toBe(true);
+        expect(klass.isStopOnUnknownOption(double("bar"))).toBe(true);
+        expect(klass.isStopOnUnknownOption(double("baz"))).toBe(false);
+      });
+    });
+
+    it("doesn't break new", () => {
+      expect(new (myScript as unknown as new () => Thor)()).toBeInstanceOf(Thor);
+    });
+
+    describe("along with check_unknown_options!", () => {
+      const myScript2 = class extends Thor {
+        static {
+          const klass = this as unknown as ThorClass;
+          klass.classOption("verbose", { type: "boolean" });
+          klass.classOption("mode", { type: "string" });
+          klass.checkUnknownOptionsBang();
+          klass.stopOnUnknownOptionBang("exec");
+
+          klass.desc("exec", "Run a command");
+          (this as unknown as ThorClass).methodAdded("exec");
+        }
+        declare options: ThorBase["options"];
+        exec(...args: unknown[]) {
+          return [this.options, args];
+        }
+        static isExitOnFailure() {
+          return false;
+        }
+      } as unknown as ThorClass;
+
+      it("passes remaining args to command when it encounters a non-option", async () => {
+        expect(r(await myScript2.start(["exec", "command", "--verbose"]))).toEqual([
+          {},
+          ["command", "--verbose"],
+        ]);
+      });
+
+      it("does not accept if first non-option looks like an option, but only refuses that invalid option", async () => {
+        expect(
+          (
+            await capture(":stderr", () => myScript2.start(["exec", "--foo", "command", "--bar"]))
+          ).trim(),
+        ).toEqual('Unknown switches "--foo"');
+      });
+
+      it("still accepts options that are given before non-options", async () => {
+        expect(r(await myScript2.start(["exec", "--verbose", "command"]))).toEqual([
+          { verbose: true },
+          ["command"],
+        ]);
+      });
+
+      it("still accepts when non-options are given after real options and argument", async () => {
+        expect(r(await myScript2.start(["exec", "--verbose", "command", "--foo"]))).toEqual([
+          { verbose: true },
+          ["command", "--foo"],
+        ]);
+      });
+
+      it("does not accept when non-option looks like an option and is after real options", async () => {
+        expect(
+          (await capture(":stderr", () => myScript2.start(["exec", "--verbose", "--foo"]))).trim(),
+        ).toEqual('Unknown switches "--foo"');
+      });
+
+      it("still accepts options that require a value", async () => {
+        expect(r(await myScript2.start(["exec", "--mode", "rashly", "command"]))).toEqual([
+          { mode: "rashly" },
+          ["command"],
+        ]);
+      });
+
+      it("still passes everything after -- to command", async () => {
+        expect(r(await myScript2.start(["exec", "--", "--verbose"]))).toEqual([{}, ["--verbose"]]);
+      });
+
+      it("still passes everything after -- to command, complex", async () => {
+        expect(
+          r(
+            await myScript2.start([
+              "exec",
+              "command",
+              "--mode",
+              "z",
+              "again",
+              "--",
+              "--verbose",
+              "more",
+            ]),
+          ),
+        ).toEqual([{}, ["command", "--mode", "z", "again", "--", "--verbose", "more"]]);
+      });
+    });
+  });
+
+  describe("#check_unknown_options!", () => {
+    const myScript = class extends Thor {
+      static {
+        const klass = this as unknown as ThorClass;
+        klass.classOption("verbose", { type: "boolean" });
+        klass.classOption("mode", { type: "string" });
+        klass.checkUnknownOptionsBang();
+
+        klass.desc("checked", "a command with checked");
+        (this as unknown as ThorClass).methodAdded("checked");
+      }
+      declare options: ThorBase["options"];
+      checked(...args: unknown[]) {
+        return [this.options, args];
+      }
+      static isExitOnFailure() {
+        return false;
+      }
+    } as unknown as ThorClass;
+
+    it("still accept options and arguments", async () => {
+      expect(r(await myScript.start(["checked", "command", "--verbose"]))).toEqual([
+        { verbose: true },
+        ["command"],
+      ]);
+    });
+
+    it("still accepts options that are given before arguments", async () => {
+      expect(r(await myScript.start(["checked", "--verbose", "command"]))).toEqual([
+        { verbose: true },
+        ["command"],
+      ]);
+    });
+
+    it("does not accept if non-option that looks like an option is before the arguments", async () => {
+      expect(
+        (
+          await capture(":stderr", () => myScript.start(["checked", "--foo", "command", "--bar"]))
+        ).trim(),
+      ).toEqual('Unknown switches "--foo", "--bar"');
+    });
+
+    it("does not accept if non-option that looks like an option is after an argument", async () => {
+      expect(
+        (
+          await capture(":stderr", () => myScript.start(["checked", "command", "--foo", "--bar"]))
+        ).trim(),
+      ).toEqual('Unknown switches "--foo", "--bar"');
+    });
+
+    it("does not accept when non-option that looks like an option is after real options", async () => {
+      expect(
+        (await capture(":stderr", () => myScript.start(["checked", "--verbose", "--foo"]))).trim(),
+      ).toEqual('Unknown switches "--foo"');
+    });
+
+    it("does not accept when non-option that looks like an option is before real options", async () => {
+      expect(
+        (await capture(":stderr", () => myScript.start(["checked", "--foo", "--verbose"]))).trim(),
+      ).toEqual('Unknown switches "--foo"');
+    });
+
+    it("still accepts options that require a value", async () => {
+      expect(r(await myScript.start(["checked", "--mode", "rashly", "command"]))).toEqual([
+        { mode: "rashly" },
+        ["command"],
+      ]);
+    });
+
+    it("still passes everything after -- to command", async () => {
+      expect(r(await myScript.start(["checked", "--", "--verbose"]))).toEqual([{}, ["--verbose"]]);
+    });
+
+    it("still passes everything after -- to command, complex", async () => {
+      expect(
+        r(
+          await myScript.start([
+            "checked",
+            "command",
+            "--mode",
+            "z",
+            "again",
+            "--",
+            "--verbose",
+            "more",
+          ]),
+        ),
+      ).toEqual([{ mode: "z" }, ["command", "again", "--verbose", "more"]]);
+    });
+  });
+
+  describe("#disable_required_check!", () => {
+    const myScript = class extends Thor {
+      static {
+        const klass = this as unknown as ThorClass;
+        klass.classOption("foo", { required: true });
+
+        klass.disableRequiredCheckBang("boring");
+
+        klass.desc("exec", "Run a command");
+        (this as unknown as ThorClass).methodAdded("exec");
+
+        klass.desc("boring", "An ordinary command");
+        (this as unknown as ThorClass).methodAdded("boring");
+      }
+      declare options: ThorBase["options"];
+      exec(...args: unknown[]) {
+        return [this.options, args];
+      }
+      boring(...args: unknown[]) {
+        return [this.options, args];
+      }
+      static isExitOnFailure() {
+        return false;
+      }
+    } as unknown as ThorClass;
+
+    it("does not check the required option in the given command", async () => {
+      expect(r(await myScript.start(["boring", "command"]))).toEqual([{}, ["command"]]);
+    });
+
+    it("does check the required option of the remaining command", async () => {
+      const content = await capture(":stderr", () => myScript.start(["exec", "command"]));
+      expect(content).toEqual("No value provided for required options '--foo'\n");
+    });
+
+    it("does affects help by default", () => {
+      expect(myScript.isDisableRequiredCheck(double("help"))).toBe(true);
+    });
+
+    describe("when provided with multiple command names", () => {
+      const klass = class extends Thor {
+        static {
+          (this as unknown as ThorClass).disableRequiredCheckBang("foo", "bar");
+        }
+      } as unknown as ThorClass;
+
+      it("affects all specified commands", () => {
+        expect(klass.isDisableRequiredCheck(double("help"))).toBe(true);
+        expect(klass.isDisableRequiredCheck(double("foo"))).toBe(true);
+        expect(klass.isDisableRequiredCheck(double("bar"))).toBe(true);
+        expect(klass.isDisableRequiredCheck(double("baz"))).toBe(false);
+      });
+    });
+
+    describe("when invoked several times", () => {
+      const klass = class extends Thor {
+        static {
+          (this as unknown as ThorClass).disableRequiredCheckBang("foo");
+          (this as unknown as ThorClass).disableRequiredCheckBang("bar");
+        }
+      } as unknown as ThorClass;
+
+      it("affects all specified commands", () => {
+        expect(klass.isDisableRequiredCheck(double("help"))).toBe(true);
+        expect(klass.isDisableRequiredCheck(double("foo"))).toBe(true);
+        expect(klass.isDisableRequiredCheck(double("bar"))).toBe(true);
+        expect(klass.isDisableRequiredCheck(double("baz"))).toBe(false);
+      });
+    });
+  });
+
+  describe("#command_exists?", () => {
+    it("returns true for a command that is defined in the class", () => {
+      expect(myScript.isCommandExists("zoo")).toBe(true);
+      expect(myScript.isCommandExists("name-with-dashes")).toBe(true);
+      expect(myScript.isCommandExists("animal_prison")).toBe(true);
+    });
+
+    it("returns false for a command that is not defined in the class", () => {
+      expect(myScript.isCommandExists("animal_heaven")).toBe(false);
+    });
+  });
+
+  describe("#map", () => {
+    it("calls the alias of a method if one is provided", async () => {
+      expect(await myScript.start(["-T", "fish"])).toEqual(["fish"]);
+    });
+
+    it("calls the alias of a method if several are provided via #map", async () => {
+      expect(r(await myScript.start(["-f", "fish"]))).toEqual(["fish", {}]);
+      expect(r(await myScript.start(["--foo", "fish"]))).toEqual(["fish", {}]);
+    });
+
+    it("inherits all mappings from parent", () => {
+      expect(myChildScript.defaultCommand()).toEqual("example_default_command");
+    });
+  });
+
+  describe("#package_name", () => {
+    it("provides a proper description for a command when the package_name is assigned", async () => {
+      const content = await capture(":stdout", () =>
+        (PackageNameScript as unknown as ThorClass).start(["help"]),
+      );
+      expect(content).toMatch(/Baboon commands:/m);
+    });
+
+    it("provides a proper description for a command when the package_name is NOT assigned", async () => {
+      const content = await capture(":stdout", () => myScript.start(["help"]));
+      expect(content).toMatch(/Commands:/m);
+    });
+  });
+
+  describe("#desc", () => {
+    it("provides description for a command", async () => {
+      const content = await capture(":stdout", () => myScript.start(["help"]));
+      expect(content).toMatch(/thor my_script:zoo\s+# zoo around/m);
+    });
+
+    it("provides no namespace if $thor_runner is false", async () => {
+      try {
+        rbGvSet("$thor_runner", false);
+        const content = await capture(":stdout", () => myScript.start(["help"]));
+        expect(content).toMatch(/thor zoo\s+# zoo around/m);
+      } finally {
+        rbGvSet("$thor_runner", true);
+      }
+    });
+
+    describe("when :for is supplied", () => {
+      it("overwrites a previous defined command", async () => {
+        expect(await capture(":stdout", () => myChildScript.start(["help"]))).toMatch(
+          /animal KIND \s+# fish around/m,
+        );
+      });
+    });
+
+    describe("when :hide is supplied", () => {
+      it("does not show the command in help", async () => {
+        expect(await capture(":stdout", () => myScript.start(["help"]))).not.toMatch(
+          /this is hidden/m,
+        );
+      });
+
+      it("but the command is still invocable, does not show the command in help", async () => {
+        expect(await myScript.start(["hidden", "yesyes"])).toEqual(["yesyes"]);
+      });
+    });
+  });
+
+  describe("#method_options", () => {
+    it("sets default options if called before an initializer", () => {
+      const options = myChildScript.classOptions();
+      expect(options["force"].type).toEqual("boolean");
+      expect(options["param"].type).toEqual("numeric");
+    });
+
+    it("overwrites default options if called on the method scope", async () => {
+      const args = ["zoo", "--force", "--param", "feathers"];
+      const options = (await myChildScript.start(args)) as Opts;
+      expect(h(options)).toEqual({ force: true, param: "feathers" });
+    });
+
+    it("allows default options to be merged with method options", async () => {
+      const args = ["animal", "bird", "--force", "--param", "1.0", "--other", "tweets"];
+      const [arg, options] = (await myChildScript.start(args)) as [unknown, Opts];
+      expect(arg).toEqual("bird");
+      expect(h(options)).toEqual({ force: true, param: 1.0, other: "tweets" });
+    });
+  });
+
+  describe("#method_exclusive", () => {
+    it("returns the exclusive option names for the class", () => {
+      const cmd = (MyOptionScript as unknown as ThorClass).commands()["exclusive"];
+      const exclusives = cmd.optionsRelation["exclusiveOptionNames"]!;
+      expect(exclusives.length).toBe(2);
+      expect(exclusives[0]).toEqual(["one", "two", "three"]);
+      expect(exclusives.at(-1)).toEqual(["after1", "after2"]);
+    });
+  });
+
+  describe("#method_at_least_one", () => {
+    it("returns the at least one of option names for the class", () => {
+      const cmd = (MyOptionScript as unknown as ThorClass).commands()["at_least_one"];
+      const atLeastOnes = cmd.optionsRelation["atLeastOneOptionNames"]!;
+      expect(atLeastOnes.length).toBe(2);
+      expect(atLeastOnes[0]).toEqual(["one", "two", "three"]);
+      expect(atLeastOnes.at(-1)).toEqual(["after1", "after2"]);
+    });
   });
 
   describe("#start", () => {

@@ -32,7 +32,9 @@ export async function createMigration(
   config: CreateMigrationConfig = {},
 ): Promise<string | undefined> {
   const instance = new CreateMigration(host, destination, data, config);
-  return host.behavior === "revoke" ? instance.revoke() : instance.invoke();
+  return (host.behavior === "revoke" ? instance.revokeBang() : instance.invokeBang()) as Promise<
+    string | undefined
+  >;
 }
 
 export interface MigrationTemplateHost extends CreateMigrationHost {

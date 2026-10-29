@@ -1,11 +1,15 @@
 import type { Basic } from "@blazetrails/thor/shell/basic";
-import { File, FileUtils, merge, rbEqual } from "@blazetrails/ruby-compat";
+import { CreateFile } from "@blazetrails/thor/actions/create-file";
+import type { EmptyDirectoryBase } from "@blazetrails/thor/actions/empty-directory";
+import { File, FileUtils, getFs, merge, rbEqual, rtest } from "@blazetrails/ruby-compat";
 import { migrationExists } from "../migration-lookup.js";
+import { GeneratorError } from "../generated-attribute.js";
 
 export interface CreateMigrationHost {
   behavior?: "invoke" | "revoke";
   shell: Basic;
   options: { force?: boolean; skip?: boolean; pretend?: boolean };
+  destinationRoot: string;
   migrationFileName: string;
   relativeToOriginalDestinationRoot(p: string): string;
 }
@@ -18,14 +22,23 @@ export interface CreateMigrationConfig {
 
 export type MigrationRenderer = string | (() => string | Promise<string>);
 
-export class CreateMigration {
+export class CreateMigration extends CreateFile {
+  declare base: EmptyDirectoryBase & CreateMigrationHost;
+  /** @internal */
+  private _existingMigration?: string | false;
+
   constructor(
-    public base: CreateMigrationHost,
-    public destination: string,
-    public data: MigrationRenderer,
-    public config: CreateMigrationConfig = {},
+    base: CreateMigrationHost,
+    destination: string,
+    data: MigrationRenderer,
+    config: CreateMigrationConfig = {},
   ) {
-    this.config = { verbose: true, ...config };
+    super(
+      base as EmptyDirectoryBase & CreateMigrationHost,
+      destination,
+      data,
+      config as Record<string, unknown>,
+    );
   }
 
   get migrationDir(): string {
@@ -36,116 +49,76 @@ export class CreateMigration {
     return this.base.migrationFileName;
   }
 
-  async render(): Promise<string> {
-    return typeof this.data === "function" ? await this.data() : this.data;
-  }
-
-  private _existingMigration?: string;
-
-  existingMigration(): string | undefined {
-    if (this._existingMigration) return this._existingMigration;
-    const found = migrationExists(this.migrationDir, this.migrationFileName);
-    const value = found ?? (File.isExist(this.destination) ? this.destination : undefined);
-    if (value) this._existingMigration = value;
-    return value;
-  }
-
-  private invalidateExistingMigration(): void {
-    this._existingMigration = undefined;
-  }
-
-  exists(): boolean {
-    return Boolean(this.existingMigration());
-  }
-
-  async identical(): Promise<boolean> {
-    const existing = this.existingMigration();
-    if (!existing) return false;
-    return rbEqual(File.binread(existing), await this.render());
-  }
-
-  relativeExistingMigration(): string {
-    const existingMigration = this.existingMigration();
-    return existingMigration ? this.base.relativeToOriginalDestinationRoot(existingMigration) : "";
-  }
-
-  relativeDestination(): string {
-    return this.base.relativeToOriginalDestinationRoot(this.destination);
-  }
-
-  pretend(): boolean {
-    return Boolean(this.base.options.pretend);
-  }
-
-  async invoke(): Promise<string> {
-    const existing = this.existingMigration();
-    if (existing) await this.onConflictBehavior();
-    else {
-      if (!this.pretend()) await this.writeRendered();
-      this.sayStatus("create", "green");
-    }
-    if (this.pretend()) return this.destination;
-    if (File.isExist(this.destination)) return this.destination;
-    return this.relativeExistingMigration();
-  }
-
-  revoke(): string | undefined {
-    const e = this.existingMigration();
-    const sayDest = e ? this.base.relativeToOriginalDestinationRoot(e) : this.relativeDestination();
-    this.sayStatus("remove", "red", sayDest);
-    if (!e) return undefined;
-    if (!this.pretend()) {
-      FileUtils.rmRf(e);
-      this.invalidateExistingMigration();
-    }
-    return e;
-  }
-
-  private async onConflictBehavior(): Promise<string | undefined> {
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- base.options is a Thor HashWithIndifferentAccess, so `merge` dispatches.
-    const options = merge(this.base.options as Record<string, unknown>, this.config) as {
-      force?: unknown;
-      skip?: unknown;
-    };
-    if (await this.identical()) {
-      this.sayStatus("identical", "blue", this.relativeExistingMigration());
-      return this.existingMigration();
-    }
-    if (options.force) {
-      this.sayStatus("remove", "green", this.relativeExistingMigration());
-      this.sayStatus("create", "green");
-      if (!this.pretend()) {
-        const e = this.existingMigration();
-        if (e) {
-          FileUtils.rmRf(e);
-          this.invalidateExistingMigration();
-        }
-        await this.writeRendered();
-      }
-      return this.destination;
-    }
-    if (options.skip) {
-      this.sayStatus("skip", "yellow");
-      return this.existingMigration();
-    }
-    this.sayStatus("conflict", "red");
-    throw new Error(
-      `Another migration is already named ${this.migrationFileName}: ` +
-        `${this.existingMigration()}. Use --force to replace this ` +
-        `migration or --skip to ignore conflicted file.`,
+  override async isIdentical(): Promise<boolean> {
+    return (
+      (await this.isExists()) &&
+      rbEqual(File.binread(this.existingMigration() as string), await this.render())
     );
   }
 
-  private async writeRendered(): Promise<void> {
-    FileUtils.mkdirP(File.dirname(this.destination));
-    File.write(this.destination, await this.render());
+  override async invokeBang(): Promise<unknown> {
+    if (rtest(this.isPretend())) return super.invokeBang();
+
+    const invokedFile = await super.invokeBang();
+    return (await getFs().exists(this.destination))
+      ? invokedFile
+      : this.relativeExistingMigration();
   }
 
-  private sayStatus(
+  override async revokeBang(): Promise<unknown> {
+    const sayDestination = (await this.isExists())
+      ? this.relativeExistingMigration()
+      : this.relativeDestination;
+    this.sayStatus("remove", ":red", sayDestination);
+    if (!(await this.isExists())) return undefined;
+    if (!rtest(this.isPretend())) await FileUtils.rmRfAsync(this.existingMigration() as string);
+    return this.existingMigration();
+  }
+
+  relativeExistingMigration(): string {
+    return this.base.relativeToOriginalDestinationRoot(this.existingMigration() as string);
+  }
+
+  existingMigration(): string | false {
+    return (this._existingMigration ||=
+      migrationExists(this.migrationDir, this.migrationFileName) ||
+      (File.isExist(this.destination) && this.destination));
+  }
+
+  override async isExists(): Promise<boolean> {
+    return rtest(this.existingMigration());
+  }
+
+  /** @internal */
+  protected override async onConflictBehavior(block: () => unknown): Promise<void> {
+    const options = merge(this.base.options, this.config);
+    if (await this.isIdentical()) {
+      this.sayStatus("identical", ":blue", this.relativeExistingMigration());
+    } else if (rtest(options["force"])) {
+      this.sayStatus("remove", ":green", this.relativeExistingMigration());
+      this.sayStatus("create", ":green");
+      if (!rtest(this.isPretend())) {
+        await FileUtils.rmRfAsync(this.existingMigration() as string);
+        await block();
+      }
+    } else if (rtest(options["skip"])) {
+      this.sayStatus("skip", ":yellow");
+    } else {
+      this.sayStatus("conflict", ":red");
+      throw new GeneratorError(
+        `Another migration is already named ${this.migrationFileName}: ` +
+          `${this.existingMigration()}. Use --force to replace this migration ` +
+          "or --skip to ignore conflicted file.",
+      );
+    }
+  }
+
+  /** @internal */
+  protected override sayStatus(
     status: string,
-    color: string,
-    message: string = this.relativeDestination(),
+    color: unknown,
+    message: string = this.relativeDestination,
   ): void {
-    if (this.config.verbose) this.base.shell.sayStatus(status, message, color);
+    if (rtest(this.config["verbose"])) this.base.shell.sayStatus(status, message, color);
   }
 }
