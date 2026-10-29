@@ -1,7 +1,7 @@
 import { Base, registerModel, type Relation } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
 
-/** @missingRailsCall connectsTo — PERMANENT */
+/** @missingRailsCall connectsTo — CONVERGEABLE solid-cable-config-reads-are-async */
 export class Record extends Base {
   static {
     this.abstractClass = true;

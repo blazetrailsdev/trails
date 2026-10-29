@@ -71,7 +71,7 @@ export class Listener extends SubscriberMap {
   static Stop = Stop;
 
   private _eventLoop: StreamEventLoop;
-  private _thread: Thread<Promise<unknown>>;
+  private _thread: Thread<Promise<void>>;
   private _lastId: number | null = null;
   private _channels: Set<string> | null = null;
   private _stop!: (stop: Stop) => void;
@@ -86,7 +86,7 @@ export class Listener extends SubscriberMap {
     this._thread = new Thread(() => this.listen());
   }
 
-  async listen(): Promise<unknown> {
+  async listen(): Promise<void> {
     try {
       for (;;) {
         let instance: { completeBang(): unknown } | null = null;
@@ -107,7 +107,6 @@ export class Listener extends SubscriberMap {
     } catch (error) {
       if (!(error instanceof Stop)) throw error;
     }
-    return null;
   }
 
   async interruptible<T>(block: () => T | Promise<T>): Promise<T> {
@@ -138,7 +137,7 @@ export class Listener extends SubscriberMap {
   }
 
   /** @internal */
-  private get thread(): Thread<Promise<unknown>> {
+  private get thread(): Thread<Promise<void>> {
     return this._thread;
   }
 
