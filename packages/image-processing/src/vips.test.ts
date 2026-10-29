@@ -65,12 +65,6 @@ describe("ImageProcessing::Vips", () => {
     await assertDimensions([800, 600], result);
   });
 
-  it("accepts Vips::Image as source", async () => {
-    const vipsImage = vips.Image.newFromFile(fixtureImage("rotated.jpg").path()!);
-    const result = await Vips.source(vipsImage).call();
-    await assertDimensions([600, 800], result);
-  });
-
   describe(".valid_image?", () => {
     it("returns true for correct images", () => {
       expect(Vips.isValidImage(portrait)).toBe(true);

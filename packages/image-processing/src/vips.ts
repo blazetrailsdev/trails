@@ -10,12 +10,20 @@ type Image = InstanceType<Awaited<ReturnType<typeof WasmVips>>["Image"]>;
 /** @noRailsEquivalent PERMANENT */
 export const vips = await WasmVips();
 
-if (!(Number(vips.version(0)) > 8 || (vips.version(0) === 8 && Number(vips.version(1)) >= 6))) {
+/** @noRailsEquivalent PERMANENT */
+function atLeastLibvips(x: number, y: number): boolean {
+  const major = Number(vips.version(0));
+  const minor = Number(vips.version(1));
+  return major > x || (major === x && minor >= y);
+}
+
+if (!atLeastLibvips(8, 6)) {
   throw new RuntimeError("image_processing/vips requires libvips 8.6+");
 }
 
 const MAX_COORD = 10_000_000;
 
+/** @noRailsEquivalent PERMANENT */
 function addAlpha(image: Image): Image {
   const maxAlpha =
     image.interpretation === "grey16" || image.interpretation === "rgb16" ? 65535 : 255;
@@ -121,7 +129,10 @@ class Processor extends BaseProcessor {
         ? (this.constructor as typeof Processor).loadImage(this.image)
         : this.image;
 
-    if (image.width * height > width * image.height) {
+    const imageRatio = image.width / image.height;
+    const thumbnailRatio = width / height;
+
+    if (imageRatio > thumbnailRatio) {
       width = MAX_COORD;
     } else {
       height = MAX_COORD;
@@ -183,9 +194,9 @@ class Processor extends BaseProcessor {
     return image.composite([overlayImage], mode as Parameters<Image["composite"]>[1], options);
   }
 
-  remove(name: string): Image {
+  remove(...args: Parameters<Image["remove"]>): Image {
     const image = this.image as Image;
-    image.remove(name);
+    image.remove(...args);
     return image;
   }
 
@@ -199,10 +210,7 @@ class Processor extends BaseProcessor {
     if (typeof this.image === "string") {
       image = vips.Image.thumbnail(this.image, width, { height, ...options });
     } else {
-      const noRotate =
-        Number(vips.version(0)) > 8 || (vips.version(0) === 8 && Number(vips.version(1)) >= 8)
-          ? { no_rotate: true }
-          : { auto_rotate: false };
+      const noRotate = atLeastLibvips(8, 8) ? { no_rotate: true } : { auto_rotate: false };
       options = { ...noRotate, ...options };
 
       image = this.image.thumbnailImage(width, { height, ...options });

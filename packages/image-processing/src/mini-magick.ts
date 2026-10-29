@@ -3,6 +3,9 @@ import {
   Dir,
   File,
   format,
+  isPlainHash,
+  TypeError,
+  rbGetKwargs,
   rbInspect,
   rbFSend,
   rbObjRespondTo,
@@ -198,12 +201,17 @@ class Processor extends BaseProcessor {
   }
 
   /** @internal */
-  private thumbnail(geometry: string, { sharpen = null }: { sharpen?: unknown } = {}): CliTool {
+  private thumbnail(geometry: string, keywords: { sharpen?: unknown } = {}): CliTool {
+    rbGetKwargs(keywords, ["sharpen"]);
+    let { sharpen = null } = keywords;
     this.magick.resize(geometry);
 
     if (sharpen != null && sharpen !== false) {
-      const merged = { ...Processor.SHARPEN_PARAMETERS, ...(sharpen as Options) };
-      this.magick.sharpen(`${merged.radius}x${merged.sigma}`);
+      if (!isPlainHash(sharpen)) {
+        throw new TypeError(`no implicit conversion of ${rbInspect(sharpen)} into Hash`);
+      }
+      sharpen = { ...Processor.SHARPEN_PARAMETERS, ...sharpen };
+      this.magick.sharpen(`${(sharpen as Options).radius}x${(sharpen as Options).sigma}`);
     }
 
     return this.magick;
@@ -249,13 +257,11 @@ class Processor extends BaseProcessor {
     },
 
     applyDefine(magick: CliTool, options: Record<string, Options>): CliTool {
-      // eslint-disable-next-line prefer-const
-      for (let [namespace, settings] of Object.entries(options)) {
-        namespace = namespace.replaceAll("_", "-");
+      for (const [rawNamespace, settings] of Object.entries(options)) {
+        const namespace = rawNamespace.replaceAll("_", "-");
 
-        // eslint-disable-next-line prefer-const
-        for (let [key, value] of Object.entries(settings)) {
-          key = key.replaceAll("_", "-");
+        for (const [rawKey, value] of Object.entries(settings)) {
+          const key = rawKey.replaceAll("_", "-");
 
           magick.define(`${namespace}:${key}=${value}`);
         }
