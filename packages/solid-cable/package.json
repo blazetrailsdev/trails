@@ -1,0 +1,32 @@
+{
+  "name": "@blazetrails/solid-cable",
+  "version": "0.1.0",
+  "description": "Database-backed Action Cable backend for Trails, mirroring the solid_cable gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/actioncable": "workspace:*",
+    "@blazetrails/activejob": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

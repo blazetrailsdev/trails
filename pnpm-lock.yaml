@@ -678,6 +678,18 @@ importers:
         specifier: ^2.8.3
         version: 2.8.3
 
+  packages/solid-cable:
+    dependencies:
+      '@blazetrails/actioncable':
+        specifier: workspace:*
+        version: link:../actioncable
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
+
   packages/solid-queue:
     dependencies:
       '@blazetrails/activejob':
@@ -984,6 +996,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../../packages/ruby-compat
+      '@blazetrails/solid-cable':
+        specifier: workspace:*
+        version: link:../../packages/solid-cable
       '@blazetrails/solid-queue':
         specifier: workspace:*
         version: link:../../packages/solid-queue
