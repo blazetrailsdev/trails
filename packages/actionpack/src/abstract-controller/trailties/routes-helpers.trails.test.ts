@@ -49,4 +49,21 @@ describe("RoutesHelpers.with (trails)", () => {
     a.namedRoutes.clear();
     expect(Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value).toBe(own);
   });
+
+  it("clearing a later route set falls back to an earlier one's helper", () => {
+    const a = new RouteSet();
+    const b = new RouteSet();
+    for (const routes of [a, b]) {
+      routes.draw(function () {
+        this.get("posts", { to: "posts#index", as: "posts" });
+      });
+    }
+    const cls = class {};
+    const wired = cls as unknown as RoutesHelpersControllerClass;
+    RoutesHelpers.with(a)(wired);
+    const fromA = Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value;
+    RoutesHelpers.with(b)(wired);
+    b.namedRoutes.clear();
+    expect(Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value).toBe(fromA);
+  });
 });

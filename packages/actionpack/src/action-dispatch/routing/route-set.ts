@@ -687,8 +687,9 @@ export class NamedRouteCollection {
     proto: object,
     supportsPath: boolean,
     installed: Map<string, PropertyDescriptor>,
+    includes: Map<string, PropertyDescriptor>[],
   ): void {
-    this._includers.add({ proto: new WeakRef(proto), supportsPath, installed });
+    this._includers.add({ proto: new WeakRef(proto), supportsPath, installed, includes });
   }
 
   /** @internal */
@@ -712,10 +713,12 @@ export class NamedRouteCollection {
     for (const includer of this._includers) {
       const proto = includer.proto.deref();
       if (!proto || !includer.installed.has(name)) continue;
-      if (isIncludedMember(proto, name, includer.installed)) {
-        delete (proto as Record<string, unknown>)[name];
-      }
+      const isShadowing = isIncludedMember(proto, name, includer.installed);
       includer.installed.delete(name);
+      if (!isShadowing) continue;
+      delete (proto as Record<string, unknown>)[name];
+      const below = [...includer.includes].reverse().find((included) => included.has(name));
+      if (below) Object.defineProperty(proto, name, below.get(name)!);
     }
   }
 }
@@ -724,6 +727,7 @@ interface IncludedHelpers {
   proto: WeakRef<object>;
   supportsPath: boolean;
   installed: Map<string, PropertyDescriptor>;
+  includes: Map<string, PropertyDescriptor>[];
 }
 
 export type UrlHelpersModule = Module & {
