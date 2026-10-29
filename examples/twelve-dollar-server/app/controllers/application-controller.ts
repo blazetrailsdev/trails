@@ -21,7 +21,7 @@ export class ApplicationController extends ActionController.API {
     this.rescueFrom(ParseError, { with: "malformedJsonBody" });
   }
 
-  protected async renderError(message: string, status: string): Promise<void> {
+  protected async renderError(message: string | null, status: string): Promise<void> {
     await this.render({ json: { error: message }, status });
   }
 

@@ -5,7 +5,9 @@ export const PostIdentifiable = {
   POST_ID: /^[1-9]\d*$/,
 
   async requireValidPostId(
-    this: ActionController.API & { renderError(message: string, status: string): Promise<void> },
+    this: ActionController.API & {
+      renderError(message: string | null, status: string): Promise<void>;
+    },
     id: string,
   ): Promise<void> {
     if (!PostIdentifiable.POST_ID.test(id))

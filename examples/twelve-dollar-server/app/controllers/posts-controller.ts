@@ -40,6 +40,6 @@ export class PostsController extends ApplicationController {
     if (await post.save()) return this.render({ json: { post }, status: ":created" });
     if (!post.errors.isInclude("body")) throw new RecordInvalid(post);
 
-    await this.renderError(post.errors.get("body")[0]!, ":bad_request");
+    await this.renderError(post.errors.get("body")[0], ":bad_request");
   }
 }
