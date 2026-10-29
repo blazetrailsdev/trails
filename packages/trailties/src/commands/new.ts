@@ -17,6 +17,10 @@ export function newCommand(): Command {
     .description("Create a new trails application")
     .argument("<name>", "Application name")
     .option("-n, --name <name>", "Name of the app")
+    .option(
+      "-m, --template <template>",
+      "Path to some application template (can be a filesystem path or URL)",
+    )
     .option("-d, --database <type>", "Database adapter (sqlite, postgres, mysql)", "sqlite")
     .option("--package-manager <pm>", "Package manager to use (pnpm, npm, yarn)", "pnpm")
     .option(
@@ -52,6 +56,7 @@ export function newCommand(): Command {
         [name],
         {
           name: options.name,
+          template: options.template,
           database: options.database,
           packageManager: pm,
           sqliteDriver: driver,

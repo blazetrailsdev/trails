@@ -139,7 +139,6 @@ export abstract class AppBase extends GeneratorBase {
     config: GeneratorConfig = {},
   ) {
     super(positionalArgv, optionArgv, config);
-    this.destinationRoot = File.expandPath(this.appPath, this.destinationRoot);
     this.options = this.deduceImpliedOptions({
       ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS,
       ...Object.fromEntries(this.options as unknown as Iterable<[string, unknown]>),

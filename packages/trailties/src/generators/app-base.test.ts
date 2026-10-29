@@ -12,8 +12,11 @@ describe("AppBase", () => {
     expect(g.database.name).toBe("sqlite3");
     expect(g.keeps()).toBe(true);
     expect(g.dependsOnSystemTest()).toBe(true);
+    g.setDefaultAccessorsBang();
     expect(g.destinationRoot).toBe("/work/blog");
-    expect(build({ appPath: "/abs/blog" }).destinationRoot).toBe("/abs/blog");
+    const abs = build({ appPath: "/abs/blog" });
+    abs.setDefaultAccessorsBang();
+    expect(abs.destinationRoot).toBe("/abs/blog");
   });
 
   it("skip(what), devcontainer, postgres delegate", () => {

@@ -528,4 +528,17 @@ describe("AppGenerator", () => {
     expect(read("config.ts")).toMatchSnapshot("config.ts");
     expect(read("vite.config.ts")).toMatchSnapshot("vite.config.ts");
   });
+
+  it("template from absolute path", async () => {
+    const template = path.join(tmpDir, "template.mjs");
+    fs.writeFileSync(template, 'export default (g) => g.say("It works from file!");\n');
+    await makeGen("sqlite", { template } as never).invokeAll();
+    expect(lines.join("\n")).toMatch("It works from file!");
+  });
+
+  it("template raises an error with invalid path", async () => {
+    const content = makeGen("sqlite", { template: "non/existent/path" } as never).invokeAll();
+    await expect(content).rejects.toThrow(/The template \[.*\] could not be loaded/);
+    await expect(content).rejects.toThrow(/non\/existent\/path/);
+  });
 });

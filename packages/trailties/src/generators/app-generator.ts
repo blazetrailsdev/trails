@@ -99,6 +99,7 @@ export class AppGenerator extends AppBase {
 
   static {
     void this.sourceRoot(File.expandPath("rails/app/templates", __dir__));
+    this.methodAdded("setDefaultAccessorsBang");
     this.methodAdded("createRoot");
     this.methodAdded("createRootFiles");
     this.methodAdded("createAppFiles");
@@ -116,6 +117,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createTestFiles");
     this.methodAdded("createSystemTestFiles");
     this.methodAdded("createStorageFiles");
+    this.methodAdded("applyRailsTemplate");
   }
 
   declare options: AppGeneratorOptions & AppBaseOptions;
