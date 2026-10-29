@@ -46,14 +46,21 @@ Object.defineProperty(RoutesHelpers, "with", {
           : routes.urlHelpers(includePathHelpers);
       const mod = urlHelpersModule();
       const proto = cls.prototype;
-      let installed = installedMembers.get(proto);
-      if (!installed) installedMembers.set(proto, (installed = new Map()));
+      let earlier = installedMembers.get(proto);
+      if (!earlier) installedMembers.set(proto, (earlier = []));
+      const installed = new Map<string, PropertyDescriptor>();
       for (const [key, descriptor] of includedDescriptors(cls, mod)) {
-        if (!isIncludedMember(proto, key, installed)) continue;
+        if (
+          Object.hasOwn(proto, key) &&
+          !earlier.some((included) => isIncludedMember(proto, key, included))
+        ) {
+          continue;
+        }
         Object.defineProperty(proto, key, descriptor);
         installed.set(key, descriptor);
       }
       const namedRoutes = (mod as { _proxy?: { _routes?: RouteSet } })._proxy?._routes?.namedRoutes;
+      earlier.push(installed);
       namedRoutes?._appendIncluder(proto, includePathHelpers, installed);
       cls._routes = (urlHelpersModule() as { _routes?: unknown })._routes ?? routes;
     };
@@ -66,7 +73,7 @@ export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods 
   prototype: object;
 }
 
-const installedMembers = new WeakMap<object, Map<string, PropertyDescriptor>>();
+const installedMembers = new WeakMap<object, Map<string, PropertyDescriptor>[]>();
 
 /**
  * @internal

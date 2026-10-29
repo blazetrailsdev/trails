@@ -29,4 +29,24 @@ describe("RoutesHelpers.with (trails)", () => {
     });
     expect((new cls() as unknown as { postsPath(): string }).postsPath()).toBe("mine");
   });
+
+  it("a redraw of an earlier route set does not replace a later one's helper", () => {
+    const draw = (routes: RouteSet, to: string): void =>
+      routes.draw(function () {
+        this.get(to, { to: `${to}#index`, as: "posts" });
+      });
+    const a = new RouteSet();
+    const b = new RouteSet();
+    draw(a, "a");
+    draw(b, "b");
+    const cls = class {};
+    const wired = cls as unknown as RoutesHelpersControllerClass;
+    RoutesHelpers.with(a)(wired);
+    RoutesHelpers.with(b)(wired);
+    const own = Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value;
+    draw(a, "a2");
+    expect(Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value).toBe(own);
+    a.namedRoutes.clear();
+    expect(Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value).toBe(own);
+  });
 });
