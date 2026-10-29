@@ -13,12 +13,18 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Actions, type ActionsHost } from "./actions.js";
 import { Thor } from "./thor.js";
-import { Group, type GroupClass } from "./group.js";
+import type { GroupClass } from "./group.js";
+import {
+  ClearCounter as ClearCounterFixture,
+  MyCounter as MyCounterFixture,
+} from "./test-helpers/fixtures/group.js";
+import { sourceRoot } from "./test-helpers/helper.js";
 import * as Util from "./util.js";
 
 vi.mock("./util.js", async (importOriginal) => ({ ...(await importOriginal<typeof Util>()) }));
 
 let fixtures: string;
+let templates: string;
 let destinationRoot: string;
 
 type CounterInstance = ActionsHost & {
@@ -35,26 +41,8 @@ type ActionsClass = Pick<GroupClass, "argument" | "removeArgument" | "classOptio
   sourceRoot(path?: string): Promise<string | null>;
   sourcePathsForSearch(): Promise<string[]>;
 } & (new (...args: unknown[]) => CounterInstance);
-const MyCounter = class MyCounter extends Group {
-  static {
-    const klass = this as unknown as ActionsClass;
-    include(this, Actions);
-    klass.addRuntimeOptionsBang();
-    klass.argument("first", { type: "numeric" });
-    klass.argument("second", { type: "numeric", default: 2 });
-  }
-  static isExitOnFailure(): boolean {
-    return false;
-  }
-} as unknown as ActionsClass;
-const ClearCounter = class ClearCounter extends (MyCounter as unknown as typeof Group) {
-  static {
-    (this as unknown as ActionsClass).removeArgument("first", "second", { undefine: true });
-  }
-  static async sourceRoot(): Promise<string> {
-    return File.expandPath(File.join(fixtures, "bundle"));
-  }
-} as unknown as ActionsClass;
+const MyCounter = MyCounterFixture as unknown as ActionsClass;
+const ClearCounter = ClearCounterFixture as unknown as ActionsClass;
 class A extends Thor {
   static {
     include(this, Actions);
@@ -80,17 +68,13 @@ async function capture(_stream: string, block: () => unknown): Promise<string> {
   return result;
 }
 
-beforeAll(async () => {
-  fixtures = Dir.mktmpdir("thor-fixtures-");
+beforeAll(() => {
+  fixtures = sourceRoot();
+  templates = Dir.mktmpdir("thor-templates-");
   destinationRoot = Dir.mktmpdir("thor-sandbox-");
-  for (const dir of ["doc", "bundle", "broken"]) FileUtils.mkdirP(File.join(fixtures, dir));
-  File.write(File.join(fixtures, "doc", "README"), "");
-  await MyCounter.sourceRoot(fixtures);
-  MyCounter.sourcePaths().push(File.expandPath("broken", fixtures));
-  ClearCounter.sourcePaths().unshift(File.expandPath(File.join(fixtures, "doc")));
 });
 afterAll(() => {
-  FileUtils.rmRf(fixtures);
+  FileUtils.rmRf(templates);
   FileUtils.rmRf(destinationRoot);
 });
 
@@ -329,10 +313,10 @@ describe("Thor::Actions", () => {
     let file: string;
 
     beforeAll(() => {
-      (MyCounter as unknown as { sourcePaths(): string[] }).sourcePaths().push(fixtures);
+      (MyCounter as unknown as { sourcePaths(): string[] }).sourcePaths().push(templates);
       template =
         'export default function (g) { this.foo = "FOO"; g.sayStatus("cool", "padding"); }\n';
-      file = File.join(fixtures, "template.mjs");
+      file = File.join(templates, "template.mjs");
       File.write(file, template);
     });
 
@@ -345,7 +329,7 @@ describe("Thor::Actions", () => {
       const apply = vi.spyOn(r, "apply").mockResolvedValue(undefined);
       await action(r, file);
       expect(apply).toHaveBeenCalledWith(file);
-      file = File.join(fixtures, "template.mjs");
+      file = File.join(templates, "template.mjs");
     });
 
     it("accepts a secure URL as the path", async () => {
@@ -354,11 +338,11 @@ describe("Thor::Actions", () => {
       const apply = vi.spyOn(r, "apply").mockResolvedValue(undefined);
       await action(r, file);
       expect(apply).toHaveBeenCalledWith(file);
-      file = File.join(fixtures, "template.mjs");
+      file = File.join(templates, "template.mjs");
     });
 
     it("accepts a local file path with spaces", async () => {
-      const spaced = File.join(fixtures, "path with spaces.mjs");
+      const spaced = File.join(templates, "path with spaces.mjs");
       File.write(spaced, template);
       const open = vi.spyOn(getPath() as Required<ReturnType<typeof getPath>>, "pathToFileURL");
       await action(counter(), spaced);
