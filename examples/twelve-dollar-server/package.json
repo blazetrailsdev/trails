@@ -17,6 +17,6 @@
     "better-sqlite3": "^12.6.2"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^25.3.5"
   }
 }

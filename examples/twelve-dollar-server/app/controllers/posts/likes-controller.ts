@@ -18,8 +18,8 @@ export class LikesController extends ApplicationController {
   }
 
   async create(): Promise<void> {
-    const post = await Post.select("id").find(this.params.get("post_id"));
-    const liked = await post.likeBy(Current.user_id!);
+    const post = await Post.select(":id").find(this.params.get("post_id"));
+    const liked = await post.likeBy(Current.userId!);
     await this.render({
       json: { liked: true, already_liked: !liked, post_id: post.id },
       status: liked ? ":created" : ":ok",

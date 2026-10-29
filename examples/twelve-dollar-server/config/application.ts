@@ -17,13 +17,17 @@ import {
   TempfileReaper,
 } from "@blazetrails/rack";
 
+import { Process } from "@blazetrails/ruby-compat";
+
 import "@blazetrails/trailties/all";
 
 export class TwelveDollarServer extends Application {
   static {
     this.config.loadDefaults("8.0");
 
-    this.config.x.bootedAt = performance.now() / 1000;
+    this.config.autoloadLib({ ignore: ["assets", "tasks"] });
+
+    this.config.x.bootedAt = Process.clockGettime(Process.CLOCK_MONOTONIC);
     this.config.x.jwtSecret = process.env.JWT_SECRET;
 
     for (const middleware of [
