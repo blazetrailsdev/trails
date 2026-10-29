@@ -799,6 +799,15 @@ on a `Module` until its own story settles it" is not a second one, and reaching
 for the carrier because the ordering is awkward is how the 61 remaining
 instances got there.
 
+One exception is ratified: `RoutesHelpers.with`
+(`actionpack/lib/abstract_controller/railties/routes_helpers.rb:12-30`).
+A route set draws its routes after controllers include its `url_helpers`, so
+no ordering puts the helpers first. Its `NamedRouteCollection` keeps a weak
+list of the prototypes that copied its helpers, and `add_url_helper` /
+`clear!` write through to them (`_appendIncluder`, `isIncludedMember`). No
+carrier is spliced into the prototype chain. Ruled by the repo owner on
+2026-10-29; it does not license an includer list for any other module.
+
 `pnpm parity:modules` (`scripts/parity/module-count.ts`) counts, per package,
 the `new Module` expressions, `superMethod(` calls and `Module` imports from
 `@blazetrails/ruby-compat`, against `scripts/parity/module-count-mark.json`.

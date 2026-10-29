@@ -11,6 +11,7 @@ import {
 
 import { AbstractController } from "../../namespaces.js";
 
+import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import type { HelpersClassMethods } from "../helpers.js";
 
 type HelperMethodsModule = Record<string, (...args: unknown[]) => unknown>;
@@ -43,41 +44,25 @@ Object.defineProperty(RoutesHelpers, "with", {
         namespaceBuilder
           ? namespaceBuilder(includePathHelpers)
           : routes.urlHelpers(includePathHelpers);
+      const mod = urlHelpersModule();
       const proto = cls.prototype;
-      Object.setPrototypeOf(
-        proto,
-        new Proxy(Object.create(Object.getPrototypeOf(proto) as object) as object, {
-          get(target, key, receiver) {
-            if (typeof key === "string") {
-              const accessor = includedAccessor(cls, urlHelpersModule(), key);
-              if (accessor) return accessor.get!.call(receiver);
-              const member = includedMember(cls, urlHelpersModule(), key);
-              if (member !== undefined) return member;
-            }
-            return Reflect.get(target, key, receiver);
-          },
-          set(target, key, value, receiver) {
-            const accessor =
-              typeof key === "string" ? includedAccessor(cls, urlHelpersModule(), key) : undefined;
-            if (accessor?.set) {
-              accessor.set.call(receiver, value);
-              return true;
-            }
-            return Reflect.set(target, key, value, receiver);
-          },
-          has(target, key) {
-            if (
-              typeof key === "string" &&
-              (includedAccessor(cls, urlHelpersModule(), key) ||
-                includedMember(cls, urlHelpersModule(), key) !== undefined)
-            ) {
-              return true;
-            }
-            return Reflect.has(target, key);
-          },
-        }),
-      );
-      cls._routes = (urlHelpersModule() as { _routes?: unknown })._routes ?? routes;
+      let earlier = installedMembers.get(proto);
+      if (!earlier) installedMembers.set(proto, (earlier = []));
+      const installed = new Map<string, PropertyDescriptor>();
+      for (const [key, descriptor] of includedDescriptors(cls, mod)) {
+        if (
+          Object.hasOwn(proto, key) &&
+          !earlier.some((included) => isIncludedMember(proto, key, included))
+        ) {
+          continue;
+        }
+        Object.defineProperty(proto, key, descriptor);
+        installed.set(key, descriptor);
+      }
+      const namedRoutes = (mod as { _routes?: Partial<RouteSet> })._routes?.namedRoutes;
+      earlier.push(installed);
+      namedRoutes?._appendIncluder(proto, includePathHelpers, installed, earlier);
+      cls._routes = (mod as { _routes?: unknown })._routes ?? routes;
     };
   },
   writable: true,
@@ -88,52 +73,29 @@ export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods 
   prototype: object;
 }
 
-function includedAccessor(
+const installedMembers = new WeakMap<object, Map<string, PropertyDescriptor>[]>();
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function isIncludedMember(
+  proto: object,
+  key: string,
+  installed: Map<string, PropertyDescriptor>,
+): boolean {
+  const own = Object.getOwnPropertyDescriptor(proto, key);
+  if (!own) return true;
+  const mine = installed.get(key);
+  return mine !== undefined && own.value === mine.value && own.get === mine.get;
+}
+
+function includedDescriptors(
   cls: RoutesHelpersControllerClass,
   mod: HelperMethodsModule | Module,
-  key: string,
-): PropertyDescriptor | undefined {
-  if (!(mod instanceof Module)) return undefined;
-  const descriptor = moduleInstanceMethod(cls, mod, key);
-  return descriptor?.get ? descriptor : undefined;
-}
-
-function includedMember(
-  cls: RoutesHelpersControllerClass,
-  mod: HelperMethodsModule | Module,
-  key: string,
-): unknown {
-  if (mod instanceof Module) return moduleInstanceMethod(cls, mod, key)?.value;
-  let current: object | null = mod;
-  while (current && current !== Object.prototype) {
-    const own = Object.getOwnPropertyDescriptor(current, key);
-    if (own && (own.enumerable || !Object.hasOwn(current, "constructor"))) {
-      const value = (mod as Record<string, unknown>)[key];
-      return typeof value === "function" || key === "_routes" ? value : undefined;
-    }
-    current = Object.getPrototypeOf(current) as object | null;
-  }
-  return undefined;
-}
-
-interface IncludedMethodTable {
-  prototype: object;
-  ancestry: object;
-}
-
-const includedMethodTables = new WeakMap<object, WeakMap<Module, IncludedMethodTable>>();
-
-/** @noRailsEquivalent PERMANENT */
-function moduleInstanceMethod(
-  cls: RoutesHelpersControllerClass,
-  mod: Module,
-  key: string,
-): PropertyDescriptor | undefined {
-  if (key === "constructor") return undefined;
-  let tables = includedMethodTables.get(cls);
-  if (!tables) includedMethodTables.set(cls, (tables = new WeakMap()));
-  let table = tables.get(mod);
-  if (!table) {
+): Map<string, PropertyDescriptor> {
+  const descriptors = new Map<string, PropertyDescriptor>();
+  if (mod instanceof Module) {
     const scan = class {};
     include(scan, mod);
     const ancestry = class {};
@@ -144,18 +106,33 @@ function moduleInstanceMethod(
     }
     const probe = class extends ancestry {};
     include(probe, mod);
-    table = { prototype: probe.prototype, ancestry: ancestry.prototype };
-    tables.set(mod, table);
+    for (
+      let current: object | null = probe.prototype;
+      current && current !== ancestry.prototype;
+      current = Object.getPrototypeOf(current) as object | null
+    ) {
+      for (const key of Object.getOwnPropertyNames(current)) {
+        if (key === "constructor" || descriptors.has(key)) continue;
+        descriptors.set(key, Object.getOwnPropertyDescriptor(current, key)!);
+      }
+    }
+    return descriptors;
   }
   for (
-    let current: object | null = table.prototype;
-    current && current !== table.ancestry;
+    let current: object | null = mod;
+    current && current !== Object.prototype;
     current = Object.getPrototypeOf(current) as object | null
   ) {
-    const descriptor = Object.getOwnPropertyDescriptor(current, key);
-    if (descriptor) return descriptor;
+    for (const key of Object.getOwnPropertyNames(current)) {
+      if (descriptors.has(key)) continue;
+      const own = Object.getOwnPropertyDescriptor(current, key)!;
+      if (!own.enumerable && Object.hasOwn(current, "constructor")) continue;
+      const value = (mod as Record<string, unknown>)[key];
+      if (typeof value !== "function" && key !== "_routes") continue;
+      descriptors.set(key, { value, writable: true, configurable: true, enumerable: false });
+    }
   }
-  return undefined;
+  return descriptors;
 }
 
 function findTrailtieUrlHelpers(

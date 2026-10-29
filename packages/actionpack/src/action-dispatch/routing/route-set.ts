@@ -29,6 +29,7 @@ import {
   RFC2396_PARSER,
 } from "@blazetrails/ruby-compat";
 import { Mapper } from "./mapper.js";
+import { isIncludedMember } from "../../abstract-controller/trailties/routes-helpers.js";
 import { deprecator } from "../deprecator.js";
 import {
   Router as JourneyRouter,
@@ -546,6 +547,8 @@ export class NamedRouteCollection {
   private readonly pathHelpers: Set<string> = new Set();
   /** @internal */
   private readonly urlHelpers: Set<string> = new Set();
+  /** @internal */
+  private readonly _includers = new Set<IncludedHelpers>();
 
   /** @internal */
   get routes(): ReadonlyMap<string, Route> {
@@ -563,10 +566,12 @@ export class NamedRouteCollection {
   clearBang(): void {
     for (const helper of this.pathHelpers) {
       this.pathHelpersModule.removeMethod(helper);
+      this._removeFromIncluders(helper);
     }
 
     for (const helper of this.urlHelpers) {
       this.urlHelpersModule.removeMethod(helper);
+      this._removeFromIncluders(helper);
     }
 
     this._routes.clear();
@@ -631,12 +636,14 @@ export class NamedRouteCollection {
       mod[pathName] = function (this: UrlHelperContext, ...args: unknown[]): string {
         return helper.call(this as unknown as PolymorphicHost, args, true);
       };
+      this._appendToIncluders(pathName, mod[pathName], true);
     });
 
     this.urlHelpersModule.moduleEval((mod) => {
       mod[urlName] = function (this: UrlHelperContext, ...args: unknown[]): string {
         return helper.call(this as unknown as PolymorphicHost, args, false);
       };
+      this._appendToIncluders(urlName, mod[urlName], false);
     });
 
     this.pathHelpers.add(pathName);
@@ -653,7 +660,7 @@ export class NamedRouteCollection {
     helper: UrlHelper,
     urlStrategy: UrlStrategy,
   ): void {
-    mod.defineMethod(name, function (this: UrlHelperContext, ...args: unknown[]): string {
+    const method = function (this: UrlHelperContext, ...args: unknown[]): string {
       const last = args[args.length - 1];
       let options: Record<string, unknown> | Hash<string, unknown> | undefined;
       if (isPlainObject(last)) {
@@ -662,8 +669,70 @@ export class NamedRouteCollection {
         options = (args.pop() as Parameters).toH();
       }
       return helper.call(this, name, args, options, urlStrategy);
-    });
+    };
+    mod.defineMethod(name, method);
+    this._appendToIncluders(name, method, mod === this.pathHelpersModule);
   }
+
+  /**
+   * Records a class prototype that `RoutesHelpers.with` copied this
+   * collection's helpers onto, so a route drawn later reaches it as Ruby's
+   * `rb_include_module` reaches a module's existing includers
+   * (vendor/ruby/v3.3.11/class.c:1179-1215).
+   *
+   * @internal
+   */
+  _appendIncluder(
+    proto: object,
+    supportsPath: boolean,
+    installed: Map<string, PropertyDescriptor>,
+    includes: Map<string, PropertyDescriptor>[],
+  ): void {
+    this._includers.add({ proto: new WeakRef(proto), supportsPath, installed, includes });
+  }
+
+  /** @internal */
+  private _appendToIncluders(name: string, method: unknown, isPath: boolean): void {
+    for (const includer of this._includers) {
+      const proto = includer.proto.deref();
+      if (!proto) {
+        this._includers.delete(includer);
+        continue;
+      }
+      if (isPath && !includer.supportsPath) continue;
+      const descriptor = { value: method, writable: true, configurable: true, enumerable: false };
+      const below = includer.includes.slice(0, includer.includes.indexOf(includer.installed) + 1);
+      const isOutranked =
+        Object.hasOwn(proto, name) &&
+        !below.some((included) => isIncludedMember(proto, name, included));
+      includer.installed.set(name, descriptor);
+      if (!isOutranked) Object.defineProperty(proto, name, descriptor);
+    }
+  }
+
+  /** @internal */
+  private _removeFromIncluders(name: string): void {
+    for (const includer of this._includers) {
+      const proto = includer.proto.deref();
+      if (!proto || !includer.installed.has(name)) continue;
+      const isShadowing = isIncludedMember(proto, name, includer.installed);
+      includer.installed.delete(name);
+      if (!isShadowing) continue;
+      delete (proto as Record<string, unknown>)[name];
+      const below = includer.includes
+        .slice(0, includer.includes.indexOf(includer.installed))
+        .reverse()
+        .find((included) => included.has(name));
+      if (below) Object.defineProperty(proto, name, below.get(name)!);
+    }
+  }
+}
+
+interface IncludedHelpers {
+  proto: WeakRef<object>;
+  supportsPath: boolean;
+  installed: Map<string, PropertyDescriptor>;
+  includes: Map<string, PropertyDescriptor>[];
 }
 
 export type UrlHelpersModule = Module & {
