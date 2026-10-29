@@ -92,6 +92,16 @@ describe("import-cycles scanFile", () => {
     );
     expect([...e.evalNames]).toEqual([]);
   });
+
+  it("scopes a var in a class static block to that block", () => {
+    const [e] = scanA([IMPORT_B, "function h() { class C { static { var B = 1; } } return B; }"]);
+    expect(e.to).toBe("/p/b.ts");
+    expect(scanA([IMPORT_B, "class D { static { var B = 1; console.log(B); } }"])).toEqual([]);
+  });
+
+  it("does not read a label spelled like an import as the import", () => {
+    expect(scanA([IMPORT_B, "B: { break B; }"])).toEqual([]);
+  });
 });
 
 describe("import-cycles makeResolver", () => {

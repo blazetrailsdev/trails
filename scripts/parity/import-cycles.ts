@@ -176,6 +176,8 @@ function isReference(id: ts.Identifier): boolean {
   const p = id.parent;
   if (ts.isPropertyAccessExpression(p) && p.name === id) return false;
   if (ts.isQualifiedName(p) && p.right === id) return false;
+  if (ts.isLabeledStatement(p) && p.label === id) return false;
+  if ((ts.isBreakStatement(p) || ts.isContinueStatement(p)) && p.label === id) return false;
   if (ts.isExportSpecifier(p) && p.propertyName === undefined && p.name !== id) return false;
   if (ts.isExportSpecifier(p) && p.propertyName !== undefined && p.name === id) return false;
   if (
@@ -217,11 +219,11 @@ function declaresInStatements(statements: readonly ts.Statement[], text: string)
   );
 }
 
-/** Whether a `var` in `body`, outside any nested function, binds `text`. */
+/** Whether a `var` in `body`, outside any nested function or static block, binds `text`. */
 function hoistsVar(body: ts.Node, text: string): boolean {
   let found = false;
   const visit = (n: ts.Node): void => {
-    if (found || ts.isFunctionLike(n)) return;
+    if (found || ts.isFunctionLike(n) || ts.isClassStaticBlockDeclaration(n)) return;
     if (
       ts.isVariableDeclarationList(n) &&
       !(n.flags & ts.NodeFlags.BlockScoped) &&
@@ -249,6 +251,7 @@ function isShadowed(id: ts.Identifier): boolean {
       }
     }
     if (ts.isClassExpression(p) && p.name?.text === text) return true;
+    if (ts.isClassStaticBlockDeclaration(p) && hoistsVar(p.body, text)) return true;
     if ((ts.isBlock(p) || ts.isModuleBlock(p)) && declaresInStatements(p.statements, text)) {
       return true;
     }
