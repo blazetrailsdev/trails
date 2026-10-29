@@ -324,7 +324,6 @@ export class Request {
     return this.remoteIp;
   }
 
-  /** @missingRailsArgs force_encoding — PERMANENT */
   get body(): StringIO {
     let rawPost = this.getHeader("RAW_POST_DATA") as string | null | undefined;
     if (rawPost != null) {

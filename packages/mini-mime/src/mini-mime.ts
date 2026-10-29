@@ -180,7 +180,6 @@ export class Db {
       return result;
     }
 
-    /** @missingRailsArgs force_encoding — PERMANENT */
     resolve(row: number): Info {
       return new Info(
         forceEncoding(

@@ -632,10 +632,7 @@ export function compareWithGlobalToken(
   return SecurityUtils.fixedLengthSecureCompare(token, this.globalCsrfToken(session));
 }
 
-/**
- * @internal
- * @missingRailsArgs chomp — PERMANENT
- */
+/** @internal */
 export function isValidPerFormCsrfToken(
   this: CsrfController,
   token: Bytes,
@@ -737,10 +734,7 @@ export function isStorageStrategy(this: unknown, object: unknown): object is Csr
   );
 }
 
-/**
- * @internal
- * @missingRailsArgs chomp — PERMANENT
- */
+/** @internal */
 export function normalizeRelativeActionPath(this: CsrfController, relActionPath: string): string {
   const uri = URI.parse(this.request.path ?? "/");
   uri.path = uri.path + `/${relActionPath}`;
@@ -749,10 +743,7 @@ export function normalizeRelativeActionPath(this: CsrfController, relActionPath:
   return chomp(uri.path, "/");
 }
 
-/**
- * @internal
- * @missingRailsArgs chomp — PERMANENT
- */
+/** @internal */
 export function normalizeActionPath(this: CsrfController, actionPath: string): string {
   const uri = URI.parse(actionPath);
 

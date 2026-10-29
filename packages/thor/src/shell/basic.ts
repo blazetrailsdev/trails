@@ -113,7 +113,6 @@ export class Basic {
     this.stderr().flush();
   }
 
-  /** @missingRailsArgs chomp — PERMANENT */
   sayStatus(status: unknown, message: unknown, logStatus: unknown = true): void {
     if (rtest(this.isQuiet()) || logStatus === false) return;
     const spaces = "  ".repeat(this.padding + 1);

@@ -273,10 +273,7 @@ export function executeCommand(
   );
 }
 
-/**
- * @missingRailsArgs chomp — PERMANENT
- * @missingRailsArgs indent — PERMANENT
- */
+/** @missingRailsArgs indent — PERMANENT */
 export function optimizeIndentation(value: unknown, amount: number = 0): string {
   if (typeof value !== "string") return `${String(value ?? "")}\n`;
   return `${chomp(indent(stripHeredoc(value), amount))}\n`;

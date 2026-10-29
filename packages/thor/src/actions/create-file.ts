@@ -52,7 +52,6 @@ export class CreateFile extends EmptyDirectory {
     this.data = data;
   }
 
-  /** @missingRailsArgs force_encoding — PERMANENT */
   async isIdentical(): Promise<boolean> {
     let render: string | Uint8Array;
     return (

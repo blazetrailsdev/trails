@@ -832,7 +832,6 @@ export class RouteSet {
     return new (this.requestClass())(env);
   }
 
-  /** @missingRailsArgs chomp — PERMANENT */
   defaultEnv(): RackEnv {
     const cachedOpts = this._defaultEnv?.["action_dispatch.routes.default_url_options"] as
       | Record<string, unknown>

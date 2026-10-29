@@ -6,8 +6,10 @@ import type { GeneratorConfig } from "./base.js";
 import { Trails } from "../rails.js";
 import { GeneratorError } from "./generated-attribute.js";
 import { type DatabaseName } from "./database.js";
-import { TEMPLATES } from "./rails/app/templates.js";
+import { TEMPLATES } from "./rails/app/templates/index.js";
 import { LOAD_DEFAULTS_VERSION } from "../application/configuration.js";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
 const RESERVED_NAMES = ["application", "destroy", "plugin", "runner", "test"];
 
@@ -96,6 +98,7 @@ export class AppGenerator extends AppBase {
   readonly sqliteDriver: SqliteDriver;
 
   static {
+    void this.sourceRoot(File.expandPath("rails/app/templates", __dir__));
     this.methodAdded("createRoot");
     this.methodAdded("createRootFiles");
     this.methodAdded("createAppFiles");
@@ -116,6 +119,21 @@ export class AppGenerator extends AppBase {
   }
 
   declare options: AppGeneratorOptions & AppBaseOptions;
+
+  /**
+   * @missingRailsCall run_bundle — CONVERGEABLE app-generator-run-bundle-and-after-bundle-callbacks
+   * @missingRailsCall run_after_bundle_callbacks — CONVERGEABLE app-generator-run-bundle-and-after-bundle-callbacks
+   */
+  static async applyRailsTemplate(template: string, destination: string): Promise<AppGenerator> {
+    const generator = new this(
+      [destination],
+      { template: template },
+      { destinationRoot: destination },
+    );
+    generator.setDefaultAccessorsBang();
+    await generator.applyRailsTemplate();
+    return generator;
+  }
 
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
     super(args, localOptions, config);
