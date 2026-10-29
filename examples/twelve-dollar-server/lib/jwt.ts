@@ -7,6 +7,7 @@ class DecodeError extends Error {}
 class ExpiredSignature extends DecodeError {}
 class ImmatureSignature extends DecodeError {}
 class Base64DecodeError extends DecodeError {}
+class SignatureError extends DecodeError {}
 
 function isHash(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -32,7 +33,7 @@ function decodeSegment(segment: string): unknown {
 
 function decode(
   token: string,
-  key: string,
+  key: string | null | undefined,
   verify: boolean,
   options: { algorithm: "HS256" },
 ): [unknown, Record<string, unknown>] {
@@ -43,6 +44,7 @@ function decode(
   const payload = decodeSegment(payloadSegment);
   if (verify) {
     if (header?.alg !== options.algorithm) throw new DecodeError("Expected a different algorithm");
+    if (key == null) throw new SignatureError("No verification key available");
     const expected = createHmac("sha256", key)
       .update(`${headerSegment}.${payloadSegment}`)
       .digest();
@@ -64,4 +66,11 @@ function decode(
   return [payload, header];
 }
 
-export const JWT = { DecodeError, ExpiredSignature, ImmatureSignature, Base64DecodeError, decode };
+export const JWT = {
+  DecodeError,
+  ExpiredSignature,
+  ImmatureSignature,
+  Base64DecodeError,
+  SignatureError,
+  decode,
+};
