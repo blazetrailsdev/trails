@@ -157,6 +157,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   afterInstallCallbacks: Array<() => void | Promise<void>> = [];
 
   _sourcePaths?: string[];
+  private _namespaceDirs?: string[];
 
   declare relativeToOriginalDestinationRoot: typeof ThorActions.relativeToOriginalDestinationRoot;
   declare sourcePaths: typeof ThorActions.sourcePaths;
@@ -395,6 +396,23 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     } else {
       return thorPrepareForInvocation(name, value);
     }
+  }
+
+  /** @internal */
+  protected namespace(): { readonly name: string } | null {
+    return Generators.namespace;
+  }
+
+  /** @internal */
+  protected isNamespaced(): { readonly name: string } | null | boolean {
+    return !this.options.skipNamespace && this.namespace();
+  }
+
+  /** @internal */
+  protected namespaceDirs(): string[] {
+    return (this._namespaceDirs ??= this.namespace()!
+      .name.split("::")
+      .map((n) => _underscore(n)));
   }
 
   protected isTypeScript(): boolean {

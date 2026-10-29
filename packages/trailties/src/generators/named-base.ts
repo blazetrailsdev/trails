@@ -33,6 +33,7 @@ export class NamedBase extends GeneratorBase {
   private _fixtureFileName?: string;
   /** @internal */
   private _insideTemplate: boolean | null = null;
+  private _namespacedClassPath?: string[];
 
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
     super(args, localOptions, config);
@@ -102,9 +103,8 @@ export class NamedBase extends GeneratorBase {
   ): string {
     return camelize(`new_${this.singularRouteName()}_${type}`, "lower");
   }
-  filePath = (): string => [...this.classPathParts, this.fileName].join("/");
-  className = (): string =>
-    [...this.classPathParts, this.fileName].map((s) => camelize(s)).join("::");
+  filePath = (): string => [...this.classPath(), this.fileName].join("/");
+  className = (): string => [...this.classPath(), this.fileName].map((s) => camelize(s)).join("::");
   i18nScope = (): string => this.filePath().replace(/\//g, ".");
   tableName = (): string =>
     (this._tableName ??= (() => {
@@ -184,8 +184,20 @@ export class NamedBase extends GeneratorBase {
     return this._fileName;
   }
 
+  /** @internal */
+  protected classPath(): string[] {
+    return this.isInsideTemplate() || !this.isNamespaced()
+      ? this.regularClassPath()
+      : this.namespacedClassPath();
+  }
+
   regularClassPath(): string[] {
     return this.classPathParts;
+  }
+
+  /** @internal */
+  protected namespacedClassPath(): string[] {
+    return (this._namespacedClassPath ??= [...this.namespaceDirs(), ...this.classPathParts]);
   }
 
   attributesNames(): string[] {

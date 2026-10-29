@@ -2,6 +2,6 @@
 
 <% for (const action of this.actions) { -%>
 // TODO
-export async function <%= action %>(): Promise<void> {}
+export async function <%= action %>() {}
 
 <% } -%>
