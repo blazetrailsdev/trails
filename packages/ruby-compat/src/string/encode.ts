@@ -99,7 +99,9 @@ export function encode(
         i -= len;
         continue;
       }
-      c = new TextDecoder().decode(Uint8Array.from(b.slice(i, i + len))).codePointAt(0)!;
+      c = new TextDecoder("utf-8", { ignoreBOM: true })
+        .decode(Uint8Array.from(b.slice(i, i + len)))
+        .codePointAt(0)!;
     } else if (c > SINGLE_BYTE[senc.name]) {
       if (senc === Encoding.ASCII_8BIT) {
         if (!undefReplace) {

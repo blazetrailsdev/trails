@@ -11,6 +11,10 @@ const replace = { invalid: ":replace", undef: ":replace" } as const;
 const binary = (...b: number[]) => Uint8Array.of(...b);
 
 describe("String#encode", () => {
+  it("converts a leading byte-order mark like any other character", () => {
+    expect(encode("\u{feff}a", "US-ASCII", replace)).toBe("?a");
+  });
+
   it("replaces what the destination cannot hold", () => {
     expect(encode(binary(0x68, 0xe9, 0x6c), "US-ASCII", replace)).toBe("h?l");
     expect(encode(binary(0x68, 0xe9, 0x6c), "UTF-8", replace)).toBe("h�l");

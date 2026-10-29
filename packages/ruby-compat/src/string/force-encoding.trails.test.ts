@@ -20,6 +20,11 @@ describe("forceEncoding", () => {
     expect(forceEncoding("Ł", "BINARY")).toBe("Ł");
     expect(forceEncoding("Ã©", "UTF-8")).toBe("é");
   });
+
+  it("keeps a leading byte-order mark", () => {
+    expect(forceEncoding("\xef\xbb\xbfab", "UTF-8")).toBe("\u{feff}ab");
+    expect(forceEncoding(Uint8Array.of(0xef, 0xbb, 0xbf, 0x61), "UTF-8")).toBe("\u{feff}a");
+  });
 });
 
 describe("forceEncoding resolves its argument through the Ruby registry", () => {

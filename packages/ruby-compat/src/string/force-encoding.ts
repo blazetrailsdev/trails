@@ -52,7 +52,7 @@ export function forceEncoding(
     encodings.set(string, enc);
     if (enc !== Encoding.UTF_8) return string;
     try {
-      return new TextDecoder("utf-8", { fatal: true }).decode(string);
+      return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(string);
     } catch {
       return string;
     }
@@ -62,7 +62,7 @@ export function forceEncoding(
   const bytes = new Uint8Array(string.length);
   for (let i = 0; i < string.length; i++) bytes[i] = string.charCodeAt(i) & 0xff;
   try {
-    return new TextDecoder(enc.decoderLabel).decode(bytes);
+    return new TextDecoder(enc.decoderLabel, { ignoreBOM: true }).decode(bytes);
   } catch {
     return string;
   }
@@ -85,7 +85,7 @@ export function isValidEncoding(string: string, encoding: string | Encoding | nu
   const bytes = new Uint8Array(string.length);
   for (let i = 0; i < string.length; i++) bytes[i] = string.charCodeAt(i) & 0xff;
   try {
-    new TextDecoder(enc.decoderLabel, { fatal: true }).decode(bytes);
+    new TextDecoder(enc.decoderLabel, { fatal: true, ignoreBOM: true }).decode(bytes);
     return true;
   } catch {
     return false;

@@ -23,7 +23,9 @@ export function scrub(
   while (i < b.length) {
     const len = sequenceLength(b, i);
     if (len > 0) {
-      result += new TextDecoder().decode(Uint8Array.from(b.slice(i, i + len)));
+      result += new TextDecoder("utf-8", { ignoreBOM: true }).decode(
+        Uint8Array.from(b.slice(i, i + len)),
+      );
       i += len;
       continue;
     }

@@ -67,7 +67,7 @@ export function strOffset(str: string, pos: number): number {
  */
 export function stringValue(val: unknown): string {
   if (typeof val === "string") return val;
-  if (val instanceof Uint8Array) return new TextDecoder().decode(val);
+  if (val instanceof Uint8Array) return new TextDecoder("utf-8", { ignoreBOM: true }).decode(val);
   const toStr = (val as { toStr?: unknown } | null)?.toStr;
   if (typeof toStr === "function") return toStr.call(val) as string;
   throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into String`);
