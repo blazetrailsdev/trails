@@ -110,6 +110,13 @@ describe("ActionCable::Server::Worker kwargs", () => {
     );
   });
 
+  it("reports missing connection: before an unknown keyword", () => {
+    const worker = new Worker();
+    expect(() => worker.invoke({ run() {} }, "run", { extra: 1 })).toThrow(
+      "missing keyword: :connection",
+    );
+  });
+
   it("keeps a trailing hash with no connection: key positional in asyncInvoke", async () => {
     const worker = new Worker();
     const seen: unknown[] = [];

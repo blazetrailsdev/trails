@@ -8,15 +8,15 @@ import {
 import {
   ArgumentError,
   type Block,
-  ThreadPoolExecutor,
   excBacktrace,
+  isPlainHash,
   rbBlockGivenP,
   rbFSend,
+  rbGetKwargs,
   rbObjClassname,
   rbObjRespondTo,
   rbScanArgs,
-  rbGetKwargs,
-  isPlainHash,
+  ThreadPoolExecutor,
 } from "@blazetrails/ruby-compat";
 import { ActionCable } from "../namespaces.js";
 import { ActiveRecordConnectionManagement } from "./worker/active-record-connection-management.js";
@@ -67,9 +67,13 @@ export class Worker {
 
   asyncExec(receiver: unknown, ...args: unknown[] | [...unknown[], Block<unknown>]): unknown {
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as Block<unknown>) : undefined;
-    const [rest, kw] = rbScanArgs<{ connection?: unknown }>(args);
-    rbGetKwargs(kw, ["connection"]);
+    const last = args.at(-1);
+    const [rest, kw]: [unknown[], { connection?: unknown }] =
+      isPlainHash(last) && Object.hasOwn(last, "connection")
+        ? rbScanArgs<{ connection?: unknown }>(args)
+        : [args, {}];
     if (!Object.hasOwn(kw, "connection")) throw new ArgumentError("missing keyword: :connection");
+    rbGetKwargs(kw, ["connection"]);
     const { connection } = kw;
     return this.asyncInvoke(
       receiver,
@@ -104,9 +108,13 @@ export class Worker {
     ...args: unknown[] | [...unknown[], Block<unknown>]
   ): Promise<unknown> {
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as Block<unknown>) : undefined;
-    const [rest, kw] = rbScanArgs<{ connection?: unknown }>(args);
-    rbGetKwargs(kw, ["connection"]);
+    const last = args.at(-1);
+    const [rest, kw]: [unknown[], { connection?: unknown }] =
+      isPlainHash(last) && Object.hasOwn(last, "connection")
+        ? rbScanArgs<{ connection?: unknown }>(args)
+        : [args, {}];
     if (!Object.hasOwn(kw, "connection")) throw new ArgumentError("missing keyword: :connection");
+    rbGetKwargs(kw, ["connection"]);
     const { connection } = kw;
     return this.work(connection, async () => {
       try {
