@@ -505,4 +505,10 @@ describe("TestIO", () => {
     expect(text(r.read(4))).toBe("ab");
     expect(r.read(4)).toBeNull();
   });
+
+  it("read(0) answers an empty buffer at end of file", () => {
+    const [r, w] = IO.pipe();
+    w.close();
+    expect(r.read(0)).toEqual(new Uint8Array(0));
+  });
 });
