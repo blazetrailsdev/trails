@@ -20,6 +20,17 @@ describe("AppGenerator (trails-only)", () => {
     FileUtils.rmRf(tmpDir);
   });
 
+  it("generates action cable files by default", async () => {
+    await new AppGenerator(["my-app"], {}, { destinationRoot: tmpDir }).invokeAll();
+
+    const cable = fs.readFileSync(path.join(tmpDir, "my-app/config/cable.ts"), "utf-8");
+    expect(cable).toContain('adapter: "redis"');
+    expect(cable).toContain('channelPrefix: "my_app_production"');
+    expect(fs.existsSync(path.join(tmpDir, "my-app/app/channels"))).toBe(false);
+    const pkg = JSON.parse(fs.readFileSync(path.join(tmpDir, "my-app/package.json"), "utf-8"));
+    expect(pkg.dependencies["@blazetrails/actioncable"]).toBeDefined();
+  });
+
   it("boots and builds its views under plain node, with no loader", async () => {
     const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
     const root = fs.mkdtempSync(path.join(packageDir, "tmp-plain-node-"));
