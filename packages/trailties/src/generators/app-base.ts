@@ -57,7 +57,7 @@ export const OPTION_IMPLICATIONS: Record<string, ReadonlyArray<keyof AppBaseOpti
 export abstract class AppBase extends GeneratorBase {
   declare appPath: string;
   declare options: AppBaseOptions;
-  railsTemplate?: string;
+  declare railsTemplate?: string;
   private _database?: Database;
   /** @internal */
   private _builder?: object;
