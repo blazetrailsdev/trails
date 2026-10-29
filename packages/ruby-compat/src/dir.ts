@@ -34,7 +34,7 @@ function isWritable(dir: string): boolean {
 /** `chdir_blocking` (`vendor/ruby/v3.3.11/dir.c:1044`), the count of open `Dir.chdir` blocks. */
 let chdirBlocking = 0;
 
-let chdirThread: symbol | null = null;
+const chdirThreads: symbol[] = [];
 let chdirStorage: AsyncContext<symbol> | null = null;
 let chdirAdapter: AsyncContextAdapter | null = null;
 
@@ -275,7 +275,7 @@ export class Dir {
 
     const storage = chdirContext();
     if (chdirBlocking > 0) {
-      if (storage.getStore() !== chdirThread) {
+      if (storage.getStore() !== chdirThreads.at(-1)) {
         throw new RuntimeError("conflicting chdir during another chdir block");
       }
       if (block == null) warn("warning: conflicting chdir during another chdir block");
@@ -285,11 +285,11 @@ export class Dir {
       const oldPath = Dir.pwd();
       chdir(path);
       chdirBlocking++;
-      if (chdirThread === null) chdirThread = Symbol("chdir");
-      const thread = chdirThread;
+      const thread = Symbol("chdir");
+      chdirThreads.push(thread);
       const chdirRestore = (): void => {
         chdirBlocking--;
-        if (chdirBlocking === 0) chdirThread = null;
+        chdirThreads.splice(chdirThreads.lastIndexOf(thread), 1);
         chdir(oldPath);
       };
       let result: T;

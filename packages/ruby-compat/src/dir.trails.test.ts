@@ -180,6 +180,27 @@ describe("Dir.chdir", () => {
     expect(await open).toBe("b");
   });
 
+  it("raises for a sibling block opened inside one open block while another sibling is pending", async () => {
+    const start = Dir.pwd();
+    const root = fixture();
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    await Dir.chdir(join(root, "a"), async () => {
+      const first = Dir.chdir(join(root, "b"), async () => {
+        const nested = await Dir.chdir(join(root, "sub"), async () => File.basename(Dir.pwd()));
+        await released;
+        return [nested, File.basename(Dir.pwd())];
+      });
+      expect(() => Dir.chdir(join(root, "sub"), async () => Dir.pwd())).toThrow(
+        "conflicting chdir during another chdir block",
+      );
+      release();
+      expect(await first).toEqual(["sub", "b"]);
+      expect(File.basename(Dir.pwd())).toBe("a");
+    });
+    expect(Dir.pwd()).toBe(start);
+  });
+
   it("restores nested async blocks in LIFO order", async () => {
     const start = Dir.pwd();
     const root = fixture();
