@@ -5,6 +5,7 @@ type Concern = {
   classMethods(block: (mod: Record<string, unknown>) => void): void;
 };
 import type { ActionController } from "@blazetrails/actionpack";
+import { toI } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 import { JWT } from "../../../lib/jwt.ts";
 import { Current } from "../../models/current.ts";
@@ -37,7 +38,7 @@ export const Authentication: {
       return this.renderError("invalid token payload", ":unauthorized");
     }
 
-    Current.userId = Number(payload.sub);
+    Current.userId = toI(payload.sub);
     Current.username = payload.username;
   },
 

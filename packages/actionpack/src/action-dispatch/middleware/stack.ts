@@ -151,7 +151,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
     this.middlewares.splice(index + 1, 1);
   }
 
-  delete(target: MiddlewareFactory): Middleware[] | null {
+  delete(target: abstract new (...args: never[]) => unknown): Middleware[] | null {
     let rejected = false;
     for (let i = this.entries.length - 1; i >= 0; i--) {
       if (this.entries[i].name === target.name) {
@@ -162,7 +162,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return rejected ? this.entries : null;
   }
 
-  deleteBang(target: MiddlewareFactory): Middleware[] {
+  deleteBang(target: abstract new (...args: never[]) => unknown): Middleware[] {
     const rejected = this.delete(target);
     if (rejected === null) {
       throw new RuntimeError(`No such middleware to remove: ${rbInspect(target)}`);

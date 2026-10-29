@@ -1,7 +1,7 @@
 import { CurrentAttributes } from "@blazetrails/activesupport";
 
 export class Current extends CurrentAttributes {
-  declare static userId: number | null;
+  declare static userId: number | bigint | null;
   declare static username: string | null;
 
   static {
