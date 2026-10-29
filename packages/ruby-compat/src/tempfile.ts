@@ -181,7 +181,7 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
   open(): File {
     const path = this.__getobj__().path()!;
     this.__getobj__().close();
-    this.__setobj__(File.open(path, "r+"));
+    this.__setobj__(File.open(path, { mode: "r+", binmode: this.opts.binmode }));
     if (this.opts.encoding != null) this.__getobj__().setEncoding(this.opts.encoding);
     return this.__getobj__();
   }
