@@ -1,4 +1,4 @@
-import { File, rbObjRespondTo, Tempfile } from "@blazetrails/ruby-compat";
+import { File, rbGetKwargs, rbObjRespondTo, Tempfile } from "@blazetrails/ruby-compat";
 import type { Operation, Options } from "./chainable.js";
 import { Error } from "./image-processing.js";
 
@@ -47,7 +47,9 @@ export class Pipeline {
     return this._destination;
   }
 
-  async call({ save = true }: { save?: boolean } = {}): Promise<unknown> {
+  async call(keywords: { save?: boolean } = {}): Promise<unknown> {
+    rbGetKwargs(keywords, ["save"]);
+    const { save = true } = keywords;
     if (save === false) {
       return this.callProcessor();
     } else if (this.destination != null) {

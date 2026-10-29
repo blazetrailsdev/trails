@@ -1,4 +1,4 @@
-import { Chainable, chainableProxy, type Operation } from "../chainable.js";
+import { Chainable, chainableProxy, type Operation, type Options } from "../chainable.js";
 
 export const StubProcessor = {
   calls: [] as Record<string, unknown>[],
@@ -14,5 +14,6 @@ export const StubProcessor = {
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const Stub: any = chainableProxy({ ...Chainable, Processor: StubProcessor });
+export type Chain = { options: Options } & { [operation: string]: (...args: unknown[]) => Chain };
+
+export const Stub = chainableProxy({ ...Chainable, Processor: StubProcessor }) as unknown as Chain;

@@ -26,12 +26,18 @@ describe("Chainable as a thenable Proxy", () => {
     expect(result.operations).toEqual([["invert", []]]);
   });
 
+  it("rejects an unknown call keyword as Ruby's call(save: true) does", async () => {
+    await expect(
+      Vips.source(fixtureImage("portrait.jpg")).call(null, { bogus: 1 }),
+    ).rejects.toThrow("unknown keyword: :bogus");
+  });
+
   it("never queues the names JS probes for", () => {
     const builder = Vips.invert();
     expect(builder.catch).toBeUndefined();
     expect(builder.finally).toBeUndefined();
     expect(builder.toJSON).toBeUndefined();
-    expect(builder[Symbol.toPrimitive]).toBeUndefined();
+    expect((builder as unknown as Record<symbol, unknown>)[Symbol.toPrimitive]).toBeUndefined();
     expect(typeof builder.constructor).toBe("function");
   });
 });
