@@ -1507,8 +1507,8 @@ thread.** The `connection/` port, when it lands, follows these rules:
   section.
 - `writes_pending` and `Stream#flush_write_buffer` are ported, because the
   hijacked io's `write_nonblock` can write part of a frame. `@map` holds a
-  module-private `Monitor` standing in for `NIO::Monitor`, and its
-  `interests=` setter is where nio4r registers writable interest with the
+  monitor object standing in for `NIO::Monitor`, and its `interests`
+  accessor's setter is where nio4r registers writable interest with the
   selector: setting `:rw` on an `:r` monitor starts the one writable wait,
   which calls `stream.flush_write_buffer` and sets `:r` when it answers true,
   as `run` does (`stream_event_loop.rb:100-106`). So `writes_pending` is

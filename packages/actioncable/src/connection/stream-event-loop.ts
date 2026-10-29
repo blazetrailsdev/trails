@@ -17,25 +17,9 @@ interface Stream {
   flushWriteBuffer(): boolean;
 }
 
-class Monitor {
-  value: Stream = null!;
-  private _interests: "r" | "rw";
-  private _selectWritable: (monitor: Monitor) => unknown;
-
-  constructor(interests: "r" | "rw", selectWritable: (monitor: Monitor) => unknown) {
-    this._interests = interests;
-    this._selectWritable = selectWritable;
-  }
-
-  get interests(): "r" | "rw" {
-    return this._interests;
-  }
-
-  set interests(interests: "r" | "rw") {
-    const selectingWritable = this._interests === "rw";
-    this._interests = interests;
-    if (interests === "rw" && !selectingWritable) this._selectWritable(this);
-  }
+interface Monitor {
+  value: Stream;
+  interests: "r" | "rw";
 }
 
 export class StreamEventLoop {
@@ -61,31 +45,40 @@ export class StreamEventLoop {
   }
 
   attach(io: Io, stream: Stream): void {
-    this._map.set(
-      io,
-      new Monitor("r", (monitor) => {
-        void (async () => {
-          while (!this._stopping && this._map.get(io) === monitor && monitor.interests === "rw") {
-            let stream: Stream | null = null;
-            try {
-              await io.waitWritable();
-              if (this._map.get(io) !== monitor) break;
-              stream = monitor.value;
+    const selectWritable = (monitor: Monitor) => {
+      void (async () => {
+        while (!this._stopping && this._map.get(io) === monitor && monitor.interests === "rw") {
+          let stream: Stream | null = null;
+          try {
+            await io.waitWritable();
+            if (this._map.get(io) !== monitor) break;
+            stream = monitor.value;
 
-              if (stream.flushWriteBuffer()) {
-                monitor.interests = "r";
-              }
+            if (stream.flushWriteBuffer()) {
+              monitor.interests = "r";
+            }
+          } catch {
+            try {
+              (stream ?? monitor.value).close();
             } catch {
-              try {
-                (stream ?? monitor.value).close();
-              } catch {
-                this._map.delete(io);
-              }
+              this._map.delete(io);
             }
           }
-        })();
-      }),
-    );
+        }
+      })();
+    };
+    let interests: "r" | "rw" = "r";
+    this._map.set(io, {
+      value: null!,
+      get interests() {
+        return interests;
+      },
+      set interests(value) {
+        const selectingWritable = interests === "rw";
+        interests = value;
+        if (value === "rw" && !selectingWritable) selectWritable(this);
+      },
+    });
     this._map.get(io)!.value = stream;
     const monitor = this._map.get(io)!;
     void (async () => {
