@@ -82,7 +82,7 @@ export class Service {
       if (this.isPublic()) {
         generatedUrl = this.publicUrl(key, options);
       } else {
-        generatedUrl = this.privateUrl(key, options as PrivateUrlOptions);
+        generatedUrl = this.privateUrl(key, options);
       }
 
       payload.url = generatedUrl;
@@ -122,7 +122,7 @@ export class Service {
   }
 
   /** @internal */
-  protected privateUrl(_key: string, _options: PrivateUrlOptions): string {
+  protected privateUrl(_key: string, _options: Record<string, unknown>): string {
     throw new NotImplementedError();
   }
 
@@ -166,13 +166,5 @@ export class Service {
     return ContentDisposition.format({ disposition: disposition, filename: filename.sanitized() });
   }
 }
-
-type PrivateUrlOptions = {
-  expiresIn: unknown;
-  filename: Filename;
-  disposition: string;
-  contentType: string;
-  [k: string]: unknown;
-};
 
 ActiveStorage.Service = Service;
