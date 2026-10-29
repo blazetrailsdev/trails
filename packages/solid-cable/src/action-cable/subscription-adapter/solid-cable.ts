@@ -72,6 +72,7 @@ export class Listener extends SubscriberMap {
   private _thread: Thread<Promise<void>>;
   private _lastId: number | null = null;
   private _channels: Set<string> | null = null;
+  private _timer: ReturnType<typeof setTimeout> | undefined;
   private _stop!: (stop: Exception) => void;
   private readonly _stopped = new Promise<never>((_resolve, reject) => (this._stop = reject));
 
@@ -100,8 +101,7 @@ export class Listener extends SubscriberMap {
         await this.interruptible(async () => {
           const pollingInterval = await SolidCableConfig.pollingInterval();
           await new Promise((resolve) => {
-            const timer = setTimeout(resolve, pollingInterval.toF() * 1000);
-            this._stopped.catch(() => clearTimeout(timer));
+            this._timer = setTimeout(resolve, pollingInterval.toF() * 1000);
           });
         });
       }
@@ -116,6 +116,7 @@ export class Listener extends SubscriberMap {
 
   async shutdown(): Promise<void> {
     this._stop(new Listener.Stop());
+    clearTimeout(this._timer);
     await this.thread.join();
   }
 

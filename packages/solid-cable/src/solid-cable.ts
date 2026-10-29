@@ -30,9 +30,10 @@ export const SolidCable = {
   name: "SolidCable",
 
   async connectsTo(): Promise<Record<string, unknown>> {
-    return deepTransformValues({ ...(await cableConfig()).connectsTo }, (value) =>
-      String(value),
-    ) as Record<string, unknown>;
+    return deepTransformValues({ ...(await cableConfig()).connectsTo }, (value) => {
+      if (value == null) throw new NoMethodError("undefined method 'to_sym' for nil");
+      return String(value);
+    }) as Record<string, unknown>;
   },
 
   async isSilencePolling(): Promise<boolean> {
