@@ -32,6 +32,30 @@ export class Tool {
   declare _name: string;
   declare _args: string[];
   declare _options: { [x: string]: unknown };
+  /** @noRailsEquivalent PERMANENT */
+  declare static Animate: typeof Tool;
+  /** @noRailsEquivalent PERMANENT */
+  declare static Compare: typeof Tool;
+  /** @noRailsEquivalent PERMANENT */
+  declare static Composite: typeof Tool;
+  /** @noRailsEquivalent PERMANENT */
+  declare static Conjure: typeof Tool;
+  /** @noRailsEquivalent PERMANENT */
+  declare static Convert: typeof Tool;
+  /** @noRailsEquivalent PERMANENT */
+  declare static Display: typeof Tool;
+  /** @noRailsEquivalent PERMANENT */
+  declare static Identify: typeof Tool;
+  /** @noRailsEquivalent PERMANENT */
+  declare static Import: typeof Tool;
+  /** @noRailsEquivalent PERMANENT */
+  declare static Magick: typeof Tool;
+  /** @noRailsEquivalent PERMANENT */
+  declare static Mogrify: typeof Tool;
+  /** @noRailsEquivalent PERMANENT */
+  declare static Montage: typeof Tool;
+  /** @noRailsEquivalent PERMANENT */
+  declare static Stream: typeof Tool;
   static CREATION_OPERATORS: string[] = [
     "xc",
     "canvas",
@@ -45,7 +69,9 @@ export class Tool {
     "pango",
   ];
 
-  static new(...args: Arg[] | [...Arg[], BlockPass<(instance: CliTool) => unknown> | undefined]) {
+  static new(
+    ...args: Arg[] | [...Arg[], BlockPass<(instance: CliTool) => unknown> | undefined]
+  ): CliTool | Promise<unknown> {
     const block = rbBlockGivenP(args.at(-1))
       ? (args.pop() as (instance: CliTool) => unknown)
       : undefined;
@@ -53,7 +79,7 @@ export class Tool {
     if (block != null) {
       return Promise.resolve(block(instance as CliTool)).then(() => instance.call());
     } else {
-      return instance;
+      return instance as CliTool;
     }
   }
 

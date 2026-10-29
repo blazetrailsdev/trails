@@ -44,7 +44,7 @@ export const MiniMagick = { version, isImagemagick7, cliVersion } as {
       ...args:
         | [Record<string, unknown>?, BlockPass<(tool: CliTool) => unknown>?]
         | [BlockPass<(tool: CliTool) => unknown>]
-    ) => unknown
+    ) => CliTool | Promise<unknown>
   >;
 extend(MiniMagick, Configuration);
 

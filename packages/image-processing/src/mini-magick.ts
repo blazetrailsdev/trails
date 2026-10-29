@@ -276,13 +276,11 @@ const ImageProcessingMiniMagick = {
   ...Chainable,
   Processor,
 
-  convertShim(block?: (convert: CliTool) => unknown): unknown {
+  convertShim(block?: (convert: CliTool) => unknown): CliTool | Promise<unknown> {
     if (rbObjRespondTo(MiniMagickGem.MiniMagick, "convert")) {
       return MiniMagickGem.MiniMagick.convert(...(block ? [blockPass(block)] : []));
     } else {
-      return (Tool as unknown as { Convert: typeof Tool }).Convert.new(
-        ...(block ? [blockPass(block)] : []),
-      );
+      return Tool.Convert.new(...(block ? [blockPass(block)] : []));
     }
   },
 

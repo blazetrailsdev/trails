@@ -1,3 +1,4 @@
+import { Image as MiniMagickImage } from "@blazetrails/mini-magick/image";
 import { File, IO, Tempfile } from "@blazetrails/ruby-compat";
 import { expect } from "vitest";
 import Vips from "wasm-vips";
@@ -30,6 +31,10 @@ export async function refuteSimilar(image1: PathLike, image2: PathLike): Promise
 export async function assertDimensions(dimensions: [number, number], file: PathLike) {
   const image = (await Vips()).Image.newFromFile(file.path()!);
   expect([image.width, image.height]).toEqual(dimensions);
+}
+
+export async function assertType(type: string, file: PathLike) {
+  expect(await new MiniMagickImage(file.path()!).type()).toEqual(type);
 }
 
 export async function distance(image1: PathLike, image2: PathLike): Promise<number> {
