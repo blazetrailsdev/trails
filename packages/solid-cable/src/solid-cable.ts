@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { NoMethodError, registerConstant, toI } from "@blazetrails/ruby-compat";
 import {
   TopLevel,
   days,
@@ -54,7 +54,7 @@ export const SolidCable = {
 
   async trimBatchSize(): Promise<number> {
     let size: number;
-    if ((size = Math.trunc(Number((await cableConfig()).trimBatchSize ?? 0)) || 0) < 2) {
+    if ((size = Number(toI((await cableConfig()).trimBatchSize))) < 2) {
       return 100;
     } else {
       return size;
@@ -81,7 +81,11 @@ function parseDuration(duration: unknown, { default: default_ }: { default: Dura
     const parts = String(duration).split(".");
     const units = parts.pop()!;
     const amount = parts;
-    return DURATION_UNITS[units](parseFloat(amount.join(".")) || 0);
+    const amountF = parseFloat(amount.join(".")) || 0;
+    if (!Object.hasOwn(DURATION_UNITS, units)) {
+      throw new NoMethodError(`undefined method '${units}' for an instance of Float`);
+    }
+    return DURATION_UNITS[units](amountF);
   } else {
     return default_;
   }
