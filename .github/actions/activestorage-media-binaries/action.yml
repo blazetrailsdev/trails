@@ -8,9 +8,9 @@ runs:
   steps:
     - shell: bash
       run: |
-        command -v ffprobe >/dev/null && command -v mutool >/dev/null && command -v pdftoppm >/dev/null \
+        command -v ffprobe >/dev/null && command -v ffmpeg >/dev/null && command -v mutool >/dev/null && command -v pdftoppm >/dev/null \
           || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg mupdf-tools poppler-utils; }
-        ffprobe -version | head -1
-        ffmpeg -version | head -1
-        mutool -v 2>&1 | head -1
-        pdftoppm -v 2>&1 | head -1
+        ffprobe -version | head -1 || true
+        ffmpeg -version | head -1 || true
+        mutool -v 2>&1 | head -1 || true
+        pdftoppm -v 2>&1 | head -1 || true

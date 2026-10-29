@@ -50,4 +50,5 @@ await ActiveStorageCreateGroups.migrate("up");
 
 afterAll(async () => {
   await Base.establishConnection(arunit);
+  Base.configurations(configurations);
 });

@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { deepDup, TopLevel } from "@blazetrails/activesupport";
 import { Base, Migration, type DatabaseAdapter } from "@blazetrails/activerecord";
 import "./test-helpers/database/setup.js";
-type Generators = ReturnType<Configuration["appGenerators"]>;
 import type { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { CreateActiveStorageTables } from "./db/migrate/20170806125915_create_active_storage_tables.js";
+
+type Generators = ReturnType<Configuration["appGenerators"]>;
 
 describe("ActiveStorage::MigrationsTest", () => {
   let originalVerbose: boolean | undefined;

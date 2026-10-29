@@ -2101,7 +2101,7 @@ const TEST_SUPPORT_BASENAMES = new Set(["test-helper.ts", "test-helpers.ts"]);
  * so its ported migrations have no lib counterpart either. Only the package's top-level
  * `db/` counts: trailties' `generators/rails/db/` mirrors lib.
  */
-const ENGINE_DB_SEGMENT = "db";
+const ENGINE_DB_DIRS = new Set(["migrate", "update-migrate"]);
 
 export function isTestSupportFile(tsFile: string): boolean {
   const segments = tsFile.split("/");
@@ -2109,7 +2109,7 @@ export function isTestSupportFile(tsFile: string): boolean {
   return (
     segments.some((s) => TEST_SUPPORT_SEGMENTS.has(s)) ||
     TEST_SUPPORT_BASENAMES.has(base) ||
-    segments[0] === ENGINE_DB_SEGMENT
+    (segments[0] === "db" && ENGINE_DB_DIRS.has(segments[1] ?? ""))
   );
 }
 

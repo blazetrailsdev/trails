@@ -7,7 +7,6 @@ import {
   type Extended,
   type Logger,
 } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Deprecation } from "@blazetrails/activesupport";
 import type { Base } from "@blazetrails/activerecord";
 import type * as Errors from "./errors.js";
@@ -57,7 +56,6 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   trackVariants: boolean;
   videoPreviewArguments: string;
 };
-registerConstant("ActiveStorage", ActiveStorage);
 extend(ActiveStorage, Autoload);
 
 ActiveStorage.autoload("Attached");
@@ -388,7 +386,10 @@ mattrAccessor.call(ActiveStorage, "trackVariants", { default: false });
 
 mattrAccessor.call(ActiveStorage, "videoPreviewArguments", { default: "-y -vframes 1 -f image2" });
 
-export const Transformers = { name: "ActiveStorage::Transformers", loadPath } as AutoloadModule & {
+export const Transformers = {
+  name: "ActiveStorage::Transformers",
+  loadPath: {} as Record<string, () => Promise<unknown>>,
+} as AutoloadModule & {
   Transformer: unknown;
   ImageProcessingTransformer: unknown;
 };

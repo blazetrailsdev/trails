@@ -15,12 +15,10 @@ export class FileNotFoundError extends Error {}
 
 export class PreviewError extends Error {}
 
-Object.assign(ActiveStorage, {
-  Error,
-  InvariableError,
-  UnpreviewableError,
-  UnrepresentableError,
-  IntegrityError,
-  FileNotFoundError,
-  PreviewError,
-});
+ActiveStorage.Error = Error;
+ActiveStorage.InvariableError = InvariableError;
+ActiveStorage.UnpreviewableError = UnpreviewableError;
+ActiveStorage.UnrepresentableError = UnrepresentableError;
+ActiveStorage.IntegrityError = IntegrityError;
+ActiveStorage.FileNotFoundError = FileNotFoundError;
+ActiveStorage.PreviewError = PreviewError;

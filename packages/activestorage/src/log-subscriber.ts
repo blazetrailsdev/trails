@@ -20,9 +20,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     );
   }
 
-  serviceStreamingDownload(event: Event): void {
-    this.serviceDownload(event);
-  }
+  declare serviceStreamingDownload: (event: Event) => void;
 
   preview(event: Event): void {
     this.info(
@@ -110,6 +108,8 @@ LogSubscriber.subscribeLogLevel("service_delete_prefixed", "info");
 LogSubscriber.subscribeLogLevel("service_exist", "debug");
 LogSubscriber.subscribeLogLevel("service_url", "debug");
 LogSubscriber.subscribeLogLevel("service_mirror", "debug");
+
+LogSubscriber.prototype.serviceStreamingDownload = LogSubscriber.prototype.serviceDownload;
 
 ActiveStorage.LogSubscriber = LogSubscriber;
 
