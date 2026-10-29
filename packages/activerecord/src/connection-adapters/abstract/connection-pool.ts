@@ -5,6 +5,7 @@ import {
   isMonOwned,
   KERNEL_METHODS,
   Mutex,
+  count,
   PROTOCOL_PROBES,
   rbDefineInspectCustom,
   rbObjDup,
@@ -601,6 +602,7 @@ export class ConnectionPool implements ReapablePool {
     return this._available?.numWaiting() ?? 0;
   }
 
+  /** @missingRailsName connections — PERMANENT */
   stat(): {
     size: number;
     connections: number;
@@ -613,9 +615,9 @@ export class ConnectionPool implements ReapablePool {
     return {
       size: this.size,
       connections: this._connections!.length,
-      busy: this._connections!.filter((c) => c.isInUse() && c.owner!.isAlive()).length,
-      dead: this._connections!.filter((c) => c.isInUse() && !c.owner!.isAlive()).length,
-      idle: this._connections!.filter((c) => !c.isInUse()).length,
+      busy: count(this._connections!, (c: DatabaseAdapter) => c.isInUse() && c.owner!.isAlive()),
+      dead: count(this._connections!, (c: DatabaseAdapter) => c.isInUse() && !c.owner!.isAlive()),
+      idle: count(this._connections!, (c: DatabaseAdapter) => !c.isInUse()),
       waiting: this.numWaitingInQueue(),
       checkoutTimeout: this.checkoutTimeout,
     };
