@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Dir, File, FileUtils, include } from "@blazetrails/ruby-compat";
 import { Actions, type ActionsHost } from "../actions.js";
-import { Error } from "../error.js";
 import { Group } from "../group.js";
 import { capture, destinationRoot, isWindows, sourceRoot } from "../test-helpers/helper.js";
 
@@ -74,9 +73,7 @@ describe("Thor::Actions::Directory", () => {
 
   describe("#invoke!", () => {
     it("raises an error if the source does not exist", async () => {
-      const error = await invokeBang("unknown").catch((e: unknown) => e);
-      expect(error).toBeInstanceOf(Error);
-      expect(String((error as Error).message)).toMatch(
+      await expect(invokeBang("unknown")).rejects.toThrow(
         /Could not find "unknown" in any of your source paths/,
       );
     });
