@@ -1,6 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { capture } from "../test-helpers/helper.js";
-import { stdin as $stdin } from "@blazetrails/ruby-compat";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stderr as $stderr, stdin as $stdin, stdout as $stdout } from "@blazetrails/ruby-compat";
 import { Basic } from "./basic.js";
 import { Group } from "../group.js";
 import type * as LineEditor from "../line-editor.js";
@@ -26,6 +25,10 @@ describe("Thor::Shell::Basic", () => {
   beforeEach(() => {
     _shell = undefined;
     readline.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe("#padding", () => {
@@ -91,17 +94,10 @@ describe("Thor::Shell::Basic", () => {
       const actual = await vi.importActual<typeof LineEditor>("../line-editor.js");
       readline.mockImplementationOnce(actual.readline);
       const noecho = vi.spyOn($stdin, "noecho").mockResolvedValue("mysecretpass" as never);
-      try {
-        let answer: unknown;
-        const out = await capture(":stdout", async () => {
-          answer = await shell().ask("What's your password?", { echo: false });
-        });
-        expect(out).toEqual("What's your password? ");
-        expect(noecho).toHaveBeenCalled();
-        expect(answer).toEqual("mysecretpass");
-      } finally {
-        noecho.mockRestore();
-      }
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      expect(await shell().ask("What's your password?", { echo: false })).toEqual("mysecretpass");
+      expect(print).toHaveBeenCalledWith("What's your password? ");
+      expect(noecho).toHaveBeenCalled();
     });
 
     it("prints a message to the user with the available options, expects case-sensitive matching, and determines the correctness of the answer", async () => {
@@ -119,39 +115,37 @@ describe("Thor::Shell::Basic", () => {
     it("prints a message to the user with the available options, expects case-sensitive matching, and reasks the question after an incorrect response", async () => {
       const flavors = ["strawberry", "chocolate", "vanilla"];
       readline.mockReturnValueOnce("moose tracks").mockReturnValueOnce("chocolate");
-      let answer: unknown;
-      const out = await capture(":stdout", async () => {
-        answer = await shell().ask("What's your favorite Neopolitan flavor?", {
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      expect(
+        await shell().ask("What's your favorite Neopolitan flavor?", {
           limitedTo: flavors,
-        });
-      });
-      expect(out).toEqual(
+        }),
+      ).toEqual("chocolate");
+      expect(print).toHaveBeenCalledWith(
         "Your response must be one of: [strawberry, chocolate, vanilla]. Please try again.\n",
       );
       expect(readline).toHaveBeenCalledWith(
         "What's your favorite Neopolitan flavor? [strawberry, chocolate, vanilla] ",
         { limitedTo: flavors },
       );
-      expect(answer).toEqual("chocolate");
     });
 
     it("prints a message to the user with the available options, expects case-sensitive matching, and reasks the question after a case-insensitive match", async () => {
       const flavors = ["strawberry", "chocolate", "vanilla"];
       readline.mockReturnValueOnce("cHoCoLaTe").mockReturnValueOnce("chocolate");
-      let answer: unknown;
-      const out = await capture(":stdout", async () => {
-        answer = await shell().ask("What's your favorite Neopolitan flavor?", {
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      expect(
+        await shell().ask("What's your favorite Neopolitan flavor?", {
           limitedTo: flavors,
-        });
-      });
-      expect(out).toEqual(
+        }),
+      ).toEqual("chocolate");
+      expect(print).toHaveBeenCalledWith(
         "Your response must be one of: [strawberry, chocolate, vanilla]. Please try again.\n",
       );
       expect(readline).toHaveBeenCalledWith(
         "What's your favorite Neopolitan flavor? [strawberry, chocolate, vanilla] ",
         { limitedTo: flavors },
       );
-      expect(answer).toEqual("chocolate");
     });
 
     it("prints a message to the user with the available options, expects case-insensitive matching, and determines the correctness of the answer", async () => {
@@ -172,21 +166,20 @@ describe("Thor::Shell::Basic", () => {
     it("prints a message to the user with the available options, expects case-insensitive matching, and reasks the question after an incorrect response", async () => {
       const flavors = ["strawberry", "chocolate", "vanilla"];
       readline.mockReturnValueOnce("moose tracks").mockReturnValueOnce("chocolate");
-      let answer: unknown;
-      const out = await capture(":stdout", async () => {
-        answer = await shell().ask("What's your favorite Neopolitan flavor?", {
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      expect(
+        await shell().ask("What's your favorite Neopolitan flavor?", {
           limitedTo: flavors,
           caseInsensitive: true,
-        });
-      });
-      expect(out).toEqual(
+        }),
+      ).toEqual("chocolate");
+      expect(print).toHaveBeenCalledWith(
         "Your response must be one of: [strawberry, chocolate, vanilla]. Please try again.\n",
       );
       expect(readline).toHaveBeenCalledWith(
         "What's your favorite Neopolitan flavor? [strawberry, chocolate, vanilla] ",
         { limitedTo: flavors, caseInsensitive: true },
       );
-      expect(answer).toEqual("chocolate");
     });
 
     it("prints a message to the user containing a default and sets the default if only enter is pressed", async () => {
@@ -202,21 +195,20 @@ describe("Thor::Shell::Basic", () => {
     it("prints a message to the user with the available options and reasks the question after an incorrect response and then returns the default", async () => {
       const flavors = ["strawberry", "chocolate", "vanilla"];
       readline.mockReturnValueOnce("moose tracks").mockReturnValueOnce("");
-      let answer: unknown;
-      const out = await capture(":stdout", async () => {
-        answer = await shell().ask("What's your favorite Neopolitan flavor?", {
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      expect(
+        await shell().ask("What's your favorite Neopolitan flavor?", {
           default: "vanilla",
           limitedTo: flavors,
-        });
-      });
-      expect(out).toEqual(
+        }),
+      ).toEqual("vanilla");
+      expect(print).toHaveBeenCalledWith(
         "Your response must be one of: [strawberry, chocolate, vanilla]. Please try again.\n",
       );
       expect(readline).toHaveBeenCalledWith(
         "What's your favorite Neopolitan flavor? [strawberry, chocolate, vanilla] (vanilla) ",
         { default: "vanilla", limitedTo: flavors },
       );
-      expect(answer).toEqual("vanilla");
     });
   });
 
@@ -262,93 +254,101 @@ describe("Thor::Shell::Basic", () => {
 
   describe("#say", () => {
     it("prints a message to the user", async () => {
-      const out = await capture(":stdout", () => shell().say("Running..."));
-      expect(out).toEqual("Running...\n");
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      shell().say("Running...");
+      expect(print).toHaveBeenCalledWith("Running...\n");
     });
 
     it("prints a message to the user without new line if it ends with a whitespace", async () => {
-      const out = await capture(":stdout", () => shell().say("Running... "));
-      expect(out).toEqual("Running... ");
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      shell().say("Running... ");
+      expect(print).toHaveBeenCalledWith("Running... ");
     });
 
     it("does not use a new line with whitespace+newline embedded", async () => {
-      const out = await capture(":stdout", () => shell().say("It's \nRunning..."));
-      expect(out).toEqual("It's \nRunning...\n");
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      shell().say("It's \nRunning...");
+      expect(print).toHaveBeenCalledWith("It's \nRunning...\n");
     });
 
     it("prints a message to the user without new line", async () => {
-      const out = await capture(":stdout", () => shell().say("Running...", null, false));
-      expect(out).toEqual("Running...");
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      shell().say("Running...", null, false);
+      expect(print).toHaveBeenCalledWith("Running...");
     });
 
     it("coerces everything to a string before printing", async () => {
-      const out = await capture(":stdout", () => shell().say("this_is_not_a_string", null, true));
-      expect(out).toEqual("this_is_not_a_string\n");
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      shell().say("this_is_not_a_string", null, true);
+      expect(print).toHaveBeenCalledWith("this_is_not_a_string\n");
     });
 
     it("does not print a message if muted", async () => {
-      const out = await capture(":stdout", () => {
-        shell().mute(() => {
-          shell().say("Running...");
-        });
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      shell().mute(() => {
+        shell().say("Running...");
       });
-      expect(out).toEqual("");
+      expect(print).not.toHaveBeenCalled();
     });
 
     it("does not print a message if base is set to quiet", async () => {
       shell().base = new MyCounter([1, 2]);
       const options = vi.spyOn(shell().base!, "options", "get").mockReturnValue({ quiet: true });
 
-      const out = await capture(":stdout", () => shell().say("Running..."));
+      const print = vi.spyOn($stdout, "write").mockReturnValue(true);
+      shell().say("Running...");
       expect(options).toHaveBeenCalled();
-      expect(out).toEqual("");
+      expect(print).not.toHaveBeenCalled();
     });
   });
 
   describe("#say_error", () => {
     it("prints a message to the user", async () => {
-      const out = await capture(":stderr", () => shell().sayError("Running..."));
-      expect(out).toEqual("Running...\n");
+      const print = vi.spyOn($stderr, "write").mockReturnValue(true);
+      shell().sayError("Running...");
+      expect(print).toHaveBeenCalledWith("Running...\n");
     });
 
     it("prints a message to the user without new line if it ends with a whitespace", async () => {
-      const out = await capture(":stderr", () => shell().sayError("Running... "));
-      expect(out).toEqual("Running... ");
+      const print = vi.spyOn($stderr, "write").mockReturnValue(true);
+      shell().sayError("Running... ");
+      expect(print).toHaveBeenCalledWith("Running... ");
     });
 
     it("does not use a new line with whitespace+newline embedded", async () => {
-      const out = await capture(":stderr", () => shell().sayError("It's \nRunning..."));
-      expect(out).toEqual("It's \nRunning...\n");
+      const print = vi.spyOn($stderr, "write").mockReturnValue(true);
+      shell().sayError("It's \nRunning...");
+      expect(print).toHaveBeenCalledWith("It's \nRunning...\n");
     });
 
     it("prints a message to the user without new line", async () => {
-      const out = await capture(":stderr", () => shell().sayError("Running...", null, false));
-      expect(out).toEqual("Running...");
+      const print = vi.spyOn($stderr, "write").mockReturnValue(true);
+      shell().sayError("Running...", null, false);
+      expect(print).toHaveBeenCalledWith("Running...");
     });
 
     it("coerces everything to a string before printing", async () => {
-      const out = await capture(":stderr", () =>
-        shell().sayError("this_is_not_a_string", null, true),
-      );
-      expect(out).toEqual("this_is_not_a_string\n");
+      const print = vi.spyOn($stderr, "write").mockReturnValue(true);
+      shell().sayError("this_is_not_a_string", null, true);
+      expect(print).toHaveBeenCalledWith("this_is_not_a_string\n");
     });
 
     it("does not print a message if muted", async () => {
-      const out = await capture(":stderr", () => {
-        shell().mute(() => {
-          shell().sayError("Running...");
-        });
+      const print = vi.spyOn($stderr, "write").mockReturnValue(true);
+      shell().mute(() => {
+        shell().sayError("Running...");
       });
-      expect(out).toEqual("");
+      expect(print).not.toHaveBeenCalled();
     });
 
     it("does not print a message if base is set to quiet", async () => {
       shell().base = new MyCounter([1, 2]);
       const options = vi.spyOn(shell().base!, "options", "get").mockReturnValue({ quiet: true });
 
-      const out = await capture(":stderr", () => shell().sayError("Running..."));
+      const print = vi.spyOn($stderr, "write").mockReturnValue(true);
+      shell().sayError("Running...");
       expect(options).toHaveBeenCalled();
-      expect(out).toEqual("");
+      expect(print).not.toHaveBeenCalled();
     });
   });
 });
