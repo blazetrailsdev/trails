@@ -47,7 +47,6 @@ export class Filename implements Comparable {
     return this.toString();
   }
 
-  /** @noRailsEquivalent PERMANENT */
   toJSON(): string {
     return this.asJson();
   }
