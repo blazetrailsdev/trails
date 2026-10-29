@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { DlKeyedHasMany } from "./dl-keyed-has-many.js";
 import type { DlKeyedHasManyThrough } from "./dl-keyed-has-many-through.js";
@@ -21,23 +22,23 @@ export class DestroyAsyncParent extends Base {
 
   static {
     this.hasOne("dlKeyedHasOne", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
       foreignKey: "destroy_async_parent_id",
       primaryKey: "parent_id",
     });
     this.hasMany("dlKeyedHasMany", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
       foreignKey: "many_key",
       primaryKey: "parent_id",
     });
     this.hasMany("dlKeyedJoin", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
       foreignKey: "destroy_async_parent_id",
       primaryKey: "parent_id",
     });
     this.hasMany("dlKeyedHasManyThrough", {
       through: "dlKeyedJoin",
-      dependent: "destroy",
+      dependent: "destroyAsync",
       foreignKey: "dl_has_many_through_key_id",
       primaryKey: "through_key",
     });
@@ -48,4 +49,5 @@ registerModel(DestroyAsyncParent);
 export interface DestroyAsyncParent {
   get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
   set dlKeyedHasOne(value: DlKeyedHasOne | null);
+  setDlKeyedHasOne(value: DlKeyedHasOne | null): Promise<unknown>;
 }

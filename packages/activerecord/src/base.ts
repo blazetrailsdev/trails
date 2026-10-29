@@ -1029,7 +1029,7 @@ export class Base extends Model {
 
   declare static findBy: <T extends typeof Base>(
     this: T,
-    arg: Record<string, unknown> | string,
+    arg: Record<string, unknown> | Map<unknown, unknown> | string,
     ...args: unknown[]
   ) => Promise<InstanceType<T> | null>;
 
@@ -1041,7 +1041,7 @@ export class Base extends Model {
 
   declare static findByBang: <T extends typeof Base>(
     this: T,
-    arg: Record<string, unknown> | string,
+    arg: Record<string, unknown> | Map<unknown, unknown> | string,
     ...args: unknown[]
   ) => Promise<InstanceType<T>>;
 

@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import { kernelThrow, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
@@ -175,7 +176,7 @@ export class CpkBookDestroyAsync extends Base {
     this.hasMany("chapters", {
       foreignKey: ["author_id", "book_id"],
       className: "Cpk::ChapterDestroyAsync",
-      dependent: "destroy",
+      dependent: "destroyAsync",
     });
   }
 }

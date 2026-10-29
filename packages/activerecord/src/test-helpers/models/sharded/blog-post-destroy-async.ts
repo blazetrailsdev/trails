@@ -1,9 +1,13 @@
+import "../../../destroy-association-async-job.js";
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
+import type { AssociationProxy } from "../../../associations/collection-proxy.js";
 import { queryConstraints } from "../../../persistence.js";
+import type { ShardedTag } from "./tag.js";
 
-/** @missingRailsArgs has_many — CONVERGEABLE port-destroy-association-async-test-and-flip-models */
 export class ShardedBlogPostDestroyAsync extends Base {
+  declare tags: AssociationProxy<ShardedTag>;
+
   static _tableName = "sharded_blog_posts";
   static {
     registerModel("Sharded::BlogPostDestroyAsync", this);
@@ -15,7 +19,7 @@ export class ShardedBlogPostDestroyAsync extends Base {
     this.belongsTo("blog");
     this.hasMany("comments", {
       className: "Sharded::CommentDestroyAsync",
-      dependent: "destroy",
+      dependent: "destroyAsync",
       foreignKey: ["blog_id", "blog_post_id"],
     });
     this.hasMany("blogPostTags", {
@@ -25,7 +29,7 @@ export class ShardedBlogPostDestroyAsync extends Base {
     this.hasMany("tags", {
       through: "blogPostTags",
       className: "Sharded::Tag",
-      dependent: "destroy",
+      dependent: "destroyAsync",
     });
   }
 }

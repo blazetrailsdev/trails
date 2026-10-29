@@ -1041,10 +1041,6 @@ export class BelongsToReflection extends AssociationReflection {
   get joinForeignType(): string | null {
     return this.foreignType;
   }
-
-  get activeRecordPrimaryKey(): string | string[] {
-    return this.activeRecord.primaryKey;
-  }
 }
 
 export class HasAndBelongsToManyReflection extends AssociationReflection {

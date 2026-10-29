@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Content } from "./content.js";
@@ -29,13 +30,13 @@ export class BookDestroyAsync extends Base {
 
   static {
     this.hasMany("taggings", { as: "taggable", className: "Tagging" });
-    this.hasMany("tags", { through: "taggings", dependent: "destroy" });
+    this.hasMany("tags", { through: "taggings", dependent: "destroyAsync" });
     this.hasMany("essays", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
       className: "EssayDestroyAsync",
       foreignKey: "book_id",
     });
-    this.hasOne("content", { dependent: "destroy" });
+    this.hasOne("content", { dependent: "destroyAsync" });
     this.enum("status", ["proposed", "written", "published"]);
   }
 }
@@ -44,6 +45,7 @@ registerModel(BookDestroyAsync);
 export interface BookDestroyAsync {
   get content(): Content | null | Promise<Content | null>;
   set content(value: Content | null);
+  setContent(value: Content | null): Promise<unknown>;
 }
 
 export class BookDestroyAsyncWithScopedTags extends Base {
@@ -54,7 +56,13 @@ export class BookDestroyAsyncWithScopedTags extends Base {
 
   static {
     this.hasMany("taggings", { as: "taggable", className: "Tagging" });
-    this.hasMany("tags", { through: "taggings", dependent: "destroy" });
+    this.hasMany(
+      "tags",
+      function (this: Relation<Tag>) {
+        return this.where({ name: "Der be rum" });
+      },
+      { through: "taggings", dependent: "destroyAsync" },
+    );
   }
 }
 registerModel(BookDestroyAsyncWithScopedTags);

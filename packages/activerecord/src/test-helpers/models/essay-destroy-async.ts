@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import type { BookDestroyAsync } from "./book-destroy-async.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
@@ -7,8 +8,8 @@ export class EssayDestroyAsync extends Base {
   static _tableName = "essays";
 
   static {
-    this.belongsTo("book", { dependent: "destroy", className: "BookDestroyAsync" });
-    this.belongsTo("writer", { polymorphic: true, dependent: "destroy" });
+    this.belongsTo("book", { dependent: "destroyAsync", className: "BookDestroyAsync" });
+    this.belongsTo("writer", { polymorphic: true, dependent: "destroyAsync" });
   }
 }
 registerModel(EssayDestroyAsync);

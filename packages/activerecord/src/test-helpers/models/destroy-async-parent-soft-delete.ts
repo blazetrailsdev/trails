@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { DlKeyedHasOne } from "./dl-keyed-has-one.js";
 import type { Tag } from "./tag.js";
@@ -16,10 +17,12 @@ export class DestroyAsyncParentSoftDelete extends Base {
     this.hasMany("taggings", { as: "taggable", className: "Tagging" });
     this.hasMany("tags", {
       through: "taggings",
-      dependent: "destroy",
+      dependent: "destroyAsync",
+      ensuringOwnerWas: "isDeleted",
     });
     this.hasOne("dlKeyedHasOne", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
+      ensuringOwnerWas: "isDeleted",
     });
   }
 
@@ -38,4 +41,5 @@ registerModel(DestroyAsyncParentSoftDelete);
 export interface DestroyAsyncParentSoftDelete {
   get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
   set dlKeyedHasOne(value: DlKeyedHasOne | null);
+  setDlKeyedHasOne(value: DlKeyedHasOne | null): Promise<unknown>;
 }

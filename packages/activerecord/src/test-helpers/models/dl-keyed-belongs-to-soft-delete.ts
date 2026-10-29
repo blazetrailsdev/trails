@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import type { DestroyAsyncParentSoftDelete } from "./destroy-async-parent-soft-delete.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
@@ -9,7 +10,8 @@ export class DlKeyedBelongsToSoftDelete extends Base {
 
   static {
     this.belongsTo("destroyAsyncParentSoftDelete", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
+      ensuringOwnerWas: "isDeleted",
       className: "DestroyAsyncParentSoftDelete",
     });
   }
