@@ -156,7 +156,7 @@ import {
   extend,
   classAttribute,
   benchmark as benchmarkable,
-  type BenchmarkLogger,
+  type Logger,
   runLoadHooks,
   type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
@@ -803,7 +803,7 @@ export class Base extends Model {
     return subclasses.concat(subclasses.flatMap((klass) => klass.descendants));
   }
 
-  declare static logger: BenchmarkLogger | null | undefined;
+  declare static logger: Logger | null | undefined;
   declare static isLogger: boolean;
 
   static benchmark = benchmarkable;

@@ -6,5 +6,7 @@ export class Engine extends TrailsEngine {
     TrailsEngine.register(this, import.meta.dirname);
 
     this.isolateNamespace(SolidCable);
+
+    this.initializer("solid_cable.config", () => SolidCable.loadCableConfig());
   }
 }

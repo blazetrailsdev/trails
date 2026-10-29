@@ -48,11 +48,9 @@ export class BlockedExecution extends Execution {
 
   static async releaseOne(concurrencyKey: unknown): Promise<unknown> {
     return await this.transaction(async () => {
-      const execution = await (
-        (this.ordered() as unknown as typeof BlockedExecution)
-          .where({ concurrency_key: concurrencyKey })
-          .limit(1) as unknown as typeof BlockedExecution
-      )
+      const execution = await this.ordered()
+        .where({ concurrency_key: concurrencyKey })
+        .limit(1)
         .nonBlockingLock()
         .first();
       if (execution) {

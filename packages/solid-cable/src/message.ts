@@ -1,11 +1,11 @@
-import type { Duration } from "@blazetrails/activesupport";
 import { registerModel, type Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { Digest, Range, unpack1 } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
+import { SolidCable } from "./solid-cable.js";
 
 export class Message extends Record {
-  declare static trimmable: (messageRetention: Duration) => Relation<Message>;
+  declare static trimmable: () => Relation<Message>;
   declare static broadcastable: (channels: Iterable<string>, lastId: number) => Relation<Message>;
   declare id: number;
   declare channel: Uint8Array;
@@ -16,8 +16,8 @@ export class Message extends Record {
   static {
     registerModel("SolidCable::Message", this);
 
-    this.scope("trimmable", function (messageRetention: Duration) {
-      return this.where({ created_at: new Range(null, messageRetention.ago(), true) });
+    this.scope("trimmable", function () {
+      return this.where({ created_at: new Range(null, SolidCable.messageRetention().ago(), true) });
     });
     this.scope("broadcastable", function (channels: Iterable<string>, lastId: number) {
       return this.where({ channel_hash: Message.channelHashesFor(channels) })
@@ -42,5 +42,12 @@ export class Message extends Record {
   /** @missingRailsArgs unpack1 — PERMANENT */
   static channelHashFor(channel: unknown): number | bigint {
     return unpack1(Digest.SHA256.digest(String(channel)), "q>")!;
+  }
+}
+
+declare module "@blazetrails/activerecord" {
+  // eslint-disable-next-line unused-imports/no-unused-vars -- the augmented interface must repeat RelationScopes<T>
+  interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
+    trimmable(this: Relation<Message>): Relation<Message>;
   }
 }

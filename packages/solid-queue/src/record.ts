@@ -11,7 +11,7 @@ export class Record extends Base {
 
   static nonBlockingLock<T extends typeof Record>(this: T): Relation<InstanceType<T>> {
     if (SolidQueue.useSkipLocked) {
-      return this.lock(sql("FOR UPDATE SKIP LOCKED") as never);
+      return this.lock(sql("FOR UPDATE SKIP LOCKED"));
     } else {
       return this.lock();
     }
@@ -21,3 +21,10 @@ export class Record extends Base {
 registerModel("SolidQueue::Record", Record);
 
 runLoadHooks("solid_queue_record", Record);
+
+declare module "@blazetrails/activerecord" {
+  // eslint-disable-next-line unused-imports/no-unused-vars -- the augmented interface must repeat RelationScopes<T>
+  interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
+    nonBlockingLock<R extends Record>(this: Relation<R>): Relation<R>;
+  }
+}

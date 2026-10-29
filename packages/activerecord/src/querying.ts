@@ -514,12 +514,19 @@ export function minimum<T extends typeof Base>(
   return rel.minimum(column) as ReturnType<ReturnType<T["all"]>["minimum"]>;
 }
 
+export function maximum<T extends typeof Base, K extends keyof InstanceType<T> & string>(
+  this: T,
+  column: K,
+): Promise<InstanceType<T>[K] | null>;
 export function maximum<T extends typeof Base>(
   this: T,
-  column: Parameters<ReturnType<T["all"]>["maximum"]>[0],
-): ReturnType<ReturnType<T["all"]>["maximum"]> {
-  const rel = this.all() as ReturnType<T["all"]>;
-  return rel.maximum(column) as ReturnType<ReturnType<T["all"]>["maximum"]>;
+  column: string | import("@blazetrails/arel").ArelNode,
+): Promise<unknown>;
+export function maximum<T extends typeof Base>(
+  this: T,
+  column: string | import("@blazetrails/arel").ArelNode,
+): Promise<unknown> {
+  return this.all().maximum(column);
 }
 
 export function average<T extends typeof Base>(
@@ -869,7 +876,7 @@ export function having<T extends typeof Base>(
 
 export function lock<T extends typeof Base>(
   this: T,
-  clause?: string | boolean,
+  clause?: string | Nodes.SqlLiteral | boolean,
 ): Relation<InstanceType<T>> {
   return this.all().lock(clause);
 }

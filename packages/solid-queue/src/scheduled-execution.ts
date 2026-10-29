@@ -26,11 +26,7 @@ export class ScheduledExecution extends Execution {
       return this.order({ scheduled_at: "asc", priority: "asc", job_id: "asc" });
     });
     this.scope("nextBatch", function (batchSize: number) {
-      return (
-        (this as unknown as typeof ScheduledExecution).due() as unknown as typeof ScheduledExecution
-      )
-        .ordered()
-        .limit(batchSize);
+      return this.due().ordered().limit(batchSize);
     });
 
     this.assumesAttributesFromJob("scheduled_at");
@@ -38,9 +34,7 @@ export class ScheduledExecution extends Execution {
 
   static async dispatchNextBatch(batchSize: number): Promise<number> {
     return (await this.transaction(async () => {
-      const jobIds = await (this.nextBatch(batchSize) as unknown as typeof ScheduledExecution)
-        .nonBlockingLock()
-        .pluck("job_id");
+      const jobIds = await this.nextBatch(batchSize).nonBlockingLock().pluck("job_id");
       if (jobIds.length === 0) return 0;
       else {
         return await SolidQueue.instrument(
@@ -52,5 +46,12 @@ export class ScheduledExecution extends Execution {
         );
       }
     }))!;
+  }
+}
+
+declare module "@blazetrails/activerecord" {
+  // eslint-disable-next-line unused-imports/no-unused-vars -- the augmented interface must repeat RelationScopes<T>
+  interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
+    due(this: Relation<ScheduledExecution>): Relation<ScheduledExecution>;
   }
 }

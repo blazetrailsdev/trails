@@ -29,51 +29,65 @@ type CableConfig = Record<string, unknown> & { connectsTo?: Record<string, unkno
 export const SolidCable = {
   name: "SolidCable",
 
-  async connectsTo(): Promise<Record<string, unknown>> {
-    return deepTransformValues({ ...(await cableConfig()).connectsTo }, (value) => {
+  connectsTo(): Record<string, unknown> {
+    return deepTransformValues({ ...cableConfig().connectsTo }, (value) => {
       if (value == null) throw new NoMethodError("undefined method 'to_sym' for nil");
       return String(value);
     }) as Record<string, unknown>;
   },
 
-  async isSilencePolling(): Promise<boolean> {
-    return (await cableConfig()).silencePolling !== false;
+  isSilencePolling(): boolean {
+    return cableConfig().silencePolling !== false;
   },
 
   /** @missingRailsArgs seconds — PERMANENT */
-  async pollingInterval(): Promise<Duration> {
-    return parseDuration((await cableConfig()).pollingInterval, { default: seconds(0.1) });
+  pollingInterval(): Duration {
+    return parseDuration(cableConfig().pollingInterval, { default: seconds(0.1) });
   },
 
-  async messageRetention(): Promise<Duration> {
-    return parseDuration((await cableConfig()).messageRetention, { default: days(1) });
+  messageRetention(): Duration {
+    return parseDuration(cableConfig().messageRetention, { default: days(1) });
   },
 
-  async isAutotrim(): Promise<boolean> {
-    return (await cableConfig()).autotrim !== false;
+  isAutotrim(): boolean {
+    return cableConfig().autotrim !== false;
   },
 
-  async trimBatchSize(): Promise<number> {
+  trimBatchSize(): number {
     let size: number;
-    if ((size = Number(toI((await cableConfig()).trimBatchSize))) < 2) {
+    if ((size = Number(toI(cableConfig().trimBatchSize))) < 2) {
       return 100;
     } else {
       return size;
     }
   },
 
-  async useSkipLocked(): Promise<boolean> {
-    return (await cableConfig()).useSkipLocked !== false;
+  useSkipLocked(): boolean {
+    return cableConfig().useSkipLocked !== false;
   },
 
   trimChance(): number {
     return 2;
   },
+
+  /** @noRailsEquivalent PERMANENT */
+  async loadCableConfig(): Promise<void> {
+    try {
+      loadedCableConfig = {
+        config: (await TopLevel.Trails!.application!.configFor("cable")) as CableConfig,
+      };
+    } catch (error) {
+      loadedCableConfig = { error };
+    }
+  },
 };
 
+let loadedCableConfig: { config: CableConfig } | { error: unknown } | null = null;
+
 /** @internal */
-async function cableConfig(): Promise<CableConfig> {
-  return (await TopLevel.Trails!.application!.configFor("cable")) as CableConfig;
+function cableConfig(): CableConfig {
+  if ("error" in loadedCableConfig!) throw loadedCableConfig.error;
+  return loadedCableConfig!.config;
 }
 
 /** @internal */

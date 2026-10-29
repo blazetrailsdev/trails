@@ -729,6 +729,9 @@ importers:
         specifier: workspace:*
         version: link:../trailties
     devDependencies:
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers

@@ -16,10 +16,14 @@ export class OrderedOptions {
     this.data = new Map();
     this.defaultBlock = defaultBlock;
     return new Proxy(this, {
-      get(target, method: string | symbol) {
+      get(target, method: string | symbol, receiver) {
         if (typeof method === "symbol" || method in target) {
           const value = (target as any)[method];
-          return typeof value === "function" ? value.bind(target) : value;
+          if (typeof value !== "function" || method === "constructor") return value;
+          return (...args: unknown[]) => {
+            const result = value.apply(target, args);
+            return result === target ? receiver : result;
+          };
         }
         if (method.endsWith("!")) {
           const nameString = method.slice(0, -1);

@@ -207,7 +207,7 @@ interface QueryMethodsHost {
   _withIsRecursive: boolean;
   limitValue: number | string | null;
   offsetValue: number | string | null;
-  lockValue: string | boolean | null;
+  lockValue: string | Arel.Nodes.SqlLiteral | boolean | null;
   readonlyValue: boolean | null;
   reorderingValue: boolean | null;
   strictLoadingValue: boolean | null;
@@ -907,12 +907,23 @@ function offsetBang(this: QueryMethodsHost, value: number | string | null): any 
   return this;
 }
 
-function lock(this: QueryMethodsHost, locks: string | boolean | null = true): any {
+function lock(
+  this: QueryMethodsHost,
+  locks: string | Arel.Nodes.SqlLiteral | boolean | null = true,
+): any {
   return lockBang.call(this.spawn(), locks);
 }
 
-function lockBang(this: QueryMethodsHost, locks: string | boolean | null = true): any {
-  if (typeof locks === "string" || locks === true || locks == null) {
+function lockBang(
+  this: QueryMethodsHost,
+  locks: string | Arel.Nodes.SqlLiteral | boolean | null = true,
+): any {
+  if (
+    typeof locks === "string" ||
+    locks instanceof Arel.Nodes.SqlLiteral ||
+    locks === true ||
+    locks == null
+  ) {
     this.lockValue = locks ?? true;
   } else {
     this.lockValue = false;

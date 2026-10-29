@@ -285,7 +285,9 @@ describe("Enum private validators", () => {
     const warnings: string[] = [];
     class Model extends Base {}
     beforeAll(() => {
-      Model.logger = { warn: (msg: string) => void warnings.push(msg) } as typeof Base.logger;
+      Model.logger = {
+        warn: (msg: string) => void warnings.push(msg),
+      } as unknown as typeof Base.logger;
     });
     afterEach(() => {
       warnings.length = 0;

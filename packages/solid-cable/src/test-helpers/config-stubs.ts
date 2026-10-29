@@ -6,14 +6,14 @@ import {
   TopLevel,
 } from "@blazetrails/activesupport";
 import { afterAll, beforeAll } from "vitest";
+import { SolidCable } from "../solid-cable.js";
 
 export class ConfigStub {
   private _config: OrderedOptions;
   private _executor?: ExectorStub;
 
   constructor(options: Record<string, unknown> = {}) {
-    this._config = new OrderedOptions();
-    this._config.update({ adapter: "test", ...options });
+    this._config = new OrderedOptions().update({ adapter: "test", ...options });
   }
 
   async configFor(_file: string): Promise<OrderedOptions> {
@@ -50,18 +50,21 @@ export async function withCableConfig<T>(
 ): Promise<T> {
   const old = TopLevel.Trails;
   TopLevel.Trails = stubTrails(options);
+  await SolidCable.loadCableConfig();
   try {
     return await block();
   } finally {
     TopLevel.Trails = old;
+    if (old?.application) await SolidCable.loadCableConfig();
   }
 }
 
 export function useDummyApplication(): void {
   let old: typeof TopLevel.Trails;
-  beforeAll(() => {
+  beforeAll(async () => {
     old = TopLevel.Trails;
     TopLevel.Trails = stubTrails();
+    await SolidCable.loadCableConfig();
   });
   afterAll(() => {
     TopLevel.Trails = old;

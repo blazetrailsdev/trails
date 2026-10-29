@@ -121,7 +121,7 @@ describe("EachTest", () => {
       error: vi.fn(),
       fatal: vi.fn(),
     };
-    Base.logger = logger;
+    Base.logger = logger as unknown as typeof Base.logger;
     try {
       for await (const _post of Post.order("title").findEach({})) {
       }

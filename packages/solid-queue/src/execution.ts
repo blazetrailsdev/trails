@@ -15,7 +15,7 @@ export class Execution extends Record {
   declare static assumableAttributesFromJob: string[];
   declare static assumesAttributesFromJob: typeof JobAttributesClassMethods.assumesAttributesFromJob;
   declare static attributesFromJob: typeof JobAttributesClassMethods.attributesFromJob;
-  declare static ordered: () => Relation<Execution>;
+  declare static ordered: <T extends typeof Execution>(this: T) => Relation<InstanceType<T>>;
   declare job: Promise<Job>;
   declare job_id: number;
   declare queue_name: string;
@@ -121,3 +121,10 @@ export class Execution extends Record {
 
 registerModel("SolidQueue::Execution", Execution);
 registerConstant("SolidQueue::Execution::UndiscardableError", UndiscardableError);
+
+declare module "@blazetrails/activerecord" {
+  // eslint-disable-next-line unused-imports/no-unused-vars -- the augmented interface must repeat RelationScopes<T>
+  interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
+    ordered<R extends Execution>(this: Relation<R>): Relation<R>;
+  }
+}
