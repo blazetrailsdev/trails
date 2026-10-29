@@ -540,10 +540,13 @@ export async function main(args: string[] = [], root = ROOT_DIR): Promise<string
         added.map((e) => `  ${describe(e)}`).join("\n"),
     );
   }
-  if (tighten(mark, current).edges.length !== mark.edges.length) {
+  const live = new Set(current.map(edgeKey));
+  const stale = mark.edges.filter((k) => !live.has(k));
+  if (stale.length > 0) {
     throw new Error(
       "import-cycles gate: STALE row (a listed edge no longer exists). " +
-        "Run `pnpm parity:import-cycles:tighten` and commit the mark file.",
+        "Run `pnpm parity:import-cycles:tighten` and commit the mark file:\n" +
+        stale.map((k) => `  ${k}`).join("\n"),
     );
   }
   return "import-cycles gate: OK";

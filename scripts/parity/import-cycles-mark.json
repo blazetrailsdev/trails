@@ -16,7 +16,6 @@
     "packages/et-orbi/src/et-orbi.ts -> packages/et-orbi/src/info.ts [_makeInfo, platformInfo, renderNozoneTime]",
     "packages/et-orbi/src/et-orbi.ts -> packages/et-orbi/src/make.ts [isChronicEnabled, make, makeTime, now, parse, setChronicEnabled]",
     "packages/i18n/src/backend/simple.ts -> packages/i18n/src/backend/base.ts [Base]",
-    "packages/image-processing/src/builder.ts -> packages/image-processing/src/chainable.ts [Chainable]",
     "packages/nokogiri/src/html5/document.ts -> packages/nokogiri/src/xml/searchable.ts [Searchable]",
     "packages/nokogiri/src/html5/node.ts -> packages/nokogiri/src/xml/searchable.ts [Searchable]",
     "packages/nokogiri/src/xml/node-set.ts -> packages/nokogiri/src/xml/searchable.ts [Searchable]",
