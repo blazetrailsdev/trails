@@ -44,6 +44,7 @@
     { "path": "packages/actioncable" },
     { "path": "packages/solid-queue" },
     { "path": "packages/solid-cable" },
+    { "path": "packages/activestorage" },
     { "path": "packages/did-you-mean" },
     { "path": "packages/thor" },
     { "path": "packages/i18n" },

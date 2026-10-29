@@ -162,6 +162,20 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "activejob/test",
       },
       {
+        name: "activestorage",
+        libPath: "activestorage/lib/active_storage",
+        libEntryFile: "activestorage/lib/active_storage.rb",
+        extraLibPaths: [
+          "activestorage/app/models/active_storage",
+          "activestorage/app/controllers/active_storage",
+          "activestorage/app/controllers/concerns/active_storage",
+          "activestorage/app/jobs/active_storage",
+        ],
+        testPath: "activestorage/test",
+        compareApi: true,
+        compareTests: true,
+      },
+      {
         name: "trailties",
         libPath: "railties/lib/rails",
         testPath: "railties/test",

@@ -389,6 +389,27 @@ importers:
         specifier: ^25.3.5
         version: 25.3.5
 
+  packages/activestorage:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/marcel':
+        specifier: workspace:*
+        version: link:../marcel
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/activesupport:
     dependencies:
       '@blazetrails/date':
@@ -933,6 +954,9 @@ importers:
       '@blazetrails/activerecord-cli':
         specifier: workspace:*
         version: link:../../packages/activerecord-cli
+      '@blazetrails/activestorage':
+        specifier: workspace:*
+        version: link:../../packages/activestorage
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../../packages/activesupport

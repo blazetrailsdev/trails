@@ -75,6 +75,18 @@ export interface ChildProcessAdapter {
     args: string[] | null,
     stdinData: string | Uint8Array,
   ): Promise<[stdout: string | Uint8Array, stderr: string, status: WaitStatus]>;
+  /**
+   * Runs `command` with `args` as its argv and no shell, as `IO.popen` execs
+   * an Array command (`rb_io_popen`, `vendor/ruby/v3.3.11/io.c:7968-7983`),
+   * with stdin inherited, stdout on a pipe and stderr on the `err` descriptor
+   * (inherited when `null`), and resolves with what it wrote to stdout.
+   */
+  popen?(
+    command: string,
+    args: string[],
+    env: Record<string, string | undefined>,
+    err: number | null,
+  ): Promise<[stdout: Uint8Array, status: WaitStatus]>;
 }
 
 const registry = new Map<string, ChildProcessAdapter>();
@@ -255,6 +267,24 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         stdout = bytes;
       }
       return [stdout, stderr, status];
+    },
+    async popen(command, args, env, err) {
+      const chunks: Uint8Array[] = [];
+      const status = await spawnChild(
+        cp,
+        command,
+        args,
+        env,
+        ["inherit", "pipe", err ?? "inherit"],
+        { bytes: (chunk) => chunks.push(chunk) },
+      );
+      const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return [bytes, status];
     },
   };
 }

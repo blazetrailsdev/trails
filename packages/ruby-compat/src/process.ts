@@ -102,6 +102,20 @@ export class Process {
   static readonly Status = Status;
 
   /**
+   * `Process.last_status` (`proc_s_last_status`,
+   * `vendor/ruby/v3.3.11/process.c:638-642`), the `$?` a waited child leaves
+   * behind. Ruby keeps it per thread (`rb_last_status_set`, `process.c:681-685`);
+   * trails keeps it per async context, falling back to one process-wide seat
+   * outside any.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process.last_status`
+   * (`vendor/ruby/v3.3.11/process.c:639`).
+   */
+  static get lastStatus(): Status | null {
+    return lastStatus;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/process.c:9404` — the clock that cannot go backwards, which is
    * every Rails elapsed-time measurement's clock id.
    *
@@ -215,4 +229,16 @@ function makeClockResult(milliseconds: number, unit: string): number {
   } else {
     throw new ArgumentError(`unexpected unit: ${unit.slice(1)}`);
   }
+}
+
+let lastStatus: Status | null = null;
+
+/**
+ * `rb_last_status_set` (`vendor/ruby/v3.3.11/process.c:681-685`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_last_status_set`
+ * (`vendor/ruby/v3.3.11/process.c:681`).
+ */
+export function rbLastStatusSet(status: Status): void {
+  lastStatus = status;
 }
