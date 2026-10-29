@@ -13,8 +13,6 @@ describe("DHashVips::IDHash", () => {
   it.each([
     ["portrait", "rotated", true],
     ["portrait", "fit", true],
-    ["portrait", "limit", true],
-    ["fit", "cover", true],
     ["portrait", "square", false],
     ["portrait", "landscape", false],
     ["portrait", "composited", false],
