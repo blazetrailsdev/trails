@@ -473,7 +473,7 @@ describe("NamedScopingTest", () => {
     const toA = await Topic.base();
     expect((await Topic.base()).filter((t) => t.approved)).toEqual(
       Enumerable.prototype.findAll.call(
-        { each: (block) => toA.forEach(block) },
+        { each: (block) => toA.forEach((t) => block(t)) },
         (t) => (t as Topic).approved,
       ),
     );

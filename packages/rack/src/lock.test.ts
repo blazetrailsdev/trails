@@ -24,7 +24,7 @@ describe("Proxy", () => {
     const response = {
       closeCalled: false,
       each(fn: (x: string) => void) {
-        ["hi", "mom"].forEach(fn);
+        ["hi", "mom"].forEach((s) => fn(s));
       },
     };
     const app = lockApp(async () => [200, { "content-type": "text/plain" }, response] as any);

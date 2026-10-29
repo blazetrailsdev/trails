@@ -42,10 +42,13 @@ const iterBreak = Symbol("rb_iter_break");
  * one, else its JS iterator, which is how an Array (`rb_ary_each`,
  * `vendor/ruby/v3.3.11/array.c:2532`), a Set or a generator yields, and a Map
  * yields `[key, value]` as `rb_hash_each_pair` does (`vendor/ruby/v3.3.11/hash.c:3149`).
+ * An `each` member's multi-value yield reaches the block packed into one
+ * Array, as `ENUM_WANT_SVALUE` packs it (`rb_enum_values_pack`,
+ * `vendor/ruby/v3.3.11/enum.c:53`).
  */
 function rbBlockCall<T, E, R>(
   obj: Iterable<T> | Each<T, E>,
-  block: (i: T) => unknown,
+  block: (i: T, argv: unknown[]) => unknown,
   result: () => R,
   awaiting = false,
 ): Enumerated<E, R> {
@@ -55,12 +58,12 @@ function rbBlockCall<T, E, R>(
   };
   if (awaiting && typeof (obj as Partial<Each<T, E>>).each === "function") {
     let pending: PromiseLike<unknown> | null = null;
-    const rest: T[] = [];
+    const rest: [T, unknown[]][] = [];
     return rbBlockCall(
       obj,
-      (i) => {
-        if (pending) return void rest.push(i);
-        const r = block(i);
+      (i, argv) => {
+        if (pending) return void rest.push([i, argv]);
+        const r = block(i, argv);
         if (r != null && typeof (r as PromiseLike<unknown>).then === "function") {
           pending = r as PromiseLike<unknown>;
         }
@@ -70,7 +73,7 @@ function rbBlockCall<T, E, R>(
         const awaited = pending;
         return (async () => {
           await awaited;
-          for (const i of rest) await block(i);
+          for (const [i, argv] of rest) await block(i, argv);
           return result();
         })();
       },
@@ -79,21 +82,26 @@ function rbBlockCall<T, E, R>(
   let each: unknown;
   try {
     if (typeof (obj as Partial<Each<T, E>>).each === "function") {
-      each = (obj as Each<T, E>).each(block);
+      each = (obj as Each<T, E>).each(((...argv: T[]) =>
+        block(
+          argv.length === 0 ? (null as T) : argv.length === 1 ? argv[0] : (argv as T),
+          argv,
+        )) as (i: T) => void);
     } else if (awaiting) {
       const it = (obj as Iterable<T>)[Symbol.iterator]();
       for (let step = it.next(); !step.done; step = it.next()) {
-        const r = block(step.value);
+        const r = block(step.value, [step.value]);
         if (r != null && typeof (r as PromiseLike<unknown>).then === "function") {
           each = (async () => {
             await r;
-            for (let step = it.next(); !step.done; step = it.next()) await block(step.value);
+            for (let step = it.next(); !step.done; step = it.next())
+              await block(step.value, [step.value]);
           })();
           break;
         }
       }
     } else {
-      for (const i of obj as Iterable<T>) block(i);
+      for (const i of obj as Iterable<T>) block(i, [i]);
     }
   } catch (e) {
     return rescue(e) as Enumerated<E, R>;
@@ -103,6 +111,21 @@ function rbBlockCall<T, E, R>(
     return Promise.resolve(each as PromiseLike<unknown>).then(result, rescue) as Enumerated<E, R>;
   }
   return result() as Enumerated<E, R>;
+}
+
+/**
+ * `rb_yield` (`vendor/ruby/v3.3.11/vm_eval.c:1376`): one value to the block,
+ * splatted across its parameters when it is an Array and the block takes more
+ * than one, as `vm_callee_setup_block_arg_arg0_splat`
+ * (`vendor/ruby/v3.3.11/vm_insnhelper.c:4807`) does. A JS function's `length`
+ * stands in for the iseq's `lead_num`; it does not count a defaulted or rest
+ * parameter (CLAUDE.md, "Runtime facts Node does not expose", arity -1).
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbYield<R>(block: (...args: never[]) => R, val: unknown): R {
+  const yielder = block as (...args: unknown[]) => R;
+  if (Array.isArray(val) && block.length > 1) return yielder(...val);
+  return yielder(val);
 }
 
 /**
@@ -142,7 +165,7 @@ export function partition<T, E = unknown>(
   return rbBlockCall(
     obj,
     (i) => {
-      const result = block(i);
+      const result = rbYield(block, i);
       if (result != null && result !== false) memo.v1.push(i);
       else memo.v2.push(i);
     },
@@ -174,7 +197,7 @@ export function groupBy<T, K, E = unknown>(
   return rbBlockCall(
     obj,
     (i) => {
-      const group = block(i);
+      const group = rbYield(block, i);
       const values = hash.get(group);
       if (values === undefined) hash.set(group, [i]);
       else values.push(i);
@@ -210,14 +233,14 @@ export function tally<T, E = unknown>(
  */
 function enumFindAll<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
-  block?: (i: T) => unknown,
+  block?: (i: T, ...rest: never[]) => unknown,
 ): Enumerated<E, T[]> {
   if (!block) return enumToA(obj);
   const ary: T[] = [];
   return rbBlockCall(
     obj,
     (i) => {
-      const result = block(i);
+      const result = rbYield(block, i);
       if (result != null && result !== false) ary.push(i);
     },
     () => ary,
@@ -240,7 +263,7 @@ export function reject<T, E = unknown>(
   return rbBlockCall(
     obj,
     (i) => {
-      const result = block(i);
+      const result = rbYield(block, i);
       if (result == null || result === false) ary.push(i);
     },
     () => ary,
@@ -268,7 +291,7 @@ export function count<T, E = unknown>(
   if (argv.length === 0) {
     if (block !== undefined) {
       func = (i) => {
-        const result = block(i);
+        const result = rbYield(block, i);
         return result != null && result !== false;
       };
     } else {
@@ -300,7 +323,7 @@ export function filterMap<T, R, E = unknown>(
   return rbBlockCall(
     obj,
     (i) => {
-      const result = block(i);
+      const result = rbYield(block, i);
       if (result != null && result !== false) ary.push(result);
     },
     () => ary,
@@ -324,7 +347,7 @@ export function find<T, E = unknown>(
   return rbBlockCall(
     obj,
     (i) => {
-      const result = block(i);
+      const result = rbYield(block, i);
       if (result != null && result !== false) {
         memo.v1 = i;
         memo.cnt = 1;
@@ -340,19 +363,42 @@ export function find<T, E = unknown>(
 }
 
 /**
- * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`.
+ * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`,
+ * whose `collect_i` (`:606`) yields the values `each` yielded as they are
+ * (`rb_yield_values2`), unpacked; a lone Array reaching a block that takes
+ * more than one parameter is splatted across them, as
+ * `vm_callee_setup_block_arg_arg0_splat` does (`vendor/ruby/v3.3.11/vm_insnhelper.c:4807`).
+ * With no block it answers the enumerator
+ * `RETURN_SIZED_ENUMERATOR` builds.
  * @noRailsEquivalent PERMANENT
  */
+export function map<A extends unknown[], R, E = unknown>(
+  obj: Enumerator<A, E>,
+  block: (...args: A) => R,
+): Enumerated<E, R[]>;
+/** @noRailsEquivalent PERMANENT */
 export function map<T, R, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
-  block?: (i: T) => R,
-): Enumerated<E, R[] | T[]> {
-  if (!block) return enumToA(obj);
+  block: (i: T, ...rest: never[]) => R,
+): Enumerated<E, R[]>;
+/** @noRailsEquivalent PERMANENT */
+export function map<T, E = unknown>(obj: Iterable<T> | Each<T, E>): Enumerator<T, E>;
+/** @noRailsEquivalent PERMANENT */
+export function map<T, R, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block?: (...args: never[]) => R,
+): unknown {
+  if (!block) {
+    return new Enumerator<T, E>({ map: (block: (i: T) => R) => map(obj, block) }, "map", [], () =>
+      enumSize(obj),
+    );
+  }
   const ary: R[] = [];
   return rbBlockCall(
     obj,
-    (i) => {
-      ary.push(block(i));
+    (_i, argv) => {
+      const args = argv.length === 1 && Array.isArray(argv[0]) && block.length > 1 ? argv[0] : argv;
+      ary.push((block as (...args: unknown[]) => R)(...args));
     },
     () => ary,
   );
@@ -427,7 +473,7 @@ export function takeWhile<T, E = unknown>(
   return rbBlockCall(
     obj,
     (i) => {
-      const r = block(i);
+      const r = rbYield(block, i);
       if (r == null || r === false) throw iterBreak;
       ary.push(i);
     },
@@ -564,7 +610,7 @@ export function sortBy<T, E = unknown>(
   return rbBlockCall(
     obj,
     (i) => {
-      buf.push([block(i), i]);
+      buf.push([rbYield(block, i), i]);
     },
     () => buf.sort(([a], [b]) => rbCmpint(cmp(a, b), a, b)).map(([, i]) => i),
   );
@@ -667,7 +713,7 @@ export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
     return rbBlockCall(
       obj,
       (i) => {
-        buf.push([block(i), i]);
+        buf.push([rbYield(block, i), i]);
       },
       () =>
         buf
@@ -682,7 +728,7 @@ export function minBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
   return rbBlockCall(
     obj,
     (i) => {
-      const v = block(i);
+      const v = rbYield(block, i);
       if (!seen) {
         seen = true;
         v1 = v;
@@ -736,7 +782,7 @@ export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
     return rbBlockCall(
       obj,
       (i) => {
-        buf.push([block(i), i]);
+        buf.push([rbYield(block, i), i]);
       },
       () =>
         buf
@@ -751,7 +797,7 @@ export function maxBy<T, E = unknown>(obj: Iterable<T> | Each<T, E>, ...argv: un
   return rbBlockCall(
     obj,
     (i) => {
-      const v = block(i);
+      const v = rbYield(block, i);
       if (!seen) {
         seen = true;
         v1 = v;
@@ -1292,8 +1338,10 @@ export class Enumerable<T = unknown, E = unknown> {
     return enumFindAll(this, block);
   }
 
+  map<T, E = unknown>(this: Each<T, E>): Enumerator<T, E>;
+  map<T, R, E = unknown>(this: Each<T, E>, block: (i: T) => R): Enumerated<E, R[]>;
   map<T, R, E = unknown>(this: Each<T, E>, block?: (i: T) => R) {
-    return map(this, block);
+    return block ? map(this, block) : map(this);
   }
 
   groupBy<T, K, E = unknown>(this: Each<T, E>, block?: (i: T) => K) {
