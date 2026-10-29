@@ -1,4 +1,4 @@
-import { DescendantsTracker, runLoadHooks, TopLevel, underscore } from "@blazetrails/activesupport";
+import { DescendantsTracker, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
 import { Base as JobBase, registerJob } from "@blazetrails/activejob";
 import { getFs, getPath, isRegisteredConstant, registerConstant } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
@@ -291,7 +291,7 @@ async function collectAppClasses<T extends abstract new (...args: never[]) => un
   for (const entry of await fs.readdir!(dir)) {
     const full = p.join(dir, entry);
     if ((await fs.stat!(full)).isDirectory()) {
-      const namespace = `${prefix}${Inflector.camelize(underscore(entry.replace(/-/g, "_")), full)}`;
+      const namespace = `${prefix}${Inflector.camelize(entry.replace(/-/g, "_"), full)}`;
       if (!isRegisteredConstant(namespace)) registerConstant(namespace, {});
       await collectAppClasses(full, `${namespace}::`, base, out);
       continue;
@@ -339,7 +339,7 @@ async function collectModels(
     const full = p.join(dir, entry);
     if ((await fs.stat(full)).isDirectory()) {
       if (prefix === "" && entry === "concerns") continue;
-      const namespace = `${prefix}${Inflector.camelize(underscore(entry.replace(/-/g, "_")), full)}`;
+      const namespace = `${prefix}${Inflector.camelize(entry.replace(/-/g, "_"), full)}`;
       if (!isRegisteredConstant(namespace)) registerConstant(namespace, {});
       await collectModels(full, `${namespace}::`, out);
       continue;

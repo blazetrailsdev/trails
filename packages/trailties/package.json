@@ -22,6 +22,10 @@
       "default": "./dist/bin.js"
     },
     "./generators": "./dist/generators/index.js",
+    "./autoloaders/inflector": {
+      "types": "./dist/autoloaders/inflector.d.ts",
+      "default": "./dist/autoloaders/inflector.js"
+    },
     "./engine": {
       "types": "./dist/engine.d.ts",
       "default": "./dist/engine.js"
