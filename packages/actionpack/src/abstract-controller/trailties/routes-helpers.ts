@@ -46,9 +46,10 @@ Object.defineProperty(RoutesHelpers, "with", {
           : routes.urlHelpers(includePathHelpers);
       const mod = urlHelpersModule();
       const proto = cls.prototype;
-      const installed = new Map<string, PropertyDescriptor>();
+      let installed = installedMembers.get(proto);
+      if (!installed) installedMembers.set(proto, (installed = new Map()));
       for (const [key, descriptor] of includedDescriptors(cls, mod)) {
-        if (Object.hasOwn(proto, key)) continue;
+        if (!isIncludedMember(proto, key, installed)) continue;
         Object.defineProperty(proto, key, descriptor);
         installed.set(key, descriptor);
       }
@@ -63,6 +64,23 @@ Object.defineProperty(RoutesHelpers, "with", {
 
 export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods {
   prototype: object;
+}
+
+const installedMembers = new WeakMap<object, Map<string, PropertyDescriptor>>();
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function isIncludedMember(
+  proto: object,
+  key: string,
+  installed: Map<string, PropertyDescriptor>,
+): boolean {
+  const own = Object.getOwnPropertyDescriptor(proto, key);
+  if (!own) return true;
+  const mine = installed.get(key);
+  return mine !== undefined && own.value === mine.value && own.get === mine.get;
 }
 
 function includedDescriptors(

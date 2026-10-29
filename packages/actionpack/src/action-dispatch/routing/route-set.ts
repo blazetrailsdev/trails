@@ -29,6 +29,7 @@ import {
   RFC2396_PARSER,
 } from "@blazetrails/ruby-compat";
 import { Mapper } from "./mapper.js";
+import { isIncludedMember } from "../../abstract-controller/trailties/routes-helpers.js";
 import { deprecator } from "../deprecator.js";
 import {
   Router as JourneyRouter,
@@ -699,7 +700,7 @@ export class NamedRouteCollection {
         continue;
       }
       if (isPath && !includer.supportsPath) continue;
-      if (Object.hasOwn(proto, name) && !includer.installed.has(name)) continue;
+      if (!isIncludedMember(proto, name, includer.installed)) continue;
       const descriptor = { value: method, writable: true, configurable: true, enumerable: false };
       Object.defineProperty(proto, name, descriptor);
       includer.installed.set(name, descriptor);
@@ -711,9 +712,7 @@ export class NamedRouteCollection {
     for (const includer of this._includers) {
       const proto = includer.proto.deref();
       if (!proto || !includer.installed.has(name)) continue;
-      if (
-        Object.getOwnPropertyDescriptor(proto, name)?.value === includer.installed.get(name)!.value
-      ) {
+      if (isIncludedMember(proto, name, includer.installed)) {
         delete (proto as Record<string, unknown>)[name];
       }
       includer.installed.delete(name);
