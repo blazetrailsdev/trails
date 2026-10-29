@@ -22,6 +22,7 @@
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/rack-session": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
+    "@blazetrails/solid-cable": "workspace:*",
     "@blazetrails/solid-queue": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
