@@ -11,6 +11,9 @@ import { stderr, stdout, type WriteStream } from "./process-adapter.js";
 import { verbose } from "./verbose.js";
 import { Errno } from "./errno.js";
 import { format } from "./kernel-format.js";
+import { NotImplementedError } from "./not-implemented-error.js";
+import { Process, rbExecargNew, rbLastStatusSet } from "./process.js";
+import { StringIO } from "./string-io.js";
 
 /** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/v3.3.11/io.c:8880`) is called through. */
 const putsAryInFlight = new Set<unknown[]>();
@@ -852,6 +855,54 @@ export class IO {
     const buffer = typeof string === "string" ? binaryBytes(string) : string;
     getFs().writeFileSync(name, buffer);
     return buffer.length;
+  }
+
+  /**
+   * `IO.popen` (`rb_io_s_popen`, `vendor/ruby/v3.3.11/io.c:7946-7966`) for the
+   * Array command and block form Active Storage calls
+   * (`vendor/rails/v8.0.2/activestorage/lib/active_storage/previewer.rb:82`):
+   * `pname` is the program and its argv, exec'd with no shell
+   * (`rb_execarg_new`, `io.c:7975`), and `err:` redirects the child's stderr
+   * to an IO (`rb_execarg_extract_options`, `io.c:7988`). The block is
+   * yielded a readable IO over the child's stdout and its value answered,
+   * then the pipe is closed and `$?` set (`popen_finish`, `io.c:8020-8022`;
+   * `pipe_finalize`, `io.c:7302`), readable as {@link Process.lastStatus}.
+   * The child's stdout is read whole before the block runs, so the IO is a
+   * binary `StringIO`.
+   *
+   * A program that cannot be spawned raises `Errno::ENOENT`, as the fork's
+   * `execve` failure is raised in the parent (`pipe_open`,
+   * `io.c:7513`), and a host with no way to spawn raises
+   * `NotImplementedError`, as `Open3.capture2e` does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO.popen`
+   * (`vendor/ruby/v3.3.11/io.c:7946`).
+   */
+  static async popen<R>(
+    pname: readonly unknown[],
+    opt: { err?: IO | null } | ((port: StringIO<Uint8Array>) => R | Promise<R>) = {},
+    block?: (port: StringIO<Uint8Array>) => R | Promise<R>,
+  ): Promise<R> {
+    if (typeof opt === "function") {
+      block = opt;
+      opt = {};
+    }
+    const [command, env, args] = rbExecargNew(pname);
+    const { getChildProcess } = await import("./child-process-adapter.js");
+    const adapter = getChildProcess();
+    if (adapter.popen === undefined) {
+      throw new NotImplementedError("fork() function is unimplemented on this machine");
+    }
+
+    const [out, status] = await adapter.popen(command, args ?? [], env, opt.err?.fileno() ?? null);
+    if (status.error !== undefined) throw status.error;
+    const port = new StringIO(out);
+    try {
+      return await block!(port);
+    } finally {
+      port.close();
+      rbLastStatusSet(new Process.Status(status));
+    }
   }
 
   /**

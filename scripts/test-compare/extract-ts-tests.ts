@@ -38,6 +38,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "actionview",
     "actioncable",
     "activejob",
+    "activestorage",
     "trailties",
     "globalid",
     "did-you-mean",

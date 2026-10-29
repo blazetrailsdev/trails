@@ -7,6 +7,7 @@
   "dependencies": {
     "@blazetrails/actioncable": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
+    "@blazetrails/activestorage": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activerecord-cli": "workspace:*",

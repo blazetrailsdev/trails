@@ -1,0 +1,35 @@
+{
+  "name": "@blazetrails/activestorage",
+  "version": "0.1.0",
+  "description": "File attachments for Trails models, mirroring the activestorage gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/activejob": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/marcel": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
