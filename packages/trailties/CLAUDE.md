@@ -173,8 +173,11 @@ that owns the base, tagged `@noRailsEquivalent PERMANENT` citing this section,
 and never a bare `registerConstant` or a `mod[camelize(filename)]` lookup in the
 finisher. Ruled by the repo owner on 2026-10-26 (trails#9319). The last
 exception, `loadControllers`' file-name selection and its `controllerConstants`
-map, converged under `load-controllers-shares-collect-constants`; route dispatch
-reaches a registered controller through `controller_class_for`'s `constantize`.
+map, converged under `load-controllers-shares-collect-constants`. A reader
+reaches a registered class by asking its `registerX` registry, not through
+`constantize`; route dispatch's `controller_class_for` `constantize` is debt
+under root CLAUDE.md § "Constant lookup is an import or a registry"
+(2026-10-28).
 
 As a consequence:
 
