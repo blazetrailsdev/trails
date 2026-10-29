@@ -72,7 +72,7 @@ export class CreateFile extends EmptyDirectory {
       | Uint8Array);
   }
 
-  override async invokeBang(): Promise<unknown> {
+  override async invokeBang(): Promise<string> {
     await this.invokeWithConflictCheck(async () => {
       await FileUtils.mkdirPAsync(File.dirname(this.destination));
       await File.writeAsync(this.destination, await this.render(), {
