@@ -40,7 +40,10 @@ export class NamedBase extends GeneratorBase {
     if (rbObjRespondTo(this, "attributes")) this.parseAttributesBang();
   }
 
-  async template(source: string, ...args: unknown[]): Promise<string> {
+  async template(
+    source: string,
+    ...args: unknown[] | [...unknown[], (content: string) => unknown]
+  ): Promise<string> {
     return this.insideTemplate(async () =>
       Generators.addGeneratedFile((await super.template(source, ...args)) as string),
     );
