@@ -303,7 +303,6 @@ export class Node {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
 /** @perf 20% — PERMANENT */
 function _arrayBody(
   env: RackEnv,
@@ -311,7 +310,11 @@ function _arrayBody(
   headers: RackResponse[1],
   body: unknown,
 ): (string | Uint8Array)[] | null {
-  if (env[REQUEST_METHOD] === "HEAD" || Object.hasOwn(STATUS_WITH_NO_ENTITY_BODY, status)) {
+  if (
+    env[REQUEST_METHOD] === "HEAD" ||
+    status === 205 ||
+    Object.hasOwn(STATUS_WITH_NO_ENTITY_BODY, status)
+  ) {
     return null;
   }
   for (const key of Object.keys(headers)) {

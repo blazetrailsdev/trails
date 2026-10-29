@@ -236,6 +236,17 @@ describe("Rack::Handler::Node", () => {
     });
   });
 
+  it("sends no computed content-length for a reset-content status", async () => {
+    const app: RackApp = async () => [205, {}, []];
+
+    await serving(app, async (url) => {
+      const response = await fetch(url);
+
+      expect(response.status).toBe(205);
+      expect(response.headers.get("content-length")).toBeNull();
+    });
+  });
+
   it("sends no computed content-length for a no-content status", async () => {
     const app: RackApp = async () => [204, {}, []];
 
