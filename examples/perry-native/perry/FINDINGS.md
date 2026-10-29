@@ -698,8 +698,13 @@ under `systemd-run MemoryMax=20G`, peak read from the scope's cgroup
 | 05-model             | ~700    | **MEM** (12GB)   | 8.14 GiB | runs; `[05] Trail function`               |
 | 06b-crud             | 891     | **MEM** @ 61/891 | 8.63 GiB | wall 8 cleared; now `establishConnection` |
 | 06d-adapter-read     | 1133    | never run        | 8.91 GiB | walls 8+10+11 cleared; wall 9 open        |
+| 07-boot              | 1731    | never run        | **MEM**  | OOM @ 12 GiB in whole-program facts       |
+| 08-serve             | 1731    | never run        | **MEM**  | same graph, same OOM; node control 200 OK |
 
-**Nothing fails to compile any more.** Peak is linear at roughly 8 MiB per
+**Nothing fails to compile any more below 06d.** 07 and 08 do fail, and not
+for a reason the per-module curve predicts: see "Wall 14" below — they are the
+first rungs whose graph reaches the CLI, and the CLI reaches vite, rollup and
+playwright. Peak is linear at roughly 8 MiB per
 module, and parallelism is nearly free: 04b costs 2.87 GiB serial and 3.37 GiB
 across 12 module jobs, while taking 703s versus 116s. `PERRY_MODULE_JOBS=1` is
 no longer a lever worth pulling.
@@ -1233,3 +1238,111 @@ bag and the `in` operator does not.
 Both re-verified against `main` @ `20fde48d` immediately before filing, and
 both duplicate-searched first. 12978's reproducer is the 23-line
 `inQueryConnection` case and the warning text is unchanged from 0.5.1520.
+
+## Wall 14: a production server binary contains vite, rollup and playwright
+
+`07-boot` and `08-serve` are the first rungs that fail to compile at all since
+wall 1 was fixed, and the per-module memory curve does not explain them. The
+budget line names the problem:
+
+```
+[perry] codegen: largest module estimate 5.16 GiB
+        (node_modules/.pnpm/playwright-core@1.60.0/.../coreBundle.js);
+        total 570.8 GiB over 1731 modules
+Found 1731 module(s): 1731 native, 0 JavaScript
+COMPILE_RC=137      # OOM-killed at MemoryMax=12G, in whole-program facts
+```
+
+1133 modules at `06d`, 1731 at `07`. The 598 new ones are vite (167 on its
+own, and the graph carries **two** pnpm copies, `@types+node@22` and
+`@types+node@25`), rollup, playwright-core, commander, and the generators.
+None of them run in a production server.
+
+### Why `env=production` does not help
+
+It is the right runtime branch and it is already written. `trailties`
+`commands/server.ts`:
+
+```ts
+if (options.environment !== "development" || !(await hasViteConfig(root))) {
+  const server = await Handler.Node.run(railsApp, { Port: port, Host: host(options) });
+  …
+  return;                     // vite is never constructed
+}
+const server = new DevServer({ … });
+```
+
+Outside development the server is `http.createServer` + `listen` and a rack
+callable, nothing more. `08-serve` is exactly that path and under Node it
+serves a real request in both environments:
+
+```
+[08] env=development port=3178 status=200 len=73
+[08] env=production  port=3178 status=200 len=73
+Processing by HealthController#show as */*
+Completed 200 OK in 8ms (Views: 4.7ms | ActiveRecord: 0.0ms (0 queries, 0 cached))
+```
+
+But a conditional is a runtime construct and the module graph is computed at
+compile time. A binary contains what the graph **reaches**, not what the taken
+branch executes. No `if` can shrink it.
+
+### How vite is reached: the package entry is the CLI
+
+```
+config/application.ts:1   import { Application } from "@blazetrails/trailties"
+trailties package.json    "." → "./dist/cli.js"
+cli.ts:5                  import { serverCommand } from "./commands/server.js"
+commands/server.ts:8      import { DevServer } from "../server/dev-server.js"
+server/dev-server.ts:2    import { createServer } from "vite"
+```
+
+Every trails application reaches the CLI on the first line of its config,
+because that is what the package's main export is. `trails new` writes that
+line. Playwright arrives the same way through
+`actionpack/src/action-dispatch/index.ts` → `system-test-case` → the driver.
+
+### Two fixes that do not work, both measured
+
+**Making the import lazy does nothing.** Moving `DevServer` to
+`const { DevServer } = await import("../server/dev-server.js")` below the
+production `return` left the graph byte-identical: 1731 modules, vite still
+present. `perry-hir/src/dynamic_import.rs` says why by design — it const-folds
+an `import()` path to a finite set of module sources and registers **each as
+an import edge**; a path it cannot fold is a _compile error_, not an exclusion.
+There is no "might never load" in an AOT build. Playwright is the independent
+proof: its import is already correctly dynamic (`driver.ts:30`,
+`await import(PLAYWRIGHT_MODULE)`) and it is still the largest module in the
+graph. Reverted — under Node it buys only import time, and vite is a runtime
+`dependency` of trailties (`^7.0.0`), not a devDependency, so it does not even
+buy deploy-install safety.
+
+**`--define` does not prune the dead branch's edge.** On
+`if (INCLUDE_DEV) { await import("vite") }`:
+
+| build                        | modules | vite in graph |
+| ---------------------------- | ------- | ------------- |
+| `--define INCLUDE_DEV=false` | 167     | yes           |
+| `--define INCLUDE_DEV=true`  | 167     | yes           |
+
+The define substitutes the value; the edge survives regardless. (A first run
+of this experiment appeared to prove the opposite — 1 module with the branch
+off. The `true` control also reported 1 module, which showed vite had simply
+not resolved in that scratch directory and the result was worthless. The
+control is what caught it; without it this file would now claim `--define` is
+the answer.)
+
+### So the fix is structural, in trails
+
+Reachability is the only lever, so the entry must not reach the CLI:
+
+- **Split the `trailties` package entry.** `"."` exports the runtime surface
+  (`Application`, `Trails`); `"./cli"` exports the CLI. No application changes
+  a line — the specifier simply stops meaning "the command-line interface" —
+  and the commands, generators, dev server, vite and rollup leave every app's
+  graph at once.
+- **Same treatment for system testing**, so a production boot does not reach
+  `action-dispatch/index.ts`'s system-test surface and through it playwright.
+
+Both are framework changes and belong in trails, not in an application or a
+Perry flag. Neither is filed yet.
