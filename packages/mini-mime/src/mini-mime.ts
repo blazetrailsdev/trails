@@ -1,4 +1,4 @@
-import { Encoding, File, forceEncoding } from "@blazetrails/ruby-compat";
+import { Encoding, File, IO, forceEncoding, rbModMethodDefined } from "@blazetrails/ruby-compat";
 import { VERSION } from "./version.js";
 
 const __FILE__ = decodeURIComponent(new URL(import.meta.url).pathname);
@@ -68,11 +68,28 @@ export class Cache {
   }
 }
 
+export class PReadFile {
+  private file: File;
+
+  constructor(filename: string) {
+    this.file = File.open(filename, "rb");
+  }
+
+  readline(): string | Uint8Array {
+    return this.file.readline();
+  }
+
+  pread(size: number, offset: number): Uint8Array {
+    this.file.seek(offset, IO.SEEK_SET);
+    return this.file.read(size)!;
+  }
+}
+
 export class RandomAccessDb {
   static readonly MAX_CACHED = 100;
 
   private path: string;
-  private file: File;
+  private file: File | PReadFile;
   private rowLength: number;
   private fileLength: number;
   private rows: number;
@@ -82,7 +99,7 @@ export class RandomAccessDb {
 
   constructor(path: string, sortOrder: number) {
     this.path = path;
-    this.file = Db.PReadFile.open(this.path);
+    this.file = Db.PReadFile === File ? File.open(this.path) : new PReadFile(this.path);
 
     this.rowLength = (this.file.readline() as string).length;
     this.fileLength = File.size(this.path);
@@ -164,7 +181,9 @@ export class Db {
   private static db: Db | null = null;
 
   static Cache = Cache;
-  static PReadFile = File;
+  static PReadFile: typeof File | typeof PReadFile = rbModMethodDefined(File, "pread")
+    ? File
+    : PReadFile;
   static RandomAccessDb = RandomAccessDb;
 
   private extDb: RandomAccessDb;

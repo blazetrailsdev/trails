@@ -29,6 +29,18 @@ describe("IO", () => {
     expect(readFileSync(copy, "utf-8")).toBe("héllo 日本");
   });
 
+  it("seek moves relative to the current position and the end under SEEK_CUR and SEEK_END", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "s.txt");
+    writeFileSync(path, "abcdef");
+    File.open(path, "r", (f) => {
+      f.seek(1);
+      f.seek(2, IO.SEEK_CUR);
+      expect(f.pos).toBe(3);
+      f.seek(-2, IO.SEEK_END);
+      expect(f.pos).toBe(4);
+    });
+  });
+
   it("pread reads at an offset without moving the position, and raises at EOF", () => {
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "t.txt");
     writeFileSync(path, "First line\nSecond line\n");

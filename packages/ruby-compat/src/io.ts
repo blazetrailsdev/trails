@@ -585,6 +585,12 @@ export interface CopyStreamSource {
  * class this file's export lives in.
  */
 export class IO {
+  /** @noRailsEquivalent PERMANENT — Ruby core `IO::SEEK_SET` (`vendor/ruby/v3.3.11/io.c:15506`). */
+  static readonly SEEK_SET = 0;
+  /** @noRailsEquivalent PERMANENT — Ruby core `IO::SEEK_CUR` (`vendor/ruby/v3.3.11/io.c:15508`). */
+  static readonly SEEK_CUR = 1;
+  /** @noRailsEquivalent PERMANENT — Ruby core `IO::SEEK_END` (`vendor/ruby/v3.3.11/io.c:15510`). */
+  static readonly SEEK_END = 2;
   /** @noRailsEquivalent PERMANENT */
   static readonly EAGAINWaitReadable = EAGAINWaitReadable;
   /** @noRailsEquivalent PERMANENT */
@@ -984,14 +990,17 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/v3.3.11/io.c:2495` `rb_io_seek_m` in its one-argument form, where
-   * `whence` is `IO::SEEK_SET` — the absolute offset the next read starts at.
+   * `vendor/ruby/v3.3.11/io.c:2495` `rb_io_seek_m`: `whence` defaults to
+   * `IO::SEEK_SET`, the absolute offset the next read starts at; `SEEK_CUR` is
+   * relative to the current position and `SEEK_END` to the stream's size.
    * It answers `0`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#seek`
    * (`vendor/ruby/v3.3.11/io.c:2495`).
    */
-  seek(amount: number): number {
+  seek(amount: number, whence: number = IO.SEEK_SET): number {
+    if (whence === IO.SEEK_CUR) amount += this._pos;
+    else if (whence === IO.SEEK_END) amount += this.stat().size;
     this._pos = amount;
     return 0;
   }
