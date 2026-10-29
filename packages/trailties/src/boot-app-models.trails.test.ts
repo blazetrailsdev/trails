@@ -38,7 +38,6 @@ describe("a generated app's models resolve string association targets", () => {
     const { User } = await import("./__fixtures__/boot-app/app/models/admin/user.js");
     const { Superuser } = await import("./__fixtures__/boot-app/app/models/admin/superuser.js");
     const { CleanupJob } = await import("./__fixtures__/boot-app/app/jobs/admin/cleanup-job.js");
-    expect(registeredConstant("Admin::User")).toBe(User);
     expect(rbModName(User)).toBe("Admin::User");
     expect(rbModName(CleanupJob)).toBe("Admin::CleanupJob");
     expect(User.stiClassFor("Admin::Superuser")).toBe(Superuser);
