@@ -50,10 +50,10 @@ export class StreamEventLoop {
     const monitor = this._map.get(io)!;
     void (async () => {
       while (!this._stopping && this._map.get(io) === monitor) {
-        const stream = monitor.value;
         try {
           await io.waitReadable();
           if (this._map.get(io) !== monitor) break;
+          const stream = monitor.value;
 
           const incoming = io.readNonblock(4096, null, { exception: false });
           if (incoming === "wait_readable") {
@@ -65,7 +65,7 @@ export class StreamEventLoop {
           }
         } catch {
           try {
-            stream.close();
+            monitor.value.close();
           } catch {
             this._map.delete(io);
           }
@@ -81,28 +81,30 @@ export class StreamEventLoop {
 
   writesPending(io: Io): void {
     const monitor = this._map.get(io);
-    if (monitor == null || monitor.interests === "rw") return;
-    monitor.interests = "rw";
-    const stream = monitor.value;
-    void (async () => {
-      try {
-        while (!this._stopping && this._map.get(io) === monitor) {
-          await io.waitWritable();
-          if (this._map.get(io) !== monitor) break;
+    if (monitor != null) {
+      const selectingWritable = monitor.interests === "rw";
+      monitor.interests = "rw";
+      if (selectingWritable) return;
+      void (async () => {
+        while (!this._stopping && this._map.get(io) === monitor && monitor.interests === "rw") {
+          try {
+            await io.waitWritable();
+            if (this._map.get(io) !== monitor) break;
+            const stream = monitor.value;
 
-          if (stream.flushWriteBuffer()) {
-            monitor.interests = "r";
-            break;
+            if (stream.flushWriteBuffer()) {
+              monitor.interests = "r";
+            }
+          } catch {
+            try {
+              monitor.value.close();
+            } catch {
+              this._map.delete(io);
+            }
           }
         }
-      } catch {
-        try {
-          stream.close();
-        } catch {
-          this._map.delete(io);
-        }
-      }
-    })();
+      })();
+    }
   }
 
   /** @missingRailsCall wakeup — PERMANENT */
