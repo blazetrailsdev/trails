@@ -11,6 +11,9 @@
       "path": "../ruby-compat"
     },
     {
+      "path": "../mini-magick"
+    },
+    {
       "path": "../vitest-matchers"
     }
   ]
