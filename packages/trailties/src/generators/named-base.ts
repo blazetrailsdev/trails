@@ -51,6 +51,10 @@ export class NamedBase extends GeneratorBase {
     );
   }
 
+  async jsTemplate(source: string, destination: string): Promise<string> {
+    return this.template(source + ".js", destination + ".js");
+  }
+
   /** @internal */
   protected async insideTemplate<T>(block: () => Promise<T>): Promise<T> {
     this._insideTemplate = true;

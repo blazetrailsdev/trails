@@ -2,7 +2,8 @@ import { File } from "@blazetrails/ruby-compat";
 import type * as ThorActions from "@blazetrails/thor/actions";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
-import { TEMPLATES } from "./templates.js";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
 export interface ChannelGeneratorOptions extends GeneratorOptions {
   assets?: boolean;
@@ -12,9 +13,11 @@ export class ChannelGenerator extends NamedBase {
   declare options: ChannelGeneratorOptions;
   declare actions: string[];
   declare run: OmitThisParameter<typeof ThorActions.run>;
+  declare copyFile: OmitThisParameter<typeof ThorActions.Actions.copyFile>;
   declare gsubFile: OmitThisParameter<typeof ThorActions.Actions.gsubFile>;
 
   static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("actions", { type: "array", default: [], banner: "method method" });
     this.classOption("assets", { type: "boolean" });
     this.checkClassCollision({ suffix: "Channel" });
@@ -56,64 +59,49 @@ export class ChannelGenerator extends NamedBase {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall copy_file — CONVERGEABLE converge-generators-onto-thor-template
-   */
+  /** @internal */
   private async createSharedChannelFiles(): Promise<void> {
     if (this.behavior !== "invoke") return;
 
-    await this.createFile(
+    await this.copyFile(
+      File.join(__dir__, "templates/application_cable/channel.ts"),
       `app/channels/application-cable/channel${this.ext()}`,
-      TEMPLATES["application_cable/channel.rb"](),
     );
-    await this.createFile(
+    await this.copyFile(
+      File.join(__dir__, "templates/application_cable/connection.ts"),
       `app/channels/application-cable/connection${this.ext()}`,
-      TEMPLATES["application_cable/connection.rb"](),
     );
   }
 
   /**
    * @internal
-   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
+   * @missingRailsCall module_namespacing — CONVERGEABLE scaffold-controller-hooks-test-framework-and-engine-arms
    */
   private async createChannelFile(): Promise<void> {
-    await this.createFile(
+    await this.template(
+      "channel.ts",
       File.join(
         "app/channels",
         ...this.classPathParts,
         `${dasherize(this.fileName)}-channel${this.ext()}`,
       ),
-      TEMPLATES["channel.rb"].call(this, this.ext()),
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
-   */
+  /** @internal */
   private async createSharedChannelJavascriptFiles(): Promise<void> {
-    await this.createFile("app/javascript/channels/index.js", TEMPLATES["javascript/index.js"]());
-    await this.createFile(
-      "app/javascript/channels/consumer.js",
-      TEMPLATES["javascript/consumer.js"](),
-    );
+    await this.template("javascript/index.js", "app/javascript/channels/index.js");
+    await this.template("javascript/consumer.js", "app/javascript/channels/consumer.js");
   }
 
-  /**
-   * @internal
-   * @missingRailsCall js_template — CONVERGEABLE converge-generators-onto-thor-template
-   */
+  /** @internal */
   private async createChannelJavascriptFile(): Promise<void> {
     const channelJsPath = File.join(
       "app/javascript/channels",
       ...this.classPathParts,
       `${dasherize(this.fileName)}-channel`,
     );
-    await this.createFile(
-      `${channelJsPath}.js`,
-      TEMPLATES["javascript/channel.js"].call(this, ".js"),
-    );
+    await this.jsTemplate("javascript/channel", channelJsPath);
     if (!(await this.isUsingJsRuntime()))
       await this.gsubFile(`${channelJsPath}.js`, /\.\/consumer/, "channels/consumer");
   }
