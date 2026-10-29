@@ -50,10 +50,11 @@ export class StreamEventLoop {
     const monitor = this._map.get(io)!;
     void (async () => {
       while (!this._stopping && this._map.get(io) === monitor) {
+        let stream: Stream | null = null;
         try {
           await io.waitReadable();
           if (this._map.get(io) !== monitor) break;
-          const stream = monitor.value;
+          stream = monitor.value;
 
           const incoming = io.readNonblock(4096, null, { exception: false });
           if (incoming === "wait_readable") {
@@ -65,7 +66,7 @@ export class StreamEventLoop {
           }
         } catch {
           try {
-            monitor.value.close();
+            (stream ?? monitor.value).close();
           } catch {
             this._map.delete(io);
           }
@@ -79,6 +80,7 @@ export class StreamEventLoop {
     io.close();
   }
 
+  /** @inventedArm if — PERMANENT */
   writesPending(io: Io): void {
     const monitor = this._map.get(io);
     if (monitor != null) {
@@ -87,17 +89,18 @@ export class StreamEventLoop {
       if (selectingWritable) return;
       void (async () => {
         while (!this._stopping && this._map.get(io) === monitor && monitor.interests === "rw") {
+          let stream: Stream | null = null;
           try {
             await io.waitWritable();
             if (this._map.get(io) !== monitor) break;
-            const stream = monitor.value;
+            stream = monitor.value;
 
             if (stream.flushWriteBuffer()) {
               monitor.interests = "r";
             }
           } catch {
             try {
-              monitor.value.close();
+              (stream ?? monitor.value).close();
             } catch {
               this._map.delete(io);
             }
