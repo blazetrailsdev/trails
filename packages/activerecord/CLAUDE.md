@@ -549,7 +549,7 @@ of reads that happen **at module-eval time**. A read inside a function or
 method body is a plain ES import, correct even inside a cycle, so it is not
 listed here and does not need a namespace — see root CLAUDE.md
 § "Call-time constant resolution". `rbModConstSet` appears only where the Rails
-body calls `const_set`, and a class's qualified Ruby path is a ruby-compat internal, read only to print it (root CLAUDE.md
+body calls `const_set`, and a class's qualified Ruby path is a ruby-compat internal, read only to produce a name (root CLAUDE.md
 § "Constant lookup is an import or a registry"), not the seat.
 
 The seated constants:

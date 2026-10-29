@@ -31,5 +31,5 @@ namespace's declared property. The generated node classes in `nodes/binary.ts`,
 builds them with `const_set name, Class.new(Binary)`
 (`activerecord/lib/arel/nodes/binary.rb:122`, `unary.rb:41`, `function.rb:42`)
 — a computed name with no declaration to assign at. A class's qualified Ruby
-path is a ruby-compat internal, read only to print it (root CLAUDE.md
+path is a ruby-compat internal, read only to produce a name (root CLAUDE.md
 § "Constant lookup is an import or a registry"), not the seat.
