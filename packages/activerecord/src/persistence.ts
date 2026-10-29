@@ -14,7 +14,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
-import type { IndexedRow } from "./result.js";
+import { IndexedRow } from "./result.js";
 import {
   ArgumentError,
   AttributeMethods,
@@ -977,7 +977,7 @@ export function instantiateInstanceOf(
 ): any {
   // eslint-disable-next-line blazetrails/ruby-compat-native-required -- attributes may be a Hash
   const names = keys(attributes as Record<string, unknown>);
-  const shape = (attributes as unknown as { columnIndexes?: object }).columnIndexes;
+  const shape = attributes instanceof IndexedRow ? attributes["columnIndexes"] : undefined;
   attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
   const record = klass.allocate();
   if (shape === undefined || _respondingShapes.get(shape) !== klass) {

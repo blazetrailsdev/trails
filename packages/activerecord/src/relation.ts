@@ -251,7 +251,7 @@ const ENUMERABLE_DELEGATES = {
 };
 
 /** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
-const _PROXY_TARGET = Symbol("relationProxyTarget");
+const _PROXY_TARGET: unique symbol = Symbol("relationProxyTarget");
 
 /** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
 const _accessorsByPrototype = new WeakMap<object, Set<string | symbol>>();
@@ -326,6 +326,7 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base, G extends boolean = false> {
+  declare [_PROXY_TARGET]?: Relation<T, G>;
   static create = _delegationCreate;
 
   static readonly MULTI_VALUE_METHODS = [
@@ -1694,7 +1695,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   /** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
   clone(): Relation<T, G> {
-    const source = (this as any)[_PROXY_TARGET] ?? this;
+    const source = this[_PROXY_TARGET] ?? this;
     if (Object.isFrozen(source) || Object.getOwnPropertySymbols(source).length > 0) {
       return rbObjClone(this);
     }
@@ -1717,7 +1718,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     const clone = isModuleIncluded(this.constructor, ClassSpecificRelation)
       ? new Proxy(copy, CLASS_SPECIFIC_RELATION_HANDLER)
       : copy;
-    clone.initializeCopy(this);
+    const initializeClone = copy.initializeClone ?? copy.initializeCopy;
+    initializeClone.call(clone, this);
     return clone;
   }
 
