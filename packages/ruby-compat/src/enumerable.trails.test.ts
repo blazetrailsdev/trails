@@ -512,6 +512,11 @@ describe("rb_enum_values_pack over a multi-value each", () => {
     const h = new Hash<string, number>().set("a", 1);
     expect(map(h, (k: string, v: number) => `${k}${v}`)).toEqual(["a1"]);
   });
+
+  it("findAll splats a yielded pair across a two-parameter block", () => {
+    const h = new Hash<string, number>().set("a", 1).set("b", 2);
+    expect(findAll(h, (_k: string, v: number) => v > 1)).toEqual([["b", 2]]);
+  });
 });
 
 describe("Enumerable free functions over any receiver", () => {
