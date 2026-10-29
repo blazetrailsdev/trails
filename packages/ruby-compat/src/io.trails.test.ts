@@ -41,6 +41,16 @@ describe("IO", () => {
     });
   });
 
+  it("readline stops at the given separator", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "r.txt");
+    writeFileSync(path, "a;b\nc");
+    File.open(path, "r", (f) => {
+      expect(f.readline(";")).toBe("a;");
+      expect(f.readline("\n")).toBe("b\n");
+      expect(f.readline()).toBe("c");
+    });
+  });
+
   it("pread reads at an offset without moving the position, and raises at EOF", () => {
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "t.txt");
     writeFileSync(path, "First line\nSecond line\n");
@@ -49,6 +59,9 @@ describe("IO", () => {
       expect(f.gets()).toBe("First line\n");
       expect(() => f.pread(4, 100)).toThrow("end of file reached");
     });
+    const closed = File.open(path, "r");
+    closed.close();
+    expect(() => closed.pread(4, 0)).toThrow("closed stream");
   });
 
   it("readlines answers every line, each keeping its separator", () => {

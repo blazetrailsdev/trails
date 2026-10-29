@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { File } from "@blazetrails/ruby-compat";
+import { File, rbObjIvarSet } from "@blazetrails/ruby-compat";
 import { MiniMime } from "../mini-mime.js";
 
 const __FILE__ = decodeURIComponent(new URL(import.meta.url).pathname);
@@ -17,13 +17,13 @@ describe("MiniMime::ConfigurationTest", () => {
   let oldContentTypeDbPath: string;
 
   beforeEach(() => {
-    Reflect.set(MiniMime.Db, "db", null);
+    rbObjIvarSet(MiniMime.Db, "@db", null);
     oldExtDbPath = MiniMime.Configuration.extDbPath;
     oldContentTypeDbPath = MiniMime.Configuration.contentTypeDbPath;
   });
 
   afterEach(() => {
-    Reflect.set(MiniMime.Db, "db", null);
+    rbObjIvarSet(MiniMime.Db, "@db", null);
     MiniMime.Configuration.extDbPath = oldExtDbPath;
     MiniMime.Configuration.contentTypeDbPath = oldContentTypeDbPath;
   });

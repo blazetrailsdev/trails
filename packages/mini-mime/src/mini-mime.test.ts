@@ -3,7 +3,7 @@ import { MiniMime } from "./mini-mime.js";
 
 describe("MiniMimeTest", () => {
   it("that it has a version number", () => {
-    expect(MiniMime.VERSION).not.toBeNull();
+    expect(MiniMime.VERSION).toBeDefined();
   });
 
   it("extension", () => {

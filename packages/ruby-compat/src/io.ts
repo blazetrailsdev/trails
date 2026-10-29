@@ -1124,6 +1124,7 @@ export class IO {
   pread(maxlen: number, offset: number): Uint8Array {
     const str = new Uint8Array(maxlen);
     if (maxlen === 0) return str;
+    if (this.fd < 0) throw new IOError("closed stream");
     const n = getFs().readSync(this.fd, str, 0, maxlen, offset);
     if (n === 0) throw new EOFError("end of file reached");
     return str.slice(0, n);
@@ -1173,19 +1174,24 @@ export class IO {
   }
 
   /**
-   * `rb_io_gets_m` (`vendor/ruby/v3.3.11/io.c:4363`) with the default separator:
-   * the bytes up to and including the next `"\n"`, or the rest of the stream,
+   * `rb_io_gets_m` (`vendor/ruby/v3.3.11/io.c:4363`): the bytes up to and
+   * including the next `sep` (`$/`, `"\n"`, by default), or the rest of the stream,
    * in the external encoding as {@link readAll} answers it; `nil` at EOF.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#gets`
    * (`vendor/ruby/v3.3.11/io.c:4363`).
    */
-  gets(): string | Uint8Array | null {
+  gets(sep = "\n"): string | Uint8Array | null {
+    const rsptr = new TextEncoder().encode(sep);
     const bytes: number[] = [];
     let b: number | null;
     while ((b = this.getbyte()) !== null) {
       bytes.push(b);
-      if (b === 0x0a) break;
+      if (
+        bytes.length >= rsptr.length &&
+        rsptr.every((c, i) => bytes[bytes.length - rsptr.length + i] === c)
+      )
+        break;
     }
     if (bytes.length === 0) return null;
     const str = Uint8Array.from(bytes);
@@ -1194,15 +1200,15 @@ export class IO {
   }
 
   /**
-   * `IO#readline` (`vendor/ruby/v3.3.11/io.rb:133`) with the default separator:
+   * `IO#readline` (`vendor/ruby/v3.3.11/io.rb:133`):
    * `io_readline` (`vendor/ruby/v3.3.11/io.c:4414`) is {@link gets} that raises
    * `EOFError` through `rb_eof_error` where `gets` answers `nil`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#readline`
    * (`vendor/ruby/v3.3.11/io.rb:133`).
    */
-  readline(): string | Uint8Array {
-    const line = this.gets();
+  readline(sep = "\n"): string | Uint8Array {
+    const line = this.gets(sep);
     if (line === null) throw new EOFError("end of file reached");
     return line;
   }
