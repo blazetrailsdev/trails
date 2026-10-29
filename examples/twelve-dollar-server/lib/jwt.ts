@@ -1,25 +1,33 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { toI } from "@blazetrails/ruby-compat";
+import { ArgumentError, Base64, toI } from "@blazetrails/ruby-compat";
 
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 
 class DecodeError extends Error {}
 class ExpiredSignature extends DecodeError {}
 class ImmatureSignature extends DecodeError {}
+class Base64DecodeError extends DecodeError {}
 
 function isHash(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function decodeSegment(segment: string): unknown {
-  if (!/^[A-Za-z0-9_-]*$/.test(segment)) throw new DecodeError("Invalid segment encoding");
-  let json: unknown;
+function urlDecode(str: string): Buffer {
   try {
-    json = JSON.parse(UTF8.decode(Buffer.from(segment, "base64url")));
+    return Buffer.from(Base64.urlsafeDecode64(str), "latin1");
+  } catch (e) {
+    if (!(e instanceof ArgumentError) || e.message !== "invalid base64") throw e;
+    throw new Base64DecodeError("Invalid base64 encoding");
+  }
+}
+
+function decodeSegment(segment: string): unknown {
+  const raw = urlDecode(segment);
+  try {
+    return JSON.parse(UTF8.decode(raw));
   } catch {
     throw new DecodeError("Invalid segment encoding");
   }
-  return json;
 }
 
 function decode(
@@ -38,7 +46,7 @@ function decode(
     const expected = createHmac("sha256", key)
       .update(`${headerSegment}.${payloadSegment}`)
       .digest();
-    const signature = Buffer.from(signatureSegment, "base64url");
+    const signature = urlDecode(signatureSegment);
     if (signature.length !== expected.length || !timingSafeEqual(signature, expected)) {
       throw new DecodeError("Signature verification failed");
     }
@@ -56,4 +64,4 @@ function decode(
   return [payload, header];
 }
 
-export const JWT = { DecodeError, ExpiredSignature, ImmatureSignature, decode };
+export const JWT = { DecodeError, ExpiredSignature, ImmatureSignature, Base64DecodeError, decode };
