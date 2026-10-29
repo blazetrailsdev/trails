@@ -1,45 +1,26 @@
-import type { Basic } from "@blazetrails/thor/shell/basic";
 import { CreateFile } from "@blazetrails/thor/actions/create-file";
 import type { EmptyDirectoryBase } from "@blazetrails/thor/actions/empty-directory";
 import { File, FileUtils, getFs, merge, rbEqual, rtest } from "@blazetrails/ruby-compat";
 import { migrationExists } from "../migration-lookup.js";
 import { GeneratorError } from "../generated-attribute.js";
 
-export interface CreateMigrationHost {
+export interface CreateMigrationHost extends EmptyDirectoryBase {
   behavior?: "invoke" | "revoke";
-  shell: Basic;
-  options: { force?: boolean; skip?: boolean; pretend?: boolean };
-  destinationRoot: string;
   migrationFileName: string;
-  relativeToOriginalDestinationRoot(p: string): string;
 }
 
-export interface CreateMigrationConfig {
+export type CreateMigrationConfig = {
   verbose?: boolean;
   force?: boolean;
   skip?: boolean;
-}
+};
 
 export type MigrationRenderer = string | (() => string | Promise<string>);
 
 export class CreateMigration extends CreateFile {
-  declare base: EmptyDirectoryBase & CreateMigrationHost;
+  declare base: CreateMigrationHost;
   /** @internal */
   private _existingMigration?: string | false;
-
-  constructor(
-    base: CreateMigrationHost,
-    destination: string,
-    data: MigrationRenderer,
-    config: CreateMigrationConfig = {},
-  ) {
-    super(
-      base as EmptyDirectoryBase & CreateMigrationHost,
-      destination,
-      data,
-      config as Record<string, unknown>,
-    );
-  }
 
   get migrationDir(): string {
     return File.dirname(this.destination);
@@ -56,23 +37,23 @@ export class CreateMigration extends CreateFile {
     );
   }
 
-  override async invokeBang(): Promise<unknown> {
-    if (rtest(this.isPretend())) return super.invokeBang();
+  override async invokeBang(): Promise<string | undefined> {
+    if (rtest(this.isPretend())) return (await super.invokeBang()) as string;
 
-    const invokedFile = await super.invokeBang();
+    const invokedFile = (await super.invokeBang()) as string;
     return (await getFs().exists(this.destination))
       ? invokedFile
       : this.relativeExistingMigration();
   }
 
-  override async revokeBang(): Promise<unknown> {
+  override async revokeBang(): Promise<string | undefined> {
     const sayDestination = (await this.isExists())
       ? this.relativeExistingMigration()
       : this.relativeDestination;
     this.sayStatus("remove", ":red", sayDestination);
     if (!(await this.isExists())) return undefined;
     if (!rtest(this.isPretend())) await FileUtils.rmRfAsync(this.existingMigration() as string);
-    return this.existingMigration();
+    return this.existingMigration() as string;
   }
 
   relativeExistingMigration(): string {
@@ -91,6 +72,7 @@ export class CreateMigration extends CreateFile {
 
   /** @internal */
   protected override async onConflictBehavior(block: () => unknown): Promise<void> {
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- base.options is a HashWithIndifferentAccess, which merge dispatches on
     const options = merge(this.base.options, this.config);
     if (await this.isIdentical()) {
       this.sayStatus("identical", ":blue", this.relativeExistingMigration());

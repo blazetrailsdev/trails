@@ -15,6 +15,7 @@ import {
 export interface MigrationGeneratorOptions extends GeneratorOptions {
   timestamps?: boolean;
   primaryKeyType?: string;
+  [key: string]: unknown;
 }
 
 function indexNameLiteral(attribute: GeneratedAttribute): string {
