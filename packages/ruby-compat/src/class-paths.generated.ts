@@ -1,4 +1,4 @@
-import { registerClassPaths } from "./classpath.js";
+import { classpaths } from "./classpath.js";
 import * as m0 from "./argument-error.js";
 import * as m1 from "./encoding-error.js";
 import * as m2 from "./eof-error.js";
@@ -27,37 +27,35 @@ import * as m24 from "./struct.js";
 import * as m25 from "./thread-error.js";
 import * as m26 from "./type-error.js";
 
-registerClassPaths([
-  [() => m0.ArgumentError, "ArgumentError"],
-  [() => Array, "Array"],
-  [() => m2.EOFError, "EOFError"],
-  [() => m1.EncodingError, "EncodingError"],
-  [() => m4.Exception, "Exception"],
-  [() => m5.FiberError, "FiberError"],
-  [() => m6.FloatDomainError, "FloatDomainError"],
-  [() => m7.FrozenError, "FrozenError"],
-  [() => m8.Hash, "Hash"],
-  [() => m10.IOError, "IOError"],
-  [() => m9.IndexError, "IndexError"],
-  [() => m21.Interrupt, "Interrupt"],
-  [() => m11.KeyError, "KeyError"],
-  [() => m12.LoadError, "LoadError"],
-  [() => m13.LocalJumpError, "LocalJumpError"],
-  [() => m14.NameError, "NameError"],
-  [() => m15.NoMethodError, "NoMethodError"],
-  [() => m16.NotImplementedError, "NotImplementedError"],
-  [() => Object, "Object"],
-  [() => m18.Range, "Range"],
-  [() => m17.RangeError, "RangeError"],
-  [() => m19.Rational, "Rational"],
-  [() => RegExp, "Regexp"],
-  [() => m20.RuntimeError, "RuntimeError"],
-  [() => m21.SignalException, "SignalException"],
-  [() => m22.StandardError, "StandardError"],
-  [() => m23.StopIteration, "StopIteration"],
-  [() => m24.Struct, "Struct"],
-  [() => m3.SystemCallError, "SystemCallError"],
-  [() => m25.ThreadError, "ThreadError"],
-  [() => m26.TypeError, "TypeError"],
-  [() => m19.ZeroDivisionError, "ZeroDivisionError"],
-]);
+classpaths.set(m0.ArgumentError, { path: "ArgumentError", permanent: true });
+classpaths.set(Array, { path: "Array", permanent: true });
+classpaths.set(m2.EOFError, { path: "EOFError", permanent: true });
+classpaths.set(m1.EncodingError, { path: "EncodingError", permanent: true });
+classpaths.set(m4.Exception, { path: "Exception", permanent: true });
+classpaths.set(m5.FiberError, { path: "FiberError", permanent: true });
+classpaths.set(m6.FloatDomainError, { path: "FloatDomainError", permanent: true });
+classpaths.set(m7.FrozenError, { path: "FrozenError", permanent: true });
+classpaths.set(m8.Hash, { path: "Hash", permanent: true });
+classpaths.set(m10.IOError, { path: "IOError", permanent: true });
+classpaths.set(m9.IndexError, { path: "IndexError", permanent: true });
+classpaths.set(m21.Interrupt, { path: "Interrupt", permanent: true });
+classpaths.set(m11.KeyError, { path: "KeyError", permanent: true });
+classpaths.set(m12.LoadError, { path: "LoadError", permanent: true });
+classpaths.set(m13.LocalJumpError, { path: "LocalJumpError", permanent: true });
+classpaths.set(m14.NameError, { path: "NameError", permanent: true });
+classpaths.set(m15.NoMethodError, { path: "NoMethodError", permanent: true });
+classpaths.set(m16.NotImplementedError, { path: "NotImplementedError", permanent: true });
+classpaths.set(Object, { path: "Object", permanent: true });
+classpaths.set(m18.Range, { path: "Range", permanent: true });
+classpaths.set(m17.RangeError, { path: "RangeError", permanent: true });
+classpaths.set(m19.Rational, { path: "Rational", permanent: true });
+classpaths.set(RegExp, { path: "Regexp", permanent: true });
+classpaths.set(m20.RuntimeError, { path: "RuntimeError", permanent: true });
+classpaths.set(m21.SignalException, { path: "SignalException", permanent: true });
+classpaths.set(m22.StandardError, { path: "StandardError", permanent: true });
+classpaths.set(m23.StopIteration, { path: "StopIteration", permanent: true });
+classpaths.set(m24.Struct, { path: "Struct", permanent: true });
+classpaths.set(m3.SystemCallError, { path: "SystemCallError", permanent: true });
+classpaths.set(m25.ThreadError, { path: "ThreadError", permanent: true });
+classpaths.set(m26.TypeError, { path: "TypeError", permanent: true });
+classpaths.set(m19.ZeroDivisionError, { path: "ZeroDivisionError", permanent: true });

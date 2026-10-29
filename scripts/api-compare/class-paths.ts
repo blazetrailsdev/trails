@@ -374,17 +374,15 @@ export function renderCoreClassPaths(): string {
   const files = [...new Set(CORE_CLASSES.flatMap(([, file]) => (file ? [file] : [])))].sort();
   const alias = new Map(files.map((file, i) => [file, `m${i}`]));
   return [
-    'import { registerClassPaths } from "./classpath.js";',
+    'import { classpaths } from "./classpath.js";',
     ...files.map(
       (file) => `import * as ${alias.get(file)} from "./${file.replace(/\.ts$/, ".js")}";`,
     ),
     "",
-    "registerClassPaths([",
     ...CORE_CLASSES.map(
       ([fqn, file, binding]) =>
-        `  [() => ${file ? `${alias.get(file)}.` : ""}${binding}, ${JSON.stringify(fqn)}],`,
+        `classpaths.set(${file ? `${alias.get(file)}.` : ""}${binding}, { path: ${JSON.stringify(fqn)}, permanent: true });`,
     ),
-    "]);",
     "",
   ].join("\n");
 }
