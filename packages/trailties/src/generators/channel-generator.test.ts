@@ -1,16 +1,16 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
-import { Application } from "../../../application.js";
-import { Trails } from "../../../rails.js";
-import "../../../test-unit/trailtie.js";
+import { Application } from "../application.js";
+import { Trails } from "../rails.js";
+import "../test-unit/trailtie.js";
 
 class ChannelGeneratorApp extends Application {}
-let ChannelGenerator: typeof import("./channel-generator.js").ChannelGenerator;
+let ChannelGenerator: typeof import("./rails/channel/channel-generator.js").ChannelGenerator;
 let destinationRoot: string;
 
 beforeAll(async () => {
   await ChannelGeneratorApp.instance().loadGenerators();
-  ({ ChannelGenerator } = await import("./channel-generator.js"));
+  ({ ChannelGenerator } = await import("./rails/channel/channel-generator.js"));
 });
 
 beforeEach(() => {

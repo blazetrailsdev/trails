@@ -1,6 +1,26 @@
 # @blazetrails/actioncable
 
-The server half of Action Cable, ported from the `actioncable` gem.
+The server half of Action Cable, ported from the `actioncable` gem: every file under
+`actioncable/lib/action_cable` except `engine.rb` has a counterpart under `src/`
+at the Rails path.
+
+- `channel/`: `Channel::Base` with its callbacks, naming, broadcasting,
+  periodic timers and streams, and `Channel::TestCase`.
+- `connection/`: `Connection::Base`, identification, authorization, callbacks,
+  the internal channel, subscriptions, the message buffer, the tagged logger
+  proxy, `Connection::TestCase`, and the socket layer (`Stream`,
+  `StreamEventLoop`, `ClientSocket`, `WebSocket`). Node's event loop stands in
+  for the nio4r selector (root `CLAUDE.md`, "Node's event loop stands in for
+  Action Cable's nio4r selector").
+- `server/`: `Server::Base`, broadcasting, configuration, connections and the
+  worker.
+- `subscription-adapter/`: the async, inline, test, PostgreSQL and Redis
+  adapters over `Base`, `SubscriberMap` and `ChannelPrefix`.
+- `RemoteConnections`, `Helpers::ActionCableHelper`, `TestHelper` and
+  `TestCase`.
+
+The engine (`config.action_cable`, the `/cable` mount) and the channel
+generator live in `@blazetrails/trailties`.
 
 ## Browser client
 

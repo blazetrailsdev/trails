@@ -52,6 +52,7 @@ export class Broadcaster {
     this.coder = coder;
   }
 
+  /** @missingRailsArgs truncate — PERMANENT */
   broadcast(message: unknown): Promise<unknown> {
     this.server.logger.debug(
       undefined,
