@@ -1,4 +1,11 @@
-import { Encoding, isAsciiOnly, pack, rbObjEncoding, unpack } from "@blazetrails/ruby-compat";
+import {
+  Encoding,
+  isAsciiOnly,
+  isValidEncoding,
+  pack,
+  rbObjEncoding,
+  unpack,
+} from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -31,12 +38,15 @@ export const Utilities = {
   isSafeForLineEndingConversion(string: string | Uint8Array): boolean {
     if (rbObjEncoding(string) === Encoding.BINARY) {
       return isAsciiOnly(string);
+    } else if (typeof string === "string") {
+      return !/\p{Cs}/u.test(string);
     } else {
-      return typeof string !== "string" || !/\p{Cs}/u.test(string);
+      return isValidEncoding(String.fromCharCode(...string), rbObjEncoding(string));
     }
   },
 
   toLf<T extends string | Uint8Array>(string: T): T {
+    string = (string instanceof Uint8Array ? string : String(string)) as T;
     if (Utilities.isSafeForLineEndingConversion(string)) {
       return Utilities.binaryUnsafeToLf(string);
     } else {
@@ -45,6 +55,7 @@ export const Utilities = {
   },
 
   toCrlf<T extends string | Uint8Array>(string: T): T {
+    string = (string instanceof Uint8Array ? string : String(string)) as T;
     if (Utilities.isSafeForLineEndingConversion(string)) {
       return Utilities.binaryUnsafeToCrlf(string);
     } else {

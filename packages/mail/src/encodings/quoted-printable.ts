@@ -10,7 +10,7 @@ export class QuotedPrintable extends SevenBit {
 
   static override readonly PRIORITY: number = 2;
 
-  static override canEncode(enc: typeof TransferEncoding | null): boolean {
+  static override canEncode(enc: typeof TransferEncoding | null): boolean | null {
     return EightBit.canEncode(enc);
   }
 

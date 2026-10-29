@@ -5,11 +5,18 @@ export class TransferEncoding {
   static readonly NAME: string = "";
   static readonly PRIORITY: number = -1;
 
-  static canTransport(enc: typeof TransferEncoding | null): boolean {
-    return enc != null && (enc === this || enc.prototype instanceof this);
+  static canTransport(enc: typeof TransferEncoding | null): boolean | null {
+    return (
+      enc &&
+      (enc === this || enc.prototype instanceof this
+        ? true
+        : this.prototype instanceof enc
+          ? false
+          : null)
+    );
   }
 
-  static canEncode(enc: typeof TransferEncoding | null): boolean {
+  static canEncode(enc: typeof TransferEncoding | null): boolean | null {
     return this.canTransport(enc);
   }
 
