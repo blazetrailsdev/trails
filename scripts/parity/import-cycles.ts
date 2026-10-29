@@ -144,7 +144,6 @@ function isModuleEvalTime(node: ts.Node): boolean {
       ts.isGetAccessorDeclaration(p) ||
       ts.isSetAccessorDeclaration(p)
     ) {
-      // A computed member name and a decorator run at definition time.
       if ("name" in p && p.name === n) continue;
       if (ts.isDecorator(n)) continue;
       return false;
@@ -298,7 +297,6 @@ export async function measureEdges(root = ROOT_DIR): Promise<Record<string, Edge
     const edges: Edge[] = [];
     for (const [from, s] of scans) {
       for (const e of s.edges) {
-        // A self-import's namespace object exists before the body runs.
         if (e.evalNames.size === 0 || e.to === from) continue;
         if (comp.get(from) === undefined || comp.get(from) !== comp.get(e.to)) continue;
         edges.push({
