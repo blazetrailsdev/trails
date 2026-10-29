@@ -23,7 +23,7 @@ describe("Thor spec helper", () => {
     expect(env["THOR_COLUMNS"]).toBe("10000");
     expect([rbProgname(), rbGvGet("$thor_runner"), rbArgv()]).toEqual(["thor", true, []]);
     expect(Base.shell).toBe(Basic);
-    expect(File.isExist(File.join(sourceRoot(), "doc", "%file_name%.rb.tt"))).toBe(true);
+    expect(File.isExist(File.join(sourceRoot(), "doc", "%fileName%.rb.tt"))).toBe(true);
     expect(File.basename(destinationRoot())).toBe("sandbox");
   });
 

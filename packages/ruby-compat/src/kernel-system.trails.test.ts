@@ -89,7 +89,27 @@ describe("Kernel#system", () => {
   });
 });
 
+describe("Kernel#system command line", () => {
+  it("is nil for a metacharacter-free command line that cannot be exec'd", async () => {
+    expect(await rbFSystem("trails-nonexistent-command")).toBeNull();
+  });
+
+  it("runs a command line with a metacharacter through /bin/sh -c", async () => {
+    expect(await rbFSystem("trails-nonexistent-command 2>/dev/null")).toBe(false);
+  });
+});
+
 describe("Open3.capture2e", () => {
+  it("raises Errno::ENOENT for a metacharacter-free command line that cannot be exec'd", async () => {
+    await expect(Open3.capture2e("trails-nonexistent-command")).rejects.toThrow(Errno.ENOENT);
+  });
+
+  it("execs a metacharacter-free command line with its space-split argv", async () => {
+    const [output, status] = await Open3.capture2e("printf  %s-%s\tx y");
+    expect(output).toBe("x-y");
+    expect(status.isSuccess()).toBe(true);
+  });
+
   it("answers stdout and stderr merged, and a Process::Status", async () => {
     const [output, status] = await Open3.capture2e("echo out; echo err 1>&2; echo again");
     expect(output).toBe("out\nerr\nagain\n");

@@ -1,0 +1,9 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/generator/generator-generator.ts",
+    "rubyName": "create_generator_files",
+    "call": "directory",
+    "reason": "Writes the generator files inline: no Thor source paths or templates yet (generators-have-no-thor-source-paths-or-template-files)."
+  }
+]

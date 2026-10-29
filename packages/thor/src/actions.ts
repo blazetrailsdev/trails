@@ -5,7 +5,6 @@ import {
   fetch,
   File,
   FileUtils,
-  getFs,
   getPath,
   Hash,
   hashDelete,
@@ -26,6 +25,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { addFile, createFile } from "./actions/create-file.js";
 import { addLink, createLink } from "./actions/create-link.js";
+import { directory } from "./actions/directory.js";
 import { emptyDirectory } from "./actions/empty-directory.js";
 import {
   appendFile,
@@ -206,7 +206,7 @@ export async function findInSourcePaths(
   for (const source of await this.sourcePaths()) {
     for (const f of possibleFiles) {
       const sourceFile = File.expandPath(f, File.join(source, relativeRoot));
-      if (await getFs().exists(sourceFile)) return sourceFile;
+      if (await File.isExistAsync(sourceFile)) return sourceFile;
     }
   }
 
@@ -238,7 +238,7 @@ export async function inside<T>(
   if (rtest(verbose)) this.shell.padding += 1;
   this._destinationStack.push(File.expandPath(dir, this.destinationRoot));
 
-  if (!(await getFs().exists(this.destinationRoot)) && !rtest(pretend)) {
+  if (!(await File.isExistAsync(this.destinationRoot)) && !rtest(pretend)) {
     await FileUtils.mkdirPAsync(this.destinationRoot);
   }
 
@@ -410,6 +410,7 @@ export const Actions = {
   run,
   runRubyScript,
   thor,
+  directory,
   emptyDirectory,
   createFile,
   addFile,

@@ -11,7 +11,11 @@ interface SystemCallError extends Error {
  * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`): `rb_exec_getargs`
  * (`process.c:2511-2538`) takes a trailing Hash as the options and a leading
  * Hash as the env, laid over `ENV` with `nil` unsetting a name. One remaining
- * String is a command line (`args` is `null`); more are a program and its argv.
+ * String is a command line; more are a program and its argv. A command line
+ * runs through `/bin/sh -c` (`args` is `null`) only where `rb_exec_fillarg`
+ * (`process.c:2575-2690`) finds a shell metacharacter, a leading assignment or
+ * a reserved word or special built-in as its first word; any other is split on
+ * spaces and tabs and exec'd directly.
  * `unsetenv_others: true` (`process.c:2195-2200`) starts the env empty rather
  * than from `ENV`, as `rb_execarg_parent_start1` does (`process.c:2887-2892`).
  *
@@ -45,7 +49,78 @@ export function rbExecargNew(
     throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(arg)} into String`);
   }
   const [prog, ...args] = rest as string[];
+  if (args.length === 0) {
+    const argvBuf = rbExecFillarg(prog);
+    if (argvBuf !== null) return [argvBuf[0], env, argvBuf.slice(1), opthash];
+  }
   return [prog, env, args.length === 0 ? null : args, opthash];
+}
+
+const POSIX_SH_CMDS = new Set([
+  "!",
+  ".",
+  ":",
+  "break",
+  "case",
+  "continue",
+  "do",
+  "done",
+  "elif",
+  "else",
+  "esac",
+  "eval",
+  "exec",
+  "exit",
+  "export",
+  "fi",
+  "for",
+  "if",
+  "in",
+  "readonly",
+  "return",
+  "set",
+  "shift",
+  "then",
+  "times",
+  "trap",
+  "unset",
+  "until",
+  "while",
+]);
+
+/**
+ * `rb_exec_fillarg`'s `use_shell` scan (`vendor/ruby/v3.3.11/process.c:2582-2690`):
+ * the command line's words when it can be exec'd with no shell, else `null`.
+ */
+function rbExecFillarg(prog: string): string[] | null {
+  let first: string | null = null;
+  let hasMeta = false;
+  let start = -1;
+  let firstDone = false;
+  for (let p = 0; p < prog.length; p++) {
+    const c = prog[p];
+    if (c === " " || c === "\t") {
+      if (start >= 0 && !firstDone) {
+        first = prog.slice(start, p);
+        firstDone = true;
+      }
+    } else if (start < 0) {
+      start = p;
+    }
+    if ("*?{}[]<>()~&|\\$;'`\"\n#".includes(c)) hasMeta = true;
+    if (!firstDone) {
+      if (c === "=") hasMeta = true;
+      else if (c === "/") firstDone = true;
+    }
+    if (hasMeta) break;
+  }
+  if (!hasMeta && start >= 0) {
+    if (!firstDone) first = prog.slice(start);
+    if (first !== null && POSIX_SH_CMDS.has(first)) hasMeta = true;
+  }
+  if (hasMeta) return null;
+  const words = prog.split(/[ \t]+/).filter((w) => w !== "");
+  return words.length === 0 ? null : words;
 }
 
 /**

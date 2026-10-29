@@ -58,8 +58,29 @@ export class ActionMethods {
   }
 
   /** @internal */
+  protected copyFile(...args: unknown[]): unknown {
+    return (this.generator as unknown as Record<string, (...args: unknown[]) => unknown>)[
+      "copyFile"
+    ](...args);
+  }
+
+  /** @internal */
+  protected directory(...args: unknown[]): unknown {
+    return (this.generator as unknown as Record<string, (...args: unknown[]) => unknown>)[
+      "directory"
+    ](...args);
+  }
+
+  /** @internal */
   protected emptyDirectory(destination: string, config: { verbose?: boolean } = {}): unknown {
     return this.generator["emptyDirectory"](destination, config);
+  }
+
+  /** @internal */
+  protected inside(...args: unknown[]): unknown {
+    return (this.generator as unknown as Record<string, (...args: unknown[]) => unknown>)["inside"](
+      ...args,
+    );
   }
 
   /** @internal */
@@ -73,6 +94,20 @@ export class ActionMethods {
   /** @internal */
   protected createFile(relativePath: string, content: string): unknown {
     return this.generator["createFile"](relativePath, content);
+  }
+
+  /** @internal */
+  protected chmod(...args: unknown[]): unknown {
+    return (this.generator as unknown as Record<string, (...args: unknown[]) => unknown>)["chmod"](
+      ...args,
+    );
+  }
+
+  /** @internal */
+  protected shebang(...args: unknown[]): unknown {
+    return (this.generator as unknown as Record<string, (...args: unknown[]) => unknown>)[
+      "shebang"
+    ](...args);
   }
 
   /** @internal */

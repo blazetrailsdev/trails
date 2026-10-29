@@ -67,8 +67,8 @@ beforeEach(() => {
       spawned.push([cmd, ...args]);
       return { status: 0, signal: null, stdout: "", stderr: "" };
     },
-    system: async (command) => {
-      spawned.push(command.split(" "));
+    system: async (command, _env, args) => {
+      spawned.push(args == null ? command.split(" ") : [command, ...args]);
       return { pid: 1, status: 0, signal: null };
     },
   });

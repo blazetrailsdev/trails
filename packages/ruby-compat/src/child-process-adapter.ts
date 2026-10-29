@@ -49,7 +49,8 @@ export interface ChildProcessAdapter {
     options?: { out?: string },
   ): Promise<WaitStatus>;
   /**
-   * Runs `command` through `/bin/sh -c` with stdout and stderr on one pipe,
+   * Runs `command` through `/bin/sh -c`, or with no `args` the program `command`
+   * exec'd with that argv and no shell, with stdout and stderr on one pipe,
    * as `Open3.popen2e` wires them (`vendor/ruby/v3.3.11/lib/open3.rb:508-523`),
    * and a stdin pipe closed at once (`open3.rb:928`), and resolves with what
    * it wrote.
@@ -57,6 +58,7 @@ export interface ChildProcessAdapter {
   capture2e?(
     command: string,
     env: Record<string, string | undefined>,
+    args?: string[] | null,
   ): Promise<[output: string, status: WaitStatus]>;
   /**
    * Runs the child with stdin, stdout and stderr on three pipes, as
@@ -223,19 +225,22 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
           : spawnChild(cp, command, args, env, stdio, () => {});
       return status.finally(() => outFile?.close());
     },
-    async capture2e(command, env) {
+    async capture2e(command, env, args) {
       let output = "";
-      const args = ["-c", 'exec 2>&1; eval "$1"', "sh", command];
-      const status = await spawnChild(
-        cp,
-        "/bin/sh",
-        args,
-        env,
-        ["pipe", "pipe", "ignore"],
-        (chunk) => {
-          output += chunk;
-        },
-      );
+      const read = (chunk: string): void => {
+        output += chunk;
+      };
+      const status =
+        args == null
+          ? await spawnChild(
+              cp,
+              "/bin/sh",
+              ["-c", 'exec 2>&1; eval "$1"', "sh", command],
+              env,
+              ["pipe", "pipe", "ignore"],
+              read,
+            )
+          : await spawnChild(cp, command, args, env, ["pipe", "pipe", "pipe"], read, "", read);
       return [output, status];
     },
     async capture3(command, env, args, stdinData) {

@@ -56,7 +56,7 @@ export class TSE {
   async result(b: object): Promise<string> {
     if (this.filename == null) throw new LoadError("cannot load such file -- (erb)");
     const compiled = `${this.filename}.js`;
-    const url = new URL(compiled, "file:///");
+    const url = new URL(compiled.replace(/[%#?]/g, encodeURIComponent), "file:///");
     url.search = `?${(loads += 1)}`;
     let mod: Compiled;
     try {
