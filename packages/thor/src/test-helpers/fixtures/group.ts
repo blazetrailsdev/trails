@@ -60,15 +60,10 @@ export class MyCounter extends Group {
     klass.desc("Description:\n  This generator runs three commands: one, two and three.\n");
 
     (this as unknown as ThorClass).methodAdded("one");
-
     (this as unknown as ThorClass).methodAdded("two");
-
     (this as unknown as ThorClass).methodAdded("three");
-
     (this as unknown as ThorClass).methodAdded("four");
-
     (this as unknown as ThorClass).methodAdded("five");
-
     (this as unknown as ThorClass).methodAdded("six");
 
     klass.noCommands(() => (this as unknown as ThorClass).methodAdded("world"));
@@ -134,9 +129,7 @@ export class BrokenCounter extends MyCounter {
     });
 
     (this as unknown as ThorClass).methodAdded("one");
-
     (this as unknown as ThorClass).methodAdded("four");
-
     (this as unknown as ThorClass).methodAdded("five");
   }
 

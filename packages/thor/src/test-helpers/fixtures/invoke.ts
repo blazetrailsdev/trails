@@ -1,4 +1,11 @@
-import { include, puts, rbInspect, stdout as $stdout, toS } from "@blazetrails/ruby-compat";
+import {
+  include,
+  puts,
+  rbEqual,
+  rbInspect,
+  stdout as $stdout,
+  toS,
+} from "@blazetrails/ruby-compat";
 import { Actions } from "../../actions.js";
 import type { Base } from "../../base.js";
 import { Group, type GroupClass } from "../../group.js";
@@ -51,7 +58,7 @@ export class A extends Thor {
   }
 
   five(number: unknown): boolean {
-    return number == 5;
+    return rbEqual(number, 5);
   }
 
   invoker(..._args: unknown[]) {
