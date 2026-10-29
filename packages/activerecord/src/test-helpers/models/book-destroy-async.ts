@@ -44,6 +44,7 @@ registerModel(BookDestroyAsync);
 export interface BookDestroyAsync {
   get content(): Content | null | Promise<Content | null>;
   set content(value: Content | null);
+  setContent(value: Content | null): Promise<unknown>;
 }
 
 export class BookDestroyAsyncWithScopedTags extends Base {

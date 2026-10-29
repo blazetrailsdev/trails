@@ -1,7 +1,9 @@
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
+import type { ShardedBlogPostDestroyAsync } from "./blog-post-destroy-async.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedCommentDestroyAsync extends Base {
   static _tableName = "sharded_comments";
   static {
@@ -22,4 +24,9 @@ export class ShardedCommentDestroyAsync extends Base {
     });
     this.belongsTo("blog");
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ShardedCommentDestroyAsync {
+  get blogPost(): ShardedBlogPostDestroyAsync | null | Promise<ShardedBlogPostDestroyAsync | null>;
+  set blogPost(value: ShardedBlogPostDestroyAsync | null);
 }

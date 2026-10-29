@@ -48,4 +48,5 @@ registerModel(DestroyAsyncParent);
 export interface DestroyAsyncParent {
   get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
   set dlKeyedHasOne(value: DlKeyedHasOne | null);
+  setDlKeyedHasOne(value: DlKeyedHasOne | null): Promise<unknown>;
 }

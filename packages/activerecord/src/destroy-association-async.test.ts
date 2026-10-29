@@ -52,14 +52,11 @@ import "./test-helpers/models/sharded/blog-post-tag.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 
-Base.destroyAssociationAsyncJob = DestroyAssociationAsyncJob;
-
 class DestroyAssociationAsyncTest extends rootTestCase() {}
 registerConstant("DestroyAssociationAsyncTest", DestroyAssociationAsyncTest);
 include(DestroyAssociationAsyncTest, ActiveJobTestHelper);
 
 type Ctx = TestContext & { testCase: TestCase & TestHelper };
-type R = any;
 
 const only = { only: DestroyAssociationAsyncJob };
 
@@ -72,7 +69,7 @@ describe("DestroyAssociationAsyncTest", () => {
     try {
       const tag = await Tag.createBang({ name: "Der be treasure" });
       const tag2 = await Tag.createBang({ name: "Der be rum" });
-      const book: R = await BookDestroyAsync.createBang();
+      const book = await BookDestroyAsync.createBang();
       await book.tags.push(tag, tag2);
       await book.saveBang();
 
@@ -94,8 +91,8 @@ describe("DestroyAssociationAsyncTest", () => {
     testCase: t,
   }: Ctx) => {
     try {
-      const blog: R = await ShardedBlog.createBang();
-      const blogPost: R = await ShardedBlogPostDestroyAsync.createBang({ blog_id: blog.id });
+      const blog = await ShardedBlog.createBang();
+      const blogPost = await ShardedBlogPostDestroyAsync.createBang({ blog_id: blog.id });
 
       const tag1 = await ShardedTag.createBang({ name: "Short Read", blog_id: blog.id });
       const tag2 = await ShardedTag.createBang({ name: "Science", blog_id: blog.id });
@@ -132,9 +129,9 @@ describe("DestroyAssociationAsyncTest", () => {
     testCase: t,
   }: Ctx) => {
     try {
-      const tag: R = await Tag.createBang({ name: "Der be treasure" });
-      const tag2: R = await Tag.createBang({ name: "Der be rum" });
-      const parent: R = await BookDestroyAsyncWithScopedTags.createBang();
+      const tag = await Tag.createBang({ name: "Der be treasure" });
+      const tag2 = await Tag.createBang({ name: "Der be rum" });
+      const parent = await BookDestroyAsyncWithScopedTags.createBang();
       await parent.tags.push(tag, tag2);
       await parent.saveBang();
 
@@ -163,7 +160,7 @@ describe("DestroyAssociationAsyncTest", () => {
     try {
       const dlKeyedHasMany = await DlKeyedHasManyThrough.createBang();
       const dlKeyedHasMany2 = await DlKeyedHasManyThrough.createBang();
-      const parent: R = await DestroyAsyncParent.createBang();
+      const parent = await DestroyAsyncParent.createBang();
       await parent.dlKeyedHasManyThrough.push(dlKeyedHasMany2, dlKeyedHasMany);
       await parent.saveBang();
       await parent.destroy();
@@ -193,14 +190,16 @@ describe("DestroyAssociationAsyncTest", () => {
     try {
       Base.destroyAssociationAsyncBatchSize = 1;
 
-      const tag: R = await Tag.createBang({ name: "Der be treasure" });
-      const tag2: R = await Tag.createBang({ name: "Der be rum" });
-      const book: R = await BookDestroyAsync.createBang();
+      const tag = await Tag.createBang({ name: "Der be treasure" });
+      const tag2 = await Tag.createBang({ name: "Der be rum" });
+      const book = await BookDestroyAsync.createBang();
       await book.tags.push(tag, tag2);
       await book.saveBang();
 
-      const job1Args = (jobArgs: R) => rbEqual(jobArgs[0].associationIds, [tag.id]);
-      const job2Args = (jobArgs: R) => rbEqual(jobArgs[0].associationIds, [tag2.id]);
+      const job1Args = (jobArgs: Array<{ associationIds: unknown }>) =>
+        rbEqual(jobArgs[0].associationIds, [tag.id]);
+      const job2Args = (jobArgs: Array<{ associationIds: unknown }>) =>
+        rbEqual(jobArgs[0].associationIds, [tag2.id]);
 
       await t.assertEnqueuedWith({ job: DestroyAssociationAsyncJob, args: job1Args }, () =>
         t.assertEnqueuedWith({ job: DestroyAssociationAsyncJob, args: job2Args }, () =>
@@ -223,7 +222,7 @@ describe("DestroyAssociationAsyncTest", () => {
 
   it("belongs to", async ({ testCase: t }: Ctx) => {
     try {
-      const essay: R = await EssayDestroyAsync.createBang({ name: "Der be treasure" });
+      const essay = await EssayDestroyAsync.createBang({ name: "Der be treasure" });
       const book = await BookDestroyAsync.createBang({ name: "Arr, matey!" });
       essay.book = book;
       await essay.saveBang();
@@ -243,9 +242,9 @@ describe("DestroyAssociationAsyncTest", () => {
 
   it("belongs to associated by composite primary key", async ({ testCase: t }: Ctx) => {
     try {
-      const blog: R = await ShardedBlog.createBang();
+      const blog = await ShardedBlog.createBang();
       const blogPost = await ShardedBlogPostDestroyAsync.createBang({ blog_id: blog.id });
-      const comment: R = await ShardedCommentDestroyAsync.createBang({
+      const comment = await ShardedCommentDestroyAsync.createBang({
         body: "Great post! :clap:",
       });
 
@@ -278,7 +277,7 @@ describe("DestroyAssociationAsyncTest", () => {
 
   it("enqueues belongs_to to be deleted with custom primary key", async ({ testCase: t }: Ctx) => {
     try {
-      const belongs: R = await DlKeyedBelongsTo.createBang();
+      const belongs = await DlKeyedBelongsTo.createBang();
       const parent = await DestroyAsyncParent.createBang();
       belongs.destroyAsyncParent = parent;
       await belongs.saveBang();
@@ -318,7 +317,7 @@ describe("DestroyAssociationAsyncTest", () => {
   it("has_one", async ({ testCase: t }: Ctx) => {
     try {
       const content = await Content.create({ title: "hello" });
-      const book: R = await BookDestroyAsync.createBang({ name: "Arr, matey!" });
+      const book = await BookDestroyAsync.createBang({ name: "Arr, matey!" });
       await book.setContent(content);
       await book.saveBang();
       await book.destroy();
@@ -338,7 +337,7 @@ describe("DestroyAssociationAsyncTest", () => {
   it("enqueues has_one to be deleted with custom primary key", async ({ testCase: t }: Ctx) => {
     try {
       const child = await DlKeyedHasOne.createBang();
-      const parent: R = await DestroyAsyncParent.createBang();
+      const parent = await DestroyAsyncParent.createBang();
       await parent.setDlKeyedHasOne(child);
       await parent.saveBang();
       await parent.destroy();
@@ -359,7 +358,7 @@ describe("DestroyAssociationAsyncTest", () => {
     try {
       const essay = await EssayDestroyAsync.createBang({ name: "Der be treasure" });
       const essay2 = await EssayDestroyAsync.createBang({ name: "Der be rum" });
-      const book: R = await BookDestroyAsync.createBang({ name: "Arr, matey!" });
+      const book = await BookDestroyAsync.createBang({ name: "Arr, matey!" });
       await book.essays.push(essay, essay2);
       await book.saveBang();
       await book.destroy();
@@ -397,7 +396,7 @@ describe("DestroyAssociationAsyncTest", () => {
   }: Ctx) => {
     try {
       const dlKeyedHasMany = new DlKeyedHasMany();
-      const parent: R = await DestroyAsyncParent.createBang();
+      const parent = await DestroyAsyncParent.createBang();
       await parent.dlKeyedHasMany.push(dlKeyedHasMany);
 
       await parent.saveBang();
@@ -417,7 +416,7 @@ describe("DestroyAssociationAsyncTest", () => {
 
   it("has_many associated with composite primary key", async ({ testCase: t }: Ctx) => {
     try {
-      const book: R = await CpkBookDestroyAsync.createBang({ id: [1, 1] });
+      const book = await CpkBookDestroyAsync.createBang({ id: [1, 1] });
       await book.chapters.createBang({ id: [1, 1], title: "Chapter 1" });
       await book.chapters.createBang({ id: [1, 2], title: "Chapter 2" });
 
@@ -450,7 +449,7 @@ describe("DestroyAssociationAsyncTest", () => {
   it("not enqueue the job if transaction is not committed", async ({ testCase: t }: Ctx) => {
     try {
       const dlKeyedHasMany = new DlKeyedHasMany();
-      const parent: R = await DestroyAsyncParent.createBang();
+      const parent = await DestroyAsyncParent.createBang();
       await parent.dlKeyedHasMany.push(dlKeyedHasMany);
 
       await parent.saveBang();
@@ -470,7 +469,7 @@ describe("DestroyAssociationAsyncTest", () => {
     try {
       const tag = await Tag.createBang({ name: "Der be treasure" });
       const tag2 = await Tag.createBang({ name: "Der be rum" });
-      const parent: R = await DestroyAsyncParentSoftDelete.createBang();
+      const parent = await DestroyAsyncParentSoftDelete.createBang();
       await parent.tags.push(tag, tag2);
       await parent.saveBang();
 
@@ -499,7 +498,7 @@ describe("DestroyAssociationAsyncTest", () => {
   it("has one ensures function for parent", async ({ testCase: t }: Ctx) => {
     try {
       const child = await DlKeyedHasOne.createBang();
-      const parent: R = await DestroyAsyncParentSoftDelete.createBang();
+      const parent = await DestroyAsyncParentSoftDelete.createBang();
       await parent.setDlKeyedHasOne(child);
       await parent.saveBang();
 
@@ -527,8 +526,8 @@ describe("DestroyAssociationAsyncTest", () => {
 
   it("enqueues belongs_to to be deleted with ensuring function", async ({ testCase: t }: Ctx) => {
     try {
-      const belongs: R = await DlKeyedBelongsToSoftDelete.createBang();
-      const parent: R = await DestroyAsyncParentSoftDelete.createBang();
+      const belongs = await DlKeyedBelongsToSoftDelete.createBang();
+      const parent = await DestroyAsyncParentSoftDelete.createBang();
       belongs.destroyAsyncParentSoftDelete = parent;
       await belongs.saveBang();
 
@@ -541,7 +540,7 @@ describe("DestroyAssociationAsyncTest", () => {
 
       await belongs.destroy();
       await t.performEnqueuedJobs(only);
-      assertPredicate(await parent.reload(), (p: R) => p.isDeleted());
+      assertPredicate(await parent.reload(), (p) => p.isDeleted());
     } finally {
       await DlKeyedBelongsToSoftDelete.deleteAll();
       await DestroyAsyncParentSoftDelete.deleteAll();
@@ -563,7 +562,7 @@ describe("DestroyAssociationAsyncTest", () => {
     try {
       const tag = await Tag.createBang({ name: "Der be treasure" });
       const tag2 = await Tag.createBang({ name: "Der be rum" });
-      const book: R = await BookDestroyAsync.createBang();
+      const book = await BookDestroyAsync.createBang();
       await book.tags.push(tag, tag2);
       await book.saveBang();
       await Base.transaction(async () => {

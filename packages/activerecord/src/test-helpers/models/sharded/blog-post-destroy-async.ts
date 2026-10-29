@@ -1,8 +1,12 @@
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
+import type { AssociationProxy } from "../../../associations/collection-proxy.js";
 import { queryConstraints } from "../../../persistence.js";
+import type { ShardedTag } from "./tag.js";
 
 export class ShardedBlogPostDestroyAsync extends Base {
+  declare tags: AssociationProxy<ShardedTag>;
+
   static _tableName = "sharded_blog_posts";
   static {
     registerModel("Sharded::BlogPostDestroyAsync", this);

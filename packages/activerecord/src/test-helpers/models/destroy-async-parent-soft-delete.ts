@@ -40,4 +40,5 @@ registerModel(DestroyAsyncParentSoftDelete);
 export interface DestroyAsyncParentSoftDelete {
   get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
   set dlKeyedHasOne(value: DlKeyedHasOne | null);
+  setDlKeyedHasOne(value: DlKeyedHasOne | null): Promise<unknown>;
 }
