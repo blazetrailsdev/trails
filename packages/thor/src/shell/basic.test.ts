@@ -297,9 +297,10 @@ describe("Thor::Shell::Basic", () => {
 
     it("does not print a message if base is set to quiet", async () => {
       shell().base = new MyCounter([1, 2]);
-      vi.spyOn(shell().base!, "options", "get").mockReturnValue({ quiet: true });
+      const options = vi.spyOn(shell().base!, "options", "get").mockReturnValue({ quiet: true });
 
       const out = await capture(":stdout", () => shell().say("Running..."));
+      expect(options).toHaveBeenCalled();
       expect(out).toEqual("");
     });
   });
@@ -343,9 +344,10 @@ describe("Thor::Shell::Basic", () => {
 
     it("does not print a message if base is set to quiet", async () => {
       shell().base = new MyCounter([1, 2]);
-      vi.spyOn(shell().base!, "options", "get").mockReturnValue({ quiet: true });
+      const options = vi.spyOn(shell().base!, "options", "get").mockReturnValue({ quiet: true });
 
       const out = await capture(":stderr", () => shell().sayError("Running..."));
+      expect(options).toHaveBeenCalled();
       expect(out).toEqual("");
     });
   });
