@@ -5,6 +5,7 @@ import {
   kernelThrow,
   rbEqual,
   rbFSend,
+  rbObjAsString,
   toI,
   eachSlice,
 } from "@blazetrails/ruby-compat";
@@ -103,9 +104,9 @@ export class HasManyAssociation extends CollectionAssociation {
             this.owner.constructor.destroyAssociationAsyncBatchSize ?? ids.length,
           )) {
             this.enqueueDestroyAssociation({
-              ownerModelName: this.owner.constructor.name,
+              ownerModelName: rbObjAsString(this.owner.constructor),
               ownerId: this.owner.id,
-              associationClass: String(this.reflection.klass.name),
+              associationClass: rbObjAsString(this.reflection.klass),
               associationIds: idsBatch,
               associationPrimaryKeyColumn: primaryKeyColumn,
               ensuringOwnerWasMethod: fetch(this.reflection.options, "ensuringOwnerWas", null),

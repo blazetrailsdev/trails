@@ -7,8 +7,8 @@ export class EssayDestroyAsync extends Base {
   static _tableName = "essays";
 
   static {
-    this.belongsTo("book", { dependent: "destroy", className: "BookDestroyAsync" });
-    this.belongsTo("writer", { polymorphic: true, dependent: "destroy" });
+    this.belongsTo("book", { dependent: "destroyAsync", className: "BookDestroyAsync" });
+    this.belongsTo("writer", { polymorphic: true, dependent: "destroyAsync" });
   }
 }
 registerModel(EssayDestroyAsync);

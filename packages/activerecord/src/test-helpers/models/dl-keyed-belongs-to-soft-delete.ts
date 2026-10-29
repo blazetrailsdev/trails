@@ -9,7 +9,8 @@ export class DlKeyedBelongsToSoftDelete extends Base {
 
   static {
     this.belongsTo("destroyAsyncParentSoftDelete", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
+      ensuringOwnerWas: "isDeleted",
       className: "DestroyAsyncParentSoftDelete",
     });
   }

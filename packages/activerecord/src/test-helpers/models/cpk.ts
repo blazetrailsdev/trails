@@ -175,7 +175,7 @@ export class CpkBookDestroyAsync extends Base {
     this.hasMany("chapters", {
       foreignKey: ["author_id", "book_id"],
       className: "Cpk::ChapterDestroyAsync",
-      dependent: "destroy",
+      dependent: "destroyAsync",
     });
   }
 }

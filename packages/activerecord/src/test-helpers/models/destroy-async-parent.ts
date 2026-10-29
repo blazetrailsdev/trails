@@ -21,23 +21,23 @@ export class DestroyAsyncParent extends Base {
 
   static {
     this.hasOne("dlKeyedHasOne", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
       foreignKey: "destroy_async_parent_id",
       primaryKey: "parent_id",
     });
     this.hasMany("dlKeyedHasMany", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
       foreignKey: "many_key",
       primaryKey: "parent_id",
     });
     this.hasMany("dlKeyedJoin", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
       foreignKey: "destroy_async_parent_id",
       primaryKey: "parent_id",
     });
     this.hasMany("dlKeyedHasManyThrough", {
       through: "dlKeyedJoin",
-      dependent: "destroy",
+      dependent: "destroyAsync",
       foreignKey: "dl_has_many_through_key_id",
       primaryKey: "through_key",
     });

@@ -14,13 +14,14 @@ export class DlKeyedBelongsTo extends Base {
 
   static {
     this.belongsTo("destroyAsyncParent", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
       foreignKey: "destroy_async_parent_id",
       primaryKey: "parent_id",
       className: "DestroyAsyncParent",
     });
     this.belongsTo("destroyAsyncParentSoftDelete", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
+      ensuringOwnerWas: "isDeleted",
       className: "DestroyAsyncParentSoftDelete",
     });
   }

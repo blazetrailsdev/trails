@@ -29,13 +29,13 @@ export class BookDestroyAsync extends Base {
 
   static {
     this.hasMany("taggings", { as: "taggable", className: "Tagging" });
-    this.hasMany("tags", { through: "taggings", dependent: "destroy" });
+    this.hasMany("tags", { through: "taggings", dependent: "destroyAsync" });
     this.hasMany("essays", {
-      dependent: "destroy",
+      dependent: "destroyAsync",
       className: "EssayDestroyAsync",
       foreignKey: "book_id",
     });
-    this.hasOne("content", { dependent: "destroy" });
+    this.hasOne("content", { dependent: "destroyAsync" });
     this.enum("status", ["proposed", "written", "published"]);
   }
 }
@@ -54,7 +54,13 @@ export class BookDestroyAsyncWithScopedTags extends Base {
 
   static {
     this.hasMany("taggings", { as: "taggable", className: "Tagging" });
-    this.hasMany("tags", { through: "taggings", dependent: "destroy" });
+    this.hasMany(
+      "tags",
+      function (this: Relation<Tag>) {
+        return this.where({ name: "Der be rum" });
+      },
+      { through: "taggings", dependent: "destroyAsync" },
+    );
   }
 }
 registerModel(BookDestroyAsyncWithScopedTags);

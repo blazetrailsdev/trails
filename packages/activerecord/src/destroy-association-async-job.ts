@@ -34,14 +34,14 @@ export class DestroyAssociationAsyncJob extends JobBase {
   } = {}): Promise<void> {
     const associationModel = computeType(Base, associationClass!.replace(/^(::)?/, "::"));
     const ownerClass = computeType(Base, ownerModelName!.replace(/^(::)?/, "::"));
-    const owner = await ownerClass.findBy({ [ownerClass.primaryKey as string]: [ownerId] });
+    const owner = await ownerClass.findBy(new Map([[ownerClass.primaryKey, [ownerId]]]));
 
     if (!(await this.isOwnerDestroyed(owner, ensuringOwnerWasMethod))) {
       throw new DestroyAssociationAsyncError("owner record not destroyed");
     }
 
     await associationModel
-      .where({ [associationPrimaryKeyColumn as string]: associationIds })
+      .where(new Map([[associationPrimaryKeyColumn, associationIds]]))
       .findEach({}, async (r) => {
         await r.destroy();
       });

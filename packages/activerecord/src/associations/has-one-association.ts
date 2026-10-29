@@ -1,4 +1,11 @@
-import { fetch, include, kernelThrow, rbEqual, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  include,
+  kernelThrow,
+  rbEqual,
+  rbFSend,
+  rbObjAsString,
+} from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError } from "./errors.js";
@@ -69,9 +76,9 @@ export class HasOneAssociation extends SingularAssociation {
           }
 
           this.enqueueDestroyAssociation({
-            ownerModelName: this.owner.constructor.name,
+            ownerModelName: rbObjAsString(this.owner.constructor),
             ownerId: this.owner.id,
-            associationClass: String(this.reflection.klass.name),
+            associationClass: rbObjAsString(this.reflection.klass),
             associationIds: [id],
             associationPrimaryKeyColumn: primaryKeyColumn,
             ensuringOwnerWasMethod: fetch(this.reflection.options, "ensuringOwnerWas", null),
