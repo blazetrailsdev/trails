@@ -152,6 +152,34 @@ export interface FileOpenOpt {
  */
 export class File extends IO {
   /**
+   * `rb_file_initialize` (`vendor/ruby/v3.3.11/io.c:9616`) over `rb_open_file`
+   * (`io.c:8102`): `File.new(filename, mode = "r", opt)` opens the named file.
+   * Ruby's mode string carries the binary flag node's `flags` has no letter
+   * for, so `b` is dropped from the flags and recorded on the stream instead
+   * (`rb_io_binmode`, `io.c:6311`), and everything after the first `:` is
+   * `parse_mode_enc`'s encoding (`io.c:6667,6883-6886`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.new`
+   * (`vendor/ruby/v3.3.11/io.c:9616`).
+   */
+  constructor(fileName: string, mode: string | FileOpenOpt = "r", opt?: FileOpenOpt) {
+    if (typeof mode === "object") {
+      opt = mode;
+      mode = opt.mode ?? "r";
+      if (opt.binmode === true)
+        mode = mode.replace(/^[^:]*/, (m) => (m.includes("b") ? m : `${m}b`));
+    }
+    const colon = mode.indexOf(":");
+    const estr = colon === -1 ? null : mode.slice(colon + 1);
+    const vmode = colon === -1 ? mode : mode.slice(0, colon);
+    super(getFs().openSync(fileName, vmode.replace(/b/g, ""), opt?.perm), fileName, mode);
+    if (vmode.includes("b")) this.binmode();
+    if (estr !== null) this.setEncoding(estr);
+    else if (opt?.externalEncoding != null) this.setEncoding(opt.externalEncoding);
+    if (this.mode & FMODE_SETENC_BY_BOM) this.ioSetEncodingByBom();
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:7427` — `File::SEPARATOR`, `"/"` on every platform.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::SEPARATOR`.
@@ -501,25 +529,8 @@ export class File extends IO {
     optBlock?: (file: File) => T,
   ): T | File {
     const block = typeof blockOrOpt === "function" ? blockOrOpt : optBlock;
-    let opt = typeof blockOrOpt === "function" ? undefined : blockOrOpt;
-    if (typeof mode === "object") {
-      opt = mode;
-      mode = opt.mode ?? "r";
-      if (opt.binmode === true)
-        mode = mode.replace(/^[^:]*/, (m) => (m.includes("b") ? m : `${m}b`));
-    }
-    const colon = mode.indexOf(":");
-    const estr = colon === -1 ? null : mode.slice(colon + 1);
-    const vmode = colon === -1 ? mode : mode.slice(0, colon);
-    const file = new File(
-      getFs().openSync(fileName, vmode.replace(/b/g, ""), opt?.perm),
-      fileName,
-      mode,
-    );
-    if (vmode.includes("b")) file.binmode();
-    if (estr !== null) file.setEncoding(estr);
-    else if (opt?.externalEncoding != null) file.setEncoding(opt.externalEncoding);
-    if (file.mode & FMODE_SETENC_BY_BOM) file.ioSetEncodingByBom();
+    const opt = typeof blockOrOpt === "function" ? undefined : blockOrOpt;
+    const file = new File(fileName, mode, opt);
     if (!block) return file;
     let result: T;
     try {

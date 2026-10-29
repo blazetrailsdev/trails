@@ -585,6 +585,12 @@ export interface CopyStreamSource {
  * class this file's export lives in.
  */
 export class IO {
+  /** @noRailsEquivalent PERMANENT — Ruby core `IO::SEEK_SET` (`vendor/ruby/v3.3.11/io.c:15506`). */
+  static readonly SEEK_SET = 0;
+  /** @noRailsEquivalent PERMANENT — Ruby core `IO::SEEK_CUR` (`vendor/ruby/v3.3.11/io.c:15508`). */
+  static readonly SEEK_CUR = 1;
+  /** @noRailsEquivalent PERMANENT — Ruby core `IO::SEEK_END` (`vendor/ruby/v3.3.11/io.c:15510`). */
+  static readonly SEEK_END = 2;
   /** @noRailsEquivalent PERMANENT */
   static readonly EAGAINWaitReadable = EAGAINWaitReadable;
   /** @noRailsEquivalent PERMANENT */
@@ -984,14 +990,17 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/v3.3.11/io.c:2495` `rb_io_seek_m` in its one-argument form, where
-   * `whence` is `IO::SEEK_SET` — the absolute offset the next read starts at.
+   * `vendor/ruby/v3.3.11/io.c:2495` `rb_io_seek_m`: `whence` defaults to
+   * `IO::SEEK_SET`, the absolute offset the next read starts at; `SEEK_CUR` is
+   * relative to the current position and `SEEK_END` to the stream's size.
    * It answers `0`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#seek`
    * (`vendor/ruby/v3.3.11/io.c:2495`).
    */
-  seek(amount: number): number {
+  seek(amount: number, whence: number = IO.SEEK_SET): number {
+    if (whence === IO.SEEK_CUR) amount += this._pos;
+    else if (whence === IO.SEEK_END) amount += this.stat().size;
     this._pos = amount;
     return 0;
   }
@@ -1105,6 +1114,23 @@ export class IO {
   }
 
   /**
+   * `rb_io_pread` (`vendor/ruby/v3.3.11/io.c:6202`): `maxlen` bytes read at
+   * `offset` without moving the stream's position, raising `EOFError` when
+   * nothing is there to read.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#pread`
+   * (`vendor/ruby/v3.3.11/io.c:6202`).
+   */
+  pread(maxlen: number, offset: number): Uint8Array {
+    const str = new Uint8Array(maxlen);
+    if (maxlen === 0) return str;
+    if (this.fd < 0) throw new IOError("closed stream");
+    const n = getFs().readSync(this.fd, str, 0, maxlen, offset);
+    if (n === 0) throw new EOFError("end of file reached");
+    return str.slice(0, n);
+  }
+
+  /**
    * `IO#each_line` (`vendor/ruby/v3.3.11/io.c:4649` `rb_io_each_line`) with the
    * default separator: each line of the rest of the stream yielded to the
    * block and the receiver returned, or — with no block — a generator standing
@@ -1148,19 +1174,24 @@ export class IO {
   }
 
   /**
-   * `rb_io_gets_m` (`vendor/ruby/v3.3.11/io.c:4363`) with the default separator:
-   * the bytes up to and including the next `"\n"`, or the rest of the stream,
+   * `rb_io_gets_m` (`vendor/ruby/v3.3.11/io.c:4363`): the bytes up to and
+   * including the next `sep` (`$/`, `"\n"`, by default), or the rest of the stream,
    * in the external encoding as {@link readAll} answers it; `nil` at EOF.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#gets`
    * (`vendor/ruby/v3.3.11/io.c:4363`).
    */
-  gets(): string | Uint8Array | null {
+  gets(sep = "\n"): string | Uint8Array | null {
+    const rsptr = new TextEncoder().encode(sep);
     const bytes: number[] = [];
     let b: number | null;
     while ((b = this.getbyte()) !== null) {
       bytes.push(b);
-      if (b === 0x0a) break;
+      if (
+        bytes.length >= rsptr.length &&
+        rsptr.every((c, i) => bytes[bytes.length - rsptr.length + i] === c)
+      )
+        break;
     }
     if (bytes.length === 0) return null;
     const str = Uint8Array.from(bytes);
@@ -1169,15 +1200,15 @@ export class IO {
   }
 
   /**
-   * `IO#readline` (`vendor/ruby/v3.3.11/io.rb:133`) with the default separator:
+   * `IO#readline` (`vendor/ruby/v3.3.11/io.rb:133`):
    * `io_readline` (`vendor/ruby/v3.3.11/io.c:4414`) is {@link gets} that raises
    * `EOFError` through `rb_eof_error` where `gets` answers `nil`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#readline`
    * (`vendor/ruby/v3.3.11/io.rb:133`).
    */
-  readline(): string | Uint8Array {
-    const line = this.gets();
+  readline(sep = "\n"): string | Uint8Array {
+    const line = this.gets(sep);
     if (line === null) throw new EOFError("end of file reached");
     return line;
   }

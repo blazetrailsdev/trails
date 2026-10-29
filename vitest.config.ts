@@ -359,6 +359,7 @@ const alias = {
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
   "@blazetrails/builder": path.resolve(__dirname, "packages/builder/src/builder.ts"),
   "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/src/marcel.ts"),
+  "@blazetrails/mini-mime": path.resolve(__dirname, "packages/mini-mime/src/mini-mime.ts"),
   "@blazetrails/image-processing": path.resolve(
     __dirname,
     "packages/image-processing/src/image-processing.ts",

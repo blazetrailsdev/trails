@@ -58,6 +58,7 @@
     { "path": "packages/fugit" },
     { "path": "packages/image-processing" },
     { "path": "packages/mini-magick" },
+    { "path": "packages/mini-mime" },
     { "path": "packages/html-sanitizer" },
     { "path": "packages/nokogiri" },
     { "path": "packages/activerecord-cli" },

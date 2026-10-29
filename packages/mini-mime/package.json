@@ -1,0 +1,31 @@
+{
+  "name": "@blazetrails/mini-mime",
+  "version": "0.1.0",
+  "description": "MIME type lookup for Trails, mirroring the mini_mime gem",
+  "type": "module",
+  "main": "dist/mini-mime.js",
+  "types": "dist/mini-mime.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/mini-mime.d.ts",
+      "default": "./dist/mini-mime.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && pnpm build:db",
+    "build:db": "cp -R src/db dist/"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
