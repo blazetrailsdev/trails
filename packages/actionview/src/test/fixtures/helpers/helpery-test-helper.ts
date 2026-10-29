@@ -1,6 +1,6 @@
-import { Module, registerConstant } from "@blazetrails/ruby-compat";
+import { defineModule, registerConstant } from "@blazetrails/ruby-compat";
 
-export const HelperyTestHelper = new Module().include({
+export const HelperyTestHelper = defineModule({
   helperyTest(): string {
     return "Default";
   },
