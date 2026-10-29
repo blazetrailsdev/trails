@@ -14,7 +14,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
-import { IndexedRow } from "./result.js";
+import type { IndexedRow } from "./result.js";
 import {
   ArgumentError,
   AttributeMethods,
@@ -956,9 +956,6 @@ export function _raiseRecordNotTouchedError(): never {
   );
 }
 
-/** @perf 2% — PERMANENT */
-const _respondingShapes = new WeakMap<object, typeof Base>();
-
 /**
  * @internal
  * @inventedArm loop — PERMANENT
@@ -977,18 +974,12 @@ export function instantiateInstanceOf(
 ): any {
   // eslint-disable-next-line blazetrails/ruby-compat-native-required -- attributes may be a Hash
   const names = keys(attributes as Record<string, unknown>);
-  const shape = attributes instanceof IndexedRow ? attributes["columnIndexes"] : undefined;
   attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
   const record = klass.allocate();
-  if (shape === undefined || _respondingShapes.get(shape) !== klass) {
-    let responds = true;
-    for (const name of names) {
-      if (!basicObjRespondTo(record, name)) {
-        responds = false;
-        (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
-      }
+  for (const name of names) {
+    if (!basicObjRespondTo(record, name)) {
+      (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
     }
-    if (responds && shape !== undefined) _respondingShapes.set(shape, klass);
   }
   return record.initWithAttributes(attributes, false, block);
 }

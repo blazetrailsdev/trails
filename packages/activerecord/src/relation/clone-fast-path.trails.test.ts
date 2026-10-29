@@ -3,13 +3,7 @@ import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 
-class PostWithColumnIndexes extends Post {
-  static {
-    this.attribute("columnIndexes", "integer");
-  }
-}
-
-registerModel([Post, PostWithColumnIndexes]);
+registerModel([Post]);
 
 describe("Relation#clone on a class-specific relation", () => {
   fixtures(["posts"]);
@@ -75,14 +69,5 @@ describe("Relation#clone copying fields", () => {
     } finally {
       Reflect.deleteProperty(proto, "_delegateToModel");
     }
-  });
-});
-
-describe("instantiate", () => {
-  fixtures(["posts"]);
-
-  it("instantiates an attribute hash whose columnIndexes key is not an object", () => {
-    const record = PostWithColumnIndexes.instantiate({ id: 1, columnIndexes: 5 });
-    expect(record.readAttribute("columnIndexes")).toBe(5);
   });
 });
