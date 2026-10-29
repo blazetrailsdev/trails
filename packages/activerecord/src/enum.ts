@@ -263,7 +263,7 @@ export function _enum(
 
     const pairs: Iterable<[string, EnumValue]> = rbObjRespondTo(values, "eachPair")
       ? Object.entries(values as Record<string, EnumValue>)
-      : (eachWithIndex(values as string[]) as Iterable<[string, EnumValue]>);
+      : eachWithIndex(values as string[]);
     let label: string, value: EnumValue;
     for ([label, value] of pairs) {
       enumValues.set(label, value);

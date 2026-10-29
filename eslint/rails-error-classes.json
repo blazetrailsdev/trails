@@ -1290,22 +1290,6 @@
         "TestUnitReporter": {
           "record": ["Interrupt"]
         }
-      },
-      "thor/base.ts": {
-        "*": {
-          "dispatch": ["NotImplementedError"]
-        },
-        "ClassMethods": {
-          "dispatch": ["NotImplementedError"]
-        }
-      },
-      "thor/shell/basic.ts": {
-        "*": {
-          "fileCollision": ["SystemExit"]
-        },
-        "Basic": {
-          "fileCollision": ["SystemExit"]
-        }
       }
     },
     "activejob": {
@@ -1399,7 +1383,25 @@
     },
     "msgpack": {},
     "rack-session": {},
-    "rack-test": {}
+    "rack-test": {},
+    "thor": {
+      "base.ts": {
+        "*": {
+          "dispatch": ["NotImplementedError"]
+        },
+        "ClassMethods": {
+          "dispatch": ["NotImplementedError"]
+        }
+      },
+      "shell/basic.ts": {
+        "*": {
+          "fileCollision": ["SystemExit"]
+        },
+        "Basic": {
+          "fileCollision": ["SystemExit"]
+        }
+      }
+    }
   },
   "errinfo": {
     "activerecord": ["StatementInvalid"],
@@ -1418,6 +1420,7 @@
     "i18n": [],
     "msgpack": [],
     "rack-session": [],
-    "rack-test": []
+    "rack-test": [],
+    "thor": []
   }
 }

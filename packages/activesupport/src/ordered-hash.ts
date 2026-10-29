@@ -1,4 +1,4 @@
-import { Hash, first, rbObjDup } from "@blazetrails/ruby-compat";
+import { Hash, first, map, rbObjDup } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 
 YAML.addBuiltinType("omap", (_type, val) => {
@@ -26,7 +26,7 @@ export class OrderedHash<K, V> extends Hash<K, V> {
   encodeWith(coder: YAML.Coder): void {
     coder.representSeq(
       "!omap",
-      [...this].map(([k, v]) => new Hash<K, V>().set(k, v)),
+      map<[K, V], Hash<K, V>>(this, ([k, v]) => new Hash<K, V>().set(k, v)),
     );
   }
 
