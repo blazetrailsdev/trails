@@ -80,13 +80,10 @@ export class StreamEventLoop {
     io.close();
   }
 
-  /** @inventedArm if — PERMANENT */
   writesPending(io: Io): void {
     const monitor = this._map.get(io);
     if (monitor != null) {
-      const selectingWritable = monitor.interests === "rw";
       monitor.interests = "rw";
-      if (selectingWritable) return;
       void (async () => {
         while (!this._stopping && this._map.get(io) === monitor && monitor.interests === "rw") {
           let stream: Stream | null = null;
