@@ -11,16 +11,16 @@ import { Current } from "../../models/current.ts";
 
 interface Host extends ActionController.API {
   renderError(message: string, status: string): Promise<void>;
-  decodeToken(token: string): Record<string, unknown> | null;
-  isValidPayload(payload: Record<string, unknown>): boolean;
+  decodeToken(token: string): unknown;
+  isValidPayload(payload: unknown): payload is { sub: string; username: string };
 }
 
 export const Authentication: {
   BEARER_PREFIX: string;
   POSITIVE_INTEGER: RegExp;
   requireAuthentication(this: Host): Promise<void>;
-  decodeToken(token: string): Record<string, unknown> | null;
-  isValidPayload(payload: Record<string, unknown>): boolean;
+  decodeToken(token: string): unknown;
+  isValidPayload(payload: unknown): payload is { sub: string; username: string };
 } = {
   BEARER_PREFIX: "Bearer ",
   POSITIVE_INTEGER: /^[1-9]\d*$/,
@@ -37,11 +37,11 @@ export const Authentication: {
       return this.renderError("invalid token payload", ":unauthorized");
     }
 
-    Current.user_id = Number(payload.sub);
-    Current.username = payload.username as string;
+    Current.userId = Number(payload.sub);
+    Current.username = payload.username;
   },
 
-  decodeToken(token: string): Record<string, unknown> | null {
+  decodeToken(token: string): unknown {
     try {
       return JWT.decode(token, Trails.configuration!.x.jwtSecret, true, { algorithm: "HS256" })[0];
     } catch (e) {
@@ -50,11 +50,14 @@ export const Authentication: {
     }
   },
 
-  isValidPayload(payload: Record<string, unknown>): boolean {
+  isValidPayload(payload: unknown): payload is { sub: string; username: string } {
     return (
-      typeof payload.sub === "string" &&
-      Authentication.POSITIVE_INTEGER.test(payload.sub) &&
-      typeof payload.username === "string"
+      typeof payload === "object" &&
+      payload !== null &&
+      !Array.isArray(payload) &&
+      typeof (payload as Record<string, unknown>).sub === "string" &&
+      Authentication.POSITIVE_INTEGER.test((payload as Record<string, string>).sub) &&
+      typeof (payload as Record<string, unknown>).username === "string"
     );
   },
 };

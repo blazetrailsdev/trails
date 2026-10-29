@@ -33,7 +33,7 @@ export class PostsController extends ApplicationController {
     }
 
     const post = new Post({
-      user_id: Current.user_id,
+      user_id: Current.userId,
       author: Current.username,
       body: this.params.get("body"),
     });

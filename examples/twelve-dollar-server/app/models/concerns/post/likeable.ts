@@ -8,10 +8,10 @@ import type { Base } from "@blazetrails/activerecord";
 import { Like } from "../../like.ts";
 
 export const Likeable = {
-  async likeBy(this: Base, user_id: number): Promise<boolean> {
+  async likeBy(this: Base, userId: number): Promise<boolean> {
     return (
-      (await Like.insert({ user_id, post_id: this.id }, { returning: [":post_id"] })).rows.length >
-      0
+      (await Like.insert({ user_id: userId, post_id: this.id }, { returning: [":post_id"] })).rows
+        .length > 0
     );
   },
 };

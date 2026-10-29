@@ -1,4 +1,5 @@
 import { Base } from "@blazetrails/activerecord";
+import { Process } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 import { ApplicationController } from "./application-controller.ts";
 
@@ -20,6 +21,8 @@ export class HealthController extends ApplicationController {
   }
 
   private uptimeSeconds(): number {
-    return Math.trunc(performance.now() / 1000 - Trails.configuration!.x.bootedAt);
+    return Math.trunc(
+      Process.clockGettime(Process.CLOCK_MONOTONIC) - Trails.configuration!.x.bootedAt,
+    );
   }
 }
