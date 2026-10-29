@@ -3,7 +3,7 @@ import "./action-controller.js";
 import { include, isPresent, onLoad, TopLevel, upcaseFirst } from "@blazetrails/activesupport";
 import { except, Process, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
-import { Callbacks } from "@blazetrails/actionpack";
+import { Callbacks, type ActionController } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
 import { Fixture } from "@blazetrails/activerecord/fixtures.js";
 import "@blazetrails/activerecord/destroy-association-async-job";
@@ -274,9 +274,12 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_record.log_runtime", () => {
-      onLoad("action_controller", (base: unknown) => {
-        include(base as never, ControllerRuntime);
-      });
+      onLoad(
+        "action_controller",
+        (base: typeof ActionController.Base | typeof ActionController.API) => {
+          include(base, ControllerRuntime);
+        },
+      );
 
       onLoad("active_job", (base: typeof ActiveJobBase) => {
         include(base, JobRuntime);

@@ -28,8 +28,8 @@ export class DestroyAssociationAsyncJob extends JobBase {
     associationPrimaryKeyColumn?: string | string[] | null;
     ensuringOwnerWasMethod?: string | null;
   } = {}): Promise<void> {
-    const associationModel = computeType(Base, associationClass!);
-    const ownerClass = computeType(Base, ownerModelName!);
+    const associationModel = computeType(Base, `::${associationClass}`);
+    const ownerClass = computeType(Base, `::${ownerModelName}`);
     const owner = await ownerClass.findBy({ [ownerClass.primaryKey as string]: [ownerId] });
 
     if (!(await this.isOwnerDestroyed(owner, ensuringOwnerWasMethod))) {
