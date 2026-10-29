@@ -1,6 +1,8 @@
 import { Mock, stub } from "@blazetrails/activesupport";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import "../test-helpers/test-helper.js";
+import { ActionCable } from "../namespaces.js";
 import { TestConnection } from "../test-helpers/stubs/test-connection.js";
 import { User } from "../test-helpers/stubs/user.js";
 import { Base } from "./base.js";
@@ -13,6 +15,10 @@ class SecretChannel extends Base {
 
   secretAction(): void {}
 }
+
+const RejectionTest = { name: "ActionCable::Channel::RejectionTest" };
+rbModConstSet(ActionCable.Channel, "RejectionTest", RejectionTest);
+rbModConstSet(RejectionTest, "SecretChannel", SecretChannel);
 
 function mockSubscriptions(): [{ removeSubscription(subscription: unknown): unknown }, Mock] {
   const removeSubscription = new Mock();
