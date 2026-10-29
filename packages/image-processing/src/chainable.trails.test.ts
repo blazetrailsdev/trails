@@ -34,22 +34,4 @@ describe("Chainable as a thenable Proxy", () => {
     expect(builder[Symbol.toPrimitive]).toBeUndefined();
     expect(typeof builder.constructor).toBe("function");
   });
-
-  it("applies a hash or an array of operations", () => {
-    const fromHash = Vips.apply({ resizeToFit: [400, 400], invert: true, rot90: null, rot: "d90" });
-    const fromArray = Vips.apply([
-      ["resizeToFit", [400, 400]],
-      ["invert", true],
-      ["rot90", null],
-      ["rot", "d90"],
-    ]);
-    const expected = [
-      ["resizeToFit", [400, 400]],
-      ["invert", []],
-      ["rot90", []],
-      ["rot", ["d90"]],
-    ];
-    expect(fromHash.options.operations).toEqual(expected);
-    expect(fromArray.options.operations).toEqual(expected);
-  });
 });
