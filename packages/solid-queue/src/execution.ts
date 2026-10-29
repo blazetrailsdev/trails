@@ -123,7 +123,7 @@ registerModel("SolidQueue::Execution", Execution);
 registerConstant("SolidQueue::Execution::UndiscardableError", UndiscardableError);
 
 declare module "@blazetrails/activerecord" {
-  // eslint-disable-next-line unused-imports/no-unused-vars -- the augmented interface must repeat RelationScopes<T>
+  // eslint-disable-next-line unused-imports/no-unused-vars
   interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
     ordered<R extends Execution>(this: Relation<R>): Relation<R>;
   }

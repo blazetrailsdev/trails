@@ -50,7 +50,7 @@ export class ScheduledExecution extends Execution {
 }
 
 declare module "@blazetrails/activerecord" {
-  // eslint-disable-next-line unused-imports/no-unused-vars -- the augmented interface must repeat RelationScopes<T>
+  // eslint-disable-next-line unused-imports/no-unused-vars
   interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
     due(this: Relation<ScheduledExecution>): Relation<ScheduledExecution>;
   }
