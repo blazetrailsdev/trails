@@ -13,6 +13,10 @@ export class DestroyAssociationAsyncJob extends JobBase {
     this.discardOn(DeserializationError);
   }
 
+  /**
+   * @inventedArm replace — CONVERGEABLE destroy-association-async-job-reads-models-from-register-model
+   * @inventedArm computeType — CONVERGEABLE destroy-association-async-job-reads-models-from-register-model
+   */
   async perform({
     ownerModelName = null,
     ownerId = null,
