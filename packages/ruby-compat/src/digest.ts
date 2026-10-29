@@ -33,6 +33,11 @@ export class DigestClass {
     return new DigestInstance(this.algorithm);
   }
 
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/digest.c:458 */
+  digest(data: string | Uint8Array): Bytes {
+    return this.new().update(data).digest();
+  }
+
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/digest.c:645 */
   hexdigest(data: string | Uint8Array): string {
     return getCrypto().createHash(this.algorithm).update(data).digest("hex");

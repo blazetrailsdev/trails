@@ -24,9 +24,17 @@
   "dependencies": {
     "@blazetrails/actioncable": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
-    "@blazetrails/activerecord": "workspace:*"
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/arel": "workspace:*",
+    "@blazetrails/date": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/trailties": "workspace:*"
   },
   "engines": {
     "node": ">=24"
+  },
+  "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*"
   }
 }
