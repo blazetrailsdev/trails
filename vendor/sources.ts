@@ -446,6 +446,27 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "rake",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby/rake.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:455 resolves rake (13.2.1).
+      ref: "v13.2.1",
+    },
+    packages: [
+      {
+        name: "rake",
+        libPath: "lib/rake",
+        libEntryFile: "lib/rake.rb",
+        testPath: "test",
+        // The port has not landed: there is no packages/rake workspace for
+        // the comparators to key on.
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "thor",
     origin: {
       type: "git",
