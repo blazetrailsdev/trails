@@ -19,11 +19,9 @@ export class OrderedOptions {
       get(target, method: string | symbol, receiver) {
         if (typeof method === "symbol" || method in target) {
           const value = (target as any)[method];
-          if (typeof value !== "function" || method === "constructor") return value;
-          return (...args: unknown[]) => {
-            const result = value.apply(target, args);
-            return result === target ? receiver : result;
-          };
+          return typeof value === "function" && method !== "constructor"
+            ? value.bind(receiver)
+            : value;
         }
         if (method.endsWith("!")) {
           const nameString = method.slice(0, -1);

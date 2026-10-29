@@ -55,7 +55,7 @@ export async function withCableConfig<T>(
     return await block();
   } finally {
     TopLevel.Trails = old;
-    if (old?.application) await SolidCable.loadCableConfig();
+    await SolidCable.loadCableConfig();
   }
 }
 
@@ -66,7 +66,8 @@ export function useDummyApplication(): void {
     TopLevel.Trails = stubTrails();
     await SolidCable.loadCableConfig();
   });
-  afterAll(() => {
+  afterAll(async () => {
     TopLevel.Trails = old;
+    await SolidCable.loadCableConfig();
   });
 }

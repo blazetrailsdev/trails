@@ -1,4 +1,4 @@
-import { NoMethodError, registerConstant, toI } from "@blazetrails/ruby-compat";
+import { NoMethodError, RuntimeError, registerConstant, toI } from "@blazetrails/ruby-compat";
 import {
   TopLevel,
   days,
@@ -86,8 +86,11 @@ let loadedCableConfig: { config: CableConfig } | { error: unknown } | null = nul
 
 /** @internal */
 function cableConfig(): CableConfig {
-  if ("error" in loadedCableConfig!) throw loadedCableConfig.error;
-  return loadedCableConfig!.config;
+  if (loadedCableConfig === null) {
+    throw new RuntimeError("Could not load configuration. No such file - config/cable.ts");
+  }
+  if ("error" in loadedCableConfig) throw loadedCableConfig.error;
+  return loadedCableConfig.config;
 }
 
 /** @internal */
