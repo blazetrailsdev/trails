@@ -2,7 +2,6 @@ import { ArgumentError } from "./argument-error.js";
 import { isPlainHash, rbBuiltinClassName } from "./object.js";
 import { env as processEnv, getProcessAdapter } from "./process-adapter.js";
 import type { WaitStatus } from "./child-process-adapter.js";
-import { getAsyncContext, type AsyncContext } from "./async-context-adapter.js";
 
 interface SystemCallError extends Error {
   code?: string;
@@ -113,7 +112,7 @@ export class Process {
    * (`vendor/ruby/v3.3.11/process.c:639`).
    */
   static get lastStatus(): Status | null {
-    return (lastStatusContext?.getStore() ?? lastStatusSeat).status;
+    return lastStatus;
   }
 
   /**
@@ -232,8 +231,7 @@ function makeClockResult(milliseconds: number, unit: string): number {
   }
 }
 
-let lastStatusContext: AsyncContext<{ status: Status | null }> | null = null;
-const lastStatusSeat: { status: Status | null } = { status: null };
+let lastStatus: Status | null = null;
 
 /**
  * `rb_last_status_set` (`vendor/ruby/v3.3.11/process.c:681-685`).
@@ -242,6 +240,5 @@ const lastStatusSeat: { status: Status | null } = { status: null };
  * (`vendor/ruby/v3.3.11/process.c:681`).
  */
 export function rbLastStatusSet(status: Status): void {
-  lastStatusContext ??= getAsyncContext().create();
-  (lastStatusContext.getStore() ?? lastStatusSeat).status = status;
+  lastStatus = status;
 }

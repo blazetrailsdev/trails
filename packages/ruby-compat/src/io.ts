@@ -867,22 +867,38 @@ export class IO {
    * yielded a readable IO over the child's stdout and its value answered,
    * then the pipe is closed and `$?` set (`popen_finish`, `io.c:8020-8022`;
    * `pipe_finalize`, `io.c:7302`), readable as {@link Process.lastStatus}.
+   * With no block the IO itself is answered (`popen_finish`, `io.c:8024`).
    * The child's stdout is read whole before the block runs, so the IO is a
-   * binary `StringIO`.
+   * binary `StringIO`, and `$?` is set once that read ends rather than at
+   * `close`.
    *
    * A program that cannot be spawned raises `Errno::ENOENT`, as the fork's
-   * `execve` failure is raised in the parent (`pipe_open`,
-   * `io.c:7513`), and a host with no way to spawn raises
+   * `execve` failure is raised in the parent (`pipe_open`, `io.c:7660-7668`),
+   * after `rb_fork_async_signal_safe` has waited the child and left `$?` at
+   * exit 127 (`io.c:7615`), and a host with no way to spawn raises
    * `NotImplementedError`, as `Open3.capture2e` does.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO.popen`
    * (`vendor/ruby/v3.3.11/io.c:7946`).
    */
+  static async popen(
+    pname: readonly unknown[],
+    opt?: { err?: IO | null },
+  ): Promise<StringIO<Uint8Array>>;
+  static async popen<R>(
+    pname: readonly unknown[],
+    block: (port: StringIO<Uint8Array>) => R | Promise<R>,
+  ): Promise<R>;
+  static async popen<R>(
+    pname: readonly unknown[],
+    opt: { err?: IO | null },
+    block: (port: StringIO<Uint8Array>) => R | Promise<R>,
+  ): Promise<R>;
   static async popen<R>(
     pname: readonly unknown[],
     opt: { err?: IO | null } | ((port: StringIO<Uint8Array>) => R | Promise<R>) = {},
     block?: (port: StringIO<Uint8Array>) => R | Promise<R>,
-  ): Promise<R> {
+  ): Promise<R | StringIO<Uint8Array>> {
     if (typeof opt === "function") {
       block = opt;
       opt = {};
@@ -895,10 +911,17 @@ export class IO {
     }
 
     const [out, status] = await adapter.popen(command, args ?? [], env, opt.err?.fileno() ?? null);
-    if (status.error !== undefined) throw status.error;
+    if (status.error !== undefined) {
+      rbLastStatusSet(new Process.Status({ pid: status.pid, status: 127, signal: null }));
+      throw status.error;
+    }
     const port = new StringIO(out);
+    if (block === undefined) {
+      rbLastStatusSet(new Process.Status(status));
+      return port;
+    }
     try {
-      return await block!(port);
+      return await block(port);
     } finally {
       port.close();
       rbLastStatusSet(new Process.Status(status));

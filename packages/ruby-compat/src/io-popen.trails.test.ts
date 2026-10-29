@@ -34,5 +34,20 @@ describe("IO.popen", () => {
     await expect(
       IO.popen(["trails-no-such-binary-xyz"], (out) => out.read()),
     ).rejects.toBeInstanceOf(Errno.ENOENT);
+    expect(Process.lastStatus!.exitstatus()).toBe(127);
+  });
+
+  it("answers the IO when no block is given", async () => {
+    const out = await IO.popen(["printf", "%s", "x"]);
+    expect(new TextDecoder().decode(out.read())).toBe("x");
+    expect(Process.lastStatus!.isSuccess()).toBe(true);
+  });
+
+  it("merges a leading env hash over the parent's env, keeping PATH", async () => {
+    const out = await IO.popen(
+      [{ POPEN_TEST: "yes" }, "sh", "-c", 'printf %s "$POPEN_TEST"'],
+      (o) => o.read(),
+    );
+    expect(new TextDecoder().decode(out)).toBe("yes");
   });
 });
