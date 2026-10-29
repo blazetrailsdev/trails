@@ -1,4 +1,4 @@
-import { underscore } from "@blazetrails/activesupport";
+import { camelize } from "@blazetrails/activesupport";
 import { block, fetch, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
 import type { Service } from "../service.js";
 
@@ -23,7 +23,7 @@ export class Configurator {
 
   build(serviceName: string): Service {
     const config = this.configFor(serviceName);
-    return this.resolve(String(fetch(config, "service"))).build({
+    return this.resolve(fetch<string>(config, "service")).build({
       ...config,
       configurator: this,
       name: serviceName,
@@ -49,7 +49,7 @@ export class Configurator {
 
   /** @internal */
   private resolve(className: string): ServiceClass {
-    const klass = services[underscore(String(className))];
+    const klass = services[`${camelize(className)}Service`];
     if (klass === undefined)
       throw new RuntimeError(`Missing service adapter for ${rbInspect(className)}`);
     return klass();

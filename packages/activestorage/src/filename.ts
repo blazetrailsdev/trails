@@ -1,4 +1,12 @@
-import { equals as cmpEquals, File, scrub, strip, type Comparable } from "@blazetrails/ruby-compat";
+import { from } from "@blazetrails/activesupport";
+import {
+  equals as cmpEquals,
+  File,
+  rbObjAsString,
+  scrub,
+  strip,
+  type Comparable,
+} from "@blazetrails/ruby-compat";
 
 export class Filename implements Comparable {
   private filename: string;
@@ -20,7 +28,7 @@ export class Filename implements Comparable {
   }
 
   extensionWithoutDelimiter(): string {
-    return this.extensionWithDelimiter().slice(1);
+    return from(this.extensionWithDelimiter(), 1).toString();
   }
 
   extension(): string {
@@ -46,9 +54,11 @@ export class Filename implements Comparable {
   /** @noRailsEquivalent PERMANENT */
   compareTo(other: unknown): number | null {
     const a = this.toString().toLowerCase();
-    const b = String(other).toLowerCase();
+    const b = rbObjAsString(other).toLowerCase();
     return a < b ? -1 : a > b ? 1 : 0;
   }
 
-  equals = cmpEquals;
+  equals(other: unknown): boolean {
+    return cmpEquals.call(this, other);
+  }
 }
