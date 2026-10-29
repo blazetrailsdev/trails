@@ -1,7 +1,8 @@
 # @blazetrails/actioncable
 
-The server half of Action Cable, ported from the `actioncable` gem: every file
-under `actioncable/lib` has a counterpart under `src/` at the Rails path.
+The server half of Action Cable, ported from the `actioncable` gem: every runtime file
+under `actioncable/lib/action_cable` has a counterpart under `src/` at the Rails
+path.
 
 - `channel/`: `Channel::Base` with its callbacks, naming, broadcasting,
   periodic timers and streams, and `Channel::TestCase`.
