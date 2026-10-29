@@ -6,10 +6,6 @@ import type { Invocation } from "../../invocation.js";
 import type { Shell } from "../../shell.js";
 import { Thor, type ThorClass } from "../../thor.js";
 
-function p(obj: unknown): void {
-  puts.call($stdout, rbInspect(obj));
-}
-
 export class A extends Thor {
   static {
     include(this, Actions);
@@ -35,22 +31,22 @@ export class A extends Thor {
   }
 
   async one() {
-    p(1);
+    puts.call($stdout, rbInspect(1));
     await (this as unknown as Invocation).invoke("two");
     await (this as unknown as Invocation).invoke("three");
   }
 
   async two() {
-    p(2);
+    puts.call($stdout, rbInspect(2));
     await (this as unknown as Invocation).invoke("three");
   }
 
   three() {
-    p(3);
+    puts.call($stdout, rbInspect(3));
   }
 
   async four() {
-    p(4);
+    puts.call($stdout, rbInspect(4));
     await (this as unknown as Invocation).invoke("defined:five");
   }
 
@@ -110,15 +106,15 @@ export class C extends Group {
   }
 
   one() {
-    p(1);
+    puts.call($stdout, rbInspect(1));
   }
 
   two() {
-    p(2);
+    puts.call($stdout, rbInspect(2));
   }
 
   three() {
-    p(3);
+    puts.call($stdout, rbInspect(3));
   }
 }
 
@@ -132,7 +128,7 @@ export class Defined extends Group {
   }
 
   async one() {
-    p(1);
+    puts.call($stdout, rbInspect(1));
     const self = this as unknown as Invocation;
     await self.invoke("a:two");
     await self.invoke("a:three");
@@ -141,7 +137,7 @@ export class Defined extends Group {
   }
 
   five() {
-    p(5);
+    puts.call($stdout, rbInspect(5));
   }
 
   print_status() {
