@@ -208,8 +208,8 @@ a genuine gap:
 
 - `Integer#xchr` and `String#to_xs` (builder xchar.rb:161-198) are the `else` arm of `if String.method_defined?(:encode)` (:97), a Ruby 1.8 fallback that no Ruby since 1.9 loads. Scoped to builder's xchar.rb.
   - `xchr`, `to_xs` (only in: `xchar.rb`)
-- Node's event loop stands in for Action Cable's `NIO::Selector` and its thread (CLAUDE.md, "Node's event loop stands in for Action Cable's nio4r selector"). `spawn`, `run` and `wakeup` own and interrupt the selector thread (stream_event_loop.rb:62-133); `writes_pending` (:47-54) and `Stream#flush_write_buffer` (stream.rb:72-92) carry a partial `write_nonblock`, which a `net.Socket` never leaves.
-  - `spawn`, `run`, `wakeup`, `writes_pending`, `flush_write_buffer` (only in: `connection/stream_event_loop.rb`, `connection/stream.rb`)
+- Node's event loop stands in for Action Cable's `NIO::Selector` and its thread (CLAUDE.md, "Node's event loop stands in for Action Cable's nio4r selector"). `spawn`, `run` and `wakeup` own and interrupt the selector thread (stream_event_loop.rb:62-133).
+  - `spawn`, `run`, `wakeup` (only in: `connection/stream_event_loop.rb`)
 - redis.rb:212-252 switches on the redis-rb version. trails ports the redis-rb 5 arm (`extract_subscribed_client(conn)` answers `conn`), which matches ioredis: it subscribes on the connection itself and has no inner raw client to write to. The redis-rb 4 arm's `SubscribedClient#send_command` writes to `conn._client`, so it has no counterpart.
   - `send_command` (only in: `subscription_adapter/redis.rb`)
 - `Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs Thorfiles) is not ported, and these `Thor::Util` members exist only for it: `namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside `Thor::Sandbox` (util.rb:58-70, :153-166), and `user_home`, `thor_root`, `thor_root_glob` and `globs_for` (util.rb:168-216) locate the Thorfiles installed under `~/.thor`. railties never reaches them. Scoped to thor's util.rb.
