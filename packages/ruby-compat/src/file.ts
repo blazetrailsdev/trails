@@ -320,6 +320,20 @@ export class File extends IO {
   }
 
   /**
+   * {@link File.isDirectory} over the backend's async `stat`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.directory?`
+   * (`vendor/ruby/v3.3.11/file.c:1615`).
+   */
+  static async isDirectoryAsync(fileName: string): Promise<boolean> {
+    try {
+      return (await getFs().stat!(fileName)).isDirectory();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:1615` `rb_file_directory_p`, which answers `false`
    * rather than raising when the stat fails (`file.c:1622`).
    *

@@ -2,7 +2,6 @@ import {
   Errno,
   FileUtils,
   File,
-  getFs,
   rbFSend,
   rbObjRespondTo,
   rtest,
@@ -49,7 +48,7 @@ export class EmptyDirectory {
   }
 
   isExists(): Promise<boolean> {
-    return getFs().exists(this.destination);
+    return File.isExistAsync(this.destination);
   }
 
   invokeBang(): Promise<unknown> {
