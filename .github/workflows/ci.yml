@@ -657,6 +657,15 @@ jobs:
           pnpm parity:modules
           pnpm vitest run scripts/parity/module-count.test.ts
 
+      - name: Module-eval import cycles
+        id: import-cycles
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm parity:import-cycles
+          pnpm vitest run scripts/parity/import-cycles.test.ts
+
       # PR attribution check. Scoped to deanmarano-authored PRs: the project
       # forbids Claude attribution in *his* PR descriptions and commits (see
       # CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other

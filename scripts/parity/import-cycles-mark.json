@@ -1,0 +1,10 @@
+{
+  "activerecord": 4,
+  "activesupport": 6,
+  "et-orbi": 2,
+  "i18n": 1,
+  "image-processing": 1,
+  "nokogiri": 4,
+  "ruby-compat": 3,
+  "solid-queue": 8
+}
