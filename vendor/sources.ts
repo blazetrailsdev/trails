@@ -921,7 +921,16 @@ export const SOURCES: readonly UpstreamSource[] = [
       url: "https://github.com/discourse/mini_mime.git",
       ref: "v1.1.5",
     },
-    packages: [],
+    packages: [
+      {
+        name: "mini-mime",
+        libPath: "lib/mini_mime",
+        libEntryFile: "lib/mini_mime.rb",
+        testPath: "test",
+        compareApi: true,
+        compareTests: true,
+      },
+    ],
   },
   {
     name: "net-smtp",

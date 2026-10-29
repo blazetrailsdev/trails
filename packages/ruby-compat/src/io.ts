@@ -1105,6 +1105,22 @@ export class IO {
   }
 
   /**
+   * `rb_io_pread` (`vendor/ruby/v3.3.11/io.c:6202`): `maxlen` bytes read at
+   * `offset` without moving the stream's position, raising `EOFError` when
+   * nothing is there to read.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#pread`
+   * (`vendor/ruby/v3.3.11/io.c:6202`).
+   */
+  pread(maxlen: number, offset: number): Uint8Array {
+    const str = new Uint8Array(maxlen);
+    if (maxlen === 0) return str;
+    const n = getFs().readSync(this.fd, str, 0, maxlen, offset);
+    if (n === 0) throw new EOFError("end of file reached");
+    return str.slice(0, n);
+  }
+
+  /**
    * `IO#each_line` (`vendor/ruby/v3.3.11/io.c:4649` `rb_io_each_line`) with the
    * default separator: each line of the rest of the stream yielded to the
    * block and the receiver returned, or — with no block — a generator standing

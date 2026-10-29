@@ -210,6 +210,7 @@ export const MANIFEST_PACKAGES = [
   "sqlite3",
   "thor",
   "mail",
+  "mini-mime",
 ] as const;
 
 /**

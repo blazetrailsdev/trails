@@ -219,6 +219,7 @@ describe("vendor/sources.ts", () => {
       "fugit",
       "chronic",
       "mail",
+      "mini-mime",
     ]);
     expect(apiComparePackages()).toContain("i18n");
     expect(Object.keys(libPathsManifest())).toContain("i18n");
@@ -401,6 +402,7 @@ describe("vendor/sources.ts", () => {
         "mail",
         "marcel",
         "mini-magick",
+        "mini-mime",
         "msgpack",
         "mysql2",
         "pg",
@@ -458,6 +460,7 @@ describe("vendor/sources.ts", () => {
         "mail",
         "marcel",
         "mini-magick",
+        "mini-mime",
         "msgpack",
         "raabro",
         "rack",

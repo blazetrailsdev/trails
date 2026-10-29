@@ -1703,6 +1703,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   bcrypt: "packages/bcrypt/src/",
   msgpack: "packages/msgpack/src/",
   marcel: "packages/marcel/src/",
+  "mini-mime": "packages/mini-mime/src/",
   chronic: "packages/chronic/src/",
   builder: "packages/builder/src/",
   "et-orbi": "packages/et-orbi/src/",

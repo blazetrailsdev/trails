@@ -639,6 +639,12 @@ importers:
         specifier: workspace:*
         version: link:../vitest-matchers
 
+  packages/mini-mime:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/msgpack:
     dependencies:
       '@blazetrails/date':
