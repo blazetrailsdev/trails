@@ -80,7 +80,6 @@ export class StreamEventLoop {
     io.close();
   }
 
-  /** @inventedArm if — PERMANENT */
   writesPending(io: Io): void {
     const monitor = this._map.get(io);
     if (monitor != null) {
