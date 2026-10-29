@@ -37,7 +37,9 @@ describe("findWithIds — composite primary key", () => {
 });
 
 describe("find — with a block", () => {
-  const rel: any = { each: (fn: (i: number) => void) => Promise.resolve([1, 2, 3].forEach(fn)) };
+  const rel: any = {
+    each: (fn: (i: number) => void) => Promise.resolve([1, 2, 3].forEach((i) => fn(i))),
+  };
 
   it("is Enumerable#find over each", async () => {
     await expect(find.call(rel, (i: number) => i > 1)).resolves.toBe(2);

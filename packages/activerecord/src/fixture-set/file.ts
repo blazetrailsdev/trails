@@ -36,7 +36,7 @@ export class File {
   }
 
   each(block: (row: [string, unknown]) => void): void {
-    this.rows().forEach(block);
+    for (const row of this.rows()) block(row);
   }
 
   get modelClass(): unknown {

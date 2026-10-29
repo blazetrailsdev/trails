@@ -234,7 +234,7 @@ class ArelLike {
   }
   each(block: (comment: Comment) => void): void {
     const a = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
-    a.forEach(block);
+    a.forEach((x) => block(x));
   }
   *[Symbol.iterator](): Iterator<Comment> {
     const a: Comment[] = [];

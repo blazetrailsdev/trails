@@ -40,7 +40,7 @@ export class Errors<TBase extends object = object> {
   private _base: TBase | null;
 
   each(fn: (error: ActiveModelError) => void): void {
-    this._errors.forEach(fn);
+    for (const error of this._errors) fn(error);
   }
 
   clear(): void {

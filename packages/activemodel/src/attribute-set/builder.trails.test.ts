@@ -90,7 +90,7 @@ describe("LazyAttributeSet", () => {
         return Object.keys(this.columnIndexes);
       }
       eachKey(block: (key: string) => void) {
-        Object.keys(this.columnIndexes).forEach(block);
+        Object.keys(this.columnIndexes).forEach((k) => block(k));
       }
       fetch(column: string, block?: () => unknown) {
         return this.isKey(column) ? this.row[this.columnIndexes[column]] : block?.();

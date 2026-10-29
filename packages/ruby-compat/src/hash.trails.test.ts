@@ -466,7 +466,7 @@ describe("a Hash send to a receiver that defines the method itself", () => {
       return Object.keys(this.row);
     }
     eachKey(block: (key: string) => void): void {
-      this.keys().forEach(block);
+      this.keys().forEach((k) => block(k));
     }
     fetch(column: string, fallback?: () => unknown): unknown {
       return this.isKey(column) ? this.row[column.toLowerCase()] : fallback?.();

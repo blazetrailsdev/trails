@@ -9,7 +9,9 @@ import "./support/canonical-model-index.js";
 
 describe("lookupCastTypeFromJoinDependencies", () => {
   const fakeJoinDependency = (nodes: unknown[]): JoinDependency =>
-    ({ each: (fn: (node: unknown) => void) => nodes.forEach(fn) }) as unknown as JoinDependency;
+    ({
+      each: (fn: (node: unknown) => void) => nodes.forEach((node) => fn(node)),
+    }) as unknown as JoinDependency;
 
   it("returns cast type from a joined table's attributeTypes", () => {
     const intType = { cast: (v: unknown) => Number(v) };

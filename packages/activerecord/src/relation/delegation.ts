@@ -215,8 +215,8 @@ export type ToXmlOptions = SerializeOptions &
 
 const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   length: (records) => records.length,
-  each: (records, fn: (record: Base, index: number) => void) => {
-    records.forEach(fn);
+  each: (records, fn: (record: Base) => void) => {
+    for (const record of records) fn(record);
     return records;
   },
   join: (records, separator?: string) => records.join(separator),

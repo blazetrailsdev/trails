@@ -160,6 +160,7 @@ export const ENUMERABLE_FREE_FUNCTIONS = new Map<string, string>([
   ["Enumerable#each_slice", "eachSlice"],
   ["Enumerable#first", "first"],
   ["Enumerable#group_by", "groupBy"],
+  ["Enumerable#map", "map"],
   ["Enumerable#partition", "partition"],
   ["Enumerable#take", "take"],
   ["Enumerable#uniq", "uniq"],

@@ -42,6 +42,9 @@ const iterBreak = Symbol("rb_iter_break");
  * one, else its JS iterator, which is how an Array (`rb_ary_each`,
  * `vendor/ruby/v3.3.11/array.c:2532`), a Set or a generator yields, and a Map
  * yields `[key, value]` as `rb_hash_each_pair` does (`vendor/ruby/v3.3.11/hash.c:3149`).
+ * An `each` member's multi-value yield reaches the block packed into one
+ * Array, as `ENUM_WANT_SVALUE` packs it (`rb_enum_values_pack`,
+ * `vendor/ruby/v3.3.11/enum.c:53`).
  */
 function rbBlockCall<T, E, R>(
   obj: Iterable<T> | Each<T, E>,
@@ -79,7 +82,10 @@ function rbBlockCall<T, E, R>(
   let each: unknown;
   try {
     if (typeof (obj as Partial<Each<T, E>>).each === "function") {
-      each = (obj as Each<T, E>).each(block);
+      each = (obj as Each<T, E>).each(((...argv: T[]) =>
+        block(argv.length === 0 ? (null as T) : argv.length === 1 ? argv[0] : (argv as T))) as (
+        i: T,
+      ) => void);
     } else if (awaiting) {
       const it = (obj as Iterable<T>)[Symbol.iterator]();
       for (let step = it.next(); !step.done; step = it.next()) {
@@ -343,6 +349,13 @@ export function find<T, E = unknown>(
  * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`.
  * @noRailsEquivalent PERMANENT
  */
+export function map<T, R, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block: (i: T) => R,
+): Enumerated<E, R[]>;
+/** @noRailsEquivalent PERMANENT */
+export function map<T, E = unknown>(obj: Iterable<T> | Each<T, E>): Enumerated<E, T[]>;
+/** @noRailsEquivalent PERMANENT */
 export function map<T, R, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
   block?: (i: T) => R,
@@ -1293,7 +1306,7 @@ export class Enumerable<T = unknown, E = unknown> {
   }
 
   map<T, R, E = unknown>(this: Each<T, E>, block?: (i: T) => R) {
-    return map(this, block);
+    return block ? map(this, block) : map(this);
   }
 
   groupBy<T, K, E = unknown>(this: Each<T, E>, block?: (i: T) => K) {
