@@ -4117,6 +4117,19 @@ describe("buildReport — TS files with no Rails counterpart", () => {
     expect(report.packages[0].extraFiles).toEqual([]);
   });
 
+  it("holds out an engine's top-level db/, which sits beside lib", () => {
+    const { ruby, ts: ts_ } = makeManifests(
+      "db/migrate/20170806125915_create_active_storage_tables.ts",
+    );
+    const report = buildReport(ruby, ts_, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+
   it("still scores test-fixtures/, the split of lib's test_fixtures.rb", () => {
     const { ruby, ts: ts_ } = makeManifests("test-fixtures/fixture-connection.ts");
     const report = buildReport(ruby, ts_, {

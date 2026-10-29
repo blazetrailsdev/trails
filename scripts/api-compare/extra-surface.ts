@@ -2096,10 +2096,21 @@ const TEST_SUPPORT_SEGMENTS = new Set([
 /** Basenames of per-adapter test helper modules that sit outside those trees. */
 const TEST_SUPPORT_BASENAMES = new Set(["test-helper.ts", "test-helpers.ts"]);
 
+/**
+ * An engine's `db/` (`activestorage/db/migrate/`, `db/update_migrate/`) sits beside `lib/`,
+ * so its ported migrations have no lib counterpart either. Only the package's top-level
+ * `db/` counts: trailties' `generators/rails/db/` mirrors lib.
+ */
+const ENGINE_DB_DIRS = new Set(["migrate", "update-migrate"]);
+
 export function isTestSupportFile(tsFile: string): boolean {
   const segments = tsFile.split("/");
   const base = segments.pop() ?? "";
-  return segments.some((s) => TEST_SUPPORT_SEGMENTS.has(s)) || TEST_SUPPORT_BASENAMES.has(base);
+  return (
+    segments.some((s) => TEST_SUPPORT_SEGMENTS.has(s)) ||
+    TEST_SUPPORT_BASENAMES.has(base) ||
+    (segments[0] === "db" && ENGINE_DB_DIRS.has(segments[1] ?? ""))
+  );
 }
 
 /**
