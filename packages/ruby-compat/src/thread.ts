@@ -26,10 +26,10 @@ let _current: AsyncContext<Thread> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
 let _threadIdCounter = 0;
 const _threads = new Set<Thread>();
-const _locations = new WeakMap<object, string>();
+const _locations = new WeakMap<object, Error>();
 
 /** @perf 2x — PERMANENT */
-function _creationFrame(): string {
+function _creationFrame(): Error {
   const v8 = Error as { stackTraceLimit?: number };
   const limit = v8.stackTraceLimit;
   v8.stackTraceLimit = 3;
@@ -39,7 +39,14 @@ function _creationFrame(): string {
   } finally {
     v8.stackTraceLimit = limit;
   }
-  return error.stack?.split("\n")[3] ?? "";
+  return error;
+}
+
+/** @perf 3x — PERMANENT */
+function _location(error: Error): string | null {
+  const frame = error.stack?.split("\n")[3] ?? "";
+  const location = /\(?((?:file:\/\/)?[^\s()]+):(\d+):\d+\)?$/.exec(frame);
+  return location ? `${location[1]}:${location[2]}` : null;
 }
 const _wakeups = new WeakMap<object, (() => void) | true>();
 const _locals = new WeakMap<object, Map<string, unknown>>();
@@ -191,9 +198,7 @@ export class Thread<R = unknown> {
     this.id = ++_threadIdCounter;
     _threads.add(this as Thread);
     this.status = "run";
-    const frame = _creationFrame();
-    const location = /\(?((?:file:\/\/)?[^\s()]+):(\d+):\d+\)?$/.exec(frame);
-    if (location) _locations.set(this, `${location[1]}:${location[2]}`);
+    _locations.set(this, _creationFrame());
     try {
       this.#value = currentSlot().run(this as Thread, () => block(...args));
     } catch (error) {
@@ -386,7 +391,9 @@ export class Thread<R = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#to_s` (`vendor/ruby/v3.3.11/thread.c:3473`).
    */
   toString(): string {
-    const location = _locations.has(this) ? ` ${_locations.get(this)}` : "";
+    const frame = _locations.get(this);
+    const at = frame ? _location(frame) : null;
+    const location = at != null ? ` ${at}` : "";
     const name = this.name != null ? `@${this.name}` : "";
     const cname = this.constructor.name;
     return `#<${cname}:0x${this.id.toString(16).padStart(16, "0")}${name}${location} ${this.status}>`;
