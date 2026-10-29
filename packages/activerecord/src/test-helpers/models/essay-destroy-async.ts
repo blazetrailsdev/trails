@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import type { BookDestroyAsync } from "./book-destroy-async.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";

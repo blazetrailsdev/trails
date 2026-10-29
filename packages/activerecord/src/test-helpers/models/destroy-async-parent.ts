@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { DlKeyedHasMany } from "./dl-keyed-has-many.js";
 import type { DlKeyedHasManyThrough } from "./dl-keyed-has-many-through.js";

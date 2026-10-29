@@ -15,6 +15,7 @@ import { compactBlank, isBlank } from "@blazetrails/activesupport";
 import { rbCheckArrayType, rbHash, rbModToS, rbObjRespondTo, uniq } from "@blazetrails/ruby-compat";
 import { _allocation, equals as coreEquals, hash as coreHash } from "./core.js";
 import { hasQueryConstraints, queryConstraints } from "./persistence.js";
+import { DestroyAssociationAsyncJob } from "./destroy-association-async-job.js";
 
 describe("present? / blank?", () => {
   fixtures(["topics"]);
@@ -594,9 +595,7 @@ describe("underscore class_attribute slots", () => {
 
     expect(Base._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
     expect(Base._isDestroyAssociationAsyncJob).toBe(true);
-    expect(() => Parent.destroyAssociationAsyncJob).toThrow(
-      /Unable to load destroy_association_async_job: /,
-    );
+    expect(Parent.destroyAssociationAsyncJob).toBe(DestroyAssociationAsyncJob);
 
     Parent.destroyAssociationAsyncJob = Job;
     expect(Child.destroyAssociationAsyncJob).toBe(Job);

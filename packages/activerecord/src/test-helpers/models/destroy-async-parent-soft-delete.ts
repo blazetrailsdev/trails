@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { DlKeyedHasOne } from "./dl-keyed-has-one.js";
 import type { Tag } from "./tag.js";

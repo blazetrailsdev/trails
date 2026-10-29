@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import type { DestroyAsyncParent } from "./destroy-async-parent.js";
 import type { DestroyAsyncParentSoftDelete } from "./destroy-async-parent-soft-delete.js";
 import { Base } from "../../base.js";

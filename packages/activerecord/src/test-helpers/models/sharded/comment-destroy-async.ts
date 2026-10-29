@@ -1,3 +1,4 @@
+import "../../../destroy-association-async-job.js";
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";

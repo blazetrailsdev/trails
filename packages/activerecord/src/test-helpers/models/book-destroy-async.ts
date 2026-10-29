@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Content } from "./content.js";

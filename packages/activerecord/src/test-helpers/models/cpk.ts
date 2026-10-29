@@ -1,3 +1,4 @@
+import "../../destroy-association-async-job.js";
 import { kernelThrow, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
