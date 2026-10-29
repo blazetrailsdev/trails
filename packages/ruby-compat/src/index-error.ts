@@ -10,5 +10,3 @@ import { StandardError } from "./standard-error.js";
  * rather than defines.
  */
 export class IndexError extends StandardError {}
-
-IndexError.prototype.name = "IndexError";

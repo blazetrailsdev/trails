@@ -17,5 +17,3 @@ export class LoadError extends Exception {
    */
   path: string | null = null;
 }
-
-LoadError.prototype.name = "LoadError";

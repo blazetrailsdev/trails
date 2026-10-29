@@ -62,15 +62,15 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   /** @missingRailsArgs template — PERMANENT */
-  editDatabaseConfig(): void {
+  async editDatabaseConfig(): Promise<void> {
     const target =
       ["config/database.ts", "config/database.js"].find((p) =>
         File.isExist(File.join(this.destinationRoot, p)),
       ) ?? `config/database${this.ext()}`;
-    this.template(this.database.template, target);
+    await this.template(this.database.template, target);
   }
 
-  private template(source: string, destination: string): void {
+  override async template(source: string, destination: string): Promise<void> {
     this.writeOrUpdate(
       destination,
       TEMPLATES[source]({ appName: this.appName, database: this.database }),

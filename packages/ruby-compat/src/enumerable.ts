@@ -479,8 +479,20 @@ export function eachWithIndex<T, E = unknown>(
 /** @noRailsEquivalent PERMANENT */
 export function eachWithIndex<T, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
-  block: (i: T, n: number) => unknown,
+): Enumerator<[T, number], E>;
+/** @noRailsEquivalent PERMANENT */
+export function eachWithIndex<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  block?: (i: T, n: number) => unknown,
 ): unknown {
+  if (!block) {
+    return new Enumerator<[T, number], E>(
+      { eachWithIndex: (block: (i: T, n: number) => unknown) => eachWithIndex(obj, block) },
+      "eachWithIndex",
+      [],
+      () => enumSize(obj),
+    );
+  }
   let n = 0;
   return rbBlockCall(
     obj,
@@ -511,8 +523,24 @@ export function eachWithObject<T, M, E = unknown>(
 export function eachWithObject<T, M, E = unknown>(
   obj: Iterable<T> | Each<T, E>,
   memo: M,
-  block: (i: T, memo: M) => unknown,
+): Enumerator<[T, M], E>;
+/** @noRailsEquivalent PERMANENT */
+export function eachWithObject<T, M, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  memo: M,
+  block?: (i: T, memo: M) => unknown,
 ): unknown {
+  if (!block) {
+    return new Enumerator<[T, M], E>(
+      {
+        eachWithObject: (memo: M, block: (i: T, memo: M) => unknown) =>
+          eachWithObject(obj, memo, block),
+      },
+      "eachWithObject",
+      [memo],
+      () => enumSize(obj),
+    );
+  }
   return rbBlockCall(
     obj,
     (i) => block(i, memo),

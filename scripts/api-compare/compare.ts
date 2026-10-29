@@ -828,6 +828,7 @@ const TYPED_CREDITED_CALLS = new Set([
   "merge",
   "merge!",
   "update",
+  "fetch",
 ]);
 
 /**

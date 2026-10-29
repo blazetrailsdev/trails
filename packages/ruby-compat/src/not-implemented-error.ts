@@ -11,5 +11,4 @@ import { Exception } from "./exception.js";
  */
 export class NotImplementedError extends Exception {}
 
-NotImplementedError.prototype.name = "NotImplementedError";
 NotImplementedError.prototype.message = "NotImplementedError";

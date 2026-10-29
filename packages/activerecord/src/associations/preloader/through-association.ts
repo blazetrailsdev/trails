@@ -153,13 +153,12 @@ export class ThroughAssociation extends Association {
   }
 
   private async preloadIndex(): Promise<Map<Base, number>> {
-    return (this._preloadIndex ??= await (async () => {
-      const result = new Map<Base, number>();
-      (await this.preloadedRecords()).forEach((record, index) => {
-        result.set(record, index);
-      });
-      return result;
-    })());
+    return (this._preloadIndex ??= eachWithObject(
+      await this.preloadedRecords(),
+      new Map<Base, number>(),
+    ).withIndex(null, ([record, result]: [Base, Map<Base, number>], index: number) => {
+      result.set(record, index);
+    }) as Map<Base, number>);
   }
 
   private throughScope(): any {

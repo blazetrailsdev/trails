@@ -26,6 +26,31 @@ import type { Base } from "./base.js";
 import type { TestCase } from "./cases/test-case.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { Column as MySQLColumn } from "./connection-adapters/mysql/column.js";
+import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
+import type { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
+import type { ExpoSQLiteAdapter } from "./connection-adapters/expo-sqlite-adapter.js";
+import type { LibSQLAdapter } from "./connection-adapters/libsql-adapter.js";
+import type { LibSQLRemoteAdapter } from "./connection-adapters/libsql-remote-adapter.js";
+import type { LibSQLReplicaAdapter } from "./connection-adapters/libsql-replica-adapter.js";
+import type { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
+import type { NodeSQLiteAdapter } from "./connection-adapters/node-sqlite-adapter.js";
+import type {
+  InverseOfAssociationRecursiveError,
+  HasManyThroughAssociationNotFoundError,
+  HasManyThroughAssociationPolymorphicSourceError,
+  HasManyThroughAssociationPolymorphicThroughError,
+  HasManyThroughAssociationPointlessSourceTypeError,
+  HasOneThroughCantAssociateThroughCollection,
+  HasOneAssociationPolymorphicThroughError,
+  HasManyThroughSourceAssociationNotFoundError,
+  ThroughCantAssociateThroughHasOneOrManyReflection,
+  HasManyThroughCantAssociateThroughHasOneOrManyReflection,
+  HasOneThroughCantAssociateThroughHasOneOrManyReflection,
+  AmbiguousSourceReflectionForThroughAssociation,
+  ThroughNestedAssociationsAreReadonly,
+  HasManyThroughNestedAssociationsAreReadonly,
+  HasOneThroughNestedAssociationsAreReadonly,
+} from "./associations/errors.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import type { load, register, resolve } from "./connection-adapters.js";
 import type * as ConnectionHandling from "./connection-handling.js";
@@ -214,6 +239,21 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Point: new (x: number, y: number) => { x: number; y: number };
   TestCase: typeof TestCase;
   Railties: typeof Railties;
+  InverseOfAssociationRecursiveError: typeof InverseOfAssociationRecursiveError;
+  HasManyThroughAssociationNotFoundError: typeof HasManyThroughAssociationNotFoundError;
+  HasManyThroughAssociationPolymorphicSourceError: typeof HasManyThroughAssociationPolymorphicSourceError;
+  HasManyThroughAssociationPolymorphicThroughError: typeof HasManyThroughAssociationPolymorphicThroughError;
+  HasManyThroughAssociationPointlessSourceTypeError: typeof HasManyThroughAssociationPointlessSourceTypeError;
+  HasOneThroughCantAssociateThroughCollection: typeof HasOneThroughCantAssociateThroughCollection;
+  HasOneAssociationPolymorphicThroughError: typeof HasOneAssociationPolymorphicThroughError;
+  HasManyThroughSourceAssociationNotFoundError: typeof HasManyThroughSourceAssociationNotFoundError;
+  ThroughCantAssociateThroughHasOneOrManyReflection: typeof ThroughCantAssociateThroughHasOneOrManyReflection;
+  HasManyThroughCantAssociateThroughHasOneOrManyReflection: typeof HasManyThroughCantAssociateThroughHasOneOrManyReflection;
+  HasOneThroughCantAssociateThroughHasOneOrManyReflection: typeof HasOneThroughCantAssociateThroughHasOneOrManyReflection;
+  AmbiguousSourceReflectionForThroughAssociation: typeof AmbiguousSourceReflectionForThroughAssociation;
+  ThroughNestedAssociationsAreReadonly: typeof ThroughNestedAssociationsAreReadonly;
+  HasManyThroughNestedAssociationsAreReadonly: typeof HasManyThroughNestedAssociationsAreReadonly;
+  HasOneThroughNestedAssociationsAreReadonly: typeof HasOneThroughNestedAssociationsAreReadonly;
   afterAllTransactionsCommit: typeof import("./active-record.js").afterAllTransactionsCommit;
 };
 registerConstant("ActiveRecord", ActiveRecord);
@@ -342,6 +382,14 @@ export const ConnectionAdapters = {
   adapters: Map<string, [string, string]>;
   ConnectionPool: typeof ConnectionPool;
   MySQL: { name: string; Column: typeof MySQLColumn };
+  AbstractAdapter: typeof AbstractAdapter;
+  BetterSQLite3Adapter: typeof BetterSQLite3Adapter;
+  ExpoSQLiteAdapter: typeof ExpoSQLiteAdapter;
+  LibSQLAdapter: typeof LibSQLAdapter;
+  LibSQLRemoteAdapter: typeof LibSQLRemoteAdapter;
+  LibSQLReplicaAdapter: typeof LibSQLReplicaAdapter;
+  Mysql2Adapter: typeof Mysql2Adapter;
+  NodeSQLiteAdapter: typeof NodeSQLiteAdapter;
   PostgreSQLAdapter: typeof PostgreSQLAdapter;
   register: typeof register;
   load: typeof load;
@@ -416,8 +464,8 @@ Encryption.eagerAutoload(() => {
   Encryption.autoload("Scheme");
 });
 
-export const Railties = { name: "ActiveRecord::Railties" } as {
+export const Railties = { name: "ActiveRecord::Trailties" } as {
   name: string;
   ControllerRuntime?: object;
 };
-rbModConstSet(ActiveRecord, "Railties", Railties);
+ActiveRecord.Railties = Railties;

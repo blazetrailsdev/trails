@@ -89,6 +89,7 @@ export {
   rbCSymbol,
   rbCTime,
   rbCTrueClass,
+  rbCProc,
   rbObjClass,
   rbClassOf,
   rbObjIsProc,
@@ -508,7 +509,5 @@ export {
 } from "./uri.js";
 
 import { Kernel } from "./include.js";
-import { abort } from "./process-adapter.js";
 import { kernelRand } from "./kernel-rand.js";
-Kernel.abort = abort;
 Kernel.rand = kernelRand;

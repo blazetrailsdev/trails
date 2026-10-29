@@ -1,10 +1,4 @@
-import {
-  classpaths,
-  defineAccessorHalf,
-  Module,
-  NameError,
-  rbModName,
-} from "@blazetrails/ruby-compat";
+import { defineAccessorHalf, Module, NameError, rbModName } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
@@ -214,26 +208,8 @@ export function attrInternalAccessor(this: object, ...attrs: string[]): void {
 
 export const attrInternal = attrInternalAccessor;
 
-/**
- * `name.nil?` (`core_ext/module/anonymous.rb:27-29`). A class is named by the
- * constant seat that paths it (`vendor/ruby/v3.3.11/variable.c:122-127`), or
- * by its own `class Foo` definition. A definition with no identifier is
- * Ruby's `Class.new`, which JS names after the binding it is assigned to:
- * like Ruby, that names the class only when the binding is a constant name
- * (`Foo = Class.new`), and not when it is a local (`klass = Class.new`).
- *
- * A minifier that mangles class names is out of scope, as it is for every
- * reader of `name`: `controller_name` would read the mangled name either way.
- * A bundle keeps its classes named by preserving names (esbuild `keepNames`
- * writes the original constant name back onto the class) or by seating them.
- */
-export function isAnonymous(klass: { name: string }): boolean {
-  if (classpaths.has(klass)) return false;
-  if (!klass.name) return true;
-  if (typeof klass !== "function") return false;
-  const source = Function.prototype.toString.call(klass);
-  if (!/^class(?:\s|\/\*[\s\S]*?\*\/|\/\/.*)*(?:extends\b|\{)/.test(source)) return false;
-  return !/^[\p{Lu}\p{Lt}]/u.test(klass.name);
+export function isAnonymous(klass: object): boolean {
+  return rbModName(klass) == null;
 }
 
 export function moduleParentName(klass: object): string | null {

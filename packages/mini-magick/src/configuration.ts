@@ -12,12 +12,8 @@ export class Configuration {
   declare _errors: unknown;
   declare _warnings: unknown;
 
+  /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
-
-  static toString(): string {
-    return "MiniMagick::Configuration";
-  }
-
   get graphicsmagick() {
     return this._graphicsmagick ?? null;
   }

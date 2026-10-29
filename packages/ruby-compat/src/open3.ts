@@ -63,7 +63,7 @@ export class Open3 {
    */
   static async capture3(
     ...cmd: unknown[]
-  ): Promise<[string, string, InstanceType<typeof Process.Status>]> {
+  ): Promise<[string | Uint8Array, string, InstanceType<typeof Process.Status>]> {
     let opts: {
       stdinData?: string | Uint8Array | null;
       binmode?: unknown;

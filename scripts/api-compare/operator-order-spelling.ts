@@ -111,6 +111,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // action_dispatch/http/mime_type.rb:51 `def [](type)` inside `class << self`
   // → http/mime-type.ts `Mime.get`.
   Mime: { "self.[]": ["get"] },
+  "MiniMagick::Image": { "[]": ["get"] },
+  "MiniMagick::Image::Info": { "[]": ["get"] },
+  "MiniMagick::Tool": { "<<": ["append"] },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.
   "Arel::Table": { "[]": ["get"] },
   // arel/nodes/table_alias.rb:10 `def [](name)` → nodes/table-alias.ts `get`.

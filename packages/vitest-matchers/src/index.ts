@@ -10,6 +10,8 @@ export interface RubyMatchers<R = unknown> {
   toBeWithinDelta(exp: number, delta?: number): R;
   toBeEmpty(): R;
   toBeExactInstanceOf(cls: unknown): R;
+  toBeTypeOfAnd(type: "number", predicate: "nonzero"): R;
+  toBeTypeOfAnd(type: "string", predicate: "nonempty"): R;
   toRespondTo(meth: string): R;
   toStartWith(...expected: unknown[]): R;
   toEndWith(...expected: unknown[]): R;
@@ -74,6 +76,14 @@ export const matchers = {
   toBeExactInstanceOf(this: MatcherState, received: unknown, cls: unknown) {
     const pass = received != null && (received as object).constructor === cls;
     return result(this, pass, received, `to be an instance of ${String(cls)}`);
+  },
+  toBeTypeOfAnd(
+    this: MatcherState,
+    received: unknown,
+    ...[type, predicate]: ["number", "nonzero"] | ["string", "nonempty"]
+  ) {
+    const pass = typeof received === type && (type === "number" ? received !== 0 : received !== "");
+    return result(this, pass, received, `to be a ${type} and be ${predicate}`);
   },
   toRespondTo(this: MatcherState, received: unknown, meth: string) {
     return result(this, rbObjRespondTo(received, meth), received, `to respond to #${meth}`);

@@ -118,8 +118,6 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   string,
   { tsExport: string; receiver: ReceiverKind }
 >([
-  ["Array#compact", { tsExport: "compact", receiver: "array" }],
-  ["Array#count", { tsExport: "aryCount", receiver: "array" }],
   ["Array#delete", { tsExport: "aryDelete", receiver: "array" }],
   ["Array#include?", { tsExport: "aryIncludes", receiver: "array" }],
   ["Array#join", { tsExport: "aryJoin", receiver: "array" }],

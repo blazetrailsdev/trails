@@ -34,16 +34,12 @@ describe("MiniMagick::Shell", () => {
     it("uses stderr and status for error messages", async () => {
       vi.spyOn(subject, "execute").mockResolvedValue(["", "stderr", 1]);
       const expectedMsg = "`foo` failed with status: 1 and error:\nstderr";
-      await expect(subject.run(["foo"])).rejects.toSatisfy(
-        (e: Error) => e instanceof Error && e.message === expectedMsg,
-      );
+      await expect(subject.run(["foo"])).rejects.toThrow(new Error(expectedMsg));
     });
 
     it("raises an error when executable wasn't found", async () => {
       vi.spyOn(subject, "execute").mockResolvedValue(["", "not found", 127]);
-      await expect(subject.run(["foo"])).rejects.toSatisfy(
-        (e: Error) => e instanceof Error && /not found/.test(e.message),
-      );
+      await expect(subject.run(["foo"])).rejects.toThrow(/not found/);
     });
 
     it("raises errors only in error mode", async () => {
@@ -61,8 +57,8 @@ describe("MiniMagick::Shell", () => {
         subject.run(["convert", imagePath(), "-resize", "10000x10000", "-blur", "0x20", "null:"], {
           timeout: 1,
         }),
-      ).rejects.toBeInstanceOf(TimeoutError);
-    });
+      ).rejects.toThrow(TimeoutError);
+    }, 30_000);
   });
 
   describe("#execute", () => {

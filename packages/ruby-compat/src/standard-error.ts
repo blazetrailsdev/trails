@@ -9,5 +9,3 @@ import { Exception } from "./exception.js";
  * inherits rather than defines.
  */
 export class StandardError extends Exception {}
-
-StandardError.prototype.name = "StandardError";

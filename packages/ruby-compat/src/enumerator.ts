@@ -3,6 +3,8 @@ import { rbBlockGivenP } from "./hash.js";
 import { rbFSend, rtest } from "./object.js";
 import type { Enumerated } from "./enumerable.js";
 import { StopIteration } from "./stop-iteration.js";
+import { FloatDomainError } from "./float-domain-error.js";
+import { num2long } from "./string/support.js";
 
 /**
  * `Enumerator::Yielder` (`vendor/ruby/v3.3.11/enumerator.c:1335` `yielder_init`).
@@ -130,6 +132,56 @@ export class Enumerator<T = unknown, E = unknown> {
       return false;
     }
     return true;
+  }
+
+  /**
+   * `enumerator_with_index` (`vendor/ruby/v3.3.11/enumerator.c:676`), over
+   * `enumerator_with_index_i` (`:642`), which packs a multi-value yield into
+   * one Array before the index. Block-less, it answers an enumerator over
+   * itself sized by `enumerator_enum_size`. The offset goes through `rb_to_int`,
+   * whose Float arm (`flo_to_i`) raises `FloatDomainError` for a non-finite value.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  withIndex(offset?: null): Enumerator<[T, number], E>;
+  /** @noRailsEquivalent PERMANENT */
+  withIndex(offset: number): Enumerator<[T, number | bigint], E>;
+  /** @noRailsEquivalent PERMANENT */
+  withIndex(offset: bigint): Enumerator<[T, bigint], E>;
+  /** @noRailsEquivalent PERMANENT */
+  withIndex(offset: null, block: (value: T, idx: number) => unknown): unknown;
+  /** @noRailsEquivalent PERMANENT */
+  withIndex(offset: number, block: (value: T, idx: number | bigint) => unknown): unknown;
+  /** @noRailsEquivalent PERMANENT */
+  withIndex(offset: bigint, block: (value: T, idx: bigint) => unknown): unknown;
+  /** @noRailsEquivalent PERMANENT */
+  withIndex(
+    offset: number | bigint | null = null,
+    block?: (value: T, idx: never) => unknown,
+  ): unknown {
+    if (!block)
+      return new Enumerator<[T, number | bigint], E>(this, "withIndex", [offset], () =>
+        this.size(),
+      );
+    let memo: number | bigint;
+    if (offset == null) memo = 0;
+    else if (typeof offset === "bigint") memo = offset;
+    else if (typeof offset === "number") {
+      if (!Number.isFinite(offset)) throw new FloatDomainError(String(offset));
+      memo = Math.trunc(offset);
+      if (!Number.isSafeInteger(memo)) memo = BigInt(memo);
+    } else memo = num2long(offset);
+    return this.each((...argv: unknown[]) => {
+      const idx = memo;
+      memo =
+        typeof memo === "bigint"
+          ? memo + 1n
+          : Number.isSafeInteger(memo + 1)
+            ? memo + 1
+            : BigInt(memo) + 1n;
+      if (argv.length <= 1) return block(argv[0] as T, idx as never);
+      return block(argv as T, idx as never);
+    });
   }
 
   /**

@@ -35,3 +35,35 @@ export function tsTypeFor(railsType: string, timeZoneAware?: boolean): string {
   }
   return ATTRIBUTE_TYPE_MAP[railsType] ?? "unknown";
 }
+
+export const ATTRIBUTE_CAST_INPUT_MAP: Record<string, string> = {
+  string: "number | boolean",
+  text: "number | boolean",
+  immutable_string: "number | boolean",
+  uuid: "",
+  inet: "string",
+  cidr: "string",
+  citext: "number | boolean",
+  integer: "string | bigint",
+  big_integer: "number | string",
+  float: "string | bigint",
+  decimal: "string | bigint",
+  boolean: "string | number",
+  date: "string | { toDate(): unknown }",
+  datetime: "string",
+  timestamp: "string",
+  timestamptz: "string",
+  time: "string",
+  json: "",
+  jsonb: "",
+  hstore: "",
+  binary: "string",
+  array: "string",
+  value: "",
+};
+
+export function writerTsTypeFor(railsType: string, readerType: string): string {
+  if (!Object.hasOwn(ATTRIBUTE_TYPE_MAP, railsType) || readerType === "unknown") return "unknown";
+  const extra = ATTRIBUTE_CAST_INPUT_MAP[railsType];
+  return extra ? `${readerType} | ${extra}` : readerType;
+}

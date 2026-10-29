@@ -1,5 +1,6 @@
-import { NotImplementedError, rbModConstSet } from "@blazetrails/ruby-compat";
-import { ActiveJob, QueueAdapters } from "../namespaces.js";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { Base } from "../base.js";
+import { QueueAdapters } from "../namespaces.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 
 export class InlineAdapter extends AbstractAdapter {
@@ -8,7 +9,7 @@ export class InlineAdapter extends AbstractAdapter {
   }
 
   override async enqueue(job: { serialize(): Record<string, unknown> }): Promise<unknown> {
-    return await ActiveJob.Base.execute(job.serialize());
+    return await Base.execute(job.serialize());
   }
 
   override enqueueAt(..._args: unknown[]): never {
@@ -17,4 +18,4 @@ export class InlineAdapter extends AbstractAdapter {
     );
   }
 }
-rbModConstSet(QueueAdapters, "InlineAdapter", InlineAdapter);
+QueueAdapters.InlineAdapter = InlineAdapter;

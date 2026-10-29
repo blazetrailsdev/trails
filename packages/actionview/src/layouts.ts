@@ -1,5 +1,3 @@
-import { ActionView } from "./namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { ArgumentError, NameError, rbFSend, rbInspect } from "@blazetrails/ruby-compat";
 import { Concern, classAttribute, dasherize, extend, underscore } from "@blazetrails/activesupport";
 import { include, Module } from "@blazetrails/ruby-compat/include";
@@ -268,5 +266,3 @@ export const Layouts = new Module((mod) => {
   mod.defineMethod("_isIncludeLayout", _isIncludeLayout);
 }) as Module & { ClassMethods: typeof ClassMethods };
 Layouts.ClassMethods = ClassMethods;
-
-rbModConstSet(ActionView, "Layouts", Layouts);

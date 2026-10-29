@@ -317,12 +317,11 @@ separate one-argument `registerSubclass`: activesupport's two-argument
 child in hand (`attributes.ts`, activemodel's `attribute-registration.ts`) keep
 calling it.
 
-`registerConstant` (ruby-compat) stays the general seat for a constant that is
-not a model, the namespace module a model sits in included: a namespaced model
-is `registerModel((Sharded.Blog = this))`, a plain assignment, as
-`test-helpers/models/sharded/*.ts` do. The seat does not path the class — a
-model's qualified Ruby name comes from the table generated out of
-`rails-api.json` (RFC 0205).
+A namespaced model is `registerModel((Sharded.Blog = this))`, a plain
+assignment, as `test-helpers/models/sharded/*.ts` do. `registerConstant` is not
+a seat for anything else: it is being deleted, and a reader that needs a model
+by name asks the `registerModel` registry, never `constantize` (root CLAUDE.md
+§ "Constant lookup is an import or a registry", 2026-10-28).
 
 This is a genuine language shortcoming, ratified here by the repo owner
 (2026-10-09). The ruling is recorded in the tasks-repo story
@@ -550,8 +549,8 @@ of reads that happen **at module-eval time**. A read inside a function or
 method body is a plain ES import, correct even inside a cycle, so it is not
 listed here and does not need a namespace — see root CLAUDE.md
 § "Call-time constant resolution". `rbModConstSet` appears only where the Rails
-body calls `const_set`, and a class's qualified Ruby path comes from the table
-generated out of `rails-api.json`, not from the seat (RFC 0205).
+body calls `const_set`, and a class's qualified Ruby path is a ruby-compat internal, read only to produce a name (root CLAUDE.md
+§ "Constant lookup is an import or a registry"), not the seat.
 
 The seated constants:
 

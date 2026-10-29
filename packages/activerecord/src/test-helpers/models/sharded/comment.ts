@@ -1,12 +1,8 @@
-import { rbModConstSet, registerConstant, registeredConstant } from "@blazetrails/ruby-compat";
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedBlog } from "./blog.js";
 import type { ShardedBlogPost } from "./blog-post.js";
-
-const Sharded = (registeredConstant("Sharded") as object | undefined) ?? {};
-registerConstant("Sharded", Sharded);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedComment extends Base {
@@ -16,7 +12,7 @@ export class ShardedComment extends Base {
 
   static _tableName = "sharded_comments";
   static {
-    registerModel(rbModConstSet(Sharded, "Comment", this));
+    registerModel("Sharded::Comment", this);
   }
 
   static {

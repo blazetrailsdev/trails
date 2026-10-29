@@ -1,5 +1,5 @@
 import { Duration } from "@blazetrails/activesupport";
-import { hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat";
 import { ActiveJob, Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
@@ -26,4 +26,4 @@ export class DurationSerializer extends ObjectSerializer {
     return Duration;
   }
 }
-rbModConstSet(Serializers, "DurationSerializer", DurationSerializer);
+Serializers.DurationSerializer = DurationSerializer;

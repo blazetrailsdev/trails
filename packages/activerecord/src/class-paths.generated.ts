@@ -184,30 +184,32 @@ import * as m181 from "./tasks/sqlite-database-tasks.js";
 import * as m182 from "./timestamp.js";
 import * as m183 from "./token-for.js";
 import * as m184 from "./touch-later.js";
-import * as m185 from "./transaction.js";
-import * as m186 from "./transactions.js";
-import * as m187 from "./translation.js";
-import * as m188 from "./type-caster/connection.js";
-import * as m189 from "./type-caster/map.js";
-import * as m190 from "./type/adapter-specific-registry.js";
-import * as m191 from "./type/date-time.js";
-import * as m192 from "./type/date.js";
-import * as m193 from "./type/decimal-without-scale.js";
-import * as m194 from "./type/hash-lookup-type-map.js";
-import * as m195 from "./type/internal/timezone.js";
-import * as m196 from "./type/json.js";
-import * as m197 from "./type/serialized.js";
-import * as m198 from "./type/text.js";
-import * as m199 from "./type/time.js";
-import * as m200 from "./type/type-map.js";
-import * as m201 from "./type/unsigned-integer.js";
-import * as m202 from "./validations.js";
-import * as m203 from "./validations/absence.js";
-import * as m204 from "./validations/associated.js";
-import * as m205 from "./validations/length.js";
-import * as m206 from "./validations/numericality.js";
-import * as m207 from "./validations/presence.js";
-import * as m208 from "./validations/uniqueness.js";
+import * as m185 from "./trailties/controller-runtime.js";
+import * as m186 from "./trailties/job-runtime.js";
+import * as m187 from "./transaction.js";
+import * as m188 from "./transactions.js";
+import * as m189 from "./translation.js";
+import * as m190 from "./type-caster/connection.js";
+import * as m191 from "./type-caster/map.js";
+import * as m192 from "./type/adapter-specific-registry.js";
+import * as m193 from "./type/date-time.js";
+import * as m194 from "./type/date.js";
+import * as m195 from "./type/decimal-without-scale.js";
+import * as m196 from "./type/hash-lookup-type-map.js";
+import * as m197 from "./type/internal/timezone.js";
+import * as m198 from "./type/json.js";
+import * as m199 from "./type/serialized.js";
+import * as m200 from "./type/text.js";
+import * as m201 from "./type/time.js";
+import * as m202 from "./type/type-map.js";
+import * as m203 from "./type/unsigned-integer.js";
+import * as m204 from "./validations.js";
+import * as m205 from "./validations/absence.js";
+import * as m206 from "./validations/associated.js";
+import * as m207 from "./validations/length.js";
+import * as m208 from "./validations/numericality.js";
+import * as m209 from "./validations/presence.js";
+import * as m210 from "./validations/uniqueness.js";
 
 registerClassPaths([
   [() => m111.ActiveRecordError, "ActiveRecord::ActiveRecordError"],
@@ -253,6 +255,8 @@ registerClassPaths([
   [() => m23.HasOneThroughAssociation, "ActiveRecord::Associations::HasOneThroughAssociation"],
   [() => m24.JoinDependency, "ActiveRecord::Associations::JoinDependency"],
   [() => m24.Aliases, "ActiveRecord::Associations::JoinDependency::Aliases"],
+  [() => m24.Aliases.Column, "ActiveRecord::Associations::JoinDependency::Aliases::Column"],
+  [() => m24.Aliases.Table, "ActiveRecord::Associations::JoinDependency::Aliases::Table"],
   [() => m25.JoinAssociation, "ActiveRecord::Associations::JoinDependency::JoinAssociation"],
   [() => m26.JoinBase, "ActiveRecord::Associations::JoinDependency::JoinBase"],
   [() => m27.JoinPart, "ActiveRecord::Associations::JoinDependency::JoinPart"],
@@ -460,6 +464,7 @@ registerClassPaths([
   [() => m97.EncryptedAttributeType, "ActiveRecord::Encryption::EncryptedAttributeType"],
   [() => m98.EncryptingOnlyEncryptor, "ActiveRecord::Encryption::EncryptingOnlyEncryptor"],
   [() => m99.Encryptor, "ActiveRecord::Encryption::Encryptor"],
+  [() => m100, "ActiveRecord::Encryption::Errors"],
   [() => m100.Base, "ActiveRecord::Encryption::Errors::Base"],
   [() => m100.Configuration, "ActiveRecord::Encryption::Errors::Configuration"],
   [() => m100.Decryption, "ActiveRecord::Encryption::Errors::Decryption"],
@@ -577,13 +582,26 @@ registerClassPaths([
   [() => m130.Migration, "ActiveRecord::Migration"],
   [() => m130.CheckPending, "ActiveRecord::Migration::CheckPending"],
   [() => m131.CommandRecorder, "ActiveRecord::Migration::CommandRecorder"],
+  [() => m132, "ActiveRecord::Migration::Compatibility"],
   [() => m132.V4_2, "ActiveRecord::Migration::Compatibility::V4_2"],
   [() => m132.V5_0, "ActiveRecord::Migration::Compatibility::V5_0"],
   [() => m132.V5_1, "ActiveRecord::Migration::Compatibility::V5_1"],
   [() => m132.V5_2, "ActiveRecord::Migration::Compatibility::V5_2"],
   [() => m132.V6_0, "ActiveRecord::Migration::Compatibility::V6_0"],
+  [
+    () => m132.V6_0.ReferenceDefinition,
+    "ActiveRecord::Migration::Compatibility::V6_0::ReferenceDefinition",
+  ],
   [() => m132.V6_1, "ActiveRecord::Migration::Compatibility::V6_1"],
+  [
+    () => m132.V6_1.PostgreSQLCompat,
+    "ActiveRecord::Migration::Compatibility::V6_1::PostgreSQLCompat",
+  ],
   [() => m132.V7_0, "ActiveRecord::Migration::Compatibility::V7_0"],
+  [
+    () => m132.V7_0.LegacyIndexName,
+    "ActiveRecord::Migration::Compatibility::V7_0::LegacyIndexName",
+  ],
   [() => m132.V7_1, "ActiveRecord::Migration::Compatibility::V7_1"],
   [() => m132.V7_2, "ActiveRecord::Migration::Compatibility::V7_2"],
   [() => m130.Current, "ActiveRecord::Migration::Current"],
@@ -643,7 +661,7 @@ registerClassPaths([
   [() => m144.HasReadonlyAttributes, "ActiveRecord::ReadonlyAttributes::HasReadonlyAttributes"],
   [() => m111.ReadOnlyError, "ActiveRecord::ReadOnlyError"],
   [() => m111.ReadOnlyRecord, "ActiveRecord::ReadOnlyRecord"],
-  [() => m202.RecordInvalid, "ActiveRecord::RecordInvalid"],
+  [() => m204.RecordInvalid, "ActiveRecord::RecordInvalid"],
   [() => m111.RecordNotDestroyed, "ActiveRecord::RecordNotDestroyed"],
   [() => m111.RecordNotFound, "ActiveRecord::RecordNotFound"],
   [() => m111.RecordNotSaved, "ActiveRecord::RecordNotSaved"],
@@ -670,6 +688,7 @@ registerClassPaths([
   [() => m153.HashMerger, "ActiveRecord::Relation::HashMerger"],
   [() => m153.Merger, "ActiveRecord::Relation::Merger"],
   [() => m161.QueryAttribute, "ActiveRecord::Relation::QueryAttribute"],
+  [() => m146.Relation.StrictLoadingScope, "ActiveRecord::Relation::StrictLoadingScope"],
   [() => m164.WhereClause, "ActiveRecord::Relation::WhereClause"],
   [() => m165.Result, "ActiveRecord::Result"],
   [() => m165.IndexedRow, "ActiveRecord::Result::IndexedRow"],
@@ -682,6 +701,7 @@ registerClassPaths([
   [() => m168.NullSchemaMigration, "ActiveRecord::SchemaMigration::NullSchemaMigration"],
   [() => m171.Default, "ActiveRecord::Scoping::Default"],
   [() => m171.DefaultScope, "ActiveRecord::Scoping::DefaultScope"],
+  [() => m172, "ActiveRecord::Scoping::Named"],
   [() => m172.ClassMethods, "ActiveRecord::Scoping::Named::ClassMethods"],
   [() => m170.ScopeRegistry, "ActiveRecord::Scoping::ScopeRegistry"],
   [() => m173.MinimumLengthError, "ActiveRecord::SecureToken::MinimumLengthError"],
@@ -730,41 +750,44 @@ registerClassPaths([
   [() => m183.RelationMethods, "ActiveRecord::TokenFor::RelationMethods"],
   [() => m183.TokenDefinition, "ActiveRecord::TokenFor::TokenDefinition"],
   [() => m184.TouchLater, "ActiveRecord::TouchLater"],
-  [() => m185.Transaction, "ActiveRecord::Transaction"],
+  [() => m185.ControllerRuntime, "ActiveRecord::Trailties::ControllerRuntime"],
+  [() => m185.ClassMethods, "ActiveRecord::Trailties::ControllerRuntime::ClassMethods"],
+  [() => m186.JobRuntime, "ActiveRecord::Trailties::JobRuntime"],
+  [() => m187.Transaction, "ActiveRecord::Transaction"],
   [() => m111.TransactionIsolationError, "ActiveRecord::TransactionIsolationError"],
   [() => m111.TransactionRollbackError, "ActiveRecord::TransactionRollbackError"],
-  [() => m186.Transactions, "ActiveRecord::Transactions"],
-  [() => m187.Translation, "ActiveRecord::Translation"],
-  [() => m190.AdapterSpecificRegistry, "ActiveRecord::Type::AdapterSpecificRegistry"],
-  [() => m192.Date, "ActiveRecord::Type::Date"],
-  [() => m191.DateTime, "ActiveRecord::Type::DateTime"],
-  [() => m193.DecimalWithoutScale, "ActiveRecord::Type::DecimalWithoutScale"],
-  [() => m190.DecorationRegistration, "ActiveRecord::Type::DecorationRegistration"],
-  [() => m194.HashLookupTypeMap, "ActiveRecord::Type::HashLookupTypeMap"],
-  [() => m195.Timezone, "ActiveRecord::Type::Internal::Timezone"],
-  [() => m196.Json, "ActiveRecord::Type::Json"],
-  [() => m190.Registration, "ActiveRecord::Type::Registration"],
-  [() => m197.Serialized, "ActiveRecord::Type::Serialized"],
-  [() => m198.Text, "ActiveRecord::Type::Text"],
-  [() => m199.Time, "ActiveRecord::Type::Time"],
-  [() => m199.Value, "ActiveRecord::Type::Time::Value"],
-  [() => m200.TypeMap, "ActiveRecord::Type::TypeMap"],
-  [() => m201.UnsignedInteger, "ActiveRecord::Type::UnsignedInteger"],
-  [() => m188.Connection, "ActiveRecord::TypeCaster::Connection"],
-  [() => m189.Map, "ActiveRecord::TypeCaster::Map"],
-  [() => m190.TypeConflictError, "ActiveRecord::TypeConflictError"],
+  [() => m188.Transactions, "ActiveRecord::Transactions"],
+  [() => m189.Translation, "ActiveRecord::Translation"],
+  [() => m192.AdapterSpecificRegistry, "ActiveRecord::Type::AdapterSpecificRegistry"],
+  [() => m194.Date, "ActiveRecord::Type::Date"],
+  [() => m193.DateTime, "ActiveRecord::Type::DateTime"],
+  [() => m195.DecimalWithoutScale, "ActiveRecord::Type::DecimalWithoutScale"],
+  [() => m192.DecorationRegistration, "ActiveRecord::Type::DecorationRegistration"],
+  [() => m196.HashLookupTypeMap, "ActiveRecord::Type::HashLookupTypeMap"],
+  [() => m197.Timezone, "ActiveRecord::Type::Internal::Timezone"],
+  [() => m198.Json, "ActiveRecord::Type::Json"],
+  [() => m192.Registration, "ActiveRecord::Type::Registration"],
+  [() => m199.Serialized, "ActiveRecord::Type::Serialized"],
+  [() => m200.Text, "ActiveRecord::Type::Text"],
+  [() => m201.Time, "ActiveRecord::Type::Time"],
+  [() => m201.Value, "ActiveRecord::Type::Time::Value"],
+  [() => m202.TypeMap, "ActiveRecord::Type::TypeMap"],
+  [() => m203.UnsignedInteger, "ActiveRecord::Type::UnsignedInteger"],
+  [() => m190.Connection, "ActiveRecord::TypeCaster::Connection"],
+  [() => m191.Map, "ActiveRecord::TypeCaster::Map"],
+  [() => m192.TypeConflictError, "ActiveRecord::TypeConflictError"],
   [() => m111.UnknownAttributeReference, "ActiveRecord::UnknownAttributeReference"],
   [() => m130.UnknownMigrationVersionError, "ActiveRecord::UnknownMigrationVersionError"],
   [() => m111.UnknownPrimaryKey, "ActiveRecord::UnknownPrimaryKey"],
   [() => m111.UnmodifiableRelation, "ActiveRecord::UnmodifiableRelation"],
-  [() => m202.Validations, "ActiveRecord::Validations"],
-  [() => m203.AbsenceValidator, "ActiveRecord::Validations::AbsenceValidator"],
-  [() => m204.AssociatedValidator, "ActiveRecord::Validations::AssociatedValidator"],
-  [() => m203.ClassMethods, "ActiveRecord::Validations::ClassMethods"],
-  [() => m205.LengthValidator, "ActiveRecord::Validations::LengthValidator"],
-  [() => m206.NumericalityValidator, "ActiveRecord::Validations::NumericalityValidator"],
-  [() => m207.PresenceValidator, "ActiveRecord::Validations::PresenceValidator"],
-  [() => m208.UniquenessValidator, "ActiveRecord::Validations::UniquenessValidator"],
+  [() => m204.Validations, "ActiveRecord::Validations"],
+  [() => m205.AbsenceValidator, "ActiveRecord::Validations::AbsenceValidator"],
+  [() => m206.AssociatedValidator, "ActiveRecord::Validations::AssociatedValidator"],
+  [() => m205.ClassMethods, "ActiveRecord::Validations::ClassMethods"],
+  [() => m207.LengthValidator, "ActiveRecord::Validations::LengthValidator"],
+  [() => m208.NumericalityValidator, "ActiveRecord::Validations::NumericalityValidator"],
+  [() => m209.PresenceValidator, "ActiveRecord::Validations::PresenceValidator"],
+  [() => m210.UniquenessValidator, "ActiveRecord::Validations::UniquenessValidator"],
   [() => m111.ValueTooLong, "ActiveRecord::ValueTooLong"],
   [() => m116.VERSION, "ActiveRecord::VERSION"],
   [() => m111.WrappedDatabaseException, "ActiveRecord::WrappedDatabaseException"],

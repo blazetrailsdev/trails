@@ -14,7 +14,22 @@ export class Conversation extends Base {
 }
 export interface Conversation {
   get status(): "active" | "archived";
-  set status(value: unknown);
+  set status(value: "active" | "archived" | 0 | 1);
+  statusPreviouslyChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  statusChanged(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  statusChange(): ["active" | "archived", "active" | "archived"] | null;
+  statusWillChange(): unknown;
+  statusWas(): "active" | "archived";
+  statusPreviousChange(): ["active" | "archived", "active" | "archived"] | null;
+  statusPreviouslyWas(): "active" | "archived";
+  restoreStatus(): void;
+  clearStatusChange(): void;
+  isSavedChangeToStatus(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  savedChangeToStatus(): ["active" | "archived", "active" | "archived"] | null;
+  statusBeforeLastSave(): "active" | "archived";
+  isWillSaveChangeToStatus(options?: { from?: unknown; to?: unknown }): boolean | undefined;
+  statusChangeToBeSaved(): ["active" | "archived", "active" | "archived"] | null;
+  statusInDatabase(): "active" | "archived";
 }
 
 

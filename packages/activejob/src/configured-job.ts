@@ -1,4 +1,3 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 
 interface ConfiguredJobClass {
@@ -37,4 +36,4 @@ export class ConfiguredJob {
     ).performAllLater(multiArgs, { options: this._options });
   }
 }
-rbModConstSet(ActiveJob, "ConfiguredJob", ConfiguredJob);
+ActiveJob.ConfiguredJob = ConfiguredJob;

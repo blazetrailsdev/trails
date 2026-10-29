@@ -5,7 +5,7 @@ import {
   include,
   rbInspect,
   rbObjAsString,
-  rbObjClassname,
+  rbCProc,
   rbObjClone,
   rbObjIsKindOf,
   rbObjRespondTo,
@@ -86,7 +86,7 @@ export class Group {
   }
 
   static invoke(this: GroupClass, ...names: unknown[]): void {
-    const block = (rbObjClassname(names.at(-1) ?? null) === "Proc" ? names.pop() : undefined) as
+    const block = (rbObjIsKindOf(names.at(-1) ?? null, rbCProc) ? names.pop() : undefined) as
       | InvocationBlock
       | undefined;
     const options = (rbObjIsKindOf(names.at(-1) ?? null, Hash) ? names.pop() : {}) as InvokeOptions;
@@ -119,7 +119,7 @@ export class Group {
   }
 
   static invokeFromOption(this: GroupClass, ...names: unknown[]): void {
-    const block = (rbObjClassname(names.at(-1) ?? null) === "Proc" ? names.pop() : undefined) as
+    const block = (rbObjIsKindOf(names.at(-1) ?? null, rbCProc) ? names.pop() : undefined) as
       | InvocationBlock
       | undefined;
     const options = (rbObjIsKindOf(names.at(-1) ?? null, Hash) ? names.pop() : {}) as InvokeOptions;
@@ -415,7 +415,7 @@ export class Group {
     command: unknown = null,
     ...args: unknown[]
   ): unknown {
-    const block = (rbObjClassname(args.at(-1) ?? null) === "Proc" ? args.pop() : undefined) as
+    const block = (rbObjIsKindOf(args.at(-1) ?? null, rbCProc) ? args.pop() : undefined) as
       | ((...yielded: unknown[]) => unknown)
       | undefined;
     return this.withPadding(() => {

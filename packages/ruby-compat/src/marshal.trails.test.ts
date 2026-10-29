@@ -96,7 +96,7 @@ function hash<H extends Hash<unknown, unknown>>(pairs: [unknown, unknown][], h: 
   return h;
 }
 
-const CONSTANTS: Record<string, unknown> = { Ary, Hsh, Column, Cache, Geo, Hash, Point };
+const CONSTANTS: Record<string, unknown> = { Ary, Hsh, Column, Cache, Geo, Point };
 
 beforeAll(() => {
   for (const [name, value] of Object.entries(CONSTANTS)) registerConstant(name, value);

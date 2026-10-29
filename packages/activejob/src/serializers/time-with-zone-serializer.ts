@@ -1,6 +1,6 @@
 import { TimeWithZone, type TimeZone, zone } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
@@ -29,4 +29,4 @@ export class TimeWithZoneSerializer extends ObjectSerializer {
     return TimeWithZone;
   }
 }
-rbModConstSet(Serializers, "TimeWithZoneSerializer", TimeWithZoneSerializer);
+Serializers.TimeWithZoneSerializer = TimeWithZoneSerializer;

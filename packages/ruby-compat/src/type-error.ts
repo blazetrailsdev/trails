@@ -12,5 +12,4 @@ import { StandardError } from "./standard-error.js";
  */
 export class TypeError extends StandardError {}
 
-TypeError.prototype.name = "TypeError";
 TypeError.prototype.message = "TypeError";

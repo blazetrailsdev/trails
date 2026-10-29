@@ -1225,6 +1225,10 @@ describe("toSym", () => {
     expect(toSym(":posts")).toBe(":posts");
   });
 
+  it("dispatches to a receiver's own to_sym", () => {
+    expect(toSym({ toSym: () => ":custom" })).toBe(":custom");
+  });
+
   it("raises NoMethodError for a receiver that defines no to_sym", () => {
     expect(() => toSym(1)).toThrow(NoMethodError);
     expect(() => toSym(1)).toThrow("undefined method 'to_sym' for an instance of Integer");

@@ -1,4 +1,3 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../namespaces.js";
 import { singularize } from "@blazetrails/activesupport";
 import { formatter, SpellChecker } from "@blazetrails/did-you-mean";
@@ -406,78 +405,29 @@ export class CollectionIdsAssignmentError extends ActiveRecordError {
   }
 }
 
-rbModConstSet(
-  ActiveRecord,
-  "InverseOfAssociationRecursiveError",
-  InverseOfAssociationRecursiveError,
-);
-rbModConstSet(
-  ActiveRecord,
-  "HasManyThroughAssociationNotFoundError",
-  HasManyThroughAssociationNotFoundError,
-);
-rbModConstSet(
-  ActiveRecord,
-  "HasManyThroughAssociationPolymorphicSourceError",
-  HasManyThroughAssociationPolymorphicSourceError,
-);
-rbModConstSet(
-  ActiveRecord,
-  "HasManyThroughAssociationPolymorphicThroughError",
-  HasManyThroughAssociationPolymorphicThroughError,
-);
-rbModConstSet(
-  ActiveRecord,
-  "HasManyThroughAssociationPointlessSourceTypeError",
-  HasManyThroughAssociationPointlessSourceTypeError,
-);
-rbModConstSet(
-  ActiveRecord,
-  "HasOneThroughCantAssociateThroughCollection",
-  HasOneThroughCantAssociateThroughCollection,
-);
-rbModConstSet(
-  ActiveRecord,
-  "HasOneAssociationPolymorphicThroughError",
-  HasOneAssociationPolymorphicThroughError,
-);
-rbModConstSet(
-  ActiveRecord,
-  "HasManyThroughSourceAssociationNotFoundError",
-  HasManyThroughSourceAssociationNotFoundError,
-);
-rbModConstSet(
-  ActiveRecord,
-  "ThroughCantAssociateThroughHasOneOrManyReflection",
-  ThroughCantAssociateThroughHasOneOrManyReflection,
-);
-rbModConstSet(
-  ActiveRecord,
-  "HasManyThroughCantAssociateThroughHasOneOrManyReflection",
-  HasManyThroughCantAssociateThroughHasOneOrManyReflection,
-);
-rbModConstSet(
-  ActiveRecord,
-  "HasOneThroughCantAssociateThroughHasOneOrManyReflection",
-  HasOneThroughCantAssociateThroughHasOneOrManyReflection,
-);
-rbModConstSet(
-  ActiveRecord,
-  "AmbiguousSourceReflectionForThroughAssociation",
-  AmbiguousSourceReflectionForThroughAssociation,
-);
-rbModConstSet(
-  ActiveRecord,
-  "ThroughNestedAssociationsAreReadonly",
-  ThroughNestedAssociationsAreReadonly,
-);
-rbModConstSet(
-  ActiveRecord,
-  "HasManyThroughNestedAssociationsAreReadonly",
-  HasManyThroughNestedAssociationsAreReadonly,
-);
-rbModConstSet(
-  ActiveRecord,
-  "HasOneThroughNestedAssociationsAreReadonly",
-  HasOneThroughNestedAssociationsAreReadonly,
-);
+ActiveRecord.InverseOfAssociationRecursiveError = InverseOfAssociationRecursiveError;
+ActiveRecord.HasManyThroughAssociationNotFoundError = HasManyThroughAssociationNotFoundError;
+ActiveRecord.HasManyThroughAssociationPolymorphicSourceError =
+  HasManyThroughAssociationPolymorphicSourceError;
+ActiveRecord.HasManyThroughAssociationPolymorphicThroughError =
+  HasManyThroughAssociationPolymorphicThroughError;
+ActiveRecord.HasManyThroughAssociationPointlessSourceTypeError =
+  HasManyThroughAssociationPointlessSourceTypeError;
+ActiveRecord.HasOneThroughCantAssociateThroughCollection =
+  HasOneThroughCantAssociateThroughCollection;
+ActiveRecord.HasOneAssociationPolymorphicThroughError = HasOneAssociationPolymorphicThroughError;
+ActiveRecord.HasManyThroughSourceAssociationNotFoundError =
+  HasManyThroughSourceAssociationNotFoundError;
+ActiveRecord.ThroughCantAssociateThroughHasOneOrManyReflection =
+  ThroughCantAssociateThroughHasOneOrManyReflection;
+ActiveRecord.HasManyThroughCantAssociateThroughHasOneOrManyReflection =
+  HasManyThroughCantAssociateThroughHasOneOrManyReflection;
+ActiveRecord.HasOneThroughCantAssociateThroughHasOneOrManyReflection =
+  HasOneThroughCantAssociateThroughHasOneOrManyReflection;
+ActiveRecord.AmbiguousSourceReflectionForThroughAssociation =
+  AmbiguousSourceReflectionForThroughAssociation;
+ActiveRecord.ThroughNestedAssociationsAreReadonly = ThroughNestedAssociationsAreReadonly;
+ActiveRecord.HasManyThroughNestedAssociationsAreReadonly =
+  HasManyThroughNestedAssociationsAreReadonly;
+ActiveRecord.HasOneThroughNestedAssociationsAreReadonly =
+  HasOneThroughNestedAssociationsAreReadonly;

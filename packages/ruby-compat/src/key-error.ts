@@ -58,5 +58,3 @@ export class KeyError extends IndexError {
     throw new ArgumentError("no key is available");
   }
 }
-
-KeyError.prototype.name = "KeyError";

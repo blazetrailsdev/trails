@@ -1,4 +1,5 @@
 import { NameError } from "./core-ext/name-error.js";
+import { block as rbBlock, eachValue, fetch } from "@blazetrails/ruby-compat";
 import { Module, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
 
 export type MethodSource = (mod: Record<string, unknown>) => void;
@@ -33,15 +34,21 @@ export class MethodSet {
   ): string {
     as = as ?? canonicalName;
 
-    const already = this.methods.get(as);
-    if (already !== undefined) return already;
-
-    if (!Object.hasOwn(this.cache, canonicalName) && !this.canonicalMethods.get(canonicalName)) {
-      block(this.sources);
-    }
-    this.canonicalMethods.set(canonicalName, true);
-    this.methods.set(as, canonicalName);
-    return canonicalName;
+    return fetch(
+      this.methods,
+      as,
+      rbBlock(() => {
+        if (
+          !Object.hasOwn(this.cache, canonicalName) &&
+          !this.canonicalMethods.get(canonicalName)
+        ) {
+          block(this.sources);
+        }
+        this.canonicalMethods.set(canonicalName, true);
+        this.methods.set(as, canonicalName);
+        return canonicalName;
+      }),
+    ) as string;
   }
 
   apply(owner: Owner, _path: string, _line: number): void {
@@ -114,9 +121,9 @@ export class CodeGenerator {
   }
 
   execute(): void {
-    for (const methodSet of this.namespaces.values()) {
+    eachValue(this.namespaces, (methodSet) => {
       methodSet.apply(this.owner, this.path, this.line - 1);
-    }
+    });
 
     if (this.sources.length !== 0) {
       if (this.owner instanceof Module) {

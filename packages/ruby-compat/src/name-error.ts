@@ -54,5 +54,3 @@ export class NameError extends StandardError {
     throw new ArgumentError("no receiver is available");
   }
 }
-
-NameError.prototype.name = "NameError";

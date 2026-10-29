@@ -10,13 +10,8 @@ import { XML } from "../namespaces.js";
 import { Namespace } from "./namespace.js";
 
 import type { Node } from "../html5/node.js";
-import {
-  Searchable,
-  cssRulesToXpath,
-  extractParams,
-  xpathInternal,
-  type SearchableHost,
-} from "./searchable.js";
+import * as Searchable from "./searchable.js";
+import type { SearchableHost } from "./searchable.js";
 
 export class NodeSet implements Iterable<Node> {
   declare atCss: (...args: unknown[]) => Node | undefined;
@@ -42,12 +37,13 @@ export class NodeSet implements Iterable<Node> {
   }
 
   css(...args: unknown[]): NodeSet {
-    const [rules, handler, ns] = extractParams.call(this as unknown as SearchableHost, args);
-    const paths = cssRulesToXpath(this as unknown as SearchableHost, rules, ns);
+    const self = this as unknown as SearchableHost;
+    const [rules, handler, ns] = self.extractParams(args);
+    const paths = self.cssRulesToXpath(rules, ns);
 
     return this._list.reduce(
       (set, node) =>
-        set.plus(xpathInternal(node as unknown as SearchableHost, paths, handler, ns, null)),
+        set.plus(self.xpathInternal(node as unknown as SearchableHost, paths, handler, ns, null)),
       new NodeSet(this.document),
     );
   }

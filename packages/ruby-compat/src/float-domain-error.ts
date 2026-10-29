@@ -14,5 +14,3 @@ import { RangeError } from "./range-error.js";
  * inherits rather than defines.
  */
 export class FloatDomainError extends RangeError {}
-
-FloatDomainError.prototype.name = "FloatDomainError";

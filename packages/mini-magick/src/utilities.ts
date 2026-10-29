@@ -1,9 +1,9 @@
-import { stringSplit, fetch, File, Tempfile, env } from "@blazetrails/ruby-compat";
+import { stringSplit, fetch, File, Tempfile, env as ENV } from "@blazetrails/ruby-compat";
 import { MiniMagick } from "./mini-magick.js";
 
 export function which(cmd: string) {
-  const exts = env.PATHEXT != null ? stringSplit(env.PATHEXT, ";") : [""];
-  for (const path of stringSplit(fetch(env, "PATH"), File.PATH_SEPARATOR)) {
+  const exts = ENV.PATHEXT != null ? stringSplit(ENV.PATHEXT, ";") : [""];
+  for (const path of stringSplit(fetch(ENV, "PATH"), File.PATH_SEPARATOR)) {
     for (const ext of exts) {
       const exe = File.join(path, `${cmd}${ext}`);
       if (File.isExecutable(exe)) {

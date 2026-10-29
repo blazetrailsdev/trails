@@ -56,8 +56,6 @@ export interface UncaughtThrowError {
 
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-UncaughtThrowError.prototype.name = "UncaughtThrowError";
-
 interface RbVmTag {
   tag: unknown;
   retval: unknown;

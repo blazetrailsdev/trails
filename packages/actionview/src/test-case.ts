@@ -21,7 +21,6 @@ import {
   rbDeclareIvar,
   rbEqual,
   rbFSend,
-  rbModConstSet,
   rbModDefineMethod,
   rbModMethodDefined,
   rbObjClassname,
@@ -44,7 +43,7 @@ import { OutputFlow } from "./flows.js";
 import { Helpers } from "./helpers.js";
 import { RecordIdentifier } from "./record-identifier.js";
 import { RoutingUrlFor } from "./routing-url-for.js";
-import { ActionView } from "./namespaces.js";
+import "./class-paths.excluded.generated.js";
 import { Testing } from "./rails-dom-testing/testing.js";
 import { Assertions as DomTestingAssertions } from "./rails-dom-testing/assertions.js";
 
@@ -164,6 +163,11 @@ export const Behavior = {
   viewAssigns,
   methodMissing,
   respondToMissing,
+  ClassMethods: undefined as typeof ClassMethods | undefined,
+  RenderedViewContent: undefined as typeof RenderedViewContent | undefined,
+  RenderedViewsCollection: undefined as typeof RenderedViewsCollection | undefined,
+  Locals: undefined as typeof Locals | undefined,
+  INTERNAL_IVARS: undefined as typeof INTERNAL_IVARS | undefined,
 };
 extend(Behavior, Concern);
 
@@ -259,7 +263,7 @@ export const ClassMethods = {
   },
 };
 
-rbModConstSet(Behavior, "ClassMethods", ClassMethods);
+Behavior.ClassMethods = ClassMethods;
 
 (
   Behavior as unknown as { included(base: null, block: (this: BehaviorClass) => void): void }
@@ -524,10 +528,10 @@ function respondToMissing(this: Behavior, name: string, _includePrivate = false)
   );
 }
 
-rbModConstSet(Behavior, "RenderedViewContent", RenderedViewContent);
-rbModConstSet(Behavior, "RenderedViewsCollection", RenderedViewsCollection);
-rbModConstSet(Behavior, "Locals", Locals);
-rbModConstSet(Behavior, "INTERNAL_IVARS", INTERNAL_IVARS);
+Behavior.RenderedViewContent = RenderedViewContent;
+Behavior.RenderedViewsCollection = RenderedViewsCollection;
+Behavior.Locals = Locals;
+Behavior.INTERNAL_IVARS = INTERNAL_IVARS;
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Behavior` (`actionview/lib/action_view/test_case.rb:446`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface TestCase extends Behavior {}
@@ -545,5 +549,3 @@ export class TestCase extends ActiveSupportTestCase {
 }
 
 include(TestCase, Behavior);
-
-rbModConstSet(ActionView, "TestCase", TestCase);

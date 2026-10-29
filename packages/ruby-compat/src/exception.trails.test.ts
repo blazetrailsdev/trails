@@ -53,10 +53,19 @@ describe("Exception#message", () => {
 });
 
 describe("Exception#name", () => {
-  it("inherits a name seated on an ancestor's prototype", () => {
+  it("answers the receiver's own class, not a name seated on an ancestor", () => {
     class SeatedError extends StandardError {}
     SeatedError.prototype.name = "Seated::Error";
     class ChildError extends SeatedError {}
-    expect(new ChildError().name).toBe("Seated::Error");
+    expect(new SeatedError().name).toBe("Seated::Error");
+    expect(new ChildError().name).toBe("ChildError");
+  });
+
+  it("names a bodiless subclass by its own path", () => {
+    class Outer {}
+    class Bodiless extends StandardError {}
+    rbModConstSet(Outer, "Bodiless", Bodiless);
+    expect(new Bodiless("x").name).toBe("Outer::Bodiless");
+    expect(new StandardError().name).toBe("StandardError");
   });
 });

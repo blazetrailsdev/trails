@@ -43,6 +43,14 @@ describe("RubyMatchers", () => {
     expect("a").toBeExactInstanceOf(String);
   });
 
+  it("checks a type and a predicate as one compound", () => {
+    expect(3).toBeTypeOfAnd("number", "nonzero");
+    expect(0).not.toBeTypeOfAnd("number", "nonzero");
+    expect("3").not.toBeTypeOfAnd("number", "nonzero");
+    expect("a").toBeTypeOfAnd("string", "nonempty");
+    expect("").not.toBeTypeOfAnd("string", "nonempty");
+  });
+
   it("asks respond_to?", () => {
     expect(new Money(1)).toRespondTo("equals");
     expect(new Money(1)).not.toRespondTo("missing");

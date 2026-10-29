@@ -6654,6 +6654,23 @@ describe("typed merge! credit", () => {
   });
 });
 
+describe("typed fetch credit", () => {
+  const forms = (body: string): Set<string> =>
+    nativeForms(
+      extractFromFiles("/p", {
+        "foo.ts": `export class Foo {
+          m(h: { a: number; b: unknown }, u: Record<string, unknown>) { ${body} }
+        }`,
+      }).classes["foo.ts:Foo"].instanceMethods.find((m) => m.name === "m")!,
+    );
+
+  it("credits fetch@typed only where the read cannot be undefined", () => {
+    expect(forms(`return Object.hasOwn(h, "a") ? h.a : 0;`).has("fetch@typed")).toBe(true);
+    expect(forms(`return Object.hasOwn(h, "b") ? h.b : 0;`).has("fetch@typed")).toBe(false);
+    expect(forms(`return Object.hasOwn(u, "a") ? u.a : 0;`).has("fetch@typed")).toBe(false);
+  });
+});
+
 describe("a native hash form credits the Hash call it ports", () => {
   const credited = (
     rubyCall: string,
