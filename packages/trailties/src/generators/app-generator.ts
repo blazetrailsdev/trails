@@ -1478,7 +1478,7 @@ export default defineConfig([
     return TopLevel.AppBuilder !== undefined ? TopLevel.AppBuilder : AppBuilder;
   }
 
-  private async template(source: string, destination: string): Promise<void> {
+  override async template(source: string, destination: string): Promise<void> {
     await this.createFile(
       destination,
       TEMPLATES[source]({

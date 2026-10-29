@@ -10,6 +10,7 @@ import {
 import { ActiveRecord } from "@blazetrails/activerecord";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorConfig } from "./base.js";
+import { Generators } from "../generators.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 
 export class NamedBase extends GeneratorBase {
@@ -30,11 +31,39 @@ export class NamedBase extends GeneratorBase {
   private _pluralTableName?: string;
   /** @internal */
   private _fixtureFileName?: string;
+  /** @internal */
+  private _insideTemplate: boolean | null = null;
+  private _namespacedClassPath?: string[];
+  private _filePath?: string;
 
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
     super(args, localOptions, config);
     this.assignNamesBang(this.name);
     if (rbObjRespondTo(this, "attributes")) this.parseAttributesBang();
+  }
+
+  async template(
+    source: string,
+    ...args: unknown[] | [...unknown[], (content: string) => unknown]
+  ): Promise<string> {
+    return this.insideTemplate(async () =>
+      Generators.addGeneratedFile((await super.template(source, ...args)) as string),
+    );
+  }
+
+  /** @internal */
+  protected async insideTemplate<T>(block: () => Promise<T>): Promise<T> {
+    this._insideTemplate = true;
+    try {
+      return await block();
+    } finally {
+      this._insideTemplate = false;
+    }
+  }
+
+  /** @internal */
+  protected isInsideTemplate(): boolean | null {
+    return this._insideTemplate;
   }
 
   singularName = (): string => this.fileName;
@@ -75,14 +104,22 @@ export class NamedBase extends GeneratorBase {
   ): string {
     return camelize(`new_${this.singularRouteName()}_${type}`, "lower");
   }
-  filePath = (): string => [...this.classPathParts, this.fileName].join("/");
-  className = (): string =>
-    [...this.classPathParts, this.fileName].map((s) => camelize(s)).join("::");
+  filePath = (): string => (this._filePath ??= [...this.classPath(), this.fileName].join("/"));
+  /** @internal */
+  protected classPath = (): string[] =>
+    this.isInsideTemplate() || !this.isNamespaced()
+      ? this.regularClassPath()
+      : this.namespacedClassPath();
+  regularClassPath = (): string[] => this.classPathParts;
+  /** @internal */
+  protected namespacedClassPath = (): string[] =>
+    (this._namespacedClassPath ??= [...this.namespaceDirs(), ...this.classPathParts]);
+  className = (): string => [...this.classPath(), this.fileName].map((s) => camelize(s)).join("::");
   i18nScope = (): string => this.filePath().replace(/\//g, ".");
   tableName = (): string =>
     (this._tableName ??= (() => {
       const base = this.isPluralizeTableNames() ? this.pluralName() : this.singularName();
-      return [...this.classPathParts, base].join("_");
+      return [...this.classPath(), base].join("_");
     })());
   singularTableName = (): string =>
     (this._singularTableName ??= this.isPluralizeTableNames()
@@ -155,10 +192,6 @@ export class NamedBase extends GeneratorBase {
   /** @internal */
   get fileName(): string {
     return this._fileName;
-  }
-
-  regularClassPath(): string[] {
-    return this.classPathParts;
   }
 
   attributesNames(): string[] {

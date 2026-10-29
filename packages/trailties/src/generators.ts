@@ -39,6 +39,8 @@ function urlToPath(url: URL): string {
 }
 
 export class Generators {
+  static namespace: { readonly name: string } | null = null;
+
   static readonly DEFAULT_ALIASES: Record<string, Record<string, unknown>> = {
     rails: {
       actions: "-a",

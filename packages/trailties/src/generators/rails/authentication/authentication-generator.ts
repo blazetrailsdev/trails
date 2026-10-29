@@ -61,7 +61,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     await this.template("test/mailers/previews/passwords_mailer_preview.rb");
   }
 
-  private async template(file: string): Promise<void> {
+  override async template(file: string): Promise<void> {
     const destination = file
       .replace(/\.rb$/, ".ts")
       .replace(/\.erb$/, ".tse")

@@ -12,7 +12,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     await this.template("app/views/sessions/new.html.erb");
   }
 
-  private async template(file: string): Promise<void> {
+  override async template(file: string): Promise<void> {
     await this.createFile(file.replace(/\.erb$/, ".tse"), TEMPLATES[file]);
   }
 }
