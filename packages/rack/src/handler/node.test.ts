@@ -209,6 +209,55 @@ describe("Rack::Handler::Node", () => {
     expect(closed).toBe(true);
   });
 
+  it("sends an array body with the content-length of its bytes", async () => {
+    const app: RackApp = async () => [
+      200,
+      { "content-type": "text/plain" },
+      ["caf\u00e9 ", "\u2713"],
+    ];
+
+    await serving(app, async (url) => {
+      const response = await fetch(url);
+
+      expect(response.headers.get("content-length")).toBe("9");
+      expect(response.headers.get("transfer-encoding")).toBeNull();
+      expect(await response.text()).toBe("caf\u00e9 \u2713");
+    });
+  });
+
+  it("keeps the content-length an app sets", async () => {
+    const app: RackApp = async () => [200, { "content-length": "2" }, ["ok"]];
+
+    await serving(app, async (url) => {
+      const response = await fetch(url);
+
+      expect(response.headers.get("content-length")).toBe("2");
+      expect(await response.text()).toBe("ok");
+    });
+  });
+
+  it("sends no computed content-length for a reset-content status", async () => {
+    const app: RackApp = async () => [205, {}, []];
+
+    await serving(app, async (url) => {
+      const response = await fetch(url);
+
+      expect(response.status).toBe(205);
+      expect(response.headers.get("content-length")).toBeNull();
+    });
+  });
+
+  it("sends no computed content-length for a no-content status", async () => {
+    const app: RackApp = async () => [204, {}, []];
+
+    await serving(app, async (url) => {
+      const response = await fetch(url);
+
+      expect(response.status).toBe(204);
+      expect(response.headers.get("content-length")).toBeNull();
+    });
+  });
+
   it("streams a multi-chunk body", async () => {
     const app: RackApp = async () => [
       201,
@@ -225,6 +274,7 @@ describe("Rack::Handler::Node", () => {
       expect(response.status).toBe(201);
       expect(response.headers.get("content-type")).toBe("text/plain");
       expect(await response.text()).toBe("onetwo");
+      expect(response.headers.get("transfer-encoding")).toBe("chunked");
     });
   });
 
