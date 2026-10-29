@@ -1,4 +1,4 @@
-import { rbFSend, rbObjRespondTo, ArgumentError } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo, ArgumentError, RuntimeError } from "@blazetrails/ruby-compat";
 import WasmVips from "wasm-vips";
 import { Chainable, chainableProxy } from "./chainable.js";
 import { Error } from "./image-processing.js";
@@ -11,7 +11,7 @@ type Image = InstanceType<Awaited<ReturnType<typeof WasmVips>>["Image"]>;
 export const vips = await WasmVips();
 
 if (!(Number(vips.version(0)) > 8 || (vips.version(0) === 8 && Number(vips.version(1)) >= 6))) {
-  throw new globalThis.Error("image_processing/vips requires libvips 8.6+");
+  throw new RuntimeError("image_processing/vips requires libvips 8.6+");
 }
 
 const MAX_COORD = 10_000_000;
@@ -198,9 +198,10 @@ class Processor extends BaseProcessor {
     if (typeof this.image === "string") {
       image = vips.Image.thumbnail(this.image, width, { height, ...options });
     } else {
-      const atLeast88 =
-        Number(vips.version(0)) > 8 || (vips.version(0) === 8 && Number(vips.version(1)) >= 8);
-      const noRotate = atLeast88 ? { no_rotate: true } : { auto_rotate: false };
+      const noRotate =
+        Number(vips.version(0)) > 8 || (vips.version(0) === 8 && Number(vips.version(1)) >= 8)
+          ? { no_rotate: true }
+          : { auto_rotate: false };
       options = { ...noRotate, ...options };
 
       image = this.image.thumbnailImage(width, { height, ...options });
