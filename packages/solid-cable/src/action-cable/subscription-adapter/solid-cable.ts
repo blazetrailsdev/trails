@@ -177,7 +177,7 @@ export class Listener extends SubscriberMap {
   /** @internal */
   private async withPollingVolume(block: () => Promise<void>): Promise<void> {
     if (SolidCableConfig.isSilencePolling() && ActiveRecordBase.logger) {
-      await ActiveRecordBase.logger.silence(undefined, block);
+      await ActiveRecordBase.logger.silence(undefined, () => block());
     } else {
       await block();
     }
