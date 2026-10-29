@@ -62,7 +62,7 @@ Object.defineProperty(RoutesHelpers, "with", {
       const namedRoutes = (mod as { _proxy?: { _routes?: RouteSet } })._proxy?._routes?.namedRoutes;
       earlier.push(installed);
       namedRoutes?._appendIncluder(proto, includePathHelpers, installed, earlier);
-      cls._routes = (urlHelpersModule() as { _routes?: unknown })._routes ?? routes;
+      cls._routes = (mod as { _routes?: unknown })._routes ?? routes;
     };
   },
   writable: true,

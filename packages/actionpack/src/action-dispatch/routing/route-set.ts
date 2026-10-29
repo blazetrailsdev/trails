@@ -700,10 +700,13 @@ export class NamedRouteCollection {
         continue;
       }
       if (isPath && !includer.supportsPath) continue;
-      if (!isIncludedMember(proto, name, includer.installed)) continue;
       const descriptor = { value: method, writable: true, configurable: true, enumerable: false };
-      Object.defineProperty(proto, name, descriptor);
+      const below = includer.includes.slice(0, includer.includes.indexOf(includer.installed) + 1);
+      const isOutranked =
+        Object.hasOwn(proto, name) &&
+        !below.some((included) => isIncludedMember(proto, name, included));
       includer.installed.set(name, descriptor);
+      if (!isOutranked) Object.defineProperty(proto, name, descriptor);
     }
   }
 
@@ -716,7 +719,10 @@ export class NamedRouteCollection {
       includer.installed.delete(name);
       if (!isShadowing) continue;
       delete (proto as Record<string, unknown>)[name];
-      const below = [...includer.includes].reverse().find((included) => included.has(name));
+      const below = includer.includes
+        .slice(0, includer.includes.indexOf(includer.installed))
+        .reverse()
+        .find((included) => included.has(name));
       if (below) Object.defineProperty(proto, name, below.get(name)!);
     }
   }

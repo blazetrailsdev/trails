@@ -66,4 +66,58 @@ describe("RoutesHelpers.with (trails)", () => {
     b.namedRoutes.clear();
     expect(Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value).toBe(fromA);
   });
+
+  it("a route drawn in a later include outranks an earlier include's helper", () => {
+    const earlier = new RouteSet();
+    const later = new RouteSet();
+    earlier.draw(function () {
+      this.get("posts", { to: "posts#index", as: "posts" });
+    });
+    const cls = class {
+      defaultUrlOptions = {};
+    };
+    const wired = cls as unknown as RoutesHelpersControllerClass;
+    RoutesHelpers.with(earlier)(wired);
+    RoutesHelpers.with(later)(wired);
+    later.draw(function () {
+      this.get("later_posts", { to: "posts#index", as: "posts" });
+    });
+    expect((new cls() as unknown as { postsPath(): string }).postsPath()).toBe("/later_posts");
+  });
+
+  it("clearing a later include restores the earlier include's redrawn helper", () => {
+    const earlier = new RouteSet();
+    const later = new RouteSet();
+    for (const routes of [earlier, later]) {
+      routes.draw(function () {
+        this.get("posts", { to: "posts#index", as: "posts" });
+      });
+    }
+    const cls = class {
+      defaultUrlOptions = {};
+    };
+    const wired = cls as unknown as RoutesHelpersControllerClass;
+    RoutesHelpers.with(earlier)(wired);
+    RoutesHelpers.with(later)(wired);
+    earlier.draw(function () {
+      this.get("redrawn", { to: "posts#index", as: "posts" });
+    });
+    later.namedRoutes.clear();
+    expect((new cls() as unknown as { postsPath(): string }).postsPath()).toBe("/redrawn");
+  });
+
+  it("splices nothing into the class's prototype chain", () => {
+    const parent = class {};
+    const cls = class extends parent {};
+    RoutesHelpers.with(new RouteSet())(cls as unknown as RoutesHelpersControllerClass);
+    expect(Object.getPrototypeOf(cls.prototype)).toBe(parent.prototype);
+  });
+
+  it("copies a namespaced module's helpers, which no route set records", () => {
+    const cls = class {};
+    const wired = cls as unknown as RoutesHelpersControllerClass;
+    wired.trailtieRoutesUrlHelpers = () => ({ enginePath: () => "/engine" });
+    RoutesHelpers.with(new RouteSet())(wired);
+    expect((new cls() as unknown as { enginePath(): string }).enginePath()).toBe("/engine");
+  });
 });
