@@ -1,6 +1,14 @@
 import { Error as MiniMagickError } from "@blazetrails/mini-magick";
 import { Tool } from "@blazetrails/mini-magick/tool";
-import { block, Dir, File, IO, NoMethodError, Pathname, Tempfile } from "@blazetrails/ruby-compat";
+import {
+  block,
+  createTmpname,
+  File,
+  IO,
+  NoMethodError,
+  Pathname,
+  Tempfile,
+} from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Error as ImageProcessingError } from "./image-processing.js";
 import { MiniMagick as ImageProcessingMiniMagick } from "./mini-magick.js";
@@ -24,13 +32,6 @@ type Pipeline = { [name: string]: (...args: unknown[]) => Promise<Result> & Pipe
 
 const Vips = ImageProcessingVips as unknown as Pipeline;
 const MiniMagick = ImageProcessingMiniMagick as unknown as Pipeline;
-
-function tmpname(basename: string, extension = ""): string {
-  return File.join(
-    Dir.tmpdir(),
-    `${basename}${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`,
-  );
-}
 
 describe("ImageProcessing::Pipeline", () => {
   let portrait: ReturnType<typeof fixtureImage>;
@@ -92,7 +93,7 @@ describe("ImageProcessing::Pipeline", () => {
   });
 
   it("makes sure the destination file is deleted on processing errors", async () => {
-    const destinationPath = tmpname("destination", ".jpg");
+    const destinationPath = createTmpname(["destination", ".jpg"], null, {}, () => {});
     const pipeline = MiniMagick.source(fixtureImage("invalid.jpg"));
     await expect(pipeline.call(null, { destination: destinationPath })).rejects.toThrow(
       MiniMagickError,
@@ -110,7 +111,7 @@ describe("ImageProcessing::Pipeline", () => {
   });
 
   it("doesn't fail when destination file hasn't been created", async () => {
-    const destinationPath = tmpname("destination");
+    const destinationPath = createTmpname("destination", null, {}, () => {});
     const pipeline = Vips.source(portrait);
     await expect(pipeline.call(null, { destination: destinationPath })).rejects.toThrow();
   });
