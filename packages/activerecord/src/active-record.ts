@@ -3,12 +3,21 @@ import { ActiveSupport, any, Autoload, InheritableOptions } from "@blazetrails/a
 import { rbEqq, rbObjIvarGet, rbObjIvarSet, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { ActiveRecord } from "./namespaces.js";
+import type { Base } from "./base.js";
 import type { SQLWarning } from "./errors.js";
 import type { Transaction } from "./connection-adapters/abstract/transaction.js";
 import type { QueryTransformer } from "./query-transformers.js";
 import * as Marshalling from "./marshalling.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import type { SchemaFormat } from "./tasks/database-tasks.js";
+
+/** @internal */
+export const _registeredModels = new Map<string, typeof Base>();
+
+/** @noRailsEquivalent PERMANENT */
+export function registeredModel(name: string): typeof Base | undefined {
+  return _registeredModels.get(name);
+}
 
 type AnyClass = abstract new (...args: never[]) => object;
 

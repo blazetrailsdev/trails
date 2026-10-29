@@ -2,7 +2,7 @@ import { Notifications, type NotificationEvent } from "@blazetrails/activesuppor
 import { describe, expect, it } from "vitest";
 import "../test-helpers/test-helper.js";
 import { TestConnection } from "../test-helpers/stubs/test-connection.js";
-import { Base } from "./base.js";
+import { Base, registerChannel, registeredChannel } from "./base.js";
 
 class BasicChannel extends Base {
   chatters(): void {}
@@ -115,5 +115,16 @@ describe("ActionCable::Channel::Base", () => {
     expect(channel.done).toBe(true);
     expect(events.length).toBe(1);
     expect(events[0].duration).toBeGreaterThanOrEqual(15);
+  });
+});
+
+describe("registeredChannel", () => {
+  it("reads back a channel seated by registerChannel under its name and an explicit name", () => {
+    class RegistryReadChannel extends Base {}
+    registerChannel(RegistryReadChannel);
+    registerChannel("Registry::AliasChannel", RegistryReadChannel);
+    expect(registeredChannel("RegistryReadChannel")).toBe(RegistryReadChannel);
+    expect(registeredChannel("Registry::AliasChannel")).toBe(RegistryReadChannel);
+    expect(registeredChannel("NeverRegisteredChannel")).toBeUndefined();
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base, registerModel } from "./index.js";
+import { Base, registerModel, registeredModel } from "./index.js";
 import type { CollectionAssociation } from "./associations/collection-association.js";
 import { Preloader } from "./associations/preloader.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -267,5 +267,16 @@ describe("association(name).reader", () => {
     await assertQueriesCount(2, false, async () => {
       await author.noJoinsComments.count();
     });
+  });
+});
+
+describe("registeredModel", () => {
+  it("reads back a model seated by registerModel under its name and an explicit name", () => {
+    class RegistryReadModel extends Base {}
+    registerModel(RegistryReadModel);
+    registerModel("Registry::AliasModel", RegistryReadModel);
+    expect(registeredModel("RegistryReadModel")).toBe(RegistryReadModel);
+    expect(registeredModel("Registry::AliasModel")).toBe(RegistryReadModel);
+    expect(registeredModel("NeverRegisteredModel")).toBeUndefined();
   });
 });

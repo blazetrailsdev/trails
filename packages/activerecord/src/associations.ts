@@ -1,3 +1,4 @@
+import { _registeredModels } from "./active-record.js";
 import type { Base } from "./base.js";
 import type { AssociationReflection, ThroughReflection } from "./reflection.js";
 import "./relation.js";
@@ -94,13 +95,6 @@ function assertActiveRecordBase(model: typeof Base): void {
   }
 }
 
-const _models = new Map<string, typeof Base>();
-
-/** @noRailsEquivalent PERMANENT */
-export function registeredModel(name: string): typeof Base | undefined {
-  return _models.get(name);
-}
-
 /** @noRailsEquivalent PERMANENT */
 export function registerModel(model: typeof Base): void;
 export function registerModel(name: string, model: typeof Base): void;
@@ -116,16 +110,16 @@ export function registerModel(
   if (typeof nameOrModel === "string") {
     if (!model) throw new ArgumentError("registerModel(name, model) requires a model class");
     assertActiveRecordBase(model);
-    _models.set(nameOrModel, model);
+    _registeredModels.set(nameOrModel, model);
     registerConstant(nameOrModel, model);
   } else {
     model = nameOrModel;
     assertActiveRecordBase(model);
-    _models.set(model.name, model);
+    _registeredModels.set(model.name, model);
     registerConstant(model.name, model);
     const qualified = rbModName(model)!;
     if (qualified !== model.name) {
-      _models.set(qualified, model);
+      _registeredModels.set(qualified, model);
       registerConstant(qualified, model);
     }
   }
@@ -227,6 +221,7 @@ export class Associations {
     const joinModel = builder.throughModel();
 
     rbModConstSet(this, joinModel.name, joinModel);
+    registerModel(rbModName(joinModel)!, joinModel);
 
     const middleReflection = builder.middleReflection(joinModel);
     HasManyBuilder.defineCallbacks(this, middleReflection);

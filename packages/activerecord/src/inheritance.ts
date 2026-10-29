@@ -18,8 +18,11 @@ import {
   rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import { demodulize } from "@blazetrails/activesupport";
-import { registeredModel } from "./associations.js";
-import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
+import {
+  registeredModel,
+  applicationRecordClass,
+  setApplicationRecordClass,
+} from "./active-record.js";
 
 export interface Inheritance {
   readonly storeFullClassName: boolean;
@@ -41,8 +44,9 @@ export const Inheritance = {
  */
 export function computeType(baseClass: typeof Base, typeName: string): typeof Base {
   if (typeName.startsWith("::")) {
-    const constant = registeredModel(typeName.slice(2));
-    if (constant == null) throw new NameError(`uninitialized constant ${typeName}`, typeName);
+    const name = typeName.slice(2);
+    const constant = registeredModel(name);
+    if (constant == null) throw new NameError(`uninitialized constant ${name}`, name);
     return constant;
   } else {
     const klass = baseClass as typeof Base & { _typeCandidatesCache: Map<string, string> };

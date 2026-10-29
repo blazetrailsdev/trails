@@ -4,7 +4,7 @@ import { Base as ServerBase } from "../server/base.js";
 import { Configuration } from "../server/configuration.js";
 import { socketPair } from "../test-helpers/socket-pair.js";
 import { StreamEventLoop } from "./stream-event-loop.js";
-import { Base } from "./base.js";
+import { Base, registerConnection, registeredConnection } from "./base.js";
 
 const noop = () => {};
 const [io] = socketPair();
@@ -85,5 +85,16 @@ describe("ActionCable::Connection::Base", () => {
     s.config.logTags = [(request: { requestMethod: string }) => request.requestMethod, "my_tag"];
     const connection = new Connection(s, env());
     expect(connection.logger.tags).toEqual(["GET", "MyTag"]);
+  });
+});
+
+describe("registeredConnection", () => {
+  it("reads back a connection seated by registerConnection under its name and an explicit name", () => {
+    class RegistryReadConnection extends Base {}
+    registerConnection(RegistryReadConnection);
+    registerConnection("Registry::AliasConnection", RegistryReadConnection);
+    expect(registeredConnection("RegistryReadConnection")).toBe(RegistryReadConnection);
+    expect(registeredConnection("Registry::AliasConnection")).toBe(RegistryReadConnection);
+    expect(registeredConnection("NeverRegisteredConnection")).toBeUndefined();
   });
 });
