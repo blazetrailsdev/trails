@@ -5,10 +5,6 @@
     "reason": "Rails boot lifecycle hook that wires I18n into the Railtie/Application init sequence. No JS equivalent — I18n is configured directly in user code."
   },
   {
-    "pattern": "destroy_association_async_job.rb",
-    "reason": "ActiveJob subclass that backs `dependent: :destroy_async`. Trails has not ported ActiveJob; async destroy is out of scope until a job framework lands."
-  },
-  {
     "pattern": "adapters/trilogy",
     "testFile": "adapters/trilogy/",
     "reason": "Trilogy is a C extension for Ruby with no Node.js equivalent, and wrapping the mysql2 npm driver under Rails' TrilogyAdapter name would invent a second Mysql2Adapter. MySQL connections go through Mysql2Adapter instead. PERMANENT: CLAUDE.md \u00a7 \"Trilogy is out of scope\"."

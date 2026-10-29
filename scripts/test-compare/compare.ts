@@ -226,6 +226,12 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     rubyFile = rubyFile.slice("i18n/".length);
   }
 
+  if (pkg === "activerecord" && rubyFile.startsWith("../activejob/")) {
+    rubyFile = rubyFile.slice("../activejob/".length);
+    // job_runtime_test.rb tests railties/job_runtime.rb, so it sits beside trailties/job-runtime.ts.
+    if (rubyFile === "job_runtime_test.rb") return "trailties/job-runtime.test.ts";
+  }
+
   if (pkg === "activejob" && rubyFile.startsWith("cases/")) {
     rubyFile = rubyFile.slice("cases/".length);
   }

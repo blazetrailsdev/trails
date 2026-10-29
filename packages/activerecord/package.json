@@ -69,6 +69,7 @@
     "@blazetrails/i18n": "workspace:*"
   },
   "peerDependencies": {
+    "@blazetrails/activejob": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
     "better-sqlite3": "^12.6.2",
     "expo-sqlite": "^15.0.0",
@@ -77,6 +78,9 @@
     "pg": "^8.19.0"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/activejob": {
+      "optional": true
+    },
     "@blazetrails/msgpack": {
       "optional": true
     },

@@ -166,6 +166,15 @@ describe("rubyToConventionTs", () => {
     );
   });
 
+  it("maps activerecord's test/activejob files, which sit beside test/cases", () => {
+    expect(
+      rubyToConventionTs("../activejob/destroy_association_async_job_test.rb", "activerecord"),
+    ).toBe("destroy-association-async-job.test.ts");
+    expect(rubyToConventionTs("../activejob/job_runtime_test.rb", "activerecord")).toBe(
+      "trailties/job-runtime.test.ts",
+    );
+  });
+
   it("strips the spec_ prefix rack-style gem suites carry", () => {
     expect(rubyToConventionTs("spec_auth_basic.rb", "rack")).toBe("auth-basic.test.ts");
     expect(rubyToConventionTs("spec_body_proxy.rb", "rack")).toBe("body-proxy.test.ts");

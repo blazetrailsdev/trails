@@ -1,11 +1,5 @@
 [
   {
-    "package": "activerecord",
-    "name": "DestroyAssociationAsyncError",
-    "rubyFile": "active_record/destroy_association_async_job.rb",
-    "reason": "active_record/destroy_association_async_job.rb (dependent: :destroy_async job) is unported."
-  },
-  {
     "package": "activesupport",
     "name": "DeprecationException",
     "rubyFile": "active_support/deprecation/behaviors.rb",

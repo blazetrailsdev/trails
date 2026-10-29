@@ -11,6 +11,13 @@ class UndefinedConstantAsync extends Base {
   }
 }
 
+class UnloadableBaseAsync extends Base {
+  static _tableName = "essays";
+  static {
+    this.destroyAssociationAsyncJob = "UnloadableBaseJob";
+  }
+}
+
 class UnusedBelongsToAsync extends Base {
   static _tableName = "essays";
   static {
@@ -48,47 +55,62 @@ describe("DestroyAssociationAsyncJobTest", () => {
 
   it("destroy_association_async_job requires valid job class", () => {
     let error: unknown;
-    try {
-      UndefinedConstantAsync.belongsTo("essayDestroyAsync", { dependent: "destroyAsync" });
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(NameError);
+    expect(() => {
+      try {
+        UndefinedConstantAsync.belongsTo("essayDestroyAsync", { dependent: "destroyAsync" });
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(NameError);
     expect((error as Error).message).toMatch(
       /destroy_association_async_job: uninitialized constant UndefinedConstantJob/,
     );
   });
 
+  // PERMANENT-SKIP: Rails' `autoload :UnloadableBaseJob` defers evaluating a class
+  it.skip("destroy_association_async_job error shows a missing parent job class, as if ActiveJob were missing", () => {
+    expect(() =>
+      UnloadableBaseAsync.belongsTo("essayDestroyAsync", { dependent: "destroyAsync" }),
+    ).toThrow(/destroy_association_async_job: uninitialized constant PretendActiveJobIsNotPresent/);
+  });
+
   it("belongs_to dependent destroy_async requires destroy_association_async_job", () => {
     let error: unknown;
-    try {
-      UnusedBelongsToAsync.belongsTo("essayDestroyAsync", { dependent: "destroyAsync" });
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(ConfigurationError);
+    expect(() => {
+      try {
+        UnusedBelongsToAsync.belongsTo("essayDestroyAsync", { dependent: "destroyAsync" });
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(ConfigurationError);
     expect((error as Error).message).toMatch(/destroy_association_async_job/);
   });
 
   it("has_one dependent destroy_async requires destroy_association_async_job", () => {
     let error: unknown;
-    try {
-      UnusedHasOneAsync.hasOne("essayDestroyAsync", { dependent: "destroyAsync" });
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(ConfigurationError);
+    expect(() => {
+      try {
+        UnusedHasOneAsync.hasOne("essayDestroyAsync", { dependent: "destroyAsync" });
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(ConfigurationError);
     expect((error as Error).message).toMatch(/destroy_association_async_job/);
   });
 
   it("has_many dependent destroy_async requires destroy_association_async_job", () => {
     let error: unknown;
-    try {
-      UnusedHasManyAsync.hasMany("essayDestroyAsyncs", { dependent: "destroyAsync" });
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(ConfigurationError);
+    expect(() => {
+      try {
+        UnusedHasManyAsync.hasMany("essayDestroyAsyncs", { dependent: "destroyAsync" });
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(ConfigurationError);
     expect((error as Error).message).toMatch(/destroy_association_async_job/);
   });
 
