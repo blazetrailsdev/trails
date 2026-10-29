@@ -1505,11 +1505,15 @@ thread.** The `connection/` port, when it lands, follows these rules:
 - The private `spawn`, `run` and `wakeup` are not ported. They are a
   `SCOPED_SKIP_GROUPS` entry in `scripts/parity/conventions.ts` citing this
   section.
-- **`writes_pending` and `Stream#flush_write_buffer` join that skip group**
-  (RFC 0177 Open question 5). Their only callers are `Stream#write`'s
-  partial-write arms (`stream.rb:54,65`) and `run`
-  (`stream_event_loop.rb:105`), none of which exists here, so a body would be
-  an empty stub.
+- `writes_pending` and `Stream#flush_write_buffer` are ported, because the
+  hijacked io's `write_nonblock` can write part of a frame. `@map` holds a
+  module-private `Monitor` standing in for `NIO::Monitor`, and its
+  `interests=` setter is where nio4r registers writable interest with the
+  selector: setting `:rw` on an `:r` monitor starts the one writable wait,
+  which calls `stream.flush_write_buffer` and sets `:r` when it answers true,
+  as `run` does (`stream_event_loop.rb:100-106`). So `writes_pending` is
+  Rails' body, `if monitor = @map[io]; monitor.interests = :rw; end`
+  (`:47-53`), with no guard of its own.
 - `attach` and `detach` keep their Rails names and callers. The hijacked io
   is the ruby-compat `TCPSocket` the Rack handler hands out, a Ruby IO, so
   `attach(io, stream)` (`stream_event_loop.rb:30-36`) holds the stream in
@@ -1522,9 +1526,10 @@ thread.** The `connection/` port, when it lands, follows these rules:
   reaches `detach`; a `stream.close` that raises deletes it as `run` does.
 - `timer`, `post` and `stop` (`:19-28`, `:56-59`) port as ordinary methods over
   ruby-compat's `TimerTask` and `ThreadPoolExecutor`.
-- `Stream#write` calls the socket's `write` and keeps its `@stream_send` arm
-  and its `rescue EOFError, Errno::ECONNRESET`. Its `write_nonblock` result
-  arms, `@write_lock`, `@write_head` and `@write_buffer` have no counterpart.
+- `Stream#write` is ported line for line over the io's `write_nonblock`,
+  with its `@stream_send` arm, its `write_nonblock` result arms, `@write_lock`,
+  `@write_head`, `@write_buffer` and its `rescue EOFError, Errno::ECONNRESET`
+  (`stream.rb:37-70`).
 - `Connection::ClientSocket` drives the npm `websocket-driver` (its own story
   adds the dependency), built with
   `Driver.http` from a request-shaped object read off the Rack env where Rails

@@ -726,11 +726,9 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "Node's event loop stands in for Action Cable's `NIO::Selector` and its " +
       "thread (CLAUDE.md, \"Node's event loop stands in for Action Cable's nio4r " +
       'selector"). `spawn`, `run` and `wakeup` own and interrupt the selector ' +
-      "thread (stream_event_loop.rb:62-133); `writes_pending` (:47-54) and " +
-      "`Stream#flush_write_buffer` (stream.rb:72-92) carry a partial " +
-      "`write_nonblock`, which a `net.Socket` never leaves.",
-    names: ["spawn", "run", "wakeup", "writes_pending", "flush_write_buffer"],
-    rubyFiles: ["connection/stream_event_loop.rb", "connection/stream.rb"],
+      "thread (stream_event_loop.rb:62-133).",
+    names: ["spawn", "run", "wakeup"],
+    rubyFiles: ["connection/stream_event_loop.rb"],
     packages: ["actioncable"],
   },
   {
