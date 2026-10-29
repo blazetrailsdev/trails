@@ -61,13 +61,13 @@ class ErrorEnqueueAfterCommitJob extends EnqueueErrorJob {
 
   override perform(): void {}
 }
-ErrorEnqueueAfterCommitJob.setQueueAdapter(new EnqueueErrorAdapter());
-ErrorEnqueueAfterCommitJob.enqueueAfterTransactionCommit = true;
 registerConstant(
   "EnqueueAfterTransactionCommitTest::ErrorEnqueueAfterCommitJob",
   ErrorEnqueueAfterCommitJob,
 );
 rbModConstSet(ErrorEnqueueAfterCommitJob, "EnqueueErrorAdapter", EnqueueErrorAdapter);
+ErrorEnqueueAfterCommitJob.setQueueAdapter(new EnqueueErrorAdapter());
+ErrorEnqueueAfterCommitJob.enqueueAfterTransactionCommit = true;
 registerConstant("EnqueueAfterTransactionCommitTest::EnqueueAfterCommitJob", EnqueueAfterCommitJob);
 
 const topLevel = TopLevel as Record<string, unknown>;
