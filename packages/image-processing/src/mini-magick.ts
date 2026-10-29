@@ -5,6 +5,7 @@ import {
   format,
   isPlainHash,
   TypeError,
+  rbBlockGivenP,
   rbGetKwargs,
   rbInspect,
   rbFSend,
@@ -124,16 +125,21 @@ class Processor extends BaseProcessor {
 
   composite(
     overlay: unknown = ":none",
-    {
+    kwargs: Options | ((magick: CliTool) => unknown) = {},
+    block?: (magick: CliTool) => unknown,
+  ): CliTool {
+    if (rbBlockGivenP(kwargs)) {
+      block = kwargs as (magick: CliTool) => unknown;
+      kwargs = {};
+    }
+    const {
       mask = null,
-      mode = null,
       gravity = null,
       offset = null,
       args = null,
       ...options
-    }: Options = {},
-    block?: (magick: CliTool) => unknown,
-  ): CliTool {
+    } = kwargs as Options;
+    let { mode = null } = kwargs as Options;
     if (overlay === ":none") return this.magick.composite();
 
     if (Object.hasOwn(options, "compose")) {
