@@ -95,6 +95,7 @@ class Processor extends BaseProcessor {
     return this.thumbnail(width, height, { crop: "centre", ...options });
   }
 
+  /** @missingRailsArgs gravity — PERMANENT */
   resizeAndPad(
     width: number,
     height: number,
@@ -251,8 +252,9 @@ const ImageProcessingVips = {
     try {
       vips.Image.newFromFile(file.path(), { access: "sequential" }).avg();
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      if (error instanceof WebAssembly.Exception) return false;
+      throw error;
     }
   },
 };

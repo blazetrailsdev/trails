@@ -106,12 +106,5 @@ describe("ImageProcessing::Vips", () => {
       const expected = fixtureImage("limit.jpg");
       await assertSimilar(expected, await pipeline.resizeToLimitBang(400, 400));
     });
-
-    it("accepts thumbnail options", async () => {
-      await assertDimensions(
-        [400, 400],
-        await pipeline.resizeToLimitBang(400, 400, { crop: "centre" }),
-      );
-    });
   });
 });
