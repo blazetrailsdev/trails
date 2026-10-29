@@ -22,10 +22,7 @@ import {
 import { Vips as ImageProcessingVips, vips } from "./vips.js";
 
 type VipsImage = InstanceType<typeof vips.Image>;
-type Result = Omit<IO, "path"> & {
-  path(): string;
-  size(): number;
-};
+type Result = Tempfile;
 type Pipeline = { [name: string]: (...args: unknown[]) => Promise<Result> & Pipeline } & {
   options: Record<string, unknown> & { operations: [string, unknown[], unknown?][] };
 };
@@ -56,10 +53,10 @@ describe("ImageProcessing::Pipeline", () => {
     const pipeline = Vips.source(portrait);
 
     let result = await pipeline.convertBang("png");
-    expect(File.extname(result.path())).toEqual(".png");
+    expect(File.extname(result.path()!)).toEqual(".png");
 
     result = await pipeline.convertBang(null);
-    expect(File.extname(result.path())).toEqual(".jpg");
+    expect(File.extname(result.path()!)).toEqual(".jpg");
     await assertSimilar(portrait, result);
   });
 
@@ -68,21 +65,21 @@ describe("ImageProcessing::Pipeline", () => {
     const png = await Vips.convert("png").call(portrait);
     const resultJpg = await Vips.invert().call(jpg);
     const resultPng = await Vips.invert().call(png);
-    expect(File.extname(resultJpg.path())).toEqual(".jpg");
-    expect(File.extname(resultPng.path())).toEqual(".png");
+    expect(File.extname(resultJpg.path()!)).toEqual(".jpg");
+    expect(File.extname(resultPng.path()!)).toEqual(".png");
   });
 
   it("saves as JPEG when format is unknown", async () => {
     const png = await Vips.convert("png").call(portrait);
-    const result = await Vips.invert().call(copyToTempfile(png as unknown as IO));
-    expect(File.extname(result.path())).toEqual(".jpg");
+    const result = await Vips.invert().call(copyToTempfile(png));
+    expect(File.extname(result.path()!)).toEqual(".jpg");
     await assertType("JPEG", result);
   });
 
   it("saves as JPEG when format is unknown and the path ends with a '.'", async () => {
     const png = await Vips.convert("png").call(portrait);
-    const result = await Vips.invert().call(copyToTempfile(png as unknown as IO, "."));
-    expect(File.extname(result.path())).toEqual(".jpg");
+    const result = await Vips.invert().call(copyToTempfile(png, "."));
+    expect(File.extname(result.path()!)).toEqual(".jpg");
     await assertType("JPEG", result);
   });
 
@@ -263,7 +260,7 @@ describe("ImageProcessing::Pipeline", () => {
     expect(tempfile).toBeInstanceOf(Tempfile);
     expect(tempfile.isBinmode()).toBe(true);
     expect(tempfile.pos).toEqual(0);
-    expect(tempfile.read()).toEqual(IO.binread(tempfile.path()));
+    expect(tempfile.read()).toEqual(IO.binread(tempfile.path()!));
   });
 
   it("returns an intermediary object on #call(save: false)", async () => {
