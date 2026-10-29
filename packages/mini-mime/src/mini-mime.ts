@@ -227,3 +227,5 @@ export const MiniMime = {
   Info,
   Db,
 };
+
+import "./class-paths.generated.js";
