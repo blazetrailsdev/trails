@@ -176,6 +176,20 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
+  if (pkg === "mail") {
+    // Specs are reported relative to `spec`, so each repeats the gem's
+    // `lib/mail` root as a leading `mail/`; drop it so
+    // `mail/encodings/base64_spec.rb` lands on `encodings/base64.test.ts`.
+    const rest = rubyFile.replace(/^mail\//, "");
+    const dir = path.dirname(rest).replace(/_/g, "-");
+    const tsFile =
+      path
+        .basename(rest, ".rb")
+        .replace(/_spec$/, "")
+        .replace(/_/g, "-") + ".test.ts";
+    return dir === "." ? tsFile : path.join(dir, tsFile);
+  }
+
   if (pkg === "mini-magick") {
     // Specs sit under `spec/lib/mini_magick/`, repeating the gem's lib root;
     // drop it so `lib/mini_magick/image_spec.rb` lands on `image.test.ts` and
@@ -1710,6 +1724,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   date: "packages/date/src/",
   "ruby-compat": "packages/ruby-compat/src/",
   thor: "packages/thor/src/",
+  mail: "packages/mail/src/",
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {

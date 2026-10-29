@@ -348,6 +348,8 @@ const alias = {
   "@blazetrails/vitest-matchers": path.resolve(__dirname, "packages/vitest-matchers/src/index.ts"),
   "@blazetrails/date": path.resolve(__dirname, "packages/date/src/index.ts"),
   "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/src/index.ts"),
+  "@blazetrails/mail/": path.resolve(__dirname, "packages/mail/src") + "/",
+  "@blazetrails/mail": path.resolve(__dirname, "packages/mail/src/index.ts"),
   "@blazetrails/thor/": path.resolve(__dirname, "packages/thor/src") + "/",
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),

@@ -91,3 +91,16 @@ export function isValidEncoding(string: string, encoding: string | Encoding | nu
     return false;
   }
 }
+
+/**
+ * Ruby core `String#ascii_only?` (`vendor/ruby/v3.3.11/string.c:11019`
+ * `rb_str_is_ascii_only_p`): whether every byte of the receiver is 7-bit. A
+ * JS string is read as its UTF-8 text, a `Uint8Array` as its bytes.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_str_is_ascii_only_p` (`vendor/ruby/v3.3.11/string.c:11019`).
+ */
+export function isAsciiOnly(string: string | Uint8Array): boolean {
+  // eslint-disable-next-line no-control-regex -- `rb_str_is_ascii_only_p` (string.c:11019)
+  if (typeof string === "string") return /^[\x00-\x7f]*$/.test(string);
+  return string.every((byte) => byte < 0x80);
+}

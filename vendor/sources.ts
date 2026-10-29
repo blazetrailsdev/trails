@@ -882,7 +882,16 @@ export const SOURCES: readonly UpstreamSource[] = [
       url: "https://github.com/mikel/mail.git",
       ref: "2.8.1",
     },
-    packages: [],
+    packages: [
+      {
+        name: "mail",
+        libPath: "lib/mail",
+        libEntryFile: "lib/mail.rb",
+        testPath: "spec",
+        compareApi: true,
+        compareTests: true,
+      },
+    ],
   },
   {
     name: "mini_mime",

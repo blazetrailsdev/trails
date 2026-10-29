@@ -25,6 +25,7 @@
     { "path": "packages/bcrypt" },
     { "path": "packages/vitest-matchers" },
     { "path": "packages/msgpack" },
+    { "path": "packages/mail" },
     { "path": "packages/tse-compiler" },
     { "path": "packages/arel" },
     { "path": "packages/activemodel" },
