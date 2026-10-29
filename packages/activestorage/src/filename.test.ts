@@ -36,7 +36,7 @@ describe("ActiveStorage::FilenameTest", () => {
   });
 
   it("strips RTL override chars used to spoof unsafe executables as docs", () => {
-    expect(new Filename("evil‮fdp.exe").sanitized()).toBe("evil-fdp.exe");
+    expect(new Filename("evil\u202Efdp.exe").sanitized()).toBe("evil-fdp.exe");
   });
 
   it("compare case-insensitively", () => {

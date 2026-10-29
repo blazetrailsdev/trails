@@ -43,7 +43,7 @@ export class Filename implements Comparable {
     return this.sanitized().toString();
   }
 
-  asJson(..._args: unknown[]): string {
+  asJson(): string {
     return this.toString();
   }
 
