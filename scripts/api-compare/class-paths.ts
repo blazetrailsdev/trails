@@ -322,7 +322,6 @@ async function checkSeatedPaths(dir: string): Promise<void> {
 export const CORE_CLASSES: readonly [string, string | null, string, string][] = [
   ["ArgumentError", "argument-error.ts", "ArgumentError", "error.c:3323"],
   ["Array", null, "Array", "array.c:8605"],
-  ["BasicObject", "object.ts", "rbCBasicObject", "class.c:893"],
   ["EOFError", "eof-error.ts", "EOFError", "io.c:15343"],
   ["EncodingError", "encoding-error.ts", "EncodingError", "error.c:3371"],
   ["Exception", "exception.ts", "Exception", "error.c:3294"],
@@ -349,7 +348,6 @@ export const CORE_CLASSES: readonly [string, string | null, string, string][] = 
   ["StandardError", "standard-error.ts", "StandardError", "error.c:3321"],
   ["StopIteration", "stop-iteration.ts", "StopIteration", "enumerator.c:4578"],
   ["Struct", "struct.ts", "Struct", "struct.c:2176"],
-  ["Symbol", "object.ts", "rbCSymbol", "string.c:12290"],
   ["SystemCallError", "errno.ts", "SystemCallError", "error.c:3380"],
   ["ThreadError", "thread-error.ts", "ThreadError", "thread.c:5451"],
   ["TypeError", "type-error.ts", "TypeError", "error.c:3322"],
@@ -363,7 +361,10 @@ async function checkCoreSites(): Promise<string[]> {
   for (const [fqn, , , site] of CORE_CLASSES) {
     const [file, line] = site.split(":");
     const source = await fs.readFile(path.join(ruby, file), "utf8").catch(() => null);
-    if (source === null) continue;
+    if (source === null) {
+      bad.push(`${fqn} ${site} (unreadable)`);
+      continue;
+    }
     if (!source.split("\n")[Number(line) - 1]?.includes(`"${fqn}"`)) bad.push(`${fqn} ${site}`);
   }
   return bad;
