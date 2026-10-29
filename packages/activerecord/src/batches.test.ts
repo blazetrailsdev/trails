@@ -4,9 +4,9 @@ import { ORDER_IGNORE_MESSAGE } from "./relation/batches.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { StringIO, regexpEscape } from "@blazetrails/ruby-compat";
 import { currentAdapter } from "./support/adapter-helper.js";
-import { assertEqual, isPresent } from "@blazetrails/activesupport";
+import { Logger, assertEqual, isPresent } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import {
   Post,
@@ -114,18 +114,13 @@ describe("EachTest", () => {
 
   it("warn if order scope is set", async () => {
     const previousLogger = Base.logger;
-    const logger = {
-      debug: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      fatal: vi.fn(),
-    };
+    const logger = new Logger(new StringIO());
+    const warn = vi.spyOn(logger, "warn");
     Base.logger = logger;
     try {
       for await (const _post of Post.order("title").findEach({})) {
       }
-      expect(logger.warn).toHaveBeenCalledWith(ORDER_IGNORE_MESSAGE);
+      expect(warn).toHaveBeenCalledWith(ORDER_IGNORE_MESSAGE);
     } finally {
       Base.logger = previousLogger;
     }

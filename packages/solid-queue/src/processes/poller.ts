@@ -62,7 +62,7 @@ export class Poller extends Base {
   async withPollingVolume<T>(block: () => Promise<T>): Promise<T> {
     return await SolidQueue.instrument("polling", {}, async () => {
       if (SolidQueue.isSilencePolling() && ActiveRecord.Base.logger) {
-        return (await ActiveRecord.Base.logger.silence!(undefined, block)) as T;
+        return (await ActiveRecord.Base.logger.silence(undefined, () => block())) as T;
       } else {
         return await block();
       }

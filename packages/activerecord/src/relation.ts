@@ -460,7 +460,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.readonlyValue;
   }
 
-  get isLocked(): string | boolean | null {
+  get isLocked(): string | Nodes.SqlLiteral | boolean | null {
     return this.lockValue;
   }
 
@@ -1871,7 +1871,7 @@ export interface Relation<T extends Base, G extends boolean = false> {
   withValues: Array<Record<string, unknown>>;
   limitValue: number | string | null;
   offsetValue: number | string | null;
-  lockValue: string | boolean | null;
+  lockValue: string | Nodes.SqlLiteral | boolean | null;
   readonlyValue: boolean | null;
   reorderingValue: boolean | null;
   strictLoadingValue: boolean | null;
@@ -1938,7 +1938,11 @@ export interface Relation<T extends Base, G extends boolean = false>
   unscope<A extends UnscopeArg[]>(
     ...args: A
   ): Relation<T, UnscopeArg extends A[number] ? boolean : ":group" extends A[number] ? false : G>;
-  lock(locks?: string | boolean | null): Relation<T, G>;
+  lock(locks?: string | Nodes.SqlLiteral | boolean | null): Relation<T, G>;
+  maximum<K extends keyof T & string>(
+    columnName: K,
+  ): Promise<G extends true ? Map<unknown, T[K]> : T[K] | null>;
+  maximum(columnName: string | ArelNode): Promise<unknown>;
   none(): Relation<T, G>;
   readonly(value?: boolean): Relation<T, G>;
   strictLoading(value?: boolean): Relation<T, G>;

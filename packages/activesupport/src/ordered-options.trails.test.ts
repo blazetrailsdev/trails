@@ -32,4 +32,10 @@ describe("OrderedOptions", () => {
     a.set("testKey", new Map([["a", 1]]));
     expect(a.dig("testKey", "a")).toBe(1);
   });
+
+  it("update answers the options, so a property read off its result works", () => {
+    const a = new OrderedOptions().update({ foo: 1 }) as OrderedOptions & { foo: unknown };
+    expect(a.foo).toBe(1);
+    expect(a.set("bar", 2).get("bar")).toBe(2);
+  });
 });

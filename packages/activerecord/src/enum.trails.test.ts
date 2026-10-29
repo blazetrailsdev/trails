@@ -1,5 +1,11 @@
+import { StringIO } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, afterAll, beforeAll, vi } from "vitest";
-import { HashWithIndifferentAccess, Inflections, camelize } from "@blazetrails/activesupport";
+import {
+  HashWithIndifferentAccess,
+  Inflections,
+  Logger,
+  camelize,
+} from "@blazetrails/activesupport";
 import {
   assertValidEnumDefinitionValues,
   assertValidEnumOptions,
@@ -285,7 +291,11 @@ describe("Enum private validators", () => {
     const warnings: string[] = [];
     class Model extends Base {}
     beforeAll(() => {
-      Model.logger = { warn: (msg: string) => void warnings.push(msg) } as typeof Base.logger;
+      Model.logger = new Logger(new StringIO());
+      vi.spyOn(Model.logger, "warn").mockImplementation((msg) => {
+        warnings.push(String(msg));
+        return true;
+      });
     });
     afterEach(() => {
       warnings.length = 0;

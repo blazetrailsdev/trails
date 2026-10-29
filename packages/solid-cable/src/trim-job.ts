@@ -3,32 +3,26 @@ import { Message } from "./message.js";
 import { SolidCable } from "./solid-cable.js";
 
 export class TrimJob extends Base {
-  /**
-   * @missingRailsArgs trimmable — CONVERGEABLE solid-cable-config-reads-are-async
-   * @missingRailsArgs non_blocking_lock — CONVERGEABLE solid-cable-config-reads-are-async
-   */
   async perform(): Promise<void> {
-    if (!(await this.isTrim())) return;
+    if (!this.isTrim()) return;
 
     await Message.transaction(async () => {
-      const ids = await (
-        Message.trimmable(await SolidCable.messageRetention()) as unknown as typeof Message
-      )
-        .nonBlockingLock(await SolidCable.useSkipLocked())
-        .limit(await this.trimBatchSize())
+      const ids = await Message.trimmable()
+        .nonBlockingLock()
+        .limit(this.trimBatchSize())
         .pluck("id");
       await Message.where({ id: ids }).deleteAll();
     });
   }
 
   /** @internal */
-  private async trimBatchSize(): Promise<number> {
-    return await SolidCable.trimBatchSize();
+  private trimBatchSize(): number {
+    return SolidCable.trimBatchSize();
   }
 
   /** @internal */
-  private async isTrim(): Promise<boolean> {
-    const expiresPerWrite = (1 / (await this.trimBatchSize())) * SolidCable.trimChance();
+  private isTrim(): boolean {
+    const expiresPerWrite = (1 / this.trimBatchSize()) * SolidCable.trimChance();
 
     return Math.random() < expiresPerWrite - Math.floor(expiresPerWrite);
   }

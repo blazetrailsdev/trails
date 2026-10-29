@@ -524,7 +524,12 @@ export default defineConfig({
             "packages/solid-cable/src/**/*.test.ts",
             "packages/activestorage/src/**/*.test.ts",
           ],
-          exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE, ...SQLITE_DRIVER_TESTS],
+          exclude: [
+            ...SHARED_EXCLUDE,
+            ...ADAPTER_SPECIFIC_EXCLUDE,
+            ...SQLITE_DRIVER_TESTS,
+            "packages/solid-cable/src/generators/**",
+          ],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
           // instead of re-issuing the DDL per file. No-op on PG/MySQL runs.
@@ -646,9 +651,15 @@ export default defineConfig({
         test: {
           name: "trailties",
           globals: true,
-          include: ["packages/trailties/src/**/*.test.ts"],
+          include: [
+            "packages/trailties/src/**/*.test.ts",
+            "packages/solid-cable/src/generators/**/*.test.ts",
+          ],
           exclude: SHARED_EXCLUDE,
-          globalSetup: ["./packages/trailties/src/test-helpers/build-templates.ts"],
+          globalSetup: [
+            "./packages/trailties/src/test-helpers/build-templates.ts",
+            "./packages/solid-cable/src/test-helpers/build-templates.ts",
+          ],
           setupFiles: otherSetupFiles,
         },
       },

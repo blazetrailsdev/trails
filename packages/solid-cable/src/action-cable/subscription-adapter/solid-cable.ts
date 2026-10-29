@@ -1,4 +1,4 @@
-import { Logger, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 import { Base as ActiveRecordBase } from "@blazetrails/activerecord";
 import { SubscriptionAdapter } from "@blazetrails/actioncable/namespaces";
 import type { StreamEventLoop } from "@blazetrails/actioncable/connection/stream-event-loop";
@@ -29,7 +29,7 @@ export class SolidCable extends Base {
   override async broadcast(channel: string, payload: unknown): Promise<unknown> {
     await Message.broadcast(channel, payload);
 
-    if (await SolidCableConfig.isAutotrim()) return await TrimJob.performNow();
+    if (SolidCableConfig.isAutotrim()) return await TrimJob.performNow();
     return null;
   }
 
@@ -100,9 +100,8 @@ export class Listener extends SubscriberMap {
         }
 
         await this.interruptible(async () => {
-          const pollingInterval = await SolidCableConfig.pollingInterval();
           await new Promise((resolve) => {
-            this._timer = setTimeout(resolve, pollingInterval.toF() * 1000);
+            this._timer = setTimeout(resolve, SolidCableConfig.pollingInterval().toF() * 1000);
             if (this._isStopped) clearTimeout(this._timer);
           });
         });
@@ -153,7 +152,7 @@ export class Listener extends SubscriberMap {
 
   /** @internal */
   private async lastId(): Promise<number> {
-    return (this._lastId ??= ((await Message.maximum("id")) as number | null) ?? 0);
+    return (this._lastId ??= (await Message.maximum("id")) ?? 0);
   }
 
   /** @internal */
@@ -177,8 +176,8 @@ export class Listener extends SubscriberMap {
 
   /** @internal */
   private async withPollingVolume(block: () => Promise<void>): Promise<void> {
-    if ((await SolidCableConfig.isSilencePolling()) && ActiveRecordBase.logger) {
-      await (ActiveRecordBase.logger as unknown as Logger).silence(undefined, block);
+    if (SolidCableConfig.isSilencePolling() && ActiveRecordBase.logger) {
+      await ActiveRecordBase.logger.silence(undefined, () => block());
     } else {
       await block();
     }

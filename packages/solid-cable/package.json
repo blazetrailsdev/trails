@@ -19,7 +19,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && pnpm build:templates",
+    "build:templates": "node -e \"require('fs').cpSync('src/generators/solid-cable/install/templates', 'dist/generators/solid-cable/install/templates', { recursive: true })\" && trails-tsc-views build-templates dist/generators"
   },
   "dependencies": {
     "@blazetrails/actioncable": "workspace:*",
@@ -35,6 +36,7 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@blazetrails/vitest-matchers": "workspace:*"
+    "@blazetrails/vitest-matchers": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*"
   }
 }

@@ -611,9 +611,9 @@ describe("FixturesTest", () => {
     try {
       Base.logger = new Logger(null);
 
-      const level = (Base.logger as Logger).level;
+      const level = Base.logger.level;
       await self().createFixtures("topics");
-      expect((Base.logger as Logger).level).toBe(level);
+      expect(Base.logger.level).toBe(level);
     } finally {
       Base.logger = previousLogger;
     }
