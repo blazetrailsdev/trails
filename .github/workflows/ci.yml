@@ -938,6 +938,7 @@ jobs:
           packages/image-processing
           packages/mini-magick
           packages/mini-mime
+          packages/rake
           packages/msgpack
           packages/nokogiri
           packages/raabro
@@ -1177,6 +1178,7 @@ jobs:
           packages/image-processing
           packages/mini-magick
           packages/mini-mime
+          packages/rake
           packages/msgpack
           packages/nokogiri
           packages/html-sanitizer

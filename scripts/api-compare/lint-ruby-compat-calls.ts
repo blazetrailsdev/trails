@@ -105,6 +105,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "marcel",
   "mini-magick",
   "mini-mime",
+  "rake",
   "msgpack",
   "mysql2",
   "pg",

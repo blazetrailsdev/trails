@@ -716,6 +716,12 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
 
+  packages/rake:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/ruby-compat:
     optionalDependencies:
       yaml:
