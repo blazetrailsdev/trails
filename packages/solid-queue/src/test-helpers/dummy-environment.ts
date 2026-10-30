@@ -24,9 +24,9 @@ function databaseNameFrom(name: string): string {
 const dummyConfigs = ["shard_one", "shard_two", "queue"].map(
   (name) =>
     new HashConfig(envName, name, {
+      ...(primary.adapter === "sqlite3" && { timeout: 5000 }),
       ...primary.configurationHash,
       pool: primary.adapter === "sqlite3" ? 50 : 20,
-      ...(primary.adapter === "sqlite3" && { timeout: 5000 }),
       database: databaseNameFrom(name),
     }),
 );
