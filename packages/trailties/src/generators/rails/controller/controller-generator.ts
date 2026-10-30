@@ -75,22 +75,22 @@ export class ControllerGenerator extends NamedBase {
     return this.options.parent!;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-generators-remainder-onto-thor-template */
   private parentRef() {
     return parentRefForRelative(this.parentClassName(), this.classPathParts.length, this.ext());
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-generators-remainder-onto-thor-template */
   private parentClass(): string {
     return Object.keys(this.parentRef().import.named!)[0];
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-generators-remainder-onto-thor-template */
   private parentPath(): string {
     return this.parentRef().import.from;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-generators-remainder-onto-thor-template */
   private controllerClassName(): string {
     return controllerPathHelpers(this.name).className;
   }

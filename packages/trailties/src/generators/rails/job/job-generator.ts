@@ -51,12 +51,12 @@ export class JobGenerator extends NamedBase {
     return this.options.parent!;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-generators-remainder-onto-thor-template */
   private parentClass(): string {
     return classify(this.parentClassName());
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-generators-remainder-onto-thor-template */
   private parentPath(): string {
     return dasherize(this.parentClassName());
   }
