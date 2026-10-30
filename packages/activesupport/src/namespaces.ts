@@ -71,7 +71,10 @@ export const TopLevel: {
         paths(): { get(path: string): { firstSync(): string | undefined } | undefined };
       };
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
-      routes(): { namedRoutes: { helperNames(): string[] } };
+      routes(): {
+        namedRoutes: { helperNames(): string[] };
+        urlHelpers(): object;
+      };
       envConfig(): Record<string, unknown>;
       executor: { wrap<T>(block: () => T): T; runBang(): unknown };
       configFor(name: string): Promise<unknown>;

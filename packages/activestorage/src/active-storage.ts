@@ -7,9 +7,10 @@ import {
   type Extended,
   type Logger,
 } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Deprecation } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import type { Base } from "@blazetrails/activerecord";
+import type { Blob } from "./blob.js";
 import type * as Errors from "./errors.js";
 import type { LogSubscriber } from "./log-subscriber.js";
 
@@ -23,7 +24,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   Service: unknown;
   Previewer: unknown;
   Analyzer: unknown;
-  Blob?: typeof Base & { service: { name: string | null } };
+  Blob?: typeof Blob;
   Transformers: typeof Transformers;
   Error: typeof Errors.Error;
   InvariableError: typeof Errors.InvariableError;
@@ -58,6 +59,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   videoPreviewArguments: string;
 };
 extend(ActiveStorage, Autoload);
+registerConstant("ActiveStorage", ActiveStorage);
 
 ActiveStorage.autoload("Attached");
 ActiveStorage.autoload("FixtureSet");

@@ -1,6 +1,5 @@
 import { isBlank, TopLevel, type Duration } from "@blazetrails/activesupport";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
-import type { RouteSet } from "@blazetrails/actionpack";
 import {
   ArgumentError,
   Dir,
@@ -43,6 +42,10 @@ export class DiskService extends Service {
 
   override async download(key: string): Promise<Uint8Array>;
   override async download(key: string, block: (chunk: Uint8Array) => unknown): Promise<void>;
+  override async download(
+    key: string,
+    block?: (chunk: Uint8Array) => unknown,
+  ): Promise<Uint8Array | void>;
   override async download(
     key: string,
     block?: (chunk: Uint8Array) => unknown,
@@ -290,9 +293,7 @@ export class DiskService extends Service {
 
   /** @internal */
   private urlHelpers(): UrlHelpers {
-    return (this._urlHelpers ??= (
-      TopLevel.Trails!.application!.routes() as unknown as RouteSet
-    ).urlHelpers() as unknown as UrlHelpers);
+    return (this._urlHelpers ??= TopLevel.Trails!.application!.routes().urlHelpers() as UrlHelpers);
   }
 
   /** @internal */
