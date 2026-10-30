@@ -729,7 +729,7 @@ describe("FileUtils async commands", () => {
       nodeFs.rmSync(root, { recursive: true, force: true });
     });
 
-    it("ln_sr", async () => {
+    it("ln sr", async () => {
       await FileUtils.lnSrAsync("data/a", "tmp/lnsdest");
       expect(nodeFs.readlinkSync("tmp/lnsdest")).toBe("../data/a");
       await FileUtils.lnSrAsync(nodePath.join(root, "data/a"), "tmp");
@@ -744,12 +744,12 @@ describe("FileUtils async commands", () => {
       expect(nodeFs.readlinkSync("tmp/l")).toBe("../data/a");
     });
 
-    it("ln_sr broken symlink", async () => {
+    it("ln sr broken symlink", async () => {
       await FileUtils.lnSrAsync("tmp/symlink", "tmp/symlink");
       expect(nodeFs.lstatSync("tmp/symlink").isSymbolicLink()).toBe(true);
     });
 
-    it("cp_lr", async () => {
+    it("cp lr", async () => {
       nodeFs.mkdirSync("data/d");
       nodeFs.writeFileSync("data/d/b", "b");
       nodeFs.mkdirSync("tmp/out");
