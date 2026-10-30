@@ -148,12 +148,15 @@ export function rbFBinding<T extends object>(self: T): T {
 /**
  * Empties the table `registerConstant` (`vendor/ruby/v3.3.11/variable.c:3674`
  * `rb_const_set` on `rb_cObject`) fills, down to the core classes seated at
- * load, which no teardown removes from `rb_cObject`.
+ * load, which no teardown removes from `rb_cObject`. A top-level module object
+ * stays too: a gem seats its namespace at load, and its readers carry no guard.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function resetConstants(): void {
-  for (const name of Object.keys(tbl)) delete tbl[name];
+  for (const [name, value] of Object.entries(tbl)) {
+    if (typeof value === "function" || name.includes("::")) delete tbl[name];
+  }
   Object.assign(tbl, _coreConstants);
 }
 
