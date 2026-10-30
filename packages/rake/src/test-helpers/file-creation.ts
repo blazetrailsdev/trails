@@ -13,9 +13,10 @@ export async function createTimedFiles(oldfile: string, ...newfiles: string[]): 
   if (await File.isExistAsync(oldfile)) {
     let allNewer = true;
     for (const newfile of newfiles) {
-      allNewer &&=
+      allNewer =
         (await File.isExistAsync(newfile)) &&
         (await File.mtimeAsync(newfile)) > (await File.mtimeAsync(oldfile));
+      if (!allNewer) break;
     }
     if (allNewer) return;
   }
@@ -37,7 +38,11 @@ export async function createFile(name: string, fileTime: Date | null = null): Pr
 }
 
 export async function deleteFile(name: string): Promise<void> {
-  await FileUtils.rmFAsync(name);
+  try {
+    File.delete(name);
+  } catch {
+    return;
+  }
 }
 
 export function useRakeTestCase(): { readonly tm: TestTaskManager } {

@@ -4,6 +4,7 @@ import {
   max,
   Monitor,
   rbCheckArrayType,
+  rbCmpint,
   rbModName,
   rbObjRespondTo,
   stringSplit,
@@ -356,7 +357,7 @@ export class Task {
     result += "pre-requisites: \n";
     const prereqs: [Task, Timestamp][] = [];
     for (const p of await this.prerequisiteTasks()) prereqs.push([p, await p.timestamp()]);
-    prereqs.sort((a, b) => cmp(a[1], b[1])!);
+    prereqs.sort((a, b) => rbCmpint(cmp(a[1], b[1]), a[1], b[1]));
     for (const [p, timestamp] of prereqs) {
       result += `--${p.name} (${_timeToS(timestamp)})\n`;
     }
