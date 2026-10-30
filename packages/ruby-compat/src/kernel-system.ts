@@ -1,6 +1,6 @@
 import { getChildProcess } from "./child-process-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
-import { rbExecargNew } from "./process.js";
+import { Process, rbExecargNew, rbLastStatusSet } from "./process.js";
 
 /**
  * `Kernel#system` (`vendor/ruby/v3.3.11/process.c:4841` `rb_f_system`), in its
@@ -27,6 +27,7 @@ export async function rbFSystem(
   }
 
   const data = await adapter.system(prog, env, args, opthash);
+  rbLastStatusSet(new Process.Status(data));
 
   if (data.pid != null && data.pid > 0) {
     if (data.status === 0) {

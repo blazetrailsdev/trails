@@ -112,6 +112,18 @@ function fuEachSrcDest0(
   }
 }
 
+async function fuEachSrcDest0Async(
+  src: string | string[],
+  dest: string,
+): Promise<[string, string][]> {
+  if (Array.isArray(src)) return src.map((s) => [s, getPath().join(dest, getPath().basename(s))]);
+  const st = await getFs()
+    .stat?.(dest)
+    .catch(() => null);
+  if (st?.isDirectory() === true) return [[src, getPath().join(dest, getPath().basename(src))]];
+  return [[src, dest]];
+}
+
 /** `fu_each_src_dest` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2466-2472`). */
 function fuEachSrcDest(
   src: string | string[],
@@ -767,6 +779,45 @@ export class FileUtils {
     fuEachSrcDest(src, dest, (s, d) => {
       FileUtils.copyFile(s, d, preserve);
     });
+  }
+
+  /** `FileUtils.ln` (`vendor/ruby/v3.3.11/lib/fileutils.rb:516-523`) over the
+   * backend's async `link`, through `fu_each_src_dest0`'s directory arm
+   * (`fileutils.rb:2474-2487`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async lnAsync(
+    src: string | string[],
+    dest: string,
+    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+  ): Promise<void> {
+    if (verbose === true)
+      fuOutputMessage(`ln${force === true ? " -f" : ""} ${[src, dest].flat().join(" ")}`);
+    if (noop === true) return;
+    for (const [s, d] of await fuEachSrcDest0Async(src, dest)) {
+      if (force === true)
+        await getFs()
+          .unlink?.(d)
+          .catch(() => {});
+      await getFs().link!(s, d);
+    }
+  }
+
+  /** `FileUtils.cp` (`vendor/ruby/v3.3.11/lib/fileutils.rb:873-879`) over the
+   * backend's async `readFile` / `writeFile`. `preserve` is unported here.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async cpAsync(
+    src: string | string[],
+    dest: string,
+    { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
+  ): Promise<void> {
+    if (verbose === true) fuOutputMessage(`cp ${[src, dest].flat().join(" ")}`);
+    if (noop === true) return;
+    for (const [s, d] of await fuEachSrcDest0Async(src, dest)) {
+      if (fuSame(s, d)) throw new ArgumentError(`same file: ${s} and ${d}`);
+      await getFs().writeFile!(d, await getFs().readFile(s));
+    }
   }
 
   /**

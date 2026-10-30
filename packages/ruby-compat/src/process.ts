@@ -35,6 +35,9 @@ export function rbExecargNew(
   let opthash: { out?: string; unsetenvOthers?: unknown } = {};
   if (rest.length > 0 && isPlainHash(rest[rest.length - 1])) {
     opthash = rest.pop() as { out?: string; unsetenvOthers?: unknown };
+    for (const key of Object.keys(opthash)) {
+      if (!EXEC_OPTIONS.has(key)) throw new ArgumentError(`wrong exec option symbol: ${key}`);
+    }
   }
   const unsetenvOthers = opthash.unsetenvOthers != null && opthash.unsetenvOthers !== false;
   const env: Record<string, string | undefined> = unsetenvOthers ? {} : { ...processEnv };
@@ -55,6 +58,22 @@ export function rbExecargNew(
   }
   return [prog, env, args.length === 0 ? null : args, opthash];
 }
+
+/** The option names `rb_execarg_addopt` (`vendor/ruby/v3.3.11/process.c:2145-2290`) accepts, camelCased. */
+const EXEC_OPTIONS = new Set([
+  "pgroup",
+  "newPgroup",
+  "unsetenvOthers",
+  "chdir",
+  "umask",
+  "closeOthers",
+  "in",
+  "out",
+  "err",
+  "uid",
+  "gid",
+  "exception",
+]);
 
 const POSIX_SH_CMDS = new Set([
   "!",
