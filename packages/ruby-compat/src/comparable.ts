@@ -87,6 +87,11 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (a === null || a === undefined || b === null || b === undefined) {
     return a === b ? 0 : null;
   }
+  // `time_cmp`'s `rb_invcmp` arm (vendor/ruby/v3.3.11/time.c:3951): `-(other <=> time)`.
+  if (a instanceof Date && !(b instanceof Date) && isComparable(b)) {
+    const c = b.compareTo(a);
+    return c == null ? null : -c;
+  }
   // boundary: Date endpoints are compared as epoch millis.
   if (a instanceof Date) a = a.getTime();
   if (b instanceof Date) b = b.getTime();
