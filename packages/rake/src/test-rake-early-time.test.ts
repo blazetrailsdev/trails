@@ -22,7 +22,7 @@ describe("TestRakeEarlyTime", () => {
   it("original time compare is not messed up", () => {
     const t1 = new Date(1970, 0, 1, 0, 0, 0);
     const t2 = new Date();
-    expect(cmp(t1, t2) < 0).toBeTruthy();
+    expect(cmp(t1, t2)! < 0).toBeTruthy();
     expect(cmp(t2, t1)! > 0).toBeTruthy();
     expect(cmp(t1, t1) === 0).toBeTruthy();
     expect(cmp(t2, t2) === 0).toBeTruthy();
