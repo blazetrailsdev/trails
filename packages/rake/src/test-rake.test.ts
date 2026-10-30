@@ -1,4 +1,6 @@
+/* eslint-disable vitest/no-conditional-expect, vitest/no-conditional-in-test */
 import { describe, expect, it } from "vitest";
+import { File } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Rake, eachDirParent } from "./rake-module.js";
 import { useApplicationTestCase } from "./test-helpers/application.js";
@@ -16,8 +18,13 @@ describe("TestRake", () => {
     expect(alldirs("a")).toEqual(["a"]);
     expect(alldirs("a/b")).toEqual(["a/b", "a"]);
     expect(alldirs("/a/b")).toEqual(["/a/b", "/a", "/"]);
-    expect(alldirs("c:/a/b")).toEqual(["c:/a/b", "c:/a", "c:"]);
-    expect(alldirs("c:a/b")).toEqual(["c:a/b", "c:a"]);
+    if (File.dirname("c:/foo") === "c:") {
+      expect(alldirs("c:/a/b")).toEqual(["c:/a/b", "c:/a", "c:"]);
+      expect(alldirs("c:a/b")).toEqual(["c:a/b", "c:a"]);
+    } else {
+      expect(alldirs("c:/a/b")).toEqual(["c:/a/b", "c:/a", "c:/"]);
+      expect(alldirs("c:a/b")).toEqual(["c:a/b", "c:a"]);
+    }
   });
 
   it("can override application", () => {

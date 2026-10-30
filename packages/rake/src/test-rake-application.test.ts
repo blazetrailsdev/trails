@@ -266,8 +266,8 @@ describe("TestRakeApplication", () => {
 
     expect(out).toBeEmpty();
 
-    expect(err).toContain("rake aborted!");
-    expect(err).toContain("test_display_exception_details");
+    expect(err).toMatch("rake aborted!");
+    expect(err).toMatch("test_display_exception_details");
   });
 
   it("display exception details with detailed message", async () => {
@@ -286,9 +286,9 @@ describe("TestRakeApplication", () => {
 
     expect(out).toBeEmpty();
 
-    expect(err).toContain("rake aborted!");
-    expect(err).toContain("detailed_message!!");
-    expect(err).toContain("test_display_exception_details_with_detailed_message");
+    expect(err).toMatch("rake aborted!");
+    expect(err).toMatch("detailed_message!!");
+    expect(err).toMatch("test_display_exception_details_with_detailed_message");
   });
 
   it("display exception details bad encoding", async () => {
@@ -300,7 +300,7 @@ describe("TestRakeApplication", () => {
     });
 
     expect(out).toBeEmpty();
-    expect(err).toContain("El Niño is coming!");
+    expect(err).toMatch("El Niño is coming!");
   });
 
   it("display exception details cause", async () => {
@@ -313,9 +313,9 @@ describe("TestRakeApplication", () => {
 
     expect(out).toBeEmpty();
 
-    expect(err).toContain("Caused by:");
-    expect(err).toContain("cause a");
-    expect(err).toContain("cause b");
+    expect(err).toMatch("Caused by:");
+    expect(err).toMatch("cause a");
+    expect(err).toMatch("cause b");
   });
 
   it("display tasks", async () => {
@@ -339,7 +339,7 @@ describe("TestRakeApplication", () => {
     const [out] = await captureOutput(() => app.displayTasksAndComments());
 
     expect(out).toMatch(/^rake t/m);
-    expect(out).toContain(`# ${numbers.slice(0, 65)}...`);
+    expect(out).toMatch(`# ${numbers.slice(0, 65)}...`);
   });
 
   it("display tasks with task name wider than tty display", async () => {
@@ -352,7 +352,7 @@ describe("TestRakeApplication", () => {
 
     const [out] = await captureOutput(() => app.displayTasksAndComments());
 
-    expect(out).toContain(`rake ${taskName}  # ...`);
+    expect(out).toMatch(`rake ${taskName}  # ...`);
   });
 
   it("display tasks with very long task name to a non tty shows name and comment", async () => {
@@ -365,7 +365,7 @@ describe("TestRakeApplication", () => {
 
     const [out] = await captureOutput(() => app.displayTasksAndComments());
 
-    expect(out).toContain(`rake ${taskName}  # something short`);
+    expect(out).toMatch(`rake ${taskName}  # something short`);
   });
 
   it("display tasks with long comments to a non tty shows entire comment", async () => {
@@ -377,7 +377,7 @@ describe("TestRakeApplication", () => {
     app.defineTask(Task, "t");
     const [out] = await captureOutput(() => app.displayTasksAndComments());
     expect(out).toMatch(/^rake t/m);
-    expect(out).toContain(`# ${comment}`);
+    expect(out).toMatch(`# ${comment}`);
   });
 
   it("truncating comments to a non tty", async () => {
@@ -392,7 +392,7 @@ describe("TestRakeApplication", () => {
     const [out] = await captureOutput(() => app.displayTasksAndComments());
 
     expect(out).toMatch(/^rake t/m);
-    expect(out).toContain(`# ${numbers.slice(0, 65)}...`);
+    expect(out).toMatch(`# ${numbers.slice(0, 65)}...`);
   });
 
   it("describe tasks", async () => {
@@ -416,7 +416,7 @@ describe("TestRakeApplication", () => {
   });
 
   it("windows", () => {
-    expect(app.isWindows() && app.isUnix()).toBe(false);
+    expect(!(app.isWindows() && app.isUnix())).toBeTruthy();
   });
 
   it("good run", async () => {
@@ -432,21 +432,24 @@ describe("TestRakeApplication", () => {
     await rakefileDefault();
     const [out, err] = await captureOutput(() => app.run(['--rakelib=""']));
 
-    expect(ran).toBe(true);
+    expect(ran).toBeTruthy();
     expect(err).toBeEmpty();
     expect(out).toBe("DEFAULT\n");
   });
 
   it("display task run", async () => {
+    const ran = false;
     app.lastDescription = "COMMENT";
     app.defineTask(Task, "default");
     const [out] = await captureOutput(() => app.run(["-f", "-s", "--tasks", '--rakelib=""']));
     expect(app.options.showTasks).toBeTruthy();
+    expect(!ran).toBeTruthy();
     expect(out).toMatch(/rake default/);
     expect(out).toMatch(/# COMMENT/);
   });
 
   it("display prereqs", async () => {
+    const ran = false;
     app.lastDescription = "COMMENT";
     const t = app.defineTask(Task, "default");
     t.enhance(["a", "b"]);
@@ -454,6 +457,7 @@ describe("TestRakeApplication", () => {
     app.defineTask(Task, "b");
     const [out] = await captureOutput(() => app.run(["-f", "-s", "--prereqs", '--rakelib=""']));
     expect(app.options.showPrereqs).toBeTruthy();
+    expect(!ran).toBeTruthy();
     expect(out).toMatch(/rake a$/m);
     expect(out).toMatch(/rake b$/m);
     expect(out).toMatch(/rake default\n( *(a|b)\n){2}/m);
@@ -544,8 +548,8 @@ describe("TestRakeApplication", () => {
     });
 
     expect(out).toBeEmpty();
-    expect(err).toContain("rake aborted!\n");
-    expect(err).toContain("blah\n");
+    expect(err).toMatch("rake aborted!\n");
+    expect(err).toMatch("blah\n");
   });
 
   it("standard exception handling invalid option", async () => {

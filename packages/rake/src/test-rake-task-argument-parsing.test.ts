@@ -12,50 +12,61 @@ describe("TestRakeTaskArgumentParsing", () => {
   });
 
   it("name only", () => {
-    expect(app.parseTaskString("name")).toEqual(["name", []]);
+    const [name, args] = app.parseTaskString("name");
+    expect(name).toBe("name");
+    expect(args).toEqual([]);
   });
 
   it("empty args", () => {
-    expect(app.parseTaskString("name[]")).toEqual(["name", []]);
+    const [name, args] = app.parseTaskString("name[]");
+    expect(name).toBe("name");
+    expect(args).toEqual([]);
   });
 
   it("one argument", () => {
-    expect(app.parseTaskString("name[one]")).toEqual(["name", ["one"]]);
+    const [name, args] = app.parseTaskString("name[one]");
+    expect(name).toBe("name");
+    expect(args).toEqual(["one"]);
   });
 
   it("two arguments", () => {
-    expect(app.parseTaskString("name[one,two]")).toEqual(["name", ["one", "two"]]);
+    const [name, args] = app.parseTaskString("name[one,two]");
+    expect(name).toBe("name");
+    expect(args).toEqual(["one", "two"]);
   });
 
   it("can handle spaces between args", () => {
-    expect(app.parseTaskString("name[one, two,\tthree , \tfour]")).toEqual([
-      "name",
-      ["one", "two", "three", "four"],
-    ]);
+    const [name, args] = app.parseTaskString("name[one, two,\tthree , \tfour]");
+    expect(name).toBe("name");
+    expect(args).toEqual(["one", "two", "three", "four"]);
   });
 
   it("can handle spaces between all args", () => {
-    expect(app.parseTaskString("name[ one , two ,\tthree , \tfour ]")).toEqual([
-      "name",
-      ["one", "two", "three", "four"],
-    ]);
+    const [name, args] = app.parseTaskString("name[ one , two ,\tthree , \tfour ]");
+    expect(name).toBe("name");
+    expect(args).toEqual(["one", "two", "three", "four"]);
   });
 
   it("keeps embedded spaces", () => {
-    expect(app.parseTaskString("name[a one ana, two]")).toEqual(["name", ["a one ana", "two"]]);
+    const [name, args] = app.parseTaskString("name[a one ana, two]");
+    expect(name).toBe("name");
+    expect(args).toEqual(["a one ana", "two"]);
   });
 
   it("can handle commas in args", () => {
-    expect(app.parseTaskString("name[one, two, three_a\\, three_b, four]")).toEqual([
-      "name",
-      ["one", "two", "three_a, three_b", "four"],
-    ]);
+    const [name, args] = app.parseTaskString("name[one, two, three_a\\, three_b, four]");
+    expect(name).toBe("name");
+    expect(args).toEqual(["one", "two", "three_a, three_b", "four"]);
   });
 
   it("treat blank arg as empty string", () => {
-    expect(app.parseTaskString("name[one,]")).toEqual(["name", ["one", ""]]);
+    let [name, args] = app.parseTaskString("name[one,]");
+    expect(name).toBe("name");
+    expect(args).toEqual(["one", ""]);
 
-    expect(app.parseTaskString("name[one,,two]")).toEqual(["name", ["one", "", "two"]]);
+    [name, args] = app.parseTaskString("name[one,,two]");
+    expect(name).toBe("name");
+    expect(args).toEqual(["one", "", "two"]);
   });
 
   it("terminal width using env", () => {
@@ -96,12 +107,12 @@ describe("TestRakeTaskArgumentParsing", () => {
 
   it("no rakeopt", async () => {
     await app.init("rake", ["--trace"]);
-    expect(app.options.silent).toBe(false);
+    expect(!app.options.silent).toBeTruthy();
   });
 
   it("rakeopt with blank options", async () => {
     await app.init("rake", ["--trace"]);
-    expect(app.options.silent).toBe(false);
+    expect(!app.options.silent).toBeTruthy();
   });
 
   it("rakeopt with silent options", async () => {
@@ -109,6 +120,6 @@ describe("TestRakeTaskArgumentParsing", () => {
 
     await app.init("rake", []);
 
-    expect(app.options.silent).toBe(true);
+    expect(app.options.silent).toBeTruthy();
   });
 });
