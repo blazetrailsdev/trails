@@ -382,6 +382,19 @@ export class File extends IO {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `File.file?`
+   * (`vendor/ruby/v3.3.11/file.c:2009`), over the backend's async `stat`.
+   */
+  static async isFileAsync(fileName: string): Promise<boolean> {
+    const fs = getFs();
+    try {
+      return (await fs.stat!(fileName)).isFile();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * {@link File.isIdentical} over the backend's async `stat`, which is the
    * form a caller on the async fs path awaits; a backend with no async `stat`
    * is read through its sync one. A stream argument is still `fstat`ed, as

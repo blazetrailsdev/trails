@@ -776,6 +776,7 @@ describe("FileUtils async commands", () => {
       expect(await FileUtils.compareFileAsync("data/a", "tmp/b")).toBe(true);
       expect(await FileUtils.compareFileAsync("data/a", "tmp/c")).toBe(false);
       expect(await FileUtils.compareFileAsync("data/a", "tmp/d")).toBe(false);
+      expect(await FileUtils.cmpAsync("data/a", "tmp/b")).toBe(true);
     });
 
     it("chmod symbol mode", async () => {

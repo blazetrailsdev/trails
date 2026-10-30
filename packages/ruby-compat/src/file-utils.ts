@@ -205,6 +205,8 @@ function fuRelativeComponentsFrom(target: string[], base: string[]): string[] {
  * `fu_clean_components` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2527-2542`). MRI's
  * `path.chomp!(regexp, "")` at `:2535` is an `ArgumentError`, since `chomp!`
  * takes one argument; this is the `sub!` that line means.
+ *
+ * @missingRailsCall chomp! — PERMANENT
  */
 async function fuCleanComponentsAsync(...comp: string[]): Promise<string[]> {
   while (comp[0] === ".") comp.shift();
@@ -331,11 +333,12 @@ function modeToS(mode: number | string): string {
   return typeof mode === "string" ? mode : mode.toString(8);
 }
 
+/** @noRailsEquivalent PERMANENT */
 async function etcIdAsync(file: string, name: string, label: string): Promise<number> {
   const rows = await getFs().readFile(file, "utf-8");
   for (const row of rows.split("\n")) {
     const fields = row.split(":");
-    if (fields[0] === name) return Number(fields[2]);
+    if (fields[0] === name && /^\d+$/.test(fields[2] ?? "")) return Number(fields[2]);
   }
   throw new ArgumentError(`can't find ${label} for ${name}`);
 }
@@ -1348,8 +1351,7 @@ export class FileUtils {
     );
   }
 
-  /** `FileUtils.link_entry` (`vendor/ruby/v3.3.11/lib/fileutils.rb:812-818`). The
-   * destination entry dereferences because `File.file?` follows a symlink.
+  /** `FileUtils.link_entry` (`vendor/ruby/v3.3.11/lib/fileutils.rb:812-818`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static async linkEntryAsync(
@@ -1359,8 +1361,8 @@ export class FileUtils {
     removeDestination = false,
   ): Promise<void> {
     await new Entry_(src, null, dereferenceRoot).preorderTraverseAsync(async (ent) => {
-      const destent = new Entry_(dest, ent.rel, true);
-      if (removeDestination && (await destent.isFileAsync())) {
+      const destent = new Entry_(dest, ent.rel, false);
+      if (removeDestination && (await File.isFileAsync(destent.path))) {
         await File.deleteAsync(destent.path);
       }
       await ent.linkAsync(destent.path);
@@ -1684,17 +1686,26 @@ export class FileUtils {
     }
   }
 
-  /** `FileUtils.compare_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1507-1514`). Reads
-   * both files whole where `compare_stream` reads a block at a time, as
-   * `copyFileAsync` does for `Entry_#copy_file`.
+  /** `FileUtils.compare_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1507-1514`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static async compareFileAsync(a: string, b: string): Promise<boolean> {
     const fs = getFs();
     if ((await fs.stat!(a)).size !== (await fs.stat!(b)).size) return false;
-    const fa = await fs.readFile(a);
-    const fb = await fs.readFile(b);
-    return fa.every((byte, i) => byte === fb[i]);
+    return FileUtils.compareStream(await fs.readFile(a), await fs.readFile(b));
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static isIdenticalAsync = FileUtils.compareFileAsync;
+
+  /** @noRailsEquivalent PERMANENT */
+  static cmpAsync = FileUtils.compareFileAsync;
+
+  /** `FileUtils.compare_stream` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1530-1542`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static compareStream(a: Uint8Array, b: Uint8Array): boolean {
+    return a.length === b.length && a.every((byte, i) => byte === b[i]);
   }
 
   /** `FileUtils.install` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1609-1639`).
