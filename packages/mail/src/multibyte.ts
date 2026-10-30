@@ -4,17 +4,17 @@ import * as Utils from "./multibyte/utils.js";
 
 export { EncodingError };
 
+let _proxyClass: typeof Chars | null = null;
+
 export const Multibyte = {
   EncodingError,
 
-  _proxyClass: null as typeof Chars | null,
-
   proxyClass(): typeof Chars {
-    return (Multibyte._proxyClass ||= Chars);
+    return (_proxyClass ||= Chars);
   },
 
   setProxyClass(klass: typeof Chars): void {
-    Multibyte._proxyClass = klass;
+    _proxyClass = klass;
   },
 
   mbChars(str: string): Chars | string {

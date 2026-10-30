@@ -27,6 +27,41 @@ function codepointsToPattern(arrayOfCodepoints: readonly number[]): string {
     .join("|");
 }
 
+type BoundaryClass = "cr" | "lf" | "l" | "v" | "lv" | "lvt" | "t" | "extend";
+
+function inRanges(...ranges: [number, number][]): (cp: number) => boolean {
+  return (cp) => ranges.some(([a, b]) => a <= cp && cp <= b);
+}
+
+function isHangulSyllable(cp: number, lv: boolean): boolean {
+  return 0xac00 <= cp && cp <= 0xd7a3 && ((cp - 0xac00) % 28 === 0) === lv;
+}
+
+const _database = {
+  boundary: {
+    cr: 0x0d,
+    lf: 0x0a,
+    l: inRanges([0x1100, 0x115f], [0xa960, 0xa97c]),
+    v: inRanges([0x1160, 0x11a7], [0xd7b0, 0xd7c6]),
+    t: inRanges([0x11a8, 0x11ff], [0xd7cb, 0xd7fb]),
+    lv: (cp: number) => isHangulSyllable(cp, true),
+    lvt: (cp: number) => isHangulSyllable(cp, false),
+    extend: (cp: number) => /\p{Grapheme_Extend}/u.test(String.fromCodePoint(cp)),
+  } as Record<BoundaryClass, number | ((cp: number) => boolean)>,
+};
+
+function caseEq(
+  matcher: number | ((cp: number) => boolean),
+  codepoint: number | undefined,
+): boolean {
+  if (codepoint === undefined) return false;
+  return typeof matcher === "number" ? matcher === codepoint : matcher(codepoint);
+}
+
+function database(): typeof _database {
+  return _database;
+}
+
 export const Unicode = {
   UNICODE_VERSION: "7.0.0",
 
@@ -62,9 +97,36 @@ export const Unicode = {
     return Array.from(string, (c) => c.codePointAt(0)!);
   },
 
+  inCharClass(codepoint: number | undefined, classes: BoundaryClass[]): boolean {
+    return classes.find((c) => caseEq(database().boundary[c], codepoint)) ? true : false;
+  },
+
   gUnpack(string: string): number[][] {
-    Unicode.uUnpack(string);
-    return Array.from(new Intl.Segmenter().segment(string), (s) => Unicode.uUnpack(s.segment));
+    const codepoints = Unicode.uUnpack(string);
+    const unpacked: number[][] = [];
+    let pos = 0;
+    let marker = 0;
+    const eoc = codepoints.length;
+    while (pos < eoc) {
+      pos += 1;
+      const previous = codepoints[pos - 1];
+      const current = codepoints[pos];
+      if (
+        !(
+          (previous === database().boundary.cr && current === database().boundary.lf) ||
+          (caseEq(database().boundary.l, previous) &&
+            Unicode.inCharClass(current, ["l", "v", "lv", "lvt"])) ||
+          (Unicode.inCharClass(previous, ["lv", "v"]) &&
+            Unicode.inCharClass(current, ["v", "t"])) ||
+          (Unicode.inCharClass(previous, ["lvt", "t"]) && caseEq(database().boundary.t, current)) ||
+          caseEq(database().boundary.extend, current)
+        )
+      ) {
+        unpacked.push(codepoints.slice(marker, pos));
+        marker = pos;
+      }
+    }
+    return unpacked;
   },
 
   gPack(unpacked: number[][]): string {

@@ -48,7 +48,9 @@ describe("Mail::Multibyte::Chars (trails)", () => {
     expect(new Chars("Café").reverse().toS()).toBe("éfaC");
     expect(new Chars("über").capitalize().toS()).toBe("Über");
     expect(Unicode.normalize("ﬁ")).toBe("fi");
-    expect(new Chars("क्षि").gLength()).toBe(1);
+    expect(new Chars("क्षि").gLength()).toBe(3);
+    expect(Unicode.gUnpack("क्षि")).toEqual([[2325, 2381], [2359], [2367]]);
+    expect(Unicode.gUnpack("\r\n각")).toEqual([[13, 10], [44033]]);
   });
 
   it("strips with the LEADERS_PAT / TRAILERS_PAT whitespace set", () => {
