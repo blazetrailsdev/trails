@@ -15,7 +15,7 @@ describe("SQLite3Adapter timeout config coercion", () => {
   it("casts a string timeout to an integer", async () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:", timeout: "5000" });
     await adapter.connectBang();
-    expect(Number(adapter["_config"]["timeout"])).toBe(5000);
+    expect(adapter["_rawConnection"]!.busyHandlerTimeout).toBe(5000);
   });
 
   it("raises TypeError when the timeout does not cast to an integer", async () => {
@@ -42,7 +42,7 @@ describe("SQLite3Adapter timeout config coercion", () => {
   it("treats a zero timeout as set", async () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:", timeout: 0 });
     await adapter.connectBang();
-    expect(adapter["_config"]["timeout"]).toBe(0);
+    expect(adapter["_rawConnection"]!.busyHandlerTimeout).toBe(0);
   });
 
   it("deprecates the retries option", async () => {
