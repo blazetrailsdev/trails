@@ -160,6 +160,7 @@ export class Application {
     });
   }
 
+  /** @missingRailsCall join — PERMANENT */
   async runWithThreads(block: () => Promise<void>): Promise<void> {
     await block();
   }
@@ -180,7 +181,10 @@ export class Application {
     await t.invoke(...args);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall gsub — PERMANENT
+   */
   parseTaskString(string: string): [string, string[]] {
     const m = /^([^[]+)(?:\[(.*)\])$/m.exec(String(string));
 
