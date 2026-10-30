@@ -164,17 +164,14 @@ describe("Mail::Encodings", () => {
   });
 
   describe(".collapse_adjacent_encodings", () => {
-    const convert = (from: string, to: string[]) =>
-      expect(Encodings.collapseAdjacentEncodings(from)).toEqual(to);
-
     it("leaves blank intact", () => {
-      convert("    ", ["    "]);
+      expect(Encodings.collapseAdjacentEncodings("    ")).toEqual(["    "]);
     });
 
     it("splits adjacent encodings into separate parts", () => {
       const x = "=?iso-2022-jp?B?X=?=";
       const y = "=?iso-2022-jp?B?Y=?=";
-      convert(`A${x}${y}B`, ["A", x, y, "B"]);
+      expect(Encodings.collapseAdjacentEncodings(`A${x}${y}B`)).toEqual(["A", x, y, "B"]);
     });
   });
 
