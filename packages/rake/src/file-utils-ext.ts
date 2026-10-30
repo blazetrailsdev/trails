@@ -12,24 +12,6 @@ import { FileUtils } from "./file-utils.js";
 
 type Options = { verbose?: boolean; noop?: boolean; [key: string]: unknown };
 
-function defaultOptions(): Options {
-  return {
-    verbose: FileUtilsExt.verboseFlag as boolean,
-    noop: FileUtilsExt.nowriteFlag as boolean,
-  };
-}
-
-function flagBlock<T>(
-  set: (value: unknown) => void,
-  oldvalue: unknown,
-  block: () => T,
-  result: () => unknown,
-): unknown {
-  const value = rbEnsure(block, () => set(oldvalue));
-  if (value instanceof Promise) return value.then(result);
-  return result();
-}
-
 export const FileUtilsExt = {
   DEFAULT: {} as object,
 
@@ -38,35 +20,53 @@ export const FileUtilsExt = {
   nowriteFlag: false as unknown,
 
   async mkdirP(list: string | string[], options: Options = {}): Promise<unknown> {
-    return StdlibFileUtils.mkdirPAsync(list, { ...defaultOptions(), ...options });
+    return StdlibFileUtils.mkdirPAsync(list, {
+      verbose: FileUtilsExt.verboseFlag as boolean,
+      noop: FileUtilsExt.nowriteFlag as boolean,
+      ...options,
+    });
   },
 
   async ln(src: string | string[], dest: string, options: Options = {}): Promise<unknown> {
-    return StdlibFileUtils.lnAsync(src, dest, { ...defaultOptions(), ...options });
+    return StdlibFileUtils.lnAsync(src, dest, {
+      verbose: FileUtilsExt.verboseFlag as boolean,
+      noop: FileUtilsExt.nowriteFlag as boolean,
+      ...options,
+    });
   },
 
   async cp(src: string | string[], dest: string, options: Options = {}): Promise<unknown> {
-    return StdlibFileUtils.cpAsync(src, dest, { ...defaultOptions(), ...options });
+    return StdlibFileUtils.cpAsync(src, dest, {
+      verbose: FileUtilsExt.verboseFlag as boolean,
+      noop: FileUtilsExt.nowriteFlag as boolean,
+      ...options,
+    });
   },
 
   async rmR(list: string | string[], options: Options = {}): Promise<unknown> {
-    return StdlibFileUtils.rmRAsync(list, { ...defaultOptions(), ...options });
+    return StdlibFileUtils.rmRAsync(list, {
+      verbose: FileUtilsExt.verboseFlag as boolean,
+      noop: FileUtilsExt.nowriteFlag as boolean,
+      ...options,
+    });
   },
 
   async rmRf(list: string | string[], options: Options = {}): Promise<unknown> {
-    return StdlibFileUtils.rmRfAsync(list, { ...defaultOptions(), ...options });
+    return StdlibFileUtils.rmRfAsync(list, {
+      verbose: FileUtilsExt.verboseFlag as boolean,
+      noop: FileUtilsExt.nowriteFlag as boolean,
+      ...options,
+    });
   },
 
   verbose(value: unknown = null, block?: () => unknown): unknown {
     const oldvalue = FileUtilsExt.verboseFlag;
     if (value != null) FileUtilsExt.verboseFlag = value;
     if (block != null) {
-      return flagBlock(
-        (v) => (FileUtilsExt.verboseFlag = v),
-        oldvalue,
-        block,
-        () => FileUtilsExt.verboseFlag,
-      );
+      const result = rbEnsure(block, () => {
+        FileUtilsExt.verboseFlag = oldvalue;
+      });
+      if (result instanceof Promise) return result.then(() => FileUtilsExt.verboseFlag);
     }
     return FileUtilsExt.verboseFlag;
   },
