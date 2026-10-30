@@ -670,3 +670,4 @@ import "./auth-plain.js";
 import "./auth-login.js";
 import "./auth-cram-md5.js";
 import "./auth-xoauth2.js";
+import "./class-paths.generated.js";
