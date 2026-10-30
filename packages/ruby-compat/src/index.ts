@@ -296,7 +296,15 @@ export { LocalJumpError } from "./local-jump-error.js";
 export { LoadError } from "./load-error.js";
 export { TSE, type TSECompiler } from "./tse.js";
 export { OpenURI } from "./open-uri.js";
-export { rbFLoad, rbFRequire, rbRequireLoaded } from "./load.js";
+export {
+  LOADED_FEATURES,
+  LOAD_PATH,
+  rbFLoad,
+  rbFRequire,
+  rbFRequireFile,
+  rbRequireLoaded,
+} from "./load.js";
+export { OptionParser } from "./optparse.js";
 export { IPAddr } from "./ipaddr.js";
 export { KERNEL_METHODS, PROTOCOL_PROBES, methodMissingProxy } from "./method-missing-proxy.js";
 export { NameError } from "./name-error.js";

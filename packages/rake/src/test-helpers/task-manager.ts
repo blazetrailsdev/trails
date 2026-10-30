@@ -14,7 +14,7 @@ export class TestTaskManager {
     this._rules = [];
     this._scope = Scope.make() as Scope;
     this.lastDescription = null;
-    Rake.application = this as typeof Rake.application;
+    Rake.application = this as unknown as typeof Rake.application;
   }
 
   addImport(fn: string): void {

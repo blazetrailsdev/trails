@@ -56,7 +56,7 @@ export function useRakeTestCase(): { readonly tm: TestTaskManager } {
   afterEach(async () => {
     Dir.chdir(origPwd);
     await FileUtils.rmRfAsync(tempdir);
-    delete Rake.application;
+    Rake.application = undefined;
   });
   return state;
 }

@@ -1,3 +1,4 @@
+import { File } from "./file.js";
 import { getPath } from "./fs-adapter.js";
 import { LoadError } from "./load-error.js";
 import { registerConstant } from "./variable.js";
@@ -24,6 +25,32 @@ export async function rbFLoad(fname: string): Promise<true> {
     if (/^[\p{Lu}\p{Lt}]/u.test(id)) registerConstant(id, val);
   }
   return true;
+}
+
+/** @noRailsEquivalent PERMANENT — `$LOAD_PATH`, `vendor/ruby/v3.3.11/load.c:1593`. */
+export const LOAD_PATH: string[] = [];
+/** @noRailsEquivalent PERMANENT — `$"`, `vendor/ruby/v3.3.11/load.c:1606`. */
+export const LOADED_FEATURES: string[] = [];
+
+/**
+ * `Kernel#require` of a file (`require_internal`,
+ * `vendor/ruby/v3.3.11/load.c:1236`): searches `$LOAD_PATH` for
+ * `feature.js` and loads it once. A miss raises `LoadError`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export async function rbFRequireFile(feature: string): Promise<boolean> {
+  for (const path of LOAD_PATH) {
+    const full = File.join(path, `${feature}.js`);
+    if (!(await File.isExistAsync(full))) continue;
+    if (LOADED_FEATURES.includes(full)) return false;
+    await rbFLoad(full);
+    LOADED_FEATURES.push(full);
+    return true;
+  }
+  const error = new LoadError(`cannot load such file -- ${feature}`);
+  error.path = feature;
+  throw error;
 }
 
 const loadedFeatures = new Map<string, Record<string, unknown>>();

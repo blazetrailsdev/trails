@@ -1,18 +1,67 @@
-import { File, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import type { TaskManager } from "./task-manager.js";
+import { File, getOs, rbFLoad, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import type { Application } from "./application.js";
+
+let _application: Application | undefined;
+let _cpuCount: number | undefined;
 
 export const Rake: {
   FileUtilsExt?: typeof import("./file-utils-ext.js").FileUtilsExt;
-  application?: TaskManager & {
-    name: string;
-    addImport(fn: string): unknown;
-    options: {
-      buildAll?: boolean;
-      traceRules?: boolean;
-      traceOutput?: { puts(...strings: string[]): unknown };
-    };
-  };
-} = {};
+  Application?: typeof Application;
+  CommandLineOptionError?: typeof import("./application.js").CommandLineOptionError;
+  application?: Application;
+  suggestedThreadCount(): number;
+  originalDir(): string;
+  loadRakefile(path: string): Promise<true>;
+  addRakelib(...files: string[]): void;
+  withApplication(
+    blockApplication: ((app: Application) => unknown) | Application,
+    block?: (app: Application) => unknown,
+  ): Promise<Application>;
+} = {
+  get application() {
+    return (_application ??= new Rake.Application!());
+  },
+
+  set application(app) {
+    _application = app;
+  },
+
+  suggestedThreadCount() {
+    _cpuCount ??= getOs().availableParallelism();
+    return _cpuCount + 4;
+  },
+
+  originalDir() {
+    return Rake.application!.originalDir;
+  },
+
+  loadRakefile(path) {
+    return rbFLoad(path);
+  },
+
+  addRakelib(...files) {
+    Rake.application!.options.rakelib ??= [];
+    Rake.application!.options.rakelib.push(...files);
+  },
+
+  async withApplication(blockApplication, block) {
+    if (block === undefined) {
+      block = blockApplication as (app: Application) => unknown;
+      blockApplication = new Rake.Application!();
+    }
+    const origApplication = Rake.application;
+
+    Rake.application = blockApplication as Application;
+
+    try {
+      await block(blockApplication as Application);
+
+      return blockApplication as Application;
+    } finally {
+      Rake.application = origApplication;
+    }
+  },
+};
 
 export function eachDirParent(dir: string, block: (dir: string) => unknown): void {
   let oldLength: number | null = null;
