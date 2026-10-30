@@ -227,6 +227,7 @@ export class Configuration extends Model {
 
   /** @internal */
   private async recurringTasks(): Promise<RecurringTask[]> {
+    await RecurringTask.loadSchema();
     return (this._recurringTasks ??= Object.entries(await this.recurringTasksConfig())
       .map(([id, options]) =>
         options != null && Object.hasOwn(options as Options, "schedule")
