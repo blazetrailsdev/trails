@@ -75,18 +75,22 @@ export class ControllerGenerator extends NamedBase {
     return this.options.parent!;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   private parentRef() {
     return parentRefForRelative(this.parentClassName(), this.classPathParts.length, this.ext());
   }
 
+  /** @noRailsEquivalent PERMANENT */
   private parentClass(): string {
     return Object.keys(this.parentRef().import.named!)[0];
   }
 
+  /** @noRailsEquivalent PERMANENT */
   private parentPath(): string {
     return this.parentRef().import.from;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   private controllerClassName(): string {
     return controllerPathHelpers(this.name).className;
   }

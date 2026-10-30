@@ -25,10 +25,12 @@ export class ControllerGenerator extends NamedBase {
     );
   }
 
+  /** @noRailsEquivalent PERMANENT */
   private paths() {
     return controllerPathHelpers(this.name);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   private importPrefix(): string {
     const { namespaceParts } = this.paths();
     return "../".repeat((namespaceParts.length > 1 ? namespaceParts.length - 1 : 0) + 2);

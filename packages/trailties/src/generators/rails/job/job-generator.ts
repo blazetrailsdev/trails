@@ -51,10 +51,12 @@ export class JobGenerator extends NamedBase {
     return this.options.parent!;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   private parentClass(): string {
     return classify(this.parentClassName());
   }
 
+  /** @noRailsEquivalent PERMANENT */
   private parentPath(): string {
     return dasherize(this.parentClassName());
   }
