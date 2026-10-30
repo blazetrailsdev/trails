@@ -2158,6 +2158,7 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
 /** @noRailsEquivalent PERMANENT */
 export interface KernelModule {
   dup(this: object): object;
+  initializeCopy(this: object, orig: unknown): object;
   initializeDup(this: object, orig: unknown): object;
   initializeClone(this: object, orig: unknown): object;
   freeze(this: object): object;
@@ -2171,7 +2172,7 @@ export interface KernelModule {
  * nothing beneath it in the receiver's ancestry defines one: `initialize_dup`
  * and `initialize_clone` (vendor/ruby/v3.3.11/object.c:654
  * `rb_obj_init_dup_clone` and :671 `rb_obj_init_clone`, which send
- * `initialize_copy`; `initialize_clone`'s `freeze:` keyword is not ported) and `freeze` (vendor/ruby/v3.3.11/object.c:1284
+ * `initialize_copy`, whose default is :634 `rb_obj_init_copy`; `initialize_clone`'s `freeze:` keyword is not ported) and `freeze` (vendor/ruby/v3.3.11/object.c:1284
  * `rb_obj_freeze`), defined at vendor/ruby/v3.3.11/object.c:4382,4385. A gem that reopens
  * `Object` defines its method here, as ActiveSupport does for `as_json`.
  * `abort` is the module function `Kernel.abort` (`rb_f_abort`,
@@ -2185,6 +2186,17 @@ export const Kernel = {
   /** @noRailsEquivalent PERMANENT */
   dup(this: object): object {
     return rbObjDup(this);
+  },
+  /** @noRailsEquivalent PERMANENT */
+  initializeCopy(this: object, orig: unknown): object {
+    if (this === orig) return this;
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${this.constructor.name}`, { receiver: this });
+    }
+    if (typeof orig !== "object" || orig === null || this.constructor !== orig.constructor) {
+      throw new TypeError("initialize_copy should take same class object");
+    }
+    return this;
   },
   /** @noRailsEquivalent PERMANENT */
   initializeDup(this: object, orig: unknown): object {

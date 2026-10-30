@@ -5,6 +5,7 @@ export { PseudoStatus } from "./pseudo-status.js";
 
 import "./class-paths.generated.js";
 export { pathmap } from "./ext/string.js";
+export { Cloneable } from "./cloneable.js";
 export { DSL } from "./dsl-definition.js";
 export { EARLY, EarlyTime } from "./early-time.js";
 export { FileCreationTask } from "./file-creation-task.js";
