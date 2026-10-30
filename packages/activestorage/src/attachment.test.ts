@@ -45,7 +45,15 @@ describe("ActiveStorage::AttachmentTest", () => {
   it.skip("directly-uploaded blob identification for many attached occurs before validation", () => {});
   it.skip("directly-uploaded blob identification for one attached occurs outside transaction", () => {});
   it.skip("directly-uploaded blob identification for many attached occurs outside transaction", () => {});
-  it.skip("getting a signed blob ID from an attachment", () => {});
+  it("getting a signed blob ID from an attachment", async () => {
+    const blob = await createBlob();
+    const { id } = await Attachment.createBang({ name: "avatar", record: user, blob });
+    const attachment = await Attachment.find(id);
+
+    const signedId = attachment.signedId();
+    expect(await Blob.findSignedBang(signedId)).toEqual(blob);
+    expect(await Blob.findSigned(signedId)).toEqual(blob);
+  });
   it.skip("getting a signed blob ID from an attachment with a custom purpose", () => {});
   it.skip("getting a signed blob ID from an attachment with a expires_in", () => {});
   it.skip("fail to find blob within expiration duration", () => {});

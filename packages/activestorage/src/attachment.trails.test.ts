@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
 import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
 import { Attachment } from "./attachment.js";
@@ -36,7 +36,13 @@ describe("Attachment", () => {
 
     expect(delegated.key).toBe(blob.key);
     expect(delegated.isText()).toBe(true);
-    expect((attachment as unknown as { mumbo?: unknown }).mumbo).toBeUndefined();
+    expect(() => (attachment as unknown as { mumbo(): void }).mumbo()).toThrow(NoMethodError);
+  });
+
+  it("delegates missing names to a blob preloaded with the attachment", async () => {
+    const found = await Attachment.find(attachment.id);
+
+    expect((found as unknown as Blob).key).toBe((await attachment.blob)!.key);
   });
 
   it("reads its own column rather than the blob's", async () => {

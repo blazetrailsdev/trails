@@ -11,7 +11,7 @@ import {
 import { Module } from "@blazetrails/ruby-compat/include";
 import { constantize, safeConstantize } from "./inflector.js";
 import { callerLocations, type CallerLocation } from "./deprecation.js";
-import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 export class DelegationError extends Error {
   static toString(): string {
@@ -268,10 +268,16 @@ export namespace Delegation {
         return __target != null && prop in Object(__target);
       },
       get(obj, prop, receiver) {
-        if (prop in obj || typeof prop === "symbol") {
+        if (
+          prop in obj ||
+          typeof prop === "symbol" ||
+          prop.startsWith("_") ||
+          KERNEL_METHODS.has(prop) ||
+          Object.hasOwn(receiver, "constructor")
+        ) {
           return Reflect.get(obj, prop, receiver);
         }
-        const __target = (obj as Record<string, unknown>)[targetName];
+        const __target = (receiver as Record<string, unknown>)[targetName];
         if (__target == null) {
           if (allowNil) return undefined;
           throw DelegationError.nilTarget(globalThis.String(prop), target);
