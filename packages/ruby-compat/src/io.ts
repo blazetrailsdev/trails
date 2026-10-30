@@ -1558,8 +1558,14 @@ export class IO {
   }
 }
 
-/** `rb_io_fmode_modestr` (`vendor/ruby/v3.3.11/io.c:6408`), without its binary and text spellings. */
-function rbIoFmodeModestr(fmode: number): string {
+/**
+ * `rb_io_fmode_modestr` (`vendor/ruby/v3.3.11/io.c:6408`), without its binary
+ * and text spellings.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_io_fmode_modestr`
+ * (`vendor/ruby/v3.3.11/io.c:6408`).
+ */
+export function rbIoFmodeModestr(fmode: number): string {
   if (fmode & FMODE_APPEND) {
     if ((fmode & FMODE_READWRITE) === FMODE_READWRITE) return "a+";
     return "a";
