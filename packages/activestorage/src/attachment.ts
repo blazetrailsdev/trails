@@ -48,9 +48,7 @@ export class Attachment extends Record {
     this.belongsTo("record", { polymorphic: true, touch: ActiveStorage.touchAttachmentRecords });
     this.belongsTo("blob", { className: "Blob", autosave: true, inverseOf: "attachments" });
 
-    this.afterCreateCommit(":mirrorBlobLater");
-    this.afterCreateCommit(":analyzeBlobLater");
-    this.afterCreateCommit(":transformVariantsLater");
+    this.afterCreateCommit(":mirrorBlobLater", ":analyzeBlobLater", ":transformVariantsLater");
     this.afterDestroyCommit(":purgeDependentBlobLater");
 
     this.scope("withAllVariantRecords", function () {
@@ -150,11 +148,11 @@ export class Attachment extends Record {
   private async transformationsByName(transformations: Transformations) {
     if (typeof transformations === "string") {
       const variantName = transformations;
-      const record = (await this.record)!;
       return fetch<NamedVariant>(
         await this.namedVariants(),
         variantName,
         block(() => {
+          const record = this.association("record").target as AttachedRecord;
           const recordModelName = record.toModel().modelName.name;
           throw new ArgumentError(
             `Cannot find variant :${variantName} for ${recordModelName}#${this.name}`,
