@@ -179,186 +179,6 @@ function fileUtime(atime: Date, mtime: Date, path: string): void {
   getFs().statSync(path);
 }
 
-/** `fu_split_path` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2506-2515`). */
-function fuSplitPath(path: string): string[] {
-  const list: string[] = [];
-  for (;;) {
-    const [parent, base] = File.split(path);
-    if (parent === path || parent === ".") break;
-    list.push(base);
-    path = parent;
-  }
-  list.push(path);
-  return list.reverse();
-}
-
-/** `fu_relative_components_from` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2518-2524`). */
-function fuRelativeComponentsFrom(target: string[], base: string[]): string[] {
-  let i = 0;
-  while (target[i] != null && target[i] === base[i]) {
-    i += 1;
-  }
-  return new Array<string>(base.length - i).fill("..").concat(target.slice(i));
-}
-
-/**
- * `fu_clean_components` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2527-2542`). MRI's
- * `path.chomp!(regexp, "")` at `:2535` is an `ArgumentError`, since `chomp!`
- * takes one argument; this is the `sub!` that line means.
- *
- * @missingRailsCall chomp! — PERMANENT
- */
-async function fuCleanComponentsAsync(...comp: string[]): Promise<string[]> {
-  while (comp[0] === ".") comp.shift();
-  if (comp.length === 0) return comp;
-  const clean = [comp.shift()!];
-  let path = File.join(...clean, "");
-  while (comp.length > 0) {
-    const c = comp.shift()!;
-    if (
-      c === ".." &&
-      clean.at(-1) !== ".." &&
-      !(getFs().symlink != null && (await File.isSymlinkAsync(path)))
-    ) {
-      clean.pop();
-      path = path.replace(/(?<=^|\/)[^/]+\/$/, "");
-    } else {
-      clean.push(c);
-      path += `${c}/`;
-    }
-  }
-  return clean;
-}
-
-/** `fu_starting_path?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2550-2552`). */
-function isFuStartingPath(path: string | undefined): boolean {
-  return path != null && path.startsWith("/");
-}
-
-/** `user_mask` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1642-1657`). */
-function userMask(target: string): number {
-  return [...target].reduce((mask, chr) => {
-    switch (chr) {
-      case "u":
-        return mask | 0o4700;
-      case "g":
-        return mask | 0o2070;
-      case "o":
-        return mask | 0o1007;
-      case "a":
-        return mask | 0o7777;
-      default:
-        throw new ArgumentError(`invalid \`who' symbol in file mode: ${chr}`);
-    }
-  }, 0);
-}
-
-/** `apply_mask` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1660-1669`). */
-function applyMask(mode: number, userMask: number, op: string, modeMask: number): number {
-  switch (op) {
-    case "=":
-      return (mode & ~userMask) | (userMask & modeMask);
-    case "+":
-      return mode | (userMask & modeMask);
-    default:
-      return mode & ~(userMask & modeMask);
-  }
-}
-
-/** `symbolic_modes_to_i` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1672-1718`). */
-async function symbolicModesToIAsync(
-  modeSym: string,
-  path: string | FsStatResult,
-): Promise<number> {
-  const st = typeof path === "string" ? await getFs().stat!(path) : path;
-  let currentMode = st.mode & 0o7777;
-  for (const clause of stringSplit(modeSym, ",")) {
-    const [target, ...actions] = clause.split(/([=+-])/);
-    if (actions.length === 0) throw new ArgumentError(`invalid file mode: ${modeSym}`);
-    const mask = userMask(target === "" ? "a" : target);
-    for (let i = 0; i < actions.length; i += 2) {
-      const op = actions[i];
-      const perm = actions[i + 1] ?? "";
-      let needApply = op === "=";
-      let modeMask = 0;
-      for (const chr of perm) {
-        switch (chr) {
-          case "r":
-            modeMask |= 0o444;
-            break;
-          case "w":
-            modeMask |= 0o222;
-            break;
-          case "x":
-            modeMask |= 0o111;
-            break;
-          case "X":
-            if (st.isDirectory()) modeMask |= 0o111;
-            break;
-          case "s":
-            modeMask |= 0o6000;
-            break;
-          case "t":
-            modeMask |= 0o1000;
-            break;
-          case "u":
-          case "g":
-          case "o": {
-            if (modeMask !== 0) currentMode = applyMask(currentMode, mask, op, modeMask);
-            needApply = false;
-            const copyMask = userMask(chr);
-            modeMask = Math.floor((currentMode & copyMask) / (copyMask & 0o111)) * (mask & 0o111);
-            break;
-          }
-          default:
-            throw new ArgumentError(`invalid \`perm' symbol in file mode: ${chr}`);
-        }
-      }
-
-      if (modeMask !== 0 || needApply) {
-        currentMode = applyMask(currentMode, mask, op, modeMask);
-      }
-    }
-  }
-  return currentMode;
-}
-
-/** `fu_mode` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1721-1723`). */
-async function fuModeAsync(mode: number | string, path: string | FsStatResult): Promise<number> {
-  return typeof mode === "string" ? symbolicModesToIAsync(mode, path) : mode;
-}
-
-/** `mode_to_s` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1726-1728`). */
-function modeToS(mode: number | string): string {
-  return typeof mode === "string" ? mode : mode.toString(8);
-}
-
-/** @noRailsEquivalent PERMANENT */
-async function etcIdAsync(file: string, name: string, label: string): Promise<number> {
-  const rows = await getFs().readFile(file, "utf-8");
-  for (const row of rows.split("\n")) {
-    const fields = row.split(":");
-    if (fields[0] === name && /^\d+$/.test(fields[2] ?? "")) return Number(fields[2]);
-  }
-  throw new ArgumentError(`can't find ${label} for ${name}`);
-}
-
-/** `fu_get_uid` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1933-1944`). */
-async function fuGetUidAsync(user: string | number | null | undefined): Promise<number | null> {
-  if (user == null) return null;
-  if (typeof user === "number") return user;
-  if (/^\d+$/.test(user)) return Number(user);
-  return etcIdAsync("/etc/passwd", user, "user");
-}
-
-/** `fu_get_gid` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1947-1958`). */
-async function fuGetGidAsync(group: string | number | null | undefined): Promise<number | null> {
-  if (group == null) return null;
-  if (typeof group === "number") return group;
-  if (/^\d+$/.test(group)) return Number(group);
-  return etcIdAsync("/etc/group", group, "group");
-}
-
 /**
  * `Entry_` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2069-2459`), the one directory-tree
  * walker every recursive `FileUtils` body is written against: `copy_entry`
@@ -933,6 +753,222 @@ export class FileUtils {
    */
   static fileutilsLabel?: string;
 
+  /** `fu_split_path` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2506-2515`).
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static fuSplitPath(path: string): string[] {
+    const list: string[] = [];
+    for (;;) {
+      const [parent, base] = File.split(path);
+      if (parent === path || parent === ".") break;
+      list.push(base);
+      path = parent;
+    }
+    list.push(path);
+    return list.reverse();
+  }
+
+  /** `fu_relative_components_from` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2518-2524`).
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static fuRelativeComponentsFrom(target: string[], base: string[]): string[] {
+    let i = 0;
+    while (target[i] != null && target[i] === base[i]) {
+      i += 1;
+    }
+    return new Array<string>(base.length - i).fill("..").concat(target.slice(i));
+  }
+
+  /**
+   * `fu_clean_components` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2527-2542`). MRI's
+   * `path.chomp!(regexp, "")` at `:2535` is an `ArgumentError`, since `chomp!`
+   * takes one argument; this is the `sub!` that line means.
+   *
+   * @missingRailsCall chomp! — PERMANENT
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuCleanComponentsAsync(...comp: string[]): Promise<string[]> {
+    while (comp[0] === ".") comp.shift();
+    if (comp.length === 0) return comp;
+    const clean = [comp.shift()!];
+    let path = File.join(...clean, "");
+    while (comp.length > 0) {
+      const c = comp.shift()!;
+      if (
+        c === ".." &&
+        clean.at(-1) !== ".." &&
+        !(getFs().symlink != null && (await File.isSymlinkAsync(path)))
+      ) {
+        clean.pop();
+        path = path.replace(/(?<=^|\/)[^/]+\/$/, "");
+      } else {
+        clean.push(c);
+        path += `${c}/`;
+      }
+    }
+    return clean;
+  }
+
+  /** `fu_starting_path?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2550-2552`).
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static isFuStartingPath(path: string | undefined): boolean {
+    return path != null && path.startsWith("/");
+  }
+
+  /** `user_mask` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1642-1657`).
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static userMask(target: string): number {
+    return [...target].reduce((mask, chr) => {
+      switch (chr) {
+        case "u":
+          return mask | 0o4700;
+        case "g":
+          return mask | 0o2070;
+        case "o":
+          return mask | 0o1007;
+        case "a":
+          return mask | 0o7777;
+        default:
+          throw new ArgumentError(`invalid \`who' symbol in file mode: ${chr}`);
+      }
+    }, 0);
+  }
+
+  /** `apply_mask` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1660-1669`).
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static applyMask(mode: number, userMask: number, op: string, modeMask: number): number {
+    switch (op) {
+      case "=":
+        return (mode & ~userMask) | (userMask & modeMask);
+      case "+":
+        return mode | (userMask & modeMask);
+      default:
+        return mode & ~(userMask & modeMask);
+    }
+  }
+
+  /** `symbolic_modes_to_i` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1672-1718`).
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static async symbolicModesToIAsync(
+    modeSym: string,
+    path: string | FsStatResult,
+  ): Promise<number> {
+    const st = typeof path === "string" ? await getFs().stat!(path) : path;
+    let currentMode = st.mode & 0o7777;
+    for (const clause of stringSplit(modeSym, ",")) {
+      const [target, ...actions] = clause.split(/([=+-])/);
+      if (actions.length === 0) throw new ArgumentError(`invalid file mode: ${modeSym}`);
+      const mask = FileUtils.userMask(target === "" ? "a" : target);
+      for (let i = 0; i < actions.length; i += 2) {
+        const op = actions[i];
+        const perm = actions[i + 1] ?? "";
+        let needApply = op === "=";
+        let modeMask = 0;
+        for (const chr of perm) {
+          switch (chr) {
+            case "r":
+              modeMask |= 0o444;
+              break;
+            case "w":
+              modeMask |= 0o222;
+              break;
+            case "x":
+              modeMask |= 0o111;
+              break;
+            case "X":
+              if (st.isDirectory()) modeMask |= 0o111;
+              break;
+            case "s":
+              modeMask |= 0o6000;
+              break;
+            case "t":
+              modeMask |= 0o1000;
+              break;
+            case "u":
+            case "g":
+            case "o": {
+              if (modeMask !== 0)
+                currentMode = FileUtils.applyMask(currentMode, mask, op, modeMask);
+              needApply = false;
+              const copyMask = FileUtils.userMask(chr);
+              modeMask = Math.floor((currentMode & copyMask) / (copyMask & 0o111)) * (mask & 0o111);
+              break;
+            }
+            default:
+              throw new ArgumentError(`invalid \`perm' symbol in file mode: ${chr}`);
+          }
+        }
+
+        if (modeMask !== 0 || needApply) {
+          currentMode = FileUtils.applyMask(currentMode, mask, op, modeMask);
+        }
+      }
+    }
+    return currentMode;
+  }
+
+  /** `fu_mode` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1721-1723`).
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuModeAsync(mode: number | string, path: string | FsStatResult): Promise<number> {
+    return typeof mode === "string" ? FileUtils.symbolicModesToIAsync(mode, path) : mode;
+  }
+
+  /** `mode_to_s` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1726-1728`).
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static modeToS(mode: number | string): string {
+    return typeof mode === "string" ? mode : mode.toString(8);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static async etcIdAsync(file: string, name: string, label: string): Promise<number> {
+    const rows = await getFs().readFile(file, "utf-8");
+    for (const row of rows.split("\n")) {
+      const fields = row.split(":");
+      if (fields[0] === name && /^\d+$/.test(fields[2] ?? "")) return Number(fields[2]);
+    }
+    throw new ArgumentError(`can't find ${label} for ${name}`);
+  }
+
+  /** `fu_get_uid` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1933-1944`).
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuGetUidAsync(user: string | number | null | undefined): Promise<number | null> {
+    if (user == null) return null;
+    if (typeof user === "number") return user;
+    if (/^\d+$/.test(user)) return Number(user);
+    return FileUtils.etcIdAsync("/etc/passwd", user, "user");
+  }
+
+  /** `fu_get_gid` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1947-1958`).
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuGetGidAsync(group: string | number | null | undefined): Promise<number | null> {
+    if (group == null) return null;
+    if (typeof group === "number") return group;
+    if (/^\d+$/.test(group)) return Number(group);
+    return FileUtils.etcIdAsync("/etc/group", group, "group");
+  }
+
   /** `FileUtils.cd` (`vendor/ruby/v3.3.11/lib/fileutils.rb:238-243`), through
    * `Dir.chdir`, which restores the previous directory once an async block
    * settles; `cd -` is printed at that point too.
@@ -1243,21 +1279,23 @@ export class FileUtils {
     const srcs = fuList(src);
     const link = async (s: string, targetDirP: unknown = true): Promise<void> => {
       const d = rtest(targetDirP) ? File.join(dest, File.basename(s)) : dest;
-      const destdirs = fuSplitPath(
+      const destdirs = FileUtils.fuSplitPath(
         await getFs().realpath!(rtest(targetDirP) ? dest : File.dirname(dest)),
       );
-      if (isFuStartingPath(s)) {
-        const srcdirs = fuSplitPath(await File.realdirpathAsync(s).catch(() => File.expandPath(s)));
-        const base = fuRelativeComponentsFrom(srcdirs, destdirs);
+      if (FileUtils.isFuStartingPath(s)) {
+        const srcdirs = FileUtils.fuSplitPath(
+          await File.realdirpathAsync(s).catch(() => File.expandPath(s)),
+        );
+        const base = FileUtils.fuRelativeComponentsFrom(srcdirs, destdirs);
         s = File.join(...base);
       } else {
-        const srcdirs = await fuCleanComponentsAsync(...fuSplitPath(s));
-        const base = fuRelativeComponentsFrom(fuSplitPath(Dir.pwd()), destdirs);
+        const srcdirs = await FileUtils.fuCleanComponentsAsync(...FileUtils.fuSplitPath(s));
+        const base = FileUtils.fuRelativeComponentsFrom(FileUtils.fuSplitPath(Dir.pwd()), destdirs);
         while (
           srcdirs[0] === ".." &&
           base.length > 0 &&
           base.at(-1) !== ".." &&
-          !isFuStartingPath(base.at(-1))
+          !FileUtils.isFuStartingPath(base.at(-1))
         ) {
           srcdirs.shift();
           base.pop();
@@ -1733,15 +1771,15 @@ export class FileUtils {
     if (rtest(verbose)) {
       let msg = "install -c";
       if (rtest(preserve)) msg += " -p";
-      if (mode != null) msg += ` -m ${modeToS(mode)}`;
+      if (mode != null) msg += ` -m ${FileUtils.modeToS(mode)}`;
       if (owner != null) msg += ` -o ${owner}`;
       if (group != null) msg += ` -g ${group}`;
       msg += ` ${[src, dest].flat().join(" ")}`;
       fuOutputMessage(msg);
     }
     if (rtest(noop)) return;
-    const uid = await fuGetUidAsync(owner);
-    const gid = await fuGetGidAsync(group);
+    const uid = await FileUtils.fuGetUidAsync(owner);
+    const gid = await FileUtils.fuGetGidAsync(group);
     await FileUtils.fuEachSrcDestAsync(src, dest, async (s, d) => {
       const st = await getFs().stat!(s);
       if (!((await File.isExistAsync(d)) && (await FileUtils.compareFileAsync(s, d)))) {
@@ -1754,7 +1792,7 @@ export class FileUtils {
           await FileUtils.copyFileAsync(s, d);
         }
         if (rtest(preserve)) await File.utimeAsync(st.atime, st.mtime, d);
-        if (mode != null) await File.chmodAsync(await fuModeAsync(mode, st), d);
+        if (mode != null) await File.chmodAsync(await FileUtils.fuModeAsync(mode, st), d);
         if (uid != null || gid != null) await File.chownAsync(uid, gid, d);
       }
     });
@@ -1769,10 +1807,10 @@ export class FileUtils {
     { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
   ): Promise<string[] | undefined> {
     list = fuList(list);
-    if (rtest(verbose)) fuOutputMessage(`chmod ${modeToS(mode)} ${list.join(" ")}`);
+    if (rtest(verbose)) fuOutputMessage(`chmod ${FileUtils.modeToS(mode)} ${list.join(" ")}`);
     if (rtest(noop)) return;
     for (const path of list) {
-      await new Entry_(path).chmodAsync(await fuModeAsync(mode, path));
+      await new Entry_(path).chmodAsync(await FileUtils.fuModeAsync(mode, path));
     }
     return list;
   }
@@ -1789,12 +1827,14 @@ export class FileUtils {
   ): Promise<string[] | undefined> {
     list = fuList(list);
     if (rtest(verbose))
-      fuOutputMessage(`chmod -R${rtest(force) ? "f" : ""} ${modeToS(mode)} ${list.join(" ")}`);
+      fuOutputMessage(
+        `chmod -R${rtest(force) ? "f" : ""} ${FileUtils.modeToS(mode)} ${list.join(" ")}`,
+      );
     if (rtest(noop)) return;
     for (const root of list) {
       await new Entry_(root).preorderTraverseAsync(async (ent) => {
         try {
-          await ent.chmodAsync(await fuModeAsync(mode, ent.path));
+          await ent.chmodAsync(await FileUtils.fuModeAsync(mode, ent.path));
         } catch (error) {
           if (!rtest(force)) throw error;
         }
@@ -1818,8 +1858,8 @@ export class FileUtils {
         `chown ${group != null ? `${user ?? ""}:${group}` : (user ?? ":")} ${list.join(" ")}`,
       );
     if (rtest(noop)) return;
-    const uid = await fuGetUidAsync(user);
-    const gid = await fuGetGidAsync(group);
+    const uid = await FileUtils.fuGetUidAsync(user);
+    const gid = await FileUtils.fuGetGidAsync(group);
     for (const path of list) {
       await new Entry_(path).chownAsync(uid, gid);
     }
@@ -1841,8 +1881,8 @@ export class FileUtils {
         `chown -R${rtest(force) ? "f" : ""} ${group != null ? `${user ?? ""}:${group}` : (user ?? ":")} ${list.join(" ")}`,
       );
     if (rtest(noop)) return;
-    const uid = await fuGetUidAsync(user);
-    const gid = await fuGetGidAsync(group);
+    const uid = await FileUtils.fuGetUidAsync(user);
+    const gid = await FileUtils.fuGetGidAsync(group);
     for (const root of list) {
       await new Entry_(root).preorderTraverseAsync(async (ent) => {
         try {
