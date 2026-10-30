@@ -81,9 +81,7 @@ describe("Thor", () => {
       z() {}
 
       static sortCommandsBang(list: string[][]): string[][] {
-        return sortByBang(list, (a: string[], b?: string[]) =>
-          a[0] === ":help" ? -1 : cmp(a[0], b?.[0]),
-        );
+        return sortByBang(list, ([a, b]) => (a[0] === ":help" ? -1 : cmp(a[0], b[0])));
       }
     } as unknown as ThorClass;
 
