@@ -39,5 +39,6 @@ export class QuotedPrintable extends SevenBit {
 
   static {
     Encodings.register(this.NAME, this);
+    Encodings.QuotedPrintable = this;
   }
 }

@@ -70,6 +70,23 @@ class EAGAIN extends SystemCallError {
 }
 
 /**
+ * `Errno::EINVAL`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EINVAL`, which
+ * `Mail::Encodings.unquote_and_convert_to` rescues.
+ */
+class EINVAL extends SystemCallError {
+  static readonly Errno = 22;
+  readonly code = "EINVAL";
+
+  constructor(message?: string) {
+    super(`Invalid argument${message ? ` - ${message}` : ""}`);
+    this.name = "Errno::EINVAL";
+    this.errno = EINVAL.Errno;
+  }
+}
+
+/**
  * `Errno::EINTR`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
  * {@link ENOTTY} is: a system call interrupted by a signal.
  *
@@ -333,6 +350,7 @@ export const Errno = {
   ECONNRESET,
   EEXIST,
   EINTR,
+  EINVAL,
   EISDIR,
   EMFILE,
   ENOENT,

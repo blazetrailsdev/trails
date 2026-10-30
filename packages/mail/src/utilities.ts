@@ -1,10 +1,21 @@
 import {
+  ArgumentError,
+  b,
+  byteslice,
   capitalize,
   casecmp,
+  ConverterNotFoundError,
   DEFAULT_PARSER,
+  encode,
+  forceEncoding,
+  InvalidByteSequenceError,
   isEmpty,
   rbInspect,
+  rbObjDup,
+  rbStrByteslice,
   rbStrEnumerateLines,
+  UndefinedConversionError,
+  warn,
   Encoding,
   isAsciiOnly,
   isValidEncoding,
@@ -13,7 +24,46 @@ import {
   rbObjRespondTo,
   unpack,
 } from "@blazetrails/ruby-compat";
+import { Configuration } from "./configuration.js";
 import * as Constants from "./constants.js";
+import { Encodings } from "./encodings.js";
+
+type RubyString = string | Uint8Array;
+
+export interface CharsetEncoder {
+  encode(string: RubyString, charset: string): RubyString;
+}
+
+class StrictCharsetEncoder implements CharsetEncoder {
+  encode(string: RubyString, charset: string): RubyString {
+    if (/utf-?7/i.test(charset)) {
+      return Utilities.decodeUtf7(string);
+    } else {
+      return forceEncoding(b(string), Utilities.pickEncoding(charset));
+    }
+  }
+}
+
+class BestEffortCharsetEncoder implements CharsetEncoder {
+  encode(string: RubyString, charset: string): RubyString {
+    if (/utf-?7/i.test(charset)) {
+      return Utilities.decodeUtf7(string);
+    } else {
+      return forceEncoding(b(string), this.pickEncoding(charset));
+    }
+  }
+
+  /** @internal */
+  private pickEncoding(charset: string): Encoding {
+    let resolved = charset;
+    if (/ansi_x3.110-1983/.test(charset)) {
+      resolved = "ISO-8859-1";
+    } else if (/Windows-?1258/i.test(charset)) {
+      resolved = "Windows-1252";
+    }
+    return Utilities.pickEncoding(resolved);
+  }
+}
 
 /** @noRailsEquivalent PERMANENT */
 function gsubBytes(string: Uint8Array, re: RegExp, replacement: string): Uint8Array {
@@ -24,6 +74,11 @@ function gsubBytes(string: Uint8Array, re: RegExp, replacement: string): Uint8Ar
 }
 
 export const Utilities = {
+  StrictCharsetEncoder,
+  BestEffortCharsetEncoder,
+
+  charsetEncoder: new BestEffortCharsetEncoder() as CharsetEncoder,
+
   isAtomSafe(str: string): boolean {
     return !Constants.ATOM_UNSAFE.test(str);
   },
@@ -209,7 +264,221 @@ export const Utilities = {
     return pack([str], "m");
   },
 
+  /** @missingRailsArgs encode — PERMANENT */
+  transcodeCharset(
+    str: RubyString,
+    fromEncoding: string,
+    toEncoding: string | Encoding = Encoding.UTF_8,
+  ): RubyString {
+    toEncoding = Encoding.find(toEncoding)!;
+    const replacementChar = toEncoding === Encoding.UTF_8 ? "\ufffd" : "?";
+    return encode(Utilities.charsetEncoder.encode(rbObjDup(str), fromEncoding), toEncoding, {
+      undef: ":replace",
+      invalid: ":replace",
+      replace: replacementChar,
+    });
+  },
+
+  /** @missingRailsArgs encode — PERMANENT */
+  encodeUtf7(string: string): Uint8Array {
+    return b(
+      string.replace(/(&)|[^\x20-\x7e]+/g, (m, amp: string | undefined) => {
+        if (amp != null) {
+          return "&-";
+        } else {
+          const base64 = pack([encode(m, Encoding.find("UTF-16BE")!)], "m0");
+          return "&" + base64.replaceAll("=", "").replaceAll("/", ",") + "-";
+        }
+      }),
+    );
+  },
+
+  /** @missingRailsArgs encode — PERMANENT */
+  decodeUtf7(utf7: RubyString): RubyString {
+    const scanned = Array.from(b(utf7), (c) => String.fromCharCode(c))
+      .join("")
+      .replace(/&([^-]+)?-/g, (_m, s: string | undefined) => {
+        if (s != null) {
+          const decoded = forceEncoding(
+            unpack(s.replaceAll(",", "/") + "===", "m")[0] as Uint8Array,
+            "UTF-16BE",
+          );
+          return String.fromCharCode(...b(encode(decoded, Encoding.UTF_8)));
+        } else {
+          return "&";
+        }
+      });
+    return forceEncoding(
+      Uint8Array.from(scanned, (c) => c.charCodeAt(0)),
+      Encoding.UTF_8,
+    );
+  },
+
+  bValueEncode(str: RubyString, _encoding: string | null = null): [string, string] {
+    const encoding = rbObjEncoding(str).toString();
+    return [Utilities.encodeBase64(str), encoding];
+  },
+
+  bValueDecode(str: RubyString): RubyString {
+    try {
+      const match = /=\?(.+)?\?[Bb]\?(.*)\?=/s.exec(str as string);
+      if (match) {
+        const charset = match[1];
+        str = Utilities.decodeBase64(match[2]);
+        str = Utilities.charsetEncoder.encode(str, charset);
+      }
+      return Utilities.transcodeToScrubbedUtf8(str);
+    } catch (e) {
+      if (
+        !(
+          e instanceof UndefinedConversionError ||
+          e instanceof ArgumentError ||
+          e instanceof ConverterNotFoundError ||
+          e instanceof InvalidByteSequenceError
+        )
+      ) {
+        throw e;
+      }
+      warn(`Encoding conversion failed ${e.message}`);
+      return forceEncoding(b(str), Encoding.UTF_8);
+    }
+  },
+
+  qValueEncode(str: RubyString, _encoding: string | null = null): [string, string] {
+    const encoding = rbObjEncoding(str).toString();
+    return [Encodings.QuotedPrintable!.encode(str), encoding];
+  },
+
+  qValueDecode(str: RubyString): RubyString {
+    try {
+      const match = /=\?(.+)?\?[Qq]\?(.*)\?=/s.exec(str as string);
+      if (match) {
+        const charset = match[1];
+        let string = match[2].replace(/_/g, "=20");
+        string = string.replace(/=$/m, "");
+        str = Encodings.QuotedPrintable!.decode(string);
+        str = Utilities.charsetEncoder.encode(str, charset);
+        if (rbObjEncoding(str) === Encoding.ASCII_8BIT) str = forceEncoding(str, Encoding.UTF_8);
+      }
+      return Utilities.transcodeToScrubbedUtf8(str);
+    } catch (e) {
+      if (
+        !(
+          e instanceof UndefinedConversionError ||
+          e instanceof ArgumentError ||
+          e instanceof ConverterNotFoundError
+        )
+      ) {
+        throw e;
+      }
+      warn(`Encoding conversion failed ${e.message}`);
+      return forceEncoding(b(str), Encoding.UTF_8);
+    }
+  },
+
+  paramDecode(str: RubyString, encoding: string | null): RubyString {
+    try {
+      str = Utilities.uriParser().unescape(str as string);
+      if (encoding != null) str = Utilities.charsetEncoder.encode(str, encoding);
+      return Utilities.transcodeToScrubbedUtf8(str);
+    } catch (e) {
+      if (
+        !(
+          e instanceof UndefinedConversionError ||
+          e instanceof ArgumentError ||
+          e instanceof ConverterNotFoundError
+        )
+      ) {
+        throw e;
+      }
+      warn(`Encoding conversion failed ${e.message}`);
+      return forceEncoding(b(str), Encoding.UTF_8);
+    }
+  },
+
+  paramEncode(str: string): string {
+    const encoding = rbObjEncoding(str).toString().toLowerCase();
+    const language = Configuration.instance().paramEncodeLanguage();
+    return `${encoding}'${language}'${Utilities.uriParser().escape(str)}`;
+  },
+
   uriParser(): typeof DEFAULT_PARSER {
     return DEFAULT_PARSER;
+  },
+
+  pickEncoding(charset: unknown): Encoding {
+    charset = String(charset ?? "");
+    const down = (charset as string).toLowerCase();
+    let encoding: unknown;
+    let m: RegExpExecArray | null;
+
+    if ((m = /^iso[-_]?8859-(\d+)(-i)?$/m.exec(down))) {
+      encoding = `ISO-8859-${m[1]}`;
+    } else if ((m = /^iso[-_]?(\d{4})-?(\w{1,2})$/m.exec(down))) {
+      encoding = `ISO-${m[1]}-${m[2]}`;
+    } else if ((m = /^iso[-_]?(\d{4})-?(\w{1,2})-?(\w*)$/m.exec(down))) {
+      encoding = `ISO-${m[1]}-${m[2]}-${m[3]}`;
+    } else if ((m = /^utf[-_]?(\d{1,2})?(\w{1,2})$/m.exec(down))) {
+      encoding = `UTF-${m[1] ?? ""}${m[2]}`.replace(/^(UTF-(?:16|32))$/, "$1BE");
+    } else if ((m = /^windows-?(.*)$/m.exec(down))) {
+      encoding = `Windows-${m[1]}`;
+    } else if (down === "8bit") {
+      encoding = Encoding.ASCII_8BIT;
+    } else if (/^iso[-_]?646(-us)?$/m.test(down) || down === "us=ascii") {
+      encoding = Encoding.US_ASCII;
+    } else if (down === "macintosh") {
+      encoding = Encoding.find("macRoman");
+    } else if (down === "ks_c_5601-1987") {
+      encoding = Encoding.find("CP949");
+    } else if (down === "shift-jis") {
+      encoding = Encoding.SHIFT_JIS;
+    } else if (down === "gb2312") {
+      encoding = Encoding.find("GB18030");
+    } else if (down === "cp-850") {
+      encoding = Encoding.find("CP850");
+    } else if (down === "latin2") {
+      encoding = Encoding.find("ISO-8859-2");
+    } else {
+      encoding = charset;
+    }
+
+    return Utilities.convertToEncoding(encoding as string | Encoding);
+  },
+
+  stringByteslice(str: RubyString, ...args: unknown[]): RubyString | null {
+    return typeof str === "string" ? rbStrByteslice(str, ...args) : byteslice(str, ...args);
+  },
+
+  /** @internal */
+  convertToEncoding(encoding: string | Encoding): Encoding {
+    if (encoding instanceof Encoding) {
+      return encoding;
+    } else {
+      try {
+        return Encoding.find(encoding)!;
+      } catch (e) {
+        if (!(e instanceof ArgumentError)) throw e;
+        return Encoding.BINARY;
+      }
+    }
+  },
+
+  /**
+   * @internal
+   * @missingRailsArgs encode — PERMANENT
+   */
+  transcodeToScrubbedUtf8(str: RubyString): string {
+    const decoded = encode(str, Encoding.UTF_8, {
+      undef: ":replace",
+      invalid: ":replace",
+      replace: "\ufffd",
+    }) as string;
+    return !/\p{Cs}/u.test(decoded)
+      ? decoded
+      : (encode(
+          encode(decoded, Encoding.find("UTF-16LE")!, { invalid: ":replace", replace: "\ufffd" }),
+          Encoding.UTF_8,
+          { invalid: ":replace", replace: "\ufffd" },
+        ) as string);
   },
 };
