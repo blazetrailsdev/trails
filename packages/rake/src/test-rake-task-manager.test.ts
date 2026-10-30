@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { RuntimeError, block } from "@blazetrails/ruby-compat";
+import { FileUtils, RuntimeError, block, rbEqq } from "@blazetrails/ruby-compat";
 import { FileTask } from "./file-task.js";
 import { NameSpace } from "./name-space.js";
 import { Rake } from "./rake-module.js";
@@ -28,8 +28,8 @@ describe("TestRakeTaskManager", () => {
   });
 
   it("index", async () => {
+    await expect(tm.get("bad")).rejects.toThrow(RuntimeError);
     const e = await tm.get("bad").catch((err: unknown) => err);
-    expect(e).toBeInstanceOf(RuntimeError);
     expect((e as Error).message).toBe(
       "Don't know how to build task 'bad' (See the list of available tasks with `rake --tasks`)",
     );
@@ -38,8 +38,8 @@ describe("TestRakeTaskManager", () => {
   it("undefined task with custom application", async () => {
     Rake.application!.name = "myrake";
 
+    await expect(tm.get("bad")).rejects.toThrow(RuntimeError);
     const e = await tm.get("bad").catch((err: unknown) => err);
-    expect(e).toBeInstanceOf(RuntimeError);
     expect((e as Error).message).toBe(
       "Don't know how to build task 'bad' (See the list of available tasks with `myrake --tasks`)",
     );
@@ -102,14 +102,20 @@ describe("TestRakeTaskManager", () => {
   });
 
   it("name lookup with implicit file tasks", async () => {
-    const t = await tm.get("package.json");
+    await FileUtils.touch("README.rdoc");
 
-    expect(t.name).toBe("package.json");
-    expect(t).toBeInstanceOf(FileTask);
+    try {
+      const t = await tm.get("README.rdoc");
+
+      expect(t.name).toBe("README.rdoc");
+      expect(rbEqq(FileTask, t)).toBeTruthy();
+    } finally {
+      await FileUtils.rmF("README.rdoc");
+    }
   });
 
   it("name lookup with nonexistent task", async () => {
-    await expect(tm.get("DOES NOT EXIST")).rejects.toBeInstanceOf(RuntimeError);
+    await expect(tm.get("DOES NOT EXIST")).rejects.toThrow(RuntimeError);
   });
 
   it("name lookup in multiple scopes", async () => {
@@ -127,7 +133,11 @@ describe("TestRakeTaskManager", () => {
       tm.inNamespace("b", () => {
         bb = tm.defineTask(Task, "bb");
         botZ = tm.defineTask(Task, "z");
+
+        expect(tm.currentScope).toEqual(make("b", "a"));
       });
+
+      expect(tm.currentScope).toEqual(make("a"));
     });
 
     const inner = make("b", "a") as Scope;

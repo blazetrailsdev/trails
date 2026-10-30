@@ -32,8 +32,8 @@ describe("TestRakeRules", () => {
   it("close matches on name do not trigger rule", async () => {
     tm.defineTask(Task, "x.c");
     tm.createRule({ ".o": [".c"] });
-    await expect(tm.get("x.obj")).rejects.toBeInstanceOf(RuntimeError);
-    await expect(tm.get("x.xyo")).rejects.toBeInstanceOf(RuntimeError);
+    await expect(tm.get("x.obj")).rejects.toThrow(RuntimeError);
+    await expect(tm.get("x.xyo")).rejects.toThrow(RuntimeError);
   });
 
   it("rule with two sources builds both sources", async () => {
@@ -62,14 +62,14 @@ describe("TestRakeRules", () => {
       tm.createRule({ [`.${letter}`]: `.${prev}` });
       prev = letter;
     }
+    await expect(tm.get("a.z")).rejects.toThrow(RuleRecursionOverflowError);
     const ex = await tm.get("a.z").catch((e: unknown) => e);
-    expect(ex).toBeInstanceOf(RuleRecursionOverflowError);
     expect((ex as Error).message).toMatch(/a\.z => a.y/);
   });
 
   it("rules with bad dependents will fail", async () => {
     tm.createRule({ a: [1] });
-    await expect(tm.get("a")).rejects.toBeInstanceOf(RuntimeError);
+    await expect(tm.get("a")).rejects.toThrow(RuntimeError);
   });
 
   it("single dependent with nil args", async () => {
