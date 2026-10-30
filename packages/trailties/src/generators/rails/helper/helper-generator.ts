@@ -12,10 +12,7 @@ export class HelperGenerator extends NamedBase {
   /** @internal */
   private __fileName?: string;
 
-  /**
-   * @missingRailsArgs template — PERMANENT
-   * @missingRailsArgs join — PERMANENT
-   */
+  /** @missingRailsArgs template — PERMANENT */
   async createHelperFiles(): Promise<void> {
     await this.template(
       "helper.ts",

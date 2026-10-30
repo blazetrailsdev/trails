@@ -49,10 +49,7 @@ export class ControllerGenerator extends NamedBase {
   /** @internal */
   private __fileName?: string;
 
-  /**
-   * @missingRailsArgs template — PERMANENT
-   * @missingRailsArgs join — PERMANENT
-   */
+  /** @missingRailsArgs template — PERMANENT */
   async createControllerFiles(): Promise<void> {
     await this.template(
       "controller.ts",

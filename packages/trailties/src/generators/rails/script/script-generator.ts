@@ -9,7 +9,6 @@ export class ScriptGenerator extends NamedBase {
     this.methodAdded("generateScript");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async generateScript(): Promise<void> {
     await this.template("script.ts", `script/${this.filePath()}${this.ext()}`);
   }

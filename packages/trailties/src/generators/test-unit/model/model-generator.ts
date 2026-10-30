@@ -43,7 +43,6 @@ export class ModelGenerator extends NamedBase {
     );
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async createFixtureFile(): Promise<void> {
     if (
       (this.options as ModelGeneratorOptions).fixture &&
