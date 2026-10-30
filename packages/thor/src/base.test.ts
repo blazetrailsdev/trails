@@ -36,10 +36,6 @@ const myChildScript = MyChildScript as unknown as AnyClass;
 const scriptsMyScript = Scripts.MyScript as unknown as AnyClass;
 const myClassOptionScript = MyClassOptionScript as unknown as AnyClass;
 
-function keys(hash: unknown): string[] {
-  return hash instanceof Map ? [...hash.keys()] : Object.keys(hash as object);
-}
-
 function assertEmpty(obj: object | string): void {
   if (!isEmpty(obj)) throw new globalThis.Error(`Expected ${JSON.stringify(obj)} to be empty.`);
 }
@@ -99,9 +95,9 @@ describe("Thor::Base", () => {
 
   describe("#no_commands", () => {
     it("avoids methods being added as commands", () => {
-      expect(keys(myScript.commands())).toContain("animal");
-      expect(keys(myScript.commands())).not.toContain("this_is_not_a_command");
-      expect(keys(myScript.commands())).not.toContain("neither_is_this");
+      expect(Object.keys(myScript.commands())).toContain("animal");
+      expect(Object.keys(myScript.commands())).not.toContain("this_is_not_a_command");
+      expect(Object.keys(myScript.commands())).not.toContain("neither_is_this");
     });
   });
 
@@ -316,7 +312,7 @@ describe("Thor::Base", () => {
   describe("#commands", () => {
     it("returns a list with all commands defined in this class", () => {
       assertRespondTo(new myChildScript(), "animal");
-      expect(keys(myChildScript.commands())).toContain("animal");
+      expect(Object.keys(myChildScript.commands())).toContain("animal");
     });
 
     it("raises an error if a command with reserved word is defined", () => {
@@ -338,14 +334,14 @@ describe("Thor::Base", () => {
   describe("#all_commands", () => {
     it("returns a list with all commands defined in this class plus superclasses", () => {
       assertRespondTo(new myChildScript(), "foo");
-      expect(keys(myChildScript.allCommands())).toContain("foo");
+      expect(Object.keys(myChildScript.allCommands())).toContain("foo");
     });
   });
 
   describe("#remove_command", () => {
     it("removes the command from its commands hash", () => {
-      expect(keys(myChildScript.allCommands())).not.toContain("name_with_dashes");
-      expect(keys(myChildScript.commands())).not.toContain("boom");
+      expect(Object.keys(myChildScript.allCommands())).not.toContain("name_with_dashes");
+      expect(Object.keys(myChildScript.commands())).not.toContain("boom");
     });
 
     it("undefines the method if desired", () => {
