@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, rstrip, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
 import { ParserTools } from "../parser-tools.js";
@@ -29,10 +29,10 @@ export const EnvelopeFromParser = extend(
     enCommentTail: 245,
     enMain: 1,
 
-    parse(data: any): any {
+    parse(data: string | Uint8Array | null): any {
       const self = EnvelopeFromParser as any;
-      let p: any, pe: any, eof: any, stack: any, cs: any, top: any, envelopeFrom: any, addressS: any, ctimeDateS: any, testEof: any, _slen: any, _trans: any, _keys: any, _inds: any, _acts: any, _nacts: any, _gotoLevel: any, _resume: any, _eofTrans: any, _again: any, _testEof: any, _out: any, _wide: any;
-      if (data != null) data = b(data);
+      let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, envelopeFrom: any, addressS: number | null = null, ctimeDateS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number;
+      data = (data == null ? data : b(data)) as Uint8Array;
       envelopeFrom = new EnvelopeFromStruct();
       if (Utilities.isBlank(data)) return envelopeFrom;
       addressS = ctimeDateS = null;
@@ -94,46 +94,55 @@ export const EnvelopeFromParser = extend(
                 }
                 case 8: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 15: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 6: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 24: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 20: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 4: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 12: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 10: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 40: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -165,11 +174,13 @@ export const EnvelopeFromParser = extend(
                     addressS = p;
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 28: {
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -178,27 +189,34 @@ export const EnvelopeFromParser = extend(
                 }
                 case 26: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 13: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 42: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 9: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -213,6 +231,7 @@ export const EnvelopeFromParser = extend(
                 }
                 case 16: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -227,6 +246,7 @@ export const EnvelopeFromParser = extend(
                 }
                 case 17: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -240,6 +260,7 @@ export const EnvelopeFromParser = extend(
                 }
                 case 29: {
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -248,6 +269,7 @@ export const EnvelopeFromParser = extend(
                 }
                 case 7: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -262,6 +284,7 @@ export const EnvelopeFromParser = extend(
                 }
                 case 23: {
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -270,20 +293,25 @@ export const EnvelopeFromParser = extend(
                 }
                 case 36: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 22: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 21: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -298,13 +326,16 @@ export const EnvelopeFromParser = extend(
                 }
                 case 11: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 39: {
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -316,6 +347,7 @@ export const EnvelopeFromParser = extend(
                     addressS = p;
                   }
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -330,8 +362,10 @@ export const EnvelopeFromParser = extend(
                 }
                 case 30: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -340,8 +374,10 @@ export const EnvelopeFromParser = extend(
                 }
                 case 25: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -350,17 +386,22 @@ export const EnvelopeFromParser = extend(
                 }
                 case 38: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 41: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -369,8 +410,10 @@ export const EnvelopeFromParser = extend(
                 }
                 case 35: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -379,8 +422,10 @@ export const EnvelopeFromParser = extend(
                 }
                 case 19: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -389,19 +434,25 @@ export const EnvelopeFromParser = extend(
                 }
                 case 34: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 37: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -410,10 +461,13 @@ export const EnvelopeFromParser = extend(
                 }
                 case 33: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -451,6 +505,7 @@ export const EnvelopeFromParser = extend(
                 }
                 case 28: {
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -459,6 +514,7 @@ export const EnvelopeFromParser = extend(
                 }
                 case 32: {
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.ctimeDate = self.chars(data, ctimeDateS, p - 1);
@@ -467,6 +523,7 @@ export const EnvelopeFromParser = extend(
                 }
                 case 29: {
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -475,6 +532,7 @@ export const EnvelopeFromParser = extend(
                 }
                 case 23: {
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -483,6 +541,7 @@ export const EnvelopeFromParser = extend(
                 }
                 case 39: {
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -491,8 +550,10 @@ export const EnvelopeFromParser = extend(
                 }
                 case 30: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -501,8 +562,10 @@ export const EnvelopeFromParser = extend(
                 }
                 case 25: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -511,8 +574,10 @@ export const EnvelopeFromParser = extend(
                 }
                 case 41: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -521,8 +586,10 @@ export const EnvelopeFromParser = extend(
                 }
                 case 35: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -531,8 +598,10 @@ export const EnvelopeFromParser = extend(
                 }
                 case 19: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -541,10 +610,13 @@ export const EnvelopeFromParser = extend(
                 }
                 case 37: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);
@@ -553,10 +625,13 @@ export const EnvelopeFromParser = extend(
                 }
                 case 33: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     envelopeFrom.address = rstrip(self.chars(data, addressS, p - 1) as string);

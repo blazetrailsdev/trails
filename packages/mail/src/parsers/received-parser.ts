@@ -1,8 +1,7 @@
-/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, strip, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
 import { ParserTools } from "../parser-tools.js";
-import { Utilities } from "../utilities.js";
 
 const ReceivedStruct = Struct.new("date", "time", "info", "error");
 
@@ -29,10 +28,10 @@ export const ReceivedParser = extend(
     enCommentTail: 636,
     enMain: 1,
 
-    parse(data: any): any {
+    parse(data: string | Uint8Array | null): any {
       const self = ReceivedParser as any;
-      let p: any, pe: any, eof: any, stack: any, cs: any, top: any, received: any, receivedTokensS: any, dateS: any, timeS: any, testEof: any, _slen: any, _trans: any, _keys: any, _inds: any, _acts: any, _nacts: any, _gotoLevel: any, _resume: any, _eofTrans: any, _again: any, _testEof: any, _out: any, _wide: any;
-      if (data != null) data = b(data);
+      let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, received: any, receivedTokensS: number | null = null, dateS: number | null = null, timeS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number;
+      data = (data == null ? data : b(data)) as Uint8Array;
       if (data == null) throw new Field.NilParseError("Mail::ReceivedElement");
       received = new ReceivedStruct();
       receivedTokensS = dateS = timeS = null;
@@ -94,61 +93,73 @@ export const ReceivedParser = extend(
                 }
                 case 9: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 52: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 127: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 68: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 10: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 22: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 64: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 61: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 26: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 24: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 70: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 63: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -189,6 +200,7 @@ export const ReceivedParser = extend(
                     receivedTokensS = p;
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -197,6 +209,7 @@ export const ReceivedParser = extend(
                     receivedTokensS = p;
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -241,27 +254,34 @@ export const ReceivedParser = extend(
                 }
                 case 81: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 105: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 120: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 50: {
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -270,48 +290,61 @@ export const ReceivedParser = extend(
                 }
                 case 51: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 69: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 53: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 66: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 72: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 71: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 56: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -326,6 +359,7 @@ export const ReceivedParser = extend(
                 }
                 case 128: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -340,6 +374,7 @@ export const ReceivedParser = extend(
                 }
                 case 129: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -353,6 +388,7 @@ export const ReceivedParser = extend(
                 }
                 case 77: {
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -361,20 +397,25 @@ export const ReceivedParser = extend(
                 }
                 case 78: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 79: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 67: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -389,6 +430,7 @@ export const ReceivedParser = extend(
                 }
                 case 104: {
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -397,27 +439,34 @@ export const ReceivedParser = extend(
                 }
                 case 106: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 38: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 15: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 65: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -432,27 +481,34 @@ export const ReceivedParser = extend(
                 }
                 case 6: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 60: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 25: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 116: {
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -461,22 +517,28 @@ export const ReceivedParser = extend(
                 }
                 case 117: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 118: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 73: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -500,22 +562,28 @@ export const ReceivedParser = extend(
                     receivedTokensS = p;
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 21: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 58: {
                   {
+                    /** @empty */
                   }
                   {
                     received.date = strip(self.chars(data, dateS, p - 1) as string);
@@ -527,35 +595,46 @@ export const ReceivedParser = extend(
                 }
                 case 86: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 111: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 125: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 85: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -564,17 +643,22 @@ export const ReceivedParser = extend(
                 }
                 case 87: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 110: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -583,35 +667,46 @@ export const ReceivedParser = extend(
                 }
                 case 112: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 45: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 48: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 124: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -620,26 +715,34 @@ export const ReceivedParser = extend(
                 }
                 case 126: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 75: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 20: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -648,26 +751,34 @@ export const ReceivedParser = extend(
                 }
                 case 23: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 101: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 98: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -676,60 +787,79 @@ export const ReceivedParser = extend(
                 }
                 case 99: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 100: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 31: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 80: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 102: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 119: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 62: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -741,22 +871,28 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 114: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 74: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -780,8 +916,10 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -799,50 +937,67 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 37: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 94: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 82: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 93: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -851,72 +1006,97 @@ export const ReceivedParser = extend(
                 }
                 case 95: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 107: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 83: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 108: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 122: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 121: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 49: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -928,17 +1108,22 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 88: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -947,21 +1132,28 @@ export const ReceivedParser = extend(
                 }
                 case 17: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 36: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -970,21 +1162,28 @@ export const ReceivedParser = extend(
                 }
                 case 39: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 13: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -993,45 +1192,61 @@ export const ReceivedParser = extend(
                 }
                 case 14: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 16: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 96: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 18: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -1046,10 +1261,13 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -1064,10 +1282,13 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -1082,47 +1303,64 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 44: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 90: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 43: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -1131,32 +1369,43 @@ export const ReceivedParser = extend(
                 }
                 case 46: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 91: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 84: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -1168,15 +1417,19 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 109: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -1188,15 +1441,19 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 123: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -1208,21 +1465,28 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 113: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -1231,38 +1495,52 @@ export const ReceivedParser = extend(
                 }
                 case 33: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 11: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 29: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
                     received.info = self.chars(data, receivedTokensS, p - 1);
@@ -1271,32 +1549,43 @@ export const ReceivedParser = extend(
                 }
                 case 30: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 32: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 97: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -1308,23 +1597,31 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 34: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -1339,47 +1636,64 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 40: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 41: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 92: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -1391,32 +1705,43 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 27: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 89: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -1428,12 +1753,16 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -1448,14 +1777,19 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -1470,19 +1804,25 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 42: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -1494,14 +1834,19 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -1516,16 +1861,22 @@ export const ReceivedParser = extend(
                     }
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -1554,6 +1905,7 @@ export const ReceivedParser = extend(
                 }
                 case 52: {
                   {
+                    /** @empty */
                   }
                   break;
                 }

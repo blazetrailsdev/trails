@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, rstrip, strip, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
 import { ParserTools } from "../parser-tools.js";
@@ -31,10 +31,10 @@ export const AddressListsParser = extend(
     enCommentTail: 2449,
     enMain: 2461,
 
-    parse(data: any): any {
+    parse(data: string | Uint8Array | null): any {
       const self = AddressListsParser as any;
-      let p: any, pe: any, eof: any, stack: any, cs: any, top: any, addressList: any, phraseS: any, phraseE: any, qstrS: any, qstr: any, commentS: any, groupNameS: any, domainS: any, groupName: any, localDotAtomS: any, localDotAtomE: any, localDotAtomPreCommentE: any, obsDomainListS: any, addressS: any, address: any, testEof: any, _slen: any, _trans: any, _keys: any, _inds: any, _acts: any, _nacts: any, _gotoLevel: any, _resume: any, _eofTrans: any, _again: any, _testEof: any, _out: any, _wide: any, group: any;
-      if (data != null) data = b(data);
+      let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, addressList: any, phraseS: number | null = null, phraseE: number | null = null, qstrS: number | null = null, qstr: any, commentS: number | null = null, groupNameS: number | null = null, domainS: number | null = null, groupName: any, localDotAtomS: number | null = null, localDotAtomE: number | null = null, localDotAtomPreCommentE: number | null = null, obsDomainListS: number | null = null, addressS: number | null = null, address: any, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number, group: any;
+      data = (data == null ? data : b(data)) as Uint8Array;
       addressList = new AddressListStruct([], []);
       if (Utilities.isBlank(data)) return addressList;
       phraseS = phraseE = qstrS = qstr = commentS = null;

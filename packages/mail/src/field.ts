@@ -4,6 +4,7 @@ import {
   forceEncoding,
   Range,
   rbInspect,
+  rbObjAsString,
   rbObjDup,
   StandardError,
 } from "@blazetrails/ruby-compat";
@@ -19,7 +20,11 @@ export class Field {
     constructor(element: unknown, value: unknown, reason: unknown) {
       const value_ = new.target.prototype.toUtf8(value);
       const reason_ = new.target.prototype.toUtf8(reason);
-      super(`${element} can not parse |${value_}|: ${reason_}`);
+      const [elementS, valueS, reasonS] = [element, value_, reason_].map((x) => {
+        const str: unknown = rbObjAsString(x);
+        return str instanceof Uint8Array ? new TextDecoder().decode(str) : str;
+      });
+      super(`${elementS} can not parse |${valueS}|: ${reasonS}`);
       this.element = element;
       this.value = value_;
       this.reason = reason_;

@@ -202,6 +202,33 @@ function translateBody(p: Parser, t: Translator): string[] {
   return out;
 }
 
+const NUMERIC = new Set([
+  "p",
+  "pe",
+  "eof",
+  "cs",
+  "top",
+  "_wide",
+  "_gotoLevel",
+  "_resume",
+  "_eofTrans",
+  "_again",
+  "_testEof",
+  "_out",
+]);
+
+function localType(x: string): string {
+  if (x === "stack") return "number[]";
+  if (x === "testEof") return "boolean";
+  if (x === "_acts" || x === "_nacts") return "null";
+  if (NUMERIC.has(x)) return "number";
+  if (["_slen", "_trans", "_keys", "_inds"].includes(x)) return "any";
+  if (/[a-z0-9][SE]$/.test(x)) {
+    return "number | null = null";
+  }
+  return "any";
+}
+
 function generate(p: Parser): string {
   const accessors = new Set([...p.tables.map(([n]) => n), ...p.scalars.map(([n]) => n)]);
   const t = new Translator(accessors, new Set(p.structs.map(([n]) => n)));
@@ -217,11 +244,13 @@ function generate(p: Parser): string {
   const member = (n: string): string => (p.kind === "class" ? `static ${n} = ` : `${n}: `);
   const end = p.kind === "class" ? ";" : ",";
   const out = [
-    "/* eslint-disable */",
+    `/* eslint-disable ${["@typescript-eslint/no-explicit-any", ...(body.some((l) => l.includes("_m!")) ? ["@typescript-eslint/no-unnecessary-type-assertion"] : []), "no-useless-assignment", "prefer-const", "unused-imports/no-unused-vars"].join(", ")} */`,
     `import { ${compat.join(", ")} } from "@blazetrails/ruby-compat";`,
     ...(body.some((l) => l.includes("Field.")) ? [`import { Field } from "../field.js";`] : []),
     `import { ParserTools } from "../parser-tools.js";`,
-    `import { Utilities } from "../utilities.js";`,
+    ...(body.some((l) => l.includes("Utilities."))
+      ? [`import { Utilities } from "../utilities.js";`]
+      : []),
     "",
     ...p.structs.map(
       ([n, members]) =>
@@ -237,10 +266,10 @@ function generate(p: Parser): string {
     ),
     ...p.scalars.map(([n, v]) => `    ${member(camel(n))}${v}${end}`),
     "",
-    `    ${p.kind === "class" ? "static " : ""}parse(data: any): any {`,
+    `    ${p.kind === "class" ? "static " : ""}parse(data: string | Uint8Array | null): any {`,
     `      const self = ${p.name} as any;`,
-    `      let ${["p", "pe", "eof", "stack", "cs", "top", ...[...t.locals].filter((x) => !["p", "pe", "eof", "stack", "cs", "top"].includes(x))].map((x) => `${x}: any`).join(", ")};`,
-    "      if (data != null) data = b(data);",
+    `      let ${["p", "pe", "eof", "stack", "cs", "top", ...[...t.locals].filter((x) => !["p", "pe", "eof", "stack", "cs", "top"].includes(x))].map((x) => `${x}: ${localType(x)}`).join(", ")};`,
+    "      data = (data == null ? data : b(data)) as Uint8Array;",
     ...body.filter((l) => !/^\s*data = data\.dup/.test(l) && !l.includes("forceEncoding")),
     `    }${p.kind === "class" ? "" : ","}`,
     ...(p.kind === "class"
@@ -248,7 +277,7 @@ function generate(p: Parser): string {
       : ["  },", "  ParserTools,", ");"]),
     "",
   ];
-  return out.join("\n");
+  return out.join("\n").replace(/\{\n( *)\}/g, "{\n$1  /** @empty */\n$1}");
 }
 
 async function main(): Promise<void> {
@@ -262,6 +291,10 @@ async function main(): Promise<void> {
     if (current === ts) continue;
     if (check) drift.push(target);
     else await writeFile(target, ts);
+  }
+  const expected = new Set(files.map((f) => `${kebab(f.replace(/\.rb$/, ""))}.ts`));
+  for (const f of await readdir(OUT)) {
+    if (f.endsWith("-parser.ts") && !expected.has(f)) drift.push(join(OUT, f));
   }
   if (drift.length > 0) {
     console.error(

@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
 import { ParserTools } from "../parser-tools.js";
@@ -29,10 +29,10 @@ export const ContentDispositionParser = extend(
     enCommentTail: 28,
     enMain: 1,
 
-    parse(data: any): any {
+    parse(data: string | Uint8Array | null): any {
       const self = ContentDispositionParser as any;
-      let p: any, pe: any, eof: any, stack: any, cs: any, top: any, contentDisposition: any, dispTypeS: any, paramAttrS: any, paramAttr: any, qstrS: any, qstr: any, paramValS: any, testEof: any, _slen: any, _trans: any, _keys: any, _inds: any, _acts: any, _nacts: any, _gotoLevel: any, _resume: any, _eofTrans: any, _again: any, _testEof: any, _out: any, _wide: any, value: any;
-      if (data != null) data = b(data);
+      let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, contentDisposition: any, dispTypeS: number | null = null, paramAttrS: number | null = null, paramAttr: any, qstrS: number | null = null, qstr: any, paramValS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number, value: any;
+      data = (data == null ? data : b(data)) as Uint8Array;
       contentDisposition = new ContentDispositionStruct("", []);
       if (Utilities.isBlank(data)) return contentDisposition;
       dispTypeS = paramAttrS = paramAttr = qstrS = qstr = paramValS = null;
@@ -130,11 +130,13 @@ export const ContentDispositionParser = extend(
                 }
                 case 10: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 13: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -208,6 +210,7 @@ export const ContentDispositionParser = extend(
                 }
                 case 12: {
                   {
+                    /** @empty */
                   }
                   {
                     paramAttrS = p;
@@ -216,6 +219,7 @@ export const ContentDispositionParser = extend(
                 }
                 case 20: {
                   {
+                    /** @empty */
                   }
                   {
                     if (paramAttr == null) {
@@ -230,6 +234,7 @@ export const ContentDispositionParser = extend(
                 }
                 case 11: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -244,6 +249,7 @@ export const ContentDispositionParser = extend(
                 }
                 case 14: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -258,6 +264,7 @@ export const ContentDispositionParser = extend(
                 }
                 case 15: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -292,6 +299,7 @@ export const ContentDispositionParser = extend(
                 }
                 case 21: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -350,11 +358,13 @@ export const ContentDispositionParser = extend(
                 }
                 case 10: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 20: {
                   {
+                    /** @empty */
                   }
                   {
                     if (paramAttr == null) {

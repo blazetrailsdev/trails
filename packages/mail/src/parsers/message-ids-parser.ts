@@ -1,8 +1,7 @@
-/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
 import { ParserTools } from "../parser-tools.js";
-import { Utilities } from "../utilities.js";
 
 const MessageIdsStruct = Struct.new("messageIds", "error");
 
@@ -29,10 +28,10 @@ export const MessageIdsParser = extend(
     enCommentTail: 306,
     enMain: 318,
 
-    parse(data: any): any {
+    parse(data: string | Uint8Array | null): any {
       const self = MessageIdsParser as any;
-      let p: any, pe: any, eof: any, stack: any, cs: any, top: any, messageIds: any, msgIdS: any, testEof: any, _slen: any, _trans: any, _keys: any, _inds: any, _acts: any, _nacts: any, _gotoLevel: any, _resume: any, _eofTrans: any, _again: any, _testEof: any, _out: any, _wide: any, id: any;
-      if (data != null) data = b(data);
+      let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, messageIds: any, msgIdS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number, id: any;
+      data = (data == null ? data : b(data)) as Uint8Array;
       if (data == null) throw new Field.NilParseError("Mail::MessageIdsElement");
       messageIds = new MessageIdsStruct([]);
       msgIdS = null;
@@ -93,51 +92,61 @@ export const MessageIdsParser = extend(
                 }
                 case 9: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 26: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 14: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 12: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 8: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 5: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 3: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 18: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 16: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 22: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -200,6 +209,7 @@ export const MessageIdsParser = extend(
                 }
                 case 25: {
                   {
+                    /** @empty */
                   }
                   {
                     msgIdS = p;
@@ -208,34 +218,43 @@ export const MessageIdsParser = extend(
                 }
                 case 15: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 11: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 24: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 23: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 10: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -250,6 +269,7 @@ export const MessageIdsParser = extend(
                 }
                 case 27: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -264,6 +284,7 @@ export const MessageIdsParser = extend(
                 }
                 case 28: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -277,6 +298,7 @@ export const MessageIdsParser = extend(
                 }
                 case 13: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -291,13 +313,16 @@ export const MessageIdsParser = extend(
                 }
                 case 20: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 33: {
                   {
+                    /** @empty */
                   }
                   {
                     id = self.chars(data, msgIdS, p - 1);
@@ -311,13 +336,16 @@ export const MessageIdsParser = extend(
                 }
                 case 7: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 6: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -332,6 +360,7 @@ export const MessageIdsParser = extend(
                 }
                 case 4: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -346,31 +375,40 @@ export const MessageIdsParser = extend(
                 }
                 case 17: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 21: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 19: {
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 34: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -421,6 +459,7 @@ export const MessageIdsParser = extend(
                 }
                 case 9: {
                   {
+                    /** @empty */
                   }
                   break;
                 }

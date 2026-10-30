@@ -5,6 +5,7 @@
   "packageManager": "pnpm@12.3.4",
   "scripts": {
     "build": "tsc --build && pnpm -C packages/actionpack build:templates && pnpm -C packages/trailties build:templates && pnpm -C packages/solid-cable build:templates",
+    "mail:parsers": "pnpm tsx scripts/mail-parsers/generate.ts",
     "tasks": "scripts/tasks/tasks.sh",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -127,8 +128,7 @@
     "test:assertions:ratchet": "pnpm parity:test:assertions",
     "test:stubs": "pnpm parity:test:stubs",
     "vendor:fetch": "pnpm tsx vendor/fetch.ts",
-    "vendor:recite": "pnpm tsx scripts/vendor-recite.ts",
-    "mail:parsers": "pnpm tsx scripts/mail-parsers/generate.ts"
+    "vendor:recite": "pnpm tsx scripts/vendor-recite.ts"
   },
   "devDependencies": {
     "@blazetrails/activerecord": "workspace:*",

@@ -20,6 +20,9 @@ function gsubBytes(string: Uint8Array, re: RegExp, replacement: string): Uint8Ar
 }
 
 export const Utilities = {
+  unescape(str: string): string {
+    return str.replace(/\\([^\n])/g, "$1");
+  },
   underscoreize(str: unknown): string {
     return String(str).toLowerCase().replaceAll(Constants.HYPHEN, Constants.UNDERSCORE);
   },
@@ -66,6 +69,18 @@ export const Utilities = {
     }
   },
 
+  isBlank(value: unknown): boolean {
+    if (value == null) {
+      return true;
+    } else if (typeof value === "string") {
+      return !/[^\t\n\v\f\r ]/.test(value);
+    } else if (value instanceof Uint8Array) {
+      return value.every((c) => c === 0x20 || (c >= 0x09 && c <= 0x0d));
+    } else {
+      return rbObjRespondTo(value, "empty?") ? isEmpty(value as object) : value === false;
+    }
+  },
+
   decodeBase64(str: string): Uint8Array {
     if (!str.endsWith("=") && str.length % 4 !== 0) {
       str = str.padEnd((str.length + 3) & ~3, "=");
@@ -76,21 +91,5 @@ export const Utilities = {
   /** @inventedArm b — CONVERGEABLE ruby-compat-pack-m-reads-utf8-bytes */
   encodeBase64(str: string | Uint8Array): string {
     return pack([b(str)], "m");
-  },
-
-  unescape(str: string): string {
-    return str.replace(/\\(.)/g, "$1");
-  },
-
-  isBlank(value: unknown): boolean {
-    if (value == null) {
-      return true;
-    } else if (typeof value === "string" || value instanceof Uint8Array) {
-      return !/[^\t\n\v\f\r ]/.test(
-        typeof value === "string" ? value : String.fromCharCode(...value),
-      );
-    } else {
-      return rbObjRespondTo(value, "empty?") ? isEmpty(value as object) : value === false;
-    }
   },
 };

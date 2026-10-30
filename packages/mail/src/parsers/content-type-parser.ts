@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
 import { ParserTools } from "../parser-tools.js";
@@ -29,10 +29,10 @@ export const ContentTypeParser = extend(
     enCommentTail: 35,
     enMain: 1,
 
-    parse(data: any): any {
+    parse(data: string | Uint8Array | null): any {
       const self = ContentTypeParser as any;
-      let p: any, pe: any, eof: any, stack: any, cs: any, top: any, contentType: any, mainTypeS: any, subTypeS: any, paramAttrS: any, paramAttr: any, qstrS: any, qstr: any, paramValS: any, testEof: any, _slen: any, _trans: any, _keys: any, _inds: any, _acts: any, _nacts: any, _gotoLevel: any, _resume: any, _eofTrans: any, _again: any, _testEof: any, _out: any, _wide: any, value: any;
-      if (data != null) data = b(data);
+      let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, contentType: any, mainTypeS: number | null = null, subTypeS: number | null = null, paramAttrS: number | null = null, paramAttr: any, qstrS: number | null = null, qstr: any, paramValS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number, value: any;
+      data = (data == null ? data : b(data)) as Uint8Array;
       if (Utilities.isBlank(data)) return new ContentTypeStruct("text", "plain", []);
       contentType = new ContentTypeStruct(null, null, []);
       mainTypeS = subTypeS = paramAttrS = paramAttr = null;
@@ -143,11 +143,13 @@ export const ContentTypeParser = extend(
                 }
                 case 12: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 15: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
@@ -236,6 +238,7 @@ export const ContentTypeParser = extend(
                 }
                 case 13: {
                   {
+                    /** @empty */
                   }
                   {
                     paramAttrS = p;
@@ -244,6 +247,7 @@ export const ContentTypeParser = extend(
                 }
                 case 23: {
                   {
+                    /** @empty */
                   }
                   {
                     if (paramAttr == null) {
@@ -258,6 +262,7 @@ export const ContentTypeParser = extend(
                 }
                 case 14: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -272,6 +277,7 @@ export const ContentTypeParser = extend(
                 }
                 case 16: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -286,6 +292,7 @@ export const ContentTypeParser = extend(
                 }
                 case 17: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -320,6 +327,7 @@ export const ContentTypeParser = extend(
                 }
                 case 24: {
                   {
+                    /** @empty */
                   }
                   {
                     {
@@ -378,11 +386,13 @@ export const ContentTypeParser = extend(
                 }
                 case 12: {
                   {
+                    /** @empty */
                   }
                   break;
                 }
                 case 23: {
                   {
+                    /** @empty */
                   }
                   {
                     if (paramAttr == null) {
