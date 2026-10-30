@@ -9,19 +9,22 @@ import * as m6 from "./encodings/quoted-printable.js";
 import * as m7 from "./encodings/transfer-encoding.js";
 import * as m8 from "./encodings/unix-to-unix.js";
 import * as m9 from "./field.js";
-import * as m10 from "./parser-tools.js";
-import * as m11 from "./parsers/address-lists-parser.js";
-import * as m12 from "./parsers/content-disposition-parser.js";
-import * as m13 from "./parsers/content-location-parser.js";
-import * as m14 from "./parsers/content-transfer-encoding-parser.js";
-import * as m15 from "./parsers/content-type-parser.js";
-import * as m16 from "./parsers/date-time-parser.js";
-import * as m17 from "./parsers/envelope-from-parser.js";
-import * as m18 from "./parsers/message-ids-parser.js";
-import * as m19 from "./parsers/mime-version-parser.js";
-import * as m20 from "./parsers/phrase-lists-parser.js";
-import * as m21 from "./parsers/received-parser.js";
-import * as m22 from "./utilities.js";
+import * as m10 from "./multibyte.js";
+import * as m11 from "./multibyte/chars.js";
+import * as m12 from "./multibyte/unicode.js";
+import * as m13 from "./parser-tools.js";
+import * as m14 from "./parsers/address-lists-parser.js";
+import * as m15 from "./parsers/content-disposition-parser.js";
+import * as m16 from "./parsers/content-location-parser.js";
+import * as m17 from "./parsers/content-transfer-encoding-parser.js";
+import * as m18 from "./parsers/content-type-parser.js";
+import * as m19 from "./parsers/date-time-parser.js";
+import * as m20 from "./parsers/envelope-from-parser.js";
+import * as m21 from "./parsers/message-ids-parser.js";
+import * as m22 from "./parsers/mime-version-parser.js";
+import * as m23 from "./parsers/phrase-lists-parser.js";
+import * as m24 from "./parsers/received-parser.js";
+import * as m25 from "./utilities.js";
 
 registerClassPaths([
   [() => m0.Encodings, "Mail::Encodings"],
@@ -39,18 +42,22 @@ registerClassPaths([
   [() => m9.Field.NilParseError, "Mail::Field::NilParseError"],
   [() => m9.Field.ParseError, "Mail::Field::ParseError"],
   [() => m9.Field.SyntaxError, "Mail::Field::SyntaxError"],
-  [() => m11.AddressListsParser, "Mail::Parsers::AddressListsParser"],
-  [() => m12.ContentDispositionParser, "Mail::Parsers::ContentDispositionParser"],
-  [() => m13.ContentLocationParser, "Mail::Parsers::ContentLocationParser"],
-  [() => m14.ContentTransferEncodingParser, "Mail::Parsers::ContentTransferEncodingParser"],
-  [() => m15.ContentTypeParser, "Mail::Parsers::ContentTypeParser"],
-  [() => m16.DateTimeParser, "Mail::Parsers::DateTimeParser"],
-  [() => m17.EnvelopeFromParser, "Mail::Parsers::EnvelopeFromParser"],
-  [() => m18.MessageIdsParser, "Mail::Parsers::MessageIdsParser"],
-  [() => m19.MimeVersionParser, "Mail::Parsers::MimeVersionParser"],
-  [() => m20.PhraseListsParser, "Mail::Parsers::PhraseListsParser"],
-  [() => m21.ReceivedParser, "Mail::Parsers::ReceivedParser"],
-  [() => m10.ParserTools, "Mail::ParserTools"],
+  [() => m10.Multibyte, "Mail::Multibyte"],
+  [() => m11.Chars, "Mail::Multibyte::Chars"],
+  [() => m10.EncodingError, "Mail::Multibyte::EncodingError"],
+  [() => m12.Unicode, "Mail::Multibyte::Unicode"],
+  [() => m14.AddressListsParser, "Mail::Parsers::AddressListsParser"],
+  [() => m15.ContentDispositionParser, "Mail::Parsers::ContentDispositionParser"],
+  [() => m16.ContentLocationParser, "Mail::Parsers::ContentLocationParser"],
+  [() => m17.ContentTransferEncodingParser, "Mail::Parsers::ContentTransferEncodingParser"],
+  [() => m18.ContentTypeParser, "Mail::Parsers::ContentTypeParser"],
+  [() => m19.DateTimeParser, "Mail::Parsers::DateTimeParser"],
+  [() => m20.EnvelopeFromParser, "Mail::Parsers::EnvelopeFromParser"],
+  [() => m21.MessageIdsParser, "Mail::Parsers::MessageIdsParser"],
+  [() => m22.MimeVersionParser, "Mail::Parsers::MimeVersionParser"],
+  [() => m23.PhraseListsParser, "Mail::Parsers::PhraseListsParser"],
+  [() => m24.ReceivedParser, "Mail::Parsers::ReceivedParser"],
+  [() => m13.ParserTools, "Mail::ParserTools"],
   [() => m0.UnknownEncodingType, "Mail::UnknownEncodingType"],
-  [() => m22.Utilities, "Mail::Utilities"],
+  [() => m25.Utilities, "Mail::Utilities"],
 ]);
