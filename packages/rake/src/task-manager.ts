@@ -82,7 +82,7 @@ export class TaskManager {
   intern(taskClass: typeof Task, taskName: string): Task {
     let task = this._tasks.get(String(taskName));
     if (task == null) {
-      task = new taskClass(taskName, this as unknown as Application);
+      task = new taskClass(taskName, this);
       this._tasks.set(String(taskName), task);
     }
     return task;

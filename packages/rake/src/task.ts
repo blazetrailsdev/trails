@@ -10,7 +10,6 @@ import {
   stringSplit,
   strip,
 } from "@blazetrails/ruby-compat";
-import type { Application } from "./application.js";
 import type { EarlyTime } from "./early-time.js";
 import { InvocationChain } from "./invocation-chain.js";
 import { InvocationExceptionMixin } from "./invocation-exception-mixin.js";
@@ -18,6 +17,7 @@ import type { LateTime } from "./late-time.js";
 import { fromPathname, Rake } from "./rake-module.js";
 import type { Scope } from "./scope.js";
 import { EMPTY_TASK_ARGS, TaskArguments } from "./task-arguments.js";
+import type { TaskManager } from "./task-manager.js";
 
 export type Timestamp = Date | EarlyTime | LateTime;
 
@@ -26,7 +26,7 @@ export type TaskAction = (task: Task, args: TaskArguments, ...rest: unknown[]) =
 export class Task {
   orderOnlyPrerequisites: string[];
   readonly actions: TaskAction[];
-  application: Application;
+  application: TaskManager;
   readonly scope: Scope;
   readonly locations: string[];
   private _prerequisites: string[];
@@ -109,7 +109,7 @@ export class Task {
     return this.sources[0] ?? null;
   }
 
-  constructor(taskName: string, app: Application) {
+  constructor(taskName: string, app: TaskManager) {
     this._name = String(taskName);
     this._prerequisites = [];
     this.actions = [];
