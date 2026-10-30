@@ -4,10 +4,13 @@ import {
   FileUtils,
   FrozenError,
   Pathname,
+  RuntimeError,
   block,
   flatten,
+  rbEqual,
   rbObjClone,
   rbObjDup,
+  rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
 import { ext, pathmap } from "./ext/string.js";
 import { FileList } from "./file-list.js";
@@ -42,8 +45,10 @@ describe("TestRakeFileList", () => {
   });
 
   it("delegating methods do not include to a or to ary", () => {
-    expect(FileList.DELEGATING_METHODS.includes("toA")).toBe(false);
-    expect(FileList.DELEGATING_METHODS.includes("toAry")).toBe(false);
+    expect(!FileList.DELEGATING_METHODS.includes("toA")).toBeTruthy();
+    expect(!FileList.DELEGATING_METHODS.includes("to_a")).toBeTruthy();
+    expect(!FileList.DELEGATING_METHODS.includes("toAry")).toBeTruthy();
+    expect(!FileList.DELEGATING_METHODS.includes("to_ary")).toBeTruthy();
   });
 
   it("create", async () => {
@@ -133,16 +138,16 @@ describe("TestRakeFileList", () => {
 
   it("square bracket pattern", async () => {
     const fl = new FileList().include("abc.[ch]");
-    expect(await fl.size()).toEqual(2);
-    expect(await fl.isInclude("abc.c")).toBe(true);
-    expect(await fl.isInclude("abc.h")).toBe(true);
+    expect((await fl.size()) === 2).toBeTruthy();
+    expect(await fl.isInclude("abc.c")).toBeTruthy();
+    expect(await fl.isInclude("abc.h")).toBeTruthy();
   });
 
   it("curly bracket pattern", async () => {
     const fl = new FileList().include("abc.{c,h}");
-    expect(await fl.size()).toEqual(2);
-    expect(await fl.isInclude("abc.c")).toBe(true);
-    expect(await fl.isInclude("abc.h")).toBe(true);
+    expect((await fl.size()) === 2).toBeTruthy();
+    expect(await fl.isInclude("abc.c")).toBeTruthy();
+    expect(await fl.isInclude("abc.h")).toBeTruthy();
   });
 
   it("reject", async () => {
@@ -172,7 +177,7 @@ describe("TestRakeFileList", () => {
   it("excluding via block", async () => {
     const fl = FileList.get("a.c", "b.c", "xyz.c");
     await fl.exclude(block((fn: string) => pathmap(fn, "%n") === "xyz"));
-    expect(await fl.isExcludedFromList("xyz.c")).toBe(true);
+    expect(await fl.isExcludedFromList("xyz.c")).toBeTruthy();
     expect(await fl.toA()).toEqual(["a.c", "b.c"]);
   });
 
@@ -216,8 +221,8 @@ describe("TestRakeFileList", () => {
     const fl = new FileList();
     fl.clearExclude();
     fl.include("**/*~", "**/*.bak", "**/core");
-    expect(await fl.isMember("core")).toBe(true);
-    expect(await fl.isMember("x.bak")).toBe(true);
+    expect(await fl.isMember("core")).toBeTruthy();
+    expect(await fl.isMember("x.bak")).toBeTruthy();
   });
 
   it("unique", async () => {
@@ -232,14 +237,15 @@ describe("TestRakeFileList", () => {
     const fl = new FileList();
     await (await fl.append("a.java")).append("b.java");
     expect(await fl.toS()).toEqual("a.java b.java");
+    expect(`${await fl.toS()}`).toEqual("a.java b.java");
   });
 
   it("to array", async () => {
     const fl = FileList.get("a.java", "b.java");
     expect(await fl.toA()).toEqual(["a.java", "b.java"]);
-    expect(Array.isArray(await fl.toA())).toBe(true);
+    expect((await fl.toA()).constructor).toEqual(Array);
     expect(await fl.toAry()).toEqual(["a.java", "b.java"]);
-    expect(Array.isArray(await fl.toAry())).toBe(true);
+    expect((await fl.toAry()).constructor).toEqual(Array);
   });
 
   it("to s pending", async () => {
@@ -272,15 +278,17 @@ describe("TestRakeFileList", () => {
   it.skip("claim to be a kind of array", () => {});
 
   it("claim to be a kind of filelist", () => {
-    expect(FileList.get("*.c") instanceof FileList).toBe(true);
+    const fl = FileList.get("*.c");
+    expect(fl instanceof FileList).toBeTruthy();
+    expect(rbObjIsKindOf(fl, FileList)).toBeTruthy();
   });
 
   it("claim to be a filelist instance", () => {
-    expect(FileList.get("*.c").constructor).toBe(FileList);
+    expect(FileList.get("*.c").constructor === FileList).toBeTruthy();
   });
 
   it("dont claim to be an array instance", () => {
-    expect(Array.isArray(FileList.get("*.c"))).toBe(false);
+    expect(!Array.isArray(FileList.get("*.c"))).toBeTruthy();
   });
 
   it("sub!", async () => {
@@ -322,8 +330,9 @@ describe("TestRakeFileList", () => {
   });
 
   it("filelist ext", async () => {
-    const fl = await FileList.get("one.net", ".one").ext("c");
-    expect(await fl.equals(FileList.get("one.c", ".one.c"))).toBe(true);
+    expect(await FileList.get("one.c", ".one.c").toA()).toEqual(
+      await (await FileList.get("one.net", ".one").ext("c")).toA(),
+    );
   });
 
   it("gsub", async () => {
@@ -369,7 +378,7 @@ describe("TestRakeFileList", () => {
       files.egrep(
         /XYZZY/,
         block(() => {
-          throw new Error("_EGREP_FAILURE_");
+          throw new RuntimeError("_EGREP_FAILURE_");
         }),
       ),
     );
@@ -379,7 +388,7 @@ describe("TestRakeFileList", () => {
   it("existing", async () => {
     const fl = FileList.get("*c.c", "notthere.c", "a*.c");
     expect(await (await fl.existing()).toA()).toEqual(["abc.c"]);
-    expect((await fl.existing()) instanceof FileList).toBe(true);
+    expect((await fl.existing()) instanceof FileList).toBeTruthy();
   });
 
   it("existing!", async () => {
@@ -391,40 +400,45 @@ describe("TestRakeFileList", () => {
 
   it("ignore special", async () => {
     const f = FileList.get("*");
-    for (const fn of ["CVS", ".svn", ".dummy", "x.bak", "x~", "core"]) {
-      expect(await f.isInclude(fn)).toBe(false);
-    }
+    expect(!(await f.isInclude("CVS"))).toBeTruthy();
+    expect(!(await f.isInclude(".svn"))).toBeTruthy();
+    expect(!(await f.isInclude(".dummy"))).toBeTruthy();
+    expect(!(await f.isInclude("x.bak"))).toBeTruthy();
+    expect(!(await f.isInclude("x~"))).toBeTruthy();
+    expect(!(await f.isInclude("core"))).toBeTruthy();
   });
 
   it("clear ignore patterns", async () => {
     const f = FileList.get("*", ".svn");
     f.clearExclude();
-    for (const fn of ["abc.c", "xyz.c", "CVS", ".svn", "x.bak", "x~"]) {
-      expect(await f.isInclude(fn)).toBe(true);
-    }
+    expect(await f.isInclude("abc.c")).toBeTruthy();
+    expect(await f.isInclude("xyz.c")).toBeTruthy();
+    expect(await f.isInclude("CVS")).toBeTruthy();
+    expect(await f.isInclude(".svn")).toBeTruthy();
+    expect(await f.isInclude("x.bak")).toBeTruthy();
+    expect(await f.isInclude("x~")).toBeTruthy();
   });
 
   it("exclude with alternate file seps", async () => {
     const fl = new FileList();
-    for (const fn of ["x/CVS/y", "x\\CVS\\y", "x/.svn/y", "x\\.svn\\y", "x/core", "x\\core"]) {
-      expect(await fl.isExcludedFromList(fn)).toBe(true);
-    }
+    expect(await fl.isExcludedFromList("x/CVS/y")).toBeTruthy();
+    expect(await fl.isExcludedFromList("x\\CVS\\y")).toBeTruthy();
+    expect(await fl.isExcludedFromList("x/.svn/y")).toBeTruthy();
+    expect(await fl.isExcludedFromList("x\\.svn\\y")).toBeTruthy();
+    expect(await fl.isExcludedFromList("x/core")).toBeTruthy();
+    expect(await fl.isExcludedFromList("x\\core")).toBeTruthy();
   });
 
   it("add default exclude list", async () => {
     const fl = new FileList();
     await fl.exclude(/~\d+$/);
-    for (const fn of [
-      "x/CVS/y",
-      "x\\CVS\\y",
-      "x/.svn/y",
-      "x\\.svn\\y",
-      "x/core",
-      "x\\core",
-      "x/abc~1",
-    ]) {
-      expect(await fl.isExcludedFromList(fn)).toBe(true);
-    }
+    expect(await fl.isExcludedFromList("x/CVS/y")).toBeTruthy();
+    expect(await fl.isExcludedFromList("x\\CVS\\y")).toBeTruthy();
+    expect(await fl.isExcludedFromList("x/.svn/y")).toBeTruthy();
+    expect(await fl.isExcludedFromList("x\\.svn\\y")).toBeTruthy();
+    expect(await fl.isExcludedFromList("x/core")).toBeTruthy();
+    expect(await fl.isExcludedFromList("x\\core")).toBeTruthy();
+    expect(await fl.isExcludedFromList("x/abc~1")).toBeTruthy();
   });
 
   it("basic array functions", async () => {
@@ -475,71 +489,137 @@ describe("TestRakeFileList", () => {
 
   it("array comparisons", async () => {
     const fl = FileList.get("b", "b");
-    expect(await fl.compare(["b", "a"])).toEqual(1);
-    expect(await fl.compare(["b", "b"])).toEqual(0);
-    expect(await fl.compare(["b", "c"])).toEqual(-1);
+    const a = ["b", "a"];
+    const b = ["b", "b"];
+    const c = ["b", "c"];
+    expect(await fl.compare(a)).toEqual(1);
+    expect(await fl.compare(b)).toEqual(0);
+    expect(await fl.compare(c)).toEqual(-1);
+    expect(await new FileList().import(a).compare(fl)).toEqual(-1);
+    expect(await new FileList().import(b).compare(fl)).toEqual(0);
+    expect(await new FileList().import(c).compare(fl)).toEqual(1);
   });
 
   it("array equality", async () => {
     const a = FileList.get("a", "b");
     const b = ["a", "b"];
-    expect(await a.equals(b)).toBe(true);
-    expect(a).not.toBe(b);
+    expect(await a.equals(b)).toBeTruthy();
+    expect(rbEqual(b, await a.toA())).toBeTruthy();
+    expect(!Object.is(a, b)).toBeTruthy();
+    expect(!Object.is(b, a)).toBeTruthy();
   });
 
   it("enumeration methods", async () => {
     const a = FileList.get("a", "b");
-    const check = async (fl: FileList, expected: string[]) => {
-      expect(await fl.toA()).toEqual(expected);
-      expect(fl.constructor).toBe(FileList);
-    };
-    await check(await a.map((it) => it.toUpperCase()), ["A", "B"]);
-    await check(await a.sort(), ["a", "b"]);
-    await check(await a.sortBy((it) => it), ["a", "b"]);
-    await check(await a.select((it) => it === "b"), ["b"]);
-    await check(await a.select((it) => it.length === 1), ["a", "b"]);
-    await check(await a.reject((it) => it === "b"), ["a"]);
-    await check(await a.grep(/./), ["a", "b"]);
-    const [yes, no] = await a.partition((it) => it === "b");
-    await check(yes, ["b"]);
-    await check(no, ["a"]);
-    expect(await a.zip(["x", "y"])).toEqual([
+    let b: FileList;
+
+    b = await a.map((it) => it.toUpperCase());
+    expect(await b.toA()).toEqual(["A", "B"]);
+    expect(b.constructor).toEqual(FileList);
+
+    b = await a.map((it) => it.toUpperCase());
+    expect(await b.toA()).toEqual(["A", "B"]);
+    expect(b.constructor).toEqual(FileList);
+
+    b = await a.sort();
+    expect(await b.toA()).toEqual(["a", "b"]);
+    expect(b.constructor).toEqual(FileList);
+
+    b = await a.sortBy((it) => it);
+    expect(await b.toA()).toEqual(["a", "b"]);
+    expect(b.constructor).toEqual(FileList);
+
+    b = await a.select((it) => it === "b");
+    expect(await b.toA()).toEqual(["b"]);
+    expect(b.constructor).toEqual(FileList);
+
+    b = await a.select((it) => it.length === 1);
+    expect(await b.toA()).toEqual(["a", "b"]);
+    expect(b.constructor).toEqual(FileList);
+
+    b = await a.reject((it) => it === "b");
+    expect(await b.toA()).toEqual(["a"]);
+    expect(b.constructor).toEqual(FileList);
+
+    b = await a.grep(/./);
+    expect(await b.toA()).toEqual(["a", "b"]);
+    expect(b.constructor).toEqual(FileList);
+
+    const p = await a.partition((it) => it === "b");
+    expect([await p[0].toA(), await p[1].toA()]).toEqual([["b"], ["a"]]);
+    expect(p.constructor).toEqual(Array);
+    expect(p[0].constructor).toEqual(FileList);
+    expect(p[1].constructor).toEqual(FileList);
+
+    const z = await a.zip(["x", "y"]);
+    expect(z).toEqual([
       ["a", "x"],
       ["b", "y"],
     ]);
+    expect(z.constructor).toEqual(Array);
+    expect((z[0] as unknown[]).constructor).toEqual(Array);
+    expect((z[1] as unknown[]).constructor).toEqual(Array);
   });
 
   it("array operators", async () => {
+    const a = ["a", "b"];
+    const b = ["c", "d"];
     const f = FileList.get("x", "y");
     const g = FileList.get("w", "z");
+
     let r = await f.plus(g);
     expect(await r.toA()).toEqual(["x", "y", "w", "z"]);
-    expect(r.constructor).toBe(FileList);
-    r = await f.plus(["c", "d"]);
+    expect(r.constructor).toEqual(FileList);
+
+    const r2 = [...a, ...(await g.toA())];
+    expect(r2).toEqual(["a", "b", "w", "z"]);
+    expect(r2.constructor).toEqual(Array);
+
+    r = await f.plus(b);
     expect(await r.toA()).toEqual(["x", "y", "c", "d"]);
+    expect(r.constructor).toEqual(FileList);
+
     r = await FileList.get("w", "x", "y", "z").minus(f);
     expect(await r.toA()).toEqual(["w", "z"]);
+    expect(r.constructor).toEqual(FileList);
+
     r = await FileList.get("w", "x", "y", "z").and(f);
     expect(await r.toA()).toEqual(["x", "y"]);
-    expect(await (f.multiply(2) as FileList).toA()).toEqual(["x", "y", "x", "y"]);
-    expect(f.multiply(",")).toEqual("x,y");
+    expect(r.constructor).toEqual(FileList);
+
+    r = f.multiply(2) as FileList;
+    expect(await r.toA()).toEqual(["x", "y", "x", "y"]);
+    expect(r.constructor).toEqual(FileList);
+
+    const r3 = f.multiply(",");
+    expect(r3).toEqual("x,y");
+    expect(r3.constructor).toEqual(String);
+
     r = await f.or(["a", "x"]);
     expect(await sorted(r)).toEqual(["a", "x", "y"]);
+    expect(r.constructor).toEqual(FileList);
   });
 
   it("other array returning methods", async () => {
     let r = await FileList.get("a", null, "b").compact();
     expect(await r.toA()).toEqual(["a", "b"]);
-    expect(r.constructor).toBe(FileList);
+    expect(r.constructor).toEqual(FileList);
+
     r = await FileList.get("a", "b").concat(["x", "y"]);
     expect(await r.toA()).toEqual(["a", "b", "x", "y"]);
-    expect(r.constructor).toBe(FileList);
+    expect(r.constructor).toEqual(FileList);
+
     r = await FileList.get("a", ["b", "c"], FileList.get("d", "e")).flatten();
     expect(await r.toA()).toEqual(["a", "b", "c", "d", "e"]);
+    expect(r.constructor).toEqual(FileList);
+
     r = await FileList.get("a", "b", "a").uniq();
     expect(await r.toA()).toEqual(["a", "b"]);
+    expect(r.constructor).toEqual(FileList);
+
     r = await FileList.get("a", "b", "c", "d").valuesAt(1, 3);
     expect(await r.toA()).toEqual(["b", "d"]);
+    expect(r.constructor).toEqual(FileList);
   });
 
   it("special return delegating methods object type", async () => {
@@ -555,8 +635,8 @@ describe("TestRakeFileList", () => {
 
   it("file utils can use filelists", async () => {
     await FileUtils.cpAsync((await FileList.get("*.c").toA()) as string[], cdir);
-    expect(await File.isExistAsync(File.join(cdir, "abc.c"))).toBe(true);
-    expect(await File.isExistAsync(File.join(cdir, "xyz.c"))).toBe(true);
-    expect(await File.isExistAsync(File.join(cdir, "x.c"))).toBe(true);
+    expect(await File.isExistAsync(File.join(cdir, "abc.c"))).toBeTruthy();
+    expect(await File.isExistAsync(File.join(cdir, "xyz.c"))).toBeTruthy();
+    expect(await File.isExistAsync(File.join(cdir, "x.c"))).toBeTruthy();
   });
 });

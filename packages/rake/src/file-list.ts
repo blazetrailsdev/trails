@@ -1,5 +1,6 @@
 import {
   Dir,
+  StandardError,
   File,
   FrozenError,
   flatten,
@@ -7,6 +8,7 @@ import {
   puts,
   rbBlockGivenP,
   rbCheckArrayType,
+  rbEqual,
   rbInspect,
   rbStrSub,
   rtest,
@@ -22,6 +24,12 @@ import { fromPathname } from "./rake-module.js";
 
 type Items = unknown[];
 type ElementBlock = (fn: string) => unknown;
+
+async function filterBy(items: Items, block: ElementBlock, keep: boolean): Promise<Items> {
+  const result: Items = [];
+  for (const fn of items) if (rtest(await block(fn as string)) === keep) result.push(fn);
+  return result;
+}
 
 const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> = {
   size: (items) => items.length,
@@ -50,8 +58,8 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     for (const [i, fn] of items.entries()) await block(fn as string, i);
     return items;
   },
-  rejectBang: (items, block: ElementBlock) => {
-    const kept = items.filter((fn) => !rtest(block(fn as string)));
+  rejectBang: async (items, block: ElementBlock) => {
+    const kept = await filterBy(items, block, false);
     if (kept.length === items.length) return null;
     items.splice(0, items.length, ...kept);
     return items;
@@ -63,25 +71,51 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     items.splice(0, items.length, ...kept);
     return items;
   },
-  inspect: (items) => rbInspect(items),
-  compare: (items, other: Items) => {
-    for (let i = 0; i < Math.min(items.length, other.length); i++) {
-      if (items[i] !== other[i]) return (items[i] as string) < (other[i] as string) ? -1 : 1;
-    }
-    return Math.sign(items.length - other.length);
+  map: async (items, block: ElementBlock) => {
+    const result: Items = [];
+    for (const fn of items) result.push(await block(fn as string));
+    return result;
   },
-  map: (items, block: ElementBlock) => items.map((fn) => block(fn as string)),
-  collect: (items, block: ElementBlock) => items.map((fn) => block(fn as string)),
+  collect: async (items, block: ElementBlock) => {
+    const result: Items = [];
+    for (const fn of items) result.push(await block(fn as string));
+    return result;
+  },
   sort: (items) => [...items].sort(),
   sortBy: (items, block: ElementBlock) => sortBy(items as string[], block),
-  select: (items, block: ElementBlock) => items.filter((fn) => rtest(block(fn as string))),
-  findAll: (items, block: ElementBlock) => items.filter((fn) => rtest(block(fn as string))),
-  reject: (items, block: ElementBlock) => items.filter((fn) => !rtest(block(fn as string))),
+  select: (items, block: ElementBlock) => filterBy(items, block, true),
+  findAll: (items, block: ElementBlock) => filterBy(items, block, true),
+  reject: (items, block: ElementBlock) => filterBy(items, block, false),
   grep: (items, pattern: RegExp) => items.filter((fn) => pattern.test(fn as string)),
   compact: (items) => items.filter((fn) => fn != null),
   flatten: (items) => flatten(items),
   uniq: (items) => uniq(items),
   valuesAt: (items, ...selectors: number[]) => selectors.map((i) => items.at(i) ?? null),
+  partition: async (items, block: ElementBlock) => [
+    await filterBy(items, block, true),
+    await filterBy(items, block, false),
+  ],
+  toA: (items) => items,
+  toAry: (items) => items,
+  multiply: (items) => items,
+  append: (items, obj: unknown) => (items.push(obj), items),
+  inject: async (items, memo: unknown, block: (res: unknown, fn: string) => unknown) => {
+    for (const fn of items) memo = await block(memo, fn as string);
+    return memo;
+  },
+  find: (items, block: ElementBlock) => items.find((fn) => rtest(block(fn as string))) ?? null,
+  count: (items) => items.length,
+  isAny: (items) => items.some((fn) => fn != null),
+  min: (items) => [...items].sort()[0] ?? null,
+  max: (items) => [...items].sort().at(-1) ?? null,
+  index: (items, obj: unknown) => (items.includes(obj) ? items.indexOf(obj) : null),
+  delete: (items, obj: unknown) => {
+    const found = items.includes(obj) ? obj : null;
+    items.splice(0, items.length, ...items.filter((fn) => fn !== obj));
+    return found;
+  },
+  take: (items, n: number) => items.slice(0, n),
+  drop: (items, n: number) => items.slice(n),
   plus: (items, other: Items) => [...items, ...other],
   minus: (items, other: Items) => items.filter((fn) => !other.includes(fn)),
   and: (items, other: Items) => uniq(items.filter((fn) => other.includes(fn))),
@@ -117,34 +151,19 @@ export class FileList {
     .filter((sym) => !FileList.MUST_NOT_DEFINE.includes(sym))
     .sort();
   static readonly GLOB_PATTERN = /[*?[{]/;
-  static readonly DEFAULT_IGNORE_PATTERNS: RegExp[] = [
-    /(^|[/\\])CVS([/\\]|$)/,
-    /(^|[/\\])\.svn([/\\]|$)/,
-    /\.bak$/,
-    /~$/,
-  ];
-  static readonly DEFAULT_IGNORE_PROCS: ElementBlock[] = [
-    async (fn) => /(^|[/\\])core$/.test(fn) && !(await File.isDirectoryAsync(fn)),
-  ];
 
   private pendingAdd: unknown[] = [];
   private pending = false;
-  private excludePatterns: unknown[] = [...FileList.DEFAULT_IGNORE_PATTERNS];
-  private excludeProcs: ElementBlock[] = [...FileList.DEFAULT_IGNORE_PROCS];
+  private excludePatterns: unknown[];
+  private excludeProcs: ElementBlock[];
   private items: Items = [];
-
-  static get<T extends typeof FileList>(this: T, ...args: unknown[]): InstanceType<T> {
-    return new this(...args) as InstanceType<T>;
-  }
-
-  static async glob(pattern: string, ...args: [number?]): Promise<string[]> {
-    return (await Dir.globAsync(pattern, ...args)).sort();
-  }
 
   constructor(...patterns: unknown[]) {
     const yieldSelf = rbBlockGivenP(patterns.at(-1))
       ? (patterns.pop() as (fl: this) => void)
       : null;
+    this.excludePatterns = [...FileList.DEFAULT_IGNORE_PATTERNS];
+    this.excludeProcs = [...FileList.DEFAULT_IGNORE_PROCS];
     patterns.forEach((pattern) => this.include(pattern));
     if (yieldSelf) yieldSelf(this);
   }
@@ -189,7 +208,7 @@ export class FileList {
 
   async equals(array: unknown): Promise<boolean> {
     const other = array instanceof FileList ? await array.toAry() : array;
-    return (await this.compare(other as Items)) === 0;
+    return rbEqual(await this.toAry(), other);
   }
 
   async toA(): Promise<Items> {
@@ -244,31 +263,22 @@ export class FileList {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall order:isExcludedFromList,rejectBang — PERMANENT
-   */
+  /** @internal */
   private async resolveExclude(): Promise<this> {
-    const excluded = new Set<unknown>();
-    for (const fn of this.items) {
-      if (await this.isExcludedFromList(fn as string)) excluded.add(fn);
-    }
-    await this.rejectBang((fn) => excluded.has(fn));
+    await this.rejectBang((fn) => this.isExcludedFromList(fn));
     return this;
   }
 
-  async sub(pat: RegExp | string, rep: string): Promise<this> {
-    const res = new (this.constructor as new () => this)();
-    for (const fn of await this.toA())
-      await res.append(rbStrSub({ string: fn as string }, pat, rep));
-    return res;
+  sub(pat: RegExp | string, rep: string): Promise<this> {
+    return this.inject(new (this.constructor as new () => this)(), (res, fn) =>
+      (res as this).append(rbStrSub({ string: fn }, pat, rep)),
+    ) as Promise<this>;
   }
 
-  async gsub(pat: RegExp | string, rep: string): Promise<this> {
-    const res = new (this.constructor as new () => this)();
-    for (const fn of await this.toA())
-      await res.append(strGsub({ string: fn as string }, [pat, rep], false));
-    return res;
+  gsub(pat: RegExp | string, rep: string): Promise<this> {
+    return this.inject(new (this.constructor as new () => this)(), (res, fn) =>
+      (res as this).append(strGsub({ string: fn }, [pat, rep], false)),
+    ) as Promise<this>;
   }
 
   async subBang(pat: RegExp | string, rep: string): Promise<this> {
@@ -289,6 +299,7 @@ export class FileList {
     return this.collect((fn) => stringExt(fn, newext));
   }
 
+  /** @missingRailsArgs open — PERMANENT */
   async egrep(pattern: RegExp, ...options: unknown[]): Promise<number> {
     const yieldBlock = rbBlockGivenP(options.at(-1))
       ? (options.pop() as (fn: string, count: number, line: string) => unknown)
@@ -299,7 +310,7 @@ export class FileList {
         let count = 0;
         for (const line of (await File.readAsync(fn)).match(/[^\n]*\n|[^\n]+$/g) ?? []) {
           count += 1;
-          if (pattern.test(line)) {
+          if (line.search(pattern) !== -1) {
             matched += 1;
             if (yieldBlock) {
               await yieldBlock(fn, count, line);
@@ -309,32 +320,29 @@ export class FileList {
           }
         }
       } catch (ex) {
-        puts.call($stderr, `Error while processing '${fn}': ${(ex as Error).message}`);
+        if (!(ex instanceof StandardError)) throw ex;
+        puts.call($stderr, `Error while processing '${fn}': ${ex.message}`);
       }
     });
     return matched;
   }
 
-  /** @missingRailsCall select — PERMANENT */
   async existing(): Promise<this> {
-    const found: Items = [];
-    for (const fn of await this.toA()) if (await File.isExistAsync(fn as string)) found.push(fn);
-    return new (this.constructor as new () => this)().import(uniq(found));
+    return (await this.select((fn) => File.isExistAsync(fn))).uniq();
   }
 
-  /** @missingRailsCall select — PERMANENT */
   async existingBang(): Promise<this> {
     await this.resolve();
-    const found: Items = [];
-    for (const fn of this.items) if (await File.isExistAsync(fn as string)) found.push(fn);
-    this.items = uniq(found);
+    this.items = uniq(
+      (await ARRAY_CALLS.select(this.items, ((fn: string) =>
+        File.isExistAsync(fn)) as never)) as Items,
+    );
     return this;
   }
 
   async partition(block: ElementBlock): Promise<[this, this]> {
     await this.resolve();
-    const result: [Items, Items] = [[], []];
-    for (const fn of this.items) result[rtest(block(fn as string)) ? 0 : 1].push(fn);
+    const result = (await ARRAY_CALLS.partition(this.items, block as never)) as [Items, Items];
     return [
       new (this.constructor as new () => this)().import(result[0]),
       new (this.constructor as new () => this)().import(result[1]),
@@ -369,9 +377,27 @@ export class FileList {
     return false;
   }
 
+  static readonly DEFAULT_IGNORE_PATTERNS: RegExp[] = [
+    /(^|[/\\])CVS([/\\]|$)/,
+    /(^|[/\\])\.svn([/\\]|$)/,
+    /\.bak$/,
+    /~$/,
+  ];
+  static readonly DEFAULT_IGNORE_PROCS: ElementBlock[] = [
+    async (fn) => /(^|[/\\])core$/.test(fn) && !(await File.isDirectoryAsync(fn)),
+  ];
+
   import(array: Items): this {
     this.items = array;
     return this;
+  }
+
+  static get<T extends typeof FileList>(this: T, ...args: unknown[]): InstanceType<T> {
+    return new this(...args) as InstanceType<T>;
+  }
+
+  static async glob(pattern: string, ...args: [number?]): Promise<string[]> {
+    return (await Dir.globAsync(pattern, ...args)).sort();
   }
 }
 
@@ -416,14 +442,37 @@ export interface FileList {
   flatten(): Promise<this>;
   uniq(): Promise<this>;
   valuesAt(...selectors: number[]): Promise<this>;
+  inject(memo: unknown, block: (res: unknown, fn: string) => unknown): Promise<unknown>;
+  find(block: ElementBlock): Promise<string | null>;
+  count(): Promise<number>;
+  isAny(): Promise<boolean>;
+  min(): Promise<string | null>;
+  max(): Promise<string | null>;
+  index(obj: unknown): Promise<number | null>;
+  delete(obj: unknown): Promise<unknown>;
+  take(n: number): Promise<Items>;
+  drop(n: number): Promise<Items>;
   plus(other: unknown): Promise<this>;
   minus(other: unknown): Promise<this>;
   and(other: unknown): Promise<this>;
   or(other: unknown): Promise<this>;
 }
 
+const MUST_DEFINE_CALLS: typeof ARRAY_CALLS = {
+  inspect: (items) => rbInspect(items),
+  compare: (items, other: Items) => {
+    for (let i = 0; i < Math.min(items.length, other.length); i++) {
+      if (items[i] !== other[i]) return (items[i] as string) < (other[i] as string) ? -1 : 1;
+    }
+    return Math.sign(items.length - other.length);
+  },
+};
+
 for (const sym of FileList.DELEGATING_METHODS) {
-  const call = ARRAY_CALLS[sym] as (items: Items, ...args: unknown[]) => unknown;
+  const call = (ARRAY_CALLS[sym] ?? MUST_DEFINE_CALLS[sym]) as (
+    items: Items,
+    ...args: unknown[]
+  ) => unknown;
   const special = FileList.SPECIAL_RETURN.includes(sym);
   Object.defineProperty(FileList.prototype, sym, {
     writable: true,
@@ -431,7 +480,7 @@ for (const sym of FileList.DELEGATING_METHODS) {
     async value(this: FileList, ...args: unknown[]) {
       const items = await this.toA();
       for (const [i, arg] of args.entries()) {
-        if (arg instanceof FileList) args[i] = await arg.toAry();
+        if (arg instanceof FileList && sym !== "inject") args[i] = await arg.toAry();
       }
       const result = await call(items, ...args);
       if (special) return new (this.constructor as typeof FileList)().import(result as Items);

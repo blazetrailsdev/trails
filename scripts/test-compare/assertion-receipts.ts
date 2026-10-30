@@ -31,6 +31,22 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "rake:test_rake_file_list.rb › TestRakeFileList › string ext": [
+    {
+      kind: "assert_equal",
+      value: "s:one.x\\two.net",
+      as: null,
+      reason:
+        "test_rake_file_list.rb:353-356 runs only under `Rake::Win32.windows?`; `win32.rb` is a non-goal of RFC 0211, so the arm has no port.",
+    },
+    {
+      kind: "assert_equal",
+      value: "s:one.x\\two.net",
+      as: null,
+      reason:
+        "test_rake_file_list.rb:353-356 runs only under `Rake::Win32.windows?`; `win32.rb` is a non-goal of RFC 0211, so the arm has no port.",
+    },
+  ],
   "rake:test_rake_linked_list.rb › TestLinkedList › conversion with inspect": [
     {
       kind: "assert_equal",

@@ -83,13 +83,12 @@ export class Task {
     }
   }
 
-  /** @missingRailsCall map — PERMANENT */
   async prerequisiteTasks(): Promise<Task[]> {
-    const tasks: Task[] = [];
-    for (const pre of [...this.prerequisites, ...this.orderOnlyPrerequisites]) {
-      tasks.push(await this.lookupPrerequisite(pre));
-    }
-    return tasks;
+    return Promise.all(
+      [...this.prerequisites, ...this.orderOnlyPrerequisites].map((pre) =>
+        this.lookupPrerequisite(pre),
+      ),
+    );
   }
 
   /** @internal */
@@ -349,7 +348,6 @@ export class Task {
     return (this._argNames = args.map((a) => String(a)));
   }
 
-  /** @missingRailsCall map — PERMANENT */
   async investigation(): Promise<string> {
     let result = "------------------------------\n";
     result += `Investigating ${this.name}\n`;
@@ -363,9 +361,9 @@ export class Task {
     for (const [p, timestamp] of prereqs) {
       result += `--${p.name} (${_timeToS(timestamp)})\n`;
     }
-    const timestamps: Timestamp[] = [];
-    for (const p of await this.prerequisiteTasks()) timestamps.push(await p.timestamp());
-    const latestPrereq = max(timestamps);
+    const latestPrereq = max(
+      await Promise.all((await this.prerequisiteTasks()).map((p) => p.timestamp())),
+    );
     result += `latest-prerequisite time: ${latestPrereq ? _timeToS(latestPrereq) : ""}\n`;
     result += "................................\n\n";
     return result;
