@@ -524,11 +524,9 @@ export class SMTP {
         if ((err as ConnectionError).code === "ETIMEDOUT") {
           throw new OpenTimeout("execution expired");
         }
-        if ((err as ConnectionError).code === "ETLS" && this.isStarttlsAlways()) {
-          this.doHelo(heloDomain);
-          if (!this.isCapableStarttls()) {
-            throw new SMTPUnsupportedCommand("STARTTLS is not supported on this server");
-          }
+        const capable = s._ehloLines?.includes("STARTTLS");
+        if ((err as ConnectionError).code === "ETLS" && this.isStarttlsAlways() && !capable) {
+          throw new SMTPUnsupportedCommand("STARTTLS is not supported on this server");
         }
         _rethrow(err as ConnectionError);
       }
