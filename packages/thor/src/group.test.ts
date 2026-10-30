@@ -59,21 +59,30 @@ describe("Thor::Group", () => {
 
     it("raises when an exception happens within the command call", async () => {
       await expect(BrokenCounter.start(["1", "2", "--fail"])).rejects.toThrow(
-        /this_method_does_not_exist/,
+        expect.objectContaining({
+          constructor: TypeError,
+          message: expect.stringMatching(/this_method_does_not_exist/),
+        }),
       );
     });
 
     it("raises an error when a Thor group command expects arguments", async () => {
       await expect(WhinyGenerator.start()).rejects.toThrow(
-        /thor wrong_arity takes 1 argument, but it should not/,
+        expect.objectContaining({
+          constructor: ArgumentError,
+          message: expect.stringMatching(/thor wrong_arity takes 1 argument, but it should not/),
+        }),
       );
     });
 
     it("invokes help message if any of the shortcuts are given", async () => {
       const help = vi.spyOn(MyCounter, "help").mockImplementation(() => {});
-      await MyCounter.start(["-h"]);
-      expect(help).toHaveBeenCalled();
-      help.mockRestore();
+      try {
+        await MyCounter.start(["-h"]);
+        expect(help).toHaveBeenCalled();
+      } finally {
+        help.mockRestore();
+      }
     });
   });
 
