@@ -27,7 +27,9 @@ describe("Base64", () => {
   });
 
   it("decode64 round-trips strictEncode64", () => {
-    expect(Base64.decode64(Base64.strictEncode64("\x80\xff:ok"))).toBe("\x80\xff:ok");
+    expect(
+      Base64.decode64(Base64.strictEncode64(Uint8Array.of(0x80, 0xff, 0x3a, 0x6f, 0x6b))),
+    ).toBe("\x80\xff:ok");
   });
 
   it("strict_decode64 decodes padded input and raises ArgumentError for malformed input", () => {
@@ -41,16 +43,20 @@ describe("Base64", () => {
   });
 
   it("urlsafe_encode64 maps the URL-safe alphabet and drops padding on request", () => {
-    expect(Base64.urlsafeEncode64("\xfb\xef\xbe")).toBe("----");
-    expect(Base64.urlsafeEncode64("\xff\xff\xff")).toBe("____");
+    expect(Base64.urlsafeEncode64(Uint8Array.of(0xfb, 0xef, 0xbe))).toBe("----");
+    expect(Base64.urlsafeEncode64(Uint8Array.of(0xff, 0xff, 0xff))).toBe("____");
     expect(Base64.urlsafeEncode64("*")).toBe("Kg==");
     expect(Base64.urlsafeEncode64("*", { padding: false })).toBe("Kg");
     expect(Base64.urlsafeEncode64("12345", { padding: false })).toBe("MTIzNDU");
     expect(Base64.urlsafeEncode64("123", { padding: false })).toBe("MTIz");
     expect(Base64.urlsafeEncode64("12345")).toBe("MTIzNDU=");
-    expect(Base64.urlsafeEncode64("\x00\x7f\x80\xff")).toBe("AH-A_w==");
-    expect(Base64.urlsafeEncode64("\x00\x7f\x80\xff", { padding: false })).toBe("AH-A_w");
-    expect(Base64.urlsafeEncode64("\x80\xff\xfe\xfd\xfc", { padding: false })).toBe("gP_-_fw");
+    expect(Base64.urlsafeEncode64(Uint8Array.of(0x00, 0x7f, 0x80, 0xff))).toBe("AH-A_w==");
+    expect(Base64.urlsafeEncode64(Uint8Array.of(0x00, 0x7f, 0x80, 0xff), { padding: false })).toBe(
+      "AH-A_w",
+    );
+    expect(
+      Base64.urlsafeEncode64(Uint8Array.of(0x80, 0xff, 0xfe, 0xfd, 0xfc), { padding: false }),
+    ).toBe("gP_-_fw");
   });
 
   it("urlsafe_decode64 pads unpadded input and maps the URL-safe alphabet", () => {

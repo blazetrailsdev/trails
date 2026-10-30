@@ -1,5 +1,4 @@
 import {
-  b,
   Encoding,
   isAsciiOnly,
   isEmpty,
@@ -88,8 +87,7 @@ export const Utilities = {
     return unpack(str, "m")[0] as Uint8Array;
   },
 
-  /** @inventedArm b — CONVERGEABLE ruby-compat-pack-m-reads-utf8-bytes */
   encodeBase64(str: string | Uint8Array): string {
-    return pack([b(str)], "m");
+    return pack([str], "m");
   },
 };

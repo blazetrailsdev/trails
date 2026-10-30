@@ -312,11 +312,7 @@ export function pack(
     const from = nextfrom() as string | Uint8Array;
     let s: Uint8Array;
     if (from instanceof Uint8Array) s = from;
-    else if (type === "u") s = b(from);
-    else {
-      s = new Uint8Array(from.length);
-      for (let i = 0; i < from.length; i++) s[i] = from.charCodeAt(i) & 0xff;
-    }
+    else s = b(from);
     let ptr = 0;
     let plen = s.length;
 

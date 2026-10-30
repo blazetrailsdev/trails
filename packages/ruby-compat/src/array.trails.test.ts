@@ -81,10 +81,11 @@ describe("Array#pack", () => {
     expect(pack([""], "m0")).toBe("");
   });
 
-  it("encodes bytes 0x80..0xff rather than UTF-8-expanding them", () => {
-    expect(pack(["\x00\x7f\x80\xff"], "m0")).toBe("AH+A/w==");
-    expect(pack(["\x80\xff"], "m0")).toBe("gP8=");
-    expect(pack(["\xc3\xbf"], "m0")).toBe("w78=");
+  it("encodes a Uint8Array's bytes and a string's UTF-8 bytes", () => {
+    expect(pack([Uint8Array.of(0x00, 0x7f, 0x80, 0xff)], "m0")).toBe("AH+A/w==");
+    expect(pack([Uint8Array.of(0x80, 0xff)], "m0")).toBe("gP8=");
+    expect(pack(["\xff"], "m0")).toBe("w78=");
+    expect(pack(["café ☃"], "m")).toBe("Y2Fmw6kg4piD\n");
   });
 
   it("packs the HTTP Basic credential Rack::Test builds", () => {
