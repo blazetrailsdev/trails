@@ -576,7 +576,8 @@ describe("ReflectionTest", () => {
       HasManyThroughSourceAssociationNotFoundError,
     );
   });
-  it("name error from incidental code is not converted to name error for association", async () => {
+  // PERMANENT-SKIP: computeType reads the registerModel registry, so a model's constMissing is not consulted (CLAUDE.md, "Constant lookup is an import or a registry").
+  it.skip("name error from incidental code is not converted to name error for association", async () => {
     const stubbed = UserWithInvalidRelation as unknown as { constMissing?: () => never };
     stubbed.constMissing = () => {
       throw new NameError("undefined local variable or method 'oops' for main:Object", "oops");
@@ -604,7 +605,8 @@ describe("ReflectionTest", () => {
     ) as typeof reflection;
     expect(dup.hasInverse()).toBeFalsy();
   });
-  it("automatic inverse does not suppress name error from incidental code", async () => {
+  // PERMANENT-SKIP: computeType reads the registerModel registry, so a model's constMissing is not consulted (CLAUDE.md, "Constant lookup is an import or a registry").
+  it.skip("automatic inverse does not suppress name error from incidental code", async () => {
     const stubbed = UserWithInvalidRelation as unknown as { constMissing?: () => never };
     stubbed.constMissing = () => {
       throw new NameError("undefined local variable or method 'oops' for main:Object", "oops");
@@ -777,7 +779,8 @@ describe("ReflectionTest", () => {
     expect(error.message).not.toMatch(":class_name");
   });
 
-  it("reflection klass requires ar subclass", async () => {
+  // PERMANENT-SKIP: computeType reads the registerModel registry, so a non-model class_name is not resolved (CLAUDE.md, "Constant lookup is an import or a registry").
+  it.skip("reflection klass requires ar subclass", async () => {
     for (const rel of [
       "accountInvalid",
       "accountClassName",
