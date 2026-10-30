@@ -1,4 +1,11 @@
-import { File, include, puts, rbObjRespondTo, stdout as $stdout } from "@blazetrails/ruby-compat";
+import {
+  File,
+  hashAref,
+  include,
+  puts,
+  rbObjRespondTo,
+  stdout as $stdout,
+} from "@blazetrails/ruby-compat";
 import { Actions } from "../../actions.js";
 import { Group, type GroupClass } from "../../group.js";
 import type { ThorClass } from "../../thor.js";
@@ -134,7 +141,7 @@ export class BrokenCounter extends MyCounter {
   }
 
   override one(): unknown {
-    return this.options["first"];
+    return hashAref(this.options, "first");
   }
 
   override four(): unknown {

@@ -170,6 +170,9 @@ function classInstanceMethodList(obj: unknown, recur: boolean): string[] {
     for (const mid of Object.getOwnPropertyNames(mod)) {
       const me = Object.getOwnPropertyDescriptor(mod, mid)!;
       if (mid !== "constructor" && typeof me.value === "function") list.add(mid);
+      if (mid === "__proto__") continue;
+      if (me.get) list.add(mid);
+      if (me.set) list.add(`${mid}=`);
     }
     const particularClass = mod === obj || Object.hasOwn(mod, FL_SINGLETON);
     if (!recur && !particularClass) break;

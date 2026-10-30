@@ -24,11 +24,11 @@ export class MyScript extends Thor {
 
   static {
     const klass = this as unknown as ThorClass;
-    klass.attrAccessor("someAttribute");
-    klass.attrWriter("anotherAttribute");
-    klass.attrReader("anotherAttribute");
+    klass.attrAccessor("some_attribute");
+    klass.attrWriter("another_attribute");
+    klass.attrReader("another_attribute");
 
-    klass.attrReader("privateAttribute");
+    klass.attrReader("private_attribute");
 
     klass.group("script");
     klass.defaultCommand(":example_default_command");
