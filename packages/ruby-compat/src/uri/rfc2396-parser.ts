@@ -1,3 +1,4 @@
+import { strNew } from "../string/bytes.js";
 import { ArgumentError } from "../argument-error.js";
 import { regexpEscape } from "../regexp.js";
 import { b } from "../string/b.js";
@@ -169,7 +170,7 @@ export class RFC2396Parser {
       last = m.index + m[0].length;
     }
     for (const uc of encoder.encode(str.slice(last))) bytes.push(uc);
-    return new TextDecoder().decode(new Uint8Array(bytes));
+    return strNew(bytes);
   }
 
   /** `initialize_pattern` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:338`). */

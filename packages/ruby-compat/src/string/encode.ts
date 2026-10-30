@@ -41,7 +41,8 @@ function dump(b: number[]): string {
  * given (`transcode.c:2772-2783`) and returned as it is otherwise; ASCII-8BIT
  * and ISO-8859-1 hold no invalid byte, so their scrub is the receiver. The
  * converters here are the ones between UTF-8, US-ASCII, ASCII-8BIT and
- * ISO-8859-1; any other pair raises `Encoding::ConverterNotFoundError`, as
+ * ISO-8859-1, from any encoding `TextDecoder` has a label for, or UTF-32, to
+ * those through UTF-8, and from UTF-8 to UTF-16BE; any other pair raises `Encoding::ConverterNotFoundError`, as
  * `rb_econv_open_exc` (`transcode.c:2097`) does for a pair MRI has no
  * transcoder for.
  *
@@ -73,6 +74,43 @@ export function encode(
     return str;
   }
   const unicode = (enc: Encoding): boolean => enc === Encoding.UTF_8;
+  const decodeLegacy = (str: Uint8Array): string | null => {
+    if (senc.name === "UTF-32BE" || senc.name === "UTF-32LE") {
+      const view = new DataView(str.buffer, str.byteOffset, str.byteLength);
+      let text = "";
+      for (let i = 0; i < str.length; i += 4) {
+        const c = i + 4 <= str.length ? view.getUint32(i, senc.name === "UTF-32LE") : 0x110000;
+        if (c <= 0x10ffff && !(c >= 0xd800 && c <= 0xdfff)) {
+          text += String.fromCodePoint(c);
+        } else if (invalidReplace) {
+          text += "\ufffd";
+        } else {
+          throw invalidByteSequence(Array.from(str), i, 4, senc, denc);
+        }
+      }
+      return text;
+    }
+    if (senc.decoderLabel === null) return null;
+    try {
+      return new TextDecoder(senc.decoderLabel, { fatal: !invalidReplace, ignoreBOM: true }).decode(
+        str,
+      );
+    } catch {
+      throw invalidByteSequence(Array.from(str), 0, 1, senc, denc);
+    }
+  };
+  if (typeof str !== "string" && !unicode(senc) && !(senc.name in SINGLE_BYTE)) {
+    const text = decodeLegacy(str);
+    if (text !== null) return unicode(denc) ? text : encode(text, denc, opts);
+  }
+  if (typeof str === "string" && denc.name === "UTF-16BE") {
+    const dest = new Uint8Array(str.length * 2);
+    for (let i = 0; i < str.length; i++) {
+      dest[2 * i] = str.charCodeAt(i) >> 8;
+      dest[2 * i + 1] = str.charCodeAt(i) & 0xff;
+    }
+    return forceEncoding(dest, denc);
+  }
   if (
     !(unicode(senc) || senc.name in SINGLE_BYTE) ||
     !(unicode(denc) || denc.name in SINGLE_BYTE)
