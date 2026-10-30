@@ -28,7 +28,7 @@ export const Rake: {
 
   /**
    * @inventedArm availableParallelism — PERMANENT
-   * @missingRailsCall count — PERMANENT
+   * @missingRailsCall count — CONVERGEABLE rake-cpu-counter-port
    */
   suggestedThreadCount() {
     _cpuCount ??= getOs().availableParallelism();
