@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   Dir,
   Errno,
@@ -18,7 +18,7 @@ import { Rake } from "./rake-module.js";
 import { captureOutput, useApplicationTestCase } from "./test-helpers/application.js";
 import { VERSION } from "./version.js";
 
-const globals = globalThis as unknown as { TESTING_REQUIRE: number[]; $xyzzy: unknown };
+const globals = globalThis as unknown as { TESTING_REQUIRE: number[] };
 
 describe("TestRakeApplicationOptions", () => {
   const state = useApplicationTestCase();
@@ -28,9 +28,6 @@ describe("TestRakeApplicationOptions", () => {
 
   beforeEach(() => {
     globals.TESTING_REQUIRE = [];
-  });
-  afterEach(() => {
-    delete (globals as Partial<typeof globals>).$xyzzy;
   });
 
   async function commandLine(...options: string[]): Promise<ApplicationOptions> {
@@ -123,36 +120,14 @@ describe("TestRakeApplicationOptions", () => {
     }
   });
 
-  it("execute", async () => {
-    globals.$xyzzy = 0;
-    await flags("--execute=$xyzzy=1", "-e $xyzzy=1", () => {
-      expect(globals.$xyzzy).toBe(1);
-      expect(exited).toBe("exit");
-      globals.$xyzzy = 0;
-    });
-  });
+  // PERMANENT-SKIP: owner ruling on trails#9503, shipped rake has no eval.
+  it.skip("execute", () => {});
 
-  it("execute and continue", async () => {
-    globals.$xyzzy = 0;
-    await flags("--execute-continue=$xyzzy=1", "-E $xyzzy=1", () => {
-      expect(globals.$xyzzy).toBe(1);
-      expect(exited).not.toBe("exit");
-      globals.$xyzzy = 0;
-    });
-  });
+  // PERMANENT-SKIP: owner ruling on trails#9503, shipped rake has no eval.
+  it.skip("execute and continue", () => {});
 
-  it("execute and print", async () => {
-    globals.$xyzzy = 0;
-    const [out] = await captureOutput(() =>
-      flags('--execute-print=$xyzzy="pugh"', '-p $xyzzy="pugh"', () => {
-        expect(globals.$xyzzy).toBe("pugh");
-        expect(exited).toBe("exit");
-        globals.$xyzzy = 0;
-      }),
-    );
-
-    expect(out).toMatch(/^pugh$/m);
-  });
+  // PERMANENT-SKIP: owner ruling on trails#9503, shipped rake has no eval.
+  it.skip("execute and print", () => {});
 
   it("help", async () => {
     const [out] = await captureOutput(() => flags("--help", "-H", "-h"));

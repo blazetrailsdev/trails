@@ -5,6 +5,7 @@ import {
   LOADED_FEATURES,
   LOAD_PATH,
   LoadError,
+  NotImplementedError,
   OptionParser,
   RuntimeError,
   STDERR,
@@ -314,25 +315,25 @@ export class Application {
         "--execute",
         "-e CODE",
         "Execute some Ruby code and exit.",
-        (value: string) => {
-          (0, eval)(value);
-          exit();
+        () => {
+          throw new NotImplementedError("eval is not supported");
         },
       ],
       [
         "--execute-print",
         "-p CODE",
         "Execute some Ruby code, print the result, then exit.",
-        (value: string) => {
-          puts.call($stdout, (0, eval)(value));
-          exit();
+        () => {
+          throw new NotImplementedError("eval is not supported");
         },
       ],
       [
         "--execute-continue",
         "-E CODE",
         "Execute some Ruby code, then continue with normal task processing.",
-        (value: string) => (0, eval)(value),
+        () => {
+          throw new NotImplementedError("eval is not supported");
+        },
       ],
       [
         "--jobs",
