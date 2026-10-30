@@ -754,7 +754,6 @@ export class FileUtils {
   static fileutilsLabel?: string;
 
   /** `fu_split_path` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2506-2515`).
-   * @internal
    * @noRailsEquivalent PERMANENT
    */
   static fuSplitPath(path: string): string[] {
@@ -770,7 +769,6 @@ export class FileUtils {
   }
 
   /** `fu_relative_components_from` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2518-2524`).
-   * @internal
    * @noRailsEquivalent PERMANENT
    */
   static fuRelativeComponentsFrom(target: string[], base: string[]): string[] {
@@ -787,7 +785,6 @@ export class FileUtils {
    * takes one argument; this is the `sub!` that line means.
    *
    * @missingRailsCall chomp! — PERMANENT
-   * @internal
    * @noRailsEquivalent PERMANENT
    */
   static async fuCleanComponentsAsync(...comp: string[]): Promise<string[]> {
@@ -813,7 +810,6 @@ export class FileUtils {
   }
 
   /** `fu_starting_path?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2550-2552`).
-   * @internal
    * @noRailsEquivalent PERMANENT
    */
   static isFuStartingPath(path: string | undefined): boolean {
@@ -821,7 +817,6 @@ export class FileUtils {
   }
 
   /** `user_mask` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1642-1657`).
-   * @internal
    * @noRailsEquivalent PERMANENT
    */
   static userMask(target: string): number {
@@ -842,7 +837,6 @@ export class FileUtils {
   }
 
   /** `apply_mask` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1660-1669`).
-   * @internal
    * @noRailsEquivalent PERMANENT
    */
   static applyMask(mode: number, userMask: number, op: string, modeMask: number): number {
@@ -857,7 +851,6 @@ export class FileUtils {
   }
 
   /** `symbolic_modes_to_i` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1672-1718`).
-   * @internal
    * @noRailsEquivalent PERMANENT
    */
   static async symbolicModesToIAsync(
@@ -919,7 +912,6 @@ export class FileUtils {
   }
 
   /** `fu_mode` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1721-1723`).
-   * @internal
    * @noRailsEquivalent PERMANENT
    */
   static async fuModeAsync(mode: number | string, path: string | FsStatResult): Promise<number> {
@@ -927,17 +919,13 @@ export class FileUtils {
   }
 
   /** `mode_to_s` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1726-1728`).
-   * @internal
    * @noRailsEquivalent PERMANENT
    */
   static modeToS(mode: number | string): string {
     return typeof mode === "string" ? mode : mode.toString(8);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent PERMANENT */
   static async etcIdAsync(file: string, name: string, label: string): Promise<number> {
     const rows = await getFs().readFile(file, "utf-8");
     for (const row of rows.split("\n")) {
@@ -948,7 +936,6 @@ export class FileUtils {
   }
 
   /** `fu_get_uid` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1933-1944`).
-   * @internal
    * @noRailsEquivalent PERMANENT
    */
   static async fuGetUidAsync(user: string | number | null | undefined): Promise<number | null> {
@@ -959,7 +946,6 @@ export class FileUtils {
   }
 
   /** `fu_get_gid` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1947-1958`).
-   * @internal
    * @noRailsEquivalent PERMANENT
    */
   static async fuGetGidAsync(group: string | number | null | undefined): Promise<number | null> {
