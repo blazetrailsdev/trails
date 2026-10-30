@@ -1,5 +1,4 @@
 import { isBlank, TopLevel, type Duration } from "@blazetrails/activesupport";
-import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import type { RouteSet } from "@blazetrails/actionpack";
 import {
@@ -10,7 +9,6 @@ import {
   FileUtils,
   IO,
   OpenSSL,
-  StringIO,
   type Range,
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
@@ -122,7 +120,7 @@ export class DiskService extends Service {
     },
   ): string {
     return this.instrument("url", { key: key }, (payload) => {
-      const verifiedTokenWithExpiration = (ActiveStorage.verifier as MessageVerifier).generate(
+      const verifiedTokenWithExpiration = ActiveStorage.verifier.generate(
         {
           key: key,
           content_type: contentType,
@@ -159,13 +157,12 @@ export class DiskService extends Service {
     destinationKey: string,
     _options: Record<string, unknown> = {},
   ): Promise<void> {
-    const destinationFile = new StringIO(new Uint8Array(0));
-    const destinationPath = await this.makePathFor(destinationKey);
+    const destinationFile = await this.makePathFor(destinationKey);
+    await File.writeAsync(destinationFile, "");
     for (const sourceKey of sourceKeys) {
-      destinationFile.write((await IO.binreadAsync(this.pathFor(sourceKey)))!);
+      const sourceFile = (await IO.binreadAsync(this.pathFor(sourceKey)))!;
+      await File.writeAsync(destinationFile, sourceFile, { mode: "a" });
     }
-    destinationFile.rewind();
-    await IO.copyStreamAsync(destinationFile, destinationPath);
   }
 
   /** @internal */
@@ -233,7 +230,7 @@ export class DiskService extends Service {
       type: disposition,
       filename: filename,
     });
-    const verifiedKeyWithExpiration = (ActiveStorage.verifier as MessageVerifier).generate(
+    const verifiedKeyWithExpiration = ActiveStorage.verifier.generate(
       {
         key: key,
         disposition: contentDisposition,
@@ -251,7 +248,7 @@ export class DiskService extends Service {
 
     return this.urlHelpers().railsDiskServiceUrl(verifiedKeyWithExpiration, {
       filename: filename,
-      ...(this.urlOptions() as Record<string, unknown>),
+      ...this.urlOptions(),
     });
   }
 
@@ -299,7 +296,7 @@ export class DiskService extends Service {
   }
 
   /** @internal */
-  private urlOptions(): unknown {
-    return (Current as unknown as { urlOptions: unknown }).urlOptions;
+  private urlOptions(): Record<string, unknown> | null {
+    return Current.urlOptions;
   }
 }

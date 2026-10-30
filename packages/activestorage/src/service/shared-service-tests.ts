@@ -39,7 +39,7 @@ export function SharedServiceTests(SERVICE: DiskService): {
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
     TopLevel.Trails ??= { application: { routes: () => routes } } as never;
-    (Current as unknown as { urlOptions: unknown }).urlOptions = {
+    Current.urlOptions = {
       protocol: "https://",
       host: "example.com",
       port: null,

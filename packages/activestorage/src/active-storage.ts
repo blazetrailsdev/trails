@@ -8,6 +8,7 @@ import {
   type Logger,
 } from "@blazetrails/activesupport";
 import type { Deprecation } from "@blazetrails/activesupport";
+import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import type { Base } from "@blazetrails/activerecord";
 import type * as Errors from "./errors.js";
 import type { LogSubscriber } from "./log-subscriber.js";
@@ -34,7 +35,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   LogSubscriber: typeof LogSubscriber;
   deprecator(): Deprecation;
   logger: Logger | null;
-  verifier: unknown;
+  verifier: MessageVerifier;
   variantProcessor: string;
   queues: Record<string, unknown>;
   previewers: unknown[];

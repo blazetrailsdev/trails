@@ -67,7 +67,7 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
   });
 
   it("URL generation without ActiveStorage::Current.url_options set", () => {
-    (Current as unknown as { urlOptions: unknown }).urlOptions = null;
+    Current.urlOptions = null;
 
     let error: unknown;
     expect(() => {
@@ -90,7 +90,7 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
   });
 
   it("URL generation keeps working with ActiveStorage::Current.host set", () => {
-    (Current as unknown as { urlOptions: unknown }).urlOptions = { host: "https://example.com" };
+    Current.urlOptions = { host: "https://example.com" };
 
     const originalUrlOptions = { ...ctx.routes.defaultUrlOptions };
     Object.assign(ctx.routes.defaultUrlOptions, {
