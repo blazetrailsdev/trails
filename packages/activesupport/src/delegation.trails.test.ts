@@ -225,3 +225,19 @@ describe("delegate", () => {
     expect(helper.adapter.x).toBe(2);
   });
 });
+
+describe("delegate_missing_to and then", () => {
+  it("does not forward then, so awaiting the delegator answers the delegator", async () => {
+    class Holder {
+      get target() {
+        return Promise.resolve("target");
+      }
+    }
+    Object.setPrototypeOf(
+      Holder.prototype,
+      Delegation.generateMethodMissing(Object.create(Object.prototype) as object, "target"),
+    );
+    const holder = new Holder();
+    expect(await holder).toBe(holder);
+  });
+});

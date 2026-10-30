@@ -1,9 +1,17 @@
 import type { Base, Relation } from "@blazetrails/activerecord";
-import { camelize, Concern, extend, TopLevel, tryCall } from "@blazetrails/activesupport";
+import {
+  camelize,
+  compactBlank,
+  Concern,
+  extend,
+  TopLevel,
+  tryCall,
+} from "@blazetrails/activesupport";
 import {
   ArgumentError,
   block,
   hashDelete,
+  rbFArray,
   rbCallSuper,
   rbInspect,
   rbModName,
@@ -12,17 +20,25 @@ import {
 import { ActiveStorage } from "../active-storage.js";
 import { Attached, type AttachedRecord } from "../attached.js";
 import { Blob } from "../blob.js";
+import { CreateMany } from "./changes/create-many.js";
+import type { CreateOneOfMany } from "./changes/create-one-of-many.js";
 import { CreateOne } from "./changes/create-one.js";
+import { DeleteMany } from "./changes/delete-many.js";
 import { DeleteOne } from "./changes/delete-one.js";
+import { Many } from "./many.js";
 import { One } from "./one.js";
-import { addAttachmentReflection, HasOneAttachedReflection } from "../reflection.js";
+import {
+  addAttachmentReflection,
+  HasManyAttachedReflection,
+  HasOneAttachedReflection,
+} from "../reflection.js";
 
 interface ModelHost {
-  _activeStorageAttached?: { [k: string]: One } | null;
+  _activeStorageAttached?: { [k: string]: One | Many } | null;
   _attachmentChanges?: AttachedRecord["attachmentChanges"] | null;
 }
 
-type HasOneAttachedOptions = {
+type HasAttachedOptions = {
   dependent?: string;
   service?: string | ((record: AttachedRecord) => string) | null;
   strictLoading?: boolean;
@@ -32,7 +48,7 @@ type HasOneAttachedOptions = {
 function hasOneAttached(
   this: typeof Base,
   name: string,
-  { dependent = "purge_later", service = null, strictLoading = false }: HasOneAttachedOptions = {},
+  { dependent = "purge_later", service = null, strictLoading = false }: HasAttachedOptions = {},
   blk?: (reflection: HasOneAttachedReflection) => void,
 ): void {
   if (typeof service !== "function") Model.validateServiceConfiguration(service, this, name);
@@ -118,7 +134,102 @@ function hasOneAttached(
   addAttachmentReflection(this, name, reflection);
 }
 
-export const ClassMethods = { hasOneAttached };
+/** @missingRailsCall create — CONVERGEABLE activestorage-reflection-and-validations */
+function hasManyAttached(
+  this: typeof Base,
+  name: string,
+  { dependent = "purge_later", service = null, strictLoading = false }: HasAttachedOptions = {},
+  blk?: (reflection: HasManyAttachedReflection) => void,
+): void {
+  if (typeof service !== "function") Model.validateServiceConfiguration(service, this, name);
+
+  const mixin = this.generatedAssociationMethods();
+  mixin.moduleEval((m) => {
+    Object.defineProperty(m, name, {
+      get(this: ModelHost & AttachedRecord) {
+        this._activeStorageAttached ??= {};
+        return (this._activeStorageAttached[name] ??= new Many(name, this));
+      },
+      configurable: true,
+      enumerable: true,
+    });
+  });
+  mixin.defineMethod(`set${camelize(name)}`, async function (
+    this: AttachedRecord,
+    attachables: unknown,
+  ) {
+    attachables = compactBlank(rbFArray(attachables));
+    const pendingUploads = tryCall(this.attachmentChanges[name], "pendingUploads") as
+      | CreateOneOfMany[]
+      | undefined;
+
+    if ((attachables as unknown[]).length === 0) {
+      this.attachmentChanges[name] = new DeleteMany(name, this);
+    } else {
+      const change = new CreateMany(name, this, attachables, { pendingUploads: pendingUploads });
+      await change.unfurl();
+      this.attachmentChanges[name] = change;
+    }
+  } as never);
+
+  this.hasMany(
+    `${name}Attachments`,
+    function (this: Relation<Base>) {
+      return this.where({ name: name });
+    },
+    {
+      as: "record",
+      className: "ActiveStorage::Attachment",
+      inverseOf: "record",
+      dependent: "destroy",
+      strictLoading: strictLoading,
+    },
+  );
+  this.hasMany(`${name}Blobs`, {
+    through: `${name}Attachments`,
+    className: "ActiveStorage::Blob",
+    source: "blob",
+    strictLoading: strictLoading,
+  });
+
+  this.scope(`withAttached${camelize(name)}`, function (this: Relation<Base>) {
+    if (ActiveStorage.trackVariants) {
+      return this.includes({
+        [`${name}Attachments`]: {
+          blob: {
+            variantRecords: { imageAttachment: "blob" },
+            previewImageAttachment: { blob: { variantRecords: { imageAttachment: "blob" } } },
+          },
+        },
+      });
+    } else {
+      return this.includes({ [`${name}Attachments`]: "blob" });
+    }
+  });
+
+  this.afterSave(async (record: AttachedRecord) => {
+    await record.attachmentChanges[name]?.save();
+  });
+
+  this.afterCommit(
+    async (record: AttachedRecord) => {
+      const change = hashDelete(record.attachmentChanges, name) as CreateMany | DeleteMany | null;
+      await tryCall(change, "upload");
+    },
+    { on: ["create", "update"] },
+  );
+
+  const reflection = new HasManyAttachedReflection(
+    name,
+    null,
+    { dependent: dependent, serviceName: service },
+    this,
+  );
+  if (blk) blk(reflection);
+  addAttachmentReflection(this, name, reflection);
+}
+
+export const ClassMethods = { hasOneAttached, hasManyAttached };
 
 function validateServiceConfiguration(
   serviceName: string | null,

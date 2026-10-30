@@ -1793,6 +1793,7 @@ the capability, in a different place. Each is decided here, and each but
 | `image_processing/chainable.rb`                       | Proxy (thenable)      |
 | `active_storage/attachment.rb`                        | Proxy (proto chain)   |
 | `active_storage/attached/one.rb`                      | Proxy (proto chain)   |
+| `active_storage/attached/many.rb`                     | Proxy (proto chain)   |
 
 Rules that apply across the table:
 
@@ -1827,7 +1828,9 @@ Rules that apply across the table:
   `NoMethodError` until `await attachment.blob`. A nil `blob` raises
   `DelegationError`, as Rails does. `attached/one.rb`'s
   `delegate_missing_to :attachment, allow_nil: true` forwards only to a loaded
-  attachment.
+  attachment. `attached/many.rb`'s `delegate_missing_to :attachments` needs no such
+  guard: `attachments` is a collection proxy or the pending change's Array,
+  and `then` is never forwarded, so awaiting a `Many` answers the `Many`.
 - `image_processing/chainable.rb`'s Proxy answers `then` with `call()`, so
   `await builder` runs the pipeline. JS awaits anything with a `then`:
   returning a builder from an `async` function, or resolving a promise with

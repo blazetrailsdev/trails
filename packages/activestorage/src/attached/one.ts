@@ -2,6 +2,7 @@ import { isPresent } from "@blazetrails/activesupport";
 import { KERNEL_METHODS, PROTOCOL_PROBES, rbFSend } from "@blazetrails/ruby-compat";
 import { Attached } from "../attached.js";
 import type { Attachment } from "../attachment.js";
+import type { CreateOne } from "./changes/create-one.js";
 import { DetachOne } from "./changes/detach-one.js";
 import { PurgeOne } from "./changes/purge-one.js";
 
@@ -20,7 +21,7 @@ export class One extends Attached {
 
   get attachment(): Attachment | null | Promise<Attachment | null> {
     return isPresent(this.change)
-      ? this.change!.attachment
+      ? (this.change as CreateOne).attachment
       : (rbFSend(this.record, `${this.name}Attachment`) as
           | Attachment
           | null
