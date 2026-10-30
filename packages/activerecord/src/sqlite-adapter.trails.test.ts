@@ -115,7 +115,7 @@ describe("SQLite adapter driver binding", () => {
       timeout: 1234,
       driverOptions: { foo: "bar" },
     }).connectBang();
-    expect(await adapter.selectValue("PRAGMA busy_timeout")).toBe(1234);
+    expect(adapter._busyHandlerTimeout).toBe(1234);
     expect(seen?.driverOptions).toEqual({ foo: "bar" });
     await adapter.disconnectBang();
   });

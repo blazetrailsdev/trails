@@ -4,6 +4,7 @@ import { b, rbRegMatchP, StandardError } from "@blazetrails/ruby-compat";
 import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
+import { BusyException } from "../../sqlite/errors.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import {
   combineMultiStatements,
@@ -118,6 +119,7 @@ interface InternalBeginTransactionHost {
 }
 
 interface PerformQueryHost {
+  _busyHandlerTimeout?: number | null;
   _cachedStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement>;
   _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement>;
   _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void;
@@ -175,6 +177,30 @@ export async function internalBeginTransaction(
 
 /** @internal */
 export async function performQuery(
+  this: PerformQueryHost,
+  rawConnection: SqliteConnection,
+  sql: string,
+  binds: unknown[],
+  typeCastedBinds: SqliteBinds,
+  options: {
+    prepare: boolean;
+    notificationPayload?: Record<string, unknown>;
+    batch?: boolean;
+  },
+): Promise<Result> {
+  const timeout = this._busyHandlerTimeout ?? 0;
+  const deadline = timeout > 0 ? Date.now() + timeout : 0;
+  while (true) {
+    try {
+      return await performQueryOnce.call(this, rawConnection, sql, binds, typeCastedBinds, options);
+    } catch (error) {
+      if (!(error instanceof BusyException) || Date.now() > deadline) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1));
+    }
+  }
+}
+
+async function performQueryOnce(
   this: PerformQueryHost,
   rawConnection: SqliteConnection,
   sql: string,

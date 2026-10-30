@@ -282,6 +282,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /** @internal */
+  _busyHandlerTimeout: number | null = null;
   declare performQuery: typeof sqlitePerformQuery;
 
   declare highPrecisionCurrentTimestamp: typeof sqliteHighPrecisionCurrentTimestamp;
@@ -1052,7 +1053,8 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
         throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
       }
-      await Pragmas.setBusyTimeout.call(this._rawConnection!, timeout);
+      this._busyHandlerTimeout = timeout;
+      await Pragmas.setBusyTimeout.call(this._rawConnection!, 0);
     } else if (rtest(this._config["retries"])) {
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
