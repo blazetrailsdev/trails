@@ -6,6 +6,7 @@ import {
   Error as URIError,
   Generic,
   InvalidComponentError,
+  rbModName,
   RFC2396Parser,
   stringSplit,
   URI,
@@ -76,10 +77,11 @@ export class GID extends Generic {
 
   static create(
     app: string,
-    model: { id: unknown; constructor: { name: string } },
+    model: { id: unknown; constructor: object },
     params: Record<string, unknown> | null = null,
   ): GID {
-    return GID.build({ app, modelName: model.constructor.name, modelId: model.id, params });
+    const name = rbModName(model.constructor)!;
+    return GID.build({ app, modelName: name, modelId: model.id, params });
   }
 
   static override build(args: {

@@ -1,12 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import type { Extended } from "@blazetrails/activesupport";
 import { StringIO } from "@blazetrails/ruby-compat";
 import "../test-helpers/database/setup.js";
 import { ActiveStorage } from "../active-storage.js";
 import { Blob } from "../blob.js";
 import { createBlob, User } from "../test-helpers/test-helper.js";
-import type { ClassMethods } from "./model.js";
 import { One } from "./one.js";
 
 type AvatarUser = User & {
@@ -15,14 +13,7 @@ type AvatarUser = User & {
   attachmentChanges: { [k: string]: unknown };
 };
 
-class Member extends User {
-  static override get tableName() {
-    return "users";
-  }
-  static {
-    (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("avatar");
-  }
-}
+const Member = User;
 
 // BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
 Object.assign(Blob.prototype, {
