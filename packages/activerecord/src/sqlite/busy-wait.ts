@@ -21,6 +21,7 @@ export async function execBatch(
   sql: string,
   timeout: number,
 ): Promise<void> {
+  if (!timeout) return await rawConnection.exec(sql);
   await setBusyTimeout.call(rawConnection, timeout);
   try {
     await rawConnection.exec(sql);

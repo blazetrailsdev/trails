@@ -55,6 +55,21 @@ describe("SQLite3Adapter busy handler", () => {
     expect(Number(rows[0].n)).toBe(1);
   });
 
+  it("leaves the driver's busy timeout alone when no timeout is configured", async () => {
+    const unconfigured = new BetterSQLite3Adapter({ database: join(dir, "busy.sqlite3") });
+    await unconfigured.execute("SELECT 1");
+    const read = async () => (await unconfigured.execute("PRAGMA busy_timeout"))![0];
+    const before = await read();
+
+    await unconfigured.performQuery(unconfigured._rawConnection!, "SELECT 1; SELECT 2;", [], [], {
+      prepare: false,
+      batch: true,
+    });
+
+    expect(await read()).toEqual(before);
+    await unconfigured.disconnectBang();
+  });
+
   it("raises once the timeout has passed", async () => {
     const impatient = new BetterSQLite3Adapter({
       database: join(dir, "busy.sqlite3"),
