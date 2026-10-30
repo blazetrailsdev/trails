@@ -6,6 +6,7 @@ import { File, IO, OpenSSL, StringIO } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import type { ClassMethods } from "../attached/model.js";
 import type { Attachment } from "../attachment.js";
+import type { Many } from "../attached/many.js";
 import type { One } from "../attached/one.js";
 import { Blob } from "../blob.js";
 import { FixtureSet } from "../fixture-set.js";
@@ -25,6 +26,12 @@ export class User extends Base {
   declare avatarBlob: Blob | null | Promise<Blob | null>;
   declare setAvatar: (attachable: unknown) => Promise<void>;
   declare setCoverPhoto: (attachable: unknown) => Promise<void>;
+  declare highlights: Many;
+  declare vlogs: Many;
+  declare highlightsAttachments: Attachment[] | Promise<Attachment[]>;
+  declare highlightsBlobs: { count(): Promise<number> };
+  declare setHighlights: (attachables: unknown) => Promise<void>;
+  declare setVlogs: (attachables: unknown) => Promise<void>;
   declare attachmentChanges: { [k: string]: unknown };
 
   static {
@@ -33,6 +40,10 @@ export class User extends Base {
     const attached = this as unknown as Extended<typeof ClassMethods>;
     attached.hasOneAttached("avatar");
     attached.hasOneAttached("coverPhoto", { dependent: false, service: "local" });
+    attached.hasManyAttached("highlights");
+    attached.hasManyAttached("vlogs", { dependent: false, service: "local" });
+
+    this.acceptsNestedAttributesFor("highlightsAttachments", { allowDestroy: true });
 
     this.afterCommit((user: User) => user.incrementCallbackCounter());
   }
