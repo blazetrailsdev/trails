@@ -7,15 +7,19 @@ type Style = "none" | "required" | "optional" | "placed";
 
 /** `OptionParser::ParseError`, `vendor/ruby/v3.3.11/lib/optparse.rb:2122`. */
 class ParseError extends RuntimeError {
+  /** @noRailsEquivalent PERMANENT */
   static Reason = "parse error";
+  /** @noRailsEquivalent PERMANENT */
   args: string[];
 
+  /** @noRailsEquivalent PERMANENT */
   constructor(...args: string[]) {
     super("");
     this.args = args;
     this.message = this.buildMessage();
   }
 
+  /** @noRailsEquivalent PERMANENT */
   setOption(opt: string, eq: unknown): this {
     if (eq) this.args[0] = opt;
     else this.args.unshift(opt);
@@ -23,6 +27,7 @@ class ParseError extends RuntimeError {
     return this;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   get reason(): string {
     return (this.constructor as typeof ParseError).Reason;
   }
@@ -92,6 +97,7 @@ const stopOrder = Symbol("stopOrder");
 
 /** @noRailsEquivalent PERMANENT — `OptionParser`, `vendor/ruby/v3.3.11/lib/optparse.rb:427`. */
 export class OptionParser {
+  /** @noRailsEquivalent PERMANENT */
   static ParseError = ParseError;
   /** @noRailsEquivalent PERMANENT */
   static AmbiguousOption = AmbiguousOption;
@@ -102,24 +108,27 @@ export class OptionParser {
   /** @noRailsEquivalent PERMANENT */
   static InvalidOption = InvalidOption;
 
+  /** @noRailsEquivalent PERMANENT */
   banner = "";
-  private lines: (Switch | string)[] = [];
-  private tail: Switch[] = [];
+  private _lines: (Switch | string)[] = [];
+  private _tail: Switch[] = [];
 
+  /** @noRailsEquivalent PERMANENT */
   separator(string: string): void {
-    this.lines.push(string);
+    this._lines.push(string);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   on(...opts: (string | SwitchBlock)[]): void {
-    this.lines.push(this.makeSwitch(opts));
+    this._lines.push(this._makeSwitch(opts));
   }
 
   /** @noRailsEquivalent PERMANENT — `on_tail`, `vendor/ruby/v3.3.11/lib/optparse.rb:1597`. */
   onTail(...opts: (string | SwitchBlock)[]): void {
-    this.tail.push(this.makeSwitch(opts));
+    this._tail.push(this._makeSwitch(opts));
   }
 
-  private makeSwitch(opts: (string | SwitchBlock)[]): Switch {
+  private _makeSwitch(opts: (string | SwitchBlock)[]): Switch {
     const sw = new Switch();
     const guess = (a: string | undefined): void => {
       if (a == null) return;
@@ -142,14 +151,14 @@ export class OptionParser {
     return sw;
   }
 
-  private get switches(): Switch[] {
-    return [...this.lines, ...this.tail].filter((l): l is Switch => l instanceof Switch);
+  private get _switches(): Switch[] {
+    return [...this._lines, ...this._tail].filter((l): l is Switch => l instanceof Switch);
   }
 
-  private complete(opt: string): Switch {
+  private _complete(opt: string): Switch {
     const key = opt.toLowerCase();
     const found = new Set<Switch>();
-    for (const sw of this.switches) {
+    for (const sw of this._switches) {
       if (sw.long.some((l) => l.toLowerCase() === key)) return sw;
       if (sw.long.some((l) => l.toLowerCase().startsWith(key))) found.add(sw);
     }
@@ -158,11 +167,11 @@ export class OptionParser {
     return [...found][0];
   }
 
-  private search(opt: string): Switch | undefined {
-    return this.switches.find((sw) => sw.short.includes(opt));
+  private _search(opt: string): Switch | undefined {
+    return this._switches.find((sw) => sw.short.includes(opt));
   }
 
-  private async parseInOrder(argv: string[], nonopt: (arg: string) => void): Promise<string[]> {
+  private async _parseInOrder(argv: string[], nonopt: (arg: string) => void): Promise<string[]> {
     let arg: string | undefined;
     while ((arg = argv.shift()) !== undefined) {
       let m: RegExpMatchArray | null;
@@ -172,7 +181,7 @@ export class OptionParser {
         if (opt === "") break;
         let sw: Switch;
         try {
-          sw = this.complete(opt);
+          sw = this._complete(opt);
         } catch (e) {
           if (e instanceof ParseError) throw e.setOption(arg, true);
           throw e;
@@ -190,9 +199,9 @@ export class OptionParser {
         const eq = m[3];
         const rest = m[2] ?? null;
         const opt = m[1];
-        let sw = this.search(opt);
+        let sw = this._search(opt);
         try {
-          sw ??= this.complete(opt);
+          sw ??= this._complete(opt);
         } catch (e) {
           if (e instanceof ParseError) throw e.setOption(arg, true);
           throw e;
@@ -217,6 +226,7 @@ export class OptionParser {
     return argv;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   async parse(argv: readonly string[]): Promise<string[]> {
     const nonopts: string[] = [];
     const copy = [...argv];
@@ -225,24 +235,26 @@ export class OptionParser {
         copy.unshift(arg);
         throw stopOrder;
       };
-      await this.parseInOrder(copy, stop).catch((e: unknown) => {
+      await this._parseInOrder(copy, stop).catch((e: unknown) => {
         if (e !== stopOrder) throw e;
       });
       return copy;
     }
-    await this.parseInOrder(copy, (arg) => nonopts.push(arg));
+    await this._parseInOrder(copy, (arg) => nonopts.push(arg));
     return [...nonopts, ...copy];
   }
 
+  /** @noRailsEquivalent PERMANENT */
   async environment(name: string): Promise<void> {
     const value = env[name] ?? env[name.toUpperCase()];
     if (value == null || value === "") return;
     await this.parse(Shellwords.shellwords(value));
   }
 
+  /** @noRailsEquivalent PERMANENT */
   toString(): string {
     const out = [this.banner];
-    for (const line of [...this.lines, ...this.tail]) {
+    for (const line of [...this._lines, ...this._tail]) {
       if (!(line instanceof Switch)) {
         out.push(line);
         continue;
