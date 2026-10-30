@@ -69,20 +69,52 @@ describe("a class-specific relation's Proxy", () => {
     }
   });
 
-  it("seats a non-configurable undefined placeholder for a field a relation first writes", () => {
+  it("seats a placeholder for a field a relation first writes beneath Relation.prototype, not on it", () => {
     const relation = Post.all() as unknown as Record<string, unknown>;
     relation._seatProbe = 1;
-    expect(Object.getOwnPropertyDescriptor(Relation.prototype, "_seatProbe")).toEqual({
+    expect(Object.hasOwn(Relation.prototype, "_seatProbe")).toBe(false);
+    expect(
+      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Relation.prototype), "_seatProbe"),
+    ).toEqual({
       value: undefined,
       writable: true,
       enumerable: false,
-      configurable: false,
+      configurable: true,
     });
     const other = Post.all() as unknown as Record<string, unknown>;
     expect(other._seatProbe).toBeUndefined();
     other._seatProbe = 2;
     expect(Object.hasOwn(other, "_seatProbe")).toBe(true);
     expect(relation._seatProbe).toBe(1);
+  });
+
+  it("lets a member defined on Relation.prototype after a placeholder is seated win, and clone not run it", () => {
+    const relation = Post.where({ id: 1 }) as unknown as Record<string, unknown>;
+    relation._lateProbe = "first";
+    const calls: unknown[] = [];
+    Object.defineProperty(Relation.prototype, "_lateProbe", {
+      configurable: true,
+      get() {
+        return "accessor";
+      },
+      set(value: unknown) {
+        calls.push(value);
+      },
+    });
+    try {
+      const fresh = Post.all() as unknown as Record<string, unknown>;
+      expect(fresh._lateProbe).toBe("accessor");
+      fresh._lateProbe = "written";
+      expect(calls).toEqual(["written"]);
+      const copy = (relation as unknown as Relation<Post>).clone() as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(calls).toEqual(["written"]);
+      expect(Object.getOwnPropertyDescriptor(copy, "_lateProbe")?.value).toBe("first");
+    } finally {
+      Reflect.deleteProperty(Relation.prototype, "_lateProbe");
+    }
   });
 
   it("answers Symbol.iterator only once the records are loaded", async () => {

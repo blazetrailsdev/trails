@@ -1852,9 +1852,10 @@ Rules that apply across the table:
   `respond_to_missing?` claims before that relation method is generated nor
   `Symbol.iterator`, which the `get` trap answers only once the records are
   loaded synchronously. `rbObjRespondTo` answers `respond_to?`. The `set`
-  trap seats a non-configurable `undefined` placeholder on `Relation.prototype`
-  for each `_` field a relation first writes, so later writes stop short of
-  the Proxy.
+  trap seats an `undefined` placeholder for each `_` field a relation first
+  writes on a private layer between `Relation.prototype` and the Proxy, so
+  later writes stop short of the Proxy and a member defined on
+  `Relation.prototype` later still shadows it.
 - `rails/engine/lazy_route_set.rb`'s `method_missing_module` is spliced beneath
   the generated url-helpers module in `LazyRouteSet#generateUrlHelpers`, since
   `include()` copies a module's methods into each includer and a Proxy on the

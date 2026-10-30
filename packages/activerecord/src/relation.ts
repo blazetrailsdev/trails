@@ -251,14 +251,14 @@ const ENUMERABLE_DELEGATES = {
 };
 
 /** @perf 11x — PERMANENT */
-const _placeholderFields = new Set<string>();
+const _placeholderFields: object = Object.create(null);
 
 /** @perf 11x — PERMANENT */
 function _isPlaceholderField(proto: object, key: string): boolean {
-  for (let p = proto; p !== Relation.prototype; p = Object.getPrototypeOf(p)) {
+  for (let p = proto; p !== _placeholderFields; p = Object.getPrototypeOf(p)) {
     if (Object.hasOwn(p, key)) return false;
   }
-  return _placeholderFields.has(key) || !Object.hasOwn(Relation.prototype, key);
+  return true;
 }
 
 /** @perf 8x — PERMANENT */
@@ -294,13 +294,12 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<object> = {
     return value;
   },
   set(target: object, prop: string | symbol, value: unknown, receiver: object) {
-    if (
-      typeof prop === "string" &&
-      prop.startsWith("_") &&
-      !Object.hasOwn(Relation.prototype, prop)
-    ) {
-      _placeholderFields.add(prop);
-      Object.defineProperty(Relation.prototype, prop, { value: undefined, writable: true });
+    if (typeof prop === "string" && prop.startsWith("_")) {
+      Object.defineProperty(_placeholderFields, prop, {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
     }
     return Reflect.set(target, prop, value, receiver);
   },
@@ -2199,6 +2198,7 @@ rbDefineAllocFunc(Relation, (klass) => Object.create(klass.prototype));
 const _enumIterator = Relation.prototype[Symbol.iterator];
 Reflect.deleteProperty(Relation.prototype, Symbol.iterator);
 Object.setPrototypeOf(
-  Relation.prototype,
+  _placeholderFields,
   new Proxy(Object.getPrototypeOf(Relation.prototype), CLASS_SPECIFIC_RELATION_HANDLER),
 );
+Object.setPrototypeOf(Relation.prototype, _placeholderFields);
