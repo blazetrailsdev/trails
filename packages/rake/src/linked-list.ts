@@ -50,7 +50,7 @@ export class LinkedList<T = unknown> {
     return this;
   }
 
-  static make<T>(this: typeof LinkedList, ...args: T[]): LinkedList<T> {
+  static make<T>(this: Pick<typeof LinkedList, "cons" | "empty">, ...args: T[]): LinkedList<T> {
     if (args.length === 0) return this.empty();
     return [...args].reverse().reduce<LinkedList<T>>((list, item) => {
       list = this.cons(item, list);

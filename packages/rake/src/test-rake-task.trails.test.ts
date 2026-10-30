@@ -7,7 +7,7 @@ function stubApplication(): TaskApplication & { tasks: Record<string, Task> } {
   return {
     tasks,
     options: {},
-    currentScope: null,
+    currentScope: null as never,
     get: (taskName) => tasks[taskName] ?? null,
     trace: () => {},
     enhanceWithMatchingRule: () => null,
@@ -125,10 +125,10 @@ describe("Rake::Task", () => {
     expect(t.fullComment).toBe("\u00A0kept");
   });
 
-  it("formats investigation times as Time#to_s", () => {
+  it("formats investigation times as Time#to_s", async () => {
     const t = task("t", ["a"]);
     task("a");
-    expect(t.investigation()).toMatch(
+    expect(await t.investigation()).toMatch(
       /timestamp: \d{4}-\d\d-\d\d \d\d:\d\d:\d\d [+-]\d{4}\n[\s\S]*--a \(\d{4}-/,
     );
   });

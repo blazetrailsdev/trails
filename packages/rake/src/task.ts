@@ -1,6 +1,7 @@
 import {
   extend,
   Monitor,
+  rbCheckArrayType,
   rbModName,
   rbObjRespondTo,
   stringSplit,
@@ -8,12 +9,14 @@ import {
 } from "@blazetrails/ruby-compat";
 import { InvocationChain } from "./invocation-chain.js";
 import { InvocationExceptionMixin } from "./invocation-exception-mixin.js";
+import { fromPathname, Rake } from "./rake-module.js";
+import type { Scope } from "./scope.js";
 import { EMPTY_TASK_ARGS, TaskArguments } from "./task-arguments.js";
 
 export interface TaskApplication {
   options: { trace?: boolean; dryrun?: boolean; alwaysMultitask?: boolean };
-  currentScope: unknown;
-  get(taskName: string, scopes?: unknown): Task | null;
+  currentScope: Scope;
+  get(taskName: string, scopes?: Scope | null): Task | null | Promise<Task | null>;
   trace(...strings: string[]): void;
   enhanceWithMatchingRule(taskName: string, level?: number): unknown;
 }
@@ -21,10 +24,10 @@ export interface TaskApplication {
 export type TaskAction = (task: Task, args: TaskArguments, ...rest: unknown[]) => unknown;
 
 export class Task {
-  readonly orderOnlyPrerequisites: string[];
+  orderOnlyPrerequisites: string[];
   readonly actions: TaskAction[];
   application: TaskApplication;
-  readonly scope: unknown;
+  readonly scope: Scope;
   readonly locations: string[];
   private _prerequisites: string[];
   private _alreadyInvoked: boolean;
@@ -68,34 +71,36 @@ export class Task {
     }
   }
 
-  prerequisiteTasks(): Task[] {
-    return [...this.prerequisites, ...this.orderOnlyPrerequisites].map((pre) =>
-      this.lookupPrerequisite(pre),
-    );
+  async prerequisiteTasks(): Promise<Task[]> {
+    const tasks: Task[] = [];
+    for (const pre of [...this.prerequisites, ...this.orderOnlyPrerequisites]) {
+      tasks.push(await this.lookupPrerequisite(pre));
+    }
+    return tasks;
   }
 
   /** @internal */
-  private lookupPrerequisite(prerequisiteName: string): Task {
-    const scopedPrerequisiteTask = this.application.get(prerequisiteName, this.scope);
+  private async lookupPrerequisite(prerequisiteName: string): Promise<Task> {
+    const scopedPrerequisiteTask = await this.application.get(prerequisiteName, this.scope);
     let unscopedPrerequisiteTask: Task | null = null;
     if (scopedPrerequisiteTask === this) {
-      unscopedPrerequisiteTask = this.application.get(prerequisiteName);
+      unscopedPrerequisiteTask = await this.application.get(prerequisiteName);
     }
     return (unscopedPrerequisiteTask || scopedPrerequisiteTask)!;
   }
 
-  allPrerequisiteTasks(): Task[] {
+  async allPrerequisiteTasks(): Promise<Task[]> {
     const seen: Record<string, Task> = {};
-    this.collectPrerequisites(seen);
+    await this.collectPrerequisites(seen);
     return Object.values(seen);
   }
 
   /** @internal */
-  protected collectPrerequisites(seen: Record<string, Task>): void {
-    for (const pre of this.prerequisiteTasks()) {
+  protected async collectPrerequisites(seen: Record<string, Task>): Promise<void> {
+    for (const pre of await this.prerequisiteTasks()) {
       if (Object.hasOwn(seen, pre.name)) continue;
       seen[pre.name] = pre;
-      pre.collectPrerequisites(seen);
+      await pre.collectPrerequisites(seen);
     }
   }
 
@@ -233,7 +238,7 @@ export class Task {
     if (this.application.options.alwaysMultitask) {
       await this.invokePrerequisitesConcurrently(taskArgs, invocationChain);
     } else {
-      for (const p of this.prerequisiteTasks()) {
+      for (const p of await this.prerequisiteTasks()) {
         const prereqArgs = taskArgs.newScope(p.argNames);
         await p.invokeWithCallChain(prereqArgs, invocationChain);
       }
@@ -245,7 +250,7 @@ export class Task {
     taskArgs: TaskArguments,
     invocationChain: InvocationChain<Task>,
   ): Promise<void> {
-    const futures = this.prerequisiteTasks().map((p) => {
+    const futures = (await this.prerequisiteTasks()).map((p) => {
       const prereqArgs = taskArgs.newScope(p.argNames);
       return p.invokeWithCallChain(prereqArgs, invocationChain);
     });
@@ -268,7 +273,7 @@ export class Task {
       return;
     }
     if (this.application.options.trace) this.application.trace(`** Execute ${this.name}`);
-    if (this.actions.length === 0) this.application.enhanceWithMatchingRule(this.name);
+    if (this.actions.length === 0) await this.application.enhanceWithMatchingRule(this.name);
     const opts = rbObjRespondTo(args, "toHash") ? args.toHash() : null;
     if (opts && Object.keys(opts).length !== 0) {
       for (const act of this.actions) await act(this, args, opts);
@@ -331,24 +336,46 @@ export class Task {
     return (this._argNames = args.map((a) => String(a)));
   }
 
-  investigation(): string {
+  async investigation(): Promise<string> {
     let result = "------------------------------\n";
     result += `Investigating ${this.name}\n`;
     result += `class: ${rbModName(this.constructor)}\n`;
     result += `task needed: ${this.isNeeded()}\n`;
     result += `timestamp: ${_timeToS(this.timestamp())}\n`;
     result += "pre-requisites: \n";
-    const prereqs = this.prerequisiteTasks();
+    const prereqs = await this.prerequisiteTasks();
     prereqs.sort((a, b) => a.timestamp().getTime() - b.timestamp().getTime());
     for (const p of prereqs) {
       result += `--${p.name} (${_timeToS(p.timestamp())})\n`;
     }
-    const timestamps = this.prerequisiteTasks().map((p) => p.timestamp());
+    const timestamps = (await this.prerequisiteTasks()).map((p) => p.timestamp());
     const latestPrereq =
       timestamps.length === 0 ? null : new Date(Math.max(...timestamps.map(Number)));
     result += `latest-prerequisite time: ${latestPrereq ? _timeToS(latestPrereq) : ""}\n`;
     result += "................................\n\n";
     return result;
+  }
+
+  static formatDeps(deps: unknown): string[] {
+    return (rbCheckArrayType(deps) ?? [deps]).map((d) => String(fromPathname(d)));
+  }
+
+  bitwiseOr(deps: unknown): this {
+    const formatted = Task.formatDeps(deps).filter((d) => !this.prerequisites.includes(d));
+    this.orderOnlyPrerequisites = [...new Set([...this.orderOnlyPrerequisites, ...formatted])];
+    return this;
+  }
+
+  static isTaskDefined(taskName: string): boolean {
+    return Rake.application!.lookup(taskName) != null;
+  }
+
+  static defineTask(...args: unknown[]): Task {
+    return Rake.application!.defineTask(this, ...args);
+  }
+
+  static scopeName(scope: Scope, taskName: string): string {
+    return scope.pathWithTaskName(taskName);
   }
 }
 
