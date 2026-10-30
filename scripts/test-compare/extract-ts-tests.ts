@@ -49,6 +49,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "mini-magick",
     "mail",
     "mini-mime",
+    "net-smtp",
     "rake",
   ];
   const packageAliases: Record<string, string> = {};

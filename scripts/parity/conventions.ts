@@ -714,6 +714,38 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "tasks RFC 0204-actionmailer-and-mail-port, Transport edges: the wire protocol is " +
+      "nodemailer's `SMTPConnection`, so Net::SMTP's command-level members, socket setup " +
+      "and the authenticators' line exchange are not ported. PERMANENT.",
+    names: [
+      "tcp_socket",
+      "ssl_socket",
+      "tlsconnect",
+      "new_internet_message_io",
+      "open_message_stream",
+      "ready",
+      "starttls",
+      "helo",
+      "ehlo",
+      "continue",
+      "base64_encode",
+      "cram_md5_response",
+      "cram_secret",
+      "digest_class",
+      "xoauth2_string",
+    ],
+    rubyFiles: [
+      "smtp.rb",
+      "authenticator.rb",
+      "auth_plain.rb",
+      "auth_login.rb",
+      "auth_cram_md5.rb",
+      "auth_xoauth2.rb",
+    ],
+    packages: ["net-smtp"],
+  },
+  {
+    reason:
       "`multitask` without a thread pool (tasks RFC 0211-rake-gem-port): Node's " +
       "event loop already runs a `MultiTask`'s awaited prerequisites concurrently, " +
       "so `Rake::ThreadPool` (thread_pool.rb), `Rake::Promise` (promise.rb), " +

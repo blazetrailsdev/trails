@@ -1704,6 +1704,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   msgpack: "packages/msgpack/src/",
   marcel: "packages/marcel/src/",
   "mini-mime": "packages/mini-mime/src/",
+  "net-smtp": "packages/net-smtp/src/",
   rake: "packages/rake/src/",
   chronic: "packages/chronic/src/",
   builder: "packages/builder/src/",

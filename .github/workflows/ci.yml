@@ -939,6 +939,7 @@ jobs:
           packages/mini-magick
           packages/mini-mime
           packages/msgpack
+          packages/net-smtp
           packages/nokogiri
           packages/raabro
           packages/rake
@@ -1179,6 +1180,7 @@ jobs:
           packages/mini-magick
           packages/mini-mime
           packages/msgpack
+          packages/net-smtp
           packages/nokogiri
           packages/html-sanitizer
           packages/raabro

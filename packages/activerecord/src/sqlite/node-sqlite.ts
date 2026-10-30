@@ -1,4 +1,4 @@
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: databaseExists, open. */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
 import { createRequire } from "node:module";
 import { File, LoadError } from "@blazetrails/ruby-compat";
 import {

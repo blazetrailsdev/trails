@@ -937,7 +937,16 @@ export const SOURCES: readonly UpstreamSource[] = [
       url: "https://github.com/ruby/net-smtp.git",
       ref: "v0.5.1",
     },
-    packages: [],
+    packages: [
+      {
+        name: "net-smtp",
+        libPath: "lib/net/smtp",
+        libEntryFile: "lib/net/smtp.rb",
+        testPath: "test",
+        compareApi: true,
+        compareTests: true,
+      },
+    ],
   },
 ];
 
