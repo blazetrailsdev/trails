@@ -191,7 +191,7 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Result> {
-  const timeout = Number((this as unknown as AbstractAdapter)["_config"]["timeout"] ?? 0);
+  const timeout = rawConnection.busyHandlerTimeout ?? 0;
   let result: Result;
   if (batch) {
     await execBatch(rawConnection, sql, timeout);

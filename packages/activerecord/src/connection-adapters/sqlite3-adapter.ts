@@ -1052,6 +1052,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
         throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
       }
+      this._rawConnection!.busyHandlerTimeout = timeout;
       await Pragmas.setBusyTimeout.call(this._rawConnection!, 0);
     } else if (rtest(this._config["retries"])) {
       deprecator().warn(
