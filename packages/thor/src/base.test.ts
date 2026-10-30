@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { isEmpty, rbObjRespondTo, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
-import { Base as ThorBase, type BaseClass } from "./base.js";
+import { Base as ThorBase } from "./base.js";
 import {
   AtLeastOneRequiredArgumentError,
   ExclusiveArgumentError,
@@ -23,10 +23,7 @@ import {
 } from "./test-helpers/fixtures/script.js";
 import type { ThorClass } from "./thor.js";
 
-type AnyClass = Omit<BaseClass & ThorClass, "prototype"> & {
-  new (...args: unknown[]): any;
-  prototype: any;
-};
+type AnyClass = Record<string, any> & (new (...args: unknown[]) => any);
 
 const myCounter = MyCounter as unknown as AnyClass;
 const brokenCounter = BrokenCounter as unknown as AnyClass;
@@ -46,6 +43,10 @@ function assertRespondTo(obj: object, meth: string): void {
 
 function assertNotRespondTo(obj: object, meth: string): void {
   if (rbObjRespondTo(obj, meth)) throw new globalThis.Error(`Expected not to respond to ${meth}.`);
+}
+
+function raiseError(klass: unknown, message: unknown): ReturnType<typeof expect.objectContaining> {
+  return expect.objectContaining({ constructor: klass, message });
 }
 
 function shellNew(): Basic {
@@ -140,19 +141,13 @@ describe("Thor::Base", () => {
       await expect(
         myClassOptionScript.start(["mix", "--one", "--two", "--three", "--five"]),
       ).rejects.toThrow(
-        expect.objectContaining({
-          constructor: ExclusiveArgumentError,
-          message: "Found exclusive options '--one', '--two'",
-        }),
+        raiseError(ExclusiveArgumentError, "Found exclusive options '--one', '--two'"),
       );
 
       await expect(
         myClassOptionScript.start(["mix", "--one", "--three", "--five", "--six"]),
       ).rejects.toThrow(
-        expect.objectContaining({
-          constructor: ExclusiveArgumentError,
-          message: "Found exclusive options '--five', '--six'",
-        }),
+        raiseError(ExclusiveArgumentError, "Found exclusive options '--five', '--six'"),
       );
     });
   });
@@ -160,19 +155,18 @@ describe("Thor::Base", () => {
   describe("#class_at_least_one", () => {
     it("raise error when at least one of required options are not given", async () => {
       setEnv("THOR_DEBUG", "1");
-
       await expect(myClassOptionScript.start(["mix", "--five"])).rejects.toThrow(
-        expect.objectContaining({
-          constructor: AtLeastOneRequiredArgumentError,
-          message: "Not found at least one of required options '--three', '--four'",
-        }),
+        raiseError(
+          AtLeastOneRequiredArgumentError,
+          "Not found at least one of required options '--three', '--four'",
+        ),
       );
 
       await expect(myClassOptionScript.start(["mix", "--one", "--three"])).rejects.toThrow(
-        expect.objectContaining({
-          constructor: AtLeastOneRequiredArgumentError,
-          message: "Not found at least one of required options '--five', '--six', '--seven'",
-        }),
+        raiseError(
+          AtLeastOneRequiredArgumentError,
+          "Not found at least one of required options '--five', '--six', '--seven'",
+        ),
       );
     });
   });
@@ -360,25 +354,25 @@ describe("Thor::Base", () => {
       setEnv("THOR_DEBUG", "1");
 
       await expect(myScript.start(["what", "--debug"])).rejects.toThrow(
-        expect.objectContaining({
-          constructor: UndefinedCommandError,
-          message: 'Could not find command "what" in "my_script" namespace.',
-        }),
+        raiseError(
+          UndefinedCommandError,
+          'Could not find command "what" in "my_script" namespace.',
+        ),
       );
     });
 
     it("raises an error instead of rescuing if :debug option is given", async () => {
       await expect(myScript.start(["what"], { debug: true })).rejects.toThrow(
-        expect.objectContaining({
-          constructor: UndefinedCommandError,
-          message: 'Could not find command "what" in "my_script" namespace.',
-        }),
+        raiseError(
+          UndefinedCommandError,
+          'Could not find command "what" in "my_script" namespace.',
+        ),
       );
     });
 
     it("suggests commands that are similar if there is a typo", async () => {
-      let expected = 'Could not find command "paintz" in "barn" namespace.\n';
-      expected += 'Did you mean?  "paint"\n';
+      const expected =
+        'Could not find command "paintz" in "barn" namespace.\nDid you mean?  "paint"\n';
 
       expect(
         await capture(":stderr", () => (Barn as unknown as AnyClass).start(["paintz"])),

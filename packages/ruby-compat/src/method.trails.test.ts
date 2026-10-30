@@ -178,15 +178,10 @@ describe("rbObjMethods", () => {
   });
 
   it("lists an attr_reader as the name and an attr_writer as the name with =", () => {
-    class Attrs {
-      get reader(): number {
-        return 1;
-      }
-      set writer(_value: number) {}
-    }
-    expect(rbObjMethods(new Attrs())).toEqual(expect.arrayContaining(["reader", "writer="]));
-    expect(rbObjMethods(new Attrs())).not.toContain("reader=");
-    expect(rbObjMethods(new Attrs())).not.toContain("__proto__");
+    const attrs = Object.defineProperties({}, { reader: { get: () => 1 }, writer: { set() {} } });
+    expect(rbObjMethods(attrs)).toEqual(expect.arrayContaining(["reader", "writer="]));
+    expect(rbObjMethods(attrs)).not.toContain("reader=");
+    expect(rbObjMethods(attrs)).not.toContain("__proto__");
   });
 });
 

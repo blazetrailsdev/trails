@@ -11,13 +11,7 @@ import {
 import { capture, isWindows, sourceRoot } from "../test-helpers/helper.js";
 import { MyCounter } from "../test-helpers/fixtures/group.js";
 
-type Runner = {
-  inside(dir: string, config: object, block: () => unknown): Promise<unknown>;
-  template(source: string, ...args: unknown[]): Promise<unknown>;
-  klass?: string;
-  filename?: () => string;
-  fileName?: () => string;
-} & Record<string, (...args: unknown[]) => Promise<unknown>>;
+type Runner = Record<string, any>;
 
 function assertEmpty(obj: string): void {
   if (!isEmpty(obj)) throw new globalThis.Error(`Expected ${JSON.stringify(obj)} to be empty.`);
