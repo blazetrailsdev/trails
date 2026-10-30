@@ -12,6 +12,7 @@ describe("Mail::Encodings", () => {
   describe("B encodings", () => {
     it("should accept other encodings", () => {
       expect(Encodings.bValueEncode(a)).toEqual(b64);
+      expect(Encodings.bValueEncode(a, "UTF-8")).toEqual(b64);
     });
 
     it("should correctly encode long string mixing with single/multi-byte characters", () => {
@@ -61,6 +62,7 @@ describe("Mail::Encodings", () => {
   describe("Q encodings", () => {
     it("should accept other character sets", () => {
       expect(Encodings.qValueEncode(a)).toEqual(qp);
+      expect(Encodings.qValueEncode(a, "UTF-8")).toEqual(qp);
     });
 
     it("should decode an encoded string", () => {
@@ -100,15 +102,17 @@ describe("Mail::Encodings", () => {
     });
   });
 
-  describe("unquote and convert to", () => {
-    it("should unquote and change to an ISO encoding if we really want", () => {
-      const b = Encodings.unquoteAndConvertTo("=?ISO-8859-1?Q?Brosch=FCre_Rand?=", "iso-8859-1");
-      expect(b).toEqual(Uint8Array.from("Brosch\xfcre Rand", (c) => c.charCodeAt(0)));
-    });
+  describe("altering an encoded text to decoded and visa versa", () => {
+    describe("unquote and convert to", () => {
+      it("should unquote and change to an ISO encoding if we really want", () => {
+        const b = Encodings.unquoteAndConvertTo("=?ISO-8859-1?Q?Brosch=FCre_Rand?=", "iso-8859-1");
+        expect(b).toEqual(Uint8Array.from("Brosch\xfcre Rand", (c) => c.charCodeAt(0)));
+      });
 
-    it("handles Windows 1252 QP encoding", () => {
-      const a = "=?WINDOWS-1252?Q?simple_=96_dash_=96_?=";
-      expect(Encodings.unquoteAndConvertTo(a, "utf-8")).toEqual("simple – dash – ");
+      it("handles Windows 1252 QP encoding", () => {
+        const a = "=?WINDOWS-1252?Q?simple_=96_dash_=96_?=";
+        expect(Encodings.unquoteAndConvertTo(a, "utf-8")).toEqual("simple – dash – ");
+      });
     });
   });
 
