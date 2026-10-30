@@ -1,32 +1,42 @@
 import { registerClassPaths } from "@blazetrails/ruby-compat";
 import * as m0 from "./base-job.js";
-import * as m1 from "./current.js";
-import * as m2 from "./errors.js";
-import * as m3 from "./filename.js";
-import * as m4 from "./gem-version.js";
-import * as m5 from "./log-subscriber.js";
-import * as m6 from "./record.js";
-import * as m7 from "./service.js";
-import * as m8 from "./service/configurator.js";
-import * as m9 from "./service/disk-service.js";
-import * as m10 from "./service/registry.js";
+import * as m1 from "./blob.js";
+import * as m2 from "./blob/identifiable.js";
+import * as m3 from "./blob/servable.js";
+import * as m4 from "./current.js";
+import * as m5 from "./downloader.js";
+import * as m6 from "./errors.js";
+import * as m7 from "./filename.js";
+import * as m8 from "./gem-version.js";
+import * as m9 from "./log-subscriber.js";
+import * as m10 from "./purge-job.js";
+import * as m11 from "./record.js";
+import * as m12 from "./service.js";
+import * as m13 from "./service/configurator.js";
+import * as m14 from "./service/disk-service.js";
+import * as m15 from "./service/registry.js";
 
 registerClassPaths([
   [() => m0.BaseJob, "ActiveStorage::BaseJob"],
-  [() => m1.Current, "ActiveStorage::Current"],
-  [() => m2.Error, "ActiveStorage::Error"],
-  [() => m3.Filename, "ActiveStorage::Filename"],
-  [() => m2.FileNotFoundError, "ActiveStorage::FileNotFoundError"],
-  [() => m2.IntegrityError, "ActiveStorage::IntegrityError"],
-  [() => m2.InvariableError, "ActiveStorage::InvariableError"],
-  [() => m5.LogSubscriber, "ActiveStorage::LogSubscriber"],
-  [() => m2.PreviewError, "ActiveStorage::PreviewError"],
-  [() => m6.Record, "ActiveStorage::Record"],
-  [() => m7.Service, "ActiveStorage::Service"],
-  [() => m8.Configurator, "ActiveStorage::Service::Configurator"],
-  [() => m9.DiskService, "ActiveStorage::Service::DiskService"],
-  [() => m10.Registry, "ActiveStorage::Service::Registry"],
-  [() => m2.UnpreviewableError, "ActiveStorage::UnpreviewableError"],
-  [() => m2.UnrepresentableError, "ActiveStorage::UnrepresentableError"],
-  [() => m4.VERSION, "ActiveStorage::VERSION"],
+  [() => m1.Blob, "ActiveStorage::Blob"],
+  [() => m2.Identifiable, "ActiveStorage::Blob::Identifiable"],
+  [() => m3.Servable, "ActiveStorage::Blob::Servable"],
+  [() => m4.Current, "ActiveStorage::Current"],
+  [() => m5.Downloader, "ActiveStorage::Downloader"],
+  [() => m6.Error, "ActiveStorage::Error"],
+  [() => m7.Filename, "ActiveStorage::Filename"],
+  [() => m6.FileNotFoundError, "ActiveStorage::FileNotFoundError"],
+  [() => m6.IntegrityError, "ActiveStorage::IntegrityError"],
+  [() => m6.InvariableError, "ActiveStorage::InvariableError"],
+  [() => m9.LogSubscriber, "ActiveStorage::LogSubscriber"],
+  [() => m6.PreviewError, "ActiveStorage::PreviewError"],
+  [() => m10.PurgeJob, "ActiveStorage::PurgeJob"],
+  [() => m11.Record, "ActiveStorage::Record"],
+  [() => m12.Service, "ActiveStorage::Service"],
+  [() => m13.Configurator, "ActiveStorage::Service::Configurator"],
+  [() => m14.DiskService, "ActiveStorage::Service::DiskService"],
+  [() => m15.Registry, "ActiveStorage::Service::Registry"],
+  [() => m6.UnpreviewableError, "ActiveStorage::UnpreviewableError"],
+  [() => m6.UnrepresentableError, "ActiveStorage::UnrepresentableError"],
+  [() => m8.VERSION, "ActiveStorage::VERSION"],
 ]);

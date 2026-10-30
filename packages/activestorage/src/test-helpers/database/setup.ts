@@ -2,6 +2,13 @@ import { afterAll } from "vitest";
 import { EnvironmentInquirer, getEnv, TopLevel } from "@blazetrails/activesupport";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/activerecord";
+import { Engine } from "@blazetrails/trailties/engine";
+import { File, Dir } from "@blazetrails/ruby-compat";
+import "../../class-paths.generated.js";
+import { ActiveStorage } from "../../active-storage.js";
+import { Blob } from "../../blob.js";
+import { Registry } from "../../service/registry.js";
+import "../../service/configurator.js";
 import { ActiveStorageCreateUsers } from "./create-users-migration.js";
 import { ActiveStorageCreateGroups } from "./create-groups-migration.js";
 
@@ -13,6 +20,19 @@ TopLevel.Trails = {
   env: TopLevel.Trails?.env ?? new EnvironmentInquirer(envName),
   configuration: { generators: configuration.appGenerators.bind(configuration) },
 } as unknown as typeof TopLevel.Trails;
+
+class ActiveStorageEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+    this.isolateNamespace(ActiveStorage as never);
+  }
+}
+void ActiveStorageEngine;
+
+Blob.services = new Registry({
+  local: { service: "Disk", root: File.join(Dir.tmpdir(), "active_storage_blobs") },
+});
+Blob.service = Blob.services.fetch("local");
 
 const configurations = Base.configurations();
 const arunit = configurations.configsFor({ envName: "arunit", name: "primary" })!;
@@ -47,6 +67,7 @@ await Base.connectsTo({
 await Base.connectionPool().migrationContext.migrate();
 await ActiveStorageCreateUsers.migrate("up");
 await ActiveStorageCreateGroups.migrate("up");
+await Blob.loadSchema();
 
 afterAll(async () => {
   await Base.establishConnection(arunit);

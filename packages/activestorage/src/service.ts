@@ -1,6 +1,7 @@
 import { Notifications, presenceIn } from "@blazetrails/activesupport";
 import { ContentDisposition } from "@blazetrails/actionpack";
-import { NotImplementedError, rbModName } from "@blazetrails/ruby-compat";
+import { NotImplementedError, rbModName, type Tempfile } from "@blazetrails/ruby-compat";
+import { Downloader } from "./downloader.js";
 import { ActiveStorage } from "./active-storage.js";
 import type { Filename } from "./filename.js";
 import type { Configurator } from "./service/configurator.js";
@@ -43,12 +44,26 @@ export class Service {
 
   async updateMetadata(_key: string, _metadata: Record<string, unknown> = {}): Promise<void> {}
 
-  async download(_key: string): Promise<Uint8Array> {
+  async download(_key: string): Promise<Uint8Array>;
+  async download(_key: string, _block: (chunk: Uint8Array) => unknown): Promise<void>;
+  async download(_key: string, _block?: (chunk: Uint8Array) => unknown): Promise<Uint8Array | void>;
+  async download(
+    _key: string,
+    _block?: (chunk: Uint8Array) => unknown,
+  ): Promise<Uint8Array | void> {
     throw new NotImplementedError();
   }
 
   async downloadChunk(_key: string, _range: unknown): Promise<Uint8Array> {
     throw new NotImplementedError();
+  }
+
+  async open<T>(
+    key: string,
+    options: Parameters<Downloader["open"]>[1],
+    block: (file: Tempfile) => T,
+  ): Promise<Awaited<T>> {
+    return await new Downloader(this).open(key, options, block);
   }
 
   async compose(

@@ -9,7 +9,7 @@ export class AddServiceNameToActiveStorageBlobs extends Migration.get(6.0) {
       await this.addColumn("active_storage_blobs", "service_name", "string");
 
       let configuredService: string | null;
-      if ((configuredService = ActiveStorage.Blob!.service.name) != null) {
+      if ((configuredService = ActiveStorage.Blob!.service!.name) != null) {
         await ActiveStorage.Blob!.unscoped().updateAll({ service_name: configuredService });
       }
 

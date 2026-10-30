@@ -1,6 +1,5 @@
 import { isBlank, TopLevel, type Duration } from "@blazetrails/activesupport";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
-import type { RouteSet } from "@blazetrails/actionpack";
 import {
   ArgumentError,
   Dir,
@@ -46,6 +45,10 @@ export class DiskService extends Service {
   override async download(
     key: string,
     block?: (chunk: Uint8Array) => unknown,
+  ): Promise<Uint8Array | void>;
+  override async download(
+    key: string,
+    block?: (chunk: Uint8Array) => unknown,
   ): Promise<Uint8Array | void> {
     if (block !== undefined) {
       return await this.instrument("streaming_download", { key: key }, async () => {
@@ -63,6 +66,7 @@ export class DiskService extends Service {
     }
   }
 
+  /** @missingRailsCall open — CONVERGEABLE disk-service-reads-through-file-open */
   override async downloadChunk(key: string, range: Range<number>): Promise<Uint8Array> {
     return await this.instrument("download_chunk", { key: key, range: range }, async () => {
       try {
@@ -152,6 +156,7 @@ export class DiskService extends Service {
     return File.join(this.root, this.folderFor(key), key);
   }
 
+  /** @missingRailsCall open — CONVERGEABLE disk-service-reads-through-file-open */
   override async compose(
     sourceKeys: string[],
     destinationKey: string,
@@ -252,7 +257,10 @@ export class DiskService extends Service {
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall open — CONVERGEABLE disk-service-reads-through-file-open
+   */
   private async stream(key: string, block: (chunk: Uint8Array) => unknown): Promise<void> {
     try {
       const path = this.pathFor(key);
@@ -290,9 +298,7 @@ export class DiskService extends Service {
 
   /** @internal */
   private urlHelpers(): UrlHelpers {
-    return (this._urlHelpers ??= (
-      TopLevel.Trails!.application!.routes() as unknown as RouteSet
-    ).urlHelpers() as unknown as UrlHelpers);
+    return (this._urlHelpers ??= TopLevel.Trails!.application!.routes().urlHelpers() as UrlHelpers);
   }
 
   /** @internal */

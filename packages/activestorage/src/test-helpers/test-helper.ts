@@ -1,3 +1,5 @@
+import { StringIO } from "@blazetrails/ruby-compat";
+import { Blob } from "../blob.js";
 import { Base, registerModel } from "@blazetrails/activerecord";
 import type { AssociationProxy } from "@blazetrails/activerecord/associations/collection-proxy";
 
@@ -31,3 +33,56 @@ export class Group extends Base {
   }
 }
 registerModel(Group);
+
+export async function createBlob({
+  key = null,
+  data = "Hello world!",
+  filename = "hello.txt",
+  contentType = "text/plain",
+  identify = true,
+  serviceName = null,
+  record = null,
+}: {
+  key?: string | null;
+  data?: string;
+  filename?: string;
+  contentType?: string | null;
+  identify?: boolean;
+  serviceName?: string | null;
+  record?: unknown;
+} = {}): Promise<Blob> {
+  return await Blob.createAndUploadBang({
+    key: key,
+    io: new StringIO(data),
+    filename: filename,
+    contentType: contentType,
+    identify: identify,
+    serviceName: serviceName,
+    record: record,
+  });
+}
+
+export function buildBlobAfterUnfurling({
+  key = null,
+  data = "Hello world!",
+  filename = "hello.txt",
+  contentType = "text/plain",
+  identify = true,
+  record = null,
+}: {
+  key?: string | null;
+  data?: string;
+  filename?: string;
+  contentType?: string | null;
+  identify?: boolean;
+  record?: unknown;
+} = {}): Blob {
+  return Blob.buildAfterUnfurling({
+    key: key,
+    io: new StringIO(data),
+    filename: filename,
+    contentType: contentType,
+    identify: identify,
+    record: record,
+  });
+}

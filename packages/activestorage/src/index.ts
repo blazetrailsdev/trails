@@ -12,3 +12,6 @@ export { BaseJob } from "./base-job.js";
 export { Service } from "./service.js";
 export { Registry } from "./service/registry.js";
 export { Configurator } from "./service/configurator.js";
+export { Blob } from "./blob.js";
+export { Downloader } from "./downloader.js";
+export { PurgeJob } from "./purge-job.js";
