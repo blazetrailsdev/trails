@@ -36,7 +36,7 @@ export function rbExecargNew(
   if (rest.length > 0 && isPlainHash(rest[rest.length - 1])) {
     opthash = rest.pop() as { out?: string; unsetenvOthers?: unknown };
     for (const key of Object.keys(opthash)) {
-      if (EXEC_OPTIONS.has(key) || key.startsWith("rlimit") || /^\d+$/.test(key)) continue;
+      if (EXEC_OPTIONS.has(key) || key.startsWith("rlimit_") || /^\d+$/.test(key)) continue;
       throw new ArgumentError(`wrong exec option symbol: ${key}`);
     }
   }

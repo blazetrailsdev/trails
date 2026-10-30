@@ -1,3 +1,1 @@
-import type { FileUtilsExt } from "./file-utils-ext.js";
-
-export const Rake: { FileUtilsExt?: typeof FileUtilsExt } = {};
+export const Rake: { FileUtilsExt?: typeof import("./file-utils-ext.js").FileUtilsExt } = {};

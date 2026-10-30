@@ -11,16 +11,14 @@ import {
 import { FileUtils } from "./file-utils.js";
 import { Rake } from "./rake-module.js";
 
-type Options = { verbose?: boolean; noop?: boolean; [key: string]: unknown };
+type FU = typeof StdlibFileUtils;
 
 export const FileUtilsExt = {
   verboseFlag: null as unknown,
-
   nowriteFlag: null as unknown,
-
   DEFAULT: {} as object,
 
-  async mkdirP(list: string | string[], options: Options = {}): Promise<unknown> {
+  async mkdirP(list: string | string[], options: Parameters<FU["mkdirPAsync"]>[1] = {}) {
     return StdlibFileUtils.mkdirPAsync(list, {
       verbose: FileUtilsExt.verboseFlag as boolean,
       noop: FileUtilsExt.nowriteFlag as boolean,
@@ -28,7 +26,7 @@ export const FileUtilsExt = {
     });
   },
 
-  async ln(src: string | string[], dest: string, options: Options = {}): Promise<unknown> {
+  async ln(src: string | string[], dest: string, options: Parameters<FU["lnAsync"]>[2] = {}) {
     return StdlibFileUtils.lnAsync(src, dest, {
       verbose: FileUtilsExt.verboseFlag as boolean,
       noop: FileUtilsExt.nowriteFlag as boolean,
@@ -36,7 +34,7 @@ export const FileUtilsExt = {
     });
   },
 
-  async cp(src: string | string[], dest: string, options: Options = {}): Promise<unknown> {
+  async cp(src: string | string[], dest: string, options: Parameters<FU["cpAsync"]>[2] = {}) {
     return StdlibFileUtils.cpAsync(src, dest, {
       verbose: FileUtilsExt.verboseFlag as boolean,
       noop: FileUtilsExt.nowriteFlag as boolean,
@@ -44,7 +42,7 @@ export const FileUtilsExt = {
     });
   },
 
-  async rmR(list: string | string[], options: Options = {}): Promise<unknown> {
+  async rmR(list: string | string[], options: Parameters<FU["rmRAsync"]>[1] = {}) {
     return StdlibFileUtils.rmRAsync(list, {
       verbose: FileUtilsExt.verboseFlag as boolean,
       noop: FileUtilsExt.nowriteFlag as boolean,
@@ -52,7 +50,7 @@ export const FileUtilsExt = {
     });
   },
 
-  async rmRf(list: string | string[], options: Options = {}): Promise<unknown> {
+  async rmRf(list: string | string[], options: Parameters<FU["rmRfAsync"]>[1] = {}) {
     return StdlibFileUtils.rmRfAsync(list, {
       verbose: FileUtilsExt.verboseFlag as boolean,
       noop: FileUtilsExt.nowriteFlag as boolean,
@@ -60,7 +58,11 @@ export const FileUtilsExt = {
     });
   },
 
-  async chmodR(mode: number, list: string | string[], options: Options = {}): Promise<unknown> {
+  async chmodR(
+    mode: number,
+    list: string | string[],
+    options: Parameters<FU["chmodRAsync"]>[2] = {},
+  ) {
     return StdlibFileUtils.chmodRAsync(mode, list, {
       verbose: FileUtilsExt.verboseFlag as boolean,
       noop: FileUtilsExt.nowriteFlag as boolean,

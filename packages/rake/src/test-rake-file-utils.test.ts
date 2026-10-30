@@ -20,13 +20,11 @@ import { FileUtils, FileUtilsExt as Ext } from "./rake.js";
 
 const FileUtilsExt = Ext as typeof Ext & typeof FileUtils;
 
-const { verbose, nowrite, sh, ruby, rmRf } = {
-  verbose: (...args: unknown[]) => FileUtilsExt.verbose(...args),
-  nowrite: (...args: unknown[]) => FileUtilsExt.nowrite(...args),
-  sh: (...args: unknown[]) => FileUtilsExt.sh(...args),
-  ruby: (...args: unknown[]) => FileUtilsExt.ruby(...args),
-  rmRf: (...args: [string | string[], { noop?: boolean }?]) => FileUtilsExt.rmRf(...args),
-};
+const verbose = FileUtilsExt.verbose.bind(FileUtilsExt);
+const nowrite = FileUtilsExt.nowrite.bind(FileUtilsExt);
+const sh = FileUtilsExt.sh.bind(FileUtilsExt);
+const ruby = FileUtilsExt.ruby.bind(FileUtilsExt);
+const rmRf = FileUtilsExt.rmRf.bind(FileUtilsExt);
 
 async function isExist(name: string): Promise<boolean> {
   return (await getFs().stat!(name).catch(() => null)) != null;
