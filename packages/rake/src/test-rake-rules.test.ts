@@ -38,7 +38,6 @@ describe("TestRakeRules", () => {
   const name = (t: Task) => void runs.push(t.name);
   const nameAndSource = (t: Task) => void runs.push(`${t.name} - ${t.source}`);
   const log = (entry: string) => () => void runs.push(entry);
-  const assertArg = (_t: Task, args: TaskArguments) => expect(args.a).toEqual("arg");
   const invoke = async (taskName: string, ...args: unknown[]) =>
     (await Task.get(taskName)).invoke(...args);
 
@@ -293,8 +292,8 @@ describe("TestRakeRules", () => {
       rule(`.${letter}`, `.${prev}`, (t) => puts.call($stdout, t.name));
       prev = letter;
     }
+    await expect(invoke("a.z")).rejects.toThrow(RuleRecursionOverflowError);
     const ex = await invoke("a.z").catch((e: unknown) => e);
-    expect(ex).toBeInstanceOf(RuleRecursionOverflowError);
     expect((ex as Error).message).toMatch(/a\.z => a.y/);
   });
 
@@ -306,14 +305,18 @@ describe("TestRakeRules", () => {
   it("string rule with args", async () => {
     await deleteFile(OBJFILE);
     await createFile(SRCFILE);
-    ruleWithArgs(".o", SRCFILE, assertArg);
+    ruleWithArgs(".o", SRCFILE, (_t, args) => {
+      expect(args.a).toEqual("arg");
+    });
     await invoke(OBJFILE, "arg");
   });
 
   it("regex rule with args", async () => {
     await deleteFile(OBJFILE);
     await createFile(SRCFILE);
-    ruleWithArgs(/.o$/, SRCFILE, assertArg);
+    ruleWithArgs(/.o$/, SRCFILE, (_t, args) => {
+      expect(args.a).toEqual("arg");
+    });
     await invoke(OBJFILE, "arg");
   });
 
@@ -328,14 +331,18 @@ describe("TestRakeRules", () => {
   it("string rule with args and lambda prereq", async () => {
     await deleteFile(OBJFILE);
     await createFile(SRCFILE);
-    ruleWithArgs(".o", [() => SRCFILE], assertArg);
+    ruleWithArgs(".o", [() => SRCFILE], (_t, args) => {
+      expect(args.a).toEqual("arg");
+    });
     await invoke(OBJFILE, "arg");
   });
 
   it("regex rule with args and lambda prereq", async () => {
     await deleteFile(OBJFILE);
     await createFile(SRCFILE);
-    ruleWithArgs(/.o$/, [() => SRCFILE], assertArg);
+    ruleWithArgs(/.o$/, [() => SRCFILE], (_t, args) => {
+      expect(args.a).toEqual("arg");
+    });
     await invoke(OBJFILE, "arg");
   });
 
