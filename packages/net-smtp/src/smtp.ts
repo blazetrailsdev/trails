@@ -483,6 +483,7 @@ export class SMTP {
   /**
    * @internal
    * @missingRailsCall critical — PERMANENT
+   * @missingRailsCall check_response — PERMANENT
    * @missingRailsArgs do_helo — PERMANENT
    */
   private async doStart(
@@ -660,7 +661,6 @@ export class SMTP {
     return await this.getok([`RCPT TO:<${addr.address}>`, ...addr.parameters].join(" "));
   }
 
-  /** @missingRailsArgs write_message — PERMANENT */
   async data(msgstr: string): Promise<Response> {
     const res = await this.critical(async () => {
       this.checkContinue(await this.getResponse("DATA"));
