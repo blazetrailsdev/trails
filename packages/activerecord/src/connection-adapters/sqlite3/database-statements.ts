@@ -4,6 +4,7 @@ import { b, rbRegMatchP, StandardError } from "@blazetrails/ruby-compat";
 import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
+import { execBatch, retryBusy } from "../../sqlite/busy-wait.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import {
   combineMultiStatements,
@@ -190,34 +191,37 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Result> {
+  const timeout = rawConnection.busyHandlerTimeout ?? 0;
   let result: Result;
   if (batch) {
-    await rawConnection.exec(sql);
+    await execBatch(rawConnection, sql, timeout);
     result = Result.empty();
   } else if (prepare) {
-    const stmt = await this._cachedStatement(rawConnection, sql);
+    const stmt = await retryBusy(timeout, () => this._cachedStatement(rawConnection, sql));
     stmt.bindParams(typeCastedBinds);
 
     if (!stmt.reader) {
-      await stmt.step();
+      await retryBusy(timeout, () => stmt.step());
       result = Result.empty();
     } else {
       const columns = stmt.columns().map((c) => c.name);
-      result = new Result(columns, await stmt.toA());
+      const toA = await retryBusy(timeout, () => stmt.toA());
+      result = new Result(columns, toA);
       this._narrowSpilledBigInts(stmt, result.rows);
     }
   } else {
-    const stmt = await this._freshStatement(rawConnection, sql);
+    const stmt = await retryBusy(timeout, () => this._freshStatement(rawConnection, sql));
     try {
       if (!(binds == null || binds.length === 0)) {
         stmt.bindParams(typeCastedBinds);
       }
       if (!stmt.reader) {
-        await stmt.step();
+        await retryBusy(timeout, () => stmt.step());
         result = Result.empty();
       } else {
         const columns = stmt.columns().map((c) => c.name);
-        result = new Result(columns, await stmt.toA());
+        const toA = await retryBusy(timeout, () => stmt.toA());
+        result = new Result(columns, toA);
         this._narrowSpilledBigInts(stmt, result.rows);
       }
     } finally {
