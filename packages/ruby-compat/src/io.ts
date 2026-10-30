@@ -878,9 +878,21 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO.copy_stream`
    * (`vendor/ruby/v3.3.11/io.c:13365`).
    */
-  static async copyStreamAsync(src: { read(): string | Uint8Array }, dst: string): Promise<number> {
-    const data = src.read();
-    const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  static async copyStreamAsync(
+    src: { read(length?: number): string | Uint8Array | null },
+    dst: string,
+  ): Promise<number> {
+    const chunks: Uint8Array[] = [];
+    let data: string | Uint8Array | null;
+    while ((data = src.read(16384)) != null && data.length > 0) {
+      chunks.push(typeof data === "string" ? new TextEncoder().encode(data) : data);
+    }
+    const bytes = new Uint8Array(chunks.reduce((size, chunk) => size + chunk.length, 0));
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
     const fs = getFs();
     if (fs.writeFile) await fs.writeFile(dst, bytes);
     else fs.writeFileSync(dst, bytes);

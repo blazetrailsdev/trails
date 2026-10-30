@@ -1,9 +1,12 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, type Extended } from "@blazetrails/activesupport";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { ActionController } from "@blazetrails/actionpack";
 import { Image } from "@blazetrails/mini-magick/image";
 import { File, IO, OpenSSL, StringIO } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
+import type { ClassMethods } from "../attached/model.js";
+import type { Attachment } from "../attachment.js";
+import type { One } from "../attached/one.js";
 import { Blob } from "../blob.js";
 import { FixtureSet } from "../fixture-set.js";
 import { Service } from "../service.js";
@@ -16,8 +19,20 @@ export class User extends Base {
   declare recordCallbacks: boolean | undefined;
   declare callbackCounter: number | undefined;
 
+  declare avatar: One;
+  declare coverPhoto: One;
+  declare avatarAttachment: Attachment | null | Promise<Attachment | null>;
+  declare avatarBlob: Blob | null | Promise<Blob | null>;
+  declare setAvatar: (attachable: unknown) => Promise<void>;
+  declare setCoverPhoto: (attachable: unknown) => Promise<void>;
+  declare attachmentChanges: { [k: string]: unknown };
+
   static {
     this.validates("name", { presence: true });
+
+    const attached = this as unknown as Extended<typeof ClassMethods>;
+    attached.hasOneAttached("avatar");
+    attached.hasOneAttached("coverPhoto", { dependent: false, service: "local" });
 
     this.afterCommit((user: User) => user.incrementCallbackCounter());
   }
@@ -48,7 +63,7 @@ export const SERVICE_CONFIGURATIONS = {
   local: { service: "Disk", root: File.join(import.meta.dirname, "../../tmp/storage") },
 };
 
-function fileFixture(fixtureName: string): string {
+export function fileFixture(fixtureName: string): string {
   return new FixtureSet().fileFixture(fixtureName);
 }
 

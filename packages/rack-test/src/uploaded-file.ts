@@ -9,6 +9,7 @@ import {
   Tempfile,
   methodMissingProxy,
   rbObjClassname,
+  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the merge is how the delegated surface reaches the class type. */
@@ -59,6 +60,10 @@ export class UploadedFile {
     if (binary) this.tempfile.binmode();
 
     return methodMissingProxy(this, { delegate: (uploadedFile) => uploadedFile.tempfile });
+  }
+
+  respondToMissing(methodName: string, _includePrivate: boolean = false): boolean {
+    return rbObjRespondTo(this.tempfile, methodName);
   }
 
   get path(): string | null {
