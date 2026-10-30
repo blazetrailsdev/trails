@@ -247,10 +247,7 @@ export class Application {
     });
   }
 
-  /**
-   * @internal
-   * @inventedArm eval — PERMANENT
-   */
+  /** @internal */
   standardRakeOptions(): OptionSpec[] {
     const options = this.options;
     return this.sortOptions([
