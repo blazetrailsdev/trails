@@ -18,10 +18,11 @@ export const Shellwords = {
     let field = "";
     const re =
       /[ \t\r\n\f\v]*(?:([^ \t\r\n\f\v\\'"]+)|'([^']*)'|"((?:[^"\\]|\\.)*)"|(\\.?)|([^ \t\r\n\f\v]))([ \t\r\n\f\v]|$(?![\s\S]))?/gsy;
-    for (const [, word, sq, dq, esc, garbage, sep] of line.matchAll(re)) {
+    for (const match of line.matchAll(re)) {
+      const [matched, word, sq, dq, esc, garbage, sep] = match;
       if (garbage !== undefined) throw new ArgumentError(`Unmatched quote: ${rbInspect(line)}`);
       field += word ?? sq ?? dq?.replace(/\\([$`"\\\n])/g, "$1") ?? esc.replace(/\\(.)/gs, "$1");
-      if (sep !== undefined) {
+      if (sep !== undefined || match.index + matched.length === line.length) {
         words.push(field);
         field = "";
       }

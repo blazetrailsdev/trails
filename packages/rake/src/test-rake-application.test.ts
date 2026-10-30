@@ -6,9 +6,13 @@ import {
   RuntimeError,
   STDERR,
   STDOUT,
+  StandardError,
   SystemExit,
   env as ENV,
+  excSetBacktrace,
+  puts,
   setEnv,
+  stdout as $stdout,
 } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Rake } from "./rake-module.js";
@@ -249,6 +253,303 @@ describe("TestRakeApplication", () => {
 
     expect(argv.includes("sometask")).toBeTruthy();
     expect(app.options.trace).toBeTruthy();
+  });
+
+  it("display exception details", async () => {
+    const ex = new RuntimeError("test");
+    excSetBacktrace(ex, ["ruby:1:in 'test_display_exception_details'"]);
+
+    const [out, err] = await captureOutput(() => {
+      app.setDefaultOptions();
+      app.displayErrorMessage(ex);
+    });
+
+    expect(out).toBeEmpty();
+
+    expect(err).toMatch("rake aborted!");
+    expect(err).toMatch("test_display_exception_details");
+  });
+
+  it("display exception details with detailed message", async () => {
+    class ErrorClass extends StandardError {
+      detailedMessage() {
+        return "detailed_message!!";
+      }
+    }
+    const ex = new ErrorClass();
+    excSetBacktrace(ex, ["ruby:1:in 'test_display_exception_details_with_detailed_message'"]);
+
+    const [out, err] = await captureOutput(() => {
+      app.setDefaultOptions();
+      app.displayErrorMessage(ex);
+    });
+
+    expect(out).toBeEmpty();
+
+    expect(err).toMatch("rake aborted!");
+    expect(err).toMatch("detailed_message!!");
+    expect(err).toMatch("test_display_exception_details_with_detailed_message");
+  });
+
+  it("display exception details bad encoding", async () => {
+    const ex = new RuntimeError("El Niño is coming!");
+
+    const [out, err] = await captureOutput(() => {
+      app.setDefaultOptions();
+      app.displayErrorMessage(ex);
+    });
+
+    expect(out).toBeEmpty();
+    expect(err).toMatch("El Niño is coming!");
+  });
+
+  it("display exception details cause", async () => {
+    const ex = new RuntimeError("cause b", { cause: new RuntimeError("cause a") });
+
+    const [out, err] = await captureOutput(() => {
+      app.setDefaultOptions();
+      app.displayErrorMessage(ex);
+    });
+
+    expect(out).toBeEmpty();
+
+    expect(err).toMatch("Caused by:");
+    expect(err).toMatch("cause a");
+    expect(err).toMatch("cause b");
+  });
+
+  it("display tasks", async () => {
+    app.options.showTasks = "tasks";
+    app.options.showTaskPattern = /(?:)/;
+    app.lastDescription = "COMMENT";
+    app.defineTask(Task, "t");
+    const [out] = await captureOutput(() => app.displayTasksAndComments());
+    expect(out).toMatch(/^rake t/m);
+    expect(out).toMatch(/# COMMENT/);
+  });
+
+  it("display tasks with long comments", async () => {
+    app.terminalColumns = 80;
+    app.options.showTasks = "tasks";
+    app.options.showTaskPattern = /(?:)/;
+    const numbers = "1234567890".repeat(8);
+    app.lastDescription = numbers;
+    app.defineTask(Task, "t");
+
+    const [out] = await captureOutput(() => app.displayTasksAndComments());
+
+    expect(out).toMatch(/^rake t/m);
+    expect(out).toMatch(`# ${numbers.slice(0, 65)}...`);
+  });
+
+  it("display tasks with task name wider than tty display", async () => {
+    app.terminalColumns = 80;
+    app.options.showTasks = "tasks";
+    app.options.showTaskPattern = /(?:)/;
+    const taskName = "task name".repeat(80);
+    app.lastDescription = "something short";
+    app.defineTask(Task, taskName);
+
+    const [out] = await captureOutput(() => app.displayTasksAndComments());
+
+    expect(out).toMatch(`rake ${taskName}  # ...`);
+  });
+
+  it("display tasks with very long task name to a non tty shows name and comment", async () => {
+    app.options.showTasks = "tasks";
+    app.options.showTaskPattern = /(?:)/;
+    app.ttyOutput = false;
+    const taskName = "task name".repeat(80);
+    app.lastDescription = "something short";
+    app.defineTask(Task, taskName);
+
+    const [out] = await captureOutput(() => app.displayTasksAndComments());
+
+    expect(out).toMatch(`rake ${taskName}  # something short`);
+  });
+
+  it("display tasks with long comments to a non tty shows entire comment", async () => {
+    app.options.showTasks = "tasks";
+    app.options.showTaskPattern = /(?:)/;
+    app.ttyOutput = false;
+    const comment = "1234567890".repeat(8);
+    app.lastDescription = comment;
+    app.defineTask(Task, "t");
+    const [out] = await captureOutput(() => app.displayTasksAndComments());
+    expect(out).toMatch(/^rake t/m);
+    expect(out).toMatch(`# ${comment}`);
+  });
+
+  it("truncating comments to a non tty", async () => {
+    app.terminalColumns = 80;
+    app.options.showTasks = "tasks";
+    app.options.showTaskPattern = /(?:)/;
+    app.ttyOutput = false;
+    const numbers = "1234567890".repeat(8);
+    app.lastDescription = numbers;
+    app.defineTask(Task, "t");
+
+    const [out] = await captureOutput(() => app.displayTasksAndComments());
+
+    expect(out).toMatch(/^rake t/m);
+    expect(out).toMatch(`# ${numbers.slice(0, 65)}...`);
+  });
+
+  it("describe tasks", async () => {
+    app.options.showTasks = "describe";
+    app.options.showTaskPattern = /(?:)/;
+    app.lastDescription = "COMMENT";
+    app.defineTask(Task, "t");
+    const [out] = await captureOutput(() => app.displayTasksAndComments());
+    expect(out).toMatch(/^rake t$/m);
+    expect(out).toMatch(/^ {4}COMMENT$/m);
+  });
+
+  it("show lines", async () => {
+    app.options.showTasks = "lines";
+    app.options.showTaskPattern = /(?:)/;
+    app.lastDescription = "COMMENT";
+    app.defineTask(Task, "t");
+    (await app.get("t")).locations.push("HERE:1");
+    const [out] = await captureOutput(() => app.displayTasksAndComments());
+    expect(out).toMatch(/^rake t +[^:]+:\d+ *$/m);
+  });
+
+  it("windows", () => {
+    expect(!(app.isWindows() && app.isUnix())).toBeTruthy();
+  });
+
+  it("good run", async () => {
+    let ran = false;
+
+    app.options.silent = true;
+
+    app.intern(Task, "default").enhance(null, () => {
+      ran = true;
+      puts.call($stdout, "DEFAULT");
+    });
+
+    await rakefileDefault();
+    const [out, err] = await captureOutput(() => app.run(['--rakelib=""']));
+
+    expect(ran).toBeTruthy();
+    expect(err).toBeEmpty();
+    expect(out).toBe("DEFAULT\n");
+  });
+
+  it("display task run", async () => {
+    const ran = false;
+    app.lastDescription = "COMMENT";
+    app.defineTask(Task, "default");
+    const [out] = await captureOutput(() => app.run(["-f", "-s", "--tasks", '--rakelib=""']));
+    expect(app.options.showTasks).toBeTruthy();
+    expect(!ran).toBeTruthy();
+    expect(out).toMatch(/rake default/);
+    expect(out).toMatch(/# COMMENT/);
+  });
+
+  it("display prereqs", async () => {
+    const ran = false;
+    app.lastDescription = "COMMENT";
+    const t = app.defineTask(Task, "default");
+    t.enhance(["a", "b"]);
+    app.defineTask(Task, "a");
+    app.defineTask(Task, "b");
+    const [out] = await captureOutput(() => app.run(["-f", "-s", "--prereqs", '--rakelib=""']));
+    expect(app.options.showPrereqs).toBeTruthy();
+    expect(!ran).toBeTruthy();
+    expect(out).toMatch(/rake a$/m);
+    expect(out).toMatch(/rake b$/m);
+    expect(out).toMatch(/rake default\n( *(a|b)\n){2}/m);
+  });
+
+  const fail = () => {
+    throw new RuntimeError("unhandled exception");
+  };
+
+  it("bad run", async () => {
+    app.intern(Task, "default").enhance(null, fail);
+    const [, err] = await captureOutput(async () => {
+      await expect(app.run(["-f", "-s", '--rakelib=""'])).rejects.toThrow(SystemExit);
+    });
+    expect(err).toMatch(/see full trace/i);
+  });
+
+  it("bad run with trace", async () => {
+    app.intern(Task, "default").enhance(null, fail);
+    const [, err] = await captureOutput(async () => {
+      app.setDefaultOptions();
+      await expect(app.run(["-f", "-s", "-t"])).rejects.toThrow(SystemExit);
+    });
+    expect(err).not.toMatch(/see full trace/i);
+  });
+
+  it("bad run with backtrace", async () => {
+    app.intern(Task, "default").enhance(null, fail);
+    const [, err] = await captureOutput(async () => {
+      await expect(app.run(["-f", "-s", "--backtrace"])).rejects.toThrow(SystemExit);
+    });
+    expect(err).not.toMatch(/see full trace/);
+  });
+
+  class CustomError extends RuntimeError {}
+
+  it("bad run includes exception name", async () => {
+    app.intern(Task, "default").enhance(null, () => {
+      throw new CustomError("intentional");
+    });
+    const [, err] = await captureOutput(async () => {
+      await expect(app.run(["-f", "-s"])).rejects.toThrow(SystemExit);
+    });
+    expect(err).toMatch(/CustomError: intentional/);
+  });
+
+  it("rake error excludes exception name", async () => {
+    app.intern(Task, "default").enhance(null, () => {
+      throw new RuntimeError("intentional");
+    });
+    const [, err] = await captureOutput(async () => {
+      await expect(app.run(["-f", "-s"])).rejects.toThrow(SystemExit);
+    });
+    expect(err).not.toMatch(/RuntimeError/);
+    expect(err).toMatch(/intentional/);
+  });
+
+  it("printing original exception cause", async () => {
+    class CustomError extends StandardError {}
+    app.intern(Task, "default").enhance(null, () => {
+      throw new CustomError("Secondary Error", { cause: new CustomError("Original Error") });
+    });
+    const [, err] = await captureOutput(async () => {
+      await expect(app.run(["-f", "-s"])).rejects.toThrow(SystemExit);
+    });
+    expect(err).toMatch(/Original Error/);
+    expect(err).toMatch(/Secondary Error/);
+  });
+
+  it("run with bad options", async () => {
+    app.intern(Task, "default").enhance(null, fail);
+    await captureOutput(async () => {
+      await expect(app.run(["-f", "-s", "--xyzzy"])).rejects.toThrow(SystemExit);
+    });
+  });
+
+  it("standard exception handling other", async () => {
+    const [out, err] = await captureOutput(async () => {
+      app.setDefaultOptions();
+
+      const promise = app.standardExceptionHandling(() => {
+        throw new RuntimeError("blah");
+      });
+      await expect(promise).rejects.toThrow(SystemExit);
+      const e = (await promise.catch((ex: unknown) => ex)) as SystemExit;
+
+      expect(e.status).toBe(1);
+    });
+
+    expect(out).toBeEmpty();
+    expect(err).toMatch("rake aborted!\n");
+    expect(err).toMatch("blah\n");
   });
 
   it("standard exception handling invalid option", async () => {

@@ -12,11 +12,16 @@ import {
   STDOUT,
   StandardError,
   SystemExit,
+  RbConfig,
   argv as ARGV,
   env as ENV,
+  excBacktrace,
   exit,
+  getChildProcess,
   include,
+  printf,
   puts,
+  rbFCaller,
   rbFRequireFile,
   rbModName,
   rbObjRespondTo,
@@ -24,8 +29,10 @@ import {
   setEnv,
   stderr as $stderr,
   stdout as $stdout,
+  stringSplit,
 } from "@blazetrails/ruby-compat";
 import { FileList } from "./file-list.js";
+import { Backtrace } from "./backtrace.js";
 import { DefaultLoader } from "./default-loader.js";
 import { FileUtilsExt } from "./file-utils-ext.js";
 import { Rake } from "./rake-module.js";
@@ -33,6 +40,7 @@ import { Scope } from "./scope.js";
 import { TaskManager } from "./task-manager.js";
 import { TraceOutput } from "./trace-output.js";
 import { VERSION } from "./version.js";
+import { Win32 } from "./win32.js";
 
 export class CommandLineOptionError extends StandardError {}
 
@@ -84,6 +92,7 @@ export class Application {
   /** @internal */ _options: ApplicationOptions | undefined;
   /** @internal */ _systemDir: string | undefined;
   /** @internal */ _displayExceptionDetailsSeen: Error[] | undefined;
+  /** @internal */ _dynamicWidth: number | undefined;
 
   /**
    * @inlinedFrom Rake::TaskManager#initialize rake/v13.2.1/lib/rake/task_manager.rb:9-15
@@ -102,6 +111,14 @@ export class Application {
     this.terminalColumns = parseInt(ENV["RAKE_COLUMNS"] ?? "", 10) || 0;
 
     this.setDefaultOptions();
+  }
+
+  async run(argv: readonly string[] = ARGV): Promise<void> {
+    await this.standardExceptionHandling(async () => {
+      await this.init("rake", argv);
+      await this.loadRakefile();
+      await this.topLevel();
+    });
   }
 
   /** @missingRailsArgs handle_options — PERMANENT */
@@ -127,6 +144,25 @@ export class Application {
 
   async loadRakefile(): Promise<void> {
     await this.standardExceptionHandling(() => this.rawLoadRakefile());
+  }
+
+  async topLevel(): Promise<void> {
+    await this.runWithThreads(async () => {
+      if (this.options.showTasks != null) {
+        this.displayTasksAndComments();
+      } else if (this.options.showPrereqs) {
+        this.displayPrerequisites();
+      } else {
+        for (const taskName of this.topLevelTasks) {
+          await this.invokeTask(taskName);
+        }
+      }
+    });
+  }
+
+  /** @missingRailsCall join — PERMANENT */
+  async runWithThreads(block: () => Promise<void>): Promise<void> {
+    await block();
   }
 
   addLoader(ext: string, loader: Loader): void {
@@ -155,6 +191,38 @@ export class Application {
 
       remainingArgs = part[2];
       args.push(part[1].replaceAll(/\\(.)/g, "$1"));
+    } while (remainingArgs != null);
+
+    return [name, args];
+  }
+
+  /** @internal */
+  async invokeTask(taskString: string): Promise<void> {
+    const [name, args] = this.parseTaskString(taskString);
+    const t = await this.get(name);
+    await t.invoke(...args);
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall gsub — PERMANENT
+   */
+  parseTaskString(string: string): [string, string[]] {
+    const m = /^([^[]+)(?:\[(.*)\])$/m.exec(String(string));
+
+    const name = m?.[1];
+    let remainingArgs: string | null = m?.[2] ?? null;
+
+    if (name == null) return [string, []];
+    if (remainingArgs === "") return [name, []];
+
+    const args: string[] = [];
+
+    do {
+      const n = /\s*((?:[^\\,]|\\.)*?)\s*(?:,\s*(.*))?$/m.exec(remainingArgs!)!;
+
+      remainingArgs = n[2] ?? null;
+      args.push(n[1].replace(/\\(.)/g, "$1"));
     } while (remainingArgs != null);
 
     return [name, args];
@@ -194,6 +262,7 @@ export class Application {
     this.displayExceptionDetailsSeen.push(ex);
 
     this.displayExceptionMessageDetails(ex);
+    if (excBacktrace(ex) != null) this.displayExceptionBacktrace(ex);
     if (this.hasCause(ex)) this.displayCauseDetails(ex.cause as Error);
   }
 
@@ -228,6 +297,27 @@ export class Application {
   }
 
   /** @internal */
+  displayExceptionBacktrace(ex: Error): void {
+    if (this.options.backtrace) {
+      this.trace(excBacktrace(ex)!.join("\n"));
+    } else {
+      this.trace(Backtrace.collapse(excBacktrace(ex)!).join("\n"));
+    }
+  }
+
+  /** @internal */
+  deprecate(oldUsage: string, newUsage: string, callSite: string): void {
+    if (!this.options.ignoreDeprecate) {
+      puts.call(
+        $stderr,
+        `WARNING: '${oldUsage}' is deprecated.  ` +
+          `Please use '${newUsage}' instead.\n` +
+          `    at ${callSite}`,
+      );
+    }
+  }
+
+  /** @internal */
   private hasChain(exception: Error): boolean {
     return rtest((exception as { chain?: unknown }).chain);
   }
@@ -243,6 +333,132 @@ export class Application {
       }
     }
     return null;
+  }
+
+  /** @internal */
+  isTtyOutput(): boolean {
+    return this.ttyOutput;
+  }
+
+  /** @internal */
+  isTruncateOutput(): boolean {
+    return this.isTtyOutput() || this.terminalColumns !== 0;
+  }
+
+  /** @internal */
+  displayTasksAndComments(): void {
+    const displayableTasks = this.tasks.filter(
+      (t) =>
+        (this.options.showAllTasks || t.comment != null) &&
+        this.options.showTaskPattern!.test(t.name),
+    );
+    switch (this.options.showTasks) {
+      case "tasks": {
+        const width =
+          displayableTasks.length > 0
+            ? Math.max(...displayableTasks.map((t) => t.nameWithArgs().length))
+            : 10;
+        let maxColumn: number | null;
+        if (this.isTruncateOutput()) {
+          maxColumn = this.terminalWidth() - this.name.length - width - 7;
+        } else {
+          maxColumn = null;
+        }
+
+        for (const t of displayableTasks) {
+          printf.call(
+            $stdout,
+            `${this.name} %-${width}s  # %s\n`,
+            t.nameWithArgs(),
+            maxColumn != null ? this.truncate(t.comment, maxColumn) : t.comment,
+          );
+        }
+        break;
+      }
+      case "describe":
+        for (const t of displayableTasks) {
+          puts.call($stdout, `${this.name} ${t.nameWithArgs()}`);
+          const comment = t.fullComment ?? "";
+          for (const line of stringSplit(comment, "\n")) {
+            puts.call($stdout, `    ${line}`);
+          }
+          puts.call($stdout);
+        }
+        break;
+      case "lines":
+        for (const t of displayableTasks) {
+          for (const loc of t.locations) {
+            printf.call($stdout, `${this.name} %-30s %s\n`, t.nameWithArgs(), loc);
+          }
+        }
+        break;
+      default:
+        throw new RuntimeError(`Unknown show task mode: '${this.options.showTasks}'`);
+    }
+  }
+
+  /** @internal */
+  terminalWidth(): number {
+    try {
+      let result: number;
+      if (this.terminalColumns !== 0) {
+        result = this.terminalColumns;
+      } else {
+        result = this.isUnix() ? this.dynamicWidth() : 80;
+      }
+      return result < 10 ? 80 : result;
+    } catch (e) {
+      if (!(e instanceof globalThis.Error)) throw e;
+      return 80;
+    }
+  }
+
+  /** @internal */
+  dynamicWidth(): number {
+    return (this._dynamicWidth ||= this.dynamicWidthStty() || this.dynamicWidthTput());
+  }
+
+  /** @internal */
+  dynamicWidthStty(): number {
+    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "stty size 2>/dev/null </dev/tty"]);
+    return parseInt(String(stdout).trim().split(/\s+/)[1], 10) || 0;
+  }
+
+  /** @internal */
+  dynamicWidthTput(): number {
+    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "tput cols 2>/dev/null </dev/tty"]);
+    return parseInt(String(stdout), 10) || 0;
+  }
+
+  /** @internal */
+  isUnix(): boolean {
+    return /(aix|darwin|linux|(net|free|open)bsd|cygwin|solaris|irix|hpux)/i.test(
+      RbConfig.CONFIG["host_os"],
+    );
+  }
+
+  /** @internal */
+  isWindows(): boolean {
+    return Win32.isWindows();
+  }
+
+  /** @internal */
+  truncate(string: string | null, width: number): string {
+    if (string == null) {
+      return "";
+    } else if (string.length <= width) {
+      return string;
+    } else {
+      return (width >= 3 ? string.slice(0, width - 3) : "") + "...";
+    }
+  }
+
+  /** @internal */
+  displayPrerequisites(): void {
+    for (const t of this.tasks) {
+      puts.call($stdout, `${this.name} ${t.name}`);
+      for (const pre of t.prerequisites) puts.call($stdout, `    ${pre}`);
+    }
   }
 
   /** @internal */
@@ -725,6 +941,15 @@ export class Application {
       }
       this._imported.push(fn);
     }
+  }
+
+  /** @internal */
+  rakefileLocation(backtrace: string[] = rbFCaller()): string {
+    backtrace.map((t) => /([^:]+):/.exec(t)?.[1]);
+    let re = new RegExp(`^${this.rakefile ?? ""}$`, "m");
+    if (this.isWindows()) re = new RegExp(re.source, "im");
+
+    return backtrace.find((str) => re.test(str)) ?? "";
   }
 
   /** @internal */

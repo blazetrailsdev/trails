@@ -5,6 +5,7 @@ export { PseudoStatus } from "./pseudo-status.js";
 
 import "./class-paths.generated.js";
 export { pathmap } from "./ext/string.js";
+export { Backtrace } from "./backtrace.js";
 export { Cloneable } from "./cloneable.js";
 export { Application, CommandLineOptionError } from "./application.js";
 export type { ApplicationOptions } from "./application.js";
@@ -12,6 +13,7 @@ export { DefaultLoader } from "./default-loader.js";
 export { PrivateReader } from "./private-reader.js";
 export { Rake } from "./rake-module.js";
 export { TraceOutput } from "./trace-output.js";
+export { Win32 } from "./win32.js";
 export { DSL } from "./dsl-definition.js";
 export { EARLY, EarlyTime } from "./early-time.js";
 export { FileCreationTask } from "./file-creation-task.js";
