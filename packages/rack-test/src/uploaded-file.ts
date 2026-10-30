@@ -8,7 +8,6 @@ import {
   StringIO,
   Tempfile,
   methodMissingProxy,
-  rbCallSuper,
   rbObjClassname,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
@@ -63,16 +62,8 @@ export class UploadedFile {
     return methodMissingProxy(this, { delegate: (uploadedFile) => uploadedFile.tempfile });
   }
 
-  respondToMissing(methodName: string, includePrivate: boolean = false): boolean {
-    return (
-      rbObjRespondTo(this.tempfile, methodName) ||
-      (rbCallSuper(
-        this,
-        UploadedFile.prototype.respondToMissing,
-        methodName,
-        includePrivate,
-      ) as boolean)
-    );
+  respondToMissing(methodName: string, _includePrivate: boolean = false): boolean {
+    return rbObjRespondTo(this.tempfile, methodName);
   }
 
   get path(): string | null {
