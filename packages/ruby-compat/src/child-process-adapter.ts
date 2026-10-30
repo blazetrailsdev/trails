@@ -1,5 +1,7 @@
 import { env as processEnv } from "./process-adapter.js";
+import { Errno } from "./errno.js";
 import { File } from "./file.js";
+import { IOError } from "./io-error.js";
 import { PipeIO, type IO } from "./io.js";
 
 export interface SpawnSyncOptions {
@@ -224,17 +226,16 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
     system(command, env, args, options) {
       const out = options?.out;
       const outFile = typeof out === "string" ? File.open(out, "w") : null;
-      const outIO = outFile ?? (out as IO | undefined) ?? null;
+      const outIO = typeof out === "string" ? outFile : out;
+      const pipeOut = outIO instanceof PipeIO ? outIO : null;
       const stdio =
-        outIO === null
-          ? "inherit"
-          : ["inherit", outIO instanceof PipeIO ? "pipe" : outIO.fileno(), "inherit"];
+        outIO == null ? "inherit" : ["inherit", pipeOut ? "pipe" : outIO.fileno(), "inherit"];
       const read = {
         bytes: (chunk: Uint8Array) => {
           try {
-            outIO?.write(chunk);
-          } catch {
-            return;
+            pipeOut?.write(chunk);
+          } catch (error) {
+            if (!(error instanceof Errno.EPIPE || error instanceof IOError)) throw error;
           }
         },
       };
