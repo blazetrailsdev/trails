@@ -769,10 +769,7 @@ export class FileUtils {
     });
   }
 
-  /** `FileUtils.ln` (`vendor/ruby/v3.3.11/lib/fileutils.rb:516-523`) over the
-   * backend's async `link`.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
-   */
+  /** @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils.ln` (`vendor/ruby/v3.3.11/lib/fileutils.rb:516-523`), over the backend's async `link`. */
   static async lnAsync(
     src: string | string[],
     dest: string,
@@ -792,10 +789,7 @@ export class FileUtils {
     }
   }
 
-  /** `FileUtils.cp` (`vendor/ruby/v3.3.11/lib/fileutils.rb:873-879`) over the
-   * backend's async `readFile` / `writeFile`. `preserve` is unported here.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
-   */
+  /** @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils.cp` (`vendor/ruby/v3.3.11/lib/fileutils.rb:873-879`), over async `readFile` / `writeFile`. */
   static async cpAsync(
     src: string | string[],
     dest: string,

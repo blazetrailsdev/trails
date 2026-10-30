@@ -3,8 +3,8 @@ import {
   Dir,
   File,
   FileUtils as StdlibFileUtils,
+  ArgumentError,
   LoadError,
-  RuntimeError,
   NotImplementedError,
   StandardError,
   block,
@@ -80,15 +80,15 @@ describe("TestRakeFileUtils", () => {
   it("rm one file", async () => {
     await createFile("a");
     await StdlibFileUtils.rmRfAsync("a");
-    expect(await isExist("a")).toBe(false);
+    expect(await isExist("a")).toBeFalsy();
   });
 
   it("rm two files", async () => {
     await createFile("a");
     await createFile("b");
     await StdlibFileUtils.rmRfAsync(["a", "b"]);
-    expect(await isExist("a")).toBe(false);
-    expect(await isExist("b")).toBe(false);
+    expect(await isExist("a")).toBeFalsy();
+    expect(await isExist("b")).toBeFalsy();
   });
 
   // PERMANENT-SKIP: `Rake::FileList` is a non-goal of RFC 0211 (README § "Non-goals", `file_list.rb`).
@@ -97,11 +97,11 @@ describe("TestRakeFileUtils", () => {
   it("rm nowrite", async () => {
     await createFile("a");
     await nowrite(true, () => rmRf("a"));
-    expect(await isExist("a")).toBe(true);
+    expect(await isExist("a")).toBeTruthy();
     await nowrite(false, () => rmRf("a", { noop: true }));
-    expect(await isExist("a")).toBe(true);
+    expect(await isExist("a")).toBeTruthy();
     await nowrite(true, () => rmRf("a", { noop: false }));
-    expect(await isExist("a")).toBe(false);
+    expect(await isExist("a")).toBeFalsy();
   });
 
   it("ln", async () => {
@@ -180,7 +180,7 @@ describe("TestRakeFileUtils", () => {
 
     await captureOutput(() => rmRf("a"));
 
-    expect(await isExist("a")).toBe(false);
+    expect(await isExist("a")).toBeFalsy();
   });
 
   it("fileutils methods dont leak", () => {
@@ -193,6 +193,7 @@ describe("TestRakeFileUtils", () => {
     await shellcommand();
 
     await verbose(false, () => sh(`${RUBY} shellcommand.rb`));
+    expect(true).toBeTruthy();
   });
 
   it("sh with a single string argument", async () => {
@@ -251,7 +252,7 @@ describe("TestRakeFileUtils", () => {
       await sh(
         `${RUBY} shellcommand.rb`,
         block((ok: unknown, res: { exitstatus(): number }) => {
-          expect(ok).toBe(true);
+          expect(ok).toBeTruthy();
           expect(res.exitstatus()).toBe(0);
           count += 1;
         }),
@@ -259,7 +260,7 @@ describe("TestRakeFileUtils", () => {
       await sh(
         `${RUBY} shellcommand.rb 1`,
         block((ok: unknown, res: { exitstatus(): number }) => {
-          expect(ok).toBe(false);
+          expect(!ok).toBeTruthy();
           expect(res.exitstatus()).toBe(1);
           count += 1;
         }),
@@ -272,14 +273,19 @@ describe("TestRakeFileUtils", () => {
     await shellcommand();
 
     await verbose(false, () => sh("shellcommand.rb 1", { noop: true }));
+    expect(true).toBeTruthy();
   });
 
   it("sh bad option", async () => {
     await shellcommand();
 
-    await expect(verbose(false, () => sh("shellcommand.rb", { badOption: true }))).rejects.toThrow(
-      /badOption/,
-    );
+    const ex = (await (
+      verbose(false, () => sh("shellcommand.rb", { badOption: true })) as Promise<unknown>
+    ).catch((e: Error) => e)) as Error;
+    expect(() => {
+      throw ex;
+    }).toThrow(ArgumentError);
+    expect(ex.message).toMatch(/badOption/);
   });
 
   it("sh verbose", async () => {
@@ -308,7 +314,7 @@ describe("TestRakeFileUtils", () => {
     FileUtilsExt.verboseFlag = null;
 
     const [out] = await captureOutput(() => sh("shellcommand.rb", { noop: true }));
-    expect(out).toBe("");
+    expect(out).toBeEmpty();
   });
 
   it("ruby with a single string argument", async () => {
@@ -338,7 +344,13 @@ describe("TestRakeFileUtils", () => {
       const standardOutput = "Some output";
       const standardError = "Some error";
       const shellCommand = `${RUBY} -e "console.log('${standardOutput}');console.error('${standardError}');process.exitCode = 1"`;
-      await expect(sh(shellCommand)).rejects.toThrow(RuntimeError);
+      await sh(`${shellCommand} > both.txt 2>&1`).then(
+        () => expect.fail(),
+        () => {},
+      );
+      const actual = await getFs().readFile("both.txt", "utf-8");
+      expect(actual).toMatch(standardOutput);
+      expect(actual).toMatch(standardError);
     });
   });
 
@@ -351,13 +363,10 @@ describe("TestRakeFileUtils", () => {
     const longString = "1234567890".repeat(10);
     const shellCommand = `${RUBY} -e "'${longString}';process.exitCode = 1"`;
     await captureOutput(async () => {
-      const ex = await sh(shellCommand).then(
-        () => null,
-        (e: Error) => e,
-      );
+      const ex = (await sh(shellCommand).catch((e: Error) => e)) as Error;
       expect(ex).not.toBeNull();
-      expect(ex!.message).toContain("Command failed with status");
-      expect(ex!.message).toContain(shellCommand);
+      expect(ex.message).toContain("Command failed with status");
+      expect(ex.message).toContain(shellCommand);
     });
   }
 

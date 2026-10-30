@@ -61,20 +61,9 @@ export function rbExecargNew(
 }
 
 /** The option names `rb_execarg_addopt` (`vendor/ruby/v3.3.11/process.c:2145-2290`) accepts, camelCased. */
-const EXEC_OPTIONS = new Set([
-  "pgroup",
-  "newPgroup",
-  "unsetenvOthers",
-  "chdir",
-  "umask",
-  "closeOthers",
-  "in",
-  "out",
-  "err",
-  "uid",
-  "gid",
-  "exception",
-]);
+const EXEC_OPTIONS = new Set(
+  "pgroup newPgroup unsetenvOthers chdir umask closeOthers in out err uid gid exception".split(" "),
+);
 
 const POSIX_SH_CMDS = new Set([
   "!",
