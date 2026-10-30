@@ -281,7 +281,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return true;
   }
 
-  /** @internal */
+  /** @noRailsEquivalent PERMANENT */
   _busyHandlerTimeout: number | null = null;
 
   /** @internal */

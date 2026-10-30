@@ -5,6 +5,7 @@ import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlit
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
 import { BusyException } from "../../sqlite/errors.js";
+import { setBusyTimeout } from "../../sqlite/pragmas.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import {
   combineMultiStatements,
@@ -192,46 +193,45 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Result> {
-  return withBusyRetry(this._busyHandlerTimeout ?? 0, async () => {
-    let result: Result;
-    if (batch) {
-      await rawConnection.exec(sql);
-      result = Result.empty();
-    } else if (prepare) {
-      const stmt = await this._cachedStatement(rawConnection, sql);
-      stmt.bindParams(typeCastedBinds);
+  const timeout = this._busyHandlerTimeout ?? 0;
+  let result: Result;
+  if (batch) {
+    await execBatch(rawConnection, sql, timeout);
+    result = Result.empty();
+  } else if (prepare) {
+    const stmt = await retryBusy(timeout, () => this._cachedStatement(rawConnection, sql));
+    stmt.bindParams(typeCastedBinds);
 
+    if (!stmt.reader) {
+      await retryBusy(timeout, () => stmt.step());
+      result = Result.empty();
+    } else {
+      const columns = stmt.columns().map((c) => c.name);
+      result = new Result(columns, await retryBusy(timeout, () => stmt.toA()));
+      this._narrowSpilledBigInts(stmt, result.rows);
+    }
+  } else {
+    const stmt = await retryBusy(timeout, () => this._freshStatement(rawConnection, sql));
+    try {
+      if (!(binds == null || binds.length === 0)) {
+        stmt.bindParams(typeCastedBinds);
+      }
       if (!stmt.reader) {
-        await stmt.step();
+        await retryBusy(timeout, () => stmt.step());
         result = Result.empty();
       } else {
         const columns = stmt.columns().map((c) => c.name);
-        result = new Result(columns, await stmt.toA());
+        result = new Result(columns, await retryBusy(timeout, () => stmt.toA()));
         this._narrowSpilledBigInts(stmt, result.rows);
       }
-    } else {
-      const stmt = await this._freshStatement(rawConnection, sql);
-      try {
-        if (!(binds == null || binds.length === 0)) {
-          stmt.bindParams(typeCastedBinds);
-        }
-        if (!stmt.reader) {
-          await stmt.step();
-          result = Result.empty();
-        } else {
-          const columns = stmt.columns().map((c) => c.name);
-          result = new Result(columns, await stmt.toA());
-          this._narrowSpilledBigInts(stmt, result.rows);
-        }
-      } finally {
-        await stmt.close();
-      }
+    } finally {
+      await stmt.close();
     }
-    this._lastAffectedRows = await rawConnection.changes();
-    this.verifiedBang();
-    if (notificationPayload) notificationPayload.row_count = result.length;
-    return result;
-  });
+  }
+  this._lastAffectedRows = await rawConnection.changes();
+  this.verifiedBang();
+  if (notificationPayload) notificationPayload.row_count = result.length;
+  return result;
 }
 
 /** @internal */
@@ -282,14 +282,29 @@ export function defaultInsertValue(column: {
   return column.default;
 }
 
-async function withBusyRetry<T>(timeout: number, query: () => Promise<T>): Promise<T> {
-  const deadline = timeout > 0 ? Date.now() + timeout : 0;
+/** @noRailsEquivalent PERMANENT */
+async function retryBusy<T>(timeout: number, step: () => T | Promise<T>): Promise<T> {
+  const deadline = Date.now() + timeout;
   while (true) {
     try {
-      return await query();
+      return await step();
     } catch (error) {
       if (!(error instanceof BusyException) || Date.now() > deadline) throw error;
       await new Promise((resolve) => setTimeout(resolve, 1));
     }
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+async function execBatch(
+  rawConnection: SqliteConnection,
+  sql: string,
+  timeout: number,
+): Promise<void> {
+  await setBusyTimeout.call(rawConnection, timeout);
+  try {
+    await rawConnection.exec(sql);
+  } finally {
+    await setBusyTimeout.call(rawConnection, 0);
   }
 }

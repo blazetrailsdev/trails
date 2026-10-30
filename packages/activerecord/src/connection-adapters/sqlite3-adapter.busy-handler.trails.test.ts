@@ -35,6 +35,26 @@ describe("SQLite3Adapter busy handler", () => {
     expect(Number(rows[0].n)).toBe(2);
   });
 
+  it("does not replay a batch that stays blocked", async () => {
+    await waiter.execute("SELECT 1");
+    await writer.execute("BEGIN IMMEDIATE");
+    await writer.execute("INSERT INTO t VALUES (1)");
+
+    await expect(
+      waiter.performQuery(
+        waiter._rawConnection!,
+        "INSERT INTO t VALUES (2); INSERT INTO t VALUES (3);",
+        [],
+        [],
+        { prepare: false, batch: true },
+      ),
+    ).rejects.toThrow(/locked/);
+    await writer.execute("COMMIT");
+
+    const rows = (await waiter.execute("SELECT COUNT(*) AS n FROM t"))!;
+    expect(Number(rows[0].n)).toBe(1);
+  });
+
   it("raises once the timeout has passed", async () => {
     const impatient = new BetterSQLite3Adapter({
       database: join(dir, "busy.sqlite3"),
