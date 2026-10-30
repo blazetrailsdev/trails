@@ -9,6 +9,7 @@ import {
   rbCheckArrayType,
   rbInspect,
   rbStrSub,
+  rtest,
   sortBy,
   stderr as $stderr,
   stdout as $stdout,
@@ -21,10 +22,6 @@ import { fromPathname } from "./rake-module.js";
 
 type Items = unknown[];
 type ElementBlock = (fn: string) => unknown;
-
-function rtest(value: unknown): boolean {
-  return value != null && value !== false;
-}
 
 const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> = {
   size: (items) => items.length,
@@ -209,7 +206,9 @@ export class FileList {
       typeof other === "string"
         ? this.items.join(other)
         : Array.from({ length: other }, () => this.items).flat();
-    return Array.isArray(result) ? this.newList().import(result) : result;
+    return Array.isArray(result)
+      ? new (this.constructor as new () => this)().import(result)
+      : result;
   }
 
   async append(obj: unknown): Promise<this> {
@@ -259,14 +258,14 @@ export class FileList {
   }
 
   async sub(pat: RegExp | string, rep: string): Promise<this> {
-    const res = this.newList();
+    const res = new (this.constructor as new () => this)();
     for (const fn of await this.toA())
       await res.append(rbStrSub({ string: fn as string }, pat, rep));
     return res;
   }
 
   async gsub(pat: RegExp | string, rep: string): Promise<this> {
-    const res = this.newList();
+    const res = new (this.constructor as new () => this)();
     for (const fn of await this.toA())
       await res.append(strGsub({ string: fn as string }, [pat, rep], false));
     return res;
@@ -318,27 +317,27 @@ export class FileList {
 
   /** @missingRailsCall select — PERMANENT */
   async existing(): Promise<this> {
-    return this.newList().import(await this.selectExisting());
+    const found: Items = [];
+    for (const fn of await this.toA()) if (await File.isExistAsync(fn as string)) found.push(fn);
+    return new (this.constructor as new () => this)().import(uniq(found));
   }
 
   /** @missingRailsCall select — PERMANENT */
   async existingBang(): Promise<this> {
-    this.items = await this.selectExisting();
-    return this;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  private async selectExisting(): Promise<Items> {
+    await this.resolve();
     const found: Items = [];
-    for (const fn of await this.toA()) if (await File.isExistAsync(fn as string)) found.push(fn);
-    return uniq(found);
+    for (const fn of this.items) if (await File.isExistAsync(fn as string)) found.push(fn);
+    this.items = uniq(found);
+    return this;
   }
 
   async partition(block: ElementBlock): Promise<[this, this]> {
     await this.resolve();
+    const result: [Items, Items] = [[], []];
+    for (const fn of this.items) result[rtest(block(fn as string)) ? 0 : 1].push(fn);
     return [
-      this.newList().import(this.items.filter((fn) => rtest(block(fn as string)))),
-      this.newList().import(this.items.filter((fn) => !rtest(block(fn as string)))),
+      new (this.constructor as new () => this)().import(result[0]),
+      new (this.constructor as new () => this)().import(result[1]),
     ];
   }
 
@@ -374,60 +373,53 @@ export class FileList {
     this.items = array;
     return this;
   }
-
-  /** @noRailsEquivalent PERMANENT */
-  private newList(): this {
-    return new (this.constructor as new () => this)();
-  }
 }
 
 include(FileList, Cloneable);
 
-type Delegated<R> = Promise<R>;
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface FileList {
-  size(): Delegated<number>;
-  length(): Delegated<number>;
-  first(): Delegated<string | null>;
-  last(): Delegated<string | null>;
-  get(i: number): Delegated<string | null>;
-  set(i: number, value: unknown): Delegated<unknown>;
-  isEmpty(): Delegated<boolean>;
-  isInclude(obj: unknown): Delegated<boolean>;
-  isMember(obj: unknown): Delegated<boolean>;
-  join(sep?: string): Delegated<string>;
-  concat(other: unknown): Delegated<this>;
-  push(...objs: unknown[]): Delegated<this>;
-  pop(): Delegated<string | null>;
-  shift(): Delegated<string | null>;
-  unshift(...objs: unknown[]): Delegated<this>;
-  clear(): Delegated<this>;
-  reverse(): Delegated<Items>;
-  zip(other: unknown): Delegated<Items>;
-  each(block: ElementBlock): Delegated<this>;
-  eachWithIndex(block: (fn: string, i: number) => unknown): Delegated<this>;
-  rejectBang(block: ElementBlock): Delegated<this | null>;
-  sortBang(): Delegated<this>;
-  uniqBang(): Delegated<this | null>;
-  inspect(): Delegated<string>;
-  compare(other: unknown): Delegated<number>;
-  map(block: ElementBlock): Delegated<this>;
-  collect(block: ElementBlock): Delegated<this>;
-  sort(): Delegated<this>;
-  sortBy(block: ElementBlock): Delegated<this>;
-  select(block: ElementBlock): Delegated<this>;
-  findAll(block: ElementBlock): Delegated<this>;
-  reject(block: ElementBlock): Delegated<this>;
-  grep(pattern: RegExp): Delegated<this>;
-  compact(): Delegated<this>;
-  flatten(): Delegated<this>;
-  uniq(): Delegated<this>;
-  valuesAt(...selectors: number[]): Delegated<this>;
-  plus(other: unknown): Delegated<this>;
-  minus(other: unknown): Delegated<this>;
-  and(other: unknown): Delegated<this>;
-  or(other: unknown): Delegated<this>;
+  size(): Promise<number>;
+  length(): Promise<number>;
+  first(): Promise<string | null>;
+  last(): Promise<string | null>;
+  get(i: number): Promise<string | null>;
+  set(i: number, value: unknown): Promise<unknown>;
+  isEmpty(): Promise<boolean>;
+  isInclude(obj: unknown): Promise<boolean>;
+  isMember(obj: unknown): Promise<boolean>;
+  join(sep?: string): Promise<string>;
+  concat(other: unknown): Promise<this>;
+  push(...objs: unknown[]): Promise<this>;
+  pop(): Promise<string | null>;
+  shift(): Promise<string | null>;
+  unshift(...objs: unknown[]): Promise<this>;
+  clear(): Promise<this>;
+  reverse(): Promise<Items>;
+  zip(other: unknown): Promise<Items>;
+  each(block: ElementBlock): Promise<this>;
+  eachWithIndex(block: (fn: string, i: number) => unknown): Promise<this>;
+  rejectBang(block: ElementBlock): Promise<this | null>;
+  sortBang(): Promise<this>;
+  uniqBang(): Promise<this | null>;
+  inspect(): Promise<string>;
+  compare(other: unknown): Promise<number>;
+  map(block: ElementBlock): Promise<this>;
+  collect(block: ElementBlock): Promise<this>;
+  sort(): Promise<this>;
+  sortBy(block: ElementBlock): Promise<this>;
+  select(block: ElementBlock): Promise<this>;
+  findAll(block: ElementBlock): Promise<this>;
+  reject(block: ElementBlock): Promise<this>;
+  grep(pattern: RegExp): Promise<this>;
+  compact(): Promise<this>;
+  flatten(): Promise<this>;
+  uniq(): Promise<this>;
+  valuesAt(...selectors: number[]): Promise<this>;
+  plus(other: unknown): Promise<this>;
+  minus(other: unknown): Promise<this>;
+  and(other: unknown): Promise<this>;
+  or(other: unknown): Promise<this>;
 }
 
 for (const sym of FileList.DELEGATING_METHODS) {
