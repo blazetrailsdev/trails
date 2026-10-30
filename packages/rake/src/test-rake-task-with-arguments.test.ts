@@ -2,20 +2,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { block } from "@blazetrails/ruby-compat";
 import { Task } from "./task.js";
 import type { TaskArguments } from "./task-arguments.js";
-import { useApplicationTestCase } from "./test-helpers/application.js";
+import { useApplicationTestCase, verifyKeywords, verifyNotes } from "./test-helpers/application.js";
 import { dsl } from "./test-helpers/file-creation.js";
 
 const { desc, multitask, task } = dsl;
-
-function verifyKeywords(notes: string[], name: string, expecteds: unknown[], actuals: unknown[]) {
-  notes.push(name);
-  expect(actuals.length).toBe(expecteds.length);
-  expecteds.forEach((e, i) => expect(actuals[i]).toBe(e));
-}
-
-function verifyNotes(notes: string[]) {
-  expect(notes).toEqual(["a", "b", "c", "d", "e", "f", "g", "h"]);
-}
 
 describe("TestRakeTaskWithArguments", () => {
   useApplicationTestCase();

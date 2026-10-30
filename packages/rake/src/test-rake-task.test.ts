@@ -252,6 +252,7 @@ describe("TestRakeTask", () => {
   });
 
   it("filelists can be prerequisites", async () => {
+    // BLOCKED: `FileList#to_ary` awaits a glob and `define_task` is synchronous, so it resolves here.
     task({ a: await new FileList().include("b", "c").toAry() });
     expect((await Task.get("a")).prerequisites).toEqual(["b", "c"]);
   });
