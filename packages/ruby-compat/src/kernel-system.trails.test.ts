@@ -7,7 +7,7 @@ import {
 import { Dir } from "./dir.js";
 import { Errno } from "./errno.js";
 import { File } from "./file.js";
-import { IO, STDERR, STDOUT } from "./io.js";
+import { IO, STDERR, STDIN, STDOUT } from "./io.js";
 import { IOError } from "./io-error.js";
 import { FileUtils } from "./file-utils.js";
 import { rbFSystem } from "./kernel-system.js";
@@ -159,6 +159,7 @@ describe("Kernel#system", () => {
   it("refuses a reopen of a closed stream or of STDOUT onto a reader", () => {
     const [r, w] = IO.pipe();
     expect(() => STDOUT.reopen(r)).toThrow(`<STDOUT> can't change access mode from "w" to "r"`);
+    expect(() => STDIN.reopen(w)).toThrow(`<STDIN> can't change access mode from "r" to "w"`);
     w.close();
     expect(() => w.reopen(r)).toThrow(IOError);
     r.close();

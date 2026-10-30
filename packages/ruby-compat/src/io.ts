@@ -1528,9 +1528,9 @@ export class IO {
    * no `dup2(2)`, so the stream takes `other_io`'s descriptor rather than a copy
    * of it, and `other_io` has to stay open for as long as this stream writes to
    * it. A descriptor's kernel offset is shared but `pos` is per IO and writes
-   * are positional, so the two IOs do not advance each other. A child spawned with inherited stdio gets {@link STDOUT} and
-   * {@link STDERR} by {@link fileno}, so it follows the reopen as it follows
-   * the `dup2` in Ruby.
+   * are positional, so the two IOs do not advance each other. A child
+   * spawned with inherited stdio gets {@link STDOUT} and {@link STDERR} by
+   * {@link fileno}, so it follows the reopen as it follows the `dup2` in Ruby.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#reopen`
    * (`vendor/ruby/v3.3.11/io.c:8446`).
@@ -1539,7 +1539,10 @@ export class IO {
     const orig = nfile.toIo();
     if (this.isClosed() || orig.isClosed()) throw new IOError("closed stream");
     if (orig === this) return this;
-    if ((this === STDOUT || this === STDERR) && !(orig.mode & FMODE_WRITABLE)) {
+    if (
+      (this === STDIN && !(orig.mode & FMODE_READABLE)) ||
+      ((this === STDOUT || this === STDERR) && !(orig.mode & FMODE_WRITABLE))
+    ) {
       throw new ArgumentError(
         `${this.pathv} can't change access mode from "${rbIoFmodeModestr(this.mode)}" to "${rbIoFmodeModestr(orig.mode)}"`,
       );
@@ -1579,7 +1582,13 @@ function rbIoFmodeModestr(fmode: number): string {
  * `rb_io_open_descriptor` (`io.c:9290`) standing in for trails' protected
  * constructor.
  */
-function prepStdio(f: WriteStream, fd: number, fmode: string, klass: typeof IO, path: string): IO {
+function prepStdio(
+  f: WriteStream | null,
+  fd: number,
+  fmode: string,
+  klass: typeof IO,
+  path: string,
+): IO {
   const io = new (klass as unknown as new (fd: number, pathv: string | null, vmode: string) => IO)(
     fd,
     path,
@@ -1588,6 +1597,14 @@ function prepStdio(f: WriteStream, fd: number, fmode: string, klass: typeof IO, 
   (io as unknown as { stdioFile: WriteStream | null }).stdioFile = f;
   return io;
 }
+
+/**
+ * `STDIN` / `$stdin`, `rb_io_prep_stdin` (`vendor/ruby/v3.3.11/io.c:9332`): an
+ * `IO` over descriptor 0, which has no write-side adapter stream.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `STDIN`.
+ */
+export const STDIN: IO = prepStdio(null, 0, "r", IO, "<STDIN>");
 
 /**
  * `STDOUT` / `$stdout`, `rb_io_prep_stdout` (`vendor/ruby/v3.3.11/io.c:9338`), defined
