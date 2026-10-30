@@ -749,6 +749,9 @@ importers:
 
   packages/rake:
     dependencies:
+      '@blazetrails/did-you-mean':
+        specifier: workspace:*
+        version: link:../did-you-mean
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

@@ -7,5 +7,9 @@
     "types": ["@blazetrails/vitest-matchers"]
   },
   "include": ["src"],
-  "references": [{ "path": "../ruby-compat" }, { "path": "../vitest-matchers" }]
+  "references": [
+    { "path": "../ruby-compat" },
+    { "path": "../did-you-mean" },
+    { "path": "../vitest-matchers" }
+  ]
 }
