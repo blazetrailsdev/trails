@@ -1,4 +1,11 @@
-import { extend, Monitor, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  Monitor,
+  rbModName,
+  rbObjRespondTo,
+  stringSplit,
+  strip,
+} from "@blazetrails/ruby-compat";
 import { InvocationChain } from "./invocation-chain.js";
 import { InvocationExceptionMixin } from "./invocation-exception-mixin.js";
 import { EMPTY_TASK_ARGS, TaskArguments } from "./task-arguments.js";
@@ -14,20 +21,28 @@ export interface TaskApplication {
 export type TaskAction = (task: Task, args: TaskArguments, ...rest: unknown[]) => unknown;
 
 export class Task {
-  prerequisites: string[];
-  orderOnlyPrerequisites: string[];
-  actions: TaskAction[];
+  readonly orderOnlyPrerequisites: string[];
+  readonly actions: TaskAction[];
   application: TaskApplication;
-  scope: unknown;
-  locations: string[];
-  alreadyInvoked: boolean;
+  readonly scope: unknown;
+  readonly locations: string[];
+  private _prerequisites: string[];
+  private _alreadyInvoked: boolean;
 
   private _name: string;
   private _comments: string[];
   private _lock: Monitor;
   private _argNames: string[] | null;
   private _invocationException: unknown;
-  private _sources?: string[];
+  declare private _sources?: string[];
+
+  get prerequisites(): string[] {
+    return this._prerequisites;
+  }
+
+  get alreadyInvoked(): boolean {
+    return this._alreadyInvoked;
+  }
 
   get prereqs(): string[] {
     return this.prerequisites;
@@ -90,9 +105,9 @@ export class Task {
 
   constructor(taskName: string, app: TaskApplication) {
     this._name = String(taskName);
-    this.prerequisites = [];
+    this._prerequisites = [];
     this.actions = [];
-    this.alreadyInvoked = false;
+    this._alreadyInvoked = false;
     this._comments = [];
     this._lock = new Monitor();
     this.application = app;
@@ -104,7 +119,7 @@ export class Task {
   }
 
   enhance(deps: string[] | null = null, block?: TaskAction): this {
-    if (deps) this.prerequisites = [...new Set([...this.prerequisites, ...deps])];
+    if (deps) this._prerequisites = [...new Set([...this.prerequisites, ...deps])];
     if (block) this.actions.push(block);
     return this;
   }
@@ -130,7 +145,7 @@ export class Task {
   }
 
   reenable(): void {
-    this.alreadyInvoked = false;
+    this._alreadyInvoked = false;
     this._invocationException = null;
   }
 
@@ -192,7 +207,7 @@ export class Task {
           }
         }
 
-        this.alreadyInvoked = true;
+        this._alreadyInvoked = true;
 
         await this.invokePrerequisites(taskArgs, newChain);
         if (this.isNeeded()) await this.execute(taskArgs);
@@ -225,6 +240,7 @@ export class Task {
     }
   }
 
+  /** @inventedArm allSettled — PERMANENT */
   async invokePrerequisitesConcurrently(
     taskArgs: TaskArguments,
     invocationChain: InvocationChain<Task>,
@@ -233,7 +249,8 @@ export class Task {
       const prereqArgs = taskArgs.newScope(p.argNames);
       return p.invokeWithCallChain(prereqArgs, invocationChain);
     });
-    await Promise.all(futures);
+    const values = await Promise.allSettled(futures);
+    for (const value of values.reverse()) if (value.status === "rejected") throw value.reason;
   }
 
   /** @internal */
@@ -270,7 +287,7 @@ export class Task {
 
   addDescription(description: string | null): void {
     if (!description) return;
-    const comment = description.trim();
+    const comment = strip(description);
     if (comment && comment.length !== 0) this.addComment(comment);
   }
 
@@ -307,7 +324,7 @@ export class Task {
 
   /** @internal */
   private firstSentence(string: string): string | null {
-    return string.split(/(?<=\w)(\.|!)[ \t]|(\.$|!)|\n/m)[0] ?? null;
+    return stringSplit(string, /(?<=\w)(\.|!)[ \t]|(\.$|!)|\n/m)[0] ?? null;
   }
 
   setArgNames(args: string[]): string[] {
@@ -319,18 +336,31 @@ export class Task {
     result += `Investigating ${this.name}\n`;
     result += `class: ${rbModName(this.constructor)}\n`;
     result += `task needed: ${this.isNeeded()}\n`;
-    result += `timestamp: ${this.timestamp()}\n`;
+    result += `timestamp: ${_timeToS(this.timestamp())}\n`;
     result += "pre-requisites: \n";
     const prereqs = this.prerequisiteTasks();
     prereqs.sort((a, b) => a.timestamp().getTime() - b.timestamp().getTime());
     for (const p of prereqs) {
-      result += `--${p.name} (${p.timestamp()})\n`;
+      result += `--${p.name} (${_timeToS(p.timestamp())})\n`;
     }
     const timestamps = this.prerequisiteTasks().map((p) => p.timestamp());
     const latestPrereq =
       timestamps.length === 0 ? null : new Date(Math.max(...timestamps.map(Number)));
-    result += `latest-prerequisite time: ${latestPrereq ?? ""}\n`;
+    result += `latest-prerequisite time: ${latestPrereq ? _timeToS(latestPrereq) : ""}\n`;
     result += "................................\n\n";
     return result;
   }
+}
+
+/**
+ * Ruby `Time#to_s` (`vendor/ruby/v3.3.11/time.c:4351` `time_to_s`), `%Y-%m-%d %H:%M:%S %z`
+ * in local time; ruby-compat has no `Time`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+function _timeToS(t: Date): string {
+  const pad = (n: number, w = 2) => String(Math.trunc(Math.abs(n))).padStart(w, "0");
+  const offset = -t.getTimezoneOffset();
+  const zone = `${offset < 0 ? "-" : "+"}${pad(offset / 60)}${pad(offset % 60)}`;
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())} ${zone}`;
 }

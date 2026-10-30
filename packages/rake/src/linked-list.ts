@@ -1,4 +1,4 @@
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { Enumerable, include, map, rbInspect } from "@blazetrails/ruby-compat";
 
 export class LinkedList<T = unknown> {
   readonly head!: T;
@@ -31,15 +31,13 @@ export class LinkedList<T = unknown> {
   }
 
   toString(): string {
-    const items: string[] = [];
-    this.each((item) => items.push(String(item)));
-    return `LL(${items.join(", ")})`;
+    const items = map(this, (item) => String(item)).join(", ");
+    return `LL(${items})`;
   }
 
   inspect(): string {
-    const items: string[] = [];
-    this.each((item) => items.push(rbInspect(item)));
-    return `LL(${items.join(", ")})`;
+    const items = map(this, (item) => rbInspect(item)).join(", ");
+    return `LL(${items})`;
   }
 
   each(block: (item: T) => void): this {
@@ -70,6 +68,8 @@ export class LinkedList<T = unknown> {
 
   static EmptyLinkedList: typeof EmptyLinkedList;
 }
+
+include(LinkedList, Enumerable);
 
 class EmptyLinkedList extends LinkedList<never> {
   static parent: typeof LinkedList = LinkedList;

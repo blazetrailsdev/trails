@@ -1,4 +1,11 @@
-import { fetch, KERNEL_METHODS, PROTOCOL_PROBES, rbModName } from "@blazetrails/ruby-compat";
+import {
+  Enumerable,
+  fetch,
+  include,
+  KERNEL_METHODS,
+  PROTOCOL_PROBES,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 
 export class TaskArguments {
   readonly names: string[];
@@ -107,5 +114,7 @@ export class TaskArguments {
     return null;
   }
 }
+
+include(TaskArguments, Enumerable);
 
 export const EMPTY_TASK_ARGS = new TaskArguments([], []);

@@ -102,4 +102,53 @@ describe("Rake::Task", () => {
     expect(t.comment).toBeNull();
     expect(t.argNames).toEqual([]);
   });
+
+  it("answers prerequisites as sources until sources are set", () => {
+    const t = task("t", ["a", "b"]);
+    expect(t.sources).toEqual(["a", "b"]);
+    expect(t.source).toBe("a");
+    t.sources = ["x"];
+    expect(t.sources).toEqual(["x"]);
+    expect(task("empty").source).toBeNull();
+  });
+
+  it("answers an empty comment for an empty one, as Ruby does", () => {
+    const t = task("t");
+    t.comment = "";
+    expect(t.comment).toBe("");
+    expect(t.fullComment).toBe("");
+  });
+
+  it("strips with Ruby's whitespace set", () => {
+    const t = task("t");
+    t.addDescription("\u00A0kept\0");
+    expect(t.fullComment).toBe("\u00A0kept");
+  });
+
+  it("formats investigation times as Time#to_s", () => {
+    const t = task("t", ["a"]);
+    task("a");
+    expect(t.investigation()).toMatch(
+      /timestamp: \d{4}-\d\d-\d\d \d\d:\d\d:\d\d [+-]\d{4}\n[\s\S]*--a \(\d{4}-/,
+    );
+  });
+
+  it("runs prerequisites concurrently and re-raises the last failure first", async () => {
+    app.options.alwaysMultitask = true;
+    const t = task("t", ["a", "b"]);
+    task("a", [], () => {
+      throw new RuntimeError("a");
+    });
+    task("b", [], () => {
+      throw new RuntimeError("b");
+    });
+    await expect(t.invoke()).rejects.toThrow("b");
+  });
+
+  it("does not run actions on a dry run", async () => {
+    app.options.dryrun = true;
+    let ran = false;
+    await task("t", [], () => void (ran = true)).invoke();
+    expect(ran).toBe(false);
+  });
 });

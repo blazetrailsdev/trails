@@ -31,26 +31,14 @@ export class InvocationChain<T = unknown> extends LinkedList<T> {
   static EmptyInvocationChain: typeof EmptyInvocationChain;
 }
 
-class EmptyInvocationChain extends InvocationChain<never> {
-  static parent: typeof LinkedList = InvocationChain;
+class EmptyInvocationChain extends LinkedList.EmptyLinkedList {
+  static override parent: typeof LinkedList = InvocationChain;
 
-  constructor() {
-    super(undefined as never, undefined as never);
-  }
-
-  override isEmpty(): boolean {
-    return true;
-  }
-
-  static override cons<T>(head: T, tail: LinkedList<T>): LinkedList<T> {
-    return this.parent.cons(head, tail);
-  }
-
-  override isMember(_obj: never): boolean {
+  isMember(_obj: unknown): boolean {
     return false;
   }
 
-  override append<T>(invocation: T): InvocationChain<T> {
+  append<T>(invocation: T): InvocationChain<T> {
     return this.conj(invocation as never) as unknown as InvocationChain<T>;
   }
 
@@ -60,4 +48,4 @@ class EmptyInvocationChain extends InvocationChain<never> {
 }
 
 InvocationChain.EmptyInvocationChain = EmptyInvocationChain;
-InvocationChain.EMPTY = new EmptyInvocationChain();
+InvocationChain.EMPTY = new EmptyInvocationChain() as unknown as InvocationChain<never>;
