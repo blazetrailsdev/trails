@@ -1097,6 +1097,9 @@ importers:
       '@blazetrails/msgpack':
         specifier: workspace:*
         version: link:../../packages/msgpack
+      '@blazetrails/net-smtp':
+        specifier: workspace:*
+        version: link:../../packages/net-smtp
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../../packages/nokogiri
