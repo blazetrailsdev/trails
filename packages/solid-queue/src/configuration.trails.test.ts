@@ -22,8 +22,9 @@ describe("Configuration", () => {
 
     vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(`${import.meta.dirname}/test-helpers/dummy`);
     const configuration = new Configuration({ dispatchers: [] });
-    await configuration.configuredProcesses();
+    const processes = await configuration.configuredProcesses();
 
+    expect(processes.map((process) => process.kind)).toContain("scheduler");
     expect(order.slice(0, 2)).toEqual(["loadSchema", "fromConfiguration"]);
   });
 });
