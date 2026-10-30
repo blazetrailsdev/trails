@@ -50,7 +50,7 @@ export const Utilities = {
   },
 
   unquote(str: string): string {
-    const m = /^"(.*?)"$/m.exec(str);
+    const m = /(?:^|(?<=\n))"([^\n]*?)"(?=\n|$)/.exec(str);
     if (m) {
       return Utilities.unescape(m[1]);
     } else {
@@ -59,7 +59,7 @@ export const Utilities = {
   },
 
   unescape(str: string): string {
-    return str.replace(/\\(.)/g, "$1");
+    return str.replace(/\\([^\n])/g, "$1");
   },
 
   unparen(str: string): string {
@@ -169,7 +169,7 @@ export const Utilities = {
     if (value == null) {
       return true;
     } else if (typeof value === "string") {
-      return !/\S/.test(value);
+      return !/[^ \t\r\n\f\v]/.test(value);
     } else {
       return rbObjRespondTo(value, "isEmpty") ? isEmpty(value as object) : value === false;
     }
