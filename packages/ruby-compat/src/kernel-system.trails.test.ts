@@ -7,6 +7,8 @@ import {
 import { Dir } from "./dir.js";
 import { Errno } from "./errno.js";
 import { File } from "./file.js";
+import { IO } from "./io.js";
+import { IOError } from "./io-error.js";
 import { FileUtils } from "./file-utils.js";
 import { rbFSystem } from "./kernel-system.js";
 import { NotImplementedError } from "./not-implemented-error.js";
@@ -78,6 +80,37 @@ describe("Kernel#system", () => {
     } finally {
       FileUtils.rmF(out);
     }
+  });
+
+  it("writes the child's stdout to an out: IO.pipe writer", async () => {
+    const [r, w] = IO.pipe();
+    expect(await rbFSystem("printf", "ok", { out: w })).toBe(true);
+    w.close();
+    expect(new TextDecoder().decode(r.read() as Uint8Array)).toBe("ok");
+  });
+
+  it("drops output once the out: pipe's reader is closed", async () => {
+    const [r, w] = IO.pipe();
+    r.close();
+    expect(await rbFSystem("printf", "ok", { out: w })).toBe(true);
+  });
+
+  it("writes the child's stdout to an out: File's descriptor", async () => {
+    const path = File.join(Dir.tmpdir(), `trails-kernel-system-io-${Process.pid}.out`);
+    const out = File.open(path, "w");
+    try {
+      expect(await rbFSystem("printf", "ok", { out })).toBe(true);
+      out.close();
+      expect(File.read(path)).toBe("ok");
+    } finally {
+      FileUtils.rmF(path);
+    }
+  });
+
+  it("raises IOError for a closed out: IO", async () => {
+    const [, w] = IO.pipe();
+    w.close();
+    await expect(rbFSystem("true", { out: w })).rejects.toThrow(IOError);
   });
 
   it("raises NotImplementedError on an adapter that cannot spawn", async () => {

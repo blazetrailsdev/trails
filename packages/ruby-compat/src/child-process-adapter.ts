@@ -1,5 +1,6 @@
 import { env as processEnv } from "./process-adapter.js";
 import { File } from "./file.js";
+import { PipeIO, type IO } from "./io.js";
 
 export interface SpawnSyncOptions {
   input?: string | Uint8Array;
@@ -40,13 +41,17 @@ export interface ChildProcessAdapter {
    * With no `args`, `command` is a command line for `/bin/sh -c` (`proc_exec_sh`,
    * `vendor/ruby/v3.3.11/process.c:1788`); with `args` it is the program, exec'd
    * with that argv and no shell (`proc_exec_cmd`, `process.c:1741`). `options.out`
-   * is `out: filename`: stdout opened on that file, truncated (`process.c:1985`).
+   * is `out: filename`: stdout opened on that file, truncated (`process.c:1985`),
+   * or `out: io`: stdout dup2'd from that IO (`check_exec_redirect_fd`,
+   * `process.c:1963-1968`). An {@link IO.pipe} end has no descriptor, so the
+   * child's stdout is pumped into its in-process buffer, and bytes written after
+   * the pipe closes are dropped, as the child's SIGPIPE would lose them.
    */
   system?(
     command: string,
     env: Record<string, string | undefined>,
     args?: string[] | null,
-    options?: { out?: string },
+    options?: { out?: string | IO },
   ): Promise<WaitStatus>;
   /**
    * Runs `command` through `/bin/sh -c`, or with no `args` the program `command`
@@ -217,12 +222,26 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
       };
     },
     system(command, env, args, options) {
-      const outFile = options?.out != null ? File.open(options.out, "w") : null;
-      const stdio = outFile === null ? "inherit" : ["inherit", outFile.fileno(), "inherit"];
+      const out = options?.out;
+      const outFile = typeof out === "string" ? File.open(out, "w") : null;
+      const outIO = outFile ?? (out as IO | undefined) ?? null;
+      const stdio =
+        outIO === null
+          ? "inherit"
+          : ["inherit", outIO instanceof PipeIO ? "pipe" : outIO.fileno(), "inherit"];
+      const read = {
+        bytes: (chunk: Uint8Array) => {
+          try {
+            outIO?.write(chunk);
+          } catch {
+            return;
+          }
+        },
+      };
       const status =
         args == null
-          ? spawnChild(cp, "/bin/sh", ["-c", command], env, stdio, () => {})
-          : spawnChild(cp, command, args, env, stdio, () => {});
+          ? spawnChild(cp, "/bin/sh", ["-c", command], env, stdio, read)
+          : spawnChild(cp, command, args, env, stdio, read);
       return status.finally(() => outFile?.close());
     },
     async capture2e(command, env, args) {

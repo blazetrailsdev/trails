@@ -1,4 +1,5 @@
 import { getChildProcess } from "./child-process-adapter.js";
+import type { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { Process, rbExecargNew, rbLastStatusSet } from "./process.js";
 
@@ -18,7 +19,7 @@ import { Process, rbExecargNew, rbLastStatusSet } from "./process.js";
  * (`vendor/ruby/v3.3.11/process.c:4841`).
  */
 export async function rbFSystem(
-  ...argv: (string | Record<string, string | null> | { out?: string })[]
+  ...argv: (string | Record<string, string | null> | { out?: string | IO })[]
 ): Promise<boolean | null> {
   const [prog, env, args, opthash] = rbExecargNew(argv);
   const adapter = getChildProcess();

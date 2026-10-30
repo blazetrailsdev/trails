@@ -3,6 +3,7 @@ import {
   Dir,
   File,
   FileUtils as StdlibFileUtils,
+  IO,
   ArgumentError,
   LoadError,
   NotImplementedError,
@@ -223,9 +224,13 @@ describe("TestRakeFileUtils", () => {
   it("sh with spawn options", async () => {
     await echocommand();
 
-    await verbose(false, () => sh(RUBY, "echocommand.rb", { out: "echocommand.out" }));
+    const [r, w] = IO.pipe();
 
-    expect(await getFs().readFile("echocommand.out", "utf-8")).toBe("echocommand.rb\n");
+    await verbose(false, () => sh(RUBY, "echocommand.rb", { out: w }));
+
+    w.close();
+
+    expect(new TextDecoder().decode(r.read() as Uint8Array)).toBe("echocommand.rb\n");
   });
 
   it("sh with hash option", async () => {
