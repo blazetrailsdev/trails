@@ -611,6 +611,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     await user.highlights.attach(blobs);
     expect(await user.highlights.isAttached()).toBe(true);
 
+    await user.updateColumn("updated_at", "2000-01-01 00:00:00");
     await assertChanges(
       () => user.readAttribute("updated_at"),
       null,
@@ -672,6 +673,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     await user.highlights.attach(blobs);
     expect(await user.highlights.isAttached()).toBe(true);
 
+    await user.updateColumn("updated_at", "2000-01-01 00:00:00");
     await performEnqueuedJobs(() =>
       assertChanges(
         () => user.readAttribute("updated_at"),
