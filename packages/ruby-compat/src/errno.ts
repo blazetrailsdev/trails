@@ -70,6 +70,24 @@ class EAGAIN extends SystemCallError {
 }
 
 /**
+ * `Errno::EINTR`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: a system call interrupted by a signal.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EINTR`, which SolidCable's
+ * `Listener` rescues.
+ */
+class EINTR extends SystemCallError {
+  static readonly Errno = 4;
+  readonly code = "EINTR";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Interrupted system call" : `Interrupted system call - ${mesg}`);
+    this.name = "Errno::EINTR";
+    this.errno = EINTR.Errno;
+  }
+}
+
+/**
  * `Errno::EPIPE`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
  * {@link ENOTTY} is. A write to a closed pipe reaches JS as the host's own
  * error carrying `code: "EPIPE"`, which is this class to `rescue Errno::EPIPE`.
@@ -314,6 +332,7 @@ export const Errno = {
   EAGAIN,
   ECONNRESET,
   EEXIST,
+  EINTR,
   EISDIR,
   EMFILE,
   ENOENT,

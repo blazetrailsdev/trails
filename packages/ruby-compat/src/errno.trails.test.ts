@@ -55,3 +55,13 @@ describe("Errno::EMFILE", () => {
     expect(new Sub() instanceof Errno.EMFILE).toBe(true);
   });
 });
+
+describe("Errno::EINTR", () => {
+  it("carries errno 4 and Ruby's message", () => {
+    const error = new Errno.EINTR("x");
+    expect(error instanceof SystemCallError).toBe(true);
+    expect(error.errno).toBe(4);
+    expect(error.message).toBe("Interrupted system call - x");
+    expect(new Errno.EINTR().message).toBe("Interrupted system call");
+  });
+});

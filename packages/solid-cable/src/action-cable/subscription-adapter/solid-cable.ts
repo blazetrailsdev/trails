@@ -6,7 +6,8 @@ import { Base } from "@blazetrails/actioncable/subscription-adapter/base";
 import { ChannelPrefix } from "@blazetrails/actioncable/subscription-adapter/channel-prefix";
 import type { InlineServer } from "@blazetrails/actioncable/subscription-adapter/inline";
 import { SubscriberMap } from "@blazetrails/actioncable/subscription-adapter/subscriber-map";
-import { Exception, Thread, forceEncoding } from "@blazetrails/ruby-compat";
+import { Errno, Exception, IO, Thread, forceEncoding } from "@blazetrails/ruby-compat";
+import type { PipeIO } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Message } from "../../message.js";
 import { SolidCable as SolidCableConfig } from "../../solid-cable.js";
@@ -74,6 +75,7 @@ export class Listener extends SubscriberMap {
   private _channels: Set<string> | null = null;
   private _timer: ReturnType<typeof setTimeout> | undefined;
   private _isStopped = false;
+  private _selfPipe: { reader: PipeIO; writer: PipeIO } | null = null;
   private _stop!: (stop: Exception) => void;
   private readonly _stopped = new Promise<never>((_resolve, reject) => (this._stop = reject));
 
@@ -181,6 +183,48 @@ export class Listener extends SubscriberMap {
     } else {
       await block();
     }
+  }
+
+  /** @internal */
+  private wakeUp(): void {
+    this.interrupt();
+  }
+
+  static readonly SELF_PIPE_BLOCK_SIZE = 11;
+
+  /** @internal */
+  private interrupt(): void {
+    for (;;) {
+      try {
+        this.selfPipe.writer.writeNonblock(".");
+        return;
+      } catch (error) {
+        if (error instanceof Errno.EAGAIN || error instanceof Errno.EINTR) continue;
+        throw error;
+      }
+    }
+  }
+
+  /** @internal */
+  private async interruptibleSleep(time: number): Promise<void> {
+    try {
+      if (time > 0 && (await this.selfPipe.reader.waitReadable(time))) {
+        for (;;) this.selfPipe.reader.readNonblock(Listener.SELF_PIPE_BLOCK_SIZE);
+      }
+    } catch (error) {
+      if (!(error instanceof Errno.EAGAIN || error instanceof Errno.EINTR)) throw error;
+    }
+  }
+
+  /** @internal */
+  private get selfPipe(): { reader: PipeIO; writer: PipeIO } {
+    return (this._selfPipe ||= this.createSelfPipe());
+  }
+
+  /** @internal */
+  private createSelfPipe(): { reader: PipeIO; writer: PipeIO } {
+    const [reader, writer] = IO.pipe();
+    return { reader: reader, writer: writer };
   }
 }
 
