@@ -66,6 +66,7 @@ export class DiskService extends Service {
     }
   }
 
+  /** @missingRailsCall open — CONVERGEABLE disk-service-reads-through-file-open */
   override async downloadChunk(key: string, range: Range<number>): Promise<Uint8Array> {
     return await this.instrument("download_chunk", { key: key, range: range }, async () => {
       try {
@@ -155,6 +156,7 @@ export class DiskService extends Service {
     return File.join(this.root, this.folderFor(key), key);
   }
 
+  /** @missingRailsCall open — CONVERGEABLE disk-service-reads-through-file-open */
   override async compose(
     sourceKeys: string[],
     destinationKey: string,
@@ -255,7 +257,10 @@ export class DiskService extends Service {
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall open — CONVERGEABLE disk-service-reads-through-file-open
+   */
   private async stream(key: string, block: (chunk: Uint8Array) => unknown): Promise<void> {
     try {
       const path = this.pathFor(key);
