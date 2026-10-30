@@ -161,11 +161,9 @@ export function rbObjMethod(obj: unknown, vid: unknown): Method {
 /**
  * `class_instance_method_list` (`vendor/ruby/v3.3.11/class.c:1818`) for an
  * object: its singleton methods, its class's, then every ancestor's while
- * `recur` is set. Every function-valued entry is listed, and an accessor
- * is listed as `rb_attr` (`vendor/ruby/v3.3.11/vm_method.c:1892-1895`) adds
- * it: its getter as `name`, its setter as `name=`. A JS entry carries no
- * visibility (CLAUDE.md, "Method visibility is compile-time only").
- * `constructor` and `Object.prototype.__proto__` are not methods.
+ * `recur` is set. A function entry is listed, and an accessor as `name` /
+ * `name=`, as `rb_attr` (`vendor/ruby/v3.3.11/vm_method.c:1892-1895`) adds it.
+ * A JS entry carries no visibility (CLAUDE.md, "Method visibility is compile-time only").
  */
 function classInstanceMethodList(obj: unknown, recur: boolean): string[] {
   const list = new Set<string>();

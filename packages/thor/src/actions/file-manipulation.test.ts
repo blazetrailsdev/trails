@@ -1,13 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  Dir,
-  File,
-  FileUtils,
-  getFs,
-  isEmpty,
-  NameError,
-  rbFBinding,
-} from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, isEmpty, NameError, rbFBinding } from "@blazetrails/ruby-compat";
 import { capture, isWindows, sourceRoot } from "../test-helpers/helper.js";
 import { MyCounter } from "../test-helpers/fixtures/group.js";
 
@@ -103,7 +95,7 @@ describe("Thor::Actions", () => {
       await action("copyFile", "preserve/script.sh", { mode: "preserve" });
       const original = File.join(sourceRoot(), "preserve/script.sh");
       const copy = File.join(destinationRoot(), "preserve/script.sh");
-      expect((await getFs().stat!(original)).mode).toEqual((await getFs().stat!(copy)).mode);
+      expect(File.stat(original).mode).toEqual(File.stat(copy).mode);
     });
 
     it("copies file from source to default destination and preserves file mode for templated filenames", async () => {
@@ -112,7 +104,7 @@ describe("Thor::Actions", () => {
       await action("copyFile", "preserve/%filename%.sh", { mode: "preserve" });
       const original = File.join(sourceRoot(), "preserve/%filename%.sh");
       const copy = File.join(destinationRoot(), "preserve/app.sh");
-      expect((await getFs().stat!(original)).mode).toEqual((await getFs().stat!(copy)).mode);
+      expect(File.stat(original).mode).toEqual(File.stat(copy).mode);
       expect(filename).toHaveBeenCalled();
     });
 
