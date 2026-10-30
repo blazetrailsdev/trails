@@ -17,8 +17,8 @@ registerClassPaths([
   [() => m3.LinkedList, "Rake::LinkedList"],
   [() => m4.PseudoStatus, "Rake::PseudoStatus"],
   [() => m5.RuleRecursionOverflowError, "Rake::RuleRecursionOverflowError"],
+  [() => m8.Task, "Rake::Task"],
   [() => m6.TaskArgumentError, "Rake::TaskArgumentError"],
   [() => m7.TaskArguments, "Rake::TaskArguments"],
-  [() => m8.Task, "Rake::Task"],
   [() => m9.Version, "Rake::Version"],
 ]);
