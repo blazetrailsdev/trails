@@ -708,9 +708,16 @@ describe("ActiveStorage::OneAttachedTest", () => {
     const service = activeStorage.service;
     activeStorage.service = null;
     try {
-      await assertRaises([RuntimeError], {}, () => {
-        (User as unknown as Attachable).hasOneAttached("featuredPhoto");
-      });
+      await assertRaises(
+        [RuntimeError],
+        {
+          match:
+            /Missing Active Storage service name. Specify Active Storage service name for config.active_storage.service in config\/environments\/test.rb/,
+        },
+        () => {
+          (User as unknown as Attachable).hasOneAttached("featuredPhoto");
+        },
+      );
     } finally {
       activeStorage.service = service;
     }

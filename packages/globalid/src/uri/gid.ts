@@ -75,13 +75,13 @@ export class GID extends Generic {
     return new GID(...genericComponents);
   }
 
-  /** @missingRailsName name — PERMANENT */
   static create(
     app: string,
     model: { id: unknown; constructor: object },
     params: Record<string, unknown> | null = null,
   ): GID {
-    return GID.build({ app, modelName: rbModName(model.constructor)!, modelId: model.id, params });
+    const name = rbModName(model.constructor)!;
+    return GID.build({ app, modelName: name, modelId: model.id, params });
   }
 
   static override build(args: {
