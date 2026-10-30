@@ -43,4 +43,33 @@ describe("actionpack entry circular-init", () => {
     },
     30_000,
   );
+
+  it("loads neither playwright nor vite from a production boot under plain node", () => {
+    const script = `
+      import { registerHooks } from "node:module";
+      const loaded = [];
+      registerHooks({
+        resolve(specifier, context, next) {
+          const result = next(specifier, context);
+          loaded.push(result.url);
+          return result;
+        },
+      });
+      await import("./packages/trailties/dist/index.js");
+      await import("./packages/trailties/dist/all.js");
+      const forbidden = loaded.filter((url) =>
+        /\\/node_modules\\/(?:\\.pnpm\\/)?(?:playwright|vite|rollup|vitest)[@/]/.test(url),
+      );
+      console.log(JSON.stringify({ count: loaded.length, forbidden }));
+    `;
+    const res = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+      cwd: ROOT,
+      encoding: "utf8",
+      input: "",
+    });
+    expect(res.status, res.stderr).toBe(0);
+    const { count, forbidden } = JSON.parse(res.stdout.trim().split("\n").at(-1)!);
+    expect(count).toBeGreaterThan(100);
+    expect(forbidden).toEqual([]);
+  }, 30_000);
 });
