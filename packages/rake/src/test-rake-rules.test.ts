@@ -292,9 +292,14 @@ describe("TestRakeRules", () => {
       rule(`.${letter}`, `.${prev}`, (t) => puts.call($stdout, t.name));
       prev = letter;
     }
-    await expect(invoke("a.z")).rejects.toThrow(RuleRecursionOverflowError);
-    const ex = await invoke("a.z").catch((e: unknown) => e);
-    expect((ex as Error).message).toMatch(/a\.z => a.y/);
+    let ex: Error;
+    await expect(
+      invoke("a.z").catch((e: Error) => {
+        ex = e;
+        throw e;
+      }),
+    ).rejects.toThrow(RuleRecursionOverflowError);
+    expect(ex!.message).toMatch(/a\.z => a.y/);
   });
 
   it("rules with bad dependents will fail", async () => {
@@ -322,7 +327,7 @@ describe("TestRakeRules", () => {
 
   it("single dependent with nil args", async () => {
     await createFile(SRCFILE);
-    rule(null, ".cpp", (t) => puts.call($stdout, t.name));
+    rule(null, ".cpp", (t) => puts.call($stdout, rbInspect(t.name)));
     rule(/\.o$/, ".c", name);
     await invoke(OBJFILE);
     expect(runs).toEqual([OBJFILE]);

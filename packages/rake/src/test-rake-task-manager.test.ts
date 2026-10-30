@@ -193,7 +193,7 @@ describe("TestRakeTaskManager", () => {
   });
 
   it("correctly scoped prerequisites are invoked", async () => {
-    const tm = new Application();
+    tm = new Application();
     const values: string[] = [];
     tm.defineTask(
       Task,
