@@ -813,6 +813,9 @@ importers:
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../trails-tsc
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/trails-tsc:
     dependencies:

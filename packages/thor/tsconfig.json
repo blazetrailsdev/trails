@@ -3,12 +3,14 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "types": ["@blazetrails/vitest-matchers"]
   },
   "include": ["src"],
   "references": [
     { "path": "../ruby-compat" },
     { "path": "../did-you-mean" },
-    { "path": "../activesupport" }
+    { "path": "../activesupport" },
+    { "path": "../vitest-matchers" }
   ]
 }

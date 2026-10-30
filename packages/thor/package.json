@@ -28,7 +28,8 @@
   },
   "devDependencies": {
     "@blazetrails/activesupport": "workspace:*",
-    "@blazetrails/trails-tsc": "workspace:*"
+    "@blazetrails/trails-tsc": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*"
   },
   "engines": {
     "node": ">=24"

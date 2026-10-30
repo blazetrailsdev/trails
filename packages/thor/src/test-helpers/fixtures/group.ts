@@ -85,19 +85,19 @@ export class MyCounter extends Group {
   }
 
   three(): unknown {
-    return this.options["third"];
+    return hashAref(this.options, "third");
   }
 
   four(): unknown {
-    return this.options["fourth"];
+    return hashAref(this.options, "fourth");
   }
 
   five(): unknown {
-    return this.options["simple"];
+    return hashAref(this.options, "simple");
   }
 
   six(): unknown {
-    return this.options["symbolic"];
+    return hashAref(this.options, "symbolic");
   }
 
   world(block: () => unknown): unknown {
