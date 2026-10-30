@@ -92,6 +92,8 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "ActionCable::Connection::TestCookies": { "[]=": ["set"] },
   // rack/headers.rb:91 `def self.[](*items)` → headers.ts `static get`, :110
   // `def [](key)` → `get`, and :114 `def []=(key, value)` → `set`.
+  "Rake::LinkedList": { "==": ["equals"] },
+  "Rake::TaskArguments": { "[]": ["get"] },
   "Rack::Headers": { "self.[]": ["get"], "[]": ["get"], "[]=": ["set"] },
   "Rack::Response": { "self.[]": ["get"] },
   "I18n::Locale::Fallbacks": { "[]": ["get"] },
