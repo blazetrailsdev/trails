@@ -20,7 +20,7 @@ export class LinkedList<T = unknown> {
   }
 
   equals(other: LinkedList<T>): boolean {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias -- `current = self` (`linked_list.rb:26`).
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     let current: LinkedList<T> = this;
     while (!current.isEmpty() && !other.isEmpty()) {
       if (current.head !== other.head) return false;
@@ -43,7 +43,7 @@ export class LinkedList<T = unknown> {
   }
 
   each(block: (item: T) => void): this {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias -- `current = self` (`linked_list.rb:49`).
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     let current: LinkedList<T> = this;
     while (!current.isEmpty()) {
       block(current.head);
