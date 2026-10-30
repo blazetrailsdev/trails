@@ -37,30 +37,39 @@ describe("TestRakeInvocationChain", () => {
   });
 
   it("append one circular", () => {
-    const ex = (() => {
+    let ex: Error | undefined;
+    expect(() => {
       try {
         one.append(firstMember);
       } catch (e) {
-        return e as Error;
+        ex = e as Error;
+        throw e;
       }
-    })();
-    expect(ex).toBeInstanceOf(RuntimeError);
+    }).toThrow(RuntimeError);
     expect(ex!.message).toMatch(/circular +dependency/i);
     expect(ex!.message).toMatch(/A.*=>.*A/);
   });
 
   it("append two circular", () => {
-    expect(() => two.append(firstMember)).toThrow(RuntimeError);
-    expect(() => two.append(firstMember)).toThrow(/A.*=>.*B.*=>.*A/);
+    let ex: Error | undefined;
+    expect(() => {
+      try {
+        two.append(firstMember);
+      } catch (e) {
+        ex = e as Error;
+        throw e;
+      }
+    }).toThrow(RuntimeError);
+    expect(ex!.message).toMatch(/A.*=>.*B.*=>.*A/);
   });
 
   it("member eh one", () => {
-    expect(one.isMember(firstMember)).toBe(true);
+    expect(one.isMember(firstMember)).toBeTruthy();
   });
 
   it("member eh two", () => {
-    expect(two.isMember(firstMember)).toBe(true);
-    expect(two.isMember(secondMember)).toBe(true);
+    expect(two.isMember(firstMember)).toBeTruthy();
+    expect(two.isMember(secondMember)).toBeTruthy();
   });
 
   it("to s empty", () => {

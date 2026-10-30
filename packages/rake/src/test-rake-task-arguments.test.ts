@@ -20,10 +20,10 @@ describe("TestRakeTaskArguments", () => {
 
   it("has key", () => {
     const ta = new TaskArguments(["a"], ["one"]);
-    expect(ta.hasKey("a")).toBe(true);
-    expect(ta.isKey("a")).toBe(true);
-    expect(ta.hasKey("b")).toBe(false);
-    expect(ta.isKey("b")).toBe(false);
+    expect(ta.hasKey("a")).toBeTruthy();
+    expect(ta.isKey("a")).toBeTruthy();
+    expect(ta.hasKey("b")).toBeFalsy();
+    expect(ta.isKey("b")).toBeFalsy();
   });
 
   it("fetch", () => {
