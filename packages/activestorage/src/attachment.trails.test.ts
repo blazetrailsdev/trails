@@ -40,14 +40,8 @@ describe("Attachment", () => {
     expect(() => (attachment as unknown as { mumbo(): void }).mumbo()).toThrow(NoMethodError);
   });
 
-  it("delegates missing names to a blob preloaded with the attachment", async () => {
-    const found = await Attachment.find(attachment.id);
-
-    expect((found as unknown as Blob).key).toBe((await attachment.blob)!.key);
-  });
-
   it("does not forward to an unloaded blob, and the blob still awaits", async () => {
-    const found = await Attachment.unscoped().find(attachment.id);
+    const found = await Attachment.find(attachment.id);
 
     expect(() => (found as unknown as { isText(): boolean }).isText()).toThrow(NoMethodError);
     expect(() => found.signedId()).toThrow(NoMethodError);

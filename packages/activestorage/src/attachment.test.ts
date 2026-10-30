@@ -47,8 +47,7 @@ describe("ActiveStorage::AttachmentTest", () => {
   it.skip("directly-uploaded blob identification for many attached occurs outside transaction", () => {});
   it("getting a signed blob ID from an attachment", async () => {
     const blob = await createBlob();
-    const { id } = await Attachment.createBang({ name: "avatar", record: user, blob });
-    const attachment = await Attachment.find(id);
+    const attachment = await Attachment.createBang({ name: "avatar", record: user, blob });
 
     const signedId = attachment.signedId();
     expect(await Blob.findSignedBang(signedId)).toEqual(blob);

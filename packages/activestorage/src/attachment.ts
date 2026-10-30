@@ -42,10 +42,6 @@ export class Attachment extends Record {
     this.belongsTo("record", { polymorphic: true, touch: ActiveStorage.touchAttachmentRecords });
     this.belongsTo("blob", { className: "Blob", autosave: true, inverseOf: "attachments" });
 
-    this.defaultScope(function () {
-      return this.includes("blob");
-    });
-
     this.afterCreateCommit(":mirrorBlobLater", ":analyzeBlobLater", ":transformVariantsLater");
     this.afterDestroyCommit(":purgeDependentBlobLater");
 
