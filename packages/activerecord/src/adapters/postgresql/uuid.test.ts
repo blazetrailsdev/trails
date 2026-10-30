@@ -509,6 +509,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     class UuidForum extends Base {
       static {
         rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidForum", this);
+        registerModel(this);
         this.tableName = "pg_uuid_forums";
         this.hasMany("uuidPosts", function (this: any) {
           return this.order("title DESC");
@@ -524,6 +525,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     class UuidPost extends Base {
       static {
         rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidPost", this);
+        registerModel(this);
         this.tableName = "pg_uuid_posts";
         this.belongsTo("uuidForum");
         this.hasMany("uuidComments");
@@ -532,6 +534,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     class UuidComment extends Base {
       static {
         rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidComment", this);
+        registerModel(this);
         this.tableName = "pg_uuid_comments";
         this.belongsTo("uuidPost");
         this.hasOne("uuidForum", { through: "uuidPost" });
