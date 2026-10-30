@@ -1711,7 +1711,7 @@ export class FileUtils {
   }
 
   /** `FileUtils.compare_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1507-1514`).
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   * @noRailsEquivalent PERMANENT
    */
   static async compareFileAsync(a: string, b: string): Promise<boolean> {
     const fs = getFs();
@@ -1726,7 +1726,7 @@ export class FileUtils {
   static cmpAsync = FileUtils.compareFileAsync;
 
   /** `FileUtils.compare_stream` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1530-1542`).
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   * @noRailsEquivalent PERMANENT
    */
   static compareStream(
     a: { read(length: number): Uint8Array | null },

@@ -2191,9 +2191,11 @@ export const Kernel = {
   initializeCopy(this: object, orig: unknown): object {
     if (this === orig) return this;
     if (Object.isFrozen(this)) {
-      throw new FrozenError(`can't modify frozen ${this.constructor.name}`, { receiver: this });
+      throw new FrozenError(`can't modify frozen ${this.constructor.name}: ${rbInspect(this)}`, {
+        receiver: this,
+      });
     }
-    if (typeof orig !== "object" || orig === null || this.constructor !== orig.constructor) {
+    if (typeof this !== typeof orig || this.constructor !== (orig as object | null)?.constructor) {
       throw new TypeError("initialize_copy should take same class object");
     }
     return this;
