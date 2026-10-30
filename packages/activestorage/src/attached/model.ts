@@ -81,7 +81,7 @@ function hasOneAttached(
   this.hasOne(
     `${name}Attachment`,
     function (this: Relation<Base>) {
-      return this.where({ name: name });
+      return this.where({ name: name }).includes("blob");
     },
     {
       className: "ActiveStorage::Attachment",
@@ -176,7 +176,7 @@ function hasManyAttached(
   this.hasMany(
     `${name}Attachments`,
     function (this: Relation<Base>) {
-      return this.where({ name: name });
+      return this.where({ name: name }).includes("blob");
     },
     {
       as: "record",

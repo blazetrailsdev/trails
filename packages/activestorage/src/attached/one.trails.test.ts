@@ -67,6 +67,13 @@ describe("ActiveStorage::Attached::One", () => {
     expect((user.avatar as unknown as { signedId(): string }).signedId()).toBe(blob.signedId());
   });
 
+  it("an attachment read through the reader has its blob loaded", async () => {
+    const blob = await createBlob({ filename: "funky.jpg" });
+    await user.avatar.attach(blob);
+    const attachment = await ((await Member.find(user.id)) as AvatarUser).avatar.attachment;
+    expect(attachment!.signedId()).toBe(blob.signedId());
+  });
+
   it("detach keeps the blob and purge removes it", async () => {
     const blob = await createBlob();
     await user.avatar.attach(blob);
