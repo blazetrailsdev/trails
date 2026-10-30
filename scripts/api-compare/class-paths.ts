@@ -35,11 +35,14 @@ import type { ClassInfo } from "@blazetrails/parity/types";
 const run = promisify(execFile);
 const OUTPUT_DIR = path.join(ROOT_DIR, "scripts/api-compare/output");
 const GENERATED = "class-paths.generated.ts";
-/** The table for the classes in files the package build excludes, which those files import. */
+/** The table for the classes in files outside the package entry's graph, which those files import. */
 const EXCLUDED_GENERATED = "class-paths.excluded.generated.ts";
 
 /** The api-compare packages whose classes are not loaded from the package entry. */
 const SKIPPED = new Set(["activerecord-test-support"]);
+
+/** A subpath entry that must stay out of the package entry's graph, so its table is its own. */
+const SUBPATH_ENTRIES: Record<string, string> = { actionpack: "system-testing.ts" };
 
 interface Manifest {
   packages: Record<
@@ -56,7 +59,7 @@ export interface ClassPathEntry {
   file: string;
   tsName: string;
   fqn: string;
-  /** The entry sits in a file the build excludes (`src/test-case.ts`), so its own table holds it. */
+  /** The entry sits outside the entry graph (`src/test-case.ts`), so its own table holds it. */
   excluded?: boolean;
   /** The module is the file's own namespace object, which the file `include`s (`DateAndTime::Calculations`). */
   namespace?: boolean;
@@ -105,10 +108,11 @@ function renameTokens(fqn: string): string {
  * imports. A table names only these, so importing it never changes what the
  * entry loads (`active_support/message_pack` is an awaited step of its own).
  */
-async function entryGraph(dir: string): Promise<Set<string>> {
+async function entryGraph(dir: string, subpath?: string): Promise<Set<string>> {
   const cwd = path.join(ROOT_DIR, "packages", dir);
   const srcRoot = path.join(cwd, "src");
-  const entry = (await entryFile(cwd)).replace(/^\.\/dist\//, "").replace(/\.js$/, ".ts");
+  const entry =
+    subpath ?? (await entryFile(cwd)).replace(/^\.\/dist\//, "").replace(/\.js$/, ".ts");
   const seen = new Set<string>();
   const queue = [entry];
   while (queue.length > 0) {
@@ -210,6 +214,8 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
 
     const excluded = await tsconfigExcludes(dir);
     const reachable = await entryGraph(dir);
+    const subpath = SUBPATH_ENTRIES[dir];
+    const subpathGraph = subpath ? await entryGraph(dir, subpath) : new Set<string>();
     const entries = byDir.get(dir) ?? [];
     const byFqn = new Map([...paired.values()].map((e) => [`${e.file}::${e.fqn}`, e]));
     const sources = new Map<string, string>();
@@ -234,7 +240,8 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     for (const [key, entry] of paired) {
       if (ambiguous.has(key)) continue;
       const rel = path.join("src", entry.file);
-      const ownTable = excluded.includes(rel);
+      const ownTable =
+        excluded.includes(rel) || (!reachable.has(entry.file) && subpathGraph.has(entry.file));
       if (
         !ownTable &&
         excluded.some((glob) => path.matchesGlob(rel, glob) || rel.startsWith(`${glob}/`))

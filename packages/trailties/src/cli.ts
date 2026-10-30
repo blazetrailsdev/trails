@@ -3,12 +3,6 @@ import { VERSION } from "./gem-version.js";
 import { hiddenCommands } from "./command.js";
 import { subclasses } from "./command/behavior.js";
 
-export { Trails } from "./rails.js";
-export type { ApplicationRegistry } from "./rails.js";
-export { Application } from "./application.js";
-export { Engine } from "./engine.js";
-export { Trailtie } from "./trailtie.js";
-
 export {
   registerPackageManagerAdapter,
   packageManagerAdapterConfig,

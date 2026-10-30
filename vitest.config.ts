@@ -329,6 +329,10 @@ const alias = {
   "@blazetrails/actionview/": path.resolve(__dirname, "packages/actionview/src") + "/",
   "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),
   "@blazetrails/tse-compiler": path.resolve(__dirname, "packages/tse-compiler/src/index.ts"),
+  "@blazetrails/actionpack/system-testing": path.resolve(
+    __dirname,
+    "packages/actionpack/src/system-testing.ts",
+  ),
   "@blazetrails/actionpack": path.resolve(__dirname, "packages/actionpack/src/index.ts"),
   "@blazetrails/globalid/wire": path.resolve(__dirname, "packages/globalid/src/wire.ts"),
   "@blazetrails/globalid/signed-global-id": path.resolve(
