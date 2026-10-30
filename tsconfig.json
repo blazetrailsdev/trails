@@ -59,6 +59,7 @@
     { "path": "packages/image-processing" },
     { "path": "packages/mini-magick" },
     { "path": "packages/mini-mime" },
+    { "path": "packages/net-smtp" },
     { "path": "packages/rake" },
     { "path": "packages/html-sanitizer" },
     { "path": "packages/nokogiri" },

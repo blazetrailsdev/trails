@@ -221,6 +221,7 @@ describe("vendor/sources.ts", () => {
       "chronic",
       "mail",
       "mini-mime",
+      "net-smtp",
     ]);
     expect(apiComparePackages()).toContain("i18n");
     expect(Object.keys(libPathsManifest())).toContain("i18n");
@@ -406,6 +407,7 @@ describe("vendor/sources.ts", () => {
         "mini-mime",
         "msgpack",
         "mysql2",
+        "net-smtp",
         "pg",
         "raabro",
         "rack",
@@ -464,6 +466,7 @@ describe("vendor/sources.ts", () => {
         "mini-magick",
         "mini-mime",
         "msgpack",
+        "net-smtp",
         "raabro",
         "rack",
         "rack-session",

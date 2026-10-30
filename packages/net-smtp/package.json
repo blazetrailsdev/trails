@@ -1,0 +1,36 @@
+{
+  "name": "@blazetrails/net-smtp",
+  "version": "0.1.0",
+  "description": "SMTP client for Trails, mirroring the net-smtp gem over nodemailer's SMTPConnection",
+  "type": "module",
+  "main": "dist/smtp.js",
+  "types": "dist/smtp.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/smtp.d.ts",
+      "default": "./dist/smtp.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*",
+    "nodemailer": "^10.3.0"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^8.0.2",
+    "@types/smtp-server": "^3.5.13",
+    "smtp-server": "^3.21.2"
+  }
+}
