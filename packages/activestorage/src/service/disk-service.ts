@@ -16,7 +16,7 @@ import { FileNotFoundError, IntegrityError } from "../errors.js";
 import type { Filename } from "../filename.js";
 import { Service } from "../service.js";
 
-type UrlHelpers = Record<string, (...args: unknown[]) => string>;
+type UrlHelpers = Record<`${string}Url`, (...args: unknown[]) => string>;
 
 export class DiskService extends Service {
   root: string;
@@ -298,7 +298,7 @@ export class DiskService extends Service {
 
   /** @internal */
   private urlHelpers(): UrlHelpers {
-    return (this._urlHelpers ??= TopLevel.Trails!.application!.routes().urlHelpers() as UrlHelpers);
+    return (this._urlHelpers ??= TopLevel.Trails!.application!.routes().urlHelpers());
   }
 
   /** @internal */

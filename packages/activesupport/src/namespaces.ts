@@ -73,7 +73,7 @@ export const TopLevel: {
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
       routes(): {
         namedRoutes: { helperNames(): string[] };
-        urlHelpers(): object;
+        urlHelpers(): Record<`${string}Url`, (...args: unknown[]) => string>;
       };
       envConfig(): Record<string, unknown>;
       executor: { wrap<T>(block: () => T): T; runBang(): unknown };
