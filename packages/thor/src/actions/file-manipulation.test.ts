@@ -305,4 +305,371 @@ describe("Thor::Actions", () => {
       expect(String((error as Error).stack)).toContain("bad_config.yaml.tt:2");
     });
   });
+
+  describe("when changing existent files", () => {
+    beforeEach(() => {
+      FileUtils.rmRf(destinationRoot());
+      FileUtils.copyEntry(sourceRoot(), destinationRoot());
+    });
+
+    const file = () => File.join(destinationRoot(), "doc", "README");
+
+    describe("#remove_file", () => {
+      it("removes the file given", async () => {
+        await action("removeFile", "doc/README");
+        expect(File.isExist(file())).toBe(false);
+      });
+
+      it("removes broken symlinks too", async () => {
+        const linkPath = File.join(destinationRoot(), "broken_symlink");
+        await File.symlinkAsync("invalid_reference", linkPath);
+        await action("removeFile", "broken_symlink");
+        expect(File.isSymlink(linkPath) || File.isExist(linkPath)).toBe(false);
+      });
+
+      it("removes directories too", async () => {
+        await action("removeDir", "doc");
+        expect(File.isExist(File.join(destinationRoot(), "doc"))).toBe(false);
+      });
+
+      it("does not remove if pretending", async () => {
+        runner({ pretend: true });
+        await action("removeFile", "doc/README");
+        expect(File.isExist(file())).toBe(true);
+      });
+
+      it("logs status", async () => {
+        expect(await action("removeFile", "doc/README")).toEqual("      remove  doc/README\n");
+      });
+
+      it("does not log status if required", async () => {
+        expect(await action("removeFile", "doc/README", { verbose: false })).toHaveLength(0);
+      });
+    });
+
+    describe("#gsub_file", () => {
+      describe("with invoke behavior", () => {
+        it("replaces the content in the file", async () => {
+          await action("gsubFile", "doc/README", "__start__", "START");
+          expect(File.read(file())).toEqual("START\nREADME\n__end__\n");
+        });
+
+        it("does not replace if pretending", async () => {
+          runner({ pretend: true });
+          await action("gsubFile", "doc/README", "__start__", "START");
+          expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
+        });
+
+        it("accepts a block", async () => {
+          await action("gsubFile", "doc/README", "__start__", (match: string) =>
+            match.replaceAll("__", "").toUpperCase(),
+          );
+          expect(File.read(file())).toEqual("START\nREADME\n__end__\n");
+        });
+
+        it("logs status", async () => {
+          expect(await action("gsubFile", "doc/README", "__start__", "START")).toEqual(
+            "        gsub  doc/README\n",
+          );
+        });
+
+        it("does not log status if required", async () => {
+          expect(
+            await action("gsubFile", file(), "__", { verbose: false }, (match: string) =>
+              match.repeat(2),
+            ),
+          ).toHaveLength(0);
+        });
+      });
+
+      describe("with revoke behavior", () => {
+        describe("and no force option", () => {
+          it("does not replace the content in the file", async () => {
+            runner({}, "revoke");
+            await action("gsubFile", "doc/README", "__start__", "START");
+            expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
+          });
+
+          it("does not replace if pretending", async () => {
+            runner({ pretend: true }, "revoke");
+            await action("gsubFile", "doc/README", "__start__", "START");
+            expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
+          });
+
+          it("does not replace the content in the file when given a block", async () => {
+            runner({}, "revoke");
+            await action("gsubFile", "doc/README", "__start__", (match: string) =>
+              match.replaceAll("__", "").toUpperCase(),
+            );
+            expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
+          });
+
+          it("does not log status", async () => {
+            runner({}, "revoke");
+            expect(await action("gsubFile", "doc/README", "__start__", "START")).toHaveLength(0);
+          });
+
+          it("does not log status if required", async () => {
+            runner({}, "revoke");
+            expect(
+              await action("gsubFile", file(), "__", { verbose: false }, (match: string) =>
+                match.repeat(2),
+              ),
+            ).toHaveLength(0);
+          });
+        });
+
+        describe("and force option", () => {
+          it("replaces the content in the file", async () => {
+            runner({}, "revoke");
+            await action("gsubFile", "doc/README", "__start__", "START", { force: true });
+            expect(File.read(file())).toEqual("START\nREADME\n__end__\n");
+          });
+
+          it("does not replace if pretending", async () => {
+            runner({ pretend: true }, "revoke");
+            await action("gsubFile", "doc/README", "__start__", "START", { force: true });
+            expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
+          });
+
+          it("replaces the content in the file when given a block", async () => {
+            runner({}, "revoke");
+            await action("gsubFile", "doc/README", "__start__", { force: true }, (match: string) =>
+              match.replaceAll("__", "").toUpperCase(),
+            );
+            expect(File.read(file())).toEqual("START\nREADME\n__end__\n");
+          });
+
+          it("logs status", async () => {
+            runner({}, "revoke");
+            expect(
+              await action("gsubFile", "doc/README", "__start__", "START", { force: true }),
+            ).toEqual("        gsub  doc/README\n");
+          });
+
+          it("does not log status if required", async () => {
+            runner({}, "revoke");
+            expect(
+              await action(
+                "gsubFile",
+                file(),
+                "__",
+                { verbose: false, force: true },
+                (match: string) => match.repeat(2),
+              ),
+            ).toHaveLength(0);
+          });
+        });
+      });
+    });
+
+    describe("#append_to_file", () => {
+      it("appends content to the file", async () => {
+        await action("appendToFile", "doc/README", "END\n");
+        expect(File.read(file())).toEqual("__start__\nREADME\n__end__\nEND\n");
+      });
+
+      it("accepts a block", async () => {
+        await action("appendToFile", "doc/README", () => "END\n");
+        expect(File.read(file())).toEqual("__start__\nREADME\n__end__\nEND\n");
+      });
+
+      it("logs status", async () => {
+        expect(await action("appendToFile", "doc/README", "END")).toEqual(
+          "      append  doc/README\n",
+        );
+      });
+    });
+
+    describe("#prepend_to_file", () => {
+      it("prepends content to the file", async () => {
+        await action("prependToFile", "doc/README", "START\n");
+        expect(File.read(file())).toEqual("START\n__start__\nREADME\n__end__\n");
+      });
+
+      it("accepts a block", async () => {
+        await action("prependToFile", "doc/README", () => "START\n");
+        expect(File.read(file())).toEqual("START\n__start__\nREADME\n__end__\n");
+      });
+
+      it("logs status", async () => {
+        expect(await action("prependToFile", "doc/README", "START")).toEqual(
+          "     prepend  doc/README\n",
+        );
+      });
+    });
+
+    describe("#inject_into_class", () => {
+      const file = () => File.join(destinationRoot(), "application.rb");
+
+      it("appends content to a class", async () => {
+        await action(
+          "injectIntoClass",
+          "application.rb",
+          "Application",
+          "  filter_parameters :password\n",
+        );
+        expect(File.read(file())).toEqual(
+          "class Application < Base\n  filter_parameters :password\nend\n",
+        );
+      });
+
+      it("accepts a block", async () => {
+        await action(
+          "injectIntoClass",
+          "application.rb",
+          "Application",
+          () => "  filter_parameters :password\n",
+        );
+        expect(File.read(file())).toEqual(
+          "class Application < Base\n  filter_parameters :password\nend\n",
+        );
+      });
+
+      it("logs status", async () => {
+        expect(
+          await action(
+            "injectIntoClass",
+            "application.rb",
+            "Application",
+            "  filter_parameters :password\n",
+          ),
+        ).toEqual("      insert  application.rb\n");
+      });
+
+      it("does not append if class name does not match", async () => {
+        await action("injectIntoClass", "application.rb", "App", "  filter_parameters :password\n");
+        expect(File.read(file())).toEqual("class Application < Base\nend\n");
+      });
+    });
+
+    describe("#inject_into_module", () => {
+      const file = () => File.join(destinationRoot(), "application_helper.rb");
+
+      it("appends content to a module", async () => {
+        await action(
+          "injectIntoModule",
+          "application_helper.rb",
+          "ApplicationHelper",
+          "  def help; 'help'; end\n",
+        );
+        expect(File.read(file())).toEqual(
+          "module ApplicationHelper\n  def help; 'help'; end\nend\n",
+        );
+      });
+
+      it("accepts a block", async () => {
+        await action(
+          "injectIntoModule",
+          "application_helper.rb",
+          "ApplicationHelper",
+          () => "  def help; 'help'; end\n",
+        );
+        expect(File.read(file())).toEqual(
+          "module ApplicationHelper\n  def help; 'help'; end\nend\n",
+        );
+      });
+
+      it("logs status", async () => {
+        expect(
+          await action(
+            "injectIntoModule",
+            "application_helper.rb",
+            "ApplicationHelper",
+            "  def help; 'help'; end\n",
+          ),
+        ).toEqual("      insert  application_helper.rb\n");
+      });
+
+      it("does not append if module name does not match", async () => {
+        await action(
+          "injectIntoModule",
+          "application_helper.rb",
+          "App",
+          "  def help; 'help'; end\n",
+        );
+        expect(File.read(file())).toEqual("module ApplicationHelper\nend\n");
+      });
+    });
+  });
+
+  describe("when adjusting comments", () => {
+    beforeEach(() => {
+      FileUtils.rmRf(destinationRoot());
+      FileUtils.copyEntry(sourceRoot(), destinationRoot());
+    });
+
+    const file = () => File.join(destinationRoot(), "doc", "COMMENTER");
+
+    const unmodifiedCommentsFile =
+      /__start__\n # greenblue\n#\n# yellowblue\n#yellowred\n #greenred\norange\n {4}purple\n {2}ind#igo\n {2}# ind#igo\n {2}# {3}spaces_between\n__end__/;
+
+    describe("#uncomment_lines", () => {
+      it("uncomments all matching lines in the file", async () => {
+        await action("uncommentLines", "doc/COMMENTER", "green");
+        expect(File.read(file())).toMatch(
+          /__start__\n greenblue\n#\n# yellowblue\n#yellowred\n greenred\norange\n {4}purple\n {2}ind#igo\n {2}# ind#igo\n {2}# {3}spaces_between\n__end__/,
+        );
+
+        await action("uncommentLines", "doc/COMMENTER", "red");
+        expect(File.read(file())).toMatch(
+          /__start__\n greenblue\n#\n# yellowblue\nyellowred\n greenred\norange\n {4}purple\n {2}ind#igo\n {2}# ind#igo\n {2}# {3}spaces_between\n__end__/,
+        );
+      });
+
+      it("correctly uncomments lines with hashes in them", async () => {
+        await action("uncommentLines", "doc/COMMENTER", "ind#igo");
+        expect(File.read(file())).toMatch(
+          /__start__\n # greenblue\n#\n# yellowblue\n#yellowred\n #greenred\norange\n {4}purple\n {2}ind#igo\n {2}ind#igo\n {2}# {3}spaces_between\n__end__/,
+        );
+      });
+
+      it("will leave the space which existed before the comment hash in tact", async () => {
+        await action("uncommentLines", "doc/COMMENTER", "ind#igo");
+        await action("uncommentLines", "doc/COMMENTER", "spaces_between");
+        expect(File.read(file())).toMatch(
+          /__start__\n # greenblue\n#\n# yellowblue\n#yellowred\n #greenred\norange\n {4}purple\n {2}ind#igo\n {2}ind#igo\n {4}spaces_between\n__end__/,
+        );
+      });
+
+      it("does not modify already uncommented lines in the file", async () => {
+        await action("uncommentLines", "doc/COMMENTER", "orange");
+        await action("uncommentLines", "doc/COMMENTER", "purple");
+        expect(File.read(file())).toMatch(unmodifiedCommentsFile);
+      });
+
+      it("does not uncomment the wrong line when uncommenting lines preceded by blank commented line", async () => {
+        await action("uncommentLines", "doc/COMMENTER", "yellow");
+        expect(File.read(file())).toMatch(
+          /__start__\n # greenblue\n#\nyellowblue\nyellowred\n #greenred\norange\n {4}purple\n {2}ind#igo\n {2}# ind#igo\n {2}# {3}spaces_between\n__end__/,
+        );
+      });
+    });
+
+    describe("#comment_lines", () => {
+      it("comments lines which are not commented", async () => {
+        await action("commentLines", "doc/COMMENTER", "orange");
+        expect(File.read(file())).toMatch(
+          /__start__\n # greenblue\n#\n# yellowblue\n#yellowred\n #greenred\n# orange\n {4}purple\n {2}ind#igo\n {2}# ind#igo\n {2}# {3}spaces_between\n__end__/,
+        );
+
+        await action("commentLines", "doc/COMMENTER", "purple");
+        expect(File.read(file())).toMatch(
+          /__start__\n # greenblue\n#\n# yellowblue\n#yellowred\n #greenred\n# orange\n {4}# purple\n {2}ind#igo\n {2}# ind#igo\n {2}# {3}spaces_between\n__end__/,
+        );
+      });
+
+      it("correctly comments lines with hashes in them", async () => {
+        await action("commentLines", "doc/COMMENTER", "ind#igo");
+        expect(File.read(file())).toMatch(
+          /__start__\n # greenblue\n#\n# yellowblue\n#yellowred\n #greenred\norange\n {4}purple\n {2}# ind#igo\n {2}# ind#igo\n {2}# {3}spaces_between\n__end__/,
+        );
+      });
+
+      it("does not modify already commented lines", async () => {
+        await action("commentLines", "doc/COMMENTER", "green");
+        expect(File.read(file())).toMatch(unmodifiedCommentsFile);
+      });
+    });
+  });
 });
