@@ -70,17 +70,19 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
     (Current as unknown as { urlOptions: unknown }).urlOptions = null;
 
     let error: unknown;
-    try {
-      ctx.service.url(ctx.key, {
-        expiresIn: minutes(5),
-        disposition: "inline",
-        filename: new Filename("avatar.png"),
-        contentType: "image/png",
-      });
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(ArgumentError);
+    expect(() => {
+      try {
+        ctx.service.url(ctx.key, {
+          expiresIn: minutes(5),
+          disposition: "inline",
+          filename: new Filename("avatar.png"),
+          contentType: "image/png",
+        });
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(ArgumentError);
 
     expect((error as Error).message).toBe(
       "Cannot generate URL for avatar.png using Disk service, please set ActiveStorage::Current.url_options.",

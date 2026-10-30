@@ -6,13 +6,13 @@ import { DiskService } from "./disk-service.js";
 describe("ActiveStorage::Service::ConfiguratorTest", () => {
   it("builds correct service instance based on service name", () => {
     const service = Configurator.build("foo", { foo: { service: "Disk", root: "path" } });
-    expect(service.constructor).toBe(DiskService);
+    expect(service).toBeInstanceOf(DiskService);
     expect((service as DiskService).root).toBe("path");
   });
 
   it("builds correct service instance based on lowercase service name", () => {
     const service = Configurator.build("foo", { foo: { service: "disk", root: "path" } });
-    expect(service.constructor).toBe(DiskService);
+    expect(service).toBeInstanceOf(DiskService);
     expect((service as DiskService).root).toBe("path");
   });
 
