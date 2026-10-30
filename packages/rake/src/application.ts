@@ -104,7 +104,6 @@ export class Application {
     this.setDefaultOptions();
   }
 
-  /** @internal */
   parseTaskString(string: string): [string, string[]] {
     const m = String(string).match(/^([^[]+)(?:\[(.*)\])$/m);
 
