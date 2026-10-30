@@ -31,6 +31,7 @@ export class CreateMany {
   async unfurl(): Promise<void> {
     for (const subchange of this.subchanges) await subchange.unfurl();
     this.pendingUploads = [...this.pendingUploads, ...this.subchangesWithoutBlobs()];
+    void this.attachments;
   }
 
   get attachments(): Attachment[] {

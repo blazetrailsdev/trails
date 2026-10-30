@@ -272,6 +272,7 @@ export namespace Delegation {
           prop in obj ||
           typeof prop === "symbol" ||
           prop.startsWith("_") ||
+          prop === "then" ||
           KERNEL_METHODS.has(prop) ||
           Object.hasOwn(receiver, "constructor")
         ) {

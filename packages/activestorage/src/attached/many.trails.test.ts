@@ -93,8 +93,25 @@ describe("ActiveStorage::Attached::Many", () => {
     expect(await Blob.isExists(blob.id)).toBe(false);
   });
 
+  it("attach on a new record waits for save, and a blank writer reads as unattached", async () => {
+    const gallery = new Gallery({ name: "New" }) as PhotosUser;
+    await gallery.photos.attach(hash());
+    expect(gallery.isNewRecord()).toBe(true);
+    await gallery.save();
+    expect(await gallery.photos.isAttached()).toBe(true);
+    await gallery.setPhotos([]);
+    expect(await gallery.photos.isAttached()).toBe(false);
+  });
+
+  it("purgeLater empties the attachments", async () => {
+    await user.photos.attach(hash());
+    await user.photos.purgeLater();
+    expect(user.attachmentChanges).toEqual({});
+  });
+
   it("delegates a missing name to the attachments and is not a thenable", async () => {
     await user.photos.attach(hash());
+    expect(await user.photos).toBe(user.photos);
     expect(await (await user.photos).isAttached()).toBe(true);
     expect(await (user.photos as unknown as { count(): Promise<number> }).count()).toBe(1);
   });
