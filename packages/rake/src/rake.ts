@@ -15,6 +15,7 @@ export { TraceOutput } from "./trace-output.js";
 export { DSL } from "./dsl-definition.js";
 export { EARLY, EarlyTime } from "./early-time.js";
 export { FileCreationTask } from "./file-creation-task.js";
+export { FileList } from "./file-list.js";
 export { FileTask } from "./file-task.js";
 export { InvocationChain } from "./invocation-chain.js";
 export { InvocationExceptionMixin } from "./invocation-exception-mixin.js";

@@ -25,6 +25,7 @@ import {
   stderr as $stderr,
   stdout as $stdout,
 } from "@blazetrails/ruby-compat";
+import { FileList } from "./file-list.js";
 import { DefaultLoader } from "./default-loader.js";
 import { FileUtilsExt } from "./file-utils-ext.js";
 import { Rake } from "./rake-module.js";
@@ -209,14 +210,11 @@ export class Application {
     return rtest((exception as { chain?: unknown }).chain);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall glob — CONVERGEABLE rake-file-list-port
-   */
+  /** @internal */
   async haveRakefile(): Promise<string | null> {
     for (const fn of this._rakefiles) {
       if (await File.isExistAsync(fn)) {
-        const others = await Dir.globAsync(fn, File.FNM_CASEFOLD);
+        const others = await FileList.glob(fn, File.FNM_CASEFOLD);
         return others.length === 1 ? others[0] : fn;
       } else if (fn === "") {
         return fn;
@@ -651,7 +649,7 @@ export class Application {
 
   /** @internal */
   private async glob(path: string, block: (name: string) => void): Promise<void> {
-    (await Dir.globAsync(path.replaceAll("\\", "/"))).forEach(block);
+    (await FileList.glob(path.replaceAll("\\", "/"))).forEach(block);
   }
 
   /** @internal */

@@ -5,25 +5,26 @@ import * as m2 from "./default-loader.js";
 import * as m3 from "./dsl-definition.js";
 import * as m4 from "./early-time.js";
 import * as m5 from "./file-creation-task.js";
-import * as m6 from "./file-task.js";
-import * as m7 from "./file-utils-ext.js";
-import * as m8 from "./invocation-chain.js";
-import * as m9 from "./invocation-exception-mixin.js";
-import * as m10 from "./late-time.js";
-import * as m11 from "./linked-list.js";
-import * as m12 from "./multi-task.js";
-import * as m13 from "./name-space.js";
-import * as m14 from "./private-reader.js";
-import * as m15 from "./pseudo-status.js";
-import * as m16 from "./rule-recursion-overflow-error.js";
-import * as m17 from "./scope.js";
-import * as m18 from "./task-argument-error.js";
-import * as m19 from "./task-arguments.js";
-import * as m20 from "./task-manager.js";
-import * as m21 from "./task.js";
-import * as m22 from "./tasklib.js";
-import * as m23 from "./trace-output.js";
-import * as m24 from "./version.js";
+import * as m6 from "./file-list.js";
+import * as m7 from "./file-task.js";
+import * as m8 from "./file-utils-ext.js";
+import * as m9 from "./invocation-chain.js";
+import * as m10 from "./invocation-exception-mixin.js";
+import * as m11 from "./late-time.js";
+import * as m12 from "./linked-list.js";
+import * as m13 from "./multi-task.js";
+import * as m14 from "./name-space.js";
+import * as m15 from "./private-reader.js";
+import * as m16 from "./pseudo-status.js";
+import * as m17 from "./rule-recursion-overflow-error.js";
+import * as m18 from "./scope.js";
+import * as m19 from "./task-argument-error.js";
+import * as m20 from "./task-arguments.js";
+import * as m21 from "./task-manager.js";
+import * as m22 from "./task.js";
+import * as m23 from "./tasklib.js";
+import * as m24 from "./trace-output.js";
+import * as m25 from "./version.js";
 
 registerClassPaths([
   [() => m0.Application, "Rake::Application"],
@@ -32,23 +33,24 @@ registerClassPaths([
   [() => m3.DSL, "Rake::DSL"],
   [() => m4.EarlyTime, "Rake::EarlyTime"],
   [() => m5.FileCreationTask, "Rake::FileCreationTask"],
-  [() => m6.FileTask, "Rake::FileTask"],
-  [() => m7.FileUtilsExt, "Rake::FileUtilsExt"],
-  [() => m8.InvocationChain, "Rake::InvocationChain"],
-  [() => m9.InvocationExceptionMixin, "Rake::InvocationExceptionMixin"],
-  [() => m10.LateTime, "Rake::LateTime"],
-  [() => m11.LinkedList, "Rake::LinkedList"],
-  [() => m12.MultiTask, "Rake::MultiTask"],
-  [() => m13.NameSpace, "Rake::NameSpace"],
-  [() => m14.PrivateReader, "Rake::PrivateReader"],
-  [() => m15.PseudoStatus, "Rake::PseudoStatus"],
-  [() => m16.RuleRecursionOverflowError, "Rake::RuleRecursionOverflowError"],
-  [() => m17.Scope, "Rake::Scope"],
-  [() => m21.Task, "Rake::Task"],
-  [() => m18.TaskArgumentError, "Rake::TaskArgumentError"],
-  [() => m19.TaskArguments, "Rake::TaskArguments"],
-  [() => m22.TaskLib, "Rake::TaskLib"],
-  [() => m20.TaskManager, "Rake::TaskManager"],
-  [() => m23.TraceOutput, "Rake::TraceOutput"],
-  [() => m24.Version, "Rake::Version"],
+  [() => m6.FileList, "Rake::FileList"],
+  [() => m7.FileTask, "Rake::FileTask"],
+  [() => m8.FileUtilsExt, "Rake::FileUtilsExt"],
+  [() => m9.InvocationChain, "Rake::InvocationChain"],
+  [() => m10.InvocationExceptionMixin, "Rake::InvocationExceptionMixin"],
+  [() => m11.LateTime, "Rake::LateTime"],
+  [() => m12.LinkedList, "Rake::LinkedList"],
+  [() => m13.MultiTask, "Rake::MultiTask"],
+  [() => m14.NameSpace, "Rake::NameSpace"],
+  [() => m15.PrivateReader, "Rake::PrivateReader"],
+  [() => m16.PseudoStatus, "Rake::PseudoStatus"],
+  [() => m17.RuleRecursionOverflowError, "Rake::RuleRecursionOverflowError"],
+  [() => m18.Scope, "Rake::Scope"],
+  [() => m22.Task, "Rake::Task"],
+  [() => m19.TaskArgumentError, "Rake::TaskArgumentError"],
+  [() => m20.TaskArguments, "Rake::TaskArguments"],
+  [() => m23.TaskLib, "Rake::TaskLib"],
+  [() => m21.TaskManager, "Rake::TaskManager"],
+  [() => m24.TraceOutput, "Rake::TraceOutput"],
+  [() => m25.Version, "Rake::Version"],
 ]);

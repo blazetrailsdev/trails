@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { FileList } from "./file-list.js";
 import {
   Dir,
   File,
@@ -123,8 +124,13 @@ describe("TestRakeFileUtils", () => {
     expect(await isExist("b")).toBeFalsy();
   });
 
-  // PERMANENT-SKIP: `Rake::FileList` is a non-goal of RFC 0211 (README § "Non-goals", `file_list.rb`).
-  it.skip("rm filelist", () => {});
+  it("rm filelist", async () => {
+    const list = await (await new FileList().append("a")).append("b");
+    await list.each((fn) => createFile(fn));
+    await StdlibFileUtils.rmRAsync((await list.toA()) as string[]);
+    expect(await isExist("a")).toBeFalsy();
+    expect(await isExist("b")).toBeFalsy();
+  });
 
   it("rm nowrite", async () => {
     await createFile("a");

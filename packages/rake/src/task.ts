@@ -83,6 +83,7 @@ export class Task {
     }
   }
 
+  /** @missingRailsCall map — CONVERGEABLE rake-task-prerequisites-awaiting-map */
   async prerequisiteTasks(): Promise<Task[]> {
     const tasks: Task[] = [];
     for (const pre of [...this.prerequisites, ...this.orderOnlyPrerequisites]) {
@@ -348,6 +349,7 @@ export class Task {
     return (this._argNames = args.map((a) => String(a)));
   }
 
+  /** @missingRailsCall map — CONVERGEABLE rake-task-prerequisites-awaiting-map */
   async investigation(): Promise<string> {
     let result = "------------------------------\n";
     result += `Investigating ${this.name}\n`;

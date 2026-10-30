@@ -447,7 +447,13 @@ export { Struct, isStruct, type StructInstance } from "./struct.js";
 export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
-export { rbStrRpartition, rbStrScanSubexpCall, rbStrStartWith, rbStrSub } from "./string/sub.js";
+export {
+  rbStrRpartition,
+  rbStrScanSubexpCall,
+  rbStrStartWith,
+  rbStrSub,
+  strGsub,
+} from "./string/sub.js";
 export { rbCheckStringType, stringValue, strlen } from "./string/support.js";
 export {
   forceEncoding,

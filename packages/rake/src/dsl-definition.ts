@@ -3,11 +3,13 @@ import {
   File,
   block,
   extend,
+  flatten,
   include,
   rbBlockGivenP,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { FileCreationTask } from "./file-creation-task.js";
+import { FileList } from "./file-list.js";
 import { FileTask } from "./file-task.js";
 import { FileUtilsExt } from "./file-utils-ext.js";
 import { MultiTask } from "./multi-task.js";
@@ -28,11 +30,16 @@ export const DSL = {
     return FileCreationTask.defineTask(...args);
   },
 
-  directory(
+  async directory(
     this: typeof FileUtilsExt & { fileCreate(...args: unknown[]): Task },
     ...args: unknown[]
-  ): Task {
-    args = args.flatMap((arg) => arg);
+  ): Promise<Task> {
+    const flat: unknown[] = [];
+    for (const arg of args) {
+      if (arg instanceof FileList) flat.push(...flatten(await arg.toA()));
+      else flat.push(...[arg].flat());
+    }
+    args = flat;
     const blockArg = rbBlockGivenP(args.at(-1)) ? [args.pop()] : [];
     const result = this.fileCreate(...args, ...blockArg);
     let dir = Rake.application!.resolveArgs(args)[0];
