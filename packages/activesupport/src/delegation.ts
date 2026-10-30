@@ -251,6 +251,7 @@ export namespace Delegation {
     return methodNames;
   }
 
+  /** @inventedArm then — PERMANENT */
   export function generateMethodMissing<T extends object>(
     owner: T,
     target: string,

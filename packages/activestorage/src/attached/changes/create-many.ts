@@ -24,13 +24,15 @@ export class CreateMany {
     this.name = name;
     this.record = record;
     this.attachables = rbFArray(attachables);
-    this.pendingUploads = rbFArray(pendingUploads) as CreateOneOfMany[];
+    this.pendingUploads = [
+      ...(rbFArray(pendingUploads) as CreateOneOfMany[]),
+      ...this.subchangesWithoutBlobs(),
+    ];
   }
 
   /** @noRailsEquivalent PERMANENT */
   async unfurl(): Promise<void> {
     for (const subchange of this.subchanges) await subchange.unfurl();
-    this.pendingUploads = [...this.pendingUploads, ...this.subchangesWithoutBlobs()];
     void this.attachments;
   }
 
