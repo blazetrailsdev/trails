@@ -1,27 +1,48 @@
-import { EncodingError, Multibyte } from "../multibyte.js";
+import {
+  Encoding,
+  forceEncoding,
+  isValidEncoding,
+  rbObjEncoding,
+  rbObjDup,
+} from "@blazetrails/ruby-compat";
+import { EncodingError } from "./encoding-error.js";
 
-export const Utils = {
-  validCharacter(): RegExp | undefined {
-    return Multibyte.VALID_CHARACTER["UTF-8"];
-  },
+/** @internal */
+export interface MultibyteHost {
+  VALID_CHARACTER: Record<string, RegExp>;
+  verify(string: string | Uint8Array): boolean;
+  toUtf8(string: string | Uint8Array): string | Uint8Array;
+}
 
-  isUtf8(string: string): boolean {
-    return Utils.verify(string);
-  },
+export function validCharacter(this: MultibyteHost): RegExp | undefined {
+  return this.VALID_CHARACTER[Encoding.defaultExternal.toString()];
+}
 
-  verify(string: string): boolean {
-    return !/\p{Cs}/u.test(string);
-  },
+export function isUtf8(this: MultibyteHost, string: string | Uint8Array): boolean {
+  switch (rbObjEncoding(string)) {
+    case Encoding.UTF_8:
+      return this.verify(string);
+    case Encoding.ASCII_8BIT:
+    case Encoding.US_ASCII:
+      return this.verify(this.toUtf8(string));
+    default:
+      return false;
+  }
+}
 
-  verifyBang(string: string): void {
-    if (!Utils.verify(string)) throw new EncodingError("Found characters with invalid encoding");
-  },
+export function verify(string: string | Uint8Array): boolean {
+  if (typeof string !== "string") return rbObjEncoding(string) === Encoding.ASCII_8BIT;
+  return isValidEncoding(string, rbObjEncoding(string));
+}
 
-  clean(string: string): string {
-    return string;
-  },
+export function verifyBang(this: MultibyteHost, string: string | Uint8Array): void {
+  if (!this.verify(string)) throw new EncodingError("Found characters with invalid encoding");
+}
 
-  toUtf8(string: string): string {
-    return string;
-  },
-};
+export function clean(string: string): string {
+  return string;
+}
+
+export function toUtf8(string: string | Uint8Array): string | Uint8Array {
+  return forceEncoding(rbObjDup(string), Encoding.UTF_8);
+}

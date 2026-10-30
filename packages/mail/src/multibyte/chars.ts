@@ -9,6 +9,9 @@ import {
   stringSplit,
   TypeError,
   ArgumentError,
+  arySlice,
+  Range,
+  rbObjClassname,
 } from "@blazetrails/ruby-compat";
 import { Unicode } from "./unicode.js";
 
@@ -24,10 +27,6 @@ export class Chars {
   }
 
   toS(): string {
-    return this.wrappedString;
-  }
-
-  toStr(): string {
     return this.wrappedString;
   }
 
@@ -61,33 +60,32 @@ export class Chars {
     return stringSplit(this.wrappedString, ...args).map((i) => this.chars(i));
   }
 
-  setIndex(...args: unknown[]): void {
+  set(...args: unknown[]): void {
     let replaceBy = args.pop() as string | number;
     if (args[0] instanceof RegExp) {
       this.wrappedString = this.wrappedString.replace(args[0], String(replaceBy));
     } else {
       const result = Unicode.uUnpack(this.wrappedString);
-      let range: [number, number];
+      let range: Range<number>;
       if (typeof args[0] === "number") {
         if (args[0] >= result.length) throw new IndexError(`index ${args[0]} out of string`);
         const min = args[0];
         const max = args[1] == null ? min : min + (args[1] as number) - 1;
-        range = [min, max];
+        range = new Range(min, max);
         if (typeof replaceBy === "number") replaceBy = pack([replaceBy], "U");
-      } else if (Array.isArray(args[0])) {
-        if (args[0][0] >= result.length) {
-          throw new RangeError(`${args[0][0]}..${args[0][1]} out of range`);
-        }
-        range = args[0] as [number, number];
+      } else if (args[0] instanceof Range) {
+        if (args[0].min() >= result.length) throw new RangeError(`${args[0].toS()} out of range`);
+        range = args[0];
       } else {
         const needle = String(args[0]);
         const min = Array.from(
           this.wrappedString.slice(0, this.wrappedString.indexOf(needle)),
         ).length;
         const max = min + Unicode.uUnpack(needle).length - 1;
-        range = [min, max];
+        range = new Range(min, max);
       }
-      result.splice(range[0], range[1] - range[0] + 1, ...Unicode.uUnpack(String(replaceBy)));
+      const end = range.excludeEnd ? range.end! : range.end! + 1;
+      result.splice(range.begin!, end - range.begin!, ...Unicode.uUnpack(String(replaceBy)));
       this.wrappedString = pack(result, "U*");
     }
   }
@@ -101,29 +99,23 @@ export class Chars {
     if (args.length > 2) {
       throw new ArgumentError(`wrong number of arguments (${args.length} for 1)`);
     } else if (args.length === 2 && !(typeof args[0] === "number" || args[0] instanceof RegExp)) {
-      throw new TypeError(`cannot convert ${typeName(args[0])} into Integer`);
+      throw new TypeError(`cannot convert ${rbObjClassname(args[0])} into Integer`);
     } else if (args.length === 2 && typeof args[1] !== "number") {
-      throw new TypeError(`cannot convert ${typeName(args[1])} into Integer`);
-    } else if (Array.isArray(args[0])) {
-      const cps = Unicode.uUnpack(this.wrappedString);
-      const [min, max] = args[0] as [number, number];
-      const from = min < 0 ? cps.length + min : min;
-      result =
-        from > cps.length
-          ? null
-          : pack(cps.slice(from, max < 0 ? cps.length + max + 1 : max + 1), "U*");
+      throw new TypeError(`cannot convert ${rbObjClassname(args[1])} into Integer`);
+    } else if (args[0] instanceof Range) {
+      const cps = arySlice(Unicode.uUnpack(this.wrappedString), args[0]) as number[] | null;
+      result = cps == null ? null : pack(cps, "U*");
     } else if (args[0] instanceof RegExp) {
       const m = this.wrappedString.match(args[0]);
       result = m ? (m[(args[1] as number) ?? 0] ?? null) : null;
     } else if (args.length === 1 && typeof args[0] === "number") {
-      const cps = Unicode.uUnpack(this.wrappedString);
-      const character = cps.at(args[0]);
+      const character = arySlice(Unicode.uUnpack(this.wrappedString), args[0]) as number | null;
       result = character != null ? pack([character], "U") : null;
     } else {
-      const cps = Unicode.uUnpack(this.wrappedString);
-      const [start, len] = args as [number, number];
-      const from = start < 0 ? cps.length + start : start;
-      result = from > cps.length || len < 0 ? null : pack(cps.slice(from, from + len), "U*");
+      const cps = arySlice(Unicode.uUnpack(this.wrappedString), args[0], args[1]) as
+        | number[]
+        | null;
+      result = cps != null ? pack(cps, "U*") : null;
     }
     return result != null ? this.chars(result) : null;
   }
@@ -133,7 +125,7 @@ export class Chars {
   }
 
   limit(limit: number): Chars | null {
-    return this.slice([0, this.translateOffset(limit)! - 1]);
+    return this.slice(new Range(0, this.translateOffset(limit), true));
   }
 
   upcase(): Chars {
@@ -147,7 +139,7 @@ export class Chars {
   capitalize(): Chars {
     return this.chars(
       (this.slice(0) ?? this.chars("")).upcase().toS() +
-        (this.slice([1, -1]) ?? this.chars("")).downcase().toS(),
+        (this.slice(new Range(1, -1)) ?? this.chars("")).downcase().toS(),
     );
   }
 
@@ -221,14 +213,18 @@ export class Chars {
   protected translateOffset(byteOffset: number | null): number | null {
     if (byteOffset == null) return null;
     if (this.wrappedString === "") return 0;
-    let bytes = 0;
-    let length = 0;
-    for (const c of this.wrappedString) {
-      bytes += new TextEncoder().encode(c).length;
-      if (bytes > byteOffset) break;
-      length += 1;
+
+    const bytes = new TextEncoder().encode(this.wrappedString);
+
+    for (;;) {
+      try {
+        return Unicode.uUnpack(
+          new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, byteOffset)),
+        ).length;
+      } catch {
+        byteOffset -= 1;
+      }
     }
-    return length;
   }
 
   /** @internal */
@@ -275,7 +271,3 @@ export class Chars {
 
 const W = "[\\p{L}\\p{M}\\p{N}\\p{Pc}]";
 const WORD_BOUNDARY_TITLEIZE = new RegExp(`(?:(?<=${W})(?!${W})|(?<!${W})(?=${W}))('?\\S)`, "gu");
-
-function typeName(value: unknown): string {
-  return value == null ? "NilClass" : typeof value === "string" ? "String" : value.constructor.name;
-}

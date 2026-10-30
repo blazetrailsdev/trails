@@ -1,21 +1,25 @@
-import { StandardError } from "@blazetrails/ruby-compat";
 import { Chars } from "./multibyte/chars.js";
-import { Utils } from "./multibyte/utils.js";
+import { EncodingError } from "./multibyte/encoding-error.js";
+import * as Utils from "./multibyte/utils.js";
 
-export class EncodingError extends StandardError {
-  static toString(): string {
-    return "Mail::Multibyte::EncodingError";
-  }
-}
+export { EncodingError };
 
 export const Multibyte = {
   EncodingError,
 
-  proxyClass: Chars,
+  _proxyClass: Chars,
+
+  proxyClass(): typeof Chars {
+    return Multibyte._proxyClass;
+  },
+
+  setProxyClass(klass: typeof Chars): void {
+    Multibyte._proxyClass = klass;
+  },
 
   mbChars(str: string): Chars | string {
     if (Multibyte.isUtf8(str)) {
-      return new Multibyte.proxyClass(str);
+      return new (Multibyte.proxyClass())(str);
     } else {
       return str;
     }

@@ -1,6 +1,6 @@
 import { Unicode as ActiveSupportUnicode } from "@blazetrails/activesupport";
 import { ArgumentError, pack } from "@blazetrails/ruby-compat";
-import { EncodingError } from "../multibyte.js";
+import { EncodingError } from "./encoding-error.js";
 
 export const Unicode = {
   UNICODE_VERSION: "7.0.0",
@@ -27,7 +27,6 @@ export const Unicode = {
     return Array.from(string, (c) => c.codePointAt(0)!);
   },
 
-  /** @missingRailsCall in_char_class? — PERMANENT */
   gUnpack(string: string): number[][] {
     Unicode.uUnpack(string);
     return Array.from(new Intl.Segmenter().segment(string), (s) => Unicode.uUnpack(s.segment));
@@ -52,7 +51,6 @@ export const Unicode = {
     return ActiveSupportUnicode.tidyBytes(string, force);
   },
 
-  /** @missingRailsCall reorder_characters — PERMANENT */
   normalize(string: string, form: string | null = null): string {
     form ||= Unicode.defaultNormalizationForm;
     const codepoints = Unicode.uUnpack(string);
