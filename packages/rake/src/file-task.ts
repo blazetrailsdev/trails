@@ -26,7 +26,10 @@ export class FileTask extends Task {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall any? — CONVERGEABLE rake-task-prerequisites-awaiting-map
+   */
   private async isOutOfDate(stamp: Date): Promise<boolean> {
     for (const prereq of await this.allPrerequisiteTasks()) {
       const prereqTask = (await this.application.get(String(prereq), this.scope))!;

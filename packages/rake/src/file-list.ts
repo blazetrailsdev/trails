@@ -377,6 +377,7 @@ export class FileList {
     }
   }
 
+  /** @missingRailsCall any? — CONVERGEABLE rake-task-prerequisites-awaiting-map */
   async isExcludedFromList(fn: string): Promise<boolean> {
     for (const pat of this.excludePatterns) {
       let hit: boolean;
