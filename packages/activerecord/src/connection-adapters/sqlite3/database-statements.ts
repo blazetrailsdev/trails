@@ -4,8 +4,7 @@ import { b, rbRegMatchP, StandardError } from "@blazetrails/ruby-compat";
 import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
-import { BusyException } from "../../sqlite/errors.js";
-import { setBusyTimeout } from "../../sqlite/pragmas.js";
+import { execBatch, retryBusy } from "../../sqlite/busy-wait.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import {
   combineMultiStatements,
@@ -279,29 +278,4 @@ export function defaultInsertValue(column: {
     return Arel.sql(column.defaultFunction);
   }
   return column.default;
-}
-
-async function retryBusy<T>(timeout: number, step: () => T | Promise<T>): Promise<T> {
-  const deadline = Date.now() + timeout;
-  while (true) {
-    try {
-      return await step();
-    } catch (error) {
-      if (!(error instanceof BusyException) || Date.now() > deadline) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 1));
-    }
-  }
-}
-
-async function execBatch(
-  rawConnection: SqliteConnection,
-  sql: string,
-  timeout: number,
-): Promise<void> {
-  await setBusyTimeout.call(rawConnection, timeout);
-  try {
-    await rawConnection.exec(sql);
-  } finally {
-    await setBusyTimeout.call(rawConnection, 0);
-  }
 }
