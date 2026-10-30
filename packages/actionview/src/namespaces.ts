@@ -1,4 +1,4 @@
-import { Autoload, extend, TopLevel, type Extended } from "@blazetrails/activesupport";
+import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { FileSystemResolver } from "./template/resolver.js";
@@ -68,8 +68,6 @@ extend(ActionView, Autoload);
 ActionView.eagerAutoload(() => {
   ActionView.autoload("Base");
 });
-
-TopLevel.ActionView = ActionView;
 
 const tagsLoadPath: Record<string, () => Promise<unknown>> = {
   "action_view/helpers/tags/select_renderer": () => import("./helpers/tags/select-renderer.js"),

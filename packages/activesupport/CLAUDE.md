@@ -52,7 +52,7 @@ body calls `const_set`, and a class's qualified Ruby path is a ruby-compat inter
   with no `autoload` call: `ActiveSupport.BroadcastLogger` (`active_support.rb:30`,
   read at `logger.rb:21`) and `Attribute.UserProvidedDefault` on the class Rails
   nests it in (`attribute_registration.rb:5`).
-- `TopLevel` in `activesupport/src/namespaces.ts` is Ruby's top-level `Object`,
+- `TopLevel` in `ruby-compat/src/object.ts` is Ruby's top-level `Object`,
   for a constant the reading gem does not depend on the defining gem for, or
   `::Rails` itself. The defining gem seats it: `TopLevel.Trails = Trails`
   (`trailties/src/rails.ts`), `TopLevel.ActionDispatch` /

@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { include, Module, rbModConstSet } from "./include.js";
 import { NameError } from "./name-error.js";
-import { rbCSymbol, rbModName, rbModToS, rbSetClassPathString } from "./object.js";
+import { TopLevel, rbCSymbol, rbModName, rbModToS, rbSetClassPathString } from "./object.js";
 import { TypeError } from "./type-error.js";
 import { Exception } from "./exception.js";
 import { Range } from "./range.js";
@@ -14,6 +14,7 @@ import {
   rbModConstants,
   rbPathToClass,
   registerConstant,
+  rbModRemoveConst,
   registeredConstant,
   resetConstants,
   unregisterConstant,
@@ -379,6 +380,42 @@ describe("rbModDeprecateConstant", () => {
     class Http {}
     expect(() => rbModDeprecateConstant(Http, "GONE")).toThrow(NameError);
     expect(() => rbModDeprecateConstant(Http, "GONE")).toThrow("constant Http::GONE not defined");
+  });
+});
+
+describe("TopLevel", () => {
+  it("is the table registerConstant writes and the readers read", () => {
+    const klass = class Seated {};
+    const tbl = TopLevel as Record<string, unknown>;
+    try {
+      registerConstant("Seated", klass);
+      expect(tbl.Seated).toBe(klass);
+      delete tbl.Seated;
+      expect(isRegisteredConstant("Seated")).toBe(false);
+      tbl.Seated = klass;
+      expect(registeredConstant("Seated")).toBe(klass);
+      expect(rbModRemoveConst(Object, "Seated")).toBe(klass);
+      expect("Seated" in tbl).toBe(false);
+    } finally {
+      delete tbl.Seated;
+    }
+  });
+
+  it("resetConstants leaves a top-level module object seated", () => {
+    const tbl = TopLevel as Record<string, unknown>;
+    const mod = {};
+    tbl.SeatedGem = mod;
+    try {
+      resetConstants();
+      expect(tbl.SeatedGem).toBe(mod);
+    } finally {
+      delete tbl.SeatedGem;
+    }
+  });
+
+  it("does not answer an Object.prototype member as a constant", () => {
+    expect(isRegisteredConstant("constructor")).toBe(false);
+    expect(registeredConstant("toString")).toBeUndefined();
   });
 });
 

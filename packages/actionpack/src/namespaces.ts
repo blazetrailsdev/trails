@@ -250,7 +250,6 @@ ActionController.autoloadAt("action_controller/test_case", () => {
 });
 
 TopLevel.ActionDispatch = ActionDispatch;
-TopLevel.ActionController = ActionController;
 registerConstant("ActionController", ActionController);
 
 onLoad("action_view", () => {

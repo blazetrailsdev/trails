@@ -2,7 +2,7 @@ import "./trailties/active-support.js";
 import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
 import { getEnv } from "@blazetrails/activesupport";
-import { ActiveSupport, TopLevel } from "@blazetrails/activesupport";
+import { ActiveSupport } from "@blazetrails/activesupport";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import type { ErrorReporter } from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
@@ -152,5 +152,4 @@ export function _resetTrailsEnv(): void {
   _backtraceCleaner = undefined;
 }
 
-TopLevel.Trails = Trails;
 registerConstant("Trails", Trails);

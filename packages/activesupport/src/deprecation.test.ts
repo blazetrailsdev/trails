@@ -131,7 +131,9 @@ function capture(_stream: ":stderr", block: () => void): string {
 }
 
 function withTrailsLogger<T>(logger: Logger | null, block: (logger: Logger | null) => T): T {
-  return stubConst(TopLevel, "Trails", { logger }, () => block(logger), { exists: false });
+  return stubConst(TopLevel as Record<string, unknown>, "Trails", { logger }, () => block(logger), {
+    exists: false,
+  });
 }
 
 function callDeprecatedMethodWarning(

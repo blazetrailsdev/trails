@@ -55,72 +55,75 @@ interface ParametersInstance {
   set(key: string, value: unknown): void;
 }
 
-export const TopLevel: {
-  I18n?: typeof import("@blazetrails/i18n");
-  ActiveSupport?: typeof ActiveSupport;
-  ActionView?: { name: string };
-  Trails?: {
-    env: EnvironmentInquirer;
-    logger: Logger | null;
-    cache: CacheStore | null;
-    error: ErrorReporter;
-    application: {
-      config: {
-        considerAllRequestsLocal: boolean;
-        root?: string | null;
-        paths(): { get(path: string): { firstSync(): string | undefined } | undefined };
-      };
-      reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
-      routes(): {
-        namedRoutes: { helperNames(): string[] };
-        urlHelpers(): Record<`${string}Url`, (...args: unknown[]) => string>;
-      };
-      envConfig(): Record<string, unknown>;
-      executor: { wrap<T>(block: () => T): T; runBang(): unknown };
-      configFor(name: string): Promise<unknown>;
-      call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
-    } | null;
-    Application: abstract new (...args: never[]) => unknown;
-    Engine: abstract new (...args: never[]) => unknown;
-    Trailtie: abstract new (...args: never[]) => unknown;
-    root(): string | null | undefined;
-    configuration?: {
-      generators(): {
-        options: { get(namespace: unknown): Record<string, unknown> | undefined };
-        orm?(): unknown;
-      };
-    } | null;
-  };
-  ActionDispatch?: {
-    Request: new (env: Record<string, unknown>) => {
-      isGet(): boolean;
-      isHead(): boolean;
-      session: { get(key: string): unknown; set(key: string, value: unknown): unknown };
-    };
-    Routing: {
-      PolymorphicRoutes: {
-        HelperMethodBuilder: { path(): PolymorphicBuilder; url(): PolymorphicBuilder };
-      };
-      UrlFor?: object;
-    };
-  };
-  ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
-  ActiveRecord?: {
-    Railties: { ControllerRuntime?: object };
-    Base?: { logger: unknown };
-    afterAllTransactionsCommit(block: () => unknown): unknown;
-  };
-  PG?: { Connection: abstract new (...args: never[]) => object };
-  ActionCable?: { name?: string; Engine?: unknown; server?(): unknown };
-  BCrypt?: {
-    Engine: { readonly MIN_COST: number; readonly cost: number };
-    Password: {
-      create(secret: unknown, options?: { cost?: number | false | null }): object;
-      new (rawHash: string): { readonly salt: string; isPassword(secret: unknown): boolean };
-    };
-  };
-  AppBuilder?: new (generator: never) => object;
-} = {};
+export { TopLevel } from "@blazetrails/ruby-compat";
 
-TopLevel.ActiveSupport = ActiveSupport;
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    I18n?: typeof import("@blazetrails/i18n");
+    ActiveSupport?: typeof ActiveSupport;
+    ActionView?: { name: string };
+    Trails?: {
+      env: EnvironmentInquirer;
+      logger: Logger | null;
+      cache: CacheStore | null;
+      error: ErrorReporter;
+      application: {
+        config: {
+          considerAllRequestsLocal: boolean;
+          root?: string | null;
+          paths(): { get(path: string): { firstSync(): string | undefined } | undefined };
+        };
+        reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
+        routes(): {
+          namedRoutes: { helperNames(): string[] };
+          urlHelpers(): Record<`${string}Url`, (...args: unknown[]) => string>;
+        };
+        envConfig(): Record<string, unknown>;
+        executor: { wrap<T>(block: () => T): T; runBang(): unknown };
+        configFor(name: string): Promise<unknown>;
+        call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
+      } | null;
+      Application: abstract new (...args: never[]) => unknown;
+      Engine: abstract new (...args: never[]) => unknown;
+      Trailtie: abstract new (...args: never[]) => unknown;
+      root(): string | null | undefined;
+      configuration?: {
+        generators(): {
+          options: { get(namespace: unknown): Record<string, unknown> | undefined };
+          orm?(): unknown;
+        };
+      } | null;
+    };
+    ActionDispatch?: {
+      Request: new (env: Record<string, unknown>) => {
+        isGet(): boolean;
+        isHead(): boolean;
+        session: { get(key: string): unknown; set(key: string, value: unknown): unknown };
+      };
+      Routing: {
+        PolymorphicRoutes: {
+          HelperMethodBuilder: { path(): PolymorphicBuilder; url(): PolymorphicBuilder };
+        };
+        UrlFor?: object;
+      };
+    };
+    ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
+    ActiveRecord?: {
+      Railties: { ControllerRuntime?: object };
+      Base?: { logger: unknown };
+      afterAllTransactionsCommit(block: () => unknown): unknown;
+    };
+    PG?: { Connection: abstract new (...args: never[]) => object };
+    ActionCable?: { name?: string; Engine?: unknown; server?(): unknown };
+    BCrypt?: {
+      Engine: { readonly MIN_COST: number; readonly cost: number };
+      Password: {
+        create(secret: unknown, options?: { cost?: number | false | null }): object;
+        new (rawHash: string): { readonly salt: string; isPassword(secret: unknown): boolean };
+      };
+    };
+    AppBuilder?: new (generator: never) => object;
+  }
+}
+
 registerConstant("ActiveSupport", ActiveSupport);

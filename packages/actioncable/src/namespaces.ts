@@ -1,6 +1,6 @@
 import type { PostgreSQL } from "./subscription-adapter/postgresql.js";
 import type { Redis } from "./subscription-adapter/redis.js";
-import { Autoload, extend, type Extended, TopLevel } from "@blazetrails/activesupport";
+import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
 import type { INTERNAL, server } from "./action-cable.js";
 import type { Base as ChannelBase } from "./channel/base.js";
 import type { Base as ConnectionBase } from "./connection/base.js";
@@ -83,5 +83,3 @@ export const ActionCable = {
 registerConstant("ActionCable", ActionCable);
 extend(ActionCable, Autoload);
 rbDeclareIvar({ prototype: ActionCable }, "@server", "_server");
-
-TopLevel.ActionCable = ActionCable;
