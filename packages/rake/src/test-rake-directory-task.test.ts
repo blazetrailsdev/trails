@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { File, Pathname, block } from "@blazetrails/ruby-compat";
 import { FileCreationTask } from "./file-creation-task.js";
+import { FileList } from "./file-list.js";
 import type { Task } from "./task.js";
 import { dsl, useRakeTestCase } from "./test-helpers/file-creation.js";
-
-declare const FileList: { get(...args: string[]): string[] };
 
 describe("TestRakeDirectoryTask", () => {
   const rake = useRakeTestCase();
@@ -37,7 +36,7 @@ describe("TestRakeDirectoryTask", () => {
   it("can use blocks", async () => {
     const runlist: string[] = [];
 
-    const t1 = dsl.directory(
+    const t1 = await dsl.directory(
       { "a/b/c": "t2" },
       block((t: Task) => void runlist.push(t.name)),
     );
@@ -64,8 +63,8 @@ describe("TestRakeDirectoryTask", () => {
     expect(await File.isDirectoryAsync("a/b/c")).toBeTruthy();
   });
 
-  it.skip("can use filelist", async () => {
-    dsl.directory(FileList.get("a", "b", "c"));
+  it("can use filelist", async () => {
+    await dsl.directory(FileList.get("a", "b", "c"));
 
     expect((await rake.tm.get("a")).constructor).toEqual(FileCreationTask);
 

@@ -83,6 +83,7 @@ export class Task {
     }
   }
 
+  /** @missingRailsCall map — PERMANENT */
   async prerequisiteTasks(): Promise<Task[]> {
     const tasks: Task[] = [];
     for (const pre of [...this.prerequisites, ...this.orderOnlyPrerequisites]) {
@@ -348,6 +349,7 @@ export class Task {
     return (this._argNames = args.map((a) => String(a)));
   }
 
+  /** @missingRailsCall map — PERMANENT */
   async investigation(): Promise<string> {
     let result = "------------------------------\n";
     result += `Investigating ${this.name}\n`;
