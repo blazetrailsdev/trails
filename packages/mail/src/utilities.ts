@@ -11,6 +11,7 @@ import {
   InvalidByteSequenceError,
   isEmpty,
   rbInspect,
+  rbObjDup,
   rbStrByteslice,
   rbStrEnumerateLines,
   UndefinedConversionError,
@@ -270,9 +271,11 @@ export const Utilities = {
     toEncoding: string | Encoding = Encoding.UTF_8,
   ): RubyString {
     toEncoding = Encoding.find(toEncoding)!;
-    return encode(Utilities.charsetEncoder.encode(b(str), fromEncoding), toEncoding, {
+    const replacementChar = toEncoding === Encoding.UTF_8 ? "\ufffd" : "?";
+    return encode(Utilities.charsetEncoder.encode(rbObjDup(str), fromEncoding), toEncoding, {
       undef: ":replace",
       invalid: ":replace",
+      replace: replacementChar,
     });
   },
 
@@ -468,7 +471,14 @@ export const Utilities = {
     const decoded = encode(str, Encoding.UTF_8, {
       undef: ":replace",
       invalid: ":replace",
+      replace: "\ufffd",
     }) as string;
-    return /\p{Cs}/u.test(decoded) ? decoded.replace(/\p{Cs}/gu, "\ufffd") : decoded;
+    return !/\p{Cs}/u.test(decoded)
+      ? decoded
+      : (encode(
+          encode(decoded, Encoding.find("UTF-16LE")!, { invalid: ":replace", replace: "\ufffd" }),
+          Encoding.UTF_8,
+          { invalid: ":replace", replace: "\ufffd" },
+        ) as string);
   },
 };

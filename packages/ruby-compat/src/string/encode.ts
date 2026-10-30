@@ -42,7 +42,7 @@ function dump(b: number[]): string {
  * and ISO-8859-1 hold no invalid byte, so their scrub is the receiver. The
  * converters here are the ones between UTF-8, US-ASCII, ASCII-8BIT and
  * ISO-8859-1, from any encoding `TextDecoder` has a label for, or UTF-32, to
- * those through UTF-8, and from UTF-8 to UTF-16BE; any other pair raises `Encoding::ConverterNotFoundError`, as
+ * those through UTF-8, and from UTF-8 to UTF-16BE and UTF-16LE; `replace` is the `:replace` option; any other pair raises `Encoding::ConverterNotFoundError`, as
  * `rb_econv_open_exc` (`transcode.c:2097`) does for a pair MRI has no
  * transcoder for.
  *
@@ -59,6 +59,7 @@ export function encode(
     invalid?: ":replace" | null;
     undef?: ":replace" | null;
     fallback?: ((c: string) => string | null) | null;
+    replace?: string | null;
   } = {},
 ): string | Uint8Array {
   const invalidReplace = econvOpts(opts.invalid, "invalid");
@@ -103,11 +104,12 @@ export function encode(
     const text = decodeLegacy(str);
     if (text !== null) return unicode(denc) ? text : encode(text, denc, opts);
   }
-  if (typeof str === "string" && denc.name === "UTF-16BE") {
+  if (typeof str === "string" && (denc.name === "UTF-16BE" || denc.name === "UTF-16LE")) {
+    const [hi, lo] = denc.name === "UTF-16BE" ? [0, 1] : [1, 0];
     const dest = new Uint8Array(str.length * 2);
     for (let i = 0; i < str.length; i++) {
-      dest[2 * i] = str.charCodeAt(i) >> 8;
-      dest[2 * i + 1] = str.charCodeAt(i) & 0xff;
+      dest[2 * i + hi] = str.charCodeAt(i) >> 8;
+      dest[2 * i + lo] = str.charCodeAt(i) & 0xff;
     }
     return forceEncoding(dest, denc);
   }
@@ -120,7 +122,7 @@ export function encode(
 
   const direct = unicode(senc) || unicode(denc);
   const steps = `in conversion from ${senc} to UTF-8 to ${denc}`;
-  const rep = unicode(denc) ? 0xfffd : 0x3f;
+  const rep = opts.replace?.codePointAt(0) ?? (unicode(denc) ? 0xfffd : 0x3f);
   const max = unicode(denc) ? 0x10ffff : SINGLE_BYTE[denc.name];
   const b = typeof str === "string" ? bytes(str) : Array.from(str);
   const dest: number[] = [];

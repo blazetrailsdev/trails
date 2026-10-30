@@ -1,5 +1,7 @@
 import {
+  b,
   chomp,
+  eachSlice,
   encode,
   type Enumerator,
   Errno,
@@ -151,9 +153,8 @@ export const Encodings = {
     }).join(" ");
   },
 
-  /** @missingRailsArgs ascii_only? — PERMANENT */
   bValueEncode(string: string, encoding: string | null = null): string {
-    if (isAsciiOnly(string)) {
+    if (isAsciiOnly(String(string ?? ""))) {
       return string;
     } else {
       return [...(Encodings.eachBase64ChunkByterange(string, 60) as Enumerator<string>)]
@@ -166,9 +167,8 @@ export const Encodings = {
     }
   },
 
-  /** @missingRailsArgs ascii_only? — PERMANENT */
   qValueEncode(encodedStr: string, encoding: string | null = null): string {
-    if (isAsciiOnly(encodedStr)) return encodedStr;
+    if (isAsciiOnly(String(encodedStr ?? ""))) return encodedStr;
     let string: string;
     [string, encoding] = Utilities.qValueEncode(encodedStr, encoding);
     string = string.replaceAll("=\r\n", "");
@@ -196,24 +196,23 @@ export const Encodings = {
   collapseAdjacentEncodings(str: string): string[] {
     const results: string[] = [];
 
+    let lastEncoded: string | null = null;
+
     const lines = stringSplit(str, Constants.FULL_ENCODED_VALUE);
-    for (let i = 0; i < lines.length; i += 2) {
-      const unencoded = lines[i];
-      const encoded = lines[i + 1] ?? null;
-      const lastEncoded = encoded;
-      if (lastEncoded != null) {
+    eachSlice(lines, 2, ([unencoded, encoded = null]: (string | null)[]) => {
+      if ((lastEncoded = encoded) != null) {
         if (
           !Utilities.isBlank(unencoded) ||
           (lastEncoded == null && unencoded !== Constants.EMPTY)
         ) {
-          results.push(unencoded);
+          results.push(unencoded!);
         }
 
-        results.push(encoded);
+        results.push(encoded!);
       } else {
-        results.push(unencoded);
+        results.push(unencoded!);
       }
-    }
+    });
 
     return results;
   },
@@ -222,15 +221,15 @@ export const Encodings = {
   eachBase64ChunkByterange(
     str: string,
     maxBytesizePerBase64Chunk: number,
-    yielder?: (chunk: string) => void,
+    block?: (chunk: string) => void,
   ): Enumerator<RubyString> | void {
     if (maxBytesizePerBase64Chunk % 4 !== 0) {
       throw new RuntimeError("size per chunk must be multiple of 4");
     }
 
-    if (yielder != null) {
+    if (block != null) {
       const maxBytesize = Math.floor((3 * maxBytesizePerBase64Chunk) / 4.0);
-      Encodings.eachChunkByterange(str, maxBytesize, yielder);
+      Encodings.eachChunkByterange(str, maxBytesize, block);
     } else {
       return toEnum(Encodings, "eachBase64ChunkByterange", str, maxBytesizePerBase64Chunk);
     }
@@ -240,9 +239,9 @@ export const Encodings = {
   eachChunkByterange(
     str: string,
     maxBytesizePerChunk: number,
-    yielder?: (chunk: string) => void,
+    block?: (chunk: string) => void,
   ): Enumerator<RubyString> | void {
-    if (yielder == null) {
+    if (block == null) {
       return toEnum(Encodings, "eachChunkByterange", str, maxBytesizePerChunk);
     }
 
@@ -250,10 +249,10 @@ export const Encodings = {
     let chunksize = 0;
 
     for (const chr of str) {
-      const charsize = new TextEncoder().encode(chr).length;
+      const charsize = b(chr).length;
 
       if (chunksize + charsize > maxBytesizePerChunk) {
-        yielder(Utilities.stringByteslice(str, offset, chunksize) as string);
+        block(Utilities.stringByteslice(str, offset, chunksize) as string);
         offset += chunksize;
         chunksize = charsize;
       } else {
@@ -261,6 +260,6 @@ export const Encodings = {
       }
     }
 
-    yielder(Utilities.stringByteslice(str, offset, chunksize) as string);
+    block(Utilities.stringByteslice(str, offset, chunksize) as string);
   },
 };
