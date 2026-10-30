@@ -856,14 +856,10 @@ export class FileUtils {
     return list;
   }
 
-  /** `FileUtils.mkpath` (`vendor/ruby/v3.3.11/lib/fileutils.rb:391`), an alias of `mkdir_p`.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static mkpathAsync = FileUtils.mkdirPAsync;
 
-  /** `FileUtils.makedirs` (`vendor/ruby/v3.3.11/lib/fileutils.rb:392`), an alias of `mkdir_p`.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static makedirsAsync = FileUtils.mkdirPAsync;
 
   /** `FileUtils.rmdir` (`vendor/ruby/v3.3.11/lib/fileutils.rb:442-458`), over async `rmdir`.
@@ -982,9 +978,7 @@ export class FileUtils {
     });
   }
 
-  /** `FileUtils.link` (`vendor/ruby/v3.3.11/lib/fileutils.rb:526`), an alias of `ln`.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static linkAsync = FileUtils.lnAsync;
 
   /** `FileUtils.ln_s` (`vendor/ruby/v3.3.11/lib/fileutils.rb:706-716`).
@@ -1004,9 +998,7 @@ export class FileUtils {
     });
   }
 
-  /** `FileUtils.symlink` (`vendor/ruby/v3.3.11/lib/fileutils.rb:719`), an alias of `ln_s`.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static symlinkAsync = FileUtils.lnSAsync;
 
   /** `FileUtils.ln_sf` (`vendor/ruby/v3.3.11/lib/fileutils.rb:724-726`).
@@ -1034,9 +1026,7 @@ export class FileUtils {
     );
   }
 
-  /** `FileUtils.copy` (`vendor/ruby/v3.3.11/lib/fileutils.rb:882`), an alias of `cp`.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static copyAsync = FileUtils.cpAsync;
 
   /** `FileUtils.cp_r` (`vendor/ruby/v3.3.11/lib/fileutils.rb:985-992`).
@@ -1231,9 +1221,7 @@ export class FileUtils {
     });
   }
 
-  /** `FileUtils.move` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1186`), an alias of `mv`.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static moveAsync = FileUtils.mvAsync;
 
   /** `FileUtils.rm` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1216-1225`).
@@ -1278,9 +1266,7 @@ export class FileUtils {
     return list;
   }
 
-  /** `FileUtils.remove` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1227`), an alias of `rm`.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static removeAsync = FileUtils.rmAsync;
 
   /** @noRailsEquivalent PERMANENT */
@@ -1291,9 +1277,7 @@ export class FileUtils {
     return FileUtils.rmAsync(list, { force: true, noop, verbose });
   }
 
-  /** `FileUtils.safe_unlink` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1246`), an alias of `rm_f`.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static safeUnlinkAsync = FileUtils.rmFAsync;
 
   /** `FileUtils.rm_r` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1299-1310`).
@@ -1370,9 +1354,7 @@ export class FileUtils {
     return FileUtils.rmRAsync(list, { force: true, noop, verbose });
   }
 
-  /** `FileUtils.rmtree` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1333`), an alias of `rm_rf`.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static rmtreeAsync = FileUtils.rmRfAsync;
 
   /** {@link FileUtils.removeEntry} (`vendor/ruby/v3.3.11/lib/fileutils.rb:1449-1456`)

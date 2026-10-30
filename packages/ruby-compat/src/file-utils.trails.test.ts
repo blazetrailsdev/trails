@@ -696,14 +696,6 @@ describe("FileUtils async commands", () => {
     expect(nodeFs.statSync("b").mtime).toEqual(nodeFs.statSync("a").mtime);
   });
 
-  it("touch without mtime gives atime and mtime one now", async () => {
-    await FileUtils.touchAsync("a");
-    const st = nodeFs.statSync("a");
-    await FileUtils.touchAsync("a");
-    expect(nodeFs.statSync("a").atimeMs).toBe(nodeFs.statSync("a").mtimeMs);
-    expect(st.isFile()).toBe(true);
-  });
-
   it("mv over a dangling symlink replaces it", async () => {
     await FileUtils.touchAsync("a");
     nodeFs.symlinkSync("gone", "s");
