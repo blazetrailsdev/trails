@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   assertChanges,
   assertDifference,
@@ -11,7 +11,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { ArgumentError, RuntimeError, StringIO } from "@blazetrails/ruby-compat";
-import { Base } from "@blazetrails/activerecord";
+import { Base, type Relation } from "@blazetrails/activerecord";
 import "../test-helpers/database/setup.js";
 import { ActiveStorage } from "../active-storage.js";
 import type { Attachment } from "../attachment.js";
@@ -31,6 +31,13 @@ Object.assign(Blob.prototype, {
   isAnalyzed: () => false,
   analyzeLater: async () => {},
   isPreviewImageNeededBeforeProcessingVariants: () => false,
+});
+
+afterAll(() => {
+  const blob = Blob.prototype as unknown as { [k: string]: unknown };
+  delete blob.isAnalyzed;
+  delete blob.analyzeLater;
+  delete blob.isPreviewImageNeededBeforeProcessingVariants;
 });
 
 type Attachable = Extended<typeof ClassMethods>;
@@ -746,17 +753,25 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
     await expectOrder("funky.jpg", "town.jpg");
 
-    const attachments = await user.highlights.attachments;
-    const reversed = [...attachments].reverse();
-    for (const attachment of attachments) await attachment.blob;
-    Object.defineProperty(User.prototype, "highlights", {
-      configurable: true,
-      get() {
-        return reversed;
-      },
-    });
+    const reader = (): PropertyDescriptor => {
+      let proto: object = User.prototype;
+      for (;;) {
+        const descriptor = Object.getOwnPropertyDescriptor(proto, "highlights");
+        if (descriptor != null) return descriptor;
+        proto = Object.getPrototypeOf(proto) as object;
+      }
+    };
+    const descriptor = reader();
     try {
-      const highlights = user.highlights as unknown as Attachment[];
+      Object.defineProperty(User.prototype, "highlights", {
+        configurable: true,
+        async get(this: User) {
+          const many = descriptor.get!.call(this) as Many;
+          return [...(await many.attachments)].reverse();
+        },
+      });
+
+      const highlights = (await user.highlights) as unknown as Attachment[];
       expect((await highlights[0].blob)!.filename.toString()).toBe("town.jpg");
       expect((await highlights[1].blob)!.filename.toString()).toBe("funky.jpg");
     } finally {
@@ -864,7 +879,9 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     await user.reload();
 
     const racecarBlob = fixtureFileUpload("racecar.jpg");
-    const attachmentId = (await user.highlightsAttachments)[0].id;
+    const attachmentId = (
+      await (townBlob.attachments as unknown as Relation<Attachment>).findByBang({ record: user })
+    ).id;
     await user.update({
       highlights: [racecarBlob],
       highlightsAttachmentsAttributes: [{ id: attachmentId, _destroy: true }],
