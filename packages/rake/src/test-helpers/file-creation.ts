@@ -38,11 +38,7 @@ export async function createFile(name: string, fileTime: Date | null = null): Pr
 }
 
 export async function deleteFile(name: string): Promise<void> {
-  try {
-    File.delete(name);
-  } catch {
-    return;
-  }
+  await File.deleteAsync(name).catch(() => null);
 }
 
 export function useRakeTestCase(): { readonly tm: TestTaskManager } {
