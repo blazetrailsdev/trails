@@ -33,6 +33,10 @@ function flagBlock<T>(
 export const FileUtilsExt = {
   DEFAULT: {} as object,
 
+  verboseFlag: null as unknown,
+
+  nowriteFlag: false as unknown,
+
   async mkdirP(list: string | string[], options: Options = {}): Promise<unknown> {
     return StdlibFileUtils.mkdirPAsync(list, { ...defaultOptions(), ...options });
   },
@@ -101,30 +105,7 @@ export const FileUtilsExt = {
     if (!(Object.keys(h).length === 0))
       throw new ArgumentError(`no such option: ${Object.keys(h).join(" ")}`);
   },
-} as FileUtilsExtModule;
-
-interface FileUtilsExtModule {
-  DEFAULT: object;
-  verboseFlag: unknown;
-  nowriteFlag: unknown;
-  mkdirP(list: string | string[], options?: Options): Promise<unknown>;
-  ln(src: string | string[], dest: string, options?: Options): Promise<unknown>;
-  cp(src: string | string[], dest: string, options?: Options): Promise<unknown>;
-  rmR(list: string | string[], options?: Options): Promise<unknown>;
-  rmRf(list: string | string[], options?: Options): Promise<unknown>;
-  verbose(value?: unknown, block?: () => unknown): unknown;
-  nowrite(value?: unknown, block?: () => unknown): unknown;
-  whenWriting(msg?: string | null, block?: () => unknown): unknown;
-  rakeOutputMessage(message: string): void;
-  rakeCheckOptions(options: Record<string, unknown>, ...optdecl: string[]): void;
-  createShellRunner: typeof FileUtils.createShellRunner;
-  shShowCommand: typeof FileUtils.shShowCommand;
-  setVerboseOption: typeof FileUtils.setVerboseOption;
-  sh: typeof FileUtils.sh;
-  ruby: typeof FileUtils.ruby;
-  safeLn: typeof FileUtils.safeLn;
-  splitAll: typeof FileUtils.splitAll;
-}
+};
 
 include(FileUtilsExt, FileUtils);
 

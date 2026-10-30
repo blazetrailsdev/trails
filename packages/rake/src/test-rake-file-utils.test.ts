@@ -16,7 +16,9 @@ import {
   stderr as $stderr,
   stdout as $stdout,
 } from "@blazetrails/ruby-compat";
-import { FileUtils, FileUtilsExt } from "./rake.js";
+import { FileUtils, FileUtilsExt as Ext } from "./rake.js";
+
+const FileUtilsExt = Ext as typeof Ext & typeof FileUtils;
 
 const { verbose, nowrite, sh, ruby, rmRf } = {
   verbose: (...args: unknown[]) => FileUtilsExt.verbose(...args),
