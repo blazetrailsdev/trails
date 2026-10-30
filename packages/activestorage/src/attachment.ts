@@ -1,6 +1,12 @@
 import { type Base } from "@blazetrails/activerecord";
 import { runLoadHooks } from "@blazetrails/activesupport";
-import { ArgumentError, fetch, KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  block,
+  fetch,
+  KERNEL_METHODS,
+  PROTOCOL_PROBES,
+} from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import type { Blob } from "./blob.js";
 import { Record } from "./record.js";
@@ -131,7 +137,7 @@ export class Attachment extends Record {
   private async dependent(): Promise<unknown> {
     const record = (await this.record)!;
     const options = record.attachmentReflections[this.name]?.options;
-    return options != null && Object.hasOwn(options, "dependent") ? options.dependent : null;
+    return options == null ? null : fetch(options, "dependent", null);
   }
 
   /** @internal */
@@ -145,12 +151,16 @@ export class Attachment extends Record {
     if (typeof transformations === "string") {
       const variantName = transformations;
       const record = (await this.record)!;
-      return fetch(await this.namedVariants(), variantName, () => {
-        const recordModelName = record.toModel().modelName.name;
-        throw new ArgumentError(
-          `Cannot find variant :${variantName} for ${recordModelName}#${this.name}`,
-        );
-      }).transformations;
+      return fetch<NamedVariant>(
+        await this.namedVariants(),
+        variantName,
+        block(() => {
+          const recordModelName = record.toModel().modelName.name;
+          throw new ArgumentError(
+            `Cannot find variant :${variantName} for ${recordModelName}#${this.name}`,
+          );
+        }),
+      ).transformations;
     } else {
       return transformations;
     }
