@@ -31,6 +31,15 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "rake:test_rake_linked_list.rb › TestLinkedList › conversion with inspect": [
+    {
+      kind: "assert_equal",
+      value: "s:LL(:one, :two, :three)",
+      as: null,
+      reason:
+        'test_rake_linked_list.rb:69 inspects Symbol items as `:one`; a Ruby Symbol is a JS string, so the items inspect as Strings (CLAUDE.md § "A Ruby Symbol is a JS string, never a JS `Symbol`")',
+    },
+  ],
   "actionview:template/render_test.rb › render location conditional append 2": [
     {
       kind: "assert_instance_of",
