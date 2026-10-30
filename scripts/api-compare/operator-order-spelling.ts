@@ -165,6 +165,12 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // multibyte/chars.rb:53 `delegate :<=>, :=~, :match?, :acts_like_string?, to: :wrapped_string`
   // → chars.ts `compareTo` and `matchOperator` (`match?` is `isMatch`).
   "ActiveSupport::Multibyte::Chars": { "<=>": ["compareTo"], "=~": ["matchOperator"] },
+  "Mail::Multibyte::Chars": {
+    "<=>": ["compareTo"],
+    "=~": ["matchOperator"],
+    "[]": ["get"],
+    "[]=": ["set"],
+  },
   "ActiveSupport::TimeWithZone": { "<=>": ["compareTo"] },
   "ActiveSupport::TimeZone": { "<=>": ["compareTo"] },
   // abstract_adapter.rb:252 `def <=>(version_string)` → abstract-adapter.ts

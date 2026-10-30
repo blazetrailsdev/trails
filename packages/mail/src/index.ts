@@ -22,3 +22,6 @@ export { MessageIdsParser } from "./parsers/message-ids-parser.js";
 export { MimeVersionParser } from "./parsers/mime-version-parser.js";
 export { PhraseListsParser } from "./parsers/phrase-lists-parser.js";
 export { ReceivedParser } from "./parsers/received-parser.js";
+export { Multibyte, EncodingError } from "./multibyte.js";
+export { Chars } from "./multibyte/chars.js";
+export { Unicode } from "./multibyte/unicode.js";
