@@ -3,6 +3,7 @@ import {
   RuntimeError,
   block,
   puts,
+  rbInspect,
   rbObjMethod,
   stdout as $stdout,
 } from "@blazetrails/ruby-compat";
