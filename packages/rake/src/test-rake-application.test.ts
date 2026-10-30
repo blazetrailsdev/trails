@@ -103,7 +103,7 @@ describe("TestRakeApplication", () => {
       await app.rawLoadRakefile();
     });
 
-    expect(err).toHaveLength(0);
+    expect(err).toBeEmpty();
   });
 
   it("load rakefile from subdir", async () => {
@@ -141,7 +141,7 @@ describe("TestRakeApplication", () => {
       await app.rawLoadRakefile();
     });
 
-    expect(err).toHaveLength(0);
+    expect(err).toBeEmpty();
   });
 
   it("load rakefile not found", async () => {
@@ -262,7 +262,7 @@ describe("TestRakeApplication", () => {
       expect(e.status).toBe(1);
     });
 
-    expect(out).toHaveLength(0);
+    expect(out).toBeEmpty();
     expect(err).toBe("invalid option: blah\n");
   });
 
@@ -277,8 +277,8 @@ describe("TestRakeApplication", () => {
       expect(e.status).toBe(0);
     });
 
-    expect(out).toHaveLength(0);
-    expect(err).toHaveLength(0);
+    expect(out).toBeEmpty();
+    expect(err).toBeEmpty();
   });
 
   it("standard exception handling system exit nonzero", async () => {
@@ -292,7 +292,7 @@ describe("TestRakeApplication", () => {
       expect(e.status).toBe(5);
     });
 
-    expect(out).toHaveLength(0);
-    expect(err).toHaveLength(0);
+    expect(out).toBeEmpty();
+    expect(err).toBeEmpty();
   });
 });
