@@ -21,7 +21,6 @@ import {
   rbModName,
   rbObjRespondTo,
   rtest,
-  strGsub,
   setEnv,
   stderr as $stderr,
   stdout as $stdout,
@@ -139,6 +138,7 @@ export class Application {
     return (this._options ??= {});
   }
 
+  /** @missingRailsCall gsub — PERMANENT */
   parseTaskString(string: string): [string, string[]] {
     const m = String(string).match(/^([^[]+)(?:\[(.*)\])$/m);
 
@@ -154,7 +154,7 @@ export class Application {
       const part = remainingArgs!.match(/\s*((?:[^\\,]|\\.)*?)\s*(?:,\s*(.*))?$/m)!;
 
       remainingArgs = part[2];
-      args.push(strGsub(part[1], /\\(.)/g, "$1"));
+      args.push(part[1].replaceAll(/\\(.)/g, "$1"));
     } while (remainingArgs != null);
 
     return [name, args];
