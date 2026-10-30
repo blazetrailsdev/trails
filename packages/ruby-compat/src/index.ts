@@ -426,6 +426,7 @@ export {
   rbStrInclude,
   rbStrPlus,
   rbStrSend,
+  rstrip,
   strip,
   STRING_METHOD_TABLE,
   stringSuperclass,

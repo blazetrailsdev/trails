@@ -537,6 +537,17 @@ export function strip(str: string): string {
 }
 
 /**
+ * `String#rstrip` (`vendor/ruby/v3.3.11/string.c:9952` `rb_str_rstrip`): the
+ * receiver without its trailing NUL and ASCII whitespace (`rstrip_offset`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `String#rstrip`, which mail's
+ * generated parsers call (`vendor/mail/2.8.1/lib/mail/parsers/envelope_from_parser.rb`).
+ */
+export function rstrip(str: string): string {
+  return str.replace(RSTRIP, "");
+}
+
+/**
  * `rb_define_method` (`vendor/ruby/v3.3.11/class.c:2134`) with a fixed `argc`, which MRI
  * checks.
  *

@@ -1957,6 +1957,10 @@ jobs:
           key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}
       - name: Fetch upstream Ruby sources
         run: pnpm vendor:fetch
+      # RFC 0204: packages/mail/src/parsers/*-parser.ts are transliterated
+      # from the vendored gem's Ragel output; fail on any drift.
+      - name: Mail parsers regeneration check
+        run: pnpm mail:parsers --check
       - name: Ruby extraction inputs
         id: ruby-extraction-key
         run: |

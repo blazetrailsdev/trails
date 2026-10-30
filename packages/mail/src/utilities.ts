@@ -2,9 +2,11 @@ import {
   b,
   Encoding,
   isAsciiOnly,
+  isEmpty,
   isValidEncoding,
   pack,
   rbObjEncoding,
+  rbObjRespondTo,
   unpack,
 } from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
@@ -18,6 +20,9 @@ function gsubBytes(string: Uint8Array, re: RegExp, replacement: string): Uint8Ar
 }
 
 export const Utilities = {
+  unescape(str: string): string {
+    return str.replace(/\\([^\n])/g, "$1");
+  },
   underscoreize(str: unknown): string {
     return String(str).toLowerCase().replaceAll(Constants.HYPHEN, Constants.UNDERSCORE);
   },
@@ -61,6 +66,18 @@ export const Utilities = {
       return Utilities.binaryUnsafeToCrlf(string);
     } else {
       return string;
+    }
+  },
+
+  isBlank(value: unknown): boolean {
+    if (value == null) {
+      return true;
+    } else if (typeof value === "string") {
+      return !/[^\t\n\v\f\r ]/.test(value);
+    } else if (value instanceof Uint8Array) {
+      return value.every((c) => c === 0x20 || (c >= 0x09 && c <= 0x0d));
+    } else {
+      return rbObjRespondTo(value, "empty?") ? isEmpty(value as object) : value === false;
     }
   },
 
