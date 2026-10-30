@@ -7,7 +7,8 @@ import * as m4 from "./pseudo-status.js";
 import * as m5 from "./rule-recursion-overflow-error.js";
 import * as m6 from "./task-argument-error.js";
 import * as m7 from "./task-arguments.js";
-import * as m8 from "./version.js";
+import * as m8 from "./task.js";
+import * as m9 from "./version.js";
 
 registerClassPaths([
   [() => m0.FileUtilsExt, "Rake::FileUtilsExt"],
@@ -18,5 +19,6 @@ registerClassPaths([
   [() => m5.RuleRecursionOverflowError, "Rake::RuleRecursionOverflowError"],
   [() => m6.TaskArgumentError, "Rake::TaskArgumentError"],
   [() => m7.TaskArguments, "Rake::TaskArguments"],
-  [() => m8.Version, "Rake::Version"],
+  [() => m8.Task, "Rake::Task"],
+  [() => m9.Version, "Rake::Version"],
 ]);

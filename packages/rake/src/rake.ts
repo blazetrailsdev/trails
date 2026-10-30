@@ -10,3 +10,5 @@ export { LinkedList } from "./linked-list.js";
 export { RuleRecursionOverflowError } from "./rule-recursion-overflow-error.js";
 export { TaskArgumentError } from "./task-argument-error.js";
 export { EMPTY_TASK_ARGS, TaskArguments } from "./task-arguments.js";
+export { Task } from "./task.js";
+export type { TaskAction, TaskApplication } from "./task.js";

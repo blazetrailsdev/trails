@@ -1,0 +1,336 @@
+import { extend, Monitor, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { InvocationChain } from "./invocation-chain.js";
+import { InvocationExceptionMixin } from "./invocation-exception-mixin.js";
+import { EMPTY_TASK_ARGS, TaskArguments } from "./task-arguments.js";
+
+export interface TaskApplication {
+  options: { trace?: boolean; dryrun?: boolean; alwaysMultitask?: boolean };
+  currentScope: unknown;
+  get(taskName: string, scopes?: unknown): Task | null;
+  trace(...strings: string[]): void;
+  enhanceWithMatchingRule(taskName: string, level?: number): unknown;
+}
+
+export type TaskAction = (task: Task, args: TaskArguments, ...rest: unknown[]) => unknown;
+
+export class Task {
+  prerequisites: string[];
+  orderOnlyPrerequisites: string[];
+  actions: TaskAction[];
+  application: TaskApplication;
+  scope: unknown;
+  locations: string[];
+  alreadyInvoked: boolean;
+
+  private _name: string;
+  private _comments: string[];
+  private _lock: Monitor;
+  private _argNames: string[] | null;
+  private _invocationException: unknown;
+  private _sources?: string[];
+
+  get prereqs(): string[] {
+    return this.prerequisites;
+  }
+
+  toString(): string {
+    return this.name;
+  }
+
+  inspect(): string {
+    return `<${rbModName(this.constructor)} ${this.name} => [${this.prerequisites.join(", ")}]>`;
+  }
+
+  set sources(sources: string[]) {
+    this._sources = sources;
+  }
+
+  get sources(): string[] {
+    if (Object.hasOwn(this, "_sources")) {
+      return this._sources!;
+    } else {
+      return this.prerequisites;
+    }
+  }
+
+  prerequisiteTasks(): Task[] {
+    return [...this.prerequisites, ...this.orderOnlyPrerequisites].map((pre) =>
+      this.lookupPrerequisite(pre),
+    );
+  }
+
+  /** @internal */
+  private lookupPrerequisite(prerequisiteName: string): Task {
+    const scopedPrerequisiteTask = this.application.get(prerequisiteName, this.scope);
+    let unscopedPrerequisiteTask: Task | null = null;
+    if (scopedPrerequisiteTask === this) {
+      unscopedPrerequisiteTask = this.application.get(prerequisiteName);
+    }
+    return (unscopedPrerequisiteTask || scopedPrerequisiteTask)!;
+  }
+
+  allPrerequisiteTasks(): Task[] {
+    const seen: Record<string, Task> = {};
+    this.collectPrerequisites(seen);
+    return Object.values(seen);
+  }
+
+  /** @internal */
+  protected collectPrerequisites(seen: Record<string, Task>): void {
+    for (const pre of this.prerequisiteTasks()) {
+      if (Object.hasOwn(seen, pre.name)) continue;
+      seen[pre.name] = pre;
+      pre.collectPrerequisites(seen);
+    }
+  }
+
+  get source(): string | null {
+    return this.sources[0] ?? null;
+  }
+
+  constructor(taskName: string, app: TaskApplication) {
+    this._name = String(taskName);
+    this.prerequisites = [];
+    this.actions = [];
+    this.alreadyInvoked = false;
+    this._comments = [];
+    this._lock = new Monitor();
+    this.application = app;
+    this.scope = app.currentScope;
+    this._argNames = null;
+    this.locations = [];
+    this._invocationException = null;
+    this.orderOnlyPrerequisites = [];
+  }
+
+  enhance(deps: string[] | null = null, block?: TaskAction): this {
+    if (deps) this.prerequisites = [...new Set([...this.prerequisites, ...deps])];
+    if (block) this.actions.push(block);
+    return this;
+  }
+
+  get name(): string {
+    return String(this._name);
+  }
+
+  nameWithArgs(): string {
+    if (this.argDescription()) {
+      return `${this.name}${this.argDescription()}`;
+    } else {
+      return this.name;
+    }
+  }
+
+  argDescription(): string | null {
+    return this._argNames ? `[${this.argNames.join(",")}]` : null;
+  }
+
+  get argNames(): string[] {
+    return this._argNames || [];
+  }
+
+  reenable(): void {
+    this.alreadyInvoked = false;
+    this._invocationException = null;
+  }
+
+  clear(): this {
+    this.clearPrerequisites();
+    this.clearActions();
+    this.clearComments();
+    this.clearArgs();
+    return this;
+  }
+
+  clearPrerequisites(): this {
+    this.prerequisites.length = 0;
+    return this;
+  }
+
+  clearActions(): this {
+    this.actions.length = 0;
+    return this;
+  }
+
+  clearComments(): this {
+    this._comments = [];
+    return this;
+  }
+
+  clearArgs(): this {
+    this._argNames = null;
+    return this;
+  }
+
+  async invoke(...args: unknown[]): Promise<void> {
+    const taskArgs = new TaskArguments(this.argNames, args);
+    await this.invokeWithCallChain(taskArgs, InvocationChain.EMPTY);
+  }
+
+  /** @internal */
+  protected async invokeWithCallChain(
+    taskArgs: TaskArguments,
+    invocationChain: InvocationChain<Task>,
+  ): Promise<void> {
+    const newChain = InvocationChain.append<Task>(this, invocationChain);
+    await this._lock.synchronize(async () => {
+      try {
+        if (this.application.options.trace) {
+          this.application.trace(`** Invoke ${this.name} ${this.formatTraceFlags()}`);
+        }
+
+        if (this.alreadyInvoked) {
+          if (this._invocationException) {
+            if (this.application.options.trace) {
+              this.application.trace(
+                `** Previous invocation of ${this.name} failed ${this.formatTraceFlags()}`,
+              );
+            }
+            throw this._invocationException;
+          } else {
+            return;
+          }
+        }
+
+        this.alreadyInvoked = true;
+
+        await this.invokePrerequisites(taskArgs, newChain);
+        if (this.isNeeded()) await this.execute(taskArgs);
+      } catch (ex) {
+        this.addChainTo(ex as object, newChain);
+        this._invocationException = ex;
+        throw ex;
+      }
+    });
+  }
+
+  /** @internal */
+  private addChainTo(exception: object, newChain: InvocationChain<Task>): void {
+    if (!rbObjRespondTo(exception, "chain")) extend(exception, InvocationExceptionMixin);
+    const ex = exception as { chain: InvocationChain | null };
+    if (ex.chain == null) ex.chain = newChain;
+  }
+
+  async invokePrerequisites(
+    taskArgs: TaskArguments,
+    invocationChain: InvocationChain<Task>,
+  ): Promise<void> {
+    if (this.application.options.alwaysMultitask) {
+      await this.invokePrerequisitesConcurrently(taskArgs, invocationChain);
+    } else {
+      for (const p of this.prerequisiteTasks()) {
+        const prereqArgs = taskArgs.newScope(p.argNames);
+        await p.invokeWithCallChain(prereqArgs, invocationChain);
+      }
+    }
+  }
+
+  async invokePrerequisitesConcurrently(
+    taskArgs: TaskArguments,
+    invocationChain: InvocationChain<Task>,
+  ): Promise<void> {
+    const futures = this.prerequisiteTasks().map((p) => {
+      const prereqArgs = taskArgs.newScope(p.argNames);
+      return p.invokeWithCallChain(prereqArgs, invocationChain);
+    });
+    await Promise.all(futures);
+  }
+
+  /** @internal */
+  private formatTraceFlags(): string {
+    const flags: string[] = [];
+    if (!this.alreadyInvoked) flags.push("first_time");
+    if (!this.isNeeded()) flags.push("not_needed");
+    return flags.length === 0 ? "" : "(" + flags.join(", ") + ")";
+  }
+
+  async execute(args: TaskArguments | null = null): Promise<void> {
+    args ||= EMPTY_TASK_ARGS;
+    if (this.application.options.dryrun) {
+      this.application.trace(`** Execute (dry run) ${this.name}`);
+      return;
+    }
+    if (this.application.options.trace) this.application.trace(`** Execute ${this.name}`);
+    if (this.actions.length === 0) this.application.enhanceWithMatchingRule(this.name);
+    const opts = rbObjRespondTo(args, "toHash") ? args.toHash() : null;
+    if (opts && Object.keys(opts).length !== 0) {
+      for (const act of this.actions) await act(this, args, opts);
+    } else {
+      for (const act of this.actions) await act(this, args);
+    }
+  }
+
+  isNeeded(): boolean {
+    return true;
+  }
+
+  timestamp(): Date {
+    return new Date();
+  }
+
+  addDescription(description: string | null): void {
+    if (!description) return;
+    const comment = description.trim();
+    if (comment && comment.length !== 0) this.addComment(comment);
+  }
+
+  set comment(comment: string | null) {
+    this.addComment(comment);
+  }
+
+  /** @internal */
+  private addComment(comment: string | null): void {
+    if (comment == null) return;
+    if (!this._comments.includes(comment)) this._comments.push(comment);
+  }
+
+  get fullComment(): string | null {
+    return this.transformComments("\n");
+  }
+
+  get comment(): string | null {
+    return this.transformComments(" / ", (c) => this.firstSentence(c));
+  }
+
+  /** @internal */
+  private transformComments(
+    separator: string,
+    block?: (c: string) => string | null,
+  ): string | null {
+    if (this._comments.length === 0) {
+      return null;
+    } else {
+      block ||= (c) => c;
+      return this._comments.map(block).join(separator);
+    }
+  }
+
+  /** @internal */
+  private firstSentence(string: string): string | null {
+    return string.split(/(?<=\w)(\.|!)[ \t]|(\.$|!)|\n/m)[0] ?? null;
+  }
+
+  setArgNames(args: string[]): string[] {
+    return (this._argNames = args.map((a) => String(a)));
+  }
+
+  investigation(): string {
+    let result = "------------------------------\n";
+    result += `Investigating ${this.name}\n`;
+    result += `class: ${rbModName(this.constructor)}\n`;
+    result += `task needed: ${this.isNeeded()}\n`;
+    result += `timestamp: ${this.timestamp()}\n`;
+    result += "pre-requisites: \n";
+    const prereqs = this.prerequisiteTasks();
+    prereqs.sort((a, b) => a.timestamp().getTime() - b.timestamp().getTime());
+    for (const p of prereqs) {
+      result += `--${p.name} (${p.timestamp()})\n`;
+    }
+    const timestamps = this.prerequisiteTasks().map((p) => p.timestamp());
+    const latestPrereq =
+      timestamps.length === 0 ? null : new Date(Math.max(...timestamps.map(Number)));
+    result += `latest-prerequisite time: ${latestPrereq ?? ""}\n`;
+    result += "................................\n\n";
+    return result;
+  }
+}
