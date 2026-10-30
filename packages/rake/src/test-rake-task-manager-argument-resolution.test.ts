@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TestTaskManager } from "./task-manager-test-helper.js";
+import { TestTaskManager } from "./test-helpers/task-manager.js";
 
 const task = (...args: unknown[]) => new TestTaskManager().resolveArgs(args);
 const ab = ["a", "b"];

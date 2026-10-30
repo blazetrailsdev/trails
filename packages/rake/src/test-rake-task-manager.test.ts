@@ -5,7 +5,7 @@ import { NameSpace } from "./name-space.js";
 import { Rake } from "./rake-module.js";
 import { Scope } from "./scope.js";
 import { Task } from "./task.js";
-import { TestTaskManager } from "./task-manager-test-helper.js";
+import { TestTaskManager } from "./test-helpers/task-manager.js";
 
 const make = (...args: string[]) => Scope.make(...args);
 

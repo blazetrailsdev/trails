@@ -1,6 +1,7 @@
 import {
   extend,
   Monitor,
+  rbCheckArrayType,
   rbModName,
   rbObjRespondTo,
   stringSplit,
@@ -9,12 +10,13 @@ import {
 import { InvocationChain } from "./invocation-chain.js";
 import { InvocationExceptionMixin } from "./invocation-exception-mixin.js";
 import { fromPathname, Rake } from "./rake-module.js";
+import type { Scope } from "./scope.js";
 import { EMPTY_TASK_ARGS, TaskArguments } from "./task-arguments.js";
 
 export interface TaskApplication {
   options: { trace?: boolean; dryrun?: boolean; alwaysMultitask?: boolean };
-  currentScope: unknown;
-  get(taskName: string, scopes?: never): Task | null | Promise<Task | null>;
+  currentScope: Scope;
+  get(taskName: string, scopes?: Scope | null): Task | null | Promise<Task | null>;
   trace(...strings: string[]): void;
   enhanceWithMatchingRule(taskName: string, level?: number): unknown;
 }
@@ -25,7 +27,7 @@ export class Task {
   orderOnlyPrerequisites: string[];
   readonly actions: TaskAction[];
   application: TaskApplication;
-  readonly scope: unknown;
+  readonly scope: Scope;
   readonly locations: string[];
   private _prerequisites: string[];
   private _alreadyInvoked: boolean;
@@ -79,10 +81,7 @@ export class Task {
 
   /** @internal */
   private async lookupPrerequisite(prerequisiteName: string): Promise<Task> {
-    const scopedPrerequisiteTask = await this.application.get(
-      prerequisiteName,
-      this.scope as never,
-    );
+    const scopedPrerequisiteTask = await this.application.get(prerequisiteName, this.scope);
     let unscopedPrerequisiteTask: Task | null = null;
     if (scopedPrerequisiteTask === this) {
       unscopedPrerequisiteTask = await this.application.get(prerequisiteName);
@@ -358,8 +357,7 @@ export class Task {
   }
 
   static formatDeps(deps: unknown): string[] {
-    if (!Array.isArray(deps)) deps = [deps];
-    return (deps as unknown[]).map((d) => String(fromPathname(d)));
+    return (rbCheckArrayType(deps) ?? [deps]).map((d) => String(fromPathname(d)));
   }
 
   bitwiseOr(deps: unknown): this {
@@ -376,10 +374,7 @@ export class Task {
     return Rake.application!.defineTask(this, ...args);
   }
 
-  static scopeName(
-    scope: { pathWithTaskName(taskName: string): string },
-    taskName: string,
-  ): string {
+  static scopeName(scope: Scope, taskName: string): string {
     return scope.pathWithTaskName(taskName);
   }
 }

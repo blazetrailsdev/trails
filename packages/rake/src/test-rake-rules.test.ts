@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { RuntimeError, block } from "@blazetrails/ruby-compat";
 import { RuleRecursionOverflowError } from "./rule-recursion-overflow-error.js";
 import { Task } from "./task.js";
-import { TestTaskManager } from "./task-manager-test-helper.js";
+import { TestTaskManager } from "./test-helpers/task-manager.js";
 
 const OBJFILE = "abc.o";
 

@@ -7,7 +7,7 @@ function stubApplication(): TaskApplication & { tasks: Record<string, Task> } {
   return {
     tasks,
     options: {},
-    currentScope: null,
+    currentScope: null as never,
     get: (taskName) => tasks[taskName] ?? null,
     trace: () => {},
     enhanceWithMatchingRule: () => null,

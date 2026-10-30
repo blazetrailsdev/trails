@@ -5,7 +5,8 @@ import {
   classModule,
   flatten,
   isPlainHash,
-  map,
+  rbCheckArrayType,
+  rtest,
   rbBlockGivenP,
   rbClassInheritedP,
   rbFCaller,
@@ -15,13 +16,14 @@ import {
   regexpEscape,
   stringSplit,
 } from "@blazetrails/ruby-compat";
+import { toA } from "@blazetrails/ruby-compat/enumerable";
 import { ext as stringExt, pathmap } from "./ext/string.js";
 import { FileTask } from "./file-task.js";
 import { NameSpace } from "./name-space.js";
 import { Rake } from "./rake-module.js";
 import { RuleRecursionOverflowError } from "./rule-recursion-overflow-error.js";
 import { Scope } from "./scope.js";
-import { Task, type TaskAction } from "./task.js";
+import { Task, type TaskAction, type TaskApplication } from "./task.js";
 
 type Rule = [RegExp | null, string[], unknown[], unknown, TaskAction | undefined];
 type ResolvedArgs = [unknown, string[], unknown[], unknown];
@@ -35,7 +37,10 @@ export class TaskManager {
   declare _rules: Rule[];
   declare _scope: Scope;
   declare _seed: number | undefined;
-  declare options: { traceOutput?: { puts(...strings: string[]): unknown } };
+  declare options: TaskApplication["options"] & {
+    traceOutput?: { puts(...strings: string[]): unknown };
+  };
+  declare trace: TaskApplication["trace"];
 
   createRule(...args: unknown[]): void {
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as TaskAction) : undefined;
@@ -56,7 +61,7 @@ export class TaskManager {
       if (typeof taskName === "string" && !rbClassInheritedP(taskClass, FileTask)) {
         const definitionScope = stringSplit(taskName, ":").reverse();
         taskName = definitionScope.shift()!;
-        this._scope = Scope.make(...definitionScope, ...map(this._scope, (s) => s)) as Scope;
+        this._scope = Scope.make(...definitionScope, ...toA(this._scope)) as Scope;
       }
 
       taskName = taskClass.scopeName(this._scope, taskName);
@@ -77,20 +82,19 @@ export class TaskManager {
   intern(taskClass: typeof Task, taskName: string): Task {
     let task = this._tasks.get(String(taskName));
     if (task == null) {
-      task = new taskClass(taskName, this as never);
+      task = new taskClass(taskName, this);
       this._tasks.set(String(taskName), task);
     }
     return task;
   }
 
-  async get(taskName: unknown, scopes: Scope | null = null): Promise<Task> {
+  async get(taskName: string, scopes: Scope | null = null): Promise<Task> {
     taskName = String(taskName);
-    const name = taskName as string;
     const task =
-      this.lookup(name, scopes) ??
-      (await this.enhanceWithMatchingRule(name)) ??
-      (await this.synthesizeFileTask(name));
-    if (task == null) throw new RuntimeError(this.generateMessageForUndefinedTask(name));
+      this.lookup(taskName, scopes) ??
+      (await this.enhanceWithMatchingRule(taskName)) ??
+      (await this.synthesizeFileTask(taskName));
+    if (task == null) throw new RuntimeError(this.generateMessageForUndefinedTask(taskName));
     return task;
   }
 
@@ -101,7 +105,9 @@ export class TaskManager {
     return message + this.generateDidYouMeanSuggestions(taskName);
   }
 
-  generateDidYouMeanSuggestions(_taskName: string): string {
+  /** @missingRailsCall correct — CONVERGEABLE rake-did-you-mean-suggestions */
+  generateDidYouMeanSuggestions(taskName: string): string {
+    void taskName;
     return "";
   }
 
@@ -124,8 +130,9 @@ export class TaskManager {
   resolveArgsWithoutDependencies(args: unknown[]): ResolvedArgs {
     const taskName = args.shift();
     let argNames: string[];
-    if (args.length === 1 && Array.isArray(args[0])) {
-      argNames = args[0];
+    const first = args.length === 1 ? rbCheckArrayType(args[0]) : null;
+    if (first != null) {
+      argNames = first as string[];
     } else {
       argNames = args as string[];
     }
@@ -137,26 +144,31 @@ export class TaskManager {
     args: unknown[],
     hash: Map<unknown, unknown> | Record<string, unknown>,
   ): ResolvedArgs {
-    const entries: [unknown, unknown][] = hash instanceof Map ? [...hash] : Object.entries(hash);
-    const isOrderOnly = ([k]: [unknown, unknown]) => k === "orderOnly";
-    if (entries.length !== 1 && (entries.length !== 2 || !entries.some(isOrderOnly))) {
+    const isMap = hash instanceof Map;
+    const size = isMap ? hash.size : Object.keys(hash).length;
+    const hasOrderOnly = isMap ? hash.has("orderOnly") : "orderOnly" in hash;
+    if (size !== 1 && (size !== 2 || !hasOrderOnly)) {
       throw new RuntimeError("Task Argument Error");
     }
-    const orderOnly = entries.find(isOrderOnly)?.[1] ?? null;
-    const [key, value] = entries.find((entry) => !isOrderOnly(entry)) ?? [];
+    const orderOnly = (isMap ? hash.get("orderOnly") : hash.orderOnly) ?? null;
+    if (isMap) hash.delete("orderOnly");
+    else delete hash.orderOnly;
+    const [key, value] = (isMap ? [...hash] : Object.entries(hash))[0] ?? [];
     let taskName: unknown;
     let argNames: string[];
     let deps: unknown;
     if (args.length === 0) {
       taskName = key;
       argNames = [];
-      deps = value ?? [];
+      deps = rtest(value) ? value : [];
     } else {
       taskName = args.shift();
-      argNames = (key ?? args.shift() ?? []) as string[];
-      deps = value ?? [];
+      let names: unknown = key;
+      if (!rtest(names)) names = args.shift();
+      argNames = (rtest(names) ? names : []) as string[];
+      deps = rtest(value) ? value : [];
     }
-    if (!Array.isArray(deps)) deps = [deps];
+    deps = rbCheckArrayType(deps) ?? [deps];
     return [taskName, argNames, deps as unknown[], orderOnly];
   }
 
@@ -193,21 +205,21 @@ export class TaskManager {
     this._rules.length = 0;
   }
 
-  lookup(taskName: unknown, initialScope: Scope | null = null): Task | null {
+  lookup(taskName: string, initialScope: Scope | null = null): Task | null {
     initialScope ??= this._scope;
-    let name = String(taskName);
+    taskName = String(taskName);
     let scopes: Scope;
     let m: RegExpMatchArray | null;
-    if (/^rake:/m.test(name)) {
+    if (/^rake:/m.test(taskName)) {
       scopes = Scope.make() as Scope;
-      name = name.replace(/^rake:/m, "");
-    } else if ((m = name.match(/^(\^+)/m))) {
+      taskName = taskName.replace(/^rake:/m, "");
+    } else if ((m = taskName.match(/^(\^+)/m))) {
       scopes = initialScope.trim(m[1].length);
-      name = name.replace(/^(\^+)/m, "");
+      taskName = taskName.replace(/^(\^+)/m, "");
     } else {
       scopes = initialScope;
     }
-    return this.lookupInScope(name, scopes);
+    return this.lookupInScope(taskName, scopes);
   }
 
   /** @internal */
@@ -308,15 +320,16 @@ export class TaskManager {
   /** @internal */
   makeSources(taskName: string, taskPattern: RegExp, extensions: unknown[]): string[] {
     const result = extensions.map((ext) => {
-      if (typeof ext === "string" && /%/.test(ext)) {
-        return pathmap(taskName, ext);
-      } else if (typeof ext === "string" && /\//.test(ext)) {
+      if (typeof ext === "string") {
+        if (/%/.test(ext)) {
+          return pathmap(taskName, ext);
+        } else if (/\//.test(ext)) {
+          return ext;
+        } else if (/^\./m.test(ext)) {
+          const source = rbStrSub({ string: taskName }, taskPattern, ext);
+          return source === ext ? stringExt(taskName, ext) : source;
+        }
         return ext;
-      } else if (typeof ext === "string" && /^\./m.test(ext)) {
-        const source = rbStrSub({ string: taskName }, taskPattern, ext);
-        return source === ext ? stringExt(taskName, ext) : source;
-      } else if (typeof ext === "string") {
-        return String(ext);
       } else if (typeof ext === "function" || ext instanceof Method) {
         const arity = ext instanceof Method ? ext.arity() : ext.length;
         return arity === 1 ? rbProcCall(ext, taskName) : rbProcCall(ext);
@@ -328,7 +341,8 @@ export class TaskManager {
   }
 
   /** @internal */
-  getDescription(_task: Task): string | null {
+  getDescription(task: Task): string | null {
+    void task;
     const desc = this.lastDescription;
     this.lastDescription = null;
     return desc;

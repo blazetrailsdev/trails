@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { LinkedList } from "./linked-list.js";
 import { NameSpace } from "./name-space.js";
 import { Task } from "./task.js";
-import { TestTaskManager as TM } from "./task-manager-test-helper.js";
+import { TestTaskManager as TM } from "./test-helpers/task-manager.js";
 
 describe("TestRakeNameSpace", () => {
   it("namespace creation", () => {
