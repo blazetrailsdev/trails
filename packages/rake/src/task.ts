@@ -1,6 +1,7 @@
 import {
   cmp,
   extend,
+  max,
   Monitor,
   rbCheckArrayType,
   rbModName,
@@ -292,7 +293,7 @@ export class Task {
     }
   }
 
-  async isNeeded(): Promise<boolean | undefined> {
+  async isNeeded(): Promise<boolean> {
     return true;
   }
 
@@ -359,7 +360,9 @@ export class Task {
     for (const [p, timestamp] of prereqs) {
       result += `--${p.name} (${_timeToS(timestamp)})\n`;
     }
-    const latestPrereq = prereqs.at(-1)?.[1];
+    const timestamps: Timestamp[] = [];
+    for (const p of await this.prerequisiteTasks()) timestamps.push(await p.timestamp());
+    const latestPrereq = max(timestamps);
     result += `latest-prerequisite time: ${latestPrereq ? _timeToS(latestPrereq) : ""}\n`;
     result += "................................\n\n";
     return result;
@@ -373,6 +376,10 @@ export class Task {
     const formatted = Task.formatDeps(deps).filter((d) => !this.prerequisites.includes(d));
     this.orderOnlyPrerequisites = [...new Set([...this.orderOnlyPrerequisites, ...formatted])];
     return this;
+  }
+
+  static get(taskName: string): Promise<Task> {
+    return Rake.application!.get(taskName);
   }
 
   static isTaskDefined(taskName: string): boolean {

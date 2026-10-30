@@ -1,7 +1,7 @@
 import { DSL } from "./dsl-definition.js";
-import { Rake } from "./rake-module.js";
+import { Task } from "./task.js";
 
 DSL.task("phony");
 
-const task = await Rake.application!.get("phony");
+const task = await Task.get("phony");
 task.timestamp = async () => new Date(0);

@@ -15,11 +15,6 @@ import type { NameSpace } from "./name-space.js";
 import { eachDirParent, fromPathname, Rake } from "./rake-module.js";
 import { Task } from "./task.js";
 
-type DSLHost = {
-  fileCreate(...args: unknown[]): Task;
-  mkdirP(...args: unknown[]): unknown;
-};
-
 export const DSL = {
   task(...args: unknown[]): Task {
     return Task.defineTask(...args);
@@ -33,11 +28,14 @@ export const DSL = {
     return FileCreationTask.defineTask(...args);
   },
 
-  directory(this: DSLHost, ...args: unknown[]): Task {
+  directory(
+    this: typeof FileUtilsExt & { fileCreate(...args: unknown[]): Task },
+    ...args: unknown[]
+  ): Task {
     args = args.flatMap((arg) => arg);
-    const result = this.fileCreate(...args);
-    const dslArgs = rbBlockGivenP(args.at(-1)) ? args.slice(0, -1) : args;
-    let dir = Rake.application!.resolveArgs(dslArgs)[0];
+    const blockArg = rbBlockGivenP(args.at(-1)) ? [args.pop()] : [];
+    const result = this.fileCreate(...args, ...blockArg);
+    let dir = Rake.application!.resolveArgs(args)[0];
     dir = fromPathname(dir);
     eachDirParent(dir as string, (d) => {
       this.fileCreate(

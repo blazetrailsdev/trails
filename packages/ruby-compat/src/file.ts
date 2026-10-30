@@ -841,7 +841,8 @@ export class File extends IO {
    * (`vendor/ruby/v3.3.11/file.c:2427`).
    */
   static async mtimeAsync(fileName: string): Promise<Date> {
-    return (await getFs().stat!(fileName)).mtime;
+    const fs = getFs();
+    return (fs.stat ? await fs.stat(fileName) : fs.statSync(fileName)).mtime;
   }
 
   /**
