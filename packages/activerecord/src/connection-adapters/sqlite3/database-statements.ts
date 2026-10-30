@@ -175,24 +175,11 @@ export async function internalBeginTransaction(
   }
 }
 
-/** @internal */
-export async function performQuery(
-  this: PerformQueryHost,
-  rawConnection: SqliteConnection,
-  sql: string,
-  binds: unknown[],
-  typeCastedBinds: SqliteBinds,
-  options: {
-    prepare: boolean;
-    notificationPayload?: Record<string, unknown>;
-    batch?: boolean;
-  },
-): Promise<Result> {
-  const timeout = this._busyHandlerTimeout ?? 0;
+async function withBusyRetry<T>(timeout: number, query: () => Promise<T>): Promise<T> {
   const deadline = timeout > 0 ? Date.now() + timeout : 0;
   while (true) {
     try {
-      return await performQueryOnce.call(this, rawConnection, sql, binds, typeCastedBinds, options);
+      return await query();
     } catch (error) {
       if (!(error instanceof BusyException) || Date.now() > deadline) throw error;
       await new Promise((resolve) => setTimeout(resolve, 1));
@@ -200,7 +187,8 @@ export async function performQuery(
   }
 }
 
-async function performQueryOnce(
+/** @internal */
+export async function performQuery(
   this: PerformQueryHost,
   rawConnection: SqliteConnection,
   sql: string,
@@ -216,28 +204,15 @@ async function performQueryOnce(
     batch?: boolean;
   },
 ): Promise<Result> {
-  let result: Result;
-  if (batch) {
-    await rawConnection.exec(sql);
-    result = Result.empty();
-  } else if (prepare) {
-    const stmt = await this._cachedStatement(rawConnection, sql);
-    stmt.bindParams(typeCastedBinds);
-
-    if (!stmt.reader) {
-      await stmt.step();
+  return withBusyRetry(this._busyHandlerTimeout ?? 0, async () => {
+    let result: Result;
+    if (batch) {
+      await rawConnection.exec(sql);
       result = Result.empty();
-    } else {
-      const columns = stmt.columns().map((c) => c.name);
-      result = new Result(columns, await stmt.toA());
-      this._narrowSpilledBigInts(stmt, result.rows);
-    }
-  } else {
-    const stmt = await this._freshStatement(rawConnection, sql);
-    try {
-      if (!(binds == null || binds.length === 0)) {
-        stmt.bindParams(typeCastedBinds);
-      }
+    } else if (prepare) {
+      const stmt = await this._cachedStatement(rawConnection, sql);
+      stmt.bindParams(typeCastedBinds);
+
       if (!stmt.reader) {
         await stmt.step();
         result = Result.empty();
@@ -246,14 +221,29 @@ async function performQueryOnce(
         result = new Result(columns, await stmt.toA());
         this._narrowSpilledBigInts(stmt, result.rows);
       }
-    } finally {
-      await stmt.close();
+    } else {
+      const stmt = await this._freshStatement(rawConnection, sql);
+      try {
+        if (!(binds == null || binds.length === 0)) {
+          stmt.bindParams(typeCastedBinds);
+        }
+        if (!stmt.reader) {
+          await stmt.step();
+          result = Result.empty();
+        } else {
+          const columns = stmt.columns().map((c) => c.name);
+          result = new Result(columns, await stmt.toA());
+          this._narrowSpilledBigInts(stmt, result.rows);
+        }
+      } finally {
+        await stmt.close();
+      }
     }
-  }
-  this._lastAffectedRows = await rawConnection.changes();
-  this.verifiedBang();
-  if (notificationPayload) notificationPayload.row_count = result.length;
-  return result;
+    this._lastAffectedRows = await rawConnection.changes();
+    this.verifiedBang();
+    if (notificationPayload) notificationPayload.row_count = result.length;
+    return result;
+  });
 }
 
 /** @internal */

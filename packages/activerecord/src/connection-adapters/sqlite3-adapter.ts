@@ -283,6 +283,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @internal */
   _busyHandlerTimeout: number | null = null;
+
+  /** @internal */
   declare performQuery: typeof sqlitePerformQuery;
 
   declare highPrecisionCurrentTimestamp: typeof sqliteHighPrecisionCurrentTimestamp;
