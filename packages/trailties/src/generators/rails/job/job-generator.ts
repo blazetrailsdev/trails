@@ -31,8 +31,8 @@ export class JobGenerator extends NamedBase {
   private _applicationJobFileName?: string;
 
   /**
-   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
-   * @missingRailsCall in_root — CONVERGEABLE converge-generators-onto-thor-template
+   * @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template
+   * @missingRailsCall in_root — CONVERGEABLE converge-remaining-generators-onto-thor-template
    */
   async createJobFile(): Promise<void> {
     await this.createFile(

@@ -13,7 +13,7 @@ export class ControllerGenerator extends NamedBase {
 
   declare actions: string[];
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
   async createTestFiles(): Promise<void> {
     const paths = controllerPathHelpers(this.name);
     const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;

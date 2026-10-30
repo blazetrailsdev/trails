@@ -5,7 +5,7 @@ export class ScriptGenerator extends NamedBase {
     this.methodAdded("generateScript");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
   async generateScript(): Promise<void> {
     const ext = this.ext();
     const filename = `script/${this.filePath()}${ext}`;

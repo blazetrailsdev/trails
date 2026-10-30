@@ -29,7 +29,7 @@ export class ModelGenerator extends NamedBase {
     this.methodAdded("createTestFile");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
   async createTestFile(): Promise<void> {
     await this.createFile(
       File.join(
@@ -41,7 +41,7 @@ export class ModelGenerator extends NamedBase {
     );
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
   async createFixtureFile(): Promise<void> {
     if (
       (this.options as ModelGeneratorOptions).fixture &&

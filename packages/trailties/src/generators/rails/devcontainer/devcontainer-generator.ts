@@ -100,8 +100,8 @@ export class DevcontainerGenerator extends GeneratorBase {
   }
 
   /**
-   * @missingRailsCall empty_directory — CONVERGEABLE converge-generators-onto-thor-template
-   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
+   * @missingRailsCall empty_directory — CONVERGEABLE converge-remaining-generators-onto-thor-template
+   * @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template
    */
   async createDevcontainer(): Promise<void> {
     await this.createFile(".devcontainer/devcontainer.json", this.devcontainerJson());
@@ -118,7 +118,7 @@ export class DevcontainerGenerator extends GeneratorBase {
     );
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
   updateDatabaseYml(): void {
     this.gsubFile(
       "config/database.ts",

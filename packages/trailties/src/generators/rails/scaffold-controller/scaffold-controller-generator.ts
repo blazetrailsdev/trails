@@ -79,7 +79,7 @@ export class ScaffoldControllerGenerator extends NamedBase {
     ModelHelpers.skipWarn = true;
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
   async createControllerFiles(): Promise<void> {
     const { api } = this.options;
     const modelClassName = this.className().split("::").join("");

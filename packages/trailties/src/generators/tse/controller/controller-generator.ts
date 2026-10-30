@@ -12,7 +12,7 @@ export class ControllerGenerator extends Base {
   declare actions: string[];
 
   /**
-   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
+   * @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template
    * @missingRailsArgs join — PERMANENT
    */
   async copyViewFiles(): Promise<void> {

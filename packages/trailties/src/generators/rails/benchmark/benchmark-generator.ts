@@ -8,7 +8,7 @@ export class BenchmarkGenerator extends NamedBase {
 
   declare reports: string[];
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
   async generateLayout(): Promise<void> {
     const reports = this.reports;
     const ext = this.ext();
