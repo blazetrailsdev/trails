@@ -1,5 +1,5 @@
 import type { Base, Relation } from "@blazetrails/activerecord";
-import { camelize, Concern, extend, TopLevel } from "@blazetrails/activesupport";
+import { camelize, Concern, extend, TopLevel, tryCall } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   block,
@@ -7,7 +7,6 @@ import {
   rbCallSuper,
   rbInspect,
   rbModName,
-  rbObjRespondTo,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
@@ -104,7 +103,7 @@ function hasOneAttached(
   this.afterCommit(
     async (record: AttachedRecord) => {
       const change = hashDelete(record.attachmentChanges, name) as CreateOne | DeleteOne | null;
-      if (rbObjRespondTo(change, "upload")) await (change as CreateOne).upload();
+      await tryCall(change, "upload");
     },
     { on: ["create", "update"] },
   );

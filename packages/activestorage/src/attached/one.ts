@@ -33,7 +33,7 @@ export class One extends Attached {
 
   async attach(attachable: unknown): Promise<this | null> {
     await rbFSend(this.record, `${this.name}=`, attachable);
-    if (this.record.isPersisted() && !this.record.changed) {
+    if (this.record.isPersisted() && !this.record.isChanged) {
       if (!(await this.record.save())) return null;
     }
     return rbFSend(this.record, this.name) as this;
