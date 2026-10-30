@@ -381,6 +381,10 @@ export class Task {
     return this;
   }
 
+  static clear(): void {
+    Rake.application!.clear();
+  }
+
   static get(taskName: string): Promise<Task> {
     return Rake.application!.get(taskName);
   }
