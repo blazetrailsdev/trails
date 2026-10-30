@@ -1,3 +1,4 @@
+import { Dir } from "./dir.js";
 import { File } from "./file.js";
 import { getPath } from "./fs-adapter.js";
 import { LoadError } from "./load-error.js";
@@ -40,8 +41,9 @@ export const LOADED_FEATURES: string[] = [];
  * @noRailsEquivalent PERMANENT
  */
 export async function rbFRequireFile(feature: string): Promise<boolean> {
-  for (const path of LOAD_PATH) {
-    const full = File.join(path, `${feature}.js`);
+  const explicit = /^(\/|\.\.?\/|~)/.test(feature);
+  for (const path of explicit ? [Dir.pwd()] : LOAD_PATH) {
+    const full = File.expandPath(`${feature}.js`, path);
     if (!(await File.isExistAsync(full))) continue;
     if (LOADED_FEATURES.includes(full)) return false;
     await rbFLoad(full);

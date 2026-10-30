@@ -1,9 +1,8 @@
-import { env } from "./process-adapter.js";
+import { argv as ARGV, env } from "./process-adapter.js";
 import { RuntimeError } from "./runtime-error.js";
 import { Shellwords } from "./shellwords.js";
 
 type SwitchBlock = (value: unknown) => unknown;
-type Style = "none" | "required" | "optional" | "placed";
 
 /** `OptionParser::ParseError`, `vendor/ruby/v3.3.11/lib/optparse.rb:2122`. */
 class ParseError extends RuntimeError {
@@ -54,42 +53,55 @@ class InvalidOption extends ParseError {
   static override Reason = "invalid option";
 }
 
-/**
- * `OptionParser::Switch` and its `NoArgument` / `RequiredArgument` /
- * `OptionalArgument` / `PlacedArgument` subclasses
- * (`vendor/ruby/v3.3.11/lib/optparse.rb:703-791`), one class over `style`.
- * Each `parse` answers `[rest of a short cluster, value]`.
- */
-class Switch {
+abstract class Switch {
   short: string[] = [];
   long: string[] = [];
-  style: Style = "none";
   arg = "";
   desc: string[] = [];
   block: SwitchBlock | null = null;
 
-  parse(
+  abstract parse(
     arg: string | null,
     argv: string[],
-    error: (...exc: [string]) => void,
+    error: (arg: string) => void,
+  ): [string | null, unknown];
+}
+
+/** `Switch::NoArgument`, `vendor/ruby/v3.3.11/lib/optparse.rb:703`. */
+class NoArgument extends Switch {
+  parse(
+    arg: string | null,
+    _argv: string[],
+    error: (arg: string) => void,
   ): [string | null, unknown] {
-    switch (this.style) {
-      case "none":
-        if (arg != null) error(arg);
-        return [arg, true];
-      case "required":
-        if (arg != null) return [null, arg];
-        if (argv.length === 0) throw new MissingArgument();
-        return [null, argv.shift()!];
-      case "optional":
-        return [null, arg];
-      case "placed": {
-        const val = arg ?? argv[0];
-        if (arg == null && (val == null || /^-./.test(val))) return [null, null];
-        if (arg == null) argv.shift();
-        return [null, val];
-      }
-    }
+    if (arg != null) error(arg);
+    return [arg, true];
+  }
+}
+
+/** `Switch::RequiredArgument`, `vendor/ruby/v3.3.11/lib/optparse.rb:728`. */
+class RequiredArgument extends Switch {
+  parse(arg: string | null, argv: string[]): [string | null, unknown] {
+    if (arg != null) return [null, arg];
+    if (argv.length === 0) throw new MissingArgument();
+    return [null, argv.shift()!];
+  }
+}
+
+/** `Switch::OptionalArgument`, `vendor/ruby/v3.3.11/lib/optparse.rb:749`. */
+class OptionalArgument extends Switch {
+  parse(arg: string | null): [string | null, unknown] {
+    return [null, arg];
+  }
+}
+
+/** `Switch::PlacedArgument`, `vendor/ruby/v3.3.11/lib/optparse.rb:770`. */
+class PlacedArgument extends Switch {
+  parse(arg: string | null, argv: string[]): [string | null, unknown] {
+    const val = arg ?? argv[0];
+    if (arg == null && (val == null || /^-./.test(val))) return [null, null];
+    if (arg == null) argv.shift();
+    return [null, val];
   }
 }
 
@@ -129,26 +141,31 @@ export class OptionParser {
   }
 
   private _makeSwitch(opts: (string | SwitchBlock)[]): Switch {
-    const sw = new Switch();
+    const short: string[] = [];
+    const long: string[] = [];
+    const desc: string[] = [];
+    let block: SwitchBlock | null = null;
+    let arg = "";
+    let klass: new () => Switch = NoArgument;
     const guess = (a: string | undefined): void => {
       if (a == null) return;
-      sw.arg = a;
-      if (/^=\[/.test(a)) sw.style = "optional";
-      else if (/^\s+\[/.test(a)) sw.style = "placed";
-      else sw.style = "required";
+      arg = a;
+      if (/^=\[/.test(a)) klass = OptionalArgument;
+      else if (/^\s+\[/.test(a)) klass = PlacedArgument;
+      else klass = RequiredArgument;
     };
     for (const o of opts) {
       let m: RegExpMatchArray | null;
-      if (typeof o === "function") sw.block = o;
+      if (typeof o === "function") block = o;
       else if ((m = o.match(/^--([^[\]=\s]*)(.+)?/))) {
-        sw.long.push(m[1]);
+        long.push(m[1]);
         guess(m[2]);
       } else if ((m = o.match(/^-(.)(.+)?/))) {
-        sw.short.push(m[1]);
+        short.push(m[1]);
         guess(m[2]);
-      } else sw.desc.push(o);
+      } else desc.push(o);
     }
-    return sw;
+    return Object.assign(new klass(), { short, long, desc, block, arg });
   }
 
   private get _switches(): Switch[] {
@@ -227,7 +244,7 @@ export class OptionParser {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  async parse(argv: readonly string[]): Promise<string[]> {
+  async parse(argv: readonly string[] = ARGV): Promise<string[]> {
     const nonopts: string[] = [];
     const copy = [...argv];
     if (env.POSIXLY_CORRECT != null) {
@@ -263,7 +280,10 @@ export class OptionParser {
         ...line.short.map((s) => `-${s}`),
         ...line.long.map((l, i) => `--${l}${i === 0 ? line.arg : ""}`),
       ];
-      out.push(`    ${names.join(", ").padEnd(32)} ${line.desc.join(" ")}`);
+      const left = names.join(", ");
+      const desc = line.desc.join(" ");
+      if (left.length > 32) out.push(`    ${left}`, `${"".padEnd(37)}${desc}`);
+      else out.push(`    ${left.padEnd(32)} ${desc}`);
     }
     return out.join("\n") + "\n";
   }

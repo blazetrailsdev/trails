@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { rbInspect } from "./object.js";
 
 /**
  * `vendor/ruby/v3.3.11/lib/shellwords.rb:70` — `Shellwords`, answering only the
@@ -15,10 +16,10 @@ export const Shellwords = {
   shellwords(line: string): string[] {
     const words: string[] = [];
     let field = "";
-    const re = /\s*(?:([^\s\\'"]+)|'([^']*)'|"((?:[^"\\]|\\.)*)"|(\\.?)|(\S))(\s|$(?![\s\S]))?/gsy;
+    const re =
+      /[ \t\r\n\f\v]*(?:([^ \t\r\n\f\v\\'"]+)|'([^']*)'|"((?:[^"\\]|\\.)*)"|(\\.?)|([^ \t\r\n\f\v]))([ \t\r\n\f\v]|$(?![\s\S]))?/gsy;
     for (const [, word, sq, dq, esc, garbage, sep] of line.matchAll(re)) {
-      if (garbage !== undefined)
-        throw new ArgumentError(`Unmatched quote: ${JSON.stringify(line)}`);
+      if (garbage !== undefined) throw new ArgumentError(`Unmatched quote: ${rbInspect(line)}`);
       field += word ?? sq ?? dq?.replace(/\\([$`"\\\n])/g, "$1") ?? esc.replace(/\\(.)/gs, "$1");
       if (sep !== undefined) {
         words.push(field);

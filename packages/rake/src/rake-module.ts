@@ -26,6 +26,7 @@ export const Rake: {
     _application = app;
   },
 
+  /** @inventedArm availableParallelism — PERMANENT */
   suggestedThreadCount() {
     _cpuCount ??= getOs().availableParallelism();
     return _cpuCount + 4;

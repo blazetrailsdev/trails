@@ -17,6 +17,8 @@ import {
   include,
   puts,
   rbFRequireFile,
+  rbModName,
+  rbObjRespondTo,
   rtest,
   setEnv,
   stderr as $stderr,
@@ -61,7 +63,7 @@ export interface ApplicationOptions {
 
 const DEFAULT_RAKEFILES = ["rakefile.ts", "Rakefile.ts"] as const;
 
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Application {
   static DEFAULT_RAKEFILES = DEFAULT_RAKEFILES;
 
@@ -79,6 +81,7 @@ export class Application {
   /** @internal */ _defaultLoader = new DefaultLoader();
   /** @internal */ _options: ApplicationOptions | undefined;
   /** @internal */ _systemDir: string | undefined;
+  /** @internal */ _displayExceptionDetailsSeen: Error[] | undefined;
 
   /**
    * @inlinedFrom Rake::TaskManager#initialize rake/v13.2.1/lib/rake/task_manager.rb:9-15
@@ -99,6 +102,7 @@ export class Application {
     this.setDefaultOptions();
   }
 
+  /** @missingRailsArgs handle_options — PERMANENT */
   async init(appName = "rake", argv: readonly string[] = ARGV): Promise<void> {
     await this.standardExceptionHandling(async () => {
       this.name = appName;
@@ -107,7 +111,7 @@ export class Application {
         args = await this.handleOptions(argv);
       } catch (e) {
         if (!(e instanceof ArgumentError)) throw e;
-        args = await (this.handleOptions as () => Promise<string[]>)();
+        args = await this.handleOptions(ARGV);
       }
       this.loadDebugAtStopFeature();
       this.collectCommandLineTasks(args);
@@ -181,7 +185,6 @@ export class Application {
   get displayExceptionDetailsSeen(): Error[] {
     return (this._displayExceptionDetailsSeen ??= []);
   }
-  /** @internal */ _displayExceptionDetailsSeen: Error[] | undefined;
 
   /** @internal */
   hasCause(ex: Error): boolean {
@@ -192,8 +195,11 @@ export class Application {
   displayExceptionMessageDetails(ex: Error): void {
     if ((ex.constructor as unknown) === RuntimeError) {
       this.trace(ex.message);
+    } else if (rbObjRespondTo(ex, "detailedMessage")) {
+      const { detailedMessage } = ex as unknown as { detailedMessage(o: object): string };
+      this.trace(`${rbModName(ex.constructor)}: ${detailedMessage.call(ex, { highlight: false })}`);
     } else {
-      this.trace(`${ex.constructor.name}: ${ex.message}`);
+      this.trace(`${rbModName(ex.constructor)}: ${ex.message}`);
     }
   }
 
@@ -204,7 +210,7 @@ export class Application {
 
   /**
    * @internal
-   * @missingRailsCall glob — PERMANENT
+   * @missingRailsCall glob — CONVERGEABLE rake-file-list-port
    */
   async haveRakefile(): Promise<string | null> {
     for (const fn of this._rakefiles) {
@@ -241,7 +247,10 @@ export class Application {
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm eval — PERMANENT
+   */
   standardRakeOptions(): OptionSpec[] {
     const options = this.options;
     return this.sortOptions([
@@ -318,7 +327,7 @@ export class Application {
         "-p CODE",
         "Execute some Ruby code, print the result, then exit.",
         (value: string) => {
-          puts.call($stdout, String((0, eval)(value)));
+          puts.call($stdout, (0, eval)(value));
           exit();
         },
       ],
@@ -653,7 +662,7 @@ export class Application {
   }
 
   /** @internal */
-  standardSystemDir(): string {
+  private standardSystemDir(): string {
     return File.join(File.expandPath("~"), ".rake");
   }
 
@@ -726,6 +735,7 @@ export class Application {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Application extends TaskManager, TraceOutput {}
 include(Application, TaskManager);
 include(Application, TraceOutput);

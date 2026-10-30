@@ -171,7 +171,10 @@ describe("TestRakeApplication", () => {
 
   it("load from calculated system rakefile", async () => {
     await rakefileDefault();
-    vi.spyOn(app, "standardSystemDir").mockReturnValue("__STD_SYS_DIR__");
+    vi.spyOn(
+      app as unknown as { standardSystemDir(): string },
+      "standardSystemDir",
+    ).mockReturnValue("__STD_SYS_DIR__");
 
     setEnv("RAKE_SYSTEM", undefined);
 
