@@ -30,4 +30,4 @@ export { EMPTY_TASK_ARGS, TaskArguments } from "./task-arguments.js";
 export { Task } from "./task.js";
 export { TaskLib } from "./tasklib.js";
 export { TaskManager } from "./task-manager.js";
-export type { TaskAction, TaskApplication, Timestamp } from "./task.js";
+export type { TaskAction, Timestamp } from "./task.js";

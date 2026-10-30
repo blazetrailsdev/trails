@@ -18,13 +18,14 @@ import {
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { toA } from "@blazetrails/ruby-compat/enumerable";
+import type { Application, ApplicationOptions } from "./application.js";
 import { ext as stringExt, pathmap } from "./ext/string.js";
 import { FileTask } from "./file-task.js";
 import { NameSpace } from "./name-space.js";
 import { Rake } from "./rake-module.js";
 import { RuleRecursionOverflowError } from "./rule-recursion-overflow-error.js";
 import { Scope } from "./scope.js";
-import { Task, type TaskAction, type TaskApplication } from "./task.js";
+import { Task, type TaskAction } from "./task.js";
 
 type Rule = [RegExp | null, string[], unknown[], unknown, TaskAction | undefined];
 type ResolvedArgs = [unknown, string[], unknown[], unknown];
@@ -38,10 +39,8 @@ export class TaskManager {
   declare _rules: Rule[];
   declare _scope: Scope;
   declare _seed: number | undefined;
-  declare options: TaskApplication["options"] & {
-    traceOutput?: { puts(...strings: string[]): unknown };
-  };
-  declare trace: TaskApplication["trace"];
+  declare options: ApplicationOptions;
+  declare trace: Application["trace"];
 
   createRule(...args: unknown[]): void {
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as TaskAction) : undefined;

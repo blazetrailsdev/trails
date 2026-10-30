@@ -10,7 +10,7 @@ import {
   stderr as $stderr,
   stdout as $stdout,
 } from "@blazetrails/ruby-compat";
-import { afterEach, beforeEach } from "vitest";
+import { afterEach, beforeEach, expect } from "vitest";
 import { Application } from "../application.js";
 import { FileUtilsExt } from "../file-utils-ext.js";
 import { Rake } from "../rake-module.js";
@@ -90,4 +90,19 @@ export async function rakeSystemDir(): Promise<string> {
   await File.writeAsync(File.join("system", "sys1.ts"), "");
   setEnv("RAKE_SYSTEM", "system");
   return "system";
+}
+
+export function verifyKeywords(
+  notes: string[],
+  name: string,
+  expecteds: unknown[],
+  actuals: unknown[],
+) {
+  notes.push(name);
+  expect(actuals.length).toBe(expecteds.length);
+  expecteds.forEach((e, i) => expect(actuals[i]).toBe(e));
+}
+
+export function verifyNotes(notes: string[]) {
+  expect(notes).toEqual(["a", "b", "c", "d", "e", "f", "g", "h"]);
 }
