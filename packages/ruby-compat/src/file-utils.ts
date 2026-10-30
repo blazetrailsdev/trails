@@ -4,6 +4,7 @@ import { File } from "./file.js";
 import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
+import { rtest } from "./object.js";
 import { stdout } from "./process-adapter.js";
 
 /** `File.directory?` (`vendor/ruby/v3.3.11/file.c:1615`). */
@@ -456,6 +457,11 @@ class Entry_ {
     return s != null && s.isSymbolicLink?.() === true;
   }
 
+  async isFileAsync(): Promise<boolean> {
+    const s = await this.lstatBangAsync();
+    return s != null && s.isFile();
+  }
+
   async entriesAsync(): Promise<Entry_[]> {
     const files = await Dir.childrenAsync(this.path);
 
@@ -489,6 +495,76 @@ class Entry_ {
       }
     } catch (error) {
       if ((error as { code?: string }).code !== "EOPNOTSUPP") throw error;
+    }
+  }
+
+  async copyAsync(dest: string): Promise<void> {
+    await this.lstatAsync();
+    if (this.isFile) {
+      await this.copyFileAsync(dest);
+    } else if (this.isDirectory) {
+      if (!(await File.isExistAsync(dest)) && this.isDescendantDirectory(dest, this.path)) {
+        throw new ArgumentError(`cannot copy directory ${this.path} to itself ${dest}`);
+      }
+      try {
+        await getFs().mkdir!(dest);
+      } catch (error) {
+        if (!(await File.isDirectoryAsync(dest))) throw error;
+      }
+    } else if (this.isSymlink) {
+      await File.symlinkAsync(await getFs().readlink!(this.path), dest);
+    } else if (this.isChardev || this.isBlockdev) {
+      throw new Error("cannot handle device file");
+    } else if (this.isSocket) {
+      throw new Error("cannot handle socket");
+    } else if (this.isPipe) {
+      throw new Error("cannot handle FIFO");
+    } else if (this.isDoor) {
+      throw new Error(`cannot handle door: ${this.path}`);
+    } else {
+      throw new Error(`unknown file type: ${this.path}`);
+    }
+  }
+
+  async copyFileAsync(dest: string): Promise<void> {
+    const fs = getFs();
+    await fs.writeFile!(dest, await fs.readFile(this.path), {
+      mode: (await fs.stat!(this.path)).mode,
+    });
+  }
+
+  async copyMetadataAsync(path: string): Promise<void> {
+    const st = await this.lstatAsync();
+    const symlink = st.isSymbolicLink?.() === true;
+    if (!symlink) {
+      await File.utimeAsync(st.atime, st.mtime, path);
+    }
+    let mode = st.mode;
+    try {
+      if (symlink) {
+        try {
+          if (getFs().lchown) await getFs().lchown!(path, st.uid, st.gid);
+          else fileLchown(st.uid, st.gid, path);
+        } catch (error) {
+          if (!(error instanceof NotImplementedError)) throw error;
+        }
+      } else {
+        await File.chownAsync(st.uid, st.gid, path);
+      }
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code !== "EPERM" && code !== "EACCES") throw error;
+      mode &= 0o1777;
+    }
+    if (symlink) {
+      try {
+        fileLchmod(mode, path);
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        if (!(error instanceof NotImplementedError) && code !== "EOPNOTSUPP") throw error;
+      }
+    } else {
+      await File.chmodAsync(mode, path);
     }
   }
 
@@ -540,6 +616,19 @@ class Entry_ {
       }
     }
     await yieldFn(this);
+  }
+
+  async wrapTraverseAsync(
+    pre: (ent: Entry_) => Promise<void>,
+    post: (ent: Entry_) => Promise<void>,
+  ): Promise<void> {
+    await pre(this);
+    if (await this.isDirectoryAsync()) {
+      for (const ent of await this.entriesAsync()) {
+        await ent.wrapTraverseAsync(pre, post);
+      }
+    }
+    await post(this);
   }
 
   /** `Entry_#wrap_traverse` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2386-2393`). */
@@ -715,11 +804,11 @@ export class FileUtils {
     { mode, noop, verbose }: { mode?: number; noop?: boolean; verbose?: boolean } = {},
   ): Promise<string[]> {
     list = fuList(list);
-    if (verbose === true)
+    if (rtest(verbose))
       fuOutputMessage(
         `mkdir -p ${mode != null ? `-m ${mode.toString(8).padStart(3, "0")} ` : ""}${list.join(" ")}`,
       );
-    if (noop === true) return list;
+    if (rtest(noop)) return list;
 
     const isDirectoryAsync = (path: string): Promise<boolean> =>
       getFs().stat!(path).then(
@@ -737,14 +826,67 @@ export class FileUtils {
       }
       for (const dir of stack.reverse()) {
         try {
-          await getFs().mkdir!(removeTrailingSlash(dir));
-          if (mode != null) await getFs().chmod?.(dir, mode);
+          await FileUtils.fuMkdirAsync(dir, mode);
         } catch (error) {
           if (!isSystemCallError(error) || !(await isDirectoryAsync(dir))) throw error;
         }
       }
     }
 
+    return list;
+  }
+
+  /** `FileUtils.mkdir` (`vendor/ruby/v3.3.11/lib/fileutils.rb:316-324`), over async `mkdir`.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async mkdirAsync(
+    list: string | string[],
+    { mode, noop, verbose }: { mode?: number; noop?: boolean; verbose?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    list = fuList(list);
+    if (rtest(verbose))
+      fuOutputMessage(
+        `mkdir ${mode != null ? `-m ${mode.toString(8).padStart(3, "0")} ` : ""}${list.join(" ")}`,
+      );
+    if (rtest(noop)) return;
+
+    for (const dir of list) {
+      await FileUtils.fuMkdirAsync(dir, mode);
+    }
+    return list;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static mkpathAsync = FileUtils.mkdirPAsync;
+
+  /** @noRailsEquivalent PERMANENT */
+  static makedirsAsync = FileUtils.mkdirPAsync;
+
+  /** `FileUtils.rmdir` (`vendor/ruby/v3.3.11/lib/fileutils.rb:442-458`), over async `rmdir`.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async rmdirAsync(
+    list: string | string[],
+    { parents, noop, verbose }: { parents?: boolean; noop?: boolean; verbose?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    list = fuList(list);
+    if (rtest(verbose)) fuOutputMessage(`rmdir ${parents ? "-p " : ""}${list.join(" ")}`);
+    if (rtest(noop)) return;
+    for (let dir of list) {
+      await getFs().rmdir!((dir = removeTrailingSlash(dir)));
+      if (parents) {
+        try {
+          let parent: string;
+          while ((parent = File.dirname(dir)) !== "." && parent !== dir) {
+            dir = parent;
+            await getFs().rmdir!(dir);
+          }
+        } catch (error) {
+          const code = (error as { code?: string }).code;
+          if (code !== "ENOTEMPTY" && code !== "EEXIST" && code !== "ENOENT") throw error;
+        }
+      }
+    }
     return list;
   }
 
@@ -769,41 +911,152 @@ export class FileUtils {
     });
   }
 
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuMkdirAsync(path: string, mode: number | undefined): Promise<void> {
+    path = removeTrailingSlash(path);
+    if (mode != null) {
+      await getFs().mkdir!(path, { mode });
+      await File.chmodAsync(mode, path);
+    } else {
+      await getFs().mkdir!(path);
+    }
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuEachSrcDest0Async(
+    src: string | string[],
+    dest: string,
+    yieldFn: (s: string, d: string) => Promise<void>,
+    targetDirectory = true,
+  ): Promise<void> {
+    if (Array.isArray(src)) {
+      for (const s of src) {
+        await yieldFn(s, targetDirectory ? getPath().join(dest, getPath().basename(s)) : dest);
+      }
+    } else {
+      if (targetDirectory && (await File.isDirectoryAsync(dest))) {
+        await yieldFn(src, getPath().join(dest, getPath().basename(src)));
+      } else {
+        await yieldFn(src, dest);
+      }
+    }
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuEachSrcDestAsync(
+    src: string | string[],
+    dest: string,
+    yieldFn: (s: string, d: string) => Promise<void>,
+  ): Promise<void> {
+    await FileUtils.fuEachSrcDest0Async(src, dest, async (s, d) => {
+      if (await File.isIdenticalAsync(s, d)) throw new ArgumentError(`same file: ${s} and ${d}`);
+      await yieldFn(s, d);
+    });
+  }
+
   /** @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils.ln` (`vendor/ruby/v3.3.11/lib/fileutils.rb:516-523`), over the backend's async `link`. */
   static async lnAsync(
     src: string | string[],
     dest: string,
-    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { force, noop, verbose }: { force?: unknown; noop?: boolean; verbose?: boolean } = {},
   ): Promise<void> {
-    if (verbose === true)
-      fuOutputMessage(`ln${force === true ? " -f" : ""} ${[src, dest].flat().join(" ")}`);
-    if (noop === true) return;
-    const pairs: [string, string][] = [];
-    fuEachSrcDest0(src, dest, (s, d) => pairs.push([s, d]));
-    for (const [s, d] of pairs) {
-      if (force === true)
-        await getFs()
-          .unlink?.(d)
-          .catch(() => {});
-      await getFs().link!(s, d);
-    }
+    if (rtest(verbose))
+      fuOutputMessage(`ln${rtest(force) ? " -f" : ""} ${[src, dest].flat().join(" ")}`);
+    if (rtest(noop)) return;
+    await FileUtils.fuEachSrcDest0Async(src, dest, async (s, d) => {
+      if (rtest(force)) await FileUtils.removeFileAsync(d, true);
+      await File.linkAsync(s, d);
+    });
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static linkAsync = FileUtils.lnAsync;
+
+  /** `FileUtils.ln_s` (`vendor/ruby/v3.3.11/lib/fileutils.rb:706-716`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async lnSAsync(
+    src: string | string[],
+    dest: string,
+    { force, noop, verbose }: { force?: unknown; noop?: boolean; verbose?: boolean } = {},
+  ): Promise<void> {
+    if (rtest(verbose))
+      fuOutputMessage(`ln -s${rtest(force) ? "f" : ""} ${[src, dest].flat().join(" ")}`);
+    if (rtest(noop)) return;
+    await FileUtils.fuEachSrcDest0Async(src, dest, async (s, d) => {
+      if (rtest(force)) await FileUtils.removeFileAsync(d, true);
+      await File.symlinkAsync(s, d);
+    });
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static symlinkAsync = FileUtils.lnSAsync;
+
+  /** `FileUtils.ln_sf` (`vendor/ruby/v3.3.11/lib/fileutils.rb:724-726`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async lnSfAsync(
+    src: string | string[],
+    dest: string,
+    { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
+  ): Promise<void> {
+    return FileUtils.lnSAsync(src, dest, { force: true, noop, verbose });
   }
 
   /** @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils.cp` (`vendor/ruby/v3.3.11/lib/fileutils.rb:873-879`), over async `readFile` / `writeFile`. */
   static async cpAsync(
     src: string | string[],
     dest: string,
-    { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
+    { preserve, noop, verbose }: { preserve?: unknown; noop?: boolean; verbose?: boolean } = {},
   ): Promise<void> {
-    if (verbose === true) fuOutputMessage(`cp ${[src, dest].flat().join(" ")}`);
-    if (noop === true) return;
-    const pairs: [string, string][] = [];
-    fuEachSrcDest(src, dest, (s, d) => pairs.push([s, d]));
-    for (const [s, d] of pairs) {
-      await getFs().writeFile!(d, await getFs().readFile(s), {
-        mode: (await getFs().stat!(s)).mode,
-      });
-    }
+    if (rtest(verbose))
+      fuOutputMessage(`cp${rtest(preserve) ? " -p" : ""} ${[src, dest].flat().join(" ")}`);
+    if (rtest(noop)) return;
+    await FileUtils.fuEachSrcDestAsync(src, dest, (s, d) =>
+      FileUtils.copyFileAsync(s, d, preserve),
+    );
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static copyAsync = FileUtils.cpAsync;
+
+  /** `FileUtils.cp_r` (`vendor/ruby/v3.3.11/lib/fileutils.rb:985-992`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async cpRAsync(
+    src: string | string[],
+    dest: string,
+    {
+      preserve,
+      noop,
+      verbose,
+      dereferenceRoot = true,
+      removeDestination,
+    }: {
+      preserve?: unknown;
+      noop?: boolean;
+      verbose?: boolean;
+      dereferenceRoot?: boolean;
+      removeDestination?: boolean;
+    } = {},
+  ): Promise<void> {
+    if (rtest(verbose))
+      fuOutputMessage(
+        `cp -r${rtest(preserve) ? "p" : ""}${removeDestination ? " --remove-destination" : ""} ${[src, dest].flat().join(" ")}`,
+      );
+    if (rtest(noop)) return;
+    await FileUtils.fuEachSrcDestAsync(src, dest, (s, d) =>
+      FileUtils.copyEntryAsync(s, d, preserve, dereferenceRoot, removeDestination),
+    );
   }
 
   /**
@@ -849,6 +1102,35 @@ export class FileUtils {
     );
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  static async copyEntryAsync(
+    src: string,
+    dest: string,
+    preserve: unknown = false,
+    dereferenceRoot = false,
+    removeDestination = false,
+  ): Promise<void> {
+    if (dereferenceRoot) {
+      src = await getFs().realpath!(src);
+    }
+
+    await new Entry_(src, null, false).wrapTraverseAsync(
+      async (ent) => {
+        const destent = new Entry_(dest, ent.rel, false);
+        if (
+          removeDestination &&
+          ((await destent.isFileAsync()) || (await destent.isSymlinkAsync()))
+        )
+          await File.deleteAsync(destent.path);
+        await ent.copyAsync(destent.path);
+      },
+      async (ent) => {
+        const destent = new Entry_(dest, ent.rel, false);
+        if (rtest(preserve)) await ent.copyMetadataAsync(destent.path);
+      },
+    );
+  }
+
   /** `FileUtils.copy_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1076-1080`), whose
    * `Entry_#copy_file` (`fileutils.rb:2277-2283`) copies the bytes and
    * `copy_metadata` (`fileutils.rb:2285-2312`) the timestamps, ownership and
@@ -861,6 +1143,18 @@ export class FileUtils {
     const ent = new Entry_(src, null, dereference);
     ent.copyFile(dest);
     if (preserve) ent.copyMetadata(dest);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static async copyFileAsync(
+    src: string,
+    dest: string,
+    preserve: unknown = false,
+    dereference = true,
+  ): Promise<void> {
+    const ent = new Entry_(src, null, dereference);
+    await ent.copyFileAsync(dest);
+    if (rtest(preserve)) await ent.copyMetadataAsync(dest);
   }
 
   /** `FileUtils.mv` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1157-1183`). Ruby's `secure:`
@@ -898,6 +1192,38 @@ export class FileUtils {
     });
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  static async mvAsync(
+    src: string | string[],
+    dest: string,
+    { force, noop, verbose }: { force?: unknown; noop?: boolean; verbose?: boolean } = {},
+  ): Promise<void> {
+    if (rtest(verbose))
+      fuOutputMessage(`mv${rtest(force) ? " -f" : ""} ${[src, dest].flat().join(" ")}`);
+    if (rtest(noop)) return;
+    await FileUtils.fuEachSrcDestAsync(src, dest, async (s, d) => {
+      const destent = new Entry_(d, null, true);
+      try {
+        if ((await destent.lstatBangAsync()) != null) {
+          if (await destent.isDirectoryAsync()) throw errnoEexist(d);
+        }
+        try {
+          await getFs().rename!(s, d);
+        } catch (error) {
+          const code = (error as { code?: string }).code;
+          if (code !== "EXDEV" && code !== "EPERM") throw error;
+          await FileUtils.copyEntryAsync(s, d, true);
+          await FileUtils.removeEntryAsync(s, force);
+        }
+      } catch (error) {
+        if (!isSystemCallError(error) || !rtest(force)) throw error;
+      }
+    });
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static moveAsync = FileUtils.mvAsync;
+
   /** `FileUtils.rm` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1216-1225`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
@@ -924,6 +1250,35 @@ export class FileUtils {
   ): string[] | undefined {
     return FileUtils.rm(list, { force: true, noop, verbose });
   }
+
+  /** @noRailsEquivalent PERMANENT */
+  static async rmAsync(
+    list: string | string[],
+    { force, noop, verbose }: { force?: unknown; noop?: boolean; verbose?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    list = fuList(list);
+    if (rtest(verbose)) fuOutputMessage(`rm${rtest(force) ? " -f" : ""} ${list.join(" ")}`);
+    if (rtest(noop)) return;
+
+    for (const path of list) {
+      await FileUtils.removeFileAsync(path, force);
+    }
+    return list;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static removeAsync = FileUtils.rmAsync;
+
+  /** @noRailsEquivalent PERMANENT */
+  static async rmFAsync(
+    list: string | string[],
+    { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    return FileUtils.rmAsync(list, { force: true, noop, verbose });
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static safeUnlinkAsync = FileUtils.rmFAsync;
 
   /** `FileUtils.rm_r` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1299-1310`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
@@ -977,11 +1332,11 @@ export class FileUtils {
    */
   static async rmRAsync(
     list: string | string[],
-    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { force, noop, verbose }: { force?: unknown; noop?: boolean; verbose?: boolean } = {},
   ): Promise<string[] | undefined> {
     list = fuList(list);
-    if (verbose === true) fuOutputMessage(`rm -r${force === true ? "f" : ""} ${list.join(" ")}`);
-    if (noop === true) return;
+    if (rtest(verbose)) fuOutputMessage(`rm -r${rtest(force) ? "f" : ""} ${list.join(" ")}`);
+    if (rtest(noop)) return;
     for (const path of list) {
       await FileUtils.removeEntryAsync(path, force);
     }
@@ -999,23 +1354,43 @@ export class FileUtils {
     return FileUtils.rmRAsync(list, { force: true, noop, verbose });
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  static rmtreeAsync = FileUtils.rmRfAsync;
+
   /** {@link FileUtils.removeEntry} (`vendor/ruby/v3.3.11/lib/fileutils.rb:1449-1456`)
    * over `Entry_`'s async walk: `Entry_#postorder_traverse`
    * (`fileutils.rb:2364-2382`) yielding to `Entry_#remove` (`fileutils.rb:2314-2332`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
-  static async removeEntryAsync(path: string, force = false): Promise<void> {
+  static async removeEntryAsync(path: string, force: unknown = false): Promise<void> {
     try {
       await new Entry_(path).postorderTraverseAsync(async (ent) => {
         try {
           await ent.removeAsync();
         } catch (error) {
-          if (force !== true) throw error;
+          if (!rtest(force)) throw error;
         }
       });
     } catch (error) {
-      if (force !== true) throw error;
+      if (!rtest(force)) throw error;
     }
+  }
+
+  /** `FileUtils.chmod` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1768-1775`), Integer `mode` only, as {@link FileUtils.chmodRAsync}.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async chmodAsync(
+    mode: number,
+    list: string | string[],
+    { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    list = fuList(list);
+    if (rtest(verbose)) fuOutputMessage(`chmod ${mode.toString(8)} ${list.join(" ")}`);
+    if (rtest(noop)) return;
+    for (const path of list) {
+      await new Entry_(path).chmodAsync(mode);
+    }
+    return list;
   }
 
   /** `FileUtils.chmod_R` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1815-1830`) over
@@ -1028,22 +1403,31 @@ export class FileUtils {
   static async chmodRAsync(
     mode: number,
     list: string | string[],
-    { noop, verbose, force }: { noop?: boolean; verbose?: boolean; force?: boolean } = {},
+    { noop, verbose, force }: { noop?: boolean; verbose?: boolean; force?: unknown } = {},
   ): Promise<string[] | undefined> {
     list = fuList(list);
-    if (verbose === true)
-      fuOutputMessage(`chmod -R${force === true ? "f" : ""} ${mode.toString(8)} ${list.join(" ")}`);
-    if (noop === true) return;
+    if (rtest(verbose))
+      fuOutputMessage(`chmod -R${rtest(force) ? "f" : ""} ${mode.toString(8)} ${list.join(" ")}`);
+    if (rtest(noop)) return;
     for (const root of list) {
       await new Entry_(root).preorderTraverseAsync(async (ent) => {
         try {
           await ent.chmodAsync(mode);
         } catch (error) {
-          if (force !== true) throw error;
+          if (!rtest(force)) throw error;
         }
       });
     }
     return list;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static async removeFileAsync(path: string, force: unknown = false): Promise<void> {
+    try {
+      await new Entry_(path).removeFileAsync();
+    } catch (error) {
+      if (!rtest(force)) throw error;
+    }
   }
 
   /** `FileUtils.remove_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1473-1477`).
@@ -1093,6 +1477,46 @@ export class FileUtils {
           if ((error as { code?: string }).code !== "ENOENT") throw error;
           if (created === true) throw error;
           getFs().appendFileSync(path, "");
+          created = true;
+          if (t != null) continue;
+        }
+        break;
+      }
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static async touchAsync(
+    list: string | string[],
+    {
+      noop,
+      mtime,
+      nocreate,
+      verbose,
+    }: { noop?: boolean; verbose?: boolean; mtime?: Date; nocreate?: boolean } = {},
+  ): Promise<void> {
+    list = fuList(list);
+    const t = mtime;
+    if (rtest(verbose)) {
+      const pad = (n: number): string => String(n).padStart(2, "0");
+      const at =
+        t != null
+          ? `-t ${t.getFullYear()}${pad(t.getMonth() + 1)}${pad(t.getDate())}` +
+            `${pad(t.getHours())}${pad(t.getMinutes())}.${pad(t.getSeconds())} `
+          : "";
+      fuOutputMessage(`touch ${nocreate === true ? "-c " : ""}${at}${list.join(" ")}`);
+    }
+    if (rtest(noop)) return;
+    for (const path of list) {
+      let created = nocreate;
+      for (;;) {
+        try {
+          const now = t ?? new Date();
+          await File.utimeAsync(now, now, path);
+        } catch (error) {
+          if ((error as { code?: string }).code !== "ENOENT") throw error;
+          if (created === true) throw error;
+          await getFs().writeFile!(path, "", { flag: "a" });
           created = true;
           if (t != null) continue;
         }

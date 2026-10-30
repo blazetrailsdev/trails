@@ -773,6 +773,27 @@ export class File extends IO {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `File.chown`
+   * (`vendor/ruby/v3.3.11/file.c:2706`), over the backend's async `chown`.
+   */
+  static async chownAsync(owner: number | null, group: number | null, path: string): Promise<void> {
+    const fs = getFs();
+    if (fs.chown) await fs.chown(path, toUid(owner), toGid(group));
+    else fs.chownSync?.(path, toUid(owner), toGid(group));
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `File.utime`
+   * (`vendor/ruby/v3.3.11/file.c:2983`), over the backend's async `utimes`.
+   */
+  static async utimeAsync(atime: Date, mtime: Date, path: string): Promise<void> {
+    const fs = getFs();
+    if (fs.utimes) await fs.utimes(path, atime, mtime);
+    else if (fs.utimesSync) fs.utimesSync(path, atime, mtime);
+    else throw new NotImplementedError("utime() function is unimplemented on this machine");
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:2706` `rb_file_s_chown`, which answers the number of
    * files whose owner was set. A `nil` owner or group is ignored
    * (`file.c:2698`) — `File.chown(nil, 100, "testfile")` — which `to_uid` /

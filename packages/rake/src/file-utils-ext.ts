@@ -3,6 +3,7 @@ import {
   FileUtils as StdlibFileUtils,
   extend,
   include,
+  isPlainHash,
   puts,
   rbEnsure,
   rtest,
@@ -13,62 +14,46 @@ import { Rake } from "./rake-module.js";
 
 type FU = typeof StdlibFileUtils;
 
-export const FileUtilsExt = {
+const VERBOSE_NOOP = ["verbose", "noop"] as const;
+
+const commands = {
+  cd: ["verbose"],
+  chdir: ["verbose"],
+  mkdir: VERBOSE_NOOP,
+  mkdirP: VERBOSE_NOOP,
+  mkpath: VERBOSE_NOOP,
+  makedirs: VERBOSE_NOOP,
+  rmdir: VERBOSE_NOOP,
+  ln: VERBOSE_NOOP,
+  link: VERBOSE_NOOP,
+  lnS: VERBOSE_NOOP,
+  symlink: VERBOSE_NOOP,
+  lnSf: VERBOSE_NOOP,
+  cp: VERBOSE_NOOP,
+  copy: VERBOSE_NOOP,
+  cpR: VERBOSE_NOOP,
+  mv: VERBOSE_NOOP,
+  move: VERBOSE_NOOP,
+  rm: VERBOSE_NOOP,
+  remove: VERBOSE_NOOP,
+  rmF: VERBOSE_NOOP,
+  safeUnlink: VERBOSE_NOOP,
+  rmR: VERBOSE_NOOP,
+  rmRf: VERBOSE_NOOP,
+  rmtree: VERBOSE_NOOP,
+  chmod: VERBOSE_NOOP,
+  chmodR: VERBOSE_NOOP,
+  touch: VERBOSE_NOOP,
+} as const;
+
+type Commands = {
+  [K in keyof typeof commands]: `${K}Async` extends keyof FU ? FU[`${K}Async`] : FU[K & keyof FU];
+};
+
+const fileUtilsExt = {
   verboseFlag: null as unknown,
   nowriteFlag: null as unknown,
   DEFAULT: {} as object,
-
-  async mkdirP(list: string | string[], options: Parameters<FU["mkdirPAsync"]>[1] = {}) {
-    return StdlibFileUtils.mkdirPAsync(list, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
-  },
-
-  async ln(src: string | string[], dest: string, options: Parameters<FU["lnAsync"]>[2] = {}) {
-    return StdlibFileUtils.lnAsync(src, dest, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
-  },
-
-  async cp(src: string | string[], dest: string, options: Parameters<FU["cpAsync"]>[2] = {}) {
-    return StdlibFileUtils.cpAsync(src, dest, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
-  },
-
-  async rmR(list: string | string[], options: Parameters<FU["rmRAsync"]>[1] = {}) {
-    return StdlibFileUtils.rmRAsync(list, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
-  },
-
-  async rmRf(list: string | string[], options: Parameters<FU["rmRfAsync"]>[1] = {}) {
-    return StdlibFileUtils.rmRfAsync(list, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
-  },
-
-  async chmodR(
-    mode: number,
-    list: string | string[],
-    options: Parameters<FU["chmodRAsync"]>[2] = {},
-  ) {
-    return StdlibFileUtils.chmodRAsync(mode, list, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
-  },
 
   /** @inventedArm if — PERMANENT */
   verbose(value: unknown = null, block?: () => unknown): unknown {
@@ -118,6 +103,8 @@ export const FileUtilsExt = {
   },
 };
 
+export const FileUtilsExt = fileUtilsExt as typeof fileUtilsExt & Commands;
+
 Object.defineProperties(FileUtilsExt, {
   verboseFlag: { enumerable: false },
   nowriteFlag: { enumerable: false },
@@ -125,6 +112,23 @@ Object.defineProperties(FileUtilsExt, {
 
 FileUtilsExt.verboseFlag = FileUtilsExt.DEFAULT;
 FileUtilsExt.nowriteFlag = false;
+
+const generated = FileUtilsExt as unknown as Record<string, (...args: unknown[]) => unknown>;
+const stdlib = StdlibFileUtils as unknown as typeof generated;
+for (const [name, opts] of Object.entries<readonly string[]>(commands)) {
+  generated[name] = (...args) => {
+    const block = typeof args.at(-1) === "function" ? [args.pop()] : [];
+    const options = isPlainHash(args.at(-1)) ? (args.pop() as object) : {};
+    const defaultOptions: Record<string, unknown> = {};
+    if (opts.includes("verbose")) defaultOptions.verbose = FileUtilsExt.verboseFlag;
+    if (opts.includes("noop")) defaultOptions.noop = FileUtilsExt.nowriteFlag;
+    return (stdlib[`${name}Async`] ?? stdlib[name])(
+      ...args,
+      { ...defaultOptions, ...options },
+      ...block,
+    );
+  };
+}
 
 include(FileUtilsExt, FileUtils);
 
