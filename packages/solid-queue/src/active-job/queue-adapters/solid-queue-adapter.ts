@@ -5,6 +5,12 @@ import { Job } from "../../job.js";
 
 type ActiveJob = Parameters<typeof Job.enqueue>[0];
 
+declare module "@blazetrails/activejob/namespaces" {
+  interface QueueAdaptersNamespace {
+    SolidQueueAdapter: typeof SolidQueueAdapter;
+  }
+}
+
 export class SolidQueueAdapter {
   isEnqueueAfterTransactionCommit(): boolean {
     return true;
@@ -23,5 +29,5 @@ export class SolidQueueAdapter {
   }
 }
 
-Object.assign(QueueAdapters, { SolidQueueAdapter });
+QueueAdapters.SolidQueueAdapter = SolidQueueAdapter;
 registerConstant("ActiveJob::QueueAdapters::SolidQueueAdapter", SolidQueueAdapter);
