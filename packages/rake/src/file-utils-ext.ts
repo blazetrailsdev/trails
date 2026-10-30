@@ -29,9 +29,11 @@ const commands = {
   lnS: VERBOSE_NOOP,
   symlink: VERBOSE_NOOP,
   lnSf: VERBOSE_NOOP,
+  lnSr: VERBOSE_NOOP,
   cp: VERBOSE_NOOP,
   copy: VERBOSE_NOOP,
   cpR: VERBOSE_NOOP,
+  cpLr: VERBOSE_NOOP,
   mv: VERBOSE_NOOP,
   move: VERBOSE_NOOP,
   rm: VERBOSE_NOOP,
@@ -43,6 +45,9 @@ const commands = {
   rmtree: VERBOSE_NOOP,
   chmod: VERBOSE_NOOP,
   chmodR: VERBOSE_NOOP,
+  chown: VERBOSE_NOOP,
+  chownR: VERBOSE_NOOP,
+  install: VERBOSE_NOOP,
   touch: VERBOSE_NOOP,
 } as const;
 

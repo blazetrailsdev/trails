@@ -382,6 +382,19 @@ export class File extends IO {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `File.file?`
+   * (`vendor/ruby/v3.3.11/file.c:2009`), over the backend's async `stat`.
+   */
+  static async isFileAsync(fileName: string): Promise<boolean> {
+    const fs = getFs();
+    try {
+      return (await fs.stat!(fileName)).isFile();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * {@link File.isIdentical} over the backend's async `stat`, which is the
    * form a caller on the async fs path awaits; a backend with no async `stat`
    * is read through its sync one. A stream argument is still `fstat`ed, as
@@ -835,6 +848,17 @@ export class File extends IO {
   }
 
   /**
+   * {@link File.mtime} over the backend's async `stat`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.mtime`
+   * (`vendor/ruby/v3.3.11/file.c:2427`).
+   */
+  static async mtimeAsync(fileName: string): Promise<Date> {
+    const fs = getFs();
+    return (fs.stat ? await fs.stat(fileName) : fs.statSync(fileName)).mtime;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:4559` `rb_file_s_realpath`, which resolves every
    * symlink and raises `ENOENT` when the path does not exist. A backend with
    * no symlink support has no `realpathSync`, and there the path resolves
@@ -847,6 +871,27 @@ export class File extends IO {
     const fs = getFs();
     if (fs.realpathSync) return fs.realpathSync(pathname);
     return File.expandPath(pathname);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/file.c:4580` `rb_file_s_realdirpath`, {@link File.realpath}
+   * with the last component allowed to be missing, following a broken symlink
+   * to its target.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.realdirpath`
+   * (`vendor/ruby/v3.3.11/file.c:4580`).
+   */
+  static async realdirpathAsync(pathname: string): Promise<string> {
+    const fs = getFs();
+    try {
+      return await fs.realpath!(pathname);
+    } catch (error) {
+      if ((error as { code?: string }).code !== "ENOENT") throw error;
+    }
+    const [dir, base] = File.split(File.expandPath(pathname));
+    const link = await fs.readlink!(pathname).catch(() => null);
+    if (link != null) return File.realdirpathAsync(File.expandPath(link, dir));
+    return File.join(await fs.realpath!(dir), base);
   }
 
   /**

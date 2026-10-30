@@ -49,6 +49,8 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
     "~@": ["bitwiseNot"],
   },
   "Chronic::Repeater": { "<=>": ["compareTo"] },
+  "Rake::EarlyTime": { "<=>": ["compareTo"] },
+  "Rake::LateTime": { "<=>": ["compareTo"] },
   "Chronic::RepeaterTime::Tick": { "*": ["multiply"] },
   "EtOrbi::EoTime": {
     "==": ["equals"],

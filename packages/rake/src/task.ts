@@ -1,25 +1,37 @@
 import {
+  cmp,
   extend,
+  max,
   Monitor,
   rbCheckArrayType,
+  rbCmpint,
   rbModName,
   rbObjRespondTo,
   stringSplit,
   strip,
 } from "@blazetrails/ruby-compat";
+import type { EarlyTime } from "./early-time.js";
 import { InvocationChain } from "./invocation-chain.js";
 import { InvocationExceptionMixin } from "./invocation-exception-mixin.js";
+import type { LateTime } from "./late-time.js";
 import { fromPathname, Rake } from "./rake-module.js";
 import type { Scope } from "./scope.js";
 import { EMPTY_TASK_ARGS, TaskArguments } from "./task-arguments.js";
 
 export interface TaskApplication {
-  options: { trace?: boolean; dryrun?: boolean; alwaysMultitask?: boolean };
+  options: {
+    trace?: boolean;
+    dryrun?: boolean;
+    alwaysMultitask?: boolean;
+    buildAll?: boolean;
+  };
   currentScope: Scope;
   get(taskName: string, scopes?: Scope | null): Task | null | Promise<Task | null>;
   trace(...strings: string[]): void;
   enhanceWithMatchingRule(taskName: string, level?: number): unknown;
 }
+
+export type Timestamp = Date | EarlyTime | LateTime;
 
 export type TaskAction = (task: Task, args: TaskArguments, ...rest: unknown[]) => unknown;
 
@@ -196,14 +208,14 @@ export class Task {
     await this._lock.synchronize(async () => {
       try {
         if (this.application.options.trace) {
-          this.application.trace(`** Invoke ${this.name} ${this.formatTraceFlags()}`);
+          this.application.trace(`** Invoke ${this.name} ${await this.formatTraceFlags()}`);
         }
 
         if (this.alreadyInvoked) {
           if (this._invocationException) {
             if (this.application.options.trace) {
               this.application.trace(
-                `** Previous invocation of ${this.name} failed ${this.formatTraceFlags()}`,
+                `** Previous invocation of ${this.name} failed ${await this.formatTraceFlags()}`,
               );
             }
             throw this._invocationException;
@@ -215,7 +227,7 @@ export class Task {
         this._alreadyInvoked = true;
 
         await this.invokePrerequisites(taskArgs, newChain);
-        if (this.isNeeded()) await this.execute(taskArgs);
+        if (await this.isNeeded()) await this.execute(taskArgs);
       } catch (ex) {
         this.addChainTo(ex as object, newChain);
         this._invocationException = ex;
@@ -259,10 +271,10 @@ export class Task {
   }
 
   /** @internal */
-  private formatTraceFlags(): string {
+  private async formatTraceFlags(): Promise<string> {
     const flags: string[] = [];
     if (!this.alreadyInvoked) flags.push("first_time");
-    if (!this.isNeeded()) flags.push("not_needed");
+    if (!(await this.isNeeded())) flags.push("not_needed");
     return flags.length === 0 ? "" : "(" + flags.join(", ") + ")";
   }
 
@@ -282,11 +294,11 @@ export class Task {
     }
   }
 
-  isNeeded(): boolean {
+  async isNeeded(): Promise<boolean> {
     return true;
   }
 
-  timestamp(): Date {
+  async timestamp(): Promise<Timestamp> {
     return new Date();
   }
 
@@ -340,17 +352,18 @@ export class Task {
     let result = "------------------------------\n";
     result += `Investigating ${this.name}\n`;
     result += `class: ${rbModName(this.constructor)}\n`;
-    result += `task needed: ${this.isNeeded()}\n`;
-    result += `timestamp: ${_timeToS(this.timestamp())}\n`;
+    result += `task needed: ${await this.isNeeded()}\n`;
+    result += `timestamp: ${_timeToS(await this.timestamp())}\n`;
     result += "pre-requisites: \n";
-    const prereqs = await this.prerequisiteTasks();
-    prereqs.sort((a, b) => a.timestamp().getTime() - b.timestamp().getTime());
-    for (const p of prereqs) {
-      result += `--${p.name} (${_timeToS(p.timestamp())})\n`;
+    const prereqs: [Task, Timestamp][] = [];
+    for (const p of await this.prerequisiteTasks()) prereqs.push([p, await p.timestamp()]);
+    prereqs.sort((a, b) => rbCmpint(cmp(a[1], b[1]), a[1], b[1]));
+    for (const [p, timestamp] of prereqs) {
+      result += `--${p.name} (${_timeToS(timestamp)})\n`;
     }
-    const timestamps = (await this.prerequisiteTasks()).map((p) => p.timestamp());
-    const latestPrereq =
-      timestamps.length === 0 ? null : new Date(Math.max(...timestamps.map(Number)));
+    const timestamps: Timestamp[] = [];
+    for (const p of await this.prerequisiteTasks()) timestamps.push(await p.timestamp());
+    const latestPrereq = max(timestamps);
     result += `latest-prerequisite time: ${latestPrereq ? _timeToS(latestPrereq) : ""}\n`;
     result += "................................\n\n";
     return result;
@@ -366,12 +379,20 @@ export class Task {
     return this;
   }
 
+  static get(taskName: string): Promise<Task> {
+    return Rake.application!.get(taskName);
+  }
+
   static isTaskDefined(taskName: string): boolean {
     return Rake.application!.lookup(taskName) != null;
   }
 
   static defineTask(...args: unknown[]): Task {
     return Rake.application!.defineTask(this, ...args);
+  }
+
+  static createRule(...args: unknown[]): void {
+    Rake.application!.createRule(...args);
   }
 
   static scopeName(scope: Scope, taskName: string): string {
@@ -385,7 +406,8 @@ export class Task {
  *
  * @noRailsEquivalent PERMANENT
  */
-function _timeToS(t: Date): string {
+function _timeToS(t: Timestamp): string {
+  if (!(t instanceof Date)) return t.toString();
   const pad = (n: number, w = 2) => String(Math.trunc(Math.abs(n))).padStart(w, "0");
   const offset = -t.getTimezoneOffset();
   const zone = `${offset < 0 ? "-" : "+"}${pad(offset / 60)}${pad(offset % 60)}`;

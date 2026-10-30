@@ -251,6 +251,7 @@ export namespace Delegation {
     return methodNames;
   }
 
+  /** @inventedArm then — PERMANENT */
   export function generateMethodMissing<T extends object>(
     owner: T,
     target: string,
@@ -272,6 +273,7 @@ export namespace Delegation {
           prop in obj ||
           typeof prop === "symbol" ||
           prop.startsWith("_") ||
+          prop === "then" ||
           KERNEL_METHODS.has(prop) ||
           Object.hasOwn(receiver, "constructor")
         ) {

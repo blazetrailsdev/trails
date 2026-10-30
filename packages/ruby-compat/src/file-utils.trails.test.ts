@@ -708,4 +708,130 @@ describe("FileUtils async commands", () => {
     await FileUtils.chmodAsync(0o640, "a");
     expect(nodeFs.statSync("a").mode & 0o777).toBe(0o640);
   });
+
+  describe("links, ownership and modes", () => {
+    let cwd: string;
+    let root: string;
+    const filemode = (path: string): number => nodeFs.statSync(path).mode & 0o7777;
+
+    beforeEach(() => {
+      cwd = Dir.pwd();
+      root = nodeFs.realpathSync(nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "file-utils-")));
+      Dir.chdir(root);
+      nodeFs.mkdirSync("tmp");
+      nodeFs.mkdirSync("data");
+      nodeFs.writeFileSync("data/a", "a");
+    });
+
+    afterEach(() => {
+      FileUtils.fileutilsOutput = undefined;
+      Dir.chdir(cwd);
+      nodeFs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it("ln sr", async () => {
+      await FileUtils.lnSrAsync("data/a", "tmp/lnsdest");
+      expect(nodeFs.readlinkSync("tmp/lnsdest")).toBe("../data/a");
+      await FileUtils.lnSrAsync(nodePath.join(root, "data/a"), "tmp");
+      expect(nodeFs.readlinkSync("tmp/a")).toBe("../data/a");
+      nodeFs.symlinkSync("../data", "tmp/src");
+      await FileUtils.lnSAsync("tmp/src/a", "data/b", { relative: true });
+      expect(nodeFs.readlinkSync("data/b")).toBe("../tmp/src/a");
+    });
+
+    it("ln_sr collapses a .. component", async () => {
+      await FileUtils.lnSrAsync("data/../data/a", "tmp/l");
+      expect(nodeFs.readlinkSync("tmp/l")).toBe("../data/a");
+    });
+
+    it("ln sr broken symlink", async () => {
+      await FileUtils.lnSrAsync("tmp/symlink", "tmp/symlink");
+      expect(nodeFs.lstatSync("tmp/symlink").isSymbolicLink()).toBe(true);
+    });
+
+    it("cp lr", async () => {
+      nodeFs.mkdirSync("data/d");
+      nodeFs.writeFileSync("data/d/b", "b");
+      nodeFs.mkdirSync("tmp/out");
+      await FileUtils.cpLrAsync("data/.", "tmp/out");
+      expect(nodeFs.statSync("tmp/out/d/b").ino).toBe(nodeFs.statSync("data/d/b").ino);
+      expect(nodeFs.statSync("tmp/out/a").nlink).toBe(2);
+    });
+
+    it("install", async () => {
+      await FileUtils.installAsync("data/a", "tmp/x/y", { mode: "u=rwx,go=rx", preserve: true });
+      expect(nodeFs.readFileSync("tmp/x/y", "utf-8")).toBe("a");
+      expect(filemode("tmp/x/y")).toBe(0o755);
+      await FileUtils.installAsync("data/a", "tmp/z/");
+      expect(nodeFs.readFileSync("tmp/z/a", "utf-8")).toBe("a");
+      const before = nodeFs.statSync("tmp/x/y").ino;
+      await FileUtils.installAsync("data/a", "tmp/x/y");
+      expect(nodeFs.statSync("tmp/x/y").ino).toBe(before);
+    });
+
+    it("compare file", async () => {
+      nodeFs.writeFileSync("tmp/b", "a");
+      nodeFs.writeFileSync("tmp/c", "c");
+      nodeFs.writeFileSync("tmp/d", "dd");
+      expect(await FileUtils.compareFileAsync("data/a", "tmp/b")).toBe(true);
+      expect(await FileUtils.compareFileAsync("data/a", "tmp/c")).toBe(false);
+      expect(await FileUtils.compareFileAsync("data/a", "tmp/d")).toBe(false);
+      expect(await FileUtils.cmpAsync("data/a", "tmp/b")).toBe(true);
+    });
+
+    it("chmod symbol mode", async () => {
+      const a = "tmp/a";
+      nodeFs.writeFileSync(a, "");
+      const steps: [string, number][] = [
+        ["u=wrx,g=rx,o=x", 0o751],
+        ["g+w-x", 0o761],
+        ["o+r,g=o+w,o-r,u-o", 0o671],
+        ["go=u", 0o666],
+        ["u=wrx,g=,o=", 0o700],
+        ["u=rx,go=", 0o500],
+        ["+wrx", 0o777],
+        ["u+s,o=s", 0o4770],
+        ["u-w,go-wrx", 0o4500],
+        ["+s", 0o6500],
+        ["u+t,o+t", 0o7500],
+        ["a-t,a-s", 0o500],
+      ];
+      for (const [mode, expected] of steps) {
+        await FileUtils.chmodAsync(mode, a);
+        expect(filemode(a)).toBe(expected);
+      }
+      for (const bad of ["a", "x+a", "u+z", ",+x", "755"]) {
+        await expect(FileUtils.chmodAsync(bad, a)).rejects.toThrow(ArgumentError);
+      }
+    });
+
+    it("chmod symbol mode R", async () => {
+      await FileUtils.chmodRAsync("u=rwX,go=", "data");
+      expect(filemode("data")).toBe(0o700);
+      expect(filemode("data/a")).toBe(0o600);
+    });
+
+    it("chown", async () => {
+      const { uid, gid } = nodeFs.statSync("data/a");
+      const lines: string[] = [];
+      FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };
+      expect(await FileUtils.chownAsync(null, gid, "data/a", { verbose: true })).toEqual([
+        "data/a",
+      ]);
+      await FileUtils.chownAsync(String(uid), null, "data/a");
+      expect(lines).toEqual([`chown :${gid} data/a`]);
+      await expect(FileUtils.chownAsync("nosuchuser", null, "data/a")).rejects.toThrow(
+        "can't find user for nosuchuser",
+      );
+      await expect(FileUtils.chownAsync(null, "nosuchgroup", "data/a")).rejects.toThrow(
+        "can't find group for nosuchgroup",
+      );
+    });
+
+    it("chown R", async () => {
+      const { uid, gid } = nodeFs.statSync("data/a");
+      expect(await FileUtils.chownRAsync(uid, gid, "data")).toEqual(["data"]);
+      expect(await FileUtils.chownRAsync(uid, gid, "nope", { noop: true })).toBeUndefined();
+    });
+  });
 });
