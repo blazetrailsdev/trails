@@ -1243,7 +1243,7 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     await this.createFile(
       "test/application-system-test-case.ts",
       `import "./test-helper.ts";
-import { SystemTestCase } from "@blazetrails/actionpack";
+import { SystemTestCase } from "@blazetrails/actionpack/system-testing";
 
 export class ApplicationSystemTestCase extends SystemTestCase {
   static {

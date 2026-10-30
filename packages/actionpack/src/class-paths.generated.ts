@@ -115,23 +115,17 @@ import * as m112 from "./action-dispatch/routing/redirection.js";
 import * as m113 from "./action-dispatch/routing/route-set.js";
 import * as m114 from "./action-dispatch/routing/routes-proxy.js";
 import * as m115 from "./action-dispatch/routing/url-for.js";
-import * as m116 from "./action-dispatch/system-test-case.js";
-import * as m117 from "./action-dispatch/system-testing/browser.js";
-import * as m118 from "./action-dispatch/system-testing/driver.js";
-import * as m119 from "./action-dispatch/system-testing/server.js";
-import * as m120 from "./action-dispatch/system-testing/test-helpers/screenshot-helper.js";
-import * as m121 from "./action-dispatch/system-testing/test-helpers/setup-and-teardown.js";
-import * as m122 from "./action-dispatch/testing/assertion-response.js";
-import * as m123 from "./action-dispatch/testing/assertions.js";
-import * as m124 from "./action-dispatch/testing/assertions/response.js";
-import * as m125 from "./action-dispatch/testing/assertions/routing.js";
-import * as m126 from "./action-dispatch/testing/integration.js";
-import * as m127 from "./action-dispatch/testing/request-encoder.js";
-import * as m128 from "./action-dispatch/testing/test-helpers/page-dump-helper.js";
-import * as m129 from "./action-dispatch/testing/test-process.js";
-import * as m130 from "./action-dispatch/testing/test-request.js";
-import * as m131 from "./action-dispatch/testing/test-response.js";
-import * as m132 from "./action-pack/gem-version.js";
+import * as m116 from "./action-dispatch/testing/assertion-response.js";
+import * as m117 from "./action-dispatch/testing/assertions.js";
+import * as m118 from "./action-dispatch/testing/assertions/response.js";
+import * as m119 from "./action-dispatch/testing/assertions/routing.js";
+import * as m120 from "./action-dispatch/testing/integration.js";
+import * as m121 from "./action-dispatch/testing/request-encoder.js";
+import * as m122 from "./action-dispatch/testing/test-helpers/page-dump-helper.js";
+import * as m123 from "./action-dispatch/testing/test-process.js";
+import * as m124 from "./action-dispatch/testing/test-request.js";
+import * as m125 from "./action-dispatch/testing/test-response.js";
+import * as m126 from "./action-pack/gem-version.js";
 
 registerClassPaths([
   [() => m1.ActionNotFound, "AbstractController::ActionNotFound"],
@@ -278,12 +272,12 @@ registerClassPaths([
   [() => m50.UrlFor, "ActionController::UrlFor"],
   [() => m28.UrlGenerationError, "ActionController::UrlGenerationError"],
   [() => m82.ActionableExceptions, "ActionDispatch::ActionableExceptions"],
-  [() => m122.AssertionResponse, "ActionDispatch::AssertionResponse"],
-  [() => m123.Assertions, "ActionDispatch::Assertions"],
-  [() => m124.ResponseAssertions, "ActionDispatch::Assertions::ResponseAssertions"],
-  [() => m125.RoutingAssertions, "ActionDispatch::Assertions::RoutingAssertions"],
+  [() => m116.AssertionResponse, "ActionDispatch::AssertionResponse"],
+  [() => m117.Assertions, "ActionDispatch::Assertions"],
+  [() => m118.ResponseAssertions, "ActionDispatch::Assertions::ResponseAssertions"],
+  [() => m119.RoutingAssertions, "ActionDispatch::Assertions::RoutingAssertions"],
   [
-    () => m125.WithIntegrationRouting,
+    () => m119.WithIntegrationRouting,
     "ActionDispatch::Assertions::RoutingAssertions::WithIntegrationRouting",
   ],
   [() => m83.AssumeSSL, "ActionDispatch::AssumeSSL"],
@@ -326,10 +320,10 @@ registerClassPaths([
   [() => m62.ParseError, "ActionDispatch::Http::Parameters::ParseError"],
   [() => m67.UploadedFile, "ActionDispatch::Http::UploadedFile"],
   [() => m68.URL, "ActionDispatch::Http::URL"],
-  [() => m126.RequestHelpers, "ActionDispatch::Integration::RequestHelpers"],
-  [() => m126.Runner, "ActionDispatch::Integration::Runner"],
-  [() => m126.Session, "ActionDispatch::Integration::Session"],
-  [() => m126.IntegrationTest, "ActionDispatch::IntegrationTest"],
+  [() => m120.RequestHelpers, "ActionDispatch::Integration::RequestHelpers"],
+  [() => m120.Runner, "ActionDispatch::Integration::Runner"],
+  [() => m120.Session, "ActionDispatch::Integration::Session"],
+  [() => m120.IntegrationTest, "ActionDispatch::IntegrationTest"],
   [() => m61.InvalidParameterError, "ActionDispatch::InvalidParameterError"],
   [() => m73.Ast, "ActionDispatch::Journey::Ast"],
   [() => m80.Format, "ActionDispatch::Journey::Format"],
@@ -399,8 +393,8 @@ registerClassPaths([
   [() => m107.NoNilParamEncoder, "ActionDispatch::Request::Utils::NoNilParamEncoder"],
   [() => m107.ParamEncoder, "ActionDispatch::Request::Utils::ParamEncoder"],
   [() => m85.RequestCookieMethods, "ActionDispatch::RequestCookieMethods"],
-  [() => m127.RequestEncoder, "ActionDispatch::RequestEncoder"],
-  [() => m127.IdentityEncoder, "ActionDispatch::RequestEncoder::IdentityEncoder"],
+  [() => m121.RequestEncoder, "ActionDispatch::RequestEncoder"],
+  [() => m121.IdentityEncoder, "ActionDispatch::RequestEncoder::IdentityEncoder"],
   [() => m96.RequestId, "ActionDispatch::RequestId"],
   [() => m66.Response, "ActionDispatch::Response"],
   [() => m66.Buffer, "ActionDispatch::Response::Buffer"],
@@ -462,18 +456,12 @@ registerClassPaths([
   [() => m102.ShowExceptions, "ActionDispatch::ShowExceptions"],
   [() => m103.SSL, "ActionDispatch::SSL"],
   [() => m105.Static, "ActionDispatch::Static"],
-  [() => m116.SystemTestCase, "ActionDispatch::SystemTestCase"],
-  [() => m117.Browser, "ActionDispatch::SystemTesting::Browser"],
-  [() => m118.Driver, "ActionDispatch::SystemTesting::Driver"],
-  [() => m119.Server, "ActionDispatch::SystemTesting::Server"],
-  [() => m120.ScreenshotHelper, "ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper"],
-  [() => m121.SetupAndTeardown, "ActionDispatch::SystemTesting::TestHelpers::SetupAndTeardown"],
-  [() => m128.InvalidResponse, "ActionDispatch::TestHelpers::PageDumpHelper::InvalidResponse"],
-  [() => m129.TestProcess, "ActionDispatch::TestProcess"],
-  [() => m129.FixtureFile, "ActionDispatch::TestProcess::FixtureFile"],
-  [() => m130.TestRequest, "ActionDispatch::TestRequest"],
-  [() => m131.TestResponse, "ActionDispatch::TestResponse"],
-  [() => m132.VERSION, "ActionPack::VERSION"],
+  [() => m122.InvalidResponse, "ActionDispatch::TestHelpers::PageDumpHelper::InvalidResponse"],
+  [() => m123.TestProcess, "ActionDispatch::TestProcess"],
+  [() => m123.FixtureFile, "ActionDispatch::TestProcess::FixtureFile"],
+  [() => m124.TestRequest, "ActionDispatch::TestRequest"],
+  [() => m125.TestResponse, "ActionDispatch::TestResponse"],
+  [() => m126.VERSION, "ActionPack::VERSION"],
   [() => m59.AllType, "Mime::AllType"],
   [() => m59.Mimes, "Mime::Mimes"],
   [() => m59.NullType, "Mime::NullType"],

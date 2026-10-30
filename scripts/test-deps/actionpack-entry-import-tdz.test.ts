@@ -29,7 +29,12 @@ function importUnderNode(entry: string): { status: number | null; stderr: string
 }
 
 describe("actionpack entry circular-init", () => {
-  it.each(["./packages/actionpack/dist/index.js", "./packages/trailties/dist/cli.js"])(
+  it.each([
+    "./packages/actionpack/dist/index.js",
+    "./packages/actionpack/dist/system-testing.js",
+    "./packages/trailties/dist/index.js",
+    "./packages/trailties/dist/cli.js",
+  ])(
     "imports %s under plain node without a TDZ ReferenceError",
     (entry) => {
       const { status, stderr } = importUnderNode(entry);
