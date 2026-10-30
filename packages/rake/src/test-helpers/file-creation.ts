@@ -1,10 +1,10 @@
 import { Dir, File, FileUtils, include } from "@blazetrails/ruby-compat";
+import { Application } from "../application.js";
 import { DSL } from "../dsl-definition.js";
 import { Rake } from "../rake-module.js";
 import { FileUtilsExt } from "../file-utils-ext.js";
 import { TaskManager } from "../task-manager.js";
 import { afterEach, beforeEach } from "vitest";
-import { TestTaskManager } from "./task-manager.js";
 
 export const OLDFILE = "old";
 export const NEWFILE = "new";
@@ -41,15 +41,15 @@ export async function deleteFile(name: string): Promise<void> {
   await File.deleteAsync(name).catch(() => null);
 }
 
-export function useRakeTestCase(): { readonly tm: TestTaskManager } {
-  const state = {} as { tm: TestTaskManager };
+export function useRakeTestCase(): { readonly tm: Application } {
+  const state = {} as { tm: Application };
   let origPwd: string;
   let tempdir: string;
   beforeEach(() => {
     origPwd = Dir.pwd();
     tempdir = Dir.mktmpdir("test_rake_");
     Dir.chdir(tempdir);
-    state.tm = new TestTaskManager();
+    Rake.application = state.tm = new Application();
     TaskManager.recordTaskMetadata = true;
     FileUtilsExt.verboseFlag = false;
   });

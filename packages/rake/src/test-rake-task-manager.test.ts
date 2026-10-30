@@ -1,15 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { FileUtils, RuntimeError, block, rbEqq } from "@blazetrails/ruby-compat";
+import { Application } from "./application.js";
 import { FileTask } from "./file-task.js";
 import { NameSpace } from "./name-space.js";
 import { Rake } from "./rake-module.js";
 import { Scope } from "./scope.js";
 import { Task } from "./task.js";
+import { useRakeTestCase } from "./test-helpers/file-creation.js";
 import { TestTaskManager } from "./test-helpers/task-manager.js";
 
 const make = (...args: string[]) => Scope.make(...args);
 
 describe("TestRakeTaskManager", () => {
+  useRakeTestCase();
   let tm: TestTaskManager;
 
   beforeEach(() => {
@@ -190,6 +193,7 @@ describe("TestRakeTaskManager", () => {
   });
 
   it("correctly scoped prerequisites are invoked", async () => {
+    const tm = new Application();
     const values: string[] = [];
     tm.defineTask(
       Task,
