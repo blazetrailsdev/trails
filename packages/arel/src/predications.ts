@@ -39,11 +39,7 @@ function isSelectManagerLike(value: unknown): value is { ast: Node } {
 }
 
 function isEnumerable(value: unknown): value is Iterable<unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as Partial<Iterable<unknown>>)[Symbol.iterator] === "function"
-  );
+  return typeof value === "object" && value !== null && Symbol.iterator in value;
 }
 
 export interface PredicationHost {

@@ -1846,6 +1846,15 @@ Rules that apply across the table:
   assignability), so a call site reaches it through a cast, and `in` still
   cannot see it. `Function.prototype.call` answers `call` before the trap can,
   so `Engine` forwards that one name with an explicit `static call`.
+- `relation/delegation.rb`'s Proxy sits once above `Relation.prototype`, so
+  only a lookup that missed the relation's class chain reaches it. Its `has`
+  trap has no receiver, so `in` answers neither a name the model's
+  `respond_to_missing?` claims before that relation method is generated nor
+  `Symbol.iterator`, which the `get` trap answers only once the records are
+  loaded synchronously. `rbObjRespondTo` answers `respond_to?`. The `set`
+  trap seats a non-configurable `undefined` placeholder on `Relation.prototype`
+  for each `_` field a relation first writes, so later writes stop short of
+  the Proxy.
 - `rails/engine/lazy_route_set.rb`'s `method_missing_module` is spliced beneath
   the generated url-helpers module in `LazyRouteSet#generateUrlHelpers`, since
   `include()` copies a module's methods into each includer and a Proxy on the

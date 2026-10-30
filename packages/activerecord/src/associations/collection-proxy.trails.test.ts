@@ -72,7 +72,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("is not iterable, and starts no load, before a persisted owner's records are loaded", async () => {
     const author = await authorWithPosts();
     author.posts.reset();
-    expect(author.posts[Symbol.iterator]).toBeUndefined();
+    expect(Symbol.iterator in author.posts).toBe(false);
     expect(author.posts).not.toBe(Post.where({ author_id: author.id }));
     expect(author.posts.isLoaded).toBe(false);
     expect(() => {

@@ -250,10 +250,10 @@ const ENUMERABLE_DELEGATES = {
   compactBlank,
 };
 
-/** @perf 10x — PERMANENT */
+/** @perf 11x — PERMANENT */
 const _placeholderFields = new Set<string>();
 
-/** @perf 10x — PERMANENT */
+/** @perf 11x — PERMANENT */
 function _isPlaceholderField(proto: object, key: string): boolean {
   for (let p = proto; p !== Relation.prototype; p = Object.getPrototypeOf(p)) {
     if (Object.hasOwn(p, key)) return false;
@@ -261,9 +261,10 @@ function _isPlaceholderField(proto: object, key: string): boolean {
   return _placeholderFields.has(key) || !Object.hasOwn(Relation.prototype, key);
 }
 
-/** @perf 10x — PERMANENT */
+/** @perf 8x — PERMANENT */
 const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<object> = {
   get(target: object, prop: string | symbol, receiver: any) {
+    if (prop === Symbol.iterator) return receiver._isRecordsSynchronous ? _enumIterator : undefined;
     const value = Reflect.get(target, prop, receiver);
     if (
       value !== undefined ||
@@ -293,17 +294,18 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<object> = {
     return value;
   },
   set(target: object, prop: string | symbol, value: unknown, receiver: object) {
-    if (typeof prop === "string" && prop.startsWith("_")) {
+    if (
+      typeof prop === "string" &&
+      prop.startsWith("_") &&
+      !Object.hasOwn(Relation.prototype, prop)
+    ) {
       _placeholderFields.add(prop);
-      Object.defineProperty(Relation.prototype, prop, {
-        value: undefined,
-        writable: true,
-        configurable: true,
-      });
+      Object.defineProperty(Relation.prototype, prop, { value: undefined, writable: true });
     }
     return Reflect.set(target, prop, value, receiver);
   },
   has(target: object, prop: string | symbol) {
+    if (prop === Symbol.iterator) return false;
     if (Reflect.has(target, prop)) return true;
     if (typeof prop === "symbol") return false;
     return Object.hasOwn(ENUMERABLE_METHODS, prop);
@@ -1674,7 +1676,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this;
   }
 
-  /** @perf 5x — PERMANENT */
+  /** @perf 2x — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */
   clone(): Relation<T, G> {
     if (Object.isFrozen(this) || Object.getOwnPropertySymbols(this).length > 0) {
       return rbObjClone(this);
@@ -2195,12 +2197,7 @@ async function computeCacheVersion(rel: Relation<Base>, timestampColumn: string)
 
 rbDefineAllocFunc(Relation, (klass) => Object.create(klass.prototype));
 const _enumIterator = Relation.prototype[Symbol.iterator];
-Object.defineProperty(Relation.prototype, Symbol.iterator, {
-  get(this: Relation<Base>) {
-    return this._isRecordsSynchronous ? _enumIterator : undefined;
-  },
-  configurable: true,
-});
+Reflect.deleteProperty(Relation.prototype, Symbol.iterator);
 Object.setPrototypeOf(
   Relation.prototype,
   new Proxy(Object.getPrototypeOf(Relation.prototype), CLASS_SPECIFIC_RELATION_HANDLER),
