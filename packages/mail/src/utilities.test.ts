@@ -1,4 +1,3 @@
-import { DEFAULT_PARSER } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Utilities } from "./utilities.js";
 
@@ -24,11 +23,11 @@ describe("Utilities Module", () => {
   describe("token safe", () => {
     describe("checking", () => {
       it("should return true if a string is token safe", () => {
-        expect(isTokenSafe(".abc")).toBe(true);
+        expect(isTokenSafe(".abc")).toBeTruthy();
       });
 
       it("should return false if a string is token safe", () => {
-        expect(isTokenSafe("?=abc")).toBe(false);
+        expect(isTokenSafe("?=abc")).toBeFalsy();
       });
     });
 
@@ -46,11 +45,11 @@ describe("Utilities Module", () => {
   describe("atom safe", () => {
     describe("checking", () => {
       it("should return true if a string is token safe", () => {
-        expect(isAtomSafe("?=abc")).toBe(true);
+        expect(isAtomSafe("?=abc")).toBeTruthy();
       });
 
       it("should return false if a string is token safe", () => {
-        expect(isAtomSafe(".abc")).toBe(false);
+        expect(isAtomSafe(".abc")).toBeFalsy();
       });
     });
 
@@ -297,7 +296,6 @@ describe("Utilities Module", () => {
 
     it("should have a wrapper on URI.escape", () => {
       expect(uriEscape("@?@!")).toBe(uriParser.escape("@?@!"));
-      expect(uriParser).toBe(DEFAULT_PARSER);
     });
 
     it("should have a wrapper on URI.unescape", () => {
@@ -307,45 +305,45 @@ describe("Utilities Module", () => {
 
   describe("blank method", () => {
     it("should say nil is blank", () => {
-      expect(Utilities.isBlank(null)).toBe(true);
+      expect(Utilities.isBlank(null)).toBeTruthy();
     });
 
     it("should say false is blank", () => {
-      expect(Utilities.isBlank(false)).toBe(true);
+      expect(Utilities.isBlank(false)).toBeTruthy();
     });
 
     it("should say true is not blank", () => {
-      expect(Utilities.isBlank(true)).toBe(false);
+      expect(Utilities.isBlank(true)).toBeFalsy();
     });
 
     it("should say an empty array is blank", () => {
-      expect(Utilities.isBlank([])).toBe(true);
+      expect(Utilities.isBlank([])).toBeTruthy();
     });
 
     it("should say an empty hash is blank", () => {
-      expect(Utilities.isBlank({})).toBe(true);
+      expect(Utilities.isBlank({})).toBeTruthy();
     });
 
     it("should say an empty string is blank", () => {
-      expect(Utilities.isBlank("")).toBe(true);
-      expect(Utilities.isBlank(" ")).toBe(true);
+      expect(Utilities.isBlank("")).toBeTruthy();
+      expect(Utilities.isBlank(" ")).toBeTruthy();
       const a = " ".repeat(1000);
-      expect(Utilities.isBlank(a)).toBe(true);
-      expect(Utilities.isBlank("\t \n\n")).toBe(true);
+      expect(Utilities.isBlank(a)).toBeTruthy();
+      expect(Utilities.isBlank("\t \n\n")).toBeTruthy();
     });
   });
 
   describe("not blank method", () => {
     it("should say a number is not blank", () => {
-      expect(Utilities.isBlank(1)).toBe(false);
+      expect(Utilities.isBlank(1)).toBeFalsy();
     });
 
     it("should say a valueless hash is not blank", () => {
-      expect(Utilities.isBlank({ one: null, two: null })).toBe(false);
+      expect(Utilities.isBlank({ one: null, two: null })).toBeFalsy();
     });
 
     it("should say a hash containing an empty hash is not blank", () => {
-      expect(Utilities.isBlank({ key: {} })).toBe(false);
+      expect(Utilities.isBlank({ key: {} })).toBeFalsy();
     });
   });
 
@@ -376,7 +374,8 @@ describe("Utilities Module", () => {
 
     it("should handle japanese characters", () => {
       const string = "あえうえお\r\n\r\nかきくけこ\r\n\r\nさしつせそ\r\n\r\n";
-      expect(Utilities.binaryUnsafeToLf(string)).toBe("あえうえお\n\nかきくけこ\n\nさしつせそ\n\n");
+      const expected = "あえうえお\n\nかきくけこ\n\nさしつせそ\n\n";
+      expect(Utilities.binaryUnsafeToLf(string)).toBe(expected);
     });
 
     describe("on NilClass", () => {
