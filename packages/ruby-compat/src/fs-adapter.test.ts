@@ -108,6 +108,7 @@ describe("the node adapter", () => {
     link: true,
     chmod: true,
     chown: true,
+    lchown: true,
     utimes: true,
     readlink: true,
   };

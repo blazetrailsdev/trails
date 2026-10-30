@@ -543,7 +543,8 @@ class Entry_ {
     try {
       if (symlink) {
         try {
-          fileLchown(st.uid, st.gid, path);
+          if (getFs().lchown) await getFs().lchown!(path, st.uid, st.gid);
+          else fileLchown(st.uid, st.gid, path);
         } catch (error) {
           if (!(error instanceof NotImplementedError)) throw error;
         }
@@ -825,8 +826,7 @@ export class FileUtils {
       }
       for (const dir of stack.reverse()) {
         try {
-          await getFs().mkdir!(removeTrailingSlash(dir));
-          if (mode != null) await getFs().chmod?.(dir, mode);
+          await FileUtils.fuMkdirAsync(dir, mode);
         } catch (error) {
           if (!isSystemCallError(error) || !(await isDirectoryAsync(dir))) throw error;
         }
@@ -851,9 +851,7 @@ export class FileUtils {
     if (rtest(noop)) return;
 
     for (const dir of list) {
-      const path = removeTrailingSlash(dir);
-      await getFs().mkdir!(path);
-      if (mode != null) await File.chmodAsync(mode, path);
+      await FileUtils.fuMkdirAsync(dir, mode);
     }
     return list;
   }
@@ -917,8 +915,23 @@ export class FileUtils {
     });
   }
 
-  /** `fu_each_src_dest0` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2474-2489`), awaiting the block.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuMkdirAsync(path: string, mode: number | undefined): Promise<void> {
+    path = removeTrailingSlash(path);
+    if (mode != null) {
+      await getFs().mkdir!(path, { mode });
+      await File.chmodAsync(mode, path);
+    } else {
+      await getFs().mkdir!(path);
+    }
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
    */
   static async fuEachSrcDest0Async(
     src: string | string[],
@@ -939,8 +952,9 @@ export class FileUtils {
     }
   }
 
-  /** `fu_each_src_dest` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2466-2472`), awaiting the block.
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
    */
   static async fuEachSrcDestAsync(
     src: string | string[],
@@ -957,13 +971,13 @@ export class FileUtils {
   static async lnAsync(
     src: string | string[],
     dest: string,
-    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { force, noop, verbose }: { force?: unknown; noop?: boolean; verbose?: boolean } = {},
   ): Promise<void> {
     if (rtest(verbose))
-      fuOutputMessage(`ln${force === true ? " -f" : ""} ${[src, dest].flat().join(" ")}`);
+      fuOutputMessage(`ln${rtest(force) ? " -f" : ""} ${[src, dest].flat().join(" ")}`);
     if (rtest(noop)) return;
     await FileUtils.fuEachSrcDest0Async(src, dest, async (s, d) => {
-      if (force === true) await FileUtils.removeFileAsync(d, true);
+      if (rtest(force)) await FileUtils.removeFileAsync(d, true);
       await File.linkAsync(s, d);
     });
   }
@@ -979,13 +993,13 @@ export class FileUtils {
   static async lnSAsync(
     src: string | string[],
     dest: string,
-    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { force, noop, verbose }: { force?: unknown; noop?: boolean; verbose?: boolean } = {},
   ): Promise<void> {
     if (rtest(verbose))
-      fuOutputMessage(`ln -s${force === true ? "f" : ""} ${[src, dest].flat().join(" ")}`);
+      fuOutputMessage(`ln -s${rtest(force) ? "f" : ""} ${[src, dest].flat().join(" ")}`);
     if (rtest(noop)) return;
     await FileUtils.fuEachSrcDest0Async(src, dest, async (s, d) => {
-      if (force === true) await FileUtils.removeFileAsync(d, true);
+      if (rtest(force)) await FileUtils.removeFileAsync(d, true);
       await File.symlinkAsync(s, d);
     });
   }
@@ -1010,10 +1024,10 @@ export class FileUtils {
   static async cpAsync(
     src: string | string[],
     dest: string,
-    { preserve, noop, verbose }: { preserve?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { preserve, noop, verbose }: { preserve?: unknown; noop?: boolean; verbose?: boolean } = {},
   ): Promise<void> {
     if (rtest(verbose))
-      fuOutputMessage(`cp${preserve === true ? " -p" : ""} ${[src, dest].flat().join(" ")}`);
+      fuOutputMessage(`cp${rtest(preserve) ? " -p" : ""} ${[src, dest].flat().join(" ")}`);
     if (rtest(noop)) return;
     await FileUtils.fuEachSrcDestAsync(src, dest, (s, d) =>
       FileUtils.copyFileAsync(s, d, preserve),
@@ -1038,7 +1052,7 @@ export class FileUtils {
       dereferenceRoot = true,
       removeDestination,
     }: {
-      preserve?: boolean;
+      preserve?: unknown;
       noop?: boolean;
       verbose?: boolean;
       dereferenceRoot?: boolean;
@@ -1047,7 +1061,7 @@ export class FileUtils {
   ): Promise<void> {
     if (rtest(verbose))
       fuOutputMessage(
-        `cp -r${preserve ? "p" : ""}${removeDestination ? " --remove-destination" : ""} ${[src, dest].flat().join(" ")}`,
+        `cp -r${rtest(preserve) ? "p" : ""}${removeDestination ? " --remove-destination" : ""} ${[src, dest].flat().join(" ")}`,
       );
     if (rtest(noop)) return;
     await FileUtils.fuEachSrcDestAsync(src, dest, (s, d) =>
@@ -1102,7 +1116,7 @@ export class FileUtils {
   static async copyEntryAsync(
     src: string,
     dest: string,
-    preserve = false,
+    preserve: unknown = false,
     dereferenceRoot = false,
     removeDestination = false,
   ): Promise<void> {
@@ -1122,7 +1136,7 @@ export class FileUtils {
       },
       async (ent) => {
         const destent = new Entry_(dest, ent.rel, false);
-        if (preserve) await ent.copyMetadataAsync(destent.path);
+        if (rtest(preserve)) await ent.copyMetadataAsync(destent.path);
       },
     );
   }
@@ -1145,12 +1159,12 @@ export class FileUtils {
   static async copyFileAsync(
     src: string,
     dest: string,
-    preserve = false,
+    preserve: unknown = false,
     dereference = true,
   ): Promise<void> {
     const ent = new Entry_(src, null, dereference);
     await ent.copyFileAsync(dest);
-    if (preserve) await ent.copyMetadataAsync(dest);
+    if (rtest(preserve)) await ent.copyMetadataAsync(dest);
   }
 
   /** `FileUtils.mv` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1157-1183`). Ruby's `secure:`
@@ -1192,10 +1206,10 @@ export class FileUtils {
   static async mvAsync(
     src: string | string[],
     dest: string,
-    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { force, noop, verbose }: { force?: unknown; noop?: boolean; verbose?: boolean } = {},
   ): Promise<void> {
     if (rtest(verbose))
-      fuOutputMessage(`mv${force === true ? " -f" : ""} ${[src, dest].flat().join(" ")}`);
+      fuOutputMessage(`mv${rtest(force) ? " -f" : ""} ${[src, dest].flat().join(" ")}`);
     if (rtest(noop)) return;
     await FileUtils.fuEachSrcDestAsync(src, dest, async (s, d) => {
       const destent = new Entry_(d, null, true);
@@ -1212,7 +1226,7 @@ export class FileUtils {
           await FileUtils.removeEntryAsync(s, force);
         }
       } catch (error) {
-        if (!isSystemCallError(error) || force !== true) throw error;
+        if (!isSystemCallError(error) || !rtest(force)) throw error;
       }
     });
   }
@@ -1252,10 +1266,10 @@ export class FileUtils {
   /** @noRailsEquivalent PERMANENT */
   static async rmAsync(
     list: string | string[],
-    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { force, noop, verbose }: { force?: unknown; noop?: boolean; verbose?: boolean } = {},
   ): Promise<string[] | undefined> {
     list = fuList(list);
-    if (rtest(verbose)) fuOutputMessage(`rm${force === true ? " -f" : ""} ${list.join(" ")}`);
+    if (rtest(verbose)) fuOutputMessage(`rm${rtest(force) ? " -f" : ""} ${list.join(" ")}`);
     if (rtest(noop)) return;
 
     for (const path of list) {
@@ -1334,10 +1348,10 @@ export class FileUtils {
    */
   static async rmRAsync(
     list: string | string[],
-    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { force, noop, verbose }: { force?: unknown; noop?: boolean; verbose?: boolean } = {},
   ): Promise<string[] | undefined> {
     list = fuList(list);
-    if (rtest(verbose)) fuOutputMessage(`rm -r${force === true ? "f" : ""} ${list.join(" ")}`);
+    if (rtest(verbose)) fuOutputMessage(`rm -r${rtest(force) ? "f" : ""} ${list.join(" ")}`);
     if (rtest(noop)) return;
     for (const path of list) {
       await FileUtils.removeEntryAsync(path, force);
@@ -1366,17 +1380,17 @@ export class FileUtils {
    * (`fileutils.rb:2364-2382`) yielding to `Entry_#remove` (`fileutils.rb:2314-2332`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
-  static async removeEntryAsync(path: string, force = false): Promise<void> {
+  static async removeEntryAsync(path: string, force: unknown = false): Promise<void> {
     try {
       await new Entry_(path).postorderTraverseAsync(async (ent) => {
         try {
           await ent.removeAsync();
         } catch (error) {
-          if (force !== true) throw error;
+          if (!rtest(force)) throw error;
         }
       });
     } catch (error) {
-      if (force !== true) throw error;
+      if (!rtest(force)) throw error;
     }
   }
 
@@ -1407,18 +1421,18 @@ export class FileUtils {
   static async chmodRAsync(
     mode: number,
     list: string | string[],
-    { noop, verbose, force }: { noop?: boolean; verbose?: boolean; force?: boolean } = {},
+    { noop, verbose, force }: { noop?: boolean; verbose?: boolean; force?: unknown } = {},
   ): Promise<string[] | undefined> {
     list = fuList(list);
     if (rtest(verbose))
-      fuOutputMessage(`chmod -R${force === true ? "f" : ""} ${mode.toString(8)} ${list.join(" ")}`);
+      fuOutputMessage(`chmod -R${rtest(force) ? "f" : ""} ${mode.toString(8)} ${list.join(" ")}`);
     if (rtest(noop)) return;
     for (const root of list) {
       await new Entry_(root).preorderTraverseAsync(async (ent) => {
         try {
           await ent.chmodAsync(mode);
         } catch (error) {
-          if (force !== true) throw error;
+          if (!rtest(force)) throw error;
         }
       });
     }
@@ -1426,11 +1440,11 @@ export class FileUtils {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  static async removeFileAsync(path: string, force = false): Promise<void> {
+  static async removeFileAsync(path: string, force: unknown = false): Promise<void> {
     try {
       await new Entry_(path).removeFileAsync();
     } catch (error) {
-      if (force !== true) throw error;
+      if (!rtest(force)) throw error;
     }
   }
 
@@ -1515,7 +1529,8 @@ export class FileUtils {
       let created = nocreate;
       for (;;) {
         try {
-          await File.utimeAsync(t ?? new Date(), t ?? new Date(), path);
+          const now = t ?? new Date();
+          await File.utimeAsync(now, now, path);
         } catch (error) {
           if ((error as { code?: string }).code !== "ENOENT") throw error;
           if (created === true) throw error;

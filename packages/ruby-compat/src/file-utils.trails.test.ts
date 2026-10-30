@@ -689,6 +689,28 @@ describe("FileUtils async commands", () => {
     expect(nodeFs.readlinkSync("u/l")).toBe("sub/f");
   });
 
+  it("force and preserve read Ruby truthiness", async () => {
+    await FileUtils.rmAsync("missing", { force: 1 });
+    await FileUtils.touchAsync("a", { mtime: new Date(2001, 0, 2) });
+    await FileUtils.cpAsync("a", "b", { preserve: 1 });
+    expect(nodeFs.statSync("b").mtime).toEqual(nodeFs.statSync("a").mtime);
+  });
+
+  it("touch without mtime gives atime and mtime one now", async () => {
+    await FileUtils.touchAsync("a");
+    const st = nodeFs.statSync("a");
+    await FileUtils.touchAsync("a");
+    expect(nodeFs.statSync("a").atimeMs).toBe(nodeFs.statSync("a").mtimeMs);
+    expect(st.isFile()).toBe(true);
+  });
+
+  it("mv over a dangling symlink replaces it", async () => {
+    await FileUtils.touchAsync("a");
+    nodeFs.symlinkSync("gone", "s");
+    await FileUtils.mvAsync("a", "s");
+    expect(nodeFs.lstatSync("s").isFile()).toBe(true);
+  });
+
   it("chmod", async () => {
     await FileUtils.touchAsync("a");
     await FileUtils.chmodAsync(0o640, "a");

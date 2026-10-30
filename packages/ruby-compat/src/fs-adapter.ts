@@ -109,11 +109,12 @@ export interface FsAdapter {
   realpath?(path: string): Promise<string>;
   rmdir?(path: string): Promise<void>;
   readdir?(path: string): Promise<string[]>;
-  mkdir?(path: string, options?: { recursive?: boolean }): Promise<void>;
+  mkdir?(path: string, options?: { recursive?: boolean; mode?: number }): Promise<void>;
   symlink?(target: string, path: string): Promise<void>;
   link?(existingPath: string, newPath: string): Promise<void>;
   chmod?(path: string, mode: number): Promise<void>;
   chown?(path: string, uid: number, gid: number): Promise<void>;
+  lchown?(path: string, uid: number, gid: number): Promise<void>;
   utimes?(path: string, atime: Date, mtime: Date): Promise<void>;
   readlink?(path: string): Promise<string>;
 }
@@ -296,11 +297,15 @@ function tryAutoRegisterNode(): boolean {
       realpath(path: string): Promise<string>;
       rmdir(path: string): Promise<void>;
       readdir(path: string): Promise<string[]>;
-      mkdir(path: string, opts?: { recursive?: boolean }): Promise<string | undefined>;
+      mkdir(
+        path: string,
+        opts?: { recursive?: boolean; mode?: number },
+      ): Promise<string | undefined>;
       symlink(target: string, path: string): Promise<void>;
       link(existingPath: string, newPath: string): Promise<void>;
       chmod(path: string, mode: number): Promise<void>;
       chown(path: string, uid: number, gid: number): Promise<void>;
+      lchown(path: string, uid: number, gid: number): Promise<void>;
       utimes(path: string, atime: Date, mtime: Date): Promise<void>;
       readlink(path: string): Promise<string>;
     };
@@ -336,12 +341,13 @@ function tryAutoRegisterNode(): boolean {
       realpath: (p: string) => fsPromises.realpath(p),
       rmdir: (p: string) => fsPromises.rmdir(p),
       readdir: (p: string) => fsPromises.readdir(p),
-      mkdir: (p: string, opts?: { recursive?: boolean }) =>
+      mkdir: (p: string, opts?: { recursive?: boolean; mode?: number }) =>
         fsPromises.mkdir(p, opts).then(() => undefined),
       symlink: (target: string, p: string) => fsPromises.symlink(target, p),
       link: (existingPath: string, newPath: string) => fsPromises.link(existingPath, newPath),
       chmod: (p: string, mode: number) => fsPromises.chmod(p, mode),
       chown: (p: string, uid: number, gid: number) => fsPromises.chown(p, uid, gid),
+      lchown: (p: string, uid: number, gid: number) => fsPromises.lchown(p, uid, gid),
       utimes: (p: string, atime: Date, mtime: Date) => fsPromises.utimes(p, atime, mtime),
       readlink: (p: string) => fsPromises.readlink(p),
       ...withFlock(nodeFs as unknown as FlockableFs),

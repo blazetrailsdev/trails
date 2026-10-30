@@ -790,7 +790,7 @@ export class File extends IO {
     const fs = getFs();
     if (fs.utimes) await fs.utimes(path, atime, mtime);
     else if (fs.utimesSync) fs.utimesSync(path, atime, mtime);
-    else fs.statSync(path);
+    else throw new NotImplementedError("utime() function is unimplemented on this machine");
   }
 
   /**

@@ -14,53 +14,46 @@ import { Rake } from "./rake-module.js";
 
 type FU = typeof StdlibFileUtils;
 
-const commands = [
-  "mkdir",
-  "mkdirP",
-  "mkpath",
-  "makedirs",
-  "rmdir",
-  "ln",
-  "link",
-  "lnS",
-  "symlink",
-  "lnSf",
-  "cp",
-  "copy",
-  "cpR",
-  "mv",
-  "move",
-  "rm",
-  "remove",
-  "rmF",
-  "safeUnlink",
-  "rmR",
-  "rmRf",
-  "rmtree",
-  "chmod",
-  "chmodR",
-  "touch",
-] as const;
+const VERBOSE_NOOP = ["verbose", "noop"] as const;
 
-type Commands = { [K in (typeof commands)[number]]: FU[`${K}Async`] } & {
-  chdir: typeof fileUtilsExt.cd;
+const commands = {
+  cd: ["verbose"],
+  chdir: ["verbose"],
+  mkdir: VERBOSE_NOOP,
+  mkdirP: VERBOSE_NOOP,
+  mkpath: VERBOSE_NOOP,
+  makedirs: VERBOSE_NOOP,
+  rmdir: VERBOSE_NOOP,
+  ln: VERBOSE_NOOP,
+  link: VERBOSE_NOOP,
+  lnS: VERBOSE_NOOP,
+  symlink: VERBOSE_NOOP,
+  lnSf: VERBOSE_NOOP,
+  cp: VERBOSE_NOOP,
+  copy: VERBOSE_NOOP,
+  cpR: VERBOSE_NOOP,
+  mv: VERBOSE_NOOP,
+  move: VERBOSE_NOOP,
+  rm: VERBOSE_NOOP,
+  remove: VERBOSE_NOOP,
+  rmF: VERBOSE_NOOP,
+  safeUnlink: VERBOSE_NOOP,
+  rmR: VERBOSE_NOOP,
+  rmRf: VERBOSE_NOOP,
+  rmtree: VERBOSE_NOOP,
+  chmod: VERBOSE_NOOP,
+  chmodR: VERBOSE_NOOP,
+  touch: VERBOSE_NOOP,
+} as const;
+
+type Commands = {
+  [K in keyof typeof commands]: `${K}Async` extends keyof FU ? FU[`${K}Async`] : FU[K & keyof FU];
 };
 
 const fileUtilsExt = {
   verboseFlag: null as unknown,
   nowriteFlag: null as unknown,
   DEFAULT: {} as object,
-
-  /** @inventedArm if — PERMANENT */
-  cd<T>(
-    dir: string,
-    options: { verbose?: boolean | null } | ((dir: string) => T) = {},
-    block?: (dir: string) => T,
-  ) {
-    if (typeof options === "function") [options, block] = [{}, options];
-    const verbose = FileUtilsExt.verboseFlag as boolean;
-    return StdlibFileUtils.cd(dir, { verbose, ...options }, block!);
-  },
 
   /** @inventedArm if — PERMANENT */
   verbose(value: unknown = null, block?: () => unknown): unknown {
@@ -122,18 +115,20 @@ FileUtilsExt.nowriteFlag = false;
 
 const generated = FileUtilsExt as unknown as Record<string, (...args: unknown[]) => unknown>;
 const stdlib = StdlibFileUtils as unknown as typeof generated;
-for (const name of commands) {
+for (const [name, opts] of Object.entries<readonly string[]>(commands)) {
   generated[name] = (...args) => {
+    const block = typeof args.at(-1) === "function" ? [args.pop()] : [];
     const options = isPlainHash(args.at(-1)) ? (args.pop() as object) : {};
-    return stdlib[`${name}Async`](...args, {
-      verbose: FileUtilsExt.verboseFlag,
-      noop: FileUtilsExt.nowriteFlag,
-      ...options,
-    });
+    const defaultOptions: Record<string, unknown> = {};
+    if (opts.includes("verbose")) defaultOptions.verbose = FileUtilsExt.verboseFlag;
+    if (opts.includes("noop")) defaultOptions.noop = FileUtilsExt.nowriteFlag;
+    return (stdlib[`${name}Async`] ?? stdlib[name])(
+      ...args,
+      { ...defaultOptions, ...options },
+      ...block,
+    );
   };
 }
-
-FileUtilsExt.chdir = FileUtilsExt.cd;
 
 include(FileUtilsExt, FileUtils);
 
