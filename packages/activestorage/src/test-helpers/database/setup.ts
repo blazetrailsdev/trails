@@ -6,6 +6,7 @@ import { Engine } from "@blazetrails/trailties/engine";
 import { File, Dir } from "@blazetrails/ruby-compat";
 import "../../class-paths.generated.js";
 import { ActiveStorage } from "../../active-storage.js";
+import { Attachment } from "../../attachment.js";
 import { Blob } from "../../blob.js";
 import { Registry } from "../../service/registry.js";
 import "../../service/configurator.js";
@@ -68,6 +69,7 @@ await Base.connectionPool().migrationContext.migrate();
 await ActiveStorageCreateUsers.migrate("up");
 await ActiveStorageCreateGroups.migrate("up");
 await Blob.loadSchema();
+await Attachment.loadSchema();
 
 afterAll(async () => {
   await Base.establishConnection(arunit);

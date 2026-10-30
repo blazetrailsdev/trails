@@ -10,6 +10,7 @@ import {
 import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Deprecation } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import type { Attachment } from "./attachment.js";
 import type { Blob } from "./blob.js";
 import type * as Errors from "./errors.js";
 import type { LogSubscriber } from "./log-subscriber.js";
@@ -20,6 +21,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {};
 
 export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModule & {
   Attached: unknown;
+  Attachment?: typeof Attachment;
   FixtureSet: unknown;
   Service: unknown;
   Previewer: unknown;
