@@ -1,11 +1,9 @@
 import {
-  block,
   chomp,
   encode,
   type Enumerator,
   Errno,
   isAsciiOnly,
-  rbBlockGivenP,
   rbObjEncoding,
   RuntimeError,
   StandardError,
@@ -158,13 +156,7 @@ export const Encodings = {
     if (isAsciiOnly(string)) {
       return string;
     } else {
-      const chunks: string[] = [];
-      Encodings.eachBase64ChunkByterange(
-        string,
-        60,
-        block((chunk: string) => void chunks.push(chunk)),
-      );
-      return chunks
+      return [...(Encodings.eachBase64ChunkByterange(string, 60) as Enumerator<string>)]
         .map((chunk) => {
           const [str, chunkEncoding] = Utilities.bValueEncode(chunk, encoding);
           encoding = chunkEncoding;
@@ -208,8 +200,12 @@ export const Encodings = {
     for (let i = 0; i < lines.length; i += 2) {
       const unencoded = lines[i];
       const encoded = lines[i + 1] ?? null;
-      if (encoded != null) {
-        if (!Utilities.isBlank(unencoded)) {
+      const lastEncoded = encoded;
+      if (lastEncoded != null) {
+        if (
+          !Utilities.isBlank(unencoded) ||
+          (lastEncoded == null && unencoded !== Constants.EMPTY)
+        ) {
           results.push(unencoded);
         }
 
@@ -232,7 +228,7 @@ export const Encodings = {
       throw new RuntimeError("size per chunk must be multiple of 4");
     }
 
-    if (rbBlockGivenP(yielder)) {
+    if (yielder != null) {
       const maxBytesize = Math.floor((3 * maxBytesizePerBase64Chunk) / 4.0);
       Encodings.eachChunkByterange(str, maxBytesize, yielder);
     } else {
@@ -246,7 +242,7 @@ export const Encodings = {
     maxBytesizePerChunk: number,
     yielder?: (chunk: string) => void,
   ): Enumerator<RubyString> | void {
-    if (!rbBlockGivenP(yielder)) {
+    if (yielder == null) {
       return toEnum(Encodings, "eachChunkByterange", str, maxBytesizePerChunk);
     }
 
