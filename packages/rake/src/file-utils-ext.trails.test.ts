@@ -50,6 +50,23 @@ describe("FileUtilsExt remaining commands", () => {
     expect(await File.isExistAsync("a")).toBe(false);
   });
 
+  it("wraps ln_sr, cp_lr, install and chown", async () => {
+    FileUtilsExt.nowriteFlag = true;
+    FileUtilsExt.verboseFlag = true;
+    await FileUtilsExt.lnSr("a", "s");
+    await FileUtilsExt.cpLr("a", "b");
+    await FileUtilsExt.install("a", "c", { mode: 0o755 });
+    await FileUtilsExt.chown(1, 2, "a");
+    await FileUtilsExt.chownR(1, null, "a");
+    expect(lines).toEqual([
+      "ln -s a s",
+      "cp -lr a b",
+      "install -c -m 755 a c",
+      "chown 1:2 a",
+      "chown -R 1 a",
+    ]);
+  });
+
   it("cd defaults verbose only", () => {
     FileUtilsExt.verboseFlag = true;
     expect(FileUtilsExt.cd(".", () => 1)).toBe(1);

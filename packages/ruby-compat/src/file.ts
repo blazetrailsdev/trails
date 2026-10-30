@@ -382,6 +382,19 @@ export class File extends IO {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `File.file?`
+   * (`vendor/ruby/v3.3.11/file.c:2009`), over the backend's async `stat`.
+   */
+  static async isFileAsync(fileName: string): Promise<boolean> {
+    const fs = getFs();
+    try {
+      return (await fs.stat!(fileName)).isFile();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * {@link File.isIdentical} over the backend's async `stat`, which is the
    * form a caller on the async fs path awaits; a backend with no async `stat`
    * is read through its sync one. A stream argument is still `fstat`ed, as
@@ -858,6 +871,27 @@ export class File extends IO {
     const fs = getFs();
     if (fs.realpathSync) return fs.realpathSync(pathname);
     return File.expandPath(pathname);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/file.c:4580` `rb_file_s_realdirpath`, {@link File.realpath}
+   * with the last component allowed to be missing, following a broken symlink
+   * to its target.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.realdirpath`
+   * (`vendor/ruby/v3.3.11/file.c:4580`).
+   */
+  static async realdirpathAsync(pathname: string): Promise<string> {
+    const fs = getFs();
+    try {
+      return await fs.realpath!(pathname);
+    } catch (error) {
+      if ((error as { code?: string }).code !== "ENOENT") throw error;
+    }
+    const [dir, base] = File.split(File.expandPath(pathname));
+    const link = await fs.readlink!(pathname).catch(() => null);
+    if (link != null) return File.realdirpathAsync(File.expandPath(link, dir));
+    return File.join(await fs.realpath!(dir), base);
   }
 
   /**

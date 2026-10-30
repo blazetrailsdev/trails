@@ -6,6 +6,7 @@ import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { rtest } from "./object.js";
 import { stdout } from "./process-adapter.js";
+import { stringSplit } from "./string/split.js";
 
 /** `File.directory?` (`vendor/ruby/v3.3.11/file.c:1615`). */
 function isDirectory(path: string): boolean {
@@ -184,7 +185,7 @@ function fileUtime(atime: Date, mtime: Date, path: string): void {
  * (`fileutils.rb:1044-1052`) hands it two procs, `remove_entry`
  * (`fileutils.rb:1450`) traverses it in postorder.
  *
- * `stat` / `stat!` / `link` and `platform_support` are only reachable from
+ * `stat` / `stat!` and `platform_support` are only reachable from
  * members no Rails body sends, and `fu_windows?` is false for every backend
  * here, so `platform_support`'s retry has no arm to select either. The
  * `chardev?`-through-`pipe?` predicates read the backend's own `FsStatResult`
@@ -498,6 +499,31 @@ class Entry_ {
     }
   }
 
+  /** `Entry_#chown` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2215-2221`). */
+  async chownAsync(uid: number | null, gid: number | null): Promise<void> {
+    if (await this.isSymlinkAsync()) {
+      if (getFs().lchown != null) await getFs().lchown!(this.path, uid ?? -1, gid ?? -1);
+    } else {
+      await File.chownAsync(uid, gid, this.path);
+    }
+  }
+
+  /** `Entry_#link` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2223-2237`). */
+  async linkAsync(dest: string): Promise<void> {
+    if (await this.isDirectoryAsync()) {
+      if (!(await File.isExistAsync(dest)) && this.isDescendantDirectory(dest, this.path)) {
+        throw new ArgumentError(`cannot link directory ${this.path} to itself ${dest}`);
+      }
+      try {
+        await getFs().mkdir!(dest);
+      } catch (error) {
+        if (!(await File.isDirectoryAsync(dest))) throw error;
+      }
+    } else {
+      await File.linkAsync(this.path, dest);
+    }
+  }
+
   async copyAsync(dest: string): Promise<void> {
     await this.lstatAsync();
     if (this.isFile) {
@@ -726,6 +752,208 @@ export class FileUtils {
    * variable, which has no member of its own to mirror.
    */
   static fileutilsLabel?: string;
+
+  /** `fu_split_path` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2506-2515`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static fuSplitPath(path: string): string[] {
+    const list: string[] = [];
+    for (;;) {
+      const [parent, base] = File.split(path);
+      if (parent === path || parent === ".") break;
+      list.push(base);
+      path = parent;
+    }
+    list.push(path);
+    return list.reverse();
+  }
+
+  /** `fu_relative_components_from` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2518-2524`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static fuRelativeComponentsFrom(target: string[], base: string[]): string[] {
+    let i = 0;
+    while (target[i] != null && target[i] === base[i]) {
+      i += 1;
+    }
+    return new Array<string>(base.length - i).fill("..").concat(target.slice(i));
+  }
+
+  /**
+   * `fu_clean_components` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2527-2542`). MRI's
+   * `path.chomp!(regexp, "")` at `:2535` is an `ArgumentError`, since `chomp!`
+   * takes one argument; this is the `sub!` that line means.
+   *
+   * @missingRailsCall chomp! — PERMANENT
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuCleanComponentsAsync(...comp: string[]): Promise<string[]> {
+    while (comp[0] === ".") comp.shift();
+    if (comp.length === 0) return comp;
+    const clean = [comp.shift()!];
+    let path = File.join(...clean, "");
+    while (comp.length > 0) {
+      const c = comp.shift()!;
+      if (
+        c === ".." &&
+        clean.at(-1) !== ".." &&
+        !(getFs().symlink != null && (await File.isSymlinkAsync(path)))
+      ) {
+        clean.pop();
+        path = path.replace(/(?<=^|\/)[^/]+\/$/, "");
+      } else {
+        clean.push(c);
+        path += `${c}/`;
+      }
+    }
+    return clean;
+  }
+
+  /** `fu_starting_path?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2550-2552`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static isFuStartingPath(path: string | undefined): boolean {
+    return path != null && path.startsWith("/");
+  }
+
+  /** `user_mask` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1642-1657`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static userMask(target: string): number {
+    return [...target].reduce((mask, chr) => {
+      switch (chr) {
+        case "u":
+          return mask | 0o4700;
+        case "g":
+          return mask | 0o2070;
+        case "o":
+          return mask | 0o1007;
+        case "a":
+          return mask | 0o7777;
+        default:
+          throw new ArgumentError(`invalid \`who' symbol in file mode: ${chr}`);
+      }
+    }, 0);
+  }
+
+  /** `apply_mask` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1660-1669`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static applyMask(mode: number, userMask: number, op: string, modeMask: number): number {
+    switch (op) {
+      case "=":
+        return (mode & ~userMask) | (userMask & modeMask);
+      case "+":
+        return mode | (userMask & modeMask);
+      default:
+        return mode & ~(userMask & modeMask);
+    }
+  }
+
+  /** `symbolic_modes_to_i` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1672-1718`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static async symbolicModesToIAsync(
+    modeSym: string,
+    path: string | FsStatResult,
+  ): Promise<number> {
+    const st = typeof path === "string" ? await getFs().stat!(path) : path;
+    let currentMode = st.mode & 0o7777;
+    for (const clause of stringSplit(modeSym, ",")) {
+      const [target, ...actions] = clause.split(/([=+-])/);
+      if (actions.length === 0) throw new ArgumentError(`invalid file mode: ${modeSym}`);
+      const mask = FileUtils.userMask(target === "" ? "a" : target);
+      for (let i = 0; i < actions.length; i += 2) {
+        const op = actions[i];
+        const perm = actions[i + 1] ?? "";
+        let needApply = op === "=";
+        let modeMask = 0;
+        for (const chr of perm) {
+          switch (chr) {
+            case "r":
+              modeMask |= 0o444;
+              break;
+            case "w":
+              modeMask |= 0o222;
+              break;
+            case "x":
+              modeMask |= 0o111;
+              break;
+            case "X":
+              if (st.isDirectory()) modeMask |= 0o111;
+              break;
+            case "s":
+              modeMask |= 0o6000;
+              break;
+            case "t":
+              modeMask |= 0o1000;
+              break;
+            case "u":
+            case "g":
+            case "o": {
+              if (modeMask !== 0)
+                currentMode = FileUtils.applyMask(currentMode, mask, op, modeMask);
+              needApply = false;
+              const copyMask = FileUtils.userMask(chr);
+              modeMask = Math.floor((currentMode & copyMask) / (copyMask & 0o111)) * (mask & 0o111);
+              break;
+            }
+            default:
+              throw new ArgumentError(`invalid \`perm' symbol in file mode: ${chr}`);
+          }
+        }
+
+        if (modeMask !== 0 || needApply) {
+          currentMode = FileUtils.applyMask(currentMode, mask, op, modeMask);
+        }
+      }
+    }
+    return currentMode;
+  }
+
+  /** `fu_mode` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1721-1723`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuModeAsync(mode: number | string, path: string | FsStatResult): Promise<number> {
+    return typeof mode === "string" ? FileUtils.symbolicModesToIAsync(mode, path) : mode;
+  }
+
+  /** `mode_to_s` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1726-1728`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static modeToS(mode: number | string): string {
+    return typeof mode === "string" ? mode : mode.toString(8);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static async etcIdAsync(file: string, name: string, label: string): Promise<number> {
+    const rows = await getFs().readFile(file, "utf-8");
+    for (const row of rows.split("\n")) {
+      const fields = row.split(":");
+      if (fields[0] === name && /^\d+$/.test(fields[2] ?? "")) return Number(fields[2]);
+    }
+    throw new ArgumentError(`can't find ${label} for ${name}`);
+  }
+
+  /** `fu_get_uid` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1933-1944`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuGetUidAsync(user: string | number | null | undefined): Promise<number | null> {
+    if (user == null) return null;
+    if (typeof user === "number") return user;
+    if (/^\d+$/.test(user)) return Number(user);
+    return FileUtils.etcIdAsync("/etc/passwd", user, "user");
+  }
+
+  /** `fu_get_gid` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1947-1958`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static async fuGetGidAsync(group: string | number | null | undefined): Promise<number | null> {
+    if (group == null) return null;
+    if (typeof group === "number") return group;
+    if (/^\d+$/.test(group)) return Number(group);
+    return FileUtils.etcIdAsync("/etc/group", group, "group");
+  }
 
   /** `FileUtils.cd` (`vendor/ruby/v3.3.11/lib/fileutils.rb:238-243`), through
    * `Dir.chdir`, which restores the previous directory once an async block
@@ -987,8 +1215,16 @@ export class FileUtils {
   static async lnSAsync(
     src: string | string[],
     dest: string,
-    { force, noop, verbose }: { force?: unknown; noop?: boolean; verbose?: boolean } = {},
+    {
+      force,
+      relative = false,
+      noop,
+      verbose,
+    }: { force?: unknown; relative?: unknown; noop?: boolean; verbose?: boolean } = {},
   ): Promise<void> {
+    if (rtest(relative)) {
+      return FileUtils.lnSrAsync(src, dest, { force, noop, verbose });
+    }
     if (rtest(verbose))
       fuOutputMessage(`ln -s${rtest(force) ? "f" : ""} ${[src, dest].flat().join(" ")}`);
     if (rtest(noop)) return;
@@ -1010,6 +1246,58 @@ export class FileUtils {
     { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
   ): Promise<void> {
     return FileUtils.lnSAsync(src, dest, { force: true, noop, verbose });
+  }
+
+  /** `FileUtils.ln_sr` (`vendor/ruby/v3.3.11/lib/fileutils.rb:731-768`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async lnSrAsync(
+    src: string | string[],
+    dest: string,
+    {
+      targetDirectory = true,
+      force,
+      noop,
+      verbose,
+    }: { targetDirectory?: unknown; force?: unknown; noop?: boolean; verbose?: boolean } = {},
+  ): Promise<void> {
+    const options = `${rtest(force) ? "f" : ""}${rtest(targetDirectory) ? "" : "T"}`;
+    const srcs = fuList(src);
+    const link = async (s: string, targetDirP: unknown = true): Promise<void> => {
+      const d = rtest(targetDirP) ? File.join(dest, File.basename(s)) : dest;
+      const destdirs = FileUtils.fuSplitPath(
+        await getFs().realpath!(rtest(targetDirP) ? dest : File.dirname(dest)),
+      );
+      if (FileUtils.isFuStartingPath(s)) {
+        const srcdirs = FileUtils.fuSplitPath(
+          await File.realdirpathAsync(s).catch(() => File.expandPath(s)),
+        );
+        const base = FileUtils.fuRelativeComponentsFrom(srcdirs, destdirs);
+        s = File.join(...base);
+      } else {
+        const srcdirs = await FileUtils.fuCleanComponentsAsync(...FileUtils.fuSplitPath(s));
+        const base = FileUtils.fuRelativeComponentsFrom(FileUtils.fuSplitPath(Dir.pwd()), destdirs);
+        while (
+          srcdirs[0] === ".." &&
+          base.length > 0 &&
+          base.at(-1) !== ".." &&
+          !FileUtils.isFuStartingPath(base.at(-1))
+        ) {
+          srcdirs.shift();
+          base.pop();
+        }
+        s = File.join(...base, ...srcdirs);
+      }
+      if (rtest(verbose)) fuOutputMessage(`ln -s${options} ${s} ${d}`);
+      if (rtest(noop)) return;
+      if (rtest(force)) await FileUtils.removeFileAsync(d, true);
+      await File.symlinkAsync(s, d);
+    };
+    if (srcs.length === 1) {
+      await link(srcs[0], rtest(targetDirectory) && (await File.isDirectoryAsync(dest)));
+    } else {
+      for (const s of srcs) await link(s);
+    }
   }
 
   /** @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils.cp` (`vendor/ruby/v3.3.11/lib/fileutils.rb:873-879`), over async `readFile` / `writeFile`. */
@@ -1057,6 +1345,52 @@ export class FileUtils {
     await FileUtils.fuEachSrcDestAsync(src, dest, (s, d) =>
       FileUtils.copyEntryAsync(s, d, preserve, dereferenceRoot, removeDestination),
     );
+  }
+
+  /** `FileUtils.cp_lr` (`vendor/ruby/v3.3.11/lib/fileutils.rb:627-634`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async cpLrAsync(
+    src: string | string[],
+    dest: string,
+    {
+      noop,
+      verbose,
+      dereferenceRoot = true,
+      removeDestination = false,
+    }: {
+      noop?: boolean;
+      verbose?: boolean;
+      dereferenceRoot?: boolean;
+      removeDestination?: boolean;
+    } = {},
+  ): Promise<void> {
+    if (rtest(verbose))
+      fuOutputMessage(
+        `cp -lr${removeDestination ? " --remove-destination" : ""} ${[src, dest].flat().join(" ")}`,
+      );
+    if (rtest(noop)) return;
+    await FileUtils.fuEachSrcDestAsync(src, dest, (s, d) =>
+      FileUtils.linkEntryAsync(s, d, dereferenceRoot, removeDestination),
+    );
+  }
+
+  /** `FileUtils.link_entry` (`vendor/ruby/v3.3.11/lib/fileutils.rb:812-818`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async linkEntryAsync(
+    src: string,
+    dest: string,
+    dereferenceRoot = false,
+    removeDestination = false,
+  ): Promise<void> {
+    await new Entry_(src, null, dereferenceRoot).preorderTraverseAsync(async (ent) => {
+      const destent = new Entry_(dest, ent.rel, false);
+      if (removeDestination && (await File.isFileAsync(destent.path))) {
+        await File.deleteAsync(destent.path);
+      }
+      await ent.linkAsync(destent.path);
+    });
   }
 
   /**
@@ -1376,43 +1710,169 @@ export class FileUtils {
     }
   }
 
-  /** `FileUtils.chmod` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1768-1775`), Integer `mode` only, as {@link FileUtils.chmodRAsync}.
+  /** `FileUtils.compare_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1507-1514`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async compareFileAsync(a: string, b: string): Promise<boolean> {
+    const fs = getFs();
+    if ((await fs.stat!(a)).size !== (await fs.stat!(b)).size) return false;
+    return FileUtils.compareStream(await fs.readFile(a), await fs.readFile(b));
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static isIdenticalAsync = FileUtils.compareFileAsync;
+
+  /** @noRailsEquivalent PERMANENT */
+  static cmpAsync = FileUtils.compareFileAsync;
+
+  /** `FileUtils.compare_stream` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1530-1542`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static compareStream(a: Uint8Array, b: Uint8Array): boolean {
+    return a.length === b.length && a.every((byte, i) => byte === b[i]);
+  }
+
+  /** `FileUtils.install` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1609-1639`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async installAsync(
+    src: string | string[],
+    dest: string,
+    {
+      mode,
+      owner,
+      group,
+      preserve,
+      noop,
+      verbose,
+    }: {
+      mode?: number | string | null;
+      owner?: string | number | null;
+      group?: string | number | null;
+      preserve?: unknown;
+      noop?: boolean;
+      verbose?: boolean;
+    } = {},
+  ): Promise<void> {
+    if (rtest(verbose)) {
+      let msg = "install -c";
+      if (rtest(preserve)) msg += " -p";
+      if (mode != null) msg += ` -m ${FileUtils.modeToS(mode)}`;
+      if (owner != null) msg += ` -o ${owner}`;
+      if (group != null) msg += ` -g ${group}`;
+      msg += ` ${[src, dest].flat().join(" ")}`;
+      fuOutputMessage(msg);
+    }
+    if (rtest(noop)) return;
+    const uid = await FileUtils.fuGetUidAsync(owner);
+    const gid = await FileUtils.fuGetGidAsync(group);
+    await FileUtils.fuEachSrcDestAsync(src, dest, async (s, d) => {
+      const st = await getFs().stat!(s);
+      if (!((await File.isExistAsync(d)) && (await FileUtils.compareFileAsync(s, d)))) {
+        await FileUtils.removeFileAsync(d, true);
+        if (d.endsWith("/")) {
+          await FileUtils.mkdirPAsync(d);
+          await FileUtils.copyFileAsync(s, d + File.basename(s));
+        } else {
+          await FileUtils.mkdirPAsync(File.expandPath("..", d));
+          await FileUtils.copyFileAsync(s, d);
+        }
+        if (rtest(preserve)) await File.utimeAsync(st.atime, st.mtime, d);
+        if (mode != null) await File.chmodAsync(await FileUtils.fuModeAsync(mode, st), d);
+        if (uid != null || gid != null) await File.chownAsync(uid, gid, d);
+      }
+    });
+  }
+
+  /** `FileUtils.chmod` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1803-1810`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static async chmodAsync(
-    mode: number,
+    mode: number | string,
     list: string | string[],
     { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
   ): Promise<string[] | undefined> {
     list = fuList(list);
-    if (rtest(verbose)) fuOutputMessage(`chmod ${mode.toString(8)} ${list.join(" ")}`);
+    if (rtest(verbose)) fuOutputMessage(`chmod ${FileUtils.modeToS(mode)} ${list.join(" ")}`);
     if (rtest(noop)) return;
     for (const path of list) {
-      await new Entry_(path).chmodAsync(mode);
+      await new Entry_(path).chmodAsync(await FileUtils.fuModeAsync(mode, path));
     }
     return list;
   }
 
   /** `FileUtils.chmod_R` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1815-1830`) over
    * `Entry_`'s async walk: `Entry_#traverse` (`fileutils.rb:2354-2362`)
-   * yielding to `Entry_#chmod` (`fileutils.rb:2206-2213`). `mode` is the
-   * Integer arm of `fu_mode` (`fileutils.rb:1721-1723`); the symbolic String
-   * arm (`"u+x"`) is unported.
+   * yielding to `Entry_#chmod` (`fileutils.rb:2206-2213`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static async chmodRAsync(
-    mode: number,
+    mode: number | string,
     list: string | string[],
     { noop, verbose, force }: { noop?: boolean; verbose?: boolean; force?: unknown } = {},
   ): Promise<string[] | undefined> {
     list = fuList(list);
     if (rtest(verbose))
-      fuOutputMessage(`chmod -R${rtest(force) ? "f" : ""} ${mode.toString(8)} ${list.join(" ")}`);
+      fuOutputMessage(
+        `chmod -R${rtest(force) ? "f" : ""} ${FileUtils.modeToS(mode)} ${list.join(" ")}`,
+      );
     if (rtest(noop)) return;
     for (const root of list) {
       await new Entry_(root).preorderTraverseAsync(async (ent) => {
         try {
-          await ent.chmodAsync(mode);
+          await ent.chmodAsync(await FileUtils.fuModeAsync(mode, ent.path));
+        } catch (error) {
+          if (!rtest(force)) throw error;
+        }
+      });
+    }
+    return list;
+  }
+
+  /** `FileUtils.chown` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1896-1907`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async chownAsync(
+    user: string | number | null,
+    group: string | number | null,
+    list: string | string[],
+    { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    list = fuList(list);
+    if (rtest(verbose))
+      fuOutputMessage(
+        `chown ${group != null ? `${user ?? ""}:${group}` : (user ?? ":")} ${list.join(" ")}`,
+      );
+    if (rtest(noop)) return;
+    const uid = await FileUtils.fuGetUidAsync(user);
+    const gid = await FileUtils.fuGetGidAsync(group);
+    for (const path of list) {
+      await new Entry_(path).chownAsync(uid, gid);
+    }
+    return list;
+  }
+
+  /** `FileUtils.chown_R` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1912-1929`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async chownRAsync(
+    user: string | number | null,
+    group: string | number | null,
+    list: string | string[],
+    { noop, verbose, force }: { noop?: boolean; verbose?: boolean; force?: unknown } = {},
+  ): Promise<string[] | undefined> {
+    list = fuList(list);
+    if (rtest(verbose))
+      fuOutputMessage(
+        `chown -R${rtest(force) ? "f" : ""} ${group != null ? `${user ?? ""}:${group}` : (user ?? ":")} ${list.join(" ")}`,
+      );
+    if (rtest(noop)) return;
+    const uid = await FileUtils.fuGetUidAsync(user);
+    const gid = await FileUtils.fuGetGidAsync(group);
+    for (const root of list) {
+      await new Entry_(root).preorderTraverseAsync(async (ent) => {
+        try {
+          await ent.chownAsync(uid, gid);
         } catch (error) {
           if (!rtest(force)) throw error;
         }
