@@ -2,6 +2,31 @@ import { Unicode as ActiveSupportUnicode } from "@blazetrails/activesupport";
 import { ArgumentError, pack } from "@blazetrails/ruby-compat";
 import { EncodingError } from "./encoding-error.js";
 
+const WHITESPACE: readonly number[] = Object.freeze(
+  [
+    [0x0009, 0x000a, 0x000b, 0x000c, 0x000d],
+    0x0020,
+    0x0085,
+    0x00a0,
+    0x1680,
+    0x180e,
+    Array.from({ length: 0x200a - 0x2000 + 1 }, (_, i) => 0x2000 + i),
+    0x2028,
+    0x2029,
+    0x202f,
+    0x205f,
+    0x3000,
+  ].flat(),
+);
+
+const LEADERS_AND_TRAILERS: readonly number[] = [...WHITESPACE, 65279];
+
+function codepointsToPattern(arrayOfCodepoints: readonly number[]): string {
+  return arrayOfCodepoints
+    .map((e) => pack([e], "U*").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+}
+
 export const Unicode = {
   UNICODE_VERSION: "7.0.0",
 
@@ -21,6 +46,16 @@ export const Unicode = {
   HANGUL_SLAST: 0xac00 + 11172,
   HANGUL_JAMO_FIRST: 0x1100,
   HANGUL_JAMO_LAST: 0x11ff,
+
+  WHITESPACE,
+
+  LEADERS_AND_TRAILERS,
+
+  codepointsToPattern,
+
+  TRAILERS_PAT: new RegExp(`(${codepointsToPattern(LEADERS_AND_TRAILERS)})+$`, "u"),
+
+  LEADERS_PAT: new RegExp(`^(${codepointsToPattern(LEADERS_AND_TRAILERS)})+`, "u"),
 
   uUnpack(string: string): number[] {
     if (/\p{Cs}/u.test(string)) throw new EncodingError("malformed UTF-8 character");
@@ -76,7 +111,6 @@ export const Unicode = {
     return pack(result, "U*");
   },
 
-  /** @internal */
   applyMapping(string: string, mapping: ":uppercase_mapping" | ":lowercase_mapping"): string {
     return pack(
       Unicode.uUnpack(string).map((codepoint) => {

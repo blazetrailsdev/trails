@@ -1,10 +1,4 @@
-import {
-  Encoding,
-  forceEncoding,
-  isValidEncoding,
-  rbObjEncoding,
-  rbObjDup,
-} from "@blazetrails/ruby-compat";
+import { Encoding, forceEncoding, rbObjEncoding, rbObjDup } from "@blazetrails/ruby-compat";
 import { EncodingError } from "./encoding-error.js";
 
 /** @internal */
@@ -30,9 +24,10 @@ export function isUtf8(this: MultibyteHost, string: string | Uint8Array): boolea
   }
 }
 
+/** @inventedArm if — PERMANENT */
 export function verify(string: string | Uint8Array): boolean {
   if (typeof string !== "string") return rbObjEncoding(string) === Encoding.ASCII_8BIT;
-  return isValidEncoding(string, rbObjEncoding(string));
+  return !/\p{Cs}/u.test(string);
 }
 
 export function verifyBang(this: MultibyteHost, string: string | Uint8Array): void {

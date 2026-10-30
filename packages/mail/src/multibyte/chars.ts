@@ -1,5 +1,7 @@
 import {
   cmp,
+  equals as cmpEquals,
+  NoMethodError,
   IndexError,
   pack,
   RangeError,
@@ -13,6 +15,7 @@ import {
   Range,
   rbObjClassname,
 } from "@blazetrails/ruby-compat";
+import { Multibyte } from "../multibyte.js";
 import { Unicode } from "./unicode.js";
 
 export class Chars {
@@ -27,6 +30,10 @@ export class Chars {
   }
 
   toS(): string {
+    return this.wrappedString;
+  }
+
+  toStr(): string {
     return this.wrappedString;
   }
 
@@ -52,18 +59,27 @@ export class Chars {
     return cmp(this.wrappedString, String(other));
   }
 
+  equals = cmpEquals;
+
   matchOperator(other: unknown): unknown {
     return rbStrMatch(this.wrappedString, other);
   }
 
-  split(...args: [pattern?: string | RegExp | null, limit?: number]): Chars[] {
-    return stringSplit(this.wrappedString, ...args).map((i) => this.chars(i));
+  split(...args: [pattern?: string | RegExp | null, limit?: number]): (Chars | string)[] {
+    return stringSplit(this.wrappedString, ...args).map((i) => Multibyte.mbChars(i));
   }
 
   set(...args: unknown[]): void {
     let replaceBy = args.pop() as string | number;
     if (args[0] instanceof RegExp) {
-      this.wrappedString = this.wrappedString.replace(args[0], String(replaceBy));
+      const m = firstMatch(this.wrappedString, args[0]);
+      const capture = args.length > 1 ? (args[1] as number) : 0;
+      if (m == null || m[capture] == null) throw new IndexError("regexp not matched");
+      const start = m.index + (capture === 0 ? 0 : m[0].indexOf(m[capture]));
+      this.wrappedString =
+        this.wrappedString.slice(0, start) +
+        String(replaceBy) +
+        this.wrappedString.slice(start + m[capture].length);
     } else {
       const result = Unicode.uUnpack(this.wrappedString);
       let range: Range<number>;
@@ -78,14 +94,18 @@ export class Chars {
         range = args[0];
       } else {
         const needle = String(args[0]);
-        const min = Array.from(
-          this.wrappedString.slice(0, this.wrappedString.indexOf(needle)),
-        ).length;
+        const index = this.wrappedString.indexOf(needle);
+        if (index < 0) throw new NoMethodError("undefined method '+' for nil");
+        const min = Array.from(this.wrappedString.slice(0, index)).length;
         const max = min + Unicode.uUnpack(needle).length - 1;
         range = new Range(min, max);
       }
-      const end = range.excludeEnd ? range.end! : range.end! + 1;
-      result.splice(range.begin!, end - range.begin!, ...Unicode.uUnpack(String(replaceBy)));
+      let beg = range.begin ?? 0;
+      let end = range.end ?? result.length;
+      if (beg < 0) beg += result.length;
+      if (end < 0) end += result.length;
+      if (range.end !== null && !range.excludeEnd) end += 1;
+      result.splice(beg, Math.max(0, end - beg), ...Unicode.uUnpack(String(replaceBy)));
       this.wrappedString = pack(result, "U*");
     }
   }
@@ -106,8 +126,8 @@ export class Chars {
       const cps = arySlice(Unicode.uUnpack(this.wrappedString), args[0]) as number[] | null;
       result = cps == null ? null : pack(cps, "U*");
     } else if (args[0] instanceof RegExp) {
-      const m = this.wrappedString.match(args[0]);
-      result = m ? (m[(args[1] as number) ?? 0] ?? null) : null;
+      const m = firstMatch(this.wrappedString, args[0]);
+      result = m ? (m[args.length > 1 ? (args[1] as number) : 0] ?? null) : null;
     } else if (args.length === 1 && typeof args[0] === "number") {
       const character = arySlice(Unicode.uUnpack(this.wrappedString), args[0]) as number | null;
       result = character != null ? pack([character], "U") : null;
@@ -221,7 +241,8 @@ export class Chars {
         return Unicode.uUnpack(
           new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, byteOffset)),
         ).length;
-      } catch {
+      } catch (e) {
+        if (!(e instanceof globalThis.TypeError)) throw e;
         byteOffset -= 1;
       }
     }
@@ -271,3 +292,7 @@ export class Chars {
 
 const W = "[\\p{L}\\p{M}\\p{N}\\p{Pc}]";
 const WORD_BOUNDARY_TITLEIZE = new RegExp(`(?:(?<=${W})(?!${W})|(?<!${W})(?=${W}))('?\\S)`, "gu");
+
+function firstMatch(string: string, re: RegExp): RegExpExecArray | null {
+  return new RegExp(re.source, re.flags.replace("g", "")).exec(string);
+}

@@ -7,10 +7,10 @@ export { EncodingError };
 export const Multibyte = {
   EncodingError,
 
-  _proxyClass: Chars,
+  _proxyClass: null as typeof Chars | null,
 
   proxyClass(): typeof Chars {
-    return Multibyte._proxyClass;
+    return (Multibyte._proxyClass ||= Chars);
   },
 
   setProxyClass(klass: typeof Chars): void {
