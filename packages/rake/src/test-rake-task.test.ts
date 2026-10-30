@@ -250,6 +250,7 @@ describe("TestRakeTask", () => {
     expect((await Task.get("a")).prerequisites).toEqual(["b", "c"]);
   });
 
+  // BLOCKED: rake-file-list-port (trails#9510), `Rake::FileList` is unported.
   it.skip("filelists can be prerequisites", async () => {
     task({ a: new FileList().include("b", "c") });
     expect((await Task.get("a")).prerequisites).toEqual(["b", "c"]);
