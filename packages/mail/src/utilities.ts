@@ -4,7 +4,6 @@ import {
   DEFAULT_PARSER,
   isEmpty,
   rbInspect,
-  rbObjRespondTo,
   rbStrEnumerateLines,
   Encoding,
   isAsciiOnly,
@@ -169,7 +168,9 @@ export const Utilities = {
     if (value == null) {
       return true;
     } else if (typeof value === "string") {
-      return !/[^ \t\r\n\f\v]/.test(value);
+      return !/[^\t\n\v\f\r ]/.test(value);
+    } else if (value instanceof Uint8Array) {
+      return value.every((c) => c === 0x20 || (c >= 0x09 && c <= 0x0d));
     } else {
       return rbObjRespondTo(value, "isEmpty") ? isEmpty(value as object) : value === false;
     }
