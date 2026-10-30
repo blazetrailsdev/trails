@@ -14,11 +14,15 @@ An engine-driven deferred load of `app/models` was considered and rejected: it
 needs a loader with no Rails body to mirror, and still runs only under
 `config.eager_load`.
 
-**The `solid_queue.config` initializer registers a `runOnce`
-`onLoad("solid_queue_record")` hook** that runs the class-body line against the
-configured `SolidQueue`. `Record` carries `@missingRailsCall connectsTo —
-PERMANENT` and `Engine` carries `@inventedArm onLoad — PERMANENT` against this
-section. Ruled by the repo owner on 2026-10-26.
+**The `solid_queue.config` initializer awaits
+`Record.connectsTo(SolidQueue.connectsTo)`** when `connectsTo` is set, after it
+has copied `config.solid_queue` onto `SolidQueue`. `connectsTo` is async and
+load hooks are synchronous, so the earlier `runOnce`
+`onLoad("solid_queue_record")` hook floated its promise; solid-cable's
+`solid_cable.config` initializer awaits the same call (trails#9459). `Record`
+carries `@missingRailsCall connectsTo — PERMANENT` and `Engine` carries
+`@inventedArm connectsTo — PERMANENT` against this section. Ruled by the repo
+owner on 2026-10-26; the await replaces the load hook pending owner sign-off.
 
 `record.ts`'s `this.tableNamePrefix = SolidQueue.tableNamePrefix` has no line
 in `record.rb`. Rails gets the prefix from the reader `isolate_namespace`
