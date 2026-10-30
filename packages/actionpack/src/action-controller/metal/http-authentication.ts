@@ -2,7 +2,6 @@ import { ActionController } from "../../namespaces.js";
 /* eslint-disable @typescript-eslint/no-namespace -- `HttpAuthentication::Basic`, `Digest` and `Token` each nest a `ControllerMethods` and share `authenticate` / `encode_credentials` / `authentication_request` (`action_controller/metal/http_authentication.rb:69,189,425`); nested namespaces keep every one at its Rails name. */
 import {
   ArgumentError,
-  b,
   Base64,
   forceEncoding,
   isValidEncoding,
@@ -147,7 +146,7 @@ export namespace HttpAuthentication {
     }
 
     export function encodeCredentials(userName: string, password: string): string {
-      return `Basic ${Base64.strictEncode64(b(`${userName}:${password}`))}`;
+      return `Basic ${Base64.strictEncode64(`${userName}:${password}`)}`;
     }
 
     export function authenticationRequest(
