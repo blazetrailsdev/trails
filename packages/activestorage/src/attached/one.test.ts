@@ -526,6 +526,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
     const blob = await createBlob({ filename: "funky.jpg" });
     await user.avatar.attach(blob);
     expect(await user.avatar.isAttached()).toBe(true);
+    await user.updateColumn("updated_at", "2000-01-01 00:00:00");
 
     await assertChanges(
       () => user.readAttribute("updated_at"),
@@ -585,6 +586,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
     const blob = await createBlob({ filename: "funky.jpg" });
     await user.avatar.attach(blob);
     expect(await user.avatar.isAttached()).toBe(true);
+    await user.updateColumn("updated_at", "2000-01-01 00:00:00");
 
     await performEnqueuedJobs(() =>
       assertChanges(
