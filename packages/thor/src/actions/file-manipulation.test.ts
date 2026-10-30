@@ -343,7 +343,7 @@ describe("Thor::Actions", () => {
       });
 
       it("does not log status if required", async () => {
-        expect(await action("removeFile", "doc/README", { verbose: false })).toHaveLength(0);
+        expect(await action("removeFile", "doc/README", { verbose: false })).toBeEmpty();
       });
     });
 
@@ -378,7 +378,7 @@ describe("Thor::Actions", () => {
             await action("gsubFile", file(), "__", { verbose: false }, (match: string) =>
               match.repeat(2),
             ),
-          ).toHaveLength(0);
+          ).toBeEmpty();
         });
       });
 
@@ -406,7 +406,7 @@ describe("Thor::Actions", () => {
 
           it("does not log status", async () => {
             runner({}, "revoke");
-            expect(await action("gsubFile", "doc/README", "__start__", "START")).toHaveLength(0);
+            expect(await action("gsubFile", "doc/README", "__start__", "START")).toBeEmpty();
           });
 
           it("does not log status if required", async () => {
@@ -415,7 +415,7 @@ describe("Thor::Actions", () => {
               await action("gsubFile", file(), "__", { verbose: false }, (match: string) =>
                 match.repeat(2),
               ),
-            ).toHaveLength(0);
+            ).toBeEmpty();
           });
         });
 
@@ -457,7 +457,7 @@ describe("Thor::Actions", () => {
                 { verbose: false, force: true },
                 (match: string) => match.repeat(2),
               ),
-            ).toHaveLength(0);
+            ).toBeEmpty();
           });
         });
       });

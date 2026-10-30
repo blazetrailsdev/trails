@@ -99,13 +99,13 @@ describe("Thor::Invocation", () => {
     it("does not invoke a Thor::Group twice", async () => {
       const base = new A();
       await silence(":stdout", () => base.invoke("c"));
-      expect(await capture(":stdout", () => base.invoke("c"))).toHaveLength(0);
+      expect(await capture(":stdout", () => base.invoke("c"))).toBeEmpty();
     });
 
     it("does not invoke any of Thor::Group commands twice", async () => {
       const base = new A();
       await silence(":stdout", () => base.invoke("c"));
-      expect(await capture(":stdout", () => base.invoke("c:one"))).toHaveLength(0);
+      expect(await capture(":stdout", () => base.invoke("c:one"))).toBeEmpty();
     });
 
     it("raises Thor::UndefinedCommandError if the command can't be found", async () => {
