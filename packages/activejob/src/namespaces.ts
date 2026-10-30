@@ -115,13 +115,18 @@ ActiveJob.eagerAutoload(() => {
 ActiveJob.autoload("TestCase");
 ActiveJob.autoload("TestHelper");
 
-export const QueueAdapters = { name: "ActiveJob::QueueAdapters", loadPath } as AutoloadModule & {
+export interface QueueAdaptersNamespace {
   lookup: typeof QueueAdaptersModule.lookup;
   AbstractAdapter: typeof AbstractAdapter;
   InlineAdapter: typeof InlineAdapter;
   TestAdapter: typeof TestAdapter;
   AsyncAdapter: typeof AsyncAdapter;
-};
+}
+
+export const QueueAdapters = {
+  name: "ActiveJob::QueueAdapters",
+  loadPath,
+} as AutoloadModule & QueueAdaptersNamespace;
 extend(QueueAdapters, Autoload);
 
 export const Serializers = { name: "ActiveJob::Serializers", loadPath } as AutoloadModule & {
