@@ -835,6 +835,17 @@ export class File extends IO {
   }
 
   /**
+   * {@link File.mtime} over the backend's async `stat`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.mtime`
+   * (`vendor/ruby/v3.3.11/file.c:2427`).
+   */
+  static async mtimeAsync(fileName: string): Promise<Date> {
+    const fs = getFs();
+    return (fs.stat ? await fs.stat(fileName) : fs.statSync(fileName)).mtime;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:4559` `rb_file_s_realpath`, which resolves every
    * symlink and raises `ENOENT` when the path does not exist. A backend with
    * no symlink support has no `realpathSync`, and there the path resolves

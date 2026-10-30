@@ -7,6 +7,7 @@ import { TaskManager } from "../task-manager.js";
 export class TestTaskManager {
   name = "rake";
   options: Record<string, unknown> = {};
+  pendingImports: string[] = [];
 
   constructor() {
     this._tasks = new Map();
@@ -14,6 +15,10 @@ export class TestTaskManager {
     this._scope = Scope.make() as Scope;
     this.lastDescription = null;
     Rake.application = this as typeof Rake.application;
+  }
+
+  addImport(fn: string): void {
+    this.pendingImports.push(fn);
   }
 
   trace(): void {}
