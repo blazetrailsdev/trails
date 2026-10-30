@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { FileUtils, Pathname, block, rbFLoad } from "@blazetrails/ruby-compat";
+import { FileUtils, Pathname, block, max, rbFLoad } from "@blazetrails/ruby-compat";
 import { FileTask } from "./file-task.js";
 import { LATE } from "./late-time.js";
 import type { Task } from "./task.js";
@@ -33,16 +33,16 @@ describe("TestRakeFileTask", () => {
 
     const ftask = await rake.tm.get(name);
 
-    expect(ftask.name).toBe(name);
+    expect(ftask.name).toEqual(name);
     await deleteFile(ftask.name);
 
     expect(await ftask.isNeeded()).toBeTruthy();
-    expect(await ftask.timestamp()).toBe(LATE);
+    expect(await ftask.timestamp()).toEqual(LATE);
 
     await createFile(ftask.name);
 
-    expect(ftask.prerequisites).toEqual([]);
-    expect(await ftask.isNeeded()).toBeFalsy();
+    expect(max(ftask.prerequisites)).toBeNull();
+    expect(!(await ftask.isNeeded())).toBeTruthy();
   });
 
   it("file times new depends on old", async () => {
@@ -50,8 +50,8 @@ describe("TestRakeFileTask", () => {
 
     const t1 = rake.tm.intern(FileTask, NEWFILE).enhance([OLDFILE]);
     const t2 = rake.tm.intern(FileTask, OLDFILE);
-    expect(await t2.isNeeded()).toBeFalsy();
-    expect(await t1.isNeeded()).toBeFalsy();
+    expect(!(await t2.isNeeded())).toBeTruthy();
+    expect(!(await t1.isNeeded())).toBeTruthy();
   });
 
   it("file times new depend on regular task timestamps", async () => {
@@ -76,10 +76,10 @@ describe("TestRakeFileTask", () => {
 
     const t1 = rake.tm.intern(FileTask, OLDFILE).enhance([NEWFILE]);
     const t2 = rake.tm.intern(FileTask, NEWFILE);
-    expect(await t2.isNeeded()).toBeFalsy();
+    expect(!(await t2.isNeeded())).toBeTruthy();
     const preqStamp = await (await rake.tm.get(t1.prerequisites[0])).timestamp();
     expect(await t2.timestamp()).toEqual(preqStamp);
-    expect(((await t1.timestamp()) as Date).getTime()).toBeLessThan((preqStamp as Date).getTime());
+    expect(((await t1.timestamp()) as Date).getTime() < (preqStamp as Date).getTime()).toBeTruthy();
     expect(await t1.isNeeded()).toBeTruthy();
   });
 
@@ -92,7 +92,7 @@ describe("TestRakeFileTask", () => {
 
     await (await rake.tm.get("obj")).invoke();
     await (await rake.tm.get(NEWFILE)).invoke();
-    expect(runs).toContain(NEWFILE);
+    expect(runs.includes(NEWFILE)).toBeTruthy();
   });
 
   it("existing file depends on non existing file", async () => {
@@ -170,7 +170,7 @@ describe("TestRakeFileTask", () => {
 
     const ftask = await rake.tm.get(name);
 
-    expect(ftask.name).toBe(name);
+    expect(ftask.name).toEqual(name);
   });
 
   it("prerequisite can be pathname", () => {

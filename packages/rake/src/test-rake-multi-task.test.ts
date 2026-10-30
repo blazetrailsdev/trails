@@ -30,10 +30,10 @@ describe("TestRakeMultiTask", () => {
     dsl.multitask({ both: ["a", "b"] });
     await (await rake.tm.get("both")).invoke();
     expect(runs.length).toBe(6);
-    expect(runs.indexOf("A0")).toBeLessThan(runs.indexOf("A1"));
-    expect(runs.indexOf("A1")).toBeLessThan(runs.indexOf("A2"));
-    expect(runs.indexOf("B0")).toBeLessThan(runs.indexOf("B1"));
-    expect(runs.indexOf("B1")).toBeLessThan(runs.indexOf("B2"));
+    expect(runs.indexOf("A0") < runs.indexOf("A1")).toBeTruthy();
+    expect(runs.indexOf("A1") < runs.indexOf("A2")).toBeTruthy();
+    expect(runs.indexOf("B0") < runs.indexOf("B1")).toBeTruthy();
+    expect(runs.indexOf("B1") < runs.indexOf("B2")).toBeTruthy();
   });
 
   it("all multitasks wait on slow prerequisites", async () => {
@@ -43,14 +43,14 @@ describe("TestRakeMultiTask", () => {
     dsl.multitask({ both: ["a", "b"] });
     await (await rake.tm.get("both")).invoke();
     expect(runs.length).toBe(9);
-    expect(runs.indexOf("S0")).toBeLessThan(runs.indexOf("S1"));
-    expect(runs.indexOf("S1")).toBeLessThan(runs.indexOf("S2"));
-    expect(runs.indexOf("S2")).toBeLessThan(runs.indexOf("A0"));
-    expect(runs.indexOf("S2")).toBeLessThan(runs.indexOf("B0"));
-    expect(runs.indexOf("A0")).toBeLessThan(runs.indexOf("A1"));
-    expect(runs.indexOf("A1")).toBeLessThan(runs.indexOf("A2"));
-    expect(runs.indexOf("B0")).toBeLessThan(runs.indexOf("B1"));
-    expect(runs.indexOf("B1")).toBeLessThan(runs.indexOf("B2"));
+    expect(runs.indexOf("S0") < runs.indexOf("S1")).toBeTruthy();
+    expect(runs.indexOf("S1") < runs.indexOf("S2")).toBeTruthy();
+    expect(runs.indexOf("S2") < runs.indexOf("A0")).toBeTruthy();
+    expect(runs.indexOf("S2") < runs.indexOf("B0")).toBeTruthy();
+    expect(runs.indexOf("A0") < runs.indexOf("A1")).toBeTruthy();
+    expect(runs.indexOf("A1") < runs.indexOf("A2")).toBeTruthy();
+    expect(runs.indexOf("B0") < runs.indexOf("B1")).toBeTruthy();
+    expect(runs.indexOf("B1") < runs.indexOf("B2")).toBeTruthy();
   });
 
   it("multitasks with parameters", async () => {
@@ -65,8 +65,8 @@ describe("TestRakeMultiTask", () => {
       block((t: Task, args: TaskArguments) => addRun(`${args.get("arg")}mt`)),
     );
     await (await rake.tm.get("b")).invoke("b");
-    expect(runs[0]).toBe("b");
-    expect(runs[1]).toBe("bmt");
+    expect(runs[0] === "b").toBeTruthy();
+    expect(runs[1] === "bmt").toBeTruthy();
   });
 
   it("cross thread prerequisite failures", async () => {
@@ -113,7 +113,7 @@ describe("TestRakeMultiTask", () => {
       if (!(e instanceof RuntimeError)) throw e;
     } finally {
       await sleep(0.5);
-      expect(taskTwoWasExecuted).toBe(false);
+      expect(taskTwoWasExecuted).toBeFalsy();
     }
   });
 });
