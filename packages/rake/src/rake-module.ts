@@ -1,1 +1,17 @@
-export const Rake: { FileUtilsExt?: typeof import("./file-utils-ext.js").FileUtilsExt } = {};
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import type { TaskManager } from "./task-manager.js";
+
+export const Rake: {
+  FileUtilsExt?: typeof import("./file-utils-ext.js").FileUtilsExt;
+  application?: TaskManager & {
+    name: string;
+    options: { traceRules?: boolean; traceOutput?: { puts(...strings: string[]): unknown } };
+  };
+} = {};
+
+export function fromPathname(path: unknown): unknown {
+  if (rbObjRespondTo(path, "toPath")) path = (path as { toPath(): unknown }).toPath();
+  if (typeof path !== "string" && rbObjRespondTo(path, "toStr"))
+    path = (path as { toStr(): unknown }).toStr();
+  return path;
+}
