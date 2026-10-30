@@ -1518,9 +1518,34 @@ export class IO {
    */
   close(): null {
     if (this.fd < 0) return null;
-    getFs().closeSync(this.fd);
+    if (this.fd > 2) getFs().closeSync(this.fd);
     this.fd = -1;
     return null;
+  }
+
+  /**
+   * `IO#reopen(other_io)` (`vendor/ruby/v3.3.11/io.c:8316` `io_reopen`). JS has
+   * no `dup2(2)`, so the stream takes `other_io`'s descriptor rather than a copy
+   * of it, and `other_io` has to stay open for as long as this stream writes to
+   * it. A child spawned with inherited stdio gets {@link STDOUT} and
+   * {@link STDERR} by {@link fileno}, so it follows the reopen as it follows
+   * the `dup2` in Ruby.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#reopen`
+   * (`vendor/ruby/v3.3.11/io.c:8446`).
+   */
+  reopen(nfile: { toIo(): IO }): this {
+    const orig = nfile.toIo();
+    if (orig.isClosed()) throw new IOError("closed stream");
+    if (orig === this) return this;
+    if (this.stdioFile != null && !(orig.mode & FMODE_WRITABLE)) {
+      throw new ArgumentError(`${this.pathv} can't change access mode from "w" to "r"`);
+    }
+    this.mode = orig.mode;
+    this.fd = orig.fd;
+    this.stdioFile = orig.stdioFile;
+    this._pos = orig._pos;
+    return this;
   }
 }
 

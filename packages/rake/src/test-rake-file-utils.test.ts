@@ -7,12 +7,16 @@ import {
   ArgumentError,
   LoadError,
   NotImplementedError,
+  STDERR,
+  STDOUT,
   StandardError,
+  Tempfile,
   block,
   env as ENV,
   getFs,
   include,
   rbEnsure,
+  rbObjDup,
   setEnv,
   stderr as $stderr,
   stdout as $stdout,
@@ -37,6 +41,33 @@ async function createFile(name: string): Promise<void> {
 
 async function command(name: string, text: string): Promise<void> {
   await getFs().writeFile!(name, text, { mode: 0o750 });
+}
+
+async function captureSubprocessIo(block: () => unknown): Promise<[string, string]> {
+  const capturedStdout = Tempfile.new("out");
+  const capturedStderr = Tempfile.new("err");
+
+  const origStdout = rbObjDup(STDOUT);
+  const origStderr = rbObjDup(STDERR);
+  try {
+    STDOUT.reopen(capturedStdout);
+    STDERR.reopen(capturedStderr);
+
+    await block();
+
+    STDOUT.rewind();
+    STDERR.rewind();
+
+    return [capturedStdout.read() as string, capturedStderr.read() as string];
+  } finally {
+    STDOUT.reopen(origStdout);
+    STDERR.reopen(origStderr);
+
+    origStdout.close();
+    origStderr.close();
+    capturedStdout.closeBang();
+    capturedStderr.closeBang();
+  }
 }
 
 async function captureOutput(block: () => unknown): Promise<[string, string]> {
@@ -349,11 +380,13 @@ describe("TestRakeFileUtils", () => {
       const standardOutput = "Some output";
       const standardError = "Some error";
       const shellCommand = `${RUBY} -e "console.log('${standardOutput}');console.error('${standardError}');process.exitCode = 1"`;
-      await sh(`${shellCommand} > both.txt 2>&1`).then(
-        () => expect.fail(),
-        () => {},
+      const actualBoth = await captureSubprocessIo(() =>
+        sh(shellCommand).then(
+          () => expect.fail(),
+          () => {},
+        ),
       );
-      const actual = await getFs().readFile("both.txt", "utf-8");
+      const actual = actualBoth.join("");
       expect(actual).toMatch(standardOutput);
       expect(actual).toMatch(standardError);
     });

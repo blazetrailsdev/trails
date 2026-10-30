@@ -7,12 +7,13 @@ import {
 import { Dir } from "./dir.js";
 import { Errno } from "./errno.js";
 import { File } from "./file.js";
-import { IO } from "./io.js";
+import { IO, STDERR, STDOUT } from "./io.js";
 import { IOError } from "./io-error.js";
 import { FileUtils } from "./file-utils.js";
 import { rbFSystem } from "./kernel-system.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { Open3 } from "./open3.js";
+import { rbObjDup } from "./include.js";
 import { Process } from "./process.js";
 
 afterEach(() => {
@@ -107,7 +108,52 @@ describe("Kernel#system", () => {
     }
   });
 
+  it("opens err: on the named file, truncated, for the child's stderr", async () => {
+    const err = File.join(Dir.tmpdir(), `trails-kernel-system-${Process.pid}.err`);
+    File.write(err, "stale contents longer than the new output");
+    try {
+      expect(await rbFSystem("printf ok >&2", { err })).toBe(true);
+      expect(File.read(err)).toBe("ok");
+    } finally {
+      FileUtils.rmF(err);
+    }
+  });
+
+  it("writes the child's stderr to an err: IO.pipe writer", async () => {
+    const [r, w] = IO.pipe();
+    expect(await rbFSystem("printf out; printf err >&2", { out: "/dev/null", err: w })).toBe(true);
+    w.close();
+    expect(new TextDecoder().decode(r.read() as Uint8Array)).toBe("err");
+  });
+
+  it("sends an inherited child's stdio to a reopened STDOUT and STDERR", async () => {
+    const path = File.join(Dir.tmpdir(), `trails-kernel-system-${Process.pid}.both`);
+    const file = File.open(path, "w");
+    const origStdout = rbObjDup(STDOUT);
+    const origStderr = rbObjDup(STDERR);
+    try {
+      STDOUT.reopen(file);
+      STDERR.reopen(file);
+      expect(await rbFSystem("printf out; printf err >&2")).toBe(true);
+    } finally {
+      STDOUT.reopen(origStdout);
+      STDERR.reopen(origStderr);
+      origStdout.close();
+      origStderr.close();
+      file.close();
+    }
+    expect(STDOUT.fileno()).toBe(1);
+    expect(File.read(path)).toBe("outerr");
+    FileUtils.rmF(path);
+  });
+
   it("raises IOError for a closed out: IO", async () => {
+    const [, w] = IO.pipe();
+    w.close();
+    await expect(rbFSystem("true", { err: w })).rejects.toThrow(IOError);
+  });
+
+  it("raises IOError for a closed err: IO", async () => {
     const [, w] = IO.pipe();
     w.close();
     await expect(rbFSystem("true", { out: w })).rejects.toThrow(IOError);
