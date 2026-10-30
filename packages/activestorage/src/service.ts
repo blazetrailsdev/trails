@@ -3,10 +3,10 @@ import { ContentDisposition } from "@blazetrails/actionpack";
 import { NotImplementedError, rbModName } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import type { Filename } from "./filename.js";
-import { Configurator } from "./service/configurator.js";
+import type { Configurator } from "./service/configurator.js";
 
 export class Service {
-  static Configurator = Configurator;
+  declare static Configurator: typeof Configurator;
 
   name: string | null = null;
   protected public: boolean | undefined;
@@ -15,7 +15,7 @@ export class Service {
     serviceName: string,
     configurations: Record<string, Record<string, unknown>>,
   ): Service {
-    return Configurator.build(serviceName, configurations);
+    return Service.Configurator.build(serviceName, configurations);
   }
 
   /** @internal */

@@ -848,6 +848,46 @@ export class IO {
   }
 
   /**
+   * {@link IO.binread} over the backend's async `readFile`, with
+   * `rb_io_s_binread`'s `length` and `offset` arguments (`io.c:12242-12270`):
+   * `offset` seeks before the read and `length` bounds it, and a read that
+   * starts at or past EOF with a positive `length` answers `nil`
+   * (`io_read`, `io.c:3800`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO.binread`
+   * (`vendor/ruby/v3.3.11/io.c:12242`).
+   */
+  static async binreadAsync(
+    name: string,
+    length: number | null = null,
+    offset: number | null = null,
+  ): Promise<Uint8Array | null> {
+    const bytes = Uint8Array.from(await getFs().readFile(name));
+    const start = offset ?? 0;
+    if (length == null) return bytes.subarray(start);
+    if (length > 0 && start >= bytes.length) return null;
+    return bytes.subarray(start, start + length);
+  }
+
+  /**
+   * {@link IO.copyStream} into a destination named by path, which
+   * `rb_io_s_copy_stream` opens for writing (`io.c:13232-13236`, `O_WRONLY |
+   * O_CREAT | O_TRUNC`), written through the backend's async `writeFile`. The
+   * source is read to EOF first. Answers the byte total (`io.c:13392`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO.copy_stream`
+   * (`vendor/ruby/v3.3.11/io.c:13365`).
+   */
+  static async copyStreamAsync(src: { read(): string | Uint8Array }, dst: string): Promise<number> {
+    const data = src.read();
+    const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+    const fs = getFs();
+    if (fs.writeFile) await fs.writeFile(dst, bytes);
+    else fs.writeFileSync(dst, bytes);
+    return bytes.length;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/io.c:12396` `rb_io_s_binwrite`, which is `IO.write`
    * (`io.c:12377`) with the stream opened in binary mode: `string` is an
    * ASCII-8BIT String and its characters go to the file as bytes, so
