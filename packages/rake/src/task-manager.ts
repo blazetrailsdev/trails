@@ -106,6 +106,7 @@ export class TaskManager {
     return message + this.generateDidYouMeanSuggestions(taskName);
   }
 
+  /** @missingRailsCall defined? — PERMANENT */
   generateDidYouMeanSuggestions(taskName: string): string {
     const suggestions = new SpellChecker({ dictionary: [...this._tasks.keys()] }).correct(
       String(taskName),
