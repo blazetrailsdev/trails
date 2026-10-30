@@ -1532,8 +1532,7 @@ export class IO {
    * spawned with inherited stdio gets {@link STDOUT} and {@link STDERR} by
    * {@link fileno}, so it follows the reopen as it follows the `dup2` in Ruby.
    *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#reopen`
-   * (`vendor/ruby/v3.3.11/io.c:8446`).
+   * @noRailsEquivalent PERMANENT
    */
   reopen(nfile: { toIo(): IO }): this {
     const orig = nfile.toIo();
