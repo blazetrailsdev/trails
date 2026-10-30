@@ -8,9 +8,10 @@ describe("TestRakeTask", () => {
     const tm = new TestTaskManager();
     tm.defineTask(Task, "test");
 
-    const error = (await tm.get("testt").catch((err: unknown) => err)) as Error;
+    const promise = tm.get("testt");
+    await expect(promise).rejects.toThrow(RuntimeError);
+    const error = (await promise.catch((err: unknown) => err)) as Error;
 
-    expect(error).toBeInstanceOf(RuntimeError);
     expect(error.message).toMatch(/Don't know how to build task 'testt'/);
     expect(error.message).toMatch(/Did you mean\? {2}test/);
   });
