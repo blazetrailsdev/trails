@@ -250,74 +250,63 @@ const ENUMERABLE_DELEGATES = {
   compactBlank,
 };
 
-/** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
-const _proxyTargets = new WeakMap<object, object>();
+/** @perf 10x — PERMANENT */
+const _placeholderFields = new Set<string>();
 
-/** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
-function _relationProxy<R extends object>(target: R): R {
-  const proxy = new Proxy(target, CLASS_SPECIFIC_RELATION_HANDLER);
-  _proxyTargets.set(proxy, target);
-  return proxy;
-}
-
-/** @perf 4x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
-function _setOnTarget(
-  target: Record<string | symbol, unknown>,
-  prop: string | symbol,
-  value: unknown,
-  receiver: object,
-): boolean {
-  const descriptor = Object.getOwnPropertyDescriptor(target, prop);
-  if (descriptor?.writable) {
-    target[prop] = value;
-    return true;
+/** @perf 10x — PERMANENT */
+function _isPlaceholderField(proto: object, key: string): boolean {
+  for (let p = proto; p !== Relation.prototype; p = Object.getPrototypeOf(p)) {
+    if (Object.hasOwn(p, key)) return false;
   }
-  return Reflect.set(target, prop, value, receiver);
+  return _placeholderFields.has(key) || !Object.hasOwn(Relation.prototype, key);
 }
 
-/** @perf 4x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
-function _definePropertyOnTarget(
-  target: object,
-  prop: string | symbol,
-  descriptor: PropertyDescriptor,
-): boolean {
-  return Reflect.defineProperty(target, prop, descriptor);
-}
-
-const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
-  get(target: any, prop: string | symbol, receiver: any) {
-    if (prop === Symbol.iterator && !target._isRecordsSynchronous) return undefined;
+/** @perf 10x — PERMANENT */
+const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<object> = {
+  get(target: object, prop: string | symbol, receiver: any) {
     const value = Reflect.get(target, prop, receiver);
-    if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
+    if (
+      value !== undefined ||
+      typeof prop === "symbol" ||
+      Reflect.has(target, prop) ||
+      !isModuleIncluded(receiver.constructor, ClassSpecificRelation)
+    ) {
       return value;
     }
     if (/^(0|[1-9]\d*)$/.test(prop)) {
-      return target._isRecordsSynchronous
-        ? (target.target ?? target._records)[Number(prop)]
-        : target.records().then((records: any[]) => records[Number(prop)]);
+      return receiver._isRecordsSynchronous
+        ? (receiver.target ?? receiver._records)[Number(prop)]
+        : receiver.records().then((records: any[]) => records[Number(prop)]);
     }
     const enumerable = ENUMERABLE_METHODS[prop];
     if (enumerable) {
       return (...args: any[]) => {
-        const records = target.each(() => {});
+        const records = receiver.each(() => {});
         return records instanceof Promise
           ? records.then((records: any[]) => enumerable([...records], args))
           : enumerable([...records], args);
       };
     }
-    if (target.respondToMissing(prop, false)) {
-      return (...args: any[]) => target.methodMissing(prop, ...args);
+    if (receiver.respondToMissing(prop, false)) {
+      return (...args: any[]) => receiver.methodMissing(prop, ...args);
     }
     return value;
   },
-  set: _setOnTarget,
-  defineProperty: _definePropertyOnTarget,
-  has(target: any, prop: string | symbol) {
-    if (prop === Symbol.iterator && !target._isRecordsSynchronous) return false;
+  set(target: object, prop: string | symbol, value: unknown, receiver: object) {
+    if (typeof prop === "string" && prop.startsWith("_")) {
+      _placeholderFields.add(prop);
+      Object.defineProperty(Relation.prototype, prop, {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+    }
+    return Reflect.set(target, prop, value, receiver);
+  },
+  has(target: object, prop: string | symbol) {
     if (Reflect.has(target, prop)) return true;
     if (typeof prop === "symbol") return false;
-    if (Object.hasOwn(ENUMERABLE_METHODS, prop)) return true;
-    return target.respondToMissing(prop, false);
+    return Object.hasOwn(ENUMERABLE_METHODS, prop);
   },
 };
 
@@ -395,7 +384,6 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   private _table: Table;
 
-  /** @inventedArm if — PERMANENT */
   constructor(
     model: typeof Base & (new (attributes?: any, block?: any) => T),
     {
@@ -419,9 +407,6 @@ export class Relation<T extends Base, G extends boolean = false> {
     this._table = table as Table;
     this._values = values;
     this._predicateBuilder = predicateBuilder;
-    if (isModuleIncluded(new.target, ClassSpecificRelation)) {
-      return _relationProxy(this);
-    }
   }
 
   inspect(): string | Promise<string> {
@@ -1689,28 +1674,30 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this;
   }
 
-  /** @perf 2x — CONVERGEABLE relation-proxy-moves-into-the-prototype-chain */
+  /** @perf 5x — PERMANENT */
   clone(): Relation<T, G> {
-    const source = _proxyTargets.get(this) ?? this;
-    if (Object.isFrozen(source) || Object.getOwnPropertySymbols(source).length > 0) {
+    if (Object.isFrozen(this) || Object.getOwnPropertySymbols(this).length > 0) {
       return rbObjClone(this);
     }
-    const copy = Object.create(null);
-    for (const key of Reflect.ownKeys(source)) {
-      const descriptor = Object.getOwnPropertyDescriptor(source, key)!;
-      if (descriptor.writable && descriptor.enumerable && descriptor.configurable) {
+    const proto = Object.getPrototypeOf(this);
+    const copy = Object.create(proto);
+    for (const key of Reflect.ownKeys(this) as string[]) {
+      const descriptor = Object.getOwnPropertyDescriptor(this, key)!;
+      if (
+        key.startsWith("_") &&
+        descriptor.writable &&
+        descriptor.enumerable &&
+        descriptor.configurable &&
+        _isPlaceholderField(proto, key)
+      ) {
         copy[key] = descriptor.value;
       } else {
         Object.defineProperty(copy, key, descriptor);
       }
     }
-    Object.setPrototypeOf(copy, Object.getPrototypeOf(source));
-    const clone = isModuleIncluded(this.constructor, ClassSpecificRelation)
-      ? _relationProxy(copy)
-      : copy;
-    const initializeClone = copy.initializeClone ?? copy.initializeCopy;
-    initializeClone.call(clone, this);
-    return clone;
+    const initializeClone = "initializeClone" in copy ? copy.initializeClone : copy.initializeCopy;
+    initializeClone.call(copy, this);
+    return copy;
   }
 
   _execScope(...args: unknown[]): unknown {
@@ -2206,7 +2193,15 @@ async function computeCacheVersion(rel: Relation<Base>, timestampColumn: string)
   return rel.computeCacheVersion(timestampColumn);
 }
 
-rbDefineAllocFunc(Relation, (klass) => {
-  const relation = Object.create(klass.prototype);
-  return isModuleIncluded(klass, ClassSpecificRelation) ? _relationProxy(relation) : relation;
+rbDefineAllocFunc(Relation, (klass) => Object.create(klass.prototype));
+const _enumIterator = Relation.prototype[Symbol.iterator];
+Object.defineProperty(Relation.prototype, Symbol.iterator, {
+  get(this: Relation<Base>) {
+    return this._isRecordsSynchronous ? _enumIterator : undefined;
+  },
+  configurable: true,
 });
+Object.setPrototypeOf(
+  Relation.prototype,
+  new Proxy(Object.getPrototypeOf(Relation.prototype), CLASS_SPECIFIC_RELATION_HANDLER),
+);

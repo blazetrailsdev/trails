@@ -1761,7 +1761,7 @@ the capability, in a different place. Each is decided here, and each but
 | `migration/command_recorder.rb`                       | typed forwarders      |
 | `migration/default_strategy.rb`                       | typed forwarders      |
 | `active_record/migration.rb`                          | typed forwarders      |
-| `relation/delegation.rb`                              | Proxy                 |
+| `relation/delegation.rb`                              | Proxy (proto chain)   |
 | `active_record/test_fixtures.rb`                      | Proxy (proto chain)   |
 | `active_support/array_inquirer.rb`                    | Proxy                 |
 | `active_support/broadcast_logger.rb`                  | Proxy                 |
