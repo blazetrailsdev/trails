@@ -133,8 +133,9 @@ export function rbSetClassPathString(
 }
 
 /** @noRailsEquivalent PERMANENT */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface TopLevelConstants {}
+export interface TopLevelConstants {
+  Object?: ObjectConstructor;
+}
 
 /**
  * Ruby's top-level `Object`, whose constant table is
