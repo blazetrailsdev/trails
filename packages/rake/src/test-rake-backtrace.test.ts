@@ -18,7 +18,11 @@ describe("TestBacktraceSuppression", () => {
   });
 
   it("near system dir isnt suppressed", () => {
-    const paths = [" at x (/app/node:12)"];
+    const paths = [
+      " at x (/app/node:12)",
+      "at Object.<anonymous> (/x/Rakefile:1:1)",
+      "/x/node:internal/y:1",
+    ];
 
     expect(Backtrace.collapse(paths)).toEqual(paths);
   });

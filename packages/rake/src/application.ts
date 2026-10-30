@@ -394,13 +394,13 @@ export class Application {
 
   /** @internal */
   dynamicWidthStty(): number {
-    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "stty size 2>/dev/null"]);
+    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "stty size 2>/dev/null </dev/tty"]);
     return parseInt(String(stdout).trim().split(/\s+/)[1], 10) || 0;
   }
 
   /** @internal */
   dynamicWidthTput(): number {
-    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "tput cols 2>/dev/null"]);
+    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "tput cols 2>/dev/null </dev/tty"]);
     return parseInt(String(stdout), 10) || 0;
   }
 
