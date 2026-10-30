@@ -920,7 +920,6 @@ export class Application {
   /** @internal */
   rakefileLocation(backtrace: string[] = rbFCaller()): string {
     backtrace.map((t) => /([^:]+):/.exec(t)?.[1]);
-
     let re = new RegExp(`^${this.rakefile ?? ""}$`, "m");
     if (this.isWindows()) re = new RegExp(re.source, "im");
 

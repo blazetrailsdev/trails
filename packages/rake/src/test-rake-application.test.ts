@@ -430,7 +430,6 @@ describe("TestRakeApplication", () => {
     });
 
     await rakefileDefault();
-
     const [out, err] = await captureOutput(() => app.run(['--rakelib=""']));
 
     expect(ran).toBe(true);
