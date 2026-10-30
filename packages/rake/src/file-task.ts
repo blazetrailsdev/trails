@@ -32,7 +32,7 @@ export class FileTask extends Task {
    */
   private async isOutOfDate(stamp: Date): Promise<boolean> {
     for (const prereq of await this.allPrerequisiteTasks()) {
-      const prereqTask = (await this.application.get(String(prereq), this.scope))!;
+      const prereqTask = await this.application.get(String(prereq), this.scope);
       const timestamp = await prereqTask.timestamp();
       if (rbObjClass(prereqTask) === FileTask) {
         if (rbCmpint(cmp(timestamp, stamp), timestamp, stamp) > 0) return true;
