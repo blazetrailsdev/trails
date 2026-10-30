@@ -735,19 +735,20 @@ interface IncludedHelpers {
   includes: Map<string, PropertyDescriptor>[];
 }
 
-export type UrlHelpersModule = Module & {
-  _proxy: Included<typeof import("./url-for.js")> & { readonly _routes: RouteSet };
-  dupForReinclude?: UrlHelpersModule;
-  urlFor(options: UrlForOptions): string;
-  fullUrlFor(options: UrlForOptions): string;
-  routeFor(name: string, ...args: unknown[]): string;
-  optimizeRoutesGeneration(): boolean;
-  polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
-  polymorphicPath(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
-  readonly _routes: RouteSet;
-  urlOptions(): Record<string, unknown>;
-  included(base: unknown, block?: (this: any) => void): void;
-};
+export type UrlHelpersModule = Module &
+  Record<`${string}Url`, (...args: unknown[]) => string> & {
+    _proxy: Included<typeof import("./url-for.js")> & { readonly _routes: RouteSet };
+    dupForReinclude?: UrlHelpersModule;
+    urlFor(options: UrlForOptions): string;
+    fullUrlFor(options: UrlForOptions): string;
+    routeFor(name: string, ...args: unknown[]): string;
+    optimizeRoutesGeneration(): boolean;
+    polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
+    polymorphicPath(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
+    readonly _routes: RouteSet;
+    urlOptions(): Record<string, unknown>;
+    included(base: unknown, block?: (this: any) => void): void;
+  };
 
 export class RouteSet {
   namedRoutes: NamedRouteCollection = new NamedRouteCollection();
