@@ -176,6 +176,13 @@ describe("rbObjMethods", () => {
     expect(rbObjMethods(child)).not.toContain("title");
     expect(rbObjMethods(child, false)).toEqual(["singleton", "own"]);
   });
+
+  it("lists an attr_reader as the name and an attr_writer as the name with =", () => {
+    const attrs = Object.defineProperties({}, { reader: { get: () => 1 }, writer: { set() {} } });
+    expect(rbObjMethods(attrs)).toEqual(expect.arrayContaining(["reader", "writer="]));
+    expect(rbObjMethods(attrs)).not.toContain("reader=");
+    expect(rbObjMethods(attrs)).not.toContain("__proto__");
+  });
 });
 
 describe("rbFCaller", () => {

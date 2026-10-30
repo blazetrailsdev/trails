@@ -161,15 +161,19 @@ export function rbObjMethod(obj: unknown, vid: unknown): Method {
 /**
  * `class_instance_method_list` (`vendor/ruby/v3.3.11/class.c:1818`) for an
  * object: its singleton methods, its class's, then every ancestor's while
- * `recur` is set. Every function-valued entry is listed: a JS entry carries no visibility
- * (CLAUDE.md, "Method visibility is compile-time only").
+ * `recur` is set. A function entry is listed, and an accessor as `name` /
+ * `name=`, as `rb_attr` (`vendor/ruby/v3.3.11/vm_method.c:1892-1895`) adds it.
+ * A JS entry carries no visibility (CLAUDE.md, "Method visibility is compile-time only").
  */
 function classInstanceMethodList(obj: unknown, recur: boolean): string[] {
   const list = new Set<string>();
   for (let mod: object | null = Object(obj); mod; mod = Object.getPrototypeOf(mod)) {
     for (const mid of Object.getOwnPropertyNames(mod)) {
       const me = Object.getOwnPropertyDescriptor(mod, mid)!;
-      if (mid !== "constructor" && typeof me.value === "function") list.add(mid);
+      if (mid === "constructor" || mid === "__proto__") continue;
+      if (typeof me.value === "function") list.add(mid);
+      if (me.get) list.add(mid);
+      if (me.set) list.add(`${mid}=`);
     }
     const particularClass = mod === obj || Object.hasOwn(mod, FL_SINGLETON);
     if (!recur && !particularClass) break;
