@@ -58,7 +58,7 @@ describe("actionpack entry circular-init", () => {
       await import("./packages/trailties/dist/index.js");
       await import("./packages/trailties/dist/all.js");
       const forbidden = loaded.filter((url) =>
-        /\\/node_modules\\/(?:\\.pnpm\\/)?(?:playwright|vite|rollup|vitest)[@/]/.test(url),
+        /\\/node_modules\\/(?:\\.pnpm\\/)?(?:playwright(?:-core)?|vite|vite-node|rollup|vitest)[@/]/.test(url),
       );
       console.log(JSON.stringify({ count: loaded.length, forbidden }));
     `;
