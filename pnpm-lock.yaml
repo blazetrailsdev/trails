@@ -1053,6 +1053,9 @@ importers:
       '@blazetrails/mini-magick':
         specifier: workspace:*
         version: link:../../packages/mini-magick
+      '@blazetrails/mini-mime':
+        specifier: workspace:*
+        version: link:../../packages/mini-mime
       '@blazetrails/msgpack':
         specifier: workspace:*
         version: link:../../packages/msgpack
@@ -1071,6 +1074,9 @@ importers:
       '@blazetrails/rack-test':
         specifier: workspace:*
         version: link:../../packages/rack-test
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../../packages/rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../../packages/ruby-compat
