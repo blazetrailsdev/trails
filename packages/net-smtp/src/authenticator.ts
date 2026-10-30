@@ -35,7 +35,6 @@ export abstract class Authenticator {
     this.smtp = smtp;
   }
 
-  /** @missingRailsCall get_response — PERMANENT */
   finish(
     arg: SMTPConnection.AuthenticationCredentials | SMTPConnection.AuthenticationOAuth2,
   ): Promise<string> {

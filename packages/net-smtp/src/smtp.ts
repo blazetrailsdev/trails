@@ -211,7 +211,7 @@ export class Address {
   }
 }
 
-function _raise(err: ConnectionError): never {
+function _rethrow(err: ConnectionError): never {
   if (err.response) {
     const res = Response.parse(`${err.response}\n`);
     if (err.code === "EAUTH") throw new SMTPAuthenticationError(res);
@@ -245,6 +245,7 @@ export class SMTP {
     return SMTP.defaultTlsPort();
   }
 
+  /** @missingRailsCall new — PERMANENT */
   static defaultSslContext(sslContextParams: SslContext | null = null): SslContext {
     return { ...(sslContextParams ?? {}) };
   }
@@ -479,11 +480,8 @@ export class SMTP {
 
   /**
    * @internal
-   * @missingRailsCall tcp_socket — PERMANENT
-   * @missingRailsCall tlsconnect — PERMANENT
-   * @missingRailsCall new_internet_message_io — PERMANENT
-   * @missingRailsCall recv_response — PERMANENT
-   * @missingRailsCall starttls — PERMANENT
+   * @missingRailsCall critical — PERMANENT
+   * @missingRailsArgs do_helo — PERMANENT
    */
   private async doStart(
     heloDomain: string,
@@ -531,7 +529,7 @@ export class SMTP {
         if ((err as ConnectionError).code === "ETLS" && !this.isCapableStarttls()) {
           throw new SMTPUnsupportedCommand("STARTTLS is not supported on this server");
         }
-        _raise(err as ConnectionError);
+        _rethrow(err as ConnectionError);
       }
       s.on("error", () => {
         this._errorOccurred = true;
@@ -550,21 +548,14 @@ export class SMTP {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall ehlo — PERMANENT
-   * @missingRailsCall helo — PERMANENT
-   */
+  /** @internal */
   private doHelo(): void {
     const lines = this._socket!._ehloLines ?? [];
     const res = Response.parse(`250-${this.address}\n${lines.map((l) => `250 ${l}\n`).join("")}`);
     this.capabilities = res.capabilities;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall quit — PERMANENT
-   */
+  /** @internal */
   private async doFinish(): Promise<void> {
     const socket = this._socket;
     try {
@@ -593,10 +584,6 @@ export class SMTP {
     return addresses.some((a) => this.requiresSmtputf8(a));
   }
 
-  /**
-   * @missingRailsCall mailfrom — PERMANENT
-   * @missingRailsCall rcptto_list — PERMANENT
-   */
   async sendMessage(
     msgstr: string,
     fromAddr: string | Address,
@@ -616,9 +603,9 @@ export class SMTP {
           to: to.map((addr) => new Address(addr).address),
         };
         socket.send(envelope, msgstr, (err, sent) => (err ? reject(err) : resolve(sent)));
-      }).catch((err: ConnectionError) => _raise(err));
+      }).catch((err: ConnectionError) => _rethrow(err));
       const refused = (info.rejectedErrors ?? [])[0] as ConnectionError | undefined;
-      if (refused) _raise(refused);
+      if (refused) _rethrow(refused);
       return Response.parse(`${info.response}\n`);
     });
   }
@@ -649,7 +636,7 @@ export class SMTP {
     try {
       return Response.parse(`${await authenticator.auth(user, secret!)}\n`);
     } catch (err) {
-      _raise(err as ConnectionError);
+      _rethrow(err as ConnectionError);
     }
   }
 
