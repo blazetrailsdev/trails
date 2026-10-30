@@ -44,6 +44,7 @@
     "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
+    "@blazetrails/net-smtp": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*"
   }
