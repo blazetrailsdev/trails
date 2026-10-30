@@ -1,0 +1,10 @@
+import { <%= this.parentClass() %> } from "<%= this.parentPath() %>";
+
+export class <%= this.controllerClassName() %> extends <%= this.parentClass() %> {
+<% for (const action of this.actions) { -%>
+  async <%= action %>()<%= this.isTypeScript() ? ": Promise<void>" : "" %> {
+    // TODO: implement
+  }
+<%= action === this.actions.at(-1) ? "" : "\n" -%>
+<% } -%>
+}

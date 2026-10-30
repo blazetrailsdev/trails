@@ -1,6 +1,7 @@
 import { StandardError } from "./standard-error.js";
 import { ArgumentError } from "./argument-error.js";
 import { RuntimeError } from "./runtime-error.js";
+import { File } from "./file.js";
 import { StringIO } from "./string-io.js";
 import { Tempfile } from "./tempfile.js";
 import { extend, include } from "./include.js";
@@ -445,3 +446,25 @@ HTTP.prototype.bufferOpen = function (
   return OpenURI.openHttp(buf, this, proxy, options);
 };
 include(HTTP, OpenRead);
+
+declare module "./uri/common.js" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- a static member added to `URI` by `require "open-uri"`
+  namespace URI {
+    function open(name: unknown, ...rest: unknown[]): Promise<unknown>;
+  }
+}
+
+/**
+ * `URI.open` (`vendor/ruby/v3.3.11/lib/open-uri.rb:23-33`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+URI.open = async function (name: unknown, ...rest: unknown[]): Promise<unknown> {
+  if (typeof (name as Partial<OpenRead> | null)?.open === "function") {
+    return (name as OpenRead).open(...rest);
+  } else if (typeof name === "string" && /^[A-Za-z][A-Za-z0-9+\-.]*:\/\//.test(name)) {
+    const uri = URI.parse(name) as Partial<OpenRead>;
+    if (typeof uri.open === "function") return uri.open(...rest);
+  }
+  return (File.open as (...args: unknown[]) => unknown)(name, ...rest);
+};

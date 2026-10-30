@@ -1,0 +1,11 @@
+import { <%= this.parentClass() %> } from "<%= "../".repeat(this.classPathParts.length) || "./" %><%= this.parentPath() %><%= this.ext() %>";
+
+export class <%= this.className().split("::").pop() %>Job extends <%= this.parentClass() %> {
+  static {
+    this.queueAs("<%= this.options.queue %>");
+  }
+
+  perform(...args: unknown[]): void {
+    // Do something later
+  }
+}

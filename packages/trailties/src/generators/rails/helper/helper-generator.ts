@@ -1,25 +1,29 @@
-import { camelize } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+
 export class HelperGenerator extends NamedBase {
+  static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
+  }
+
   /** @internal */
   private __fileName?: string;
 
   /**
-   * @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template
+   * @missingRailsArgs template — PERMANENT
    * @missingRailsArgs join — PERMANENT
    */
   async createHelperFiles(): Promise<void> {
-    const helperName = [...this.classPathParts, this.fileName].map((p) => camelize(p)).join("");
-    await this.createFile(
+    await this.template(
+      "helper.ts",
       File.join(
         "app/helpers",
         ...this.classPathParts.map((p) => dasherize(p)),
         `${dasherize(this.fileName)}-helper${this.ext()}`,
       ),
-      `export const ${helperName}Helper = {\n};\n`,
     );
   }
 

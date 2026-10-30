@@ -1,7 +1,9 @@
+import { classify } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
-import { TEMPLATES } from "./templates.js";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
 export interface JobGeneratorOptions extends GeneratorOptions {
   queue?: string;
@@ -12,6 +14,7 @@ export class JobGenerator extends NamedBase {
   declare options: JobGeneratorOptions;
 
   static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.classOption("queue", {
       type: "string",
       default: "default",
@@ -30,26 +33,30 @@ export class JobGenerator extends NamedBase {
   /** @internal */
   private _applicationJobFileName?: string;
 
-  /**
-   * @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template
-   * @missingRailsCall in_root — CONVERGEABLE converge-remaining-generators-onto-thor-template
-   */
+  /** @missingRailsArgs template — PERMANENT */
   async createJobFile(): Promise<void> {
-    await this.createFile(
+    await this.template(
+      "job.ts",
       File.join("app/jobs", ...this.classPathParts, `${dasherize(this.fileName)}-job${this.ext()}`),
-      TEMPLATES.job.call(this, this.ext()),
     );
 
-    if (
-      this.behavior === "invoke" &&
-      !File.isExist(File.join(this.destinationRoot, this.applicationJobFileName()))
-    ) {
-      await this.createFile(this.applicationJobFileName(), TEMPLATES.application_job.call(this));
-    }
+    await this.inRoot(async () => {
+      if (this.behavior === "invoke" && !File.isExist(this.applicationJobFileName())) {
+        await this.template("application_job.ts", this.applicationJobFileName());
+      }
+    });
   }
 
   parentClassName(): string {
     return this.options.parent!;
+  }
+
+  private parentClass(): string {
+    return classify(this.parentClassName());
+  }
+
+  private parentPath(): string {
+    return dasherize(this.parentClassName());
   }
 
   /**

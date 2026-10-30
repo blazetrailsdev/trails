@@ -1,0 +1,2 @@
+<h1><%= this.className() %>#<%= this._action %></h1>
+<p>Find me in <%= this._path %></p>

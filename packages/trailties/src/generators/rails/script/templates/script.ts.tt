@@ -1,0 +1,3 @@
+import "<%= "../".repeat(this.depth()) %>config/environment<%= this.ext() %>";
+
+// Your code goes here
