@@ -22,7 +22,9 @@ import {
 type Connection = SMTPConnection & {
   _ehloLines?: string[];
   _destroyed: boolean;
-  _socket?: { setTimeout(ms: number): unknown };
+  _socket?: { setTimeout(ms: number): unknown; write(data: string): unknown };
+  _sendCommand(str: string): void;
+  _responseActions: Array<(str: string) => void>;
   lastServerResponse: string | false;
 };
 
@@ -594,20 +596,8 @@ export class SMTP {
     if (this.anyRequireSmtputf8(to) && this.isCapable("SMTPUTF8")) {
       fromAddr = new Address(fromAddr, "SMTPUTF8");
     }
-    if (to.length === 0) throw new ArgumentError("mail destination not given");
-    const socket = this._socket;
-    return await this.critical(async () => {
-      const info = await new Promise<SMTPConnection.SentMessageInfo>((resolve, reject) => {
-        const envelope = {
-          from: new Address(fromAddr).address,
-          to: to.map((addr) => new Address(addr).address),
-        };
-        socket.send(envelope, msgstr, (err, sent) => (err ? reject(err) : resolve(sent)));
-      }).catch((err: ConnectionError) => _rethrow(err));
-      const refused = (info.rejectedErrors ?? [])[0] as ConnectionError | undefined;
-      if (refused) _rethrow(refused);
-      return Response.parse(`${info.response}\n`);
-    });
+    await this.mailfrom(fromAddr);
+    return await this.rcpttoList(to, () => this.data(msgstr));
   }
 
   sendMail(
@@ -647,6 +637,78 @@ export class SMTP {
     klass.checkArgs(...args);
   }
 
+  async rset(): Promise<Response> {
+    return await this.getok("RSET");
+  }
+
+  async mailfrom(fromAddr: string | Address): Promise<Response> {
+    const addr =
+      this.requiresSmtputf8(fromAddr) && this.isCapable("SMTPUTF8")
+        ? new Address(fromAddr, "SMTPUTF8")
+        : new Address(fromAddr);
+    return await this.getok([`MAIL FROM:<${addr.address}>`, ...addr.parameters].join(" "));
+  }
+
+  async rcpttoList<T>(toAddrs: Array<string | Address>, block: () => Promise<T>): Promise<T> {
+    if (toAddrs.length === 0) throw new ArgumentError("mail destination not given");
+    for (const addr of toAddrs.flat()) await this.rcptto(addr);
+    return await block();
+  }
+
+  async rcptto(toAddr: string | Address): Promise<Response> {
+    const addr = new Address(toAddr);
+    return await this.getok([`RCPT TO:<${addr.address}>`, ...addr.parameters].join(" "));
+  }
+
+  /** @missingRailsArgs write_message — PERMANENT */
+  async data(msgstr: string): Promise<Response> {
+    const res = await this.critical(async () => {
+      this.checkContinue(await this.getResponse("DATA"));
+      const body = msgstr.replace(/\r?\n/g, "\r\n").replace(/^\./gm, "..");
+      const tail = body.endsWith("\r\n") ? "" : "\r\n";
+      this._socket!._socket.write(`${body}${tail}.\r\n`);
+      return await this.recvResponse();
+    });
+    this.checkResponse(res);
+    return res;
+  }
+
+  async getResponse(reqline: string): Promise<Response> {
+    this.validateLine(reqline);
+    this._socket!._sendCommand(reqline);
+    return await this.recvResponse();
+  }
+
+  /** @internal */
+  private validateLine(line: string): void {
+    if (/[\r\n]/.test(line)) throw new ArgumentError("A line must not contain CR or LF");
+  }
+
+  /** @internal */
+  private async getok(reqline: string): Promise<Response> {
+    this.validateLine(reqline);
+    const res = await this.critical(async () => {
+      this._socket!._sendCommand(reqline);
+      return await this.recvResponse();
+    });
+    this.checkResponse(res);
+    return res;
+  }
+
+  /** @internal */
+  private recvResponse(): Promise<Response> {
+    const socket = this._socket!;
+    return new Promise((resolve, reject) => {
+      const eof = (): void => reject(new EOFError("end of file reached"));
+      if (socket._destroyed) return eof();
+      socket.once("end", eof);
+      socket._responseActions.push((str: string) => {
+        socket.removeListener("end", eof);
+        resolve(Response.parse(`${str}\n`));
+      });
+    });
+  }
+
   /** @internal */
   async critical<T>(block?: () => T | Promise<T>): Promise<T | Response> {
     if (this._errorOccurred) return Response.parse("200 dummy reply code");
@@ -655,6 +717,20 @@ export class SMTP {
     } catch (err) {
       this._errorOccurred = true;
       throw err;
+    }
+  }
+
+  /** @internal */
+  private checkResponse(res: Response): void {
+    if (!res.isSuccess()) throw new res.exceptionClass(res);
+  }
+
+  /** @internal */
+  private checkContinue(res: Response): void {
+    if (!res.isContinue()) {
+      throw new SMTPUnknownError(res, {
+        message: `could not get 3xx (${res.status}: ${res.string})`,
+      });
     }
   }
 

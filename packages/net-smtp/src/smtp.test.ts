@@ -174,6 +174,82 @@ describe("TestSMTP", () => {
   it("unsuccessful send message fatal error", () => refusedAt("520 FATAL ERROR", SMTPFatalError));
   it("unsuccessful send message unknown error", () => refusedAt("300 UNKNOWN", SMTPUnknownError));
 
+  it("rset", async () => {
+    const smtp = (await SMTP.start("127.0.0.1", await fakeServerStart())) as SMTP;
+    expect((await smtp.rset()).isSuccess()).toBe(true);
+    await smtp.finish();
+  });
+
+  it("mailfrom", async () => {
+    const smtp = (await SMTP.start("127.0.0.1", await fakeServerStart())) as SMTP;
+    expect((await smtp.mailfrom("foo@example.com")).isSuccess()).toBe(true);
+    await smtp.finish();
+  });
+
+  it("rcptto", async () => {
+    const smtp = (await SMTP.start("127.0.0.1", await fakeServerStart())) as SMTP;
+    await smtp.mailfrom("foo@example.com");
+    expect((await smtp.rcptto("foo@example.com")).isSuccess()).toBe(true);
+    await smtp.finish();
+  });
+
+  it("crlf injection", async () => {
+    const smtp = new SMTP("localhost", 25);
+    await expect(smtp.mailfrom("foo\r\nbar")).rejects.toBeInstanceOf(ArgumentError);
+    await expect(smtp.mailfrom("foo\rbar")).rejects.toBeInstanceOf(ArgumentError);
+    await expect(smtp.mailfrom("foo\nbar")).rejects.toBeInstanceOf(ArgumentError);
+    await expect(smtp.rcptto("foo\r\nbar")).rejects.toBeInstanceOf(ArgumentError);
+  });
+
+  it("start with tls", async () => {
+    await SMTP.start("127.0.0.1", await fakeServerStart({ secure: true }), {
+      tls: true,
+      tlsVerify: false,
+    }).then((s) => (s as SMTP).finish());
+    await SMTP.start("127.0.0.1", await fakeServerStart(), { tls: false }).then((s) =>
+      (s as SMTP).finish(),
+    );
+  });
+
+  it("start with starttls always", async () => {
+    const port = await fakeServerStart({ disabledCommands: ["AUTH"] });
+    const smtp = (await SMTP.start("127.0.0.1", port, {
+      starttls: "always",
+      tlsVerify: false,
+    })) as SMTP;
+    await smtp.finish();
+    const refused = SMTP.start("127.0.0.1", await fakeServerStart(), { starttls: "always" });
+    await expect(refused).rejects.toBeInstanceOf(SMTPUnsupportedCommand);
+  });
+
+  it("start instance", async () => {
+    const smtp = new SMTP("127.0.0.1", await fakeServerStart());
+    await smtp.start();
+    expect(smtp.isStarted()).toBe(true);
+    await smtp.finish();
+  });
+
+  it("start instance with position argument", async () => {
+    const port = await fakeServerStart({ ...auth, authMethods: ["PLAIN"] });
+    const smtp = new SMTP("127.0.0.1", port);
+    await smtp.start("myname", "account", "password", "plain");
+    await smtp.finish();
+  });
+
+  it("start instance with keyword argument", async () => {
+    const port = await fakeServerStart({ ...auth, authMethods: ["PLAIN"] });
+    const smtp = new SMTP("127.0.0.1", port);
+    await smtp.start({ helo: "myname", user: "account", secret: "password", authtype: "plain" });
+    await smtp.finish();
+  });
+
+  it("start instance password is secret", async () => {
+    const port = await fakeServerStart({ ...auth, authMethods: ["PLAIN"] });
+    const smtp = new SMTP("127.0.0.1", port);
+    await smtp.start({ helo: "myname", user: "account", password: "password", authtype: "plain" });
+    await smtp.finish();
+  });
+
   it("with tls", async () => {
     const port = await fakeServerStart({ secure: true });
     const smtp = new SMTP("127.0.0.1", port, { tls: true, tlsVerify: false });
@@ -248,5 +324,53 @@ describe("TestSMTP", () => {
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ArgumentError);
     expect((err as Error).message).toBe("wrong number of arguments (given 5, expected 0..4)");
+  });
+
+  it("refused recipient stops before data", async () => {
+    let delivered = false;
+    const port = await fakeServerStart({
+      onRcptTo(address, _session, callback) {
+        const refused = address.address === "bad@example.com";
+        callback(refused ? Object.assign(new Error("no"), { responseCode: 550 }) : undefined);
+      },
+      onData(stream, _session, callback) {
+        delivered = true;
+        stream.resume();
+        stream.on("end", () => callback());
+      },
+    });
+    const smtp = (await SMTP.start("127.0.0.1", port)) as SMTP;
+    await expect(
+      smtp.sendMessage("message", "a@example.com", "ok@example.com", "bad@example.com"),
+    ).rejects.toBeInstanceOf(SMTPFatalError);
+    expect(delivered).toBe(false);
+  });
+});
+
+describe("TestStarttls", () => {
+  it("enable tls and enable starttls", () => {
+    const smtp = new SMTP("localhost", 25);
+    smtp.enableTls();
+    expect(() => smtp.enableStarttls()).toThrow(ArgumentError);
+  });
+
+  it("enable tls and enable starttls auto", () => {
+    const smtp = new SMTP("localhost", 25);
+    smtp.enableTls();
+    expect(() => smtp.enableStarttlsAuto()).toThrow(ArgumentError);
+  });
+
+  it("enable starttls and enable starttls auto", () => {
+    const smtp = new SMTP("localhost", 25);
+    smtp.enableStarttls();
+    expect(smtp.isStarttlsAlways()).toBe(true);
+    smtp.enableStarttlsAuto();
+    expect(smtp.isStarttlsAuto()).toBe(true);
+  });
+
+  it("disable starttls", () => {
+    const smtp = new SMTP("localhost", 25);
+    smtp.disableStarttls();
+    expect(smtp.isStarttls()).toBe(false);
   });
 });
