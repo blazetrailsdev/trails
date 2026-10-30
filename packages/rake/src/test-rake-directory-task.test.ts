@@ -4,6 +4,8 @@ import { FileCreationTask } from "./file-creation-task.js";
 import type { Task } from "./task.js";
 import { dsl, useRakeTestCase } from "./test-helpers/file-creation.js";
 
+declare const FileList: { get(...args: string[]): string[] };
+
 describe("TestRakeDirectoryTask", () => {
   const rake = useRakeTestCase();
 
@@ -63,7 +65,7 @@ describe("TestRakeDirectoryTask", () => {
   });
 
   it.skip("can use filelist", async () => {
-    dsl.directory(["a", "b", "c"]);
+    dsl.directory(FileList.get("a", "b", "c"));
 
     expect((await rake.tm.get("a")).constructor).toEqual(FileCreationTask);
 
