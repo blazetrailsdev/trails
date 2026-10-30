@@ -489,7 +489,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
     );
     expect(error).toBeInstanceOf(ArgumentError);
     expect((error as Error).message).toMatch(
-      /^Could not find or build blob: expected attachable, got /,
+      /^Could not find or build blob: expected attachable, got .*foo/,
     );
   });
 
