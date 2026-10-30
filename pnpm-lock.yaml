@@ -406,6 +406,9 @@ importers:
       '@blazetrails/marcel':
         specifier: workspace:*
         version: link:../marcel
+      '@blazetrails/rack-test':
+        specifier: workspace:*
+        version: link:../rack-test
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -413,9 +416,6 @@ importers:
       '@blazetrails/mini-magick':
         specifier: workspace:*
         version: link:../mini-magick
-      '@blazetrails/rack-test':
-        specifier: workspace:*
-        version: link:../rack-test
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../trailties

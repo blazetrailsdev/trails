@@ -27,6 +27,7 @@
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/marcel": "workspace:*",
+    "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   },
   "engines": {
@@ -34,7 +35,6 @@
   },
   "devDependencies": {
     "@blazetrails/mini-magick": "workspace:*",
-    "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
   }
 }
