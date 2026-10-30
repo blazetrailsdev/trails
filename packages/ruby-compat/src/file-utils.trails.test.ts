@@ -6,7 +6,14 @@ import { ArgumentError } from "./argument-error.js";
 import { Dir } from "./dir.js";
 import { TypeError } from "./type-error.js";
 import { FileUtils } from "./file-utils.js";
-import { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter.js";
+import { StringIO } from "./string-io.js";
+import {
+  fsAdapterConfig,
+  getFs,
+  getPath,
+  registerFsAdapter,
+  type FsStatResult,
+} from "./fs-adapter.js";
 
 /** Forces `mv`'s cross-device fallback (`vendor/ruby/v3.3.11/lib/fileutils.rb:1170-1173`). */
 function registerExdevFs(): void {
@@ -777,6 +784,42 @@ describe("FileUtils async commands", () => {
       expect(await FileUtils.compareFileAsync("data/a", "tmp/c")).toBe(false);
       expect(await FileUtils.compareFileAsync("data/a", "tmp/d")).toBe(false);
       expect(await FileUtils.cmpAsync("data/a", "tmp/b")).toBe(true);
+    });
+
+    it("compare_stream reads block by block and stops at the first differing block", () => {
+      const bsize = 1024;
+      const chunks: number[] = [];
+      const stream = (bytes: Uint8Array) => {
+        const io = new StringIO(bytes);
+        return {
+          read(length: number) {
+            chunks.push(length);
+            return io.read(length);
+          },
+        };
+      };
+      const same = new Uint8Array(bsize * 3);
+      const other = same.slice();
+      other[0] = 1;
+      expect(FileUtils.compareStream(stream(same), stream(other))).toBe(false);
+      expect(chunks).toEqual([bsize, bsize]);
+      chunks.length = 0;
+      expect(FileUtils.compareStream(stream(same), stream(same.slice()))).toBe(true);
+      expect(chunks).toHaveLength(8);
+      expect(FileUtils.compareStream(stream(same), stream(same.slice(0, bsize)))).toBe(false);
+    });
+
+    it("compare_stream takes its block size from the first stream with a usable blksize", () => {
+      const lengths: number[] = [];
+      const stream = (blksize: number) => ({
+        stat: () => ({ blksize }) as FsStatResult,
+        read(length: number) {
+          lengths.push(length);
+          return null;
+        },
+      });
+      expect(FileUtils.compareStream(stream(0), stream(4096))).toBe(true);
+      expect(lengths).toEqual([4096, 4096]);
     });
 
     it("chmod symbol mode", async () => {

@@ -33,6 +33,7 @@ export interface FsStatResult {
   mode: number;
   dev?: number;
   ino?: number;
+  blksize?: number;
   uid: number;
   gid: number;
 }

@@ -4,7 +4,7 @@ import { File } from "./file.js";
 import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
-import { rtest } from "./object.js";
+import { rbObjRespondTo, rtest } from "./object.js";
 import { stdout } from "./process-adapter.js";
 import { stringSplit } from "./string/split.js";
 
@@ -1711,12 +1711,12 @@ export class FileUtils {
   }
 
   /** `FileUtils.compare_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1507-1514`).
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   * @noRailsEquivalent PERMANENT
    */
   static async compareFileAsync(a: string, b: string): Promise<boolean> {
     const fs = getFs();
     if ((await fs.stat!(a)).size !== (await fs.stat!(b)).size) return false;
-    return FileUtils.compareStream(await fs.readFile(a), await fs.readFile(b));
+    return File.open(a, "rb", (fa) => File.open(b, "rb", (fb) => FileUtils.compareStream(fa, fb)));
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -1726,10 +1726,52 @@ export class FileUtils {
   static cmpAsync = FileUtils.compareFileAsync;
 
   /** `FileUtils.compare_stream` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1530-1542`).
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   * @noRailsEquivalent PERMANENT
    */
-  static compareStream(a: Uint8Array, b: Uint8Array): boolean {
-    return a.length === b.length && a.every((byte, i) => byte === b[i]);
+  static compareStream(
+    a: { read(length: number): Uint8Array | null },
+    b: { read(length: number): Uint8Array | null },
+  ): boolean {
+    const bsize = FileUtils.fuStreamBlksize(a, b);
+
+    let sa: Uint8Array;
+    let sb: Uint8Array;
+
+    do {
+      sa = a.read(bsize) ?? new Uint8Array(0);
+      sb = b.read(bsize) ?? new Uint8Array(0);
+      if (sa.length === 0 && sb.length === 0) return true;
+    } while (sa.length === sb.length && sa.every((byte, i) => byte === sb[i]));
+    return false;
+  }
+
+  /** `fu_stream_blksize` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2045-2052`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static fuStreamBlksize(...streams: object[]): number {
+    for (const s of streams) {
+      if (!rbObjRespondTo(s, "stat")) continue;
+      const size = FileUtils.fuBlksize((s as IO).stat());
+      if (size != null) return size;
+    }
+    return FileUtils.fuDefaultBlksize();
+  }
+
+  /** `fu_blksize` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2054-2059`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static fuBlksize(st: FsStatResult): number | null {
+    const s = st.blksize;
+    if (s == null) return null;
+    if (s === 0) return null;
+    return s;
+  }
+
+  /** `fu_default_blksize` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2061-2063`).
+   * @noRailsEquivalent PERMANENT
+   */
+  static fuDefaultBlksize(): number {
+    return 1024;
   }
 
   /** `FileUtils.install` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1609-1639`).
