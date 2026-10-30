@@ -175,18 +175,6 @@ export async function internalBeginTransaction(
   }
 }
 
-async function withBusyRetry<T>(timeout: number, query: () => Promise<T>): Promise<T> {
-  const deadline = timeout > 0 ? Date.now() + timeout : 0;
-  while (true) {
-    try {
-      return await query();
-    } catch (error) {
-      if (!(error instanceof BusyException) || Date.now() > deadline) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 1));
-    }
-  }
-}
-
 /** @internal */
 export async function performQuery(
   this: PerformQueryHost,
@@ -292,4 +280,16 @@ export function defaultInsertValue(column: {
     return Arel.sql(column.defaultFunction);
   }
   return column.default;
+}
+
+async function withBusyRetry<T>(timeout: number, query: () => Promise<T>): Promise<T> {
+  const deadline = timeout > 0 ? Date.now() + timeout : 0;
+  while (true) {
+    try {
+      return await query();
+    } catch (error) {
+      if (!(error instanceof BusyException) || Date.now() > deadline) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1));
+    }
+  }
 }
