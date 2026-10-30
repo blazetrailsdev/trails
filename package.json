@@ -127,7 +127,8 @@
     "test:assertions:ratchet": "pnpm parity:test:assertions",
     "test:stubs": "pnpm parity:test:stubs",
     "vendor:fetch": "pnpm tsx vendor/fetch.ts",
-    "vendor:recite": "pnpm tsx scripts/vendor-recite.ts"
+    "vendor:recite": "pnpm tsx scripts/vendor-recite.ts",
+    "mail:parsers": "pnpm tsx scripts/mail-parsers/generate.ts"
   },
   "devDependencies": {
     "@blazetrails/activerecord": "workspace:*",

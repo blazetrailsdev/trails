@@ -2,9 +2,11 @@ import {
   b,
   Encoding,
   isAsciiOnly,
+  isEmpty,
   isValidEncoding,
   pack,
   rbObjEncoding,
+  rbObjRespondTo,
   unpack,
 } from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
@@ -74,5 +76,21 @@ export const Utilities = {
   /** @inventedArm b — CONVERGEABLE ruby-compat-pack-m-reads-utf8-bytes */
   encodeBase64(str: string | Uint8Array): string {
     return pack([b(str)], "m");
+  },
+
+  unescape(str: string): string {
+    return str.replace(/\\(.)/g, "$1");
+  },
+
+  isBlank(value: unknown): boolean {
+    if (value == null) {
+      return true;
+    } else if (typeof value === "string" || value instanceof Uint8Array) {
+      return !/[^\t\n\v\f\r ]/.test(
+        typeof value === "string" ? value : String.fromCharCode(...value),
+      );
+    } else {
+      return rbObjRespondTo(value, "empty?") ? isEmpty(value as object) : value === false;
+    }
   },
 };
