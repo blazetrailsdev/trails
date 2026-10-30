@@ -33,6 +33,8 @@
     "node": ">=24"
   },
   "devDependencies": {
+    "@blazetrails/mini-magick": "workspace:*",
+    "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
   }
 }

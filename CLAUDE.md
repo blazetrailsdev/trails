@@ -1791,6 +1791,7 @@ the capability, in a different place. Each is decided here, and each but
 | `mini_magick/tool.rb`                                 | Proxy                 |
 | `mini_magick/image.rb`                                | Proxy (ungated)       |
 | `image_processing/chainable.rb`                       | Proxy (thenable)      |
+| `active_storage/attachment.rb`                        | Proxy (proto chain)   |
 
 Rules that apply across the table:
 
@@ -1819,6 +1820,9 @@ Rules that apply across the table:
 - A `Proxy (misses only)` row reaches `method_missing` only for a name the
   object does not already answer, so a builder tag named `constructor`,
   `toString` or `append` is written `xml.tagBang(name)`, Ruby's `tag!`.
+- `active_storage/attachment.rb`'s `delegate_missing_to :blob` forwards only
+  to a blob already loaded, since its trap is synchronous; an unloaded blob
+  reads `undefined` until `await attachment.blob`.
 - `image_processing/chainable.rb`'s Proxy answers `then` with `call()`, so
   `await builder` runs the pipeline. JS awaits anything with a `then`:
   returning a builder from an `async` function, or resolving a promise with

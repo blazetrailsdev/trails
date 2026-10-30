@@ -410,6 +410,12 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
     devDependencies:
+      '@blazetrails/mini-magick':
+        specifier: workspace:*
+        version: link:../mini-magick
+      '@blazetrails/rack-test':
+        specifier: workspace:*
+        version: link:../rack-test
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../trailties

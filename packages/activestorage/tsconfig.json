@@ -12,6 +12,8 @@
     { "path": "../activerecord" },
     { "path": "../activesupport" },
     { "path": "../marcel" },
+    { "path": "../mini-magick" },
+    { "path": "../rack-test" },
     { "path": "../ruby-compat" },
     { "path": "../trailties" }
   ]

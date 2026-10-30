@@ -6,6 +6,8 @@ packages/actionpack/src/test-helpers/fixtures/multipart/* binary
 packages/marcel/src/test-helpers/fixtures/** binary
 # Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures: ImageMagick reads them.
 packages/mini-magick/src/test-helpers/fixtures/** binary
+# Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
+packages/activestorage/src/test-helpers/fixtures/files/** binary
 
 # Shell scripts must keep LF endings even on Windows checkouts; CRLF makes
 # them unparseable by /usr/bin/env in Linux containers.
