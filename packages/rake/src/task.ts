@@ -83,12 +83,13 @@ export class Task {
     }
   }
 
+  /** @missingRailsCall map — CONVERGEABLE rake-task-prerequisites-awaiting-map */
   async prerequisiteTasks(): Promise<Task[]> {
-    return Promise.all(
-      [...this.prerequisites, ...this.orderOnlyPrerequisites].map((pre) =>
-        this.lookupPrerequisite(pre),
-      ),
-    );
+    const tasks: Task[] = [];
+    for (const pre of [...this.prerequisites, ...this.orderOnlyPrerequisites]) {
+      tasks.push(await this.lookupPrerequisite(pre));
+    }
+    return tasks;
   }
 
   /** @internal */
@@ -348,6 +349,7 @@ export class Task {
     return (this._argNames = args.map((a) => String(a)));
   }
 
+  /** @missingRailsCall map — CONVERGEABLE rake-task-prerequisites-awaiting-map */
   async investigation(): Promise<string> {
     let result = "------------------------------\n";
     result += `Investigating ${this.name}\n`;
@@ -361,9 +363,9 @@ export class Task {
     for (const [p, timestamp] of prereqs) {
       result += `--${p.name} (${_timeToS(timestamp)})\n`;
     }
-    const latestPrereq = max(
-      await Promise.all((await this.prerequisiteTasks()).map((p) => p.timestamp())),
-    );
+    const timestamps: Timestamp[] = [];
+    for (const p of await this.prerequisiteTasks()) timestamps.push(await p.timestamp());
+    const latestPrereq = max(timestamps);
     result += `latest-prerequisite time: ${latestPrereq ? _timeToS(latestPrereq) : ""}\n`;
     result += "................................\n\n";
     return result;

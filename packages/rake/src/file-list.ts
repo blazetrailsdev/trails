@@ -25,17 +25,19 @@ import { fromPathname } from "./rake-module.js";
 type Items = unknown[];
 type ElementBlock = (fn: string) => unknown;
 
-async function filterBy(items: Items, block: ElementBlock, keep: boolean): Promise<Items> {
+async function _filterBy(items: Items, block: ElementBlock, keep: boolean): Promise<Items> {
   const result: Items = [];
   for (const fn of items) if (rtest(await block(fn as string)) === keep) result.push(fn);
   return result;
 }
 
+/** @noRailsEquivalent CONVERGEABLE rake-file-list-full-array-delegation */
 const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> = {
   size: (items) => items.length,
   length: (items) => items.length,
-  first: (items) => items[0] ?? null,
-  last: (items) => items.at(-1) ?? null,
+  first: (items, n?: number) => (n === undefined ? (items[0] ?? null) : items.slice(0, n)),
+  last: (items, n?: number) =>
+    n === undefined ? (items.at(-1) ?? null) : items.slice(Math.max(items.length - n, 0)),
   get: (items, i: number) => items.at(i) ?? null,
   set: (items, i: number, value: unknown) => (items[i < 0 ? items.length + i : i] = value),
   isEmpty: (items) => items.length === 0,
@@ -49,7 +51,7 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   unshift: (items, ...objs: unknown[]) => (items.unshift(...objs), items),
   clear: (items) => ((items.length = 0), items),
   reverse: (items) => [...items].reverse(),
-  zip: (items, other: Items) => items.map((x, i) => [x, other[i] ?? null]),
+  zip: (items, ...others: Items[]) => items.map((x, i) => [x, ...others.map((o) => o[i] ?? null)]),
   each: async (items, block: ElementBlock) => {
     for (const fn of items) await block(fn as string);
     return items;
@@ -59,7 +61,7 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     return items;
   },
   rejectBang: async (items, block: ElementBlock) => {
-    const kept = await filterBy(items, block, false);
+    const kept = await _filterBy(items, block, false);
     if (kept.length === items.length) return null;
     items.splice(0, items.length, ...kept);
     return items;
@@ -83,18 +85,19 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   },
   sort: (items) => [...items].sort(),
   sortBy: (items, block: ElementBlock) => sortBy(items as string[], block),
-  select: (items, block: ElementBlock) => filterBy(items, block, true),
-  findAll: (items, block: ElementBlock) => filterBy(items, block, true),
-  reject: (items, block: ElementBlock) => filterBy(items, block, false),
-  grep: (items, pattern: RegExp) => items.filter((fn) => pattern.test(fn as string)),
+  select: (items, block: ElementBlock) => _filterBy(items, block, true),
+  findAll: (items, block: ElementBlock) => _filterBy(items, block, true),
+  reject: (items, block: ElementBlock) => _filterBy(items, block, false),
+  grep: (items, pattern: RegExp) => items.filter((fn) => (fn as string).search(pattern) !== -1),
   compact: (items) => items.filter((fn) => fn != null),
   flatten: (items) => flatten(items),
   uniq: (items) => uniq(items),
   valuesAt: (items, ...selectors: number[]) => selectors.map((i) => items.at(i) ?? null),
-  partition: async (items, block: ElementBlock) => [
-    await filterBy(items, block, true),
-    await filterBy(items, block, false),
-  ],
+  partition: async (items, block: ElementBlock) => {
+    const result: [Items, Items] = [[], []];
+    for (const fn of items) result[rtest(await block(fn as string)) ? 0 : 1].push(fn);
+    return result;
+  },
   toA: (items) => items,
   toAry: (items) => items,
   multiply: (items) => items,
@@ -103,7 +106,10 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     for (const fn of items) memo = await block(memo, fn as string);
     return memo;
   },
-  find: (items, block: ElementBlock) => items.find((fn) => rtest(block(fn as string))) ?? null,
+  find: async (items, block: ElementBlock) => {
+    for (const fn of items) if (rtest(await block(fn as string))) return fn;
+    return null;
+  },
   count: (items) => items.length,
   isAny: (items) => items.some((fn) => fn != null),
   min: (items) => [...items].sort()[0] ?? null,
@@ -224,7 +230,9 @@ export class FileList {
     const result =
       typeof other === "string"
         ? this.items.join(other)
-        : Array.from({ length: other }, () => this.items).flat();
+        : Array.from({ length: other }, () => [...this.items])
+            .flatMap((copy) => [copy])
+            .reduce<Items>((res, copy) => (res.push(...copy), res), []);
     return Array.isArray(result)
       ? new (this.constructor as new () => this)().import(result)
       : result;
@@ -407,8 +415,8 @@ include(FileList, Cloneable);
 export interface FileList {
   size(): Promise<number>;
   length(): Promise<number>;
-  first(): Promise<string | null>;
-  last(): Promise<string | null>;
+  first(n?: number): Promise<string | null | Items>;
+  last(n?: number): Promise<string | null | Items>;
   get(i: number): Promise<string | null>;
   set(i: number, value: unknown): Promise<unknown>;
   isEmpty(): Promise<boolean>;
@@ -422,14 +430,14 @@ export interface FileList {
   unshift(...objs: unknown[]): Promise<this>;
   clear(): Promise<this>;
   reverse(): Promise<Items>;
-  zip(other: unknown): Promise<Items>;
+  zip(...others: unknown[]): Promise<Items>;
   each(block: ElementBlock): Promise<this>;
   eachWithIndex(block: (fn: string, i: number) => unknown): Promise<this>;
   rejectBang(block: ElementBlock): Promise<this | null>;
   sortBang(): Promise<this>;
   uniqBang(): Promise<this | null>;
   inspect(): Promise<string>;
-  compare(other: unknown): Promise<number>;
+  compare(other: unknown): Promise<number | null>;
   map(block: ElementBlock): Promise<this>;
   collect(block: ElementBlock): Promise<this>;
   sort(): Promise<this>;
@@ -458,9 +466,11 @@ export interface FileList {
   or(other: unknown): Promise<this>;
 }
 
+/** @noRailsEquivalent PERMANENT */
 const MUST_DEFINE_CALLS: typeof ARRAY_CALLS = {
   inspect: (items) => rbInspect(items),
   compare: (items, other: Items) => {
+    if (!Array.isArray(other)) return null;
     for (let i = 0; i < Math.min(items.length, other.length); i++) {
       if (items[i] !== other[i]) return (items[i] as string) < (other[i] as string) ? -1 : 1;
     }
