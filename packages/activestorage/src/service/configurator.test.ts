@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Configurator } from "./configurator.js";
+import { DiskService } from "./disk-service.js";
 
 describe("ActiveStorage::Service::ConfiguratorTest", () => {
-  it.skip("builds correct service instance based on service name", () => {});
+  it("builds correct service instance based on service name", () => {
+    const service = Configurator.build("foo", { foo: { service: "Disk", root: "path" } });
+    expect(service.constructor).toBe(DiskService);
+    expect((service as DiskService).root).toBe("path");
+  });
 
-  it.skip("builds correct service instance based on lowercase service name", () => {});
+  it("builds correct service instance based on lowercase service name", () => {
+    const service = Configurator.build("foo", { foo: { service: "disk", root: "path" } });
+    expect(service.constructor).toBe(DiskService);
+    expect((service as DiskService).root).toBe("path");
+  });
 
   it("raises error when passing non-existent service name", () => {
     expect(() => Configurator.build("bigfoot", {})).toThrow(RuntimeError);

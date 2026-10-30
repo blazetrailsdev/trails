@@ -114,6 +114,10 @@ const alias = {
     __dirname,
     "packages/activemodel/src/locale/en.ts",
   ),
+  "@blazetrails/activesupport/core-ext/numeric/bytes": path.resolve(
+    __dirname,
+    "packages/activesupport/src/core-ext/numeric/bytes.ts",
+  ),
   "@blazetrails/activesupport/message-verifier": path.resolve(
     __dirname,
     "packages/activesupport/src/message-verifier.ts",

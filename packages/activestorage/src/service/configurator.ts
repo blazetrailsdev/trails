@@ -1,10 +1,14 @@
 import { camelize } from "@blazetrails/activesupport";
 import { block, fetch, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
-import type { Service } from "../service.js";
+import { Service } from "../service.js";
+import { DiskService } from "./disk-service.js";
 
-type ServiceClass = typeof Service;
+type ServiceClass = Pick<typeof Service, "build"> &
+  (new (config: Record<string, unknown>) => Service);
 
-const services: Record<string, () => ServiceClass> = {};
+const services: Record<string, () => ServiceClass> = {
+  DiskService: () => DiskService,
+};
 
 /** @internal */
 export class Configurator {
@@ -55,3 +59,5 @@ export class Configurator {
     return klass();
   }
 }
+
+Service.Configurator = Configurator;

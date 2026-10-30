@@ -1,5 +1,6 @@
 import { getCrypto, type HashAdapter } from "./crypto-adapter.js";
-import type { Bytes } from "./fs-adapter.js";
+import { getFs, type Bytes } from "./fs-adapter.js";
+import { Base64 } from "./base64.js";
 
 /**
  * One `Digest::Class` subclass (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:20`),
@@ -42,6 +43,26 @@ export class DigestClass {
   hexdigest(data: string | Uint8Array): string {
     return getCrypto().createHash(this.algorithm).update(data).digest("hex");
   }
+
+  /**
+   * `Digest::Class.file` (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:48-50`),
+   * `new.file(name)`, async because the file is read.
+   *
+   * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:48
+   */
+  async file(name: string): Promise<DigestInstance> {
+    return await this.new().file(name);
+  }
+
+  /**
+   * `Digest::Class.base64digest` (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:55-57`),
+   * `[digest(str)].pack('m0')`: strict Base64 with no line feeds.
+   *
+   * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:55
+   */
+  base64digest(str: string | Uint8Array): string {
+    return Base64.strictEncode64(this.digest(str));
+  }
 }
 
 /**
@@ -62,6 +83,28 @@ export class DigestInstance {
   constructor(algorithm: string) {
     this.algorithm = algorithm;
     this.impl = getCrypto().createHash(algorithm);
+  }
+
+  /**
+   * `Digest::Instance#file` (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:63-71`),
+   * which feeds the file's bytes to `update` and answers `self`. The file is
+   * read whole through the backend's async `readFile`.
+   *
+   * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:63
+   */
+  async file(name: string): Promise<this> {
+    this.update(Uint8Array.from(await getFs().readFile(name)));
+    return this;
+  }
+
+  /**
+   * `Digest::Instance#base64digest` (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:82-84`)
+   * in its no-argument form, `[digest].pack('m0')`.
+   *
+   * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:82
+   */
+  base64digest(): string {
+    return Base64.strictEncode64(this.digest());
   }
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/digest.c:143 */
