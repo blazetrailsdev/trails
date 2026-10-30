@@ -34,6 +34,7 @@ type AttachedRecord = Base & {
 
 export class Attachment extends Record {
   declare name: string;
+  declare blobId: number | string;
   declare record: AttachedRecord | null | Promise<AttachedRecord | null>;
   declare blob: AttachedBlob | null | Promise<AttachedBlob | null>;
   declare static withAllVariantRecords: () => unknown;

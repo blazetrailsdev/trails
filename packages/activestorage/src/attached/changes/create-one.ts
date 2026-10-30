@@ -12,10 +12,9 @@ import {
   rbProcCall,
 } from "@blazetrails/ruby-compat";
 import { Attachment } from "../../attachment.js";
-import type { AssociationWriter, AttachedRecord } from "../../attached.js";
+import { Attached, type AssociationWriter, type AttachedRecord } from "../../attached.js";
 import { Blob } from "../../blob.js";
 import { Changes } from "../changes.js";
-import { Model } from "../model.js";
 
 type BlobIo = Parameters<typeof Blob.buildAfterUnfurling>[0]["io"];
 
@@ -86,7 +85,7 @@ export class CreateOne {
   }
 
   /** @internal */
-  private async findAttachment(): Promise<Attachment | null | undefined> {
+  protected async findAttachment(): Promise<Attachment | null | undefined> {
     const record = this.record as unknown as { [k: string]: unknown };
     if (rbEqual(await record[`${this.name}Blob`], this.blob)) {
       return (await record[`${this.name}Attachment`]) as Attachment | null;
@@ -155,7 +154,7 @@ export class CreateOne {
     let serviceName = this.record.attachmentReflections[this.name].options.serviceName;
     if (typeof serviceName === "function") {
       serviceName = rbProcCall(serviceName, this.record);
-      Model.validateServiceConfiguration(
+      Attached.Model.validateServiceConfiguration(
         serviceName as string | null,
         this.record.constructor,
         this.name,

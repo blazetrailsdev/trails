@@ -10,6 +10,12 @@ export class HasOneAttachedReflection extends HasAttachedReflection {
   }
 }
 
+export class HasManyAttachedReflection extends HasAttachedReflection {
+  get macro(): string {
+    return "has_many_attached";
+  }
+}
+
 export function addAttachmentReflection(
   model: typeof Base,
   name: string,
