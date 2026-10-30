@@ -2,7 +2,7 @@ import { env as processEnv } from "./process-adapter.js";
 import { Errno } from "./errno.js";
 import { File } from "./file.js";
 import { IOError } from "./io-error.js";
-import { PipeIO, type IO } from "./io.js";
+import { PipeIO, STDERR, STDOUT, type IO } from "./io.js";
 
 export interface SpawnSyncOptions {
   input?: string | Uint8Array;
@@ -48,12 +48,15 @@ export interface ChildProcessAdapter {
    * `process.c:1963-1968`). An {@link IO.pipe} end has no descriptor, so the
    * child's stdout is pumped into its in-process buffer, and bytes written after
    * the pipe closes are dropped, as the child's SIGPIPE would lose them.
+   * `options.err` is the same for stderr (`check_exec_redirect`,
+   * `process.c:2009`). A stream with no redirect is {@link STDOUT} or
+   * {@link STDERR} at its current descriptor, which {@link IO.reopen} moves.
    */
   system?(
     command: string,
     env: Record<string, string | undefined>,
     args?: string[] | null,
-    options?: { out?: string | IO },
+    options?: { out?: string | IO; err?: string | IO },
   ): Promise<WaitStatus>;
   /**
    * Runs `command` through `/bin/sh -c`, or with no `args` the program `command`
@@ -172,7 +175,7 @@ function spawnChild(
   stdio: unknown,
   read: ((chunk: string) => void) | { bytes: (chunk: Uint8Array) => void },
   input?: string | Uint8Array,
-  readErr?: (chunk: string) => void,
+  readErr?: ((chunk: string) => void) | { bytes: (chunk: Uint8Array) => void },
 ): Promise<WaitStatus> {
   return new Promise((resolve) => {
     const child = cp.spawn(file, args, { env, stdio });
@@ -184,9 +187,11 @@ function spawnChild(
     } else {
       child.stdout?.on("data", read.bytes);
     }
-    if (readErr !== undefined) {
+    if (typeof readErr === "function") {
       child.stderr?.setEncoding("utf8");
       child.stderr?.on("data", readErr);
+    } else if (readErr !== undefined) {
+      child.stderr?.on("data", readErr.bytes);
     }
     child.on("error", (error) =>
       resolve({ pid: child.pid ?? null, status: null, signal: null, error }),
@@ -224,26 +229,38 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
       };
     },
     system(command, env, args, options) {
-      const out = options?.out;
-      const outFile = typeof out === "string" ? File.open(out, "w") : null;
-      const outIO = typeof out === "string" ? outFile : out;
-      const pipeOut = outIO instanceof PipeIO ? outIO : null;
-      const stdio =
-        outIO == null ? "inherit" : ["inherit", pipeOut ? "pipe" : outIO.fileno(), "inherit"];
-      const read = {
-        bytes: (chunk: Uint8Array) => {
-          try {
-            pipeOut?.write(chunk);
-          } catch (error) {
-            if (!(error instanceof Errno.EPIPE || error instanceof IOError)) throw error;
-          }
-        },
+      const opened: File[] = [];
+      const redirect = (target: string | IO | undefined, inherited: IO) => {
+        let io: IO;
+        if (typeof target === "string") {
+          const file = File.open(target, "w");
+          opened.push(file);
+          io = file;
+        } else {
+          io = target ?? inherited;
+        }
+        const pipe = io instanceof PipeIO ? io : null;
+        const read = {
+          bytes: (chunk: Uint8Array) => {
+            try {
+              pipe?.write(chunk);
+            } catch (error) {
+              if (!(error instanceof Errno.EPIPE || error instanceof IOError)) throw error;
+            }
+          },
+        };
+        return { stdio: pipe ? "pipe" : io.isClosed() ? "inherit" : io.fileno(), read };
       };
+      const out = redirect(options?.out, STDOUT);
+      const err = redirect(options?.err, STDERR);
+      const stdio = ["inherit", out.stdio, err.stdio];
       const status =
         args == null
-          ? spawnChild(cp, "/bin/sh", ["-c", command], env, stdio, read)
-          : spawnChild(cp, command, args, env, stdio, read);
-      return status.finally(() => outFile?.close());
+          ? spawnChild(cp, "/bin/sh", ["-c", command], env, stdio, out.read, undefined, err.read)
+          : spawnChild(cp, command, args, env, stdio, out.read, undefined, err.read);
+      return status.finally(() => {
+        for (const file of opened) file.close();
+      });
     },
     async capture2e(command, env, args) {
       let output = "";
@@ -300,7 +317,7 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         command,
         args,
         env,
-        ["inherit", "pipe", err ?? "inherit"],
+        ["inherit", "pipe", err ?? (STDERR.isClosed() ? "inherit" : STDERR.fileno())],
         { bytes: (chunk) => chunks.push(chunk) },
       );
       const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));

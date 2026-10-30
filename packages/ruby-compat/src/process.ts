@@ -31,19 +31,21 @@ export function rbExecargNew(
   prog: string,
   env: Record<string, string | undefined>,
   args: string[] | null,
-  opthash: { out?: string | IO; unsetenvOthers?: unknown },
+  opthash: { out?: string | IO; err?: string | IO; unsetenvOthers?: unknown },
 ] {
   const rest = [...argv];
-  let opthash: { out?: string | IO; unsetenvOthers?: unknown } = {};
+  let opthash: { out?: string | IO; err?: string | IO; unsetenvOthers?: unknown } = {};
   if (rest.length > 0 && isPlainHash(rest[rest.length - 1])) {
-    opthash = rest.pop() as { out?: string | IO; unsetenvOthers?: unknown };
+    opthash = rest.pop() as { out?: string | IO; err?: string | IO; unsetenvOthers?: unknown };
     for (const key of Object.keys(opthash)) {
       if (EXEC_OPTIONS.has(key) || key.startsWith("rlimit_") || /^\d+$/.test(key)) continue;
       throw new ArgumentError(`wrong exec option symbol: ${key}`);
     }
   }
-  if (typeof opthash.out === "object" && opthash.out?.isClosed()) {
-    throw new IOError("closed stream");
+  for (const redirect of [opthash.out, opthash.err]) {
+    if (typeof redirect === "object" && redirect?.isClosed()) {
+      throw new IOError("closed stream");
+    }
   }
   const unsetenvOthers = opthash.unsetenvOthers != null && opthash.unsetenvOthers !== false;
   const env: Record<string, string | undefined> = unsetenvOthers ? {} : { ...processEnv };
