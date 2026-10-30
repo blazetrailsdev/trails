@@ -39,6 +39,18 @@ describe("Attachment", () => {
     expect((attachment as unknown as { mumbo?: unknown }).mumbo).toBeUndefined();
   });
 
+  it("reads its own column rather than the blob's", async () => {
+    await attachment.blob;
+    const blobId = attachment.readAttribute("blob_id");
+    const found = (await Attachment.find(attachment.id)) as unknown as { id: unknown };
+
+    expect(found.id).toBe(attachment.id);
+    expect((attachment as unknown as { blob_id: unknown }).blob_id).toBe(blobId);
+    expect((attachment as unknown as { created_at: unknown }).created_at).toEqual(
+      attachment.readAttribute("created_at"),
+    );
+  });
+
   it("delegates signedId to the blob", async () => {
     const blob = (await attachment.blob)!;
 
