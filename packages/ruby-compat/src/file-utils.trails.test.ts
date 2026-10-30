@@ -625,3 +625,73 @@ describe("FileUtils", () => {
     expect(FileUtils.chdir).toBe(FileUtils.cd);
   });
 });
+
+describe("FileUtils async commands", () => {
+  let origPwd: string;
+  let tmp: string;
+
+  beforeEach(() => {
+    origPwd = Dir.pwd();
+    tmp = nodeFs.realpathSync(nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "fu-async-")));
+    Dir.chdir(tmp);
+  });
+
+  afterEach(() => {
+    Dir.chdir(origPwd);
+    nodeFs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("touch, mv, rm and rm_f", async () => {
+    await FileUtils.touchAsync("a");
+    await FileUtils.mvAsync("a", "b");
+    expect(nodeFs.existsSync("b")).toBe(true);
+    await FileUtils.rmAsync("b");
+    await expect(FileUtils.rmAsync("b")).rejects.toMatchObject({ code: "ENOENT" });
+    await FileUtils.rmFAsync("b");
+  });
+
+  it("mv raises EEXIST for a directory destination", async () => {
+    await FileUtils.touchAsync("a");
+    nodeFs.mkdirSync("d/a", { recursive: true });
+    await expect(FileUtils.mvAsync("a", "d")).rejects.toMatchObject({ code: "EEXIST" });
+  });
+
+  it("touch with mtime sets it and nocreate raises", async () => {
+    const t = new Date(2001, 0, 2, 3, 4, 5);
+    await FileUtils.touchAsync("a", { mtime: t });
+    expect(nodeFs.statSync("a").mtime).toEqual(t);
+    await expect(FileUtils.touchAsync("z", { nocreate: true })).rejects.toThrow();
+  });
+
+  it("mkdir and rmdir with parents", async () => {
+    await FileUtils.mkdirAsync("x");
+    await FileUtils.mkdirAsync("x/y", { mode: 0o700 });
+    expect(nodeFs.statSync("x/y").mode & 0o777).toBe(0o700);
+    await FileUtils.rmdirAsync("x/y/", { parents: true });
+    expect(nodeFs.existsSync("x")).toBe(false);
+  });
+
+  it("ln_s and ln_sf", async () => {
+    await FileUtils.touchAsync("a");
+    await FileUtils.lnSAsync("a", "s");
+    await FileUtils.touchAsync("b");
+    await expect(FileUtils.lnSAsync("a", "b")).rejects.toMatchObject({ code: "EEXIST" });
+    await FileUtils.lnSfAsync("a", "b");
+    expect(nodeFs.readlinkSync("b")).toBe("a");
+  });
+
+  it("cp_r copies a tree with symlinks", async () => {
+    await FileUtils.mkdirPAsync("t/sub");
+    nodeFs.writeFileSync("t/sub/f", "x");
+    nodeFs.symlinkSync("sub/f", "t/l");
+    await FileUtils.cpRAsync("t", "u", { preserve: true });
+    expect(nodeFs.readFileSync("u/sub/f", "utf8")).toBe("x");
+    expect(nodeFs.readlinkSync("u/l")).toBe("sub/f");
+  });
+
+  it("chmod", async () => {
+    await FileUtils.touchAsync("a");
+    await FileUtils.chmodAsync(0o640, "a");
+    expect(nodeFs.statSync("a").mode & 0o777).toBe(0o640);
+  });
+});

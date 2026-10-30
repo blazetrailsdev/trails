@@ -107,6 +107,9 @@ describe("the node adapter", () => {
     symlink: true,
     link: true,
     chmod: true,
+    chown: true,
+    utimes: true,
+    readlink: true,
   };
 
   test("carries only the verbs FsAdapter declares", () => {

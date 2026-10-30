@@ -3,6 +3,7 @@ import {
   FileUtils as StdlibFileUtils,
   extend,
   include,
+  isPlainHash,
   puts,
   rbEnsure,
   rtest,
@@ -13,61 +14,52 @@ import { Rake } from "./rake-module.js";
 
 type FU = typeof StdlibFileUtils;
 
-export const FileUtilsExt = {
+const commands = [
+  "mkdir",
+  "mkdirP",
+  "mkpath",
+  "makedirs",
+  "rmdir",
+  "ln",
+  "link",
+  "lnS",
+  "symlink",
+  "lnSf",
+  "cp",
+  "copy",
+  "cpR",
+  "mv",
+  "move",
+  "rm",
+  "remove",
+  "rmF",
+  "safeUnlink",
+  "rmR",
+  "rmRf",
+  "rmtree",
+  "chmod",
+  "chmodR",
+  "touch",
+] as const;
+
+type Commands = { [K in (typeof commands)[number]]: FU[`${K}Async`] } & {
+  chdir: typeof fileUtilsExt.cd;
+};
+
+const fileUtilsExt = {
   verboseFlag: null as unknown,
   nowriteFlag: null as unknown,
   DEFAULT: {} as object,
 
-  async mkdirP(list: string | string[], options: Parameters<FU["mkdirPAsync"]>[1] = {}) {
-    return StdlibFileUtils.mkdirPAsync(list, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
-  },
-
-  async ln(src: string | string[], dest: string, options: Parameters<FU["lnAsync"]>[2] = {}) {
-    return StdlibFileUtils.lnAsync(src, dest, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
-  },
-
-  async cp(src: string | string[], dest: string, options: Parameters<FU["cpAsync"]>[2] = {}) {
-    return StdlibFileUtils.cpAsync(src, dest, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
-  },
-
-  async rmR(list: string | string[], options: Parameters<FU["rmRAsync"]>[1] = {}) {
-    return StdlibFileUtils.rmRAsync(list, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
-  },
-
-  async rmRf(list: string | string[], options: Parameters<FU["rmRfAsync"]>[1] = {}) {
-    return StdlibFileUtils.rmRfAsync(list, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
-  },
-
-  async chmodR(
-    mode: number,
-    list: string | string[],
-    options: Parameters<FU["chmodRAsync"]>[2] = {},
+  /** @inventedArm if — PERMANENT */
+  cd<T>(
+    dir: string,
+    options: { verbose?: boolean | null } | ((dir: string) => T) = {},
+    block?: (dir: string) => T,
   ) {
-    return StdlibFileUtils.chmodRAsync(mode, list, {
-      verbose: FileUtilsExt.verboseFlag as boolean,
-      noop: FileUtilsExt.nowriteFlag as boolean,
-      ...options,
-    });
+    if (typeof options === "function") [options, block] = [{}, options];
+    const verbose = FileUtilsExt.verboseFlag as boolean;
+    return StdlibFileUtils.cd(dir, { verbose, ...options }, block!);
   },
 
   /** @inventedArm if — PERMANENT */
@@ -118,6 +110,8 @@ export const FileUtilsExt = {
   },
 };
 
+export const FileUtilsExt = fileUtilsExt as typeof fileUtilsExt & Commands;
+
 Object.defineProperties(FileUtilsExt, {
   verboseFlag: { enumerable: false },
   nowriteFlag: { enumerable: false },
@@ -125,6 +119,21 @@ Object.defineProperties(FileUtilsExt, {
 
 FileUtilsExt.verboseFlag = FileUtilsExt.DEFAULT;
 FileUtilsExt.nowriteFlag = false;
+
+const generated = FileUtilsExt as unknown as Record<string, (...args: unknown[]) => unknown>;
+const stdlib = StdlibFileUtils as unknown as typeof generated;
+for (const name of commands) {
+  generated[name] = (...args) => {
+    const options = isPlainHash(args.at(-1)) ? (args.pop() as object) : {};
+    return stdlib[`${name}Async`](...args, {
+      verbose: FileUtilsExt.verboseFlag,
+      noop: FileUtilsExt.nowriteFlag,
+      ...options,
+    });
+  };
+}
+
+FileUtilsExt.chdir = FileUtilsExt.cd;
 
 include(FileUtilsExt, FileUtils);
 
