@@ -727,7 +727,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "starttls",
       "helo",
       "ehlo",
-      "quit",
       "continue",
       "base64_encode",
       "cram_md5_response",

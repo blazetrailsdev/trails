@@ -174,6 +174,12 @@ describe("TestSMTP", () => {
   it("unsuccessful send message fatal error", () => refusedAt("520 FATAL ERROR", SMTPFatalError));
   it("unsuccessful send message unknown error", () => refusedAt("300 UNKNOWN", SMTPUnknownError));
 
+  it("data guards its message and block arguments", async () => {
+    const smtp = new SMTP("localhost", 25);
+    await expect(smtp.data()).rejects.toThrow("message or block is required");
+    await expect(smtp.data("m", () => {})).rejects.toThrow("message and block are exclusive");
+  });
+
   it("rset", async () => {
     const smtp = (await SMTP.start("127.0.0.1", await fakeServerStart())) as SMTP;
     expect((await smtp.rset()).isSuccess()).toBe(true);

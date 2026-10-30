@@ -55,10 +55,6 @@ export const SMTPError = {
   },
 };
 
-function _isResponse(response: unknown): response is Response {
-  return response instanceof Response;
-}
-
 export class SMTPAuthenticationError extends ProtoAuthError {
   response: Response | null;
   /** @internal */
@@ -66,8 +62,8 @@ export class SMTPAuthenticationError extends ProtoAuthError {
 
   constructor(response: Response | string, { message = null }: { message?: string | null } = {}) {
     super();
-    this.response = _isResponse(response) ? response : null;
-    this._message = _isResponse(response) ? message : (message ?? response);
+    this.response = response instanceof Response ? response : null;
+    this._message = response instanceof Response ? message : (message ?? response);
   }
 }
 include(SMTPAuthenticationError, SMTPError);
@@ -79,8 +75,8 @@ export class SMTPServerBusy extends ProtoServerError {
 
   constructor(response: Response | string, { message = null }: { message?: string | null } = {}) {
     super();
-    this.response = _isResponse(response) ? response : null;
-    this._message = _isResponse(response) ? message : (message ?? response);
+    this.response = response instanceof Response ? response : null;
+    this._message = response instanceof Response ? message : (message ?? response);
   }
 }
 include(SMTPServerBusy, SMTPError);
@@ -92,8 +88,8 @@ export class SMTPSyntaxError extends ProtoSyntaxError {
 
   constructor(response: Response | string, { message = null }: { message?: string | null } = {}) {
     super();
-    this.response = _isResponse(response) ? response : null;
-    this._message = _isResponse(response) ? message : (message ?? response);
+    this.response = response instanceof Response ? response : null;
+    this._message = response instanceof Response ? message : (message ?? response);
   }
 }
 include(SMTPSyntaxError, SMTPError);
@@ -105,8 +101,8 @@ export class SMTPFatalError extends ProtoFatalError {
 
   constructor(response: Response | string, { message = null }: { message?: string | null } = {}) {
     super();
-    this.response = _isResponse(response) ? response : null;
-    this._message = _isResponse(response) ? message : (message ?? response);
+    this.response = response instanceof Response ? response : null;
+    this._message = response instanceof Response ? message : (message ?? response);
   }
 }
 include(SMTPFatalError, SMTPError);
@@ -118,8 +114,8 @@ export class SMTPUnknownError extends ProtoUnknownError {
 
   constructor(response: Response | string, { message = null }: { message?: string | null } = {}) {
     super();
-    this.response = _isResponse(response) ? response : null;
-    this._message = _isResponse(response) ? message : (message ?? response);
+    this.response = response instanceof Response ? response : null;
+    this._message = response instanceof Response ? message : (message ?? response);
   }
 }
 include(SMTPUnknownError, SMTPError);
@@ -131,8 +127,8 @@ export class SMTPUnsupportedCommand extends ProtocolError {
 
   constructor(response: Response | string, { message = null }: { message?: string | null } = {}) {
     super();
-    this.response = _isResponse(response) ? response : null;
-    this._message = _isResponse(response) ? message : (message ?? response);
+    this.response = response instanceof Response ? response : null;
+    this._message = response instanceof Response ? message : (message ?? response);
   }
 }
 include(SMTPUnsupportedCommand, SMTPError);
@@ -484,7 +480,7 @@ export class SMTP {
    * @internal
    * @missingRailsCall critical — PERMANENT
    * @missingRailsCall check_response — PERMANENT
-   * @missingRailsArgs do_helo — PERMANENT
+   * @inventedArm rescue — PERMANENT
    */
   private async doStart(
     heloDomain: string,
@@ -525,12 +521,14 @@ export class SMTP {
           });
         });
       } catch (err) {
-        this.doHelo();
         if ((err as ConnectionError).code === "ETIMEDOUT") {
           throw new OpenTimeout("execution expired");
         }
-        if ((err as ConnectionError).code === "ETLS" && !this.isCapableStarttls()) {
-          throw new SMTPUnsupportedCommand("STARTTLS is not supported on this server");
+        if ((err as ConnectionError).code === "ETLS" && this.isStarttlsAlways()) {
+          this.doHelo(heloDomain);
+          if (!this.isCapableStarttls()) {
+            throw new SMTPUnsupportedCommand("STARTTLS is not supported on this server");
+          }
         }
         _rethrow(err as ConnectionError);
       }
@@ -538,7 +536,7 @@ export class SMTP {
         this._errorOccurred = true;
       });
       this.logging(`Connection opened: ${this.address}:${this.port}`);
-      this.doHelo();
+      this.doHelo(heloDomain);
       if (user != null) {
         await this.authenticate(user, secret, authtype ?? SMTP.DEFAULT_AUTH_TYPE);
       }
@@ -552,10 +550,11 @@ export class SMTP {
   }
 
   /** @internal */
-  private doHelo(): void {
-    const lines = this._socket!._ehloLines ?? [];
-    const res = Response.parse(`250-${this.address}\n${lines.map((l) => `250 ${l}\n`).join("")}`);
-    this.capabilities = res.capabilities;
+  private doHelo(heloDomain: string): void {
+    const lines = this._socket!._ehloLines;
+    if (lines == null) this.esmtp = false;
+    const replies = (lines ?? []).map((line) => `250 ${line}\n`).join("");
+    this.capabilities = Response.parse(`250-${heloDomain}\n${replies}`).capabilities;
   }
 
   /** @internal */
@@ -563,10 +562,7 @@ export class SMTP {
     const socket = this._socket;
     try {
       if (socket != null && !socket._destroyed && !this._errorOccurred) {
-        await new Promise<void>((resolve) => {
-          socket.once("end", () => resolve());
-          socket.quit();
-        });
+        await this.quit();
       }
     } finally {
       this._started = false;
@@ -661,16 +657,32 @@ export class SMTP {
     return await this.getok([`RCPT TO:<${addr.address}>`, ...addr.parameters].join(" "));
   }
 
-  async data(msgstr: string): Promise<Response> {
+  async data(
+    msgstr: string | null = null,
+    block: ((stream: { write(str: string): unknown }) => unknown) | null = null,
+  ): Promise<Response> {
+    if (msgstr != null && block != null) {
+      throw new ArgumentError("message and block are exclusive");
+    }
+    if (msgstr == null && block == null) throw new ArgumentError("message or block is required");
     const res = await this.critical(async () => {
       this.checkContinue(await this.getResponse("DATA"));
-      const body = msgstr.replace(/\r?\n/g, "\r\n").replace(/^\./gm, "..");
+      const chunks: string[] = msgstr != null ? [msgstr] : [];
+      if (block != null) await block({ write: (str: string) => chunks.push(str) });
+      const body = chunks
+        .join("")
+        .replace(/\r\n|\n|\r/g, "\r\n")
+        .replace(/^\./gm, "..");
       const tail = body.endsWith("\r\n") ? "" : "\r\n";
       this._socket!._socket.write(`${body}${tail}.\r\n`);
       return await this.recvResponse();
     });
     this.checkResponse(res);
     return res;
+  }
+
+  async quit(): Promise<Response> {
+    return await this.getok("QUIT");
   }
 
   async getResponse(reqline: string): Promise<Response> {
