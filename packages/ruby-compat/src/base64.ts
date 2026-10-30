@@ -30,9 +30,7 @@ export class Base64 {
    * `[bin].pack("m0")` (`base64.rb:274`) — Base64 over the String's BYTES,
    * with no line breaks.
    *
-   * `bin` is an ASCII-8BIT String in this package's representation — one code
-   * unit per byte, what {@link IO.binread} answers and {@link IO.binwrite}
-   * consumes.
+   * `bin` is text, read as its UTF-8 bytes, or an ASCII-8BIT `Uint8Array`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Base64.strict_encode64`
    * (`vendor/ruby/v3.3.11/lib/base64.rb:273`).
