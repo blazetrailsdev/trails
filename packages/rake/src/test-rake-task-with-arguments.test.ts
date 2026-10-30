@@ -7,6 +7,16 @@ import { dsl } from "./test-helpers/file-creation.js";
 
 const { desc, multitask, task } = dsl;
 
+function verifyKeywords(notes: string[], name: string, expecteds: unknown[], actuals: unknown[]) {
+  notes.push(name);
+  expect(actuals.length).toBe(expecteds.length);
+  expecteds.forEach((e, i) => expect(actuals[i]).toBe(e));
+}
+
+function verifyNotes(notes: string[]) {
+  expect(notes).toEqual(["a", "b", "c", "d", "e", "f", "g", "h"]);
+}
+
 describe("TestRakeTaskWithArguments", () => {
   useApplicationTestCase();
 
@@ -94,11 +104,8 @@ describe("TestRakeTaskWithArguments", () => {
     type Keywords = { dflt?: string; ovrd?: string; reqr?: string };
     const notes: string[] = [];
     const t = task("t", ["reqr", "ovrd", "dflt"]);
-    const verify = (name: string, expecteds: unknown[], actuals: unknown[]) => {
-      notes.push(name);
-      expect(actuals.length).toBe(expecteds.length);
-      expecteds.forEach((e, i) => expect(actuals[i]).toBe(e));
-    };
+    const verify = (name: string, expecteds: unknown[], actuals: unknown[]) =>
+      verifyKeywords(notes, name, expecteds, actuals);
     const enhance = (block: (t2: Task, keywords: Keywords) => void) =>
       t.enhance(null, (t2, _args, keywords) => block(t2, keywords as Keywords));
 
@@ -114,7 +121,7 @@ describe("TestRakeTaskWithArguments", () => {
     enhance((t2, { ovrd = "-", reqr }) => verify("h", [t, "o", "r"], [t2, ovrd, reqr]));
 
     await t.invoke("r", "o");
-    expect(notes).toEqual(["a", "b", "c", "d", "e", "f", "g", "h"]);
+    verifyNotes(notes);
   });
 
   it("arguments are passed to block", async () => {

@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RuntimeError, block, regexpEscape } from "@blazetrails/ruby-compat";
+import { FileList } from "./file-list.js";
 import { Rake } from "./rake-module.js";
 import { Task } from "./task.js";
 import { captureOutput, useApplicationTestCase } from "./test-helpers/application.js";
 import { dsl } from "./test-helpers/file-creation.js";
-
-declare const FileList: { new (): { include(...names: string[]): unknown } };
 
 const { desc, namespace, task } = dsl;
 const sleep = (seconds: number) => new Promise((r) => setTimeout(r, seconds * 1000));
@@ -65,8 +64,9 @@ describe("TestRakeTask", () => {
     const t2 = task({ t2: ["t1"] }, recordingName(runlist));
     expect(t1.prerequisites).toEqual(["t2"]);
     expect(t2.prerequisites).toEqual(["t1"]);
-    const ex = (await t1.invoke().catch((e: unknown) => e)) as RuntimeError;
-    expect(ex).toBeInstanceOf(RuntimeError);
+    const invocation = t1.invoke();
+    await expect(invocation).rejects.toThrow(RuntimeError);
+    const ex = (await invocation.catch((e: unknown) => e)) as RuntimeError;
     expect(ex.message).toMatch(/circular dependency/i);
     expect(ex.message).toMatch(/t1 => t2 => t1/);
   });
@@ -157,7 +157,7 @@ describe("TestRakeTask", () => {
     expect(t.prerequisites.length === 0).toBeTruthy();
     expect(t.actions.length === 0).toBeTruthy();
     expect(t.comment).toBeNull();
-    expect(t.argNames).toEqual([]);
+    expect(t.argNames).toBeEmpty();
   });
 
   it("clear prerequisites", () => {
@@ -194,14 +194,15 @@ describe("TestRakeTask", () => {
 
     task("foo");
 
-    expect(task("foo").argNames).toEqual([]);
+    expect(task("foo").argNames).toBeEmpty();
   });
 
   it("find", async () => {
     task("tfind");
     expect((await Task.get("tfind")).name).toBe("tfind");
-    const ex = (await Task.get("leaves").catch((e: unknown) => e)) as RuntimeError;
-    expect(ex).toBeInstanceOf(RuntimeError);
+    const lookup = Task.get("leaves");
+    await expect(lookup).rejects.toThrow(RuntimeError);
+    const ex = (await lookup.catch((e: unknown) => e)) as RuntimeError;
     expect(ex.message).toBe(
       "Don't know how to build task 'leaves'" +
         " (See the list of available tasks with `rake --tasks`)",
@@ -250,9 +251,8 @@ describe("TestRakeTask", () => {
     expect((await Task.get("a")).prerequisites).toEqual(["b", "c"]);
   });
 
-  // BLOCKED: rake-file-list-port (trails#9510), `Rake::FileList` is unported.
-  it.skip("filelists can be prerequisites", async () => {
-    task({ a: new FileList().include("b", "c") });
+  it("filelists can be prerequisites", async () => {
+    task({ a: await new FileList().include("b", "c").toAry() });
     expect((await Task.get("a")).prerequisites).toEqual(["b", "c"]);
   });
 
@@ -492,8 +492,9 @@ describe("TestRakeTask", () => {
 
   it("suggests valid rake task names", async () => {
     task("test");
-    const error = (await Task.get("testt").catch((e: unknown) => e)) as RuntimeError;
-    expect(error).toBeInstanceOf(RuntimeError);
+    const lookup = Task.get("testt");
+    await expect(lookup).rejects.toThrow(RuntimeError);
+    const error = (await lookup.catch((e: unknown) => e)) as RuntimeError;
 
     expect(error.message).toMatch(/Don't know how to build task 'testt'/);
     expect(error.message).toMatch(/Did you mean\? {2}test/);
