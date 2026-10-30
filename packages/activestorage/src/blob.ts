@@ -16,6 +16,7 @@ import {
   OpenSSL,
   rbObjRespondTo,
   type Included,
+  type Tempfile,
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import { Identifiable } from "./blob/identifiable.js";
@@ -430,7 +431,7 @@ export class Blob extends Record {
 
   async open<T>(
     { tmpdir = null }: { tmpdir?: string | null } = {},
-    block: (file: import("@blazetrails/ruby-compat").Tempfile) => T,
+    block: (file: Tempfile) => T,
   ): Promise<Awaited<T>> {
     return await this.service.open(
       this.key,
