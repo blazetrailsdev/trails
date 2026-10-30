@@ -1792,6 +1792,7 @@ the capability, in a different place. Each is decided here, and each but
 | `mini_magick/image.rb`                                | Proxy (ungated)       |
 | `image_processing/chainable.rb`                       | Proxy (thenable)      |
 | `active_storage/attachment.rb`                        | Proxy (proto chain)   |
+| `active_storage/attached/one.rb`                      | Proxy (proto chain)   |
 
 Rules that apply across the table:
 
@@ -1822,7 +1823,9 @@ Rules that apply across the table:
   `toString` or `append` is written `xml.tagBang(name)`, Ruby's `tag!`.
 - `active_storage/attachment.rb`'s `delegate_missing_to :blob` forwards only
   to a blob already loaded, since its trap is synchronous; an unloaded blob
-  reads `undefined` until `await attachment.blob`.
+  reads `undefined` until `await attachment.blob`. `attached/one.rb`'s
+  `delegate_missing_to :attachment, allow_nil: true` likewise forwards only to
+  a loaded attachment.
 - `image_processing/chainable.rb`'s Proxy answers `then` with `call()`, so
   `await builder` runs the pipeline. JS awaits anything with a `then`:
   returning a builder from an `async` function, or resolving a promise with

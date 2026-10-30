@@ -1,12 +1,15 @@
 import { afterAll } from "vitest";
-import { EnvironmentInquirer, getEnv, TopLevel } from "@blazetrails/activesupport";
+import { EnvironmentInquirer, getEnv, onLoad, TopLevel } from "@blazetrails/activesupport";
+import { GlobalID, Identification } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/activerecord";
 import { Engine } from "@blazetrails/trailties/engine";
-import { File, Dir } from "@blazetrails/ruby-compat";
+import { File, Dir, include } from "@blazetrails/ruby-compat";
 import "../../class-paths.generated.js";
 import { ActiveStorage } from "../../active-storage.js";
+import { Model } from "../../attached/model.js";
 import { Attachment } from "../../attachment.js";
+import { ActiveRecordExtensions } from "../../reflection.js";
 import { Blob } from "../../blob.js";
 import { Registry } from "../../service/registry.js";
 import "../../service/configurator.js";
@@ -19,7 +22,10 @@ const configuration = new Configuration();
 TopLevel.Trails = {
   ...TopLevel.Trails,
   env: TopLevel.Trails?.env ?? new EnvironmentInquirer(envName),
-  configuration: { generators: configuration.appGenerators.bind(configuration) },
+  configuration: {
+    generators: configuration.appGenerators.bind(configuration),
+    activeStorage: { service: "local" },
+  },
 } as unknown as typeof TopLevel.Trails;
 
 class ActiveStorageEngine extends Engine {
@@ -29,6 +35,14 @@ class ActiveStorageEngine extends Engine {
   }
 }
 void ActiveStorageEngine;
+
+GlobalID.setApp("ActiveStorageExampleApp");
+
+onLoad("active_record", function (this: typeof Base) {
+  include(this, Model);
+  include(this, ActiveRecordExtensions);
+  include(this, Identification);
+});
 
 Blob.services = new Registry({
   local: { service: "Disk", root: File.join(Dir.tmpdir(), "active_storage_blobs") },
