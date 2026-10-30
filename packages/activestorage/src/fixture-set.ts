@@ -42,7 +42,10 @@ export class FixtureSet {
         Object.entries(instance.attributes)
           .map(([key, value]) => [
             key,
-            value instanceof HashWithIndifferentAccess ? JSON.stringify(value) : value,
+            value instanceof HashWithIndifferentAccess ||
+            (value != null && Object.getPrototypeOf(value) === Object.prototype)
+              ? JSON.stringify(value)
+              : value,
           ])
           .filter(([, value]) => value != null),
       ),
