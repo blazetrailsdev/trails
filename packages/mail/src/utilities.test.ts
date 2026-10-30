@@ -70,6 +70,20 @@ describe("Utilities Module", () => {
       const inputStr = Object.freeze("blargh");
       expect(() => quotePhrase(inputStr)).not.toThrow();
     });
+
+    describe("given a non-unsafe string", () => {
+      // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the assertion is on `String#encoding`.
+      it.skip("should not change the encoding", () => {
+        expect(quotePhrase("blargh")).toBe("blargh");
+      });
+    });
+
+    describe("given an unsafe string", () => {
+      // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the assertion is on `String#encoding`.
+      it.skip("should not change the encoding", () => {
+        expect(quotePhrase("Bjørn")).toBe('"Bjørn"');
+      });
+    });
   });
 
   describe("escaping parenthesies", () => {

@@ -4,6 +4,7 @@ import {
   DEFAULT_PARSER,
   isEmpty,
   rbInspect,
+  rbObjRespondTo,
   rbStrEnumerateLines,
   Encoding,
   isAsciiOnly,
@@ -170,7 +171,7 @@ export const Utilities = {
     } else if (typeof value === "string") {
       return !/\S/.test(value);
     } else {
-      return typeof value === "object" ? isEmpty(value) : value === false;
+      return rbObjRespondTo(value, "isEmpty") ? isEmpty(value as object) : value === false;
     }
   },
 
