@@ -1562,8 +1562,7 @@ export class IO {
  * `rb_io_fmode_modestr` (`vendor/ruby/v3.3.11/io.c:6408`), without its binary
  * and text spellings.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `rb_io_fmode_modestr`
- * (`vendor/ruby/v3.3.11/io.c:6408`).
+ * @noRailsEquivalent PERMANENT
  */
 export function rbIoFmodeModestr(fmode: number): string {
   if (fmode & FMODE_APPEND) {
@@ -1608,7 +1607,7 @@ function prepStdio(
  * `STDIN` / `$stdin`, `rb_io_prep_stdin` (`vendor/ruby/v3.3.11/io.c:9332`): an
  * `IO` over descriptor 0, which has no write-side adapter stream.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `STDIN`.
+ * @noRailsEquivalent PERMANENT
  */
 export const STDIN: IO = prepStdio(null, 0, "r", IO, "<STDIN>");
 
