@@ -809,12 +809,17 @@ describe("FileUtils async commands", () => {
       expect(FileUtils.compareStream(stream(same), stream(same.slice(0, bsize)))).toBe(false);
     });
 
-    it("fu_blksize answers nil for a missing or zero blksize", () => {
-      const st = (blksize?: number) => ({ blksize }) as FsStatResult;
-      expect(FileUtils.fuBlksize(st())).toBeNull();
-      expect(FileUtils.fuBlksize(st(0))).toBeNull();
-      expect(FileUtils.fuBlksize(st(4096))).toBe(4096);
-      expect(FileUtils.fuDefaultBlksize()).toBe(1024);
+    it("compare_stream takes its block size from the first stream with a usable blksize", () => {
+      const lengths: number[] = [];
+      const stream = (blksize: number) => ({
+        stat: () => ({ blksize }) as FsStatResult,
+        read(length: number) {
+          lengths.push(length);
+          return null;
+        },
+      });
+      expect(FileUtils.compareStream(stream(0), stream(4096))).toBe(true);
+      expect(lengths).toEqual([4096, 4096]);
     });
 
     it("chmod symbol mode", async () => {

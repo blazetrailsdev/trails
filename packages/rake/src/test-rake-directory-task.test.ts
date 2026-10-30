@@ -62,5 +62,13 @@ describe("TestRakeDirectoryTask", () => {
     expect(await File.isDirectoryAsync("a/b/c")).toBeTruthy();
   });
 
-  it.skip("can use filelist", () => {});
+  it.skip("can use filelist", async () => {
+    dsl.directory(["a", "b", "c"]);
+
+    expect((await rake.tm.get("a")).constructor).toEqual(FileCreationTask);
+
+    await dsl.verbose(false, async () => (await rake.tm.get("a")).invoke());
+
+    expect(await File.isDirectoryAsync("a")).toBeTruthy();
+  });
 });
