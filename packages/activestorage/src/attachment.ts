@@ -1,12 +1,6 @@
 import { type Base } from "@blazetrails/activerecord";
-import { runLoadHooks } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  block,
-  fetch,
-  KERNEL_METHODS,
-  PROTOCOL_PROBES,
-} from "@blazetrails/ruby-compat";
+import { delegate, delegateMissingTo, runLoadHooks } from "@blazetrails/activesupport";
+import { ArgumentError, block, fetch } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import type { Blob } from "./blob.js";
 import { Record } from "./record.js";
@@ -59,10 +53,6 @@ export class Attachment extends Record {
         },
       });
     });
-  }
-
-  override signedId(...args: Parameters<Base["signedId"]>): string {
-    return (this.association("blob").target as Blob).signedId(...args);
   }
 
   async purge(): Promise<void> {
@@ -167,27 +157,12 @@ export class Attachment extends Record {
 
 Object.setPrototypeOf(
   Attachment.prototype,
-  new Proxy(Object.create(Object.getPrototypeOf(Attachment.prototype) as object) as object, {
-    get(target, prop, receiver: Attachment) {
-      const value = Reflect.get(target, prop, receiver);
-      if (
-        value !== undefined ||
-        typeof prop === "symbol" ||
-        prop.startsWith("_") ||
-        Reflect.has(target, prop) ||
-        PROTOCOL_PROBES.has(prop) ||
-        KERNEL_METHODS.has(prop) ||
-        receiver === Attachment.prototype
-      ) {
-        return value;
-      }
-      const blob = receiver.association("blob").target as { [k: string]: unknown } | null;
-      if (blob == null || !(prop in blob)) return value;
-      const member = blob[prop];
-      return typeof member === "function" ? member.bind(blob) : member;
-    },
-  }),
+  delegateMissingTo.call(
+    Object.create(Object.getPrototypeOf(Attachment.prototype) as object),
+    "blob",
+  ),
 );
+delegate.call(Attachment.prototype, "signedId", { to: "blob" });
 
 ActiveStorage.Attachment = Attachment;
 

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { DelegationError } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
 import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
 import { Attachment } from "./attachment.js";
@@ -36,7 +37,23 @@ describe("Attachment", () => {
 
     expect(delegated.key).toBe(blob.key);
     expect(delegated.isText()).toBe(true);
-    expect((attachment as unknown as { mumbo?: unknown }).mumbo).toBeUndefined();
+    expect(() => (attachment as unknown as { mumbo(): void }).mumbo()).toThrow(NoMethodError);
+  });
+
+  it("does not forward to an unloaded blob, and the blob still awaits", async () => {
+    const found = await Attachment.find(attachment.id);
+
+    expect(() => (found as unknown as { isText(): boolean }).isText()).toThrow(NoMethodError);
+    expect(() => found.signedId()).toThrow(NoMethodError);
+    expect((await found.blob)!.key).toBe((await attachment.blob)!.key);
+    expect((found as unknown as Blob).isText()).toBe(true);
+  });
+
+  it("raises DelegationError for a nil blob", () => {
+    const blank = new Attachment();
+
+    expect(() => (blank as unknown as { key: unknown }).key).toThrow(DelegationError);
+    expect(() => blank.signedId()).toThrow(DelegationError);
   });
 
   it("reads its own column rather than the blob's", async () => {

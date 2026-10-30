@@ -182,6 +182,29 @@ describe("Delegation.generateMethodMissing", () => {
     expect(obj["marshal_dump"]()).toBe("dumped");
   });
 
+  it("reads the target through the receiver when spliced into a prototype chain", () => {
+    class Host {
+      get delegate() {
+        return { greet: () => "hello" };
+      }
+    }
+    Object.setPrototypeOf(
+      Host.prototype,
+      Delegation.generateMethodMissing(Object.create(Object.prototype), "delegate"),
+    );
+    expect((new Host() as unknown as { greet(): string }).greet()).toBe("hello");
+    expect((Host.prototype as unknown as { greet?: unknown }).greet).toBeUndefined();
+  });
+
+  it("does not forward an underscore field or a Kernel method", () => {
+    const obj = Delegation.generateMethodMissing(
+      { delegate: { _x: 1, dup: () => 2 } } as any,
+      "delegate",
+    );
+    expect(obj._x).toBeUndefined();
+    expect(obj.dup).toBeUndefined();
+  });
+
   it("proxies method calls to delegate", () => {
     const delegate = {
       greet() {

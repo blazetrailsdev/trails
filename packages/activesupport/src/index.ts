@@ -300,6 +300,7 @@ export {
   registerSubclass,
   subclasses,
   descendants,
+  delegateMissingTo,
 } from "./module-ext.js";
 export { Rescuable } from "./rescuable.js";
 export type { MattrOptions } from "./module-ext.js";
