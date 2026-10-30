@@ -120,7 +120,6 @@ interface InternalBeginTransactionHost {
 }
 
 interface PerformQueryHost {
-  _busyHandlerTimeout?: number | null;
   _cachedStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement>;
   _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement>;
   _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void;
@@ -193,7 +192,7 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Result> {
-  const timeout = this._busyHandlerTimeout ?? 0;
+  const timeout = Number((this as unknown as AbstractAdapter)["_config"]["timeout"] ?? 0);
   let result: Result;
   if (batch) {
     await execBatch(rawConnection, sql, timeout);
@@ -282,7 +281,6 @@ export function defaultInsertValue(column: {
   return column.default;
 }
 
-/** @noRailsEquivalent PERMANENT */
 async function retryBusy<T>(timeout: number, step: () => T | Promise<T>): Promise<T> {
   const deadline = Date.now() + timeout;
   while (true) {
@@ -295,7 +293,6 @@ async function retryBusy<T>(timeout: number, step: () => T | Promise<T>): Promis
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
 async function execBatch(
   rawConnection: SqliteConnection,
   sql: string,
