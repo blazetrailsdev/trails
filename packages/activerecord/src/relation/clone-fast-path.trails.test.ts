@@ -1,3 +1,4 @@
+import { types } from "node:util";
 import { describe, expect, it } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -42,6 +43,14 @@ describe("a class-specific relation's Proxy", () => {
     (relation as unknown as { seenBy: unknown }).seenBy = 1;
     expect(receivers).toHaveLength(1);
     expect(receivers[0]).toBe(relation);
+  });
+
+  it("sits in the prototype chain, so the relation itself is not a Proxy and still reaches its misses", async () => {
+    const relation = Post.where({ id: 1 });
+    expect(types.isProxy(relation)).toBe(false);
+    expect(types.isProxy(relation.limit(1))).toBe(false);
+    const first = await (relation as unknown as Record<number, Promise<Post>>)[0];
+    expect(first.id).toBe(1);
   });
 });
 
