@@ -454,7 +454,6 @@ export class Blob extends Record {
     }
   }
 
-  /** @inventedArm return — PERMANENT */
   override async delete(): Promise<this> {
     await this.service.delete(this.key);
     if (this.isImage()) await this.service.deletePrefixed(`variants/${this.key}/`);
