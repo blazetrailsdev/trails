@@ -1,3 +1,4 @@
+import { formatter, SpellChecker } from "@blazetrails/did-you-mean";
 import {
   File,
   Method,
@@ -105,10 +106,11 @@ export class TaskManager {
     return message + this.generateDidYouMeanSuggestions(taskName);
   }
 
-  /** @missingRailsCall correct — CONVERGEABLE rake-did-you-mean-suggestions */
   generateDidYouMeanSuggestions(taskName: string): string {
-    void taskName;
-    return "";
+    const suggestions = new SpellChecker({ dictionary: [...this._tasks.keys()] }).correct(
+      String(taskName),
+    );
+    return formatter().messageFor(suggestions);
   }
 
   async synthesizeFileTask(taskName: string): Promise<Task | null> {
