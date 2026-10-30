@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { types } from "node:util";
+import { describe, expect, it, vi } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
+import { Relation } from "../relation.js";
 
 registerModel([Post]);
 
@@ -43,6 +45,88 @@ describe("a class-specific relation's Proxy", () => {
     expect(receivers).toHaveLength(1);
     expect(receivers[0]).toBe(relation);
   });
+
+  it("sits in the prototype chain, so the relation itself is not a Proxy and still reaches its misses", async () => {
+    const relation = Post.where({ id: 1 });
+    expect(types.isProxy(relation)).toBe(false);
+    expect(types.isProxy(relation.limit(1))).toBe(false);
+    const first = await (relation as unknown as Record<number, Promise<Post>>)[0];
+    expect(first.id).toBe(1);
+  });
+
+  it("leaves a plain Relation's miss undefined, with no delegation to the model", () => {
+    const spy = vi.spyOn(Post, "generateRelationMethod");
+    try {
+      const plain = new Relation(Post) as unknown as Record<string, unknown>;
+      expect(plain.containingTheLetterA).toBeUndefined();
+      expect(plain.noSuchThingAtAll).toBeUndefined();
+      expect(spy).not.toHaveBeenCalled();
+      plain._plainProbe = 1;
+      expect(plain._plainProbe).toBe(1);
+      expect(Object.hasOwn(plain, "_plainProbe")).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("seats a placeholder for a field a relation first writes beneath Relation.prototype, not on it", () => {
+    const relation = Post.all() as unknown as Record<string, unknown>;
+    relation._seatProbe = 1;
+    expect(Object.hasOwn(Relation.prototype, "_seatProbe")).toBe(false);
+    expect(
+      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Relation.prototype), "_seatProbe"),
+    ).toEqual({
+      value: undefined,
+      writable: true,
+      enumerable: false,
+      configurable: true,
+    });
+    const other = Post.all() as unknown as Record<string, unknown>;
+    expect(other._seatProbe).toBeUndefined();
+    other._seatProbe = 2;
+    expect(Object.hasOwn(other, "_seatProbe")).toBe(true);
+    expect(relation._seatProbe).toBe(1);
+  });
+
+  it("lets a member defined on Relation.prototype after a placeholder is seated win, and clone not run it", () => {
+    const relation = Post.where({ id: 1 }) as unknown as Record<string, unknown>;
+    relation._lateProbe = "first";
+    const calls: unknown[] = [];
+    Object.defineProperty(Relation.prototype, "_lateProbe", {
+      configurable: true,
+      get() {
+        return "accessor";
+      },
+      set(value: unknown) {
+        calls.push(value);
+      },
+    });
+    try {
+      const fresh = Post.all() as unknown as Record<string, unknown>;
+      expect(fresh._lateProbe).toBe("accessor");
+      fresh._lateProbe = "written";
+      expect(calls).toEqual(["written"]);
+      const copy = (relation as unknown as Relation<Post>).clone() as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(calls).toEqual(["written"]);
+      expect(Object.getOwnPropertyDescriptor(copy, "_lateProbe")?.value).toBe("first");
+    } finally {
+      Reflect.deleteProperty(Relation.prototype, "_lateProbe");
+    }
+  });
+
+  it("answers Symbol.iterator only once the records are loaded", async () => {
+    const relation = Post.where({ id: [1, 2] });
+    expect(Symbol.iterator in relation).toBe(false);
+    expect((relation as unknown as Iterable<Post>)[Symbol.iterator]).toBeUndefined();
+    await relation.load();
+    expect(Symbol.iterator in relation).toBe(false);
+    expect(Array.from(relation as unknown as Iterable<Post>).map((post) => post.id)).toEqual([
+      1, 2,
+    ]);
+  });
 });
 
 describe("Relation#clone copying fields", () => {
@@ -68,6 +152,32 @@ describe("Relation#clone copying fields", () => {
       expect(Object.hasOwn(copy, "_delegateToModel")).toBe(true);
     } finally {
       Reflect.deleteProperty(proto, "_delegateToModel");
+    }
+  });
+
+  it("copies a field without a leading underscore without running a prototype setter", () => {
+    const relation = Post.where({ id: 1 }) as unknown as Record<string, unknown>;
+    relation.annotation = "kept";
+    const proto = Object.getPrototypeOf(relation) as object;
+    const calls: unknown[] = [];
+    Object.defineProperty(proto, "annotation", {
+      configurable: true,
+      get() {
+        return "proto";
+      },
+      set(value: unknown) {
+        calls.push(value);
+      },
+    });
+    try {
+      const copy = (relation as unknown as Relation<Post>).clone() as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(calls).toEqual([]);
+      expect(Object.getOwnPropertyDescriptor(copy, "annotation")?.value).toBe("kept");
+    } finally {
+      Reflect.deleteProperty(proto, "annotation");
     }
   });
 });

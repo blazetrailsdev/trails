@@ -10,6 +10,7 @@ import { CollectionProxy } from "../associations/collection-proxy.js";
 import { Relation } from "../relation.js";
 import { AssociationRelation } from "../association-relation.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 const defineClassMethod = (model: object, name: string, fn: (...args: never[]) => unknown) =>
   Object.defineProperty(model, name, { value: fn, writable: true, configurable: true });
@@ -231,7 +232,7 @@ describe("respond_to_missing? — `in` on the dispatch proxies", () => {
   it("answers a named scope, a class method and a delegated array method on a Relation", () => {
     const rel = Comment.all();
     expect("containingTheLetterE" in rel).toBe(true);
-    expect("whatAreYou" in rel).toBe(true);
+    expect(rbObjRespondTo(rel, "whatAreYou")).toBe(true);
     expect("toSentence" in rel).toBe(true);
     expect("partition" in rel).toBe(true);
     expect("noSuchThingAtAll" in rel).toBe(false);
@@ -242,7 +243,7 @@ describe("respond_to_missing? — `in` on the dispatch proxies", () => {
     const comments = post.comments as unknown as object;
     expect(comments).toBeInstanceOf(CollectionProxy);
     expect("containingTheLetterE" in comments).toBe(true);
-    expect("whatAreYou" in comments).toBe(true);
+    expect(rbObjRespondTo(comments, "whatAreYou")).toBe(true);
     expect("toSentence" in comments).toBe(true);
     expect("partition" in comments).toBe(true);
     expect("noSuchThingAtAll" in comments).toBe(false);

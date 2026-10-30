@@ -1761,7 +1761,7 @@ the capability, in a different place. Each is decided here, and each but
 | `migration/command_recorder.rb`                       | typed forwarders      |
 | `migration/default_strategy.rb`                       | typed forwarders      |
 | `active_record/migration.rb`                          | typed forwarders      |
-| `relation/delegation.rb`                              | Proxy                 |
+| `relation/delegation.rb`                              | Proxy (proto chain)   |
 | `active_record/test_fixtures.rb`                      | Proxy (proto chain)   |
 | `active_support/array_inquirer.rb`                    | Proxy                 |
 | `active_support/broadcast_logger.rb`                  | Proxy                 |
@@ -1846,6 +1846,16 @@ Rules that apply across the table:
   assignability), so a call site reaches it through a cast, and `in` still
   cannot see it. `Function.prototype.call` answers `call` before the trap can,
   so `Engine` forwards that one name with an explicit `static call`.
+- `relation/delegation.rb`'s Proxy sits once above `Relation.prototype`, so
+  only a lookup that missed the relation's class chain reaches it. Its `has`
+  trap has no receiver, so `in` answers neither a name the model's
+  `respond_to_missing?` claims before that relation method is generated nor
+  `Symbol.iterator`, which the `get` trap answers only once the records are
+  loaded synchronously. `rbObjRespondTo` answers `respond_to?`. The `set`
+  trap seats an `undefined` placeholder for each `_` field a relation first
+  writes on a private layer between `Relation.prototype` and the Proxy, so
+  later writes stop short of the Proxy and a member defined on
+  `Relation.prototype` later still shadows it.
 - `rails/engine/lazy_route_set.rb`'s `method_missing_module` is spliced beneath
   the generated url-helpers module in `LazyRouteSet#generateUrlHelpers`, since
   `include()` copies a module's methods into each includer and a Proxy on the
