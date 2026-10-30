@@ -576,7 +576,7 @@ describe("ReflectionTest", () => {
       HasManyThroughSourceAssociationNotFoundError,
     );
   });
-  // PERMANENT-SKIP: computeType reads the registerModel registry, so a model's constMissing is not consulted (CLAUDE.md, "Constant lookup is an import or a registry").
+  // PERMANENT-SKIP: computeType reads the registerModel registry, so a model's constMissing is not consulted (CLAUDE.md, "Constant lookup is an import or a registry"; repo-owner ruling on trails#9466, 2026-10-29).
   it.skip("name error from incidental code is not converted to name error for association", async () => {
     const stubbed = UserWithInvalidRelation as unknown as { constMissing?: () => never };
     stubbed.constMissing = () => {
@@ -605,7 +605,7 @@ describe("ReflectionTest", () => {
     ) as typeof reflection;
     expect(dup.hasInverse()).toBeFalsy();
   });
-  // PERMANENT-SKIP: computeType reads the registerModel registry, so a model's constMissing is not consulted (CLAUDE.md, "Constant lookup is an import or a registry").
+  // PERMANENT-SKIP: computeType reads the registerModel registry, so a model's constMissing is not consulted (CLAUDE.md, "Constant lookup is an import or a registry"; repo-owner ruling on trails#9466, 2026-10-29).
   it.skip("automatic inverse does not suppress name error from incidental code", async () => {
     const stubbed = UserWithInvalidRelation as unknown as { constMissing?: () => never };
     stubbed.constMissing = () => {
@@ -779,7 +779,7 @@ describe("ReflectionTest", () => {
     expect(error.message).not.toMatch(":class_name");
   });
 
-  // PERMANENT-SKIP: computeType reads the registerModel registry, so a non-model class_name is not resolved (CLAUDE.md, "Constant lookup is an import or a registry").
+  // PERMANENT-SKIP: computeType reads the registerModel registry, so a non-model class_name is not resolved (CLAUDE.md, "Constant lookup is an import or a registry"; repo-owner ruling on trails#9466, 2026-10-29).
   it.skip("reflection klass requires ar subclass", async () => {
     for (const rel of [
       "accountInvalid",
