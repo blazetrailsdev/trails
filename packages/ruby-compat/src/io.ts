@@ -1527,7 +1527,8 @@ export class IO {
    * `IO#reopen(other_io)` (`vendor/ruby/v3.3.11/io.c:8316` `io_reopen`). JS has
    * no `dup2(2)`, so the stream takes `other_io`'s descriptor rather than a copy
    * of it, and `other_io` has to stay open for as long as this stream writes to
-   * it. A child spawned with inherited stdio gets {@link STDOUT} and
+   * it. A descriptor's kernel offset is shared but `pos` is per IO and writes
+   * are positional, so the two IOs do not advance each other. A child spawned with inherited stdio gets {@link STDOUT} and
    * {@link STDERR} by {@link fileno}, so it follows the reopen as it follows
    * the `dup2` in Ruby.
    *
@@ -1536,16 +1537,40 @@ export class IO {
    */
   reopen(nfile: { toIo(): IO }): this {
     const orig = nfile.toIo();
-    if (orig.isClosed()) throw new IOError("closed stream");
+    if (this.isClosed() || orig.isClosed()) throw new IOError("closed stream");
     if (orig === this) return this;
-    if (this.stdioFile != null && !(orig.mode & FMODE_WRITABLE)) {
-      throw new ArgumentError(`${this.pathv} can't change access mode from "w" to "r"`);
+    if ((this === STDOUT || this === STDERR) && !(orig.mode & FMODE_WRITABLE)) {
+      throw new ArgumentError(
+        `${this.pathv} can't change access mode from "${rbIoFmodeModestr(this.mode)}" to "${rbIoFmodeModestr(orig.mode)}"`,
+      );
     }
+    if (this.mode & FMODE_WRITABLE) this.flush();
+    if (orig.mode & FMODE_WRITABLE) orig.flush();
     this.mode = orig.mode;
+    if (orig.pathv != null) this.pathv = orig.pathv;
     this.fd = orig.fd;
     this.stdioFile = orig.stdioFile;
     this._pos = orig._pos;
     return this;
+  }
+}
+
+/** `rb_io_fmode_modestr` (`vendor/ruby/v3.3.11/io.c:6408`), without its binary and text spellings. */
+function rbIoFmodeModestr(fmode: number): string {
+  if (fmode & FMODE_APPEND) {
+    if ((fmode & FMODE_READWRITE) === FMODE_READWRITE) return "a+";
+    return "a";
+  }
+  switch (fmode & FMODE_READWRITE) {
+    case FMODE_READABLE:
+      return "r";
+    case FMODE_WRITABLE:
+      return "w";
+    case FMODE_READWRITE:
+      if (fmode & FMODE_CREATE) return "w+";
+      return "r+";
+    default:
+      throw new ArgumentError(`invalid access fmode 0x${fmode.toString(16)}`);
   }
 }
 

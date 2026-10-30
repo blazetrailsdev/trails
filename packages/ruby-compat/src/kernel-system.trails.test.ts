@@ -147,16 +147,33 @@ describe("Kernel#system", () => {
     FileUtils.rmF(path);
   });
 
+  it("gives a child the inherited descriptor when STDOUT is closed", async () => {
+    STDOUT.close();
+    try {
+      expect(await rbFSystem("true")).toBe(true);
+    } finally {
+      (STDOUT as unknown as { fd: number }).fd = 1;
+    }
+  });
+
+  it("refuses a reopen of a closed stream or of STDOUT onto a reader", () => {
+    const [r, w] = IO.pipe();
+    expect(() => STDOUT.reopen(r)).toThrow(`<STDOUT> can't change access mode from "w" to "r"`);
+    w.close();
+    expect(() => w.reopen(r)).toThrow(IOError);
+    r.close();
+  });
+
   it("raises IOError for a closed out: IO", async () => {
     const [, w] = IO.pipe();
     w.close();
-    await expect(rbFSystem("true", { err: w })).rejects.toThrow(IOError);
+    await expect(rbFSystem("true", { out: w })).rejects.toThrow(IOError);
   });
 
   it("raises IOError for a closed err: IO", async () => {
     const [, w] = IO.pipe();
     w.close();
-    await expect(rbFSystem("true", { out: w })).rejects.toThrow(IOError);
+    await expect(rbFSystem("true", { err: w })).rejects.toThrow(IOError);
   });
 
   it("raises NotImplementedError on an adapter that cannot spawn", async () => {

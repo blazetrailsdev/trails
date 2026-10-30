@@ -231,9 +231,14 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
     system(command, env, args, options) {
       const opened: File[] = [];
       const redirect = (target: string | IO | undefined, inherited: IO) => {
-        const file = typeof target === "string" ? File.open(target, "w") : null;
-        if (file !== null) opened.push(file);
-        const io = file ?? (target as IO | undefined) ?? inherited;
+        let io: IO;
+        if (typeof target === "string") {
+          const file = File.open(target, "w");
+          opened.push(file);
+          io = file;
+        } else {
+          io = target ?? inherited;
+        }
         const pipe = io instanceof PipeIO ? io : null;
         const read = {
           bytes: (chunk: Uint8Array) => {
@@ -244,7 +249,7 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
             }
           },
         };
-        return { stdio: pipe ? "pipe" : io.fileno(), read };
+        return { stdio: pipe ? "pipe" : io.isClosed() ? "inherit" : io.fileno(), read };
       };
       const out = redirect(options?.out, STDOUT);
       const err = redirect(options?.err, STDERR);
@@ -312,7 +317,7 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         command,
         args,
         env,
-        ["inherit", "pipe", err ?? STDERR.fileno()],
+        ["inherit", "pipe", err ?? (STDERR.isClosed() ? "inherit" : STDERR.fileno())],
         { bytes: (chunk) => chunks.push(chunk) },
       );
       const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
