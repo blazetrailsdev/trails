@@ -10,6 +10,7 @@ import {
   stringSplit,
   strip,
 } from "@blazetrails/ruby-compat";
+import type { Application } from "./application.js";
 import type { EarlyTime } from "./early-time.js";
 import { InvocationChain } from "./invocation-chain.js";
 import { InvocationExceptionMixin } from "./invocation-exception-mixin.js";
@@ -18,19 +19,6 @@ import { fromPathname, Rake } from "./rake-module.js";
 import type { Scope } from "./scope.js";
 import { EMPTY_TASK_ARGS, TaskArguments } from "./task-arguments.js";
 
-export interface TaskApplication {
-  options: {
-    trace?: boolean;
-    dryrun?: boolean;
-    alwaysMultitask?: boolean;
-    buildAll?: boolean;
-  };
-  currentScope: Scope;
-  get(taskName: string, scopes?: Scope | null): Task | null | Promise<Task | null>;
-  trace(...strings: string[]): void;
-  enhanceWithMatchingRule(taskName: string, level?: number): unknown;
-}
-
 export type Timestamp = Date | EarlyTime | LateTime;
 
 export type TaskAction = (task: Task, args: TaskArguments, ...rest: unknown[]) => unknown;
@@ -38,7 +26,7 @@ export type TaskAction = (task: Task, args: TaskArguments, ...rest: unknown[]) =
 export class Task {
   orderOnlyPrerequisites: string[];
   readonly actions: TaskAction[];
-  application: TaskApplication;
+  application: Application;
   readonly scope: Scope;
   readonly locations: string[];
   private _prerequisites: string[];
@@ -99,7 +87,7 @@ export class Task {
     if (scopedPrerequisiteTask === this) {
       unscopedPrerequisiteTask = await this.application.get(prerequisiteName);
     }
-    return (unscopedPrerequisiteTask || scopedPrerequisiteTask)!;
+    return unscopedPrerequisiteTask || scopedPrerequisiteTask;
   }
 
   async allPrerequisiteTasks(): Promise<Task[]> {
@@ -121,7 +109,7 @@ export class Task {
     return this.sources[0] ?? null;
   }
 
-  constructor(taskName: string, app: TaskApplication) {
+  constructor(taskName: string, app: Application) {
     this._name = String(taskName);
     this._prerequisites = [];
     this.actions = [];
@@ -280,7 +268,7 @@ export class Task {
   }
 
   async execute(args: TaskArguments | null = null): Promise<void> {
-    args ||= EMPTY_TASK_ARGS;
+    args ??= EMPTY_TASK_ARGS;
     if (this.application.options.dryrun) {
       this.application.trace(`** Execute (dry run) ${this.name}`);
       return;
@@ -383,6 +371,10 @@ export class Task {
 
   static clear(): void {
     Rake.application!.clear();
+  }
+
+  static get tasks(): Task[] {
+    return Rake.application!.tasks;
   }
 
   static get(taskName: string): Promise<Task> {

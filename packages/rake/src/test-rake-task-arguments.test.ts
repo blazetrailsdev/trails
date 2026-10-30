@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { block, KeyError, map } from "@blazetrails/ruby-compat";
+import { Application } from "./application.js";
 import { TaskArguments } from "./task-arguments.js";
 
 describe("TestRakeTaskArguments", () => {
@@ -111,5 +112,37 @@ describe("TestRakeTaskArguments", () => {
     const ta = new TaskArguments(["aa", "bb"], [null, "original_val"]);
     ta.withDefaults({ cc: "default_val" });
     expect(ta.get("cc")).toBeNull();
+  });
+
+  it("all and extra arguments without named arguments", () => {
+    const app = new Application();
+    const [, args] = app.parseTaskString("task[1,two,more]");
+    const ta = new TaskArguments([], args);
+    expect(ta.names).toEqual([]);
+    expect(ta.toA()).toEqual(["1", "two", "more"]);
+    expect(ta.extras()).toEqual(["1", "two", "more"]);
+  });
+
+  it("all and extra arguments with named arguments", () => {
+    const app = new Application();
+    const [, args] = app.parseTaskString("task[1,two,more,still more]");
+    const ta = new TaskArguments(["first", "second"], args);
+    expect(ta.names).toEqual(["first", "second"]);
+    expect(ta.get("first")).toBe("1");
+    expect(ta.get("second")).toBe("two");
+    expect(ta.toA()).toEqual(["1", "two", "more", "still more"]);
+    expect(ta.extras()).toEqual(["more", "still more"]);
+  });
+
+  it("extra args with less than named arguments", () => {
+    const app = new Application();
+    const [, args] = app.parseTaskString("task[1,two]");
+    const ta = new TaskArguments(["first", "second", "third"], args);
+    expect(ta.names).toEqual(["first", "second", "third"]);
+    expect(ta.get("first")).toBe("1");
+    expect(ta.get("second")).toBe("two");
+    expect(ta.get("third")).toBeNull();
+    expect(ta.toA()).toEqual(["1", "two"]);
+    expect(ta.extras()).toEqual([]);
   });
 });

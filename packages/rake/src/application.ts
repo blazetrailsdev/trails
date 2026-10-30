@@ -104,6 +104,28 @@ export class Application {
     this.setDefaultOptions();
   }
 
+  /** @internal */
+  parseTaskString(string: string): [string, string[]] {
+    const m = String(string).match(/^([^[]+)(?:\[(.*)\])$/m);
+
+    const name = m?.[1];
+    let remainingArgs = m?.[2];
+
+    if (name == null) return [string, []];
+    if (remainingArgs!.length === 0) return [name, []];
+
+    const args: string[] = [];
+
+    do {
+      const part = remainingArgs!.match(/\s*((?:[^\\,]|\\.)*?)\s*(?:,\s*(.*))?$/m)!;
+
+      remainingArgs = part[2];
+      args.push(part[1].replace(/\\(.)/g, "$1"));
+    } while (remainingArgs != null);
+
+    return [name, args];
+  }
+
   /** @missingRailsArgs handle_options — PERMANENT */
   async init(appName = "rake", argv: readonly string[] = ARGV): Promise<void> {
     await this.standardExceptionHandling(async () => {

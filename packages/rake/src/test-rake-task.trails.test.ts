@@ -1,28 +1,22 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RuntimeError } from "@blazetrails/ruby-compat";
-import { Task, type TaskAction, type TaskApplication } from "./task.js";
-
-function stubApplication(): TaskApplication & { tasks: Record<string, Task> } {
-  const tasks: Record<string, Task> = {};
-  return {
-    tasks,
-    options: {},
-    currentScope: null as never,
-    get: (taskName) => tasks[taskName] ?? null,
-    trace: () => {},
-    enhanceWithMatchingRule: () => null,
-  };
-}
+import { Application } from "./application.js";
+import { Rake } from "./rake-module.js";
+import { Task, type TaskAction } from "./task.js";
 
 describe("Rake::Task", () => {
-  let app: ReturnType<typeof stubApplication>;
+  let app: Application;
   function task(name: string, deps: string[] = [], block?: TaskAction): Task {
-    const t = (app.tasks[name] ??= new Task(name, app));
-    return t.enhance(deps, block);
+    return app.intern(Task, name).enhance(deps, block);
   }
 
   beforeEach(() => {
-    app = stubApplication();
+    app = new Application();
+    Rake.application = app;
+  });
+
+  afterEach(() => {
+    Rake.application = undefined;
   });
 
   it("invokes prerequisites first, and each task once", async () => {
