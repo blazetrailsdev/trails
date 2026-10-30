@@ -97,7 +97,7 @@ export const Unicode = {
     return Array.from(string, (c) => c.codePointAt(0)!);
   },
 
-  inCharClass(codepoint: number | undefined, classes: BoundaryClass[]): boolean {
+  isInCharClass(codepoint: number | undefined, classes: BoundaryClass[]): boolean {
     return classes.find((c) => caseEq(database().boundary[c], codepoint)) ? true : false;
   },
 
@@ -115,10 +115,11 @@ export const Unicode = {
         !(
           (previous === database().boundary.cr && current === database().boundary.lf) ||
           (caseEq(database().boundary.l, previous) &&
-            Unicode.inCharClass(current, ["l", "v", "lv", "lvt"])) ||
-          (Unicode.inCharClass(previous, ["lv", "v"]) &&
-            Unicode.inCharClass(current, ["v", "t"])) ||
-          (Unicode.inCharClass(previous, ["lvt", "t"]) && caseEq(database().boundary.t, current)) ||
+            Unicode.isInCharClass(current, ["l", "v", "lv", "lvt"])) ||
+          (Unicode.isInCharClass(previous, ["lv", "v"]) &&
+            Unicode.isInCharClass(current, ["v", "t"])) ||
+          (Unicode.isInCharClass(previous, ["lvt", "t"]) &&
+            caseEq(database().boundary.t, current)) ||
           caseEq(database().boundary.extend, current)
         )
       ) {
