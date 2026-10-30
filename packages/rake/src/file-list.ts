@@ -46,8 +46,9 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   join: (items, sep: string = "") => items.join(sep),
   concat: (items, other: Items) => (items.push(...other), items),
   push: (items, ...objs: unknown[]) => (items.push(...objs), items),
-  pop: (items) => items.pop() ?? null,
-  shift: (items) => items.shift() ?? null,
+  pop: (items, n?: number) =>
+    n === undefined ? (items.pop() ?? null) : items.splice(Math.max(items.length - n, 0)),
+  shift: (items, n?: number) => (n === undefined ? (items.shift() ?? null) : items.splice(0, n)),
   unshift: (items, ...objs: unknown[]) => (items.unshift(...objs), items),
   clear: (items) => ((items.length = 0), items),
   reverse: (items) => [...items].reverse(),
@@ -110,10 +111,17 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     for (const fn of items) if (rtest(await block(fn as string))) return fn;
     return null;
   },
-  count: (items) => items.length,
-  isAny: (items) => items.some((fn) => fn != null),
-  min: (items) => [...items].sort()[0] ?? null,
-  max: (items) => [...items].sort().at(-1) ?? null,
+  count: async (items, obj?: unknown) => {
+    if (obj === undefined) return items.length;
+    if (typeof obj !== "function") return items.filter((fn) => fn === obj).length;
+    return (await _filterBy(items, obj as ElementBlock, true)).length;
+  },
+  isAny: async (items, block?: ElementBlock) =>
+    block ? (await _filterBy(items, block, true)).length > 0 : items.some(rtest),
+  min: (items, block?: (a: string, b: string) => number) =>
+    [...items].sort(block as never)[0] ?? null,
+  max: (items, block?: (a: string, b: string) => number) =>
+    [...items].sort(block as never).at(-1) ?? null,
   index: (items, obj: unknown) => (items.includes(obj) ? items.indexOf(obj) : null),
   delete: (items, obj: unknown) => {
     const found = items.includes(obj) ? obj : null;
@@ -230,9 +238,7 @@ export class FileList {
     const result =
       typeof other === "string"
         ? this.items.join(other)
-        : Array.from({ length: other }, () => [...this.items])
-            .flatMap((copy) => [copy])
-            .reduce<Items>((res, copy) => (res.push(...copy), res), []);
+        : Array.from({ length: other }, () => this.items).flat(1);
     return Array.isArray(result)
       ? new (this.constructor as new () => this)().import(result)
       : result;
@@ -247,7 +253,9 @@ export class FileList {
   async resolve(): Promise<this> {
     if (this.pending) {
       if (Object.isFrozen(this)) {
-        throw new FrozenError("can't modify frozen Rake::FileList", { receiver: this });
+        throw new FrozenError(`can't modify frozen Rake::FileList: ${rbInspect(this.items)}`, {
+          receiver: this,
+        });
       }
       this.pending = false;
       for (const fn of this.pendingAdd) await this.resolveAdd(fn);
@@ -307,7 +315,7 @@ export class FileList {
     return this.collect((fn) => stringExt(fn, newext));
   }
 
-  /** @missingRailsArgs open — PERMANENT */
+  /** @missingRailsArgs open — CONVERGEABLE rake-file-list-egrep-async-open */
   async egrep(pattern: RegExp, ...options: unknown[]): Promise<number> {
     const yieldBlock = rbBlockGivenP(options.at(-1))
       ? (options.pop() as (fn: string, count: number, line: string) => unknown)
@@ -425,8 +433,8 @@ export interface FileList {
   join(sep?: string): Promise<string>;
   concat(other: unknown): Promise<this>;
   push(...objs: unknown[]): Promise<this>;
-  pop(): Promise<string | null>;
-  shift(): Promise<string | null>;
+  pop(n?: number): Promise<string | null | Items>;
+  shift(n?: number): Promise<string | null | Items>;
   unshift(...objs: unknown[]): Promise<this>;
   clear(): Promise<this>;
   reverse(): Promise<Items>;
@@ -452,10 +460,10 @@ export interface FileList {
   valuesAt(...selectors: number[]): Promise<this>;
   inject(memo: unknown, block: (res: unknown, fn: string) => unknown): Promise<unknown>;
   find(block: ElementBlock): Promise<string | null>;
-  count(): Promise<number>;
-  isAny(): Promise<boolean>;
-  min(): Promise<string | null>;
-  max(): Promise<string | null>;
+  count(obj?: unknown): Promise<number>;
+  isAny(block?: ElementBlock): Promise<boolean>;
+  min(block?: (a: string, b: string) => number): Promise<string | null>;
+  max(block?: (a: string, b: string) => number): Promise<string | null>;
   index(obj: unknown): Promise<number | null>;
   delete(obj: unknown): Promise<unknown>;
   take(n: number): Promise<Items>;
