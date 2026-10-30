@@ -174,10 +174,7 @@ export async function internalBeginTransaction(
   }
 }
 
-/**
- * @internal
- * @missingRailsArgs new — PERMANENT
- */
+/** @internal */
 export async function performQuery(
   this: PerformQueryHost,
   rawConnection: SqliteConnection,
@@ -208,7 +205,8 @@ export async function performQuery(
       result = Result.empty();
     } else {
       const columns = stmt.columns().map((c) => c.name);
-      result = new Result(columns, await retryBusy(timeout, () => stmt.toA()));
+      const toA = await retryBusy(timeout, () => stmt.toA());
+      result = new Result(columns, toA);
       this._narrowSpilledBigInts(stmt, result.rows);
     }
   } else {
@@ -222,7 +220,8 @@ export async function performQuery(
         result = Result.empty();
       } else {
         const columns = stmt.columns().map((c) => c.name);
-        result = new Result(columns, await retryBusy(timeout, () => stmt.toA()));
+        const toA = await retryBusy(timeout, () => stmt.toA());
+        result = new Result(columns, toA);
         this._narrowSpilledBigInts(stmt, result.rows);
       }
     } finally {
