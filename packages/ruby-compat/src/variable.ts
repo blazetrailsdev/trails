@@ -24,19 +24,14 @@ import { warn } from "./kernel-warn.js";
 import { verbose } from "./verbose.js";
 import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
-import {
-  RCLASS_CONST_TBL,
-  classpaths,
-  rbCBasicObject,
-  rbCSymbol,
-  rbModName,
-  rbModToS,
-} from "./object.js";
+import { TopLevel, classpaths, rbCBasicObject, rbCSymbol, rbModName, rbModToS } from "./object.js";
 import { Range } from "./range.js";
 import { generatedClass } from "./classpath.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { Struct } from "./struct.js";
 import { TypeError } from "./type-error.js";
+
+const tbl = TopLevel as Record<string, unknown>;
 
 const _globals = new Map<string, unknown>();
 
@@ -72,7 +67,7 @@ export function rbGvSet<T>(name: string, val: T): T {
  * @noRailsEquivalent PERMANENT
  */
 export function registerConstant(name: string, value: unknown): void {
-  RCLASS_CONST_TBL.set(name, value);
+  tbl[name] = value;
   if (
     (typeof value === "object" && value !== null) ||
     (typeof value === "function" &&
@@ -91,8 +86,8 @@ export function registerConstant(name: string, value: unknown): void {
  * @noRailsEquivalent PERMANENT
  */
 export function unregisterConstant(name: string, expected: unknown): void {
-  if (RCLASS_CONST_TBL.get(name) !== expected) return;
-  RCLASS_CONST_TBL.delete(name);
+  if (tbl[name] !== expected) return;
+  delete tbl[name];
 }
 
 /**
@@ -105,13 +100,13 @@ export function unregisterConstant(name: string, expected: unknown): void {
  * @noRailsEquivalent PERMANENT
  */
 export function rbModRemoveConst(mod: object, name: string): unknown {
-  const tbl = mod as Record<string, unknown>;
-  if (mod === Object ? !RCLASS_CONST_TBL.has(name) : !Object.hasOwn(mod, name)) {
+  const modTbl = mod as Record<string, unknown>;
+  if (mod === Object ? !Object.hasOwn(tbl, name) : !Object.hasOwn(mod, name)) {
     throw new NameError(`constant ${rbModName(mod)}::${name} not defined`, name);
   }
-  const val = mod === Object ? RCLASS_CONST_TBL.get(name) : tbl[name];
-  if (mod === Object) RCLASS_CONST_TBL.delete(name);
-  else delete tbl[name];
+  const val = mod === Object ? tbl[name] : modTbl[name];
+  if (mod === Object) delete tbl[name];
+  else delete modTbl[name];
   return val;
 }
 
@@ -121,7 +116,7 @@ export function rbModRemoveConst(mod: object, name: string): unknown {
  * @noRailsEquivalent PERMANENT
  */
 export function isRegisteredConstant(name: string): boolean {
-  return RCLASS_CONST_TBL.has(name);
+  return Object.hasOwn(tbl, name);
 }
 
 /**
@@ -131,7 +126,7 @@ export function isRegisteredConstant(name: string): boolean {
  * @noRailsEquivalent PERMANENT
  */
 export function registeredConstant(name: string): unknown {
-  return RCLASS_CONST_TBL.get(name);
+  return tbl[name];
 }
 
 /**
@@ -144,11 +139,9 @@ export function registeredConstant(name: string): unknown {
  */
 export function rbFBinding<T extends object>(self: T): T {
   return new Proxy(self, {
-    has: (target, key) => key in target || (typeof key === "string" && RCLASS_CONST_TBL.has(key)),
+    has: (target, key) => key in target || (typeof key === "string" && key in tbl),
     get: (target, key, receiver) =>
-      key in target || typeof key !== "string"
-        ? Reflect.get(target, key, receiver)
-        : RCLASS_CONST_TBL.get(key),
+      key in target || typeof key !== "string" ? Reflect.get(target, key, receiver) : tbl[key],
   });
 }
 
@@ -160,8 +153,8 @@ export function rbFBinding<T extends object>(self: T): T {
  * @noRailsEquivalent PERMANENT
  */
 export function resetConstants(): void {
-  RCLASS_CONST_TBL.clear();
-  for (const [name, value] of _coreConstants) RCLASS_CONST_TBL.set(name, value);
+  for (const name of Object.keys(tbl)) delete tbl[name];
+  Object.assign(tbl, _coreConstants);
 }
 
 /**
@@ -188,7 +181,7 @@ export function rbPathToClass(pathname: string): unknown {
     throw new ArgumentError(`can't retrieve anonymous class ${pathname}`);
   }
   while (p < pend) {
-    if (RCLASS_CONST_TBL.has(pathname)) p = pend;
+    if (Object.hasOwn(tbl, pathname)) p = pend;
     while (p < pend && pathname[p] !== ":") p++;
     const id = pathname.slice(pbeg, p);
     const path = pathname.slice(0, p);
@@ -202,8 +195,8 @@ export function rbPathToClass(pathname: string): unknown {
     if (id === "") {
       throw new ArgumentError(`undefined class/module ${pathname.slice(0, p)}`);
     }
-    c = RCLASS_CONST_TBL.has(path)
-      ? RCLASS_CONST_TBL.get(path)
+    c = Object.hasOwn(tbl, path)
+      ? tbl[path]
       : c !== Object && /^[A-Z]/.test(id) && Object.hasOwn(c as object, id)
         ? (c as Record<string, unknown>)[id]
         : undefined;
@@ -287,7 +280,7 @@ export function rbConstGet(klass: object, id: string): unknown {
       }
     }
   }
-  if (RCLASS_CONST_TBL.has(id)) return RCLASS_CONST_TBL.get(id);
+  if (Object.hasOwn(tbl, id)) return tbl[id];
   const { constMissing } = klass as { constMissing?: (name: string) => unknown };
   if (constMissing !== undefined) return constMissing.call(klass, id);
   return rbModConstMissing(klass, id);
@@ -376,15 +369,15 @@ export function rbModConstants(mod: object, inherit: unknown = true): string[] {
  * @noRailsEquivalent PERMANENT
  */
 export function rbModConstGet(mod: object, name: string): unknown {
-  if (RCLASS_CONST_TBL.has(name)) return RCLASS_CONST_TBL.get(name);
+  if (Object.hasOwn(tbl, name)) return tbl[name];
   let path = "";
   let c: unknown = mod;
   for (const [i, part] of name.split("::").entries()) {
     path = i === 0 ? part : `${path}::${part}`;
     if (i === 0) {
       c = rbConstGet(mod, part);
-    } else if (RCLASS_CONST_TBL.has(path)) {
-      c = RCLASS_CONST_TBL.get(path);
+    } else if (Object.hasOwn(tbl, path)) {
+      c = tbl[path];
     } else if (
       c !== null &&
       (typeof c === "object" || typeof c === "function") &&
@@ -435,4 +428,4 @@ registerConstant("Symbol", rbCSymbol);
 
 registerConstant("Rational", Rational);
 
-const _coreConstants = [...RCLASS_CONST_TBL];
+const _coreConstants = { ...tbl };

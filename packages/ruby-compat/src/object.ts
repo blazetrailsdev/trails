@@ -132,15 +132,21 @@ export function rbSetClassPathString(
   classpaths.set(klass, { path: `${str}::${name}`, permanent });
 }
 
+/** @noRailsEquivalent PERMANENT */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TopLevelConstants {}
+
 /**
- * `RCLASS_CONST_TBL(rb_cObject)` (`vendor/ruby/v3.3.11/internal/class.h:95`):
- * the top-level constant table `registerConstant` fills. It lives with
- * `rb_cObject` so `object.ts` reads it without importing `variable.ts`, whose
- * load-time `registerConstant` calls need this module evaluated first.
+ * Ruby's top-level `Object`, whose constant table is
+ * `RCLASS_CONST_TBL(rb_cObject)` (`vendor/ruby/v3.3.11/internal/class.h:95`). It
+ * lives with `rb_cObject` so `object.ts` reads it without importing
+ * `variable.ts`, whose load-time `registerConstant` calls need this module
+ * evaluated first. It has no prototype, so a name such as `constructor` is
+ * not a constant.
  *
  * @noRailsEquivalent PERMANENT
  */
-export const RCLASS_CONST_TBL = new Map<string, unknown>();
+export const TopLevel = Object.create(null) as TopLevelConstants;
 
 /**
  * The one class object a core class has once a gem reopens it
@@ -153,7 +159,7 @@ export const RCLASS_CONST_TBL = new Map<string, unknown>();
  */
 export function reopened(klass: object): object {
   const path = classpaths.get(klass)?.path;
-  return path === undefined ? klass : (RCLASS_CONST_TBL.get(path) ?? klass);
+  return path === undefined ? klass : ((TopLevel as Record<string, object>)[path] ?? klass);
 }
 
 /**

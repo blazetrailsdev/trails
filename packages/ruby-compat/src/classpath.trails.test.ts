@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classPathMismatches, registerClassPaths } from "./classpath.js";
-import { RCLASS_CONST_TBL, rbModName, rbModToS } from "./object.js";
+import { TopLevel, rbModName, rbModToS } from "./object.js";
 import { rbPathToClass } from "./variable.js";
 import { rbModConstSet } from "./include.js";
 
@@ -76,9 +76,9 @@ describe("rbModName over the generated class-path table", () => {
     class Inner {}
     class Rebound {}
     const Walked = { Inner: Rebound };
-    RCLASS_CONST_TBL.set("Walked", Walked);
+    (TopLevel as Record<string, unknown>).Walked = Walked;
     registerClassPaths([[() => Inner, "Walked::Inner"]]);
     expect(rbPathToClass("Walked::Inner")).toBe(Rebound);
-    RCLASS_CONST_TBL.delete("Walked");
+    delete (TopLevel as Record<string, unknown>).Walked;
   });
 });

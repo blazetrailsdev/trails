@@ -1123,7 +1123,7 @@ For a module-eval read, two shapes are sanctioned, and only these:
   a ruby-compat internal (§ "Constant lookup is an import or a registry"),
   not the seat. A constant Rails
   `require`s rather than autoloads is seated with no `autoload` call. Ruby's
-  top-level `Object` is `TopLevel` in `activesupport/src/namespaces.ts`: the
+  top-level `Object` is `TopLevel` in `ruby-compat/src/object.ts`: the
   defining gem seats it (`TopLevel.Trails = Trails`) and a reader names it at
   call time (`TopLevel.Trails!.env`), carrying a guard only where Rails has a
   `defined?`. A `globalThis` seat was rejected because a `declare global` in a

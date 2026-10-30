@@ -118,6 +118,8 @@ export {
   rtest,
   isNil,
   rbCBasicObject,
+  TopLevel,
+  type TopLevelConstants,
 } from "./object.js";
 export {
   Hash,

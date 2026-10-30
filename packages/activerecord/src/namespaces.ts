@@ -1,4 +1,4 @@
-import { Autoload, extend, type Extended, TopLevel } from "@blazetrails/activesupport";
+import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
 import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
@@ -257,7 +257,6 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   afterAllTransactionsCommit: typeof import("./active-record.js").afterAllTransactionsCommit;
 };
 registerConstant("ActiveRecord", ActiveRecord);
-TopLevel.ActiveRecord = ActiveRecord;
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");
 ActiveRecord.autoload("ConnectionHandling");
