@@ -384,50 +384,26 @@ describe("TestRakeFileUtils", () => {
   function checkNoExpansion(): Promise<void> {
     return command(
       "check_no_expansion.rb",
-      `const ARGV = process.argv.slice(2);
-if (ARGV[0] != ARGV[1]) {
-  process.exit(0);
-} else {
-  process.exit(1);
-}
-`,
+      "const [a, b] = process.argv.slice(2); process.exit(a != b ? 0 : 1);\n",
     );
   }
 
   function checkEnvironment(): Promise<void> {
     return command(
       "check_environment.rb",
-      `const ARGV = process.argv.slice(2);
-if (process.env[ARGV[0]] != ARGV[1]) {
-  process.exit(1);
-} else {
-  process.exit(0);
-}
-`,
+      "const [a, b] = process.argv.slice(2); process.exit(process.env[a] != b ? 1 : 0);\n",
     );
   }
 
   function checkExpansion(): Promise<void> {
     return command(
       "check_expansion.rb",
-      `const ARGV = process.argv.slice(2);
-if (ARGV[0] != ARGV[1]) {
-  process.exit(1);
-} else {
-  process.exit(0);
-}
-`,
+      "const [a, b] = process.argv.slice(2); process.exit(a != b ? 1 : 0);\n",
     );
   }
 
   function echocommand(): Promise<void> {
-    return command(
-      "echocommand.rb",
-      `console.log("echocommand.rb");
-
-process.exit(0);
-`,
-    );
+    return command("echocommand.rb", 'console.log("echocommand.rb");\n');
   }
 
   function replaceRuby<T>(block: () => T): T {
@@ -439,11 +415,7 @@ process.exit(0);
   }
 
   function shellcommand(): Promise<void> {
-    return command(
-      "shellcommand.rb",
-      `process.exit(Number(process.argv[2] || "0"));
-`,
-    );
+    return command("shellcommand.rb", 'process.exit(Number(process.argv[2] || "0"));\n');
   }
 
   function envVar(): string {

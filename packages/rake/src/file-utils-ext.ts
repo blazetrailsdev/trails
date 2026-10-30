@@ -9,15 +9,16 @@ import {
   stderr as $stderr,
 } from "@blazetrails/ruby-compat";
 import { FileUtils } from "./file-utils.js";
+import { Rake } from "./rake-module.js";
 
 type Options = { verbose?: boolean; noop?: boolean; [key: string]: unknown };
 
 export const FileUtilsExt = {
-  DEFAULT: {} as object,
-
   verboseFlag: null as unknown,
 
-  nowriteFlag: false as unknown,
+  nowriteFlag: null as unknown,
+
+  DEFAULT: {} as object,
 
   async mkdirP(list: string | string[], options: Options = {}): Promise<unknown> {
     return StdlibFileUtils.mkdirPAsync(list, {
@@ -59,6 +60,15 @@ export const FileUtilsExt = {
     });
   },
 
+  async chmodR(mode: number, list: string | string[], options: Options = {}): Promise<unknown> {
+    return StdlibFileUtils.chmodRAsync(mode, list, {
+      verbose: FileUtilsExt.verboseFlag as boolean,
+      noop: FileUtilsExt.nowriteFlag as boolean,
+      ...options,
+    });
+  },
+
+  /** @inventedArm if — PERMANENT */
   verbose(value: unknown = null, block?: () => unknown): unknown {
     const oldvalue = FileUtilsExt.verboseFlag;
     if (value != null) FileUtilsExt.verboseFlag = value;
@@ -71,6 +81,7 @@ export const FileUtilsExt = {
     return FileUtilsExt.verboseFlag;
   },
 
+  /** @inventedArm if — PERMANENT */
   nowrite(value: unknown = null, block?: () => unknown): unknown {
     const oldvalue = FileUtilsExt.nowriteFlag;
     if (value != null) FileUtilsExt.nowriteFlag = value;
@@ -87,7 +98,7 @@ export const FileUtilsExt = {
     if (rtest(FileUtilsExt.nowriteFlag)) {
       if (rtest(msg)) puts.call($stderr, `DRYRUN: ${msg}`);
     } else {
-      return block?.();
+      return block!();
     }
   },
 
@@ -100,16 +111,21 @@ export const FileUtilsExt = {
     for (const name of optdecl) {
       delete h[name];
     }
-    if (!(Object.keys(h).length === 0))
+    if (Object.keys(h).length !== 0)
       throw new ArgumentError(`no such option: ${Object.keys(h).join(" ")}`);
   },
 };
 
-include(FileUtilsExt, FileUtils);
-
 Object.defineProperties(FileUtilsExt, {
-  verboseFlag: { value: FileUtilsExt.DEFAULT, writable: true, enumerable: false },
-  nowriteFlag: { value: false, writable: true, enumerable: false },
+  verboseFlag: { enumerable: false },
+  nowriteFlag: { enumerable: false },
 });
 
+FileUtilsExt.verboseFlag = FileUtilsExt.DEFAULT;
+FileUtilsExt.nowriteFlag = false;
+
+include(FileUtilsExt, FileUtils);
+
 extend(FileUtilsExt, FileUtilsExt);
+
+Rake.FileUtilsExt = FileUtilsExt;

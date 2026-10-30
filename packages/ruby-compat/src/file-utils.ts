@@ -806,7 +806,9 @@ export class FileUtils {
     const pairs: [string, string][] = [];
     fuEachSrcDest(src, dest, (s, d) => pairs.push([s, d]));
     for (const [s, d] of pairs) {
-      await getFs().writeFile!(d, await getFs().readFile(s));
+      await getFs().writeFile!(d, await getFs().readFile(s), {
+        mode: (await getFs().stat!(s)).mode,
+      });
     }
   }
 

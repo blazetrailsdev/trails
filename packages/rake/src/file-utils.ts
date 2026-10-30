@@ -11,8 +11,8 @@ import {
   rbFSystem,
   rtest,
 } from "@blazetrails/ruby-compat";
-import { FileUtilsExt } from "./file-utils-ext.js";
 import { PseudoStatus } from "./pseudo-status.js";
+import { Rake } from "./rake-module.js";
 
 type Options = Record<string, unknown>;
 type ShellRunner = (ok: boolean | null, status: { exitstatus(): number | null }) => unknown;
@@ -47,9 +47,9 @@ export const FileUtils = {
     delete options.verbose;
     const noopOption = options.noop;
     delete options.noop;
-    const noop = rtest(noopOption) ? noopOption : FileUtilsExt.nowriteFlag;
+    const noop = rtest(noopOption) ? noopOption : Rake.FileUtilsExt!.nowriteFlag;
 
-    if (rtest(verbose)) FileUtilsExt.rakeOutputMessage(this.shShowCommand(cmd));
+    if (rtest(verbose)) Rake.FileUtilsExt!.rakeOutputMessage(this.shShowCommand(cmd));
 
     if (!rtest(noop)) {
       const argv = cmd as Parameters<typeof rbFSystem>;
@@ -94,7 +94,8 @@ export const FileUtils = {
   setVerboseOption(options: Options): void {
     if (!Object.hasOwn(options, "verbose")) {
       options.verbose =
-        FileUtilsExt.verboseFlag === FileUtilsExt.DEFAULT || FileUtilsExt.verboseFlag;
+        Rake.FileUtilsExt!.verboseFlag === Rake.FileUtilsExt!.DEFAULT ||
+        Rake.FileUtilsExt!.verboseFlag;
     }
   },
 
@@ -126,7 +127,7 @@ export const FileUtils = {
   },
 
   splitAll(path: string): string[] {
-    const [head, tail] = [File.dirname(path), File.basename(path)];
+    const [head, tail] = File.split(path);
     if (head === "." || tail === "/") return [tail];
     if (head === "/") return [head, tail];
     return [...FileUtils.splitAll(head), tail];

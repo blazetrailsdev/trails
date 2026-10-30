@@ -13,6 +13,10 @@ export class PseudoStatus {
     return this.#exitstatus << 8;
   }
 
+  bitwiseShiftRight(n: number): number {
+    return this.toI() >> n;
+  }
+
   isStopped(): boolean {
     return false;
   }
