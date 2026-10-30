@@ -75,12 +75,10 @@ export const FileUtilsExt = {
     const oldvalue = FileUtilsExt.nowriteFlag;
     if (value != null) FileUtilsExt.nowriteFlag = value;
     if (block != null) {
-      return flagBlock(
-        (v) => (FileUtilsExt.nowriteFlag = v),
-        oldvalue,
-        block,
-        () => oldvalue,
-      );
+      const result = rbEnsure(block, () => {
+        FileUtilsExt.nowriteFlag = oldvalue;
+      });
+      if (result instanceof Promise) return result.then(() => oldvalue);
     }
     return oldvalue;
   },
