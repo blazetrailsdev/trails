@@ -524,7 +524,7 @@ export class SMTP {
         if ((err as ConnectionError).code === "ETIMEDOUT") {
           throw new OpenTimeout("execution expired");
         }
-        const capable = s._ehloLines?.includes("STARTTLS");
+        const capable = s._ehloLines?.some((line) => line.split(/\s+/)[0] === "STARTTLS");
         if ((err as ConnectionError).code === "ETLS" && this.isStarttlsAlways() && !capable) {
           throw new SMTPUnsupportedCommand("STARTTLS is not supported on this server");
         }
@@ -619,7 +619,7 @@ export class SMTP {
     this.checkAuthArgs(authtype, user, secret);
     const authenticator = new (Authenticator.authClass(authtype)!)(this);
     try {
-      return Response.parse(`${await authenticator.auth(user, secret!)}\n`);
+      return await authenticator.auth(user, secret!);
     } catch (err) {
       _rethrow(err as ConnectionError);
     }

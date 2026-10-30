@@ -1,5 +1,6 @@
 import type SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import type { Response } from "./smtp.js";
 
 interface AuthHost {
   _socket: (SMTPConnection & { lastServerResponse: string | false }) | null;
@@ -29,7 +30,7 @@ export abstract class Authenticator {
   }
 
   readonly smtp: AuthHost;
-  abstract auth(user: string, secret: string): Promise<string>;
+  abstract auth(user: string, secret: string): Promise<Response>;
 
   constructor(smtp: AuthHost) {
     this.smtp = smtp;
@@ -38,12 +39,16 @@ export abstract class Authenticator {
   /** @missingRailsCall get_response — PERMANENT */
   finish(
     arg: SMTPConnection.AuthenticationCredentials | SMTPConnection.AuthenticationOAuth2,
-  ): Promise<string> {
+  ): Promise<Response> {
     const socket = this.smtp._socket!;
     return new Promise((resolve, reject) => {
-      socket.login(arg, (err) =>
-        err ? reject(err) : resolve(socket.lastServerResponse as string),
-      );
+      socket.login(arg, (err) => {
+        if (err) return reject(err);
+        const { Response } = this.smtp.constructor as unknown as {
+          Response: typeof import("./smtp.js").Response;
+        };
+        resolve(Response.parse(`${String(socket.lastServerResponse)}\n`));
+      });
     });
   }
 }

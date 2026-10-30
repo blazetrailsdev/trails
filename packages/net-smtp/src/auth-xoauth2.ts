@@ -1,11 +1,12 @@
 import { Authenticator } from "./authenticator.js";
+import type { Response } from "./smtp.js";
 
 export class AuthXoauth2 extends Authenticator {
   static {
     this.authType("xoauth2");
   }
 
-  auth(user: string, secret: string): Promise<string> {
+  auth(user: string, secret: string): Promise<Response> {
     return this.finish({
       type: "OAUTH2",
       user,

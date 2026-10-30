@@ -1,4 +1,5 @@
 import { Authenticator } from "./authenticator.js";
+import type { Response } from "./smtp.js";
 
 export class AuthLogin extends Authenticator {
   static {
@@ -6,7 +7,7 @@ export class AuthLogin extends Authenticator {
   }
 
   /** @missingRailsArgs finish — PERMANENT */
-  auth(user: string, secret: string): Promise<string> {
+  auth(user: string, secret: string): Promise<Response> {
     return this.finish({ credentials: { user, pass: secret }, method: "LOGIN" });
   }
 }

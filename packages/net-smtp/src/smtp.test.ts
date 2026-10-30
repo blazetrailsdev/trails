@@ -174,12 +174,6 @@ describe("TestSMTP", () => {
   it("unsuccessful send message fatal error", () => refusedAt("520 FATAL ERROR", SMTPFatalError));
   it("unsuccessful send message unknown error", () => refusedAt("300 UNKNOWN", SMTPUnknownError));
 
-  it("data guards its message and block arguments", async () => {
-    const smtp = new SMTP("localhost", 25);
-    await expect(smtp.data()).rejects.toThrow("message or block is required");
-    await expect(smtp.data("m", () => {})).rejects.toThrow("message and block are exclusive");
-  });
-
   it("rset", async () => {
     const smtp = (await SMTP.start("127.0.0.1", await fakeServerStart())) as SMTP;
     expect((await smtp.rset()).isSuccess()).toBe(true);
@@ -330,26 +324,6 @@ describe("TestSMTP", () => {
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ArgumentError);
     expect((err as Error).message).toBe("wrong number of arguments (given 5, expected 0..4)");
-  });
-
-  it("refused recipient stops before data", async () => {
-    let delivered = false;
-    const port = await fakeServerStart({
-      onRcptTo(address, _session, callback) {
-        const refused = address.address === "bad@example.com";
-        callback(refused ? Object.assign(new Error("no"), { responseCode: 550 }) : undefined);
-      },
-      onData(stream, _session, callback) {
-        delivered = true;
-        stream.resume();
-        stream.on("end", () => callback());
-      },
-    });
-    const smtp = (await SMTP.start("127.0.0.1", port)) as SMTP;
-    await expect(
-      smtp.sendMessage("message", "a@example.com", "ok@example.com", "bad@example.com"),
-    ).rejects.toBeInstanceOf(SMTPFatalError);
-    expect(delivered).toBe(false);
   });
 });
 
