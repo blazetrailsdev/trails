@@ -850,6 +850,27 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/file.c:4580` `rb_file_s_realdirpath`, {@link File.realpath}
+   * with the last component allowed to be missing, following a broken symlink
+   * to its target.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.realdirpath`
+   * (`vendor/ruby/v3.3.11/file.c:4580`).
+   */
+  static async realdirpathAsync(pathname: string): Promise<string> {
+    const fs = getFs();
+    try {
+      return await fs.realpath!(pathname);
+    } catch (error) {
+      if ((error as { code?: string }).code !== "ENOENT") throw error;
+    }
+    const [dir, base] = File.split(File.expandPath(pathname));
+    const link = await fs.readlink!(pathname).catch(() => null);
+    if (link != null) return File.realdirpathAsync(File.expandPath(link, dir));
+    return File.join(await fs.realpath!(dir), base);
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:5013` `rb_file_join`, which is a STRING join and not
    * a path normalization: `File.join("a", "..", "b")` is `"a/../b"`, where
    * node's `path.join` answers `"b"`. A separator at the boundary is squeezed
