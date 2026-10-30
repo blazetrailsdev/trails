@@ -32,6 +32,7 @@ function pathmapPartial(self: string, n: number): string {
   return File.join(...[partialDirs].flat());
 }
 
+/** @missingRailsArgs new — PERMANENT */
 function pathmapReplace(self: string, patterns: string, block?: PathmapBlock): string {
   let result = self;
   for (const pair of stringSplit(patterns, ";")) {
