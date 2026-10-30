@@ -331,8 +331,8 @@ class ECONNRESET extends SystemCallError {
 export const Errno = {
   EAGAIN,
   ECONNRESET,
-  EINTR,
   EEXIST,
+  EINTR,
   EISDIR,
   EMFILE,
   ENOENT,

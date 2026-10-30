@@ -69,9 +69,6 @@ prepend(SolidCable, ChannelPrefix);
 export class Listener extends SubscriberMap {
   static Stop = class Stop extends Exception {};
 
-  /** @internal */
-  static readonly SELF_PIPE_BLOCK_SIZE = 11;
-
   private _eventLoop: StreamEventLoop;
   private _thread: Thread<Promise<void>>;
   private _lastId: number | null = null;
@@ -192,6 +189,8 @@ export class Listener extends SubscriberMap {
   private wakeUp(): void {
     this.interrupt();
   }
+
+  static readonly SELF_PIPE_BLOCK_SIZE = 11;
 
   /** @internal */
   private interrupt(): void {
