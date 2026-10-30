@@ -185,6 +185,13 @@ export const Util = {
  */
 export class URI {
   /**
+   * `URI.open` (`vendor/ruby/v3.3.11/lib/open-uri.rb:23-33`), seated by `open-uri.ts`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  declare static open: (name: unknown, ...rest: unknown[]) => Promise<unknown>;
+
+  /**
    * `URI.register_scheme` (`vendor/ruby/v3.3.11/lib/uri/common.rb:81`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:

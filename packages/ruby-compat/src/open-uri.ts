@@ -447,13 +447,6 @@ HTTP.prototype.bufferOpen = function (
 };
 include(HTTP, OpenRead);
 
-declare module "./uri/common.js" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace -- a static member added to `URI` by `require "open-uri"`
-  namespace URI {
-    function open(name: unknown, ...rest: unknown[]): Promise<unknown>;
-  }
-}
-
 /**
  * `URI.open` (`vendor/ruby/v3.3.11/lib/open-uri.rb:23-33`).
  *
