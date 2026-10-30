@@ -1,5 +1,6 @@
 import { afterAll } from "vitest";
 import { EnvironmentInquirer, getEnv, onLoad, TopLevel } from "@blazetrails/activesupport";
+import { GlobalID, Identification } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/activerecord";
 import { Engine } from "@blazetrails/trailties/engine";
@@ -35,9 +36,12 @@ class ActiveStorageEngine extends Engine {
 }
 void ActiveStorageEngine;
 
+GlobalID.setApp("ActiveStorageExampleApp");
+
 onLoad("active_record", function (this: typeof Base) {
   include(this, Model);
   include(this, ActiveRecordExtensions);
+  include(this, Identification);
 });
 
 Blob.services = new Registry({

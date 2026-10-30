@@ -23,7 +23,10 @@ export class PurgeOne {
     await this.reset();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm writer — PERMANENT
+   */
   private async reset(): Promise<void> {
     delete this.record.attachmentChanges[this.name];
     await (

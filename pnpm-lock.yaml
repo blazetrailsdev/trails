@@ -403,6 +403,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/globalid':
+        specifier: workspace:*
+        version: link:../globalid
       '@blazetrails/marcel':
         specifier: workspace:*
         version: link:../marcel

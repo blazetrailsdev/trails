@@ -70,6 +70,7 @@ export class CreateOne {
     }
   }
 
+  /** @inventedArm writer — PERMANENT */
   async save(): Promise<void> {
     await (
       this.record.association(`${this.name}Attachment`) as unknown as AssociationWriter

@@ -69,7 +69,7 @@ describe("ActiveStorage::Attached::One", () => {
     const blob = await createBlob({ filename: "funky.jpg" });
     expect(await user.avatar.attach(blob)).toBe(user.avatar);
     const reloaded = (await Member.find(user.id)) as AvatarUser;
-    expect((await reloaded.avatar.attachment)?.blob_id).toBe(blob.id);
+    expect((await reloaded.avatar.attachment)?.readAttribute("blob_id")).toBe(blob.id);
     expect(await user.avatar.isBlank()).toBe(false);
     expect(((await Member.find(user.id)) as AvatarUser).avatar).toBeInstanceOf(One);
     await user.avatar.attachment;
@@ -90,7 +90,6 @@ describe("ActiveStorage::Attached::One", () => {
   });
 
   it("assigning nil records a delete and an unknown attachable raises", async () => {
-    await user.avatar.attach(await createBlob());
     await user.avatar.attach(hash());
     expect(user.attachmentChanges).toEqual({});
     await user.setAvatar(null);

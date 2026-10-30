@@ -26,6 +26,7 @@
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/globalid": "workspace:*",
     "@blazetrails/marcel": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
