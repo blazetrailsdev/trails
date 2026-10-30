@@ -174,7 +174,10 @@ export async function internalBeginTransaction(
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsArgs new — PERMANENT
+ */
 export async function performQuery(
   this: PerformQueryHost,
   rawConnection: SqliteConnection,
