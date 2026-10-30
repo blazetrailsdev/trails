@@ -456,8 +456,6 @@ declare module "./uri/common.js" {
 
 /**
  * `URI.open` (`vendor/ruby/v3.3.11/lib/open-uri.rb:23-33`).
- *
- * @noRailsEquivalent PERMANENT
  */
 URI.open = async function (name: unknown, ...rest: unknown[]): Promise<unknown> {
   if (typeof (name as Partial<OpenRead> | null)?.open === "function") {
