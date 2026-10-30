@@ -9,7 +9,7 @@ export class JobGenerator extends NamedBase {
     this.methodAdded("createTestFile");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
   async createTestFile(): Promise<void> {
     await this.createFile(
       File.join(

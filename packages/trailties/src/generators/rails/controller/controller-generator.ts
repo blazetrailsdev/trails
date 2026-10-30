@@ -52,7 +52,7 @@ export class ControllerGenerator extends NamedBase {
   private __fileName?: string;
 
   /**
-   * @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template
+   * @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template
    * @missingRailsArgs join — PERMANENT
    */
   async createControllerFiles(): Promise<void> {

@@ -9,7 +9,7 @@ export class ChannelGenerator extends NamedBase {
     this.methodAdded("createTestFiles");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generators-onto-thor-template */
+  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
   async createTestFiles(): Promise<void> {
     await this.createFile(
       File.join(
