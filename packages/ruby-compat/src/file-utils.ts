@@ -769,6 +769,43 @@ export class FileUtils {
     });
   }
 
+  /** @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils.ln` (`vendor/ruby/v3.3.11/lib/fileutils.rb:516-523`), over the backend's async `link`. */
+  static async lnAsync(
+    src: string | string[],
+    dest: string,
+    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+  ): Promise<void> {
+    if (verbose === true)
+      fuOutputMessage(`ln${force === true ? " -f" : ""} ${[src, dest].flat().join(" ")}`);
+    if (noop === true) return;
+    const pairs: [string, string][] = [];
+    fuEachSrcDest0(src, dest, (s, d) => pairs.push([s, d]));
+    for (const [s, d] of pairs) {
+      if (force === true)
+        await getFs()
+          .unlink?.(d)
+          .catch(() => {});
+      await getFs().link!(s, d);
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils.cp` (`vendor/ruby/v3.3.11/lib/fileutils.rb:873-879`), over async `readFile` / `writeFile`. */
+  static async cpAsync(
+    src: string | string[],
+    dest: string,
+    { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
+  ): Promise<void> {
+    if (verbose === true) fuOutputMessage(`cp ${[src, dest].flat().join(" ")}`);
+    if (noop === true) return;
+    const pairs: [string, string][] = [];
+    fuEachSrcDest(src, dest, (s, d) => pairs.push([s, d]));
+    for (const [s, d] of pairs) {
+      await getFs().writeFile!(d, await getFs().readFile(s), {
+        mode: (await getFs().stat!(s)).mode,
+      });
+    }
+  }
+
   /**
    * `copy_entry` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
    * walks a directory tree and copies each entry with `Entry_#copy`
