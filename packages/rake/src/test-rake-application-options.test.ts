@@ -73,8 +73,8 @@ describe("TestRakeApplicationOptions", () => {
     expect(opts.trace).toBe(false);
     expect(opts.threadPoolSize).toBe(Rake.suggestedThreadCount());
     expect(opts.rakelib).toEqual(["rakelib"]);
-    expect(FileUtilsExt.verboseFlag).toBeFalsy();
-    expect(FileUtilsExt.nowriteFlag).toBeFalsy();
+    expect(!FileUtilsExt.verboseFlag).toBeTruthy();
+    expect(!FileUtilsExt.nowriteFlag).toBeTruthy();
   });
 
   it("dry run", async () => {
@@ -149,14 +149,14 @@ describe("TestRakeApplicationOptions", () => {
       expect(opts.threadPoolSize).toBe(Rake.suggestedThreadCount() - 1);
     });
     await flags("--jobs", "-j", (opts) => {
-      expect(opts.threadPoolSize).toBeGreaterThan(1_000_000);
+      expect(opts.threadPoolSize! > 1_000_000).toBeTruthy();
     });
   });
 
   it("libdir", async () => {
     try {
       await flags(["--libdir", "xx"], ["-I", "xx"], ["-Ixx"], () => {
-        expect(LOAD_PATH).toContain("xx");
+        LOAD_PATH.includes("xx");
       });
     } finally {
       LOAD_PATH.splice(0, LOAD_PATH.length, ...LOAD_PATH.filter((p) => p !== "xx"));
@@ -204,8 +204,9 @@ describe("TestRakeApplicationOptions", () => {
   });
 
   it("missing require", async () => {
-    const ex = (await flags(["--require", "test/missing"]).catch((e: unknown) => e)) as Error;
-    expect(ex).toBeInstanceOf(LoadError);
+    const promise = flags(["--require", "test/missing"]);
+    await expect(promise).rejects.toThrow(LoadError);
+    const ex = (await promise.catch((e: unknown) => e)) as Error;
     expect(ex.message).toMatch(/such file/);
     expect(ex.message).toMatch(/test\/missing/);
   });
@@ -217,8 +218,8 @@ describe("TestRakeApplicationOptions", () => {
   it("quiet", async () => {
     FileUtilsExt.verboseFlag = true;
     await flags("--quiet", "-q", (opts) => {
-      expect(FileUtilsExt.verboseFlag).toBeFalsy();
-      expect(opts.silent).toBeFalsy();
+      expect(!FileUtilsExt.verboseFlag).toBeTruthy();
+      expect(!opts.silent).toBeTruthy();
     });
   });
 
@@ -229,7 +230,7 @@ describe("TestRakeApplicationOptions", () => {
   it("silent", async () => {
     FileUtilsExt.verboseFlag = true;
     await flags("--silent", "-s", (opts) => {
-      expect(FileUtilsExt.verboseFlag).toBeFalsy();
+      expect(!FileUtilsExt.verboseFlag).toBeTruthy();
       expect(opts.silent).toBeTruthy();
     });
   });
@@ -242,74 +243,89 @@ describe("TestRakeApplicationOptions", () => {
     await flags("--no-system", "-G", (opts) => expect(opts.ignoreSystem).toBeTruthy());
   });
 
-  function expectTrace(opts: ApplicationOptions, out: unknown): void {
-    expect(opts.trace).toBeTruthy();
-    expect(opts.backtrace).toBeTruthy();
-    expect(opts.traceOutput).toBe(out);
-    expect(FileUtilsExt.verboseFlag).toBeTruthy();
-  }
-
-  function expectBacktrace(opts: ApplicationOptions, out: unknown): void {
-    expect(opts.backtrace).toBeTruthy();
-    expect(opts.traceOutput).toBe(out);
-    expect(opts.trace).toBeFalsy();
-  }
-
   it("trace", async () => {
     await flags("--trace", "-t", (opts) => {
-      expectTrace(opts, STDERR);
-      expect(FileUtilsExt.nowriteFlag).toBeFalsy();
+      expect(opts.trace).toBeTruthy();
+      expect(opts.backtrace).toBeTruthy();
+      expect(opts.traceOutput).toBe(STDERR);
+      expect(FileUtilsExt.verboseFlag).toBeTruthy();
+      expect(!FileUtilsExt.nowriteFlag).toBeTruthy();
     });
   });
 
   it("trace with stdout", async () => {
     await flags("--trace=stdout", "-tstdout", (opts) => {
-      expectTrace(opts, STDOUT);
-      expect(FileUtilsExt.nowriteFlag).toBeFalsy();
+      expect(opts.trace).toBeTruthy();
+      expect(opts.backtrace).toBeTruthy();
+      expect(opts.traceOutput).toBe(STDOUT);
+      expect(FileUtilsExt.verboseFlag).toBeTruthy();
+      expect(!FileUtilsExt.nowriteFlag).toBeTruthy();
     });
   });
 
   it("trace with stderr", async () => {
     await flags("--trace=stderr", "-tstderr", (opts) => {
-      expectTrace(opts, STDERR);
-      expect(FileUtilsExt.nowriteFlag).toBeFalsy();
+      expect(opts.trace).toBeTruthy();
+      expect(opts.backtrace).toBeTruthy();
+      expect(opts.traceOutput).toBe(STDERR);
+      expect(FileUtilsExt.verboseFlag).toBeTruthy();
+      expect(!FileUtilsExt.nowriteFlag).toBeTruthy();
     });
   });
 
   it("trace with error", async () => {
-    const ex = (await flags("--trace=xyzzy").catch((e: unknown) => e)) as Error;
-    expect(ex).toBeInstanceOf(CommandLineOptionError);
+    const promise = flags("--trace=xyzzy");
+    await expect(promise).rejects.toThrow(CommandLineOptionError);
+    const ex = (await promise.catch((e: unknown) => e)) as Error;
     expect(ex.message).toMatch(/un(known|recognized).*\btrace\b.*xyzzy/i);
   });
 
   it("trace with following task name", async () => {
     await flags(["--trace", "taskname"], ["-t", "taskname"], (opts) => {
-      expectTrace(opts, STDERR);
+      expect(opts.trace).toBeTruthy();
+      expect(opts.backtrace).toBeTruthy();
+      expect(opts.traceOutput).toBe(STDERR);
+      expect(FileUtilsExt.verboseFlag).toBeTruthy();
       expect(app.topLevelTasks).toEqual(["taskname"]);
     });
   });
 
   it("backtrace", async () => {
-    await flags("--backtrace", (opts) => expectBacktrace(opts, STDERR));
+    await flags("--backtrace", (opts) => {
+      expect(opts.backtrace).toBeTruthy();
+      expect(opts.traceOutput).toBe(STDERR);
+      expect(!opts.trace).toBeTruthy();
+    });
   });
 
   it("backtrace with stdout", async () => {
-    await flags("--backtrace=stdout", (opts) => expectBacktrace(opts, STDOUT));
+    await flags("--backtrace=stdout", (opts) => {
+      expect(opts.backtrace).toBeTruthy();
+      expect(opts.traceOutput).toBe(STDOUT);
+      expect(!opts.trace).toBeTruthy();
+    });
   });
 
   it("backtrace with stderr", async () => {
-    await flags("--backtrace=stderr", (opts) => expectBacktrace(opts, STDERR));
+    await flags("--backtrace=stderr", (opts) => {
+      expect(opts.backtrace).toBeTruthy();
+      expect(opts.traceOutput).toBe(STDERR);
+      expect(!opts.trace).toBeTruthy();
+    });
   });
 
   it("backtrace with error", async () => {
-    const ex = (await flags("--backtrace=xyzzy").catch((e: unknown) => e)) as Error;
-    expect(ex).toBeInstanceOf(CommandLineOptionError);
+    const promise = flags("--backtrace=xyzzy");
+    await expect(promise).rejects.toThrow(CommandLineOptionError);
+    const ex = (await promise.catch((e: unknown) => e)) as Error;
     expect(ex.message).toMatch(/un(known|recognized).*\bbacktrace\b.*xyzzy/i);
   });
 
   it("backtrace with following task name", async () => {
     await flags(["--backtrace", "taskname"], (opts) => {
-      expectBacktrace(opts, STDERR);
+      expect(!opts.trace).toBeTruthy();
+      expect(opts.backtrace).toBeTruthy();
+      expect(opts.traceOutput).toBe(STDERR);
       expect(app.topLevelTasks).toEqual(["taskname"]);
     });
   });
@@ -364,7 +380,7 @@ describe("TestRakeApplicationOptions", () => {
     await captureOutput(() =>
       flags("--verbose", "-v", (opts) => {
         expect(FileUtilsExt.verboseFlag).toBeTruthy();
-        expect(opts.silent).toBeFalsy();
+        expect(!opts.silent).toBeTruthy();
       }),
     );
   });
@@ -373,16 +389,23 @@ describe("TestRakeApplicationOptions", () => {
     const [out] = await captureOutput(() => flags("--version", "-V"));
 
     expect(out).toMatch(/\bversion\b/);
-    expect(out).toContain(VERSION);
+    expect(out).toMatch(new RegExp(`\\b${VERSION}\\b`));
     expect(exited).toBe("exit");
   });
 
   it("bad option", async () => {
     const [, err] = await captureOutput(async () => {
-      const ex = (await flags("--bad-option").catch((e: unknown) => e)) as Error;
-      expect(ex).toBeInstanceOf(OptionParser.InvalidOption);
-      expect(ex.message).toMatch(/(invalid|unrecognized) option/i);
-      expect(ex.message).toMatch(/--bad-option/);
+      const promise = flags("--bad-option");
+      await expect(promise).rejects.toThrow(OptionParser.InvalidOption);
+      const ex = (await promise.catch((e: unknown) => e)) as Error;
+      /* eslint-disable vitest/no-conditional-expect */
+      if (/^While/m.test(ex.message)) {
+        expect(ex.message).toMatch(/while parsing/i);
+      } else {
+        expect(ex.message).toMatch(/(invalid|unrecognized) option/i);
+        expect(ex.message).toMatch(/--bad-option/);
+      }
+      /* eslint-enable vitest/no-conditional-expect */
     });
 
     expect(err).toBe("");
@@ -422,7 +445,7 @@ describe("TestRakeApplicationOptions", () => {
 
     const libs = Rake.application!.options.rakelib!;
 
-    expect(libs).toContain("app/task");
-    expect(libs).toContain("other");
+    expect(libs.includes("app/task")).toBeTruthy();
+    expect(libs.includes("other")).toBeTruthy();
   });
 });

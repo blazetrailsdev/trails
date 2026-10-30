@@ -6,7 +6,6 @@ export { PseudoStatus } from "./pseudo-status.js";
 import "./class-paths.generated.js";
 export { pathmap } from "./ext/string.js";
 export { Cloneable } from "./cloneable.js";
-||||||| parent of 07b66d74d9 (feat(rake,ruby-compat): port Rake::Application option parsing and Rakefile loading)
 export { Application, CommandLineOptionError } from "./application.js";
 export type { ApplicationOptions } from "./application.js";
 export { DefaultLoader } from "./default-loader.js";

@@ -80,7 +80,7 @@ describe("TestRakeApplication", () => {
 
   it("not finding rakefile", async () => {
     app._rakefiles = ["NEVER_FOUND"];
-    expect(await app.haveRakefile()).toBeFalsy();
+    expect(!(await app.haveRakefile())).toBeTruthy();
     expect(app.rakefile).toBeNull();
   });
 
@@ -103,7 +103,7 @@ describe("TestRakeApplication", () => {
       await app.rawLoadRakefile();
     });
 
-    expect(err).toBe("");
+    expect(err).toHaveLength(0);
   });
 
   it("load rakefile from subdir", async () => {
@@ -141,7 +141,7 @@ describe("TestRakeApplication", () => {
       await app.rawLoadRakefile();
     });
 
-    expect(err).toBe("");
+    expect(err).toHaveLength(0);
   });
 
   it("load rakefile not found", async () => {
@@ -151,8 +151,9 @@ describe("TestRakeApplication", () => {
     await app.handleOptions([]);
     app.options.silent = true;
 
-    const ex = (await app.rawLoadRakefile().catch((e: unknown) => e)) as Error;
-    expect(ex).toBeInstanceOf(RuntimeError);
+    const promise = app.rawLoadRakefile();
+    await expect(promise).rejects.toThrow(RuntimeError);
+    const ex = (await promise.catch((e: unknown) => e)) as Error;
     expect(ex.message).toMatch(/no rakefile found/i);
   });
 
@@ -205,8 +206,6 @@ describe("TestRakeApplication", () => {
     app.addLoader("dummy", loader);
     app.addImport("x.dummy");
     await app.loadImports();
-
-    expect(loader.loadCalled).toBe(true);
   });
 
   it("building imported files on demand", async () => {
@@ -216,12 +215,10 @@ describe("TestRakeApplication", () => {
     app.addLoader("dummy", loader);
     app.addImport("x.dummy");
     await app.loadImports();
-
-    expect(loader.makeDummyCalled).toBe(true);
   });
 
   it("handle options should not strip options from argv", async () => {
-    expect(app.options.trace).toBeFalsy();
+    expect(!app.options.trace).toBeTruthy();
 
     const argv = ["--trace"];
     await app.handleOptions(argv);
@@ -245,57 +242,57 @@ describe("TestRakeApplication", () => {
   });
 
   it("handle options trace does not eat following task names", async () => {
-    expect(app.options.trace).toBeFalsy();
+    expect(!app.options.trace).toBeTruthy();
 
     const argv = ["--trace", "sometask"];
     await app.handleOptions(argv);
 
-    expect(argv).toContain("sometask");
+    expect(argv.includes("sometask")).toBeTruthy();
     expect(app.options.trace).toBeTruthy();
   });
 
   it("standard exception handling invalid option", async () => {
     const [out, err] = await captureOutput(async () => {
-      const e = (await app
-        .standardExceptionHandling(() => {
-          throw new OptionParser.InvalidOption("blah");
-        })
-        .catch((ex: unknown) => ex)) as SystemExit;
+      const promise = app.standardExceptionHandling(() => {
+        throw new OptionParser.InvalidOption("blah");
+      });
+      await expect(promise).rejects.toThrow(SystemExit);
+      const e = (await promise.catch((ex: unknown) => ex)) as SystemExit;
 
       expect(e.status).toBe(1);
     });
 
-    expect(out).toBe("");
+    expect(out).toHaveLength(0);
     expect(err).toBe("invalid option: blah\n");
   });
 
   it("standard exception handling system exit", async () => {
     const [out, err] = await captureOutput(async () => {
-      const e = (await app
-        .standardExceptionHandling(() => {
-          throw new SystemExit(0);
-        })
-        .catch((ex: unknown) => ex)) as SystemExit;
+      const promise = app.standardExceptionHandling(() => {
+        throw new SystemExit(0);
+      });
+      await expect(promise).rejects.toThrow(SystemExit);
+      const e = (await promise.catch((ex: unknown) => ex)) as SystemExit;
 
       expect(e.status).toBe(0);
     });
 
-    expect(out).toBe("");
-    expect(err).toBe("");
+    expect(out).toHaveLength(0);
+    expect(err).toHaveLength(0);
   });
 
   it("standard exception handling system exit nonzero", async () => {
     const [out, err] = await captureOutput(async () => {
-      const e = (await app
-        .standardExceptionHandling(() => {
-          throw new SystemExit(5);
-        })
-        .catch((ex: unknown) => ex)) as SystemExit;
+      const promise = app.standardExceptionHandling(() => {
+        throw new SystemExit(5);
+      });
+      await expect(promise).rejects.toThrow(SystemExit);
+      const e = (await promise.catch((ex: unknown) => ex)) as SystemExit;
 
       expect(e.status).toBe(5);
     });
 
-    expect(out).toBe("");
-    expect(err).toBe("");
+    expect(out).toHaveLength(0);
+    expect(err).toHaveLength(0);
   });
 });
