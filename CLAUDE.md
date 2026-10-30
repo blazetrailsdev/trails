@@ -1822,7 +1822,6 @@ Rules that apply across the table:
   object does not already answer, so a builder tag named `constructor`,
   `toString` or `append` is written `xml.tagBang(name)`, Ruby's `tag!`.
 - `active_storage/attachment.rb`'s `delegate_missing_to :blob` is
-- `active_storage/attachment.rb`'s `delegate_missing_to :blob` is
   `delegateMissingTo` over a prototype, so its trap is synchronous. An unloaded
   `blob` is a promise that answers nothing: a forwarded name raises
   `NoMethodError` until `await attachment.blob`. A nil `blob` raises
