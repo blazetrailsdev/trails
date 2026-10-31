@@ -1,5 +1,5 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { exit, include, type Included } from "@blazetrails/ruby-compat";
+import { exit, include, puts, type Included } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { environment } from "../command.js";
@@ -24,7 +24,7 @@ interface ConsoleApp {
     disableSandbox?: boolean;
     sandboxByDefault?: boolean;
   };
-  name?(): string;
+  name(): string;
   loadConsole(): unknown;
 }
 
@@ -44,7 +44,7 @@ export class Console {
     app.sandbox = this.isSandbox();
 
     if (this.isSandbox() && app.config.disableSandbox) {
-      console.log(
+      puts(
         "Error: Unable to start console in sandbox mode as sandbox mode is disabled (config.disableSandbox is true).",
       );
       exit(1);
@@ -79,10 +79,10 @@ export class Console {
     if (this.isEnvironment()) this.setEnvironmentBang();
 
     if (this.isSandbox()) {
-      console.log(`Loading ${Trails.env} environment in sandbox (Trails ${Trails.version()})`);
-      console.log("Any modifications you make will be rolled back on exit");
+      puts(`Loading ${Trails.env} environment in sandbox (Trails ${Trails.version()})`);
+      puts("Any modifications you make will be rolled back on exit");
     } else {
-      console.log(`Loading ${Trails.env} environment (Trails ${Trails.version()})`);
+      puts(`Loading ${Trails.env} environment (Trails ${Trails.version()})`);
     }
 
     await this.console.start();

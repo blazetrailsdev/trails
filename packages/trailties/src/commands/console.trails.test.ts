@@ -31,7 +31,7 @@ async function evaluate(line: string): Promise<void> {
 }
 
 function startConsole(): Promise<void> {
-  const app = { sandbox: null, config: {}, loadConsole() {} };
+  const app = { sandbox: null, config: {}, name: () => "app", loadConsole() {} };
   return Console.start(app);
 }
 

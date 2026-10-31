@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { capture } from "@blazetrails/activesupport";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
 import { Console, ConsoleCommand } from "./console.js";
@@ -18,6 +19,7 @@ function buildApp(console: typeof FakeConsole | null) {
   return {
     sandbox: undefined as boolean | null | undefined,
     config: { console },
+    name: () => "app",
     loadConsole() {},
   };
 }
@@ -36,9 +38,6 @@ describe("Rails::ConsoleTest", () => {
     FakeConsole._started = false;
     app = buildApp(FakeConsole);
     output = "";
-    vi.spyOn(console, "log").mockImplementation((line: string) => {
-      output += `${line}\n`;
-    });
   });
 
   afterEach(() => {
@@ -50,7 +49,8 @@ describe("Rails::ConsoleTest", () => {
   });
 
   async function start(argv: string[] = []) {
-    await new Console(app, parseArguments(argv)).start();
+    const railsConsole = new Console(app, parseArguments(argv));
+    output = await capture(":stdout", () => railsConsole.start());
   }
 
   async function withEnv(

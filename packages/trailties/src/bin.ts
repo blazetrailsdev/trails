@@ -22,7 +22,14 @@ if (APP_PATH == null) {
   }
 }
 
-const aliases: Record<string, string> = { c: "console" };
+const aliases: Record<string, string> = {
+  g: "generate",
+  d: "destroy",
+  c: "console",
+  s: "server",
+  r: "runner",
+  t: "test",
+};
 
 const [, , command = "", ...args] = argv;
 await invoke(Object.hasOwn(aliases, command) ? aliases[command] : command, args);

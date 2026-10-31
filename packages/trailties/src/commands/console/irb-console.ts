@@ -8,9 +8,9 @@ const CLEAR = "\u001b[0m";
 
 export class IRBConsole {
   /** @internal */
-  private app: { name?(): string };
+  private app: { name(): string };
 
-  constructor(app: { name?(): string }) {
+  constructor(app: { name(): string }) {
     this.app = app;
   }
 
@@ -27,7 +27,7 @@ export class IRBConsole {
    */
   async start(): Promise<void> {
     const env = this.colorizedEnv();
-    const promptPrefix = `${this.app.name?.() ?? "trails"}(${env})`;
+    const promptPrefix = `${this.app.name()}(${env})`;
 
     const context = await this.loadModels();
     const repl = await getReplAsync();
