@@ -147,15 +147,31 @@ function rbExecFillarg(prog: string): string[] | null {
 class Status {
   readonly pid: number | null;
   readonly #status: number | null;
+  readonly #signal: string | null;
 
   constructor(status: WaitStatus) {
     this.pid = status.pid;
+    this.#signal = status.signal ?? null;
     this.#status = status.error === undefined ? status.status : null;
   }
 
   /** `Process::Status#exitstatus` (`pst_wexitstatus`, `vendor/ruby/v3.3.11/process.c:1084-1091`). */
   exitstatus(): number | null {
     return this.#status;
+  }
+
+  /** `Process::Status#signaled?` (`pst_wifsignaled`, `vendor/ruby/v3.3.11/process.c:1050`). */
+  isSignaled(): boolean {
+    return this.#signal !== null;
+  }
+
+  /**
+   * `Process::Status#termsig` (`pst_wtermsig`, `vendor/ruby/v3.3.11/process.c:1064`).
+   * Node reports the signal's name and no number, and `SignalException.new`
+   * takes either.
+   */
+  termsig(): string | null {
+    return this.#signal;
   }
 
   isSuccess(): boolean | null {
