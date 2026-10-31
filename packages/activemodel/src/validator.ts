@@ -1,4 +1,4 @@
-import { isBlank, underscore } from "@blazetrails/activesupport";
+import { isBlank, isPresent, underscore } from "@blazetrails/activesupport";
 import { ArgumentError, NotImplementedError } from "./attribute-assignment.js";
 import type { Errors } from "./errors.js";
 
@@ -51,7 +51,7 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
       ).readAttributeForValidation(attribute);
       if (
         (value == null && this.options.allowNil === true) ||
-        (isBlank(value) && this.options.allowBlank === true)
+        (!(await isPresent(value)) && this.options.allowBlank === true)
       ) {
         continue;
       }

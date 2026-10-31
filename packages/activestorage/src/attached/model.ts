@@ -119,7 +119,7 @@ function hasOneAttached(
     { on: ["create", "update"] },
   );
 
-  const reflection = Reflection.create!(
+  const reflection = Reflection.create(
     "hasOneAttached",
     name,
     null,
@@ -214,7 +214,7 @@ function hasManyAttached(
     { on: ["create", "update"] },
   );
 
-  const reflection = Reflection.create!(
+  const reflection = Reflection.create(
     "hasManyAttached",
     name,
     null,

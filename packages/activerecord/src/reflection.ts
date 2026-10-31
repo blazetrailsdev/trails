@@ -1573,8 +1573,8 @@ export class RuntimeReflection extends AbstractReflection {
 interface ReflectionModule {
   [included](base: object): void;
   addAttachmentReflection?: (model: typeof Base, name: string, reflection: MacroReflection) => void;
-  create?: typeof create;
-  reflectionClassFor?: typeof reflectionClassFor;
+  create: typeof create;
+  reflectionClassFor: typeof reflectionClassFor;
 }
 
 /** @internal */
@@ -1628,7 +1628,7 @@ export function create(
   options: Record<string, unknown>,
   ar: typeof Base,
 ): MacroReflection | ThroughReflection {
-  const ReflectionClass = Reflection.reflectionClassFor!(macro);
+  const ReflectionClass = Reflection.reflectionClassFor(macro);
   const reflection = new ReflectionClass(name, scope, options, ar);
   return options.through ? new ThroughReflection(reflection as AssociationReflection) : reflection;
 }
@@ -1764,7 +1764,7 @@ export interface Reflection {
   readonly automaticallyInvertPluralAssociations: boolean;
 }
 
-export const Reflection: ReflectionModule = {
+export const Reflection = {
   [included](base: object): void {
     classAttribute.call(base, "_reflections", { instanceWriter: false, default: {} });
     classAttribute.call(base, "aggregateReflections", { instanceWriter: false, default: {} });
@@ -1774,7 +1774,7 @@ export const Reflection: ReflectionModule = {
       default: false,
     });
   },
-};
+} as ReflectionModule;
 
 include(rbObjSingletonClass(Reflection), { create, reflectionClassFor });
 
