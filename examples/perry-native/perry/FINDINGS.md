@@ -45,20 +45,21 @@ rows are that build's behaviour; each wall's own section says what changed.
 
 ## The ladder
 
-| Rung                                                              | Node | Perry       |                                                |
-| ----------------------------------------------------------------- | ---- | ----------- | ---------------------------------------------- |
-| `02-class` — classes, `#private` fields, accessors, static blocks | ok   | **ok**      | 2s, 17MB                                       |
-| `03-proxy` — `Proxy` `get` trap + `methodMissing`                 | ok   | **ok**      | 2s, 17MB                                       |
-| `04a-local-modules` — control: 2-module local graph, no package   | ok   | **ok**      | 17MB                                           |
-| `04c-ruby-compat` — **real framework code**, foundation layer     | ok   | **ok**      | **54 modules, 21MB, correct output**           |
-| `04d-ruby-compat-barrel` — the same function via the barrel       | ok   | **RUNTIME** | 139 modules, links at 40MB, crashes on startup |
-| `04b-deep-import` — activesupport leaf, barrel bypassed           | ok   | **MEM**     | 364 modules                                    |
-| `04-activesupport` — one named import from the barrel             | ok   | **MEM**     | 429 modules                                    |
-| `05-model` — an `ActiveRecord` model class, no connection         | ok   | **MEM**     | killed at 12GB after 261s                      |
-| `06-sqlite` — `better-sqlite3`                                    | ok   | **ok\***    | 8s, 30MB — shimmed, see below                  |
-| `06b-crud` — one model, real connection, full CRUD                | ok   | **MEM**     | 891 modules; killed in codegen at 61/891       |
-| `06d-adapter-read` — adapter reads rows, no model layer           | ok   | _not run_   | 1133 modules; walls 8+10+11 fixed, wall 9 open |
-| `07-boot` — full framework boot                                   | ok   | **MEM**     | killed at 12GB after 689s                      |
+| Rung                                                              | Node | Perry       |                                                                  |
+| ----------------------------------------------------------------- | ---- | ----------- | ---------------------------------------------------------------- |
+| `02-class` — classes, `#private` fields, accessors, static blocks | ok   | **ok**      | 2s, 17MB                                                         |
+| `03-proxy` — `Proxy` `get` trap + `methodMissing`                 | ok   | **ok**      | 2s, 17MB                                                         |
+| `04a-local-modules` — control: 2-module local graph, no package   | ok   | **ok**      | 17MB                                                             |
+| `04c-ruby-compat` — **real framework code**, foundation layer     | ok   | **ok**      | **54 modules, 21MB, correct output**                             |
+| `04d-ruby-compat-barrel` — the same function via the barrel       | ok   | **RUNTIME** | 139 modules, links at 40MB, crashes on startup                   |
+| `04b-deep-import` — activesupport leaf, barrel bypassed           | ok   | **MEM**     | 364 modules                                                      |
+| `04-activesupport` — one named import from the barrel             | ok   | **MEM**     | 429 modules                                                      |
+| `05-model` — an `ActiveRecord` model class, no connection         | ok   | **MEM**     | killed at 12GB after 261s                                        |
+| `06-sqlite` — `better-sqlite3`                                    | ok   | **ok\***    | 8s, 30MB — shimmed, see below                                    |
+| `06b-crud` — one model, real connection, full CRUD                | ok   | **MEM**     | 891 modules; killed in codegen at 61/891                         |
+| `06d-adapter-read` — adapter reads rows, no model layer           | ok   | _not run_   | 1133 modules; walls 8+10+11 fixed, wall 9 open                   |
+| `07-boot` — full framework boot                                   | ok   | **MEM**     | killed at 12GB after 689s                                        |
+| `08-serve` — `trails server`'s own production path, serving `/up` | ok   | **RUNTIME** | **compiles** in 1065s, 1620 modules, 171MB — throws in `include` |
 
 Every rung runs correctly under Node, so no failure here is a broken program.
 Rungs are listed by module count, which is the axis that matters.
@@ -1239,7 +1240,119 @@ Both re-verified against `main` @ `20fde48d` immediately before filing, and
 both duplicate-searched first. 12978's reproducer is the 23-line
 `inQueryConnection` case and the warning text is unchanged from 0.5.1520.
 
+## Wall 15: a module that imports itself gets `undefined`, not a namespace object
+
+`08-serve`'s binary compiles and then throws:
+
+```
+TypeError: Cannot convert undefined or null to object
+    at include (<anonymous>)
+```
+
+`include` was instrumented temporarily to print its arguments (reverted
+afterwards). `klass` is a healthy class; the **module argument is `undefined`**.
+The call site is
+`packages/activesupport/src/core-ext/date-and-time/calculations.ts:487`,
+`include(RubyTime, DateAndTimeCalculations)`, and line 9 of that same file is:
+
+```ts
+import * as DateAndTimeCalculations from "./calculations.js";
+```
+
+The module imports **itself** as a namespace object. That is legal ESM: the
+namespace object is created before the module is evaluated, so top-level code
+at line 487 sees it populated. Perry evaluates it to `undefined`.
+
+Reduced to a two-line fixture (one file, no framework):
+
+| expression           | Node           | Perry       |
+| -------------------- | -------------- | ----------- |
+| `typeof Self`        | `object`       | `object`    |
+| `Self === undefined` | `false`        | **`true`**  |
+| `typeof Self.mixin`  | `function`     | `undefined` |
+| `Object.keys(Self)`  | `marker,mixin` | **throws**  |
+
+`typeof` says `object` while the value is `undefined`, so `typeof` is folded
+from the binding's declared kind at compile time while the runtime slot never
+receives a namespace object. The fix belongs in Perry: construct and populate
+the namespace object for a self-referential import (a cycle of length one)
+before evaluating the module body.
+
+**Two corrections to earlier readings of this wall, both recorded because the
+wrong ones were plausible:**
+
+- The call site is **not** `activerecord/src/type/time.ts:39`
+  (`include(Time, Timezone)`). That was picked by grepping for `include(Time`
+  and matched a different `Time`. The init chain shows no activerecord module
+  runs at all.
+- There is **no import cycle through `active-record.js`**, which an earlier
+  draft of this section claimed. `active-record.ts`'s value imports are
+  `namespaces.js`, `marshalling.js` and `migration/default-strategy.js`.
+- `PERRY_DEBUG_INIT` is a **compile-time** variable
+  (`perry-codegen/src/codegen/entry.rs:425`), not a runtime one, and its
+  `INIT:` lines interleave with unbuffered stderr — the error text lands
+  spliced into the middle of an unrelated module name, and init lines continue
+  after it. The position of the throw in that stream does not identify the
+  module that threw.
+
+It is **pre-existing and unrelated to the wall 14 cuts**: the 533-module
+`probe/db-read/errors-direct.ts` fixture reproduces it, and predates them.
+
 ## Wall 14: a production server binary contains vite, rollup and playwright
+
+**Fixed in trails by #9495** (`997845bfb3`, merged 2026-10-30), from RFC 0061
+story `keep-playwright-and-vite-out-of-a-production-boot`. That change carries
+the two cuts below plus the pieces this prototype left open: an `exports` map on
+`@blazetrails/actionpack` (so the `./system-testing` subpath resolves), a
+`production-boot.trails.test.ts` asserting the graph, an entry-import TDZ guard,
+and regenerated `class-paths` parity manifests.
+
+The measurements that motivated it, from the prototype of the same two cuts:
+
+| measurement | before                      | barrel cut only | both cuts       |
+| ----------- | --------------------------- | --------------- | --------------- |
+| compile     | OOM @12 GiB; TIMEOUT @60min | 1 module failed | **RC=0, 1065s** |
+| modules     | 1720                        | 1713            | 1620            |
+| playwright  | 570 warnings, 43min stall   | **0**           | **0**           |
+| vite        | present                     | 145 mentions    | **0**           |
+| peak RSS    | 20.0 GiB                    | 10.6 GiB        | —               |
+
+The cuts:
+
+1. **`system-testing` off the `action-dispatch` barrel.** `driver.ts` imports
+   playwright. The import is _already_ lazy (`await import(PLAYWRIGHT_MODULE)`),
+   and that does not matter: Perry const-folds the specifier and registers it as
+   an import edge (`perry-hir/src/dynamic_import.rs`), so playwright joins the
+   graph of anything that can reach the file. The barrel was the only importer
+   of `system-test-case.js`, and nothing in the repo imported `SystemTestCase`,
+   `Driver`, `DrivenByOptions` or `ServedByOptions` from it.
+
+2. **The `trailties` entry split.** `"."` was `./dist/cli.js`, so every app's
+   `config/application.ts:1` reached commander, every command, the generators,
+   and — via `commands/server.ts` → `server/dev-server.ts:2` — vite and rollup.
+   `"."` is now the runtime surface (`Trails`, `Application`, `Engine`,
+   `Trailtie`, exactly what `cli.ts:19-22` re-exported) and the CLI moved to
+   `"./cli"`.
+
+**Cost is not module count.** The first cut removed only 7 of 1720 modules and
+bought 43 minutes of codegen and ~10 GiB of RSS, because
+`playwright-core/lib/coreBundle.js` was a single enormous bundled file (5.16 GiB
+in the facts profile). An earlier reading of this wall dismissed the entry split
+as "62 of 1731 modules, 3.6%, not worth it" — that used the wrong metric, and
+the measurement above overturns it.
+
+**What the cuts did not fix.** The binary compiles and then throws
+`TypeError: Cannot convert undefined or null to object at include` — the same
+failure the 533-module `probe/db-read/errors-direct.ts` fixture produces, so it
+is pre-existing and not a consequence of the cuts. Compilation also reports
+`unimplemented API buffer.hasOwnProperty` in `safer-buffer/safer.js:130` as a
+_deferred_ runtime error, latent behind the `include` one;
+`--strict-unimplemented` turns that class into a compile-time error.
+
+**Open packaging question.** `@blazetrails/actionpack` has `main` and no
+`exports` map, so the new `@blazetrails/actionpack/system-testing` subpath does
+not resolve as written — it needs an `exports` map, which would change
+deep-import behaviour for existing consumers. That decision is not made here.
 
 `07-boot` and `08-serve` are the first rungs that fail to compile at all since
 wall 1 was fixed, and the per-module memory curve does not explain them. The
