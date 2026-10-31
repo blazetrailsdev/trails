@@ -2,7 +2,7 @@ import { Dir, FileUtils, File, regexpEscape, setEnv } from "@blazetrails/ruby-co
 import { describe, expect, it } from "vitest";
 import { useApplicationTestCase } from "./test-helpers/application.js";
 import * as d from "./test-helpers/rakefile-definitions.js";
-import { rake, ruby, RUBY, runner, runRuby, useRubyRunner } from "./test-helpers/ruby-runner.js";
+import { rake, RUBY, runner, runRuby, useRubyRunner } from "./test-helpers/ruby-runner.js";
 
 const shown = new RegExp(`${regexpEscape(RUBY)} -e`);
 
@@ -342,7 +342,7 @@ describe("TestRakeFunctional", () => {
       'import { FileList } from "@blazetrails/rake/file-list";\n' +
         'console.log(await new FileList("a").size());\n',
     );
-    await ruby("size.ts");
+    await runRuby(["size.ts"]);
     expect(runner.out).toBe("1\n");
   });
 

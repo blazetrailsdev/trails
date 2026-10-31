@@ -89,6 +89,7 @@ export function ioPutsAry(this: GenericWritable, ary: unknown[]): void {
  */
 export function print(this: GenericWritable, ...args: unknown[]): null {
   for (const arg of args) this.write(arg == null ? "" : String(arg));
+  if (args.length > 0 && rbOutputRs.value != null) this.write(rbOutputRs.value);
   return null;
 }
 
@@ -108,7 +109,11 @@ export function printf(this: GenericWritable, fmt: string, ...argv: unknown[]): 
   return null;
 }
 
-/** @noRailsEquivalent PERMANENT — `$\\`, `rb_output_rs`, `vendor/ruby/v3.3.11/io.c:195`. */
+/**
+ * `$\` (`rb_output_rs`, `vendor/ruby/v3.3.11/io.c:195`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 export const rbOutputRs: { value: string | null } = { value: null };
 
 /** `vendor/ruby/v3.3.11/io.c:160` `IO_RBUF_CAPA_MIN`, the read buffer Ruby fills. */

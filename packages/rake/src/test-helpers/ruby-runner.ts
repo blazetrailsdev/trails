@@ -21,10 +21,6 @@ export function useRubyRunner(): void {
   });
 }
 
-export function ruby(...optionList: string[]): Promise<void> {
-  return runRuby(optionList);
-}
-
 export function rake(...rakeOptions: string[]): Promise<void> {
   return runRuby([rakeExec, ...rakeOptions]);
 }

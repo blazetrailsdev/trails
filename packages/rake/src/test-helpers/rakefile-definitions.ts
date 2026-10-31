@@ -22,12 +22,8 @@ const TOP_LEVEL_CONSTANT = 0;
 function aTopLevelFunction() {}
 task({ default: ["work", "obj", "const"] });
 task("work", block(() => {
-  try {
-    aTopLevelFunction();
-    console.log("GOOD:M Top level methods can be called in tasks");
-  } catch {
-    console.log("BAD:M  Top level methods can not be called in tasks");
-  }
+  aTopLevelFunction();
+  console.log("GOOD:M Top level methods can be called in tasks");
 }));
 task("obj", block(() => {
   try {
@@ -38,12 +34,8 @@ task("obj", block(() => {
   }
 }));
 task("const", block(() => {
-  try {
-    TOP_LEVEL_CONSTANT;
-    console.log("GOOD:C Top level constants are available in tasks");
-  } catch {
-    console.log("BAD:C  Top level constants are NOT available in tasks");
-  }
+  TOP_LEVEL_CONSTANT;
+  console.log("GOOD:C Top level constants are available in tasks");
 }));
 `);
 }
