@@ -5,7 +5,7 @@ export class ActiveStorageCreateUsers extends Migration.get(5.2) {
     await this.createTable("users", (t) => {
       t.string("name");
       t.integer("group_id");
-      t.timestamps();
+      t.timestamps({ precision: 6 });
     });
   }
 }
