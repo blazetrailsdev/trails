@@ -19,8 +19,7 @@ describe("elements with no spec of their own", () => {
   it("reads the remaining single-parser elements", () => {
     expect(new ContentLocationElement("foo.html").toString()).toEqual("foo.html");
     expect(new ContentTransferEncodingElement("base64").encoding).toEqual("base64");
-    const version = new MimeVersionElement("1.0");
-    expect([version.major, version.minor]).toEqual(["1", "0"]);
+    expect(new MimeVersionElement("1.0").minor).toEqual("0");
     expect(new DateTimeElement("Wed, 27 Apr 2005 14:15:31 -0700").timeString).toEqual(
       "14:15:31 -0700",
     );

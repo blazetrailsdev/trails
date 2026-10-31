@@ -29,8 +29,7 @@ export class Address {
 
   format(outputType = "decode"): string {
     if (!this._parsed) this.parse();
-    let name: string | null;
-    let a: string | null;
+    let name: string | null, a: string | null;
     if (this._data == null) {
       return Constants.EMPTY;
     } else if ((name = this.displayName(outputType)) != null) {
