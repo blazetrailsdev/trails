@@ -11,6 +11,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Authenticator } from "./authenticator.js";
 import {
+  Net,
   OpenTimeout,
   ProtoAuthError,
   ProtoFatalError,
@@ -70,6 +71,7 @@ export class SMTPAuthenticationError extends ProtoAuthError {
   }
 }
 include(SMTPAuthenticationError, SMTPError);
+Net.SMTPAuthenticationError = SMTPAuthenticationError;
 
 export class SMTPServerBusy extends ProtoServerError {
   response: Response | null;

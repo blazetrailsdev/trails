@@ -1,5 +1,6 @@
 import { ArgumentError, pack } from "@blazetrails/ruby-compat";
-import { SMTPAuthenticationError, type Response } from "./smtp.js";
+import { Net } from "./protocol.js";
+import type { Response } from "./smtp.js";
 
 interface AuthHost {
   getResponse(reqline: string): Promise<Response>;
@@ -43,7 +44,7 @@ export abstract class Authenticator {
 
   async finish(arg: string): Promise<Response> {
     const res = await this.smtp.getResponse(arg);
-    if (!res.isSuccess()) throw new SMTPAuthenticationError(res);
+    if (!res.isSuccess()) throw new Net.SMTPAuthenticationError!(res);
     return res;
   }
 
