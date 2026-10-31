@@ -1,11 +1,11 @@
-import { classModule } from "@blazetrails/ruby-compat";
+import { classModule, rbOutputRs } from "@blazetrails/ruby-compat";
 
 export class TraceOutput {
   static readonly [classModule] = true;
 
   /** @missingRailsArgs join — PERMANENT */
   traceOn(out: { print(...strings: string[]): unknown }, ...strings: (string | null)[]): void {
-    const sep = "\n";
+    const sep = rbOutputRs.value ?? "\n";
     let output: string;
     if (strings.length === 0) {
       output = sep;

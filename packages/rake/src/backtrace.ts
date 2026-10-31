@@ -5,6 +5,10 @@ const SYS_KEYS = Object.keys(RbConfig.CONFIG).filter((k) => /(?:[a-z]prefix|libd
 const SYS_PATHS = [
   ...new Set(SYS_KEYS.map((k) => RbConfig.CONFIG[k])),
   File.join(File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)), ".."),
+  File.join(
+    File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)),
+    "../../ruby-compat",
+  ),
 ];
 
 const SUPPRESSED_PATHS = SYS_PATHS.map((s) => s.replaceAll("\\", "/"))
@@ -20,7 +24,7 @@ export const Backtrace = {
   SUPPRESSED_PATHS,
   SUPPRESSED_PATHS_RE,
   SUPPRESS_PATTERN: new RegExp(
-    `^(?:at (?:async )?(?:.*\\()?(?:file://)?)?(?:${SUPPRESSED_PATHS_RE})|bin/rake:\\d+|/ruby-compat/(?:dist|src)/`,
+    `^(?:at (?:async )?(?:.*\\()?(?:file://)?)?(?:${SUPPRESSED_PATHS_RE})|bin/rake:\\d+`,
     "i",
   ),
 

@@ -108,6 +108,9 @@ export function printf(this: GenericWritable, fmt: string, ...argv: unknown[]): 
   return null;
 }
 
+/** @noRailsEquivalent PERMANENT — `$\\`, `rb_output_rs`, `vendor/ruby/v3.3.11/io.c:195`. */
+export const rbOutputRs: { value: string | null } = { value: null };
+
 /** `vendor/ruby/v3.3.11/io.c:160` `IO_RBUF_CAPA_MIN`, the read buffer Ruby fills. */
 const READ_CHUNK = 8192;
 

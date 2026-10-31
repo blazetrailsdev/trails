@@ -116,9 +116,6 @@ task({ one: ["temp_one"] });
 task({ two: ["temp_two"] });
 file("temp_one", block(() => self.touch("temp_one")));
 file("temp_two", block(() => self.touch("temp_two")));
-task("clean", block(async () => {
-  for (const file of ["temp_one", "temp_two", "temp_main"]) await self.rmF(file);
-}));
 `);
   await FileUtils.touchAsync("temp_main");
   await FileUtils.touchAsync("temp_two");

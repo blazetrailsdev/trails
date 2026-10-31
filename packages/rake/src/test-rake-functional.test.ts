@@ -302,10 +302,8 @@ describe("TestRakeFunctional", () => {
 
   // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
   it.skip("test task descriptions", () => {});
-
   // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
   it.skip("test task when verbose unless verbose passed not prompt testopts", () => {});
-
   // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
   it.skip("test task when verbose passed prompts testopts", () => {});
 
@@ -351,7 +349,6 @@ describe("TestRakeFunctional", () => {
 
   // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
   it.skip("signal propagation in tests", () => {});
-
   // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
   it.skip("failing test sets exit status", () => {});
 
