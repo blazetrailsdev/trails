@@ -10,7 +10,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { UploadedFile } from "@blazetrails/rack-test";
-import { ArgumentError, File, Pathname, RuntimeError, StringIO } from "@blazetrails/ruby-compat";
+import { ArgumentError, RuntimeError, StringIO } from "@blazetrails/ruby-compat";
 import "../test-helpers/database/setup.js";
 import { ActiveStorage } from "../active-storage.js";
 import { Blob } from "../blob.js";
@@ -70,7 +70,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
   });
 
   it("creating a record with a File as attachable attribute", async () => {
-    user = await User.createBang({ name: "Dorian", avatar: File.open(fileFixture("image.gif")) });
+    user = await User.createBang({ name: "Dorian", avatar: fileFixture("image.gif").open() });
 
     expect(await filename(user.avatar)).toBe("image.gif");
     expect(await user.avatarAttachment).not.toBeNull();
@@ -78,14 +78,14 @@ describe("ActiveStorage::OneAttachedTest", () => {
   });
 
   it("uploads the file when passing a File as attachable attribute", async () => {
-    user = await User.createBang({ name: "Dorian", avatar: File.open(fileFixture("image.gif")) });
+    user = await User.createBang({ name: "Dorian", avatar: fileFixture("image.gif").open() });
     await (await blobOf(user.avatar)).download();
   });
 
   it("creating a record with a Pathname as attachable attribute", async () => {
     user = await User.createBang({
       name: "Dorian",
-      avatar: new Pathname(fileFixture("image.gif")),
+      avatar: fileFixture("image.gif"),
     });
 
     expect(await filename(user.avatar)).toBe("image.gif");
@@ -96,7 +96,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
   it("uploads the file when passing a Pathname as attachable attribute", async () => {
     user = await User.createBang({
       name: "Dorian",
-      avatar: new Pathname(fileFixture("image.gif")),
+      avatar: fileFixture("image.gif"),
     });
     await (await blobOf(user.avatar)).download();
   });

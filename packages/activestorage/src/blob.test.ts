@@ -14,7 +14,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import { ContentDisposition } from "@blazetrails/actionpack";
 import { RecordInvalid, RecordNotSaved, RecordNotUnique } from "@blazetrails/activerecord";
-import { ArgumentError, Dir, File, IO, OpenSSL, Pathname } from "@blazetrails/ruby-compat";
+import { ArgumentError, Dir, File, IO, OpenSSL } from "@blazetrails/ruby-compat";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import "./test-helpers/database/setup.js";
@@ -202,7 +202,7 @@ describe("ActiveStorage::BlobTest", () => {
   it("create_and_upload raises for non-rewindable io", async () => {
     await expect(
       Blob.createAndUploadBang({
-        io: new Pathname(fileFixture("racecar.jpg")) as never,
+        io: fileFixture("racecar.jpg") as never,
         filename: "racecar.jpg",
       }),
     ).rejects.toThrow(ArgumentError);
@@ -215,7 +215,7 @@ describe("ActiveStorage::BlobTest", () => {
       avatar: {
         contentType: "image/jpeg",
         filename: "racecar.jpg",
-        io: File.open(fileFixture("racecar.jpg")),
+        io: fileFixture("racecar.jpg").open(),
       },
     });
 
@@ -326,7 +326,7 @@ describe("ActiveStorage::BlobTest", () => {
 
   it("open with integrity", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg" });
-    const fixture = await IO.binreadAsync(fileFixture("racecar.jpg"));
+    const fixture = await IO.binreadAsync(fileFixture("racecar.jpg").toPath());
     await blob.open({}, (file) => {
       expect(file.isBinmode()).toBe(true);
       expect(file.pos).toBe(0);
@@ -349,7 +349,7 @@ describe("ActiveStorage::BlobTest", () => {
 
   it("open in a custom tmpdir", async () => {
     const tmpdir = Dir.mktmpdir();
-    const fixture = await IO.binreadAsync(fileFixture("racecar.jpg"));
+    const fixture = await IO.binreadAsync(fileFixture("racecar.jpg").toPath());
     await (
       await createFileBlob({ filename: "racecar.jpg" })
     ).open({ tmpdir: tmpdir }, (file) => {

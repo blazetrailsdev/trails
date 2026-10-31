@@ -1,6 +1,7 @@
 import { getCrypto, type HashAdapter } from "./crypto-adapter.js";
 import { getFs, type Bytes } from "./fs-adapter.js";
 import { Base64 } from "./base64.js";
+import { rbGetPath, type PathLike } from "./file.js";
 
 /**
  * One `Digest::Class` subclass (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:20`),
@@ -50,7 +51,7 @@ export class DigestClass {
    *
    * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:48
    */
-  async file(name: string): Promise<DigestInstance> {
+  async file(name: string | PathLike): Promise<DigestInstance> {
     return await this.new().file(name);
   }
 
@@ -92,8 +93,8 @@ export class DigestInstance {
    *
    * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:63
    */
-  async file(name: string): Promise<this> {
-    this.update(Uint8Array.from(await getFs().readFile(name)));
+  async file(name: string | PathLike): Promise<this> {
+    this.update(Uint8Array.from(await getFs().readFile(rbGetPath(name))));
     return this;
   }
 

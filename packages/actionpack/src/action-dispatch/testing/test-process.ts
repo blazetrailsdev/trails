@@ -1,4 +1,4 @@
-import { File, NoMethodError } from "@blazetrails/ruby-compat";
+import { File, NoMethodError, type Pathname } from "@blazetrails/ruby-compat";
 
 export { NoMethodError };
 
@@ -24,15 +24,15 @@ export interface TestProcessHost {
   request: TestProcessRequest;
   response: TestProcessResponse;
   _cookieJar?: CookieJar;
-  fileFixture?(path: string): string;
+  fileFixture?(path: string | Pathname): Pathname;
   constructor: {
-    fileFixturePath?: string | null;
+    fileFixturePath?: string | Pathname | null;
   };
 }
 
 export function fileFixtureUpload(
   this: TestProcessHost,
-  path: string,
+  path: string | Pathname,
   mimeType?: string | null,
   binary: boolean = false,
 ): UploadedFile {
