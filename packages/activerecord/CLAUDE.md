@@ -356,6 +356,15 @@ block's value as `relation.rb:1344-1350` does. The synchronous builders (`new`,
 `build`) do not await: they have nothing to order a promise against, and a JS
 constructor cannot await.
 
+A writer that must await, such as `has_one_attached`'s `setAvatar`
+(`activestorage/lib/active_storage/attached/model.rb:118-125`), takes the same
+shape. `awaitingAssignment` (`activemodel/src/attribute-assignment.ts`) wraps the
+build in each create path, and the constructor's `assignAttributes` hands it
+the writer's promise instead of raising. The caller awaits the assignment, then the block, before saving, and
+nothing is parked on the record. `new` and `build` still raise. A key after an
+awaiting writer, and the block, run after that writer resolves, so an
+`after_initialize` callback can see them unassigned.
+
 This is a genuine language shortcoming — JS has no synchronous await — ratified
 repo-wide here. This section is the wrapper's receipt: the wrapper raises no
 call or argument row, so no JSDoc tag applies.

@@ -19,20 +19,31 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
       `When assigning attributes, you must pass a hash as an argument, ${rbObjClassname(newAttributes)} passed.`,
     );
   }
+  const capture = assignmentCapture;
+  assignmentCapture = null;
   if (isEmpty(newAttributes)) return;
 
   const host = this as unknown as Record<symbol, boolean | undefined>;
   const outer = host[assigningSynchronously];
   host[assigningSynchronously] = true;
   try {
-    assertAssignedSynchronously(
-      this._assignAttributes(this.sanitizeForMassAssignment(newAttributes)),
-      "assignAttributes",
-    );
+    const assigned = this._assignAttributes(this.sanitizeForMassAssignment(newAttributes));
+    if (capture == null) {
+      assertAssignedSynchronously(assigned, "assignAttributes");
+    } else if (assigned instanceof Promise) {
+      void assigned.catch(() => {});
+      capture.assigned = assigned;
+    }
   } finally {
     host[assigningSynchronously] = outer;
   }
 }
+
+interface AssignmentCapture {
+  assigned?: Promise<void>;
+}
+
+let assignmentCapture: AssignmentCapture | null = null;
 
 export const assigningSynchronously: unique symbol = Symbol.for(
   "@blazetrails/activemodel:assigningSynchronously",
@@ -128,4 +139,32 @@ export function assertAssignedSynchronously(pending: unknown, methodName: string
   throw new RuntimeError(
     `${methodName} cannot assign this attribute synchronously; use \`await record.setAttributes(...)\` instead.`,
   );
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export async function awaitingAssignment<R, K = never>(
+  attributes: unknown,
+  block: ((record: K) => void | Promise<void>) | undefined,
+  build: (block?: (record: K) => void) => R,
+): Promise<R> {
+  const capture: AssignmentCapture = {};
+  let yielded: unknown;
+  if (attributes != null) assignmentCapture = capture;
+  let record: R;
+  try {
+    record = build(
+      block &&
+        ((record: K) => {
+          yielded = capture.assigned ? capture.assigned.then(() => block(record)) : block(record);
+        }),
+    );
+  } finally {
+    assignmentCapture = null;
+  }
+  await capture.assigned;
+  await yielded;
+  return record;
 }

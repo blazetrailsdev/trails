@@ -18,6 +18,7 @@ import type { IndexedRow } from "./result.js";
 import {
   ArgumentError,
   AttributeMethods,
+  awaitingAssignment,
   type PermittedAttributes,
 } from "@blazetrails/activemodel";
 import { extractOptionsBang, indexWith, transformKeys } from "@blazetrails/activesupport";
@@ -66,15 +67,11 @@ export async function create(
     return records;
   }
   await this.ensureSchemaLoaded();
-  let yielded: unknown;
-  const record = new this(
+  const record = await awaitingAssignment(
     attributes,
-    block &&
-      ((record: any) => {
-        yielded = block(record);
-      }),
+    block,
+    (block) => new this(attributes, block),
   );
-  await yielded;
   await record.save();
   return record;
 }
@@ -90,15 +87,11 @@ export async function createBang(
     return records;
   }
   await this.ensureSchemaLoaded();
-  let yielded: unknown;
-  const record = new this(
+  const record = await awaitingAssignment(
     attributes,
-    block &&
-      ((record: any) => {
-        yielded = block(record);
-      }),
+    block,
+    (block) => new this(attributes, block),
   );
-  await yielded;
   await record.saveBang();
   return record;
 }
