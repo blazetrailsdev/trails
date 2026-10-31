@@ -9,6 +9,7 @@ import {
   puts,
   stdout as $stdout,
   rbArgv,
+  flatten,
   rbFArray,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
@@ -111,7 +112,7 @@ export class TestTask extends TaskLib {
   }
 
   libPath(): string {
-    return this.libs.join(File.PATH_SEPARATOR);
+    return flatten(this.libs).join(File.PATH_SEPARATOR);
   }
 
   async fileListString(): Promise<string> {
@@ -147,7 +148,10 @@ export class TestTask extends TaskLib {
       case "testrb":
         return "-S testrb";
       case "rake":
-        return `${import.meta.dirname}/rake-test-loader.js`;
+        return (
+          `${import.meta.dirname}/rake-test-loader.js` +
+          (this.libs.length === 0 ? "" : ` -I"${this.libPath()}"`)
+        );
     }
   }
 }

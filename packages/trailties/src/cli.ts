@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { VERSION } from "./gem-version.js";
 import { hiddenCommands } from "./command.js";
-import { subclasses } from "./command/behavior.js";
+import { commanderFactories } from "./command/behavior.js";
 
 export {
   registerPackageManagerAdapter,
@@ -21,7 +21,7 @@ export function createProgram(): Command {
     .enablePositionalOptions()
     .version(VERSION.STRING, "-v, --version");
 
-  for (const factory of subclasses()) {
+  for (const factory of commanderFactories()) {
     const command = factory();
     program.addCommand(command, {
       hidden: hiddenCommands().some((klass) => klass.commandName() === command.name()),
@@ -30,5 +30,3 @@ export function createProgram(): Command {
 
   return program;
 }
-
-import "./class-paths.generated.js";
