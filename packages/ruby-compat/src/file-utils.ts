@@ -1,6 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { Dir } from "./dir.js";
-import { File } from "./file.js";
+import { File, rbGetPath, type PathLike } from "./file.js";
 import { getFs, getPath, type FsFileHandle, type FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
@@ -1474,12 +1474,12 @@ export class FileUtils {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static copyFile(
-    src: string | { toPath(): string },
+    src: string | PathLike,
     dest: string,
     preserve = false,
     dereference = true,
   ): void {
-    const ent = new Entry_(typeof src === "string" ? src : src.toPath(), null, dereference);
+    const ent = new Entry_(rbGetPath(src), null, dereference);
     ent.copyFile(dest);
     if (preserve) ent.copyMetadata(dest);
   }

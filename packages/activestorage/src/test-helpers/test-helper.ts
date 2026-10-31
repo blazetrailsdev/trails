@@ -192,7 +192,7 @@ export async function directlyUploadFileBlob({
 }: { filename?: string; contentType?: string | null; record?: unknown } = {}): Promise<Blob> {
   const file = fileFixture(filename);
   const byteSize = file.size();
-  const checksum = (await OpenSSL.Digest.MD5.file(file.toPath())).base64digest();
+  const checksum = (await OpenSSL.Digest.MD5.file(file)).base64digest();
 
   const blob = await createBlobBeforeDirectUpload({
     filename: filename,

@@ -16,7 +16,11 @@ const FMODE_SETENC_BY_BOM = 0x00100000;
  * object itself where it has no `to_path`) goes through `StringValue`
  * (`rb_get_path_check_to_string`, `file.c:212-224`).
  */
-function rbGetPath(obj: unknown): string {
+/** @noRailsEquivalent PERMANENT */
+export type PathLike = { toPath(): string };
+
+/** @noRailsEquivalent PERMANENT — `rb_get_path`, `vendor/ruby/v3.3.11/file.c:246` */
+export function rbGetPath(obj: unknown): string {
   if (typeof obj === "string") return obj;
   const toPath = (obj as { toPath?: unknown } | null)?.toPath;
   const tmp = typeof toPath === "function" ? toPath.call(obj) : obj;
@@ -64,7 +68,7 @@ function chompdirsep(path: string): string {
   return path.slice(0, end);
 }
 
-type FileJoinArg = string | { toPath(): string } | readonly FileJoinArg[];
+type FileJoinArg = string | PathLike | readonly FileJoinArg[];
 
 const joining = new Set<readonly FileJoinArg[]>();
 
@@ -291,7 +295,7 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.exist?`
    * (`vendor/ruby/v3.3.11/file.c:1806`).
    */
-  static isExist(fileName: string | { toPath(): string }): boolean {
+  static isExist(fileName: string | PathLike): boolean {
     return getFs().existsSync(rbGetPath(fileName));
   }
 
@@ -993,7 +997,7 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.basename`
    * (`vendor/ruby/v3.3.11/file.c:4705`).
    */
-  static basename(fileName: string | { toPath(): string }, suffix?: string): string {
+  static basename(fileName: string | PathLike, suffix?: string): string {
     const name = rbGetPath(fileName);
     const base = /^\/+$/.test(name) ? "/" : getPath().basename(name);
     if (suffix === undefined) return base;
