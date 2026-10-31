@@ -4,6 +4,7 @@ import { Association } from "./association.js";
 import { exceptBang, kernelArray } from "@blazetrails/activesupport";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { RecordInvalid } from "../validations.js";
+import { awaitingAssignment } from "@blazetrails/activemodel";
 
 export class SingularAssociation extends Association<Base> {
   override reset(): void {
@@ -93,15 +94,9 @@ export class SingularAssociation extends Association<Base> {
     block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | null> {
     await this.klass.ensureSchemaLoaded();
-    let yielded: unknown;
-    const record = this.buildRecord(
-      attributes,
-      block &&
-        ((record: Base) => {
-          yielded = block(record);
-        }),
-    )!;
-    await yielded;
+    const record = (await awaitingAssignment(attributes, block, (block) =>
+      this.buildRecord(attributes, block),
+    ))!;
     const saved = await record.save();
     await this.detachDisplacedOnBuild(record);
     await this.setNewRecord(record);
