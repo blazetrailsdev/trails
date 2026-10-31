@@ -378,7 +378,7 @@ export { rbRegInitStr, rbRegMatchP, rbRegSUnion, rbRegToS, regexpEscape } from "
 export { Pathname } from "./pathname.js";
 export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";
-export { Enumerator, toEnum } from "./enumerator.js";
+export { Chain, Enumerator, Lazy, enumChain, enumerableLazy, toEnum } from "./enumerator.js";
 export { RUBY_ENGINE, RUBY_PLATFORM, RUBY_VERSION } from "./ruby-platform.js";
 export { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 export { rbHash, rbObjHash } from "./rb-hash.js";
