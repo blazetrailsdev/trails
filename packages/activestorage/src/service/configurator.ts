@@ -4,12 +4,11 @@ import { Service } from "../service.js";
 import { DiskService } from "./disk-service.js";
 import { MirrorService } from "./mirror-service.js";
 
-type ServiceClass = Pick<typeof Service, "build"> &
-  (new (config: Record<string, unknown>) => Service);
+type ServiceClass = { build(config: { configurator: Configurator; name: string }): Service };
 
 const services: Record<string, () => ServiceClass> = {
   DiskService: () => DiskService,
-  MirrorService: () => MirrorService as unknown as ServiceClass,
+  MirrorService: () => MirrorService,
 };
 
 /** @internal */

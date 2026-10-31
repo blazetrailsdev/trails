@@ -15,10 +15,13 @@ import "../test-helpers/database/setup.js";
 import { ActiveStorage } from "../active-storage.js";
 import { Blob } from "../blob.js";
 import { PurgeJob } from "../purge-job.js";
+import { DiskService } from "../service/disk-service.js";
+import { MirrorService } from "../service/mirror-service.js";
 import {
   createBlob,
   fileFixture,
   fixtureFileUpload,
+  withService,
   Group,
   User,
 } from "../test-helpers/test-helper.js";
@@ -698,10 +701,50 @@ describe("ActiveStorage::OneAttachedTest", () => {
     }
   });
 
-  // BLOCKED: activestorage-mirror-service-over-disk
-  it.skip("attaching a new blob from a Hash with a custom service", () => {});
-  it.skip("attaching a new blob from an uploaded file with a custom_service", () => {});
-  it.skip("attaching a new blob from an uploaded file with a service defined at runtime", () => {});
+  it("attaching a new blob from a Hash with a custom service", async () => {
+    await withService("mirror", async () => {
+      const attachable = () => ({
+        io: new StringIO("STUFF"),
+        filename: "town.jpg",
+        contentType: "image/jpeg",
+      });
+      await user.avatar.attach(attachable());
+      await user.coverPhoto.attach(attachable());
+
+      expect((user.avatar as unknown as Blob).service).toBeInstanceOf(MirrorService);
+      expect((user.coverPhoto as unknown as Blob).service).toBeInstanceOf(DiskService);
+    });
+  });
+
+  it("attaching a new blob from an uploaded file with a custom_service", async () => {
+    await withService("mirror", async () => {
+      await user.avatar.attach(fixtureFileUpload("racecar.jpg"));
+      await user.coverPhoto.attach(fixtureFileUpload("racecar.jpg"));
+
+      expect((user.avatar as unknown as Blob).service).toBeInstanceOf(MirrorService);
+      expect((user.coverPhoto as unknown as Blob).service).toBeInstanceOf(DiskService);
+    });
+  });
+
+  it("attaching a new blob from an uploaded file with a service defined at runtime", async () => {
+    class ExtraAttached extends User {
+      static override get tableName() {
+        return "users";
+      }
+      static {
+        (this as unknown as Attachable).hasOneAttached("signature", {
+          service: (user) => `disk_${(user as ExtraAttached).mirrorRegion()}`,
+        });
+      }
+      mirrorRegion() {
+        return "mirror_2";
+      }
+    }
+    const extra = user.becomes(ExtraAttached) as unknown as { signature: One };
+
+    await extra.signature.attach(fixtureFileUpload("cropped.pdf"));
+    expect((extra.signature as unknown as Blob).service.name).toBe("disk_mirror_2");
+  });
 
   it("raises error when global service configuration is missing", async () => {
     const activeStorage = (

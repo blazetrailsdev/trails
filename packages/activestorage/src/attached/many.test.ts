@@ -17,10 +17,13 @@ import { ActiveStorage } from "../active-storage.js";
 import type { Attachment } from "../attachment.js";
 import { Blob } from "../blob.js";
 import { PurgeJob } from "../purge-job.js";
+import { DiskService } from "../service/disk-service.js";
+import { MirrorService } from "../service/mirror-service.js";
 import {
   createBlob,
   createFileBlob,
   fixtureFileUpload,
+  withService,
   User,
 } from "../test-helpers/test-helper.js";
 import type { Many } from "./many.js";
@@ -41,6 +44,7 @@ afterAll(() => {
 });
 
 type Attachable = Extended<typeof ClassMethods>;
+type FirstBlob = { first(): Promise<Blob> };
 type Delegated = { reload(): Promise<unknown>; count(): Promise<number> };
 
 const attachmentAt = async (many: Many, index: number): Promise<Attachment> =>
@@ -781,10 +785,59 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     }
   });
 
-  // BLOCKED: activestorage-mirror-service-over-disk
-  it.skip("attaching a new blob from a Hash with a custom service", () => {});
-  it.skip("attaching a new blob from an uploaded file with a custom service", () => {});
-  it.skip("attaching a new blob from an uploaded file with a service defined at runtime", () => {});
+  it("attaching a new blob from a Hash with a custom service", async () => {
+    await withService("mirror", async () => {
+      const attachable = () => ({
+        io: new StringIO("STUFF"),
+        filename: "town.jpg",
+        contentType: "image/jpeg",
+      });
+      await user.highlights.attach(attachable());
+      await user.vlogs.attach(attachable());
+
+      expect((await (user.highlights as unknown as FirstBlob).first()).service).toBeInstanceOf(
+        MirrorService,
+      );
+      expect((await (user.vlogs as unknown as FirstBlob).first()).service).toBeInstanceOf(
+        DiskService,
+      );
+    });
+  });
+
+  it("attaching a new blob from an uploaded file with a custom service", async () => {
+    await withService("mirror", async () => {
+      await user.highlights.attach(fixtureFileUpload("racecar.jpg"));
+      await user.vlogs.attach(fixtureFileUpload("racecar.jpg"));
+
+      expect((await (user.highlights as unknown as FirstBlob).first()).service).toBeInstanceOf(
+        MirrorService,
+      );
+      expect((await (user.vlogs as unknown as FirstBlob).first()).service).toBeInstanceOf(
+        DiskService,
+      );
+    });
+  });
+
+  it("attaching a new blob from an uploaded file with a service defined at runtime", async () => {
+    class ExtraAttached extends User {
+      static override get tableName() {
+        return "users";
+      }
+      static {
+        (this as unknown as Attachable).hasManyAttached("signatures", {
+          service: (user) => `disk_${(user as ExtraAttached).mirrorRegion()}`,
+        });
+      }
+      mirrorRegion() {
+        return "mirror_2";
+      }
+    }
+    const extra = user.becomes(ExtraAttached) as unknown as { signatures: Many };
+
+    await extra.signatures.attach(fixtureFileUpload("cropped.pdf"));
+    const first = await (extra.signatures as unknown as FirstBlob).first();
+    expect(first.service.name).toBe("disk_mirror_2");
+  });
 
   it("attaching blobs to a persisted, unchanged, and valid record, returns the attachments", async () => {
     await user.highlights.attach(await createBlob({ filename: "racecar.jpg" }));

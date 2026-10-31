@@ -10,6 +10,21 @@ export class MirrorService extends Service {
   private executor: ThreadPoolExecutor;
   declare pathFor: (key: string) => string;
 
+  static {
+    delegate.call(
+      this.prototype,
+      "download",
+      "downloadChunk",
+      "isExist",
+      "url",
+      "urlForDirectUpload",
+      "headersForDirectUpload",
+      "pathFor",
+      "compose",
+      { to: "primary" },
+    );
+  }
+
   /** @internal */
   static override build({
     primary,
@@ -101,19 +116,7 @@ export class MirrorService extends Service {
           this.executor.post(() => service[method](...args).then(resolve, reject));
         }),
     );
-    await Promise.all(tasks);
+    for (const task of tasks) task.catch(() => {});
+    for (const task of tasks) await task;
   }
 }
-
-delegate.call(
-  MirrorService.prototype,
-  "download",
-  "downloadChunk",
-  "isExist",
-  "url",
-  "urlForDirectUpload",
-  "headersForDirectUpload",
-  "pathFor",
-  "compose",
-  { to: "primary" },
-);
