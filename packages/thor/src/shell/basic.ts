@@ -274,14 +274,11 @@ export class Basic {
   protected async showDiff(destination: string, content: unknown): Promise<void> {
     const diffCmd = env["THOR_DIFF"] || env["RAILS_DIFF"] || "diff -u";
 
-    const temp = Tempfile.new(File.basename(destination), File.dirname(destination));
-    try {
+    await Tempfile.open(File.basename(destination), File.dirname(destination), async (temp) => {
       temp.write(content as string | Uint8Array);
       temp.rewind();
       await rbFSystem(`${diffCmd} "${destination}" "${temp.path()}"`);
-    } finally {
-      temp.close();
-    }
+    });
   }
 
   /** @internal */
@@ -361,17 +358,15 @@ export class Basic {
 
   /** @internal */
   protected async merge(destination: string, content: unknown): Promise<void> {
-    const temp = Tempfile.new(
+    await Tempfile.open(
       [File.basename(destination), File.extname(destination)],
       File.dirname(destination),
+      async (temp) => {
+        temp.write(content as string | Uint8Array);
+        temp.rewind();
+        await rbFSystem(`${await this.mergeTool()} "${temp.path()}" "${destination}"`);
+      },
     );
-    try {
-      temp.write(content as string | Uint8Array);
-      temp.rewind();
-      await rbFSystem(`${await this.mergeTool()} "${temp.path()}" "${destination}"`);
-    } finally {
-      temp.close();
-    }
   }
 
   /** @internal */

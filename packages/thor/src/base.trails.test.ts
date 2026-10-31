@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Thor } from "./thor.js";
 import {
   ArgumentError,
   extend,
@@ -542,5 +543,22 @@ describe("Thor::Base", () => {
     it("raises NotImplementedError from the dispatch signature", async () => {
       await expect(baseclass().start([])).rejects.toThrow("NotImplementedError");
     });
+  });
+});
+
+describe("Thor::Base#initialize @args", () => {
+  it("writes the ivar, not an overridden args= writer", () => {
+    class Writer extends Thor {
+      writes = 0;
+      set args(_value: unknown[]) {
+        this.writes += 1;
+      }
+      get args(): unknown[] {
+        return (this as unknown as { _args: unknown[] })._args;
+      }
+    }
+    const instance = new (Writer as unknown as new (a: unknown[]) => Writer)(["one"]);
+    expect(instance.writes).toBe(0);
+    expect(instance.args).toEqual(["one"]);
   });
 });
