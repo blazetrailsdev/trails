@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
+import { MessageIdsElement } from "../elements/message-ids-element.js";
 import { ParserTools } from "../parser-tools.js";
 
 const MessageIdsStruct = Struct.new("messageIds", "error");
@@ -32,7 +33,7 @@ export const MessageIdsParser = extend(
       const self = MessageIdsParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, messageIds: any, msgIdS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number, id: any;
       data = (data == null ? data : b(data)) as Uint8Array;
-      if (data == null) throw new Field.NilParseError("Mail::MessageIdsElement");
+      if (data == null) throw new Field.NilParseError(MessageIdsElement);
       messageIds = new MessageIdsStruct([]);
       msgIdS = null;
       p = 0;
@@ -472,7 +473,7 @@ export const MessageIdsParser = extend(
         }
       }
       if (p != eof || cs < 318) {
-        throw new Field.IncompleteParseError("Mail::MessageIdsElement", data, p);
+        throw new Field.IncompleteParseError(MessageIdsElement, data, p);
       }
       return messageIds;
     },

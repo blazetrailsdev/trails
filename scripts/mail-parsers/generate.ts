@@ -52,6 +52,9 @@ function read(rb: string): Parser {
   return { kind, name, structs, tables, scalars, body: lines.slice(start + 1, end) };
 }
 
+const elementFile = (s: string): string =>
+  s.replace(/(?<=[a-z])[A-Z]/g, (c) => `-${c}`).toLowerCase();
+
 class Translator {
   readonly locals = new Set<string>();
   readonly elements = new Set<string>();
@@ -90,7 +93,7 @@ class Translator {
         return camel(id);
       })
       .replace(/\.(\w+)/g, (_, id) => `.${camel(id)}`)
-      .replace(/\uE001(\w+)\uE001/g, (_, el) => JSON.stringify(`Mail::${el}`));
+      .replace(/\uE001(\w+)\uE001/g, "$1");
     return s.replace(/\uE000(\d+)\uE000/g, (_, i) => strings[Number(i)]);
   }
 
@@ -247,6 +250,9 @@ function generate(p: Parser): string {
     `/* eslint-disable ${["@typescript-eslint/no-explicit-any", ...(body.some((l) => l.includes("_m!")) ? ["@typescript-eslint/no-unnecessary-type-assertion"] : []), "no-useless-assignment", "prefer-const", "unused-imports/no-unused-vars"].join(", ")} */`,
     `import { ${compat.join(", ")} } from "@blazetrails/ruby-compat";`,
     ...(body.some((l) => l.includes("Field.")) ? [`import { Field } from "../field.js";`] : []),
+    ...[...t.elements]
+      .sort()
+      .map((el) => `import { ${el} } from "../elements/${elementFile(el)}.js";`),
     `import { ParserTools } from "../parser-tools.js";`,
     ...(body.some((l) => l.includes("Utilities."))
       ? [`import { Utilities } from "../utilities.js";`]

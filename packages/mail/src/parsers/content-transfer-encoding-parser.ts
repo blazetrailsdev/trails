@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
+import { ContentTransferEncodingElement } from "../elements/content-transfer-encoding-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
@@ -227,7 +228,7 @@ export const ContentTransferEncodingParser = extend(
         }
       }
       if (p != eof || cs < 21) {
-        throw new Field.IncompleteParseError("Mail::ContentTransferEncodingElement", data, p);
+        throw new Field.IncompleteParseError(ContentTransferEncodingElement, data, p);
       }
       return contentTransferEncoding;
     },

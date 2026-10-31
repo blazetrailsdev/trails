@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
+import { PhraseList } from "../elements/phrase-list.js";
 import { ParserTools } from "../parser-tools.js";
 
 const PhraseListsStruct = Struct.new("phrases", "error");
@@ -31,7 +32,7 @@ export class PhraseListsParser {
       const self = PhraseListsParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, phraseLists: any, phraseS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number;
       data = (data == null ? data : b(data)) as Uint8Array;
-      if (data == null) throw new Field.NilParseError("Mail::PhraseList");
+      if (data == null) throw new Field.NilParseError(PhraseList);
       phraseLists = new PhraseListsStruct([]);
       phraseS = null;
       p = 0;
@@ -253,7 +254,7 @@ export class PhraseListsParser {
         }
       }
       if (p != eof || cs < 42) {
-        throw new Field.IncompleteParseError("Mail::PhraseList", data, p);
+        throw new Field.IncompleteParseError(PhraseList, data, p);
       }
       return phraseLists;
     }

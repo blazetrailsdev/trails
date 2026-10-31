@@ -14,7 +14,12 @@ export const EMPTY = "";
 export const UNDERSCORE = "_";
 export const HYPHEN = "-";
 export const CRLF = "\r\n";
+export const CR = "\r";
 export const LF = "\n";
+export const CR_ENCODED = "=0D";
+export const LF_ENCODED = "=0A";
+export const CAPITAL_M = "M";
+export const EQUAL_LF = "=\n";
 export const SPACE = " ";
 
 export const Q_VALUES = ["Q", "q"];
