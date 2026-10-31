@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError, File, IndexError, Range, block, tally } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  File,
+  IndexError,
+  Range,
+  RuntimeError,
+  block,
+  flatten,
+  rbFArray,
+  tally,
+} from "@blazetrails/ruby-compat";
 import { FileList } from "./file-list.js";
 import { useRakeTestCase } from "./test-helpers/file-creation.js";
 
@@ -138,5 +148,20 @@ describe("FileList#egrep", () => {
       block((_fn: string, _ln: number, l: unknown) => void (line = l)),
     );
     expect(line).toBeInstanceOf(Uint8Array);
+  });
+});
+
+describe("FileList#toAry", () => {
+  it("raises on a pending list", () => {
+    const pending = FileList.get("x");
+    expect(() => pending.toAry()).toThrow(RuntimeError);
+    expect(() => new FileList().include(pending)).toThrow(RuntimeError);
+  });
+
+  it("converts implicitly once resolved", async () => {
+    const resolved = await FileList.get("x").resolve();
+    expect(flatten(["a", resolved])).toEqual(["a", "x"]);
+    expect(rbFArray(resolved)).toEqual(["x"]);
+    expect(await new FileList().include(resolved).toA()).toEqual(["x"]);
   });
 });

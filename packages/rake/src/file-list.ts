@@ -37,6 +37,7 @@ import {
   rbProcCall,
   rbRegMatchM,
   rbStrMatchM,
+  RuntimeError,
   rbStrSub,
   rtest,
   sortBy,
@@ -600,11 +601,11 @@ export class FileList {
 
   include(...filenames: unknown[]): this {
     for (const fn of filenames) {
-      const ary = fn instanceof FileList ? null : rbCheckArrayType(fn);
+      const ary = rbCheckArrayType(fn);
       if (ary !== null) {
         this.include(...ary);
       } else {
-        this.pendingAdd.push(fn instanceof FileList ? fn : fromPathname(fn));
+        this.pendingAdd.push(fromPathname(fn));
       }
     }
     this.pending = true;
@@ -618,7 +619,7 @@ export class FileList {
   async exclude(...patterns: unknown[]): Promise<this> {
     const excludeBlock = rbBlockGivenP(patterns.at(-1)) ? (patterns.pop() as ElementBlock) : null;
     for (const pat of patterns) {
-      const ary = pat instanceof FileList ? await pat.toAry() : rbCheckArrayType(pat);
+      const ary = rbCheckArrayType(pat);
       if (ary !== null) {
         await this.exclude(...ary);
       } else {
@@ -637,8 +638,8 @@ export class FileList {
   }
 
   async equals(array: unknown): Promise<boolean> {
-    const other = array instanceof FileList ? await array.toAry() : array;
-    return rbEqual(await this.toAry(), other);
+    const other = array instanceof FileList ? await array.toA() : array;
+    return rbEqual(await this.toA(), other);
   }
 
   async toA(): Promise<Items> {
@@ -646,8 +647,15 @@ export class FileList {
     return this.items;
   }
 
-  toAry(): Promise<Items> {
-    return this.toA();
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm throw — PERMANENT
+   */
+  toAry(): Items {
+    if (this.pending) {
+      throw new RuntimeError("unresolved Rake::FileList: await resolve before to_ary");
+    }
+    return this.items;
   }
 
   multiply(other: number | string): this | string {
@@ -681,14 +689,9 @@ export class FileList {
     return this;
   }
 
-  /**
-   * @internal
-   * @inventedArm if — PERMANENT
-   */
+  /** @internal */
   private async resolveAdd(fn: unknown): Promise<void> {
-    if (fn instanceof FileList) {
-      for (const item of await fn.toAry()) await this.resolveAdd(item);
-    } else if (typeof fn === "string" && FileList.GLOB_PATTERN.test(fn)) {
+    if (typeof fn === "string" && FileList.GLOB_PATTERN.test(fn)) {
       await this.addMatching(fn);
     } else {
       await this.append(fn);
@@ -968,7 +971,7 @@ for (const sym of FileList.DELEGATING_METHODS) {
     async value(this: FileList, ...args: unknown[]) {
       const items = await this.toA();
       for (const [i, arg] of args.entries()) {
-        if (arg instanceof FileList && sym !== "inject") args[i] = await arg.toAry();
+        if (arg instanceof FileList && sym !== "inject") args[i] = await arg.toA();
       }
       const result = await call(items, ...args);
       if (special) return new (this.constructor as typeof FileList)().import(result as Items);

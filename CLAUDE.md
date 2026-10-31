@@ -2078,6 +2078,12 @@ Moved to [packages/trailties/CLAUDE.md](packages/trailties/CLAUDE.md#thor-dispat
 The decision is unchanged; the heading stays here so code citing it still
 resolves.
 
+## FileList#to_ary reads a resolved list
+
+Ratified in [packages/rake/CLAUDE.md](packages/rake/CLAUDE.md#filelistto_ary-reads-a-resolved-list).
+The one-line rule: `resolve` is async, and `toAry` answers a resolved list
+synchronously and raises while it is pending.
+
 ## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
 
 Moved to [packages/trailties/CLAUDE.md](packages/trailties/CLAUDE.md#trails-has-no-autoloader-railsautoloaders--zeitwerk).

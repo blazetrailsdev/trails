@@ -73,7 +73,7 @@ describe("TestRakeFileList", () => {
   });
 
   it("create with brackets and filelist", async () => {
-    const fl = FileList.get(FileList.get("*.c", "x"));
+    const fl = FileList.get(await FileList.get("*.c", "x").resolve());
     expect(await sorted(fl)).toEqual(["abc.c", "x", "x.c", "xyz.c"]);
   });
 
@@ -82,7 +82,7 @@ describe("TestRakeFileList", () => {
   });
 
   it("include with another filelist", async () => {
-    const fl = new FileList().include(FileList.get("*.c", "x"));
+    const fl = new FileList().include(await FileList.get("*.c", "x").resolve());
     expect(await sorted(fl)).toEqual(["abc.c", "x", "x.c", "xyz.c"]);
   });
 
@@ -212,7 +212,7 @@ describe("TestRakeFileList", () => {
   });
 
   it("exclude a filelist", async () => {
-    const excluded = FileList.get("existing", "*.c");
+    const excluded = await FileList.get("existing", "*.c").resolve();
     const fl = await FileList.get("*").exclude(excluded);
     expect(await fl.toA()).toEqual(["abc.h", "abc.x", "cfiles", "xyzzy.txt"]);
   });
@@ -274,7 +274,7 @@ describe("TestRakeFileList", () => {
     expect(await sorted(f3)).toEqual(["abc.o", "x.o", "xyz.o"]);
   });
 
-  // PERMANENT-SKIP: CLAUDE.md § "Ruby protocol methods with a different JS mechanism": `is_a?` is a hook on the class tested against, and `Array[Symbol.hasInstance]` would reroute every `instanceof Array` in the process.
+  // PERMANENT-SKIP: CLAUDE.md § "Ruby protocol methods with a different JS mechanism": `is_a?` is a hook on the class tested against, and `Array[Symbol.hasInstance]` would reroute every `instanceof Array` in the process; packages/rake/CLAUDE.md, "FileList#to_ary reads a resolved list".
   it.skip("claim to be a kind of array", () => {});
 
   it("claim to be a kind of filelist", () => {
@@ -454,7 +454,7 @@ describe("TestRakeFileList", () => {
   });
 
   it("flatten", async () => {
-    expect(flatten(["a", await FileList.get("*.c").toA()]).sort()).toEqual([
+    expect(flatten(["a", await FileList.get("*.c").resolve()]).sort()).toEqual([
       "a",
       "abc.c",
       "x.c",
@@ -609,7 +609,7 @@ describe("TestRakeFileList", () => {
     expect(await r.toA()).toEqual(["a", "b", "x", "y"]);
     expect(r.constructor).toEqual(FileList);
 
-    r = await FileList.get("a", ["b", "c"], FileList.get("d", "e")).flatten();
+    r = await FileList.get("a", ["b", "c"], await FileList.get("d", "e").resolve()).flatten();
     expect(await r.toA()).toEqual(["a", "b", "c", "d", "e"]);
     expect(r.constructor).toEqual(FileList);
 
