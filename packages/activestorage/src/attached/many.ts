@@ -20,6 +20,7 @@ export class Many extends Attached {
     await this.detachMany().detach();
   }
 
+  /** @inventedArm includes — PERMANENT */
   get attachments(): PromiseLike<Attachment[]> | Attachment[] {
     return isPresent(this.change)
       ? (this.change as CreateMany).attachments
@@ -30,7 +31,10 @@ export class Many extends Attached {
         ).includes("blob");
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
   get associationAttachments(): PromiseLike<Attachment[]> | Attachment[] {
     return isPresent(this.change)
       ? (this.change as CreateMany).attachments
@@ -73,7 +77,7 @@ Object.setPrototypeOf(
   Many.prototype,
   delegateMissingTo.call(
     Object.create(Object.getPrototypeOf(Many.prototype) as object),
-    "attachments",
+    "associationAttachments",
   ),
 );
 
