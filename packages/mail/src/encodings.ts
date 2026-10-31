@@ -1,4 +1,5 @@
 import {
+  type Encoding,
   b,
   chomp,
   eachSlice,
@@ -46,7 +47,11 @@ export const Encodings = {
     return Utilities.underscoreize(name).toLowerCase();
   },
 
-  transcodeCharset(str: RubyString, fromCharset: string | null, toCharset = "UTF-8"): RubyString {
+  transcodeCharset(
+    str: RubyString,
+    fromCharset: string | null,
+    toCharset: string | Encoding = "UTF-8",
+  ): RubyString {
     if (fromCharset != null) {
       return Utilities.transcodeCharset(str, fromCharset, toCharset);
     } else {

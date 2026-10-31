@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, rstrip, strip, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
+import { AddressList } from "../elements/address-list.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
@@ -1397,7 +1398,7 @@ export const AddressListsParser = extend(
         }
       }
       if (p != eof || cs < 2461) {
-        throw new Field.IncompleteParseError("Mail::AddressList", data, p);
+        throw new Field.IncompleteParseError(AddressList, data, p);
       }
       return addressList;
     },

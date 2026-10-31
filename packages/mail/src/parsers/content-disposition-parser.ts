@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
+import { ContentDispositionElement } from "../elements/content-disposition-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
@@ -119,7 +120,7 @@ export const ContentDispositionParser = extend(
                 case 18: {
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentDispositionElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentDispositionElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentDisposition.parameters.push({ [paramAttr]: value });
@@ -190,7 +191,7 @@ export const ContentDispositionParser = extend(
                 case 22: {
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentDispositionElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentDispositionElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentDisposition.parameters.push({ [paramAttr]: value });
@@ -223,7 +224,7 @@ export const ContentDispositionParser = extend(
                   }
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentDispositionElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentDispositionElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentDisposition.parameters.push({ [paramAttr]: value });
@@ -288,7 +289,7 @@ export const ContentDispositionParser = extend(
                   }
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentDispositionElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentDispositionElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentDisposition.parameters.push({ [paramAttr]: value });
@@ -312,7 +313,7 @@ export const ContentDispositionParser = extend(
                   }
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentDispositionElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentDispositionElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentDisposition.parameters.push({ [paramAttr]: value });
@@ -347,7 +348,7 @@ export const ContentDispositionParser = extend(
                 case 18: {
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentDispositionElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentDispositionElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentDisposition.parameters.push({ [paramAttr]: value });
@@ -368,7 +369,7 @@ export const ContentDispositionParser = extend(
                   }
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentDispositionElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentDispositionElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentDisposition.parameters.push({ [paramAttr]: value });
@@ -386,7 +387,7 @@ export const ContentDispositionParser = extend(
         }
       }
       if (p != eof || cs < 40) {
-        throw new Field.IncompleteParseError("Mail::ContentDispositionElement", data, p);
+        throw new Field.IncompleteParseError(ContentDispositionElement, data, p);
       }
       return contentDisposition;
     },

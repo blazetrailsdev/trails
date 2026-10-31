@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
+import { ContentTypeElement } from "../elements/content-type-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
@@ -132,7 +133,7 @@ export const ContentTypeParser = extend(
                 case 21: {
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentTypeElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentTypeElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentType.parameters.push({ [paramAttr]: value });
@@ -218,7 +219,7 @@ export const ContentTypeParser = extend(
                 case 25: {
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentTypeElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentTypeElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentType.parameters.push({ [paramAttr]: value });
@@ -251,7 +252,7 @@ export const ContentTypeParser = extend(
                   }
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentTypeElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentTypeElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentType.parameters.push({ [paramAttr]: value });
@@ -316,7 +317,7 @@ export const ContentTypeParser = extend(
                   }
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentTypeElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentTypeElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentType.parameters.push({ [paramAttr]: value });
@@ -340,7 +341,7 @@ export const ContentTypeParser = extend(
                   }
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentTypeElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentTypeElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentType.parameters.push({ [paramAttr]: value });
@@ -375,7 +376,7 @@ export const ContentTypeParser = extend(
                 case 21: {
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentTypeElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentTypeElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentType.parameters.push({ [paramAttr]: value });
@@ -396,7 +397,7 @@ export const ContentTypeParser = extend(
                   }
                   {
                     if (paramAttr == null) {
-                      throw new Field.ParseError("Mail::ContentTypeElement", data, "no attribute for value");
+                      throw new Field.ParseError(ContentTypeElement, data, "no attribute for value");
                     }
                     value = qstr ?? self.chars(data, paramValS, p - 1);
                     contentType.parameters.push({ [paramAttr]: value });
@@ -414,7 +415,7 @@ export const ContentTypeParser = extend(
         }
       }
       if (p != eof || cs < 47) {
-        throw new Field.IncompleteParseError("Mail::ContentTypeElement", data, p);
+        throw new Field.IncompleteParseError(ContentTypeElement, data, p);
       }
       return contentType;
     },

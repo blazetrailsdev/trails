@@ -118,6 +118,8 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "MiniMagick::Image": { "[]": ["get"] },
   "MiniMagick::Image::Info": { "[]": ["get"] },
   "MiniMagick::Tool": { "<<": ["append"] },
+  "Mail::AddressContainer": { "<<": ["append"] },
+  "Mail::CommonAddressField": { "<<": ["append"] },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.
   "Arel::Table": { "[]": ["get"] },
   // arel/nodes/table_alias.rb:10 `def [](name)` → nodes/table-alias.ts `get`.

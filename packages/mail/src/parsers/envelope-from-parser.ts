@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, rstrip, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
+import { EnvelopeFromElement } from "../elements/envelope-from-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
@@ -647,7 +648,7 @@ export const EnvelopeFromParser = extend(
         }
       }
       if (p != eof || cs < 257) {
-        throw new Field.IncompleteParseError("Mail::EnvelopeFromElement", data, p);
+        throw new Field.IncompleteParseError(EnvelopeFromElement, data, p);
       }
       return envelopeFrom;
     },
