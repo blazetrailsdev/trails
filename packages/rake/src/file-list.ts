@@ -464,10 +464,11 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   ],
   minBy: (items, ...args: unknown[]) => _extremeBy(minBy, items, args),
   maxBy: (items, ...args: unknown[]) => _extremeBy(maxBy, items, args),
-  minmaxBy: async (items, block: ElementBlock) => [
-    await ARRAY_CALLS.minBy(items, block as never),
-    await ARRAY_CALLS.maxBy(items, block as never),
-  ],
+  minmaxBy: async (items, block: ElementBlock) =>
+    Promise.all([
+      ARRAY_CALLS.minBy(items, block as never),
+      ARRAY_CALLS.maxBy(items, block as never),
+    ]),
   index: async (items, ...args: unknown[]) => {
     if (args.length === 0) return [...items];
     const test = _isProc(args[0]) ? args[0] : (fn: string) => rbEqual(fn, args[0]);
