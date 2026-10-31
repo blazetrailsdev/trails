@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   chmodSync,
   closeSync,
@@ -379,5 +379,69 @@ describe("File.foreach", () => {
     const lines: string[] = [];
     expect(File.foreach(path, (line) => lines.push(line))).toBeNull();
     expect(lines).toEqual(["a\n", `${long}\n`, "last"]);
+  });
+});
+
+describe("File.openAsync", () => {
+  it("yields each line by eachAsync, separator retained, and closes after the block", async () => {
+    const path = join(fixture(), "lines.txt");
+    writeFileSync(path, `é\n${"x".repeat(70000)}é\nlast`);
+    let inner: File | null = null;
+    const lines = await File.openAsync(path, "r", async (file: File) => {
+      inner = file;
+      const seen: unknown[] = [];
+      for await (const line of file.eachAsync()) seen.push(line);
+      return seen;
+    });
+    expect(lines).toEqual(["é\n", `${"x".repeat(70000)}é\n`, "last"]);
+    expect(inner!.isClosed()).toBe(true);
+    expect(inner!.path()).toBe(path);
+  });
+
+  it("passes the opt hash through, ahead of the block", async () => {
+    const path = join(fixture(), "bin.txt");
+    writeFileSync(path, "a\n");
+    const lines = await File.openAsync(path, "r", { externalEncoding: "ASCII-8BIT" }, async (f) => {
+      const seen: unknown[] = [];
+      for await (const line of f.eachAsync()) seen.push(line);
+      return seen;
+    });
+    expect(lines).toEqual([Uint8Array.of(0x61, 0x0a)]);
+  });
+
+  it("keeps a character straddling two read chunks", async () => {
+    const path = join(fixture(), "straddle.txt");
+    const head = "x".repeat(8191);
+    writeFileSync(path, `${head}é\n`);
+    const lines = await File.openAsync(path, "r", async (f) => {
+      const seen: unknown[] = [];
+      for await (const line of f.eachAsync()) seen.push(line);
+      return seen;
+    });
+    expect(lines).toEqual([`${head}é\n`]);
+  });
+
+  it("resumes where gets stopped", async () => {
+    const path = join(fixture(), "mixed.txt");
+    writeFileSync(path, "a\nb\nc\n");
+    const lines = await File.openAsync(path, "r", async (f) => {
+      const seen: unknown[] = [f.gets()];
+      for await (const line of f.eachAsync()) seen.push(line);
+      return seen;
+    });
+    expect(lines).toEqual(["a\n", "b\n", "c\n"]);
+  });
+
+  it("closes the descriptor when the stream cannot be built", async () => {
+    const path = join(fixture(), "bad.txt");
+    writeFileSync(path, "a");
+    const closeSync = vi.spyOn(getFs(), "closeSync");
+    await expect(File.openAsync(path, "r:NOT-AN-ENCODING")).rejects.toThrow();
+    expect(closeSync).toHaveBeenCalledTimes(1);
+    closeSync.mockRestore();
+  });
+
+  it("rejects with the errno a missing file raises", async () => {
+    await expect(File.openAsync(join(fixture(), "missing"), "r")).rejects.toThrow(/ENOENT/);
   });
 });

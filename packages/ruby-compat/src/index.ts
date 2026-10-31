@@ -7,7 +7,7 @@ export { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 export { UndefinedConversionError } from "./undefined-conversion-error.js";
 export { EOFError } from "./eof-error.js";
 export { Errno, SystemCallError } from "./errno.js";
-export { File } from "./file.js";
+export { File, type FileOpenOpt } from "./file.js";
 export { Base64 } from "./base64.js";
 export {
   classPathMismatches,
@@ -453,6 +453,8 @@ export {
   rbStrStartWith,
   rbStrSub,
   strGsub,
+  rbRegMatchM,
+  rbStrMatchM,
 } from "./string/sub.js";
 export { rbCheckStringType, stringValue, strlen } from "./string/support.js";
 export {

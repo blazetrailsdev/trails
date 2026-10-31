@@ -161,8 +161,11 @@ export class File extends IO {
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.new`
    * (`vendor/ruby/v3.3.11/io.c:9616`).
+   *
+   * An Integer `fileName` is `rb_file_initialize`'s fd arm, `rb_io_initialize`
+   * over a descriptor already open, which has no path.
    */
-  constructor(fileName: string, mode: string | FileOpenOpt = "r", opt?: FileOpenOpt) {
+  constructor(fileName: string | number, mode: string | FileOpenOpt = "r", opt?: FileOpenOpt) {
     if (typeof mode === "object") {
       opt = mode;
       mode = opt.mode ?? "r";
@@ -172,7 +175,8 @@ export class File extends IO {
     const colon = mode.indexOf(":");
     const estr = colon === -1 ? null : mode.slice(colon + 1);
     const vmode = colon === -1 ? mode : mode.slice(0, colon);
-    super(getFs().openSync(fileName, vmode.replace(/b/g, ""), opt?.perm), fileName, mode);
+    if (typeof fileName === "number") super(fileName, null, mode);
+    else super(getFs().openSync(fileName, vmode.replace(/b/g, ""), opt?.perm), fileName, mode);
     if (vmode.includes("b")) this.binmode();
     if (estr !== null) this.setEncoding(estr);
     else if (opt?.externalEncoding != null) this.setEncoding(opt.externalEncoding);
@@ -572,6 +576,56 @@ export class File extends IO {
     }
     file.close();
     return result;
+  }
+
+  /**
+   * {@link File.open} over the backend's async open, for a caller whose block
+   * reads with {@link IO#eachAsync}. The stream closes once the block settles.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.open`
+   * (`vendor/ruby/v3.3.11/io.c:8148`).
+   */
+  static async openAsync(
+    fileName: string,
+    mode?: string | FileOpenOpt,
+    opt?: FileOpenOpt,
+  ): Promise<File>;
+  static async openAsync<T>(
+    fileName: string,
+    mode: string | FileOpenOpt | undefined,
+    block: (file: File) => T | Promise<T>,
+  ): Promise<T>;
+  static async openAsync<T>(
+    fileName: string,
+    mode: string | FileOpenOpt | undefined,
+    opt: FileOpenOpt,
+    block: (file: File) => T | Promise<T>,
+  ): Promise<T>;
+  static async openAsync<T>(
+    fileName: string,
+    mode: string | FileOpenOpt = "r",
+    blockOrOpt?: ((file: File) => T | Promise<T>) | FileOpenOpt,
+    optBlock?: (file: File) => T | Promise<T>,
+  ): Promise<T | File> {
+    const block = typeof blockOrOpt === "function" ? blockOrOpt : optBlock;
+    const opt = typeof blockOrOpt === "function" ? undefined : blockOrOpt;
+    const perm = typeof mode === "object" ? mode.perm : opt?.perm;
+    const vmode = (typeof mode === "object" ? (mode.mode ?? "r") : mode).split(":")[0];
+    const fd = await getFs().openAsync(fileName, vmode.replace(/b/g, ""), perm);
+    let file: File;
+    try {
+      file = new File(fd, mode, opt);
+    } catch (error) {
+      getFs().closeSync(fd);
+      throw error;
+    }
+    file.pathv = fileName;
+    if (!block) return file;
+    try {
+      return await block(file);
+    } finally {
+      file.close();
+    }
   }
 
   /**

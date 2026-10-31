@@ -1254,6 +1254,39 @@ export class IO {
   }
 
   /**
+   * {@link each} over the backend's async read: each line of the rest of the
+   * stream, its separator retained, read in chunks and never whole. Lines are
+   * split as bytes, so a character straddling two chunks survives.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#each`
+   * (`vendor/ruby/v3.3.11/io.c:15462`).
+   */
+  async *eachAsync(): AsyncGenerator<string | Uint8Array> {
+    const buffer = new Uint8Array(READ_CHUNK);
+    const enc = (str: Uint8Array): string | Uint8Array =>
+      this.enc2 === null
+        ? ioEncStr(str, str.length, this.ioReadEncoding())
+        : ioEncStr(str, str.length, this.enc2, this.ioReadEncoding());
+    let rest = new Uint8Array(0);
+    for (;;) {
+      const read = await getFs().readAsync(this.fd, buffer, 0, buffer.length, this._pos);
+      if (read === 0) break;
+      this._pos += read;
+      const bytes = new Uint8Array(rest.length + read);
+      bytes.set(rest);
+      bytes.set(buffer.subarray(0, read), rest.length);
+      let start = 0;
+      for (let i = rest.length; i < bytes.length; i++) {
+        if (bytes[i] !== 0x0a) continue;
+        yield enc(bytes.slice(start, i + 1));
+        start = i + 1;
+      }
+      rest = bytes.slice(start);
+    }
+    if (rest.length > 0) yield enc(rest);
+  }
+
+  /**
    * `rb_io_gets_m` (`vendor/ruby/v3.3.11/io.c:4363`): the bytes up to and
    * including the next `sep` (`$/`, `"\n"`, by default), or the rest of the stream,
    * in the external encoding as {@link readAll} answers it; `nil` at EOF.

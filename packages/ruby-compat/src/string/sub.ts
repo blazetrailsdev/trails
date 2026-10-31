@@ -268,6 +268,25 @@ export function rbStrMatchMP(self: StringReceiver, ...args: unknown[]): boolean 
   return regMatchPos(re, self.string, args.length === 2 ? num2long(args[1]) : 0) !== null;
 }
 
+/**
+ * `Regexp#match` (`vendor/ruby/v3.3.11/re.c:3763` `rb_reg_match_m`) with no
+ * `pos`: a `MatchData`, or `nil` for a `nil` String. An ASCII-8BIT String, a
+ * `Uint8Array`, is searched a byte per character.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbRegMatchM(
+  re: RegExp,
+  str: string | Uint8Array | null | undefined,
+): MatchData | null {
+  if (str == null) return null;
+  return regMatchPos(
+    re,
+    typeof str === "string" ? str : Array.from(str, (c) => String.fromCharCode(c)).join(""),
+    0,
+  );
+}
+
 function regMatchPos(re: RegExp, str: string, pos: number): MatchData | null {
   if (pos < 0) {
     pos += strlen(str);

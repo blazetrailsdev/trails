@@ -75,6 +75,7 @@ export interface FsAdapter {
   realpathSync?(path: string): string;
   accessSync?(path: string, mode: number): void;
   openSync(path: string, flags: string, mode?: number): number;
+  openAsync(path: string, flags: string, mode?: number): Promise<number>;
   readSync(
     fd: number,
     buffer: Uint8Array,
@@ -82,6 +83,13 @@ export interface FsAdapter {
     length: number,
     position: number | null,
   ): number;
+  readAsync(
+    fd: number,
+    buffer: Uint8Array,
+    offset: number,
+    length: number,
+    position: number | null,
+  ): Promise<number>;
   writeSync(
     fd: number,
     buffer: Uint8Array,
@@ -324,6 +332,22 @@ function tryAutoRegisterNode(): boolean {
       utimes(path: string, atime: Date, mtime: Date): Promise<void>;
       readlink(path: string): Promise<string>;
     };
+    const nodeCallbackFs = nodeFs as unknown as {
+      open(
+        p: string,
+        flags: string,
+        mode: number | undefined,
+        cb: (error: Error | null, fd: number) => void,
+      ): void;
+      read(
+        fd: number,
+        buffer: Uint8Array,
+        offset: number,
+        length: number,
+        position: number | null,
+        cb: (error: Error | null, bytesRead: number) => void,
+      ): void;
+    };
     const withExecutable = (stat: FsStatResult): FsStatResult =>
       Object.assign(stat, {
         isExecutable: () => (stat.mode & 0o111) !== 0,
@@ -334,6 +358,27 @@ function tryAutoRegisterNode(): boolean {
       fstatSync: (fd: number) => withExecutable(nodeFs.fstatSync!(fd)),
       lstatSync: (p: string) => withExecutable(nodeFs.lstatSync(p)),
       cwd: () => proc.cwd(),
+      openAsync: (p: string, flags: string, mode?: number) =>
+        new Promise<number>((resolve, reject) => {
+          nodeCallbackFs.open(p, flags, mode, (error, fd) => {
+            if (error) return reject(error);
+            flockPaths.set(fd, p);
+            resolve(fd);
+          });
+        }),
+      readAsync: (
+        fd: number,
+        buffer: Uint8Array,
+        offset: number,
+        length: number,
+        position: number | null,
+      ) =>
+        new Promise<number>((resolve, reject) => {
+          nodeCallbackFs.read(fd, buffer, offset, length, position, (error, bytesRead) => {
+            if (error) reject(error);
+            else resolve(bytesRead);
+          });
+        }),
       exists: (p: string) =>
         fsPromises.access(p).then(
           () => true,
