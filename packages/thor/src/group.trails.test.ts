@@ -23,6 +23,9 @@ class Shell {
     if (logStatus === false) return;
     this.out.push(`${String(status)} ${toS(message)} ${String(logStatus)} @${this.padding}`);
   }
+  error(message: unknown) {
+    this.out.push(`error ${String(message)}`);
+  }
   printTable(rows: string[][]) {
     rows.forEach((row) => this.out.push(row.join(" ")));
   }
@@ -142,7 +145,11 @@ describe("Thor::Group", () => {
     expect(klass.invocations().get("invoked")).toBe(false);
     const shell = await start(Invoker, []);
     expect(log).toEqual(["invoked"]);
-    expect(shell.out).toEqual(["invoke invoked true @0", 'error "nowhere" [not found] :red @0']);
+    expect(shell.out).toEqual([
+      "invoke invoked true @0",
+      "invoke nowhere true @0",
+      'error Could not find command "nowhere" in "default" namespace.',
+    ]);
   });
 
   it("invoke and invoke_from_option keep names apart that differ only in case", () => {

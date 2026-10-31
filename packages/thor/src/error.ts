@@ -27,7 +27,7 @@ export class Error extends StandardError {
 
   constructor(message?: string) {
     super(message);
-    this.#mesg = message ?? "";
+    this.#mesg = message ?? this.name;
     delete (this as { message?: string }).message;
   }
 
@@ -40,6 +40,8 @@ export class Error extends StandardError {
     return this.#mesg;
   }
 }
+
+Error.prototype.name = "Thor::Error";
 
 export class UndefinedCommandError extends Error {
   readonly command: string;
@@ -78,13 +80,16 @@ export namespace UndefinedCommandError {
     }
   }
 }
+UndefinedCommandError.prototype.name = "Thor::UndefinedCommandError";
 prepend(UndefinedCommandError, Correctable);
 export const UndefinedTaskError = UndefinedCommandError;
 
 export class AmbiguousCommandError extends Error {}
+AmbiguousCommandError.prototype.name = "Thor::AmbiguousCommandError";
 export const AmbiguousTaskError = AmbiguousCommandError;
 
 export class InvocationError extends Error {}
+InvocationError.prototype.name = "Thor::InvocationError";
 
 export class UnknownArgumentError extends Error {
   readonly switches: string[];
@@ -123,12 +128,17 @@ export namespace UnknownArgumentError {
     }
   }
 }
+UnknownArgumentError.prototype.name = "Thor::UnknownArgumentError";
 prepend(UnknownArgumentError, Correctable);
 
 export class RequiredArgumentMissingError extends InvocationError {}
+RequiredArgumentMissingError.prototype.name = "Thor::RequiredArgumentMissingError";
 
 export class MalformattedArgumentError extends InvocationError {}
+MalformattedArgumentError.prototype.name = "Thor::MalformattedArgumentError";
 
 export class ExclusiveArgumentError extends InvocationError {}
+ExclusiveArgumentError.prototype.name = "Thor::ExclusiveArgumentError";
 
 export class AtLeastOneRequiredArgumentError extends InvocationError {}
+AtLeastOneRequiredArgumentError.prototype.name = "Thor::AtLeastOneRequiredArgumentError";

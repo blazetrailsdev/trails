@@ -702,7 +702,7 @@ export default defineConfig({
           include: ["packages/thor/src/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
           globalSetup: ["./packages/thor/src/test-helpers/build-templates.ts"],
-          setupFiles: otherSetupFiles,
+          setupFiles: [...otherSetupFiles, "./packages/thor/src/test-helpers/setup.ts"],
         },
       },
       {

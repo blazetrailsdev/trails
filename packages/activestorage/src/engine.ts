@@ -6,7 +6,7 @@ import "@blazetrails/trailties/trailties/active-job";
 import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ActiveStorage } from "./active-storage.js";
-import { Model } from "./attached/model.js";
+import { ClassMethods, Model } from "./attached/model.js";
 import { ActiveRecordExtensions, ReflectionExtension } from "./reflection.js";
 
 export class Engine extends TrailsEngine {
@@ -25,6 +25,10 @@ export class Engine extends TrailsEngine {
       onLoad("active_record", function (this: typeof Base) {
         include(this, ActiveRecordExtensions);
         prepend(rbObjSingletonClass(Reflection), ReflectionExtension);
+      });
+
+      onLoad("active_storage_variant_record", function (this: typeof Base) {
+        ClassMethods.hasOneAttached.call(this, "image");
       });
     });
   }

@@ -3,52 +3,8 @@ import { assertEmpty } from "@blazetrails/activesupport";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "./core-ext/hash-with-indifferent-access.js";
 import { Thor, type ThorClass } from "./thor.js";
+import { AnotherScript, Apple, MyScript, Pear, Scripts } from "./test-helpers/fixtures/script.js";
 import * as Util from "./util.js";
-
-const Scripts = { name: "Scripts" };
-
-class MyScript extends Thor {
-  static {
-    (this as unknown as ThorClass).desc("zoo", "zoo around");
-    (this as unknown as ThorClass).methodAdded("zoo");
-  }
-  zoo() {}
-}
-
-class AnotherScript extends Thor {
-  static {
-    (this as unknown as ThorClass).desc("baz", "do some bazing");
-    (this as unknown as ThorClass).methodAdded("baz");
-  }
-  baz() {}
-}
-rbModConstSet(MyScript, "AnotherScript", AnotherScript);
-
-class ScriptsMyScript extends MyScript {
-  static {
-    (this as unknown as ThorClass).desc("zoo", "zoo around");
-    (this as unknown as ThorClass).methodAdded("zoo");
-  }
-  zoo() {}
-}
-rbModConstSet(Scripts, "MyScript", ScriptsMyScript);
-
-class MyDefaults extends Thor {
-  static {
-    (this as unknown as ThorClass).namespace("default");
-    (this as unknown as ThorClass).desc("cow", "prints 'moo'");
-    (this as unknown as ThorClass).methodAdded("cow");
-  }
-  cow() {}
-}
-rbModConstSet(Scripts, "MyDefaults", MyDefaults);
-
-class ChildDefault extends Thor {
-  static {
-    (this as unknown as ThorClass).namespace("default:child");
-  }
-}
-rbModConstSet(Scripts, "ChildDefault", ChildDefault);
 
 class BrokenCounter extends Thor {
   static {
@@ -56,36 +12,14 @@ class BrokenCounter extends Thor {
   }
 }
 
-class Apple extends Thor {
-  static {
-    (this as unknown as ThorClass).namespace("fruits");
-    (this as unknown as ThorClass).desc("apple", "apple");
-    (this as unknown as ThorClass).methodAdded("apple");
-    (this as unknown as ThorClass).desc("rotten-apple", "rotten apple");
-    (this as unknown as ThorClass).methodAdded("rotten_apple");
-    (this as unknown as ThorClass).map({ ra: ":rotten_apple" });
-  }
-  apple() {}
-  rotten_apple() {}
-}
-
-class Pear extends Thor {
-  static {
-    (this as unknown as ThorClass).namespace("fruits");
-    (this as unknown as ThorClass).desc("pear", "pear");
-    (this as unknown as ThorClass).methodAdded("pear");
-  }
-  pear() {}
-}
-
 describe("Thor::Util", () => {
   describe("#find_by_namespace", () => {
     it("returns 'default' if no namespace is given", () => {
-      expect(Util.findByNamespace("")).toEqual(MyDefaults);
+      expect(Util.findByNamespace("")).toEqual(Scripts.MyDefaults);
     });
 
     it("adds 'default' if namespace starts with :", () => {
-      expect(Util.findByNamespace(":child")).toEqual(ChildDefault);
+      expect(Util.findByNamespace(":child")).toEqual(Scripts.ChildDefault);
     });
 
     it("returns nil if the namespace can't be found", () => {
@@ -97,7 +31,7 @@ describe("Thor::Util", () => {
     });
 
     it("matches classes default namespace", () => {
-      expect(Util.findByNamespace("scripts:my_script")).toEqual(ScriptsMyScript);
+      expect(Util.findByNamespace("scripts:my_script")).toEqual(Scripts.MyScript);
     });
   });
 
@@ -177,7 +111,7 @@ describe("Thor::Util", () => {
     });
 
     it("falls back on the default namespace class if nothing else matches", () => {
-      expect(Util.findClassAndCommandByNamespace("test")).toEqual([MyDefaults, "test"]);
+      expect(Util.findClassAndCommandByNamespace("test")).toEqual([Scripts.MyDefaults, "test"]);
     });
 
     it("returns correct Thor class and the command name when shared namespaces", () => {

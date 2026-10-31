@@ -5,10 +5,10 @@ import {
   RbConfig,
   rbModConstants,
   rbModName,
-  rbModToS,
   rbObjAsString,
   rbObjRespondTo,
   rtest,
+  strSqueeze,
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { Base, type BaseClass } from "./base.js";
@@ -25,11 +25,9 @@ export function findByNamespace(namespace: string): ThorClass | null {
 }
 
 export function namespaceFromThorClass(constant: unknown): string {
-  let name = (
-    typeof constant === "function" ? rbModToS(constant as never) : rbObjAsString(constant)
-  ).replace(/^Thor::Sandbox::/gm, "");
-  name = snakeCase(name).replace(/:+/g, ":");
-  return name;
+  constant = rbObjAsString(constant).replace(/^Thor::Sandbox::/gm, "");
+  constant = strSqueeze(snakeCase(constant as string), [":"]);
+  return constant as string;
 }
 
 export function thorClassesIn(klass: BaseClass): BaseClass[] {
@@ -44,10 +42,7 @@ export function thorClassesIn(klass: BaseClass): BaseClass[] {
 
 export function snakeCase(str: string): string {
   if (/^[A-Z_]+$/m.test(str)) return str.toLowerCase();
-  const lastMatch = str
-    .replace(/\B[A-Z]/g, "_$&")
-    .replace(/_+/g, "_")
-    .match(/_*(.*)/)!;
+  const lastMatch = strSqueeze(str.replace(/\B[A-Z]/g, "_$&"), ["_"]).match(/_*(.*)/)!;
   return lastMatch.at(-1)!.toLowerCase();
 }
 

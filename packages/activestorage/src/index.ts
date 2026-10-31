@@ -9,6 +9,7 @@ export { VERSION, gemVersion } from "./gem-version.js";
 export { version } from "./version.js";
 export { Filename } from "./filename.js";
 export { Record } from "./record.js";
+export { VariantRecord } from "./variant-record.js";
 export { Current } from "./current.js";
 export { BaseJob } from "./base-job.js";
 export { Service } from "./service.js";

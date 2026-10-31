@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Dir, File, FileUtils, stdout } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { capture } from "../test-helpers/helper.js";
 import { type ActionsHost } from "../actions.js";
 import type { GroupClass } from "../group.js";
 import { MyCounter as MyCounterFixture } from "../test-helpers/fixtures/group.js";
@@ -12,21 +13,6 @@ type CounterInstance = ActionsHost & {
 };
 type ActionsClass = Pick<GroupClass, "argument"> & (new (...args: unknown[]) => CounterInstance);
 const MyCounter = MyCounterFixture as unknown as ActionsClass;
-
-async function capture(_stream: string, block: () => unknown): Promise<string> {
-  let result = "";
-  const write = stdout.write;
-  (stdout as { write: typeof write }).write = (chunk) => {
-    result += chunk;
-    return true;
-  };
-  try {
-    await block();
-  } finally {
-    (stdout as { write: typeof write }).write = write;
-  }
-  return result;
-}
 
 beforeAll(() => {
   destinationRoot = Dir.mktmpdir("thor-sandbox-");
