@@ -14,7 +14,7 @@ export class CpuCounter {
     }
   }
 
-  count(): number | null {
+  count(): number {
     return getOs().availableParallelism();
   }
 }

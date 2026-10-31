@@ -16,7 +16,7 @@ describe("TestRakeCpuCounter", () => {
   });
 
   it("count with default nil", () => {
-    cpuCounter.count = () => null;
+    cpuCounter.count = () => null as unknown as number;
     expect(cpuCounter.countWithDefault(8)).toEqual(8);
     expect(cpuCounter.countWithDefault()).toEqual(4);
   });
@@ -42,9 +42,9 @@ describe("TestRakeCpuCounter", () => {
     it("count nil", () => {
       let counted = false;
       class Klass extends CpuCounter {
-        count(): null {
+        count(): number {
           counted = true;
-          return null;
+          return null as unknown as number;
         }
       }
       expect(Klass.count()).toEqual(4);
