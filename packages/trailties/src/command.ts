@@ -1,8 +1,10 @@
 import { presence } from "@blazetrails/activesupport";
 import { env } from "@blazetrails/ruby-compat";
 import type { Command as Program } from "commander";
+import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";
-import { lookup, lookupBang } from "./command/behavior.js";
+import { createProgram } from "./cli.js";
+import { lookup, lookupBang, subclasses } from "./command/behavior.js";
 
 export const HELP_MAPPINGS: ReadonlySet<string> = new Set(["-h", "-?", "--help"]);
 export const VERSION_MAPPINGS: ReadonlySet<string> = new Set(["-v", "--version"]);
@@ -22,7 +24,13 @@ export async function invoke(fullNamespace: string, args: string[] = []): Promis
   const [namespace, commandName] = splitNamespace(fullNamespace);
   const command = await findByNamespace(namespace, commandName);
 
-  if (command && command.name() === commandName) {
+  if (command && "perform" in command) {
+    if (Object.hasOwn((command as unknown as ThorClass).allCommands(), commandName)) {
+      await command.perform(commandName, args, {});
+    } else {
+      await invokeRake(fullNamespace, args);
+    }
+  } else if (command && command.name() === commandName) {
     await command.parent!.parseAsync([commandName, ...args], { from: "user" });
   } else if (command && command.commands.some((c) => c.name() === commandName)) {
     await command.parent!.parseAsync([command.name(), commandName, ...args], { from: "user" });
@@ -34,14 +42,17 @@ export async function invoke(fullNamespace: string, args: string[] = []): Promis
 export async function findByNamespace(
   namespace: string,
   commandName?: string,
-): Promise<Program | undefined> {
+): Promise<Program | typeof Base | undefined> {
   const lookups = [namespace];
   if (commandName) lookups.push(`${namespace}:${commandName}`);
   lookups.push(...lookups.map((lookup) => `rails:${lookup}`));
 
   await lookup(lookups);
 
-  const { createProgram } = await import("./cli.js");
+  const klasses = new Map(subclasses().map((klass) => [klass.namespace(), klass]));
+  const first = lookups.find((lookup) => klasses.has(lookup));
+  if (first !== undefined) return klasses.get(first);
+
   const namespaces = new Map(createProgram().commands.map((c) => [c.name(), c]));
   const found = lookups.find((lookup) => namespaces.has(lookup));
   return found === undefined ? undefined : namespaces.get(found);
@@ -60,7 +71,6 @@ function splitNamespace(namespace: string): [string, string] {
 /** @internal */
 async function invokeRake(task: string, args: string[]): Promise<void> {
   await lookupBang();
-  const { createProgram } = await import("./cli.js");
   const program = createProgram();
   const colon = task.indexOf(":");
   if (colon > 0) {

@@ -1,9 +1,16 @@
-import { File, abort, getPath, rbArgv } from "@blazetrails/ruby-compat";
+import { File, LOAD_PATH, abort, getPath, rbArgv } from "@blazetrails/ruby-compat";
 import { FileList } from "./file-list.js";
 
 const argv: string[] = [];
-for (const argument of rbArgv()) {
-  if (/^-/m.test(argument)) {
+for (const [index, argument] of rbArgv().entries()) {
+  if (index === 0 && /^-I/.test(argument)) {
+    LOAD_PATH.unshift(
+      ...argument
+        .slice(2)
+        .split(File.PATH_SEPARATOR)
+        .map((path) => File.expandPath(path)),
+    );
+  } else if (/^-/m.test(argument)) {
     argv.push(argument);
   } else if (/\*/.test(argument)) {
     for (const file of (await FileList.get(argument).toA()) as string[]) {

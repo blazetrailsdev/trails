@@ -2,6 +2,7 @@ import { LoadError, regexpEscape } from "@blazetrails/ruby-compat";
 import { Base as ThorBase } from "@blazetrails/thor/shell";
 import { Basic } from "@blazetrails/thor/shell/basic";
 import type { Command as Program } from "commander";
+import type { Base } from "./base.js";
 
 type CommandFactory = () => Program;
 
@@ -27,10 +28,17 @@ export function noColorBang(): void {
   ThorBase.shell = Basic;
 }
 
-let _subclasses: CommandFactory[] | undefined;
+let _subclasses: (typeof Base)[] | undefined;
 
-export function subclasses(): CommandFactory[] {
+export function subclasses(): (typeof Base)[] {
   return (_subclasses ??= []);
+}
+
+const _commanderFactories: CommandFactory[] = [];
+
+/** @noRailsEquivalent CONVERGEABLE retire-commander-cli-onto-rails-command-invoke */
+export function commanderFactories(): CommandFactory[] {
+  return _commanderFactories;
 }
 
 /**
@@ -46,7 +54,7 @@ export async function lookup(namespaces: string[]): Promise<void> {
     try {
       if (!Object.hasOwn(LOAD_PATH, path)) throw new LoadError(`cannot load such file -- ${path}`);
       const factory = await LOAD_PATH[path]();
-      if (!subclasses().includes(factory)) subclasses().push(factory);
+      if (!commanderFactories().includes(factory)) commanderFactories().push(factory);
       return;
     } catch (e) {
       if (e instanceof LoadError) {
@@ -69,7 +77,7 @@ export async function lookupBang(): Promise<void> {
   for (const load of Object.values(LOAD_PATH)) {
     try {
       const factory = await load();
-      if (!subclasses().includes(factory)) subclasses().push(factory);
+      if (!commanderFactories().includes(factory)) commanderFactories().push(factory);
     } catch {
       continue;
     }

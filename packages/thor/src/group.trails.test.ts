@@ -265,3 +265,31 @@ describe("Thor::Group", () => {
     expect((raised as Error).message).toMatch(/ one takes 2 arguments, but it should not\.$/);
   });
 });
+
+describe("Thor::Group.invoke_from_option", () => {
+  it("prints the Ruby option name for a multi-word boolean option", async () => {
+    class ResourceRoute extends Group {
+      static {
+        const klass = this as unknown as GroupClass;
+        klass.namespace("resource_route");
+      }
+    }
+    class Scaffold extends Group {
+      static {
+        const klass = this as unknown as GroupClass;
+        klass.classOption("resourceRoute", { type: "boolean" });
+        klass.invokeFromOption("resourceRoute");
+        (klass as unknown as { prepareForInvocation: unknown }).prepareForInvocation = () =>
+          ResourceRoute;
+      }
+    }
+    const shell = new Shell();
+    const instance = new (Scaffold as unknown as new (...args: unknown[]) => Instance)(
+      [],
+      { resourceRoute: true },
+      { shell },
+    );
+    await instance.invokeAll();
+    expect(shell.out[0]).toMatch(/^invoke resource_route /);
+  });
+});
