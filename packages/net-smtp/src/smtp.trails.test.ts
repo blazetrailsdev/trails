@@ -1,4 +1,3 @@
-import { createServer } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
 import { createServer } from "node:net";
