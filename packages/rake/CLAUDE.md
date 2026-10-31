@@ -13,7 +13,9 @@ implicit conversion is synchronous: `rbCheckArrayType` behind `flatten`,
 raises `RuntimeError` while it is pending.** A caller awaits `fl.resolve()` first,
 so `flatten(["a", await fl.resolve()])` and
 `FileList.get(await inner.resolve())` are the spellings of Rails'
-`["a", fl].flatten` and `FileList[inner]`, and `include` expands a nested list
+`["a", fl].flatten` and `FileList[inner]`, `task({ a: await fl.resolve() })` is
+`task a: fl` (`Task.format_deps`, `task.rb:373-376`), so `prerequisites` holds
+the entries as soon as the task is defined, and `include` expands a nested list
 at include time, with no deferred arm in `resolve_add`. `await fl.toA()` stays
 the resolving read, and `toAry` carries its receipts against this section.
 
