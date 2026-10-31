@@ -75,6 +75,6 @@ describe("TestRakeTopLevelFunctions", () => {
   });
 
   it("missing other constant", () => {
-    expect(() => rbModConstMissing(Object, "Xyz")).toThrow(NameError);
+    expect(() => rbModConstMissing(Object as { name?: string }, "Xyz")).toThrow(NameError);
   });
 });
