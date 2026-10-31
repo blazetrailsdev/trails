@@ -1,5 +1,5 @@
 import { type Base } from "@blazetrails/activerecord";
-import { delegate, delegateMissingTo, runLoadHooks } from "@blazetrails/activesupport";
+import { delegateMissingTo, DelegationError, runLoadHooks } from "@blazetrails/activesupport";
 import { ArgumentError, block, fetch } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import type { Blob } from "./blob.js";
@@ -72,6 +72,21 @@ export class Attachment extends Record {
       if (record?.isPersisted()) await record.touch();
     });
     await (await this.blob)?.purgeLater();
+  }
+
+  override signedId(options: Parameters<Blob["signedId"]>[0] = {}): string {
+    if (this.blob_id != null && !this.association("blob").isLoaded()) {
+      const { purpose = "blob_id", expiresIn, expiresAt } = options;
+      const klass = ActiveStorage.Blob!;
+      return klass.signedIdVerifier.generate(this.blob_id, {
+        expiresIn,
+        expiresAt,
+        purpose: klass.combineSignedIdPurposes(purpose),
+      });
+    }
+    const blob = this.blob as AttachedBlob | null;
+    if (blob == null) throw DelegationError.nilTarget("signedId", "blob");
+    return blob.signedId(options);
   }
 
   async variant(transformations: Transformations): Promise<unknown> {
@@ -163,7 +178,6 @@ Object.setPrototypeOf(
     "blob",
   ),
 );
-delegate.call(Attachment.prototype, "signedId", { to: "blob" });
 
 ActiveStorage.Attachment = Attachment;
 

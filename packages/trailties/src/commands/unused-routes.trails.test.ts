@@ -187,9 +187,9 @@ describe("unusedRoutesCommand", () => {
     const { UnusedRoutesCommand } = await import("./unused-routes.js");
     const perform = vi.spyOn(UnusedRoutesCommand, "perform").mockResolvedValue();
     onTestFinished(() => perform.mockRestore());
-    await createProgram().parseAsync(["unused_routes", "--controller", "Posts", "-g", "x"], {
+    await createProgram().parseAsync(["unused-routes", "--controller", "Posts", "-g", "x"], {
       from: "user",
     });
-    expect(perform).toHaveBeenCalledWith("unused_routes", ["--controller", "Posts", "-g", "x"], {});
+    expect(perform).toHaveBeenCalledWith("unused-routes", ["--controller", "Posts", "-g", "x"], {});
   });
 });

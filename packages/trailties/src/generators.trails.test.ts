@@ -156,4 +156,10 @@ describe("Generators.findByNamespace fallbacks and context", () => {
   it("answers null when neither the lookups nor a fallback resolve", async () => {
     expect(await Generators.findByNamespace("nope", null, "model")).toBeNull();
   });
+
+  it("resolves a generator from either spelling of its namespace", async () => {
+    const dashed = await Generators.findByNamespace("scaffold-controller");
+    expect(dashed?.namespace()).toBe("rails:scaffold-controller");
+    expect(await Generators.findByNamespace("scaffold_controller")).toBe(dashed);
+  });
 });

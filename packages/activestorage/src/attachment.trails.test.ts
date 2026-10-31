@@ -44,7 +44,8 @@ describe("Attachment", () => {
     const found = await Attachment.find(attachment.id);
 
     expect(() => (found as unknown as { isText(): boolean }).isText()).toThrow(NoMethodError);
-    expect(() => found.signedId()).toThrow(NoMethodError);
+    expect(found.signedId()).toBe((await attachment.blob)!.signedId());
+    expect(found.association("blob").isLoaded()).toBe(false);
     expect((await found.blob)!.key).toBe((await attachment.blob)!.key);
     expect((found as unknown as Blob).isText()).toBe(true);
   });

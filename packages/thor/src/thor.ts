@@ -1,4 +1,5 @@
 import {
+  kebabCase,
   ArgumentError,
   aryDelete,
   arySlice,
@@ -180,7 +181,7 @@ export class Thor {
     kw: Record<string, string> = {},
   ): Record<string, string> {
     if (!Object.hasOwn(this, "_map") || !rtest(this._map)) {
-      this._map = this.fromSuperclass("map", {}) as Record<string, string>;
+      this._map = this.fromSuperclass("map", Object.create(null)) as Record<string, string>;
     }
 
     if (rtest(mappings) && Object.keys(kw).length !== 0) {
@@ -564,7 +565,7 @@ export class Thor {
         exclusiveOptionNames: this.methodExclusiveOptionNames(),
         atLeastOneOptionNames: this.methodAtLeastOneOptionNames(),
       };
-      this.commands()[meth] = new baseClass(
+      this.commands()[kebabCase(meth)] = new baseClass(
         meth,
         this._desc,
         this._longDesc,
@@ -577,7 +578,7 @@ export class Thor {
       this._methodOptions = this._hide = null;
       this._methodExclusiveOptionNames = this._methodAtLeastOneOptionNames = null;
       return true;
-    } else if (rtest(this.allCommands()[meth]) || meth === "method_missing") {
+    } else if (rtest(this.allCommands()[kebabCase(meth)]) || meth === "method_missing") {
       return true;
     } else {
       puts.call(
@@ -609,9 +610,12 @@ export class Thor {
   /** @internal */
   declare static retrieveTaskName: typeof Thor.retrieveCommandName;
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm kebabCase — PERMANENT
+   */
   static normalizeCommandName(this: ThorClass, meth: string | null | undefined): string {
-    if (!rtest(meth)) return toS(this.defaultCommand()).replaceAll("-", "_");
+    if (!rtest(meth)) return kebabCase(toS(this.defaultCommand()));
 
     const possibilities = this.findCommandPossibilities(meth);
     if (possibilities.length > 1) {
@@ -628,7 +632,7 @@ export class Thor {
       meth = possibilities[0] ?? null;
     }
 
-    return toS(meth).replaceAll("-", "_");
+    return kebabCase(toS(meth));
   }
   /** @internal */
   declare static normalizeTaskName: typeof Thor.normalizeCommandName;

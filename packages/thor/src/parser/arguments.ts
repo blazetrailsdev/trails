@@ -1,6 +1,7 @@
 import {
   aryDelete,
   arySlice,
+  camelized,
   format,
   Hash,
   isInclude,
@@ -75,7 +76,7 @@ export class Arguments {
       aryDelete(this.nonAssignedRequired, argument);
       this.assigns[argument.humanName] = rbFSend(
         this,
-        `parse_${argument.type}`.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase()),
+        camelized(`parse_${argument.type}`),
         argument.humanName,
       );
     }

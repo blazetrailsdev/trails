@@ -1,4 +1,5 @@
 import {
+  kebabCase,
   ArgumentError,
   aryDeleteIf,
   env,
@@ -386,14 +387,17 @@ export const ClassMethods = {
   },
 
   commands(this: BaseClass): Record<string, Command> {
-    if (!Object.hasOwn(this, "_commands")) this._commands = {};
+    if (!Object.hasOwn(this, "_commands")) this._commands = Object.create(null);
     return this._commands!;
   },
   tasks: undefined as unknown as BaseClass["commands"],
 
   allCommands(this: BaseClass): Record<string, Command> {
     if (!Object.hasOwn(this, "_allCommands")) {
-      this._allCommands = this.fromSuperclass("allCommands", {}) as Record<string, Command>;
+      this._allCommands = this.fromSuperclass("allCommands", Object.create(null)) as Record<
+        string,
+        Command
+      >;
     }
     return Object.assign(this._allCommands!, this.commands());
   },
@@ -405,8 +409,8 @@ export const ClassMethods = {
     };
 
     names.forEach((name) => {
-      delete this.commands()[rbObjAsString(name)];
-      delete this.allCommands()[rbObjAsString(name)];
+      delete this.commands()[kebabCase(rbObjAsString(name))];
+      delete this.allCommands()[kebabCase(rbObjAsString(name))];
       if (rtest(options.undefine)) {
         Object.defineProperty(this.prototype, rbObjAsString(name), {
           value: undefined,
@@ -597,10 +601,11 @@ export const ClassMethods = {
   /** @internal */
   findAndRefreshCommand(this: BaseClass, name: string): Command {
     let command: Command | undefined;
-    if (this.commands()[rbObjAsString(name)] != null) {
-      return this.commands()[rbObjAsString(name)];
-    } else if ((command = this.allCommands()[rbObjAsString(name)]) != null) {
-      return (this.commands()[rbObjAsString(name)] = rbObjClone(command));
+    const key = kebabCase(rbObjAsString(name));
+    if (this.commands()[key] != null) {
+      return this.commands()[key];
+    } else if ((command = this.allCommands()[key]) != null) {
+      return (this.commands()[key] = rbObjClone(command));
     } else {
       throw new ArgumentError(
         `You supplied :for => ${rbInspect(name)}, but the command ${rbInspect(name)} could not be found.`,

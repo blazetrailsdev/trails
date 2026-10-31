@@ -9,6 +9,6 @@ describe("Rails::Command::BaseTest", () => {
       }
     }
 
-    expect(CustomBinCommand.executable()).toBe("FOO custom_bin");
+    expect(CustomBinCommand.executable()).toBe("FOO custom-bin");
   });
 });

@@ -119,12 +119,12 @@ describe("Thor", () => {
         });
 
         it("adds a command to the command list if the updated command is on the parent class", () => {
-          expect(scriptsMyScript.commands()["example_default_command"]).toBeTruthy();
+          expect(scriptsMyScript.commands()["example-default-command"]).toBeTruthy();
         });
 
         it("clones the parent command", () => {
-          expect(scriptsMyScript.commands()["example_default_command"]).not.toBe(
-            myChildScript.commands()["example_default_command"],
+          expect(scriptsMyScript.commands()["example-default-command"]).not.toBe(
+            myChildScript.commands()["example-default-command"],
           );
         });
       });
@@ -619,7 +619,7 @@ describe("Thor", () => {
 
   describe("#method_at_least_one", () => {
     it("returns the at least one of option names for the class", () => {
-      const cmd = (MyOptionScript as unknown as ThorClass).commands()["at_least_one"];
+      const cmd = (MyOptionScript as unknown as ThorClass).commands()["at-least-one"];
       const atLeastOnes = cmd.optionsRelation["atLeastOneOptionNames"]!;
       expect(atLeastOnes.length).toBe(2);
       expect(atLeastOnes[0]).toEqual(["one", "two", "three"]);
@@ -733,7 +733,7 @@ describe("Thor", () => {
         const error = vi.spyOn(shell, "error").mockImplementation(() => {});
         await myScript.start(["call"], { shell: shell });
         expect(error).toHaveBeenCalledWith(
-          "Ambiguous command call matches [call_myself_with_wrong_arity, call_unexistent_method]",
+          "Ambiguous command call matches [call-myself-with-wrong-arity, call-unexistent-method]",
         );
       });
 

@@ -53,6 +53,22 @@ describe("Thor::Actions#apply (trails)", () => {
     expect(r.foo).toBeUndefined();
   });
 
+  it("re-evaluates a URL template's module body on every apply", async () => {
+    const applied = globalThis as unknown as { thorApplied?: number };
+    applied.thorApplied = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("globalThis.thorApplied += 1; export default function () {}")),
+    );
+    const r = new Counter([], {}, {}) as unknown as CounterInstance;
+
+    await capture(":stdout", () => r.apply("https://example.com/once.js"));
+    await capture(":stdout", () => r.apply("https://example.com/once.js"));
+
+    expect(applied.thorApplied).toBe(2);
+    delete applied.thorApplied;
+  });
+
   it("re-reads a local template on every apply", async () => {
     const dir = Dir.mktmpdir("thor-apply-");
     Counter.sourcePaths().push(dir);

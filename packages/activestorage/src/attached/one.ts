@@ -19,21 +19,13 @@ export class One extends Attached {
     await (await this.detachOne()).detach();
   }
 
-  /** @inventedArm if — PERMANENT */
   get attachment(): Attachment | null | Promise<Attachment | null> {
-    if (isPresent(this.change)) return (this.change as CreateOne).attachment;
-    const attachment = rbFSend(this.record, `${this.name}Attachment`) as
-      | Attachment
-      | null
-      | Promise<Attachment | null>;
-    if (attachment instanceof Promise) {
-      return attachment.then(async (record) => {
-        await record?.blob;
-        return record;
-      });
-    }
-    const blob = attachment?.blob;
-    return blob instanceof Promise ? blob.then(() => attachment) : attachment;
+    return isPresent(this.change)
+      ? (this.change as CreateOne).attachment
+      : (rbFSend(this.record, `${this.name}Attachment`) as
+          | Attachment
+          | null
+          | Promise<Attachment | null>);
   }
 
   async isBlank(): Promise<boolean> {
@@ -49,11 +41,7 @@ export class One extends Attached {
   }
 
   async isAttached(): Promise<boolean> {
-    return isPresent(
-      await (isPresent(this.change)
-        ? (this.change as CreateOne).attachment
-        : rbFSend(this.record, `${this.name}Attachment`)),
-    );
+    return isPresent(await this.attachment);
   }
 
   /** @internal */

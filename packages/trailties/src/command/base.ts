@@ -1,5 +1,5 @@
-import { classAttribute, underscore } from "@blazetrails/activesupport";
-import { include, rbObjMethod, type Included } from "@blazetrails/ruby-compat";
+import { classAttribute } from "@blazetrails/activesupport";
+import { kebabCase, include, rbObjMethod, type Included } from "@blazetrails/ruby-compat";
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import type { Command as ThorCommand } from "@blazetrails/thor/command";
 import type { Base as ThorBase, BaseConfig } from "@blazetrails/thor/base";
@@ -27,6 +27,7 @@ export class Base extends Thor {
     return false;
   }
 
+  /** @inventedArm replaceAll — PERMANENT */
   static namespace(name: string | null = null): string {
     const thor = Thor as unknown as ThorClass;
     if (name != null) {
@@ -36,7 +37,8 @@ export class Base extends Thor {
         this._namespace = thor.namespace
           .call(this as unknown as ThorClass)
           .replace(/_command$/, "")
-          .replace(/:command:/, ":");
+          .replace(/:command:/, ":")
+          .replaceAll("_", "-");
       }
       return this._namespace;
     }
@@ -70,7 +72,7 @@ export class Base extends Thor {
     if (command != null) {
       return command
         .formattedUsage(this as unknown as ThorClass)
-        .replace(new RegExp(`^${this.namespace()}:(\\w+)`, "gm"), (_, name: string) =>
+        .replace(new RegExp(`^${this.namespace()}:([\\w-]+)`, "gm"), (_, name: string) =>
           this.executable(name),
         );
     } else {
@@ -78,10 +80,11 @@ export class Base extends Thor {
     }
   }
 
+  /** @inventedArm kebabCase — PERMANENT */
   static commandName(): string {
     if (!Object.hasOwn(this, "_commandName")) {
       const command = this.name.split("::").at(-1)!;
-      this._commandName = underscore(command.replace(/Command$/, ""));
+      this._commandName = kebabCase(command.replace(/Command$/, ""));
     }
     return this._commandName!;
   }
@@ -98,7 +101,7 @@ export class Base extends Thor {
       klass.methodAdded(this.commandName());
       return true;
     } else {
-      if (!Object.hasOwn(this, "_usage") || klass._usage == null) klass._usage = meth;
+      if (!Object.hasOwn(this, "_usage") || klass._usage == null) klass._usage = kebabCase(meth);
       if (!Object.hasOwn(this, "_desc") || klass._desc == null) klass._desc = "";
 
       return (Thor as unknown as ThorClass).createCommand.call(klass, meth);

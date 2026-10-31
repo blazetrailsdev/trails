@@ -12,7 +12,7 @@ const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory>>> = {
   server: async () => (await import("../commands/server.js")).serverCommand,
   db: async () => (await import("../commands/db.js")).dbCommand,
   routes: async () => (await import("../commands/routes.js")).routesCommand,
-  unused_routes: async () => (await import("../commands/unused-routes.js")).unusedRoutesCommand,
+  "unused-routes": async () => (await import("../commands/unused-routes.js")).unusedRoutesCommand,
   console: async () => (await import("../commands/console.js")).consoleCommand,
   dbconsole: async () => (await import("../commands/dbconsole.js")).dbconsoleCommand,
   destroy: async () => (await import("../commands/destroy.js")).destroyCommand,

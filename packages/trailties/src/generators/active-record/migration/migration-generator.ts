@@ -1,7 +1,7 @@
 import { File, getFs, rbFBinding, strNew, TSE } from "@blazetrails/ruby-compat";
 import type { GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
-import { migrationTemplate } from "../../migration.js";
+import { createMigration, migrationTemplate, type MigrationTemplateHost } from "../../migration.js";
 import { nextMigrationNumber } from "../migration.js";
 import { GeneratedAttribute } from "../../generated-attribute.js";
 import {
@@ -53,6 +53,7 @@ export class MigrationGenerator extends NamedBase {
   static nextMigrationNumber = nextMigrationNumber;
 
   private migrationTemplate = "migration.ts";
+  createMigration = createMigration;
   private migrationAction: string | undefined;
   private joinTables: string[] = [];
 
@@ -67,8 +68,8 @@ export class MigrationGenerator extends NamedBase {
     this.setLocalAssignsBang(underscore(name));
     const source = File.expandPath(await this.findInSourcePaths(this.migrationTemplate));
 
-    await migrationTemplate(
-      this,
+    await migrationTemplate.call(
+      this as unknown as MigrationTemplateHost,
       async () => {
         const erb = new TSE(strNew(Array.from(await getFs().readFile(source))), {
           trimMode: "-",
