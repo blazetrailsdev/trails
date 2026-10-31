@@ -10,6 +10,7 @@ describe("Application (trails)", () => {
     const app = new Application();
     Rake.application = app;
     app.options.jobStats = true;
+    app.options.threadPoolSize = 2;
     Task.defineTask("a");
     Task.defineTask("b");
     MultiTask.defineTask({ c: ["a", "b"] });

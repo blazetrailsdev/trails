@@ -730,19 +730,18 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "`multitask` without a thread pool (tasks RFC 0211-rake-gem-port): Node's " +
+      "`multitask` without worker threads (tasks RFC 0211-rake-gem-port): Node's " +
       "event loop already runs a `MultiTask`'s awaited prerequisites concurrently, " +
-      "so `Rake::ThreadPool` (thread_pool.rb), `Rake::Promise` (promise.rb) and " +
-      "`Rake::ThreadHistoryDisplay` (thread_history_display.rb) are not ported, " +
+      "so `Rake::ThreadPool` (thread_pool.rb) keeps only `future`, `join` and " +
+      "`statistics`, a future is a native promise rather than `Rake::Promise` " +
+      "(promise.rb), `Rake::ThreadHistoryDisplay` (thread_history_display.rb) is " +
+      "not ported, " +
       "nor is cpu_counter.rb's `unless method_defined?(:count)` fallback, which " +
       "`Etc.nprocessors` keeps from loading. PERMANENT.",
     names: [
       "initialize",
-      "future",
-      "join",
       "gather_history",
       "history",
-      "statistics",
       "process_queue_item",
       "safe_thread_count",
       "start_thread",

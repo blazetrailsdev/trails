@@ -1,4 +1,5 @@
 import {
+  block,
   AsyncEnumerable,
   cmp,
   extend,
@@ -256,23 +257,18 @@ export class Task {
     }
   }
 
-  /** @inventedArm allSettled — PERMANENT */
   async invokePrerequisitesConcurrently(
     taskArgs: TaskArguments,
     invocationChain: InvocationChain<Task>,
   ): Promise<void> {
     const futures = (await this.prerequisiteTasks()).map((p) => {
       const prereqArgs = taskArgs.newScope(p.argNames);
-      const stats = this.application.threadPool;
-      stats.totalThreadsInPlay += 1;
-      stats.activeThreads += 1;
-      stats.maxActiveThreads = Math.max(stats.maxActiveThreads, stats.activeThreads);
-      return p.invokeWithCallChain(prereqArgs, invocationChain).finally(() => {
-        stats.activeThreads -= 1;
-      });
+      return this.application.threadPool.future(
+        p,
+        block((r: Task) => r.invokeWithCallChain(prereqArgs, invocationChain)),
+      );
     });
-    const values = await Promise.allSettled(futures);
-    for (const value of values.reverse()) if (value.status === "rejected") throw value.reason;
+    for (const future of futures.reverse()) await future;
   }
 
   /** @internal */

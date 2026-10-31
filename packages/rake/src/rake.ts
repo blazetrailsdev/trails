@@ -23,6 +23,7 @@ export { FileTask } from "./file-task.js";
 export { InvocationChain } from "./invocation-chain.js";
 export { InvocationExceptionMixin } from "./invocation-exception-mixin.js";
 export { LATE, LateTime } from "./late-time.js";
+export { ThreadPool } from "./thread-pool.js";
 export { LinkedList } from "./linked-list.js";
 export { MultiTask } from "./multi-task.js";
 export { NameSpace } from "./name-space.js";
