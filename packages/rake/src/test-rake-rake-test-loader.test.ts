@@ -1,4 +1,4 @@
-import { File, FileUtils, SystemExit, rbArgv, rbFLoad } from "@blazetrails/ruby-compat";
+import { File, FileUtils, LoadError, SystemExit, rbArgv, rbFLoad } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { captureOutput, useApplicationTestCase } from "./test-helpers/application.js";
 
@@ -48,11 +48,14 @@ describe("TestRakeRakeTestLoader", () => {
   });
 
   it("load error raised explicitly", async () => {
-    await File.writeAsync("error_test.js", "throw new Error('explicitly raised');");
+    Object.assign(globalThis, { LoadError });
+    await File.writeAsync("error_test.js", "throw new LoadError('explicitly raised');");
     const [out, err] = await captureOutput(async () => {
       argvReplace("error_test.js");
 
-      await expect(load()).rejects.toThrow("explicitly raised");
+      const exc = await load().catch((e: unknown) => e);
+      expect(exc).toBeInstanceOf(LoadError);
+      expect((exc as LoadError).message).toBe("explicitly raised");
     });
     expect(out).toBe("");
     expect(err).toBe("");

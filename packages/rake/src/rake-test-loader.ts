@@ -4,9 +4,12 @@ import { FileList } from "./file-list.js";
 const argv: string[] = [];
 for (const argument of rbArgv()) {
   if (/^-I/.test(argument)) {
-    for (const path of argument.slice(2).split(File.PATH_SEPARATOR)) {
-      LOAD_PATH.push(File.expandPath(path));
-    }
+    LOAD_PATH.unshift(
+      ...argument
+        .slice(2)
+        .split(File.PATH_SEPARATOR)
+        .map((path) => File.expandPath(path)),
+    );
   } else if (/^-/m.test(argument)) {
     argv.push(argument);
   } else if (/\*/.test(argument)) {

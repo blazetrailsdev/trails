@@ -45,18 +45,24 @@ describe("DestroyCommand", () => {
 
     process.chdir(tmpDir);
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    await Generators.invoke("scaffold", ["Post", "title:string"], {
-      destinationRoot: tmpDir,
-    });
+    const generateOutput = await capture(":stdout", () =>
+      Generators.invoke("scaffold", ["Post", "title:string"], {
+        destinationRoot: tmpDir,
+      }),
+    );
+    expect(generateOutput).toMatch(/invoke\s+resource_route/);
     const generated = listFiles(tmpDir);
     expect(generated).toContain("app/views/posts/index.html.tse");
     expect(generated.some((f) => /^db\/migrate\/\d+_create_posts\.ts$/.test(f))).toBe(true);
     expect(fs.readFileSync(path.join(tmpDir, "config", "routes.ts"), "utf-8")).not.toBe(routes);
 
-    await destroyCommand()
-      .exitOverride()
-      .parseAsync(["scaffold", "Post", "title:string"], { from: "user" });
+    const destroyOutput = await capture(":stdout", () =>
+      destroyCommand()
+        .exitOverride()
+        .parseAsync(["scaffold", "Post", "title:string"], { from: "user" }),
+    );
     log.mockRestore();
+    expect(destroyOutput).toMatch(/invoke\s+resource_route/);
 
     expect(listFiles(tmpDir)).toEqual(before);
     expect(fs.readFileSync(path.join(tmpDir, "config", "routes.ts"), "utf-8")).toBe(routes);

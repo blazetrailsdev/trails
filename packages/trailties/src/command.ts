@@ -25,7 +25,7 @@ export async function invoke(fullNamespace: string, args: string[] = []): Promis
   const command = await findByNamespace(namespace, commandName);
 
   if (command && "perform" in command) {
-    if (commandName in (command as unknown as ThorClass).allCommands()) {
+    if (Object.hasOwn((command as unknown as ThorClass).allCommands(), commandName)) {
       await command.perform(commandName, args, {});
     } else {
       await invokeRake(fullNamespace, args);
@@ -50,8 +50,8 @@ export async function findByNamespace(
   await lookup(lookups);
 
   const klasses = new Map(subclasses().map((klass) => [klass.namespace(), klass]));
-  const klass = lookups.find((lookup) => klasses.has(lookup));
-  if (klass !== undefined) return klasses.get(klass);
+  const first = lookups.find((lookup) => klasses.has(lookup));
+  if (first !== undefined) return klasses.get(first);
 
   const namespaces = new Map(createProgram().commands.map((c) => [c.name(), c]));
   const found = lookups.find((lookup) => namespaces.has(lookup));

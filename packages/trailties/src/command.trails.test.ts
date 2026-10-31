@@ -1,7 +1,7 @@
-import type { Command as Program } from "commander";
-import { describe, it, expect, vi } from "vitest";
+import { Command as Program } from "commander";
+import { describe, it, expect, onTestFinished, vi } from "vitest";
 import { createProgram } from "./cli.js";
-import { findByNamespace } from "./command.js";
+import { findByNamespace, invoke } from "./command.js";
 import { lookupBang, subclasses } from "./command/behavior.js";
 
 const loaded = vi.hoisted(() => [] as string[]);
@@ -39,6 +39,22 @@ describe("Rails::Command.find_by_namespace", () => {
     const { UnusedRoutesCommand } = await import("./commands/unused-routes.js");
     expect(await findByNamespace("unused_routes", "unused_routes")).toBe(UnusedRoutesCommand);
     expect(subclasses()).toContain(UnusedRoutesCommand);
+  }, 30_000);
+
+  it("performs a Base command only for a name in all_commands", async () => {
+    const { UnusedRoutesCommand } = await import("./commands/unused-routes.js");
+    const perform = vi.spyOn(UnusedRoutesCommand, "perform").mockResolvedValue();
+    const rake = vi.spyOn(Program.prototype, "parseAsync").mockResolvedValue(createProgram());
+    onTestFinished(() => (perform.mockRestore(), rake.mockRestore()));
+
+    await invoke("unused_routes", ["-g", "x"]);
+    expect(perform).toHaveBeenCalledWith("unused_routes", ["-g", "x"], {});
+    expect(rake).not.toHaveBeenCalled();
+
+    perform.mockClear();
+    await invoke("unused_routes:constructor");
+    expect(perform).not.toHaveBeenCalled();
+    expect(rake).toHaveBeenCalled();
   }, 30_000);
 
   it("finds nothing for an unknown namespace", async () => {

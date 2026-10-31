@@ -22,16 +22,18 @@ describe("TestTask", () => {
   it("puts the -I libs on LOAD_PATH before the loader's test files load", async () => {
     const argv = [...rbArgv()];
     rbArgv().splice(0, rbArgv().length, `-Ilib${File.PATH_SEPARATOR}test`, "-v");
-    const loaded = LOAD_PATH.length;
+    const existing = [...LOAD_PATH];
+    LOAD_PATH.push("/existing");
     try {
       await rbFLoad(new URL("./rake-test-loader.ts", import.meta.url).pathname);
-      expect(LOAD_PATH.slice(loaded)).toEqual([
+      expect(LOAD_PATH.slice(0, 2)).toEqual([
         File.expandPath("lib", Dir.pwd()),
         File.expandPath("test", Dir.pwd()),
       ]);
+      expect(LOAD_PATH.at(-1)).toBe("/existing");
       expect(rbArgv()).toEqual(["-v"]);
     } finally {
-      LOAD_PATH.length = loaded;
+      LOAD_PATH.splice(0, LOAD_PATH.length, ...existing);
       rbArgv().splice(0, rbArgv().length, ...argv);
     }
   });
