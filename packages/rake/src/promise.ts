@@ -15,26 +15,22 @@ export class Promise<T = unknown> {
   async value(): globalThis.Promise<T> {
     if (!this.isComplete()) {
       while (this._mutex != null) await this._mutex;
-      await this.lockedChore();
+      this._mutex = this.chore().finally(() => {
+        this._mutex = null;
+      });
+      await this._mutex;
     }
     if (this.isError()) throw this._error;
     return this._result as T;
   }
 
   async work(): globalThis.Promise<void> {
-    if (this._mutex == null) await this.lockedChore();
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  private lockedChore(): globalThis.Promise<void> {
-    const mutex = this.chore().finally(() => {
-      this._mutex = null;
-    });
-    this._mutex = mutex;
-    return mutex;
+    if (this._mutex == null) {
+      this._mutex = this.chore().finally(() => {
+        this._mutex = null;
+      });
+      await this._mutex;
+    }
   }
 
   /** @internal */
