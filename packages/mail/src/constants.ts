@@ -15,6 +15,7 @@ export const UNDERSCORE = "_";
 export const HYPHEN = "-";
 export const CRLF = "\r\n";
 export const LF = "\n";
+export const SPACE = " ";
 
 export const Q_VALUES = ["Q", "q"];
 export const B_VALUES = ["B", "b"];
