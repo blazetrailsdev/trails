@@ -40,20 +40,16 @@ describe("TestBacktraceSuppression", () => {
 describe("TestRakeBacktrace", () => {
   useApplicationTestCase();
   useRubyRunner();
-
   beforeEach((ctx) => {
     if (Backtrace.SUPPRESS_PATTERN.test(Dir.pwd())) ctx.skip();
   });
-
   async function invoke(...args: string[]): Promise<string> {
     await rake(...args);
     return runner.err;
   }
-
   function assertSomethingMatches(pattern: RegExp, lines: string[]): void {
     expect(lines.find((ln) => pattern.test(ln))).toMatch(pattern);
   }
-
   function rakefileFrame(line: number): RegExp {
     return new RegExp(`^at .*${regexpEscape(Dir.pwd())}/Rakefile\\.ts\\?\\d+:${line}:`, "i");
   }

@@ -348,6 +348,7 @@ describe("TestRakeFunctional", () => {
 
   // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
   it.skip("signal propagation in tests", () => {});
+  // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
   it.skip("failing test sets exit status", () => {});
 
   it("stand alone filelist", async () => {
