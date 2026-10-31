@@ -164,7 +164,7 @@ export async function awaitingAssignment<R, K = never>(
   } finally {
     assignmentCapture = null;
   }
-  await capture.assigned;
   await yielded;
+  await capture.assigned;
   return record;
 }

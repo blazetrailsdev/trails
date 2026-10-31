@@ -46,6 +46,15 @@ describe("ActiveStorage::Attached::One", () => {
     expect(attached).toBeDefined();
   });
 
+  it("create with a block rejects with the attachment writer's error", async () => {
+    let yielded = false;
+    const created = Member.createBang({ name: "Jason", avatar: Symbol.for("foo") }, () => {
+      yielded = true;
+    });
+    await expect(created).rejects.toThrow(/Could not find or build blob/);
+    expect(yielded).toBe(false);
+  });
+
   it("a relation create awaits the attachment writer", async () => {
     const created = (await Member.where({ name: "Jason" }).createBang({
       avatar: hash(),
