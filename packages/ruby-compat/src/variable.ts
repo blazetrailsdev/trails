@@ -250,7 +250,9 @@ export function rbConstMissing(klass: object): void {
  */
 export function rbModConstMissing(klass: { name?: string } | null, name: string): never {
   if (klass != null && klass !== globalThis && klass !== Object) {
-    throw new NameError(`uninitialized constant ${klass.name}::${name}`, name, { receiver: klass });
+    throw new NameError(`uninitialized constant ${rbModName(klass) ?? klass.name}::${name}`, name, {
+      receiver: klass,
+    });
   } else {
     throw new NameError(`uninitialized constant ${name}`, name, { receiver: Object });
   }
@@ -263,12 +265,13 @@ export function rbModConstMissing(klass: { name?: string } | null, name: string)
  * then its ancestors. The superclasses are the prototype chain `in` reads, the
  * included modules are the {@link rbModAncestors} entries no prototype link
  * carries, and `rb_cObject`, where the walk ends, is the table
- * `registerConstant` fills. A miss goes to `rb_const_missing`
+ * `registerConstant` fills, skipped under `exclude` as `rb_const_get_from`
+ * (`vendor/ruby/v3.3.11/variable.c:3204`) skips it. A miss goes to `rb_const_missing`
  * (`vendor/ruby/v3.3.11/variable.c:2346`), which sends `const_missing` to `klass`.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbConstGet(klass: object, id: string): unknown {
+export function rbConstGet(klass: object, id: string, exclude = false): unknown {
   if (id in klass) {
     let tmp: object | null = klass;
     while (tmp !== null && !Object.hasOwn(tmp, id)) tmp = Object.getPrototypeOf(tmp) as object;
@@ -283,7 +286,7 @@ export function rbConstGet(klass: object, id: string): unknown {
       }
     }
   }
-  if (Object.hasOwn(tbl, id)) return tbl[id];
+  if (!exclude && Object.hasOwn(tbl, id)) return tbl[id];
   const { constMissing } = klass as { constMissing?: (name: string) => unknown };
   if (constMissing !== undefined) return constMissing.call(klass, id);
   return rbModConstMissing(klass, id);
@@ -362,35 +365,38 @@ export function rbModConstants(mod: object, inherit: unknown = true): string[] {
 
 /**
  * `rb_mod_const_get` (`vendor/ruby/v3.3.11/object.c:2423`), `Module#const_get`
- * of a name that may be a `::` path. The first segment is read by
- * {@link rbConstGet}; each later one is read from the namespace before it
- * alone (`rb_const_get_0` with `exclude`), and a miss raises `NameError`
- * naming that segment. The top-level table seats a constant under its full
- * path and not every prefix of it, so a seated path or prefix is read whole,
- * as {@link rbPathToClass} reads it.
+ * of a name that may be a `::` path, walking the namespaces by segment. A
+ * leading `::` starts at `Object`, and a name that is not a constant path
+ * raises `NameError`. The first segment is {@link rbConstGet}; each later one
+ * is `rb_const_get_from`, which skips the top level. A value that is not a
+ * namespace raises `TypeError`. A full-path `registerConstant` seat, and a class
+ * only a generated table holds, are read where the walk reaches them, until
+ * `delete-register-constant-and-class-path-api` removes both.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModConstGet(mod: object, name: string): unknown {
-  if (Object.hasOwn(tbl, name)) return tbl[name];
+  const qualified = name.startsWith("::");
+  const cpath = qualified ? name.slice(2) : name;
+  const parts = cpath.split("::");
+  if (!parts.every((part) => /^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(part))) {
+    throw new NameError(`wrong constant name ${name}`, name);
+  }
+  if (qualified) mod = Object;
+  if (Object.hasOwn(tbl, cpath)) return tbl[cpath];
   let path = "";
   let c: unknown = mod;
-  for (const [i, part] of name.split("::").entries()) {
-    path = i === 0 ? part : `${path}::${part}`;
-    if (i === 0) {
-      c = rbConstGet(mod, part);
-    } else if (Object.hasOwn(tbl, path)) {
-      c = tbl[path];
-    } else if (
-      c !== null &&
-      (typeof c === "object" || typeof c === "function") &&
-      Object.hasOwn(c, part)
-    ) {
-      rbConstWarnIfDeprecated(c, part);
-      c = (c as Record<string, unknown>)[part];
-    } else {
-      return rbModConstMissing(c as { name?: string } | null, part);
+  for (const [i, part] of parts.entries()) {
+    if (c === null || (typeof c !== "object" && typeof c !== "function")) {
+      throw new TypeError(`${path} does not refer to class/module`);
     }
+    path = i === 0 ? part : `${path}::${part}`;
+    if (Object.hasOwn(tbl, path)) {
+      c = tbl[path];
+      continue;
+    }
+    const generated = mod === Object && !(part in c) ? generatedClass(path) : undefined;
+    c = generated !== undefined ? generated : rbConstGet(c, part, i > 0);
   }
   return c;
 }

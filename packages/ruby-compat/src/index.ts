@@ -119,6 +119,7 @@ export {
   isNil,
   rbCBasicObject,
   TopLevel,
+  type ConstantTable,
   type TopLevelConstants,
 } from "./object.js";
 export {

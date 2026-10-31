@@ -137,6 +137,9 @@ export interface TopLevelConstants {
   Object?: ObjectConstructor;
 }
 
+/** @noRailsEquivalent PERMANENT */
+export interface ConstantTable {} // eslint-disable-line @typescript-eslint/no-empty-object-type
+
 /**
  * Ruby's top-level `Object`, whose constant table is
  * `RCLASS_CONST_TBL(rb_cObject)` (`vendor/ruby/v3.3.11/internal/class.h:95`). It
