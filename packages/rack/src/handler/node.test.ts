@@ -209,6 +209,20 @@ describe("Rack::Handler::Node", () => {
     expect(closed).toBe(true);
   });
 
+  it("answers 500 when the app raises on an ordinary request", async () => {
+    await serving(
+      async () => {
+        throw new Error("boom");
+      },
+      async (url) => {
+        const response = await fetch(`${url}/up`);
+
+        expect(response.status).toBe(500);
+        expect(await response.text()).toBe("");
+      },
+    );
+  });
+
   it("sends an array body with the content-length of its bytes", async () => {
     const app: RackApp = async () => [
       200,

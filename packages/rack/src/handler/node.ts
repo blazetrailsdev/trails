@@ -96,8 +96,21 @@ export class Node {
       env[RACK_IS_HIJACK] = socket != null;
       if (env[RACK_IS_HIJACK]) env[RACK_HIJACK] = release;
 
+      let response: RackResponse;
       try {
-        const [status, headers, body] = await (rbProcCall(this.app, env) as Promise<RackResponse>);
+        response = await (rbProcCall(this.app, env) as Promise<RackResponse>);
+      } catch (error) {
+        stderr.write(
+          `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+        );
+        if (hijacked) return;
+        res.writeHead(500, { "content-length": "0" });
+        res.end();
+        return;
+      }
+
+      try {
+        const [status, headers, body] = response;
         try {
           if (hijacked) return;
           const partial = headers[RACK_HIJACK];
