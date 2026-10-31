@@ -28,7 +28,6 @@ import { DeleteOne } from "./changes/delete-one.js";
 import { Many } from "./many.js";
 import { One } from "./one.js";
 import type { HasManyAttachedReflection, HasOneAttachedReflection } from "../reflection.js";
-import { ReflectionExtension } from "../reflection.js";
 
 interface ModelHost {
   _activeStorageAttached?: { [k: string]: One | Many } | null;
@@ -128,7 +127,7 @@ function hasOneAttached(
     this,
   ) as HasOneAttachedReflection;
   if (blk) blk(reflection);
-  ReflectionExtension.addAttachmentReflection(this, name, reflection);
+  Reflection.addAttachmentReflection!(this, name, reflection);
 }
 
 function hasManyAttached(
@@ -223,7 +222,7 @@ function hasManyAttached(
     this,
   ) as HasManyAttachedReflection;
   if (blk) blk(reflection);
-  ReflectionExtension.addAttachmentReflection(this, name, reflection);
+  Reflection.addAttachmentReflection!(this, name, reflection);
 }
 
 export const ClassMethods = { hasOneAttached, hasManyAttached };

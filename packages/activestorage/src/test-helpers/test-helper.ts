@@ -53,7 +53,7 @@ export class User extends Base {
       });
       attachable.variant("method", {
         resizeToLimit: [3, 3],
-        preprocessed: "isShouldPreprocessed",
+        preprocessed: ":isShouldPreprocessed",
       });
     });
     attached.hasOneAttached("introVideo");
@@ -74,7 +74,7 @@ export class User extends Base {
       });
       attachable.variant("method", {
         resizeToLimit: [3, 3],
-        preprocessed: "isShouldPreprocessed",
+        preprocessed: ":isShouldPreprocessed",
       });
     });
     attached.hasOneAttached("resume", {}, (attachable) => {

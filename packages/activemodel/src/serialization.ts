@@ -252,8 +252,8 @@ async function resolveIncludeAsync(record: SerializationRecord, name: string): P
     return raw;
   }
   if (raw !== null && raw !== undefined) {
-    const proxy = raw as { load?: () => unknown };
-    if (typeof proxy.load === "function") await proxy.load();
+    const proxy = raw as { isAttached?: unknown; load?: () => unknown };
+    if (typeof proxy.isAttached === "function") await proxy.load?.();
     return raw;
   }
 

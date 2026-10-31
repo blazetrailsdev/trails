@@ -1572,6 +1572,7 @@ export class RuntimeReflection extends AbstractReflection {
 
 interface ReflectionModule {
   [included](base: object): void;
+  addAttachmentReflection?: (model: typeof Base, name: string, reflection: MacroReflection) => void;
   create?: typeof create;
   reflectionClassFor?: typeof reflectionClassFor;
 }

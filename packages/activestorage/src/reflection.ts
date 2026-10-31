@@ -1,6 +1,6 @@
 import { MacroReflection, type Base } from "@blazetrails/activerecord";
 import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
-import { included, rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import { NamedVariant } from "./named-variant.js";
 
 export class HasAttachedReflection extends MacroReflection {
@@ -60,14 +60,13 @@ export const ClassMethods = {
   },
 
   reflectOnAttachment(this: AttachmentHost, attachment: string): HasAttachedReflection | null {
-    return this.attachmentReflections[attachment] ?? null;
+    const reflections = this.attachmentReflections;
+    return Object.hasOwn(reflections, attachment) ? reflections[attachment] : null;
   },
 };
 
-export const ActiveRecordExtensions = {
-  [included](klass: typeof Base): void {
-    classAttribute.call(klass, "attachmentReflections", { instanceWriter: false, default: {} });
-  },
-} as unknown as { ClassMethods: typeof ClassMethods };
+export const ActiveRecordExtensions = { ClassMethods };
 extend(ActiveRecordExtensions, Concern);
-ActiveRecordExtensions.ClassMethods = ClassMethods;
+Concern.included.call(ActiveRecordExtensions as never, null, function (this: typeof Base) {
+  classAttribute.call(this, "attachmentReflections", { instanceWriter: false, default: {} });
+});

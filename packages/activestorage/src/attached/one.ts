@@ -44,8 +44,8 @@ export class One extends Attached {
     await this.attachment;
   }
 
-  isBlank(): Promise<boolean> {
-    return this.isAttached().then((attached) => !attached);
+  async isBlank(): Promise<boolean> {
+    return !(await this.isAttached());
   }
 
   async attach(attachable: unknown): Promise<this | null> {

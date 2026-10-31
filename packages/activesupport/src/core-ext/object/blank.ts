@@ -136,7 +136,6 @@ export function isBlank(value: unknown): boolean {
   const blank = (value as { isBlank?: unknown }).isBlank;
   if (typeof blank === "function" && !isAsyncFunction(blank)) {
     const result: unknown = (blank as () => unknown).call(value);
-    if (result instanceof Promise) return result as unknown as boolean;
     return result != null && result !== false;
   }
   const empty = (value as { isEmpty?: unknown }).isEmpty ?? (value as { empty?: unknown }).empty;

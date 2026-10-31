@@ -66,8 +66,9 @@ export class Many extends Attached {
     await this.associationAttachments;
   }
 
-  isBlank(): Promise<boolean> {
-    return this.isAttached().then((attached) => !attached);
+  /** @noRailsEquivalent PERMANENT */
+  async isBlank(): Promise<boolean> {
+    return !(await this.isAttached());
   }
 
   async isAttached(): Promise<boolean> {

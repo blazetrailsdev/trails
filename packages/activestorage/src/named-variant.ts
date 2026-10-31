@@ -12,8 +12,8 @@ export class NamedVariant {
 
   isPreprocessed(record: unknown): unknown {
     const preprocessed = this.preprocessed;
-    if (typeof preprocessed === "string") {
-      return rbFSend(record as object, preprocessed);
+    if (typeof preprocessed === "string" && preprocessed.startsWith(":")) {
+      return rbFSend(record as object, preprocessed.slice(1));
     } else if (typeof preprocessed === "function") {
       return rbProcCall(preprocessed, record);
     } else {

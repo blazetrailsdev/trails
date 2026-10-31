@@ -372,6 +372,7 @@ export class Delegation {
     return withRecords(this, (records) => RECORD_DELEGATES.toSentence(records, options) as string);
   }
 
+  /** @inventedArm if — PERMANENT */
   asJson(this: DelegationHost, options?: SerializeOptions): unknown[] | Promise<unknown[]> {
     const hashes = withRecords(
       this,
