@@ -7,8 +7,8 @@ import { rbInspect, rbObjDup, rbObjId, strip } from "@blazetrails/ruby-compat";
 export class Address {
   /** @internal */
   private _parsed = false;
-  /** @internal */ // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _data: any = null;
+  /** @internal */
+  private _data: InstanceType<typeof AddressListsParser.AddressStruct> | null = null;
   /** @internal */
   private _displayName: string | null = null;
   /** @internal */
@@ -24,7 +24,7 @@ export class Address {
   }
 
   get raw(): string {
-    return this._data.raw;
+    return this._data!.raw as string;
   }
 
   format(outputType = "decode"): string {
@@ -72,7 +72,7 @@ export class Address {
     if (!this._parsed) this.parse();
     const local = this.getLocal();
     if (local == null) return null;
-    return Encodings.decodeEncode(`${this._data.obsDomainList ?? ""}${strip(local)}`, outputType);
+    return Encodings.decodeEncode(`${this._data!.obsDomainList ?? ""}${strip(local)}`, outputType);
   }
 
   domain(outputType = "decode"): string | null {
@@ -116,7 +116,7 @@ export class Address {
   }
 
   get group(): string | null {
-    return this._data?.group ?? null;
+    return (this._data?.group ?? null) as string | null;
   }
 
   /** @internal */
@@ -150,7 +150,7 @@ export class Address {
     const comments = this.comments;
     if (!Utilities.isBlank(comments)) {
       for (const comment of comments!) {
-        if (this._data.domain != null && this._data.domain.includes(`(${comment})`)) {
+        if (this.getDomain()?.includes(`(${comment})`)) {
           value = value!.replaceAll(`(${comment})`, Constants.EMPTY);
         }
       }
@@ -162,7 +162,7 @@ export class Address {
   private getDisplayName(): string | null {
     let str: string | null = null;
     if (this._data != null && this._data.displayName != null) {
-      str = this.stripAllComments(this._data.displayName);
+      str = this.stripAllComments(this._data.displayName as string);
     } else if (this._data != null && this._data.comments != null && this._data.domain != null) {
       str = this.stripDomainComments(this.formatComments());
     }
@@ -197,16 +197,16 @@ export class Address {
 
   /** @internal */
   private getLocal(): string | null {
-    return this._data?.local ?? null;
+    return (this._data?.local ?? null) as string | null;
   }
 
   /** @internal */
   private getDomain(): string | null {
-    return this._data?.domain ?? null;
+    return (this._data?.domain ?? null) as string | null;
   }
 
   /** @internal */
   private getComments(): string[] | null {
-    return this._data?.comments ?? null;
+    return (this._data?.comments ?? null) as string[] | null;
   }
 }
