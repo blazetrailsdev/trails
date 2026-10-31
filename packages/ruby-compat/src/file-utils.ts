@@ -1473,8 +1473,13 @@ export class FileUtils {
    * arm under `preserve` alone and only for a symlink source.
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
-  static copyFile(src: string, dest: string, preserve = false, dereference = true): void {
-    const ent = new Entry_(src, null, dereference);
+  static copyFile(
+    src: string | { toPath(): string },
+    dest: string,
+    preserve = false,
+    dereference = true,
+  ): void {
+    const ent = new Entry_(typeof src === "string" ? src : src.toPath(), null, dereference);
     ent.copyFile(dest);
     if (preserve) ent.copyMetadata(dest);
   }

@@ -31,7 +31,7 @@ describe("ActiveStorage::FixtureSetTest", () => {
     expect(blob.service.name).toBe("local");
     await blob.open({}, async (file) => {
       const fixture = new FixtureSet().fileFixture("racecar.jpg");
-      expect(await IO.binreadAsync(file.path()!)).toEqual(await IO.binreadAsync(fixture));
+      expect(await IO.binreadAsync(file.path()!)).toEqual(await IO.binreadAsync(fixture.toPath()));
     });
   }, 30_000);
 

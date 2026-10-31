@@ -1,7 +1,7 @@
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { FileFixtures } from "@blazetrails/activesupport/testing/file-fixtures";
 import { Base } from "@blazetrails/activerecord";
-import { include, IO, StringIO, type Included } from "@blazetrails/ruby-compat";
+import { include, type Included, type Pathname } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import { Blob } from "./blob.js";
 
@@ -9,12 +9,12 @@ type Attributes = { [k: string]: unknown };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface FixtureSet extends Included<typeof FileFixtures> {
-  fileFixturePath: string | null;
+  fileFixturePath: string | Pathname | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class FixtureSet {
-  declare static fileFixturePath: string | null;
+  declare static fileFixturePath: string | Pathname | null;
 
   static generateUniqueSecureToken = Base.generateUniqueSecureToken;
 
@@ -28,11 +28,8 @@ export class FixtureSet {
     );
   }
 
-  /** @missingRailsCall open — PERMANENT */
   async prepare(instance: Blob, attributes: Attributes = {}): Promise<string> {
-    const io = new StringIO(
-      (await IO.binreadAsync(this.fileFixture(instance.filename.toString())))!,
-    );
+    const io = this.fileFixture(instance.filename.toString()).open();
     instance.unfurl(io);
     instance.assignAttributes(attributes);
     await instance.uploadWithoutUnfurling(io);
