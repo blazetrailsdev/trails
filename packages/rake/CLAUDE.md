@@ -35,3 +35,8 @@ and an ES import does not read `$LOAD_PATH`, so `-I` is dropped and `lib_path`
 stays ported with no caller. The `:direct` loader's `-e` program is the
 JS spelling of Ruby's, and `:testrb` stays Rake's string, since `testrb` has no
 Node counterpart. The default `pattern` keeps `test/test*.rb`.
+
+`file_list`'s `@test_files.to_a` (`testtask.rb:134-145`) keeps an
+`Array.isArray` arm: a JS Array answers no `toA`, a `FileList`'s is async
+(§ "FileList#to_ary reads a resolved list"), and `rbFArray` reads `to_ary`,
+which raises on a pending list, so no one call covers both receivers.
