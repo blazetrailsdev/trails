@@ -19,15 +19,9 @@ export abstract class ImageAnalyzer<I extends Dimensions = Dimensions> extends A
     });
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @internal */
   protected abstract readImage(block: (image: I) => Promise<Metadata>): Promise<Metadata>;
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @internal */
   protected abstract isRotatedImage(image: I): boolean | Promise<boolean>;
 }
