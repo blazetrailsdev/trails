@@ -4,6 +4,7 @@ import {
   File,
   FileUtils,
   NoMethodError,
+  type Pathname,
   RuntimeError,
   StringIO,
   Tempfile,
@@ -43,7 +44,7 @@ export class UploadedFile {
   contentType: string | null;
 
   constructor(
-    content: StringIO<string | Uint8Array> | string,
+    content: StringIO<string | Uint8Array> | string | Pathname,
     contentType: string | null = "text/plain",
     binary: boolean = false,
     { originalFilename = null }: { originalFilename?: string | null } = {},
@@ -108,7 +109,7 @@ export class UploadedFile {
     this.tempfile = stringio;
   }
 
-  private initializeFromFilePath(path: string): void {
+  private initializeFromFilePath(path: string | Pathname): void {
     if (!File.isExist(path)) throw new RuntimeError(`${path} file does not exist`);
 
     this.originalFilename ??= File.basename(path);

@@ -64,7 +64,7 @@ function chompdirsep(path: string): string {
   return path.slice(0, end);
 }
 
-type FileJoinArg = string | readonly FileJoinArg[];
+type FileJoinArg = string | { toPath(): string } | readonly FileJoinArg[];
 
 const joining = new Set<readonly FileJoinArg[]>();
 
@@ -90,7 +90,9 @@ function rbFileJoin(ary: readonly FileJoinArg[]): string {
     let tmp = ary[i];
     if (typeof tmp !== "string") {
       if (ary === tmp) throw new ArgumentError("recursive array");
-      tmp = fileInspectJoin(ary, tmp);
+      tmp = Array.isArray(tmp)
+        ? fileInspectJoin(ary, tmp as readonly FileJoinArg[])
+        : rbGetPath(tmp);
     }
     if (i !== 0) {
       const tail = chompdirsep(result);
@@ -991,8 +993,9 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.basename`
    * (`vendor/ruby/v3.3.11/file.c:4705`).
    */
-  static basename(fileName: string, suffix?: string): string {
-    const base = /^\/+$/.test(fileName) ? "/" : getPath().basename(fileName);
+  static basename(fileName: string | { toPath(): string }, suffix?: string): string {
+    const name = rbGetPath(fileName);
+    const base = /^\/+$/.test(name) ? "/" : getPath().basename(name);
     if (suffix === undefined) return base;
     if (suffix === ".*") {
       const extname = File.extname(base);

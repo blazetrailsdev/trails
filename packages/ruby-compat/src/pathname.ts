@@ -49,6 +49,10 @@ export class Pathname {
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:647` `path_open` */
+  open(): File;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:647` `path_open` */
+  open(...args: unknown[]): unknown;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:647` `path_open` */
   open(...args: unknown[]): unknown {
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as (file: File) => unknown) : undefined;
     const file = File as unknown as { open(fileName: string, ...rest: unknown[]): unknown };
@@ -57,6 +61,11 @@ export class Pathname {
     } else {
       return file.open(this.toPath(), ...args);
     }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:929` `path_size` */
+  size(): number {
+    return File.size(this._path);
   }
 
   private chopBasename(path: string): [string, string] | null {
