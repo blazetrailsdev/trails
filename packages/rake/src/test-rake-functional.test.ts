@@ -371,7 +371,7 @@ describe("TestRakeFunctional", () => {
   it("failing test sets exit status", async () => {
     await d.rakefileFailingTestTask();
     await rake();
-    expect(runner.exit!.exitstatus()).toBeGreaterThan(0);
+    expect(runner.exit!.exitstatus()! > 0).toBeTruthy();
   });
 
   it("stand alone filelist", async () => {
