@@ -836,7 +836,6 @@ export default defineConfig(
 
   {
     files: ["packages/thor/src/**/*.ts"],
-    ignores: ["packages/thor/src/test-helpers/build-templates.ts"],
     rules: {
       "blazetrails/thor-import-boundary": "error",
     },
@@ -1175,6 +1174,7 @@ export default defineConfig(
           allowDefaultProject: [
             "packages/actionview/types/tse-modules.d.ts",
             "packages/activerecord/scripts/materialize-model-declares.ts",
+            "packages/thor/build-templates.ts",
             "packages/activerecord/scripts/materialize-model-declares.test.ts",
             "packages/website/docs/.vitepress/config.ts",
             "vitest.config.ts",
