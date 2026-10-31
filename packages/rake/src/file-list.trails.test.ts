@@ -1,0 +1,79 @@
+import { describe, expect, it } from "vitest";
+import { Range } from "@blazetrails/ruby-compat";
+import { FileList } from "./file-list.js";
+
+const fl = () => new FileList().import(["a.c", "b.h", "c.c", "d.h"]);
+const later = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 0));
+
+describe("FileList delegation", () => {
+  it("delegates every Array instance method name", () => {
+    const names = `all? any? assoc at bsearch bsearch_index chain chunk chunk_while clear collect
+      collect! collect_concat combination compact compact! concat count cycle deconstruct delete
+      delete_at delete_if detect difference dig drop drop_while each each_cons each_entry
+      each_index each_slice each_with_index each_with_object empty? entries fetch fill filter
+      filter! filter_map find find_all find_index first flat_map flatten flatten! grep grep_v
+      group_by include? index inject insert intersect? intersection join keep_if last lazy length
+      map map! max max_by member? min min_by minmax minmax_by none? one? pack permutation pop
+      prepend product push rassoc reduce reject reject! repeated_combination repeated_permutation
+      replace reverse reverse! reverse_each rindex rotate rotate! sample select select! shift
+      shuffle shuffle! size slice slice! slice_after slice_before slice_when sort sort! sort_by
+      sort_by! sum take take_while tally to_h to_set transpose union uniq uniq! unshift values_at
+      zip`.split(/\s+/);
+    for (const name of names) {
+      const base = name.replace(/[?!]$/, "").replace(/_(\w)/g, (_m, c) => c.toUpperCase());
+      const cap = base[0].toUpperCase() + base.slice(1);
+      const ts = name.endsWith("?") ? `is${cap}` : name.endsWith("!") ? `${base}Bang` : base;
+      expect(FileList.DELEGATING_METHODS, name).toContain(ts);
+    }
+  });
+
+  it("answers the methods the closed table missed", async () => {
+    expect(await fl().eachSlice(3)).toEqual([["a.c", "b.h", "c.c"], ["d.h"]]);
+    expect(await fl().eachWithObject([] as string[], (f, m) => m.push(f))).toHaveLength(4);
+    expect(await fl().flatMap((f) => [f, f])).toHaveLength(8);
+    expect(await fl().sum("", async (f: string) => later(f[0]))).toEqual("abcd");
+    expect(await new FileList().import(["a", "a"]).tally()).toBeDefined();
+    expect(await fl().takeWhile((f) => later(f < "c"))).toEqual(["a.c", "b.h"]);
+    expect(await fl().pop(2)).toEqual(["c.c", "d.h"]);
+    expect(await fl().shift(1)).toEqual(["a.c"]);
+    expect(await fl().get(1, 2)).toEqual(["b.h", "c.c"]);
+    expect(await fl().get(new Range(1, 2))).toEqual(["b.h", "c.c"]);
+    expect(await fl().count((f: string) => later(f.endsWith(".c")))).toEqual(2);
+    expect(await fl().isAny((f: string) => later(f === "c.c"))).toBe(true);
+    expect(await fl().isAny(/\.z$/)).toBe(false);
+    expect(await fl().min((a: string, b: string) => b.localeCompare(a))).toEqual("d.h");
+    expect(await fl().max((a: string, b: string) => b.localeCompare(a))).toEqual("a.c");
+    expect(await fl().max(2)).toEqual(["d.h", "c.c"]);
+    expect(await (await fl().grep(/\.c$/, (f) => f.toUpperCase())).toA()).toEqual(["A.C", "C.C"]);
+    expect(await fl().inject((a: string, b: string) => a + b)).toEqual("a.cb.hc.cd.h");
+  });
+
+  it("returns self from an in-place method and mutates the list", async () => {
+    const f = fl();
+    expect(await f.keepIf((x) => later(x.endsWith(".c")))).toBe(f);
+    expect(await f.toA()).toEqual(["a.c", "c.c"]);
+    expect(await f.selectBang(() => true)).toBeNull();
+    expect(await f.reverseBang()).toBe(f);
+    expect(await f.sliceBang(0, 1)).toEqual(["c.c"]);
+    expect(await f.toA()).toEqual(["a.c"]);
+  });
+
+  it("answers the combinatoric and grouping arms", async () => {
+    const f = new FileList().import(["a", "b", "c"]);
+    expect(await f.combination(2)).toEqual([
+      ["a", "b"],
+      ["a", "c"],
+      ["b", "c"],
+    ]);
+    expect(await f.permutation(2)).toHaveLength(6);
+    expect(await f.repeatedCombination(2)).toHaveLength(6);
+    expect(await f.repeatedPermutation(2)).toHaveLength(9);
+    expect(await f.sliceWhen((a, b) => b === "c")).toEqual([["a", "b"], ["c"]]);
+    expect(await f.chunkWhile((a, b) => b !== "c")).toEqual([["a", "b"], ["c"]]);
+    expect(await f.chunk((x) => x === "c")).toEqual([
+      [false, ["a", "b"]],
+      [true, ["c"]],
+    ]);
+    expect(await f.bsearch((x) => x >= "b")).toEqual("b");
+  });
+});
