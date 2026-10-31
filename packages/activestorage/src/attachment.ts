@@ -3,14 +3,10 @@ import { delegate, delegateMissingTo, runLoadHooks } from "@blazetrails/activesu
 import { ArgumentError, block, fetch } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import type { Blob } from "./blob.js";
+import type { NamedVariant } from "./named-variant.js";
 import { Record } from "./record.js";
 
 type Transformations = string | { [k: string]: unknown };
-
-interface NamedVariant {
-  transformations: { [k: string]: unknown };
-  isPreprocessed(record: unknown): boolean;
-}
 
 interface AttachmentReflection {
   options?: { dependent?: unknown };

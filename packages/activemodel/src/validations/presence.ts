@@ -4,8 +4,8 @@ import { isBlank } from "@blazetrails/activesupport";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 export class PresenceValidator extends EachValidator {
-  validateEach(record: ValidatableRecord, attrName: string, value: unknown): void {
-    if (isBlank(value)) {
+  async validateEach(record: ValidatableRecord, attrName: string, value: unknown): Promise<void> {
+    if (await isBlank(value)) {
       record.errors.add(attrName, ":blank", this.options);
     }
   }

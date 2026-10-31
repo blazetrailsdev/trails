@@ -1,4 +1,9 @@
-import type { Base, Relation } from "@blazetrails/activerecord";
+import {
+  Reflection,
+  type Base,
+  type ReflectionSingleton,
+  type Relation,
+} from "@blazetrails/activerecord";
 import {
   camelize,
   compactBlank,
@@ -27,11 +32,8 @@ import { DeleteMany } from "./changes/delete-many.js";
 import { DeleteOne } from "./changes/delete-one.js";
 import { Many } from "./many.js";
 import { One } from "./one.js";
-import {
-  addAttachmentReflection,
-  HasManyAttachedReflection,
-  HasOneAttachedReflection,
-} from "../reflection.js";
+import type { HasManyAttachedReflection, HasOneAttachedReflection } from "../reflection.js";
+import { ReflectionExtension } from "../reflection.js";
 
 interface ModelHost {
   _activeStorageAttached?: { [k: string]: One | Many } | null;
@@ -44,12 +46,11 @@ type HasAttachedOptions = {
   strictLoading?: boolean;
 };
 
-/** @missingRailsCall create — CONVERGEABLE activestorage-reflection-and-validations */
 function hasOneAttached(
   this: typeof Base,
   name: string,
   { dependent = "purge_later", service = null, strictLoading = false }: HasAttachedOptions = {},
-  blk?: (reflection: HasOneAttachedReflection) => void,
+  blk?: (attachable: HasOneAttachedReflection) => void,
 ): void {
   if (typeof service !== "function") Model.validateServiceConfiguration(service, this, name);
 
@@ -124,22 +125,22 @@ function hasOneAttached(
     { on: ["create", "update"] },
   );
 
-  const reflection = new HasOneAttachedReflection(
+  const reflection = (Reflection as unknown as ReflectionSingleton).create(
+    "hasOneAttached",
     name,
     null,
     { dependent: dependent, serviceName: service },
     this,
-  );
+  ) as HasOneAttachedReflection;
   if (blk) blk(reflection);
-  addAttachmentReflection(this, name, reflection);
+  ReflectionExtension.addAttachmentReflection(this, name, reflection);
 }
 
-/** @missingRailsCall create — CONVERGEABLE activestorage-reflection-and-validations */
 function hasManyAttached(
   this: typeof Base,
   name: string,
   { dependent = "purge_later", service = null, strictLoading = false }: HasAttachedOptions = {},
-  blk?: (reflection: HasManyAttachedReflection) => void,
+  blk?: (attachable: HasManyAttachedReflection) => void,
 ): void {
   if (typeof service !== "function") Model.validateServiceConfiguration(service, this, name);
 
@@ -219,14 +220,15 @@ function hasManyAttached(
     { on: ["create", "update"] },
   );
 
-  const reflection = new HasManyAttachedReflection(
+  const reflection = (Reflection as unknown as ReflectionSingleton).create(
+    "hasManyAttached",
     name,
     null,
     { dependent: dependent, serviceName: service },
     this,
-  );
+  ) as HasManyAttachedReflection;
   if (blk) blk(reflection);
-  addAttachmentReflection(this, name, reflection);
+  ReflectionExtension.addAttachmentReflection(this, name, reflection);
 }
 
 export const ClassMethods = { hasOneAttached, hasManyAttached };

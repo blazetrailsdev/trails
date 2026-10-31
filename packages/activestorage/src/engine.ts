@@ -1,15 +1,14 @@
 import { onLoad } from "@blazetrails/activesupport";
-import { include } from "@blazetrails/ruby-compat";
-import type { Base } from "@blazetrails/activerecord";
+import { include, prepend, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { Reflection, type Base } from "@blazetrails/activerecord";
 import "@blazetrails/trailties/trailties/action-controller";
 import "@blazetrails/trailties/trailties/active-job";
 import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ActiveStorage } from "./active-storage.js";
 import { Model } from "./attached/model.js";
-import { ActiveRecordExtensions } from "./reflection.js";
+import { ActiveRecordExtensions, ReflectionExtension } from "./reflection.js";
 
-/** @missingRailsCall prepend — CONVERGEABLE activestorage-engine */
 export class Engine extends TrailsEngine {
   static {
     TrailsEngine.register(this, import.meta.dirname);
@@ -25,6 +24,7 @@ export class Engine extends TrailsEngine {
     this.initializer("active_storage.reflection", () => {
       onLoad("active_record", function (this: typeof Base) {
         include(this, ActiveRecordExtensions);
+        prepend(rbObjSingletonClass(Reflection), ReflectionExtension);
       });
     });
   }

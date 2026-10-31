@@ -6,6 +6,8 @@ import {
   rbInspect,
   rbModName,
   rbModToS,
+  include,
+  rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
@@ -1568,6 +1570,11 @@ export class RuntimeReflection extends AbstractReflection {
   }
 }
 
+export interface ReflectionSingleton {
+  create: typeof create;
+  reflectionClassFor: typeof reflectionClassFor;
+}
+
 /** @internal */
 function reflectionClassFor(
   macro: string,
@@ -1606,17 +1613,22 @@ export function create(
   activeRecord: typeof Base,
 ): AggregateReflection;
 export function create(
-  macro: MacroType,
+  macro: string,
+  name: string | null,
+  scope: ((...args: any[]) => any) | null,
+  options: Record<string, unknown>,
+  activeRecord: typeof Base,
+): MacroReflection;
+export function create(
+  macro: string,
   name: string | null,
   scope: ((...args: any[]) => any) | null,
   options: Record<string, unknown>,
   ar: typeof Base,
-): AssociationReflection | ThroughReflection | AggregateReflection {
-  const ReflectionClass = reflectionClassFor(macro);
+): MacroReflection | ThroughReflection {
+  const ReflectionClass = (Reflection as unknown as ReflectionSingleton).reflectionClassFor(macro);
   const reflection = new ReflectionClass(name, scope, options, ar);
-  return options.through
-    ? new ThroughReflection(reflection as AssociationReflection)
-    : (reflection as AssociationReflection | AggregateReflection);
+  return options.through ? new ThroughReflection(reflection as AssociationReflection) : reflection;
 }
 
 export function addReflection(
@@ -1761,6 +1773,8 @@ export const Reflection = {
     });
   },
 };
+
+include(rbObjSingletonClass(Reflection), { create, reflectionClassFor });
 
 export const ClassMethods = {
   reflections(

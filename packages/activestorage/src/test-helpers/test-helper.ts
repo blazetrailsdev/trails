@@ -40,12 +40,57 @@ export class User extends Base {
     const attached = this as unknown as Extended<typeof ClassMethods>;
     attached.hasOneAttached("avatar");
     attached.hasOneAttached("coverPhoto", { dependent: false, service: "local" });
+    attached.hasOneAttached("avatarWithVariants", {}, (attachable) => {
+      attachable.variant("thumb", { resizeToLimit: [100, 100] });
+    });
+    attached.hasOneAttached("avatarWithPreprocessed", {}, (attachable) => {
+      attachable.variant("bool", { resizeToLimit: [1, 1], preprocessed: true });
+    });
+    attached.hasOneAttached("avatarWithConditionalPreprocessed", {}, (attachable) => {
+      attachable.variant("proc", {
+        resizeToLimit: [2, 2],
+        preprocessed: (user: User) => user.name === "transform via proc",
+      });
+      attachable.variant("method", {
+        resizeToLimit: [3, 3],
+        preprocessed: "isShouldPreprocessed",
+      });
+    });
+    attached.hasOneAttached("introVideo");
+    attached.hasOneAttached("namePronunciationAudio");
+
     attached.hasManyAttached("highlights");
     attached.hasManyAttached("vlogs", { dependent: false, service: "local" });
+    attached.hasManyAttached("highlightsWithVariants", {}, (attachable) => {
+      attachable.variant("thumb", { resizeToLimit: [100, 100] });
+    });
+    attached.hasManyAttached("highlightsWithPreprocessed", {}, (attachable) => {
+      attachable.variant("bool", { resizeToLimit: [1, 1], preprocessed: true });
+    });
+    attached.hasManyAttached("highlightsWithConditionalPreprocessed", {}, (attachable) => {
+      attachable.variant("proc", {
+        resizeToLimit: [2, 2],
+        preprocessed: (user: User) => user.name === "transform via proc",
+      });
+      attachable.variant("method", {
+        resizeToLimit: [3, 3],
+        preprocessed: "isShouldPreprocessed",
+      });
+    });
+    attached.hasOneAttached("resume", {}, (attachable) => {
+      attachable.variant("preview", { resizeToFill: [400, 400] });
+    });
+    attached.hasOneAttached("resumeWithPreprocessing", {}, (attachable) => {
+      attachable.variant("preview", { resizeToFill: [400, 400], preprocessed: true });
+    });
 
     this.acceptsNestedAttributesFor("highlightsAttachments", { allowDestroy: true });
 
     this.afterCommit((user: User) => user.incrementCallbackCounter());
+  }
+
+  isShouldPreprocessed(): boolean {
+    return this.name === "transform via method";
   }
 
   incrementCallbackCounter(): void {
@@ -61,6 +106,7 @@ export class Group extends Base {
   declare users: AssociationProxy<User>;
 
   static {
+    (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("avatar");
     this.hasMany("users", { autosave: true });
 
     this.acceptsNestedAttributesFor("users");

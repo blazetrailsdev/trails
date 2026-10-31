@@ -36,8 +36,16 @@ export class One extends Attached {
     return blob instanceof Promise ? blob.then(() => attachment) : attachment;
   }
 
-  async isBlank(): Promise<boolean> {
-    return !(await this.isAttached());
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  async load(): Promise<void> {
+    await this.attachment;
+  }
+
+  isBlank(): Promise<boolean> {
+    return this.isAttached().then((attached) => !attached);
   }
 
   async attach(attachable: unknown): Promise<this | null> {

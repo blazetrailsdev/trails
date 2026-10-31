@@ -2,13 +2,13 @@ import { PresenceValidator as BasePresenceValidator } from "@blazetrails/activem
 import { wrap } from "@blazetrails/activesupport";
 
 export class PresenceValidator extends BasePresenceValidator {
-  validateEach(record: any, attribute: string, associationOrValue: unknown): void {
+  async validateEach(record: any, attribute: string, associationOrValue: unknown): Promise<void> {
     if (record.constructor._reflectOnAssociation?.(attribute)) {
       associationOrValue = wrap(associationOrValue).filter(
         (v: any) => !(typeof v?.markedForDestruction === "function" && v.markedForDestruction()),
       );
     }
-    super.validateEach(record, attribute, associationOrValue);
+    await super.validateEach(record, attribute, associationOrValue);
   }
 }
 
