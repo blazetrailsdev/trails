@@ -901,6 +901,36 @@ describe("Rack::Handler::Node", () => {
       expect(closed).toBe(true);
     });
 
+    it("keeps a complete response when closing the body raises", async () => {
+      const log = captureStderr();
+      const payload = "x".repeat(4 * 1024 * 1024);
+      let text = "";
+      try {
+        await serving(
+          async () => [
+            200,
+            {},
+            {
+              async *[Symbol.asyncIterator]() {
+                yield payload;
+              },
+              close() {
+                throw new Error("close raised");
+              },
+            } as unknown as RackBody,
+          ],
+          async (url) => {
+            ({ text } = await upgradeRequest(url, "/cable"));
+          },
+        );
+      } finally {
+        log.restore();
+      }
+
+      expect(text).toContain(payload);
+      expect(log.lines.join("")).toContain("close raised");
+    });
+
     it("destroys the socket, without a second head, when the body raises mid-response", async () => {
       let text = "";
       let closed = false;

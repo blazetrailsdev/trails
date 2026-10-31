@@ -239,6 +239,7 @@ export class Node {
           `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
         );
         if (hijacked) return;
+        if (socket.writableEnded) return;
         if (started) socket.destroy();
         else socket.end(responseHead(500, { "content-length": "0" }));
       }
