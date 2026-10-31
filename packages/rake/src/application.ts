@@ -873,7 +873,10 @@ export class Application {
     return (this._systemDir ??= ENV["RAKE_SYSTEM"] ?? this.standardSystemDir());
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   private standardSystemDir(): string {
     if (Win32.isWindows()) return Win32.win32SystemDir();
     return File.join(File.expandPath("~"), ".rake");
