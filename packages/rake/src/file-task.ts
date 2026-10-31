@@ -1,4 +1,4 @@
-import { cmp, Errno, File, rbCmpint, rbObjClass } from "@blazetrails/ruby-compat";
+import { AsyncEnumerable, cmp, Errno, File, rbCmpint, rbObjClass } from "@blazetrails/ruby-compat";
 import { LATE } from "./late-time.js";
 import { fromPathname } from "./rake-module.js";
 import type { Scope } from "./scope.js";
@@ -26,22 +26,19 @@ export class FileTask extends Task {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall any? — CONVERGEABLE rake-task-prerequisites-awaiting-map
-   */
+  /** @internal */
   private async isOutOfDate(stamp: Date): Promise<boolean> {
-    for (const prereq of await this.allPrerequisiteTasks()) {
+    return AsyncEnumerable.isAny.call(await this.allPrerequisiteTasks(), async (prereq) => {
       const prereqTask = await this.application.get(String(prereq), this.scope);
       const timestamp = await prereqTask.timestamp();
       if (rbObjClass(prereqTask) === FileTask) {
-        if (rbCmpint(cmp(timestamp, stamp), timestamp, stamp) > 0) return true;
-        if (this.application.options.buildAll) return true;
-      } else if (rbCmpint(cmp(timestamp, stamp), timestamp, stamp) > 0) {
-        return true;
+        return (
+          rbCmpint(cmp(timestamp, stamp), timestamp, stamp) > 0 || this.application.options.buildAll
+        );
+      } else {
+        return rbCmpint(cmp(timestamp, stamp), timestamp, stamp) > 0;
       }
-    }
-    return false;
+    });
   }
 
   static override scopeName(scope: Scope, taskName: string): string {

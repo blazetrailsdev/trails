@@ -1466,6 +1466,39 @@ export const AsyncEnumerable = {
     return enumSumValue(memo);
   },
 
+  /**
+   * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`,
+   * awaiting the block before the next element, so side effects keep Ruby's
+   * order. An Array receiver is read directly, having no `each` member.
+   * @noRailsEquivalent PERMANENT
+   */
+  async map<T, R>(this: AsyncEach<T> | T[], block: (i: T) => R | Promise<R>): Promise<R[]> {
+    const ary: R[] = [];
+    const collectI = async (i: T): Promise<void> => {
+      ary.push(await block(i));
+    };
+    if (Array.isArray(this)) {
+      for (const i of this) await collectI(i);
+    } else {
+      await this.each(collectI);
+    }
+    return ary;
+  },
+
+  /**
+   * Mirrors: Ruby's Enumerable#any? — `vendor/ruby/v3.3.11/enum.c:1861` `enum_any`,
+   * awaiting the block and stopping at its first truthy result. An Array
+   * receiver is read directly, having no `each` member.
+   * @noRailsEquivalent PERMANENT
+   */
+  async isAny<T>(this: T[], block: (i: T) => unknown): Promise<boolean> {
+    for (const i of this) {
+      const result = await block(i);
+      if (result != null && result !== false) return true;
+    }
+    return false;
+  },
+
   first: Enumerable.prototype.first,
 
   /**
