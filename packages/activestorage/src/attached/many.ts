@@ -21,9 +21,23 @@ export class Many extends Attached {
   }
 
   get attachments(): PromiseLike<Attachment[]> | Attachment[] {
-    return isPresent(this.change)
-      ? (this.change as CreateMany).attachments
-      : (rbFSend(this.record, `${this.name}Attachments`) as PromiseLike<Attachment[]>);
+    if (isPresent(this.change)) return (this.change as CreateMany).attachments;
+    const attachments = rbFSend(this.record, `${this.name}Attachments`) as PromiseLike<
+      Attachment[]
+    >;
+    return new Proxy(attachments, {
+      get(target, prop) {
+        if (prop === "then") {
+          const loaded = target.then(async (records) => {
+            for (const attachment of records) await attachment.blob;
+            return records;
+          });
+          return loaded.then.bind(loaded);
+        }
+        const value = Reflect.get(target, prop, target) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
   }
 
   get blobs(): PromiseLike<Blob[]> | Blob[] {

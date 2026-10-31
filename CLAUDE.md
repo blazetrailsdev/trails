@@ -1825,10 +1825,10 @@ Rules that apply across the table:
 - `active_storage/attachment.rb`'s `delegate_missing_to :blob` is
   `delegateMissingTo` over a prototype, so its trap is synchronous. An unloaded
   `blob` is a promise that answers nothing: a forwarded name raises
-  `NoMethodError` until `await attachment.blob`, so `has_one_attached` and
-  `has_many_attached` add `includes("blob")` to their association scopes, and
-  an attachment read through the record has it loaded. `Attachment` has no
-  default scope. A nil `blob` raises
+  `NoMethodError` until `await attachment.blob`, so `One#attachment` and
+  `Many#attachments` await each `blob` where Rails' delegation loads it in
+  line, `Many`'s behind a Proxy that keeps its collection proxy's members.
+  `Attachment` has no default scope. A nil `blob` raises
   `DelegationError`, as Rails does. `attached/one.rb`'s
   `delegate_missing_to :attachment, allow_nil: true` forwards only to a loaded
   attachment. `attached/many.rb`'s `delegate_missing_to :attachments` needs no such

@@ -20,12 +20,19 @@ export class One extends Attached {
   }
 
   get attachment(): Attachment | null | Promise<Attachment | null> {
-    return isPresent(this.change)
-      ? (this.change as CreateOne).attachment
-      : (rbFSend(this.record, `${this.name}Attachment`) as
-          | Attachment
-          | null
-          | Promise<Attachment | null>);
+    if (isPresent(this.change)) return (this.change as CreateOne).attachment;
+    const attachment = rbFSend(this.record, `${this.name}Attachment`) as
+      | Attachment
+      | null
+      | Promise<Attachment | null>;
+    if (attachment instanceof Promise) {
+      return attachment.then(async (record) => {
+        await record?.blob;
+        return record;
+      });
+    }
+    const blob = attachment?.blob;
+    return blob instanceof Promise ? blob.then(() => attachment) : attachment;
   }
 
   async isBlank(): Promise<boolean> {
