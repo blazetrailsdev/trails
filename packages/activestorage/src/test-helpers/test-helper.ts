@@ -2,7 +2,7 @@ import { Notifications, type Extended } from "@blazetrails/activesupport";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { ActionController } from "@blazetrails/actionpack";
 import { Image } from "@blazetrails/mini-magick/image";
-import { File, IO, OpenSSL, StringIO } from "@blazetrails/ruby-compat";
+import { File, OpenSSL, StringIO, type Pathname } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import type { ClassMethods } from "../attached/model.js";
 import type { Attachment } from "../attachment.js";
@@ -74,7 +74,7 @@ export const SERVICE_CONFIGURATIONS = {
   local: { service: "Disk", root: File.join(import.meta.dirname, "../../tmp/storage") },
 };
 
-export function fileFixture(fixtureName: string): string {
+export function fileFixture(fixtureName: string): Pathname {
   return new FixtureSet().fileFixture(fixtureName);
 }
 
@@ -150,7 +150,7 @@ export async function createFileBlob({
   record?: unknown;
 } = {}): Promise<Blob> {
   return await Blob.createAndUploadBang({
-    io: new StringIO((await IO.binreadAsync(fileFixture(fixture)))!),
+    io: fileFixture(fixture).open(),
     filename: filename,
     contentType: contentType,
     identify: identify,
@@ -190,9 +190,9 @@ export async function directlyUploadFileBlob({
   contentType = "image/jpeg",
   record = null,
 }: { filename?: string; contentType?: string | null; record?: unknown } = {}): Promise<Blob> {
-  const file = (await IO.binreadAsync(fileFixture(filename)))!;
-  const byteSize = file.length;
-  const checksum = OpenSSL.Digest.MD5.base64digest(file);
+  const file = fileFixture(filename);
+  const byteSize = file.size();
+  const checksum = (await OpenSSL.Digest.MD5.file(file.toPath())).base64digest();
 
   const blob = await createBlobBeforeDirectUpload({
     filename: filename,
@@ -202,7 +202,7 @@ export async function directlyUploadFileBlob({
     record: record,
   });
   const service = (Blob.service as (Service & { primary?: Service }) | null)!;
-  await (service.primary ?? service).upload(blob.key, new StringIO(file));
+  await (service.primary ?? service).upload(blob.key, file.open());
   return blob;
 }
 

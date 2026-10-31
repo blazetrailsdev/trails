@@ -1,3 +1,4 @@
+import type { Pathname } from "@blazetrails/ruby-compat";
 import { runLoadHooks } from "./lazy-load-hooks.js";
 import {
   testOrder as activeSupportTestOrder,
@@ -47,8 +48,8 @@ export class TestCase extends Minitest.Test {
     return "ActiveSupport::TestCase";
   }
 
-  declare static fileFixturePath: string | null;
-  declare readonly fileFixturePath: string | null;
+  declare static fileFixturePath: string | Pathname | null;
+  declare readonly fileFixturePath: string | Pathname | null;
   declare static isFileFixturePath: () => boolean;
   declare isFileFixturePath: () => boolean;
   declare fileFixture: typeof FileFixtures.fileFixture;

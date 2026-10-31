@@ -1,9 +1,9 @@
-import { ArgumentError, File, format } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, Pathname, format } from "@blazetrails/ruby-compat";
 import { included } from "@blazetrails/ruby-compat/include";
 import { classAttribute } from "../class-attribute.js";
 
 interface FileFixturesHost {
-  fileFixturePath: string | null;
+  fileFixturePath: string | Pathname | null;
 }
 
 export const FileFixtures = {
@@ -11,11 +11,10 @@ export const FileFixtures = {
     classAttribute.call(base, "fileFixturePath", { instanceWriter: false });
   },
 
-  // BLOCKED: ruby-compat-pathname-for-file-fixture-and-save-page
-  fileFixture(this: FileFixturesHost, fixtureName: string): string {
-    const path = File.join(this.fileFixturePath!, fixtureName);
+  fileFixture(this: FileFixturesHost, fixtureName: string | Pathname): Pathname {
+    const path = new Pathname(File.join(this.fileFixturePath!, fixtureName));
 
-    if (File.isExist(path)) {
+    if (path.isExist()) {
       return path;
     } else {
       const msg = "the directory '%s' does not contain a file named '%s'";
