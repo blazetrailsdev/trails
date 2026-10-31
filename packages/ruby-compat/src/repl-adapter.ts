@@ -1,3 +1,5 @@
+import { LoadError } from "./load-error.js";
+
 export interface ReplServerLike {
   context: Record<string, unknown>;
   on(event: "exit", listener: () => void): unknown;
@@ -9,6 +11,7 @@ export interface ReplAdapter {
 
 const registry = new Map<string, ReplAdapter>();
 
+/** @noRailsEquivalent PERMANENT */
 export const replAdapterConfig: { adapter: string } = { adapter: "node" };
 
 /** @noRailsEquivalent PERMANENT */
@@ -25,6 +28,6 @@ export async function getReplAsync(): Promise<ReplAdapter> {
     if (repl != null) registry.set("node", repl as ReplAdapter);
   }
   const adapter = registry.get(name);
-  if (adapter == null) throw new Error(`No REPL adapter registered as ${name}`);
+  if (adapter == null) throw new LoadError(`cannot load such file -- ${name}`);
   return adapter;
 }

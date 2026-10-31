@@ -1,5 +1,5 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { STDOUT, exit, include, type Included } from "@blazetrails/ruby-compat";
+import { STDOUT, exit, include, rbArgv, type Included } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { environment } from "../command.js";
@@ -45,7 +45,7 @@ export class Console {
 
     if (this.isSandbox() && app.config.disableSandbox) {
       STDOUT.puts(
-        "Error: Unable to start console in sandbox mode as sandbox mode is disabled (config.disableSandbox is true).",
+        "Error: Unable to start console in sandbox mode as sandbox mode is disabled (config.disable_sandbox is true).",
       );
       exit(1);
     }
@@ -118,11 +118,17 @@ export class ConsoleCommand extends Base {
 
   /** @inlinedFrom Rails::Command::EnvironmentArgument#initialize rails/v8.0.2/railties/lib/rails/command/environment_argument.rb:16-26 */
   constructor(...[args = [], localOptions = {}, config = {}]: ConstructorParameters<typeof Base>) {
+    let consoleOptions: string[] = [];
+
     if (Array.isArray(localOptions)) {
       const termination = localOptions.indexOf("--");
-      if (termination !== -1) localOptions = localOptions.slice(0, termination);
+      if (termination !== -1) {
+        consoleOptions = localOptions.slice(termination + 1);
+        localOptions = localOptions.slice(0, termination);
+      }
     }
 
+    rbArgv().splice(0, rbArgv().length, ...consoleOptions);
     super(args, localOptions, config);
 
     this._environmentSpecified = isPresent(this.options.environment);

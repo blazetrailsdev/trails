@@ -1,5 +1,12 @@
 import { Base as ActiveRecordBase, Migration } from "@blazetrails/activerecord";
-import { Dir, getFs, getPath, getReplAsync } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  NotImplementedError,
+  STDERR,
+  getFs,
+  getPath,
+  getReplAsync,
+} from "@blazetrails/ruby-compat";
 import { Trails } from "../../rails.js";
 
 const BLUE = "\u001b[34m";
@@ -8,9 +15,9 @@ const CLEAR = "\u001b[0m";
 
 export class IRBConsole {
   /** @internal */
-  private app: { name(): string };
+  private app: { name(): string; sandbox?: boolean | null };
 
-  constructor(app: { name(): string }) {
+  constructor(app: { name(): string; sandbox?: boolean | null }) {
     this.app = app;
   }
 
@@ -19,13 +26,17 @@ export class IRBConsole {
   }
 
   /**
-   * @missingRailsCall key? — PERMANENT
-   * @missingRailsCall filter — PERMANENT
-   * @missingRailsCall run — PERMANENT
-   * @inventedArm loadModels — PERMANENT
-   * @inventedArm clearAllConnectionsBang — PERMANENT
+   * @missingRailsCall key? — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
+   * @missingRailsCall filter — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
+   * @missingRailsCall run — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
+   * @inventedArm loadModels — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
+   * @inventedArm clearAllConnectionsBang — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
    */
   async start(): Promise<void> {
+    if (this.app.sandbox) {
+      throw new NotImplementedError("console sandbox rollback is not ported");
+    }
+
     const env = this.colorizedEnv();
     const promptPrefix = `${this.app.name()}(${env})`;
 
@@ -53,7 +64,7 @@ export class IRBConsole {
 
   /**
    * @internal
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE console-sandbox-rollback-and-irb-helpers
    */
   private async loadModels(): Promise<Record<string, unknown>> {
     const context: Record<string, unknown> = {
@@ -65,13 +76,16 @@ export class IRBConsole {
     const modelsDir = path.join(Dir.pwd(), "app", "models");
     if (await fs.exists(modelsDir)) {
       for (const file of await fs.readdir!(modelsDir)) {
-        if (!file.endsWith(".ts") && !file.endsWith(".js")) continue;
-        const mod = (await import(path.pathToFileURL!(path.join(modelsDir, file)).href)) as Record<
-          string,
-          unknown
-        >;
-        for (const [name, value] of Object.entries(mod)) {
-          if (typeof value === "function") context[name] = value;
+        if (!/(?<!\.d|\.test)\.[tj]s$/.test(file)) continue;
+        try {
+          const mod = (await import(
+            path.pathToFileURL!(path.join(modelsDir, file)).href
+          )) as Record<string, unknown>;
+          for (const [name, value] of Object.entries(mod)) {
+            if (typeof value === "function") context[name] = value;
+          }
+        } catch (error) {
+          STDERR.puts(`Could not load ${file}: ${(error as Error).message}`);
         }
       }
     }

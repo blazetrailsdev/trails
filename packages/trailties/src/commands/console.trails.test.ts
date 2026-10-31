@@ -36,6 +36,11 @@ function startConsole(): Promise<void> {
 }
 
 describe("ConsoleCommand (trails)", () => {
+  it("refuses --sandbox rather than promising a rollback it cannot perform", async () => {
+    const app = { sandbox: null, config: {}, name: () => "app", loadConsole() {} };
+    await expect(new Console(app, { sandbox: true }).start()).rejects.toThrow("sandbox");
+  });
+
   it("--help reaches Thor's help through Rails::Command.invoke", async () => {
     const printed = await capture(":stdout", () => invoke("console", ["--help"]));
     expect(printed).toContain("--sandbox");
