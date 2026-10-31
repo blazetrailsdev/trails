@@ -79,7 +79,7 @@ export class UnstructuredField extends CommonField {
         if (!isAsciiOnly(word)) {
           return word;
         } else {
-          return word.match(/.{7}|.+$/gm) ?? [];
+          return word.match(/[^\n]{7}|[^\n]+$/g) ?? [];
         }
       });
     } else {
@@ -100,7 +100,8 @@ export class UnstructuredField extends CommonField {
         }
 
         if (shouldEncode) word = this.encode(word);
-        word = this.encodeCrlf(word as string);
+        if (word instanceof Uint8Array) word = String.fromCharCode(...word);
+        word = this.encodeCrlf(word);
         if (line.length !== 0 && line.length + word.length + 1 > limit) break;
         words.shift();
         if (firstWord) {

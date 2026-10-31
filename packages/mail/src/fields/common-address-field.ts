@@ -60,22 +60,22 @@ export class CommonAddressField extends NamedStructuredField {
     return this.addresses()[0] ?? null;
   }
 
-  addresses(): (string | null)[] {
+  addresses(): AddressContainer<string | null> | (string | null)[] {
     const list = this.element().addresses.map((a) => a.address());
     return new AddressContainer(this, list);
   }
 
-  formatted(): string[] {
+  formatted(): AddressContainer<string> {
     const list = this.element().addresses.map((a) => a.format());
     return new AddressContainer(this, list);
   }
 
-  displayNames(): (string | null)[] {
+  displayNames(): AddressContainer<string | null> {
     const list = this.element().addresses.map((a) => a.displayName());
     return new AddressContainer(this, list);
   }
 
-  addrs(): Address[] {
+  addrs(): AddressContainer<Address> {
     const list = this.element().addresses;
     return new AddressContainer(this, list);
   }

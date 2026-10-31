@@ -1,14 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 import { rbObjAsString, casecmp, type Encoding } from "@blazetrails/ruby-compat";
 
 const FILENAME_RE = /\b(filename|name)=([^;"\r\n]+[ \t\r\n\f\v][^;"\r\n]+)/;
-
-export interface CommonField {
-  /** @internal */
-  doEncode(): string;
-  /** @internal */
-  doDecode(): unknown;
-}
 
 export class CommonField {
   static isSingular(): boolean {
@@ -76,11 +68,11 @@ export class CommonField {
   }
 
   decoded(): unknown {
-    return this.doDecode();
+    return (this as unknown as { doDecode(): unknown }).doDecode();
   }
 
   encoded(): string {
-    return this.doEncode();
+    return (this as unknown as { doEncode(): string }).doEncode();
   }
 
   /** @missingRailsArgs casecmp — PERMANENT */
