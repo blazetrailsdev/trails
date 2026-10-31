@@ -1,4 +1,3 @@
-import { beforeEach } from "vitest";
 import {
   File,
   Gem,
@@ -26,10 +25,6 @@ await import("./fixtures/enum.js");
 await import("./fixtures/script.js");
 await import("./fixtures/subcommand.js");
 await import("./fixtures/command.js");
-
-beforeEach(() => {
-  rbArgv().length = 0;
-});
 
 const __FILE__ = decodeURIComponent(
   new URL(import.meta.url).pathname.replace(/^\/(?=[A-Z]:)/i, ""),

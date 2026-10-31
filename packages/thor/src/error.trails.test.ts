@@ -60,6 +60,8 @@ describe("Thor::Error", () => {
   it("answers its Ruby class name", () => {
     expect(new ThorError("x").name).toBe("Thor::Error");
     expect(new ThorError().message).toBe("Thor::Error");
+    class Foo extends ThorError {}
+    expect(new Foo().message).toBe("Foo");
     expect(new UndefinedCommandError("x", [], null).name).toBe("Thor::UndefinedCommandError");
     expect(new AmbiguousCommandError("x").name).toBe("Thor::AmbiguousCommandError");
     expect(new InvocationError("x").name).toBe("Thor::InvocationError");

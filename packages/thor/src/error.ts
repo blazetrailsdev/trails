@@ -1,5 +1,11 @@
 import { formatter, SpellChecker as DidYouMeanSpellChecker } from "@blazetrails/did-you-mean";
-import { prepend, rbCallSuper, rbInspect, StandardError } from "@blazetrails/ruby-compat";
+import {
+  prepend,
+  rbCallSuper,
+  rbInspect,
+  rbModName,
+  StandardError,
+} from "@blazetrails/ruby-compat";
 
 interface Corrected {
   _corrections?: string[];
@@ -27,7 +33,7 @@ export class Error extends StandardError {
 
   constructor(message?: string) {
     super(message);
-    this.#mesg = message ?? this.name;
+    this.#mesg = message ?? rbModName(new.target) ?? "";
     delete (this as { message?: string }).message;
   }
 

@@ -25,6 +25,16 @@ export class User extends Base {
   declare coverPhoto: One;
   declare avatarAttachment: Attachment | null | Promise<Attachment | null>;
   declare avatarBlob: Blob | null | Promise<Blob | null>;
+  declare avatarWithVariants: One;
+  declare avatarWithPreprocessed: One;
+  declare avatarWithConditionalPreprocessed: One;
+  declare introVideo: One;
+  declare namePronunciationAudio: One;
+  declare resume: One;
+  declare resumeWithPreprocessing: One;
+  declare highlightsWithVariants: Many;
+  declare highlightsWithPreprocessed: Many;
+  declare highlightsWithConditionalPreprocessed: Many;
   declare setAvatar: (attachable: unknown) => Promise<void>;
   declare setCoverPhoto: (attachable: unknown) => Promise<void>;
   declare highlights: Many;

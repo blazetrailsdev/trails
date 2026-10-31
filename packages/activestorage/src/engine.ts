@@ -26,10 +26,6 @@ export class Engine extends TrailsEngine {
         include(this, ActiveRecordExtensions);
         prepend(rbObjSingletonClass(Reflection), ReflectionExtension);
       });
-
-      onLoad("active_storage_variant_record", function (this: typeof Base) {
-        ClassMethods.hasOneAttached.call(this, "image");
-      });
     });
   }
 }
