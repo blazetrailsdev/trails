@@ -48,6 +48,7 @@ export class One extends Attached {
     return rbFSend(this.record, this.name) as this;
   }
 
+  /** @missingRailsCall attachment — PERMANENT */
   async isAttached(): Promise<boolean> {
     return isPresent(
       await (isPresent(this.change)
