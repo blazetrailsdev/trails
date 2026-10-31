@@ -208,8 +208,7 @@ describe("ActiveStorage::BlobTest", () => {
     ).rejects.toThrow(ArgumentError);
   });
 
-  // BLOCKED: activestorage-image-analyzers
-  it.skip("record touched after analyze", async () => {
+  it("record touched after analyze", async () => {
     const user = await User.createBang({
       name: "Nate",
       avatar: {

@@ -3,7 +3,7 @@ description: >-
   Install the binaries ActiveStorage's analyzers and previewers shell out to:
   ffprobe / ffmpeg (video_analyzer.rb, audio_analyzer.rb, video_previewer.rb),
   mutool (mupdf_previewer.rb), pdftoppm (poppler_pdf_previewer.rb) and
-  ImageMagick (image_processing_transformer.rb, through mini_magick).
+  ImageMagick (image_analyzer/image_magick.rb, image_processing_transformer.rb).
 runs:
   using: composite
   steps:

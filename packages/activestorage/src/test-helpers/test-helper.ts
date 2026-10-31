@@ -211,8 +211,8 @@ export async function readImage(blobOrVariant: { service: Service; key: string }
 }
 
 export async function extractMetadataFrom(blob: Blob) {
-  await (blob as Blob & { analyze(): Promise<void> }).analyze();
-  return blob.readAttribute("metadata");
+  await blob.analyze();
+  return blob.metadata;
 }
 
 export function fixtureFileUpload(filename: string): UploadedFile {

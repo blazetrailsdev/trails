@@ -10,6 +10,7 @@ import {
 import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Deprecation } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import type { Analyzer } from "./analyzer.js";
 import type { Attachment } from "./attachment.js";
 import type { Blob } from "./blob.js";
 import type * as Errors from "./errors.js";
@@ -25,7 +26,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   FixtureSet: unknown;
   Service: unknown;
   Previewer: unknown;
-  Analyzer: unknown;
+  Analyzer: typeof Analyzer;
   Blob?: typeof Blob;
   Transformers: typeof Transformers;
   Error: typeof Errors.Error;
@@ -42,7 +43,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   variantProcessor: string;
   queues: Record<string, unknown>;
   previewers: unknown[];
-  analyzers: unknown[];
+  analyzers: (typeof Analyzer)[];
   paths: Record<string, unknown>;
   variableContentTypes: string[];
   webImageContentTypes: string[];

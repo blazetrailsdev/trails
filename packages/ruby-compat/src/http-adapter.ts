@@ -10,6 +10,8 @@ export interface HttpRequest {
 }
 
 export interface HttpResponse {
+  readonly headersSent: boolean;
+  readonly writableEnded: boolean;
   writeHead(status: number, headers?: Record<string, string | string[]>): unknown;
   write(chunk: string | Uint8Array): unknown;
   end(chunk?: string | Uint8Array): unknown;
@@ -18,6 +20,7 @@ export interface HttpResponse {
 
 /** @noRailsEquivalent PERMANENT */
 export interface HttpSocket {
+  readonly writableEnded: boolean;
   readonly writableLength: number;
   readonly writableHighWaterMark: number;
   write(chunk: string | Uint8Array): unknown;
