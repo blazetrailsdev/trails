@@ -34,7 +34,7 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
   "rake:test_rake_test_task.rb › TestRakeTestTask › run code rake": [
     {
       kind: "assert_includes",
-      value: "s:lib/rake/rakeTestLoader.js",
+      value: "s:lib/rake/rake_test_loader.rb",
       as: "assert_includes",
       reason:
         "test_rake_test_task.rb:131 names rake's installed path. A TS module is emitted by kebab-case file name beside its importer, so the same assertion names `rake-test-loader.js`, the spelling `run_code` produces.",
