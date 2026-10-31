@@ -1,0 +1,9 @@
+import "<%= "../".repeat(this.classPathParts.length + 1) %>test-helper<%= this.ext() %>";
+import * as ActionCable from "@blazetrails/actioncable";
+
+export class <%= this.className().split("::").join("") %>ChannelTest extends ActionCable.Channel.TestCase {
+  // test("subscribes", async () => {
+  //   await this.subscribe();
+  //   assert(this.subscription.isConfirmed());
+  // });
+}

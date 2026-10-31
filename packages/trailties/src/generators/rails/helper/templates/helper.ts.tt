@@ -1,0 +1,2 @@
+export const <%= this.className().split("::").join("") %>Helper = {
+};

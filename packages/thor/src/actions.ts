@@ -22,6 +22,8 @@ import {
   rtest,
   strip,
   toS,
+  URI,
+  block,
 } from "@blazetrails/ruby-compat";
 import { addFile, createFile } from "./actions/create-file.js";
 import { addLink, createLink } from "./actions/create-link.js";
@@ -276,10 +278,11 @@ export async function apply(
 
   let url: string;
   if (isUri) {
-    const response = await globalThis.fetch(path, {
-      headers: { Accept: "application/x-thor-template" },
-    });
-    const contents = await response.text();
+    const contents = (await URI.open(
+      path,
+      { Accept: "application/x-thor-template" },
+      block((io: { read(): unknown }) => io.read()),
+    )) as string;
     url = `data:text/javascript,${encodeURIComponent(contents)}`;
   } else {
     url = `${getPath().pathToFileURL!(path).href}?${(applied += 1)}`;

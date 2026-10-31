@@ -1,8 +1,12 @@
+import { File } from "@blazetrails/ruby-compat";
 import { NamedBase } from "../../named-base.js";
 import { controllerPathHelpers } from "../../rails/controller/controller-paths.js";
 
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+
 export class ControllerGenerator extends NamedBase {
   static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("actions", { type: "array", default: [], banner: "action action" });
     this.classOption("skipRoutes", { type: "boolean" });
 
@@ -13,24 +17,21 @@ export class ControllerGenerator extends NamedBase {
 
   declare actions: string[];
 
-  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
+  /** @missingRailsArgs template — PERMANENT */
   async createTestFiles(): Promise<void> {
-    const paths = controllerPathHelpers(this.name);
-    const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
-    const importPrefix = "../".repeat(depth + 2);
-    const cases = this.actions
-      .map((a) => `  it("${a}", () => {\n    // TODO: test ${a} action\n  });`)
-      .join("\n\n");
-    await this.createFile(
-      `test/controllers/${paths.controllerFile}.test${this.ext()}`,
-      `import { describe, it, expect } from "vitest";
-import { ${paths.className} } from "${importPrefix}app/controllers/${paths.controllerFile}.js";
-
-describe("${paths.displayName}", () => {
-${cases}
-});
-`,
+    await this.template(
+      "functional_test.ts",
+      `test/controllers/${this.paths().controllerFile}.test${this.ext()}`,
     );
+  }
+
+  private paths() {
+    return controllerPathHelpers(this.name);
+  }
+
+  private importPrefix(): string {
+    const { namespaceParts } = this.paths();
+    return "../".repeat((namespaceParts.length > 1 ? namespaceParts.length - 1 : 0) + 2);
   }
 }
 

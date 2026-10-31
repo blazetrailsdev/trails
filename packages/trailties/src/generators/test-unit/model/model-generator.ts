@@ -1,7 +1,8 @@
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
-import { TEMPLATES } from "./templates.js";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
 export interface ModelGeneratorOptions extends GeneratorOptions {
   fixture?: boolean;
@@ -22,6 +23,7 @@ export class ModelGenerator extends NamedBase {
   ];
 
   static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("attributes", { type: "array", default: [], banner: "field:type field:type" });
 
     this.checkClassCollision({ suffix: "Test" });
@@ -29,27 +31,26 @@ export class ModelGenerator extends NamedBase {
     this.methodAdded("createTestFile");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
+  /** @missingRailsArgs template — PERMANENT */
   async createTestFile(): Promise<void> {
-    await this.createFile(
+    await this.template(
+      "unit_test.ts",
       File.join(
         "test/models",
         ...this.classPathParts,
         `${dasherize(this.fileName)}.test${this.ext()}`,
       ),
-      TEMPLATES.unit_test.call(this),
     );
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
   async createFixtureFile(): Promise<void> {
     if (
       (this.options as ModelGeneratorOptions).fixture &&
       (this.options as ModelGeneratorOptions).fixtureReplacement == null
     ) {
-      await this.createFile(
+      await this.template(
+        "fixtures.yml",
         File.join("test/fixtures", ...this.classPathParts, `${this.fixtureFileName()}.yml`),
-        TEMPLATES.fixtures.call(this),
       );
     }
   }

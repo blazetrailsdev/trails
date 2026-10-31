@@ -32,11 +32,25 @@ describe("Thor::Actions#apply (trails)", () => {
 
     expect(fetch).toHaveBeenCalledWith("https://example.com/template.js", {
       headers: { Accept: "application/x-thor-template" },
+      redirect: "manual",
     });
     expect(r.foo).toBe("FOO");
     expect(out).toMatch(/ {7}apply {2}https:\/\/example.com\/template.js\n/);
     expect(out).toMatch(/cool {4}padding/);
     expect(r.shell.padding).toBe(0);
+  });
+
+  it("raises OpenURI::HTTPError for a non-2xx response instead of importing its body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("nope", { status: 404, statusText: "Not Found" })),
+    );
+    const r = new Counter([], {}, {}) as unknown as CounterInstance;
+
+    await capture(":stdout", () =>
+      expect(r.apply("https://example.com/template.js")).rejects.toThrow("404 Not Found"),
+    );
+    expect(r.foo).toBeUndefined();
   });
 
   it("re-reads a local template on every apply", async () => {

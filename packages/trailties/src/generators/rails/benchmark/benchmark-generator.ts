@@ -1,34 +1,19 @@
+import { File } from "@blazetrails/ruby-compat";
 import { NamedBase } from "../../named-base.js";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
 export class BenchmarkGenerator extends NamedBase {
   static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("reports", { type: "array", default: ["before", "after"] });
     this.methodAdded("generateLayout");
   }
 
   declare reports: string[];
 
-  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
+  /** @missingRailsArgs template — PERMANENT */
   async generateLayout(): Promise<void> {
-    const reports = this.reports;
-    const ext = this.ext();
-    const filename = `script/benchmarks/${this.fileName}${ext}`;
-    const reportLines = reports.map((r) => `  ${r}: () => {},`).join("\n");
-
-    await this.createFile(
-      filename,
-      `// Any benchmarking setup goes here...
-
-const reports: Record<string, () => void> = {
-${reportLines}
-};
-
-for (const [name, fn] of Object.entries(reports)) {
-  const start = performance.now();
-  fn();
-  console.log(\`\${name}: \${(performance.now() - start).toFixed(3)}ms\`);
-}
-`,
-    );
+    await this.template("benchmark.ts", `script/benchmarks/${this.fileName}${this.ext()}`);
   }
 }

@@ -1,0 +1,6 @@
+import { describe, it } from "vitest";
+import "<%= "../".repeat(this.classPathParts.length + 1) %>test-helper.js";
+
+describe("<%= this.className().split("::").join("") %>Test", () => {
+  it.todo("the truth");
+});

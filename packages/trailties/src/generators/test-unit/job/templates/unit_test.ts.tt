@@ -1,0 +1,8 @@
+import "<%= "../".repeat(this.classPathParts.length + 1) %>test-helper<%= this.ext() %>";
+import { ActiveJob } from "@blazetrails/activejob";
+
+export class <%= this.className().split("::").join("") %>JobTest extends ActiveJob.TestCase {
+  // test("the truth", () => {
+  //   assert(true);
+  // });
+}

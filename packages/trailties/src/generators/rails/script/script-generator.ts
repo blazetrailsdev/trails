@@ -1,23 +1,16 @@
+import { File } from "@blazetrails/ruby-compat";
 import { NamedBase } from "../../named-base.js";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
 export class ScriptGenerator extends NamedBase {
   static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.methodAdded("generateScript");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-remaining-generators-onto-thor-template */
   async generateScript(): Promise<void> {
-    const ext = this.ext();
-    const filename = `script/${this.filePath()}${ext}`;
-    const upDots = "../".repeat(this.depth());
-
-    await this.createFile(
-      filename,
-      `import "${upDots}config/environment${ext}";
-
-// Your code goes here
-`,
-    );
+    await this.template("script.ts", `script/${this.filePath()}${this.ext()}`);
   }
 
   private depth(): number {

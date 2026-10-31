@@ -1,0 +1,30 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+<% if (this.attributes.length > 0) { -%>
+<% for (const name of ["one", "two"]) { -%>
+
+<%= name %>:
+<% for (const attribute of this.attributes) { -%>
+<% if (attribute.passwordDigest()) { -%>
+  password_digest: <%%= BCrypt.Password.create("secret") %>
+<% } else if (attribute.reference()) { -%>
+  <%= this.yamlKeyValue(attribute.columnName().replace(/_id$/, ""), attribute.default() != null && attribute.default() !== false ? attribute.default() : name) %>
+<% } else if (!attribute.virtual()) { -%>
+  <%= this.yamlKeyValue(attribute.columnName(), attribute.default()) %>
+<% } -%>
+<% if (attribute.polymorphic()) { -%>
+  <%= this.yamlKeyValue(`${attribute.name}_type`, attribute.humanName()) %>
+<% } -%>
+<% } -%>
+<% } -%>
+<% } else { -%>
+
+# This model initially had no columns defined. If you add columns to the
+# model remove the "{}" from the fixture names and add the columns immediately
+# below each fixture, per the syntax in the comments below
+#
+one: {}
+# column: value
+#
+two: {}
+# column: value
+<% } -%>
