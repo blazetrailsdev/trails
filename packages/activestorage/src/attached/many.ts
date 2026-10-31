@@ -20,25 +20,21 @@ export class Many extends Attached {
     await this.detachMany().detach();
   }
 
-  /** @inventedArm if — PERMANENT */
   get attachments(): PromiseLike<Attachment[]> | Attachment[] {
-    if (isPresent(this.change)) return (this.change as CreateMany).attachments;
-    const attachments = rbFSend(this.record, `${this.name}Attachments`) as PromiseLike<
-      Attachment[]
-    >;
-    return new Proxy(attachments, {
-      get(target, prop) {
-        if (prop === "then") {
-          const loaded = target.then(async (records) => {
-            for (const attachment of records) await attachment.blob;
-            return records;
-          });
-          return loaded.then.bind(loaded);
-        }
-        const value = Reflect.get(target, prop, target) as unknown;
-        return typeof value === "function" ? value.bind(target) : value;
-      },
-    });
+    return isPresent(this.change)
+      ? (this.change as CreateMany).attachments
+      : (
+          rbFSend(this.record, `${this.name}Attachments`) as {
+            includes(association: string): PromiseLike<Attachment[]>;
+          }
+        ).includes("blob");
+  }
+
+  /** @internal */
+  get associationAttachments(): PromiseLike<Attachment[]> | Attachment[] {
+    return isPresent(this.change)
+      ? (this.change as CreateMany).attachments
+      : (rbFSend(this.record, `${this.name}Attachments`) as PromiseLike<Attachment[]>);
   }
 
   get blobs(): PromiseLike<Blob[]> | Blob[] {
@@ -59,17 +55,17 @@ export class Many extends Attached {
   }
 
   async isAttached(): Promise<boolean> {
-    return (await this.attachments).length > 0;
+    return (await this.associationAttachments).length > 0;
   }
 
   /** @internal */
   private purgeMany(): PurgeMany {
-    return new PurgeMany(this.name, this.record, this.attachments);
+    return new PurgeMany(this.name, this.record, this.associationAttachments);
   }
 
   /** @internal */
   private detachMany(): DetachMany {
-    return new DetachMany(this.name, this.record, this.attachments);
+    return new DetachMany(this.name, this.record, this.associationAttachments);
   }
 }
 
