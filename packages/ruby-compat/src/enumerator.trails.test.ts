@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Enumerator, toEnum } from "./enumerator.js";
+import { Chain, Enumerator, Lazy, enumChain, enumerableLazy, toEnum } from "./enumerator.js";
 import { eachSlice, eachWithIndex, eachWithObject } from "./enumerable.js";
 import { block } from "./hash.js";
 import { StopIteration } from "./stop-iteration.js";
@@ -150,5 +150,76 @@ describe("Enumerator#with_index (enumerator_with_index, vendor/ruby/v3.3.11/enum
         .withIndex(10n ** 25n)
         .toA(),
     ).toEqual([[["x", 0], 10n ** 25n]]);
+  });
+});
+
+describe("Enumerator::Lazy", () => {
+  it("evaluates only as far as first asks", () => {
+    const seen: number[] = [];
+    const lazy = enumerableLazy<number>([1, 2, 3, 4]).map((x) => (seen.push(x), x * 2));
+
+    expect(lazy).toBeInstanceOf(Lazy);
+    expect(lazy.select((x) => x > 2).first(1)).toEqual([4]);
+    expect(seen).toEqual([1, 2]);
+    expect(lazy.first()).toBe(2);
+  });
+
+  it("restarts its memos on every force", () => {
+    const lazy = enumerableLazy<number>([1, 2, 3]).drop(1).take(1);
+
+    expect(lazy.force()).toEqual([2]);
+    expect(lazy.force()).toEqual([2]);
+    expect(lazy.size()).toBe(null);
+    expect(
+      enumerableLazy([1, 2, 3], () => 3)
+        .take(2)
+        .size(),
+    ).toBe(2);
+  });
+
+  it("ports each operation", () => {
+    const lazy = enumerableLazy<number | null>([1, null, 2, 2, 3]);
+    const nums = lazy.compact();
+
+    expect(nums.uniq().toA()).toEqual([1, 2, 3]);
+    expect(nums.reject((x) => x === 2).toA()).toEqual([1, 3]);
+    expect(nums.filterMap((x) => (x > 2 ? x : null)).toA()).toEqual([3]);
+    expect(nums.flatMap((x) => [x, x]).first(3)).toEqual([1, 1, 2]);
+    expect(nums.takeWhile((x) => x < 2).toA()).toEqual([1]);
+    expect(nums.dropWhile((x) => x < 3).toA()).toEqual([3]);
+    expect(nums.grep(2).toA()).toEqual([2, 2]);
+    expect(nums.grepV(2).toA()).toEqual([1, 3]);
+    expect(nums.zip(["a"]).first(2)).toEqual([
+      [1, "a"],
+      [2, null],
+    ]);
+    expect((nums.withIndex(1) as unknown as Lazy).first(1)).toEqual([[1, 1]]);
+    expect(nums.take(0).toA()).toEqual([]);
+    expect(nums.lazy()).toBe(nums);
+    expect(nums.eager()).not.toBeInstanceOf(Lazy);
+  });
+
+  it("raises MRI's errors", () => {
+    expect(() => new Lazy([])).toThrow("tried to call lazy new without a block");
+    expect(() => enumerableLazy([]).take(-1)).toThrow("attempt to take negative size");
+    expect(() => enumerableLazy([]).zip(1)).toThrow(
+      "wrong argument type Number (must respond to :each)",
+    );
+  });
+});
+
+describe("Enumerator::Chain", () => {
+  it("iterates its enumerables in sequence", () => {
+    const chain = enumChain<number>([1], [2, 3]);
+
+    expect(chain).toBeInstanceOf(Chain);
+    expect(chain.toA()).toEqual([1, 2, 3]);
+    expect(chain.size()).toBe(3);
+    expect((chain as Chain).inspect()).toBe("#<Enumerator::Chain: [[1], [2, 3]]>");
+  });
+
+  it("is lazy when one of its enumerables is", () => {
+    expect(enumerableLazy([1]).chain([2])).toBeInstanceOf(Lazy);
+    expect(toEnum([1]).plus([2]).toA()).toEqual([1, 2]);
   });
 });

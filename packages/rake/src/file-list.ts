@@ -3,6 +3,7 @@ import {
   ArgumentError,
   Dir,
   Enumerable,
+  Enumerator,
   File,
   type FileOpenOpt,
   FrozenError,
@@ -14,6 +15,8 @@ import {
   cmp,
   compactBang,
   deleteAt,
+  enumChain,
+  enumerableLazy,
   eachCons,
   eachSlice,
   flatten,
@@ -45,7 +48,6 @@ import {
   stdout as $stdout,
   strGsub,
   tally,
-  toEnum,
   uniq,
 } from "@blazetrails/ruby-compat";
 import { Cloneable } from "./cloneable.js";
@@ -94,6 +96,13 @@ function _comparator(block?: unknown): (a: unknown, b: unknown) => number {
   return _isProc(block)
     ? (a, b) => (block as unknown as (a: unknown, b: unknown) => number)(a, b)
     : _compare;
+}
+
+function _enum(items: Items, meth: string, args: unknown[] = [], size?: () => unknown): Enumerator {
+  const receiver = {
+    [meth]: (...a: unknown[]) => (ARRAY_CALLS[meth] as (...b: unknown[]) => unknown)(items, ...a),
+  };
+  return new Enumerator(receiver, meth, args, size ?? null);
 }
 
 /** `rb_range_beg_len` (`vendor/ruby/v3.3.11/range.c:1744`) for `Array#[]=` and `#slice!`. */
@@ -188,11 +197,7 @@ async function _search(items: Items, block: ElementBlock): Promise<number | null
   return found;
 }
 
-/**
- * @noRailsEquivalent PERMANENT
- * @missingRailsCall lazy — CONVERGEABLE rake-file-list-enumerator-returns
- * @missingRailsCall chain — CONVERGEABLE rake-file-list-enumerator-returns
- */
+/** @noRailsEquivalent PERMANENT */
 const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> = {
   size: (items) => items.length,
   length: (items) => items.length,
@@ -308,41 +313,49 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     return _combinatoric(product(items, ...(others as Items[])), items, block);
   },
   combination: (items, n: number, block?: ElementBlock) =>
-    _combinatoric(_choose(items, n, false, false), items, block),
+    !block
+      ? _enum(items, "combination", [n], () => _choose(items, n, false, false).length)
+      : _combinatoric(_choose(items, n, false, false), items, block),
   permutation: (items, ...args: unknown[]) => {
     const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : undefined;
     const n = (args[0] as number | undefined) ?? items.length;
+    if (!block)
+      return _enum(items, "permutation", args, () => _choose(items, n, true, false).length);
     return _combinatoric(_choose(items, n, true, false), items, block);
   },
   repeatedCombination: (items, n: number, block?: ElementBlock) =>
-    _combinatoric(_choose(items, n, false, true), items, block),
+    !block
+      ? _enum(items, "repeatedCombination", [n], () => _choose(items, n, false, true).length)
+      : _combinatoric(_choose(items, n, false, true), items, block),
   repeatedPermutation: (items, n: number, block?: ElementBlock) =>
-    _combinatoric(_choose(items, n, true, true), items, block),
+    !block
+      ? _enum(items, "repeatedPermutation", [n], () => _choose(items, n, true, true).length)
+      : _combinatoric(_choose(items, n, true, true), items, block),
   pack: (items, ...args: unknown[]) => (pack as (...a: unknown[]) => unknown)(items, ...args),
   deconstruct: (items) => items,
   entries: (items) => [...items],
   toH: async (items, block?: ElementBlock) =>
     Object.fromEntries((block ? await _yields(items, block) : items) as [string, unknown][]),
   toSet: (items) => ARRAY_METHOD_TABLE.toSet(items),
-  chain: (items, ...others: Items[]) => [...items, ...others.flat(1)],
-  lazy: (items) => [...items],
+  chain: (items, ...others: object[]) => enumChain(items, ...others),
+  lazy: (items) => enumerableLazy(items, () => items.length),
   each: async (items, block?: ElementBlock) => {
-    if (!block) return toEnum(items, "each");
+    if (!block) return _enum(items, "each", [], () => items.length);
     for (const fn of items) await block(fn as string);
     return items;
   },
   eachWithIndex: async (items, block?: (fn: string, i: number) => unknown) => {
-    if (!block) return items.map((fn, i) => [fn, i]);
+    if (!block) return _enum(items, "eachWithIndex", [], () => items.length);
     for (const [i, fn] of items.entries()) await block(fn as string, i);
     return items;
   },
   eachIndex: async (items, block?: (i: number) => unknown) => {
-    if (!block) return [...items.keys()];
+    if (!block) return _enum(items, "eachIndex", [], () => items.length);
     for (const i of items.keys()) await block(i);
     return items;
   },
   reverseEach: async (items, block?: ElementBlock) => {
-    if (!block) return [...items].reverse();
+    if (!block) return _enum(items, "reverseEach", [], () => items.length);
     await _yields([...items].reverse(), block);
     return items;
   },
@@ -351,13 +364,21 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     return memo;
   },
   eachSlice: (items, n: number, block?: ElementBlock) =>
-    _eachGroup(items, eachSlice(items, n) as unknown as Iterable<unknown>, block),
+    !block
+      ? _enum(items, "eachSlice", [n], () => Math.ceil(items.length / n))
+      : _eachGroup(items, eachSlice(items, n) as unknown as Iterable<unknown>, block),
   eachCons: (items, n: number, block?: ElementBlock) =>
-    _eachGroup(items, eachCons(items, n) as unknown as Iterable<unknown>, block),
+    !block
+      ? _enum(items, "eachCons", [n], () => Math.max(items.length - n + 1, 0))
+      : _eachGroup(items, eachCons(items, n) as unknown as Iterable<unknown>, block),
   cycle: async (items, ...args: unknown[]) => {
     const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : null;
     const n = (args[0] as number | null | undefined) ?? null;
-    if (!block) return n === null ? [...items] : Array.from({ length: n }, () => items).flat(1);
+    if (!block) {
+      return _enum(items, "cycle", [n], () =>
+        items.length === 0 ? 0 : n === null ? Infinity : Math.max(n, 0) * items.length,
+      );
+    }
     if (items.length === 0) return null;
     for (let i = 0; n === null || i < n; i++) await _yields(items, block);
     return null;
@@ -388,16 +409,23 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     return result;
   },
   deleteAt: (items, i: number) => deleteAt(items, i),
-  map: (items, block?: ElementBlock) => (block ? _yields(items, block) : [...items]),
+  map: (items, block?: ElementBlock) =>
+    block ? _yields(items, block) : _enum(items, "map", [], () => items.length),
   flatMap: async (items, block?: ElementBlock) =>
-    block ? (await _yields(items, block)).flat(1) : [...items],
+    block ? (await _yields(items, block)).flat(1) : _enum(items, "flatMap", [], () => items.length),
   filterMap: async (items, block?: ElementBlock) =>
-    block ? (await _yields(items, block)).filter(rtest) : [...items],
+    block
+      ? (await _yields(items, block)).filter(rtest)
+      : _enum(items, "filterMap", [], () => items.length),
   sort: (items, block?: unknown) => [...items].sort(_comparator(block)),
   sortBy: async (items, block?: ElementBlock) =>
-    block ? sortBy(items, await _replay(items, block)) : [...items],
-  select: (items, block?: ElementBlock) => (block ? _filterBy(items, block, true) : [...items]),
-  reject: (items, block?: ElementBlock) => (block ? _filterBy(items, block, false) : [...items]),
+    block
+      ? sortBy(items, await _replay(items, block))
+      : _enum(items, "sortBy", [], () => items.length),
+  select: (items, block?: ElementBlock) =>
+    block ? _filterBy(items, block, true) : _enum(items, "select", [], () => items.length),
+  reject: (items, block?: ElementBlock) =>
+    block ? _filterBy(items, block, false) : _enum(items, "reject", [], () => items.length),
   grep: (items, pattern: unknown, block?: ElementBlock) => _grep(items, pattern, true, block),
   grepV: (items, pattern: unknown, block?: ElementBlock) => _grep(items, pattern, false, block),
   compact: (items) => items.filter((fn) => fn != null),
@@ -435,7 +463,7 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   },
   find: async (items, ...args: unknown[]) => {
     const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : null;
-    if (!block) return [...items];
+    if (!block) return _enum(items, "find", args);
     for (const fn of items) if (rtest(await block(fn as string))) return fn;
     return _isProc(args[0]) ? (args[0] as () => unknown)() : null;
   },
@@ -473,13 +501,13 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     await ARRAY_CALLS.maxBy(items, block as never),
   ],
   index: async (items, ...args: unknown[]) => {
-    if (args.length === 0) return [...items];
+    if (args.length === 0) return _enum(items, "index");
     const test = _isProc(args[0]) ? args[0] : (fn: string) => rbEqual(fn, args[0]);
     for (const [i, fn] of items.entries()) if (rtest(await test(fn as string))) return i;
     return null;
   },
   rindex: async (items, ...args: unknown[]) => {
-    if (args.length === 0) return [...items].reverse();
+    if (args.length === 0) return _enum(items, "rindex");
     const test = _isProc(args[0]) ? args[0] : (fn: string) => rbEqual(fn, args[0]);
     for (let i = items.length; i--; ) if (rtest(await test(items[i] as string))) return i;
     return null;
@@ -974,7 +1002,8 @@ for (const sym of FileList.DELEGATING_METHODS) {
         if (arg instanceof FileList && sym !== "inject") args[i] = await arg.toA();
       }
       const result = await call(items, ...args);
-      if (special) return new (this.constructor as typeof FileList)().import(result as Items);
+      if (special && !(result instanceof Enumerator))
+        return new (this.constructor as typeof FileList)().import(result as Items);
       return result === items ? this : result;
     },
   });
