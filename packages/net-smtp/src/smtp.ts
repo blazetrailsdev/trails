@@ -623,7 +623,7 @@ export class SMTP {
     fromAddr: string | Address,
     ...toAddrs: Array<string | Address | Array<string | Address>>
   ): Promise<Response> {
-    const to = toAddrs.flat();
+    const to = toAddrs.flat(Infinity) as Array<string | Address>;
     if (this._socket == null) throw new IOError("closed session");
     if (this.anyRequireSmtputf8(to) && this.isCapable("SMTPUTF8")) {
       fromAddr = new Address(fromAddr, "SMTPUTF8");
@@ -706,7 +706,7 @@ export class SMTP {
 
   async rcpttoList<T>(toAddrs: Array<string | Address>, block: () => Promise<T>): Promise<T> {
     if (toAddrs.length === 0) throw new ArgumentError("mail destination not given");
-    for (const addr of toAddrs.flat()) await this.rcptto(addr);
+    for (const addr of toAddrs.flat(Infinity) as Array<string | Address>) await this.rcptto(addr);
     return await block();
   }
 
