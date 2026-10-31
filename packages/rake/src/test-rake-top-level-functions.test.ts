@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { puts, stdout as $stdout } from "@blazetrails/ruby-compat";
+import { NameError, puts, rbModConstMissing, stdout as $stdout } from "@blazetrails/ruby-compat";
 import type { Application } from "./application.js";
 import { FileUtilsExt } from "./file-utils-ext.js";
 import { Rake } from "./rake-module.js";
@@ -74,6 +74,7 @@ describe("TestRakeTopLevelFunctions", () => {
     }
   });
 
-  // PERMANENT-SKIP: Ruby's const_missing has no port (CLAUDE.md § "Constant lookup is an import or a registry").
-  it.skip("missing other constant", () => {});
+  it("missing other constant", () => {
+    expect(() => rbModConstMissing(Object, "Xyz")).toThrow(NameError);
+  });
 });
