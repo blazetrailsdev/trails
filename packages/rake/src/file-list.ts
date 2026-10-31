@@ -32,6 +32,7 @@ import {
   rbEqual,
   rbFSend,
   rbInspect,
+  rbObjIsProc,
   rbStrSub,
   rtest,
   sortBy,
@@ -72,7 +73,7 @@ function _replace(items: Items, result: Items): Items {
   return items;
 }
 
-const _isProc = (arg: unknown): arg is ElementBlock => typeof arg === "function";
+const _isProc = rbObjIsProc as (arg: unknown) => arg is ElementBlock;
 
 const _compare = (a: unknown, b: unknown): number => rbCmpint(cmp(a, b), a, b);
 
@@ -515,9 +516,9 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     return _split(items, (a) => test(a));
   },
   plus: (items, other: Items) => [...items, ...other],
-  minus: (items, other: Items) => items.filter((fn) => !other.includes(fn)),
-  and: (items, other: Items) => uniq(items.filter((fn) => other.includes(fn))),
-  or: (items, other: Items) => uniq([...items, ...other]),
+  minus: (items, other: Items) => ARRAY_METHOD_TABLE.difference(items, other as never),
+  and: (items, other: Items) => ARRAY_METHOD_TABLE.intersection(items, other as never),
+  or: (items, other: Items) => ARRAY_METHOD_TABLE.union(items, other as never),
   difference: (items, ...others: Items[]) =>
     ARRAY_METHOD_TABLE.difference(items, ...(others as never[])),
   union: (items, ...others: Items[]) => ARRAY_METHOD_TABLE.union(items, ...(others as never[])),
