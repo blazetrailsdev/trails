@@ -218,6 +218,7 @@ describe("Rack::Handler::Node", () => {
         const response = await fetch(`${url}/up`);
 
         expect(response.status).toBe(500);
+        expect(response.headers.get("content-length")).toBe("0");
         expect(await response.text()).toBe("");
       },
     );

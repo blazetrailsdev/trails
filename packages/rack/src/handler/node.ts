@@ -59,7 +59,17 @@ export class Node {
     const handler = new Node(app);
     const http = await getHttpAsync();
     const server = http.createServer((req, res) => {
-      void handler.service(req, res);
+      void handler.service(req, res).catch((error: unknown) => {
+        stderr.write(
+          `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+        );
+        if ((res as { headersSent?: boolean }).headersSent) {
+          res.socket?.destroy();
+          return;
+        }
+        res.writeHead(500, { "content-length": "0" });
+        res.end();
+      });
     });
     server.on("upgrade", (req, socket, head) => {
       void handler.upgrade(req, socket, head);
@@ -96,21 +106,8 @@ export class Node {
       env[RACK_IS_HIJACK] = socket != null;
       if (env[RACK_IS_HIJACK]) env[RACK_HIJACK] = release;
 
-      let response: RackResponse;
       try {
-        response = await (rbProcCall(this.app, env) as Promise<RackResponse>);
-      } catch (error) {
-        stderr.write(
-          `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
-        );
-        if (hijacked) return;
-        res.writeHead(500, { "content-length": "0" });
-        res.end();
-        return;
-      }
-
-      try {
-        const [status, headers, body] = response;
+        const [status, headers, body] = await (rbProcCall(this.app, env) as Promise<RackResponse>);
         try {
           if (hijacked) return;
           const partial = headers[RACK_HIJACK];
