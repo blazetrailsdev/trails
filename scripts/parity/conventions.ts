@@ -714,26 +714,10 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
-      "tasks RFC 0204-actionmailer-and-mail-port, Transport edges: the wire protocol is " +
-      "nodemailer's `SMTPConnection`, so Net::SMTP's command-level members, socket setup " +
-      "and the authenticators' line exchange are not ported. PERMANENT.",
-    names: [
-      "tcp_socket",
-      "ssl_socket",
-      "tlsconnect",
-      "new_internet_message_io",
-      "open_message_stream",
-      "ready",
-      "starttls",
-      "helo",
-      "ehlo",
-      "continue",
-      "base64_encode",
-      "cram_md5_response",
-      "cram_secret",
-      "digest_class",
-      "xoauth2_string",
-    ],
+      "tasks RFC 0204-actionmailer-and-mail-port, Transport edges: the socket is " +
+      "nodemailer's `SMTPConnection`, so Net::SMTP's socket setup members are not ported. " +
+      "PERMANENT.",
+    names: ["tcp_socket", "ssl_socket", "tlsconnect", "new_internet_message_io"],
     rubyFiles: [
       "smtp.rb",
       "authenticator.rb",

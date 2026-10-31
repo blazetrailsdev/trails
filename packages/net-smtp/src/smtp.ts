@@ -4,6 +4,7 @@ import {
   EOFError,
   IOError,
   include,
+  isModuleIncluded,
   rbBlockGivenP,
   rbFArray,
   rbModName,
@@ -20,15 +21,16 @@ import {
 } from "./protocol.js";
 
 type Connection = SMTPConnection & {
-  _ehloLines?: string[];
   _destroyed: boolean;
   _socket?: { setTimeout(ms: number): unknown; write(data: string): unknown };
   _sendCommand(str: string): void;
   _responseActions: Array<(str: string) => void>;
-  lastServerResponse: string | false;
+  _actionGreeting(str: string): void;
+  _clearPhase(): void;
+  _upgradeConnection(callback: (err: Error | null) => void): void;
 };
 
-type ConnectionError = Error & { code?: string; response?: string };
+type ConnectionError = Error & { code?: string };
 
 type SslContext = Record<string, unknown>;
 
@@ -209,23 +211,14 @@ export class Address {
   }
 }
 
-function _rethrow(err: ConnectionError): never {
-  if (err.response) {
-    const res = Response.parse(`${err.response}\n`);
-    if (err.code === "EAUTH") throw new SMTPAuthenticationError(res);
-    throw new res.exceptionClass(res);
-  }
-  if (err.code === "EAUTH") throw new SMTPAuthenticationError(err.message);
-  if (err.code === "ECONNECTION") throw new EOFError("end of file reached");
-  throw err;
-}
-
 export class SMTP {
   static readonly VERSION = "0.5.1";
   static readonly DEFAULT_AUTH_TYPE = "plain";
   static readonly Response = Response;
   static readonly Address = Address;
   static readonly Authenticator = Authenticator;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly SMTPAuthenticationError = SMTPAuthenticationError;
 
   static defaultPort(): number {
     return 25;
@@ -478,9 +471,9 @@ export class SMTP {
 
   /**
    * @internal
-   * @missingRailsCall critical — PERMANENT
-   * @missingRailsCall check_response — PERMANENT
    * @inventedArm rescue — PERMANENT
+   * @missingRailsCall order:critical,tlsconnect — PERMANENT
+   * @missingRailsArgs tlsconnect — PERMANENT
    */
   private async doStart(
     heloDomain: string,
@@ -499,8 +492,6 @@ export class SMTP {
       port: this.port,
       name: heloDomain,
       secure: this.isTls(),
-      requireTLS: this.isStarttlsAlways(),
-      ignoreTLS: this._starttls === false,
       connectionTimeout: this.openTimeout * 1000,
       greetingTimeout: this.openTimeout * 1000,
       socketTimeout: this._readTimeout * 1000,
@@ -512,29 +503,43 @@ export class SMTP {
     }) as Connection;
     this._socket = s;
     try {
+      let res: Response;
       try {
-        await new Promise<void>((resolve, reject) => {
+        res = await new Promise<Response>((resolve, reject) => {
           s.once("error", reject);
-          s.connect(() => {
+          s._actionGreeting = (str: string) => {
+            s._clearPhase();
             s.removeListener("error", reject);
-            resolve();
-          });
+            resolve(Response.parse(`${str}\n`));
+          };
+          s.connect();
         });
       } catch (err) {
         if ((err as ConnectionError).code === "ETIMEDOUT") {
           throw new OpenTimeout("execution expired");
         }
-        const capable = s._ehloLines?.some((line) => line.split(/\s+/)[0] === "STARTTLS");
-        if ((err as ConnectionError).code === "ETLS" && this.isStarttlsAlways() && !capable) {
-          throw new SMTPUnsupportedCommand("STARTTLS is not supported on this server");
+        if ((err as ConnectionError).code === "ECONNECTION") {
+          throw new EOFError("end of file reached");
         }
-        _rethrow(err as ConnectionError);
+        throw err;
       }
       s.on("error", () => {
         this._errorOccurred = true;
       });
       this.logging(`Connection opened: ${this.address}:${this.port}`);
-      this.doHelo(heloDomain);
+      this.checkResponse(await this.critical(() => res));
+      await this.doHelo(heloDomain);
+      if (
+        !this.isTls() &&
+        (this.isStarttlsAlways() || (this.isCapableStarttls() && this.isStarttlsAuto()))
+      ) {
+        if (!this.isCapableStarttls()) {
+          throw new SMTPUnsupportedCommand("STARTTLS is not supported on this server");
+        }
+        await this.starttls();
+        await this.tlsconnect(s);
+        await this.doHelo(heloDomain);
+      }
       if (user != null) {
         await this.authenticate(user, secret, authtype ?? SMTP.DEFAULT_AUTH_TYPE);
       }
@@ -548,11 +553,34 @@ export class SMTP {
   }
 
   /** @internal */
-  private doHelo(heloDomain: string): void {
-    const lines = this._socket!._ehloLines;
-    if (lines == null) this.esmtp = false;
-    const replies = (lines ?? []).map((line) => `250 ${line}\n`).join("");
-    this.capabilities = Response.parse(`250-${heloDomain}\n${replies}`).capabilities;
+  private async tlsconnect(s: Connection): Promise<void> {
+    this.logging("TLS connection started");
+    await new Promise<void>((resolve, reject) => {
+      s.once("error", reject);
+      s._upgradeConnection((err) => {
+        s.removeListener("error", reject);
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  }
+
+  /** @internal */
+  private async doHelo(heloDomain: string): Promise<void> {
+    for (;;) {
+      try {
+        const res = this.esmtp ? await this.ehlo(heloDomain) : await this.helo(heloDomain);
+        this.capabilities = res.capabilities;
+        return;
+      } catch (err) {
+        if (this.esmtp && err instanceof Error && isModuleIncluded(err.constructor, SMTPError)) {
+          this.esmtp = false;
+          this._errorOccurred = false;
+          continue;
+        }
+        throw err;
+      }
+    }
   }
 
   /** @internal */
@@ -611,6 +639,21 @@ export class SMTP {
     return this.sendMessage(msgstr, fromAddr, ...toAddrs);
   }
 
+  async openMessageStream(fromAddr: string | Address, ...toAddrs: unknown[]): Promise<Response> {
+    const block = toAddrs.pop() as (stream: { write(str: string): unknown }) => unknown;
+    const to = toAddrs.flat() as Array<string | Address>;
+    if (this._socket == null) throw new IOError("closed session");
+    if (this.anyRequireSmtputf8(to) && this.isCapable("SMTPUTF8")) {
+      fromAddr = new Address(fromAddr, "SMTPUTF8");
+    }
+    await this.mailfrom(fromAddr);
+    return await this.rcpttoList(to, () => this.data(null, block));
+  }
+
+  ready(fromAddr: string | Address, ...toAddrs: unknown[]): Promise<Response> {
+    return this.openMessageStream(fromAddr, ...toAddrs);
+  }
+
   async authenticate(
     user: string,
     secret: string | null,
@@ -618,11 +661,7 @@ export class SMTP {
   ): Promise<Response> {
     this.checkAuthArgs(authtype, user, secret);
     const authenticator = new (Authenticator.authClass(authtype)!)(this);
-    try {
-      return await authenticator.auth(user, secret!);
-    } catch (err) {
-      _rethrow(err as ConnectionError);
-    }
+    return await authenticator.auth(user, secret!);
   }
 
   /** @internal */
@@ -630,6 +669,18 @@ export class SMTP {
     const klass = Authenticator.authClass(type ?? SMTP.DEFAULT_AUTH_TYPE);
     if (klass == null) throw new ArgumentError(`wrong authentication type ${type}`);
     klass.checkArgs(...args);
+  }
+
+  async starttls(): Promise<Response> {
+    return await this.getok("STARTTLS");
+  }
+
+  async helo(domain: string): Promise<Response> {
+    return await this.getok(`HELO ${domain}`);
+  }
+
+  async ehlo(domain: string): Promise<Response> {
+    return await this.getok(`EHLO ${domain}`);
   }
 
   async rset(): Promise<Response> {
@@ -712,8 +763,10 @@ export class SMTP {
       const eof = (): void => reject(new EOFError("end of file reached"));
       if (socket._destroyed) return eof();
       socket.once("end", eof);
+      socket.once("error", reject);
       socket._responseActions.push((str: string) => {
         socket.removeListener("end", eof);
+        socket.removeListener("error", reject);
         resolve(Response.parse(`${str}\n`));
       });
     });

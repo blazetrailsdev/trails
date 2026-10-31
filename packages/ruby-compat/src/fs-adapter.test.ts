@@ -92,6 +92,7 @@ describe("the node adapter", () => {
     cwd: true,
     exists: true,
     stat: true,
+    openHandle: true,
     lstat: true,
     mkdtempSync: true,
     readFile: true,

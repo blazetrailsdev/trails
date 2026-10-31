@@ -1,6 +1,7 @@
 import { Unicode as ActiveSupportUnicode } from "@blazetrails/activesupport";
 import { ArgumentError, pack } from "@blazetrails/ruby-compat";
 import { EncodingError } from "./encoding-error.js";
+import { LOWERCASE_MAPPING, UPPERCASE_MAPPING } from "./simple-case-mappings.generated.js";
 
 const WHITESPACE: readonly number[] = Object.freeze(
   [
@@ -177,10 +178,10 @@ export const Unicode = {
   applyMapping(string: string, mapping: ":uppercase_mapping" | ":lowercase_mapping"): string {
     return pack(
       Unicode.uUnpack(string).map((codepoint) => {
-        const c = String.fromCodePoint(codepoint);
-        const mapped = mapping === ":uppercase_mapping" ? c.toUpperCase() : c.toLowerCase();
-        const ncp = Array.from(mapped).length === 1 ? mapped.codePointAt(0)! : 0;
-        if (ncp > 0) {
+        const ncp = (mapping === ":uppercase_mapping" ? UPPERCASE_MAPPING : LOWERCASE_MAPPING).get(
+          codepoint,
+        );
+        if (ncp != null && ncp > 0) {
           return ncp;
         } else {
           return codepoint;

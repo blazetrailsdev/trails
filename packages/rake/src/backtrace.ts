@@ -10,6 +10,7 @@ const SYS_PATHS = [
 const SUPPRESSED_PATHS = SYS_PATHS.map((s) => s.replaceAll("\\", "/"))
   .map((f) => File.expandPath(f))
   .filter((s) => !/^ *$/m.test(s));
+/** @noRailsEquivalent PERMANENT */
 const SUPPRESSED_PATHS_RE =
   SUPPRESSED_PATHS.map((f) => regexpEscape(f)).join("|") +
   "|^<internal:\\w+>|node:|<anonymous>\\)$";
