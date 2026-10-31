@@ -1,4 +1,9 @@
-import { base36, classAttribute, runLoadHooks } from "@blazetrails/activesupport";
+import {
+  base36,
+  classAttribute,
+  runLoadHooks,
+  type HashWithIndifferentAccess,
+} from "@blazetrails/activesupport";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import {
   InvalidForeignKey,
@@ -84,7 +89,7 @@ export class Blob extends Record {
     this.hasMany("attachments", { autosave: false });
 
     this.scope("unattached", function () {
-      return this.where().missing("attachments");
+      return this.where().missing(":attachments");
     });
 
     this.afterInitialize((blob: Blob) => {
@@ -110,7 +115,7 @@ export class Blob extends Record {
     this.validate((blob: Blob) => {
       if (blob.service_nameChanged() && blob.service_name) {
         blob.services.fetch(blob.service_name, () => {
-          blob.errors.add("service_name", "invalid");
+          blob.errors.add("service_name", ":invalid");
         });
       }
     });
@@ -324,17 +329,17 @@ export class Blob extends Record {
 
   get customMetadata(): { [k: string]: unknown } {
     return (
-      ((this.readAttribute("metadata") as { [k: string]: unknown }).custom as {
+      ((this.readAttribute("metadata") as HashWithIndifferentAccess).get("custom") as {
         [k: string]: unknown;
       }) ?? {}
     );
   }
 
   set customMetadata(metadata: { [k: string]: unknown }) {
-    this.writeAttribute("metadata", {
-      ...(this.readAttribute("metadata") as { [k: string]: unknown }),
-      custom: metadata,
-    });
+    this.writeAttribute(
+      "metadata",
+      (this.readAttribute("metadata") as HashWithIndifferentAccess).merge({ custom: metadata }),
+    );
   }
 
   isImage(): boolean {
