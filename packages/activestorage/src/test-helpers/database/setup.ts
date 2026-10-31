@@ -9,6 +9,7 @@ import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/gl
 import { File, Dir } from "@blazetrails/ruby-compat";
 import "../../class-paths.generated.js";
 import { Attachment } from "../../attachment.js";
+import { ActiveStorage } from "../../active-storage.js";
 import { Blob } from "../../blob.js";
 import { Engine } from "../../engine.js";
 import { Registry } from "../../service/registry.js";
