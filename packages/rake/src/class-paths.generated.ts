@@ -57,4 +57,5 @@ registerClassPaths([
   [() => m25.TraceOutput, "Rake::TraceOutput"],
   [() => m26.Version, "Rake::Version"],
   [() => m27.Win32, "Rake::Win32"],
+  [() => m27.Win32HomeError, "Rake::Win32::Win32HomeError"],
 ]);
