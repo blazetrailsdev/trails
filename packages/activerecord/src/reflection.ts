@@ -1617,7 +1617,7 @@ export function create(
 export function create(
   macro: string,
   name: string | null,
-  scope: ((...args: any[]) => any) | null,
+  scope: null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
 ): MacroReflection;
