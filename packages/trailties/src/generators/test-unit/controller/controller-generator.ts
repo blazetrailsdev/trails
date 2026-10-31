@@ -25,12 +25,10 @@ export class ControllerGenerator extends NamedBase {
     );
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-generators-remainder-onto-thor-template */
   private paths() {
     return controllerPathHelpers(this.name);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-generators-remainder-onto-thor-template */
   private importPrefix(): string {
     const { namespaceParts } = this.paths();
     return "../".repeat((namespaceParts.length > 1 ? namespaceParts.length - 1 : 0) + 2);
