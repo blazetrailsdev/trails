@@ -10,16 +10,17 @@ import { registerConstant } from "./variable.js";
 /** `FMODE_SETENC_BY_BOM` (`vendor/ruby/v3.3.11/include/ruby/io.h:368`). */
 const FMODE_SETENC_BY_BOM = 0x00100000;
 
+/** @noRailsEquivalent PERMANENT */
+export type PathLike = { toPath(): string };
+
 /**
  * `rb_get_path` (`vendor/ruby/v3.3.11/file.c:246`), the `FilePathValue` conversion:
  * a String is the path, anything else is asked for `to_path`, and the answer (the
  * object itself where it has no `to_path`) goes through `StringValue`
  * (`rb_get_path_check_to_string`, `file.c:212-224`).
+ *
+ * @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/file.c:246`
  */
-/** @noRailsEquivalent PERMANENT */
-export type PathLike = { toPath(): string };
-
-/** @noRailsEquivalent PERMANENT — `rb_get_path`, `vendor/ruby/v3.3.11/file.c:246` */
 export function rbGetPath(obj: unknown): string {
   if (typeof obj === "string") return obj;
   const toPath = (obj as { toPath?: unknown } | null)?.toPath;
