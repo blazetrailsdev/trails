@@ -62,6 +62,7 @@ describe("rbModUndefMethod", () => {
     class Writer extends Parent {}
     rbModUndefMethod(Writer, "name=");
     expect(rbObjRespondTo(new Reader(), "name")).toBe(false);
+    expect((new Reader() as { name?: unknown }).name).toBeUndefined();
     expect(() => rbFSend(new Reader(), "name")).toThrow(NoMethodError);
     expect(rbObjRespondTo(new Reader(), "name=")).toBe(true);
     expect(rbObjRespondTo(new Writer(), "name=")).toBe(false);

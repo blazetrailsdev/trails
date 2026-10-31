@@ -1101,7 +1101,7 @@ export function rbModUndefMethod<K extends { prototype: object }>(klass: K, ...n
       }
     }
     if (set !== undefined) {
-      const get = absentHalf(name, false) as () => unknown;
+      const get = (): undefined => undefined;
       UNDEF_HALVES.add(get);
       Object.defineProperty(proto, name, { configurable: true, get, set });
     } else {
