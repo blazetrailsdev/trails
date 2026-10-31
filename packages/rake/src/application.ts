@@ -13,7 +13,6 @@ import {
   StandardError,
   SystemExit,
   RbConfig,
-  argv as ARGV,
   env as ENV,
   excBacktrace,
   exit,
@@ -21,6 +20,7 @@ import {
   include,
   printf,
   puts,
+  rbArgv,
   rbFCaller,
   rbFRequireFile,
   rbModName,
@@ -113,7 +113,7 @@ export class Application {
     this.setDefaultOptions();
   }
 
-  async run(argv: readonly string[] = ARGV): Promise<void> {
+  async run(argv: readonly string[] = rbArgv()): Promise<void> {
     await this.standardExceptionHandling(async () => {
       await this.init("rake", argv);
       await this.loadRakefile();
@@ -122,7 +122,7 @@ export class Application {
   }
 
   /** @missingRailsArgs handle_options — PERMANENT */
-  async init(appName = "rake", argv: readonly string[] = ARGV): Promise<void> {
+  async init(appName = "rake", argv: readonly string[] = rbArgv()): Promise<void> {
     await this.standardExceptionHandling(async () => {
       this.name = appName;
       let args: string[];
@@ -130,7 +130,7 @@ export class Application {
         args = await this.handleOptions(argv);
       } catch (e) {
         if (!(e instanceof ArgumentError)) throw e;
-        args = await this.handleOptions(ARGV);
+        args = await this.handleOptions(rbArgv());
       }
       this.loadDebugAtStopFeature();
       this.collectCommandLineTasks(args);

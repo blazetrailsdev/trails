@@ -34,4 +34,7 @@ describe("TestTraceOutput", () => {
     expect(spy.result).toBe("HI\nLO\n");
     expect(spy.calls).toBe(1);
   });
+
+  // PERMANENT-SKIP: Node has no `$\\`, so `trace_on`'s separator is always "\n" (CLAUDE.md § "Runtime facts Node does not expose").
+  it.skip("trace issues single io for args multiple strings and alternate sep", () => {});
 });

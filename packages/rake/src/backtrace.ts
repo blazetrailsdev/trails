@@ -20,7 +20,7 @@ export const Backtrace = {
   SUPPRESSED_PATHS,
   SUPPRESSED_PATHS_RE,
   SUPPRESS_PATTERN: new RegExp(
-    `^(?:at (?:.*\\()?(?:file://)?)?(?:${SUPPRESSED_PATHS_RE})|bin/rake:\\d+`,
+    `^(?:at (?:async )?(?:.*\\()?(?:file://)?)?(?:${SUPPRESSED_PATHS_RE})|bin/rake:\\d+|/ruby-compat/(?:dist|src)/`,
     "i",
   ),
 

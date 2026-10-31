@@ -87,3 +87,6 @@ export const DSL = {
 include(DSL, FileUtilsExt);
 
 extend(Rake, FileUtilsExt);
+
+/** @noRailsEquivalent PERMANENT */
+export const main = extend({}, DSL) as typeof DSL & typeof FileUtilsExt;
