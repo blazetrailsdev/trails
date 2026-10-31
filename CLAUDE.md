@@ -2072,6 +2072,12 @@ Moved to [packages/trailties/CLAUDE.md](packages/trailties/CLAUDE.md#thor-comman
 The decision is unchanged; the heading stays here so code citing it still
 resolves.
 
+## FileList#to_ary reads a resolved list
+
+Ratified in [packages/rake/CLAUDE.md](packages/rake/CLAUDE.md#filelistto_ary-reads-a-resolved-list).
+The one-line rule: `resolve` is async, and `toAry` answers a resolved list
+synchronously and raises while it is pending.
+
 ## Thor dispatch is async
 
 Moved to [packages/trailties/CLAUDE.md](packages/trailties/CLAUDE.md#thor-dispatch-is-async).
