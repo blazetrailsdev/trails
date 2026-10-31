@@ -1485,6 +1485,20 @@ export const AsyncEnumerable = {
     return ary;
   },
 
+  /**
+   * Mirrors: Ruby's Enumerable#any? — `vendor/ruby/v3.3.11/enum.c:1861` `enum_any`,
+   * awaiting the block and stopping at its first truthy result. An Array
+   * receiver is read directly, having no `each` member.
+   * @noRailsEquivalent PERMANENT
+   */
+  async isAny<T>(this: T[], block: (i: T) => unknown): Promise<boolean> {
+    for (const i of this) {
+      const result = await block(i);
+      if (result != null && result !== false) return true;
+    }
+    return false;
+  },
+
   first: Enumerable.prototype.first,
 
   /**

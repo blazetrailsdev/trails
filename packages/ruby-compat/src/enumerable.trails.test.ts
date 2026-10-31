@@ -316,6 +316,17 @@ describe("AsyncEnumerable", () => {
     expect(await AsyncEnumerable.toA.call(new AsyncBag([1, 2, 3]))).toEqual([1, 2, 3]);
   });
 
+  it("isAny stops at the block's first truthy result, with Ruby truthiness", async () => {
+    const seen: number[] = [];
+    const block = async (i: unknown) => {
+      seen.push(i as number);
+      return i === 2 ? 0 : null;
+    };
+    expect(await AsyncEnumerable.isAny.call([1, 2, 3], block)).toBe(true);
+    expect(seen).toEqual([1, 2]);
+    expect(await AsyncEnumerable.isAny.call([1], block)).toBe(false);
+  });
+
   it("map awaits the block before the next element, as an Array or through each", async () => {
     for (const receiver of [[1, 2, 3], new AsyncBag([1, 2, 3])]) {
       const seen: string[] = [];
