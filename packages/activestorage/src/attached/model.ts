@@ -1,9 +1,4 @@
-import {
-  Reflection,
-  type Base,
-  type ReflectionSingleton,
-  type Relation,
-} from "@blazetrails/activerecord";
+import { Reflection, type Base, type Relation } from "@blazetrails/activerecord";
 import {
   camelize,
   compactBlank,
@@ -125,7 +120,7 @@ function hasOneAttached(
     { on: ["create", "update"] },
   );
 
-  const reflection = (Reflection as unknown as ReflectionSingleton).create(
+  const reflection = Reflection.create!(
     "hasOneAttached",
     name,
     null,
@@ -220,7 +215,7 @@ function hasManyAttached(
     { on: ["create", "update"] },
   );
 
-  const reflection = (Reflection as unknown as ReflectionSingleton).create(
+  const reflection = Reflection.create!(
     "hasManyAttached",
     name,
     null,

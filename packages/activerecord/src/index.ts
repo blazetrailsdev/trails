@@ -195,7 +195,6 @@ export {
   AbstractReflection,
   MacroReflection,
   Reflection,
-  type ReflectionSingleton,
   AggregateReflection,
   AssociationReflection,
   HasManyReflection,

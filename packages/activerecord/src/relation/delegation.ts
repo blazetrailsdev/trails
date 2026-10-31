@@ -373,10 +373,12 @@ export class Delegation {
   }
 
   asJson(this: DelegationHost, options?: SerializeOptions): unknown[] | Promise<unknown[]> {
-    return withRecords(this, (records) => {
-      const hashes = RECORD_DELEGATES.asJson(records, options) as unknown[];
-      return options?.include == null ? hashes : (Promise.all(hashes) as unknown as unknown[]);
-    });
+    const hashes = withRecords(
+      this,
+      (records) => RECORD_DELEGATES.asJson(records, options) as unknown[],
+    );
+    if (options?.include == null) return hashes;
+    return Promise.resolve(hashes).then((resolved) => Promise.all(resolved));
   }
 
   toFs(this: DelegationHost, format?: string): string | Promise<string> {
