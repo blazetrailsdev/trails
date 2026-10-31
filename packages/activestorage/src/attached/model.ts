@@ -249,7 +249,6 @@ function validateServiceConfiguration(
 /**
  * @internal
  * @missingRailsCall table_exists — CONVERGEABLE activestorage-engine
- * @inventedArm configuration — CONVERGEABLE activestorage-attached-macros-run-after-boot
  */
 function validateGlobalServiceConfiguration(modelClass: typeof Base): void {
   const trails = TopLevel.Trails as unknown as
