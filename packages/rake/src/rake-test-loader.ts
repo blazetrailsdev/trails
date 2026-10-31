@@ -2,8 +2,8 @@ import { File, LOAD_PATH, abort, getPath, rbArgv } from "@blazetrails/ruby-compa
 import { FileList } from "./file-list.js";
 
 const argv: string[] = [];
-for (const argument of rbArgv()) {
-  if (/^-I/.test(argument)) {
+for (const [index, argument] of rbArgv().entries()) {
+  if (index === 0 && /^-I/.test(argument)) {
     LOAD_PATH.unshift(
       ...argument
         .slice(2)

@@ -21,7 +21,7 @@ describe("TestTask", () => {
 
   it("puts the -I libs on LOAD_PATH before the loader's test files load", async () => {
     const argv = [...rbArgv()];
-    rbArgv().splice(0, rbArgv().length, `-Ilib${File.PATH_SEPARATOR}test`, "-v");
+    rbArgv().splice(0, rbArgv().length, `-Ilib${File.PATH_SEPARATOR}test`, "-v", "-Irunner");
     const existing = [...LOAD_PATH];
     LOAD_PATH.push("/existing");
     try {
@@ -31,7 +31,7 @@ describe("TestTask", () => {
         File.expandPath("test", Dir.pwd()),
       ]);
       expect(LOAD_PATH.at(-1)).toBe("/existing");
-      expect(rbArgv()).toEqual(["-v"]);
+      expect(rbArgv()).toEqual(["-v", "-Irunner"]);
     } finally {
       LOAD_PATH.splice(0, LOAD_PATH.length, ...existing);
       rbArgv().splice(0, rbArgv().length, ...argv);

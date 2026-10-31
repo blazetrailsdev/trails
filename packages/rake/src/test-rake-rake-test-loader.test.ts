@@ -8,7 +8,10 @@ const argvReplace = (...argv: string[]) => rbArgv().splice(0, rbArgv().length, .
 describe("TestRakeRakeTestLoader", () => {
   const app = useApplicationTestCase();
   const saved = [...rbArgv()];
-  afterEach(() => argvReplace(...saved));
+  afterEach(() => {
+    argvReplace(...saved);
+    delete (globalThis as { LoadError?: unknown }).LoadError;
+  });
 
   it("pattern", async () => {
     await FileUtils.touchAsync("foo.js");
