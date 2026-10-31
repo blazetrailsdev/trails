@@ -316,6 +316,20 @@ describe("AsyncEnumerable", () => {
     expect(await AsyncEnumerable.toA.call(new AsyncBag([1, 2, 3]))).toEqual([1, 2, 3]);
   });
 
+  it("map awaits the block before the next element, as an Array or through each", async () => {
+    for (const receiver of [[1, 2, 3], new AsyncBag([1, 2, 3])]) {
+      const seen: string[] = [];
+      const result = await AsyncEnumerable.map.call(receiver, async (i) => {
+        seen.push(`start ${i}`);
+        await Promise.resolve();
+        seen.push(`end ${i}`);
+        return (i as number) * 2;
+      });
+      expect(result).toEqual([2, 4, 6]);
+      expect(seen).toEqual(["start 1", "end 1", "start 2", "end 2", "start 3", "end 3"]);
+    }
+  });
+
   it("sum adds the elements to the initial value, as enum_sum does", async () => {
     expect(await AsyncEnumerable.sum.call(new AsyncBag([1, 2, 3]))).toBe(6);
     expect(await AsyncEnumerable.sum.call(new AsyncBag([]))).toBe(0);

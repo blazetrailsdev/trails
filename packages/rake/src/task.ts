@@ -1,4 +1,5 @@
 import {
+  AsyncEnumerable,
   cmp,
   extend,
   max,
@@ -75,11 +76,10 @@ export class Task {
 
   async prerequisiteTasks(): Promise<Task[]> {
     await this._resolvePrerequisites();
-    const tasks: Task[] = [];
-    for (const pre of [...this.prerequisites, ...this.orderOnlyPrerequisites]) {
-      tasks.push(await this.lookupPrerequisite(pre));
-    }
-    return tasks;
+    return (await AsyncEnumerable.map.call(
+      [...this.prerequisites, ...this.orderOnlyPrerequisites],
+      (pre) => this.lookupPrerequisite(pre as string),
+    )) as Task[];
   }
 
   /** @internal */
@@ -360,15 +360,19 @@ export class Task {
     result += `task needed: ${await this.isNeeded()}\n`;
     result += `timestamp: ${_timeToS(await this.timestamp())}\n`;
     result += "pre-requisites: \n";
-    const prereqs: [Task, Timestamp][] = [];
-    for (const p of await this.prerequisiteTasks()) prereqs.push([p, await p.timestamp()]);
+    const prereqs = (await AsyncEnumerable.map.call(await this.prerequisiteTasks(), async (p) => [
+      p,
+      await (p as Task).timestamp(),
+    ])) as [Task, Timestamp][];
     prereqs.sort((a, b) => rbCmpint(cmp(a[1], b[1]), a[1], b[1]));
     for (const [p, timestamp] of prereqs) {
       result += `--${p.name} (${_timeToS(timestamp)})\n`;
     }
-    const timestamps: Timestamp[] = [];
-    for (const p of await this.prerequisiteTasks()) timestamps.push(await p.timestamp());
-    const latestPrereq = max(timestamps);
+    const latestPrereq = max(
+      (await AsyncEnumerable.map.call(await this.prerequisiteTasks(), (p) =>
+        (p as Task).timestamp(),
+      )) as Timestamp[],
+    );
     result += `latest-prerequisite time: ${latestPrereq ? _timeToS(latestPrereq) : ""}\n`;
     result += "................................\n\n";
     return result;
