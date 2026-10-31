@@ -299,7 +299,10 @@ export class Group {
     return Group;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm kebabCase — PERMANENT
+   */
   static createCommand(this: GroupClass, meth: string): boolean {
     this.commands()[kebabCase(rbObjAsString(meth))] = new Command(meth, null, null, null, null);
     return true;

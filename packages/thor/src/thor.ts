@@ -549,7 +549,10 @@ export class Thor {
     return DynamicCommand;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm kebabCase — PERMANENT
+   */
   static createCommand(this: ThorClass, meth: string): boolean {
     if (!Object.hasOwn(this, "_usage") || !rtest(this._usage)) this._usage = null;
     if (!Object.hasOwn(this, "_desc") || !rtest(this._desc)) this._desc = null;

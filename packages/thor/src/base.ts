@@ -403,6 +403,7 @@ export const ClassMethods = {
   },
   allTasks: undefined as unknown as BaseClass["allCommands"],
 
+  /** @inventedArm kebabCase — PERMANENT */
   removeCommand(this: BaseClass, ...names: unknown[]): void {
     const options = (rbObjIsKindOf(names.at(-1) ?? null, Hash) ? names.pop() : {}) as {
       undefine?: unknown;
@@ -598,7 +599,10 @@ export const ClassMethods = {
     }
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm kebabCase — PERMANENT
+   */
   findAndRefreshCommand(this: BaseClass, name: string): Command {
     let command: Command | undefined;
     const key = kebabCase(rbObjAsString(name));

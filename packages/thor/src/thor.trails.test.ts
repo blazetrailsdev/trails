@@ -508,7 +508,7 @@ describe("Thor class paths", () => {
   it("registers a command in kebab-case and accepts either spelling", async () => {
     class Kebab extends Thor {
       static {
-        this.methodAdded("fooBar");
+        (this as unknown as ThorClass).methodAdded("fooBar");
       }
       fooBar() {
         return "ran";
