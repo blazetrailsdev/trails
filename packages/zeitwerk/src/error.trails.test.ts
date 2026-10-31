@@ -1,4 +1,5 @@
-import { NameError as RubyNameError, StandardError } from "@blazetrails/ruby-compat";
+import { NameError as RubyNameError, StandardError, rbModName } from "@blazetrails/ruby-compat";
+import "./zeitwerk.js";
 import { describe, expect, it } from "vitest";
 import {
   Error as ZeitwerkError,
@@ -15,6 +16,10 @@ describe("Zeitwerk errors", () => {
     expect(new SetupRequired().message).toBe(
       "please, finish your configuration and call Zeitwerk::Loader#setup once all is ready",
     );
+  });
+
+  it("registers Zeitwerk's class paths through the package entry", () => {
+    expect(rbModName(NameError)).toBe("Zeitwerk::NameError");
   });
 
   it("keeps Zeitwerk's ancestry", () => {

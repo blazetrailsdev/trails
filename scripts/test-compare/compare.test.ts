@@ -210,6 +210,12 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("cron_spec.rb", "fugit")).toBe("cron.test.ts");
   });
 
+  it("strips zeitwerk's test_ prefix", () => {
+    expect(rubyToConventionTs("lib/test_null_inflector.rb", "zeitwerk")).toBe(
+      "null-inflector.test.ts",
+    );
+  });
+
   it("strips raabro's _spec suffix", () => {
     expect(rubyToConventionTs("sample_xel_spec.rb", "raabro")).toBe("sample-xel.test.ts");
   });

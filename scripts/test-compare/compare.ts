@@ -211,12 +211,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     );
   }
 
-  if (pkg === "zeitwerk") {
-    const base = path.basename(rubyFile, ".rb").replace(/^test_/, "");
-    return base.replace(/_/g, "-") + ".test.ts";
-  }
-
-  if (pkg === "chronic" || pkg === "builder") {
+  if (pkg === "chronic" || pkg === "builder" || pkg === "zeitwerk") {
     const base = path.basename(rubyFile, ".rb").replace(/^test_/, "");
     return base.replace(/_/g, "-") + ".test.ts";
   }
