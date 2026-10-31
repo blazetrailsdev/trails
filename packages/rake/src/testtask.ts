@@ -6,6 +6,8 @@ import {
   block,
   env as ENV,
   isPlainHash,
+  puts,
+  stdout as $stdout,
   rbArgv,
   rbFArray,
   rbBlockGivenP,
@@ -62,7 +64,7 @@ export class TestTask extends TaskLib {
       block(() =>
         FileUtilsExt.verbose(this.verbose, async () => {
           if (rbArgv().includes("--verbose")) {
-            console.log('Use TESTOPTS="--verbose" to pass --verbose, etc. to runners.');
+            puts.call($stdout, 'Use TESTOPTS="--verbose" to pass --verbose, etc. to runners.');
           }
           const args =
             `${this.rubyOptsString()} ${this.runCode()} ` +
