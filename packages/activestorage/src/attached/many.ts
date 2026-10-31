@@ -20,7 +20,22 @@ export class Many extends Attached {
     await this.detachMany().detach();
   }
 
+  /** @inventedArm includes — PERMANENT */
   get attachments(): PromiseLike<Attachment[]> | Attachment[] {
+    return isPresent(this.change)
+      ? (this.change as CreateMany).attachments
+      : (
+          rbFSend(this.record, `${this.name}Attachments`) as {
+            includes(association: string): PromiseLike<Attachment[]>;
+          }
+        ).includes("blob");
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  get associationAttachments(): PromiseLike<Attachment[]> | Attachment[] {
     return isPresent(this.change)
       ? (this.change as CreateMany).attachments
       : (rbFSend(this.record, `${this.name}Attachments`) as PromiseLike<Attachment[]>);
@@ -44,17 +59,17 @@ export class Many extends Attached {
   }
 
   async isAttached(): Promise<boolean> {
-    return (await this.attachments).length > 0;
+    return (await this.associationAttachments).length > 0;
   }
 
   /** @internal */
   private purgeMany(): PurgeMany {
-    return new PurgeMany(this.name, this.record, this.attachments);
+    return new PurgeMany(this.name, this.record, this.associationAttachments);
   }
 
   /** @internal */
   private detachMany(): DetachMany {
-    return new DetachMany(this.name, this.record, this.attachments);
+    return new DetachMany(this.name, this.record, this.associationAttachments);
   }
 }
 
@@ -62,7 +77,7 @@ Object.setPrototypeOf(
   Many.prototype,
   delegateMissingTo.call(
     Object.create(Object.getPrototypeOf(Many.prototype) as object),
-    "attachments",
+    "associationAttachments",
   ),
 );
 

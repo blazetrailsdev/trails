@@ -109,6 +109,13 @@ describe("ActiveStorage::Attached::Many", () => {
     expect(user.attachmentChanges).toEqual({});
   });
 
+  it("an attachment read through the reader has its blob loaded", async () => {
+    await user.photos.attach(hash());
+    const blob = (await user.photos.blobs)[0];
+    const reloaded = (await Gallery.find(user.id)) as typeof user;
+    expect((await reloaded.photos.attachments)[0].signedId()).toBe(blob.signedId());
+  });
+
   it("delegates a missing name to the attachments and is not a thenable", async () => {
     await user.photos.attach(hash());
     expect(await user.photos).toBe(user.photos);
