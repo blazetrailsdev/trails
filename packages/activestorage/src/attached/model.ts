@@ -12,7 +12,6 @@ import {
   block,
   hashDelete,
   rbFArray,
-  isPlainHash,
   rbCallSuper,
   rbInspect,
   rbModName,
@@ -231,35 +230,6 @@ function hasManyAttached(
 }
 
 export const ClassMethods = { hasOneAttached, hasManyAttached };
-type CreateBlock = (record: Base) => void | Promise<void>;
-type CreateMethod = (
-  this: typeof Base,
-  attributes?: unknown,
-  block?: CreateBlock,
-) => Promise<unknown>;
-
-/** @noRailsEquivalent CONVERGEABLE activestorage-create-awaits-attachment-writers */
-function attachableBlock(
-  klass: typeof Base,
-  attributes: { [k: string]: unknown },
-  block?: CreateBlock,
-): [{ [k: string]: unknown }, CreateBlock] {
-  const reflections = (klass as unknown as { attachmentReflections: { [k: string]: unknown } })
-    .attachmentReflections;
-  const rest: { [k: string]: unknown } = {};
-  const attachables: [string, unknown][] = [];
-  for (const [key, value] of Object.entries(attributes)) {
-    if (Object.hasOwn(reflections, key)) attachables.push([key, value]);
-    else rest[key] = value;
-  }
-  return [
-    rest,
-    async (record) => {
-      await record.setAttributes(Object.fromEntries(attachables));
-      await block?.(record);
-    },
-  ];
-}
 
 function validateServiceConfiguration(
   serviceName: string | null,
@@ -336,21 +306,5 @@ Object.defineProperty(Model, "validateServiceConfiguration", {
   enumerable: false,
 });
 Model.ClassMethods = ClassMethods;
-
-/** @noRailsEquivalent CONVERGEABLE activestorage-create-awaits-attachment-writers */
-function awaitAttachablesOnCreate(this: typeof Base): void {
-  const host = this as unknown as { [k: string]: CreateMethod };
-  for (const name of ["create", "createBang"]) {
-    const method = host[name];
-    host[name] = function (this: typeof Base, attributes, block) {
-      if (!isPlainHash(attributes)) return method.call(this, attributes, block);
-      return method.call(this, ...attachableBlock(this, attributes, block));
-    };
-  }
-}
-(Model as unknown as { included(base: null, block: () => void): void }).included(
-  null,
-  awaitAttachablesOnCreate,
-);
 
 Attached.Model = Model;

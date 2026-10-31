@@ -2,7 +2,7 @@ import { File, FileUtils, setEnv } from "@blazetrails/ruby-compat";
 import { RUBY } from "./ruby-runner.js";
 
 const PRELUDE =
-  'import { FileList, Rake, main as self } from "@blazetrails/rake"; ' +
+  'import { FileList, Rake, Task, main as self } from "@blazetrails/rake"; ' +
   'import { File, RuntimeError, block, env as ENV } from "@blazetrails/ruby-compat"; ' +
   "const { task, file, multitask, rule, desc, namespace } = self; ";
 
@@ -262,4 +262,71 @@ const FL = await FileList.glob("*.ts");
 console.log(FL.join("\\n"));
 `,
   );
+}
+
+const TESTTASK = 'import { TestTask } from "@blazetrails/rake/testtask"; ';
+
+export function rakefileTestTask(): Promise<void> {
+  return rakefile(`${TESTTASK}
+new TestTask("unit", block((t) => {
+  t.description = "custom test task description";
+}));
+`);
+}
+
+export function rakefileTestTaskVerbose(): Promise<void> {
+  return rakefile(`${TESTTASK}
+new TestTask("unit", block((t) => {
+  t.verbose = true;
+}));
+`);
+}
+
+export async function rakefileImports(): Promise<void> {
+  await rakefile(`import "@blazetrails/rake/loaders/makefile";
+task("default");
+task("other", block(() => console.log("OTHER")));
+file("dynamic_deps", block((t) => File.writeAsync(t.name, "console.log('DYNAMIC')\\n")));
+self.import("dynamic_deps");
+self.import("static_deps");
+self.import("static_deps");
+self.import("deps.mf");
+console.log("FIRST");
+`);
+  await File.writeAsync("deps.mf", "default: other\n");
+  await File.writeAsync("static_deps", 'console.log("STATIC")\n');
+}
+
+export async function rakefileTestSignal(): Promise<void> {
+  await rakefile(`${TESTTASK}
+new TestTask("a", block((t) => {
+  t.testFiles = ["a_test.ts"];
+}));
+new TestTask("b", block((t) => {
+  t.testFiles = ["b_test.ts"];
+}));
+task("test", block(async () => {
+  await (await Task.get("a")).invoke();
+  await (await Task.get("b")).invoke();
+}));
+task({ default: "test" });
+`);
+  await File.writeAsync(
+    "a_test.ts",
+    'import { Process } from "@blazetrails/ruby-compat";\n' +
+      'console.log("ATEST");\n' +
+      'Process.kill("TERM", Process.pid);\n' +
+      "await new Promise((resolve) => setTimeout(resolve, 5000));\n",
+  );
+  await File.writeAsync("b_test.ts", 'console.log("BTEST");\n');
+}
+
+export async function rakefileFailingTestTask(): Promise<void> {
+  await rakefile(`${TESTTASK}
+task({ default: "test" });
+new TestTask("test", block((t) => {
+  t.testFiles = ["a_test.ts"];
+}));
+`);
+  await File.writeAsync("a_test.ts", 'throw new Error("this should fail");\n');
 }

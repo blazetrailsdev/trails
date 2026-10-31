@@ -1,4 +1,5 @@
 import {
+  block,
   AsyncEnumerable,
   cmp,
   extend,
@@ -12,7 +13,6 @@ import {
   strip,
 } from "@blazetrails/ruby-compat";
 import type { EarlyTime } from "./early-time.js";
-import { FileList } from "./file-list.js";
 import { InvocationChain } from "./invocation-chain.js";
 import { InvocationExceptionMixin } from "./invocation-exception-mixin.js";
 import type { LateTime } from "./late-time.js";
@@ -32,7 +32,6 @@ export class Task {
   readonly scope: Scope;
   readonly locations: string[];
   private _prerequisites: string[];
-  private _pendingPrerequisites: FileList[];
   private _alreadyInvoked: boolean;
 
   private _name: string;
@@ -75,7 +74,6 @@ export class Task {
   }
 
   async prerequisiteTasks(): Promise<Task[]> {
-    await this._resolvePrerequisites();
     return (await AsyncEnumerable.map.call(
       [...this.prerequisites, ...this.orderOnlyPrerequisites],
       (pre) => this.lookupPrerequisite(pre as string),
@@ -114,7 +112,6 @@ export class Task {
   constructor(taskName: string, app: TaskManager) {
     this._name = String(taskName);
     this._prerequisites = [];
-    this._pendingPrerequisites = [];
     this.actions = [];
     this._alreadyInvoked = false;
     this._comments = [];
@@ -127,17 +124,10 @@ export class Task {
     this.orderOnlyPrerequisites = [];
   }
 
-  enhance(deps: string[] | FileList | null = null, block?: TaskAction): this {
-    if (deps instanceof FileList) this._pendingPrerequisites.push(deps);
-    else if (deps) this._prerequisites = [...new Set([...this.prerequisites, ...deps])];
+  enhance(deps: string[] | null = null, block?: TaskAction): this {
+    if (deps) this._prerequisites = [...new Set([...this.prerequisites, ...deps])];
     if (block) this.actions.push(block);
     return this;
-  }
-
-  async _resolvePrerequisites(): Promise<void> {
-    for (const fileList of this._pendingPrerequisites.splice(0)) {
-      this.enhance(Task.formatDeps(await fileList.toA()));
-    }
   }
 
   get name(): string {
@@ -256,23 +246,18 @@ export class Task {
     }
   }
 
-  /** @inventedArm allSettled — PERMANENT */
   async invokePrerequisitesConcurrently(
     taskArgs: TaskArguments,
     invocationChain: InvocationChain<Task>,
   ): Promise<void> {
     const futures = (await this.prerequisiteTasks()).map((p) => {
       const prereqArgs = taskArgs.newScope(p.argNames);
-      const stats = this.application.threadPool;
-      stats.totalThreadsInPlay += 1;
-      stats.activeThreads += 1;
-      stats.maxActiveThreads = Math.max(stats.maxActiveThreads, stats.activeThreads);
-      return p.invokeWithCallChain(prereqArgs, invocationChain).finally(() => {
-        stats.activeThreads -= 1;
-      });
+      return this.application.threadPool.future(
+        p,
+        block((r: Task) => r.invokeWithCallChain(prereqArgs, invocationChain)),
+      );
     });
-    const values = await Promise.allSettled(futures);
-    for (const value of values.reverse()) if (value.status === "rejected") throw value.reason;
+    for (const future of futures.reverse()) await future.value();
   }
 
   /** @internal */

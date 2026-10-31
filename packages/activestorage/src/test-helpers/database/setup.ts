@@ -2,6 +2,7 @@ import { afterAll } from "vitest";
 import { EnvironmentInquirer, getEnv, TopLevel } from "@blazetrails/activesupport";
 import { GlobalID } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
+import { RouteSet } from "@blazetrails/actionpack";
 import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/activerecord";
 import { Application } from "@blazetrails/trailties";
 import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/global-id";
@@ -17,10 +18,21 @@ import { ActiveStorageCreateGroups } from "./create-groups-migration.js";
 
 const envName = String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
 
+const routes = new RouteSet();
+routes.draw(function () {
+  this.scope("/rails/active_storage", function () {
+    this.get("/disk/:encoded_key/*filename", {
+      to: "active_storage/disk#show",
+      as: "rails_disk_service",
+    });
+  });
+});
+
 const configuration = new Configuration();
 TopLevel.Trails = {
   ...TopLevel.Trails,
   env: TopLevel.Trails?.env ?? new EnvironmentInquirer(envName),
+  application: { routes: () => routes },
   configuration: {
     generators: configuration.appGenerators.bind(configuration),
     activeStorage: { service: "local" },
@@ -35,6 +47,31 @@ for (const railtie of [GlobalIDRailtie, Engine]) {
     await initializer.bind(railtie.instance()).run(app);
   }
 }
+
+ActiveStorage.trackVariants = true;
+ActiveStorage.contentTypesToServeAsBinary = [
+  "text/html",
+  "image/svg+xml",
+  "application/postscript",
+  "application/x-shockwave-flash",
+  "text/xml",
+  "application/xml",
+  "application/xhtml+xml",
+  "application/mathml+xml",
+  "text/cache-manifest",
+];
+ActiveStorage.contentTypesAllowedInline = [
+  "image/webp",
+  "image/avif",
+  "image/png",
+  "image/gif",
+  "image/jpeg",
+  "image/tiff",
+  "image/bmp",
+  "image/vnd.adobe.photoshop",
+  "image/vnd.microsoft.icon",
+  "application/pdf",
+];
 
 GlobalID.setApp("ActiveStorageExampleApp");
 

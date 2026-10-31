@@ -4,7 +4,7 @@ import { StringIO } from "@blazetrails/ruby-compat";
 import "../test-helpers/database/setup.js";
 import { ActiveStorage } from "../active-storage.js";
 import { Blob } from "../blob.js";
-import { createBlob, User } from "../test-helpers/test-helper.js";
+import { createBlob, Group, User } from "../test-helpers/test-helper.js";
 import { One } from "./one.js";
 
 type AvatarUser = User & {
@@ -30,6 +30,64 @@ describe("ActiveStorage::Attached::One", () => {
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
     user = (await Member.createBang({ name: "Josh" })) as AvatarUser;
+  });
+
+  it("create awaits the attachment writer before saving", async () => {
+    const created = (await Member.create({ name: "Jason", avatar: hash() })) as AvatarUser;
+    expect(await created.avatar.isAttached()).toBe(true);
+    expect(created.isPersisted()).toBe(true);
+  });
+
+  it("create runs its block after the attachment writer resolves", async () => {
+    let attached: unknown;
+    await Member.createBang({ name: "Jason", avatar: hash() }, (record: AvatarUser) => {
+      attached = record.attachmentChanges.avatar;
+    });
+    expect(attached).toBeDefined();
+  });
+
+  it("create with a block rejects with the attachment writer's error", async () => {
+    let yielded = false;
+    const created = Member.createBang({ name: "Jason", avatar: Symbol.for("foo") }, () => {
+      yielded = true;
+    });
+    await expect(created).rejects.toThrow(/Could not find or build blob/);
+    expect(yielded).toBe(false);
+  });
+
+  it("create assigns a key after the attachment key", async () => {
+    const created = (await Member.createBang({ avatar: hash(), name: "Jason" })) as AvatarUser;
+    expect(created.name).toBe("Jason");
+    expect(await created.avatar.isAttached()).toBe(true);
+  });
+
+  it("create with an array of hashes awaits each attachment writer", async () => {
+    const created = (await Member.createBang([
+      { name: "Jason", avatar: hash() },
+      { name: "Dorian", avatar: hash() },
+    ])) as unknown as AvatarUser[];
+    for (const record of created) expect(await record.avatar.isAttached()).toBe(true);
+  });
+
+  it("a relation create awaits the attachment writer", async () => {
+    const created = (await Member.where({ name: "Jason" }).createBang({
+      avatar: hash(),
+    })) as unknown as AvatarUser;
+    expect(created.name).toBe("Jason");
+    expect(await created.avatar.isAttached()).toBe(true);
+  });
+
+  it("an association create awaits the attachment writer", async () => {
+    const group = await Group.createBang({});
+    const created = (await group.association("users").createBang({
+      name: "Jason",
+      avatar: hash(),
+    })) as AvatarUser;
+    expect(await created.avatar.isAttached()).toBe(true);
+  });
+
+  it("new raises for an attachment key", () => {
+    expect(() => new Member({ name: "Jason", avatar: hash() })).toThrow(/setAttributes/);
   });
 
   it("the writer builds the blob before it resolves and uploads after commit", async () => {

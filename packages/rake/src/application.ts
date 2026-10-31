@@ -37,6 +37,7 @@ import { DefaultLoader } from "./default-loader.js";
 import { FileUtilsExt } from "./file-utils-ext.js";
 import { Rake } from "./rake-module.js";
 import { Scope } from "./scope.js";
+import { ThreadPool } from "./thread-pool.js";
 import { TaskManager } from "./task-manager.js";
 import { TraceOutput } from "./trace-output.js";
 import { VERSION } from "./version.js";
@@ -93,15 +94,7 @@ export class Application {
   /** @internal */ _systemDir: string | undefined;
   /** @internal */ _displayExceptionDetailsSeen: Error[] | undefined;
   /** @internal */ _dynamicWidth: number | undefined;
-  threadPool = {
-    activeThreads: 0,
-    maxActiveThreads: 0,
-    totalThreadsInPlay: 0,
-    statistics(): { maxActiveThreads: number; totalThreadsInPlay: number } {
-      const { maxActiveThreads, totalThreadsInPlay } = this;
-      return { maxActiveThreads, totalThreadsInPlay };
-    },
-  };
+  /** @internal */ _threadPool: ThreadPool | undefined;
 
   /**
    * @inlinedFrom Rake::TaskManager#initialize rake/v13.2.1/lib/rake/task_manager.rb:9-15
@@ -169,9 +162,9 @@ export class Application {
     });
   }
 
-  /** @missingRailsCall join — PERMANENT */
   async runWithThreads(block: () => Promise<void>): Promise<void> {
     await block();
+    if (this._threadPool !== undefined) await this.threadPool.join();
     if (this.options.jobStats) {
       const stats = this.threadPool.statistics();
       STDOUT.puts(`Maximum active threads: ${stats.maxActiveThreads} + main`);
@@ -186,6 +179,12 @@ export class Application {
 
   get options(): ApplicationOptions {
     return (this._options ??= {});
+  }
+
+  get threadPool(): ThreadPool {
+    return (this._threadPool ??= new ThreadPool(
+      this.options.threadPoolSize ?? Rake.suggestedThreadCount() - 1,
+    ));
   }
 
   /** @internal */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ArgumentError,
+  Enumerator,
   File,
   IndexError,
   Range,
@@ -36,7 +37,10 @@ slice_after slice_before slice_when sort sort! sort_by sort_by! sum take take_wh
   });
 
   it("answers the methods the closed table missed", async () => {
-    expect(await fl().eachSlice(3)).toEqual([["a.c", "b.h", "c.c"], ["d.h"]]);
+    expect(await ((await fl().eachSlice(3)) as unknown as Enumerator).toA()).toEqual([
+      ["a.c", "b.h", "c.c"],
+      ["d.h"],
+    ]);
     expect(await fl().eachWithObject([] as string[], (f, m) => m.push(f))).toHaveLength(4);
     expect(await fl().flatMap((f) => [f, f])).toHaveLength(8);
     expect(await fl().sum("", async (f: string) => later(f[0]))).toEqual("abcd");
@@ -66,10 +70,12 @@ slice_after slice_before slice_when sort sort! sort_by sort_by! sum take take_wh
 
   it("answers the combinatoric and grouping arms", async () => {
     const f = new FileList().import(["a", "b", "c"]);
-    expect(await f.combination(3)).toEqual([["a", "b", "c"]]);
-    expect(await f.permutation(2)).toHaveLength(6);
-    expect(await f.repeatedCombination(2)).toHaveLength(6);
-    expect(await f.repeatedPermutation(2)).toHaveLength(9);
+    expect(await ((await f.combination(3)) as unknown as Enumerator).toA()).toEqual([
+      ["a", "b", "c"],
+    ]);
+    expect(await ((await f.permutation(2)) as Enumerator).toA()).toHaveLength(6);
+    expect(await ((await f.repeatedCombination(2)) as unknown as Enumerator).toA()).toHaveLength(6);
+    expect(await ((await f.repeatedPermutation(2)) as unknown as Enumerator).toA()).toHaveLength(9);
     expect(await f.sliceWhen((a, b) => b === "c")).toEqual([["a", "b"], ["c"]]);
     expect(await f.chunkWhile((a, b) => b !== "c")).toEqual([["a", "b"], ["c"]]);
     expect(await f.chunk((x) => x === "c")).toEqual([
@@ -120,7 +126,7 @@ slice_after slice_before slice_when sort sort! sort_by sort_by! sum take take_wh
   it("compares through Array#<=>, finds without a block, and appends several", async () => {
     expect(await new FileList().import([1, [2]]).compare([1, [3]])).toEqual(-1);
     expect(await fl().compare("x")).toBeNull();
-    expect(await fl().find()).toHaveLength(4);
+    expect(await fl().find()).toBeInstanceOf(Enumerator);
     expect(await (await new FileList().append("a", "b")).toA()).toEqual(["a", "b"]);
   });
 });
@@ -163,5 +169,34 @@ describe("FileList#toAry", () => {
     expect(flatten(["a", resolved])).toEqual(["a", "x"]);
     expect(rbFArray(resolved)).toEqual(["x"]);
     expect(await new FileList().include(resolved).toA()).toEqual(["x"]);
+  });
+});
+
+describe("FileList enumerators", () => {
+  it("lazy, chain and blockless iterators answer an Enumerator", async () => {
+    const fl = FileList.get("a.c", "b.c");
+
+    expect(await fl.lazy()).toBeInstanceOf(Enumerator.Lazy);
+    expect(await ((await fl.chain(["x"])) as Enumerator).toA()).toEqual(["a.c", "b.c", "x"]);
+    for (const iterator of [
+      fl.each(),
+      fl.map(undefined as never),
+      fl.eachSlice(1),
+      fl.cycle(),
+      fl.takeWhile(undefined as never),
+      fl.minBy(),
+      fl.deleteIf(undefined as never),
+      fl.groupBy(undefined as never),
+    ]) {
+      expect(await iterator).toBeInstanceOf(Enumerator);
+    }
+    const other = FileList.get("c.c");
+    const lazy = ((await fl.each()) as Enumerator).lazy();
+    expect(await lazy.take(1).toA()).toEqual(["a.c"]);
+    const chained = (await fl.chain(await other.each())) as Enumerator;
+    expect(await chained.toA()).toEqual(["a.c", "b.c", "c.c"]);
+    const each = (await fl.map(undefined as never)) as unknown as Enumerator;
+    expect(each.size()).toBe(2);
+    expect(await each.each((fn: never) => `${fn}!`)).toEqual(["a.c!", "b.c!"]);
   });
 });

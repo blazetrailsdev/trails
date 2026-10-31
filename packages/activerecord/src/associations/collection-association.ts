@@ -22,6 +22,7 @@ import type { AssociationProxy } from "./collection-proxy.js";
 import { CollectionProxy } from "./collection-proxy.js";
 import { NotImplementedError, RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
+import { awaitingAssignment } from "@blazetrails/activemodel";
 
 export abstract class CollectionAssociation extends Association {
   nestedAttributesTarget: (Base | null)[] | null = null;
@@ -253,15 +254,9 @@ export abstract class CollectionAssociation extends Association {
     }
 
     await this.klass.ensureSchemaLoaded();
-    let yielded: unknown;
-    const record = this.buildRecord(
-      attributes,
-      block &&
-        ((record: Base) => {
-          yielded = block(record);
-        }),
-    )!;
-    await yielded;
+    const record = (await awaitingAssignment(attributes, block, (block) =>
+      this.buildRecord(attributes, block),
+    ))!;
     await this.transaction(async () => {
       let result: boolean | undefined = undefined;
       await this.addToTarget(record, {}, async () => {

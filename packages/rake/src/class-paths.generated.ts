@@ -25,9 +25,10 @@ import * as m22 from "./task-arguments.js";
 import * as m23 from "./task-manager.js";
 import * as m24 from "./task.js";
 import * as m25 from "./tasklib.js";
-import * as m26 from "./trace-output.js";
-import * as m27 from "./version.js";
-import * as m28 from "./win32.js";
+import * as m26 from "./thread-pool.js";
+import * as m27 from "./trace-output.js";
+import * as m28 from "./version.js";
+import * as m29 from "./win32.js";
 
 registerClassPaths([
   [() => m0.Application, "Rake::Application"],
@@ -56,8 +57,9 @@ registerClassPaths([
   [() => m22.TaskArguments, "Rake::TaskArguments"],
   [() => m25.TaskLib, "Rake::TaskLib"],
   [() => m23.TaskManager, "Rake::TaskManager"],
-  [() => m26.TraceOutput, "Rake::TraceOutput"],
-  [() => m27.Version, "Rake::Version"],
-  [() => m28.Win32, "Rake::Win32"],
-  [() => m28.Win32HomeError, "Rake::Win32::Win32HomeError"],
+  [() => m26.ThreadPool, "Rake::ThreadPool"],
+  [() => m27.TraceOutput, "Rake::TraceOutput"],
+  [() => m28.Version, "Rake::Version"],
+  [() => m29.Win32, "Rake::Win32"],
+  [() => m29.Win32HomeError, "Rake::Win32::Win32HomeError"],
 ]);
