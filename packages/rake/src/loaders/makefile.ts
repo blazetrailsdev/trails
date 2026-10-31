@@ -3,10 +3,8 @@ import { DSL } from "../dsl-definition.js";
 import { Rake } from "../rake-module.js";
 
 export class MakefileLoader {
-  /** @internal */
   static SPACE_MARK = "\0";
 
-  /** @internal */
   async load(fn: string): Promise<void> {
     let lines = await File.readAsync(fn);
     lines = lines.replace(/\\ /g, MakefileLoader.SPACE_MARK);

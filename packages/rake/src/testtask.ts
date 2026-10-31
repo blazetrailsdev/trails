@@ -10,7 +10,6 @@ import {
   stdout as $stdout,
   rbArgv,
   rbFArray,
-  rbBlockGivenP,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import type { main } from "./dsl-definition.js";
@@ -27,7 +26,7 @@ type RunStatus = {
 };
 
 export class TestTask extends TaskLib {
-  name: unknown;
+  name: string | Record<string, unknown>;
   libs: string[] = ["lib"];
   verbose = false;
   options: string | null = null;
@@ -43,15 +42,22 @@ export class TestTask extends TaskLib {
     this._testFiles = list;
   }
 
-  constructor(name: unknown = "test", ...args: unknown[]) {
+  constructor(
+    name: string | Record<string, unknown> | ((t: TestTask) => unknown) = "test",
+    blk: ((t: TestTask) => unknown) | null = null,
+  ) {
     super();
+    if (typeof name === "function") {
+      blk = name;
+      name = "test";
+    }
     this.name = name;
     this.description = "Run tests" + (this.name === "test" ? "" : ` for ${String(this.name)}`);
     if (isPlainHash(this.name)) {
       this.deps = Object.values(this.name)[0];
       this.name = Object.keys(this.name)[0];
     }
-    if (rbBlockGivenP(args.at(-1))) (args.at(-1) as (t: TestTask) => unknown)(this);
+    if (blk != null) blk(this);
     if (this.pattern == null && this._testFiles == null) this.pattern = "test/test*.rb";
     this.define();
   }
@@ -92,31 +98,26 @@ export class TestTask extends TaskLib {
     return this;
   }
 
-  /** @internal */
   optionList(): string {
     return (
       ENV["TESTOPTS"] || ENV["TESTOPT"] || ENV["TEST_OPTS"] || ENV["TEST_OPT"] || this.options || ""
     );
   }
 
-  /** @internal */
   rubyOptsString(): string {
     const opts = [...this.rubyOpts];
     if (this.warning) opts.unshift("--pending-deprecation");
     return opts.join(" ");
   }
 
-  /** @internal */
   libPath(): string {
     return this.libs.join(File.PATH_SEPARATOR);
   }
 
-  /** @internal */
   async fileListString(): Promise<string> {
     return (await this.fileList()).map((fn: string) => `"${fn}"`).join(" ");
   }
 
-  /** @internal */
   async fileList(): Promise<string[]> {
     if (ENV["TEST"]) {
       return (await FileList.get(ENV["TEST"]).toA()) as string[];
@@ -135,12 +136,10 @@ export class TestTask extends TaskLib {
     }
   }
 
-  /** @internal */
   rubyVersion(): string {
     return RUBY_VERSION;
   }
 
-  /** @internal */
   runCode(): string | undefined {
     switch (this.loader) {
       case "direct":
@@ -148,7 +147,7 @@ export class TestTask extends TaskLib {
       case "testrb":
         return "-S testrb";
       case "rake":
-        return `${File.dirname(decodeURIComponent(new URL(import.meta.url).pathname))}/rake-test-loader.js`;
+        return `${import.meta.dirname}/rake-test-loader.js`;
     }
   }
 }
