@@ -252,7 +252,7 @@ describe("TestRakeTask", () => {
   });
 
   it("filelists can be prerequisites", async () => {
-    task({ a: new FileList().include("b", "c") });
+    task({ a: await new FileList().include("b", "c").resolve() });
     expect((await Task.get("a")).prerequisites).toEqual(["b", "c"]);
   });
 
