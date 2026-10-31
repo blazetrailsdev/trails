@@ -105,7 +105,7 @@ describe("Thor::Group", () => {
   });
 
   describe("#help", () => {
-    const content = () => capture(":stdout", () => MyCounter.help(new Base.shell!()));
+    const content = () => capture(":stdout", () => MyCounter.help(new Base.shell()));
 
     it("provides usage information", async () => {
       expect(await content()).toMatch(/my_counter N \[N\]/);
@@ -146,7 +146,7 @@ describe("Thor::Group", () => {
     });
 
     it("shows invoked options on help", async () => {
-      const content = await capture(":stdout", () => E.help(new Base.shell!()));
+      const content = await capture(":stdout", () => E.help(new Base.shell()));
       expect(content).toMatch(/Defined options:/);
       expect(content).toMatch(/\[--unused\]/);
       expect(content).toMatch(/# This option has no use/);
@@ -188,7 +188,7 @@ describe("Thor::Group", () => {
       });
 
       it("shows invoked options on help", async () => {
-        const content = await capture(":stdout", () => G.help(new Base.shell!()));
+        const content = await capture(":stdout", () => G.help(new Base.shell()));
         expect(content).toMatch(/defined options:/);
         expect(content).toMatch(/\[--unused\]/);
         expect(content).toMatch(/# This option has no use/);
@@ -215,7 +215,7 @@ describe("Thor::Group", () => {
       });
 
       it("shows invoked options on help", async () => {
-        const content = await capture(":stdout", () => H.help(new Base.shell!()));
+        const content = await capture(":stdout", () => H.help(new Base.shell()));
         expect(content).toMatch(/defined options:/);
         expect(content).toMatch(/\[--unused\]/);
         expect(content).toMatch(/# This option has no use/);

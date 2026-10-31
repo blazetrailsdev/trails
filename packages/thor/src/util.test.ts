@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertEmpty } from "@blazetrails/activesupport";
+import { assertEmpty } from "./test-helpers/assertions.js";
 import { constSet } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "./core-ext/hash-with-indifferent-access.js";
 import { Thor, type ThorClass } from "./thor.js";

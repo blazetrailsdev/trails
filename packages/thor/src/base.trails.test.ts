@@ -255,6 +255,7 @@ describe("Thor::Base", () => {
       expect(rbObjRespondTo(instance, "other")).toBe(false);
       expect(rbObjRespondTo(instance, "other=")).toBe(false);
       expect(() => rbFSend(instance, "other=", 1)).toThrow(NoMethodError);
+      expect(() => rbFSend(instance, "other")).toThrow(NoMethodError);
     });
   });
 

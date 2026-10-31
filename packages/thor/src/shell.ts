@@ -6,13 +6,13 @@ type ShellClass = new () => Basic;
 
 const singleton = {
   /** @internal */
-  _shell: null as ShellClass | null | undefined,
+  _shell: null as ShellClass | null,
 
   set shell(shell: ShellClass | null) {
     this._shell = shell;
   },
 
-  get shell(): ShellClass | undefined {
+  get shell(): ShellClass {
     if (this._shell == null) {
       if (env["THOR_SHELL"] != null && env["THOR_SHELL"] !== "") {
         this._shell = rbConstGet(Shell, env["THOR_SHELL"]) as ShellClass;
@@ -30,8 +30,6 @@ const singletonMethods = Object.getOwnPropertyDescriptors(singleton);
 for (const descriptor of Object.values(singletonMethods)) descriptor.enumerable = false;
 
 export const Base = Object.defineProperties({}, singletonMethods) as typeof singleton;
-
-type Delegated = Record<string, (...args: unknown[]) => unknown>;
 
 export interface Shell {
   /** @internal */
@@ -74,7 +72,7 @@ function setShell(this: Shell, shell: Basic | null | undefined): void {
 }
 
 function shell(this: Shell): Basic {
-  return (this._shell ??= new Base.shell!());
+  return (this._shell ??= new Base.shell());
 }
 
 function ask(this: Shell, ...args: Parameters<Basic["ask"]>): ReturnType<Basic["ask"]> {
@@ -121,12 +119,15 @@ function printWrapped(this: Shell, ...args: Parameters<Basic["printWrapped"]>): 
   return this.shell.printWrapped(...args);
 }
 
-function fileCollision(this: Shell, ...args: unknown[]): unknown {
-  return (this.shell as unknown as Delegated).fileCollision(...args);
+function fileCollision(
+  this: Shell,
+  ...args: Parameters<Basic["fileCollision"]>
+): ReturnType<Basic["fileCollision"]> {
+  return this.shell.fileCollision(...args);
 }
 
-function terminalWidth(this: Shell, ...args: unknown[]): unknown {
-  return (this.shell as unknown as Delegated).terminalWidth(...args);
+function terminalWidth(this: Shell): number {
+  return (this.shell as Basic & { terminalWidth(): number }).terminalWidth();
 }
 
 function withPadding<T>(this: Shell, block: () => T): T {

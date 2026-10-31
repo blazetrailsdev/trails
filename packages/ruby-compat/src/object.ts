@@ -1070,6 +1070,42 @@ export function defineAccessorHalf(
 }
 
 /**
+ * `Module#undef_method` (`rb_mod_undef_method`,
+ * `vendor/ruby/v3.3.11/vm_method.c:1973`). An undefined name raises `NameError`.
+ * `name` and `name=` are one JS descriptor, so undefining one half of an accessor
+ * seats that half absent and keeps the other.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModUndefMethod(klass: { prototype: object }, ...names: string[]): void {
+  const proto = klass.prototype;
+  for (const name of names) {
+    if (!checkDefinition(klass, name)) {
+      throw new NameError(`undefined method '${name}' for class '${rbModName(klass)}'`, name);
+    }
+    const writer = name.endsWith("=");
+    const id = writer ? name.slice(0, -1) : name;
+    let desc: PropertyDescriptor | undefined;
+    for (let o: object | null = proto; o && !desc; o = Object.getPrototypeOf(o) as object | null) {
+      desc = Object.getOwnPropertyDescriptor(o, id);
+    }
+    const other = writer ? desc?.get : desc?.set;
+    if (other !== undefined && !isAbsentHalf(other)) {
+      Object.defineProperty(proto, id, {
+        configurable: true,
+        enumerable: desc!.enumerable,
+        get: writer ? desc!.get : absentHalf(id, false),
+        set: writer ? absentHalf(id, true) : desc!.set,
+      });
+    } else {
+      UNDEF_METHOD_TABLES.add(proto);
+      Object.defineProperty(proto, id, { value: undefined, writable: true, configurable: true });
+    }
+  }
+  rbClearMethodCache();
+}
+
+/**
  * `rb_attr` (`vendor/ruby/v3.3.11/vm_method.c:1863`). The half not being
  * defined is left to the next table ({@link defineAccessorHalf}); the ivar
  * lives in the `_`-prefixed field ({@link rbDeclareIvar}).

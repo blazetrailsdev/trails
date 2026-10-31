@@ -122,6 +122,7 @@ export {
   TopLevel,
   type ConstantTable,
   type TopLevelConstants,
+  rbModUndefMethod,
 } from "./object.js";
 export {
   Hash,

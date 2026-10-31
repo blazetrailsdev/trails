@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { assertPredicate } from "@blazetrails/activesupport";
+import { assertPredicate } from "../test-helpers/assertions.js";
 import { stdin as $stdin, stdout as $stdout } from "@blazetrails/ruby-compat";
 import { Basic } from "./basic.js";
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "../test-helpers/helper.js";
 import { env, rational, setEnv, ZeroDivisionError } from "@blazetrails/ruby-compat";
 import { Basic } from "./basic.js";
 

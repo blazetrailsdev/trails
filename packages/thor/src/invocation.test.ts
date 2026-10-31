@@ -86,7 +86,7 @@ describe("Thor::Invocation", () => {
 
     it("allow extra configuration values to be given", async () => {
       const base = new A();
-      const shell = new Base.shell!();
+      const shell = new Base.shell();
       expect(((await base.invoke("b:three", [], {}, { shell: shell })) as Invoker).shell).toEqual(
         shell,
       );
