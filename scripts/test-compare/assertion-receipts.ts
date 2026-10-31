@@ -31,6 +31,15 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "rake:test_rake_test_task.rb › TestRakeTestTask › run code rake": [
+    {
+      kind: "assert_includes",
+      value: "s:lib/rake/rakeTestLoader.js",
+      as: "assert_includes",
+      reason:
+        "test_rake_test_task.rb:131 names rake's installed path. A TS module is emitted by kebab-case file name beside its importer, so the same assertion names `rake-test-loader.js`, the spelling `run_code` produces.",
+    },
+  ],
   "rake:test_rake_rake_test_loader.rb › TestRakeRakeTestLoader › load error raised implicitly": [
     {
       kind: "assert_equal",

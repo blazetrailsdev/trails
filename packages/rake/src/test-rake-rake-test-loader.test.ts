@@ -45,7 +45,7 @@ describe("TestRakeRakeTestLoader", () => {
 
     const noSuchPath = File.join(app.tempdir, "no_such_test_file.rb");
 
-    expect(err).toMatch(new RegExp(`^\\nFile does not exist: ${noSuchPath}\\n\\n`));
+    expect(err).toMatch(new RegExp(`^\\nFile does not exist: ${noSuchPath}\\n\\n\\n?$`));
   });
 
   it("load error raised implicitly", async () => {
