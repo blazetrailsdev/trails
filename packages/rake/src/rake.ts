@@ -34,3 +34,5 @@ export { Task } from "./task.js";
 export { TaskLib } from "./tasklib.js";
 export { TaskManager } from "./task-manager.js";
 export type { TaskAction, Timestamp } from "./task.js";
+export { NOT_SET, Promise } from "./promise.js";
+export { ThreadPool } from "./thread-pool.js";
