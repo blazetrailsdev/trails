@@ -81,7 +81,7 @@ export function ioPutsAry(this: GenericWritable, ary: unknown[]): void {
 }
 
 /**
- * `rb_io_print` (`vendor/ruby/v3.3.11/io.c:8715`) with `$,` and `$\` nil: each
+ * `rb_io_print` (`vendor/ruby/v3.3.11/io.c:8715`) with `$,` nil: each
  * argument's `to_s`, written with no separator, answering `nil`. Shared by
  * `IO#print` and `StringIO#print` the way {@link puts} is.
  *
