@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   assertCalledWith,
+  assertChanges,
   assertNoDifference,
   assertRaises,
   base36,
@@ -14,18 +15,22 @@ import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import { ContentDisposition } from "@blazetrails/actionpack";
 import { RecordInvalid, RecordNotSaved, RecordNotUnique } from "@blazetrails/activerecord";
 import { ArgumentError, Dir, File, IO, OpenSSL, Pathname } from "@blazetrails/ruby-compat";
+import { TestCase } from "@blazetrails/activejob/test-case";
+import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
 import { Blob } from "./blob.js";
 import { Current } from "./current.js";
 import { IntegrityError } from "./errors.js";
 import { Filename } from "./filename.js";
+import { PurgeJob } from "./purge-job.js";
 import { DiskService } from "./service/disk-service.js";
 import {
   buildBlobAfterUnfurling,
   createBlob,
   createFileBlob,
   directlyUploadFileBlob,
+  extractMetadataFrom,
   fileFixture,
   User,
   withService,
@@ -39,6 +44,10 @@ Object.assign(Blob.prototype, {
   analyzeLater: async () => {},
   isPreviewImageNeededBeforeProcessingVariants: () => false,
 });
+
+class BlobTest extends TestCase {
+  purgeLater(): void {}
+}
 
 const binary = (bytes: unknown) => new TextDecoder("latin1").decode(bytes as Uint8Array);
 const decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
@@ -201,7 +210,25 @@ describe("ActiveStorage::BlobTest", () => {
   });
 
   // BLOCKED: activestorage-image-analyzers
-  it.skip("record touched after analyze", () => {});
+  it.skip("record touched after analyze", async () => {
+    const user = await User.createBang({
+      name: "Nate",
+      avatar: {
+        contentType: "image/jpeg",
+        filename: "racecar.jpg",
+        io: File.open(fileFixture("racecar.jpg")),
+      },
+    });
+
+    await assertChanges(
+      async () => (await user.reload()).readAttribute("updated_at"),
+      null,
+      {},
+      async () => {
+        await extractMetadataFrom((await (await user.avatar.attachment)!.blob)!);
+      },
+    );
+  });
 
   it("build_after_unfurling generates a 28-character base36 key", () => {
     expect(buildBlobAfterUnfurling().key).toMatch(/^[a-z0-9]{28}$/);
@@ -399,7 +426,22 @@ describe("ActiveStorage::BlobTest", () => {
   });
 
   // BLOCKED: activestorage-variation-and-variants
-  it.skip("purge deletes variants from external service with the purge_later", () => {});
+  it.skip("purge deletes variants from external service with the purge_later", async () => {
+    const blob = await createFileBlob();
+    const variant = await (
+      blob as unknown as {
+        variant(transformations: object): {
+          processed(): Promise<{ image: { blob: Blob } }>;
+        };
+      }
+    )
+      .variant({ resizeToLimit: [100, null] })
+      .processed();
+
+    await blob.purge();
+    const t = new BlobTest("purgeLater") as unknown as TestHelper;
+    await t.assertEnqueuedWith({ job: PurgeJob, args: [variant.image.blob] });
+  });
 
   it("purge does nothing when attachments exist", async () => {
     const blob = await createBlob();
