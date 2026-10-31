@@ -86,7 +86,10 @@ export class Handler {
     return rbEqual(this.pattern, other.pattern);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName gsub — PERMANENT
+   */
   private isTagsMatch(name: string, tokens: Token[], tokenIndex: number): boolean | undefined {
     const klass = constGet(
       Chronic,
