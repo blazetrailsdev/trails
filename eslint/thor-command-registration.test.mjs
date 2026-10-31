@@ -16,6 +16,18 @@ tester.run("thor-command-registration", rule, {
   valid: [
     {
       code: `
+import { Base } from "../command/base.js";
+class Db extends Base {
+  static {
+    const klass = this as unknown as ThorClass;
+    klass.methodAdded("perform");
+  }
+  perform() {}
+}`,
+      options: [{ baseImports: ["command/base.js"] }],
+    },
+    {
+      code: `
 class MyScript extends Thor {
   zoo() {}
 }

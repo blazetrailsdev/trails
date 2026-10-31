@@ -47,13 +47,23 @@ function commandCandidates(body) {
 
 function registeredNames(blocks, sourceCode, className = null) {
   const names = new Set();
+  const aliases = new Set();
   const visit = (node) => {
+    if (
+      node.type === "VariableDeclarator" &&
+      node.id.type === "Identifier" &&
+      node.init &&
+      isThis(node.init)
+    ) {
+      aliases.add(node.id.name);
+    }
     if (
       node.type === "CallExpression" &&
       node.callee.type === "MemberExpression" &&
       !node.callee.computed &&
       node.callee.property.name === "methodAdded" &&
       (isThis(node.callee.object) ||
+        aliases.has(dottedName(node.callee.object)) ||
         (className !== null && dottedName(node.callee.object) === className))
     ) {
       const [arg] = node.arguments;
@@ -83,7 +93,8 @@ function registeredNames(blocks, sourceCode, className = null) {
  * a command, and a `static` method is a class method `method_added` never sees.
  *
  * The `extends` chain is read within the file, in any declaration order.
- * `baseClasses` names further Thor classes a file imports. A registration is a
+ * `baseClasses` names further Thor classes a file imports; `baseImports` names
+ * module path suffixes whose named imports are Thor classes. A registration is a
  * `this.methodAdded("name")` call, or a top-level `Klass.methodAdded("name")`, with a string literal: a name passed through
  * a variable is not read, and its method is reported.
  *
@@ -101,7 +112,10 @@ export default {
     schema: [
       {
         type: "object",
-        properties: { baseClasses: { type: "array", items: { type: "string" } } },
+        properties: {
+          baseClasses: { type: "array", items: { type: "string" } },
+          baseImports: { type: "array", items: { type: "string" } },
+        },
         additionalProperties: false,
       },
     ],
@@ -116,6 +130,8 @@ export default {
   create(context) {
     const sourceCode = context.sourceCode;
     const thorClasses = new Set([...THOR_BASES, ...(context.options[0]?.baseClasses ?? [])]);
+
+    const baseImports = context.options[0]?.baseImports ?? [];
 
     const classes = [];
 
@@ -165,6 +181,12 @@ export default {
     return {
       ClassDeclaration: (node) => classes.push(node),
       ClassExpression: (node) => classes.push(node),
+      ImportDeclaration(node) {
+        if (!baseImports.some((suffix) => node.source.value.endsWith(suffix))) return;
+        for (const specifier of node.specifiers) {
+          if (specifier.type === "ImportSpecifier") thorClasses.add(specifier.local.name);
+        }
+      },
       "Program:exit"() {
         let pending = classes.filter((node) => dottedName(node.superClass) !== null);
         for (let found = true; found; ) {

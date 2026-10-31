@@ -152,7 +152,7 @@ export class Basic {
 
   async fileCollision(destination: string, block?: () => unknown): Promise<boolean | null> {
     if (this._alwaysForce) return true;
-    const options = block ? "[Ynaqdhm]" : "[Ynaqh]";
+    const options = block != null ? "[Ynaqdhm]" : "[Ynaqh]";
 
     for (;;) {
       const answer = await this.ask(`Overwrite ${destination}? (enter "h" for help) ${options}`, {
@@ -179,17 +179,17 @@ export class Basic {
         this.say("Aborting...");
         throw new SystemExit(0);
       } else if (rtest(matchOperator(answer, this.is("diff")))) {
-        if (block) await this.showDiff(destination, await block());
+        if (block != null) await this.showDiff(destination, await block());
         this.say("Retrying...");
       } else if (rtest(matchOperator(answer, this.is("merge")))) {
-        if (block && (await this.mergeTool()).length !== 0) {
+        if (block != null && (await this.mergeTool()).length !== 0) {
           await this.merge(destination, await block());
           return null;
         }
 
         this.say("Please specify merge tool to `THOR_MERGE` env.");
       } else {
-        this.say(this.fileCollisionHelp(block !== undefined));
+        this.say(this.fileCollisionHelp(block != null));
       }
     }
   }

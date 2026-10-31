@@ -131,11 +131,41 @@ describe("Thor::Actions create_file, create_link and empty_directory (trails)", 
 
     it("shows help, then the diff of a block, then retries", async () => {
       File.write(File.join(root, "a.txt"), "old\n");
-      const out = await capture(":stdout", () =>
-        answering("x", "d", "n").createFile("a.txt", "new\n"),
-      );
+      const r = answering("x", "d", "n");
+      const diffed: unknown[][] = [];
+      (r.shell as unknown as { showDiff(...args: unknown[]): unknown }).showDiff = async (
+        ...args
+      ) => diffed.push(args);
+      const out = await capture(":stdout", () => r.createFile("a.txt", "new\n"));
+      expect(diffed).toEqual([[File.join(root, "a.txt"), "new\n"]]);
       expect(out).toMatch(/d - diff, show the differences/);
       expect(out).toMatch(/Retrying\.\.\./);
+    });
+
+    it("runs the merge tool on m and answers nil, leaving the file to it", async () => {
+      File.write(File.join(root, "a.txt"), "old");
+      const r = answering("m");
+      const shell = r.shell as unknown as {
+        mergeTool(): Promise<string>;
+        merge(destination: string, content: unknown): Promise<void>;
+      };
+      const merged: unknown[][] = [];
+      shell.mergeTool = async () => "tool";
+      shell.merge = async (destination, content) => {
+        merged.push([destination, content]);
+      };
+      const out = await capture(":stdout", () => r.createFile("a.txt", "new"));
+      expect(merged).toEqual([[File.join(root, "a.txt"), "new"]]);
+      expect(out).toMatch(/conflict {2}a\.txt\n\s+skip {2}a\.txt/);
+      expect(File.read(File.join(root, "a.txt"))).toBe("old");
+    });
+
+    it("asks for a merge tool on m when none is set", async () => {
+      File.write(File.join(root, "a.txt"), "old");
+      const r = answering("m", "n");
+      (r.shell as unknown as { mergeTool(): Promise<string> }).mergeTool = async () => "";
+      const out = await capture(":stdout", () => r.createFile("a.txt", "new"));
+      expect(out).toMatch(/Please specify merge tool to `THOR_MERGE` env\./);
     });
   });
 
