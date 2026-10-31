@@ -64,9 +64,7 @@ describe("TestRakeBacktrace", () => {
         throw new RuntimeError("foooo!");
       }));
     `);
-
     const lines = (await invoke("foo")).split("\n");
-
     expect(lines[0]).toBe("rake aborted!");
     expect(lines[1]).toBe("foooo!");
     assertSomethingMatches(rakefileFrame(3), lines);
@@ -82,9 +80,7 @@ describe("TestRakeBacktrace", () => {
         throw new RuntimeError("barrr!");
       }));
     `);
-
     const lines = (await invoke("foo")).split("\n");
-
     expect(lines[0]).toBe("rake aborted!");
     expect(lines[1]).toBe("barrr!");
     assertSomethingMatches(rakefileFrame(6), lines);
@@ -98,12 +94,10 @@ describe("TestRakeBacktrace", () => {
         throw new RuntimeError("bazzz!");
       }));
     `);
-
     let lines = (await invoke("baz")).split("\n");
     expect(lines[0]).toBe("rake aborted!");
     expect(lines[1]).toBe("bazzz!");
     assertSomethingMatches(/Rakefile/i, lines);
-
     lines = (await invoke("--suppress-backtrace", ".ak.file", "baz")).split("\n");
     expect(lines[0]).toBe("rake aborted!");
     expect(lines[1]).toBe("bazzz!");

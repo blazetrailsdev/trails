@@ -4,7 +4,6 @@ import { useApplicationTestCase } from "./test-helpers/application.js";
 import * as d from "./test-helpers/rakefile-definitions.js";
 import { rake, ruby, RUBY, runner, runRuby, useRubyRunner } from "./test-helpers/ruby-runner.js";
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const shown = new RegExp(`${regexpEscape(RUBY)} -e`);
 
 function dryrunTasks(): string[] {
@@ -225,7 +224,7 @@ describe("TestRakeFunctional", () => {
     await rake("-n");
     expect(dryrunTasks()).toEqual(["fileA", "fileB", "fileC", "default"]);
     await rake();
-    await sleep(1000);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     await FileUtils.touchAsync("fileA");
     await rake("-n");
     expect(dryrunTasks()).toEqual(["fileB", "fileC", "default"]);
@@ -349,7 +348,6 @@ describe("TestRakeFunctional", () => {
 
   // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
   it.skip("signal propagation in tests", () => {});
-  // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
   it.skip("failing test sets exit status", () => {});
 
   it("stand alone filelist", async () => {
