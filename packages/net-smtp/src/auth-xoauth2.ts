@@ -7,14 +7,13 @@ export class AuthXoauth2 extends Authenticator {
   }
 
   auth(user: string, secret: string): Promise<Response> {
-    return this.finish({
-      type: "OAUTH2",
-      user,
-      method: "XOAUTH2",
-      oauth2: {
-        getToken: (_renew: boolean, cb: (err: null, token: string) => void) => cb(null, secret),
-        buildXOAuth2Token: (token: string) => btoa(`user=${user}\x01auth=Bearer ${token}\x01\x01`),
-      },
-    } as never);
+    const token = this.xoauth2String(user, secret);
+
+    return this.finish(`AUTH XOAUTH2 ${this.base64Encode(token)}`);
+  }
+
+  /** @internal */
+  private xoauth2String(user: string, secret: string): string {
+    return `user=${user}\x01auth=Bearer ${secret}\x01\x01`;
   }
 }

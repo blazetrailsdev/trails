@@ -20,6 +20,7 @@ import {
 import { toA } from "@blazetrails/ruby-compat/enumerable";
 import type { Application, ApplicationOptions } from "./application.js";
 import { ext as stringExt, pathmap } from "./ext/string.js";
+import { FileList } from "./file-list.js";
 import { FileTask } from "./file-task.js";
 import { NameSpace } from "./name-space.js";
 import { Rake } from "./rake-module.js";
@@ -39,6 +40,7 @@ export class TaskManager {
   declare _rules: Rule[];
   declare _scope: Scope;
   declare _seed: number | undefined;
+  declare threadPool: Application["threadPool"];
   declare options: ApplicationOptions;
   declare trace: Application["trace"];
 
@@ -71,7 +73,7 @@ export class TaskManager {
         this.addLocation(task);
         task.addDescription(this.getDescription(task));
       }
-      task.enhance(Task.formatDeps(deps), block);
+      task.enhance(deps instanceof FileList ? deps : Task.formatDeps(deps), block);
       if (orderOnly != null) task.bitwiseOr(orderOnly);
       return task;
     } finally {
@@ -95,6 +97,7 @@ export class TaskManager {
       (await this.enhanceWithMatchingRule(taskName)) ??
       (await this.synthesizeFileTask(taskName));
     if (task == null) throw new RuntimeError(this.generateMessageForUndefinedTask(taskName));
+    await task._resolvePrerequisites();
     return task;
   }
 
@@ -169,7 +172,7 @@ export class TaskManager {
       argNames = (rtest(names) ? names : []) as string[];
       deps = rtest(value) ? value : [];
     }
-    deps = rbCheckArrayType(deps) ?? [deps];
+    if (!(deps instanceof FileList)) deps = rbCheckArrayType(deps) ?? [deps];
     return [taskName, argNames, deps as unknown[], orderOnly];
   }
 

@@ -93,6 +93,15 @@ export class Application {
   /** @internal */ _systemDir: string | undefined;
   /** @internal */ _displayExceptionDetailsSeen: Error[] | undefined;
   /** @internal */ _dynamicWidth: number | undefined;
+  threadPool = {
+    activeThreads: 0,
+    maxActiveThreads: 0,
+    totalThreadsInPlay: 0,
+    statistics(): { maxActiveThreads: number; totalThreadsInPlay: number } {
+      const { maxActiveThreads, totalThreadsInPlay } = this;
+      return { maxActiveThreads, totalThreadsInPlay };
+    },
+  };
 
   /**
    * @inlinedFrom Rake::TaskManager#initialize rake/v13.2.1/lib/rake/task_manager.rb:9-15
@@ -163,6 +172,11 @@ export class Application {
   /** @missingRailsCall join — PERMANENT */
   async runWithThreads(block: () => Promise<void>): Promise<void> {
     await block();
+    if (this.options.jobStats) {
+      const stats = this.threadPool.statistics();
+      STDOUT.puts(`Maximum active threads: ${stats.maxActiveThreads} + main`);
+      STDOUT.puts(`Total threads in play:  ${stats.totalThreadsInPlay} + main`);
+    }
   }
 
   addLoader(ext: string, loader: Loader): void {
@@ -398,13 +412,17 @@ export class Application {
 
   /** @internal */
   dynamicWidthStty(): number {
-    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "stty size 2>/dev/null </dev/tty"]);
+    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "stty size 2>/dev/null"], {
+      inheritStdin: true,
+    });
     return parseInt(String(stdout).trim().split(/\s+/)[1], 10) || 0;
   }
 
   /** @internal */
   dynamicWidthTput(): number {
-    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "tput cols 2>/dev/null </dev/tty"]);
+    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "tput cols 2>/dev/null"], {
+      inheritStdin: true,
+    });
     return parseInt(String(stdout), 10) || 0;
   }
 

@@ -878,3 +878,42 @@ describe("FileUtils async commands", () => {
     });
   });
 });
+
+describe("FileUtils.compareFileAsync", () => {
+  it("reads through handles in blocks and stops at the first differing block", async () => {
+    const fs = getFs();
+    const dir = await fs.mkdtemp!("/tmp/compare-file-");
+    await fs.writeFile!(`${dir}/a`, "x".repeat(3000) + "a");
+    await fs.writeFile!(`${dir}/b`, "y".repeat(3000) + "b");
+    await fs.writeFile!(`${dir}/c`, "x".repeat(3000) + "a");
+    const lengths: number[] = [];
+    const { fstatSync: _fstatSync, readSync: _readSync, openSync: _openSync, ...rest } = fs;
+    const adapter = {
+      ...rest,
+      statSync: fs.statSync,
+      openHandle: async (path: string, flags: string) => {
+        const handle = await fs.openHandle!(path, flags);
+        return {
+          read: (b: Uint8Array, o: number, l: number, p: number | null) => {
+            lengths.push(l);
+            return handle.read(b, o, l, p);
+          },
+          stat: async () => ({ ...(await handle.stat()), blksize: undefined }),
+          close: () => handle.close(),
+        };
+      },
+    };
+    registerFsAdapter("compare-file-no-fstat", adapter as never, getPath());
+    const previous = fsAdapterConfig.adapter;
+    fsAdapterConfig.adapter = "compare-file-no-fstat";
+    try {
+      expect(await FileUtils.compareFileAsync(`${dir}/a`, `${dir}/c`)).toBe(true);
+      lengths.length = 0;
+      expect(await FileUtils.compareFileAsync(`${dir}/a`, `${dir}/b`)).toBe(false);
+      expect(lengths).toEqual([1024, 1024]);
+    } finally {
+      fsAdapterConfig.adapter = previous;
+      await fs.rm!(dir, { recursive: true, force: true });
+    }
+  });
+});

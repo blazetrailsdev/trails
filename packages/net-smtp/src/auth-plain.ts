@@ -7,6 +7,6 @@ export class AuthPlain extends Authenticator {
   }
 
   auth(user: string, secret: string): Promise<Response> {
-    return this.finish({ credentials: { user, pass: secret }, method: "PLAIN" });
+    return this.finish("AUTH PLAIN " + this.base64Encode(`\0${user}\0${secret}`));
   }
 }

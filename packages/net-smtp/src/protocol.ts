@@ -1,4 +1,8 @@
 import { StandardError, Timeout } from "@blazetrails/ruby-compat";
+import type { SMTPAuthenticationError } from "./smtp.js";
+
+/** @noRailsEquivalent PERMANENT */
+export const Net: { SMTPAuthenticationError?: typeof SMTPAuthenticationError } = {};
 
 /** @noRailsEquivalent PERMANENT */
 export class ProtocolError extends StandardError {}

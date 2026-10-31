@@ -1,9 +1,9 @@
-import type SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, pack } from "@blazetrails/ruby-compat";
+import { Net } from "./protocol.js";
 import type { Response } from "./smtp.js";
 
 interface AuthHost {
-  _socket: (SMTPConnection & { lastServerResponse: string | false }) | null;
+  getResponse(reqline: string): Promise<Response>;
 }
 
 type AuthClass = (new (smtp: AuthHost) => Authenticator) & typeof Authenticator;
@@ -36,19 +36,19 @@ export abstract class Authenticator {
     this.smtp = smtp;
   }
 
-  /** @missingRailsCall get_response — PERMANENT */
-  finish(
-    arg: SMTPConnection.AuthenticationCredentials | SMTPConnection.AuthenticationOAuth2,
-  ): Promise<Response> {
-    const socket = this.smtp._socket!;
-    return new Promise((resolve, reject) => {
-      socket.login(arg, (err) => {
-        if (err) return reject(err);
-        const { Response } = this.smtp.constructor as unknown as {
-          Response: typeof import("./smtp.js").Response;
-        };
-        resolve(Response.parse(`${String(socket.lastServerResponse)}\n`));
-      });
-    });
+  async continue(arg: string): Promise<string> {
+    const res = await this.smtp.getResponse(arg);
+    if (!res.isContinue()) throw new res.exceptionClass(res);
+    return res.string.trim().split(/\s+/)[1];
+  }
+
+  async finish(arg: string): Promise<Response> {
+    const res = await this.smtp.getResponse(arg);
+    if (!res.isSuccess()) throw new Net.SMTPAuthenticationError!(res);
+    return res;
+  }
+
+  base64Encode(str: string): string {
+    return pack([str], "m0");
   }
 }

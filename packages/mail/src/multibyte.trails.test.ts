@@ -57,3 +57,12 @@ describe("Mail::Multibyte::Chars (trails)", () => {
     expect(" 　x﻿".replace(Unicode.LEADERS_PAT, "").replace(Unicode.TRAILERS_PAT, "")).toBe("x");
   });
 });
+
+describe("Unicode.applyMapping", () => {
+  it("reads the simple mapping where the full one differs", () => {
+    expect(Unicode.applyMapping("ǅ", ":uppercase_mapping")).toBe("Ǆ");
+    expect(Unicode.applyMapping("ǅ", ":lowercase_mapping")).toBe("ǆ");
+    expect(Unicode.applyMapping("ß", ":uppercase_mapping")).toBe("ß");
+    expect(Unicode.applyMapping("aÉ", ":uppercase_mapping")).toBe("AÉ");
+  });
+});

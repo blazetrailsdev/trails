@@ -118,6 +118,19 @@ export interface FsAdapter {
   lchown?(path: string, uid: number, gid: number): Promise<void>;
   utimes?(path: string, atime: Date, mtime: Date): Promise<void>;
   readlink?(path: string): Promise<string>;
+  openHandle?(path: string, flags: string): Promise<FsFileHandle>;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export interface FsFileHandle {
+  read(
+    buffer: Uint8Array,
+    offset: number,
+    length: number,
+    position: number | null,
+  ): Promise<{ bytesRead: number }>;
+  stat(): Promise<FsStatResult>;
+  close(): Promise<void>;
 }
 
 export interface PathAdapter {
@@ -287,6 +300,7 @@ function tryAutoRegisterNode(): boolean {
     ) as NodeSyncFs;
     const fsPromises = req("node:fs/promises") as {
       access(p: string): Promise<void>;
+      open(p: string, flags: string): Promise<FsFileHandle>;
       stat(p: string): Promise<FsStatResult>;
       lstat(p: string): Promise<FsStatResult>;
       readFile(p: string, enc?: string): Promise<Bytes | string>;
@@ -329,6 +343,7 @@ function tryAutoRegisterNode(): boolean {
             throw error;
           },
         ),
+      openHandle: (p: string, flags: string) => fsPromises.open(p, flags),
       stat: (p: string) => fsPromises.stat(p).then(withExecutable),
       lstat: (p: string) => fsPromises.lstat(p).then(withExecutable),
       readFile: (p: string, enc?: string) =>
