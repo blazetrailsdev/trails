@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Port of the rake gem: a make-like build utility",
   "type": "module",
+  "bin": {
+    "rake": "./bin/rake.js"
+  },
   "main": "dist/rake.js",
   "types": "dist/rake.d.ts",
   "exports": {
@@ -16,7 +19,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "scripts": {
     "build": "tsc"

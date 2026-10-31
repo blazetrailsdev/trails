@@ -1,3 +1,4 @@
+import { rbOutputRs } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { TraceOutput } from "./trace-output.js";
 
@@ -33,5 +34,18 @@ describe("TestTraceOutput", () => {
     traceOn(spy, "HI\n", null, "LO");
     expect(spy.result).toBe("HI\nLO\n");
     expect(spy.calls).toBe(1);
+  });
+
+  it("trace issues single io for args multiple strings and alternate sep", () => {
+    const oldSep = rbOutputRs.value;
+    rbOutputRs.value = "\r";
+    try {
+      const spy = new PrintSpy();
+      traceOn(spy, "HI\r", "LO");
+      expect(spy.result).toBe("HI\rLO\r");
+      expect(spy.calls).toBe(1);
+    } finally {
+      rbOutputRs.value = oldSep;
+    }
   });
 });

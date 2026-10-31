@@ -14,7 +14,7 @@ export { PrivateReader } from "./private-reader.js";
 export { Rake } from "./rake-module.js";
 export { TraceOutput } from "./trace-output.js";
 export { Win32 } from "./win32.js";
-export { DSL } from "./dsl-definition.js";
+export { DSL, main } from "./dsl-definition.js";
 export { EARLY, EarlyTime } from "./early-time.js";
 export { FileCreationTask } from "./file-creation-task.js";
 export { FileList } from "./file-list.js";
