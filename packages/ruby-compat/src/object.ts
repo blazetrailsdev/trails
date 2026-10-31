@@ -138,8 +138,7 @@ export interface TopLevelConstants {
 }
 
 /** @noRailsEquivalent PERMANENT */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface ConstantTable {}
+export interface ConstantTable {} // eslint-disable-line @typescript-eslint/no-empty-object-type
 
 /**
  * Ruby's top-level `Object`, whose constant table is

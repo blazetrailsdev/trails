@@ -138,7 +138,7 @@ describe("Application#env_config", () => {
 
     try {
       expect(() => app.envConfig()).toThrow(
-        new NameError("uninitialized constant Logger::LOUD", "LOUD"),
+        new NameError("uninitialized constant ActiveSupport::Logger::LOUD", "LOUD"),
       );
     } finally {
       app.config.actionDispatch.debugExceptionLogLevel = saved;
