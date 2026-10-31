@@ -381,3 +381,35 @@ describe("File.foreach", () => {
     expect(lines).toEqual(["a\n", `${long}\n`, "last"]);
   });
 });
+
+describe("File.openAsync", () => {
+  it("yields each line by eachAsync, separator retained, and closes after the block", async () => {
+    const path = join(fixture(), "lines.txt");
+    writeFileSync(path, `é\n${"x".repeat(70000)}é\nlast`);
+    let inner: File | null = null;
+    const lines = await File.openAsync(path, "r", async (file: File) => {
+      inner = file;
+      const seen: unknown[] = [];
+      for await (const line of file.eachAsync()) seen.push(line);
+      return seen;
+    });
+    expect(lines).toEqual(["é\n", `${"x".repeat(70000)}é\n`, "last"]);
+    expect(inner!.isClosed()).toBe(true);
+    expect(inner!.path()).toBe(path);
+  });
+
+  it("passes the opt hash through, ahead of the block", async () => {
+    const path = join(fixture(), "bin.txt");
+    writeFileSync(path, "a\n");
+    const lines = await File.openAsync(path, "r", { externalEncoding: "ASCII-8BIT" }, async (f) => {
+      const seen: unknown[] = [];
+      for await (const line of f.eachAsync()) seen.push(line);
+      return seen;
+    });
+    expect(lines).toEqual([Uint8Array.of(0x61, 0x0a)]);
+  });
+
+  it("rejects with the errno a missing file raises", async () => {
+    await expect(File.openAsync(join(fixture(), "missing"), "r")).rejects.toThrow(/ENOENT/);
+  });
+});
