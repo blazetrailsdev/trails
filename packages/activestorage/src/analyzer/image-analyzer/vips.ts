@@ -5,7 +5,7 @@ import { ImageAnalyzer } from "../image-analyzer.js";
 type Metadata = { [k: string]: unknown };
 type ReadImage = { width: number; height: number; getString(name: string): string };
 
-const ROTATIONS = /Right-top|Left-bottom|Top-right|Bottom-left|^[5-8] \(/;
+const ROTATIONS = /Right-top|Left-bottom|Top-right|Bottom-left|^[2468] \(/;
 
 export class Vips extends ImageAnalyzer<ReadImage> {
   static readonly ROTATIONS = ROTATIONS;
@@ -49,7 +49,7 @@ export class Vips extends ImageAnalyzer<ReadImage> {
       } catch (error) {
         if (error instanceof WebAssembly.Exception) {
           this.logger.error(
-            `Skipping image analysis due to a Vips error: ${Reflect.get(error, "message")[1]}`,
+            `Skipping image analysis due to a Vips error: ${[Reflect.get(error, "message")].flat().at(-1)}`,
           );
           return {};
         }
@@ -58,7 +58,10 @@ export class Vips extends ImageAnalyzer<ReadImage> {
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm getString — PERMANENT
+   */
   protected override isRotatedImage(image: ReadImage): boolean {
     try {
       return ROTATIONS.test(image.getString("exif-ifd0-Orientation"));

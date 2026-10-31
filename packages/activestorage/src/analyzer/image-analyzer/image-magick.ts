@@ -10,7 +10,10 @@ export class ImageMagick extends ImageAnalyzer<ReadImage> {
     return super.isAccept(blob) && ActiveStorage.variantProcessor === "mini_magick";
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm get — PERMANENT
+   */
   protected override async readImage(
     block: (image: ReadImage) => Promise<Metadata>,
   ): Promise<Metadata> {

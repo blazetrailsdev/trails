@@ -17,8 +17,8 @@ async function analyzeLater(this: Blob): Promise<void> {
   }
 }
 
-function isAnalyzed(this: Blob): boolean {
-  return this.analyzed as boolean;
+function isAnalyzed(this: Blob): unknown {
+  return this.analyzed;
 }
 
 /** @internal */
