@@ -55,6 +55,20 @@ describe("ActiveStorage::Attached::One", () => {
     expect(yielded).toBe(false);
   });
 
+  it("create assigns a key after the attachment key", async () => {
+    const created = (await Member.createBang({ avatar: hash(), name: "Jason" })) as AvatarUser;
+    expect(created.name).toBe("Jason");
+    expect(await created.avatar.isAttached()).toBe(true);
+  });
+
+  it("create with an array of hashes awaits each attachment writer", async () => {
+    const created = (await Member.createBang([
+      { name: "Jason", avatar: hash() },
+      { name: "Dorian", avatar: hash() },
+    ])) as unknown as AvatarUser[];
+    for (const record of created) expect(await record.avatar.isAttached()).toBe(true);
+  });
+
   it("a relation create awaits the attachment writer", async () => {
     const created = (await Member.where({ name: "Jason" }).createBang({
       avatar: hash(),

@@ -361,9 +361,7 @@ A writer that must await, such as `has_one_attached`'s `setAvatar`
 shape. `awaitingAssignment` (`activemodel/src/attribute-assignment.ts`) wraps the
 build in each create path, and the constructor's `assignAttributes` hands it
 the writer's promise instead of raising. The caller awaits the assignment, then the block, before saving, and
-nothing is parked on the record. `new` and `build` still raise. A key after an
-awaiting writer, and the block, run after that writer resolves, so an
-`after_initialize` callback can see them unassigned.
+nothing is parked on the record. `new` and `build` still raise.
 
 This is a genuine language shortcoming — JS has no synchronous await — ratified
 repo-wide here. This section is the wrapper's receipt: the wrapper raises no

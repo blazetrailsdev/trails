@@ -19,8 +19,8 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
       `When assigning attributes, you must pass a hash as an argument, ${rbObjClassname(newAttributes)} passed.`,
     );
   }
-  const capture = assignmentCapture;
-  assignmentCapture = null;
+  const capture = assignmentCapture?.attributes === newAttributes ? assignmentCapture : null;
+  if (capture != null) assignmentCapture = null;
   if (isEmpty(newAttributes)) return;
 
   const host = this as unknown as Record<symbol, boolean | undefined>;
@@ -40,6 +40,7 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
 }
 
 interface AssignmentCapture {
+  attributes: unknown;
   assigned?: Promise<void>;
 }
 
@@ -143,14 +144,14 @@ export function assertAssignedSynchronously(pending: unknown, methodName: string
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE create-after-initialize-sees-awaited-attachment-writers
  */
 export async function awaitingAssignment<R, K = never>(
   attributes: unknown,
   block: ((record: K) => void | Promise<void>) | undefined,
   build: (block?: (record: K) => void) => R,
 ): Promise<R> {
-  const capture: AssignmentCapture = {};
+  const capture: AssignmentCapture = { attributes };
   let yielded: unknown;
   if (attributes != null) assignmentCapture = capture;
   let record: R;
