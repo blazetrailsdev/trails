@@ -1261,7 +1261,7 @@ export class IO {
         : ioEncStr(str, str.length, this.enc2, this.ioReadEncoding());
     let rest = new Uint8Array(0);
     for (;;) {
-      const read = await getFs().readAsync!(this.fd, buffer, 0, buffer.length, this._pos);
+      const read = await getFs().readAsync(this.fd, buffer, 0, buffer.length, this._pos);
       if (read === 0) break;
       this._pos += read;
       const bytes = new Uint8Array(rest.length + read);

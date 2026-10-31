@@ -75,7 +75,7 @@ export interface FsAdapter {
   realpathSync?(path: string): string;
   accessSync?(path: string, mode: number): void;
   openSync(path: string, flags: string, mode?: number): number;
-  openAsync?(path: string, flags: string, mode?: number): Promise<number>;
+  openAsync(path: string, flags: string, mode?: number): Promise<number>;
   readSync(
     fd: number,
     buffer: Uint8Array,
@@ -83,7 +83,7 @@ export interface FsAdapter {
     length: number,
     position: number | null,
   ): number;
-  readAsync?(
+  readAsync(
     fd: number,
     buffer: Uint8Array,
     offset: number,

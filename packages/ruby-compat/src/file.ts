@@ -611,8 +611,14 @@ export class File extends IO {
     const opt = typeof blockOrOpt === "function" ? undefined : blockOrOpt;
     const perm = typeof mode === "object" ? mode.perm : opt?.perm;
     const vmode = (typeof mode === "object" ? (mode.mode ?? "r") : mode).split(":")[0];
-    const fd = await getFs().openAsync!(fileName, vmode.replace(/b/g, ""), perm);
-    const file = new File(fd, mode, opt);
+    const fd = await getFs().openAsync(fileName, vmode.replace(/b/g, ""), perm);
+    let file: File;
+    try {
+      file = new File(fd, mode, opt);
+    } catch (error) {
+      getFs().closeSync(fd);
+      throw error;
+    }
     file.pathv = fileName;
     if (!block) return file;
     try {
