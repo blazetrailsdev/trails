@@ -48,7 +48,7 @@ describe("Rails::Command.find_by_namespace", () => {
     onTestFinished(() => (perform.mockRestore(), rake.mockRestore()));
 
     await invoke("unused_routes", ["-g", "x"]);
-    expect(perform).toHaveBeenCalledWith("unused_routes", ["-g", "x"], {});
+    expect(perform).toHaveBeenCalledWith("unused-routes", ["-g", "x"], {});
     expect(rake).not.toHaveBeenCalled();
 
     perform.mockClear();
