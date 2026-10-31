@@ -105,7 +105,7 @@ describe("Pathname#open", () => {
       const text = join(dir, "text");
       writeFileSync(text, "hello");
       expect(new Pathname(text).open(block((f: File) => f.read()))).toBe("hello");
-      const file = new Pathname(path).open() as File;
+      const file = new Pathname(path).open();
       expect(file).toBeInstanceOf(File);
       file.close();
     } finally {

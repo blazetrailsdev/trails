@@ -11,6 +11,7 @@
     { "path": "../activejob" },
     { "path": "../activerecord" },
     { "path": "../activesupport" },
+    { "path": "../image-processing" },
     { "path": "../marcel" },
     { "path": "../mini-magick" },
     { "path": "../rack-test" },

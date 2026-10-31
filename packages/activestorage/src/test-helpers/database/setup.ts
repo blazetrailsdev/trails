@@ -1,5 +1,5 @@
 import { afterAll } from "vitest";
-import { EnvironmentInquirer, getEnv, TopLevel } from "@blazetrails/activesupport";
+import { EnvironmentInquirer, getEnv, NullLogger, TopLevel } from "@blazetrails/activesupport";
 import { GlobalID } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { RouteSet } from "@blazetrails/actionpack";
@@ -8,6 +8,8 @@ import { Application } from "@blazetrails/trailties";
 import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/global-id";
 import { File, Dir } from "@blazetrails/ruby-compat";
 import "../../class-paths.generated.js";
+import { ImageMagick } from "../../analyzer/image-analyzer/image-magick.js";
+import { Vips } from "../../analyzer/image-analyzer/vips.js";
 import { Attachment } from "../../attachment.js";
 import { ActiveStorage } from "../../active-storage.js";
 import { Blob } from "../../blob.js";
@@ -16,6 +18,9 @@ import { Registry } from "../../service/registry.js";
 import "../../service/configurator.js";
 import { ActiveStorageCreateUsers } from "./create-users-migration.js";
 import { ActiveStorageCreateGroups } from "./create-groups-migration.js";
+
+ActiveStorage.logger = new NullLogger();
+ActiveStorage.analyzers = [Vips, ImageMagick];
 
 const envName = String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
 
