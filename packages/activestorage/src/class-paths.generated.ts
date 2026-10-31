@@ -25,13 +25,15 @@ import * as m22 from "./filename.js";
 import * as m23 from "./fixture-set.js";
 import * as m24 from "./gem-version.js";
 import * as m25 from "./log-subscriber.js";
-import * as m26 from "./purge-job.js";
-import * as m27 from "./record.js";
-import * as m28 from "./reflection.js";
-import * as m29 from "./service.js";
-import * as m30 from "./service/configurator.js";
-import * as m31 from "./service/disk-service.js";
-import * as m32 from "./service/registry.js";
+import * as m26 from "./mirror-job.js";
+import * as m27 from "./purge-job.js";
+import * as m28 from "./record.js";
+import * as m29 from "./reflection.js";
+import * as m30 from "./service.js";
+import * as m31 from "./service/configurator.js";
+import * as m32 from "./service/disk-service.js";
+import * as m33 from "./service/mirror-service.js";
+import * as m34 from "./service/registry.js";
 
 registerClassPaths([
   [() => m0.Attached, "ActiveStorage::Attached"],
@@ -62,17 +64,19 @@ registerClassPaths([
   [() => m21.IntegrityError, "ActiveStorage::IntegrityError"],
   [() => m21.InvariableError, "ActiveStorage::InvariableError"],
   [() => m25.LogSubscriber, "ActiveStorage::LogSubscriber"],
+  [() => m26.MirrorJob, "ActiveStorage::MirrorJob"],
   [() => m21.PreviewError, "ActiveStorage::PreviewError"],
-  [() => m26.PurgeJob, "ActiveStorage::PurgeJob"],
-  [() => m27.Record, "ActiveStorage::Record"],
-  [() => m28.ActiveRecordExtensions, "ActiveStorage::Reflection::ActiveRecordExtensions"],
-  [() => m28.HasAttachedReflection, "ActiveStorage::Reflection::HasAttachedReflection"],
-  [() => m28.HasManyAttachedReflection, "ActiveStorage::Reflection::HasManyAttachedReflection"],
-  [() => m28.HasOneAttachedReflection, "ActiveStorage::Reflection::HasOneAttachedReflection"],
-  [() => m29.Service, "ActiveStorage::Service"],
-  [() => m30.Configurator, "ActiveStorage::Service::Configurator"],
-  [() => m31.DiskService, "ActiveStorage::Service::DiskService"],
-  [() => m32.Registry, "ActiveStorage::Service::Registry"],
+  [() => m27.PurgeJob, "ActiveStorage::PurgeJob"],
+  [() => m28.Record, "ActiveStorage::Record"],
+  [() => m29.ActiveRecordExtensions, "ActiveStorage::Reflection::ActiveRecordExtensions"],
+  [() => m29.HasAttachedReflection, "ActiveStorage::Reflection::HasAttachedReflection"],
+  [() => m29.HasManyAttachedReflection, "ActiveStorage::Reflection::HasManyAttachedReflection"],
+  [() => m29.HasOneAttachedReflection, "ActiveStorage::Reflection::HasOneAttachedReflection"],
+  [() => m30.Service, "ActiveStorage::Service"],
+  [() => m31.Configurator, "ActiveStorage::Service::Configurator"],
+  [() => m32.DiskService, "ActiveStorage::Service::DiskService"],
+  [() => m33.MirrorService, "ActiveStorage::Service::MirrorService"],
+  [() => m34.Registry, "ActiveStorage::Service::Registry"],
   [() => m21.UnpreviewableError, "ActiveStorage::UnpreviewableError"],
   [() => m21.UnrepresentableError, "ActiveStorage::UnrepresentableError"],
   [() => m24.VERSION, "ActiveStorage::VERSION"],

@@ -20,4 +20,5 @@ export { Model } from "./attached/model.js";
 export { One } from "./attached/one.js";
 export { FixtureSet } from "./fixture-set.js";
 export { Downloader } from "./downloader.js";
+export { MirrorJob } from "./mirror-job.js";
 export { PurgeJob } from "./purge-job.js";
