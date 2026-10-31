@@ -21,4 +21,14 @@ describe("Rake::ThreadPool (trails)", () => {
       history.find((e) => e.event === "spawned")!.data!.new_thread,
     );
   });
+
+  it("adds a worker before its body runs, so the cap holds", async () => {
+    const pool = new ThreadPool(1);
+    pool.gatherHistory();
+    pool.future(block(() => pool.future(block(() => 1))));
+    await pool.join();
+    const events = pool.history().map((e) => e.event);
+    expect(events.filter((e) => e === "spawned")).toHaveLength(1);
+    expect(events.indexOf("spawned")).toBeLessThan(events.indexOf("dequeued"));
+  });
 });

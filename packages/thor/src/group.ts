@@ -249,8 +249,9 @@ export class Group {
     throw exception;
   }
 
+  /** @inventedArm kebabCase — PERMANENT */
   static isCommandExists(this: GroupClass, commandName: string): boolean {
-    return Object.keys(this.commands()).includes(commandName);
+    return Object.keys(this.commands()).includes(kebabCase(commandName));
   }
 
   /** @internal */

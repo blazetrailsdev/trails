@@ -60,10 +60,7 @@ export class ThreadPool {
     };
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs stat — PERMANENT
-   */
+  /** @internal */
   private async processQueueItem(): Promise<boolean> {
     if (this._queue.length === 0) return false;
     const promise = this._queue.shift()!;
@@ -83,11 +80,11 @@ export class ThreadPool {
   /**
    * @internal
    * @missingRailsCall count — PERMANENT
-   * @missingRailsArgs stat — PERMANENT
    */
   private startThread(): void {
     if (!(this._threads.size < this._maxActiveThreads)) return;
     const t = new Thread(async () => {
+      await null;
       try {
         while (this.safeThreadCount() <= this._maxActiveThreads) {
           if (!(await this.processQueueItem())) break;
