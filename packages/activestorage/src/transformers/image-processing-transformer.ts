@@ -11,11 +11,13 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage, Transformers } from "../active-storage.js";
 import { Transformer } from "./transformer.js";
+import "../class-paths.excluded.generated.js";
 
 let ImageProcessing: typeof Namespace;
 try {
   ({ ImageProcessing } = await import("@blazetrails/image-processing"));
-} catch {
+} catch (error) {
+  if ((error as { code?: string }).code !== "ERR_MODULE_NOT_FOUND") throw error;
   throw new LoadError(
     'Generating image variants require the image_processing gem. Please add `gem "image_processing", "~> 1.2"` to your Gemfile.',
   );

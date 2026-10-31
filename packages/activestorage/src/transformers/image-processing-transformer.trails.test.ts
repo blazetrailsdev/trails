@@ -69,6 +69,12 @@ describe("ActiveStorage::Transformers::ImageProcessingTransformer", () => {
     ).resolves.toBeGreaterThan(0);
   });
 
+  it("names the error by its qualified Ruby path", () => {
+    expect(new UnsupportedImageProcessingArgument().message).toBe(
+      "ActiveStorage::Transformers::ImageProcessingTransformer::UnsupportedImageProcessingArgument",
+    );
+  });
+
   it("raises UnsupportedImageProcessingMethod for an unlisted method", async () => {
     await expect(transform({ systemCall: "x" })).rejects.toThrow(UnsupportedImageProcessingMethod);
   });
