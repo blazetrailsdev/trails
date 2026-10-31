@@ -17,7 +17,10 @@ export class ImageProcessingTransformer extends Transformer {
   static UnsupportedImageProcessingMethod = UnsupportedImageProcessingMethod;
   static UnsupportedImageProcessingArgument = UnsupportedImageProcessingArgument;
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm loadPath — PERMANENT
+   */
   protected override async process(
     file: unknown,
     { format }: { format: string },
@@ -39,7 +42,10 @@ export class ImageProcessingTransformer extends Transformer {
     ) as ChainableHost;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm underscore — PERMANENT
+   */
   private operations(): [string, unknown][] {
     const list: [string, unknown][] = [];
     for (const [name, argument] of Object.entries(this.transformations)) {
@@ -60,7 +66,10 @@ export class ImageProcessingTransformer extends Transformer {
     return list;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm underscore — PERMANENT
+   */
   private validateTransformation(name: string, argument: unknown): void {
     const methodName = underscore(name.replaceAll("-", "_"));
 
