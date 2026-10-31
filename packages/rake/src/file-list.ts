@@ -1,16 +1,40 @@
 import {
+  ARRAY_METHOD_TABLE,
+  ArgumentError,
   Dir,
-  StandardError,
+  Enumerable,
   File,
   type FileOpenOpt,
   FrozenError,
+  IndexError,
+  Range,
+  StandardError,
+  arySlice,
+  aryJoin,
+  cmp,
+  compactBang,
+  deleteAt,
+  eachCons,
+  eachSlice,
   flatten,
+  groupBy,
   include,
+  isIntersect,
+  maxBy,
+  minBy,
+  pack,
+  product,
   puts,
+  rbAryFetch,
   rbBlockGivenP,
   rbCheckArrayType,
+  rbCmpint,
+  rbEqq,
   rbEqual,
+  rbFSend,
   rbInspect,
+  rbObjIsProc,
+  rbProcCall,
   rbRegMatchM,
   rbStrMatchM,
   rbStrSub,
@@ -19,6 +43,8 @@ import {
   stderr as $stderr,
   stdout as $stdout,
   strGsub,
+  tally,
+  toEnum,
   uniq,
 } from "@blazetrails/ruby-compat";
 import { Cloneable } from "./cloneable.js";
@@ -27,117 +53,504 @@ import { fromPathname } from "./rake-module.js";
 
 type Items = unknown[];
 type ElementBlock = (fn: string) => unknown;
+type PairBlock = (a: string, b: string) => unknown;
 
-async function _filterBy(items: Items, block: ElementBlock, keep: boolean): Promise<Items> {
+async function _yields(items: Items, block: ElementBlock): Promise<Items> {
   const result: Items = [];
-  for (const fn of items) if (rtest(await block(fn as string)) === keep) result.push(fn);
+  for (const fn of items) result.push(await block(fn as string));
   return result;
 }
 
-/** @noRailsEquivalent CONVERGEABLE rake-file-list-full-array-delegation */
+async function _filterBy(items: Items, block: ElementBlock, keep: boolean): Promise<Items> {
+  const yields = await _yields(items, block);
+  return items.filter((_fn, i) => rtest(yields[i]) === keep);
+}
+
+async function _replay(items: Items, block: ElementBlock): Promise<(fn: unknown) => unknown> {
+  const yields = await _yields(items, block);
+  let i = 0;
+  return () => yields[i++];
+}
+
+function _replace(items: Items, result: Items): Items {
+  items.splice(0, items.length, ...result);
+  return items;
+}
+
+const _isProc = rbObjIsProc as (arg: unknown) => arg is ElementBlock;
+
+const _bang = (items: Items, kept: Items): Items | null =>
+  kept.length === items.length ? null : _replace(items, kept);
+
+async function _extremeBy(by: unknown, items: Items, args: unknown[]): Promise<unknown> {
+  const block = await _replay(items, args.pop() as ElementBlock);
+  return (by as (...a: unknown[]) => unknown)(items, ...args, block);
+}
+
+const _compare = (a: unknown, b: unknown): number => rbCmpint(cmp(a, b), a, b);
+
+function _comparator(block?: unknown): (a: unknown, b: unknown) => number {
+  return _isProc(block)
+    ? (a, b) => (block as unknown as (a: unknown, b: unknown) => number)(a, b)
+    : _compare;
+}
+
+/** `rb_range_beg_len` (`vendor/ruby/v3.3.11/range.c:1744`) for `Array#[]=` and `#slice!`. */
+function _span(items: Items, start: unknown, len?: number): [number, number] {
+  if (start instanceof Range) {
+    let beg = (start.begin as number | null) ?? 0;
+    let end = (start.end as number | null) ?? items.length;
+    if (beg < 0) beg += items.length;
+    if (end < 0) end += items.length;
+    if (start.end !== null && !start.excludeEnd) end += 1;
+    return [beg, Math.max(0, end - beg)];
+  }
+  return [(start as number) < 0 ? (start as number) + items.length : (start as number), len ?? 1];
+}
+
+function _choose(items: Items, n: number, ordered: boolean, repeat: boolean): Items[] {
+  if (n < 0) return [];
+  if (n === 0) return [[]];
+  return items.flatMap((fn, i) => {
+    const rest = ordered
+      ? repeat
+        ? items
+        : items.filter((_x, j) => j !== i)
+      : items.slice(repeat ? i : i + 1);
+    return _choose(rest, n - 1, ordered, repeat).map((tail) => [fn, ...tail]);
+  });
+}
+
+async function _combinatoric(result: Items[], items: Items, block?: ElementBlock): Promise<Items> {
+  if (!block) return result;
+  for (const c of result) await (block as unknown as (c: Items) => unknown)(c);
+  return items;
+}
+
+async function _extreme(items: Items, args: unknown[], last: boolean): Promise<unknown> {
+  const block = _isProc(args.at(-1)) ? args.pop() : undefined;
+  const sorted = [...items].sort(_comparator(block));
+  if (last) sorted.reverse();
+  return args.length ? sorted.slice(0, args[0] as number) : (sorted[0] ?? null);
+}
+
+async function _split(items: Items, cut: (a: string, b: string) => unknown): Promise<Items[]> {
+  const result: Items[] = [];
+  for (const [i, fn] of items.entries()) {
+    if (i > 0 && !rtest(await cut(items[i - 1] as string, fn as string))) {
+      result.at(-1)!.push(fn);
+    } else {
+      result.push([fn]);
+    }
+  }
+  return result;
+}
+
+function _matcher(args: unknown[]): ElementBlock {
+  return _isProc(args[0]) ? args[0] : (fn) => rbEqq(args[0], fn);
+}
+
+function _grep(items: Items, pattern: unknown, keep: boolean, block?: ElementBlock): unknown {
+  const matched = items.filter((fn) => rtest(rbEqq(pattern, fn)) === keep);
+  return block ? _yields(matched, block) : matched;
+}
+
+async function _while(items: Items, block: ElementBlock): Promise<number> {
+  let n = 0;
+  while (n < items.length && rtest(await block(items[n] as string))) n++;
+  return n;
+}
+
+async function _eachGroup(
+  items: Items,
+  groups: Iterable<unknown>,
+  block?: ElementBlock,
+): Promise<Items> {
+  if (!block) return [...groups];
+  await _yields([...groups], block);
+  return items;
+}
+
+async function _search(items: Items, block: ElementBlock): Promise<number | null> {
+  let [low, high, found] = [0, items.length, null as number | null];
+  while (low < high) {
+    const mid = low + Math.floor((high - low) / 2);
+    const v = await block(items[mid] as string);
+    if (v === 0) return mid;
+    if (v === true || (typeof v === "number" && v < 0)) {
+      if (v === true) found = mid;
+      high = mid;
+    } else {
+      low = mid + 1;
+    }
+  }
+  return found;
+}
+
+/**
+ * @noRailsEquivalent PERMANENT
+ * @missingRailsCall lazy — CONVERGEABLE rake-file-list-enumerator-returns
+ * @missingRailsCall chain — CONVERGEABLE rake-file-list-enumerator-returns
+ */
 const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> = {
   size: (items) => items.length,
   length: (items) => items.length,
-  first: (items, n?: number) => (n === undefined ? (items[0] ?? null) : items.slice(0, n)),
-  last: (items, n?: number) =>
-    n === undefined ? (items.at(-1) ?? null) : items.slice(Math.max(items.length - n, 0)),
-  get: (items, i: number) => items.at(i) ?? null,
-  set: (items, i: number, value: unknown) => (items[i < 0 ? items.length + i : i] = value),
+  first: (items, ...args: [number?]) => {
+    if (args.length === 0) return items[0] ?? null;
+    if (args[0]! < 0) throw new ArgumentError("negative array size");
+    return items.slice(0, args[0]);
+  },
+  last: (items, ...args: [number?]) => {
+    if (args.length === 0) return items.at(-1) ?? null;
+    if (args[0]! < 0) throw new ArgumentError("negative array size");
+    return items.slice(Math.max(items.length - args[0]!, 0));
+  },
+  at: (items, i: number) => items.at(i) ?? null,
+  get: (items, ...args: [unknown, unknown?]) => arySlice(items, ...args),
+  set: (items, ...args: unknown[]) => {
+    const value = args.at(-1);
+    if (args.length === 2 && !(args[0] instanceof Range)) {
+      const [i] = _span(items, args[0]);
+      if (i < 0)
+        throw new IndexError(`index ${args[0]} too small for array; minimum: -${items.length}`);
+      while (items.length < i) items.push(null);
+      items[i] = value;
+      return value;
+    }
+    const [beg, len] = _span(items, args[0], args[1] as number);
+    while (items.length < beg) items.push(null);
+    items.splice(beg, len, ...(Array.isArray(value) ? value : [value]));
+    return value;
+  },
+  fetch: (items, ...args: unknown[]) => {
+    const i = args[0] as number;
+    const inRange = i < items.length && i >= -items.length;
+    if (inRange || args.length === 1) return rbAryFetch(items, i);
+    return _isProc(args[1]) ? (args[1] as unknown as (i: number) => unknown)(i) : args[1];
+  },
+  dig: (items, i: number, ...rest: unknown[]) => {
+    const v = items.at(i) ?? null;
+    if (rest.length === 0 || v === null) return v;
+    if (Array.isArray(v)) return ARRAY_CALLS.dig(v, ...(rest as never[]));
+    return (v as { dig(...a: unknown[]): unknown }).dig(...rest);
+  },
   isEmpty: (items) => items.length === 0,
-  isInclude: (items, obj: unknown) => items.includes(obj),
-  isMember: (items, obj: unknown) => items.includes(obj),
-  join: (items, sep: string = "") => items.join(sep),
-  concat: (items, other: Items) => (items.push(...other), items),
+  isInclude: (items, obj: unknown) => items.some((fn) => rbEqual(fn, obj)),
+  isMember: (items, obj: unknown) => items.some((fn) => rbEqual(fn, obj)),
+  join: (items, sep: string | null = null) => aryJoin(items, sep),
+  concat: (items, ...others: Items[]) => (items.push(...others.flat(1)), items),
   push: (items, ...objs: unknown[]) => (items.push(...objs), items),
-  pop: (items, n?: number) =>
-    n === undefined ? (items.pop() ?? null) : items.splice(Math.max(items.length - n, 0)),
-  shift: (items, n?: number) => (n === undefined ? (items.shift() ?? null) : items.splice(0, n)),
+  pop: (items, n?: number) => {
+    if (n === undefined) return items.pop() ?? null;
+    if (n < 0) throw new ArgumentError("negative array size");
+    return items.splice(Math.max(items.length - n, 0));
+  },
+  shift: (items, n?: number) => {
+    if (n === undefined) return items.shift() ?? null;
+    if (n < 0) throw new ArgumentError("negative array size");
+    return items.splice(0, n);
+  },
   unshift: (items, ...objs: unknown[]) => (items.unshift(...objs), items),
+  insert: (items, i: number, ...objs: unknown[]) => {
+    if (objs.length === 0) return items;
+    const at = i < 0 ? i + items.length + 1 : i;
+    if (at < 0) {
+      throw new IndexError(`index ${i} too small for array; minimum: -${items.length + 1}`);
+    }
+    while (items.length < at) items.push(null);
+    items.splice(at, 0, ...objs);
+    return items;
+  },
   clear: (items) => ((items.length = 0), items),
+  replace: (items, other: Items) => _replace(items, [...other]),
+  fill: async (items, ...args: unknown[]) => {
+    const block = _isProc(args[0]) ? (args.shift() as (i: number) => unknown) : null;
+    const [obj] = block ? [null] : args.splice(0, 1);
+    const [beg, len] = args.length
+      ? _span(items, args[0] ?? 0, args[1] as number)
+      : [0, items.length];
+    const end = args[0] instanceof Range || args[1] != null ? beg + len : items.length;
+    for (let i = beg; i < end; i++) items[i] = block ? await block(i) : obj;
+    return items;
+  },
   reverse: (items) => [...items].reverse(),
-  zip: (items, ...others: Items[]) => items.map((x, i) => [x, ...others.map((o) => o[i] ?? null)]),
-  each: async (items, block: ElementBlock) => {
+  reverseBang: (items) => items.reverse(),
+  rotate: (items, cnt?: number) => ARRAY_METHOD_TABLE.rotate(items, cnt as never),
+  rotateBang: (items, cnt?: number) =>
+    _replace(items, ARRAY_METHOD_TABLE.rotate(items, cnt as never) as Items),
+  shuffle: (items) => ARRAY_METHOD_TABLE.shuffle(items),
+  shuffleBang: (items) => _replace(items, ARRAY_METHOD_TABLE.shuffle(items) as Items),
+  sample: (items, ...args: [number?]) =>
+    ARRAY_METHOD_TABLE.sample(items, ...(args as unknown as never[])),
+  zip: async (items, ...others: unknown[]) => {
+    const block = _isProc(others.at(-1)) ? (others.pop() as ElementBlock) : null;
+    const result = items.map((x, i) => [x, ...(others as Items[]).map((o) => o[i] ?? null)]);
+    if (!block) return result;
+    await _yields(result, block);
+    return null;
+  },
+  transpose: (items) => {
+    const rows = items as Items[];
+    for (const row of rows) {
+      if (row.length !== rows[0].length) {
+        throw new IndexError(`element size differs (${row.length} should be ${rows[0].length})`);
+      }
+    }
+    return (rows[0] ?? []).map((_x, i) => rows.map((row) => row[i]));
+  },
+  assoc: (items, key: unknown) =>
+    items.find((row) => Array.isArray(row) && rbEqual(row[0], key)) ?? null,
+  rassoc: (items, value: unknown) =>
+    items.find((row) => Array.isArray(row) && rbEqual(row[1], value)) ?? null,
+  product: (items, ...others: unknown[]) => {
+    const block = _isProc(others.at(-1)) ? (others.pop() as ElementBlock) : undefined;
+    return _combinatoric(product(items, ...(others as Items[])), items, block);
+  },
+  combination: (items, n: number, block?: ElementBlock) =>
+    _combinatoric(_choose(items, n, false, false), items, block),
+  permutation: (items, ...args: unknown[]) => {
+    const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : undefined;
+    const n = (args[0] as number | undefined) ?? items.length;
+    return _combinatoric(_choose(items, n, true, false), items, block);
+  },
+  repeatedCombination: (items, n: number, block?: ElementBlock) =>
+    _combinatoric(_choose(items, n, false, true), items, block),
+  repeatedPermutation: (items, n: number, block?: ElementBlock) =>
+    _combinatoric(_choose(items, n, true, true), items, block),
+  pack: (items, ...args: unknown[]) => (pack as (...a: unknown[]) => unknown)(items, ...args),
+  deconstruct: (items) => items,
+  entries: (items) => [...items],
+  toH: async (items, block?: ElementBlock) =>
+    Object.fromEntries((block ? await _yields(items, block) : items) as [string, unknown][]),
+  toSet: (items) => ARRAY_METHOD_TABLE.toSet(items),
+  chain: (items, ...others: Items[]) => [...items, ...others.flat(1)],
+  lazy: (items) => [...items],
+  each: async (items, block?: ElementBlock) => {
+    if (!block) return toEnum(items, "each");
     for (const fn of items) await block(fn as string);
     return items;
   },
-  eachWithIndex: async (items, block: (fn: string, i: number) => unknown) => {
+  eachWithIndex: async (items, block?: (fn: string, i: number) => unknown) => {
+    if (!block) return items.map((fn, i) => [fn, i]);
     for (const [i, fn] of items.entries()) await block(fn as string, i);
     return items;
   },
-  rejectBang: async (items, block: ElementBlock) => {
-    const kept = await _filterBy(items, block, false);
-    if (kept.length === items.length) return null;
-    items.splice(0, items.length, ...kept);
+  eachIndex: async (items, block?: (i: number) => unknown) => {
+    if (!block) return [...items.keys()];
+    for (const i of items.keys()) await block(i);
     return items;
   },
-  sortBang: (items) => items.sort(),
-  uniqBang: (items) => {
-    const kept = uniq(items);
-    if (kept.length === items.length) return null;
-    items.splice(0, items.length, ...kept);
+  reverseEach: async (items, block?: ElementBlock) => {
+    if (!block) return [...items].reverse();
+    await _yields([...items].reverse(), block);
     return items;
   },
-  map: async (items, block: ElementBlock) => {
-    const result: Items = [];
-    for (const fn of items) result.push(await block(fn as string));
+  eachWithObject: async (items, memo: unknown, block: (fn: string, memo: unknown) => unknown) => {
+    for (const fn of items) await block(fn as string, memo);
+    return memo;
+  },
+  eachSlice: (items, n: number, block?: ElementBlock) =>
+    _eachGroup(items, eachSlice(items, n) as unknown as Iterable<unknown>, block),
+  eachCons: (items, n: number, block?: ElementBlock) =>
+    _eachGroup(items, eachCons(items, n) as unknown as Iterable<unknown>, block),
+  cycle: async (items, ...args: unknown[]) => {
+    const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : null;
+    const n = (args[0] as number | null | undefined) ?? null;
+    if (!block) return n === null ? [...items] : Array.from({ length: n }, () => items).flat(1);
+    if (items.length === 0) return null;
+    for (let i = 0; n === null || i < n; i++) await _yields(items, block);
+    return null;
+  },
+  rejectBang: async (items, block: ElementBlock) =>
+    _bang(items, await _filterBy(items, block, false)),
+  selectBang: async (items, block: ElementBlock) =>
+    _bang(items, await _filterBy(items, block, true)),
+  deleteIf: async (items, block: ElementBlock) =>
+    _replace(items, await _filterBy(items, block, false)),
+  keepIf: async (items, block: ElementBlock) =>
+    _replace(items, await _filterBy(items, block, true)),
+  mapBang: async (items, block: ElementBlock) => _replace(items, await _yields(items, block)),
+  sortBang: (items, block?: unknown) => items.sort(_comparator(block)),
+  sortByBang: async (items, block: ElementBlock) =>
+    _replace(items, sortBy(items, await _replay(items, block)) as Items),
+  uniqBang: async (items, block?: ElementBlock) =>
+    _bang(items, (await ARRAY_CALLS.uniq(items, block as never)) as Items),
+  compactBang: (items) => compactBang(items),
+  flattenBang: (items, level?: number) => {
+    if (!items.some(Array.isArray)) return null;
+    return _replace(items, ARRAY_CALLS.flatten(items, level as never) as Items);
+  },
+  sliceBang: (items, ...args: [unknown, number?]) => {
+    if (args.length === 1 && !(args[0] instanceof Range)) return deleteAt(items, args[0] as number);
+    const result = arySlice(items, ...args);
+    if (result !== null) items.splice(..._span(items, args[0], args[1]));
     return result;
   },
-  collect: async (items, block: ElementBlock) => {
-    const result: Items = [];
-    for (const fn of items) result.push(await block(fn as string));
-    return result;
-  },
-  sort: (items) => [...items].sort(),
-  sortBy: (items, block: ElementBlock) => sortBy(items as string[], block),
-  select: (items, block: ElementBlock) => _filterBy(items, block, true),
-  findAll: (items, block: ElementBlock) => _filterBy(items, block, true),
-  reject: (items, block: ElementBlock) => _filterBy(items, block, false),
-  grep: (items, pattern: RegExp) => items.filter((fn) => (fn as string).search(pattern) !== -1),
+  deleteAt: (items, i: number) => deleteAt(items, i),
+  map: (items, block?: ElementBlock) => (block ? _yields(items, block) : [...items]),
+  flatMap: async (items, block?: ElementBlock) =>
+    block ? (await _yields(items, block)).flat(1) : [...items],
+  filterMap: async (items, block?: ElementBlock) =>
+    block ? (await _yields(items, block)).filter(rtest) : [...items],
+  sort: (items, block?: unknown) => [...items].sort(_comparator(block)),
+  sortBy: async (items, block?: ElementBlock) =>
+    block ? sortBy(items, await _replay(items, block)) : [...items],
+  select: (items, block?: ElementBlock) => (block ? _filterBy(items, block, true) : [...items]),
+  reject: (items, block?: ElementBlock) => (block ? _filterBy(items, block, false) : [...items]),
+  grep: (items, pattern: unknown, block?: ElementBlock) => _grep(items, pattern, true, block),
+  grepV: (items, pattern: unknown, block?: ElementBlock) => _grep(items, pattern, false, block),
   compact: (items) => items.filter((fn) => fn != null),
-  flatten: (items) => flatten(items),
-  uniq: (items) => uniq(items),
+  flatten: (items, level?: number) =>
+    level === undefined || level < 0 ? flatten(items) : items.flat(level),
+  uniq: async (items, block?: ElementBlock) =>
+    block ? uniq(items, await _replay(items, block)) : uniq(items),
   valuesAt: (items, ...selectors: number[]) => selectors.map((i) => items.at(i) ?? null),
   partition: async (items, block: ElementBlock) => {
     const result: [Items, Items] = [[], []];
     for (const fn of items) result[rtest(await block(fn as string)) ? 0 : 1].push(fn);
     return result;
   },
+  groupBy: async (items, block: ElementBlock) => groupBy(items, await _replay(items, block)),
+  tally: (items) => tally(items),
+  sum: async (items, ...args: unknown[]) => {
+    const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : null;
+    const values = block ? await _yields(items, block) : items;
+    return new Enumerable(values).sum(...args);
+  },
   toA: (items) => items,
   toAry: (items) => items,
   multiply: (items) => items,
   append: (items, obj: unknown) => (items.push(obj), items),
-  inject: async (items, memo: unknown, block: (res: unknown, fn: string) => unknown) => {
-    for (const fn of items) memo = await block(memo, fn as string);
+  inject: async (items, ...args: unknown[]) => {
+    const op = args.at(-1);
+    const block = _isProc(op) ? (op as unknown as (res: unknown, fn: string) => unknown) : null;
+    if (block || (typeof op === "string" && args.length > 0)) args.pop();
+    const rest = [...items];
+    let memo = args.length ? args[0] : (rest.shift() ?? null);
+    for (const fn of rest) {
+      memo = block ? await block(memo, fn as string) : rbFSend(memo, op as string, fn);
+    }
     return memo;
   },
-  find: async (items, block: ElementBlock) => {
+  find: async (items, ...args: unknown[]) => {
+    const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : null;
+    if (!block) return [...items];
     for (const fn of items) if (rtest(await block(fn as string))) return fn;
-    return null;
+    return _isProc(args[0]) ? (args[0] as () => unknown)() : null;
   },
   count: async (items, obj?: unknown) => {
     if (obj === undefined) return items.length;
-    if (typeof obj !== "function") return items.filter((fn) => fn === obj).length;
-    return (await _filterBy(items, obj as ElementBlock, true)).length;
+    if (!_isProc(obj)) return items.filter((fn) => rbEqual(fn, obj)).length;
+    return (await _filterBy(items, obj, true)).length;
   },
-  isAny: async (items, block?: ElementBlock) =>
-    block ? (await _filterBy(items, block, true)).length > 0 : items.some(rtest),
-  min: (items, block?: (a: string, b: string) => number) =>
-    [...items].sort(block as never)[0] ?? null,
-  max: (items, block?: (a: string, b: string) => number) =>
-    [...items].sort(block as never).at(-1) ?? null,
-  index: (items, obj: unknown) => (items.includes(obj) ? items.indexOf(obj) : null),
-  delete: (items, obj: unknown) => {
-    const found = items.includes(obj) ? obj : null;
-    items.splice(0, items.length, ...items.filter((fn) => fn !== obj));
+  isAny: async (items, ...args: unknown[]) => {
+    const test = args.length ? _matcher(args) : (rtest as ElementBlock);
+    for (const fn of items) if (rtest(await test(fn as string))) return true;
+    return false;
+  },
+  isAll: async (items, ...args: unknown[]) => {
+    const test = args.length ? _matcher(args) : (rtest as ElementBlock);
+    for (const fn of items) if (!rtest(await test(fn as string))) return false;
+    return true;
+  },
+  isNone: async (items, ...args: unknown[]) =>
+    !(await ARRAY_CALLS.isAny(items, ...(args as never[]))),
+  isOne: async (items, ...args: unknown[]) => {
+    const test = args.length ? _matcher(args) : (rtest as ElementBlock);
+    return (await _filterBy(items, test, true)).length === 1;
+  },
+  min: (items, ...args: unknown[]) => _extreme(items, args, false),
+  max: (items, ...args: unknown[]) => _extreme(items, args, true),
+  minmax: async (items, block?: unknown) => [
+    await _extreme(items, block ? [block] : [], false),
+    await _extreme(items, block ? [block] : [], true),
+  ],
+  minBy: (items, ...args: unknown[]) => _extremeBy(minBy, items, args),
+  maxBy: (items, ...args: unknown[]) => _extremeBy(maxBy, items, args),
+  minmaxBy: async (items, block: ElementBlock) => [
+    await ARRAY_CALLS.minBy(items, block as never),
+    await ARRAY_CALLS.maxBy(items, block as never),
+  ],
+  index: async (items, ...args: unknown[]) => {
+    if (args.length === 0) return [...items];
+    const test = _isProc(args[0]) ? args[0] : (fn: string) => rbEqual(fn, args[0]);
+    for (const [i, fn] of items.entries()) if (rtest(await test(fn as string))) return i;
+    return null;
+  },
+  rindex: async (items, ...args: unknown[]) => {
+    if (args.length === 0) return [...items].reverse();
+    const test = _isProc(args[0]) ? args[0] : (fn: string) => rbEqual(fn, args[0]);
+    for (let i = items.length; i--; ) if (rtest(await test(items[i] as string))) return i;
+    return null;
+  },
+  bsearch: async (items, block: ElementBlock) => {
+    const i = await _search(items, block);
+    return i === null ? null : items[i];
+  },
+  bsearchIndex: (items, block: ElementBlock) => _search(items, block),
+  delete: async (items, obj: unknown, block?: () => unknown) => {
+    const found = items.find((fn) => rbEqual(fn, obj));
+    if (found === undefined) return block ? block() : null;
+    _replace(
+      items,
+      items.filter((fn) => !rbEqual(fn, obj)),
+    );
     return found;
   },
-  take: (items, n: number) => items.slice(0, n),
-  drop: (items, n: number) => items.slice(n),
+  take: (items, n: number) => {
+    if (n < 0) throw new ArgumentError("attempt to take negative size");
+    return items.slice(0, n);
+  },
+  drop: (items, n: number) => {
+    if (n < 0) throw new ArgumentError("attempt to drop negative size");
+    return items.slice(n);
+  },
+  takeWhile: async (items, block: ElementBlock) => items.slice(0, await _while(items, block)),
+  dropWhile: async (items, block: ElementBlock) => items.slice(await _while(items, block)),
+  chunk: async (items, block: ElementBlock) => {
+    const result: [unknown, Items][] = [];
+    const yields = await _yields(items, block);
+    for (const [i, fn] of items.entries()) {
+      if (yields[i] === null || yields[i] === undefined) continue;
+      const tail = result.at(-1);
+      if (tail && i > 0 && rbEqual(tail[0], yields[i]) && rbEqual(yields[i - 1], yields[i])) {
+        tail[1].push(fn);
+      } else {
+        result.push([yields[i], [fn]]);
+      }
+    }
+    return result;
+  },
+  chunkWhile: (items, block: PairBlock) => _split(items, async (a, b) => !rtest(await block(a, b))),
+  sliceWhen: (items, block: PairBlock) => _split(items, block),
+  sliceBefore: (items, ...args: unknown[]) => _split(items, (_a, b) => _matcher(args)(b)),
+  sliceAfter: (items, ...args: unknown[]) => _split(items, (a) => _matcher(args)(a)),
   plus: (items, other: Items) => [...items, ...other],
-  minus: (items, other: Items) => items.filter((fn) => !other.includes(fn)),
-  and: (items, other: Items) => uniq(items.filter((fn) => other.includes(fn))),
-  or: (items, other: Items) => uniq([...items, ...other]),
+  minus: (items, other: Items) => ARRAY_METHOD_TABLE.difference(items, other as never),
+  and: (items, other: Items) => ARRAY_METHOD_TABLE.intersection(items, other as never),
+  or: (items, other: Items) => ARRAY_METHOD_TABLE.union(items, other as never),
+  difference: (items, ...others: Items[]) =>
+    ARRAY_METHOD_TABLE.difference(items, ...(others as never[])),
+  union: (items, ...others: Items[]) => ARRAY_METHOD_TABLE.union(items, ...(others as never[])),
+  intersection: (items, ...others: Items[]) =>
+    ARRAY_METHOD_TABLE.intersection(items, ...(others as never[])),
+  isIntersect: (items, other: Items) => isIntersect(items, other),
 };
+
+Object.assign(ARRAY_CALLS, {
+  collect: ARRAY_CALLS.map,
+  collectBang: ARRAY_CALLS.mapBang,
+  collectConcat: ARRAY_CALLS.flatMap,
+  detect: ARRAY_CALLS.find,
+  eachEntry: ARRAY_CALLS.each,
+  filter: ARRAY_CALLS.select,
+  filterBang: ARRAY_CALLS.selectBang,
+  findAll: ARRAY_CALLS.select,
+  findIndex: ARRAY_CALLS.index,
+  prepend: ARRAY_CALLS.unshift,
+  reduce: ARRAY_CALLS.inject,
+  slice: ARRAY_CALLS.get,
+});
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class FileList {
@@ -247,9 +660,9 @@ export class FileList {
       : result;
   }
 
-  async append(obj: unknown): Promise<this> {
+  async append(...objs: unknown[]): Promise<this> {
     await this.resolve();
-    this.items.push(fromPathname(obj));
+    this.items.push(...objs.map((obj) => fromPathname(obj)));
     return this;
   }
 
@@ -289,14 +702,14 @@ export class FileList {
   }
 
   sub(pat: RegExp | string, rep: string): Promise<this> {
-    return this.inject(new (this.constructor as new () => this)(), (res, fn) =>
-      (res as this).append(rbStrSub({ string: fn }, pat, rep)),
+    return this.inject(new (this.constructor as new () => this)(), (res: unknown, fn: unknown) =>
+      (res as this).append(rbStrSub({ string: fn as string }, pat, rep)),
     ) as Promise<this>;
   }
 
   gsub(pat: RegExp | string, rep: string): Promise<this> {
-    return this.inject(new (this.constructor as new () => this)(), (res, fn) =>
-      (res as this).append(strGsub({ string: fn }, [pat, rep], false)),
+    return this.inject(new (this.constructor as new () => this)(), (res: unknown, fn: unknown) =>
+      (res as this).append(strGsub({ string: fn as string }, [pat, rep], false)),
     ) as Promise<this>;
   }
 
@@ -386,21 +799,17 @@ export class FileList {
     }
   }
 
-  /** @missingRailsCall any? — CONVERGEABLE rake-file-list-full-array-delegation */
   async isExcludedFromList(fn: string): Promise<boolean> {
-    for (const pat of this.excludePatterns) {
-      let hit: boolean;
-      if (pat instanceof RegExp) {
-        hit = fn != null && pat.test(fn);
-      } else if (typeof pat === "string" && FileList.GLOB_PATTERN.test(pat)) {
-        hit = File.fnmatch(pat, fn, File.FNM_PATHNAME | File.FNM_EXTGLOB);
-      } else {
-        hit = fn === pat;
+    const hit = await ARRAY_CALLS.isAny(this.excludePatterns, ((pat: unknown) => {
+      if (pat instanceof RegExp) return fn != null && pat.test(fn);
+      if (typeof pat === "string" && FileList.GLOB_PATTERN.test(pat)) {
+        return File.fnmatch(pat, fn, File.FNM_PATHNAME | File.FNM_EXTGLOB);
       }
-      if (hit) return true;
-    }
-    for (const p of this.excludeProcs) if (rtest(await p(fn))) return true;
-    return false;
+      return fn === pat;
+    }) as never);
+    if (hit) return true;
+    return ARRAY_CALLS.isAny(this.excludeProcs, ((p: ElementBlock) =>
+      rbProcCall(p, fn)) as never) as Promise<boolean>;
   }
 
   static readonly DEFAULT_IGNORE_PATTERNS: RegExp[] = [
@@ -429,53 +838,110 @@ export class FileList {
 
 include(FileList, Cloneable);
 
+type Names0 = "at" | "fetch" | "dig" | "slice" | "sliceBang" | "sample" | "transpose";
+type Names1 = "assoc" | "rassoc" | "product" | "permutation" | "pack" | "entries" | "toSet";
+type Names2 = "chain" | "lazy" | "cycle" | "deleteAt" | "reduce" | "detect" | "minBy";
+type Names3 = "maxBy" | "rindex" | "findIndex" | "sliceBefore" | "sliceAfter" | "difference";
+type Names4 = "union" | "intersection" | "isIntersect" | "rotate" | "shuffle" | "tally";
+type Names5 = "sum";
+type Delegated = Record<
+  Names0 | Names1 | Names2 | Names3 | Names4 | Names5,
+  (...args: unknown[]) => Promise<unknown>
+>;
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface FileList {
+export interface FileList extends Delegated {
+  insert(i: number, ...objs: unknown[]): Promise<this>;
+  prepend(...objs: unknown[]): Promise<this>;
+  replace(other: unknown): Promise<this>;
+  fill(...args: unknown[]): Promise<this>;
+  reverseBang(): Promise<this>;
+  rotateBang(cnt?: number): Promise<this>;
+  shuffleBang(): Promise<this>;
+  combination(n: number, block?: (c: string[]) => unknown): Promise<Items>;
+  repeatedCombination(n: number, block?: (c: string[]) => unknown): Promise<Items>;
+  repeatedPermutation(n: number, block?: (c: string[]) => unknown): Promise<Items>;
+  deconstruct(): Promise<this>;
+  toH(block?: ElementBlock): Promise<unknown>;
+  eachIndex(block?: (i: number) => unknown): Promise<this | number[]>;
+  eachEntry(block?: ElementBlock): Promise<unknown>;
+  reverseEach(block?: ElementBlock): Promise<this | Items>;
+  eachWithObject<M>(memo: M, block: (fn: string, memo: M) => unknown): Promise<M>;
+  eachSlice(n: number, block?: (slice: string[]) => unknown): Promise<this | Items>;
+  eachCons(n: number, block?: (cons: string[]) => unknown): Promise<this | Items>;
+  selectBang(block: ElementBlock): Promise<this | null>;
+  filterBang(block: ElementBlock): Promise<this | null>;
+  deleteIf(block: ElementBlock): Promise<this>;
+  keepIf(block: ElementBlock): Promise<this>;
+  mapBang(block: ElementBlock): Promise<this>;
+  collectBang(block: ElementBlock): Promise<this>;
+  sortByBang(block: ElementBlock): Promise<this>;
+  compactBang(): Promise<this | null>;
+  flattenBang(level?: number): Promise<this | null>;
+  flatMap(block?: ElementBlock): Promise<Items>;
+  collectConcat(block?: ElementBlock): Promise<Items>;
+  filterMap(block?: ElementBlock): Promise<Items>;
+  filter(block?: ElementBlock): Promise<this>;
+  grepV(pattern: unknown, block?: ElementBlock): Promise<Items>;
+  groupBy(block: ElementBlock): Promise<unknown>;
+  isAll(...args: unknown[]): Promise<boolean>;
+  isNone(...args: unknown[]): Promise<boolean>;
+  isOne(...args: unknown[]): Promise<boolean>;
+  minmax(block?: (a: string, b: string) => number): Promise<[string | null, string | null]>;
+  minmaxBy(block: ElementBlock): Promise<[unknown, unknown]>;
+  bsearch(block: ElementBlock): Promise<unknown>;
+  bsearchIndex(block: ElementBlock): Promise<number | null>;
+  takeWhile(block: ElementBlock): Promise<Items>;
+  dropWhile(block: ElementBlock): Promise<Items>;
+  chunk(block: ElementBlock): Promise<Items>;
+  chunkWhile(block: (a: string, b: string) => unknown): Promise<Items>;
+  sliceWhen(block: (a: string, b: string) => unknown): Promise<Items>;
   size(): Promise<number>;
   length(): Promise<number>;
   first(n?: number): Promise<string | null | Items>;
   last(n?: number): Promise<string | null | Items>;
-  get(i: number): Promise<string | null>;
-  set(i: number, value: unknown): Promise<unknown>;
+  get(start: unknown, length?: number): Promise<unknown>;
+  set(...args: unknown[]): Promise<unknown>;
   isEmpty(): Promise<boolean>;
   isInclude(obj: unknown): Promise<boolean>;
   isMember(obj: unknown): Promise<boolean>;
-  join(sep?: string): Promise<string>;
-  concat(other: unknown): Promise<this>;
+  join(sep?: string | null): Promise<string>;
+  concat(...others: unknown[]): Promise<this>;
   push(...objs: unknown[]): Promise<this>;
   pop(n?: number): Promise<string | null | Items>;
   shift(n?: number): Promise<string | null | Items>;
   unshift(...objs: unknown[]): Promise<this>;
   clear(): Promise<this>;
   reverse(): Promise<Items>;
-  zip(...others: unknown[]): Promise<Items>;
-  each(block: ElementBlock): Promise<this>;
+  zip(...others: (Items | FileList)[]): Promise<Items>;
+  zip(...others: unknown[]): Promise<Items | null>;
+  each(block?: ElementBlock): Promise<unknown>;
   eachWithIndex(block: (fn: string, i: number) => unknown): Promise<this>;
   rejectBang(block: ElementBlock): Promise<this | null>;
-  sortBang(): Promise<this>;
-  uniqBang(): Promise<this | null>;
+  sortBang(block?: (a: string, b: string) => number): Promise<this>;
+  uniqBang(block?: ElementBlock): Promise<this | null>;
   inspect(): Promise<string>;
   compare(other: unknown): Promise<number | null>;
   map(block: ElementBlock): Promise<this>;
   collect(block: ElementBlock): Promise<this>;
-  sort(): Promise<this>;
+  sort(block?: (a: string, b: string) => number): Promise<this>;
   sortBy(block: ElementBlock): Promise<this>;
   select(block: ElementBlock): Promise<this>;
   findAll(block: ElementBlock): Promise<this>;
   reject(block: ElementBlock): Promise<this>;
-  grep(pattern: RegExp): Promise<this>;
+  grep(pattern: unknown, block?: ElementBlock): Promise<this>;
   compact(): Promise<this>;
-  flatten(): Promise<this>;
-  uniq(): Promise<this>;
+  flatten(level?: number): Promise<this>;
+  uniq(block?: ElementBlock): Promise<this>;
   valuesAt(...selectors: number[]): Promise<this>;
-  inject(memo: unknown, block: (res: unknown, fn: string) => unknown): Promise<unknown>;
-  find(block: ElementBlock): Promise<string | null>;
+  inject(...args: unknown[]): Promise<unknown>;
+  find(...args: unknown[]): Promise<unknown>;
   count(obj?: unknown): Promise<number>;
-  isAny(block?: ElementBlock): Promise<boolean>;
-  min(block?: (a: string, b: string) => number): Promise<string | null>;
-  max(block?: (a: string, b: string) => number): Promise<string | null>;
-  index(obj: unknown): Promise<number | null>;
-  delete(obj: unknown): Promise<unknown>;
+  isAny(...args: unknown[]): Promise<boolean>;
+  min(...args: unknown[]): Promise<unknown>;
+  max(...args: unknown[]): Promise<unknown>;
+  index(...args: unknown[]): Promise<unknown>;
+  delete(obj: unknown, block?: () => unknown): Promise<unknown>;
   take(n: number): Promise<Items>;
   drop(n: number): Promise<Items>;
   plus(other: unknown): Promise<this>;
@@ -487,13 +953,7 @@ export interface FileList {
 /** @noRailsEquivalent PERMANENT */
 const MUST_DEFINE_CALLS: typeof ARRAY_CALLS = {
   inspect: (items) => rbInspect(items),
-  compare: (items, other: Items) => {
-    if (!Array.isArray(other)) return null;
-    for (let i = 0; i < Math.min(items.length, other.length); i++) {
-      if (items[i] !== other[i]) return (items[i] as string) < (other[i] as string) ? -1 : 1;
-    }
-    return Math.sign(items.length - other.length);
-  },
+  compare: (items, other: unknown) => cmp(items, other),
 };
 
 for (const sym of FileList.DELEGATING_METHODS) {
