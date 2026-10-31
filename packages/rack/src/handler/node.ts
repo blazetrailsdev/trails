@@ -63,7 +63,8 @@ export class Node {
         stderr.write(
           `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
         );
-        if ((res as { headersSent?: boolean }).headersSent) {
+        if (res.writableEnded) return;
+        if (res.headersSent) {
           res.socket?.destroy();
           return;
         }
