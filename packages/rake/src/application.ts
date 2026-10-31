@@ -93,7 +93,7 @@ export class Application {
   /** @internal */ _systemDir: string | undefined;
   /** @internal */ _displayExceptionDetailsSeen: Error[] | undefined;
   /** @internal */ _dynamicWidth: number | undefined;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE rake-minimal-thread-pool-class */
   threadPool = {
     activeThreads: 0,
     maxActiveThreads: 0,
