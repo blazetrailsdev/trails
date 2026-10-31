@@ -59,7 +59,18 @@ export class Node {
     const handler = new Node(app);
     const http = await getHttpAsync();
     const server = http.createServer((req, res) => {
-      void handler.service(req, res);
+      void handler.service(req, res).catch((error: unknown) => {
+        stderr.write(
+          `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+        );
+        if (res.writableEnded) return;
+        if (res.headersSent) {
+          res.socket?.destroy();
+          return;
+        }
+        res.writeHead(500, { "content-length": "0" });
+        res.end();
+      });
     });
     server.on("upgrade", (req, socket, head) => {
       void handler.upgrade(req, socket, head);
@@ -228,6 +239,7 @@ export class Node {
           `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
         );
         if (hijacked) return;
+        if (socket.writableEnded) return;
         if (started) socket.destroy();
         else socket.end(responseHead(500, { "content-length": "0" }));
       }

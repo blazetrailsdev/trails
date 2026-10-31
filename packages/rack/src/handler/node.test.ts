@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { connect, type Socket } from "node:net";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { HttpRequest, HttpResponse, StringIO } from "@blazetrails/ruby-compat";
-import { b, TCPSocket } from "@blazetrails/ruby-compat";
+import { b, stderr, TCPSocket } from "@blazetrails/ruby-compat";
 import type { RackApp, RackBody, RackEnv, RackMiddleware } from "../index.js";
 import { RACK_ERRORS, RACK_HIJACK, RACK_INPUT, RACK_IS_HIJACK } from "../constants.js";
 import { Files } from "../files.js";
@@ -207,6 +207,103 @@ describe("Rack::Handler::Node", () => {
       new Node(app).service(await mockReq({}), res as unknown as HttpResponse),
     ).rejects.toThrow(boom);
     expect(closed).toBe(true);
+  });
+
+  function captureStderr(): { lines: string[]; restore: () => void } {
+    const lines: string[] = [];
+    const spy = vi.spyOn(stderr, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true as never;
+    });
+    return { lines, restore: () => spy.mockRestore() };
+  }
+
+  it("answers 500 when the app raises on an ordinary request", async () => {
+    const log = captureStderr();
+    try {
+      await serving(
+        async () => {
+          throw new Error("boom");
+        },
+        async (url) => {
+          const response = await fetch(`${url}/up`);
+
+          expect(response.status).toBe(500);
+          expect(response.headers.get("content-length")).toBe("0");
+          expect(await response.text()).toBe("");
+        },
+      );
+    } finally {
+      log.restore();
+    }
+
+    expect(log.lines.join("")).toContain("boom");
+  });
+
+  it("fails the request, without hanging, when the body raises after the head is sent", async () => {
+    const log = captureStderr();
+    let failed = false;
+    try {
+      await serving(
+        async () => [
+          200,
+          { "content-type": "text/plain" },
+          {
+            async *[Symbol.asyncIterator]() {
+              yield "first";
+              throw new Error("mid-body");
+            },
+          } as unknown as RackBody,
+        ],
+        async (url) => {
+          try {
+            const response = await fetch(`${url}/stream`);
+            await response.text();
+          } catch {
+            failed = true;
+          }
+        },
+      );
+    } finally {
+      log.restore();
+    }
+
+    expect(failed).toBe(true);
+    expect(log.lines.join("")).toContain("mid-body");
+  });
+
+  it("keeps a complete response when closing the body raises", async () => {
+    const log = captureStderr();
+    const payload = "x".repeat(4 * 1024 * 1024);
+    let body = "";
+    let status = 0;
+    try {
+      await serving(
+        async () => [
+          200,
+          { "content-type": "text/plain" },
+          {
+            async *[Symbol.asyncIterator]() {
+              yield payload;
+            },
+            close() {
+              throw new Error("close raised");
+            },
+          } as unknown as RackBody,
+        ],
+        async (url) => {
+          const response = await fetch(`${url}/closes`);
+          status = response.status;
+          body = await response.text();
+        },
+      );
+    } finally {
+      log.restore();
+    }
+
+    expect(status).toBe(200);
+    expect(body.length).toBe(payload.length);
+    expect(log.lines.join("")).toContain("close raised");
   });
 
   it("sends an array body with the content-length of its bytes", async () => {
@@ -802,6 +899,36 @@ describe("Rack::Handler::Node", () => {
 
       expect(text.startsWith("HTTP/1.1 500 Internal Server Error\r\n")).toBe(true);
       expect(closed).toBe(true);
+    });
+
+    it("keeps a complete response when closing the body raises", async () => {
+      const log = captureStderr();
+      const payload = "x".repeat(4 * 1024 * 1024);
+      let text = "";
+      try {
+        await serving(
+          async () => [
+            200,
+            {},
+            {
+              async *[Symbol.asyncIterator]() {
+                yield payload;
+              },
+              close() {
+                throw new Error("close raised");
+              },
+            } as unknown as RackBody,
+          ],
+          async (url) => {
+            ({ text } = await upgradeRequest(url, "/cable"));
+          },
+        );
+      } finally {
+        log.restore();
+      }
+
+      expect(text).toContain(payload);
+      expect(log.lines.join("")).toContain("close raised");
     });
 
     it("destroys the socket, without a second head, when the body raises mid-response", async () => {
