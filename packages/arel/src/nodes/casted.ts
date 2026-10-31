@@ -1,5 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { isNil, rbFSend, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { isNil, rbFSend, constSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { Arel, Attributes, Nodes } from "../namespaces.js";
@@ -102,5 +102,5 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Casted extends _AliasPredication {}
 
-rbModConstSet(Nodes, "Quoted", Quoted);
-rbModConstSet(Nodes, "Casted", Casted);
+constSet(Nodes, "Quoted", Quoted);
+constSet(Nodes, "Casted", Casted);

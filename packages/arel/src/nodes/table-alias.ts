@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { constSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";
@@ -69,4 +69,4 @@ export class TableAlias extends Binary {
   }
 }
 
-rbModConstSet(Nodes, "TableAlias", TableAlias);
+constSet(Nodes, "TableAlias", TableAlias);

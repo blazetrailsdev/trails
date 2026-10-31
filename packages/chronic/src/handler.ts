@@ -2,7 +2,7 @@ import {
   STDOUT,
   rbEqual,
   rbFSend,
-  rbModConstGet,
+  constGet,
   rbObjClassname,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
@@ -88,7 +88,7 @@ export class Handler {
 
   /** @internal */
   private isTagsMatch(name: string, tokens: Token[], tokenIndex: number): boolean | undefined {
-    const klass = rbModConstGet(
+    const klass = constGet(
       Chronic,
       name.replace(/(?:^|_)(.)/gm, (_m, c: string) => c.toUpperCase()),
     ) as abstract new (...args: never[]) => Tag;

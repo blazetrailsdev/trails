@@ -77,7 +77,7 @@ import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { rbModConstSet } from "./include.js";
+import { constSet } from "./include.js";
 import { stringSuperclass } from "./string/method-table.js";
 
 describe("Object#inspect", () => {
@@ -1298,7 +1298,7 @@ describe("Exception#inspect", () => {
   it("names a namespaced class by its path", () => {
     class Outer {}
     class Inner extends Error {}
-    rbModConstSet(Outer, "Inner", Inner);
+    constSet(Outer, "Inner", Inner);
     expect(inspect(new Inner("boom"))).toBe("#<Outer::Inner: boom>");
   });
 });
@@ -1467,7 +1467,7 @@ describe("rbObjIsKindOf(obj, Module)", () => {
   it("answers a named plain-object module and a class, not a bare hash", () => {
     class Outer {}
     const mod = {};
-    rbModConstSet(Outer, "Inner", mod);
+    constSet(Outer, "Inner", mod);
     expect(rbObjIsKindOf(mod, Module)).toBe(true);
     expect(rbObjIsKindOf(Outer, Module)).toBe(true);
     expect(rbObjIsKindOf({ a: 1 }, Module)).toBe(false);

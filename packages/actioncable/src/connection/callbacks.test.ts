@@ -1,6 +1,6 @@
 import { assertDifference, assertNoDifference } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
-import { kernelThrow, rbModConstSet } from "@blazetrails/ruby-compat";
+import { kernelThrow, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import "../test-helpers/test-helper.js";
 import { ActionCable } from "../namespaces.js";
@@ -64,8 +64,8 @@ class ChatChannel extends ChannelBase {
   }
 }
 const CallbacksTest = { name: "ActionCable::Connection::CallbacksTest", ChatChannel };
-rbModConstSet(ActionCable.Connection, "CallbacksTest", CallbacksTest);
-rbModConstSet(CallbacksTest, "ChatChannel", ChatChannel);
+constSet(ActionCable.Connection, "CallbacksTest", CallbacksTest);
+constSet(CallbacksTest, "ChatChannel", ChatChannel);
 
 describe("ActionCable::Connection::CallbacksTest", () => {
   let server: TestServer;

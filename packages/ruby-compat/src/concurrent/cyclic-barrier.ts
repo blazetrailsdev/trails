@@ -1,5 +1,5 @@
 import { ArgumentError } from "../argument-error.js";
-import { rbModConstSet } from "../include.js";
+import { constSet } from "../include.js";
 import { Concurrent } from "./map.js";
 
 /**
@@ -48,4 +48,4 @@ export class CyclicBarrier {
   }
 }
 
-rbModConstSet(Concurrent, "CyclicBarrier", CyclicBarrier);
+constSet(Concurrent, "CyclicBarrier", CyclicBarrier);

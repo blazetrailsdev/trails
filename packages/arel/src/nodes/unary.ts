@@ -1,5 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -60,24 +60,24 @@ export class OptimizerHints extends Unary {
 }
 export class RollUp extends Unary {}
 
-rbModConstSet(Nodes, "Not", Not);
+constSet(Nodes, "Not", Not);
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 export interface Unary<E = unknown> extends _AliasPredication {
   expr: E;
 }
 
-rbModConstSet(Nodes, "Unary", Unary);
-rbModConstSet(Nodes, "Offset", Offset);
-rbModConstSet(Nodes, "Limit", Limit);
-rbModConstSet(Nodes, "Lock", Lock);
-rbModConstSet(Nodes, "DistinctOn", DistinctOn);
-rbModConstSet(Nodes, "Bin", Bin);
-rbModConstSet(Nodes, "On", On);
-rbModConstSet(Nodes, "Lateral", Lateral);
-rbModConstSet(Nodes, "GroupingElement", GroupingElement);
-rbModConstSet(Nodes, "Cube", Cube);
-rbModConstSet(Nodes, "GroupingSet", GroupingSet);
-rbModConstSet(Nodes, "Group", Group);
-rbModConstSet(Nodes, "OptimizerHints", OptimizerHints);
-rbModConstSet(Nodes, "RollUp", RollUp);
+constSet(Nodes, "Unary", Unary);
+constSet(Nodes, "Offset", Offset);
+constSet(Nodes, "Limit", Limit);
+constSet(Nodes, "Lock", Lock);
+constSet(Nodes, "DistinctOn", DistinctOn);
+constSet(Nodes, "Bin", Bin);
+constSet(Nodes, "On", On);
+constSet(Nodes, "Lateral", Lateral);
+constSet(Nodes, "GroupingElement", GroupingElement);
+constSet(Nodes, "Cube", Cube);
+constSet(Nodes, "GroupingSet", GroupingSet);
+constSet(Nodes, "Group", Group);
+constSet(Nodes, "OptimizerHints", OptimizerHints);
+constSet(Nodes, "RollUp", RollUp);

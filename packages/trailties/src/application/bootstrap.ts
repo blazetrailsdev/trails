@@ -13,7 +13,7 @@ import {
 import { Runtime } from "@blazetrails/rack";
 import {
   LoadError,
-  rbModConstGet,
+  constGet,
   rbObjRespondTo,
   StandardError,
   STDERR,
@@ -72,13 +72,13 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, asyn
 
   if (TopLevel.Trails!.logger instanceof BroadcastLogger) {
     if (this.config.broadcastLogLevel != null) {
-      TopLevel.Trails!.logger.level = rbModConstGet(
+      TopLevel.Trails!.logger.level = constGet(
         Logger,
         String(this.config.broadcastLogLevel).replace(/^:/, "").toUpperCase(),
       ) as number;
     }
   } else {
-    TopLevel.Trails!.logger.level = rbModConstGet(
+    TopLevel.Trails!.logger.level = constGet(
       Logger,
       String(this.config.logLevel).replace(/^:/, "").toUpperCase(),
     ) as number;

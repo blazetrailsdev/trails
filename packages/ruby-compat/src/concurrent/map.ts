@@ -1,5 +1,5 @@
 import { Hash, rbBlockGivenP, type Block } from "../hash.js";
-import { rbModConstSet } from "../include.js";
+import { constSet } from "../include.js";
 import type { CountDownLatch } from "./count-down-latch.js";
 import type { CyclicBarrier } from "./cyclic-barrier.js";
 import type { Event } from "./event.js";
@@ -192,4 +192,4 @@ export class Map<K, V> {
   }
 }
 
-rbModConstSet(Concurrent, "Map", Map);
+constSet(Concurrent, "Map", Map);

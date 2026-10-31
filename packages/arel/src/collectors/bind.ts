@@ -1,4 +1,4 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Collectors } from "../namespaces.js";
 
 export class Bind {
@@ -33,4 +33,4 @@ export class Bind {
   }
 }
 
-rbModConstSet(Collectors, "Bind", Bind);
+constSet(Collectors, "Bind", Bind);

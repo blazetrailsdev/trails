@@ -1,5 +1,5 @@
 import { ArgumentError } from "../argument-error.js";
-import { rbModConstSet } from "../include.js";
+import { constSet } from "../include.js";
 import { Concurrent } from "./map.js";
 
 const MAX_TIMEOUT = 2 ** 31 - 1;
@@ -105,4 +105,4 @@ export class TimerTask {
   }
 }
 
-rbModConstSet(Concurrent, "TimerTask", TimerTask);
+constSet(Concurrent, "TimerTask", TimerTask);

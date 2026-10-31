@@ -1,5 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { Binary } from "./binary.js";
@@ -58,4 +58,4 @@ export class Cte extends Binary {
   }
 }
 
-rbModConstSet(Nodes, "Cte", Cte);
+constSet(Nodes, "Cte", Cte);

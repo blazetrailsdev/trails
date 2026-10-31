@@ -6,7 +6,7 @@ import type { UniqueReply } from "./reply.js";
 import type { WebReply } from "./reply.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { TimeWithZone } from "@blazetrails/activesupport";
-import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
@@ -288,7 +288,7 @@ export class WebTopic extends Base {
   static _tableName = "topics";
 
   static {
-    registerModel(rbModConstSet(Web, "Topic", this));
+    registerModel(constSet(Web, "Topic", this));
     this.hasMany("replies", {
       dependent: "destroy",
       foreignKey: "parent_id",

@@ -11,13 +11,7 @@ import {
   isPresent,
 } from "@blazetrails/activesupport";
 import { Utils } from "@blazetrails/rack";
-import {
-  RFC2396_PARSER,
-  URI,
-  first,
-  rbModConstDefined,
-  type Module,
-} from "@blazetrails/ruby-compat";
+import { RFC2396_PARSER, URI, first, constDefined, type Module } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import { Request } from "../../action-dispatch/http/request.js";
@@ -1715,14 +1709,14 @@ describe("RouteSetTest", () => {
   });
 
   it("routing traversal does not load extra classes", async () => {
-    assertNot(rbModConstDefined(Object, "Profiler__"), "Profiler should not be loaded");
+    assertNot(constDefined(Object, "Profiler__"), "Profiler should not be loaded");
     set.draw(function () {
       this.get({ "/profile": "profile#index" });
     });
 
     await tc.requestPathParams("/profile").catch(() => null);
 
-    assertNot(rbModConstDefined(Object, "Profiler__"), "Profiler should not be loaded");
+    assertNot(constDefined(Object, "Profiler__"), "Profiler should not be loaded");
   });
 
   it("recognize with conditions and format", async () => {

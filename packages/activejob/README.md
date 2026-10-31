@@ -19,9 +19,9 @@ uses the repo's one constant mechanism, and nothing of its own. Today only
 each story that ports a file follows:
 
 - **A framework class is seated by its defining module** with
-  `rbModConstSet(Owner, "Name", klass)` from `@blazetrails/ruby-compat`, on the
+  `constSet(Owner, "Name", klass)` from `@blazetrails/ruby-compat`, on the
   namespace object from `src/namespaces.ts`, as `base.ts` does with
-  `rbModConstSet(ActiveJob, "Base", Base)`. A serializer is seated on
+  `constSet(ActiveJob, "Base", Base)`. A serializer is seated on
   `Serializers`, an adapter on `QueueAdapters`, an error class on `ActiveJob`.
   As Ruby's `const_set` does, the seat is also what names the class:
   `ActiveJob::Base`.

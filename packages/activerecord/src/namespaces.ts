@@ -1,5 +1,5 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
-import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
 import type { AssociationScope } from "./associations/association-scope.js";
@@ -291,7 +291,7 @@ export const Associations = { name: "ActiveRecord::Associations", loadPath } as 
   DisableJoinsAssociationScope: typeof DisableJoinsAssociationScope;
   AliasTracker: typeof AliasTracker;
 };
-rbModConstSet(ActiveRecord, "Associations", Associations);
+constSet(ActiveRecord, "Associations", Associations);
 extend(Associations, Autoload);
 Associations.autoload("CollectionProxy");
 Associations.eagerAutoload(() => {
@@ -358,7 +358,7 @@ Scoping.eagerAutoload(() => {
 });
 
 export const TypeCaster = { name: "ActiveRecord::TypeCaster" };
-rbModConstSet(ActiveRecord, "TypeCaster", TypeCaster);
+constSet(ActiveRecord, "TypeCaster", TypeCaster);
 
 export const Tasks = { name: "ActiveRecord::Tasks", loadPath } as AutoloadModule & {
   DatabaseTasks: typeof DatabaseTasks;

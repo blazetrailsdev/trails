@@ -6,7 +6,7 @@ import {
   RuntimeError,
   SecureRandom,
   StringIO,
-  rbModConstSet,
+  constSet,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -35,7 +35,7 @@ class Connection extends ConnectionBase {
   }
 }
 Connection.identifiedBy("id");
-rbModConstSet(ClientTest, "Connection", Connection);
+constSet(ClientTest, "Connection", Connection);
 
 class EchoChannel extends ChannelBase {
   protected override subscribed(): unknown {
@@ -59,7 +59,7 @@ class EchoChannel extends ChannelBase {
     return (ActionCable.server() as ServerBase).broadcast("global", { wide: data["message"] });
   }
 }
-rbModConstSet(ClientTest, "EchoChannel", EchoChannel);
+constSet(ClientTest, "EchoChannel", EchoChannel);
 
 class SyncClient {
   readonly pings = new AtomicFixnum(0);

@@ -1,6 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { Concurrent } from "./concurrent/map.js";
-import { rbModConstSet } from "./include.js";
+import { constSet } from "./include.js";
 import { StandardError } from "./standard-error.js";
 import { Thread } from "./thread.js";
 
@@ -252,5 +252,5 @@ export function globalIoExecutor(): CachedThreadPool {
 }
 
 Concurrent.globalIoExecutor = globalIoExecutor;
-rbModConstSet(Concurrent, "ThreadPoolExecutor", ThreadPoolExecutor);
-rbModConstSet(Concurrent, "RejectedExecutionError", RejectedExecutionError);
+constSet(Concurrent, "ThreadPoolExecutor", ThreadPoolExecutor);
+constSet(Concurrent, "RejectedExecutionError", RejectedExecutionError);

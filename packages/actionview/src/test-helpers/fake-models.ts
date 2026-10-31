@@ -4,7 +4,7 @@ import {
   extend,
   include,
   rbInspect,
-  rbModConstSet,
+  constSet,
   registerConstant,
   Struct,
   toS,
@@ -108,7 +108,7 @@ class Book {
 }
 export const Cpk = { name: "Cpk" } as { name: string; Book: typeof Book };
 registerConstant("Cpk", Cpk);
-rbModConstSet(Cpk, "Book", Book);
+constSet(Cpk, "Book", Book);
 
 export class Customer extends Struct.new("name", "id") {
   declare name: string;
@@ -202,7 +202,7 @@ export const Blog = { name: "Blog", isUseRelativeModelNaming: () => true } as {
 };
 registerConstant("Blog", Blog);
 
-rbModConstSet(
+constSet(
   Blog,
   "Post",
   class Post extends Struct.new("title", "id") {

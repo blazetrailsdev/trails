@@ -27,7 +27,7 @@ import {
   rbCString,
   rbFSend,
   rbModAncestors,
-  rbModConstSet,
+  constSet,
   rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
 import "../test-helpers/abstract-unit.js";
@@ -40,7 +40,7 @@ type Tc = Record<string, any>;
 type TestCaseClass = typeof TestCase & Record<string, any>;
 
 const ATestHelper: Record<string, unknown> = {};
-rbModConstSet(ActionView, "ATestHelper", ATestHelper);
+constSet(ActionView, "ATestHelper", ATestHelper);
 
 const AnotherTestHelper = {
   fromAnotherHelper() {
@@ -61,7 +61,7 @@ class DeveloperStruct {
 }
 
 function named<T extends object>(klass: T, name: string, namespace: object = ActionView): T {
-  rbModConstSet(namespace, name, klass);
+  constSet(namespace, name, klass);
   Object.defineProperty(klass, "name", {
     value: `${(namespace as { name: string }).name}::${name}`,
   });

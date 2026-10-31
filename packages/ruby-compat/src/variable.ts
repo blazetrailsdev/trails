@@ -346,7 +346,7 @@ export function rbConstWarnIfDeprecated(klass: object, id: string): void {
  * (`variable.c:3417-3427`) collects them along the ancestry, stopping short of
  * `Object`. With a falsy `inherit` it is `rb_local_constants`
  * (`variable.c:3382-3397`), `mod`'s own table alone. A constant is a property
- * {@link rbModConstSet} or a `static` field seated under a constant name.
+ * {@link constSet} or a `static` field seated under a constant name.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -375,7 +375,7 @@ export function rbModConstants(mod: object, inherit: unknown = true): string[] {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModConstGet(mod: object, name: string): unknown {
+export function constGet(mod: object, name: string): unknown {
   const qualified = name.startsWith("::");
   const cpath = qualified ? name.slice(2) : name;
   const parts = cpath.split("::");

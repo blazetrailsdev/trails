@@ -5,7 +5,7 @@ import {
   hashAref,
   update,
   rbHashSRuby2KeywordsHash,
-  rbModConstSet,
+  constSet,
   rbHashSRuby2KeywordsHashP,
 } from "@blazetrails/ruby-compat";
 import { GlobalID, MissingModelIdError } from "@blazetrails/globalid";
@@ -124,7 +124,7 @@ describe("ActiveJob::Arguments", () => {
         return Money;
       }
     }
-    rbModConstSet(ActiveJob.Serializers, "MoneySerializer", MoneySerializer);
+    constSet(ActiveJob.Serializers, "MoneySerializer", MoneySerializer);
     Serializers.addSerializers(MoneySerializer);
     const serialized = serialize([new Money(5)]);
     expect(serialized).toEqual([

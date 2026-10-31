@@ -1,4 +1,4 @@
-import { print, rbModConstSet, stdout as $stdout } from "@blazetrails/ruby-compat";
+import { print, constSet, stdout as $stdout } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import { Thor, type ThorClass } from "../../thor.js";
 
@@ -16,7 +16,7 @@ class Subcommand extends Thor {
     print.call($stdout, this.options["opt"]);
   }
 }
-rbModConstSet(testSubcommands, "Subcommand", Subcommand);
+constSet(testSubcommands, "Subcommand", Subcommand);
 
 class Parent extends Thor {
   static {
@@ -27,7 +27,7 @@ class Parent extends Thor {
     klass.subcommand("sub", Subcommand as unknown as ThorClass);
   }
 }
-rbModConstSet(testSubcommands, "Parent", Parent);
+constSet(testSubcommands, "Parent", Parent);
 
 export const TestSubcommands = testSubcommands as typeof testSubcommands & {
   Subcommand: typeof Subcommand;

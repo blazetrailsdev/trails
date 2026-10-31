@@ -86,7 +86,7 @@ function buildNamespacedClassRegistry(registry: ReadonlyMap<string, string>): Ma
       for (const m of stmt.members) {
         if (!ts.isClassStaticBlockDeclaration(m)) continue;
         for (const s of m.body.statements) {
-          if (!ts.isExpressionStatement(s) || !isCall(s.expression, "rbModConstSet")) continue;
+          if (!ts.isExpressionStatement(s) || !isCall(s.expression, "constSet")) continue;
           const [mod, id] = s.expression.arguments;
           if (!ts.isIdentifier(mod) || !ts.isStringLiteralLikeNode(id)) continue;
           const qualified = `${paths.get(mod.text) ?? mod.text}::${id.text}`;

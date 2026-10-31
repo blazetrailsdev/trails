@@ -17,7 +17,7 @@ import {
   rbInspect,
   rbObjAsString,
   rbObjRespondTo,
-  rbModConstSet,
+  constSet,
   rbSetClassPathString,
   rtest,
   sort,
@@ -816,14 +816,14 @@ rbSetClassPathString(Argument, Thor, "Argument");
 rbSetClassPathString(Arguments, Thor, "Arguments");
 rbSetClassPathString(Option, Thor, "Option");
 rbSetClassPathString(Options, Thor, "Options");
-rbModConstSet(Thor, "Command", Command);
-rbModConstSet(Thor, "Task", Command);
-rbModConstSet(Thor, "HiddenCommand", HiddenCommand);
-rbModConstSet(Thor, "HiddenTask", HiddenCommand);
-rbModConstSet(Thor, "DynamicCommand", DynamicCommand);
-rbModConstSet(Thor, "DynamicTask", DynamicCommand);
-rbModConstSet(Thor, "CoreExt", CoreExt);
-rbModConstSet(CoreExt, "HashWithIndifferentAccess", HashWithIndifferentAccess);
+constSet(Thor, "Command", Command);
+constSet(Thor, "Task", Command);
+constSet(Thor, "HiddenCommand", HiddenCommand);
+constSet(Thor, "HiddenTask", HiddenCommand);
+constSet(Thor, "DynamicCommand", DynamicCommand);
+constSet(Thor, "DynamicTask", DynamicCommand);
+constSet(Thor, "CoreExt", CoreExt);
+constSet(CoreExt, "HashWithIndifferentAccess", HashWithIndifferentAccess);
 
 Thor.defaultTask = Thor.defaultCommand;
 Thor.options = Thor.methodOptions;

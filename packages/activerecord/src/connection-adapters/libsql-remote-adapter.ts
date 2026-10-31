@@ -4,7 +4,7 @@ import {
   extend,
   hasKey,
   include,
-  rbModConstSet,
+  constSet,
   rbObjAsString,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -51,7 +51,7 @@ export interface LibSQLRemoteAdapter extends Omit<
 include(LibSQLRemoteAdapter, SQLite3Adapter);
 extend(LibSQLRemoteAdapter, SQLite3Adapter);
 for (const name of ["ADAPTER_NAME", "TYPE_MAP", "EXTENDED_TYPE_MAPS"] as const) {
-  rbModConstSet(LibSQLRemoteAdapter, name, SQLite3Adapter[name]);
+  constSet(LibSQLRemoteAdapter, name, SQLite3Adapter[name]);
 }
 
 ConnectionAdapters.LibSQLRemoteAdapter = LibSQLRemoteAdapter;

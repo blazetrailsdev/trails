@@ -19,7 +19,7 @@ import {
 import {
   FrozenError,
   Marshal,
-  rbModConstSet,
+  constSet,
   rbObjIvarGet,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -35,7 +35,7 @@ registerConstant("ErrorsTest", ErrorsTest);
 
 class Person {
   static {
-    rbModConstSet(ErrorsTest, "Person", this);
+    constSet(ErrorsTest, "Person", this);
   }
   declare modelName: ModelName;
   errors: Errors<Person>;

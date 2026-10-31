@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assertDifference, TopLevel } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
-import { block, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { block, constSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { EnqueueError } from "./enqueuing.js";
 import "./test-helpers/helper.js";
@@ -65,7 +65,7 @@ registerConstant(
   "EnqueueAfterTransactionCommitTest::ErrorEnqueueAfterCommitJob",
   ErrorEnqueueAfterCommitJob,
 );
-rbModConstSet(ErrorEnqueueAfterCommitJob, "EnqueueErrorAdapter", EnqueueErrorAdapter);
+constSet(ErrorEnqueueAfterCommitJob, "EnqueueErrorAdapter", EnqueueErrorAdapter);
 ErrorEnqueueAfterCommitJob.setQueueAdapter(new EnqueueErrorAdapter());
 ErrorEnqueueAfterCommitJob.enqueueAfterTransactionCommit = true;
 registerConstant("EnqueueAfterTransactionCommitTest::EnqueueAfterCommitJob", EnqueueAfterCommitJob);

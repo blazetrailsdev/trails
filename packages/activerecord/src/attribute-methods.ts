@@ -11,7 +11,7 @@ import {
   rbClassSuperclass,
   rbFCaller,
   rbInspect as inspect,
-  rbModConstSet,
+  constSet,
   rbModMethodDefined,
   rbModInstanceMethod,
   rbObjIvarGet,
@@ -273,7 +273,7 @@ export function dangerousAttributeMethods(): Set<string> {
 
 /** @missingRailsName generatedAttributeMethods — PERMANENT */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
-  this._generatedAttributeMethods = rbModConstSet(
+  this._generatedAttributeMethods = constSet(
     this,
     "GeneratedAttributeMethods",
     new GeneratedAttributeMethods(),

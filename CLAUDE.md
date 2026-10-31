@@ -1113,7 +1113,7 @@ For a module-eval read, two shapes are sanctioned, and only these:
   mirroring Rails' `autoload` lists: each constant is seated by its defining
   module with a plain `Namespace.Name = Klass` assignment, which is type-checked
   against the namespace's declared property, and is read where a module-eval
-  read needs it (`include(Base, ActiveRecord.Scoping)`). `rbModConstSet` is
+  read needs it (`include(Base, ActiveRecord.Scoping)`). `constSet` is
   written only where the ported body itself calls `const_set` — 18 sites in the
   vendored Rails tree, tabled in the tasks repo's
   `rfcs/0205-namespace-seats-are-plain-javascript/README.md` — and never as the
@@ -1121,7 +1121,7 @@ For a module-eval read, two shapes are sanctioned, and only these:
   `const_set` qualifies the same way (thor's `rake_compat.rb:64` is the one
   such site outside Rails, and is unported). A class's qualified Ruby path is
   a ruby-compat internal (§ "Constant lookup is an import or a registry"),
-  not the seat. `rbModConstGet` reads these seats at call time. A constant Rails
+  not the seat. `constGet` reads these seats at call time. A constant Rails
   `require`s rather than autoloads is seated with no `autoload` call. Ruby's
   top-level `Object` is `TopLevel` in `ruby-compat/src/object.ts`: the
   defining gem seats it (`TopLevel.Trails = Trails`) and a reader names it at
@@ -1162,7 +1162,7 @@ Ruby finds a class by name at run time: `constantize`, `const_get`,
 - **A name Rails computes, or one application data supplies, is a lookup.**
   `constantize` is `Object.const_get(camel_cased_word)`
   (`vendor/rails/v8.0.2/activesupport/lib/active_support/inflector/methods.rb:289-291`):
-  `rbModConstGet(Object, word)` walks `TopLevel` by segment and calls the
+  `constGet(Object, word)` walks `TopLevel` by segment and calls the
   receiver's `constMissing` on a miss. `compute_type`
   (`vendor/rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:255-261`)
   ports line for line. A literal argument is typed through ruby-compat's

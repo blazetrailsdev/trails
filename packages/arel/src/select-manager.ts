@@ -23,7 +23,7 @@ import {
   isEmpty,
   isSymbol,
   rbConstGet,
-  rbModConstSet,
+  constSet,
   rbObjAsString,
   rtest,
   symbolToS,
@@ -316,4 +316,4 @@ export interface SelectManager extends _FactoryMethodsModule, Crud {}
 
 include(SelectManager, Crud);
 
-rbModConstSet(Arel, "SelectManager", SelectManager);
+constSet(Arel, "SelectManager", SelectManager);

@@ -1,6 +1,6 @@
 import { ActiveSupportJSON, assertCalled } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
-import { Exception, hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
+import { Exception, hashAref, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Base as ChannelBase } from "../channel/base.js";
 import { ActionCable } from "../namespaces.js";
@@ -51,8 +51,8 @@ class ChatChannel extends ChannelBase {
 }
 
 const SubscriptionsTest = { name: "ActionCable::Connection::SubscriptionsTest" };
-rbModConstSet(ActionCable.Connection, "SubscriptionsTest", SubscriptionsTest);
-rbModConstSet(SubscriptionsTest, "ChatChannel", ChatChannel);
+constSet(ActionCable.Connection, "SubscriptionsTest", SubscriptionsTest);
+constSet(SubscriptionsTest, "ChatChannel", ChatChannel);
 
 describe("ActionCable::Connection::SubscriptionsTest", () => {
   const t = new TestCase("subscriptions");

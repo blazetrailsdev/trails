@@ -1,4 +1,4 @@
-import { rbModConstSet } from "../include.js";
+import { constSet } from "../include.js";
 import { Concurrent } from "./map.js";
 
 /**
@@ -48,4 +48,4 @@ export class CountDownLatch {
   }
 }
 
-rbModConstSet(Concurrent, "CountDownLatch", CountDownLatch);
+constSet(Concurrent, "CountDownLatch", CountDownLatch);

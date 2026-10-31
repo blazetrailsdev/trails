@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { registerModel } from "./index.js";
-import { registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
+import { registerConstant, constSet } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Base } from "./base.js";
 import { Entry } from "./test-helpers/models/entry.js";
@@ -48,7 +48,7 @@ describe("DelegatedTypeTest (trails)", () => {
     registerConstant("Access", Access);
     class NoticeMessage extends Base {
       static {
-        rbModConstSet(Access, "NoticeMessage", this);
+        constSet(Access, "NoticeMessage", this);
       }
     }
     registerModel(NoticeMessage);
@@ -73,7 +73,7 @@ describe("DelegatedTypeTest (trails)", () => {
     registerConstant("Access", Access);
     class NoticeMessage extends Base {
       static {
-        rbModConstSet(Access, "NoticeMessage", this);
+        constSet(Access, "NoticeMessage", this);
       }
       static {
         this.attribute("body", "string");

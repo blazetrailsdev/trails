@@ -3,7 +3,7 @@ import {
   StandardError,
   StringIO,
   rbInspect,
-  rbModConstSet,
+  constSet,
   rbObjIvarGet,
   rbObjIvarSet,
 } from "@blazetrails/ruby-compat";
@@ -108,8 +108,8 @@ class ChatChannel extends BasicChannel {
 }
 
 const BaseTest = { name: "ActionCable::Channel::BaseTest" };
-rbModConstSet(ActionCable.Channel, "BaseTest", BaseTest);
-rbModConstSet(BaseTest, "ChatChannel", ChatChannel);
+constSet(ActionCable.Channel, "BaseTest", BaseTest);
+constSet(BaseTest, "ChatChannel", ChatChannel);
 
 describe("ActionCable::Channel::BaseTest", () => {
   let user: User;
