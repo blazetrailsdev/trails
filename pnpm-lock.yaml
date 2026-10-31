@@ -1170,6 +1170,9 @@ importers:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../../packages/vitest-matchers
+      '@blazetrails/zeitwerk':
+        specifier: workspace:*
+        version: link:../../packages/zeitwerk
 
   scripts/parity:
     dependencies:
