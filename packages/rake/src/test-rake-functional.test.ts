@@ -204,8 +204,12 @@ describe("TestRakeFunctional", () => {
     expect(runner.out).not.toMatch(/No such file/);
   });
 
-  // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/loaders/makefile` is unported.
-  it.skip("imports", () => {});
+  it("imports", async () => {
+    await d.rakefileImports();
+    await rake();
+    expect(await File.isExistAsync(File.join(state.tempdir, "dynamic_deps"))).toBeTruthy();
+    expect(runner.out).toMatch(/^FIRST$\s+^DYNAMIC$\s+^STATIC$\s+^OTHER$/m);
+  });
 
   it("regenerate imports", async () => {
     await d.rakefileRegenerateImports();
@@ -299,12 +303,23 @@ describe("TestRakeFunctional", () => {
     expect(runner.out).toMatch(/^PREPARE\nSCOPEDEP$/m);
   });
 
-  // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
-  it.skip("test task descriptions", () => {});
-  // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
-  it.skip("test task when verbose unless verbose passed not prompt testopts", () => {});
-  // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
-  it.skip("test task when verbose passed prompts testopts", () => {});
+  it("test task descriptions", async () => {
+    await d.rakefileTestTask();
+    await rake("-T");
+    expect(runner.out).toMatch(/custom test task description/);
+  });
+
+  it("test task when verbose unless verbose passed not prompt testopts", async () => {
+    await d.rakefileTestTaskVerbose();
+    await rake("unit");
+    expect(runner.out).not.toMatch(/TESTOPTS="--verbose" to pass --verbose/);
+  });
+
+  it("test task when verbose passed prompts testopts", async () => {
+    await d.rakefileTestTask();
+    await rake("--verbose", "unit");
+    expect(runner.out).toMatch(/TESTOPTS="--verbose" to pass --verbose/);
+  });
 
   it("comment before task acts like desc", async () => {
     await d.rakefileComments();
@@ -346,10 +361,18 @@ describe("TestRakeFunctional", () => {
     expect(runner.out).toBe("1\n");
   });
 
-  // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
-  it.skip("signal propagation in tests", () => {});
-  // BLOCKED: rake-testtask-and-makefile-loader-port, `rake/testtask` is unported.
-  it.skip("failing test sets exit status", () => {});
+  it("signal propagation in tests", async () => {
+    await d.rakefileTestSignal();
+    await rake();
+    expect(runner.out).toMatch(/ATEST/);
+    expect(runner.out).not.toMatch(/BTEST/);
+  });
+
+  it("failing test sets exit status", async () => {
+    await d.rakefileFailingTestTask();
+    await rake();
+    expect(runner.exit!.exitstatus()).toBeGreaterThan(0);
+  });
 
   it("stand alone filelist", async () => {
     await d.rakefileStandAloneFilelist();

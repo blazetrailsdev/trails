@@ -1,4 +1,4 @@
-import { Dir, File, FileUtils, Open3 } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, Open3, setEnv } from "@blazetrails/ruby-compat";
 import { beforeEach } from "vitest";
 import { FileUtils as RakeFileUtils } from "../file-utils.js";
 
@@ -14,6 +14,7 @@ export const runner = { out: "", err: "", exit: null as { exitstatus(): number |
 
 export function useRubyRunner(): void {
   beforeEach(async () => {
+    setEnv("TEST", undefined);
     await FileUtils.mkdirPAsync("node_modules/@blazetrails");
     for (const name of ["rake", "ruby-compat"]) {
       await File.symlinkAsync(File.join(packages, name), `node_modules/@blazetrails/${name}`);
