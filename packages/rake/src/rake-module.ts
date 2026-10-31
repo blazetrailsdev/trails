@@ -1,5 +1,6 @@
-import { File, getOs, rbFLoad, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { File, rbFLoad, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Application } from "./application.js";
+import { CpuCounter } from "./cpu-counter.js";
 
 let _application: Application | undefined;
 let _cpuCount: number | undefined;
@@ -26,12 +27,8 @@ export const Rake: {
     _application = app;
   },
 
-  /**
-   * @inventedArm availableParallelism — PERMANENT
-   * @missingRailsCall count — CONVERGEABLE rake-cpu-counter-port
-   */
   suggestedThreadCount() {
-    _cpuCount ??= getOs().availableParallelism();
+    _cpuCount ??= CpuCounter.count();
     return _cpuCount + 4;
   },
 

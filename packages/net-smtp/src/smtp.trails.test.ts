@@ -109,6 +109,24 @@ describe("SMTP (trails)", () => {
     expect((await smtp.authenticate("account", "password", "cram_md5")).isSuccess()).toBe(true);
   });
 
+  it("a 5xx reply to a continue step raises its exception class", async () => {
+    const server = createServer((sock) => {
+      sock.write("220 ready\r\n");
+      sock.on("data", (chunk) => {
+        sock.write(chunk.toString().startsWith("EHLO") ? "250 ok\r\n" : "554 refused\r\n");
+      });
+      sock.on("error", () => {});
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const { port } = server.address() as { port: number };
+    const smtp = (await SMTP.start("127.0.0.1", port)) as SMTP;
+    const err = await smtp.authenticate("account", "password", "login").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SMTPFatalError);
+    await smtp.finish().catch(() => {});
+    server.close();
+    server.unref();
+  });
+
   it("refused recipient stops before data", async () => {
     let delivered = false;
     const port = await fakeServerStart({
