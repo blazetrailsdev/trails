@@ -1,8 +1,8 @@
 import { ContentDispositionParser } from "../parsers/content-disposition-parser.js";
 
 export class ContentDispositionElement {
-  dispositionType: string;
-  parameters: Record<string, string>[];
+  readonly dispositionType: string;
+  readonly parameters: Record<string, string>[];
 
   constructor(string: string | null) {
     const contentDisposition = ContentDispositionParser.parse(this.cleaned(string));

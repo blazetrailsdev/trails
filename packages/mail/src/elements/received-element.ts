@@ -1,11 +1,11 @@
 import { DateTime, strftime } from "@blazetrails/date";
-import { ArgumentError, rbObjAsString, warn } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbModName, rbObjAsString, warn } from "@blazetrails/ruby-compat";
 import { ReceivedParser } from "../parsers/received-parser.js";
 import { Utilities } from "../utilities.js";
 
 export class ReceivedElement {
-  info: string | null;
-  dateTime: ReturnType<typeof DateTime.parse> | null;
+  readonly info: string | null;
+  readonly dateTime: ReturnType<typeof DateTime.parse> | null;
 
   constructor(string: string | null) {
     if (Utilities.isBlank(string)) {
@@ -34,7 +34,7 @@ export class ReceivedElement {
       if (!(e instanceof ArgumentError)) throw e;
       if (e.message !== "invalid date") throw e;
       warn(
-        `WARNING: Invalid date field for received element (${received.date} ${received.time}): ${e.constructor.name}: ${e.message}`,
+        `WARNING: Invalid date field for received element (${received.date} ${received.time}): ${rbModName(e.constructor)}: ${e.message}`,
       );
       return null;
     }

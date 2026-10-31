@@ -1,9 +1,9 @@
 import { ContentTypeParser } from "../parsers/content-type-parser.js";
 
 export class ContentTypeElement {
-  mainType: string;
-  subType: string;
-  parameters: Record<string, string>[];
+  readonly mainType: string;
+  readonly subType: string;
+  readonly parameters: Record<string, string>[];
 
   constructor(string: string | null) {
     const contentType = ContentTypeParser.parse(this.cleaned(string));

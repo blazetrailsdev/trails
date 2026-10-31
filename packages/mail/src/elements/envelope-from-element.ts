@@ -3,8 +3,8 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { EnvelopeFromParser } from "../parsers/envelope-from-parser.js";
 
 export class EnvelopeFromElement {
-  dateTime: ReturnType<typeof DateTime.parse> | null = null;
-  address: string;
+  readonly dateTime: ReturnType<typeof DateTime.parse> | null = null;
+  readonly address: string;
 
   constructor(string: string | null) {
     const envelopeFrom = EnvelopeFromParser.parse(string);

@@ -1,8 +1,8 @@
 import { MimeVersionParser } from "../parsers/mime-version-parser.js";
 
 export class MimeVersionElement {
-  major: string;
-  minor: string;
+  readonly major: string;
+  readonly minor: string;
 
   constructor(string: string | null) {
     const mimeVersion = MimeVersionParser.parse(string);

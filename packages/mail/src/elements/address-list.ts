@@ -3,10 +3,10 @@ import { AddressListsParser } from "../parsers/address-lists-parser.js";
 import { Address } from "./address.js";
 
 export class AddressList {
-  addresses: Address[];
-  groupNames: string[];
+  readonly addresses: Address[];
+  readonly groupNames: string[];
 
-  constructor(string: string | Uint8Array | null) {
+  constructor(string: string | null) {
     const addressList = AddressListsParser.parse(string);
     this.addresses = addressList.addresses.map((a: unknown) => new Address(a));
     this.groupNames = addressList.groupNames;

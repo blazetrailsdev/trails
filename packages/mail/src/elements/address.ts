@@ -126,7 +126,7 @@ export class Address {
 
     if (value instanceof AddressListsParser.AddressStruct) {
       this._data = value;
-    } else if (typeof value === "string" || value instanceof Uint8Array) {
+    } else if (typeof value === "string") {
       if (!Utilities.isBlank(value)) {
         const addressList = AddressListsParser.parse(value);
         this._data = addressList.addresses[0] ?? null;
@@ -150,7 +150,7 @@ export class Address {
     const comments = this.comments;
     if (!Utilities.isBlank(comments)) {
       for (const comment of comments!) {
-        if (this.getDomain()?.includes(`(${comment})`)) {
+        if ((this._data!.domain as string | null)?.includes(`(${comment})`)) {
           value = value!.replaceAll(`(${comment})`, Constants.EMPTY);
         }
       }

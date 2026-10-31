@@ -3,10 +3,12 @@ import { Utilities } from "../utilities.js";
 
 export class MessageIdsElement {
   static parse(string: string | null): MessageIdsElement {
-    return new this(string);
+    const element = new this(string);
+    void element.messageIds;
+    return element;
   }
 
-  messageIds: string[];
+  readonly messageIds: string[];
 
   constructor(string: string | null) {
     this.messageIds = this.parse(string);
