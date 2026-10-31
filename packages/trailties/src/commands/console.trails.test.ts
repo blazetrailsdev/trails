@@ -1,42 +1,52 @@
 import { describe, it, expect, vi } from "vitest";
 import { PassThrough } from "node:stream";
-import type { REPLServer, ReplOptions } from "node:repl";
+import type { REPLServer } from "node:repl";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isPlainObject } from "@blazetrails/activesupport";
-import { Dir } from "@blazetrails/ruby-compat";
-import { createProgram } from "../cli.js";
-import { lookupBang } from "../command/behavior.js";
-
-await lookupBang();
+import { capture, isPlainObject } from "@blazetrails/activesupport";
+import { Dir, registerReplAdapter, replAdapterConfig } from "@blazetrails/ruby-compat";
+import { invoke } from "../command.js";
+import { Console } from "./console.js";
 
 const io = vi.hoisted(() => ({ server: null as REPLServer | null, output: "", piped: "" }));
 
-vi.mock("node:repl", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:repl")>();
-  const start = (options: ReplOptions) => {
+const actual = await import("node:repl");
+registerReplAdapter("test", {
+  start(options) {
     const input = new PassThrough();
     const output = new PassThrough();
     output.on("data", (chunk) => (io.output += String(chunk)));
     io.server = actual.start({ ...options, input, output, terminal: false });
     setImmediate(() => input.write(io.piped));
     return io.server;
-  };
-  return { ...actual, default: { ...actual, start }, start };
+  },
 });
+replAdapterConfig.adapter = "test";
 
 async function evaluate(line: string): Promise<void> {
   const before = io.output.length;
   io.server!.input.emit("data", `${line}\n`);
-  await vi.waitFor(() => expect(io.output.slice(before)).toContain("trails> "));
+  await vi.waitFor(() => expect(io.output.slice(before)).toContain("> "));
+}
+
+function startConsole(): Promise<void> {
+  const app = { sandbox: null, config: {}, loadConsole() {} };
+  return Console.start(app);
 }
 
 describe("ConsoleCommand (trails)", () => {
+  it("--help reaches Thor's help through Rails::Command.invoke", async () => {
+    const printed = await capture(":stdout", () => invoke("console", ["--help"]));
+    expect(printed).toContain("--sandbox");
+  });
+
   it("evaluates input in the main realm and keeps bindings across lines", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const globalsBefore = new Set(Reflect.ownKeys(globalThis));
-    await createProgram().parseAsync(["node", "trails", "console"]);
+    io.server = null;
+    const started = startConsole();
+    await vi.waitFor(() => expect(io.server).not.toBeNull());
     const g = globalThis as Record<string, unknown>;
     try {
       await evaluate(`const consoleRealmPost = await Promise.resolve({ title: "x" })`);
@@ -45,6 +55,7 @@ describe("ConsoleCommand (trails)", () => {
       expect(isPlainObject(g.consoleRealmHash)).toBe(true);
     } finally {
       io.server!.close();
+      await started;
       for (const key of Reflect.ownKeys(globalThis)) {
         if (!globalsBefore.has(key)) Reflect.deleteProperty(globalThis, key);
       }
@@ -63,13 +74,16 @@ describe("ConsoleCommand (trails)", () => {
     vi.spyOn(Dir, "pwd").mockReturnValue(root);
     io.piped = "globalThis.consolePipedTitle = ConsolePipedPost.first().then((p) => p.title)\n";
     const g = globalThis as Record<string, unknown>;
+    io.server = null;
+    const started = startConsole();
     try {
-      await createProgram().parseAsync(["node", "trails", "console"]);
+      await vi.waitFor(() => expect(io.server).not.toBeNull());
       await vi.waitFor(() => expect(g.consolePipedTitle).toBeDefined());
       expect(await g.consolePipedTitle).toBe("Hello");
     } finally {
       io.piped = "";
       io.server!.close();
+      await started;
       delete g.consolePipedTitle;
       delete g.ConsolePipedPost;
       vi.restoreAllMocks();

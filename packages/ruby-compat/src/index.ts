@@ -244,6 +244,8 @@ export {
   ARRAY_METHOD_TABLE,
 } from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";
+export { registerReplAdapter, getReplAsync, replAdapterConfig } from "./repl-adapter.js";
+export type { ReplAdapter, ReplServerLike } from "./repl-adapter.js";
 export { FrozenError } from "./frozen-error.js";
 export { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter.js";
 export type { Bytes, FsAdapter, FsDirent, FsStatResult, PathAdapter } from "./fs-adapter.js";

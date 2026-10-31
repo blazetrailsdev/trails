@@ -91,6 +91,7 @@ export class Configuration extends EngineConfiguration {
     contentPath: null,
     keyPath: null,
   };
+  console: { start(): unknown } | null = null;
   disableSandbox = false;
   sandboxByDefault = false;
   encoding = "utf-8";
