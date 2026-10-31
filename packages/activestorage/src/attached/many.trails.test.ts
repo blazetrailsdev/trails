@@ -116,6 +116,14 @@ describe("ActiveStorage::Attached::Many", () => {
     expect((await reloaded.photos.attachments)[0].signedId()).toBe(blob.signedId());
   });
 
+  it("an attachment has its blob loaded through withAttachedPhotos", async () => {
+    await user.photos.attach(hash());
+    const blob = (await user.photos.blobs)[0];
+    const relation = Gallery as unknown as { withAttachedPhotos(): { find(id: unknown): unknown } };
+    const found = (await relation.withAttachedPhotos().find(user.id)) as typeof user;
+    expect((await found.photos.attachments)[0].signedId()).toBe(blob.signedId());
+  });
+
   it("delegates a missing name to the attachments and is not a thenable", async () => {
     await user.photos.attach(hash());
     expect(await user.photos).toBe(user.photos);
