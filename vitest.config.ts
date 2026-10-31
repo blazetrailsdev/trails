@@ -382,10 +382,6 @@ const alias = {
   "@blazetrails/rake": path.resolve(__dirname, "packages/rake/src/rake.ts"),
   "@blazetrails/mini-magick/": path.resolve(__dirname, "packages/mini-magick/src") + "/",
   "@blazetrails/image-processing/": path.resolve(__dirname, "packages/image-processing/src") + "/",
-  "@blazetrails/image-processing": path.resolve(
-    __dirname,
-    "packages/image-processing/src/image-processing.ts",
-  ),
   "@blazetrails/chronic": path.resolve(__dirname, "packages/chronic/src/chronic.ts"),
   "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/src/index.ts"),
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/src/et-orbi.ts"),
@@ -463,6 +459,10 @@ const COVERAGE_EXCLUDE = [
 ];
 
 const aliasEntries = [
+  {
+    find: /^@blazetrails\/image-processing$/,
+    replacement: path.resolve(__dirname, "packages/image-processing/src/image-processing.ts"),
+  },
   {
     find: /^@blazetrails\/mini-magick$/,
     replacement: path.resolve(__dirname, "packages/mini-magick/src/mini-magick.ts"),

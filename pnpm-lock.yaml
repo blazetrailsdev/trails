@@ -611,6 +611,9 @@ importers:
 
   packages/image-processing:
     dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
       '@blazetrails/mini-magick':
         specifier: workspace:*
         version: link:../mini-magick

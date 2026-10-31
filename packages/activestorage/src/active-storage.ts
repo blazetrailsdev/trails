@@ -394,7 +394,11 @@ mattrAccessor.call(ActiveStorage, "videoPreviewArguments", { default: "-y -vfram
 
 export const Transformers = {
   name: "ActiveStorage::Transformers",
-  loadPath: {} as Record<string, () => Promise<unknown>>,
+  loadPath: {
+    "active_storage/transformers/transformer": () => import("./transformers/transformer.js"),
+    "active_storage/transformers/image_processing_transformer": () =>
+      import("./transformers/image-processing-transformer.js"),
+  } as Record<string, () => Promise<unknown>>,
 } as AutoloadModule & {
   Transformer: unknown;
   ImageProcessingTransformer: unknown;

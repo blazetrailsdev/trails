@@ -36,7 +36,15 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@blazetrails/image-processing": "workspace:*",
-    "@blazetrails/mini-magick": "workspace:*"
+    "@blazetrails/mini-magick": "workspace:*",
+    "@blazetrails/image-processing": "workspace:*"
+  },
+  "peerDependencies": {
+    "@blazetrails/image-processing": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@blazetrails/image-processing": {
+      "optional": true
+    }
   }
 }

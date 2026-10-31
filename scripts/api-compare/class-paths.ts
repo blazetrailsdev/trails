@@ -42,7 +42,10 @@ const EXCLUDED_GENERATED = "class-paths.excluded.generated.ts";
 const SKIPPED = new Set(["activerecord-test-support"]);
 
 /** A subpath entry that must stay out of the package entry's graph, so its table is its own. */
-const SUBPATH_ENTRIES: Record<string, string> = { actionpack: "system-testing.ts" };
+const SUBPATH_ENTRIES: Record<string, string> = {
+  actionpack: "system-testing.ts",
+  activestorage: "transformers/image-processing-transformer.ts",
+};
 
 interface Manifest {
   packages: Record<

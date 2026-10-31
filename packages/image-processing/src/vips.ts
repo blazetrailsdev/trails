@@ -8,6 +8,7 @@ import {
 import WasmVips from "wasm-vips";
 import { Chainable, chainableProxy } from "./chainable.js";
 import { Error } from "./image-processing.js";
+import { ImageProcessing } from "./namespaces.js";
 import { Processor as BaseProcessor } from "./processor.js";
 
 type Options = Record<string, unknown>;
@@ -423,3 +424,4 @@ const ImageProcessingVips = {
 };
 
 export const Vips = chainableProxy(ImageProcessingVips);
+ImageProcessing.Vips = Vips;

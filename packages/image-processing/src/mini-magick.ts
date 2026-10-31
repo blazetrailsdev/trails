@@ -18,6 +18,7 @@ import * as MiniMagickGem from "@blazetrails/mini-magick";
 import { Tool, type CliTool } from "@blazetrails/mini-magick/tool";
 import { Chainable, chainableProxy } from "./chainable.js";
 import { Error } from "./image-processing.js";
+import { ImageProcessing } from "./namespaces.js";
 import { Processor as BaseProcessor } from "./processor.js";
 
 type Options = Record<string, unknown>;
@@ -306,3 +307,4 @@ const ImageProcessingMiniMagick = {
 };
 
 export const MiniMagick = chainableProxy(ImageProcessingMiniMagick);
+ImageProcessing.MiniMagick = MiniMagick;
