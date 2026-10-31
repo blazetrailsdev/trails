@@ -770,13 +770,13 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     o = Object.getPrototypeOf(o) as object | null
   ) {
     const entry = Object.hasOwn(o, mid) ? Object.getOwnPropertyDescriptor(o, mid) : undefined;
-    if (isUndefHalf(entry?.get)) return false;
+    if (UNDEF_HALVES.has(entry?.get as object)) return false;
     if (entry && !isAbsentHalf(entry.get)) {
       if (!("value" in entry)) return true;
       return klass ? typeof entry.value === "function" : entry.value !== undefined;
     }
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
-    if (isUndefHalf(setter)) return false;
+    if (UNDEF_HALVES.has(setter as object)) return false;
     if (setter !== undefined && !isAbsentHalf(setter)) return true;
     if (
       writer !== undefined &&
@@ -870,10 +870,10 @@ function checkDefinition(mod: { prototype: object }, mid: string, inherit = true
     o = inherit ? (Object.getPrototypeOf(o) as object | null) : null
   ) {
     const me = Object.getOwnPropertyDescriptor(o, mid);
-    if (isUndefHalf(me?.get)) return false;
+    if (UNDEF_HALVES.has(me?.get as object)) return false;
     if (me && !isAbsentHalf(me.get)) return typeof me.value === "function" || me.get !== undefined;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
-    if (isUndefHalf(setter)) return false;
+    if (UNDEF_HALVES.has(setter as object)) return false;
     if (setter !== undefined && !isAbsentHalf(setter)) return true;
     if (
       writer !== undefined &&
@@ -990,10 +990,6 @@ export function rbModDefineMethod(
 const ABSENT_HALVES = new WeakSet<object>();
 const UNDEF_HALVES = new WeakSet<object>();
 
-function isUndefHalf(half: unknown): boolean {
-  return typeof half === "function" && UNDEF_HALVES.has(half);
-}
-
 /**
  * Whether `half` is the getter or setter {@link defineAccessorHalf} seats for
  * a method the table does not define. Ruby keeps `x` and `x=` as two method
@@ -1099,7 +1095,7 @@ export function rbModUndefMethod<K extends { prototype: object }>(klass: K, ...n
       const desc = Object.getOwnPropertyDescriptor(o, id);
       if (desc === undefined) continue;
       const half = writer ? desc.get : desc.set;
-      if (isUndefHalf(half)) break;
+      if (UNDEF_HALVES.has(half as object)) break;
       if (half !== undefined && !isAbsentHalf(half)) {
         other = half as () => unknown;
         break;
@@ -1360,13 +1356,13 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     const desc = Object.getOwnPropertyDescriptor(o, mid);
     if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
     if (UNDEF_METHOD_TABLES.has(o) && desc && "value" in desc && desc.value === undefined) break;
-    if (isUndefHalf(desc?.get)) break;
+    if (UNDEF_HALVES.has(desc?.get as object)) break;
     if (desc && argc === 0 && !isAbsentHalf(desc.get)) {
       return desc.get ? desc.get.call(recv) : desc.value;
     }
     if (desc?.get && !isAbsentHalf(desc.get)) rbErrorArity(argc, 0, 0);
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
-    if (isUndefHalf(setter)) break;
+    if (UNDEF_HALVES.has(setter as object)) break;
     if (setter && !isAbsentHalf(setter)) return setter.call(recv, args[0]);
     const set = writer === undefined ? undefined : Object.getOwnPropertyDescriptor(o, writer);
     if (typeof set?.value === "function") return (set.value as AnyFunction).apply(recv, args);
@@ -1467,7 +1463,7 @@ function _writerFor(recv: object, mid: string): AnyFunction | null {
         if (typeof desc?.value === "function") entry.write = desc.value as AnyFunction;
         if (desc) break;
         const setter = Object.getOwnPropertyDescriptor(o, entry.attr)?.set;
-        if (isUndefHalf(setter)) break;
+        if (UNDEF_HALVES.has(setter as object)) break;
         if (setter && !isAbsentHalf(setter)) {
           entry.write = setter as AnyFunction;
           break;
