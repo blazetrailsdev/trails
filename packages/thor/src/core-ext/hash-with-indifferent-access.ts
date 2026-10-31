@@ -52,7 +52,8 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   override get(key: string): V | undefined {
-    return super.get(this.convertKey(key));
+    const value = super.get(this.convertKey(key));
+    return (value === undefined ? null : value) as V | undefined;
   }
 
   override set(key: string, value: V): this {

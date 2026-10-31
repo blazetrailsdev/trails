@@ -46,6 +46,12 @@ const SUBPATH_ENTRIES: Record<string, string> = {
   actionpack: "system-testing.ts",
   activestorage: "transformers/image-processing-transformer.ts",
 };
+/** A subpath entry that must not load another subpath's table, so its table is named for it. */
+const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = { activestorage: "variant-record.ts" };
+
+function separateTable(subpath: string): string {
+  return `class-paths.${path.basename(subpath, ".ts")}.generated.ts`;
+}
 
 interface Manifest {
   packages: Record<
@@ -64,6 +70,8 @@ export interface ClassPathEntry {
   fqn: string;
   /** The entry sits outside the entry graph (`src/test-case.ts`), so its own table holds it. */
   excluded?: boolean;
+  /** The entry sits in a `SEPARATE_SUBPATH_ENTRIES` graph, so that subpath's table holds it. */
+  table?: string;
   /** The module is the file's own namespace object, which the file `include`s (`DateAndTime::Calculations`). */
   namespace?: boolean;
 }
@@ -219,6 +227,8 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     const reachable = await entryGraph(dir);
     const subpath = SUBPATH_ENTRIES[dir];
     const subpathGraph = subpath ? await entryGraph(dir, subpath) : new Set<string>();
+    const separate = SEPARATE_SUBPATH_ENTRIES[dir];
+    const separateGraph = separate ? await entryGraph(dir, separate) : new Set<string>();
     const entries = byDir.get(dir) ?? [];
     const byFqn = new Map([...paired.values()].map((e) => [`${e.file}::${e.fqn}`, e]));
     const sources = new Map<string, string>();
@@ -243,8 +253,11 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     for (const [key, entry] of paired) {
       if (ambiguous.has(key)) continue;
       const rel = path.join("src", entry.file);
+      const separated = !reachable.has(entry.file) && separateGraph.has(entry.file);
       const ownTable =
-        excluded.includes(rel) || (!reachable.has(entry.file) && subpathGraph.has(entry.file));
+        excluded.includes(rel) ||
+        separated ||
+        (!reachable.has(entry.file) && subpathGraph.has(entry.file));
       if (
         !ownTable &&
         excluded.some((glob) => path.matchesGlob(rel, glob) || rel.startsWith(`${glob}/`))
@@ -254,8 +267,14 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       if (!ownTable && !reachable.has(entry.file)) continue;
       const source = await read(entry.file);
       const reached = await tsPath(entry);
-      if (reached !== null) entries.push({ ...entry, tsName: reached, excluded: ownTable });
-      else if (modules.has(key) && isSelfNamespace(source, entry.file, entry.tsName)) {
+      if (reached !== null) {
+        entries.push({
+          ...entry,
+          tsName: reached,
+          excluded: ownTable,
+          ...(separated ? { table: separateTable(separate) } : {}),
+        });
+      } else if (modules.has(key) && isSelfNamespace(source, entry.file, entry.tsName)) {
         entries.push({ ...entry, namespace: true });
       } else if (fallbackModules.has(key)) continue;
       else if (modules.has(key)) {
@@ -405,7 +424,16 @@ async function main(): Promise<void> {
   const tables = await collectClassPaths(only);
   const targets = [...tables].flatMap(([dir, entries]) => [
     [dir, GENERATED, entries.filter((e) => !e.excluded)] as const,
-    [dir, EXCLUDED_GENERATED, entries.filter((e) => e.excluded)] as const,
+    [dir, EXCLUDED_GENERATED, entries.filter((e) => e.excluded && !e.table)] as const,
+    ...(SEPARATE_SUBPATH_ENTRIES[dir]
+      ? [
+          [
+            dir,
+            separateTable(SEPARATE_SUBPATH_ENTRIES[dir]),
+            entries.filter((e) => e.table === separateTable(SEPARATE_SUBPATH_ENTRIES[dir])),
+          ] as const,
+        ]
+      : []),
   ]);
   if (only === undefined || only === "ruby-compat") {
     const target = path.join(ROOT_DIR, "packages/ruby-compat/src", GENERATED);

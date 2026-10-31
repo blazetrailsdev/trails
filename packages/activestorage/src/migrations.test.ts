@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { deepDup, TopLevel } from "@blazetrails/activesupport";
 import { Base, Migration, type DatabaseAdapter } from "@blazetrails/activerecord";
 import "./test-helpers/database/setup.js";
+import "./attachment.js";
+import "./blob.js";
+import { Record } from "./record.js";
+import "./variant-record.js";
 import type { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { CreateActiveStorageTables } from "./db/migrate/20170806125915_create_active_storage_tables.js";
 
@@ -65,7 +69,7 @@ describe("ActiveStorage::MigrationsTest", () => {
   }
 
   function activeStorageTables(): string[] {
-    return ["active_storage_blobs", "active_storage_attachments", "active_storage_variant_records"];
+    return Record.descendants.map((klass) => klass.tableName!);
   }
 
   async function primaryKey(table: string) {

@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { formatter, Formatter, setFormatter } from "@blazetrails/did-you-mean";
 import {
   AmbiguousCommandError,
+  AtLeastOneRequiredArgumentError,
+  ExclusiveArgumentError,
+  InvocationError,
+  MalformattedArgumentError,
+  RequiredArgumentMissingError,
   Error as ThorError,
   AmbiguousTaskError,
   UndefinedCommandError,
@@ -50,5 +55,22 @@ describe("Thor::Error", () => {
   it("aliases the task errors to the command errors", () => {
     expect(UndefinedTaskError).toBe(UndefinedCommandError);
     expect(AmbiguousTaskError).toBe(AmbiguousCommandError);
+  });
+
+  it("answers its Ruby class name", () => {
+    expect(new ThorError("x").name).toBe("Thor::Error");
+    expect(new ThorError().message).toBe("Thor::Error");
+    class Foo extends ThorError {}
+    expect(new Foo().message).toBe("Foo");
+    expect(new UndefinedCommandError("x", [], null).name).toBe("Thor::UndefinedCommandError");
+    expect(new AmbiguousCommandError("x").name).toBe("Thor::AmbiguousCommandError");
+    expect(new InvocationError("x").name).toBe("Thor::InvocationError");
+    expect(new UnknownArgumentError([], ["x"]).name).toBe("Thor::UnknownArgumentError");
+    expect(new RequiredArgumentMissingError("x").name).toBe("Thor::RequiredArgumentMissingError");
+    expect(new MalformattedArgumentError("x").name).toBe("Thor::MalformattedArgumentError");
+    expect(new ExclusiveArgumentError("x").name).toBe("Thor::ExclusiveArgumentError");
+    expect(new AtLeastOneRequiredArgumentError("x").name).toBe(
+      "Thor::AtLeastOneRequiredArgumentError",
+    );
   });
 });

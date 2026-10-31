@@ -19,11 +19,22 @@ export class User extends Base {
   declare name: string | null;
   declare recordCallbacks: boolean | undefined;
   declare callbackCounter: number | undefined;
+  notificationSent: boolean | undefined;
 
   declare avatar: One;
   declare coverPhoto: One;
   declare avatarAttachment: Attachment | null | Promise<Attachment | null>;
   declare avatarBlob: Blob | null | Promise<Blob | null>;
+  declare avatarWithVariants: One;
+  declare avatarWithPreprocessed: One;
+  declare avatarWithConditionalPreprocessed: One;
+  declare introVideo: One;
+  declare namePronunciationAudio: One;
+  declare resume: One;
+  declare resumeWithPreprocessing: One;
+  declare highlightsWithVariants: Many;
+  declare highlightsWithPreprocessed: Many;
+  declare highlightsWithConditionalPreprocessed: Many;
   declare setAvatar: (attachable: unknown) => Promise<void>;
   declare setCoverPhoto: (attachable: unknown) => Promise<void>;
   declare highlights: Many;
@@ -84,9 +95,10 @@ export class User extends Base {
       attachable.variant("preview", { resizeToFill: [400, 400], preprocessed: true });
     });
 
-    this.acceptsNestedAttributesFor("highlightsAttachments", { allowDestroy: true });
-
     this.afterCommit((user: User) => user.incrementCallbackCounter());
+    this.afterUpdateCommit((user: User) => user.notify());
+
+    this.acceptsNestedAttributesFor("highlightsAttachments", { allowDestroy: true });
   }
 
   isShouldPreprocessed(): boolean {
@@ -99,10 +111,17 @@ export class User extends Base {
       this.callbackCounter += 1;
     }
   }
+
+  async notify(): Promise<void> {
+    if ((await this.highlightsAttachments).some((a) => a.isPreviouslyNewRecord())) {
+      this.notificationSent = true;
+    }
+  }
 }
 registerModel(User);
 
 export class Group extends Base {
+  declare avatar: One;
   declare users: AssociationProxy<User>;
 
   static {

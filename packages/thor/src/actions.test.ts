@@ -8,7 +8,6 @@ import {
   include,
   isEmpty,
   setExitCode,
-  stdout,
   SystemExit,
 } from "@blazetrails/ruby-compat";
 import { Actions, type ActionsHost } from "./actions.js";
@@ -18,7 +17,7 @@ import {
   ClearCounter as ClearCounterFixture,
   MyCounter as MyCounterFixture,
 } from "./test-helpers/fixtures/group.js";
-import { sourceRoot } from "./test-helpers/helper.js";
+import { capture, sourceRoot } from "./test-helpers/helper.js";
 import * as Util from "./util.js";
 
 vi.mock("./util.js", async (importOriginal) => ({ ...(await importOriginal<typeof Util>()) }));
@@ -51,21 +50,6 @@ class A extends Thor {
 
 function assertEmpty(obj: string): void {
   if (!isEmpty(obj)) throw new globalThis.Error(`Expected ${JSON.stringify(obj)} to be empty.`);
-}
-
-async function capture(_stream: string, block: () => unknown): Promise<string> {
-  let result = "";
-  const write = stdout.write;
-  (stdout as { write: typeof write }).write = (chunk) => {
-    result += chunk;
-    return true;
-  };
-  try {
-    await block();
-  } finally {
-    (stdout as { write: typeof write }).write = write;
-  }
-  return result;
 }
 
 beforeAll(() => {

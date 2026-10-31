@@ -21,7 +21,7 @@ describe("Thor::CoreExt::HashWithIndifferentAccess (trails)", () => {
 
     expect(hash.skipGit).toBe(true);
     expect(hash.size).toBe(2);
-    expect((hash as { missing?: unknown }).missing).toBeUndefined();
+    expect((hash as { missing?: unknown }).missing).toBeNull();
   });
 
   it("stays a Hash behind the method_missing link", () => {

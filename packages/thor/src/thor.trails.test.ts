@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ArgumentError, STDOUT, rbGvSet, rbModName } from "@blazetrails/ruby-compat";
 import { HELP_MAPPINGS } from "./base.js";
 import { Command, DynamicCommand, HiddenCommand } from "./command.js";
@@ -344,7 +344,11 @@ describe("Thor", () => {
       }
     }
     const script = Script as unknown as ThorClass;
-    const b = script.basename() ?? "";
+    let b = "";
+    beforeAll(() => {
+      b = script.basename() ?? "";
+      rbGvSet("$thor_runner", false);
+    });
 
     const shell = () => {
       const said: unknown[] = [];

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Dir, File, FileUtils, include, NoMethodError, stdout } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, include, NoMethodError } from "@blazetrails/ruby-compat";
+import { capture } from "../test-helpers/helper.js";
 import { Actions, type ActionsHost } from "../actions.js";
 import { Shell } from "../shell.js";
 import { Thor } from "../thor.js";
@@ -9,21 +10,6 @@ class Script extends Thor {
     include(this, Shell);
     include(this, Actions);
   }
-}
-
-async function capture(_stream: string, block: () => unknown): Promise<string> {
-  let result = "";
-  const write = stdout.write;
-  (stdout as { write: typeof write }).write = (chunk) => {
-    result += chunk;
-    return true;
-  };
-  try {
-    await block();
-  } finally {
-    (stdout as { write: typeof write }).write = write;
-  }
-  return result;
 }
 
 type Host = ActionsHost & {
