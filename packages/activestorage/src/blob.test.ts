@@ -30,7 +30,6 @@ import {
   createBlob,
   createFileBlob,
   directlyUploadFileBlob,
-  extractMetadataFrom,
   fileFixture,
   User,
   withService,
@@ -225,7 +224,8 @@ describe("ActiveStorage::BlobTest", () => {
       null,
       {},
       async () => {
-        await extractMetadataFrom((await (await user.avatar.attachment)!.blob)!);
+        const blob = (await (await user.avatar.attachment)!.blob)!;
+        await (blob as Blob & { analyze(): Promise<void> }).analyze();
       },
     );
   });
