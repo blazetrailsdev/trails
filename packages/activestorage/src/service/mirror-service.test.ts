@@ -64,7 +64,7 @@ describe("ActiveStorage::Service::MirrorServiceTest", () => {
         await ctx.service.upload(key, io, { checksum: checksum });
       });
 
-      expect(io.isEof()).toBe(true);
+      expect(io.isEof()).toBeTruthy();
 
       expect(await ctx.service.primary.download(key)).toEqual(encode(data));
       for (const mirror of ctx.service.mirrors) {
@@ -89,9 +89,9 @@ describe("ActiveStorage::Service::MirrorServiceTest", () => {
   it("deleting from all services", async () => {
     await ctx.service.delete(ctx.key);
 
-    expect(await SERVICE.primary.isExist(ctx.key)).toBe(false);
+    expect(await SERVICE.primary.isExist(ctx.key)).toBeFalsy();
     for (const mirror of SERVICE.mirrors) {
-      expect(await mirror.isExist(ctx.key)).toBe(false);
+      expect(await mirror.isExist(ctx.key)).toBeFalsy();
     }
   });
 
