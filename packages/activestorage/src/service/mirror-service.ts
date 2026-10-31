@@ -113,7 +113,13 @@ export class MirrorService extends Service {
     const tasks = this.eachService().map(
       (service) =>
         new Promise<void>((resolve, reject) => {
-          this.executor.post(() => service[method](...args).then(resolve, reject));
+          this.executor.post(async () => {
+            try {
+              resolve(await service[method](...args));
+            } catch (error) {
+              reject(error);
+            }
+          });
         }),
     );
     for (const task of tasks) task.catch(() => {});
