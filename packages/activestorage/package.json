@@ -27,7 +27,6 @@
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
-    "@blazetrails/image-processing": "workspace:*",
     "@blazetrails/marcel": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
@@ -37,6 +36,15 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@blazetrails/mini-magick": "workspace:*"
+    "@blazetrails/mini-magick": "workspace:*",
+    "@blazetrails/image-processing": "workspace:*"
+  },
+  "peerDependencies": {
+    "@blazetrails/image-processing": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@blazetrails/image-processing": {
+      "optional": true
+    }
   }
 }

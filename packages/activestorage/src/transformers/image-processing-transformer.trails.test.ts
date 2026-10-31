@@ -1,5 +1,6 @@
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActiveStorage } from "../active-storage.js";
+import { ActiveStorage, Transformers } from "../active-storage.js";
 import {
   ImageProcessingTransformer,
   UnsupportedImageProcessingArgument,
@@ -10,11 +11,16 @@ import { Transformer } from "./transformer.js";
 const FIXTURE = new URL("../test-helpers/fixtures/files/racecar.jpg", import.meta.url).pathname;
 
 describe("ActiveStorage::Transformers::ImageProcessingTransformer", () => {
+  const unsupported = ActiveStorage.unsupportedImageProcessingArguments;
+  const supported = ActiveStorage.supportedImageProcessingMethods;
+
   beforeEach(() => {
     ActiveStorage.unsupportedImageProcessingArguments = ["-debug", "-write", "-set"];
   });
   afterEach(() => {
     ActiveStorage.variantProcessor = "mini_magick";
+    ActiveStorage.unsupportedImageProcessingArguments = unsupported;
+    ActiveStorage.supportedImageProcessingMethods = supported;
   });
 
   const transform = (transformations: Record<string, unknown>) =>
@@ -40,16 +46,38 @@ describe("ActiveStorage::Transformers::ImageProcessingTransformer", () => {
     await expect(transform(transformations)).rejects.toThrow(UnsupportedImageProcessingArgument);
   });
 
+  it("validates a HashWithIndifferentAccess argument", async () => {
+    await expect(
+      transform({ resize: new HashWithIndifferentAccess({ a: "-write x" }) }),
+    ).rejects.toThrow(UnsupportedImageProcessingArgument);
+  });
+
+  it("holds the allowlist to the exact name and its camelCase spelling", async () => {
+    await expect(transform({ Resize: "10x10" })).rejects.toThrow(UnsupportedImageProcessingMethod);
+    await expect(transform({ RESIZE: "10x10" })).rejects.toThrow(UnsupportedImageProcessingMethod);
+  });
+
+  it("resolves through the Transformers autoload path", async () => {
+    await Transformers.loadPath["active_storage/transformers/image_processing_transformer"]();
+    expect(Transformers.ImageProcessingTransformer).toBe(ImageProcessingTransformer);
+  });
+
+  it("converts and applies a saver under vips", async () => {
+    ActiveStorage.variantProcessor = "vips";
+    await expect(
+      transform({ resizeToLimit: [10, 10], saver: { compression: 6 } }),
+    ).resolves.toBeGreaterThan(0);
+  });
+
   it("raises UnsupportedImageProcessingMethod for an unlisted method", async () => {
     await expect(transform({ systemCall: "x" })).rejects.toThrow(UnsupportedImageProcessingMethod);
   });
 
   it("refuses combine_options", async () => {
-    ActiveStorage.supportedImageProcessingMethods.push("combine_options");
+    ActiveStorage.supportedImageProcessingMethods = [...supported, "combine_options"];
     await expect(transform({ combineOptions: { a: 1 } })).rejects.toThrow(
       "doesn't support :combine_options",
     );
-    ActiveStorage.supportedImageProcessingMethods.pop();
   });
 
   it("does not validate under vips", async () => {
