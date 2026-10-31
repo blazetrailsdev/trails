@@ -136,7 +136,7 @@ export class Task {
 
   async _resolvePrerequisites(): Promise<void> {
     for (const fileList of this._pendingPrerequisites.splice(0)) {
-      this.enhance(Task.formatDeps(await fileList.toAry()));
+      this.enhance(Task.formatDeps(await fileList.toA()));
     }
   }
 
