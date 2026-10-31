@@ -268,7 +268,7 @@ export class Task {
         block((r: Task) => r.invokeWithCallChain(prereqArgs, invocationChain)),
       );
     });
-    for (const future of futures.reverse()) await future;
+    for (const future of futures.reverse()) await future.value();
   }
 
   /** @internal */

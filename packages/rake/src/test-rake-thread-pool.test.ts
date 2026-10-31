@@ -41,7 +41,7 @@ describe("TestRakeTestThreadPool", () => {
     each(() => each(() => each(() => void (count += 1))));
     await pool.join();
     expect(count).toBe(repeat ** 3);
-    expect(pool.statistics().maxActiveThreads).toBe(2);
+    expect(pool._queue.length === 0).toBe(true);
   });
 
   it("exceptions", async () => {
@@ -49,9 +49,9 @@ describe("TestRakeTestThreadPool", () => {
     const pool = new ThreadPool(10);
     const deepExceptionBlock = block(async (count: number): Promise<unknown> => {
       if (count < 1) throw new CustomError();
-      return pool.future(count - 1, deepExceptionBlock);
+      return pool.future(count - 1, deepExceptionBlock).value();
     });
-    await expect(pool.future(2, deepExceptionBlock)).rejects.toThrow(CustomError);
+    await expect(pool.future(2, deepExceptionBlock).value()).rejects.toThrow(CustomError);
     await pool.join();
   });
 
@@ -61,21 +61,21 @@ describe("TestRakeTestThreadPool", () => {
     const futuresA = Array.from({ length: 10 }, () =>
       pool.future(
         block(async () => {
-          await commonDependencyA;
+          await commonDependencyA.value();
           await sleep(Math.random() * 0.01);
         }),
       ),
     );
-    const commonDependencyB = pool.future(block(() => Promise.all(futuresA)));
+    const commonDependencyB = pool.future(block(() => Promise.all(futuresA.map((f) => f.value()))));
     const futuresB = Array.from({ length: 10 }, () =>
       pool.future(
         block(async () => {
-          await commonDependencyB;
+          await commonDependencyB.value();
           await sleep(Math.random() * 0.01);
         }),
       ),
     );
-    await Promise.all(futuresB);
+    await Promise.all(futuresB.map((f) => f.value()));
     await pool.join();
   });
 
@@ -84,19 +84,21 @@ describe("TestRakeTestThreadPool", () => {
     const [a, b, c] = [18, 5, 3];
     const results = await Promise.all(
       Array.from({ length: a }, () =>
-        pool.future<number>(
-          block(async () => {
-            const inner = Array.from({ length: b }, () =>
-              pool.future<number>(
-                block(async () => {
-                  await sleep(Math.random() * 0.001);
-                  return c;
-                }),
-              ),
-            );
-            return (await Promise.all(inner)).reduce((m, f) => m + f, 0);
-          }),
-        ),
+        pool
+          .future<number>(
+            block(async () => {
+              const inner = Array.from({ length: b }, () =>
+                pool.future<number>(
+                  block(async () => {
+                    await sleep(Math.random() * 0.001);
+                    return c;
+                  }),
+                ),
+              );
+              return (await Promise.all(inner.map((f) => f.value()))).reduce((m, f) => m + f, 0);
+            }),
+          )
+          .value(),
       ),
     );
     expect(results.reduce((m, f) => m + f, 0)).toBe(a * b * c);

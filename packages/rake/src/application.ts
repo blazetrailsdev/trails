@@ -162,6 +162,7 @@ export class Application {
     });
   }
 
+  /** @missingRailsCall gather_history — PERMANENT */
   async runWithThreads(block: () => Promise<void>): Promise<void> {
     await block();
     if (this._threadPool !== undefined) await this.threadPool.join();
