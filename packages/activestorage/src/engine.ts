@@ -1,6 +1,7 @@
 import { onLoad } from "@blazetrails/activesupport";
 import { include } from "@blazetrails/ruby-compat";
 import type { Base } from "@blazetrails/activerecord";
+import "@blazetrails/trailties/trailties/action-controller";
 import "@blazetrails/trailties/trailties/active-job";
 import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
@@ -8,11 +9,12 @@ import { ActiveStorage } from "./active-storage.js";
 import { Model } from "./attached/model.js";
 import { ActiveRecordExtensions } from "./reflection.js";
 
+/** @missingRailsCall prepend — CONVERGEABLE activestorage-engine */
 export class Engine extends TrailsEngine {
   static {
     TrailsEngine.register(this, import.meta.dirname);
 
-    this.isolateNamespace(ActiveStorage as never);
+    this.isolateNamespace(ActiveStorage);
 
     this.initializer("active_storage.attached", () => {
       onLoad("active_record", function (this: typeof Base) {
