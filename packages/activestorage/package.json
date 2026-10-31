@@ -29,13 +29,13 @@
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/marcel": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
-    "@blazetrails/ruby-compat": "workspace:*"
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/trailties": "workspace:*"
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
-    "@blazetrails/mini-magick": "workspace:*",
-    "@blazetrails/trailties": "workspace:*"
+    "@blazetrails/mini-magick": "workspace:*"
   }
 }
