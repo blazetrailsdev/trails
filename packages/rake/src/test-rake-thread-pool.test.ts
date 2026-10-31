@@ -5,6 +5,18 @@ import { ThreadPool } from "./thread-pool.js";
 const sleep = (seconds: number) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 
 describe("TestRakeTestThreadPool", () => {
+  // PERMANENT-SKIP: a future runs on the event loop; there is no Thread.current to compare.
+  it.skip("pool executes in current thread for zero threads", () => {});
+
+  // PERMANENT-SKIP: a future runs on the event loop; there is no Thread.current to compare.
+  it.skip("pool executes in other thread for pool of size one", () => {});
+
+  // PERMANENT-SKIP: a future runs on the event loop; there is no Thread.current to compare.
+  it.skip("pool executes in two other threads for pool of size two", () => {});
+
+  // PERMANENT-SKIP: a future runs on the event loop; there is no Thread.current to compare.
+  it.skip("pool creates the correct number of threads", () => {});
+
   it("pool future does not duplicate arguments", async () => {
     const pool = new ThreadPool(2);
     const obj = {};
@@ -21,7 +33,7 @@ describe("TestRakeTestThreadPool", () => {
 
   it("pool join empties queue", async () => {
     const pool = new ThreadPool(2);
-    const repeat = 5;
+    const repeat = 25;
     let count = 0;
     const each = (fn: () => void) => {
       for (let i = 0; i < repeat; i++) pool.future(block(fn));
@@ -40,6 +52,30 @@ describe("TestRakeTestThreadPool", () => {
       return pool.future(count - 1, deepExceptionBlock);
     });
     await expect(pool.future(2, deepExceptionBlock)).rejects.toThrow(CustomError);
+    await pool.join();
+  });
+
+  it("pool prevents deadlock", async () => {
+    const pool = new ThreadPool(5);
+    const commonDependencyA = pool.future(block(() => sleep(0.2)));
+    const futuresA = Array.from({ length: 10 }, () =>
+      pool.future(
+        block(async () => {
+          await commonDependencyA;
+          await sleep(Math.random() * 0.01);
+        }),
+      ),
+    );
+    const commonDependencyB = pool.future(block(() => Promise.all(futuresA)));
+    const futuresB = Array.from({ length: 10 }, () =>
+      pool.future(
+        block(async () => {
+          await commonDependencyB;
+          await sleep(Math.random() * 0.01);
+        }),
+      ),
+    );
+    await Promise.all(futuresB);
     await pool.join();
   });
 
