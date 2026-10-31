@@ -453,6 +453,7 @@ export {
   rbStrStartWith,
   rbStrSub,
   strGsub,
+  rbRegMatchM,
   rbStrMatchM,
 } from "./string/sub.js";
 export { rbCheckStringType, stringValue, strlen } from "./string/support.js";

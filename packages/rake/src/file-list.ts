@@ -11,7 +11,7 @@ import {
   rbCheckArrayType,
   rbEqual,
   rbInspect,
-  rbRegMatchP,
+  rbRegMatchM,
   rbStrMatchM,
   rbStrSub,
   rtest,
@@ -318,6 +318,7 @@ export class FileList {
     return this.collect((fn) => stringExt(fn, newext));
   }
 
+  /** @inventedArm if — PERMANENT */
   async egrep(pattern: RegExp | string, ...options: unknown[]): Promise<number> {
     const yieldBlock = rbBlockGivenP(options.at(-1))
       ? (options.pop() as (fn: string, count: number, line: string) => unknown)
@@ -332,7 +333,7 @@ export class FileList {
             if (
               typeof pattern === "string"
                 ? rbStrMatchM({ string: pattern }, line)
-                : rbRegMatchP(pattern, line)
+                : rbRegMatchM(pattern, line)
             ) {
               matched += 1;
               if (yieldBlock) {
