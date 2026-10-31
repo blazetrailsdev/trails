@@ -733,7 +733,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
       }
       static {
         (this as unknown as Attachable).hasOneAttached("signature", {
-          service: (user) => `disk_${(user as ExtraAttached).mirrorRegion()}`,
+          service: (user) => `disk_${(user as unknown as ExtraAttached).mirrorRegion()}`,
         });
       }
       mirrorRegion() {
