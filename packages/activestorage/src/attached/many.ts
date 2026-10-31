@@ -48,7 +48,7 @@ export class Many extends Attached {
    * @noRailsEquivalent PERMANENT
    */
   async load(): Promise<void> {
-    await this.associationAttachments;
+    await this.attachments;
   }
 
   /** @noRailsEquivalent PERMANENT */
