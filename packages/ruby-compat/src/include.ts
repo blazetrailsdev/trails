@@ -43,6 +43,7 @@ import {
   FL_SINGLETON,
   T_ICLASS,
   TopLevel,
+  type TopLevelConstants,
   classpaths,
   isPlainHash,
   rbSetClassPathString,
@@ -105,7 +106,8 @@ export function rbModConstSet<T>(
     | Module
     | (abstract new (...args: never) => unknown)
     | { readonly name: string }
-    | ModuleObject,
+    | ModuleObject
+    | TopLevelConstants,
   id: string,
   value: T,
 ): T {

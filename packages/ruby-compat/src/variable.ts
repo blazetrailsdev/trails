@@ -396,19 +396,7 @@ export function rbModConstGet(mod: object, name: string): unknown {
       continue;
     }
     const generated = mod === Object && !(part in c) ? generatedClass(path) : undefined;
-    if (generated !== undefined) {
-      c = generated;
-    } else if (
-      i > 0 &&
-      typeof c === "object" &&
-      rbModName(c) === null &&
-      !(part in c) &&
-      !("constMissing" in c)
-    ) {
-      throw new NameError(`uninitialized constant ${path}`, part, { receiver: c });
-    } else {
-      c = rbConstGet(c, part, i > 0);
-    }
+    c = generated !== undefined ? generated : rbConstGet(c, part, i > 0);
   }
   return c;
 }

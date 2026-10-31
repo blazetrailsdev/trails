@@ -24,7 +24,7 @@ export async function rbFLoad(fname: string): Promise<true> {
   path.search = `?${(loads += 1)}`;
   const exports = (await import(path.href)) as Record<string, unknown>;
   for (const [id, val] of Object.entries(exports)) {
-    if (/^[\p{Lu}\p{Lt}]/u.test(id)) rbModConstSet(TopLevel as { name: string }, id, val);
+    if (/^[\p{Lu}\p{Lt}]/u.test(id)) rbModConstSet(TopLevel, id, val);
   }
   return true;
 }
