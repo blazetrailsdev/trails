@@ -22,6 +22,7 @@ import {
 
 type Connection = SMTPConnection & {
   _destroyed: boolean;
+  options: { tls?: object };
   _socket?: { setTimeout(ms: number): unknown; write(data: string): unknown };
   _sendCommand(str: string): void;
   _responseActions: Array<(str: string) => void>;
@@ -485,8 +486,7 @@ export class SMTP {
     if (user != null || secret != null || authtype != null) {
       this.checkAuthArgs(authtype, user, secret);
     }
-    const context = (this.isTls() ? this._sslContextTls : this._sslContextStarttls) ?? {};
-    const { verifyMode, ...tls } = context;
+    const { verifyMode, ...tls } = this._sslContextTls ?? {};
     const s = new SMTPConnection({
       host: this.address,
       port: this.port,
@@ -537,7 +537,7 @@ export class SMTP {
           throw new SMTPUnsupportedCommand("STARTTLS is not supported on this server");
         }
         await this.starttls();
-        await this.tlsconnect(s);
+        await this.tlsconnect(s, this._sslContextStarttls);
         await this.doHelo(heloDomain);
       }
       if (user != null) {
@@ -553,7 +553,13 @@ export class SMTP {
   }
 
   /** @internal */
-  private async tlsconnect(s: Connection): Promise<void> {
+  private async tlsconnect(s: Connection, context: SslContext | null): Promise<void> {
+    const { verifyMode, ...tls } = context ?? {};
+    s.options.tls = {
+      ...tls,
+      rejectUnauthorized: verifyMode !== "VERIFY_NONE",
+      servername: this.tlsHostname ?? this.address,
+    };
     this.logging("TLS connection started");
     await new Promise<void>((resolve, reject) => {
       s.once("error", reject);

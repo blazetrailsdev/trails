@@ -717,7 +717,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "tasks RFC 0204-actionmailer-and-mail-port, Transport edges: the socket is " +
       "nodemailer's `SMTPConnection`, so Net::SMTP's socket setup members are not ported. " +
       "PERMANENT.",
-    names: ["tcp_socket", "ssl_socket", "tlsconnect", "new_internet_message_io"],
+    names: ["tcp_socket", "ssl_socket", "new_internet_message_io"],
     rubyFiles: [
       "smtp.rb",
       "authenticator.rb",
