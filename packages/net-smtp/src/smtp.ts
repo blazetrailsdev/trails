@@ -774,10 +774,12 @@ export class SMTP {
       const eof = (): void => reject(new EOFError("end of file reached"));
       if (socket._destroyed) return eof();
       socket.once("end", eof);
-      socket.once("error", reject);
+      const onError = (err: ConnectionError): void =>
+        err.code === "ECONNECTION" ? eof() : reject(err);
+      socket.once("error", onError);
       socket._responseActions.push((str: string) => {
         socket.removeListener("end", eof);
-        socket.removeListener("error", reject);
+        socket.removeListener("error", onError);
         resolve(Response.parse(`${str}\n`));
       });
     });
