@@ -379,7 +379,7 @@ export function rbModConstGet(mod: object, name: string): unknown {
   const qualified = name.startsWith("::");
   const cpath = qualified ? name.slice(2) : name;
   const parts = cpath.split("::");
-  if (!parts.every((part) => /^[\p{Lu}\p{Lt}]\w*$/u.test(part))) {
+  if (!parts.every((part) => /^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(part))) {
     throw new NameError(`wrong constant name ${name}`, name);
   }
   if (qualified) mod = Object;
