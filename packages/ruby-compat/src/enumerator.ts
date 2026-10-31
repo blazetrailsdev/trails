@@ -243,7 +243,7 @@ export class Enumerator<T = unknown, E = unknown> {
    * @noRailsEquivalent PERMANENT
    */
   plus(eobj: object): Enumerator<T> {
-    return newEnumChain<T>([this, eobj]);
+    return enumChain<T>(this, eobj);
   }
 
   /**
@@ -277,11 +277,11 @@ export function toEnum<T = unknown>(
   return new Enumerator<T>(obj, meth, args, size);
 }
 
-type LazyYielder = { yield(value: unknown): unknown };
-type LazyProc = (yielder: LazyYielder, value: never, memos: Record<string, unknown>) => unknown;
+type _LazyYielder = { yield(value: unknown): unknown };
+type _LazyProc = (yielder: _LazyYielder, value: never, memos: Record<string, unknown>) => unknown;
 
 /** `LAZY_MEMO_BREAK` (`vendor/ruby/v3.3.11/enumerator.c:125`). */
-const LAZY_BREAK = {};
+const _LAZY_BREAK = {};
 
 /**
  * `Enumerator::Lazy` (`vendor/ruby/v3.3.11/enumerator.c:1804` `lazy_initialize`).
@@ -294,15 +294,15 @@ const LAZY_BREAK = {};
  * @noRailsEquivalent PERMANENT
  */
 export class Lazy<T = unknown> extends Enumerator<T> {
-  #source: object;
-  #block: LazyProc;
+  private _source: object;
+  private _block: _LazyProc;
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(obj: object, block?: LazyProc, size: (() => unknown) | null = null) {
+  constructor(obj: object, block?: _LazyProc, size: (() => unknown) | null = null) {
     if (!block) throw new ArgumentError("tried to call lazy new without a block");
     super(obj, "each", [], size);
-    this.#source = obj;
-    this.#block = block;
+    this._source = obj;
+    this._block = block;
   }
 
   /**
@@ -316,11 +316,11 @@ export class Lazy<T = unknown> extends Enumerator<T> {
     const yielder = new Yielder<unknown>(block as (value: unknown) => unknown);
     const memos = {};
     try {
-      rbFSend(this.#source, "each", (...values: unknown[]) =>
-        this.#block(yielder, (values.length <= 1 ? values[0] : values) as never, memos),
+      rbFSend(this._source, "each", (...values: unknown[]) =>
+        this._block(yielder, (values.length <= 1 ? values[0] : values) as never, memos),
       );
     } catch (error) {
-      if (error !== LAZY_BREAK) throw error;
+      if (error !== _LAZY_BREAK) throw error;
     }
     return this;
   }
@@ -461,7 +461,7 @@ export class Lazy<T = unknown> extends Enumerator<T> {
         const remain = ((memos.remain as number | undefined) ?? n) - 1;
         memos.remain = remain;
         y.yield(v);
-        if (remain === 0) throw LAZY_BREAK;
+        if (remain === 0) throw _LAZY_BREAK;
       },
       size,
     );
@@ -475,7 +475,7 @@ export class Lazy<T = unknown> extends Enumerator<T> {
   takeWhile(block: (value: T) => unknown): Lazy<T> {
     if (!block) throw new ArgumentError("tried to call lazy take_while without a block");
     return new Lazy<T>(this, (y, v) => {
-      if (!rtest(block(v))) throw LAZY_BREAK;
+      if (!rtest(block(v))) throw _LAZY_BREAK;
       y.yield(v);
     });
   }
@@ -627,12 +627,12 @@ export function enumerableLazy<T = unknown>(
  * @noRailsEquivalent PERMANENT
  */
 export class Chain<T = unknown> extends Enumerator<T> {
-  #enums: readonly object[];
+  private _enums: readonly object[];
 
   /** @noRailsEquivalent PERMANENT */
   constructor(...enums: object[]) {
     super(enums);
-    this.#enums = Object.freeze(enums);
+    this._enums = Object.freeze(enums);
   }
 
   /**
@@ -642,7 +642,7 @@ export class Chain<T = unknown> extends Enumerator<T> {
    */
   override each(block?: (...args: never[]) => unknown): unknown {
     if (!block) return this;
-    for (const e of this.#enums) rbFSend(e, "each", block);
+    for (const e of this._enums) rbFSend(e, "each", block);
     return this;
   }
 
@@ -653,7 +653,7 @@ export class Chain<T = unknown> extends Enumerator<T> {
    */
   override size(): unknown {
     let total = 0;
-    for (const e of this.#enums) {
+    for (const e of this._enums) {
       const size = Array.isArray(e)
         ? e.length
         : rbObjRespondTo(e, "size")
@@ -672,24 +672,20 @@ export class Chain<T = unknown> extends Enumerator<T> {
    * @noRailsEquivalent PERMANENT
    */
   inspect(): string {
-    return `#<Enumerator::Chain: ${rbInspect([...this.#enums])}>`;
+    return `#<Enumerator::Chain: ${rbInspect([...this._enums])}>`;
   }
 }
 
-/** `new_enum_chain` (`vendor/ruby/v3.3.11/enumerator.c:3191`). */
-function newEnumChain<T>(enums: object[]): Enumerator<T> {
-  const obj = new Chain<T>(...enums);
-  if (enums.some((e) => e instanceof Lazy)) return enumerableLazy<T>(obj, () => obj.size());
-  return obj;
-}
-
 /**
- * `enum_chain` (`vendor/ruby/v3.3.11/enumerator.c:3371`).
+ * `enum_chain` (`vendor/ruby/v3.3.11/enumerator.c:3371`), over `new_enum_chain` (`:3191`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export function enumChain<T = unknown>(obj: object, ...enums: object[]): Enumerator<T> {
-  return newEnumChain<T>([obj, ...enums]);
+  const all = [obj, ...enums];
+  const chain = new Chain<T>(...all);
+  if (all.some((e) => e instanceof Lazy)) return enumerableLazy<T>(chain, () => chain.size());
+  return chain;
 }
 
 Enumerator.Lazy = Lazy;

@@ -359,7 +359,8 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     await _yields([...items].reverse(), block);
     return items;
   },
-  eachWithObject: async (items, memo: unknown, block: (fn: string, memo: unknown) => unknown) => {
+  eachWithObject: async (items, memo: unknown, block?: (fn: string, memo: unknown) => unknown) => {
+    if (!block) return _enum(items, "eachWithObject", [memo], () => items.length);
     for (const fn of items) await block(fn as string, memo);
     return memo;
   },
@@ -383,18 +384,31 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     for (let i = 0; n === null || i < n; i++) await _yields(items, block);
     return null;
   },
-  rejectBang: async (items, block: ElementBlock) =>
-    _bang(items, await _filterBy(items, block, false)),
-  selectBang: async (items, block: ElementBlock) =>
-    _bang(items, await _filterBy(items, block, true)),
-  deleteIf: async (items, block: ElementBlock) =>
-    _replace(items, await _filterBy(items, block, false)),
-  keepIf: async (items, block: ElementBlock) =>
-    _replace(items, await _filterBy(items, block, true)),
-  mapBang: async (items, block: ElementBlock) => _replace(items, await _yields(items, block)),
+  rejectBang: async (items, block?: ElementBlock) =>
+    block
+      ? _bang(items, await _filterBy(items, block, false))
+      : _enum(items, "rejectBang", [], () => items.length),
+  selectBang: async (items, block?: ElementBlock) =>
+    block
+      ? _bang(items, await _filterBy(items, block, true))
+      : _enum(items, "selectBang", [], () => items.length),
+  deleteIf: async (items, block?: ElementBlock) =>
+    block
+      ? _replace(items, await _filterBy(items, block, false))
+      : _enum(items, "deleteIf", [], () => items.length),
+  keepIf: async (items, block?: ElementBlock) =>
+    block
+      ? _replace(items, await _filterBy(items, block, true))
+      : _enum(items, "keepIf", [], () => items.length),
+  mapBang: async (items, block?: ElementBlock) =>
+    block
+      ? _replace(items, await _yields(items, block))
+      : _enum(items, "mapBang", [], () => items.length),
   sortBang: (items, block?: unknown) => items.sort(_comparator(block)),
-  sortByBang: async (items, block: ElementBlock) =>
-    _replace(items, sortBy(items, await _replay(items, block)) as Items),
+  sortByBang: async (items, block?: ElementBlock) =>
+    block
+      ? _replace(items, sortBy(items, await _replay(items, block)) as Items)
+      : _enum(items, "sortByBang", [], () => items.length),
   uniqBang: async (items, block?: ElementBlock) =>
     _bang(items, (await ARRAY_CALLS.uniq(items, block as never)) as Items),
   compactBang: (items) => compactBang(items),
@@ -434,12 +448,16 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   uniq: async (items, block?: ElementBlock) =>
     block ? uniq(items, await _replay(items, block)) : uniq(items),
   valuesAt: (items, ...selectors: number[]) => selectors.map((i) => items.at(i) ?? null),
-  partition: async (items, block: ElementBlock) => {
+  partition: async (items, block?: ElementBlock) => {
+    if (!block) return _enum(items, "partition", [], () => items.length);
     const result: [Items, Items] = [[], []];
     for (const fn of items) result[rtest(await block(fn as string)) ? 0 : 1].push(fn);
     return result;
   },
-  groupBy: async (items, block: ElementBlock) => groupBy(items, await _replay(items, block)),
+  groupBy: async (items, block?: ElementBlock) =>
+    block
+      ? groupBy(items, await _replay(items, block))
+      : _enum(items, "groupBy", [], () => items.length),
   tally: (items) => tally(items),
   sum: async (items, ...args: unknown[]) => {
     const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : null;
@@ -494,12 +512,21 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     await _extreme(items, block ? [block] : [], false),
     await _extreme(items, block ? [block] : [], true),
   ],
-  minBy: (items, ...args: unknown[]) => _extremeBy(minBy, items, args),
-  maxBy: (items, ...args: unknown[]) => _extremeBy(maxBy, items, args),
-  minmaxBy: async (items, block: ElementBlock) => [
-    await ARRAY_CALLS.minBy(items, block as never),
-    await ARRAY_CALLS.maxBy(items, block as never),
-  ],
+  minBy: (items, ...args: unknown[]) =>
+    _isProc(args.at(-1))
+      ? _extremeBy(minBy, items, args)
+      : _enum(items, "minBy", args, () => items.length),
+  maxBy: (items, ...args: unknown[]) =>
+    _isProc(args.at(-1))
+      ? _extremeBy(maxBy, items, args)
+      : _enum(items, "maxBy", args, () => items.length),
+  minmaxBy: async (items, block?: ElementBlock) =>
+    !block
+      ? _enum(items, "minmaxBy", [], () => items.length)
+      : [
+          await ARRAY_CALLS.minBy(items, block as never),
+          await ARRAY_CALLS.maxBy(items, block as never),
+        ],
   index: async (items, ...args: unknown[]) => {
     if (args.length === 0) return _enum(items, "index");
     const test = _isProc(args[0]) ? args[0] : (fn: string) => rbEqual(fn, args[0]);
@@ -512,11 +539,13 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     for (let i = items.length; i--; ) if (rtest(await test(items[i] as string))) return i;
     return null;
   },
-  bsearch: async (items, block: ElementBlock) => {
+  bsearch: async (items, block?: ElementBlock) => {
+    if (!block) return _enum(items, "bsearch");
     const i = await _search(items, block);
     return i === null ? null : items[i];
   },
-  bsearchIndex: (items, block: ElementBlock) => _search(items, block),
+  bsearchIndex: async (items, block?: ElementBlock) =>
+    block ? _search(items, block) : _enum(items, "bsearchIndex"),
   delete: async (items, obj: unknown, block?: () => unknown) => {
     const found = items.find((fn) => rbEqual(fn, obj));
     if (found === undefined) return block ? block() : null;
@@ -534,8 +563,10 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     if (n < 0) throw new ArgumentError("attempt to drop negative size");
     return items.slice(n);
   },
-  takeWhile: async (items, block: ElementBlock) => items.slice(0, await _while(items, block)),
-  dropWhile: async (items, block: ElementBlock) => items.slice(await _while(items, block)),
+  takeWhile: async (items, block?: ElementBlock) =>
+    block ? items.slice(0, await _while(items, block)) : _enum(items, "takeWhile"),
+  dropWhile: async (items, block?: ElementBlock) =>
+    block ? items.slice(await _while(items, block)) : _enum(items, "dropWhile"),
   chunk: async (items, block: ElementBlock) => {
     const result: [unknown, Items][] = [];
     const yields = await _yields(items, block);
@@ -809,9 +840,12 @@ export class FileList {
     return this;
   }
 
-  async partition(block: ElementBlock): Promise<[this, this]> {
+  partition(block: ElementBlock): Promise<[this, this]>;
+  partition(): Promise<Enumerator>;
+  async partition(block?: ElementBlock): Promise<[this, this] | Enumerator> {
     await this.resolve();
     const result = (await ARRAY_CALLS.partition(this.items, block as never)) as [Items, Items];
+    if (result instanceof Enumerator) return result;
     return [
       new (this.constructor as new () => this)().import(result[0]),
       new (this.constructor as new () => this)().import(result[1]),

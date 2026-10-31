@@ -178,7 +178,16 @@ describe("FileList enumerators", () => {
 
     expect(await fl.lazy()).toBeInstanceOf(Enumerator.Lazy);
     expect(await ((await fl.chain(["x"])) as Enumerator).toA()).toEqual(["a.c", "b.c", "x"]);
-    for (const iterator of [fl.each(), fl.map(undefined as never), fl.eachSlice(1), fl.cycle()]) {
+    for (const iterator of [
+      fl.each(),
+      fl.map(undefined as never),
+      fl.eachSlice(1),
+      fl.cycle(),
+      fl.takeWhile(undefined as never),
+      fl.minBy(),
+      fl.deleteIf(undefined as never),
+      fl.groupBy(undefined as never),
+    ]) {
       expect(await iterator).toBeInstanceOf(Enumerator);
     }
     const each = (await fl.map(undefined as never)) as unknown as Enumerator;
