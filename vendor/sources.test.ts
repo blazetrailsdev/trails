@@ -212,6 +212,7 @@ describe("vendor/sources.ts", () => {
       "mini-magick",
       "rake",
       "thor",
+      "zeitwerk",
       "rails-dom-testing",
       "i18n",
       "solid-queue",
@@ -420,6 +421,7 @@ describe("vendor/sources.ts", () => {
         "solid-queue",
         "thor",
         "trailties",
+        "zeitwerk",
       ].sort(),
     );
   });
@@ -477,6 +479,7 @@ describe("vendor/sources.ts", () => {
         "solid-queue",
         "thor",
         "trailties",
+        "zeitwerk",
       ].sort(),
     );
     expect(m["thor"].endsWith("vendor/thor/v1.3.2/spec")).toBe(true);
