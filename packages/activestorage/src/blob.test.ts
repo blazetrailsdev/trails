@@ -460,8 +460,7 @@ describe("ActiveStorage::BlobTest", () => {
     expect(blob.isDestroyed()).toBe(true);
   });
 
-  // BLOCKED: activestorage-mirror-service-over-disk
-  it.skip("uses service from blob when provided", async () => {
+  it("uses service from blob when provided", async () => {
     await withService("mirror", async () => {
       const blob = await createBlob({ filename: "funky.jpg", serviceName: "local" });
       expect(blob.service).toBeInstanceOf(DiskService);

@@ -78,6 +78,14 @@ GlobalID.setApp("ActiveStorageExampleApp");
 
 Blob.services = new Registry({
   local: { service: "Disk", root: File.join(Dir.tmpdir(), "active_storage_blobs") },
+  disk_mirror_1: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_1") },
+  disk_mirror_2: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_2") },
+  disk_mirror_3: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_3") },
+  mirror: {
+    service: "Mirror",
+    primary: "local",
+    mirrors: ["disk_mirror_1", "disk_mirror_2", "disk_mirror_3"],
+  },
 });
 Blob.service = Blob.services.fetch("local");
 
