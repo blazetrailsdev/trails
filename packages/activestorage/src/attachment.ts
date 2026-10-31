@@ -1,4 +1,3 @@
-import type { NamedVariant } from "./named-variant.js";
 import { type Base } from "@blazetrails/activerecord";
 import { delegateMissingTo, DelegationError, runLoadHooks } from "@blazetrails/activesupport";
 import { ArgumentError, block, fetch } from "@blazetrails/ruby-compat";

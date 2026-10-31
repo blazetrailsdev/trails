@@ -274,8 +274,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
           excluded: ownTable,
           ...(separated ? { table: separateTable(separate) } : {}),
         });
-      }
-      else if (modules.has(key) && isSelfNamespace(source, entry.file, entry.tsName)) {
+      } else if (modules.has(key) && isSelfNamespace(source, entry.file, entry.tsName)) {
         entries.push({ ...entry, namespace: true });
       } else if (fallbackModules.has(key)) continue;
       else if (modules.has(key)) {
