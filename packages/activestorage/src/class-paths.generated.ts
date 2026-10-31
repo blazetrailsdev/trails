@@ -16,22 +16,23 @@ import * as m13 from "./attached/one.js";
 import * as m14 from "./attachment.js";
 import * as m15 from "./base-job.js";
 import * as m16 from "./blob.js";
-import * as m17 from "./blob/identifiable.js";
-import * as m18 from "./blob/servable.js";
-import * as m19 from "./current.js";
-import * as m20 from "./downloader.js";
-import * as m21 from "./errors.js";
-import * as m22 from "./filename.js";
-import * as m23 from "./fixture-set.js";
-import * as m24 from "./gem-version.js";
-import * as m25 from "./log-subscriber.js";
-import * as m26 from "./purge-job.js";
-import * as m27 from "./record.js";
-import * as m28 from "./reflection.js";
-import * as m29 from "./service.js";
-import * as m30 from "./service/configurator.js";
-import * as m31 from "./service/disk-service.js";
-import * as m32 from "./service/registry.js";
+import * as m17 from "./blob/analyzable.js";
+import * as m18 from "./blob/identifiable.js";
+import * as m19 from "./blob/servable.js";
+import * as m20 from "./current.js";
+import * as m21 from "./downloader.js";
+import * as m22 from "./errors.js";
+import * as m23 from "./filename.js";
+import * as m24 from "./fixture-set.js";
+import * as m25 from "./gem-version.js";
+import * as m26 from "./log-subscriber.js";
+import * as m27 from "./purge-job.js";
+import * as m28 from "./record.js";
+import * as m29 from "./reflection.js";
+import * as m30 from "./service.js";
+import * as m31 from "./service/configurator.js";
+import * as m32 from "./service/disk-service.js";
+import * as m33 from "./service/registry.js";
 
 registerClassPaths([
   [() => m0.Attached, "ActiveStorage::Attached"],
@@ -51,29 +52,30 @@ registerClassPaths([
   [() => m14.Attachment, "ActiveStorage::Attachment"],
   [() => m15.BaseJob, "ActiveStorage::BaseJob"],
   [() => m16.Blob, "ActiveStorage::Blob"],
-  [() => m17.Identifiable, "ActiveStorage::Blob::Identifiable"],
-  [() => m18.Servable, "ActiveStorage::Blob::Servable"],
-  [() => m19.Current, "ActiveStorage::Current"],
-  [() => m20.Downloader, "ActiveStorage::Downloader"],
-  [() => m21.Error, "ActiveStorage::Error"],
-  [() => m22.Filename, "ActiveStorage::Filename"],
-  [() => m21.FileNotFoundError, "ActiveStorage::FileNotFoundError"],
-  [() => m23.FixtureSet, "ActiveStorage::FixtureSet"],
-  [() => m21.IntegrityError, "ActiveStorage::IntegrityError"],
-  [() => m21.InvariableError, "ActiveStorage::InvariableError"],
-  [() => m25.LogSubscriber, "ActiveStorage::LogSubscriber"],
-  [() => m21.PreviewError, "ActiveStorage::PreviewError"],
-  [() => m26.PurgeJob, "ActiveStorage::PurgeJob"],
-  [() => m27.Record, "ActiveStorage::Record"],
-  [() => m28.ActiveRecordExtensions, "ActiveStorage::Reflection::ActiveRecordExtensions"],
-  [() => m28.HasAttachedReflection, "ActiveStorage::Reflection::HasAttachedReflection"],
-  [() => m28.HasManyAttachedReflection, "ActiveStorage::Reflection::HasManyAttachedReflection"],
-  [() => m28.HasOneAttachedReflection, "ActiveStorage::Reflection::HasOneAttachedReflection"],
-  [() => m29.Service, "ActiveStorage::Service"],
-  [() => m30.Configurator, "ActiveStorage::Service::Configurator"],
-  [() => m31.DiskService, "ActiveStorage::Service::DiskService"],
-  [() => m32.Registry, "ActiveStorage::Service::Registry"],
-  [() => m21.UnpreviewableError, "ActiveStorage::UnpreviewableError"],
-  [() => m21.UnrepresentableError, "ActiveStorage::UnrepresentableError"],
-  [() => m24.VERSION, "ActiveStorage::VERSION"],
+  [() => m17.Analyzable, "ActiveStorage::Blob::Analyzable"],
+  [() => m18.Identifiable, "ActiveStorage::Blob::Identifiable"],
+  [() => m19.Servable, "ActiveStorage::Blob::Servable"],
+  [() => m20.Current, "ActiveStorage::Current"],
+  [() => m21.Downloader, "ActiveStorage::Downloader"],
+  [() => m22.Error, "ActiveStorage::Error"],
+  [() => m23.Filename, "ActiveStorage::Filename"],
+  [() => m22.FileNotFoundError, "ActiveStorage::FileNotFoundError"],
+  [() => m24.FixtureSet, "ActiveStorage::FixtureSet"],
+  [() => m22.IntegrityError, "ActiveStorage::IntegrityError"],
+  [() => m22.InvariableError, "ActiveStorage::InvariableError"],
+  [() => m26.LogSubscriber, "ActiveStorage::LogSubscriber"],
+  [() => m22.PreviewError, "ActiveStorage::PreviewError"],
+  [() => m27.PurgeJob, "ActiveStorage::PurgeJob"],
+  [() => m28.Record, "ActiveStorage::Record"],
+  [() => m29.ActiveRecordExtensions, "ActiveStorage::Reflection::ActiveRecordExtensions"],
+  [() => m29.HasAttachedReflection, "ActiveStorage::Reflection::HasAttachedReflection"],
+  [() => m29.HasManyAttachedReflection, "ActiveStorage::Reflection::HasManyAttachedReflection"],
+  [() => m29.HasOneAttachedReflection, "ActiveStorage::Reflection::HasOneAttachedReflection"],
+  [() => m30.Service, "ActiveStorage::Service"],
+  [() => m31.Configurator, "ActiveStorage::Service::Configurator"],
+  [() => m32.DiskService, "ActiveStorage::Service::DiskService"],
+  [() => m33.Registry, "ActiveStorage::Service::Registry"],
+  [() => m22.UnpreviewableError, "ActiveStorage::UnpreviewableError"],
+  [() => m22.UnrepresentableError, "ActiveStorage::UnrepresentableError"],
+  [() => m25.VERSION, "ActiveStorage::VERSION"],
 ]);

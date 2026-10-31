@@ -6,6 +6,7 @@ class PairedSocket implements HttpSocket {
   peer!: PairedSocket;
   private _listeners = new Map<string, Listener[]>();
   private _destroyed = false;
+  writableEnded = false;
   writableLength = 0;
   writableHighWaterMark = 16 * 1024;
 
@@ -22,6 +23,7 @@ class PairedSocket implements HttpSocket {
   }
 
   end(): void {
+    this.writableEnded = true;
     queueMicrotask(() => this.peer.emit("end"));
   }
 

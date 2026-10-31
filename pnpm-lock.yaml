@@ -419,6 +419,9 @@ importers:
         specifier: workspace:*
         version: link:../trailties
     devDependencies:
+      '@blazetrails/image-processing':
+        specifier: workspace:*
+        version: link:../image-processing
       '@blazetrails/mini-magick':
         specifier: workspace:*
         version: link:../mini-magick

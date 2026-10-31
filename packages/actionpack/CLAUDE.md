@@ -208,7 +208,7 @@ request's own strings, so the String/Symbol folding is the identity.
 A null prototype keeps a `__proto__` or `toString` param from reaching
 `Object.prototype`. The two `assert_instance_of` assertions in
 `dispatch/param_builder_test.rb:15,21` are re-scored as an assertion that the
-prototype is `null`, by rows in `scripts/test-compare/assertion-receipts.ts`
+prototype is `null`, by rows in `scripts/test-compare/assertion-receipts/`
 citing this section. There is no story to make params a
 `HashWithIndifferentAccess`.
 Ruled by the repo owner on 2026-10-18, closing story

@@ -24,6 +24,7 @@ import {
   type Tempfile,
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
+import { Analyzable } from "./blob/analyzable.js";
 import { Identifiable } from "./blob/identifiable.js";
 import { Servable } from "./blob/servable.js";
 import { Filename } from "./filename.js";
@@ -52,7 +53,8 @@ type UnfurlOptions = {
 const MINIMUM_TOKEN_LENGTH = 28;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Blob extends Included<typeof Identifiable>, Included<typeof Servable> {}
+export interface Blob
+  extends Included<typeof Analyzable>, Included<typeof Identifiable>, Included<typeof Servable> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Blob extends Record {
@@ -68,6 +70,7 @@ export class Blob extends Record {
   declare content_type: string | null;
   declare byte_size: number | null;
   declare checksum: string | null;
+  declare metadata: HashWithIndifferentAccess;
   declare analyzed: unknown;
   declare identified: unknown;
   declare composed: unknown;
@@ -549,6 +552,7 @@ export class Blob extends Record {
   }
 }
 
+include(Blob, Analyzable);
 include(Blob, Identifiable);
 include(Blob, Servable);
 

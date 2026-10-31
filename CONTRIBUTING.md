@@ -66,7 +66,7 @@ of the value under test before choosing the built-in.
 
 A Rails test that asserts on a Minitest failure message or `diff` output loses
 that assertion permanently. Record it with a row in
-`scripts/test-compare/assertion-receipts.ts`.
+`scripts/test-compare/assertion-receipts/<package>.ts`.
 
 ## Rails-private helpers and `@internal` JSDoc
 

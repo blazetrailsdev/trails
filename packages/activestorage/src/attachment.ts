@@ -18,7 +18,7 @@ interface AttachmentReflection {
 }
 
 interface AttachedBlob extends Blob {
-  isAnalyzed(): boolean;
+  isAnalyzed(): unknown;
   analyzeLater(): Promise<void>;
   variant(transformations: unknown): unknown;
   preview(transformations: unknown): unknown;

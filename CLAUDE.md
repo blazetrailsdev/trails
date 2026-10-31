@@ -1395,7 +1395,7 @@ interpolation, to buy eight ActiveModel tests. This is the same trade
 A Rails test whose assertions turn on String identity, frozenness or in-place
 mutation is permanently unportable for that arm. Port the assertions that do
 not depend on it; where those leave a running test short of Rails' count, drop
-each missing one with a row in `scripts/test-compare/assertion-receipts.ts`
+each missing one with a row in `scripts/test-compare/assertion-receipts/<package>.ts`
 citing this section. A test with nothing left is parked as `it.skip` under a
 `PERMANENT-SKIP:` line citing this section, its body kept as the Rails body.
 
