@@ -7,18 +7,15 @@ const later = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 0));
 
 describe("FileList delegation", () => {
   it("delegates every Array instance method name", () => {
-    const names = `all? any? assoc at bsearch bsearch_index chain chunk chunk_while clear collect
-      collect! collect_concat combination compact compact! concat count cycle deconstruct delete
-      delete_at delete_if detect difference dig drop drop_while each each_cons each_entry
-      each_index each_slice each_with_index each_with_object empty? entries fetch fill filter
-      filter! filter_map find find_all find_index first flat_map flatten flatten! grep grep_v
-      group_by include? index inject insert intersect? intersection join keep_if last lazy length
-      map map! max max_by member? min min_by minmax minmax_by none? one? pack permutation pop
-      prepend product push rassoc reduce reject reject! repeated_combination repeated_permutation
-      replace reverse reverse! reverse_each rindex rotate rotate! sample select select! shift
-      shuffle shuffle! size slice slice! slice_after slice_before slice_when sort sort! sort_by
-      sort_by! sum take take_while tally to_h to_set transpose union uniq uniq! unshift values_at
-      zip`.split(/\s+/);
+    const names =
+      `all? any? assoc at bsearch bsearch_index chain chunk chunk_while clear collect collect! collect_concat combination compact compact! concat count cycle deconstruct delete
+delete_at delete_if detect difference dig drop drop_while each each_cons each_entry each_index each_slice each_with_index each_with_object empty? entries fetch fill
+filter filter! filter_map find find_all find_index first flat_map flatten flatten! grep grep_v group_by include? index inject insert intersect? intersection join keep_if
+last lazy length map map! max max_by member? min min_by minmax minmax_by none? one? pack permutation pop prepend product push rassoc reduce reject reject!
+repeated_combination repeated_permutation replace reverse reverse! reverse_each rindex rotate rotate! sample select select! shift shuffle shuffle! size slice slice!
+slice_after slice_before slice_when sort sort! sort_by sort_by! sum take take_while tally to_h to_set transpose union uniq uniq! unshift values_at zip`.split(
+        /\s+/,
+      );
     for (const name of names) {
       const base = name.replace(/[?!]$/, "").replace(/_(\w)/g, (_m, c) => c.toUpperCase());
       const cap = base[0].toUpperCase() + base.slice(1);

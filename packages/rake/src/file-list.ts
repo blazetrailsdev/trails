@@ -76,6 +76,14 @@ function _replace(items: Items, result: Items): Items {
 
 const _isProc = rbObjIsProc as (arg: unknown) => arg is ElementBlock;
 
+const _bang = (items: Items, kept: Items): Items | null =>
+  kept.length === items.length ? null : _replace(items, kept);
+
+async function _extremeBy(by: unknown, items: Items, args: unknown[]): Promise<unknown> {
+  const block = await _replay(items, args.pop() as ElementBlock);
+  return (by as (...a: unknown[]) => unknown)(items, ...args, block);
+}
+
 const _compare = (a: unknown, b: unknown): number => rbCmpint(cmp(a, b), a, b);
 
 function _comparator(block?: unknown): (a: unknown, b: unknown) => number {
@@ -137,6 +145,27 @@ async function _split(items: Items, cut: (a: string, b: string) => unknown): Pro
 
 function _matcher(args: unknown[]): ElementBlock {
   return _isProc(args[0]) ? args[0] : (fn) => rbEqq(args[0], fn);
+}
+
+function _grep(items: Items, pattern: unknown, keep: boolean, block?: ElementBlock): unknown {
+  const matched = items.filter((fn) => rtest(rbEqq(pattern, fn)) === keep);
+  return block ? _yields(matched, block) : matched;
+}
+
+async function _while(items: Items, block: ElementBlock): Promise<number> {
+  let n = 0;
+  while (n < items.length && rtest(await block(items[n] as string))) n++;
+  return n;
+}
+
+async function _eachGroup(
+  items: Items,
+  groups: Iterable<unknown>,
+  block?: ElementBlock,
+): Promise<Items> {
+  if (!block) return [...groups];
+  await _yields([...groups], block);
+  return items;
 }
 
 async function _search(items: Items, block: ElementBlock): Promise<number | null> {
@@ -317,18 +346,10 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     for (const fn of items) await block(fn as string, memo);
     return memo;
   },
-  eachSlice: async (items, n: number, block?: ElementBlock) => {
-    const slices = eachSlice(items, n) as unknown as Iterable<unknown>;
-    if (!block) return [...slices];
-    await _yields([...slices], block);
-    return items;
-  },
-  eachCons: async (items, n: number, block?: ElementBlock) => {
-    const cons = eachCons(items, n) as unknown as Iterable<unknown>;
-    if (!block) return [...cons];
-    await _yields([...cons], block);
-    return items;
-  },
+  eachSlice: (items, n: number, block?: ElementBlock) =>
+    _eachGroup(items, eachSlice(items, n) as unknown as Iterable<unknown>, block),
+  eachCons: (items, n: number, block?: ElementBlock) =>
+    _eachGroup(items, eachCons(items, n) as unknown as Iterable<unknown>, block),
   cycle: async (items, ...args: unknown[]) => {
     const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : null;
     const n = (args[0] as number | null | undefined) ?? null;
@@ -337,14 +358,10 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     for (let i = 0; n === null || i < n; i++) await _yields(items, block);
     return null;
   },
-  rejectBang: async (items, block: ElementBlock) => {
-    const kept = await _filterBy(items, block, false);
-    return kept.length === items.length ? null : _replace(items, kept);
-  },
-  selectBang: async (items, block: ElementBlock) => {
-    const kept = await _filterBy(items, block, true);
-    return kept.length === items.length ? null : _replace(items, kept);
-  },
+  rejectBang: async (items, block: ElementBlock) =>
+    _bang(items, await _filterBy(items, block, false)),
+  selectBang: async (items, block: ElementBlock) =>
+    _bang(items, await _filterBy(items, block, true)),
   deleteIf: async (items, block: ElementBlock) =>
     _replace(items, await _filterBy(items, block, false)),
   keepIf: async (items, block: ElementBlock) =>
@@ -353,10 +370,8 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   sortBang: (items, block?: unknown) => items.sort(_comparator(block)),
   sortByBang: async (items, block: ElementBlock) =>
     _replace(items, sortBy(items, await _replay(items, block)) as Items),
-  uniqBang: async (items, block?: ElementBlock) => {
-    const kept = (await ARRAY_CALLS.uniq(items, block as never)) as Items;
-    return kept.length === items.length ? null : _replace(items, kept);
-  },
+  uniqBang: async (items, block?: ElementBlock) =>
+    _bang(items, (await ARRAY_CALLS.uniq(items, block as never)) as Items),
   compactBang: (items) => compactBang(items),
   flattenBang: (items, level?: number) => {
     if (!items.some(Array.isArray)) return null;
@@ -379,14 +394,8 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     block ? sortBy(items, await _replay(items, block)) : [...items],
   select: (items, block?: ElementBlock) => (block ? _filterBy(items, block, true) : [...items]),
   reject: (items, block?: ElementBlock) => (block ? _filterBy(items, block, false) : [...items]),
-  grep: (items, pattern: unknown, block?: ElementBlock) => {
-    const matched = items.filter((fn) => rbEqq(pattern, fn));
-    return block ? _yields(matched, block) : matched;
-  },
-  grepV: (items, pattern: unknown, block?: ElementBlock) => {
-    const matched = items.filter((fn) => !rbEqq(pattern, fn));
-    return block ? _yields(matched, block) : matched;
-  },
+  grep: (items, pattern: unknown, block?: ElementBlock) => _grep(items, pattern, true, block),
+  grepV: (items, pattern: unknown, block?: ElementBlock) => _grep(items, pattern, false, block),
   compact: (items) => items.filter((fn) => fn != null),
   flatten: (items, level?: number) =>
     level === undefined || level < 0 ? flatten(items) : items.flat(level),
@@ -453,14 +462,8 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     await _extreme(items, block ? [block] : [], false),
     await _extreme(items, block ? [block] : [], true),
   ],
-  minBy: async (items, ...args: unknown[]) => {
-    const block = args.pop() as ElementBlock;
-    return (minBy as (...a: unknown[]) => unknown)(items, ...args, await _replay(items, block));
-  },
-  maxBy: async (items, ...args: unknown[]) => {
-    const block = args.pop() as ElementBlock;
-    return (maxBy as (...a: unknown[]) => unknown)(items, ...args, await _replay(items, block));
-  },
+  minBy: (items, ...args: unknown[]) => _extremeBy(minBy, items, args),
+  maxBy: (items, ...args: unknown[]) => _extremeBy(maxBy, items, args),
   minmaxBy: async (items, block: ElementBlock) => [
     await ARRAY_CALLS.minBy(items, block as never),
     await ARRAY_CALLS.maxBy(items, block as never),
@@ -499,16 +502,8 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     if (n < 0) throw new ArgumentError("attempt to drop negative size");
     return items.slice(n);
   },
-  takeWhile: async (items, block: ElementBlock) => {
-    let n = 0;
-    while (n < items.length && rtest(await block(items[n] as string))) n++;
-    return items.slice(0, n);
-  },
-  dropWhile: async (items, block: ElementBlock) => {
-    let n = 0;
-    while (n < items.length && rtest(await block(items[n] as string))) n++;
-    return items.slice(n);
-  },
+  takeWhile: async (items, block: ElementBlock) => items.slice(0, await _while(items, block)),
+  dropWhile: async (items, block: ElementBlock) => items.slice(await _while(items, block)),
   chunk: async (items, block: ElementBlock) => {
     const result: [unknown, Items][] = [];
     const yields = await _yields(items, block);
@@ -525,14 +520,8 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   },
   chunkWhile: (items, block: PairBlock) => _split(items, async (a, b) => !rtest(await block(a, b))),
   sliceWhen: (items, block: PairBlock) => _split(items, block),
-  sliceBefore: (items, ...args: unknown[]) => {
-    const test = _matcher(args);
-    return _split(items, (_a, b) => test(b));
-  },
-  sliceAfter: (items, ...args: unknown[]) => {
-    const test = _matcher(args);
-    return _split(items, (a) => test(a));
-  },
+  sliceBefore: (items, ...args: unknown[]) => _split(items, (_a, b) => _matcher(args)(b)),
+  sliceAfter: (items, ...args: unknown[]) => _split(items, (a) => _matcher(args)(a)),
   plus: (items, other: Items) => [...items, ...other],
   minus: (items, other: Items) => ARRAY_METHOD_TABLE.difference(items, other as never),
   and: (items, other: Items) => ARRAY_METHOD_TABLE.intersection(items, other as never),
@@ -840,41 +829,14 @@ export class FileList {
 
 include(FileList, Cloneable);
 
+type Names0 = "at" | "fetch" | "dig" | "slice" | "sliceBang" | "sample" | "transpose";
+type Names1 = "assoc" | "rassoc" | "product" | "permutation" | "pack" | "entries" | "toSet";
+type Names2 = "chain" | "lazy" | "cycle" | "deleteAt" | "reduce" | "detect" | "minBy";
+type Names3 = "maxBy" | "rindex" | "findIndex" | "sliceBefore" | "sliceAfter" | "difference";
+type Names4 = "union" | "intersection" | "isIntersect" | "rotate" | "shuffle" | "tally";
+type Names5 = "sum";
 type Delegated = Record<
-  | "at"
-  | "fetch"
-  | "dig"
-  | "slice"
-  | "sliceBang"
-  | "sample"
-  | "transpose"
-  | "assoc"
-  | "rassoc"
-  | "product"
-  | "permutation"
-  | "pack"
-  | "entries"
-  | "toSet"
-  | "chain"
-  | "lazy"
-  | "cycle"
-  | "deleteAt"
-  | "reduce"
-  | "detect"
-  | "minBy"
-  | "maxBy"
-  | "rindex"
-  | "findIndex"
-  | "sliceBefore"
-  | "sliceAfter"
-  | "difference"
-  | "union"
-  | "intersection"
-  | "isIntersect"
-  | "rotate"
-  | "shuffle"
-  | "tally"
-  | "sum",
+  Names0 | Names1 | Names2 | Names3 | Names4 | Names5,
   (...args: unknown[]) => Promise<unknown>
 >;
 
