@@ -79,7 +79,7 @@ export class UnstructuredField extends CommonField {
         if (!isAsciiOnly(word)) {
           return word;
         } else {
-          return word.match(/[^\n]{7}|[^\n]+$/g) ?? [];
+          return word.match(/[^\n]{7}|[^\n]+$/gm) ?? [];
         }
       });
     } else {

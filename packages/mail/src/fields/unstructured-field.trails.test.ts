@@ -11,4 +11,15 @@ describe("UnstructuredField#fold", () => {
     const field = new UnstructuredField("Subject", "é ab\rcd");
     expect(field.encoded()).toBe("Subject: =?UTF-8?Q?=C3=A9_ab=0Dcd?=\r\n");
   });
+
+  it.each([
+    ["é ab\ncd", "=C3=A9_abcd"],
+    ["é abcdefghij\nkl\nmn x", "=C3=A9_abcdefghijklmn_x"],
+    ["é ab\r\ncd", "=C3=A9_ab=0Dcd"],
+    ["é ab\n", "=C3=A9_ab"],
+  ])("keeps every line of an ascii word in %j", (value, encoded) => {
+    expect(new UnstructuredField("Subject", value).encoded()).toBe(
+      `Subject: =?UTF-8?Q?${encoded}?=\r\n`,
+    );
+  });
 });
