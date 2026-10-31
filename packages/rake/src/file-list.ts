@@ -33,6 +33,7 @@ import {
   rbFSend,
   rbInspect,
   rbObjIsProc,
+  rbProcCall,
   rbStrSub,
   rtest,
   sortBy,
@@ -154,7 +155,11 @@ async function _search(items: Items, block: ElementBlock): Promise<number | null
   return found;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/**
+ * @noRailsEquivalent PERMANENT
+ * @missingRailsCall lazy — CONVERGEABLE rake-file-list-enumerator-returns
+ * @missingRailsCall chain — CONVERGEABLE rake-file-list-enumerator-returns
+ */
 const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> = {
   size: (items) => items.length,
   length: (items) => items.length,
@@ -163,8 +168,11 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     if (args[0]! < 0) throw new ArgumentError("negative array size");
     return items.slice(0, args[0]);
   },
-  last: (items, ...args: [number?]) =>
-    args.length === 0 ? (items.at(-1) ?? null) : items.slice(Math.max(items.length - args[0]!, 0)),
+  last: (items, ...args: [number?]) => {
+    if (args.length === 0) return items.at(-1) ?? null;
+    if (args[0]! < 0) throw new ArgumentError("negative array size");
+    return items.slice(Math.max(items.length - args[0]!, 0));
+  },
   at: (items, i: number) => items.at(i) ?? null,
   get: (items, ...args: [unknown, unknown?]) => arySlice(items, ...args),
   set: (items, ...args: unknown[]) => {
@@ -190,9 +198,9 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   },
   dig: (items, i: number, ...rest: unknown[]) => {
     const v = items.at(i) ?? null;
-    return rest.length === 0 || v === null
-      ? v
-      : (v as { dig(...a: unknown[]): unknown }).dig(...rest);
+    if (rest.length === 0 || v === null) return v;
+    if (Array.isArray(v)) return ARRAY_CALLS.dig(v, ...(rest as never[]));
+    return (v as { dig(...a: unknown[]): unknown }).dig(...rest);
   },
   isEmpty: (items) => items.length === 0,
   isInclude: (items, obj: unknown) => items.some((fn) => rbEqual(fn, obj)),
@@ -200,13 +208,23 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   join: (items, sep: string | null = null) => aryJoin(items, sep),
   concat: (items, ...others: Items[]) => (items.push(...others.flat(1)), items),
   push: (items, ...objs: unknown[]) => (items.push(...objs), items),
-  pop: (items, n?: number) =>
-    n === undefined ? (items.pop() ?? null) : items.splice(Math.max(items.length - n, 0)),
-  shift: (items, n?: number) => (n === undefined ? (items.shift() ?? null) : items.splice(0, n)),
+  pop: (items, n?: number) => {
+    if (n === undefined) return items.pop() ?? null;
+    if (n < 0) throw new ArgumentError("negative array size");
+    return items.splice(Math.max(items.length - n, 0));
+  },
+  shift: (items, n?: number) => {
+    if (n === undefined) return items.shift() ?? null;
+    if (n < 0) throw new ArgumentError("negative array size");
+    return items.splice(0, n);
+  },
   unshift: (items, ...objs: unknown[]) => (items.unshift(...objs), items),
   insert: (items, i: number, ...objs: unknown[]) => {
     if (objs.length === 0) return items;
     const at = i < 0 ? i + items.length + 1 : i;
+    if (at < 0) {
+      throw new IndexError(`index ${i} too small for array; minimum: -${items.length + 1}`);
+    }
     while (items.length < at) items.push(null);
     items.splice(at, 0, ...objs);
     return items;
@@ -403,7 +421,7 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     return memo;
   },
   find: async (items, ...args: unknown[]) => {
-    const block = args.pop() as ElementBlock | undefined;
+    const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : null;
     if (!block) return [...items];
     for (const fn of items) if (rtest(await block(fn as string))) return fn;
     return _isProc(args[0]) ? (args[0] as () => unknown)() : null;
@@ -650,9 +668,9 @@ export class FileList {
       : result;
   }
 
-  async append(obj: unknown): Promise<this> {
+  async append(...objs: unknown[]): Promise<this> {
     await this.resolve();
-    this.items.push(fromPathname(obj));
+    this.items.push(...objs.map((obj) => fromPathname(obj)));
     return this;
   }
 
@@ -793,7 +811,7 @@ export class FileList {
     }) as never);
     if (hit) return true;
     return ARRAY_CALLS.isAny(this.excludeProcs, ((p: ElementBlock) =>
-      p(fn)) as never) as Promise<boolean>;
+      rbProcCall(p, fn)) as never) as Promise<boolean>;
   }
 
   static readonly DEFAULT_IGNORE_PATTERNS: RegExp[] = [
@@ -822,45 +840,64 @@ export class FileList {
 
 include(FileList, Cloneable);
 
+type Delegated = Record<
+  | "at"
+  | "fetch"
+  | "dig"
+  | "slice"
+  | "sliceBang"
+  | "sample"
+  | "transpose"
+  | "assoc"
+  | "rassoc"
+  | "product"
+  | "permutation"
+  | "pack"
+  | "entries"
+  | "toSet"
+  | "chain"
+  | "lazy"
+  | "cycle"
+  | "deleteAt"
+  | "reduce"
+  | "detect"
+  | "minBy"
+  | "maxBy"
+  | "rindex"
+  | "findIndex"
+  | "sliceBefore"
+  | "sliceAfter"
+  | "difference"
+  | "union"
+  | "intersection"
+  | "isIntersect"
+  | "rotate"
+  | "shuffle"
+  | "tally"
+  | "sum",
+  (...args: unknown[]) => Promise<unknown>
+>;
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface FileList {
-  at(i: number): Promise<string | null>;
-  fetch(i: number, fallback?: unknown): Promise<unknown>;
-  dig(i: number, ...rest: unknown[]): Promise<unknown>;
-  slice(start: unknown, length?: number): Promise<unknown>;
-  sliceBang(start: unknown, length?: number): Promise<unknown>;
+export interface FileList extends Delegated {
   insert(i: number, ...objs: unknown[]): Promise<this>;
   prepend(...objs: unknown[]): Promise<this>;
   replace(other: unknown): Promise<this>;
   fill(...args: unknown[]): Promise<this>;
   reverseBang(): Promise<this>;
-  rotate(cnt?: number): Promise<Items>;
   rotateBang(cnt?: number): Promise<this>;
-  shuffle(): Promise<Items>;
   shuffleBang(): Promise<this>;
-  sample(n?: number): Promise<unknown>;
-  transpose(): Promise<Items>;
-  assoc(key: unknown): Promise<unknown>;
-  rassoc(value: unknown): Promise<unknown>;
-  product(...others: unknown[]): Promise<Items>;
   combination(n: number, block?: (c: string[]) => unknown): Promise<Items>;
-  permutation(...args: unknown[]): Promise<Items>;
   repeatedCombination(n: number, block?: (c: string[]) => unknown): Promise<Items>;
   repeatedPermutation(n: number, block?: (c: string[]) => unknown): Promise<Items>;
-  pack(...args: unknown[]): Promise<unknown>;
   deconstruct(): Promise<this>;
-  entries(): Promise<Items>;
   toH(block?: ElementBlock): Promise<unknown>;
-  toSet(): Promise<Set<unknown>>;
-  chain(...others: unknown[]): Promise<Items>;
-  lazy(): Promise<Items>;
   eachIndex(block?: (i: number) => unknown): Promise<this | number[]>;
   eachEntry(block?: ElementBlock): Promise<unknown>;
   reverseEach(block?: ElementBlock): Promise<this | Items>;
   eachWithObject<M>(memo: M, block: (fn: string, memo: M) => unknown): Promise<M>;
   eachSlice(n: number, block?: (slice: string[]) => unknown): Promise<this | Items>;
   eachCons(n: number, block?: (cons: string[]) => unknown): Promise<this | Items>;
-  cycle(...args: unknown[]): Promise<Items | null>;
   selectBang(block: ElementBlock): Promise<this | null>;
   filterBang(block: ElementBlock): Promise<this | null>;
   deleteIf(block: ElementBlock): Promise<this>;
@@ -870,26 +907,17 @@ export interface FileList {
   sortByBang(block: ElementBlock): Promise<this>;
   compactBang(): Promise<this | null>;
   flattenBang(level?: number): Promise<this | null>;
-  deleteAt(i: number): Promise<unknown>;
   flatMap(block?: ElementBlock): Promise<Items>;
   collectConcat(block?: ElementBlock): Promise<Items>;
   filterMap(block?: ElementBlock): Promise<Items>;
   filter(block?: ElementBlock): Promise<this>;
   grepV(pattern: unknown, block?: ElementBlock): Promise<Items>;
   groupBy(block: ElementBlock): Promise<unknown>;
-  tally(): Promise<unknown>;
-  sum(...args: unknown[]): Promise<unknown>;
-  reduce(...args: unknown[]): Promise<unknown>;
-  detect(...args: unknown[]): Promise<unknown>;
   isAll(...args: unknown[]): Promise<boolean>;
   isNone(...args: unknown[]): Promise<boolean>;
   isOne(...args: unknown[]): Promise<boolean>;
   minmax(block?: (a: string, b: string) => number): Promise<[string | null, string | null]>;
-  minBy(...args: unknown[]): Promise<unknown>;
-  maxBy(...args: unknown[]): Promise<unknown>;
   minmaxBy(block: ElementBlock): Promise<[unknown, unknown]>;
-  rindex(...args: unknown[]): Promise<unknown>;
-  findIndex(...args: unknown[]): Promise<unknown>;
   bsearch(block: ElementBlock): Promise<unknown>;
   bsearchIndex(block: ElementBlock): Promise<number | null>;
   takeWhile(block: ElementBlock): Promise<Items>;
@@ -897,12 +925,6 @@ export interface FileList {
   chunk(block: ElementBlock): Promise<Items>;
   chunkWhile(block: (a: string, b: string) => unknown): Promise<Items>;
   sliceWhen(block: (a: string, b: string) => unknown): Promise<Items>;
-  sliceBefore(...args: unknown[]): Promise<Items>;
-  sliceAfter(...args: unknown[]): Promise<Items>;
-  difference(...others: unknown[]): Promise<Items>;
-  union(...others: unknown[]): Promise<Items>;
-  intersection(...others: unknown[]): Promise<Items>;
-  isIntersect(other: unknown): Promise<boolean>;
   size(): Promise<number>;
   length(): Promise<number>;
   first(n?: number): Promise<string | null | Items>;
@@ -960,13 +982,7 @@ export interface FileList {
 /** @noRailsEquivalent PERMANENT */
 const MUST_DEFINE_CALLS: typeof ARRAY_CALLS = {
   inspect: (items) => rbInspect(items),
-  compare: (items, other: Items) => {
-    if (!Array.isArray(other)) return null;
-    for (let i = 0; i < Math.min(items.length, other.length); i++) {
-      if (items[i] !== other[i]) return (items[i] as string) < (other[i] as string) ? -1 : 1;
-    }
-    return Math.sign(items.length - other.length);
-  },
+  compare: (items, other: unknown) => cmp(items, other),
 };
 
 for (const sym of FileList.DELEGATING_METHODS) {

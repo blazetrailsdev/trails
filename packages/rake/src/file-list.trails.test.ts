@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Range } from "@blazetrails/ruby-compat";
+import { ArgumentError, IndexError, Range, tally } from "@blazetrails/ruby-compat";
 import { FileList } from "./file-list.js";
 
 const fl = () => new FileList().import(["a.c", "b.h", "c.c", "d.h"]);
@@ -32,7 +32,7 @@ describe("FileList delegation", () => {
     expect(await fl().eachWithObject([] as string[], (f, m) => m.push(f))).toHaveLength(4);
     expect(await fl().flatMap((f) => [f, f])).toHaveLength(8);
     expect(await fl().sum("", async (f: string) => later(f[0]))).toEqual("abcd");
-    expect(await new FileList().import(["a", "a"]).tally()).toBeDefined();
+    expect(await new FileList().import(["a", "a"]).tally()).toEqual(tally(["a", "a"]));
     expect(await fl().takeWhile((f) => later(f < "c"))).toEqual(["a.c", "b.h"]);
     expect(await fl().pop(2)).toEqual(["c.c", "d.h"]);
     expect(await fl().shift(1)).toEqual(["a.c"]);
@@ -75,5 +75,60 @@ describe("FileList delegation", () => {
       [true, ["c"]],
     ]);
     expect(await f.bsearch((x) => x >= "b")).toEqual("b");
+  });
+  it("answers the hand-written element arms", async () => {
+    const f = fl();
+    await f.set(0, 2, "x");
+    expect(await f.toA()).toEqual(["x", "c.c", "d.h"]);
+    await f.set(new Range(0, 1), ["y"]);
+    expect(await f.toA()).toEqual(["y", "d.h"]);
+    await f.set(3, "z");
+    expect(await f.toA()).toEqual(["y", "d.h", null, "z"]);
+    expect(await fl().fetch(9, "none")).toEqual("none");
+    await expect(fl().fetch(9)).rejects.toBeInstanceOf(IndexError);
+    expect(await (await fl().insert(-2, "m")).toA()).toEqual(["a.c", "b.h", "c.c", "m", "d.h"]);
+    await expect(fl().insert(-7, "m")).rejects.toBeInstanceOf(IndexError);
+    expect(await (await fl().fill("q", 3)).toA()).toEqual(["a.c", "b.h", "c.c", "q"]);
+    expect(await fl().zip(["1"])).toHaveLength(4);
+    expect((await fl().zip(new FileList().import(["1", "2", "3", "4"])))[3]).toEqual(["d.h", "4"]);
+    expect(await fl().rotate()).toEqual(["b.h", "c.c", "d.h", "a.c"]);
+    expect(await fl().rindex("b.h")).toEqual(1);
+    expect(await fl().deleteAt(0)).toEqual("a.c");
+    expect(await fl().delete("zz")).toBeNull();
+    expect(
+      await new FileList()
+        .import([
+          ["a", "b"],
+          ["c", "d"],
+        ])
+        .transpose(),
+    ).toEqual([
+      ["a", "c"],
+      ["b", "d"],
+    ]);
+    expect(await new FileList().import([["a", 1]]).toH()).toEqual({ a: 1 });
+    expect(await new FileList().import([[["a"]]]).dig(0, 0, 0)).toEqual("a");
+    const seen: string[] = [];
+    await new FileList().import(["a"]).cycle(2, (x: string) => seen.push(x));
+    expect(seen).toEqual(["a", "a"]);
+  });
+
+  it("answers nil from an unchanged bang method", async () => {
+    expect(await fl().flattenBang()).toBeNull();
+    expect(await fl().uniqBang()).toBeNull();
+    expect(await fl().compactBang()).toBeNull();
+  });
+
+  it("raises on a negative count", async () => {
+    await expect(fl().last(-1)).rejects.toBeInstanceOf(ArgumentError);
+    await expect(fl().pop(-1)).rejects.toBeInstanceOf(ArgumentError);
+    await expect(fl().shift(-1)).rejects.toBeInstanceOf(ArgumentError);
+  });
+
+  it("compares through Array#<=>, finds without a block, and appends several", async () => {
+    expect(await new FileList().import([1, [2]]).compare([1, [3]])).toEqual(-1);
+    expect(await fl().compare("x")).toBeNull();
+    expect(await fl().find()).toHaveLength(4);
+    expect(await (await new FileList().append("a", "b")).toA()).toEqual(["a", "b"]);
   });
 });
