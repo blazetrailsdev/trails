@@ -190,6 +190,11 @@ describe("FileList enumerators", () => {
     ]) {
       expect(await iterator).toBeInstanceOf(Enumerator);
     }
+    const other = FileList.get("c.c");
+    const lazy = ((await fl.each()) as Enumerator).lazy();
+    expect(await lazy.take(1).toA()).toEqual(["a.c"]);
+    const chained = (await fl.chain(await other.each())) as Enumerator;
+    expect(await chained.toA()).toEqual(["a.c", "b.c", "c.c"]);
     const each = (await fl.map(undefined as never)) as unknown as Enumerator;
     expect(each.size()).toBe(2);
     expect(await each.each((fn: never) => `${fn}!`)).toEqual(["a.c!", "b.c!"]);

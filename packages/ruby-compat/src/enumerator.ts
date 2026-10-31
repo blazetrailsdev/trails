@@ -592,7 +592,7 @@ export class Lazy<T = unknown> extends Enumerator<T> {
           y.yield([v, idx]);
         }
       },
-    ) as never;
+    );
   }
 
   /**
