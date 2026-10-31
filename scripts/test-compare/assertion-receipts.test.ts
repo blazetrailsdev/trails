@@ -1,6 +1,8 @@
+import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   ASSERTION_RECEIPTS,
+  ASSERTION_RECEIPTS_BY_PACKAGE,
   applyAssertionReceipts,
   assertionReceiptKey,
   unconsumedAssertionReceipts,
@@ -58,6 +60,25 @@ describe("applyAssertionReceipts", () => {
   it("gives every committed receipt a reason", () => {
     for (const rows of Object.values(ASSERTION_RECEIPTS)) {
       for (const row of rows) expect(row.reason.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("merges one record per package file", () => {
+    const dir = new URL("./assertion-receipts/", import.meta.url);
+    const packages = readdirSync(dir).map((file) => file.replace(/\.ts$/, ""));
+    expect(Object.keys(ASSERTION_RECEIPTS_BY_PACKAGE).sort()).toEqual(packages.sort());
+  });
+
+  it("keeps each package file's keys sorted", () => {
+    for (const record of Object.values(ASSERTION_RECEIPTS_BY_PACKAGE)) {
+      const keys = Object.keys(record);
+      expect(keys).toEqual([...keys].sort());
+    }
+  });
+
+  it("files each key under its package prefix", () => {
+    for (const [pkg, record] of Object.entries(ASSERTION_RECEIPTS_BY_PACKAGE)) {
+      for (const key of Object.keys(record)) expect(key.slice(0, key.indexOf(":"))).toBe(pkg);
     }
   });
 });
