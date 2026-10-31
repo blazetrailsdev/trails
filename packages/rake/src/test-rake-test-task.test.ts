@@ -133,7 +133,8 @@ describe("TestRakeTestTask", () => {
       t.loader = "rake";
     });
 
-    expect(testTask.runCode()).toContain("rake-test-loader.js");
+    const loader = "rake-test-loader.js";
+    expect(testTask.runCode()).toContain(loader);
   });
 
   it("test files equals", async () => {

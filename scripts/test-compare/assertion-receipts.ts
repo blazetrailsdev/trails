@@ -31,6 +31,15 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "rake:test_rake_rake_test_loader.rb › TestRakeRakeTestLoader › load error raised implicitly": [
+    {
+      kind: "assert_equal",
+      value: "s:no such file to load -- superkalifragilisticoespialidoso",
+      as: null,
+      reason:
+        'test_rake_rake_test_loader.rb:52-56 runs that arm only on `RUBY_ENGINE == "jruby"`; Node has no JRuby to assert against.',
+    },
+  ],
   "rake:test_rake_file_list.rb › TestRakeFileList › string ext": [
     {
       kind: "assert_equal",

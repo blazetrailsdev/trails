@@ -1,4 +1,12 @@
-import { File, FileUtils, LoadError, SystemExit, rbArgv, rbFLoad } from "@blazetrails/ruby-compat";
+import {
+  File,
+  FileUtils,
+  LoadError,
+  SystemExit,
+  rbArgv,
+  rbFLoad,
+  rbFRequireFile,
+} from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { captureOutput, useApplicationTestCase } from "./test-helpers/application.js";
 
@@ -11,6 +19,7 @@ describe("TestRakeRakeTestLoader", () => {
   afterEach(() => {
     argvReplace(...saved);
     delete (globalThis as { LoadError?: unknown }).LoadError;
+    delete (globalThis as { rbFRequireFile?: unknown }).rbFRequireFile;
   });
 
   it("pattern", async () => {
@@ -32,22 +41,29 @@ describe("TestRakeRakeTestLoader", () => {
       await expect(load()).rejects.toThrow(SystemExit);
     });
 
-    expect(out).toBe("");
+    expect(out).toBeEmpty();
 
     const noSuchPath = File.join(app.tempdir, "no_such_test_file.rb");
 
-    expect(err).toBe(`\nFile does not exist: ${noSuchPath}\n\n\n`);
+    expect(err).toMatch(new RegExp(`^\\nFile does not exist: ${noSuchPath}\\n\\n`));
   });
 
   it("load error raised implicitly", async () => {
-    await File.writeAsync("error_test.js", "import 'superkalifragilisticoespialidoso';");
+    Object.assign(globalThis, { rbFRequireFile });
+    await File.writeAsync(
+      "error_test.js",
+      "await rbFRequireFile('superkalifragilisticoespialidoso');",
+    );
     const [out, err] = await captureOutput(async () => {
       argvReplace("error_test.js");
 
-      await expect(load()).rejects.toThrow(/superkalifragilisticoespialidoso/);
+      const exc = load();
+      await expect(exc).rejects.toThrow(LoadError);
+      const { message } = (await exc.catch((e: unknown) => e)) as LoadError;
+      expect(message).toBe("cannot load such file -- superkalifragilisticoespialidoso");
     });
-    expect(out).toBe("");
-    expect(err).toBe("");
+    expect(out).toBeEmpty();
+    expect(err).toBeEmpty();
   });
 
   it("load error raised explicitly", async () => {
@@ -56,11 +72,12 @@ describe("TestRakeRakeTestLoader", () => {
     const [out, err] = await captureOutput(async () => {
       argvReplace("error_test.js");
 
-      const exc = await load().catch((e: unknown) => e);
-      expect(exc).toBeInstanceOf(LoadError);
-      expect((exc as LoadError).message).toBe("explicitly raised");
+      const exc = load();
+      await expect(exc).rejects.toThrow(LoadError);
+      const { message } = (await exc.catch((e: unknown) => e)) as LoadError;
+      expect(message).toBe("explicitly raised");
     });
-    expect(out).toBe("");
-    expect(err).toBe("");
+    expect(out).toBeEmpty();
+    expect(err).toBeEmpty();
   });
 });
