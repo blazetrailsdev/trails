@@ -20,6 +20,7 @@ export class Many extends Attached {
     await this.detachMany().detach();
   }
 
+  /** @inventedArm if — PERMANENT */
   get attachments(): PromiseLike<Attachment[]> | Attachment[] {
     if (isPresent(this.change)) return (this.change as CreateMany).attachments;
     const attachments = rbFSend(this.record, `${this.name}Attachments`) as PromiseLike<

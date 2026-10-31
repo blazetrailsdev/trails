@@ -19,6 +19,7 @@ export class One extends Attached {
     await (await this.detachOne()).detach();
   }
 
+  /** @inventedArm if — PERMANENT */
   get attachment(): Attachment | null | Promise<Attachment | null> {
     if (isPresent(this.change)) return (this.change as CreateOne).attachment;
     const attachment = rbFSend(this.record, `${this.name}Attachment`) as

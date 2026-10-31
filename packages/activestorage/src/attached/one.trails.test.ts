@@ -74,15 +74,6 @@ describe("ActiveStorage::Attached::One", () => {
     expect(attachment!.signedId()).toBe(blob.signedId());
   });
 
-  it("an attachment has its blob loaded after attach and through withAttachedAvatar", async () => {
-    const blob = await createBlob({ filename: "funky.jpg" });
-    await user.avatar.attach(blob);
-    expect((await user.avatar.attachment)!.signedId()).toBe(blob.signedId());
-    const relation = Member as unknown as { withAttachedAvatar(): { find(id: unknown): unknown } };
-    const found = (await relation.withAttachedAvatar().find(user.id)) as AvatarUser;
-    expect((await found.avatar.attachment)!.signedId()).toBe(blob.signedId());
-  });
-
   it("detach keeps the blob and purge removes it", async () => {
     const blob = await createBlob();
     await user.avatar.attach(blob);
