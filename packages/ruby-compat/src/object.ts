@@ -776,7 +776,6 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
       return klass ? typeof entry.value === "function" : entry.value !== undefined;
     }
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
-    if (UNDEF_HALVES.has(setter as object)) return false;
     if (setter !== undefined && !isAbsentHalf(setter)) return true;
     if (
       writer !== undefined &&
@@ -873,7 +872,6 @@ function checkDefinition(mod: { prototype: object }, mid: string, inherit = true
     if (UNDEF_HALVES.has(me?.get as object)) return false;
     if (me && !isAbsentHalf(me.get)) return typeof me.value === "function" || me.get !== undefined;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
-    if (UNDEF_HALVES.has(setter as object)) return false;
     if (setter !== undefined && !isAbsentHalf(setter)) return true;
     if (
       writer !== undefined &&
@@ -1077,8 +1075,9 @@ export function defineAccessorHalf(
 /**
  * `Module#undef_method` (`rb_mod_undef_method`,
  * `vendor/ruby/v3.3.11/vm_method.c:1973`). An undefined name raises `NameError`.
- * `name` and `name=` are one JS descriptor, so undefining one half of an accessor
- * seats that half absent and keeps the other.
+ * `name` and `name=` are one JS descriptor, so `name=` is undefined by a `"name="`
+ * entry, which every lookup reads first, and `name` by a reader half that stops
+ * the search and keeps the writer.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -1088,31 +1087,25 @@ export function rbModUndefMethod<K extends { prototype: object }>(klass: K, ...n
     if (!checkDefinition(klass, name)) {
       throw new NameError(`undefined method '${name}' for class '${rbModName(klass)}'`, name);
     }
-    const writer = name.endsWith("=");
-    const id = writer ? name.slice(0, -1) : name;
-    let other: PropertyDescriptor["get"];
+    UNDEF_METHOD_TABLES.add(proto);
+    if (name.endsWith("=")) {
+      Object.defineProperty(proto, name, { value: undefined, writable: true, configurable: true });
+      continue;
+    }
+    let set: PropertyDescriptor["set"];
     for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
-      const desc = Object.getOwnPropertyDescriptor(o, id);
-      if (desc === undefined) continue;
-      const half = writer ? desc.get : desc.set;
-      if (UNDEF_HALVES.has(half as object)) break;
+      const half = Object.getOwnPropertyDescriptor(o, name)?.set;
       if (half !== undefined && !isAbsentHalf(half)) {
-        other = half as () => unknown;
+        set = half;
         break;
       }
     }
-    if (other !== undefined) {
-      const undef = absentHalf(id, writer);
-      UNDEF_HALVES.add(undef);
-      Object.defineProperty(proto, id, {
-        configurable: true,
-        enumerable: Object.getOwnPropertyDescriptor(proto, id)?.enumerable ?? false,
-        get: writer ? other : undef,
-        set: writer ? undef : other,
-      } as PropertyDescriptor);
+    if (set !== undefined) {
+      const get = absentHalf(name, false) as () => unknown;
+      UNDEF_HALVES.add(get);
+      Object.defineProperty(proto, name, { configurable: true, get, set });
     } else {
-      UNDEF_METHOD_TABLES.add(proto);
-      Object.defineProperty(proto, id, { value: undefined, writable: true, configurable: true });
+      Object.defineProperty(proto, name, { value: undefined, writable: true, configurable: true });
     }
   }
   rbClearMethodCache();
@@ -1362,7 +1355,6 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     }
     if (desc?.get && !isAbsentHalf(desc.get)) rbErrorArity(argc, 0, 0);
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
-    if (UNDEF_HALVES.has(setter as object)) break;
     if (setter && !isAbsentHalf(setter)) return setter.call(recv, args[0]);
     const set = writer === undefined ? undefined : Object.getOwnPropertyDescriptor(o, writer);
     if (typeof set?.value === "function") return (set.value as AnyFunction).apply(recv, args);
@@ -1463,7 +1455,6 @@ function _writerFor(recv: object, mid: string): AnyFunction | null {
         if (typeof desc?.value === "function") entry.write = desc.value as AnyFunction;
         if (desc) break;
         const setter = Object.getOwnPropertyDescriptor(o, entry.attr)?.set;
-        if (UNDEF_HALVES.has(setter as object)) break;
         if (setter && !isAbsentHalf(setter)) {
           entry.write = setter as AnyFunction;
           break;
