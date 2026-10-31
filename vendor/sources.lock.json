@@ -151,6 +151,10 @@
     "thor": {
       "ref": "v1.3.2",
       "sha": "33b9682da680cda9404f9961a62ec208832cbff3"
+    },
+    "zeitwerk": {
+      "ref": "v2.7.2",
+      "sha": "6aa28216c8dbea60bea097d7c7e6f4cc5210a080"
     }
   }
 }

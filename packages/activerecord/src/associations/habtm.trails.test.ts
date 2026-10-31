@@ -1,6 +1,8 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
+import { constantize } from "@blazetrails/activesupport";
+import { rbModName } from "@blazetrails/ruby-compat";
 import "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import "../support/canonical-model-index.js";
@@ -9,6 +11,12 @@ import { Project as CanonicalProject } from "../test-helpers/models/project.js";
 
 describe("has_and_belongs_to_many", () => {
   const { developers, projects } = fixtures(["developers", "projects", "developersProjects"]);
+
+  it("reaches a join model under its qualified name", () => {
+    const joinModel = (CanonicalDeveloper as unknown as Record<string, object>).HABTM_Projects;
+    expect(rbModName(joinModel)).toBe("Developer::HABTM_Projects");
+    expect(constantize("Developer::HABTM_Projects")).toBe(joinModel);
+  });
 
   it("loads associated records through a join table", async () => {
     const david = developers("david");

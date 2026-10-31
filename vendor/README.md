@@ -118,6 +118,14 @@ The Ruby half is ready — `extract-ruby-api.rb` reports 5 classes, 4 modules, 9
 public methods over this clone — so the blocker is only the missing TS
 workspace, which RFC 0137's `enroll-rack-test-in-compare-tooling` creates.
 
+## `vendor/zeitwerk/` — the Zeitwerk anchor
+
+Railties asks for `zeitwerk ~> 2.6`
+(`vendor/rails/v8.0.2/railties/railties.gemspec:46`), resolved to **2.7.2** by
+`vendor/rails/v8.0.2/Gemfile.lock:676`. RFC 0213 ports it as
+`@blazetrails/zeitwerk`. `compareApi` and `compareTests` are off until
+`zeitwerk-package-skeleton-and-inflector` creates that package.
+
 ## `vendor/bcrypt-ruby/` — the BCrypt anchor
 
 `has_secure_password` reaches the `bcrypt` gem —

@@ -1,9 +1,23 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 import { NameError } from "@blazetrails/ruby-compat/name-error";
 import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { StopIteration } from "@blazetrails/ruby-compat/stop-iteration";
 import { constantize, safeConstantize } from "./inflector.js";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+
+declare module "@blazetrails/ruby-compat" {
+  interface ConstantTable {
+    "Typed::Literal": typeof Date;
+  }
+}
+
+describe("constantize types a literal through ConstantTable", () => {
+  it("answers the table's class for a literal and unknown otherwise", () => {
+    expectTypeOf(constantize<"Typed::Literal">).returns.toEqualTypeOf<typeof Date>();
+    expectTypeOf(constantize("Date" as string)).toBeUnknown();
+    expect(constantize("Object")).toBe(Object);
+  });
+});
 
 describe("constantize resolves core exception classes", () => {
   it("answers ruby-compat's NotImplementedError", () => {
@@ -15,17 +29,19 @@ describe("constantize resolves core exception classes", () => {
 
 describe("constantize walks seated constants like Object.const_get", () => {
   const Bar = {};
-  const Foo = { Bar };
+  const Foo: Record<string, unknown> = {};
 
   afterEach(() => unregisterConstant("Foo", Foo));
 
   it("resolves a nested constant seated on a registered namespace", () => {
     registerConstant("Foo", Foo);
+    rbModConstSet(Foo, "Bar", Bar);
     expect(constantize("Foo::Bar")).toBe(Bar);
   });
 
   it("names only the path up to the unresolved segment", () => {
     registerConstant("Foo", Foo);
+    rbModConstSet(Foo, "Bar", Bar);
     let error: unknown;
     try {
       constantize("Foo::Bar::Baz::Qux");

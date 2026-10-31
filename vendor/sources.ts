@@ -481,6 +481,24 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "zeitwerk",
+    origin: {
+      type: "git",
+      url: "https://github.com/fxn/zeitwerk.git",
+      ref: "v2.7.2",
+    },
+    packages: [
+      {
+        name: "zeitwerk",
+        libPath: "lib/zeitwerk",
+        libEntryFile: "lib/zeitwerk.rb",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "date",
     origin: {
       type: "git",
