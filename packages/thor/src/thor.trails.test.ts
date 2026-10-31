@@ -378,7 +378,7 @@ describe("Thor", () => {
     it("prefers an exact match and raises on an ambiguous prefix", async () => {
       await expect(start(["animal", "cow"])).resolves.toBe("cow");
       await expect(start(["anim"])).rejects.toThrow(
-        new AmbiguousCommandError("Ambiguous command anim matches [animal, animal_prison]"),
+        new AmbiguousCommandError("Ambiguous command anim matches [animal, animal-prison]"),
       );
       expect(script.findCommandPossibilities("--")).toEqual([":help"]);
       expect(script.findCommandPossibilities("h")).toEqual(["help"]);
@@ -492,5 +492,34 @@ describe("Thor class paths", () => {
     expect((thor.CoreExt as Record<string, unknown>).HashWithIndifferentAccess).toBe(
       HashWithIndifferentAccess,
     );
+  });
+
+  it("treats Object.prototype member names as undefined commands", async () => {
+    class Empty extends Thor {}
+    const klass = Empty as unknown as ThorClass;
+    expect(klass.allCommands()["constructor"]).toBeUndefined();
+    expect(klass.map()["toString"]).toBeUndefined();
+    expect(klass.normalizeCommandName("toString")).toBe("to-string");
+    await expect(klass.dispatch(null, ["constructor"], null, {})).rejects.toThrow(
+      /Could not find command "constructor"/,
+    );
+  });
+
+  it("registers a command in kebab-case and accepts either spelling", async () => {
+    class Kebab extends Thor {
+      static {
+        (this as unknown as ThorClass).methodAdded("fooBar");
+      }
+      fooBar() {
+        return "ran";
+      }
+    }
+    const klass = Kebab as unknown as ThorClass;
+    klass.desc("foo-bar", "does it");
+    klass.methodAdded("fooBar");
+    expect(Object.keys(klass.commands())).toEqual(["foo-bar"]);
+    expect(await klass.dispatch(null, ["foo-bar"], null, {})).toBe("ran");
+    expect(await klass.dispatch(null, ["foo_bar"], null, {})).toBe("ran");
+    expect(await klass.dispatch(null, ["foo_b"], null, {})).toBe("ran");
   });
 });

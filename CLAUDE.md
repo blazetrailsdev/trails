@@ -1822,9 +1822,9 @@ Rules that apply across the table:
 - `active_storage/attachment.rb`'s `delegate_missing_to :blob` is
   `delegateMissingTo` over a prototype, so its trap is synchronous. An unloaded
   `blob` is a promise that answers nothing: a forwarded name raises
-  `NoMethodError` until `await attachment.blob`, so `One#attachment` awaits the
-  `blob` and `Many#attachments` reads through `includes("blob")`, where Rails'
-  delegation loads it in line. `Attachment` has no default scope. A nil `blob` raises
+  `NoMethodError` until `await attachment.blob`, where Rails' delegation loads
+  it in line. `signed_id` needs only `blob_id`, so it signs that without a
+  query. `Attachment` has no default scope. A nil `blob` raises
   `DelegationError`, as Rails does. `attached/one.rb`'s
   `delegate_missing_to :attachment, allow_nil: true` forwards only to a loaded
   attachment. `attached/many.rb`'s `delegate_missing_to :attachments` needs no such

@@ -834,8 +834,29 @@ export function writerSpelling(attr: string | undefined): string | undefined {
   return writer;
 }
 
-function camelized(name: string): string {
+/**
+ * The `snake_case` to `camelCase` spelling of a Ruby ID `rb_f_send`
+ * (`vendor/ruby/v3.3.11/vm_eval.c:1330`) would dispatch.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function camelized(name: string): string {
   return name.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase());
+}
+
+/**
+ * Thor's `name.tr("-", "_")` reversed (`rb_str_tr`,
+ * `vendor/ruby/v3.3.11/string.c:8226`) for a CLI name: RFC 0171 decision 6.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function kebabCase(name: string): string {
+  if (name.startsWith("_")) return name;
+  return name
+    .replace(/([a-z\d])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
+    .replace(/[-_]+/g, "-")
+    .toLowerCase();
 }
 
 function checkDefinition(mod: { prototype: object }, mid: string, inherit = true): boolean {

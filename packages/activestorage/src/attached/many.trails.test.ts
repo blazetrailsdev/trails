@@ -109,7 +109,7 @@ describe("ActiveStorage::Attached::Many", () => {
     expect(user.attachmentChanges).toEqual({});
   });
 
-  it("an attachment read through the reader has its blob loaded", async () => {
+  it("signedId on an attachment read through the reader queries no blob", async () => {
     await user.photos.attach(hash());
     const blob = (await user.photos.blobs)[0];
     const reloaded = (await Gallery.find(user.id)) as typeof user;

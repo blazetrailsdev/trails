@@ -20,6 +20,7 @@ import { msgpack } from "./assertion-receipts/msgpack.js";
 import { rack } from "./assertion-receipts/rack.js";
 import { rake } from "./assertion-receipts/rake.js";
 import { rubyCompat } from "./assertion-receipts/ruby-compat.js";
+import { trailties } from "./assertion-receipts/trailties.js";
 
 /** One Rails assertion the port cannot make. */
 export interface AssertionReceipt {
@@ -56,6 +57,7 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   rack,
   rake,
   "ruby-compat": rubyCompat,
+  trailties,
 };
 
 /**

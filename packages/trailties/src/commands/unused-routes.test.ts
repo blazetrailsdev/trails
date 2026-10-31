@@ -9,19 +9,19 @@ await lookupBang();
 describe("UnusedRoutesCommand", () => {
   it("is registered on the program", () => {
     const program = createProgram();
-    expect(program.commands.some((c) => c.name() === "unused_routes")).toBe(true);
+    expect(program.commands.some((c) => c.name() === "unused-routes")).toBe(true);
   });
 
   it("is hidden, mirroring hide_command!", () => {
     const program = createProgram();
-    const cmd = program.commands.find((c) => c.name() === "unused_routes");
+    const cmd = program.commands.find((c) => c.name() === "unused-routes");
     expect(cmd?.helpInformation).toBeDefined();
     expect(
       program
         .createHelp()
         .visibleCommands(program)
         .map((c) => c.name()),
-    ).not.toContain("unused_routes");
+    ).not.toContain("unused-routes");
   });
 
   it("has the class options UnusedRoutesCommand declares", () => {

@@ -1,4 +1,5 @@
 import {
+  kebabCase,
   extend,
   flatten,
   Hash,
@@ -137,7 +138,7 @@ async function _retrieveClassAndCommand(
   const self = this.constructor as unknown as InvocationClass;
   if (name == null) {
     return [self, null];
-  } else if (rtest(self.allCommands()[toS(name)])) {
+  } else if (rtest(self.allCommands()[typeof name === "string" ? kebabCase(name) : toS(name)])) {
     return [self, toS(name)];
   } else {
     const prepared = await self.prepareForInvocation(null, name);

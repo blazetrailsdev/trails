@@ -283,7 +283,7 @@ export async function apply(
       { Accept: "application/x-thor-template" },
       block((io: { read(): unknown }) => io.read()),
     )) as string;
-    url = `data:text/javascript,${encodeURIComponent(contents)}`;
+    url = `data:text/javascript,${encodeURIComponent(contents)}#${(applied += 1)}`;
   } else {
     url = `${getPath().pathToFileURL!(path).href}?${(applied += 1)}`;
   }

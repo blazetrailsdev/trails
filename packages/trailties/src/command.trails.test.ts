@@ -32,7 +32,7 @@ describe("Rails::Command.find_by_namespace", () => {
     const hidden = createProgram()
       .commands.filter((c) => (c as unknown as { _hidden: boolean })._hidden)
       .map((c) => c.name());
-    expect(hidden).toEqual(["unused_routes"]);
+    expect(hidden).toEqual(["unused-routes"]);
   }, 30_000);
 
   it("finds a command ported onto Base by its namespace", async () => {
@@ -48,7 +48,7 @@ describe("Rails::Command.find_by_namespace", () => {
     onTestFinished(() => (perform.mockRestore(), rake.mockRestore()));
 
     await invoke("unused_routes", ["-g", "x"]);
-    expect(perform).toHaveBeenCalledWith("unused_routes", ["-g", "x"], {});
+    expect(perform).toHaveBeenCalledWith("unused-routes", ["-g", "x"], {});
     expect(rake).not.toHaveBeenCalled();
 
     perform.mockClear();
@@ -59,5 +59,11 @@ describe("Rails::Command.find_by_namespace", () => {
 
   it("finds nothing for an unknown namespace", async () => {
     expect(await findByNamespace("nope", "cache")).toBeUndefined();
+  });
+
+  it("finds a command by either spelling and keeps an underscored rake name", async () => {
+    await expect(findByNamespace("unused_routes")).resolves.toBeDefined();
+    await expect(findByNamespace("unused-routes")).resolves.toBeDefined();
+    await expect(findByNamespace("active_storage", "install")).resolves.toBeUndefined();
   });
 });

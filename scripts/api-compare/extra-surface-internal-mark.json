@@ -23,6 +23,6 @@
   "rack-session": 60,
   "rack-test": 45,
   "rails-dom-testing": 25,
-  "ruby-compat": 809,
+  "ruby-compat": 808,
   "thor": 175
 }

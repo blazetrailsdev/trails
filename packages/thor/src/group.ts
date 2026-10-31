@@ -1,4 +1,5 @@
 import {
+  kebabCase,
   ArgumentError,
   fetch,
   flatten,
@@ -248,8 +249,9 @@ export class Group {
     throw exception;
   }
 
+  /** @inventedArm kebabCase — PERMANENT */
   static isCommandExists(this: GroupClass, commandName: string): boolean {
-    return Object.keys(this.commands()).includes(commandName);
+    return Object.keys(this.commands()).includes(kebabCase(commandName));
   }
 
   /** @internal */
@@ -275,7 +277,7 @@ export class Group {
     if (block !== undefined) block(instance);
 
     if (rtest(command)) {
-      return await instance.invokeCommand(this.allCommands()[command]);
+      return await instance.invokeCommand(this.allCommands()[kebabCase(command)]);
     } else {
       return await instance.invokeAll();
     }
@@ -298,9 +300,12 @@ export class Group {
     return Group;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm kebabCase — PERMANENT
+   */
   static createCommand(this: GroupClass, meth: string): boolean {
-    this.commands()[rbObjAsString(meth)] = new Command(meth, null, null, null, null);
+    this.commands()[kebabCase(rbObjAsString(meth))] = new Command(meth, null, null, null, null);
     return true;
   }
   /** @internal */

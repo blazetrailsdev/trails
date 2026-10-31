@@ -730,20 +730,12 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "Rake's thread history (tasks RFC 0211-rake-gem-port): `--job-stats=history` " +
-      "reports per-Thread events and Node has no worker threads to key them on, so " +
-      "`ThreadPool`'s `gather_history`, `history` and `stat`, `Promise`'s recorder " +
-      "and `Rake::ThreadHistoryDisplay` (thread_history_display.rb) are not ported, " +
-      "nor is cpu_counter.rb's `unless method_defined?(:count)` fallback, which " +
-      "`Etc.nprocessors` keeps from loading. PERMANENT.",
+      "Rake's `ThreadPool#__queue__` is a test-only reader, and cpu_counter.rb's " +
+      "`unless method_defined?(:count)` fallback is kept from loading by " +
+      "`Etc.nprocessors`. PERMANENT.",
     names: [
       "initialize",
-      "gather_history",
-      "history",
-      "stat",
       "__queue__",
-      "recorder",
-      "recorder=",
       "count_via_java_runtime",
       "count_via_win32",
       "count_via_cpuinfo",
@@ -752,13 +744,8 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "resolve_command",
       "look_for_command",
       "in_path_command",
-      "stats",
-      "items",
-      "threads",
-      "show",
-      "rename",
     ],
-    rubyFiles: ["thread_pool.rb", "promise.rb", "cpu_counter.rb", "thread_history_display.rb"],
+    rubyFiles: ["thread_pool.rb", "promise.rb", "cpu_counter.rb"],
     packages: ["rake"],
   },
   {

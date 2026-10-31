@@ -125,7 +125,7 @@ describe("ActiveStorage::Attached::One", () => {
     expect((user.avatar as unknown as { signedId(): string }).signedId()).toBe(blob.signedId());
   });
 
-  it("an attachment read through the reader has its blob loaded", async () => {
+  it("signedId on an attachment read through the reader queries no blob", async () => {
     const blob = await createBlob({ filename: "funky.jpg" });
     await user.avatar.attach(blob);
     const attachment = await ((await Member.find(user.id)) as AvatarUser).avatar.attachment;

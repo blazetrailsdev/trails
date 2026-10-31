@@ -292,4 +292,14 @@ describe("Thor::Group.invoke_from_option", () => {
     await instance.invokeAll();
     expect(shell.out[0]).toMatch(/^invoke resource_route /);
   });
+
+  it("answers isCommandExists for either spelling of a kebab-keyed command", () => {
+    class Kebab extends Group {
+      fooBar() {}
+    }
+    const klass = Kebab as unknown as GroupClass;
+    klass.methodAdded("fooBar");
+    expect(klass.isCommandExists("fooBar")).toBe(true);
+    expect(klass.isCommandExists("foo_bar")).toBe(true);
+  });
 });

@@ -1,3 +1,4 @@
+import { action } from "@blazetrails/thor/actions";
 import { Basic } from "@blazetrails/thor/shell/basic";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as fs from "node:fs";
@@ -7,6 +8,7 @@ import {
   currentMigrationNumber,
   migrationExists,
   migrationLookupAt,
+  createMigration,
   migrationTemplate,
   nextMigrationNumber,
   NotImplementedError,
@@ -53,9 +55,11 @@ describe("migration", () => {
       destinationRoot: tmpDir,
       relativeToOriginalDestinationRoot: (p: string) => p,
       constructor: { nextMigrationNumber: () => "20260101000000" },
+      action,
+      createMigration,
     };
-    const dest = await migrationTemplate(
-      host,
+    const dest = await migrationTemplate.call(
+      host as never,
       () => `class ${host.migrationClassName} {}`,
       "db/migrate/create_articles.rb",
     );

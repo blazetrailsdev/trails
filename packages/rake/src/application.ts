@@ -37,6 +37,7 @@ import { DefaultLoader } from "./default-loader.js";
 import { FileUtilsExt } from "./file-utils-ext.js";
 import { Rake } from "./rake-module.js";
 import { Scope } from "./scope.js";
+import { ThreadHistoryDisplay } from "./thread-history-display.js";
 import { ThreadPool } from "./thread-pool.js";
 import { TaskManager } from "./task-manager.js";
 import { TraceOutput } from "./trace-output.js";
@@ -163,12 +164,17 @@ export class Application {
   }
 
   async runWithThreads(block: () => Promise<void>): Promise<void> {
+    if (this.options.jobStats === "history") this.threadPool.gatherHistory();
+
     await block();
     if (this._threadPool !== undefined) await this.threadPool.join();
     if (this.options.jobStats) {
       const stats = this.threadPool.statistics();
       STDOUT.puts(`Maximum active threads: ${stats.maxActiveThreads} + main`);
       STDOUT.puts(`Total threads in play:  ${stats.totalThreadsInPlay} + main`);
+    }
+    if (this.options.jobStats === "history") {
+      new ThreadHistoryDisplay(this.threadPool.history()).show();
     }
   }
 

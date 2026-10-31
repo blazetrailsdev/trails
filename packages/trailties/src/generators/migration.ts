@@ -1,4 +1,4 @@
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError, toS } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import {
@@ -25,17 +25,21 @@ export function nextMigrationNumber(): never {
   throw new NotImplementedError("nextMigrationNumber must be implemented");
 }
 
-export async function createMigration(
-  host: CreateMigrationHost,
+export function createMigration(
+  this: CreateMigrationHost & { action(instance: CreateMigration): unknown },
   destination: string,
-  data: MigrationRenderer,
+  data: unknown,
   config: CreateMigrationConfig = {},
+  block: Exclude<MigrationRenderer, string> | null = null,
 ): Promise<string | undefined> {
-  const instance = new CreateMigration(host, destination, data, config);
-  return host.behavior === "revoke" ? instance.revokeBang() : instance.invokeBang();
+  return this.action(new CreateMigration(this, destination, block || toS(data), config)) as Promise<
+    string | undefined
+  >;
 }
 
 export interface MigrationTemplateHost extends CreateMigrationHost {
+  action(instance: CreateMigration): unknown;
+  createMigration: typeof createMigration;
   destinationRoot: string;
   constructor: { nextMigrationNumber(dirname: string): string };
   migrationNumber: string;
@@ -52,15 +56,15 @@ export function setMigrationAssigns(this: MigrationTemplateHost, destination: st
 
 /** @missingRailsCall find_in_source_paths — CONVERGEABLE migration-template-expands-the-source-template-path */
 export async function migrationTemplate(
-  host: MigrationTemplateHost,
+  this: MigrationTemplateHost,
   source: () => string | Promise<string>,
   destination: string,
   config: CreateMigrationConfig = {},
 ): Promise<string | undefined> {
-  setMigrationAssigns.call(host, destination);
-  const resolved = File.expandPath(destination, host.destinationRoot);
+  setMigrationAssigns.call(this, destination);
+  const resolved = File.expandPath(destination, this.destinationRoot);
   const [dir, base] = [File.dirname(resolved), File.basename(resolved)];
-  const numberedDestination = File.join(dir, [host.migrationNumber, base].join("_"));
-  const file = await createMigration(host, numberedDestination, source, config);
+  const numberedDestination = File.join(dir, [this.migrationNumber, base].join("_"));
+  const file = await this.createMigration(numberedDestination, null, config, source);
   return Generators.addGeneratedFile(file!);
 }

@@ -19,32 +19,38 @@ export function environment(): string {
   return presence(env.TRAILS_ENV) ?? presence(env.NODE_ENV) ?? "development";
 }
 
-/** @missingRailsArgs invoke_rake — PERMANENT */
+/**
+ * @missingRailsArgs invoke_rake — PERMANENT
+ * @inventedArm replaceAll — PERMANENT
+ */
 export async function invoke(fullNamespace: string, args: string[] = []): Promise<void> {
   const [namespace, commandName] = splitNamespace(fullNamespace);
   const command = await findByNamespace(namespace, commandName);
+  const name = commandName.replaceAll("_", "-");
 
   if (command && "perform" in command) {
-    if (Object.hasOwn((command as unknown as ThorClass).allCommands(), commandName)) {
-      await command.perform(commandName, args, {});
+    if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
+      await command.perform(name, args, {});
     } else {
       await invokeRake(fullNamespace, args);
     }
-  } else if (command && command.name() === commandName) {
-    await command.parent!.parseAsync([commandName, ...args], { from: "user" });
-  } else if (command && command.commands.some((c) => c.name() === commandName)) {
-    await command.parent!.parseAsync([command.name(), commandName, ...args], { from: "user" });
+  } else if (command && command.name() === name) {
+    await command.parent!.parseAsync([name, ...args], { from: "user" });
+  } else if (command && command.commands.some((c) => c.name() === name)) {
+    await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
   } else {
     await invokeRake(fullNamespace, args);
   }
 }
 
+/** @inventedArm replaceAll — PERMANENT */
 export async function findByNamespace(
   namespace: string,
   commandName?: string,
 ): Promise<Program | typeof Base | undefined> {
+  namespace = namespace.replaceAll("_", "-");
   const lookups = [namespace];
-  if (commandName) lookups.push(`${namespace}:${commandName}`);
+  if (commandName) lookups.push(`${namespace}:${commandName.replaceAll("_", "-")}`);
   lookups.push(...lookups.map((lookup) => `rails:${lookup}`));
 
   await lookup(lookups);
