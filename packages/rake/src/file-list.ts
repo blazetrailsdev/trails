@@ -99,10 +99,20 @@ function _comparator(block?: unknown): (a: unknown, b: unknown) => number {
 }
 
 function _enum(items: Items, meth: string, args: unknown[] = [], size?: () => unknown): Enumerator {
-  const receiver = {
-    [meth]: (...a: unknown[]) => (ARRAY_CALLS[meth] as (...b: unknown[]) => unknown)(items, ...a),
-  };
-  return new Enumerator(receiver, meth, args, size ?? null);
+  const each = (...a: unknown[]) =>
+    (ARRAY_CALLS[meth] as (...b: unknown[]) => unknown)(items, ...a);
+  return new Enumerator({ each }, "each", args, size ?? null);
+}
+
+function _chooseSize(n: number, k: number, ordered: boolean, repeat: boolean): number {
+  if (k < 0) return 0;
+  if (repeat && !ordered)
+    return n === 0 ? (k === 0 ? 1 : 0) : _chooseSize(n + k - 1, k, false, false);
+  if (repeat) return n ** k;
+  if (k > n) return 0;
+  let size = 1;
+  for (let i = 0; i < k; i++) size = ordered ? size * (n - i) : (size * (n - i)) / (i + 1);
+  return size;
 }
 
 /** `rb_range_beg_len` (`vendor/ruby/v3.3.11/range.c:1744`) for `Array#[]=` and `#slice!`. */
@@ -314,22 +324,22 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   },
   combination: (items, n: number, block?: ElementBlock) =>
     !block
-      ? _enum(items, "combination", [n], () => _choose(items, n, false, false).length)
+      ? _enum(items, "combination", [n], () => _chooseSize(items.length, n, false, false))
       : _combinatoric(_choose(items, n, false, false), items, block),
   permutation: (items, ...args: unknown[]) => {
     const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : undefined;
     const n = (args[0] as number | undefined) ?? items.length;
     if (!block)
-      return _enum(items, "permutation", args, () => _choose(items, n, true, false).length);
+      return _enum(items, "permutation", args, () => _chooseSize(items.length, n, true, false));
     return _combinatoric(_choose(items, n, true, false), items, block);
   },
   repeatedCombination: (items, n: number, block?: ElementBlock) =>
     !block
-      ? _enum(items, "repeatedCombination", [n], () => _choose(items, n, false, true).length)
+      ? _enum(items, "repeatedCombination", [n], () => _chooseSize(items.length, n, false, true))
       : _combinatoric(_choose(items, n, false, true), items, block),
   repeatedPermutation: (items, n: number, block?: ElementBlock) =>
     !block
-      ? _enum(items, "repeatedPermutation", [n], () => _choose(items, n, true, true).length)
+      ? _enum(items, "repeatedPermutation", [n], () => _chooseSize(items.length, n, true, true))
       : _combinatoric(_choose(items, n, true, true), items, block),
   pack: (items, ...args: unknown[]) => (pack as (...a: unknown[]) => unknown)(items, ...args),
   deconstruct: (items) => items,
@@ -567,7 +577,8 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     block ? items.slice(0, await _while(items, block)) : _enum(items, "takeWhile"),
   dropWhile: async (items, block?: ElementBlock) =>
     block ? items.slice(await _while(items, block)) : _enum(items, "dropWhile"),
-  chunk: async (items, block: ElementBlock) => {
+  chunk: async (items, block?: ElementBlock) => {
+    if (!block) return _enum(items, "chunk");
     const result: [unknown, Items][] = [];
     const yields = await _yields(items, block);
     for (const [i, fn] of items.entries()) {

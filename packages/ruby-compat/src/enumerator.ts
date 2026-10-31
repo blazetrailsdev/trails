@@ -3,6 +3,7 @@ import { rbBlockGivenP } from "./hash.js";
 import { rbFSend, rbInspect, rbObjRespondTo, rtest } from "./object.js";
 import { ArgumentError } from "./argument-error.js";
 import { rbEql, rbEqq } from "./rb-equal.js";
+import { rbHash } from "./rb-hash.js";
 import type { Enumerated } from "./enumerable.js";
 import { StopIteration } from "./stop-iteration.js";
 import { FloatDomainError } from "./float-domain-error.js";
@@ -278,10 +279,10 @@ export function toEnum<T = unknown>(
 }
 
 type _LazyYielder = { yield(value: unknown): unknown };
-type _LazyProc = (yielder: _LazyYielder, value: never, memos: Record<string, unknown>) => unknown;
+const _isThenable = (value: unknown): value is PromiseLike<unknown> =>
+  value != null && typeof (value as PromiseLike<unknown>).then === "function";
 
-/** `LAZY_MEMO_BREAK` (`vendor/ruby/v3.3.11/enumerator.c:125`). */
-const _LAZY_BREAK = {};
+type _LazyProc = (yielder: _LazyYielder, value: never, memos: Record<string, unknown>) => unknown;
 
 /**
  * `Enumerator::Lazy` (`vendor/ruby/v3.3.11/enumerator.c:1804` `lazy_initialize`).
@@ -298,7 +299,7 @@ export class Lazy<T = unknown> extends Enumerator<T> {
   private _block: _LazyProc;
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(obj: object, block?: _LazyProc, size: (() => unknown) | null = null) {
+  constructor(obj: object, size: (() => unknown) | null = null, block?: _LazyProc) {
     if (!block) throw new ArgumentError("tried to call lazy new without a block");
     super(obj, "each", [], size);
     this._source = obj;
@@ -314,13 +315,18 @@ export class Lazy<T = unknown> extends Enumerator<T> {
   override each(block?: (...args: never[]) => unknown): unknown {
     if (!block) return this;
     const yielder = new Yielder<unknown>(block as (value: unknown) => unknown);
-    const memos = {};
+    const memos: Record<string, unknown> = { break: {} };
+    const rescue = (error: unknown): this => {
+      if (error !== memos.break) throw error;
+      return this;
+    };
     try {
-      rbFSend(this._source, "each", (...values: unknown[]) =>
+      const result = new Enumerator(this._source).each((...values: never[]) =>
         this._block(yielder, (values.length <= 1 ? values[0] : values) as never, memos),
       );
+      if (_isThenable(result)) return Promise.resolve(result).then(() => this, rescue);
     } catch (error) {
-      if (error !== _LAZY_BREAK) throw error;
+      return rescue(error);
     }
     return this;
   }
@@ -334,8 +340,8 @@ export class Lazy<T = unknown> extends Enumerator<T> {
     if (!block) throw new ArgumentError("tried to call lazy map without a block");
     return new Lazy<U>(
       this,
-      (y, v) => y.yield(block(v)),
       () => this.size(),
+      (y, v) => y.yield(block(v)),
     );
   }
 
@@ -346,12 +352,12 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    */
   flatMap<U = unknown>(block: (value: T) => unknown): Lazy<U> {
     if (!block) throw new ArgumentError("tried to call lazy flat_map without a block");
-    return new Lazy<U>(this, (y, v) => {
+    return new Lazy<U>(this, null, (y, v) => {
       const value = block(v);
       if (Array.isArray(value)) {
         for (const x of value) y.yield(x);
       } else if (rbObjRespondTo(value, "force") && rbObjRespondTo(value, "each")) {
-        rbFSend(value, "each", (x: unknown) => y.yield(x));
+        (value as Enumerator).each((x: never) => y.yield(x));
       } else {
         y.yield(value);
       }
@@ -365,7 +371,7 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    */
   select(block: (value: T) => unknown): Lazy<T> {
     if (!block) throw new ArgumentError("tried to call lazy select without a block");
-    return new Lazy<T>(this, (y, v) => {
+    return new Lazy<T>(this, null, (y, v) => {
       if (rtest(block(v))) y.yield(v);
     });
   }
@@ -377,7 +383,7 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    */
   filterMap<U = unknown>(block: (value: T) => unknown): Lazy<U> {
     if (!block) throw new ArgumentError("tried to call lazy filter_map without a block");
-    return new Lazy<U>(this, (y, v) => {
+    return new Lazy<U>(this, null, (y, v) => {
       const value = block(v);
       if (rtest(value)) y.yield(value);
     });
@@ -390,7 +396,7 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    */
   reject(block: (value: T) => unknown): Lazy<T> {
     if (!block) throw new ArgumentError("tried to call lazy reject without a block");
-    return new Lazy<T>(this, (y, v) => {
+    return new Lazy<T>(this, null, (y, v) => {
       if (!rtest(block(v))) y.yield(v);
     });
   }
@@ -401,7 +407,7 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    * @noRailsEquivalent PERMANENT
    */
   grep(pattern: unknown, block?: (value: T) => unknown): Lazy {
-    return new Lazy(this, (y, v) => {
+    return new Lazy(this, null, (y, v) => {
       if (rtest(rbEqq(pattern, v))) y.yield(block ? block(v) : v);
     });
   }
@@ -412,7 +418,7 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    * @noRailsEquivalent PERMANENT
    */
   grepV(pattern: unknown, block?: (value: T) => unknown): Lazy {
-    return new Lazy(this, (y, v) => {
+    return new Lazy(this, null, (y, v) => {
       if (!rtest(rbEqq(pattern, v))) y.yield(block ? block(v) : v);
     });
   }
@@ -423,7 +429,13 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    *
    * @noRailsEquivalent PERMANENT
    */
-  zip(...args: unknown[]): Lazy<unknown[]> {
+  zip(...args: [...unknown[], (value: unknown[]) => unknown]): null;
+  /** @noRailsEquivalent PERMANENT */
+  zip(...args: unknown[]): Lazy<unknown[]>;
+  /** @noRailsEquivalent PERMANENT */
+  zip(...args: unknown[]): Lazy<unknown[]> | null {
+    const block =
+      typeof args.at(-1) === "function" ? (args.pop() as (value: unknown[]) => unknown) : null;
     const ary = args.map((arg) => {
       if (Array.isArray(arg)) return arg as unknown[];
       if (!rbObjRespondTo(arg, "each")) {
@@ -432,15 +444,18 @@ export class Lazy<T = unknown> extends Enumerator<T> {
       }
       return new Enumerator<unknown>(arg as object).toA();
     });
-    return new Lazy<unknown[]>(
+    const zipped = new Lazy<unknown[]>(
       this,
+      () => this.size(),
       (y, v, memos) => {
         const i = (memos.index as number | undefined) ?? 0;
         memos.index = i + 1;
         y.yield([v, ...ary.map((a) => a[i] ?? null)]);
       },
-      () => this.size(),
     );
+    if (!block) return zipped;
+    zipped.each(block);
+    return null;
   }
 
   /**
@@ -454,17 +469,13 @@ export class Lazy<T = unknown> extends Enumerator<T> {
       const receiver = this.size();
       return receiver == null ? null : Math.min(n, receiver as number);
     };
-    if (n === 0) return new Lazy<T>([], (y, v) => y.yield(v), size);
-    return new Lazy<T>(
-      this,
-      (y, v, memos) => {
-        const remain = ((memos.remain as number | undefined) ?? n) - 1;
-        memos.remain = remain;
-        y.yield(v);
-        if (remain === 0) throw _LAZY_BREAK;
-      },
-      size,
-    );
+    if (n === 0) return new Lazy<T>([], size, (y, v) => y.yield(v));
+    return new Lazy<T>(this, size, (y, v, memos) => {
+      const remain = ((memos.remain as number | undefined) ?? n) - 1;
+      memos.remain = remain;
+      y.yield(v);
+      if (remain === 0) throw memos.break;
+    });
   }
 
   /**
@@ -474,8 +485,8 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    */
   takeWhile(block: (value: T) => unknown): Lazy<T> {
     if (!block) throw new ArgumentError("tried to call lazy take_while without a block");
-    return new Lazy<T>(this, (y, v) => {
-      if (!rtest(block(v))) throw _LAZY_BREAK;
+    return new Lazy<T>(this, null, (y, v, memos) => {
+      if (!rtest(block(v))) throw memos.break;
       y.yield(v);
     });
   }
@@ -489,14 +500,14 @@ export class Lazy<T = unknown> extends Enumerator<T> {
     if (n < 0) throw new ArgumentError("attempt to drop negative size");
     return new Lazy<T>(
       this,
+      () => {
+        const receiver = this.size();
+        return receiver == null ? null : Math.max((receiver as number) - n, 0);
+      },
       (y, v, memos) => {
         const remain = (memos.remain as number | undefined) ?? n;
         if (remain > 0) memos.remain = remain - 1;
         else y.yield(v);
-      },
-      () => {
-        const receiver = this.size();
-        return receiver == null ? null : Math.max((receiver as number) - n, 0);
       },
     );
   }
@@ -508,7 +519,7 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    */
   dropWhile(block: (value: T) => unknown): Lazy<T> {
     if (!block) throw new ArgumentError("tried to call lazy drop_while without a block");
-    return new Lazy<T>(this, (y, v, memos) => {
+    return new Lazy<T>(this, null, (y, v, memos) => {
       if (!memos.dropped) {
         if (rtest(block(v))) return;
         memos.dropped = true;
@@ -523,11 +534,14 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    * @noRailsEquivalent PERMANENT
    */
   uniq(block?: (value: T) => unknown): Lazy<T> {
-    return new Lazy<T>(this, (y, v, memos) => {
-      const seen = (memos.seen ??= []) as unknown[];
+    return new Lazy<T>(this, null, (y, v, memos) => {
+      const seen = (memos.seen ??= new Map()) as Map<unknown, unknown[]>;
       const key = block ? block(v) : v;
-      if (seen.some((other) => rbEql(other, key))) return;
-      seen.push(key);
+      const hash = rbHash(key);
+      const bucket = seen.get(hash);
+      if (bucket?.some((other) => rbEql(other, key))) return;
+      if (bucket) bucket.push(key);
+      else seen.set(hash, [key]);
       y.yield(v);
     });
   }
@@ -538,7 +552,7 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    * @noRailsEquivalent PERMANENT
    */
   compact(): Lazy<NonNullable<T>> {
-    return new Lazy<NonNullable<T>>(this, (y, v) => {
+    return new Lazy<NonNullable<T>>(this, null, (y, v) => {
       if (v != null) y.yield(v);
     });
   }
@@ -548,21 +562,36 @@ export class Lazy<T = unknown> extends Enumerator<T> {
    *
    * @noRailsEquivalent PERMANENT
    */
-  override withIndex(offset?: unknown, block?: unknown): never {
-    const memo = (offset as number | null | undefined) ?? 0;
+  override withIndex(offset?: null): Lazy<[T, number]>;
+  /** @noRailsEquivalent PERMANENT */
+  override withIndex(offset: number): Lazy<[T, number | bigint]>;
+  /** @noRailsEquivalent PERMANENT */
+  override withIndex(offset: bigint): Lazy<[T, bigint]>;
+  /** @noRailsEquivalent PERMANENT */
+  override withIndex(offset: null, block: (value: T, idx: number) => unknown): Lazy<T>;
+  /** @noRailsEquivalent PERMANENT */
+  override withIndex(offset: number, block: (value: T, idx: number | bigint) => unknown): Lazy<T>;
+  /** @noRailsEquivalent PERMANENT */
+  override withIndex(offset: bigint, block: (value: T, idx: bigint) => unknown): Lazy<T>;
+  /** @noRailsEquivalent PERMANENT */
+  override withIndex(
+    offset: number | bigint | null = null,
+    block?: (value: T, idx: never) => unknown,
+  ): unknown {
+    const memo = Number(offset ?? 0);
     return new Lazy(
       this,
+      () => this.size(),
       (y, v, memos) => {
         const idx = (memos.idx as number | undefined) ?? memo;
         memos.idx = idx + 1;
         if (block) {
-          (block as (value: unknown, idx: number) => unknown)(v, idx);
+          block(v, idx as never);
           y.yield(v);
         } else {
           y.yield([v, idx]);
         }
       },
-      () => this.size(),
     ) as never;
   }
 
@@ -617,7 +646,7 @@ export function enumerableLazy<T = unknown>(
   obj: object,
   size: (() => unknown) | null = null,
 ): Lazy<T> {
-  return new Lazy<T>(obj, (y, v) => y.yield(v), size);
+  return new Lazy<T>(obj, size, (y, v) => y.yield(v));
 }
 
 /**
@@ -642,8 +671,15 @@ export class Chain<T = unknown> extends Enumerator<T> {
    */
   override each(block?: (...args: never[]) => unknown): unknown {
     if (!block) return this;
-    for (const e of this._enums) rbFSend(e, "each", block);
-    return this;
+    let i = 0;
+    const step = (): unknown => {
+      while (i < this._enums.length) {
+        const result = new Enumerator(this._enums[i++]).each(block);
+        if (_isThenable(result)) return Promise.resolve(result).then(step);
+      }
+      return this;
+    };
+    return step();
   }
 
   /**
@@ -657,7 +693,7 @@ export class Chain<T = unknown> extends Enumerator<T> {
       const size = Array.isArray(e)
         ? e.length
         : rbObjRespondTo(e, "size")
-          ? rbFSend(e, "size")
+          ? (e as Enumerator).size()
           : null;
       if (size == null || size === Infinity) return size ?? null;
       if (typeof size !== "number" || !Number.isInteger(size)) return null;

@@ -193,14 +193,46 @@ describe("Enumerator::Lazy", () => {
       [1, "a"],
       [2, null],
     ]);
-    expect((nums.withIndex(1) as unknown as Lazy).first(1)).toEqual([[1, 1]]);
+    expect(nums.withIndex(1).first(1)).toEqual([[1, 1]]);
     expect(nums.take(0).toA()).toEqual([]);
     expect(nums.lazy()).toBe(nums);
     expect(nums.eager()).not.toBeInstanceOf(Lazy);
   });
 
+  it("scopes a break to the lazy that raised it", () => {
+    const inner = enumerableLazy<number>([1, 2]).take(1);
+
+    expect(
+      enumerableLazy<number>([1, 2])
+        .flatMap(() => inner.force())
+        .toA(),
+    ).toEqual([1, 1]);
+  });
+
+  it("zips into a block and answers nil", () => {
+    const seen: unknown[] = [];
+
+    expect(enumerableLazy([1]).zip(["a"], (pair: unknown[]) => seen.push(pair))).toBe(null);
+    expect(seen).toEqual([[1, "a"]]);
+  });
+
+  it("uniq compares by hash and eql", () => {
+    expect(enumerableLazy([1, 1.0, "a", "a"]).uniq().toA()).toEqual([1, "a"]);
+  });
+
+  it("awaits an each that answers a promise", async () => {
+    const source = {
+      each: async (block: (x: number) => unknown) => {
+        for (const x of [1, 2, 3]) await block(x);
+      },
+    };
+
+    await expect(enumerableLazy<number>(source).take(2).toA()).resolves.toEqual([1, 2]);
+    await expect(enumChain<number>(source, [4]).toA()).resolves.toEqual([1, 2, 3, 4]);
+  });
+
   it("raises MRI's errors", () => {
-    expect(() => new Lazy([])).toThrow("tried to call lazy new without a block");
+    expect(() => new Lazy([], null)).toThrow("tried to call lazy new without a block");
     expect(() => enumerableLazy([]).take(-1)).toThrow("attempt to take negative size");
     expect(() => enumerableLazy([]).zip(1)).toThrow(
       "wrong argument type Number (must respond to :each)",
