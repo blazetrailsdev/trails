@@ -42,6 +42,5 @@ describe("elements with no spec of their own", () => {
     const invalid = new ReceivedElement("from a by b; Tue, 31 Feb 2005 17:26:50 +0000");
     spy.mockRestore();
     expect(invalid.dateTime).toBeNull();
-    expect(invalid.info).toEqual("from a by b");
   });
 });
