@@ -225,7 +225,7 @@ describe("ActiveStorage::BlobTest", () => {
       {},
       async () => {
         const blob = (await (await user.avatar.attachment)!.blob)!;
-        await (blob as Blob & { analyze(): Promise<void> }).analyze();
+        await (blob as unknown as { analyze(): Promise<void> }).analyze();
       },
     );
   });
