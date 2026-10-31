@@ -7,6 +7,7 @@ import "./class-paths.generated.js";
 export { pathmap } from "./ext/string.js";
 export { Backtrace } from "./backtrace.js";
 export { Cloneable } from "./cloneable.js";
+export { CpuCounter } from "./cpu-counter.js";
 export { Application, CommandLineOptionError } from "./application.js";
 export type { ApplicationOptions } from "./application.js";
 export { DefaultLoader } from "./default-loader.js";
