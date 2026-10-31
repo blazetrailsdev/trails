@@ -4,6 +4,7 @@ import {
   Dir,
   Enumerable,
   File,
+  type FileOpenOpt,
   FrozenError,
   IndexError,
   Range,
@@ -34,6 +35,8 @@ import {
   rbInspect,
   rbObjIsProc,
   rbProcCall,
+  rbRegMatchM,
+  rbStrMatchM,
   rbStrSub,
   rtest,
   sortBy,
@@ -728,26 +731,32 @@ export class FileList {
     return this.collect((fn) => stringExt(fn, newext));
   }
 
-  /** @missingRailsArgs open — CONVERGEABLE rake-file-list-egrep-async-open */
-  async egrep(pattern: RegExp, ...options: unknown[]): Promise<number> {
+  /** @inventedArm if — PERMANENT */
+  async egrep(pattern: RegExp | string, ...options: unknown[]): Promise<number> {
     const yieldBlock = rbBlockGivenP(options.at(-1))
       ? (options.pop() as (fn: string, count: number, line: string) => unknown)
       : null;
     let matched = 0;
     await this.each(async (fn) => {
       try {
-        let count = 0;
-        for (const line of (await File.readAsync(fn)).match(/[^\n]*\n|[^\n]+$/g) ?? []) {
-          count += 1;
-          if (line.search(pattern) !== -1) {
-            matched += 1;
-            if (yieldBlock) {
-              await yieldBlock(fn, count, line);
-            } else {
-              puts.call($stdout, `${fn}:${count}:${line}`);
+        await File.openAsync(fn, "r", ...(options as [FileOpenOpt]), async (inf: File) => {
+          let count = 0;
+          for await (const line of inf.eachAsync() as AsyncGenerator<string>) {
+            count += 1;
+            if (
+              typeof pattern === "string"
+                ? rbStrMatchM({ string: pattern }, line)
+                : rbRegMatchM(pattern, line)
+            ) {
+              matched += 1;
+              if (yieldBlock) {
+                await yieldBlock(fn, count, line);
+              } else {
+                puts.call($stdout, `${fn}:${count}:${line}`);
+              }
             }
           }
-        }
+        });
       } catch (ex) {
         if (!(ex instanceof StandardError)) throw ex;
         puts.call($stderr, `Error while processing '${fn}': ${ex.message}`);

@@ -1,7 +1,7 @@
 import { ArgumentError } from "./argument-error.js";
 import { Dir } from "./dir.js";
 import { File } from "./file.js";
-import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
+import { getFs, getPath, type FsFileHandle, type FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { rbObjRespondTo, rtest } from "./object.js";
@@ -1716,7 +1716,17 @@ export class FileUtils {
   static async compareFileAsync(a: string, b: string): Promise<boolean> {
     const fs = getFs();
     if ((await fs.stat!(a)).size !== (await fs.stat!(b)).size) return false;
-    return File.open(a, "rb", (fa) => File.open(b, "rb", (fb) => FileUtils.compareStream(fa, fb)));
+    const fa = await fs.openHandle!(a, "r");
+    try {
+      const fb = await fs.openHandle!(b, "r");
+      try {
+        return await FileUtils.compareStreamAsync(fa, fb);
+      } finally {
+        await fb.close();
+      }
+    } finally {
+      await fa.close();
+    }
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -1740,6 +1750,36 @@ export class FileUtils {
     do {
       sa = a.read(bsize) ?? new Uint8Array(0);
       sb = b.read(bsize) ?? new Uint8Array(0);
+      if (sa.length === 0 && sb.length === 0) return true;
+    } while (sa.length === sb.length && sa.every((byte, i) => byte === sb[i]));
+    return false;
+  }
+
+  /** `FileUtils.compare_stream` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1530-1542`) over handles.
+   * @noRailsEquivalent PERMANENT
+   */
+  static async compareStreamAsync(a: FsFileHandle, b: FsFileHandle): Promise<boolean> {
+    const bsize =
+      FileUtils.fuBlksize(await a.stat()) ??
+      FileUtils.fuBlksize(await b.stat()) ??
+      FileUtils.fuDefaultBlksize();
+    const read = async (s: FsFileHandle): Promise<Uint8Array> => {
+      const buffer = new Uint8Array(bsize);
+      let size = 0;
+      while (size < bsize) {
+        const { bytesRead } = await s.read(buffer, size, bsize - size, null);
+        if (bytesRead === 0) break;
+        size += bytesRead;
+      }
+      return buffer.subarray(0, size);
+    };
+
+    let sa: Uint8Array;
+    let sb: Uint8Array;
+
+    do {
+      sa = await read(a);
+      sb = await read(b);
       if (sa.length === 0 && sb.length === 0) return true;
     } while (sa.length === sb.length && sa.every((byte, i) => byte === sb[i]));
     return false;

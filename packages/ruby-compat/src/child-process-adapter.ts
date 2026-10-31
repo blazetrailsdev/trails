@@ -11,6 +11,7 @@ export interface SpawnSyncOptions {
   cwd?: string;
   out?: string;
   in?: string;
+  inheritStdin?: boolean;
 }
 
 export interface SpawnSyncResult {
@@ -212,8 +213,14 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
           env: options?.env ?? { ...processEnv },
           encoding: options?.encoding ?? "utf8",
           cwd: options?.cwd,
-          ...(outFile !== null || inFile !== null
-            ? { stdio: [inFile?.fileno() ?? "pipe", outFile?.fileno() ?? "pipe", "pipe"] }
+          ...(outFile !== null || inFile !== null || options?.inheritStdin
+            ? {
+                stdio: [
+                  options?.inheritStdin ? "inherit" : (inFile?.fileno() ?? "pipe"),
+                  outFile?.fileno() ?? "pipe",
+                  "pipe",
+                ],
+              }
             : {}),
         });
       } finally {

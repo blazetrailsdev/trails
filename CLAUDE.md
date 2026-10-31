@@ -1484,6 +1484,10 @@ ratified here so no port re-derives them.
   `@inventedArm assign — PERMANENT`. `marshalLoad` has no skeleton row, so it
   carries none. An allocator handed the coder was rejected, because a Ruby
   allocator never sees it. Ruled by the repo owner on 2026-10-16.
+- **Ruby's `main` object.** `self.extend Rake::DSL`
+  (`vendor/rake/v13.2.1/lib/rake/dsl_definition.rb:195`) extends the top-level
+  `self`. An ES module's top-level `this` is `undefined`, so rake exports
+  `main`, the object a `Rakefile.ts` imports in its place.
 - **SQLite's double-quoted-string setting.** better-sqlite3 compiles with
   `SQLITE_DQS=0` and no option reaches `SQLITE_DBCONFIG_DQS_DDL` / `_DML`, so
   `strict: false` cannot re-enable double-quoted string literals on that

@@ -13,7 +13,6 @@ import {
   StandardError,
   SystemExit,
   RbConfig,
-  argv as ARGV,
   env as ENV,
   excBacktrace,
   exit,
@@ -21,6 +20,7 @@ import {
   include,
   printf,
   puts,
+  rbArgv,
   rbFCaller,
   rbFRequireFile,
   rbModName,
@@ -93,6 +93,15 @@ export class Application {
   /** @internal */ _systemDir: string | undefined;
   /** @internal */ _displayExceptionDetailsSeen: Error[] | undefined;
   /** @internal */ _dynamicWidth: number | undefined;
+  threadPool = {
+    activeThreads: 0,
+    maxActiveThreads: 0,
+    totalThreadsInPlay: 0,
+    statistics(): { maxActiveThreads: number; totalThreadsInPlay: number } {
+      const { maxActiveThreads, totalThreadsInPlay } = this;
+      return { maxActiveThreads, totalThreadsInPlay };
+    },
+  };
 
   /**
    * @inlinedFrom Rake::TaskManager#initialize rake/v13.2.1/lib/rake/task_manager.rb:9-15
@@ -113,7 +122,7 @@ export class Application {
     this.setDefaultOptions();
   }
 
-  async run(argv: readonly string[] = ARGV): Promise<void> {
+  async run(argv: readonly string[] = rbArgv()): Promise<void> {
     await this.standardExceptionHandling(async () => {
       await this.init("rake", argv);
       await this.loadRakefile();
@@ -122,7 +131,7 @@ export class Application {
   }
 
   /** @missingRailsArgs handle_options — PERMANENT */
-  async init(appName = "rake", argv: readonly string[] = ARGV): Promise<void> {
+  async init(appName = "rake", argv: readonly string[] = rbArgv()): Promise<void> {
     await this.standardExceptionHandling(async () => {
       this.name = appName;
       let args: string[];
@@ -130,7 +139,7 @@ export class Application {
         args = await this.handleOptions(argv);
       } catch (e) {
         if (!(e instanceof ArgumentError)) throw e;
-        args = await this.handleOptions(ARGV);
+        args = await this.handleOptions(rbArgv());
       }
       this.loadDebugAtStopFeature();
       this.collectCommandLineTasks(args);
@@ -163,6 +172,11 @@ export class Application {
   /** @missingRailsCall join — PERMANENT */
   async runWithThreads(block: () => Promise<void>): Promise<void> {
     await block();
+    if (this.options.jobStats) {
+      const stats = this.threadPool.statistics();
+      STDOUT.puts(`Maximum active threads: ${stats.maxActiveThreads} + main`);
+      STDOUT.puts(`Total threads in play:  ${stats.totalThreadsInPlay} + main`);
+    }
   }
 
   addLoader(ext: string, loader: Loader): void {
@@ -398,13 +412,17 @@ export class Application {
 
   /** @internal */
   dynamicWidthStty(): number {
-    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "stty size 2>/dev/null </dev/tty"]);
+    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "stty size 2>/dev/null"], {
+      inheritStdin: true,
+    });
     return parseInt(String(stdout).trim().split(/\s+/)[1], 10) || 0;
   }
 
   /** @internal */
   dynamicWidthTput(): number {
-    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "tput cols 2>/dev/null </dev/tty"]);
+    const { stdout } = getChildProcess().spawnSync("sh", ["-c", "tput cols 2>/dev/null"], {
+      inheritStdin: true,
+    });
     return parseInt(String(stdout), 10) || 0;
   }
 
@@ -873,8 +891,12 @@ export class Application {
     return (this._systemDir ??= ENV["RAKE_SYSTEM"] ?? this.standardSystemDir());
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   private standardSystemDir(): string {
+    if (Win32.isWindows()) return Win32.win32SystemDir();
     return File.join(File.expandPath("~"), ".rake");
   }
 

@@ -6,8 +6,9 @@ export class AuthLogin extends Authenticator {
     this.authType("login");
   }
 
-  /** @missingRailsArgs finish — PERMANENT */
-  auth(user: string, secret: string): Promise<Response> {
-    return this.finish({ credentials: { user, pass: secret }, method: "LOGIN" });
+  async auth(user: string, secret: string): Promise<Response> {
+    await this.continue("AUTH LOGIN");
+    await this.continue(this.base64Encode(user));
+    return await this.finish(this.base64Encode(secret));
   }
 }
