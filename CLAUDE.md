@@ -1486,6 +1486,13 @@ ratified here so no port re-derives them.
   `strict: false` cannot re-enable double-quoted string literals on that
   driver.
 
+- **A non-V8 stack.** `Location` and `Command.FILE_REGEXP` read V8 frames, so on
+  an engine with another stack format `excBacktraceLocations` answers no frames
+  and `Thor::Command#handle_argument_error?` hands every arity-like
+  `ArgumentError` to `handle_argument_error`: `sans_backtrace` is empty, which
+  is the usage error, the answer for a CLI user. Ruby-compat's own send frames
+  are dropped by the same reader, as `vm_call_opt_send` pushes none.
+
 A test that depends on one of these ports the assertions that do not, and parks
 the rest as `it.skip` under a `PERMANENT-SKIP:` line citing this section.
 

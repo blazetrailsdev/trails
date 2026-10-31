@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport";
-import { Dir, File, FileUtils, include } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, include, SystemExit } from "@blazetrails/ruby-compat";
 import { Actions, type ActionsHost } from "../actions.js";
 import { Shell } from "../shell.js";
 import { Thor } from "../thor.js";
@@ -84,6 +84,61 @@ describe("Thor::Actions create_file, create_link and empty_directory (trails)", 
     expect(File.read(File.join(root, "a.txt"))).toBe("old");
   });
 
+  it("resolves a Ruby-spelled %file_name% against a camelCase method", async () => {
+    await capture(":stdout", () => host().createFile("doc/%file_name%.rb", "CONFIG"));
+    expect(File.read(File.join(root, "doc/rdoc.rb"))).toBe("CONFIG");
+  });
+
+  describe("file_collision", () => {
+    const answering = (...answers: (string | null)[]) => {
+      const r = host();
+      (r.shell as unknown as { ask(): unknown }).ask = async () => answers.shift() ?? null;
+      return r;
+    };
+
+    it("leaves the file on n, reporting conflict then skip", async () => {
+      File.write(File.join(root, "a.txt"), "old");
+      const out = await capture(":stdout", () => answering("n").createFile("a.txt", "new"));
+      expect(out).toMatch(/conflict {2}a\.txt\n\s+skip {2}a\.txt/);
+      expect(File.read(File.join(root, "a.txt"))).toBe("old");
+    });
+
+    it("overwrites on EOF and on y, reporting conflict then force", async () => {
+      for (const r of [answering(null), answering("y")]) {
+        File.write(File.join(root, "a.txt"), "old");
+        const out = await capture(":stdout", () => r.createFile("a.txt", "new"));
+        expect(out).toMatch(/conflict {2}a\.txt\n\s+force {2}a\.txt/);
+        expect(File.read(File.join(root, "a.txt"))).toBe("new");
+      }
+    });
+
+    it("forces every later collision after a", async () => {
+      File.write(File.join(root, "a.txt"), "old");
+      File.write(File.join(root, "b.txt"), "old");
+      const r = answering("a");
+      await capture(":stdout", () => r.createFile("a.txt", "new"));
+      await capture(":stdout", () => r.createFile("b.txt", "new"));
+      expect(File.read(File.join(root, "b.txt"))).toBe("new");
+    });
+
+    it("raises SystemExit on q", async () => {
+      File.write(File.join(root, "a.txt"), "old");
+      const r = answering("q");
+      await expect(capture(":stdout", () => r.createFile("a.txt", "new"))).rejects.toBeInstanceOf(
+        SystemExit,
+      );
+    });
+
+    it("shows help, then the diff of a block, then retries", async () => {
+      File.write(File.join(root, "a.txt"), "old\n");
+      const out = await capture(":stdout", () =>
+        answering("x", "d", "n").createFile("a.txt", "new\n"),
+      );
+      expect(out).toMatch(/d - diff, show the differences/);
+      expect(out).toMatch(/Retrying\.\.\./);
+    });
+  });
+
   it("does not write under pretend, and removes on revoke", async () => {
     await capture(":stdout", () => host({ pretend: true }).createFile("a.txt", "new"));
     expect(File.isExist(File.join(root, "a.txt"))).toBe(false);
@@ -116,7 +171,9 @@ describe("Thor::Actions create_file, create_link and empty_directory (trails)", 
 
   it("forces a changed file when the shell answers the collision", async () => {
     File.write(File.join(root, "a.txt"), "old");
-    const out = await capture(":stdout", () => host().createFile("a.txt", "new"));
+    const r = host();
+    (r.shell as unknown as { ask(): unknown }).ask = async () => null;
+    const out = await capture(":stdout", () => r.createFile("a.txt", "new"));
     expect(out).toMatch(/conflict {2}a\.txt\n\s+force {2}a\.txt/);
     expect(File.read(File.join(root, "a.txt"))).toBe("new");
   });

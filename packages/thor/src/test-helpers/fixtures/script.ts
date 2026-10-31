@@ -143,7 +143,8 @@ export class MyScript extends Thor {
   }
 
   call_myself_with_wrong_arity(): unknown {
-    rbCheckArity(this.call_myself_with_wrong_arity, 1);
+    const callee = (): void => rbCheckArity(this.call_myself_with_wrong_arity, 1);
+    callee();
     return (this.call_myself_with_wrong_arity as (n: number) => unknown).call(this, 4);
   }
 

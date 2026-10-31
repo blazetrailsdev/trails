@@ -16,6 +16,19 @@ import { GeneratedAttribute } from "./generated-attribute.js";
 export class NamedBase extends GeneratorBase {
   static {
     this.argument("name", { type: "string" });
+    this.noCommands(() => this.methodAdded("template"));
+    this.noCommands(() => this.methodAdded("jsTemplate"));
+    this.noCommands(() => this.methodAdded("indexHelper"));
+    this.noCommands(() => this.methodAdded("showHelper"));
+    this.noCommands(() => this.methodAdded("editHelper"));
+    this.noCommands(() => this.methodAdded("newHelper"));
+    this.noCommands(() => this.methodAdded("routeUrl"));
+    this.noCommands(() => this.methodAdded("redirectResourceName"));
+    this.noCommands(() => this.methodAdded("modelResourceName"));
+    this.noCommands(() => this.methodAdded("singularRouteName"));
+    this.noCommands(() => this.methodAdded("pluralRouteName"));
+    this.noCommands(() => this.methodAdded("assignNamesBang"));
+    this.noCommands(() => this.methodAdded("attributesNames"));
   }
 
   declare name: string;

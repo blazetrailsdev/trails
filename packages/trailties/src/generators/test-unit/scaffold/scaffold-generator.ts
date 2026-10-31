@@ -72,6 +72,10 @@ export class ScaffoldGenerator extends NamedBase {
     this.argument("attributes", { type: "array", default: [], banner: "field:type field:type" });
 
     this.methodAdded("createTestFiles");
+    this.noCommands(() => this.methodAdded("fixtureName"));
+    this.noCommands(() => this.methodAdded("attributesString"));
+    this.noCommands(() => this.methodAdded("attributesHash"));
+    this.noCommands(() => this.methodAdded("isVirtual"));
   }
 
   async createTestFiles(): Promise<void> {

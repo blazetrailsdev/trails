@@ -131,6 +131,20 @@ export abstract class AppBase extends GeneratorBase {
       default: null,
       desc: "Set up the application with package.json pointing to your Trails checkout",
     });
+    this.noCommands(() => this.methodAdded("requiredRailties"));
+    this.noCommands(() => this.methodAdded("includeAllRailties"));
+    this.noCommands(() => this.methodAdded("railsRequireStatement"));
+    this.noCommands(() => this.methodAdded("skip"));
+    this.noCommands(() => this.methodAdded("sqlite3"));
+    this.noCommands(() => this.methodAdded("skipStorage"));
+    this.noCommands(() => this.methodAdded("keeps"));
+    this.noCommands(() => this.methodAdded("devcontainer"));
+    this.noCommands(() => this.methodAdded("skipDevcontainer"));
+    this.noCommands(() => this.methodAdded("dependsOnSystemTest"));
+    this.noCommands(() => this.methodAdded("railsGemfileEntry"));
+    this.noCommands(() => this.methodAdded("railsDevPackages"));
+    this.noCommands(() => this.methodAdded("applyRailsTemplate"));
+    this.noCommands(() => this.methodAdded("setDefaultAccessorsBang"));
   }
 
   constructor(

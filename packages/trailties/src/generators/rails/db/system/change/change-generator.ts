@@ -30,6 +30,7 @@ export class ChangeGenerator extends GeneratorBase {
     this.methodAdded("editPackageJson");
     this.methodAdded("editDockerfile");
     this.methodAdded("editDevcontainerFiles");
+    this.noCommands(() => this.methodAdded("template"));
   }
 
   /** @internal */

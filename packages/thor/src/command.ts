@@ -47,7 +47,7 @@ export class Command extends Struct.new(
   "ancestorName",
 ) {
   static FILE_REGEXP = new RegExp(
-    `^at (?:.*\\()?(?:file://)?${regexpEscape(new URL(".", import.meta.url).pathname.replace(/\/$/, ""))}`,
+    `^at (?:.*\\()?(?:file://)?${regexpEscape(new URL(".", import.meta.url).pathname.replace(/\/$/, ""))}(?!.*(?:\\.test\\.|/test-helpers/))`,
   );
 
   declare name: string;

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { useInMemoryDatabaseUrl } from "./support/in-memory-database-url.js";
 import "./all.js";
 import { Base } from "@blazetrails/activejob";
+import { Base as RecordBase } from "@blazetrails/activerecord";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
 
@@ -28,5 +30,6 @@ describe("rails/all", () => {
     expect(app.config.activeJob).toBeDefined();
     expect(Base.queueAdapterName).toBe("test");
     expect(Base.logger).toBe(Trails.logger);
+    expect(rbObjRespondTo(RecordBase, "hasOneAttached")).toBe(true);
   });
 });
