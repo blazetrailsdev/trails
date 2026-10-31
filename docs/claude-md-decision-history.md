@@ -434,3 +434,20 @@ methods, files, inheritance, arity and params and 307/307 tests on that split.
 Settled by trails#9180, which also records why the parked
 `translate caching backend` test keeps an empty body: the Rails body names
 `I18n::Backend::Cache`, so a kept body would not type-check.
+
+## Constant lookup and the autoloader: two reversals
+
+The repo owner reversed two rulings on 2026-10-30, in RFC 0213.
+
+- **"Constant lookup is an import or a registry" (2026-10-28).** It kept
+  `constantize` out of Rails bodies in favour of `registerX` read sides. That
+  cannot do what `constantize` does: trails#9466 gave each `registerX` a
+  name → class map and had to park three `reflection_test.rb` tests, because a
+  model registry finds no non-model constant and reaches no `const_missing`.
+  Lookup now walks the namespaces; an import is still right for a known name.
+- **"Trails has no autoloader".** Its premise was that Zeitwerk is not vendored,
+  so a port would have no Ruby source to mirror. Vendoring v2.7.2, the version
+  Rails 8.0.2 locks (`vendor/rails/v8.0.2/Gemfile.lock:676`), removes that, and
+  only `Module#autoload` lacks a JS form. The application scan in
+  `packages/trailties/src/application/finisher.ts` was an invented loader with
+  no file contract and no reload.

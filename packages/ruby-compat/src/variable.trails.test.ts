@@ -232,7 +232,7 @@ describe("rb_const_get", () => {
       expect(error).toBeInstanceOf(NameError);
       expect((error as NameError).constantName).toBe("ConstGetAbsent");
       expect(() => rbModConstGet(Sub, "ConstGetOuter::Absent")).toThrow(
-        "uninitialized constant Outer::Absent",
+        "uninitialized constant ConstGetOuter::Absent",
       );
     });
   });

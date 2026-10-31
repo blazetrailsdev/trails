@@ -1121,7 +1121,7 @@ For a module-eval read, two shapes are sanctioned, and only these:
   `const_set` qualifies the same way (thor's `rake_compat.rb:64` is the one
   such site outside Rails, and is unported). A class's qualified Ruby path is
   a ruby-compat internal (§ "Constant lookup is an import or a registry"),
-  not the seat. A constant Rails
+  not the seat. `rbModConstGet` reads these seats at call time. A constant Rails
   `require`s rather than autoloads is seated with no `autoload` call. Ruby's
   top-level `Object` is `TopLevel` in `ruby-compat/src/object.ts`: the
   defining gem seats it (`TopLevel.Trails = Trails`) and a reader names it at
@@ -1155,35 +1155,31 @@ subclass modules at all, so their self-registration never runs.
 ### Constant lookup is an import or a registry (`constantize`, `const_get`)
 
 Ruby finds a class by name at run time: `constantize`, `const_get`,
-`const_defined?`, `constants`, `path2class`. trails does not port that lookup,
-even where the Rails body calls it. This is JavaScript, and a class is reached
-the way JavaScript reaches it. Ruled by the repo owner on 2026-10-28.
+`const_defined?`, `constants`, `path2class`. trails ports that lookup. The
+2026-10-28 ruling against it was reversed by the repo owner on 2026-10-30
+(RFC 0213; the heading stays so citations resolve).
 
-- **A known name is an ES import.** A name that is a literal at the call site,
-  or one drawn from a set the framework closes (adapters, coders, type names),
-  is an import, or a module-private map or `switch` beside the reader.
-- **An open set of application classes is an explicit registry.** A model
-  named by an STI `type` or polymorphic `_type` column, a `class_name:` or a
-  GlobalID is found through `registerModel`. A routed controller is found
-  through `registerController`, a job through `registerJob`, and a channel or
-  connection through `registerChannel` / `registerConnection`. Today each
-  `registerX` returns `void` and writes through `registerConstant`, so it has
-  no read side yet: a reader such as `compute_type`
+- **A name Rails computes, or one application data supplies, is a lookup.**
+  `constantize` is `Object.const_get(camel_cased_word)`
+  (`vendor/rails/v8.0.2/activesupport/lib/active_support/inflector/methods.rb:289-291`):
+  `rbModConstGet(Object, word)` walks `TopLevel` by segment and calls the
+  receiver's `constMissing` on a miss. `compute_type`
   (`vendor/rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:255-261`)
-  converts only once its package adds a name → class read beside its
-  `registerX`, over that registry's own map. A domain with no registry gets one
-  of the same shape, never a generic constant lookup.
-- **"Rails calls `const_get` here" is not a reason to keep one.** No
-  `constantize`, `safeConstantize`, `rbModConstGet`, `rbModConstDefined`,
-  `rbModConstants`, `rbPathToClass` or `registeredConstant` call is added
-  outside ruby-compat, and every existing one is debt. `registerConstant` and
-  the top-level constant table are being deleted (RFC 0205).
-- **Class-path tables answer class → Ruby name, and nothing else.** That
-  direction is output: `rbModName`, `rbInspect` and exception text, and every
-  Rails body that reads a class's `name` to build a string, such as
-  `compute_type`'s candidate names (`inheritance.rb:255-261`), an STI `type`
-  value or an i18n key. They are never a name → class lookup: `generatedClass`
-  is debt like the rest of this list. They are ruby-compat internals. The
+  ports line for line. A literal argument is typed through ruby-compat's
+  `ConstantTable`, and answers `unknown` otherwise.
+- **A known name is still an ES import.** A name that is a literal at the call
+  site, and that a plain import can reach, is an import (§ "Call-time constant
+  resolution"), or a module-private map or `switch` beside the reader.
+- **`registerModel`, `registerController`, `registerJob`, `registerChannel` and
+  `registerConnection` retire** under RFC 0213. Until then they seat through
+  `registerConstant`, and the walk finds what they seated.
+- **Full-path seats and class-path tables are transitional.** `registerConstant`
+  seats `"A::B"` whole and `generatedClass` holds a class no namespace does, so
+  the walk reads both where it reaches them, until
+  `delete-register-constant-and-class-path-api`. Do not add a caller.
+- **Class-path tables answer class → Ruby name.** That direction is output:
+  `rbModName`, `rbInspect` and exception text, and every Rails body that reads a
+  class's `name` to build a string. They are ruby-compat internals. The
   generated `class-paths*.generated.ts` file each package carries is the one
   place outside ruby-compat that calls `registerClassPaths`; the hand-written
   row in `actionpack/src/action-controller/metal/strong-parameters.ts` is debt,
@@ -1191,9 +1187,6 @@ the way JavaScript reaches it. Ruled by the repo owner on 2026-10-28.
   ruby-compat never calls `registerClassPaths`, `generatedClass`,
   `generatedClassPath` or reads `classpaths`; it reaches a Ruby name only
   through `rbModName` / `rbInspect`.
-
-This supersedes the 2026-10-27 ruling in RFC 0205 that replaced the `registerX`
-APIs with a class-path table filled by a boot scan.
 
 **A slot or seat read carries no guard**, because the Ruby body it mirrors
 carries none: `Arel::Nodes::Node#not` is `Nodes::Not.new self`
@@ -2215,7 +2208,8 @@ not a new decision to argue, and there is no story to make `translate` async.
 
 Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#a-migration-file-is-loaded-by-kernelload-migrationproxyload_migration).
 The one-line rule: `Kernel#load` is ruby-compat's `rbFLoad`, an awaited
-`import()` that evaluates the file again and seats its constant-named exports.
+`import()` that evaluates the file again and seats its constant-named exports
+on `TopLevel`.
 
 ## A dumped statement wraps its trailing options in braces (`SchemaDumper`'s `parts.join(", ")`)
 

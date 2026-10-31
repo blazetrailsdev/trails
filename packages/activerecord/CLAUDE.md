@@ -674,8 +674,8 @@ than binding it anywhere. **`Kernel#load` is `rbFLoad` in ruby-compat**
 
 - It awaits an `import()` of the file under a URL no earlier load used, so a
   changed file is evaluated again.
-- It seats every constant-named export in the top-level constant table, where
-  `constantize` reads it. `rbModRemoveConst` (`rb_mod_remove_const`,
+- It seats every constant-named export on `TopLevel`, where `constantize`
+  reads it. `rbModRemoveConst` (`rb_mod_remove_const`,
   `vendor/ruby/v3.3.11/variable.c:3302`) removes one.
 - `loadMigration` is Rails' three lines in Rails' order and is async, as every
   caller of `MigrationProxy#migration` already is.

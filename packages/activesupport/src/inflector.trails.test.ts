@@ -1,9 +1,22 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 import { NameError } from "@blazetrails/ruby-compat/name-error";
 import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { StopIteration } from "@blazetrails/ruby-compat/stop-iteration";
 import { constantize, safeConstantize } from "./inflector.js";
 import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+
+declare module "@blazetrails/ruby-compat" {
+  interface ConstantTable {
+    "Typed::Literal": typeof Date;
+  }
+}
+
+describe("constantize types a literal through ConstantTable", () => {
+  it("answers the table's class for a literal and unknown otherwise", () => {
+    expectTypeOf(constantize<"Typed::Literal">).returns.toEqualTypeOf<typeof Date>();
+    expectTypeOf(constantize("Date" as string)).toBeUnknown();
+  });
+});
 
 describe("constantize resolves core exception classes", () => {
   it("answers ruby-compat's NotImplementedError", () => {

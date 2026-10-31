@@ -42,6 +42,7 @@ import { toI } from "./numeric.js";
 import {
   FL_SINGLETON,
   T_ICLASS,
+  TopLevel,
   classpaths,
   isPlainHash,
   rbSetClassPathString,
@@ -120,7 +121,7 @@ export function rbModConstSet<T>(
   ) {
     const klass = mod as abstract new (...args: never) => unknown;
     const valPath = classpaths.get(value);
-    if (mod === Object) {
+    if (mod === Object || mod === TopLevel) {
       if (valPath?.permanent !== true) classpaths.set(value, { path: id, permanent: true });
       return value;
     }
