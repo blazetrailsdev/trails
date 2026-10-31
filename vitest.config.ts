@@ -360,7 +360,6 @@ const alias = {
     "packages/trailties/src/trailtie/configuration.ts",
   ),
   "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/src/trailtie.ts"),
-  "@blazetrails/trailties": path.resolve(__dirname, "packages/trailties/src/index.ts"),
   "@blazetrails/ruby-compat/": path.resolve(__dirname, "packages/ruby-compat/src") + "/",
   "@blazetrails/ruby-compat": path.resolve(__dirname, "packages/ruby-compat/src/index.ts"),
   "@blazetrails/bcrypt": path.resolve(__dirname, "packages/bcrypt/src/index.ts"),
@@ -465,6 +464,10 @@ const aliasEntries = [
   {
     find: /^@blazetrails\/thor$/,
     replacement: path.resolve(__dirname, "packages/thor/src/thor.ts"),
+  },
+  {
+    find: /^@blazetrails\/trailties$/,
+    replacement: path.resolve(__dirname, "packages/trailties/src/index.ts"),
   },
   ...Object.entries(alias).map(([find, replacement]) => ({ find, replacement })),
 ];
