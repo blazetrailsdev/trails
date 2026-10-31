@@ -17,6 +17,13 @@ tester.run("thor-command-registration", rule, {
     {
       code: `
 class MyScript extends Thor {
+  zoo() {}
+}
+MyScript.methodAdded("zoo");`,
+    },
+    {
+      code: `
+class MyScript extends Thor {
   static {
     this.desc("zoo", "zoo around");
     this.methodAdded("zoo");

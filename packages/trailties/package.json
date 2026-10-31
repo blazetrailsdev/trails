@@ -117,6 +117,9 @@
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/activestorage": {
+      "optional": true
+    },
     "typescript": {
       "optional": true
     }

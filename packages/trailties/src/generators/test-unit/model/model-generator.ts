@@ -29,7 +29,6 @@ export class ModelGenerator extends NamedBase {
     this.checkClassCollision({ suffix: "Test" });
 
     this.methodAdded("createTestFile");
-    this.methodAdded("createFixtureFile");
     this.noCommands(() => this.methodAdded("yamlKeyValue"));
   }
 

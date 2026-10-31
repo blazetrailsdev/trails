@@ -45,7 +45,7 @@ function commandCandidates(body) {
   );
 }
 
-function registeredNames(blocks, sourceCode) {
+function registeredNames(blocks, sourceCode, className = null) {
   const names = new Set();
   const visit = (node) => {
     if (
@@ -53,7 +53,8 @@ function registeredNames(blocks, sourceCode) {
       node.callee.type === "MemberExpression" &&
       !node.callee.computed &&
       node.callee.property.name === "methodAdded" &&
-      isThis(node.callee.object)
+      (isThis(node.callee.object) ||
+        (className !== null && dottedName(node.callee.object) === className))
     ) {
       const [arg] = node.arguments;
       if (arg?.type === "Literal" && typeof arg.value === "string") names.add(arg.value);
@@ -83,7 +84,7 @@ function registeredNames(blocks, sourceCode) {
  *
  * The `extends` chain is read within the file, in any declaration order.
  * `baseClasses` names further Thor classes a file imports. A registration is a
- * `this.methodAdded("name")` call with a string literal: a name passed through
+ * `this.methodAdded("name")` call, or a top-level `Klass.methodAdded("name")`, with a string literal: a name passed through
  * a variable is not read, and its method is reported.
  *
  * @type {import("eslint").Rule.RuleModule}
@@ -120,7 +121,15 @@ export default {
 
     const check = (node) => {
       const blocks = node.body.body.filter((member) => member.type === "StaticBlock");
-      const registered = registeredNames(blocks, sourceCode);
+      const className = boundName(node);
+      const registered = registeredNames(
+        [
+          ...blocks,
+          ...sourceCode.ast.body.filter((statement) => statement.type === "ExpressionStatement"),
+        ],
+        sourceCode,
+        className,
+      );
       for (const method of commandCandidates(node.body)) {
         const methodName = keyName(method.key);
         if (registered.has(methodName)) continue;

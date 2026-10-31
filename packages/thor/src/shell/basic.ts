@@ -5,6 +5,7 @@ import {
   Hash,
   isSymbol,
   matchOperator,
+  NotImplementedError,
   Open3,
   print,
   puts,
@@ -272,7 +273,7 @@ export class Basic {
 
   /** @internal */
   protected async showDiff(destination: string, content: unknown): Promise<void> {
-    const diffCmd = env["THOR_DIFF"] || env["RAILS_DIFF"] || "diff -u";
+    const diffCmd = env["THOR_DIFF"] ?? env["RAILS_DIFF"] ?? "diff -u";
 
     await Tempfile.open(File.basename(destination), File.dirname(destination), async (temp) => {
       temp.write(content as string | Uint8Array);
@@ -371,14 +372,15 @@ export class Basic {
 
   /** @internal */
   protected async mergeTool(): Promise<string> {
-    return (this._mergeTool ||= env["THOR_MERGE"] || (await this.gitMergeTool()));
+    return (this._mergeTool ??= env["THOR_MERGE"] ?? (await this.gitMergeTool()));
   }
 
   /** @internal */
   protected async gitMergeTool(): Promise<string> {
     try {
-      return (await Open3.capture2e("git config merge.tool"))[0].trimEnd();
-    } catch {
+      return toS((await Open3.capture3("git config merge.tool"))[0]).trimEnd();
+    } catch (e) {
+      if (e instanceof NotImplementedError) throw e;
       return "";
     }
   }

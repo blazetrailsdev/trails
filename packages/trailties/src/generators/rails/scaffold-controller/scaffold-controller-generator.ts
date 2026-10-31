@@ -36,9 +36,6 @@ export interface ScaffoldControllerGenerator
   extends Included<typeof ResourceHelpers>, Included<typeof ModelHelpers> {}
 
 export class ScaffoldControllerGenerator extends NamedBase {
-  static {
-    this.methodAdded("createControllerFiles");
-  }
   /** @internal */
   declare controllerName: string;
   /** @internal */

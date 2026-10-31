@@ -7,7 +7,6 @@ const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathnam
 export class HelperGenerator extends NamedBase {
   static {
     void this.sourceRoot(File.expandPath("templates", __dir__));
-    this.methodAdded("createHelperFiles");
   }
 
   /** @internal */
