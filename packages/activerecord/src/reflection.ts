@@ -1615,7 +1615,7 @@ export function create(
   activeRecord: typeof Base,
 ): AggregateReflection;
 export function create(
-  macro: string,
+  macro: `${string}Attached`,
   name: string | null,
   scope: null,
   options: Record<string, unknown>,
