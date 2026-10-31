@@ -406,6 +406,9 @@ importers:
       '@blazetrails/globalid':
         specifier: workspace:*
         version: link:../globalid
+      '@blazetrails/image-processing':
+        specifier: workspace:*
+        version: link:../image-processing
       '@blazetrails/marcel':
         specifier: workspace:*
         version: link:../marcel
