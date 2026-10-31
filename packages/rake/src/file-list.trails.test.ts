@@ -36,6 +36,7 @@ slice_after slice_before slice_when sort sort! sort_by sort_by! sum take take_wh
     expect(await fl().get(new Range(1, 2))).toEqual(["b.h", "c.c"]);
     expect(await fl().count((f: string) => later(f.endsWith(".c")))).toEqual(2);
     expect(await fl().isAny((f: string) => later(f === "c.c"))).toBe(true);
+    expect(await fl().isAny(/\.z$/)).toBe(false);
     expect(await fl().min((a: string, b: string) => b.localeCompare(a))).toEqual("d.h");
     expect(await fl().max((a: string, b: string) => b.localeCompare(a))).toEqual("a.c");
     expect(await fl().max(2)).toEqual(["d.h", "c.c"]);
