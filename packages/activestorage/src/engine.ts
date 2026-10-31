@@ -6,7 +6,7 @@ import "@blazetrails/trailties/trailties/active-job";
 import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ActiveStorage } from "./active-storage.js";
-import { ClassMethods, Model } from "./attached/model.js";
+import { Model } from "./attached/model.js";
 import { ActiveRecordExtensions, ReflectionExtension } from "./reflection.js";
 
 export class Engine extends TrailsEngine {
