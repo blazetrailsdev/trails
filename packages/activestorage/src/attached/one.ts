@@ -49,7 +49,11 @@ export class One extends Attached {
   }
 
   async isAttached(): Promise<boolean> {
-    return isPresent(await this.attachment);
+    return isPresent(
+      await (isPresent(this.change)
+        ? (this.change as CreateOne).attachment
+        : rbFSend(this.record, `${this.name}Attachment`)),
+    );
   }
 
   /** @internal */

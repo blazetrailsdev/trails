@@ -74,6 +74,15 @@ describe("ActiveStorage::Attached::One", () => {
     expect(attachment!.signedId()).toBe(blob.signedId());
   });
 
+  it("isAttached does not load the blob", async () => {
+    await user.avatar.attach(await createBlob({ filename: "funky.jpg" }));
+    const reloaded = (await Member.find(user.id)) as AvatarUser;
+    expect(await reloaded.avatar.isAttached()).toBe(true);
+    const attachment = (await (reloaded as unknown as { avatarAttachment: unknown })
+      .avatarAttachment) as { association(name: string): { isLoaded(): boolean } };
+    expect(attachment.association("blob").isLoaded()).toBe(false);
+  });
+
   it("detach keeps the blob and purge removes it", async () => {
     const blob = await createBlob();
     await user.avatar.attach(blob);
