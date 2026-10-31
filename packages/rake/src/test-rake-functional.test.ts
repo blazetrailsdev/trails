@@ -248,7 +248,7 @@ describe("TestRakeFunctional", () => {
   it("dot rake files can be loaded with dash r", async () => {
     await d.rakefileRakelib();
     await rake("-I", "rakelib", "-rtest2", "-f");
-    expect(runner.err).toHaveLength(0);
+    expect(runner.err).toBeEmpty();
     expect(runner.out).toMatch(/^TEST2$/m);
   });
 
