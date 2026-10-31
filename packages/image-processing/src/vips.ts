@@ -14,7 +14,7 @@ type Options = Record<string, unknown>;
 type Image = InstanceType<Awaited<ReturnType<typeof WasmVips>>["Image"]>;
 
 /** @noRailsEquivalent PERMANENT */
-export const vips = await WasmVips();
+export const vips = await WasmVips({ dynamicLibraries: ["vips-resvg.wasm"] });
 
 /** @noRailsEquivalent PERMANENT */
 function atLeastLibvips(x: number, y: number): boolean {

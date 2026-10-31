@@ -36,6 +36,7 @@
     "node": ">=24"
   },
   "devDependencies": {
+    "@blazetrails/image-processing": "workspace:*",
     "@blazetrails/mini-magick": "workspace:*"
   }
 }

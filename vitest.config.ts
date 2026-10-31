@@ -380,6 +380,8 @@ const alias = {
   "@blazetrails/mini-mime": path.resolve(__dirname, "packages/mini-mime/src/mini-mime.ts"),
   "@blazetrails/net-smtp": path.resolve(__dirname, "packages/net-smtp/src/smtp.ts"),
   "@blazetrails/rake": path.resolve(__dirname, "packages/rake/src/rake.ts"),
+  "@blazetrails/mini-magick/": path.resolve(__dirname, "packages/mini-magick/src") + "/",
+  "@blazetrails/image-processing/": path.resolve(__dirname, "packages/image-processing/src") + "/",
   "@blazetrails/image-processing": path.resolve(
     __dirname,
     "packages/image-processing/src/image-processing.ts",
@@ -461,6 +463,10 @@ const COVERAGE_EXCLUDE = [
 ];
 
 const aliasEntries = [
+  {
+    find: /^@blazetrails\/mini-magick$/,
+    replacement: path.resolve(__dirname, "packages/mini-magick/src/mini-magick.ts"),
+  },
   {
     find: /^@blazetrails\/thor$/,
     replacement: path.resolve(__dirname, "packages/thor/src/thor.ts"),

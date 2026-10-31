@@ -393,7 +393,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
     expect(await user.coverPhoto.isAttached()).toBe(false);
   });
 
-  // BLOCKED: activestorage-image-analyzers
+  // BLOCKED: attached-analyzing-tests
   it.skip("analyzing a new blob from an uploaded file after attaching it to an existing record", () => {});
   it.skip("analyzing a new blob from an uploaded file after attaching it to an existing record via update", () => {});
   it.skip("analyzing a directly-uploaded blob after attaching it to an existing record", () => {});
@@ -496,7 +496,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
     );
   });
 
-  // BLOCKED: activestorage-image-analyzers
+  // BLOCKED: attached-analyzing-tests
   it.skip("analyzing a new blob from an uploaded file after attaching it to a new record", () => {});
   it.skip("analyzing a directly-uploaded blob after attaching it to a new record", () => {});
 
