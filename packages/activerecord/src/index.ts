@@ -194,6 +194,7 @@ export {
 export {
   AbstractReflection,
   MacroReflection,
+  Reflection,
   AggregateReflection,
   AssociationReflection,
   HasManyReflection,

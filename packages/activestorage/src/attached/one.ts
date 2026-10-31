@@ -28,6 +28,14 @@ export class One extends Attached {
           | Promise<Attachment | null>);
   }
 
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  async load(): Promise<void> {
+    await this.attachment;
+  }
+
   async isBlank(): Promise<boolean> {
     return !(await this.isAttached());
   }

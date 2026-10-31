@@ -33,14 +33,15 @@ import * as m30 from "./fixture-set.js";
 import * as m31 from "./gem-version.js";
 import * as m32 from "./log-subscriber.js";
 import * as m33 from "./mirror-job.js";
-import * as m34 from "./purge-job.js";
-import * as m35 from "./record.js";
-import * as m36 from "./reflection.js";
-import * as m37 from "./service.js";
-import * as m38 from "./service/configurator.js";
-import * as m39 from "./service/disk-service.js";
-import * as m40 from "./service/mirror-service.js";
-import * as m41 from "./service/registry.js";
+import * as m34 from "./named-variant.js";
+import * as m35 from "./purge-job.js";
+import * as m36 from "./record.js";
+import * as m37 from "./reflection.js";
+import * as m38 from "./service.js";
+import * as m39 from "./service/configurator.js";
+import * as m40 from "./service/disk-service.js";
+import * as m41 from "./service/mirror-service.js";
+import * as m42 from "./service/registry.js";
 
 registerClassPaths([
   [() => m0.AnalyzeJob, "ActiveStorage::AnalyzeJob"],
@@ -79,18 +80,21 @@ registerClassPaths([
   [() => m28.InvariableError, "ActiveStorage::InvariableError"],
   [() => m32.LogSubscriber, "ActiveStorage::LogSubscriber"],
   [() => m33.MirrorJob, "ActiveStorage::MirrorJob"],
+  [() => m34.NamedVariant, "ActiveStorage::NamedVariant"],
   [() => m28.PreviewError, "ActiveStorage::PreviewError"],
-  [() => m34.PurgeJob, "ActiveStorage::PurgeJob"],
-  [() => m35.Record, "ActiveStorage::Record"],
-  [() => m36.ActiveRecordExtensions, "ActiveStorage::Reflection::ActiveRecordExtensions"],
-  [() => m36.HasAttachedReflection, "ActiveStorage::Reflection::HasAttachedReflection"],
-  [() => m36.HasManyAttachedReflection, "ActiveStorage::Reflection::HasManyAttachedReflection"],
-  [() => m36.HasOneAttachedReflection, "ActiveStorage::Reflection::HasOneAttachedReflection"],
-  [() => m37.Service, "ActiveStorage::Service"],
-  [() => m38.Configurator, "ActiveStorage::Service::Configurator"],
-  [() => m39.DiskService, "ActiveStorage::Service::DiskService"],
-  [() => m40.MirrorService, "ActiveStorage::Service::MirrorService"],
-  [() => m41.Registry, "ActiveStorage::Service::Registry"],
+  [() => m35.PurgeJob, "ActiveStorage::PurgeJob"],
+  [() => m36.Record, "ActiveStorage::Record"],
+  [() => m37.ActiveRecordExtensions, "ActiveStorage::Reflection::ActiveRecordExtensions"],
+  [() => m37.ClassMethods, "ActiveStorage::Reflection::ActiveRecordExtensions::ClassMethods"],
+  [() => m37.HasAttachedReflection, "ActiveStorage::Reflection::HasAttachedReflection"],
+  [() => m37.HasManyAttachedReflection, "ActiveStorage::Reflection::HasManyAttachedReflection"],
+  [() => m37.HasOneAttachedReflection, "ActiveStorage::Reflection::HasOneAttachedReflection"],
+  [() => m37.ReflectionExtension, "ActiveStorage::Reflection::ReflectionExtension"],
+  [() => m38.Service, "ActiveStorage::Service"],
+  [() => m39.Configurator, "ActiveStorage::Service::Configurator"],
+  [() => m40.DiskService, "ActiveStorage::Service::DiskService"],
+  [() => m41.MirrorService, "ActiveStorage::Service::MirrorService"],
+  [() => m42.Registry, "ActiveStorage::Service::Registry"],
   [() => m28.UnpreviewableError, "ActiveStorage::UnpreviewableError"],
   [() => m28.UnrepresentableError, "ActiveStorage::UnrepresentableError"],
   [() => m31.VERSION, "ActiveStorage::VERSION"],

@@ -43,6 +43,19 @@ export class Many extends Attached {
     return rbFSend(this.record, this.name) as this;
   }
 
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  async load(): Promise<void> {
+    await this.associationAttachments;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async isBlank(): Promise<boolean> {
+    return !(await this.isAttached());
+  }
+
   async isAttached(): Promise<boolean> {
     return (await this.attachments).length > 0;
   }
