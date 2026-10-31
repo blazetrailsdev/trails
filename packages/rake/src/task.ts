@@ -134,10 +134,6 @@ export class Task {
     return this;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE rake-file-list-prerequisite-sync-read
-   */
   async _resolvePrerequisites(): Promise<void> {
     for (const fileList of this._pendingPrerequisites.splice(0)) {
       this.enhance(Task.formatDeps(await fileList.toAry()));
