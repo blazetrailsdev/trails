@@ -8,13 +8,17 @@ const order = (klass: unknown): string[] =>
 describe("generator command order", () => {
   it("runs check_class_collision before the files it guards", () => {
     const commands = order(HelperGenerator);
-    expect(commands.indexOf("checkClassCollision")).toBeLessThan(
-      commands.indexOf("createHelperFiles"),
+    expect(commands.indexOf("check-class-collision")).toBeGreaterThanOrEqual(0);
+    expect(commands.indexOf("check-class-collision")).toBeLessThan(
+      commands.indexOf("create-helper-files"),
     );
   });
 
   it("registers create_fixture_file after create_test_file", () => {
     const commands = order(ModelGenerator);
-    expect(commands.indexOf("createTestFile")).toBeLessThan(commands.indexOf("createFixtureFile"));
+    expect(commands.indexOf("create-test-file")).toBeGreaterThanOrEqual(0);
+    expect(commands.indexOf("create-test-file")).toBeLessThan(
+      commands.indexOf("create-fixture-file"),
+    );
   });
 });
