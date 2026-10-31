@@ -875,6 +875,7 @@ export class Application {
 
   /** @internal */
   private standardSystemDir(): string {
+    if (Win32.isWindows()) return Win32.win32SystemDir();
     return File.join(File.expandPath("~"), ".rake");
   }
 
