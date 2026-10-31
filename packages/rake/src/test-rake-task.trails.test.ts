@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
+import { FileList } from "./file-list.js";
 import { Rake } from "./rake-module.js";
 import { Task, type TaskAction } from "./task.js";
 
@@ -17,6 +18,15 @@ describe("Rake::Task", () => {
 
   afterEach(() => {
     Rake.application = undefined;
+  });
+
+  it("reads a resolved FileList's entries as prerequisites at define time", async () => {
+    const t = app.defineTask(Task, { a: await new FileList().include("b", "c").resolve() });
+    expect(t.prerequisites).toEqual(["b", "c"]);
+  });
+
+  it("raises defining a task on a pending FileList", () => {
+    expect(() => app.defineTask(Task, { a: new FileList().include("b") })).toThrow(RuntimeError);
   });
 
   it("invokes prerequisites first, and each task once", async () => {
