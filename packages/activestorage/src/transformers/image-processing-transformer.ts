@@ -55,7 +55,10 @@ export class ImageProcessingTransformer extends Transformer {
     ) as ChainableHost;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm camelize — CONVERGEABLE activestorage-transformer-deviations-ruling
+   */
   private operations(): [string, unknown][] {
     const list: [string, unknown][] = [];
     for (const [name, argument] of Object.entries(this.transformations)) {
@@ -70,7 +73,7 @@ export class ImageProcessingTransformer extends Transformer {
       }
 
       if (isPresent(argument)) {
-        list.push([name, argument]);
+        list.push([camelize(name.replaceAll("-", "_"), false), argument]);
       }
     }
     return list;

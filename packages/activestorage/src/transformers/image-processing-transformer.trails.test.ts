@@ -75,6 +75,11 @@ describe("ActiveStorage::Transformers::ImageProcessingTransformer", () => {
     );
   });
 
+  it.each(["mini_magick", "vips"])("dispatches a snake_case name under %s", async (processor) => {
+    ActiveStorage.variantProcessor = processor;
+    await expect(transform({ resize_to_limit: [10, 10] })).resolves.toBeGreaterThan(0);
+  });
+
   it("raises UnsupportedImageProcessingMethod for an unlisted method", async () => {
     await expect(transform({ systemCall: "x" })).rejects.toThrow(UnsupportedImageProcessingMethod);
   });
