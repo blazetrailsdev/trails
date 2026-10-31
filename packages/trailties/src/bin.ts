@@ -4,6 +4,7 @@ import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Dir, argv } from "@blazetrails/ruby-compat";
 import { APP_PATH, setAppPath } from "./app-path.js";
 import { invoke } from "./command.js";
+import "./class-paths.generated.js";
 
 if (APP_PATH == null) {
   const root = Dir.pwd();

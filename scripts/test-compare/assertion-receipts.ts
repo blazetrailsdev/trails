@@ -121,6 +121,24 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
           "encodings_spec.rb:615 spells the expected text as octal UTF-8 bytes; a JS string has no encoding tag, so the port spells the decoded characters (CLAUDE.md, A String has no encoding tag either).",
       },
     ],
+  "rake:test_rake_test_task.rb › TestRakeTestTask › run code rake": [
+    {
+      kind: "assert_includes",
+      value: "s:lib/rake/rake_test_loader.rb",
+      as: "assert_includes",
+      reason:
+        "test_rake_test_task.rb:131 names rake's installed path. A TS module is emitted by kebab-case file name beside its importer, so the same assertion names `rake-test-loader.js`, the spelling `run_code` produces.",
+    },
+  ],
+  "rake:test_rake_rake_test_loader.rb › TestRakeRakeTestLoader › load error raised implicitly": [
+    {
+      kind: "assert_equal",
+      value: "s:no such file to load -- superkalifragilisticoespialidoso",
+      as: null,
+      reason:
+        'test_rake_rake_test_loader.rb:52-56 runs that arm only on `RUBY_ENGINE == "jruby"`; Node has no JRuby to assert against.',
+    },
+  ],
   "rake:test_rake_file_list.rb › TestRakeFileList › string ext": [
     {
       kind: "assert_equal",

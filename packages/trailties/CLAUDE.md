@@ -212,3 +212,13 @@ rejected because every package-shipped engine would carry the same one.
 This is a genuine runtime difference, ruled by the repo owner on 2026-10-23
 (trails#9280). `findRoot` carries `@inventedArm loop` / `if — PERMANENT`
 against this section.
+
+## `Rails::Command::Base.inherited` runs at a subclass's first `methodAdded`
+
+`Base.inherited` adds a named subclass not ending in `Base` to
+`Rails::Command.subclasses`
+(`vendor/rails/v8.0.2/railties/lib/rails/command/base.rb:59-65`). JS has no hook
+at `extends` (CLAUDE.md § "`inherited` is deferred to own-property memo guards"),
+so `Base.methodAdded` seats the class the first time it adds a command, with
+`inherited`'s guard. A subclass with no command is never seated, which loses
+nothing: `find_by_namespace` needs a command to dispatch.

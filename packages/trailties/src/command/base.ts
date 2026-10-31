@@ -7,6 +7,7 @@ import { Error as ThorError } from "@blazetrails/thor/error";
 import type { Shell } from "@blazetrails/thor/shell";
 import { HELP_MAPPINGS, hiddenCommands } from "../command.js";
 import { Actions } from "./actions.js";
+import { subclasses } from "./behavior.js";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Base extends Included<typeof Actions>, ThorBase, Shell {}
@@ -39,6 +40,13 @@ export class Base extends Thor {
       }
       return this._namespace;
     }
+  }
+
+  static methodAdded(meth: string): void {
+    if (this.name && !this.name.endsWith("Base") && !subclasses().includes(this)) {
+      subclasses().push(this);
+    }
+    (Thor as unknown as ThorClass).methodAdded.call(this as unknown as ThorClass, meth);
   }
 
   static hideCommandBang(): void {

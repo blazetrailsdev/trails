@@ -7,7 +7,7 @@ import { ActiveStorage } from "../active-storage.js";
 import { Current } from "../current.js";
 import { FileNotFoundError, IntegrityError } from "../errors.js";
 import { Filename } from "../filename.js";
-import type { DiskService } from "./disk-service.js";
+import type { Service } from "../service.js";
 
 export const FIXTURE_DATA = Uint8Array.from(
   "89504e470d0a1a0a0000000d4948445200000010000000100103000000253d6d2200000006504c5445000000ffffffa5d99fdd0000003349444154789c63f8ff9fe1ff5f86ff9f190eb033dc3fcc707f32c3cdcd0c378d19ee1483d0bdcf0cf78152cc0c0fc0e8ff7f0051861728ce5d9b500000000049454e44ae426082"
@@ -29,8 +29,10 @@ routes.draw(function () {
   });
 });
 
-export function SharedServiceTests(SERVICE: DiskService): {
-  service: DiskService;
+export function SharedServiceTests<T extends Service>(
+  SERVICE: T,
+): {
+  service: T;
   key: string;
   routes: RouteSet;
 } {

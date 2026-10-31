@@ -20,6 +20,7 @@ import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, type Relations } 
 import { Actions, type ActionsHost } from "./actions.js";
 import { Arguments } from "./parser/arguments.js";
 import { Command, DynamicCommand } from "./command.js";
+import { snakeCase } from "./util.js";
 import type { Invocation } from "./invocation.js";
 import type { Option } from "./parser/option.js";
 import { Options } from "./parser/options.js";
@@ -142,7 +143,7 @@ export class Group {
           if (!rtest(this.options[name])) return;
 
           let value = this.options[name];
-          if (value === true) value = name;
+          if (value === true) value = snakeCase(name);
           const self = this.constructor as GroupClass;
           const prepared = await self.prepareForInvocation(name, value);
           const [klass, command = null] = Array.isArray(prepared) ? prepared : [prepared];

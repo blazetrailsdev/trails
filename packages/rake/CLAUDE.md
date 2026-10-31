@@ -32,9 +32,12 @@ argue.
 `Rake::TestTask#ruby_opts_string` prepends `-w` and `-I"lib"`
 (`vendor/rake/v13.2.1/lib/rake/testtask.rb:152-157`), and `FileUtils::RUBY` is
 `node`, which rejects both as bad options. `-w` ports as
-`--pending-deprecation`, Node's nearest switch. Node has no load-path switch
-and an ES import does not read `$LOAD_PATH`, so `-I` is dropped and `lib_path`
-stays ported with no caller. The `:direct` loader's `-e` program is the
+`--pending-deprecation`, Node's nearest switch. Node has no load-path switch, so `-I"#{lib_path}"` moves
+from `ruby_opts_string` to behind the `:rake` loader in `run_code`, and
+`rake-test-loader.ts` does what Ruby's `-I` does (`vendor/ruby/v3.3.11/ruby.c`,
+`proc_options`): it expands each entry onto the front of `LOAD_PATH` before any test file
+loads. `rbFRequireFile` reads `LOAD_PATH`; a plain ES import does not. The
+`:direct` and `:testrb` loaders run no trails code, so they take no `-I`. The `:direct` loader's `-e` program is the
 JS spelling of Ruby's, and `:testrb` stays Rake's string, since `testrb` has no
 Node counterpart. The default `pattern` keeps `test/test*.rb`.
 
