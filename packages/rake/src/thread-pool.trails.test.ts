@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { block } from "@blazetrails/ruby-compat";
+import { block, rbObjId, Thread } from "@blazetrails/ruby-compat";
 import { ThreadPool } from "./thread-pool.js";
 
 describe("Rake::ThreadPool (trails)", () => {
@@ -7,14 +7,16 @@ describe("Rake::ThreadPool (trails)", () => {
     const pool = new ThreadPool(0);
     pool.gatherHistory();
     await pool.future(block(() => 1)).value();
-    expect(pool.history().find((e) => e.event === "did_execute")!.thread).toBe("main");
+    expect(pool.history().find((e) => e.event === "did_execute")!.thread).toBe(
+      rbObjId(Thread.main),
+    );
 
     const threaded = new ThreadPool(1);
     threaded.gatherHistory();
     threaded.future(block(() => 1));
     await threaded.join();
     const history = threaded.history();
-    expect(history.find((e) => e.event === "queued")!.thread).toBe("main");
+    expect(history.find((e) => e.event === "queued")!.thread).toBe(rbObjId(Thread.main));
     expect(history.find((e) => e.event === "did_execute")!.thread).toBe(
       history.find((e) => e.event === "spawned")!.data!.new_thread,
     );

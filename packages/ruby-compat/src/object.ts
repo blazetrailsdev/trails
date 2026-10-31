@@ -852,8 +852,11 @@ export function camelized(name: string): string {
  */
 export function kebabCase(name: string): string {
   if (name.startsWith("_")) return name;
-  const words = /^[A-Z_]+$/.test(name) ? name : name.replace(/\B[A-Z]/g, "-$&");
-  return words.replace(/[-_]+/g, "-").toLowerCase();
+  return name
+    .replace(/([a-z\d])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
+    .replace(/[-_]+/g, "-")
+    .toLowerCase();
 }
 
 function checkDefinition(mod: { prototype: object }, mid: string, inherit = true): boolean {

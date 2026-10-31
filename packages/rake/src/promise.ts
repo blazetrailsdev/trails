@@ -8,7 +8,7 @@ export class Promise<T = unknown> {
   /** @internal */ _error: unknown = NOT_SET;
   /** @internal */ _args: unknown[] | null;
   /** @internal */ _block: ((...args: unknown[]) => T | globalThis.Promise<T>) | null;
-  recorder: ((event: string, data: object, thread: object | null) => void) | null = null;
+  recorder: ((event: string, data: object) => void) | null = null;
 
   constructor(args: unknown[], block: (...args: unknown[]) => T | globalThis.Promise<T>) {
     this._args = args;
@@ -20,7 +20,7 @@ export class Promise<T = unknown> {
       this.stat("sleeping_on", { item_id: rbObjId(this) });
       while (this._mutex != null) await this._mutex;
       this.stat("has_lock_on", { item_id: rbObjId(this) });
-      this._mutex = this.chore(null).finally(() => {
+      this._mutex = this.chore().finally(() => {
         this._mutex = null;
       });
       await this._mutex;
@@ -30,34 +30,33 @@ export class Promise<T = unknown> {
     return this._result as T;
   }
 
-  /** @missingRailsArgs work — PERMANENT */
-  async work(thread: object | null = null): globalThis.Promise<void> {
-    this.stat("attempting_lock_on", { item_id: rbObjId(this) }, thread);
+  async work(): globalThis.Promise<void> {
+    this.stat("attempting_lock_on", { item_id: rbObjId(this) });
     if (this._mutex == null) {
-      this.stat("has_lock_on", { item_id: rbObjId(this) }, thread);
-      this._mutex = this.chore(thread).finally(() => {
+      this.stat("has_lock_on", { item_id: rbObjId(this) });
+      this._mutex = this.chore().finally(() => {
         this._mutex = null;
       });
       await this._mutex;
-      this.stat("releasing_lock_on", { item_id: rbObjId(this) }, thread);
+      this.stat("releasing_lock_on", { item_id: rbObjId(this) });
     } else {
-      this.stat("bailed_on", { item_id: rbObjId(this) }, thread);
+      this.stat("bailed_on", { item_id: rbObjId(this) });
     }
   }
 
   /** @internal */
-  private async chore(thread: object | null): globalThis.Promise<void> {
+  private async chore(): globalThis.Promise<void> {
     if (this.isComplete()) {
-      this.stat("found_completed", { item_id: rbObjId(this) }, thread);
+      this.stat("found_completed", { item_id: rbObjId(this) });
       return;
     }
-    this.stat("will_execute", { item_id: rbObjId(this) }, thread);
+    this.stat("will_execute", { item_id: rbObjId(this) });
     try {
       this._result = await this._block!(...this._args!);
     } catch (e) {
       this._error = e;
     }
-    this.stat("did_execute", { item_id: rbObjId(this) }, thread);
+    this.stat("did_execute", { item_id: rbObjId(this) });
     this.discard();
   }
 
@@ -83,7 +82,7 @@ export class Promise<T = unknown> {
   }
 
   /** @internal */
-  private stat(event: string, data: object, thread: object | null = null): void {
-    if (this.recorder != null) this.recorder(event, data, thread);
+  private stat(event: string, data: object): void {
+    if (this.recorder != null) this.recorder(event, data);
   }
 }

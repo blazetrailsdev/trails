@@ -1,4 +1,4 @@
-import { rbBlockGivenP, rbObjId } from "@blazetrails/ruby-compat";
+import { rbBlockGivenP, rbObjId, Thread } from "@blazetrails/ruby-compat";
 import { Promise as RakePromise } from "./promise.js";
 
 export interface HistoryEvent {
@@ -10,7 +10,7 @@ export interface HistoryEvent {
 
 export class ThreadPool {
   /** @internal */ _maxActiveThreads: number;
-  /** @internal */ _threads = new Set<Promise<void>>();
+  /** @internal */ _threads = new Set<Thread>();
   /** @internal */ _queue: RakePromise[] = [];
   /** @internal */ _joinCond: (() => void)[] = [];
   /** @internal */ _historyStartTime: number | null = null;
@@ -26,7 +26,7 @@ export class ThreadPool {
       ...args: unknown[]
     ) => T | Promise<T>;
     const promise = new RakePromise<T>(args, block);
-    promise.recorder = (event, data, thread) => this.stat(event, data, thread);
+    promise.recorder = (event, data) => this.stat(event, data);
 
     this._queue.push(promise as RakePromise);
     this.stat("queued", { item_id: rbObjId(promise) });
@@ -64,11 +64,11 @@ export class ThreadPool {
    * @internal
    * @missingRailsArgs stat — PERMANENT
    */
-  private async processQueueItem(thread: object): Promise<boolean> {
+  private async processQueueItem(): Promise<boolean> {
     if (this._queue.length === 0) return false;
     const promise = this._queue.shift()!;
-    this.stat("dequeued", { item_id: rbObjId(promise) }, thread);
-    await promise.work(thread);
+    this.stat("dequeued", { item_id: rbObjId(promise) });
+    await promise.work();
     return true;
   }
 
@@ -83,19 +83,18 @@ export class ThreadPool {
   /**
    * @internal
    * @missingRailsCall count — PERMANENT
-   * @missingRailsArgs process_queue_item — PERMANENT
    * @missingRailsArgs stat — PERMANENT
    */
   private startThread(): void {
     if (!(this._threads.size < this._maxActiveThreads)) return;
-    const t: Promise<void> = Promise.resolve().then(async () => {
+    const t = new Thread(async () => {
       try {
         while (this.safeThreadCount() <= this._maxActiveThreads) {
-          if (!(await this.processQueueItem(t))) break;
+          if (!(await this.processQueueItem())) break;
         }
       } finally {
-        this._threads.delete(t);
-        this.stat("ended", { thread_count: this._threads.size }, t);
+        this._threads.delete(Thread.current());
+        this.stat("ended", { thread_count: this._threads.size });
         if (this._threads.size === 0) for (const resolve of this._joinCond.splice(0)) resolve();
       }
     });
@@ -107,13 +106,13 @@ export class ThreadPool {
   }
 
   /** @internal */
-  private stat(event: string, data: object | null = null, thread: object | null = null): void {
+  private stat(event: string, data: object | null = null): void {
     if (this._historyStartTime == null) return;
     this._history.push({
       event,
       data: data as HistoryEvent["data"],
       time: Date.now() / 1000,
-      thread: thread == null ? "main" : rbObjId(thread),
+      thread: rbObjId(Thread.current()),
     });
   }
 }

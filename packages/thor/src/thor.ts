@@ -640,11 +640,17 @@ export class Thor {
   /** @internal */
   declare static normalizeTaskName: typeof Thor.normalizeCommandName;
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm replaceAll — PERMANENT
+   */
   static findCommandPossibilities(this: ThorClass, meth: string): string[] {
     const len = toS(meth).length;
+    const folded = toS(meth).replaceAll("_", "-");
     const possibilities = sort(
-      Object.keys({ ...this.allCommands(), ...this.map() }).filter((n) => meth === n.slice(0, len)),
+      Object.keys({ ...this.allCommands(), ...this.map() }).filter(
+        (n) => meth === n.slice(0, len) || folded === n.slice(0, len),
+      ),
     );
     const uniquePossibilities = [
       ...new Set(possibilities.map((k) => (rtest(this.map()[k]) ? this.map()[k] : k))),
@@ -652,6 +658,8 @@ export class Thor {
 
     if (possibilities.includes(meth)) {
       return [meth];
+    } else if (possibilities.includes(folded)) {
+      return [folded];
     } else if (uniquePossibilities.length === 1) {
       return uniquePossibilities;
     } else {

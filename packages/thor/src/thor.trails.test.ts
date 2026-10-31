@@ -520,5 +520,6 @@ describe("Thor class paths", () => {
     expect(Object.keys(klass.commands())).toEqual(["foo-bar"]);
     expect(await klass.dispatch(null, ["foo-bar"], null, {})).toBe("ran");
     expect(await klass.dispatch(null, ["foo_bar"], null, {})).toBe("ran");
+    expect(await klass.dispatch(null, ["foo_b"], null, {})).toBe("ran");
   });
 });

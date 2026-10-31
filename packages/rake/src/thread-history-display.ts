@@ -41,7 +41,7 @@ export class ThreadHistoryDisplay {
   /** @internal */
   private rename(hash: object, key: string, renames: Renames): void {
     const h = hash as Record<string, string | number>;
-    if (h[key] != null) {
+    if (hash != null && h[key] != null) {
       const original = h[key];
       let value = renames[original];
       if (value == null) {
