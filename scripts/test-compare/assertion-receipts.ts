@@ -15,6 +15,7 @@ import { activejob } from "./assertion-receipts/activejob.js";
 import { activemodel } from "./assertion-receipts/activemodel.js";
 import { activerecord } from "./assertion-receipts/activerecord.js";
 import { activesupport } from "./assertion-receipts/activesupport.js";
+import { mail } from "./assertion-receipts/mail.js";
 import { msgpack } from "./assertion-receipts/msgpack.js";
 import { rack } from "./assertion-receipts/rack.js";
 import { rake } from "./assertion-receipts/rake.js";
@@ -50,6 +51,7 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   activemodel,
   activerecord,
   activesupport,
+  mail,
   msgpack,
   rack,
   rake,

@@ -1,3 +1,4 @@
+import { Mail } from "./mail.js";
 import {
   ArgumentError,
   b,
@@ -14,6 +15,7 @@ import {
   rbObjDup,
   rbStrByteslice,
   rbStrEnumerateLines,
+  Socket,
   UndefinedConversionError,
   warn,
   Encoding,
@@ -229,6 +231,10 @@ export const Utilities = {
     } else {
       return rbObjRespondTo(value, "isEmpty") ? isEmpty(value as object) : value === false;
     }
+  },
+
+  generateMessageId(): string {
+    return `<${Mail.randomTag()}@${Socket.gethostname()}.mail>`;
   },
 
   escapeParen(str: string): string {

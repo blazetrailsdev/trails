@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
+import { ContentLocationElement } from "../elements/content-location-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
@@ -290,7 +291,7 @@ export const ContentLocationParser = extend(
         }
       }
       if (p != eof || cs < 32) {
-        throw new Field.IncompleteParseError("Mail::ContentLocationElement", data, p);
+        throw new Field.IncompleteParseError(ContentLocationElement, data, p);
       }
       return contentLocation;
     },

@@ -1,3 +1,4 @@
+import { NoMethodError } from "../no-method-error.js";
 import { bytes } from "./bytes.js";
 
 /**
@@ -16,5 +17,6 @@ import { bytes } from "./bytes.js";
  * (`vendor/ruby/v3.3.11/string.c:10955` `rb_str_b`).
  */
 export function b(str: string | Uint8Array): Uint8Array {
+  if (Array.isArray(str)) throw new NoMethodError("undefined method 'b' for an instance of Array");
   return Uint8Array.from(str instanceof Uint8Array ? str : bytes(String(str)));
 }

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, no-useless-assignment, prefer-const, unused-imports/no-unused-vars */
 import { b, extend, Struct } from "@blazetrails/ruby-compat";
 import { Field } from "../field.js";
+import { MimeVersionElement } from "../elements/mime-version-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
@@ -263,7 +264,7 @@ export const MimeVersionParser = extend(
         }
       }
       if (p != eof || cs < 23) {
-        throw new Field.IncompleteParseError("Mail::MimeVersionElement", data, p);
+        throw new Field.IncompleteParseError(MimeVersionElement, data, p);
       }
       return mimeVersion;
     },
