@@ -1,17 +1,16 @@
 import { afterAll } from "vitest";
-import { EnvironmentInquirer, getEnv, onLoad, TopLevel } from "@blazetrails/activesupport";
-import { GlobalID, Identification } from "@blazetrails/globalid";
+import { EnvironmentInquirer, getEnv, TopLevel } from "@blazetrails/activesupport";
+import { GlobalID } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { RouteSet } from "@blazetrails/actionpack";
 import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/activerecord";
-import { Engine } from "@blazetrails/trailties/engine";
-import { File, Dir, include } from "@blazetrails/ruby-compat";
+import { Application } from "@blazetrails/trailties";
+import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/global-id";
+import { File, Dir } from "@blazetrails/ruby-compat";
 import "../../class-paths.generated.js";
-import { ActiveStorage } from "../../active-storage.js";
-import { Model } from "../../attached/model.js";
 import { Attachment } from "../../attachment.js";
-import { ActiveRecordExtensions } from "../../reflection.js";
 import { Blob } from "../../blob.js";
+import { Engine } from "../../engine.js";
 import { Registry } from "../../service/registry.js";
 import "../../service/configurator.js";
 import { ActiveStorageCreateUsers } from "./create-users-migration.js";
@@ -40,13 +39,14 @@ TopLevel.Trails = {
   },
 } as unknown as typeof TopLevel.Trails;
 
-class ActiveStorageEngine extends Engine {
-  static {
-    Engine.register(this, import.meta.dirname);
-    this.isolateNamespace(ActiveStorage as never);
+class Dummy extends Application {}
+Application.register(Dummy, import.meta.dirname);
+const app = Dummy.instance();
+for (const railtie of [GlobalIDRailtie, Engine]) {
+  for (const initializer of railtie.initializers) {
+    await initializer.bind(railtie.instance()).run(app);
   }
 }
-void ActiveStorageEngine;
 
 ActiveStorage.trackVariants = true;
 ActiveStorage.contentTypesToServeAsBinary = [
@@ -74,12 +74,6 @@ ActiveStorage.contentTypesAllowedInline = [
 ];
 
 GlobalID.setApp("ActiveStorageExampleApp");
-
-onLoad("active_record", function (this: typeof Base) {
-  include(this, Model);
-  include(this, ActiveRecordExtensions);
-  include(this, Identification);
-});
 
 Blob.services = new Registry({
   local: { service: "Disk", root: File.join(Dir.tmpdir(), "active_storage_blobs") },

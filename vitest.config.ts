@@ -352,6 +352,8 @@ const alias = {
   "@blazetrails/solid-queue": path.resolve(__dirname, "packages/solid-queue/src/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/src/index.ts"),
   "@blazetrails/trailties/all": path.resolve(__dirname, "packages/trailties/src/all.ts"),
+  "@blazetrails/trailties/trailties/":
+    path.resolve(__dirname, "packages/trailties/src/trailties") + "/",
   "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/src/engine.ts"),
   "@blazetrails/trailties/trailtie/configuration": path.resolve(
     __dirname,
@@ -462,6 +464,10 @@ const aliasEntries = [
   {
     find: /^@blazetrails\/thor$/,
     replacement: path.resolve(__dirname, "packages/thor/src/thor.ts"),
+  },
+  {
+    find: /^@blazetrails\/trailties$/,
+    replacement: path.resolve(__dirname, "packages/trailties/src/index.ts"),
   },
   ...Object.entries(alias).map(([find, replacement]) => ({ find, replacement })),
 ];
