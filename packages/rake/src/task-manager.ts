@@ -40,7 +40,7 @@ export class TaskManager {
   declare _rules: Rule[];
   declare _scope: Scope;
   declare _seed: number | undefined;
-  declare _threadStatistics: Application["_threadStatistics"];
+  declare threadPool: Application["threadPool"];
   declare options: ApplicationOptions;
   declare trace: Application["trace"];
 

@@ -136,7 +136,7 @@ export class Task {
 
   /**
    * @internal
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE rake-file-list-prerequisite-sync-read
    */
   async _resolvePrerequisites(): Promise<void> {
     for (const fileList of this._pendingPrerequisites.splice(0)) {
@@ -267,7 +267,7 @@ export class Task {
   ): Promise<void> {
     const futures = (await this.prerequisiteTasks()).map((p) => {
       const prereqArgs = taskArgs.newScope(p.argNames);
-      const stats = this.application._threadStatistics;
+      const stats = this.application.threadPool;
       stats.totalThreadsInPlay += 1;
       stats.activeThreads += 1;
       stats.maxActiveThreads = Math.max(stats.maxActiveThreads, stats.activeThreads);

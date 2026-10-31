@@ -218,8 +218,6 @@ export class SMTP {
   static readonly Response = Response;
   static readonly Address = Address;
   static readonly Authenticator = Authenticator;
-  /** @noRailsEquivalent PERMANENT */
-  static readonly SMTPAuthenticationError = SMTPAuthenticationError;
 
   static defaultPort(): number {
     return 25;
@@ -473,8 +471,8 @@ export class SMTP {
   /**
    * @internal
    * @inventedArm rescue — PERMANENT
-   * @missingRailsCall order:critical,tlsconnect — PERMANENT
-   * @missingRailsArgs tlsconnect — PERMANENT
+   * @missingRailsCall order:critical,tlsconnect — CONVERGEABLE net-smtp-smtps-tlsconnect-in-do-start
+   * @missingRailsArgs tlsconnect — CONVERGEABLE net-smtp-smtps-tlsconnect-in-do-start
    */
   private async doStart(
     heloDomain: string,
@@ -503,31 +501,36 @@ export class SMTP {
     }) as Connection;
     this._socket = s;
     try {
-      let res: Response;
-      try {
-        res = await new Promise<Response>((resolve, reject) => {
-          s.once("error", reject);
-          s._actionGreeting = (str: string) => {
-            s._clearPhase();
-            s.removeListener("error", reject);
-            resolve(Response.parse(`${str}\n`));
-          };
-          s.connect();
-        });
-      } catch (err) {
-        if ((err as ConnectionError).code === "ETIMEDOUT") {
-          throw new OpenTimeout("execution expired");
-        }
-        if ((err as ConnectionError).code === "ECONNECTION") {
-          throw new EOFError("end of file reached");
-        }
-        throw err;
-      }
+      this.logging(`Connection opened: ${this.address}:${this.port}`);
+      this.checkResponse(
+        await this.critical(async () => {
+          let onError: (err: Error) => void;
+          try {
+            return await new Promise<Response>((resolve, reject) => {
+              onError = reject;
+              s.once("error", onError);
+              s._actionGreeting = (str: string) => {
+                s._clearPhase();
+                resolve(Response.parse(`${str}\n`));
+              };
+              s.connect();
+            });
+          } catch (err) {
+            if ((err as ConnectionError).code === "ETIMEDOUT") {
+              throw new OpenTimeout("execution expired");
+            }
+            if ((err as ConnectionError).code === "ECONNECTION") {
+              throw new EOFError("end of file reached");
+            }
+            throw err;
+          } finally {
+            s.removeListener("error", onError!);
+          }
+        }),
+      );
       s.on("error", () => {
         this._errorOccurred = true;
       });
-      this.logging(`Connection opened: ${this.address}:${this.port}`);
-      this.checkResponse(await this.critical(() => res));
       await this.doHelo(heloDomain);
       if (
         !this.isTls() &&
@@ -647,7 +650,7 @@ export class SMTP {
 
   async openMessageStream(fromAddr: string | Address, ...toAddrs: unknown[]): Promise<Response> {
     const block = toAddrs.pop() as (stream: { write(str: string): unknown }) => unknown;
-    const to = toAddrs.flat() as Array<string | Address>;
+    const to = toAddrs.flat(Infinity) as Array<string | Address>;
     if (this._socket == null) throw new IOError("closed session");
     if (this.anyRequireSmtputf8(to) && this.isCapable("SMTPUTF8")) {
       fromAddr = new Address(fromAddr, "SMTPUTF8");
