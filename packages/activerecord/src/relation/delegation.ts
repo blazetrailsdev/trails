@@ -107,11 +107,15 @@ export class DelegateCache {
 
   /** @internal */
   static generatedRelationMethods(this: typeof Base): GeneratedRelationMethods {
-    const existing = rbObjIvarGet(this, "@generated_relation_methods");
-    if (existing != null) return existing as GeneratedRelationMethods;
-    const mod = new GeneratedRelationMethods();
-    constSet(this, "GeneratedRelationMethods", mod);
-    return rbObjIvarSet(this, "@generated_relation_methods", mod) as GeneratedRelationMethods;
+    return (rbObjIvarGet(this, "@generated_relation_methods") ??
+      rbObjIvarSet(
+        this,
+        "@generated_relation_methods",
+        ((mod) => {
+          constSet(this, "GeneratedRelationMethods", mod);
+          return mod;
+        })(new GeneratedRelationMethods()),
+      )) as GeneratedRelationMethods;
   }
 }
 

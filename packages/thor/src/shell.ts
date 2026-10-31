@@ -1,4 +1,4 @@
-import { env, RbConfig, rbCallSuper, rbConstGet, rbEnsure } from "@blazetrails/ruby-compat";
+import { env, RbConfig, rbCallSuper, constGet, rbEnsure } from "@blazetrails/ruby-compat";
 import { Basic } from "./shell/basic.js";
 import { Color } from "./shell/color.js";
 
@@ -15,7 +15,7 @@ const singleton = {
   get shell(): ShellClass {
     if (this._shell == null) {
       if (env["THOR_SHELL"] != null && env["THOR_SHELL"] !== "") {
-        this._shell = rbConstGet(Shell, env["THOR_SHELL"]) as ShellClass;
+        this._shell = constGet(Shell, env["THOR_SHELL"]) as ShellClass;
       } else if (/mswin|mingw/.test(RbConfig.CONFIG["host_os"]) && env["ANSICON"] == null) {
         this._shell = Shell.Basic;
       } else {

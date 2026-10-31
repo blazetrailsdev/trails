@@ -6861,6 +6861,14 @@ describe("callArgs", () => {
   const site = (source: string, method = "create"): CallSite[] =>
     extractFromSource(source).instanceMethods.find((m) => m.name === method)!.callArgs!;
 
+  it("drops the module, Ruby's receiver, from a const family call", () => {
+    expect(
+      site(`class Foo { create(mod: any, name: string) { return constGet(mod, name); } }`).find(
+        (s) => s.name === "constGet",
+      )?.args,
+    ).toEqual(["id:name"]);
+  });
+
   it("records a native hash form's key as an @in / @delete site (RFC 0190)", () => {
     expect(
       site(

@@ -22,7 +22,7 @@ import {
   capitalize,
   isEmpty,
   isSymbol,
-  rbConstGet,
+  constGet,
   constSet,
   rbObjAsString,
   rtest,
@@ -234,7 +234,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
   union(operation: string | SelectManager, other: SelectManager | null = null): Union {
     let nodeClass: typeof Union;
     if (other != null) {
-      nodeClass = rbConstGet(
+      nodeClass = constGet(
         Nodes,
         `Union${capitalize(rbObjAsString(operation), [])}`,
       ) as typeof Union;
@@ -266,7 +266,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
   with(...subqueries: (string | Subqueries)[]): this {
     let nodeClass: typeof With;
     if (isSymbol(subqueries[0])) {
-      nodeClass = rbConstGet(
+      nodeClass = constGet(
         Nodes,
         `With${capitalize(symbolToS(subqueries.shift() as string), [])}`,
       ) as typeof With;

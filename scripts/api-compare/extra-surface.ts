@@ -1943,6 +1943,24 @@ function resolveDelegatedClass(
 }
 
 /**
+ * Packages whose Ruby-name credit comes from their own names only, so the
+ * verdict does not change with which other gems the artifact holds: the scoped
+ * lane's `rails-api.json` carries thor and its mixins, the full lane every gem.
+ */
+const OWN_MOVED_CREDIT_PACKAGES = new Set(["thor"]);
+
+/** The Ruby-name oracle a file in `pkg` is scored against. */
+function creditCandidates(
+  pkg: string,
+  ruby: ApiManifest,
+  globalRubyCandidates: Map<string, RubyOwner[]>,
+): Map<string, RubyOwner[]> {
+  const own = ruby.packages[pkg];
+  if (!OWN_MOVED_CREDIT_PACKAGES.has(pkg) || own === undefined) return globalRubyCandidates;
+  return buildGlobalRubyCandidates({ ...ruby, packages: { [pkg]: own } });
+}
+
+/**
  * Build the global "all Ruby method candidate names anywhere in Rails-land"
  * map, used to classify each extra as novel (nowhere in Rails) vs moved
  * (somewhere in Rails, just not in the matched file).
@@ -1966,33 +1984,6 @@ function resolveDelegatedClass(
  * doesn't sit in its own file as novel-by-omission, which is exactly the
  * miscount this pass exists to remove.
  */
-/**
- * Packages whose `moved` credit comes from their own Ruby names only, so the
- * verdict does not change with which other gems the artifact holds: the scoped
- * lane's `rails-api.json` carries thor and its mixins, the full lane every gem.
- */
-const OWN_MOVED_CREDIT_PACKAGES = new Set(["thor"]);
-const ownRubyCandidates = new WeakMap<object, Map<string, RubyOwner[]>>();
-
-/** The Ruby owners crediting `name` as `moved` for a file in `pkg`. */
-export function movedOwners(
-  pkg: string,
-  name: string,
-  ruby: ApiManifest,
-  globalRubyCandidates: Map<string, RubyOwner[]>,
-): RubyOwner[] | undefined {
-  const own = ruby.packages[pkg];
-  if (!OWN_MOVED_CREDIT_PACKAGES.has(pkg) || own === undefined) {
-    return globalRubyCandidates.get(name);
-  }
-  let candidates = ownRubyCandidates.get(own);
-  if (candidates === undefined) {
-    candidates = buildGlobalRubyCandidates({ ...ruby, packages: { [pkg]: own } });
-    ownRubyCandidates.set(own, candidates);
-  }
-  return candidates.get(name);
-}
-
 export function buildGlobalRubyCandidates(ruby: ApiManifest): Map<string, RubyOwner[]> {
   const all = new Map<string, RubyOwner[]>();
   const add = (candidate: string, owner: RubyOwner): void => {
@@ -2357,6 +2348,7 @@ function buildPackageReport(
   // Pre-fold ASC's `::ClassMethods` submodules into their parent's
   // classMethods (mirrors compare.ts:759-773). Mutates rubyPkg.modules.
   const foldedFqns = foldClassMethodsModules(rubyPkg.modules);
+  const candidates = creditCandidates(pkg, ruby, globalRubyCandidates);
 
   const moduleFqnByShort = new Map<string, string[]>();
   for (const fqn of Object.keys(rubyPkg.modules)) {
@@ -2775,7 +2767,7 @@ function buildPackageReport(
     let interfaceExemptCount = 0;
     let overrideExemptCount = 0;
     const trailsOnly = (klass: string): boolean =>
-      !allowed.has(klass) && !scopedAllows(klass) && !globalRubyCandidates.has(klass);
+      !allowed.has(klass) && !scopedAllows(klass) && !candidates.has(klass);
     for (const name of tsNames) {
       const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
       // A tag on a name the scorer already allows covers no extra — it asserts
@@ -2791,7 +2783,7 @@ function buildPackageReport(
         allowlistedCount++;
         continue;
       }
-      const owners = movedOwners(pkg, name, ruby, globalRubyCandidates);
+      const owners = candidates.get(name);
       const kind: ExtraKind = owners ? "moved" : "novel";
       if (kind === "moved" && overrideOnly.get(name)?.every(trailsOnly) === true) {
         overrideExemptCount++;
@@ -2808,7 +2800,7 @@ function buildPackageReport(
       const memberOwners = interfaceMemberOnly.get(name);
       if (
         memberOwners !== undefined &&
-        memberOwners.every((o) => interfaceOnly.has(o) && !globalRubyCandidates.has(o))
+        memberOwners.every((o) => interfaceOnly.has(o) && !candidates.has(o))
       ) {
         interfaceExemptCount++;
         continue;

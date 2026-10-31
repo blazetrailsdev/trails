@@ -770,11 +770,13 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     o = Object.getPrototypeOf(o) as object | null
   ) {
     const entry = Object.hasOwn(o, mid) ? Object.getOwnPropertyDescriptor(o, mid) : undefined;
+    if (isUndefHalf(entry?.get)) return false;
     if (entry && !isAbsentHalf(entry.get)) {
       if (!("value" in entry)) return true;
       return klass ? typeof entry.value === "function" : entry.value !== undefined;
     }
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
+    if (isUndefHalf(setter)) return false;
     if (setter !== undefined && !isAbsentHalf(setter)) return true;
     if (
       writer !== undefined &&
@@ -868,8 +870,10 @@ function checkDefinition(mod: { prototype: object }, mid: string, inherit = true
     o = inherit ? (Object.getPrototypeOf(o) as object | null) : null
   ) {
     const me = Object.getOwnPropertyDescriptor(o, mid);
+    if (isUndefHalf(me?.get)) return false;
     if (me && !isAbsentHalf(me.get)) return typeof me.value === "function" || me.get !== undefined;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
+    if (isUndefHalf(setter)) return false;
     if (setter !== undefined && !isAbsentHalf(setter)) return true;
     if (
       writer !== undefined &&
@@ -984,6 +988,11 @@ export function rbModDefineMethod(
 }
 
 const ABSENT_HALVES = new WeakSet<object>();
+const UNDEF_HALVES = new WeakSet<object>();
+
+function isUndefHalf(half: unknown): boolean {
+  return typeof half === "function" && UNDEF_HALVES.has(half);
+}
 
 /**
  * Whether `half` is the getter or setter {@link defineAccessorHalf} seats for
@@ -1077,7 +1086,7 @@ export function defineAccessorHalf(
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModUndefMethod(klass: { prototype: object }, ...names: string[]): void {
+export function rbModUndefMethod<K extends { prototype: object }>(klass: K, ...names: string[]): K {
   const proto = klass.prototype;
   for (const name of names) {
     if (!checkDefinition(klass, name)) {
@@ -1085,24 +1094,33 @@ export function rbModUndefMethod(klass: { prototype: object }, ...names: string[
     }
     const writer = name.endsWith("=");
     const id = writer ? name.slice(0, -1) : name;
-    let desc: PropertyDescriptor | undefined;
-    for (let o: object | null = proto; o && !desc; o = Object.getPrototypeOf(o) as object | null) {
-      desc = Object.getOwnPropertyDescriptor(o, id);
+    let other: PropertyDescriptor["get"];
+    for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
+      const desc = Object.getOwnPropertyDescriptor(o, id);
+      if (desc === undefined) continue;
+      const half = writer ? desc.get : desc.set;
+      if (isUndefHalf(half)) break;
+      if (half !== undefined && !isAbsentHalf(half)) {
+        other = half as () => unknown;
+        break;
+      }
     }
-    const other = writer ? desc?.get : desc?.set;
-    if (other !== undefined && !isAbsentHalf(other)) {
+    if (other !== undefined) {
+      const undef = absentHalf(id, writer);
+      UNDEF_HALVES.add(undef);
       Object.defineProperty(proto, id, {
         configurable: true,
-        enumerable: desc!.enumerable,
-        get: writer ? desc!.get : absentHalf(id, false),
-        set: writer ? absentHalf(id, true) : desc!.set,
-      });
+        enumerable: Object.getOwnPropertyDescriptor(proto, id)?.enumerable ?? false,
+        get: writer ? other : undef,
+        set: writer ? undef : other,
+      } as PropertyDescriptor);
     } else {
       UNDEF_METHOD_TABLES.add(proto);
       Object.defineProperty(proto, id, { value: undefined, writable: true, configurable: true });
     }
   }
   rbClearMethodCache();
+  return klass;
 }
 
 /**
@@ -1342,11 +1360,13 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     const desc = Object.getOwnPropertyDescriptor(o, mid);
     if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
     if (UNDEF_METHOD_TABLES.has(o) && desc && "value" in desc && desc.value === undefined) break;
+    if (isUndefHalf(desc?.get)) break;
     if (desc && argc === 0 && !isAbsentHalf(desc.get)) {
       return desc.get ? desc.get.call(recv) : desc.value;
     }
     if (desc?.get && !isAbsentHalf(desc.get)) rbErrorArity(argc, 0, 0);
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
+    if (isUndefHalf(setter)) break;
     if (setter && !isAbsentHalf(setter)) return setter.call(recv, args[0]);
     const set = writer === undefined ? undefined : Object.getOwnPropertyDescriptor(o, writer);
     if (typeof set?.value === "function") return (set.value as AnyFunction).apply(recv, args);
@@ -1447,6 +1467,7 @@ function _writerFor(recv: object, mid: string): AnyFunction | null {
         if (typeof desc?.value === "function") entry.write = desc.value as AnyFunction;
         if (desc) break;
         const setter = Object.getOwnPropertyDescriptor(o, entry.attr)?.set;
+        if (isUndefHalf(setter)) break;
         if (setter && !isAbsentHalf(setter)) {
           entry.write = setter as AnyFunction;
           break;

@@ -9,7 +9,7 @@ import {
   Open3,
   print,
   puts,
-  rbConstGet,
+  constGet,
   rbEnsure,
   rbEqual,
   rbFSystem,
@@ -231,7 +231,7 @@ export class Basic {
   /** @internal */
   protected lookupColor(color: unknown): unknown {
     if (!isSymbol(color)) return color;
-    return rbConstGet(this.constructor, symbolToS(color).toUpperCase());
+    return constGet(this.constructor, symbolToS(color).toUpperCase());
   }
 
   /** @internal */

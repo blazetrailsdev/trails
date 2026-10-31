@@ -4,7 +4,6 @@ import * as ts from "typescript-5";
 import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "@blazetrails/parity/types";
 import {
   buildGlobalRubyCandidates,
-  movedOwners,
   buildReport,
   parseArgs,
   collectTsFileNames,
@@ -5246,24 +5245,44 @@ describe("buildReport — a RUBY_FILE_TS_OVERRIDES row onto a path-mirrored file
   });
 });
 
-describe("movedOwners", () => {
-  const entity = (name: string, file: string) => ({
-    name,
-    file,
-    instanceMethods: [],
-    classMethods: [],
+describe("thor scoring across lanes", () => {
+  const pkg = (classes: Record<string, ClassInfo>): PackageInfo =>
+    ({ classes, modules: {} }) as unknown as PackageInfo;
+  const manifest = (packages: Record<string, PackageInfo>): ApiManifest =>
+    ({ packages }) as unknown as ApiManifest;
+  const thorRuby = pkg({ "Thor::Runner": rubyClass({ name: "Runner", file: "thor/runner.rb" }) });
+  const thorTs = manifest({
+    thor: pkg({
+      Runner: rubyClass({
+        name: "Runner",
+        file: "runner.ts",
+        instance: [method("group"), method("run")],
+      }),
+    }),
   });
-  const pkg = (classes: Record<string, unknown>) => ({ classes, modules: {} });
+  const extras = (ruby: ApiManifest) =>
+    buildReport(ruby, thorTs, {
+      filterPkg: "thor",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    }).packages[0]?.extraFiles[0]?.extras.map((e) => [e.name, e.kind]);
 
-  it("scores a thor name the same whichever other gems the artifact holds", () => {
-    const thor = pkg({ "Thor::Group": entity("Group", "thor/group.rb") });
-    const manifest = (packages: Record<string, unknown>) =>
-      ({ packages }) as unknown as ApiManifest;
-    const alone = manifest({ thor });
-    const full = manifest({ thor, arel: pkg({ "Arel::Foo": entity("Foo", "arel/foo.rb") }) });
-    expect(movedOwners("thor", "Foo", alone, buildGlobalRubyCandidates(alone))).toBeUndefined();
-    expect(movedOwners("thor", "Foo", full, buildGlobalRubyCandidates(full))).toBeUndefined();
-    expect(movedOwners("arel", "Foo", full, buildGlobalRubyCandidates(full))).toBeDefined();
-    expect(movedOwners("thor", "Group", full, buildGlobalRubyCandidates(full))).toBeDefined();
+  it("gives the same verdict whichever other gems the artifact holds", () => {
+    const arel = pkg({
+      "Arel::Foo": rubyClass({
+        name: "Foo",
+        file: "arel/foo.rb",
+        instance: [method("group"), method("run")],
+      }),
+    });
+    const alone = extras(manifest({ thor: thorRuby }));
+    expect(alone).toEqual(
+      expect.arrayContaining([
+        ["group", "novel"],
+        ["run", "novel"],
+      ]),
+    );
+    expect(extras(manifest({ thor: thorRuby, arel }))).toEqual(alone);
   });
 });

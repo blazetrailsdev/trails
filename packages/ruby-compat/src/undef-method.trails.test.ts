@@ -10,6 +10,22 @@ import {
 } from "./index.js";
 
 describe("rbModUndefMethod", () => {
+  it("stops the search at a subclass, for each half", () => {
+    class Parent {}
+    rbModAttrReader(Parent, "name");
+    rbModAttrWriter(Parent, "name");
+    class Reader extends Parent {}
+    expect(rbModUndefMethod(Reader, "name")).toBe(Reader);
+    class Writer extends Parent {}
+    rbModUndefMethod(Writer, "name=");
+    expect(rbObjRespondTo(new Reader(), "name")).toBe(false);
+    expect(() => rbFSend(new Reader(), "name")).toThrow(NoMethodError);
+    expect(rbObjRespondTo(new Reader(), "name=")).toBe(true);
+    expect(rbObjRespondTo(new Writer(), "name=")).toBe(false);
+    expect(() => rbFSend(new Writer(), "name=", 1)).toThrow(NoMethodError);
+    expect(rbFSend(new Writer(), "name")).toBe(null);
+  });
+
   it("raises NameError for an undefined name", () => {
     class Klass {}
     expect(() => rbModUndefMethod(Klass, "missing")).toThrow(NameError);
