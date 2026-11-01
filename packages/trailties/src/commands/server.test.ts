@@ -68,6 +68,18 @@ describe("Rails::Command::ServerTest", () => {
     });
   });
 
+  it("test_environment_with_rails_env", () => {
+    withEnv({ NODE_ENV: undefined, TRAILS_ENV: "production" }, () =>
+      expect(parseArguments().environment).toBe("production"),
+    );
+  });
+
+  it("test_environment_with_rack_env", () => {
+    withEnv({ TRAILS_ENV: undefined, NODE_ENV: "production" }, () =>
+      expect(parseArguments().environment).toBe("production"),
+    );
+  });
+
   it("test_environment_with_port", () => {
     withEnv({ PORT: "1234" }, () => expect(parseArguments().Port).toBe(1234));
   });

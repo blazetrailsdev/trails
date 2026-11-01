@@ -47,6 +47,12 @@ export interface ServerOptions {
   SSLEnable?: boolean;
 }
 
+export class Options {
+  parseBang(args: string[]): ServerOptions {
+    return new ServerCommand([], args).serverOptions();
+  }
+}
+
 export class Server {
   /** @internal */
   _defaultOptions: ServerOptions;
@@ -56,6 +62,10 @@ export class Server {
     this._defaultOptions = options ?? {};
     this.options = this._defaultOptions;
     this.setEnvironment();
+  }
+
+  optParser(): Options {
+    return new Options();
   }
 
   setEnvironment(): void {
