@@ -1,6 +1,6 @@
 import { Nodes } from "../namespaces.js";
 import { include } from "@blazetrails/activesupport";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { Expressions, type ExpressionsModule } from "../expressions.js";
 import { Predications, type PredicationsModule } from "../predications.js";
@@ -21,4 +21,4 @@ include(NodeExpression, AliasPredication);
 include(NodeExpression, OrderPredications);
 include(NodeExpression, MathMixin);
 
-rbModConstSet(Nodes, "NodeExpression", NodeExpression);
+constSet(Nodes, "NodeExpression", NodeExpression);

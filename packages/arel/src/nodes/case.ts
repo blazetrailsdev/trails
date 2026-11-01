@@ -1,4 +1,4 @@
-import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbObjClone, constSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
@@ -63,6 +63,6 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Case extends _AliasPredication {}
 
-rbModConstSet(Nodes, "Case", Case);
-rbModConstSet(Nodes, "When", When);
-rbModConstSet(Nodes, "Else", Else);
+constSet(Nodes, "Case", Case);
+constSet(Nodes, "When", When);
+constSet(Nodes, "Else", Else);

@@ -1,4 +1,4 @@
-import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbObjClone, constSet } from "@blazetrails/ruby-compat";
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { Temporal } from "@blazetrails/date";
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
@@ -188,20 +188,20 @@ export interface Binary<L = NodeOrValue, R = NodeOrValue> extends _AliasPredicat
   right: R;
 }
 
-rbModConstSet(Nodes, "Binary", Binary);
-rbModConstSet(Nodes, "Assignment", Assignment);
-rbModConstSet(Nodes, "As", As);
-rbModConstSet(Nodes, "Between", Between);
-rbModConstSet(Nodes, "NotEqual", NotEqual);
-rbModConstSet(Nodes, "GreaterThan", GreaterThan);
-rbModConstSet(Nodes, "GreaterThanOrEqual", GreaterThanOrEqual);
-rbModConstSet(Nodes, "LessThan", LessThan);
-rbModConstSet(Nodes, "LessThanOrEqual", LessThanOrEqual);
-rbModConstSet(Nodes, "IsDistinctFrom", IsDistinctFrom);
-rbModConstSet(Nodes, "IsNotDistinctFrom", IsNotDistinctFrom);
-rbModConstSet(Nodes, "NotIn", NotIn);
-rbModConstSet(Nodes, "Join", Join);
-rbModConstSet(Nodes, "Union", Union);
-rbModConstSet(Nodes, "UnionAll", UnionAll);
-rbModConstSet(Nodes, "Intersect", Intersect);
-rbModConstSet(Nodes, "Except", Except);
+constSet(Nodes, "Binary", Binary);
+constSet(Nodes, "Assignment", Assignment);
+constSet(Nodes, "As", As);
+constSet(Nodes, "Between", Between);
+constSet(Nodes, "NotEqual", NotEqual);
+constSet(Nodes, "GreaterThan", GreaterThan);
+constSet(Nodes, "GreaterThanOrEqual", GreaterThanOrEqual);
+constSet(Nodes, "LessThan", LessThan);
+constSet(Nodes, "LessThanOrEqual", LessThanOrEqual);
+constSet(Nodes, "IsDistinctFrom", IsDistinctFrom);
+constSet(Nodes, "IsNotDistinctFrom", IsNotDistinctFrom);
+constSet(Nodes, "NotIn", NotIn);
+constSet(Nodes, "Join", Join);
+constSet(Nodes, "Union", Union);
+constSet(Nodes, "UnionAll", UnionAll);
+constSet(Nodes, "Intersect", Intersect);
+constSet(Nodes, "Except", Except);

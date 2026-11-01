@@ -1,4 +1,4 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "../test-helpers/test-helper.js";
 import { ActionCable } from "../namespaces.js";
@@ -13,8 +13,8 @@ const Chat = ChatChannel as unknown as {
 };
 
 const BroadcastingTest = { name: "ActionCable::Channel::BroadcastingTest" };
-rbModConstSet(ActionCable.Channel, "BroadcastingTest", BroadcastingTest);
-rbModConstSet(BroadcastingTest, "ChatChannel", ChatChannel);
+constSet(ActionCable.Channel, "BroadcastingTest", BroadcastingTest);
+constSet(BroadcastingTest, "ChatChannel", ChatChannel);
 
 describe("ActionCable::Channel::BroadcastingTest", () => {
   let tc: TestCase;

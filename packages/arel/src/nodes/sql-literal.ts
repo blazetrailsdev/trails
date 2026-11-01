@@ -1,6 +1,6 @@
 import { Nodes } from "../namespaces.js";
 import { ArgumentError, include } from "@blazetrails/activesupport";
-import { stringSuperclass, rbModConstSet } from "@blazetrails/ruby-compat";
+import { stringSuperclass, constSet } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Fragments } from "./fragments.js";
 import { Expressions, type ExpressionsModule } from "../expressions.js";
@@ -43,4 +43,4 @@ include(SqlLiteral, Predications);
 include(SqlLiteral, AliasPredication);
 include(SqlLiteral, OrderPredications);
 
-rbModConstSet(Nodes, "SqlLiteral", SqlLiteral);
+constSet(Nodes, "SqlLiteral", SqlLiteral);

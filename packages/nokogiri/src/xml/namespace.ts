@@ -1,4 +1,4 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
 
@@ -29,4 +29,4 @@ export class Namespace {
   }
 }
 
-rbModConstSet(XML, "Namespace", Namespace);
+constSet(XML, "Namespace", Namespace);

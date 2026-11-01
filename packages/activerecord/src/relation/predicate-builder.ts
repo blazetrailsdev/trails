@@ -2,7 +2,7 @@ import {
   ArgumentError,
   rbCBasicObject as BasicObject,
   rbFSend,
-  rbModConstSet,
+  constSet,
   rbObjAsString as toS,
   rbObjIsKindOf,
   rbObjRespondTo,
@@ -258,11 +258,11 @@ export class PredicateBuilder {
   }
 }
 
-rbModConstSet(ActiveRecord, "PredicateBuilder", PredicateBuilder);
-rbModConstSet(PredicateBuilder, "ArrayHandler", ArrayHandler);
-rbModConstSet(PredicateBuilder, "BasicObjectHandler", BasicObjectHandler);
-rbModConstSet(PredicateBuilder, "RangeHandler", RangeHandler);
-rbModConstSet(PredicateBuilder, "RelationHandler", RelationHandler);
+constSet(ActiveRecord, "PredicateBuilder", PredicateBuilder);
+constSet(PredicateBuilder, "ArrayHandler", ArrayHandler);
+constSet(PredicateBuilder, "BasicObjectHandler", BasicObjectHandler);
+constSet(PredicateBuilder, "RangeHandler", RangeHandler);
+constSet(PredicateBuilder, "RelationHandler", RelationHandler);
 
 type Attributes = Record<string, unknown> | Map<unknown, unknown>;
 

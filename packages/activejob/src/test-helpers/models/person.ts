@@ -3,7 +3,7 @@ import {
   type Included,
   include,
   rbEqual,
-  rbModConstSet,
+  constSet,
   registerConstant,
   StandardError,
   toI,
@@ -41,4 +41,4 @@ export class Person {
 export interface Person extends Included<typeof Identification> {}
 include(Person, Identification);
 registerConstant("Person", Person);
-rbModConstSet(Person, "RecordNotFound", RecordNotFound);
+constSet(Person, "RecordNotFound", RecordNotFound);

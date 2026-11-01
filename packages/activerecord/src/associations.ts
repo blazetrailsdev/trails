@@ -18,7 +18,7 @@ import {
   include,
   rbClassInheritedP,
   rbClassSuperclass,
-  rbModConstSet,
+  constSet,
   rbModName,
   registerConstant,
   rbCallSuper,
@@ -214,7 +214,7 @@ export class Associations {
 
     const joinModel = builder.throughModel();
 
-    rbModConstSet(this, joinModel.name, joinModel);
+    constSet(this, joinModel.name, joinModel);
 
     const middleReflection = builder.middleReflection(joinModel);
     HasManyBuilder.defineCallbacks(this, middleReflection);

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { classPathMismatches, registerClassPaths } from "./classpath.js";
 import { TopLevel, rbModName, rbModToS } from "./object.js";
 import { rbPathToClass } from "./variable.js";
-import { rbModConstSet } from "./include.js";
+import { constSet } from "./include.js";
 
 describe("rbModName over the generated class-path table", () => {
   it("answers a generated path", () => {
@@ -16,7 +16,7 @@ describe("rbModName over the generated class-path table", () => {
   it("answers a const_set-bound path ahead of the generated one", () => {
     const Owner = class Owner {};
     class Seated {}
-    rbModConstSet(Owner, "Seated", Seated);
+    constSet(Owner, "Seated", Seated);
     registerClassPaths([[() => Seated, "Elsewhere::Seated"]]);
     expect(rbModName(Seated)).toBe("Owner::Seated");
     expect(classPathMismatches()).toContainEqual(["Owner::Seated", "Elsewhere::Seated"]);

@@ -4,7 +4,7 @@ import { DeleteStatement } from "./nodes/delete-statement.js";
 import { Group } from "./nodes/unary.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Arel } from "./namespaces.js";
 import type { ArelNode } from "./arel.js";
 
@@ -45,4 +45,4 @@ export class DeleteManager extends TreeManager<DeleteStatement> {
 
 include(DeleteManager, StatementMethods);
 
-rbModConstSet(Arel, "DeleteManager", DeleteManager);
+constSet(Arel, "DeleteManager", DeleteManager);

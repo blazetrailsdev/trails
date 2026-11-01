@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Exception, excSetupMessage } from "./exception.js";
-import { StandardError, rbModConstSet } from "./index.js";
+import { StandardError, constSet } from "./index.js";
 
 describe("excSetupMessage", () => {
   it("gives a raised exception the rescued one as its cause", () => {
@@ -47,7 +47,7 @@ describe("Exception#message", () => {
     expect(new Exception().message).toBe("Exception");
     class Outer {}
     class Inner extends StandardError {}
-    rbModConstSet(Outer, "Inner", Inner);
+    constSet(Outer, "Inner", Inner);
     expect(new Inner().message).toBe("Outer::Inner");
   });
 });
@@ -64,7 +64,7 @@ describe("Exception#name", () => {
   it("names a bodiless subclass by its own path", () => {
     class Outer {}
     class Bodiless extends StandardError {}
-    rbModConstSet(Outer, "Bodiless", Bodiless);
+    constSet(Outer, "Bodiless", Bodiless);
     expect(new Bodiless("x").name).toBe("Outer::Bodiless");
     expect(new StandardError().name).toBe("StandardError");
   });

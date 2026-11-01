@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "../test-helpers/helper.js";
 import { Dir, File, FileUtils, getFs, include } from "@blazetrails/ruby-compat";
 import { Actions, type ActionsHost } from "../actions.js";
 import { Shell } from "../shell.js";

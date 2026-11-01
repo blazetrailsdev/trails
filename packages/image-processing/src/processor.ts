@@ -3,7 +3,7 @@ import {
   rbBlockGivenP,
   rbFSend,
   rbInspect,
-  rbModConstSet,
+  constSet,
   rbModDefineMethod,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
@@ -68,7 +68,7 @@ export class Processor {
         return this._accumulator;
       },
     });
-    rbModConstSet(this, "ACCUMULATOR_CLASS", klass);
+    constSet(this, "ACCUMULATOR_CLASS", klass);
   }
 
   static applyOperation(accumulator: unknown, [name, args, block]: Operation): unknown {

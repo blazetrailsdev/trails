@@ -13,7 +13,7 @@ import {
   keys as hashKeys,
   include,
   rbHash,
-  rbModConstSet,
+  constSet,
   rbModSingletonP,
   rbModToS,
   rbObjHash,
@@ -685,7 +685,7 @@ export function generatedAssociationMethods(this: CoreHost): Module {
       ? this._generatedAssociationMethods
       : undefined) ||
     (this._generatedAssociationMethods = (() => {
-      const mod = rbModConstSet(
+      const mod = constSet(
         this as unknown as new (...args: unknown[]) => unknown,
         "GeneratedAssociationMethods",
         new Module(),

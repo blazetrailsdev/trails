@@ -28,7 +28,7 @@ import {
   fetch,
   include,
   rbFSend,
-  rbModConstSet,
+  constSet,
   rbClassSuperclass,
   rbModName,
   rbObjIvarGet,
@@ -84,7 +84,7 @@ export class DelegateCache {
       include(delegate, ClassSpecificRelation);
       DelegateCache.includeRelationMethods.call(this, delegate);
       const mangledName = rbModName(klass)!.replaceAll("::", "_");
-      rbModConstSet(this, mangledName, delegate);
+      constSet(this, mangledName, delegate);
 
       cache.set(klass, delegate);
     }
@@ -111,7 +111,10 @@ export class DelegateCache {
       rbObjIvarSet(
         this,
         "@generated_relation_methods",
-        rbModConstSet(this, "GeneratedRelationMethods", new GeneratedRelationMethods()),
+        ((mod) => {
+          constSet(this, "GeneratedRelationMethods", mod);
+          return mod;
+        })(new GeneratedRelationMethods()),
       )) as GeneratedRelationMethods;
   }
 }

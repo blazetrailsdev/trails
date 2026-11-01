@@ -16,7 +16,7 @@ import {
   ArgumentError,
   FrozenError,
   Marshal,
-  rbModConstSet,
+  constSet,
   rbEqual,
   rbObjIvarGet,
   registerConstant,
@@ -52,7 +52,7 @@ describe("AttributesTest", () => {
     declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
 
     static {
-      rbModConstSet(AttributesTest, "ModelForAttributesTest", this);
+      constSet(AttributesTest, "ModelForAttributesTest", this);
       include(this, Attributes);
       this.attribute("integer_field", "integer");
       this.attribute("string_field", "string");

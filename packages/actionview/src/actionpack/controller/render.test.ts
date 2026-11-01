@@ -15,7 +15,7 @@ import {
   include,
   type Included,
   File,
-  rbModConstSet,
+  constSet,
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjSingletonClass,
@@ -51,14 +51,14 @@ class Question extends Struct.new("name", "id") {
     return isPresent(this.id);
   }
 }
-rbModConstSet(Quiz, "Question", Question);
+constSet(Quiz, "Question", Question);
 
 class QuestionsController extends ActionController.Base {
   async new(): Promise<void> {
     await this.render({ partial: new Quiz.Question("Namespaced Partial") });
   }
 }
-rbModConstSet(Quiz, "QuestionsController", QuestionsController);
+constSet(Quiz, "QuestionsController", QuestionsController);
 
 const Fun = {} as { GamesController: typeof GamesController };
 registerConstant("Fun", Fun);
@@ -70,7 +70,7 @@ class GamesController extends ActionController.Base {
     await this.render({ partial: new FormBuilder("post", null, this.viewContext(), {}) });
   }
 }
-rbModConstSet(Fun, "GamesController", GamesController);
+constSet(Fun, "GamesController", GamesController);
 
 class ValidatingPost extends Post {
   declare static validates: (...args: unknown[]) => void;

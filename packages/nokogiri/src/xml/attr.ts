@@ -1,4 +1,4 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 
 import { parse5PointerId } from "../html5/node.js";
 import { XML } from "../namespaces.js";
@@ -69,4 +69,4 @@ export class Attr {
   }
 }
 
-rbModConstSet(XML, "Attr", Attr);
+constSet(XML, "Attr", Attr);

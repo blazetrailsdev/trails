@@ -11,7 +11,7 @@ import {
   excBacktraceLocations,
   File,
   Module,
-  rbModConstSet,
+  constSet,
   rbObjMethods,
 } from "@blazetrails/ruby-compat";
 import type { RackResponse } from "@blazetrails/rack";
@@ -335,7 +335,7 @@ describe("HelperTest", () => {
   }
 
   function setTestHelper(helperModule: HelperMethodsModule): void {
-    rbModConstSet(constants, "TestHelper", helperModule);
+    constSet(constants, "TestHelper", helperModule);
   }
 });
 

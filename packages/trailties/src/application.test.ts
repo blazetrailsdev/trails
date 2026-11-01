@@ -2,7 +2,7 @@ import type { RackResponse } from "@blazetrails/rack";
 import {
   publicInstanceMethods,
   rbFSend,
-  rbModConstSet,
+  constSet,
   StringIO,
   rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
@@ -602,7 +602,7 @@ describe("Application::Configuration", () => {
 
   it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", () => {
     class MyCustomStore extends Session.CookieStore {}
-    rbModConstSet(ActionDispatch.Session, "MyCustomStore", MyCustomStore);
+    constSet(ActionDispatch.Session, "MyCustomStore", MyCustomStore);
     try {
       const c = new Configuration();
       c.sessionStore(":my_custom_store");

@@ -32,7 +32,7 @@ import {
   FileUtils,
   rbEqual,
   rbFLoad,
-  rbModConstSet,
+  constSet,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
@@ -861,7 +861,7 @@ export class DatabaseTasks {
   }
 }
 
-rbModConstSet(ActiveRecord.Tasks, "DatabaseTasks", DatabaseTasks);
+constSet(ActiveRecord.Tasks, "DatabaseTasks", DatabaseTasks);
 
 export interface DatabaseTaskInstance {
   create?(): Promise<unknown>;

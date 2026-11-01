@@ -1,5 +1,5 @@
 import { Namespaced } from "../test-helpers/models/company.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { registerModel } from "../index.js";
@@ -10,7 +10,7 @@ import { fixtures } from "../test-helpers/use-fixtures.js";
 class NamespacedPost extends Base {
   static _tableName = "posts";
   static {
-    rbModConstSet(Namespaced, "Post", this);
+    constSet(Namespaced, "Post", this);
   }
 
   declare title: string;

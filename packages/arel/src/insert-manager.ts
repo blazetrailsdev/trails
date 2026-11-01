@@ -4,7 +4,7 @@ import { Attribute } from "./attributes/attribute.js";
 import { ValuesList } from "./nodes/values-list.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
-import { first, isEmpty, rbModConstSet } from "@blazetrails/ruby-compat";
+import { first, isEmpty, constSet } from "@blazetrails/ruby-compat";
 import { Arel } from "./namespaces.js";
 import type { ArelNode } from "./arel.js";
 
@@ -60,4 +60,4 @@ export class InsertManager extends TreeManager<InsertStatement> {
   }
 }
 
-rbModConstSet(Arel, "InsertManager", InsertManager);
+constSet(Arel, "InsertManager", InsertManager);

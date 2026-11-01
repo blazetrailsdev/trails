@@ -1,4 +1,4 @@
-import { rbModConstSet } from "../include.js";
+import { constSet } from "../include.js";
 import { Concurrent } from "./map.js";
 
 /**
@@ -72,4 +72,4 @@ export class ReadWriteLock {
   }
 }
 
-rbModConstSet(Concurrent, "ReadWriteLock", ReadWriteLock);
+constSet(Concurrent, "ReadWriteLock", ReadWriteLock);

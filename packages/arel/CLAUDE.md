@@ -27,7 +27,7 @@ alias seat.
 
 A seat is a plain `Nodes.Not = Not` assignment, type-checked against the
 namespace's declared property. The generated node classes in `nodes/binary.ts`,
-`nodes/unary.ts` and `nodes/function.ts` keep `rbModConstSet`, because Rails
+`nodes/unary.ts` and `nodes/function.ts` keep `constSet`, because Rails
 builds them with `const_set name, Class.new(Binary)`
 (`activerecord/lib/arel/nodes/binary.rb:122`, `unary.rb:41`, `function.rb:42`)
 — a computed name with no declaration to assign at. A class's qualified Ruby

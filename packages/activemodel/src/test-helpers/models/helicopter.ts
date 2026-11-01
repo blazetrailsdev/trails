@@ -1,4 +1,4 @@
-import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Model } from "../../index.js";
 import { ModelName } from "../../naming.js";
 
@@ -6,7 +6,7 @@ export class Helicopter extends Model {}
 registerConstant("Helicopter", Helicopter);
 
 export class Comanche extends Model {}
-rbModConstSet(Helicopter, "Comanche", Comanche);
+constSet(Helicopter, "Comanche", Comanche);
 
 export class Apache extends Model {
   private static _modelNameMemo: ModelName | null = null;
@@ -21,4 +21,4 @@ export class Apache extends Model {
     return this._modelNameMemo;
   }
 }
-rbModConstSet(Helicopter, "Apache", Apache);
+constSet(Helicopter, "Apache", Apache);

@@ -10,7 +10,7 @@ import {
   rbCSymbol,
   rbEqual,
   rbInspect,
-  rbModConstSet,
+  constSet,
   rbObjClass,
   rbObjDup,
   registerConstant,
@@ -40,7 +40,7 @@ import {
 const SerializedAttributeTest = {};
 registerConstant("SerializedAttributeTest", SerializedAttributeTest);
 
-const MyObject = rbModConstSet(
+const MyObject = constSet(
   SerializedAttributeTest,
   "MyObject",
   Struct.new("attribute1", "attribute2"),
@@ -53,7 +53,7 @@ class Topic extends Base {
   declare group: any;
 
   static {
-    registerModel(rbModConstSet(SerializedAttributeTest, "Topic", this));
+    registerModel(constSet(SerializedAttributeTest, "Topic", this));
     this.serialize("content");
   }
 }
@@ -62,7 +62,7 @@ class ImportantTopic extends Topic {
   declare important: any;
 
   static {
-    registerModel(rbModConstSet(SerializedAttributeTest, "ImportantTopic", this));
+    registerModel(constSet(SerializedAttributeTest, "ImportantTopic", this));
     this.serialize("important", { type: Hash });
   }
 }
@@ -71,7 +71,7 @@ class ClassifiedTopic extends Topic {
   declare important: any;
 
   static {
-    registerModel(rbModConstSet(SerializedAttributeTest, "ClassifiedTopic", this));
+    registerModel(constSet(SerializedAttributeTest, "ClassifiedTopic", this));
     this.serialize("important", { type: rbCClass });
   }
 }

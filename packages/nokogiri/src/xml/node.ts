@@ -5,7 +5,7 @@ import {
   XmlText as LibXmlText,
   XmlTreeNode,
 } from "libxml2-wasm";
-import { include, rbModConstSet } from "@blazetrails/ruby-compat";
+import { include, constSet } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
 
@@ -96,4 +96,4 @@ export class XmlNode {
 }
 
 include(XmlNode, Searchable);
-rbModConstSet(XML, "Node", XmlNode);
+constSet(XML, "Node", XmlNode);

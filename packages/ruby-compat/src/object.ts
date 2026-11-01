@@ -770,6 +770,7 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     o = Object.getPrototypeOf(o) as object | null
   ) {
     const entry = Object.hasOwn(o, mid) ? Object.getOwnPropertyDescriptor(o, mid) : undefined;
+    if (UNDEF_HALVES.has(entry?.get as object)) return false;
     if (entry && !isAbsentHalf(entry.get)) {
       if (!("value" in entry)) return true;
       return klass ? typeof entry.value === "function" : entry.value !== undefined;
@@ -868,6 +869,7 @@ function checkDefinition(mod: { prototype: object }, mid: string, inherit = true
     o = inherit ? (Object.getPrototypeOf(o) as object | null) : null
   ) {
     const me = Object.getOwnPropertyDescriptor(o, mid);
+    if (UNDEF_HALVES.has(me?.get as object)) return false;
     if (me && !isAbsentHalf(me.get)) return typeof me.value === "function" || me.get !== undefined;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter !== undefined && !isAbsentHalf(setter)) return true;
@@ -984,6 +986,7 @@ export function rbModDefineMethod(
 }
 
 const ABSENT_HALVES = new WeakSet<object>();
+const UNDEF_HALVES = new WeakSet<object>();
 
 /**
  * Whether `half` is the getter or setter {@link defineAccessorHalf} seats for
@@ -1067,6 +1070,46 @@ export function defineAccessorHalf(
     set: half.set ?? existing?.set ?? absentHalf(name, true),
   });
   rbClearMethodCache();
+}
+
+/**
+ * `Module#undef_method` (`rb_mod_undef_method`,
+ * `vendor/ruby/v3.3.11/vm_method.c:1973`). An undefined name raises `NameError`.
+ * `name` and `name=` are one JS descriptor, so `name=` is undefined by a `"name="`
+ * entry, which every lookup reads first, and `name` by a reader half that stops
+ * the search and keeps the writer.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModUndefMethod<K extends { prototype: object }>(klass: K, ...names: string[]): K {
+  const proto = klass.prototype;
+  for (const name of names) {
+    if (!checkDefinition(klass, name)) {
+      throw new NameError(`undefined method '${name}' for class '${rbModName(klass)}'`, name);
+    }
+    UNDEF_METHOD_TABLES.add(proto);
+    if (name.endsWith("=")) {
+      Object.defineProperty(proto, name, { value: undefined, writable: true, configurable: true });
+      continue;
+    }
+    let set: PropertyDescriptor["set"];
+    for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
+      const half = Object.getOwnPropertyDescriptor(o, name)?.set;
+      if (half !== undefined && !isAbsentHalf(half)) {
+        set = half;
+        break;
+      }
+    }
+    if (set !== undefined) {
+      const get = (): undefined => undefined;
+      UNDEF_HALVES.add(get);
+      Object.defineProperty(proto, name, { configurable: true, get, set });
+    } else {
+      Object.defineProperty(proto, name, { value: undefined, writable: true, configurable: true });
+    }
+  }
+  rbClearMethodCache();
+  return klass;
 }
 
 /**
@@ -1306,6 +1349,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     const desc = Object.getOwnPropertyDescriptor(o, mid);
     if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
     if (UNDEF_METHOD_TABLES.has(o) && desc && "value" in desc && desc.value === undefined) break;
+    if (UNDEF_HALVES.has(desc?.get as object)) break;
     if (desc && argc === 0 && !isAbsentHalf(desc.get)) {
       return desc.get ? desc.get.call(recv) : desc.value;
     }

@@ -1,4 +1,4 @@
-import { Hash, kernelThrow, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { Hash, kernelThrow, constSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Account } from "./account.js";
@@ -98,7 +98,7 @@ registerConstant("Namespaced", Namespaced);
 
 export class NamespacedCompany extends Company {
   static {
-    registerModel(rbModConstSet(Namespaced, "Company", this));
+    registerModel(constSet(Namespaced, "Company", this));
   }
 }
 
@@ -106,7 +106,7 @@ export class NamespacedFirm extends Company {
   declare clients: AssociationProxy<NamespacedClient>;
 
   static {
-    registerModel(rbModConstSet(Namespaced, "Firm", this));
+    registerModel(constSet(Namespaced, "Firm", this));
   }
 
   static {
@@ -116,7 +116,7 @@ export class NamespacedFirm extends Company {
 
 export class NamespacedClient extends Company {
   static {
-    registerModel(rbModConstSet(Namespaced, "Client", this));
+    registerModel(constSet(Namespaced, "Client", this));
   }
 }
 

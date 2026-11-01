@@ -1,5 +1,5 @@
 import "@blazetrails/msgpack";
-import { extend, rbModConstSet } from "@blazetrails/ruby-compat/include";
+import { extend, constSet } from "@blazetrails/ruby-compat/include";
 import { runLoadHooks } from "./lazy-load-hooks.js";
 import { CacheSerializer } from "./message-pack/cache-serializer.js";
 import { Serializer } from "./message-pack/serializer.js";
@@ -26,8 +26,8 @@ export const MessagePack = ActiveSupport.MessagePack as Serializer & {
   UnserializableObjectError: typeof UnserializableObjectError;
   MissingClassError: typeof MissingClassError;
 };
-rbModConstSet(MessagePack, "CacheSerializer", CacheSerializer);
-rbModConstSet(MessagePack, "Serializer", Serializer);
+constSet(MessagePack, "CacheSerializer", CacheSerializer);
+constSet(MessagePack, "Serializer", Serializer);
 extend(MessagePack, Serializer);
 
 runLoadHooks("message_pack", MessagePack);

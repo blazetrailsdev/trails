@@ -1,5 +1,5 @@
 import { Admin } from "../admin.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import {
   ActiveSupportJSON,
   isPresent,
@@ -33,8 +33,8 @@ export class AdminUser extends Base {
   declare settings: HashWithIndifferentAccess<unknown>;
   declare spouse: HashWithIndifferentAccess<unknown>;
   static {
-    registerModel(rbModConstSet(Admin, "User", this));
-    rbModConstSet(this, "Coder", Coder);
+    registerModel(constSet(Admin, "User", this));
+    constSet(this, "Coder", Coder);
   }
 
   static {

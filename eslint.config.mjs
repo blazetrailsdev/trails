@@ -836,23 +836,6 @@ export default defineConfig(
 
   {
     files: ["packages/thor/src/**/*.ts"],
-    ignores: [
-      "packages/thor/src/actions.trails.test.ts",
-      "packages/thor/src/actions/create-file.trails.test.ts",
-      "packages/thor/src/actions/file-manipulation.trails.test.ts",
-      "packages/thor/src/line-editor/basic.test.ts",
-      "packages/thor/src/nested-context.test.ts",
-      "packages/thor/src/parser/argument.test.ts",
-      "packages/thor/src/parser/arguments.test.ts",
-      "packages/thor/src/parser/option.test.ts",
-      "packages/thor/src/parser/options.test.ts",
-      "packages/thor/src/shell.test.ts",
-      "packages/thor/src/shell.trails.test.ts",
-      "packages/thor/src/shell/color.test.ts",
-      "packages/thor/src/shell/table-printer.trails.test.ts",
-      "packages/thor/src/util.test.ts",
-      "packages/thor/src/test-helpers/build-templates.ts",
-    ],
     rules: {
       "blazetrails/thor-import-boundary": "error",
     },

@@ -1,6 +1,6 @@
 import { Nodes } from "../namespaces.js";
 import { include } from "@blazetrails/activesupport";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Binary } from "./binary.js";
 import { WindowPredications, type WindowPredicationsModule } from "../window-predications.js";
 import { AliasPredication, type AliasPredicationModule } from "../alias-predication.js";
@@ -14,4 +14,4 @@ export interface Filter extends WindowPredicationsModule, AliasPredicationModule
 include(Filter, WindowPredications);
 include(Filter, AliasPredication);
 
-rbModConstSet(Nodes, "Filter", Filter);
+constSet(Nodes, "Filter", Filter);

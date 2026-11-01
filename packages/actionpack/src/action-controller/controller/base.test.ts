@@ -17,7 +17,7 @@ import { domClass, domId } from "@blazetrails/actionview";
 import {
   include,
   publicInstanceMethods,
-  rbModConstSet,
+  constSet,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
@@ -197,7 +197,7 @@ describe("ControllerInstanceTests", () => {
   it("temporary anonymous controllers", () => {
     const name = "ExamplesController";
     const klass = class extends Base {};
-    rbModConstSet(Object, name, klass);
+    constSet(Object, name, klass);
 
     try {
       const controller = new klass();

@@ -6,7 +6,7 @@ import {
   travelTo,
 } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { Kernel, rbModConstGet, rbObjClass, StandardError, toF } from "@blazetrails/ruby-compat";
+import { Kernel, constGet, rbObjClass, StandardError, toF } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "./test-helpers/helper.js";
 import { Base } from "./base.js";
@@ -383,9 +383,7 @@ describe.skipIf(isAdapterSkipsScheduling(Base.queueAdapter))("ExceptionsTest", (
   it("#after_discard block is run when an unhandled error is raised", async () => {
     await expect(
       AfterDiscardRetryJob.performLater("AfterDiscardRetryJob::UnhandledError", 2),
-    ).rejects.toThrow(
-      rbModConstGet(AfterDiscardRetryJob, "UnhandledError") as typeof StandardError,
-    );
+    ).rejects.toThrow(constGet(AfterDiscardRetryJob, "UnhandledError") as typeof StandardError);
 
     expect(JobBuffer.lastValue()).toBe(
       "Ran after_discard for job. Message: AfterDiscardRetryJob::UnhandledError",
@@ -404,7 +402,7 @@ describe.skipIf(isAdapterSkipsScheduling(Base.queueAdapter))("ExceptionsTest", (
     await expect(
       AfterDiscardRetryJob.performLater("AfterDiscardRetryJob::ChildAfterDiscardError", 6),
     ).rejects.toThrow(
-      rbModConstGet(AfterDiscardRetryJob, "ChildAfterDiscardError") as typeof StandardError,
+      constGet(AfterDiscardRetryJob, "ChildAfterDiscardError") as typeof StandardError,
     );
     expect(JobBuffer.values().slice(-2)).toEqual([
       "Raised AfterDiscardRetryJob::ChildAfterDiscardError for the 5th time",

@@ -24,7 +24,7 @@ import {
   included,
   rbEqual,
   rbInspect,
-  rbModConstSet,
+  constSet,
   rbModName,
   rbObjClass,
   registerConstant,
@@ -2463,7 +2463,7 @@ class QueueAdapterTest extends TestCase {
   override queueAdapterForTest = (): unknown => new QueueAdapters.TestAdapter();
 }
 registerConstant("QueueAdapterTest", QueueAdapterTest);
-rbModConstSet(QueueAdapterTest, "JobWithAnAdapter", JobWithAnAdapter);
+constSet(QueueAdapterTest, "JobWithAnAdapter", JobWithAnAdapter);
 
 describe("QueueAdapterTest", () => {
   it("assert_enqueued_with enqueues a job with a queue_adapter and queue_adapter_for_test", async ({
@@ -2487,7 +2487,7 @@ class OverrideQueueAdapterTest extends TestCase {
   override queueAdapterForTest = (): unknown => new CustomQueueAdapter();
 }
 registerConstant("OverrideQueueAdapterTest", OverrideQueueAdapterTest);
-rbModConstSet(OverrideQueueAdapterTest, "CustomQueueAdapter", CustomQueueAdapter);
+constSet(OverrideQueueAdapterTest, "CustomQueueAdapter", CustomQueueAdapter);
 
 describe("OverrideQueueAdapterTest", () => {
   it("assert job has custom queue adapter set", () => {

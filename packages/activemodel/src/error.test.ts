@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNotRespondTo, assertNothingRaised, extend } from "@blazetrails/activesupport";
-import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Errors } from "./errors.js";
 import { I18n } from "./i18n.js";
 import { Naming, type ModelName, type ModelLike } from "./naming.js";
@@ -12,7 +12,7 @@ registerConstant("ErrorTest", ErrorTest);
 
 class Person {
   static {
-    rbModConstSet(ErrorTest, "Person", this);
+    constSet(ErrorTest, "Person", this);
   }
   declare static modelName: ModelName;
   declare modelName: ModelName;
@@ -40,7 +40,7 @@ extend(Person, Naming);
 
 class Manager extends Person {
   static {
-    rbModConstSet(ErrorTest, "Manager", this);
+    constSet(ErrorTest, "Manager", this);
   }
 
   override readAttributeForValidation(attr: string): unknown {

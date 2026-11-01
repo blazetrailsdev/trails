@@ -101,7 +101,7 @@ type ModuleHooks = {
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
-export function rbModConstSet<T>(
+export function constSet<T>(
   mod:
     | Module
     | (abstract new (...args: never) => unknown)
@@ -158,7 +158,7 @@ export function rbModConstSet<T>(
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModConstDefined(
+export function constDefined(
   mod:
     | Module
     | (abstract new (...args: never) => unknown)

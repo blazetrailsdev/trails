@@ -6,7 +6,7 @@ import {
   includedModules,
   isModuleIncluded,
   Module,
-  rbModConstSet,
+  constSet,
 } from "@blazetrails/ruby-compat";
 
 import { AbstractController } from "../../namespaces.js";
@@ -151,4 +151,4 @@ function findTrailtieUrlHelpers(
 
 export const Trailties = { RoutesHelpers };
 
-rbModConstSet(AbstractController, "Trailties", Trailties);
+constSet(AbstractController, "Trailties", Trailties);

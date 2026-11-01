@@ -1,5 +1,5 @@
 import "../../destroy-association-async-job.js";
-import { kernelThrow, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { kernelThrow, constSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
@@ -13,7 +13,7 @@ export class CpkAuthor extends Base {
 
   static _tableName = "cpk_authors";
   static {
-    registerModel(rbModConstSet(Cpk, "Author", this));
+    registerModel(constSet(Cpk, "Author", this));
   }
 
   static {
@@ -36,7 +36,7 @@ export class CpkBook extends Base {
 
   static _tableName = "cpk_books";
   static {
-    registerModel(rbModConstSet(Cpk, "Book", this));
+    registerModel(constSet(Cpk, "Book", this));
   }
 
   declare failDestroy: boolean | undefined;
@@ -75,14 +75,14 @@ CpkBook.generatesTokenFor("test");
 
 export class CpkBestSeller extends CpkBook {
   static {
-    registerModel(rbModConstSet(Cpk, "BestSeller", this));
+    registerModel(constSet(Cpk, "BestSeller", this));
   }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenBook extends CpkBook {
   static {
-    registerModel(rbModConstSet(Cpk, "BrokenBook", this));
+    registerModel(constSet(Cpk, "BrokenBook", this));
   }
   static {
     this.belongsTo("order", { className: "Cpk::OrderWithSpecialPrimaryKey" });
@@ -97,7 +97,7 @@ export interface CpkBrokenBook {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
   static {
-    registerModel(rbModConstSet(Cpk, "BrokenBookWithNonCpkOrder", this));
+    registerModel(constSet(Cpk, "BrokenBookWithNonCpkOrder", this));
   }
   static {
     this.belongsTo("order", {
@@ -115,7 +115,7 @@ export interface CpkBrokenBookWithNonCpkOrder {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkNonCpkBook extends CpkBook {
   static {
-    registerModel(rbModConstSet(Cpk, "NonCpkBook", this));
+    registerModel(constSet(Cpk, "NonCpkBook", this));
   }
   static {
     this.primaryKey = "id";
@@ -131,7 +131,7 @@ export interface CpkNonCpkBook {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkNullifiedBook extends CpkBook {
   static {
-    registerModel(rbModConstSet(Cpk, "NullifiedBook", this));
+    registerModel(constSet(Cpk, "NullifiedBook", this));
   }
   static {
     this.hasOne("chapter", {
@@ -151,7 +151,7 @@ export class CpkBookWithOrderAgreements extends CpkBook {
   declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
 
   static {
-    registerModel(rbModConstSet(Cpk, "BookWithOrderAgreements", this));
+    registerModel(constSet(Cpk, "BookWithOrderAgreements", this));
   }
   static {
     this.hasMany("orderAgreements", { through: "order" });
@@ -168,7 +168,7 @@ export class CpkBookDestroyAsync extends Base {
   declare chapters: AssociationProxy<CpkChapterDestroyAsync>;
 
   static {
-    registerModel(rbModConstSet(Cpk, "BookDestroyAsync", this));
+    registerModel(constSet(Cpk, "BookDestroyAsync", this));
   }
   static _tableName = "cpk_books";
 
@@ -188,7 +188,7 @@ export class CpkChapter extends Base {
   declare title: string;
 
   static {
-    registerModel(rbModConstSet(Cpk, "Chapter", this));
+    registerModel(constSet(Cpk, "Chapter", this));
   }
   static _tableName = "cpk_chapters";
 
@@ -206,7 +206,7 @@ export interface CpkChapter {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkChapterDestroyAsync extends Base {
   static {
-    registerModel(rbModConstSet(Cpk, "ChapterDestroyAsync", this));
+    registerModel(constSet(Cpk, "ChapterDestroyAsync", this));
   }
   static _tableName = "cpk_chapters";
 
@@ -236,7 +236,7 @@ export class CpkOrder extends Base {
 
   static _tableName = "cpk_orders";
   static {
-    registerModel(rbModConstSet(Cpk, "Order", this));
+    registerModel(constSet(Cpk, "Order", this));
   }
 
   static {
@@ -262,7 +262,7 @@ export interface CpkOrder {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenOrder extends CpkOrder {
   static {
-    registerModel(rbModConstSet(Cpk, "BrokenOrder", this));
+    registerModel(constSet(Cpk, "BrokenOrder", this));
   }
   static {
     this.primaryKey = ["shop_id", "status"];
@@ -279,7 +279,7 @@ export interface CpkBrokenOrder {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
   static {
-    registerModel(rbModConstSet(Cpk, "OrderWithSpecialPrimaryKey", this));
+    registerModel(constSet(Cpk, "OrderWithSpecialPrimaryKey", this));
   }
   static {
     this.primaryKey = ["shop_id", "status"];
@@ -296,7 +296,7 @@ export interface CpkOrderWithSpecialPrimaryKey {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
   static {
-    registerModel(rbModConstSet(Cpk, "BrokenOrderWithNonCpkBooks", this));
+    registerModel(constSet(Cpk, "BrokenOrderWithNonCpkBooks", this));
   }
   static {
     this.primaryKey = ["shop_id", "status"];
@@ -312,7 +312,7 @@ export interface CpkBrokenOrderWithNonCpkBooks {
 
 export class CpkNonCpkOrder extends CpkOrder {
   static {
-    registerModel(rbModConstSet(Cpk, "NonCpkOrder", this));
+    registerModel(constSet(Cpk, "NonCpkOrder", this));
   }
   static {
     this.primaryKey = "id";
@@ -322,7 +322,7 @@ export class CpkNonCpkOrder extends CpkOrder {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
   static {
-    registerModel(rbModConstSet(Cpk, "OrderWithPrimaryKeyAssociatedBook", this));
+    registerModel(constSet(Cpk, "OrderWithPrimaryKeyAssociatedBook", this));
   }
   static {
     this.hasOne("book", { foreignKey: "order_id" });
@@ -337,7 +337,7 @@ export interface CpkOrderWithPrimaryKeyAssociatedBook {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithNullifiedBook extends CpkOrder {
   static {
-    registerModel(rbModConstSet(Cpk, "OrderWithNullifiedBook", this));
+    registerModel(constSet(Cpk, "OrderWithNullifiedBook", this));
   }
   static {
     this.hasOne("book", {
@@ -356,7 +356,7 @@ export class CpkOrderWithSingularBookChapters extends CpkOrder {
   declare chapters: AssociationProxy<CpkChapter>;
 
   static {
-    registerModel(rbModConstSet(Cpk, "OrderWithSingularBookChapters", this));
+    registerModel(constSet(Cpk, "OrderWithSingularBookChapters", this));
   }
   static {
     this.hasMany("chapters", { through: "book" });
@@ -369,7 +369,7 @@ export class CpkOrderAgreement extends Base {
   declare signature: string;
 
   static {
-    registerModel(rbModConstSet(Cpk, "OrderAgreement", this));
+    registerModel(constSet(Cpk, "OrderAgreement", this));
   }
   static _tableName = "cpk_order_agreements";
 
@@ -391,7 +391,7 @@ export class CpkOrderTag extends Base {
   declare tag_id: number;
 
   static {
-    registerModel(rbModConstSet(Cpk, "OrderTag", this));
+    registerModel(constSet(Cpk, "OrderTag", this));
   }
   static _tableName = "cpk_order_tags";
   static {
@@ -417,7 +417,7 @@ export class CpkTag extends Base {
   declare name: string;
 
   static {
-    registerModel(rbModConstSet(Cpk, "Tag", this));
+    registerModel(constSet(Cpk, "Tag", this));
   }
   static _tableName = "cpk_tags";
 
@@ -433,7 +433,7 @@ export class CpkPost extends Base {
   declare title: string;
 
   static {
-    registerModel(rbModConstSet(Cpk, "Post", this));
+    registerModel(constSet(Cpk, "Post", this));
   }
   static _tableName = "cpk_posts";
 
@@ -454,7 +454,7 @@ export class CpkComment extends Base {
   declare text: string;
 
   static {
-    registerModel(rbModConstSet(Cpk, "Comment", this));
+    registerModel(constSet(Cpk, "Comment", this));
   }
   static _tableName = "cpk_comments";
 
@@ -486,7 +486,7 @@ export class CpkReview extends Base {
   declare rating: number;
 
   static {
-    registerModel(rbModConstSet(Cpk, "Review", this));
+    registerModel(constSet(Cpk, "Review", this));
   }
   static _tableName = "cpk_reviews";
 
@@ -510,7 +510,7 @@ export class CpkCar extends Base {
 
   static _tableName = "cpk_cars";
   static {
-    registerModel(rbModConstSet(Cpk, "Car", this));
+    registerModel(constSet(Cpk, "Car", this));
   }
 
   static {
@@ -529,7 +529,7 @@ export class CpkCarReview extends Base {
 
   static _tableName = "cpk_car_reviews";
   static {
-    registerModel(rbModConstSet(Cpk, "CarReview", this));
+    registerModel(constSet(Cpk, "CarReview", this));
   }
 
   static {

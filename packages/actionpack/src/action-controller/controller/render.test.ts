@@ -23,7 +23,7 @@ import {
   File,
   maxBy,
   rbFSend,
-  rbModConstSet,
+  constSet,
   rbObjIvarGet,
   registerConstant,
   RuntimeError,
@@ -115,7 +115,7 @@ class ImplicitRenderTestController extends Base {
 
 const Namespaced = {} as { ImplicitRenderTestController: typeof Base };
 registerConstant("Namespaced", Namespaced);
-rbModConstSet(
+constSet(
   Namespaced,
   "ImplicitRenderTestController",
   class extends Base {

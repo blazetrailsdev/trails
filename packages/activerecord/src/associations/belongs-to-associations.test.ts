@@ -1,8 +1,8 @@
 import { Admin } from "../test-helpers/models/admin.js";
 import {
   kernelThrow,
-  rbModConstDefined,
-  rbModConstSet,
+  constDefined,
+  constSet,
   registeredConstant,
   unregisterConstant,
 } from "@blazetrails/ruby-compat";
@@ -598,9 +598,9 @@ describe("BelongsToAssociationsTest", () => {
           this.belongsTo("region");
         }
       }
-      rbModConstSet(Admin, "RegionalUser", AdminRegionalUser);
+      constSet(Admin, "RegionalUser", AdminRegionalUser);
       class AdminRegion extends Base {}
-      rbModConstSet(Admin, "Region", AdminRegion);
+      constSet(Admin, "Region", AdminRegion);
       registerModel(AdminRegion as any);
       registerModel(AdminRegionalUser as any);
 
@@ -611,8 +611,8 @@ describe("BelongsToAssociationsTest", () => {
         /^Region\([^)]+\) expected, got "wrong value" which is an instance of String\([^)]+\)$/,
       );
     } finally {
-      if (rbModConstDefined(Admin, "Region")) Reflect.deleteProperty(Admin, "Region");
-      if (rbModConstDefined(Admin, "RegionalUser")) Reflect.deleteProperty(Admin, "RegionalUser");
+      if (constDefined(Admin, "Region")) Reflect.deleteProperty(Admin, "Region");
+      if (constDefined(Admin, "RegionalUser")) Reflect.deleteProperty(Admin, "RegionalUser");
       unregisterConstant("AdminRegion", registeredConstant("AdminRegion"));
       unregisterConstant("AdminRegionalUser", registeredConstant("AdminRegionalUser"));
 

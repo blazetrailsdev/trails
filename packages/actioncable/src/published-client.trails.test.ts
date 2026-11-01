@@ -1,6 +1,6 @@
 import { Logger } from "@blazetrails/activesupport";
 import { Handler } from "@blazetrails/rack";
-import { StringIO, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { StringIO, constSet, registerConstant } from "@blazetrails/ruby-compat";
 import * as Client from "@rails/actioncable";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Base as ChannelBase } from "./channel/base.js";
@@ -36,7 +36,7 @@ class EchoChannel extends ChannelBase {
     return (ActionCable.server() as ServerBase).broadcast("global", { wide: data["message"] });
   }
 }
-rbModConstSet(PublishedClientTest, "EchoChannel", EchoChannel);
+constSet(PublishedClientTest, "EchoChannel", EchoChannel);
 
 const visibilityShim = globalThis as unknown as Record<string, unknown>;
 
