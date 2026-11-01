@@ -19,7 +19,7 @@ export const Config = {
     this: Loader,
     path: PathArg,
     { namespace = Object as unknown }: { namespace?: unknown } = {},
-  ): Promise<void> {
+  ): Promise<object> {
     if (
       typeof namespace !== "function" &&
       !(typeof namespace === "object" && namespace !== null && isModuleObject(namespace))
@@ -35,7 +35,7 @@ export const Config = {
     const abspath = File.expandPath(path);
     if (await this.isDir(abspath)) {
       this.raiseIfConflictingDirectory(abspath);
-      this.roots[abspath] = namespace;
+      return (this.roots[abspath] = namespace);
     } else {
       throw new ZeitwerkError(`the root directory ${abspath} does not exist`);
     }

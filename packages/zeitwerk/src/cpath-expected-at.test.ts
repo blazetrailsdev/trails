@@ -4,6 +4,8 @@ import { Error as ZeitwerkError, NameError } from "./error.js";
 import type { Loader } from "./loader.js";
 import { newLoader, teardown, withFiles, withSetup } from "./test-helpers/loader-test.js";
 
+const wrongName = ["wrong constant name", "Foo.bar"].join(" ");
+
 function hooks() {
   const state = { loader: null as unknown as Loader };
   beforeEach(() => {
@@ -18,8 +20,9 @@ describe("TestCpathExpectedAtErrors", () => {
 
   it("raises Zeitwerk::Error if the argument does not exist", async () => {
     await withSetup(s.loader, [], { dirs: ["."] }, async () => {
-      const error = await s.loader.cpathExpectedAt("does_not_exist.ts").catch((e: Error) => e);
-      expect(error).toBeInstanceOf(ZeitwerkError);
+      const at = s.loader.cpathExpectedAt("does_not_exist.ts");
+      await expect(at).rejects.toThrow(ZeitwerkError);
+      const error = await at.catch((e: Error) => e);
       const abspath = File.expandPath("does_not_exist.ts");
       expect((error as Error).message).toContain(`${abspath} does not exist`);
     });
@@ -30,12 +33,14 @@ describe("TestCpathExpectedAtErrors", () => {
     await withFiles(files, async () => {
       await s.loader.pushDir(".");
 
-      let error = await s.loader.cpathExpectedAt(files[0][0]).catch((e: Error) => e);
-      expect(error).toBeInstanceOf(NameError);
-      expect((error as Error).message).toContain("wrong constant name Foo.bar");
+      let at = s.loader.cpathExpectedAt(files[0][0]);
+      await expect(at).rejects.toThrow(NameError);
+      let error: unknown = await at.catch((e: Error) => e);
+      expect((error as Error).message).toContain(wrongName);
 
-      error = await s.loader.cpathExpectedAt(files[1][0]).catch((e: Error) => e);
-      expect(error).toBeInstanceOf(NameError);
+      at = s.loader.cpathExpectedAt(files[1][0]);
+      await expect(at).rejects.toThrow(NameError);
+      error = await at.catch((e: Error) => e);
       expect((error as Error).message).toContain("wrong constant name 1");
     });
   });
@@ -43,9 +48,10 @@ describe("TestCpathExpectedAtErrors", () => {
   it("raises Zeitwerk::NameError if some intermediate segment does not yield a constant name", async () => {
     await withFiles([["x/foo.bar/y/z.ts"]], async () => {
       await s.loader.pushDir(".");
-      const error = await s.loader.cpathExpectedAt("x/foo.bar/y/z.ts").catch((e: Error) => e);
-      expect(error).toBeInstanceOf(NameError);
-      expect((error as Error).message).toContain("wrong constant name Foo.bar");
+      const at = s.loader.cpathExpectedAt("x/foo.bar/y/z.ts");
+      await expect(at).rejects.toThrow(NameError);
+      const error = await at.catch((e: Error) => e);
+      expect((error as Error).message).toContain(wrongName);
     });
   });
 });
@@ -100,7 +106,7 @@ describe("TestCpathExpectedAtString", () => {
 
   const s = hooks();
 
-  const expectCpath = (
+  const checkCpath = (
     files: [string][],
     options: { dirs?: string[]; namespace?: object },
     path: string | Pathname,
@@ -111,41 +117,41 @@ describe("TestCpathExpectedAtString", () => {
     });
 
   it("returns the name of the root namespace for a root directory (Object)", () =>
-    expectCpath([["README.md"]], {}, ".", "Object"));
+    checkCpath([["README.md"]], {}, ".", "Object"));
 
   it("returns the name of the root namespace for a root directory (Object, Pathname)", () =>
-    expectCpath([["README.md"]], {}, new Pathname("."), "Object"));
+    checkCpath([["README.md"]], {}, new Pathname("."), "Object"));
 
   it("returns the name of the root namespace for a root directory (Custom)", () =>
-    expectCpath([], { dirs: ["."], namespace: M }, ".", M_REAL_NAME));
+    checkCpath([], { dirs: ["."], namespace: M }, ".", M_REAL_NAME));
 
   it("returns the name of the root namespace for a root directory (Custom, Pathname)", () =>
-    expectCpath([], { dirs: ["."], namespace: M }, new Pathname("."), M_REAL_NAME));
+    checkCpath([], { dirs: ["."], namespace: M }, new Pathname("."), M_REAL_NAME));
 
   it("returns the name of the root directory even if it is hidden", () =>
-    expectCpath([[".foo/x.ts"]], { dirs: [".foo"] }, ".foo", "Object"));
+    checkCpath([[".foo/x.ts"]], { dirs: [".foo"] }, ".foo", "Object"));
 
-  it("returns the cpath to a root file (Object)", () => expectCpath([["x.ts"]], {}, "x.ts", "X"));
+  it("returns the cpath to a root file (Object)", () => checkCpath([["x.ts"]], {}, "x.ts", "X"));
 
   it("returns the cpath to a root file (Custom)", () =>
-    expectCpath([["x.ts"]], { namespace: M }, "x.ts", `${M_REAL_NAME}::X`));
+    checkCpath([["x.ts"]], { namespace: M }, "x.ts", `${M_REAL_NAME}::X`));
 
-  it("returns the cpath to a subdirectory (Object)", () => expectCpath([["a/x.ts"]], {}, "a", "A"));
+  it("returns the cpath to a subdirectory (Object)", () => checkCpath([["a/x.ts"]], {}, "a", "A"));
 
   it("returns the cpath to a subdirectory (Custom)", () =>
-    expectCpath([["a/x.ts"]], { namespace: M }, "a", `${M_REAL_NAME}::A`));
+    checkCpath([["a/x.ts"]], { namespace: M }, "a", `${M_REAL_NAME}::A`));
 
   it("returns the cpath to a nested file (Object)", () =>
-    expectCpath([["a/b/c/x.ts"]], {}, "a/b/c/x.ts", "A::B::C::X"));
+    checkCpath([["a/b/c/x.ts"]], {}, "a/b/c/x.ts", "A::B::C::X"));
 
   it("returns the cpath to a nested file (Custom)", () =>
-    expectCpath([["a/b/c/x.ts"]], { namespace: M }, "a/b/c/x.ts", `${M_REAL_NAME}::A::B::C::X`));
+    checkCpath([["a/b/c/x.ts"]], { namespace: M }, "a/b/c/x.ts", `${M_REAL_NAME}::A::B::C::X`));
 
   it("returns the cpath to a nested directory (Object)", () =>
-    expectCpath([["a/b/c/x.ts"]], {}, "a/b/c", "A::B::C"));
+    checkCpath([["a/b/c/x.ts"]], {}, "a/b/c", "A::B::C"));
 
   it("returns the cpath to a nested directory (Custom)", () =>
-    expectCpath([["a/b/c/x.ts"]], { namespace: M }, "a/b/c", `${M_REAL_NAME}::A::B::C`));
+    checkCpath([["a/b/c/x.ts"]], { namespace: M }, "a/b/c", `${M_REAL_NAME}::A::B::C`));
 
   it("supports collapsed directories (Object)", async () => {
     await withSetup(s.loader, [["a/b/collapsed/x.ts"]], {}, async () => {

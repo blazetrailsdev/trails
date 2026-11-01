@@ -29,38 +29,39 @@ describe("TestConflictingDirectory", () => {
     );
   }
 
-  async function assertConflict(dir: string) {
-    const e = await loader.pushDir(dir).catch((error: unknown) => error);
-    expect(e).toBeInstanceOf(ZeitwerkError);
-    expect((e as ZeitwerkError).message).toEqual(conflictingDirectoryMessage(dir));
+  async function checkConflict(dir: string) {
+    const push = loader.pushDir(dir);
+    await expect(push).rejects.toThrow(ZeitwerkError);
+    const e = await push.catch((error: Error) => error);
+    expect((e as Error).message).toEqual(conflictingDirectoryMessage(dir));
   }
 
   it("raises if an existing loader manages the same root dir", async () => {
     await existingLoader.pushDir(dir);
-    await assertConflict(dir);
+    await checkConflict(dir);
   });
 
   it("raises if an existing loader manages a parent directory", async () => {
     await existingLoader.pushDir(parent);
-    await assertConflict(dir);
+    await checkConflict(dir);
   });
 
   it("raises if an existing loader manages a subdirectory", async () => {
     await existingLoader.pushDir(dir);
-    await assertConflict(parent);
+    await checkConflict(parent);
   });
 
   it("does not raise if an existing loader manages a directory with a matching prefix", async () => {
     await withFiles(files, async () => {
       await existingLoader.pushDir("foo");
-      await expect(loader.pushDir("foobar")).resolves.toBeUndefined();
+      expect(await loader.pushDir("foobar")).toBeTruthy();
     });
   });
 
   it("does not raise if an existing loader ignores the directory (dir)", async () => {
     await existingLoader.pushDir(parent);
     await existingLoader.ignore(dir);
-    await expect(loader.pushDir(dir)).resolves.toBeUndefined();
+    expect(await loader.pushDir(dir)).toBeTruthy();
   });
 
   it("does not raise if a second existing loader ignores the directory (dir)", async () => {
@@ -68,25 +69,25 @@ describe("TestConflictingDirectory", () => {
     await secondExistingLoader.pushDir(parent);
     await secondExistingLoader.ignore(dir);
 
-    await expect(loader.pushDir(dir)).resolves.toBeUndefined();
+    expect(await loader.pushDir(dir)).toBeTruthy();
   });
 
   it("does not raise if an existing loader ignores the directory (glob pattern)", async () => {
     await existingLoader.pushDir(parent);
     await existingLoader.ignore(`${parent}/*`);
-    await expect(loader.pushDir(dir)).resolves.toBeUndefined();
+    expect(await loader.pushDir(dir)).toBeTruthy();
   });
 
   it("does not raise if the loader ignores a directory managed by an existing loader (dir)", async () => {
     await existingLoader.pushDir(dir);
     await loader.ignore(dir);
-    await expect(loader.pushDir(parent)).resolves.toBeUndefined();
+    expect(await loader.pushDir(parent)).toBeTruthy();
   });
 
   it("does not raise if the loader ignores a directory managed by an existing loader (glob pattern)", async () => {
     await existingLoader.pushDir(dir);
     await loader.ignore(`${parent}/*`);
-    await expect(loader.pushDir(parent)).resolves.toBeUndefined();
+    expect(await loader.pushDir(parent)).toBeTruthy();
   });
 
   it("raises if an existing loader ignores a directory with a matching prefix", async () => {
@@ -97,7 +98,7 @@ describe("TestConflictingDirectory", () => {
       await existingLoader.pushDir(".");
       await existingLoader.ignore(ignored);
 
-      await assertConflict(conflictingDir);
+      await checkConflict(conflictingDir);
     });
   });
 });
