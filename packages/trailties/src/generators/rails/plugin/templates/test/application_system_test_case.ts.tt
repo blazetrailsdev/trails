@@ -1,3 +1,4 @@
+import { ActionDispatch } from "@blazetrails/actionpack";
 import "./test_helper.js";
 
 export class ApplicationSystemTestCase extends ActionDispatch.SystemTestCase {

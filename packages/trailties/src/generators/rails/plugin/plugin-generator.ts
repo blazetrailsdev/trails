@@ -12,6 +12,7 @@ interface PluginBuilderHost {
   emptyDirectoryWithKeepFile(destination: string): Promise<unknown>;
   removeDir(path: string): Promise<unknown>;
   removeFile(path: string): Promise<unknown>;
+  createFile(path: string, content: string, config: object): Promise<unknown>;
   insertIntoFile(path: string, content: string, config: object): Promise<unknown>;
   chmod(path: string, mode: number, config: object): Promise<unknown>;
   run(command: string, config: object): Promise<unknown>;
@@ -33,8 +34,6 @@ interface PluginBuilderHost {
 }
 
 export class PluginBuilder {
-  static DUMMY_IGNORE_OPTIONS = ["dev", "edge", "master", "template"];
-
   /** @missingRailsArgs template — PERMANENT */
   async rakefile(this: PluginBuilderHost): Promise<void> {
     await this.template("Rakefile.ts");
@@ -73,7 +72,7 @@ export class PluginBuilder {
     await this.template("README.md");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
+  /** @missingRailsArgs template — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json */
   async gemfile(this: PluginBuilderHost): Promise<void> {
     await this.template("pnpm-workspace.yaml");
   }
@@ -82,7 +81,7 @@ export class PluginBuilder {
     if (!this.isInsideApplication()) await this.template("MIT-LICENSE");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
+  /** @missingRailsArgs template — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json */
   async gemspec(this: PluginBuilderHost): Promise<void> {
     await this.template("package.json");
   }
@@ -149,6 +148,8 @@ export class PluginBuilder {
     }
   }
 
+  static DUMMY_IGNORE_OPTIONS = ["dev", "edge", "master", "template"];
+
   async generateTestDummy(this: PluginBuilderHost, force = false): Promise<void> {
     const opts: Record<string, unknown> = { ...this.options };
     for (const key of PluginBuilder.DUMMY_IGNORE_OPTIONS) delete opts[key];
@@ -188,11 +189,11 @@ export class PluginBuilder {
         indent(
           `
 // For compatibility with applications that use this config
-config.actionController.includeAllHelpers = false;
+this.config.actionController.includeAllHelpers = false;
 `,
           4,
         ),
-        { after: /^\s*.*loadDefaults.*\n/m },
+        { after: /^\s*this\.config\.loadDefaults.*\n/m },
       );
     }
   }
@@ -230,6 +231,7 @@ config.actionController.includeAllHelpers = false;
     }
   }
 
+  /** @missingRailsCall umask — CONVERGEABLE ruby-compat-file-umask */
   async bin(this: PluginBuilderHost): Promise<void> {
     const excludePattern = new RegExp(
       [this.isEngine() ? "test\\.tt" : "rails\\.tt", this.skipEslint() ? "eslint" : null]
@@ -242,14 +244,19 @@ config.actionController.includeAllHelpers = false;
     await this.chmod("bin", 0o755, { verbose: false });
   }
 
-  /** @missingRailsArgs join — PERMANENT */
+  /**
+   * @missingRailsArgs join — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json
+   * @missingRailsCall append_file — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json
+   */
   async gemfileEntry(this: PluginBuilderHost): Promise<void> {
     if (!this.isInsideApplication()) return;
 
     const gemfileInAppPath = File.join(this.railsAppPath()!, "package.json");
     if (await File.isExistAsync(gemfileInAppPath)) {
-      const entry = `    "${this.name()}": "file:${this.relativePath()}",\n`;
-      await this.insertIntoFile(gemfileInAppPath, entry, { after: /"dependencies": \{\n/ });
+      const json = JSON.parse(await File.readAsync(gemfileInAppPath));
+      json.dependencies = { ...json.dependencies, [this.name()]: `file:${this.relativePath()}` };
+      const entry = JSON.stringify(json, null, 2) + "\n";
+      await this.createFile(gemfileInAppPath, entry, { force: true });
     }
   }
 }

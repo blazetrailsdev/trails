@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import "./test_helper.js";
-import { VERSION } from "../lib/<%= this.namespacedName() %>/version.js";
+import "./<%= "../".repeat(this.namespacedName().split("/").length - 1) %>test_helper.js";
+import { VERSION } from "../<%= "../".repeat(this.namespacedName().split("/").length - 1) %>lib/<%= this.namespacedName() %>/version.js";
 
 describe("<%= this.camelizedModules() %>", () => {
-  it("has a version number", () => {
+  it("it has a version number", () => {
     expect(VERSION).toBeTruthy();
   });
 });

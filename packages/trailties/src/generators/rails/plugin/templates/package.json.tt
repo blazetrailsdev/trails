@@ -9,7 +9,10 @@
   "license": "MIT",
 <% } -%>
   "files": ["app", "config", "db", "lib", "MIT-LICENSE", "Rakefile.ts", "README.md"],
-  "<%= this.railsPrerelease() ? "devDependencies" : "peerDependencies" %>": {
-    "@blazetrails/trailties": <%= JSON.stringify(this.railsVersionSpecifier()) %>
+  "<%= this.railsPrerelease() ? "devDependencies" : "dependencies" %>": {
+<% const packages = ["activerecord", "activesupport", "actionpack", "activejob", "ruby-compat", "trailties"]; -%>
+<% packages.forEach((pkg, i) => { -%>
+    "@blazetrails/<%= pkg %>": <%= JSON.stringify([this.railsVersionSpecifier()].flat().join(" ")) %><%= i < packages.length - 1 ? "," : "" %>
+<% }); -%>
   }
 }

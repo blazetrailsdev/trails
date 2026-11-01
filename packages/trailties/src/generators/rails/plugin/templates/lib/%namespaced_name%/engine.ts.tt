@@ -1,4 +1,6 @@
+import { Trails } from "@blazetrails/trailties";
+
 <%= this.wrapInModules(`export class Engine extends Trails.Engine {
-${this.isMountable() ? "  static { this.isolateNamespace(" + this.camelizedModules() + "); }" : ""}
+${this.isMountable() ? "  static { this.isolateNamespace(" + this.camelizedModules().replaceAll("::", ".") + "); }" : ""}
 ${this.isApi() ? "  static { this.config.generators.apiOnly = true; }" : ""}
 }`) %>

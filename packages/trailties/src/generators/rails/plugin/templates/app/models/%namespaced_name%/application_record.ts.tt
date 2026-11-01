@@ -1,3 +1,5 @@
+import { ActiveRecord } from "@blazetrails/activerecord";
+
 <%= this.wrapInModules(`export class ApplicationRecord extends ActiveRecord.Base {
   static {
     this.abstractClass = true;

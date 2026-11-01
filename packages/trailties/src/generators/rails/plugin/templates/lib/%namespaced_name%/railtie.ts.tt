@@ -1,1 +1,3 @@
-<%= this.wrapInModules(`export class Railtie extends Trails.Railtie {}`) %>
+import { Trails } from "@blazetrails/trailties";
+
+<%= this.wrapInModules(`export class Railtie extends Trails.Trailtie {}`) %>

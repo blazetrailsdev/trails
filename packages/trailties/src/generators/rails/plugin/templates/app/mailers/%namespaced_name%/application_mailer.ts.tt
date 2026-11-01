@@ -1,3 +1,5 @@
+import { ActionMailer } from "@blazetrails/actionmailer";
+
 <%= this.wrapInModules(`export class ApplicationMailer extends ActionMailer.Base {
   static {
     this.default({ from: "from@example.com" });

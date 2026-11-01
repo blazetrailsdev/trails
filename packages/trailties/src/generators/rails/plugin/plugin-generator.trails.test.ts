@@ -27,8 +27,11 @@ class Host extends AppBase {
     this.methodAdded("isEngine");
     this.methodAdded("isWithDummyApp");
     this.methodAdded("isInsideApplication");
+    this.methodAdded("railsAppPath");
+    this.methodAdded("relativePath");
     this.methodAdded("testCommand");
   }
+  inApp = false;
   mode: "plain" | "full" | "mountable" = "plain";
   getBuilderClass() {
     return PluginBuilder as never;
@@ -82,7 +85,13 @@ class Host extends AppBase {
     return true;
   }
   isInsideApplication() {
-    return false;
+    return this.inApp;
+  }
+  railsAppPath() {
+    return this.destinationRoot;
+  }
+  relativePath() {
+    return "vendor/blog-admin";
   }
   testCommand() {
     return "bin/test";
@@ -109,7 +118,7 @@ describe("PluginBuilder", () => {
     await g["build"]("gemspec");
     await g["build"]("gemfile");
     expect(JSON.parse(await File.readAsync(`${root}/package.json`)).name).toBe("blog-admin");
-    expect(await File.readAsync(`${root}/pnpm-workspace.yaml`)).toContain("- test/dummy");
+    expect(await File.readAsync(`${root}/pnpm-workspace.yaml`)).toContain("- .");
   });
 
   it("generates a railtie unless the plugin is an engine", async () => {
@@ -126,6 +135,55 @@ describe("PluginBuilder", () => {
     expect(await File.readAsync(`${root}/bin/rails`)).toMatch(/^#!\/usr\/bin\/env node\n/);
   });
 
+  it("resolves relative imports from a namespaced file", async () => {
+    const g = generator("full");
+    await g["build"]("lib");
+    await g["build"]("test");
+    expect(await File.readAsync(`${root}/lib/blog/admin.ts`)).toContain('"./admin/version.js"');
+    const test = await File.readAsync(`${root}/test/blog/admin.test.ts`);
+    expect(test).toContain('"./../test_helper.js"');
+    expect(test).toContain('"../../lib/blog/admin/version.js"');
+  });
+
+  it("renders the root files", async () => {
+    const g = generator("plain");
+    for (const meth of ["readme", "gitignore", "cifiles", "rakefile"]) await g["build"](meth);
+    expect(await File.readAsync(`${root}/README.md`)).toContain("Blog::Admin");
+    expect(await File.readAsync(`${root}/.gitignore`)).toContain("/test/dummy/log/*.log");
+    expect(await File.readAsync(`${root}/.github/workflows/ci.yml`)).toContain("pnpm install");
+    expect(await File.isExistAsync(`${root}/Rakefile.ts`)).toBe(true);
+  });
+
+  it("configures the dummy application for an engine", async () => {
+    const g = generator("mountable");
+    await FileUtils.mkdirP(`${root}/test/dummy/config`);
+    await File.writeAsync(
+      `${root}/test/dummy/config/application.ts`,
+      '  static {\n    // loadDefaults\n    this.config.loadDefaults("8.0");\n  }\n',
+    );
+    await g["build"]("testDummyConfig");
+    await g["build"]("testDummyAssets");
+    expect(await File.readAsync(`${root}/test/dummy/config/application.ts`)).toContain(
+      '"8.0");\n\n    // For compatibility with applications that use this config\n    this.config.actionController.includeAllHelpers = false;',
+    );
+    expect(await File.readAsync(`${root}/test/dummy/config/routes.ts`)).toContain(
+      "this.mount(Blog.Admin.Engine,",
+    );
+    expect(
+      await File.isExistAsync(`${root}/test/dummy/app/assets/stylesheets/application.css`),
+    ).toBe(true);
+  });
+
+  it("adds the plugin to an application's dependencies with none declared", async () => {
+    const g = generator("plain");
+    await File.writeAsync(`${root}/package.json`, '{ "dependencies": {} }');
+    g.inApp = true;
+    await g["build"]("gemfileEntry");
+    expect(JSON.parse(await File.readAsync(`${root}/package.json`)).dependencies).toEqual({
+      "blog-admin": "file:vendor/blog-admin",
+    });
+  });
+
   it("copies the app directory for a mountable engine", async () => {
     const g = generator("mountable");
     await g["build"]("app");
@@ -134,6 +192,8 @@ describe("PluginBuilder", () => {
       await File.readAsync(`${root}/app/views/layouts/blog/admin/application.html.tse`),
     ).toContain('stylesheetLinkTag("blog/admin/application"');
     expect(await File.isExistAsync(`${root}/app/models/concerns/.keep`)).toBe(true);
-    expect(await File.readAsync(`${root}/config/routes.ts`)).toContain("Blog::Admin.Engine");
+    expect(await File.readAsync(`${root}/config/routes.ts`)).toContain(
+      "Blog.Admin.Engine.instance().routes().draw(",
+    );
   });
 });

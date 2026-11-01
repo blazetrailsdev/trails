@@ -16,6 +16,9 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
 
+      - name: Install packages
+        run: corepack enable && pnpm install
+
       - name: Lint code for consistent style
         run: bin/eslint
 
@@ -49,6 +52,9 @@ jobs:
 
       - name: Set up Node
         uses: actions/setup-node@v4
+
+      - name: Install packages
+        run: corepack enable && pnpm install
 
       - name: Run tests
         env:
