@@ -24,8 +24,7 @@ export class Base extends Thor {
 
   static {
     classAttribute.call(this, "bin", { instanceAccessor: false, default: "bin/rails" });
-    const klass = this as unknown as ThorClass;
-    klass.noCommands(() => klass.methodAdded("invokeCommand"));
+    (this as unknown as ThorClass).noCommands(() => this.methodAdded("invokeCommand"));
     this.methodAdded("invokeCommand");
   }
 
