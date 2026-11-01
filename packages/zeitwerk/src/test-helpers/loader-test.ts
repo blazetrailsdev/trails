@@ -10,7 +10,7 @@ export function newLoader(): Loader {
 }
 
 export function teardown(): void {
-  Registry.loaders.clear();
+  Registry.loaders.length = 0;
   ExplicitNamespaces.clear();
 }
 

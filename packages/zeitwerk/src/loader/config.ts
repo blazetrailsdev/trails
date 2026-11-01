@@ -46,7 +46,7 @@ export const Config = {
   },
 
   set tag(tag: unknown) {
-    (this as unknown as Loader)._tag = String(tag);
+    (this as unknown as Loader)._tag = tag == null ? "" : String(tag);
   },
 
   dirs(

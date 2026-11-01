@@ -1,43 +1,44 @@
+import { aryDelete } from "@blazetrails/ruby-compat";
 import type { Loader } from "./loader.js";
 import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 
 export const Registry = {
   ExplicitNamespaces,
 
-  loaders: new Set<Loader>(),
-  gemLoadersByRootFile: new Map<string, Loader>(),
-  autoloads: new Map<string, Loader>(),
+  loaders: [] as Loader[],
+  gemLoadersByRootFile: {} as Record<string, Loader>,
+  autoloads: {} as Record<string, Loader>,
 
   registerLoader(loader: Loader): void {
-    this.loaders.add(loader);
+    this.loaders.push(loader);
   },
 
   unregisterLoader(loader: Loader): void {
-    this.loaders.delete(loader);
-    for (const [k, l] of this.gemLoadersByRootFile) {
-      if (l === loader) this.gemLoadersByRootFile.delete(k);
+    aryDelete(this.loaders, loader);
+    for (const [k, l] of Object.entries(this.gemLoadersByRootFile)) {
+      if (l === loader) delete this.gemLoadersByRootFile[k];
     }
-    for (const [k, l] of this.autoloads) {
-      if (l === loader) this.autoloads.delete(k);
+    for (const [k, l] of Object.entries(this.autoloads)) {
+      if (l === loader) delete this.autoloads[k];
     }
   },
 
   registerAutoload(loader: Loader, abspath: string): Loader {
-    this.autoloads.set(abspath, loader);
-    return loader;
+    return (this.autoloads[abspath] = loader);
   },
 
+  /** @missingRailsCall delete — PERMANENT */
   unregisterAutoload(abspath: string): void {
-    this.autoloads.delete(abspath);
+    delete this.autoloads[abspath];
   },
 
   loaderFor(path: string): Loader | null {
-    return this.autoloads.get(path) ?? null;
+    return this.autoloads[path] ?? null;
   },
 
   onUnload(loader: Loader): void {
-    for (const [path, object] of this.autoloads) {
-      if (object === loader) this.autoloads.delete(path);
+    for (const [path, object] of Object.entries(this.autoloads)) {
+      if (object === loader) delete this.autoloads[path];
     }
   },
 };

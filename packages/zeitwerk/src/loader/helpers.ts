@@ -51,10 +51,10 @@ export const Helpers = {
           continue;
         }
 
-        ftype = ":directory";
+        ftype = "directory";
       } else {
         if (!(await this.isRuby(abspath))) continue;
-        ftype = ":file";
+        ftype = "file";
       }
 
       await block(basename.replaceAll("-", "_"), abspath, ftype);
