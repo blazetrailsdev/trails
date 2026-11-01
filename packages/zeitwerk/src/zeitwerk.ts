@@ -7,3 +7,11 @@ export { Error, NameError, ReloadingDisabledError, SetupRequired } from "./error
 export { Cref } from "./cref.js";
 export { Loader } from "./loader.js";
 export { Registry } from "./registry.js";
+export {
+  buildManifest,
+  configurationDigest,
+  manifestRoot,
+  writeArtifacts,
+  type Manifest,
+  type ManifestRow,
+} from "./loader/manifest.js";

@@ -25,6 +25,7 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
+    "@blazetrails/zeitwerk": "workspace:*",
     "typescript-5": "npm:typescript@5.9.3"
   },
   "peerDependencies": {

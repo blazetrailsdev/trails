@@ -910,6 +910,9 @@ importers:
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
+      '@blazetrails/zeitwerk':
+        specifier: workspace:*
+        version: link:../zeitwerk
       typescript-5:
         specifier: npm:typescript@5.9.3
         version: typescript@5.9.3
