@@ -725,6 +725,7 @@ function fuOutputMessage(msg: string): void {
   output.puts(msg);
 }
 
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
  * Ruby's `FileUtils` (stdlib, `vendor/ruby/v3.3.11/lib/fileutils.rb:1`), the file
  * operations Rails sends from ported bodies — `mkdir_p` when a schema dump or a
@@ -743,7 +744,6 @@ function fuOutputMessage(msg: string): void {
  * for it while Rails bodies send `FileUtils.mkdir_p` and friends.
  */
 export class FileUtils {
-  // eslint-disable-line @typescript-eslint/no-unsafe-declaration-merging
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
@@ -2089,7 +2089,7 @@ export class FileUtils {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface FileUtils extends Omit<
   typeof FileUtils,
   "prototype" | "fileutilsOutput" | "fileutilsLabel"
