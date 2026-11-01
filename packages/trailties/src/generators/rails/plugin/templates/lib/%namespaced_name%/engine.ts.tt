@@ -1,0 +1,4 @@
+<%= this.wrapInModules(`export class Engine extends Trails.Engine {
+${this.isMountable() ? "  static { this.isolateNamespace(" + this.camelizedModules() + "); }" : ""}
+${this.isApi() ? "  static { this.config.generators.apiOnly = true; }" : ""}
+}`) %>

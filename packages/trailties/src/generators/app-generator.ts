@@ -60,8 +60,11 @@ export class ActionMethods {
   }
 
   /** @internal */
-  protected async template(source: string, destination: string): Promise<void> {
-    await this.generator["template"](source, destination);
+  protected async template(source: string, ...args: unknown[]): Promise<void> {
+    await (this.generator as unknown as { template(...a: unknown[]): Promise<void> }).template(
+      source,
+      ...args,
+    );
   }
 
   /** @internal */

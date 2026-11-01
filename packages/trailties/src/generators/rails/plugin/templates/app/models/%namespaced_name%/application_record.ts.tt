@@ -1,0 +1,5 @@
+<%= this.wrapInModules(`export class ApplicationRecord extends ActiveRecord.Base {
+  static {
+    this.abstractClass = true;
+  }
+}`) %>

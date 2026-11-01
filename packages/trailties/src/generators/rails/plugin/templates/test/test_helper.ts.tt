@@ -1,0 +1,5 @@
+// Configure Trails Environment
+import { setEnv } from "@blazetrails/ruby-compat";
+setEnv("TRAILS_ENV", "test");
+
+await import("<%= `../${this.options.dummyPath}/config/environment.js` %>");

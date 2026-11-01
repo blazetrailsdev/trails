@@ -1,0 +1,6 @@
+<% if (this.isMountable()) { -%>
+<%= this.camelizedModules() %>.Engine.routes.draw(() => {
+<% } else { -%>
+Trails.application.routes.draw(() => {
+<% } -%>
+});

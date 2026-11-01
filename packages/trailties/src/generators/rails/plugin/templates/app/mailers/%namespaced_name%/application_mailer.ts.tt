@@ -1,0 +1,6 @@
+<%= this.wrapInModules(`export class ApplicationMailer extends ActionMailer.Base {
+  static {
+    this.default({ from: "from@example.com" });
+    this.layout("mailer");
+  }
+}`) %>

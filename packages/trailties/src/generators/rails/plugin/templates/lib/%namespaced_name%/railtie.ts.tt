@@ -1,0 +1,1 @@
+<%= this.wrapInModules(`export class Railtie extends Trails.Railtie {}`) %>

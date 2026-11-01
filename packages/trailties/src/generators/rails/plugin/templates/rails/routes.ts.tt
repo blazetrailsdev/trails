@@ -1,0 +1,3 @@
+Trails.application.routes.draw(function () {
+  this.mount(<%= this.camelizedModules() %>.Engine, { at: "/<%= this.name() %>" });
+});

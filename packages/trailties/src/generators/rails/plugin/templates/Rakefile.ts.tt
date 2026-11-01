@@ -1,0 +1,7 @@
+<% if (this.isEngine() && !this.options.skipActiveRecord && this.isWithDummyApp()) { -%>
+export const APP_RAKEFILE = new URL("<%= this.dummyPath() %>/Rakefile.ts", import.meta.url).pathname;
+await import("@blazetrails/trailties/tasks/engine");
+<% } -%>
+<% if (this.isEngine()) { -%>
+await import("@blazetrails/trailties/tasks/statistics");
+<% } -%>

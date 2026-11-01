@@ -1,0 +1,8 @@
+import "./<%= this.namespacedName() %>/version.js";
+<% if (this.isEngine()) { -%>
+import "./<%= this.namespacedName() %>/engine.js";
+<% } else { -%>
+import "./<%= this.namespacedName() %>/railtie.js";
+<% } -%>
+
+<%= this.wrapInModules("// Your code goes here...") %>

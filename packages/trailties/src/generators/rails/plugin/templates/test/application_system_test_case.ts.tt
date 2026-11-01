@@ -1,0 +1,7 @@
+import "./test_helper.js";
+
+export class ApplicationSystemTestCase extends ActionDispatch.SystemTestCase {
+  static {
+    this.drivenBy("playwright", { using: "chromium", screenSize: [1400, 1400] });
+  }
+}

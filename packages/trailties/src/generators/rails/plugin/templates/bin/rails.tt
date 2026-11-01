@@ -1,0 +1,11 @@
+// This command will automatically be run when you run "trails" from the root of your engine.
+import { File } from "@blazetrails/ruby-compat";
+
+const __dir__ = import.meta.dirname;
+export const ENGINE_ROOT = File.expandPath("..", __dir__);
+export const ENGINE_PATH = File.expandPath("../lib/<%= this.namespacedName() %>/engine", __dir__);
+<% if (this.isWithDummyApp()) { -%>
+export const APP_PATH = File.expandPath("../<%= this.dummyPath() %>/config/application", __dir__);
+<% } -%>
+
+await import("@blazetrails/trailties/engine/commands");
