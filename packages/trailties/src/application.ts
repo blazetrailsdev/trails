@@ -373,15 +373,13 @@ export class Application extends Engine {
   }
 
   messageVerifiers(): MessageVerifiers {
-    return (this._messageVerifiers ??= new MessageVerifiers(
-      Object.assign(
-        (salt: string, { secretKeyBase = this.secretKeyBase() }: { secretKeyBase?: string } = {}) =>
-          this.keyGenerator(secretKeyBase).generateKey(salt),
-        {
-          parameters: ["secretKeyBase"],
-        },
-      ),
-    ).rotateDefaults());
+    if (this._messageVerifiers) return this._messageVerifiers;
+    const secretGenerator = Object.assign(
+      (salt: string, { secretKeyBase = this.secretKeyBase() }: { secretKeyBase?: string } = {}) =>
+        this.keyGenerator(secretKeyBase).generateKey(salt),
+      { parameters: ["secretKeyBase"] },
+    );
+    return (this._messageVerifiers = new MessageVerifiers(secretGenerator).rotateDefaults());
   }
 
   messageVerifier(verifierName: string): MessageVerifier {
