@@ -228,6 +228,13 @@ describe("AppGenerator", () => {
     }
   });
 
+  it("skip git", async () => {
+    await makeGen("sqlite", { skipGit: true }).invokeAll();
+    await assertNoFile("my-app/.gitignore");
+    await assertNoFile("my-app/.gitattributes");
+    await assertNoFile("my-app/.git");
+  });
+
   it("generates valid package.json", async () => {
     await makeGen().invokeAll();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
