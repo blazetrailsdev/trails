@@ -4,6 +4,7 @@ import {
   ArgumentError,
   extend,
   include,
+  NameError,
   NoMethodError,
   rbFSend,
   rbObjRespondTo,
@@ -383,7 +384,8 @@ describe("Thor::Base", () => {
       klass.prototype.build = () => {};
       klass.methodAdded("build");
       klass.removeCommand("build", { undefine: true });
-      expect(klass.prototype.build).toBeUndefined();
+      expect(() => rbFSend(new klass(), "build")).toThrow(NoMethodError);
+      expect(() => klass.removeCommand("nope", { undefine: true })).toThrow(NameError);
     });
   });
 

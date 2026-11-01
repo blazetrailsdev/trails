@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- `include AppName` (`change_generator.rb:12`); the class/interface merge is how the mixin surfaces on the type side. */
 import { any } from "@blazetrails/activesupport";
 import {
   aryDelete,
   File,
+  include,
+  type Included,
   rbObjDup,
   FileUtils,
   flatten,
@@ -11,31 +14,36 @@ import {
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
-import { TEMPLATES } from "../../../app/templates/index.js";
+import { AppName } from "../../../../app-name.js";
 
 const BASE_PACKAGES = ["curl", "libvips"];
 const BUILD_PACKAGES = ["build-essential", "git"];
 
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+
 export interface ChangeGeneratorOptions extends GeneratorOptions {
   to: string;
   database?: string;
-  appName?: string;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- the class/interface merge carries `include AppName`.
+export interface ChangeGenerator extends Included<typeof AppName> {}
 
 export class ChangeGenerator extends GeneratorBase {
   static {
+    include(this as unknown as new (...args: unknown[]) => unknown, AppName);
+    void this.sourceRoot(File.expandPath("../../../app/templates", __dir__));
     this.classOption("to", { required: true, desc: "The database system to switch to." });
 
+    this.noCommands(() => this.methodAdded("isDevcontainer"));
     this.methodAdded("editDatabaseConfig");
     this.methodAdded("editPackageJson");
     this.methodAdded("editDockerfile");
     this.methodAdded("editDevcontainerFiles");
-    this.noCommands(() => this.methodAdded("template"));
   }
 
-  /** @internal */
-  readonly appName: string;
   private _database?: Database;
+  private _devcontainer?: boolean;
 
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
     super(args, localOptions, config);
@@ -49,7 +57,6 @@ export class ChangeGenerator extends GeneratorBase {
     const opt = rbObjDup(this.options) as ChangeGeneratorOptions;
     opt.database ||= opt.to;
     this.options = Object.freeze(opt);
-    this.appName = opt.appName ?? File.basename(this.destinationRoot);
   }
 
   /** @internal */
@@ -62,6 +69,15 @@ export class ChangeGenerator extends GeneratorBase {
     return this._database;
   }
 
+  /** @internal */
+  isDevcontainer(): boolean {
+    if (this._devcontainer !== undefined) return this._devcontainer;
+
+    return (this._devcontainer = File.isExist(
+      File.expandPath(".devcontainer", this.destinationRoot),
+    ));
+  }
+
   /** @missingRailsArgs template — PERMANENT */
   async editDatabaseConfig(): Promise<void> {
     const target =
@@ -69,13 +85,6 @@ export class ChangeGenerator extends GeneratorBase {
         File.isExist(File.join(this.destinationRoot, p)),
       ) ?? `config/database${this.ext()}`;
     await this.template(this.database.template, target);
-  }
-
-  override async template(source: string, destination: string): Promise<void> {
-    this.writeOrUpdate(
-      destination,
-      TEMPLATES[source]({ appName: this.appName, database: this.database }),
-    );
   }
 
   editPackageJson(): void {

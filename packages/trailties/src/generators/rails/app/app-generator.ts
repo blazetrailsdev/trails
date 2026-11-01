@@ -6,7 +6,6 @@ import type { GeneratorConfig } from "../../base.js";
 import { Trails } from "../../../rails.js";
 import { GeneratorError } from "../../generated-attribute.js";
 import { type DatabaseName } from "../../database.js";
-import { TEMPLATES } from "./templates/index.js";
 import { LOAD_DEFAULTS_VERSION } from "../../../application/configuration.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
@@ -1574,19 +1573,5 @@ export default defineConfig([
   /** @internal */
   protected getBuilderClass(): new (generator: never) => object {
     return TopLevel.AppBuilder !== undefined ? TopLevel.AppBuilder : AppBuilder;
-  }
-
-  override async template(source: string, ...args: unknown[]): Promise<void> {
-    await this.createFile(
-      args[0] as string,
-      TEMPLATES[source]({
-        appName: this.appName(),
-        database: this.database,
-        sqliteDriver: this.sqliteDriver,
-        packageManager: this.packageManager,
-        skipEslint: !!this.skipEslint(),
-        skipTest: !!this.options.skipTest,
-      }),
-    );
   }
 }

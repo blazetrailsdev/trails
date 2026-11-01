@@ -29,6 +29,7 @@ import {
   unpack,
   unpack1,
   sortByBang,
+  each,
 } from "./array.js";
 import { Range } from "./range.js";
 import type { Enumerator } from "./enumerator.js";
@@ -727,5 +728,16 @@ describe("Array#product", () => {
     expect(product([1, 2])).toEqual([[1], [2]]);
     expect(product([1, 2], [])).toEqual([]);
     expect(product([], [1])).toEqual([]);
+  });
+});
+
+describe("each", () => {
+  it("yields a Set's members and the [key, value] pairs of a Map or plain Hash", () => {
+    const seen: unknown[] = [];
+    const hash = { a: 1 };
+    expect(each(hash, (i) => seen.push(i))).toBe(hash);
+    each(new Map([["b", 2]]), (i) => seen.push(i));
+    each(new Set(["c"]), (i) => seen.push(i));
+    expect(seen).toEqual([["a", 1], ["b", 2], "c"]);
   });
 });

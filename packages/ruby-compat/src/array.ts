@@ -9,6 +9,7 @@ import { rbBigNorm, rbPlus } from "./numeric.js";
 import { NoMethodError } from "./no-method-error.js";
 import {
   conversionMismatch,
+  isPlainHash,
   rbBuiltinClassName,
   rbObjClassname,
   rbObjIsProc,
@@ -881,16 +882,22 @@ export async function aryReject<T>(ary: readonly T[], block: (item: T) => unknow
 /**
  * Ruby `Array#each` (`vendor/ruby/v3.3.11/array.c:2532` `rb_ary_each`): yields each
  * element and returns the receiver. With no block it is
- * `RETURN_SIZED_ENUMERATOR` (`:2535`), whose elements are the receiver's.
+ * `RETURN_SIZED_ENUMERATOR` (`:2535`), whose elements are the receiver's. A `Set`
+ * yields its members, and a `Map` or plain Hash its `[key, value]` pairs, as
+ * `rb_hash_each_pair` does (`vendor/ruby/v3.3.11/hash.c`).
  *
  * @noRailsEquivalent PERMANENT
  */
-export function each<T>(ary: T[], block?: (item: T) => unknown): T[] {
-  if (!block) return ary;
-  for (const i of ary) {
-    block(i);
+export function each<R extends object>(
+  recv: R,
+  block?: (item: R extends Iterable<infer T> ? T : [string, unknown]) => unknown,
+): R {
+  if (!block) return recv;
+  const yielder = block as (item: unknown) => unknown;
+  for (const i of isPlainHash(recv) ? Object.entries(recv) : (recv as Iterable<unknown>)) {
+    yielder(i);
   }
-  return ary;
+  return recv;
 }
 
 /**

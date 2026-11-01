@@ -71,7 +71,7 @@ export abstract class AppBase extends GeneratorBase {
     this.noCommands(() => this.methodAdded("sqlite3"));
     this.noCommands(() => this.methodAdded("skipStorage"));
     this.noCommands(() => this.methodAdded("keeps"));
-    this.noCommands(() => this.methodAdded("devcontainer"));
+    this.noCommands(() => this.methodAdded("isDevcontainer"));
     this.noCommands(() => this.methodAdded("skipDevcontainer"));
     this.noCommands(() => this.methodAdded("dependsOnSystemTest"));
     this.noCommands(() => this.methodAdded("railsGemfileEntry"));
@@ -475,7 +475,7 @@ ${requireStatements.join("\n")}`;
     return !this.options.devcontainer;
   }
   /** @internal */
-  devcontainer(): boolean {
+  isDevcontainer(): boolean {
     return !!this.options.devcontainer;
   }
   /** @internal */
