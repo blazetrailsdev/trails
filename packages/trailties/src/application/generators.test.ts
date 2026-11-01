@@ -6,6 +6,7 @@ import {
   SecureRandom,
   childProcessAdapterConfig,
   registerChildProcessAdapter,
+  stdout,
 } from "@blazetrails/ruby-compat";
 import { assertNoMatch, assertNothingRaised, capture } from "@blazetrails/activesupport";
 import { Configuration } from "./configuration.js";
@@ -93,9 +94,12 @@ describe("GeneratorsTest", () => {
     appRoot = File.join(Dir.tmpdir(), `trails-generators-${SecureRandom.hex(8)}`);
     FileUtils.mkdirP(appRoot);
     registerChildProcessAdapter("application-generators-test", {
-      spawnSync(_cmd, args) {
-        const stdout = args.includes("--quiet") ? "" : "3 files inspected, no offenses detected\n";
-        return { status: 0, signal: null, stdout, stderr: "" };
+      spawnSync() {
+        return { status: 0, signal: null, stdout: "", stderr: "" };
+      },
+      async system(_cmd, _env, args) {
+        if (!args?.includes("--quiet")) stdout.write("3 files inspected, no offenses detected\n");
+        return { pid: 1, status: 0, signal: null };
       },
     });
     previousAdapter = childProcessAdapterConfig.adapter;

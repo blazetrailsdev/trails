@@ -34,6 +34,7 @@ export interface ProcessAdapter {
   pid(): number;
   ppid?(): number;
   kill?(pid: number, signal: number | string): void;
+  signo?(name: string): number;
   hostname?(): string;
   setEnv(key: string, value: string | undefined): void;
   exit(code?: number): never;
@@ -605,6 +606,9 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
     kill: (pid, signal) => {
       proc.kill(pid, signal);
     },
+    signo: (name) =>
+      (proc.getBuiltinModule?.("node:os") as { constants: { signals: Record<string, number> } })
+        .constants.signals[name],
     hostname: () => (proc.getBuiltinModule?.("node:os") as { hostname(): string }).hostname(),
     setEnv: (key, value) => {
       if (value === undefined) delete proc.env[key];

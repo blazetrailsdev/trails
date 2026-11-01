@@ -1,13 +1,6 @@
 import type { MiddlewareStack } from "@blazetrails/actionpack";
 import { deepDup, isPlainObject } from "@blazetrails/activesupport";
-import {
-  File,
-  Hash,
-  RuntimeError,
-  getChildProcess,
-  hashDelete,
-  stdout,
-} from "@blazetrails/ruby-compat";
+import { File, Hash, hashDelete, rbFSystem } from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 type MiddlewareOperation = (middleware: any) => void;
@@ -90,7 +83,7 @@ export class MiddlewareStackProxy {
 
 export type GeneratorsConfigHash = Hash<unknown, Record<string, unknown>>;
 
-export type AfterGenerateCallback = (files: string[]) => void;
+export type AfterGenerateCallback = (files: string[]) => void | Promise<void>;
 
 function namespaceHash(): GeneratorsConfigHash {
   return new Hash<unknown, Record<string, unknown>>((h, k) => {
@@ -165,23 +158,13 @@ export class Generators {
     this._afterGenerateCallbacks.push(block);
   }
 
-  /** @missingRailsCall system — CONVERGEABLE configuration-eslint-autocorrect-calls-system */
   applyEslintAutocorrectAfterGenerateBang(): void {
-    this.afterGenerate((files) => {
+    this.afterGenerate(async (files) => {
       const parsableFiles = files.filter(
         (file) => File.isExist(file) && /\.[cm]?[jt]s$/.test(file),
       );
       if (parsableFiles.length !== 0) {
-        const result = getChildProcess().spawnSync("bin/eslint", [
-          "--fix",
-          "--quiet",
-          ...parsableFiles,
-        ]);
-        if (result.error) throw result.error;
-        stdout.write(result.stdout);
-        if (result.status !== 0) {
-          throw new RuntimeError(`Command failed with exit ${result.status}: bin/eslint`);
-        }
+        await rbFSystem("bin/eslint", "--fix", "--quiet", ...parsableFiles, { exception: true });
       }
     });
   }
