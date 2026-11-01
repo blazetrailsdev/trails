@@ -1,5 +1,4 @@
-import { describe, expect, it } from "vitest";
-import { env } from "@blazetrails/ruby-compat";
+import { describe, expect, it, vi } from "vitest";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 import { Root } from "./paths.js";
 import { Annotation, Parser } from "./source-annotation-extractor.js";
@@ -23,12 +22,12 @@ describe("Paths remaining surface", () => {
 describe("BacktraceCleaner", () => {
   it("returns the raw backtrace when BACKTRACE is set", () => {
     const backtrace = ["/gem/a.rb:1"];
-    env.BACKTRACE = "1";
+    vi.stubEnv("BACKTRACE", "1");
     try {
       expect(new BacktraceCleaner().clean(backtrace)).toBe(backtrace);
       expect(new BacktraceCleaner().cleanFrame("/gem/a.rb:1")).toBe("/gem/a.rb:1");
     } finally {
-      delete env.BACKTRACE;
+      vi.unstubAllEnvs();
     }
   });
 });
