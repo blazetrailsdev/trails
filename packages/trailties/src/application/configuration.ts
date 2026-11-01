@@ -586,7 +586,7 @@ export class Configuration extends EngineConfiguration {
     return { contentPath: contentPath, keyPath: keyPath };
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE generate-local-secret-converges-on-rails-body */
   async loadLocalSecret(): Promise<string> {
     const keyFile = getPath().join(this.root as string, "tmp/local_secret.txt");
 
@@ -599,7 +599,7 @@ export class Configuration extends EngineConfiguration {
     return (this._localSecret = await getFs().readFile(keyFile, "utf8"));
   }
 
-  /** @missingRailsCall mkdir_p — PERMANENT */
+  /** @missingRailsCall mkdir_p — CONVERGEABLE generate-local-secret-converges-on-rails-body */
   private generateLocalSecret(): string {
     if (this._localSecret === undefined) {
       throw new RuntimeError(
