@@ -60,7 +60,7 @@ describe("Rails::Command.find_by_namespace", () => {
     perform.mockClear();
     await invoke("unused_routes:constructor");
     expect(perform).not.toHaveBeenCalled();
-    expect(rake).toHaveBeenCalled();
+    expect(rake).not.toHaveBeenCalled();
   }, 30_000);
 
   it("finds nothing for an unknown namespace", async () => {

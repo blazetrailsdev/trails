@@ -1,7 +1,15 @@
 import { Trails } from "./rails.js";
 import { presence } from "@blazetrails/activesupport";
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
-import { File, Pathname, StandardError, env, prepend, rbArgv } from "@blazetrails/ruby-compat";
+import {
+  File,
+  Pathname,
+  StandardError,
+  env,
+  prepend,
+  rbArgv,
+  rbInspect,
+} from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
@@ -33,6 +41,13 @@ export class CorrectableNameError extends StandardError {
 }
 
 prepend(CorrectableNameError, Correctable);
+
+export class UnrecognizedCommandError extends CorrectableNameError {
+  /** @missingRailsCall printing_commands — PERMANENT */
+  constructor(name: string, commands: string[]) {
+    super(`Unrecognized command ${rbInspect(name)}`, name, commands);
+  }
+}
 
 let _hiddenCommands: (typeof Base)[] | undefined;
 
@@ -76,26 +91,35 @@ export async function invoke(
   const command = await findByNamespace(namespace, commandName);
   const name = commandName.replaceAll("_", "-");
 
-  await withArgv(args, async () => {
-    if (command && "perform" in command) {
-      if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
-        await command.perform(name, args, config);
-      } else if (
-        commandName === fullNamespace &&
-        !createProgram().commands.some((c) => c.name() === fullNamespace)
-      ) {
-        await command.perform("help", [], config);
+  try {
+    await withArgv(args, async () => {
+      if (command && "perform" in command) {
+        if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
+          await command.perform(name, args, config);
+        } else {
+          await invokeRake(fullNamespace, args, config);
+        }
+      } else if (command && command.name() === name) {
+        await command.parent!.parseAsync([name, ...args], { from: "user" });
+      } else if (command && command.commands.some((c) => c.name() === name)) {
+        await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
       } else {
         await invokeRake(fullNamespace, args, config);
       }
-    } else if (command && command.name() === name) {
-      await command.parent!.parseAsync([name, ...args], { from: "user" });
-    } else if (command && command.commands.some((c) => c.name() === name)) {
-      await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
+    });
+  } catch (error) {
+    if (!(error instanceof UnrecognizedCommandError)) throw error;
+    if (
+      error.name === fullNamespace &&
+      command &&
+      "perform" in command &&
+      commandName === fullNamespace
+    ) {
+      await command.perform("help", [], config);
     } else {
-      await invokeRake(fullNamespace, args, config);
+      stdout.write(`${error.detailedMessage()}\n`);
     }
-  });
+  }
 }
 
 /** @inventedArm replaceAll — PERMANENT */
@@ -163,6 +187,12 @@ async function invokeRake(
       await program.parseAsync([command.name(), subcommand, ...args], { from: "user" });
       return;
     }
+  }
+  if (task !== "" && !program.commands.some((c) => c.name() === task.split(":")[0])) {
+    throw new UnrecognizedCommandError(
+      task,
+      (await printingCommands()).map(([name]) => name),
+    );
   }
   await program.parseAsync(task === "" ? args : [task, ...args], { from: "user" });
 }
