@@ -1240,6 +1240,68 @@ Both re-verified against `main` @ `20fde48d` immediately before filing, and
 both duplicate-searched first. 12978's reproducer is the 23-line
 `inQueryConnection` case and the warning text is unchanged from 0.5.1520.
 
+## The serve rung compiles (2026-10-31)
+
+`08-serve` compiles and links with the full graph, including the generator
+subtree. First time any trails server has become a binary:
+
+| measurement       | value       |
+| ----------------- | ----------- |
+| compile           | RC=0, 1301s |
+| modules           | 1937        |
+| binary            | 235 MB      |
+| playwright / vite | 0 / 0       |
+
+Toolchain: trails main with #9495 and #9545, Perry main at `b28eca785` with
+#13622 (wall 15) and #13501. Node control: `status=200 len=73`, a real
+`HealthController#show` render, with `SECRET_KEY_BASE_DUMMY=1` — the Rails
+escape hatch `application.ts:171` honours, so the rung needs no invented
+config.
+
+**The OOM was a budget probe, not a graph size.** At 36 GiB the same compile was
+SIGKILLed at 35% of codegen. `CodegenBudget::for_this_machine`
+(`perry-codegen/src/workers.rs:275`) sizes the budget from `MemAvailable` plus
+cgroup headroom, and over-scheduled against a 36 GiB cap on a box where other
+work held 47 GiB. Pinning `PERRY_CODEGEN_MEMORY_MB=18000` compiled the identical
+1937-module graph in 1301s. Any ladder run on a shared box should pin it.
+
+**The generator subtree costs +317 modules** (1620 → 1937) and is reached by two
+const-folded dynamic imports: `engine.ts:227` → `generators.js:340` →
+`generators/base.ts`. Both are correct Rails parity —
+`Engine#loadGenerators` mirrors `railties/lib/rails/engine.rb:476`'s
+`load_generators`, which also requires lazily inside the method — so there is
+nothing to fix in trails. Perry const-folds the specifier and registers a hard
+edge, exactly as it does for playwright in wall 14, and
+`--strict-dynamic-import` does not help because it only covers specifiers that
+do NOT resolve. Keeping a Rails-faithful lazy boundary out of a binary needs a
+Perry-side lever that does not exist today.
+
+## Wall 16: a namespace member is read in TDZ from a constructor
+
+The 1937-module binary runs and throws:
+
+```text
+ReferenceError: Cannot access '_allocation' before initialization
+    at new Base (<anonymous>)
+```
+
+`packages/activerecord/src/core.ts:736` is
+`export const _allocation: { klass: unknown } = { klass: null }`, and
+`packages/activerecord/src/base.ts:1336`, inside the `Base` constructor, reads
+`_Core._allocation.klass` through the namespace import at `base.ts:270`.
+
+There is **no cycle**: `core.ts:141` imports `Base` as `import type`, which is
+erased, so `core.ts` is an ordinary dependency of `base.ts` and should be
+initialized first. A `Base` is nevertheless constructed before `core.ts`'s
+top-level `const` is initialized.
+
+This is the same family as wall 15 and arguably #13622 working: the namespace
+object is now populated early with getter-backed live bindings, so the getter
+reports TDZ honestly instead of handing back `undefined`. The remaining defect
+is the initialization order itself. Next measurement: a `PERRY_DEBUG_INIT`
+build (compile-time flag) to show where `core.ts` lands relative to the first
+`new Base`.
+
 ## Wall 15: a module that imports itself gets `undefined`, not a namespace object
 
 `08-serve`'s binary compiles and then throws:
