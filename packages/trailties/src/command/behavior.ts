@@ -9,7 +9,7 @@ type CommandFactory = () => Program;
 const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory | null>>> = {
   new: async () => (await import("../commands/new.js")).newCommand,
   generate: async () => (await import("../commands/generate.js"), null),
-  server: async () => (await import("../commands/server.js")).serverCommand,
+  server: async () => (await import("../commands/server.js"), null),
   db: async () => (await import("../commands/db.js")).dbCommand,
   routes: async () => (await import("../commands/routes.js"), null),
   "unused-routes": async () => (await import("../commands/unused-routes.js"), null),

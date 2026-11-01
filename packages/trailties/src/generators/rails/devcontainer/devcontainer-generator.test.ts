@@ -19,12 +19,16 @@ type Opts = Partial<DevcontainerGeneratorOptions>;
 const run = async (o: Opts = {}) => {
   const generator = new DevcontainerGenerator([], o, { destinationRoot: tmpDir });
   await generator.createDevcontainer();
-  generator.updateApplicationSystemTestCase();
-  generator.updateDatabaseYml();
+  await generator.updateApplicationSystemTestCase();
+  await generator.updateDatabaseYml();
 };
 const read = (rel: string) => fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 const exists = (rel: string) => fs.existsSync(path.join(tmpDir, rel));
-const dc = () => JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
+const dc = () =>
+  JSON.parse(read(".devcontainer/devcontainer.json").replace(/^\s*\/\/.*$/gm, "")) as Record<
+    string,
+    unknown
+  >;
 const cm = () =>
   JSON.parse(JSON.stringify(YAML.load(read(".devcontainer/compose.yaml")))) as Record<
     string,
@@ -79,14 +83,12 @@ describe("DevcontainerGeneratorTest", () => {
     expect(dc().forwardPorts).toContain(3306);
   });
   it("test_database_mysql", async () => {
-    fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
-    fs.writeFileSync(path.join(tmpDir, "config/database.ts"), 'host: "localhost"\n');
     await run({ database: "mysql" });
     expect(services().mysql).toMatchObject({ image: "mysql/mysql-server:8.0" });
     expect(cm().volumes).toHaveProperty("mysql-data");
     expect(env().DB_HOST).toBe("mysql");
     expect(dc().forwardPorts).toContain(3306);
-    expect(read("config/database.ts")).toMatch(/process\.env\.DB_HOST/);
+    expect(exists("config/database.ts")).toBe(false);
   });
   it("test_database_postgresql", async () => {
     await run({ database: "postgresql" });
@@ -94,6 +96,7 @@ describe("DevcontainerGeneratorTest", () => {
     expect(env().DB_HOST).toBe("postgres");
     expect(features()).toHaveProperty("ghcr.io/rails/devcontainer/features/postgres-client");
     expect(dc().forwardPorts).toContain(5432);
+    expect(read("config/database.ts")).toMatch(/process\.env\.DB_HOST/);
   });
   it("test_dev_option_default", async () => {
     await run();

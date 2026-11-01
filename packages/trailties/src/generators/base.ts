@@ -180,6 +180,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   declare inRoot: <T>(block: () => T | Promise<T>) => Promise<T>;
   declare injectIntoFile: (destination: string, ...args: unknown[]) => unknown;
   declare emptyDirectory: OmitThisParameter<typeof ThorActions.Actions.emptyDirectory>;
+  declare gsubFile: OmitThisParameter<typeof ThorActions.Actions.gsubFile>;
   declare createFile: OmitThisParameter<typeof ThorActions.Actions.createFile>;
   declare appendToFile: OmitThisParameter<typeof ThorActions.Actions.appendToFile>;
   /** @internal */

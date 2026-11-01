@@ -1,4 +1,3 @@
-import { classify } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
@@ -50,14 +49,6 @@ export class JobGenerator extends NamedBase {
 
   parentClassName(): string {
     return this.options.parent!;
-  }
-
-  private parentClass(): string {
-    return classify(this.parentClassName());
-  }
-
-  private parentPath(): string {
-    return dasherize(this.parentClassName());
   }
 
   /**

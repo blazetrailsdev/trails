@@ -1,5 +1,6 @@
 import { presence } from "@blazetrails/activesupport";
-import { File, Pathname, env, rbArgv } from "@blazetrails/ruby-compat";
+import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
+import { File, Pathname, StandardError, env, prepend, rbArgv } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
@@ -9,6 +10,28 @@ import { lookup, lookupBang, subclasses } from "./command/behavior.js";
 
 export const HELP_MAPPINGS: ReadonlySet<string> = new Set(["-h", "-?", "--help"]);
 export const VERSION_MAPPINGS: ReadonlySet<string> = new Set(["-v", "--version"]);
+
+export class CorrectableNameError extends StandardError {
+  readonly name: string;
+  /** @internal */
+  _alternatives: string[];
+  /** @internal */
+  _corrections?: string[];
+
+  constructor(message: string, name: string, alternatives: string[]) {
+    super(message);
+    this.name = name;
+    this._alternatives = alternatives;
+  }
+
+  get corrections(): string[] {
+    return (this._corrections ??= new SpellChecker({ dictionary: this._alternatives }).correct(
+      this.name,
+    ));
+  }
+}
+
+prepend(CorrectableNameError, Correctable);
 
 let _hiddenCommands: (typeof Base)[] | undefined;
 

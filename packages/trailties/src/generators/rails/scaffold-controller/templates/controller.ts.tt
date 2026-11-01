@@ -1,0 +1,78 @@
+<% const modelClassName = this.className().split("::").join(""); -%>
+<% const singular = this.singularTableName(); -%>
+<% const plural = this.pluralTableName(); -%>
+<% const params = `this.${ActiveSupport.Inflector.camelize(singular, false)}Params()`; -%>
+<% const ts = this.isTypeScript(); -%>
+import { <%= modelClassName %> } from "<%= "../".repeat(this.controllerClassPath().length + 1) %>models/<%= this.filePath() %><%= this.ext() %>";
+import { ApplicationController } from "<%= "../".repeat(this.controllerClassPath().length) || "./" %>application-controller<%= this.ext() %>";
+
+export class <%= this.controllerClassName().split("::").join("") %>Controller extends ApplicationController {
+<% const sig = ts ? ": Promise<void>" : ""; -%>
+  static {
+    this.beforeAction("set<%= ActiveSupport.Inflector.camelize(singular) %>", { only: ["show", "edit", "update", "destroy"] });
+  }
+<% if (ts) { -%>
+
+  declare <%= plural %>: <%= modelClassName %>[];
+
+  declare <%= singular %>: <%= modelClassName %>;
+<% } -%>
+
+  // GET <%= this.routeUrl() %>
+  async index()<%= sig %> {
+    this.<%= plural %> = await <%= this.ormClass().all(modelClassName) %>;
+  }
+
+  // GET <%= this.routeUrl() %>/1
+  async show()<%= sig %> {}
+
+  // GET <%= this.routeUrl() %>/new
+  async new()<%= sig %> {
+    this.<%= singular %> = <%= this.ormClass().build(modelClassName) %>;
+  }
+
+  // GET <%= this.routeUrl() %>/1/edit
+  async edit()<%= sig %> {}
+
+  // POST <%= this.routeUrl() %>
+  async create()<%= sig %> {
+    this.<%= singular %> = <%= this.ormClass().build(modelClassName, params) %>;
+
+    if (await this.<%= this.ormInstance().save() %>) {
+      this.redirectTo(<%= this.redirectResourceName() %>, { notice: "<%= this.humanName() %> was successfully created." });
+    } else {
+      await this.render("new", { status: "unprocessable_entity" });
+    }
+  }
+
+  // PATCH/PUT <%= this.routeUrl() %>/1
+  async update()<%= sig %> {
+    if (await this.<%= this.ormInstance().update(params) %>) {
+      this.redirectTo(<%= this.redirectResourceName() %>, { notice: "<%= this.humanName() %> was successfully updated.", status: "see_other" });
+    } else {
+      await this.render("edit", { status: "unprocessable_entity" });
+    }
+  }
+
+  // DELETE <%= this.routeUrl() %>/1
+  async destroy()<%= sig %> {
+    await this.<%= this.ormInstance().destroy() %>;
+    this.redirectTo(this.<%= this.indexHelper() %>Path(), { notice: "<%= this.humanName() %> was successfully destroyed.", status: "see_other" });
+  }
+
+  // Use callbacks to share common setup or constraints between actions.
+  <%= ts ? "private " : "" %>async set<%= ActiveSupport.Inflector.camelize(singular) %>()<%= sig %> {
+    this.<%= singular %> = await <%= this.ormClass().find(modelClassName, 'this.params.expect("id")') %>;
+  }
+
+  // Only allow a list of trusted parameters through.
+<% if (this.attributesNames().length === 0) { -%>
+  <%= ts ? "private " : "" %><%= ActiveSupport.Inflector.camelize(singular, false) %>Params()<%= ts ? ": Record<string, unknown>" : "" %> {
+    return this.params.fetch("<%= singular %>", {})<%= ts ? " as Record<string, unknown>" : "" %>;
+  }
+<% } else { -%>
+  <%= ts ? "private " : "" %><%= ActiveSupport.Inflector.camelize(singular, false) %>Params() {
+    return this.params.expect({ <%= singular %>: [<%= this.permittedParams() %>] });
+  }
+<% } -%>
+}
