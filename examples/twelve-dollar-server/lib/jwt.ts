@@ -4,10 +4,14 @@ import { ArgumentError, Base64, toI } from "@blazetrails/ruby-compat";
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 
 class DecodeError extends Error {}
-class ExpiredSignature extends DecodeError {}
-class ImmatureSignature extends DecodeError {}
-class Base64DecodeError extends DecodeError {}
-class SignatureError extends DecodeError {}
+class TokenError extends DecodeError {}
+class MalformedTokenError extends TokenError {}
+class Base64DecodeError extends MalformedTokenError {}
+class SignatureError extends TokenError {}
+class VerificationError extends SignatureError {}
+class ClaimValidationError extends TokenError {}
+class ExpiredSignature extends ClaimValidationError {}
+class ImmatureSignature extends ClaimValidationError {}
 
 function isHash(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -50,7 +54,7 @@ function decode(
       .digest();
     const signature = urlDecode(signatureSegment);
     if (signature.length !== expected.length || !timingSafeEqual(signature, expected)) {
-      throw new DecodeError("Signature verification failed");
+      throw new VerificationError("Signature verification failed");
     }
     if (isHash(payload) && Object.hasOwn(payload, "exp")) {
       if (toI(payload.exp) <= Math.trunc(Date.now() / 1000)) {
@@ -72,5 +76,6 @@ export const JWT = {
   ImmatureSignature,
   Base64DecodeError,
   SignatureError,
+  VerificationError,
   decode,
 };

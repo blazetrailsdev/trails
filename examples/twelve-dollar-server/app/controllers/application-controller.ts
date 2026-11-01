@@ -25,6 +25,10 @@ export class ApplicationController extends ActionController.API {
     await this.render({ json: { error: message }, status });
   }
 
+  /**
+   * Rescues `Error`, not `StandardError`: a native `TypeError` or a driver's error
+   * does not extend ruby-compat's `StandardError`, and Ruby's would.
+   */
   protected async internalServerError(exception: Error): Promise<void> {
     Trails.logger!.error(exception.stack ?? String(exception));
     await this.renderError("internal server error", ":internal_server_error");
