@@ -29,6 +29,9 @@ const DEF_HEAD = new RegExp(
   `\\s*(?:${IDENT}\\.)?(?:${IDENT}[?!=]?|${OPERATOR})(\\(|[ \\t]+(?=[A-Za-z_*&]))?`,
   "y",
 );
+const LAMBDA_DO = /do\b/y;
+const PATTERN_LITERAL = /"[^"]*"|'[^']*'|(?<!\w):\w+/g;
+const PATTERN_KEY = /\w+:(?=\s*[^\s,})])/g;
 const IN_PATTERN = /[^\n]*?(?=\bthen\b|\bif\b|\bunless\b|;|$)/my;
 const FOR_VARS = /([^\n]*?)\bin\b/y;
 const RESCUE_VAR = new RegExp(`[^\\n]*?=>\\s*(${IDENT})`, "y");
@@ -63,7 +66,6 @@ export class Ripper {
   private _state = EXPR_BEG;
   private _forIn = false;
   private _pending: Array<{ id: string; indent: boolean; raw: boolean }> = [];
-  /** @noRailsEquivalent CONVERGEABLE ripper-reports-syntax-errors-beyond-unterminated-literals */
   private _locals = new Set<string>();
 
   /**
@@ -134,6 +136,20 @@ export class Ripper {
       const c = src[i];
       if (depth === 0 && destructuring === 0 && c === close) return;
       if (depth === 0 && close === "\n" && c === ";") return;
+      LAMBDA_DO.lastIndex = i;
+      if (depth === 0 && close === "{" && LAMBDA_DO.test(src)) return;
+      if (c === "#") {
+        const eol = src.indexOf("\n", i);
+        if (eol === -1) return;
+        i = eol - 1;
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        for (i += 1; i < src.length && src[i] !== c; i++) {
+          if (src[i] === "\\") i += 1;
+        }
+        continue;
+      }
       WORD.lastIndex = i;
       const word = expected && depth === 0 ? WORD.exec(src) : null;
       if (word) {
@@ -340,7 +356,9 @@ export class Ripper {
       } else if (name === "in" && this._forIn) {
         this._forIn = false;
       } else if (name === "in") {
-        this._localVars(this._match(IN_PATTERN)![0]);
+        this._localVars(
+          this._match(IN_PATTERN)![0].replace(PATTERN_LITERAL, "").replace(PATTERN_KEY, ""),
+        );
       }
       const rescued = name === "rescue" ? this._match(RESCUE_VAR) : null;
       if (rescued) this._localVars(rescued[1]);

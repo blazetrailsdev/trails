@@ -77,6 +77,7 @@ describe("Ripper", () => {
       "a, b = 1, 2\na /2\n# a\n",
       "foo { _1 /2 }\n# a\n",
       "def f(a = (1), b)\n b /2\nend\n# a\n",
+      'def a(b = ")", c)\n c /2\nend\n# a\n',
       "def f(a: (1), b: 2)\n b /2\nend\n# a\n",
       "def f(a = [1], b = g(2), c)\n c /2\nend\n# a\n",
       "-> (a,\n b) { b /2 }\n# a\n",
@@ -98,10 +99,21 @@ describe("Ripper", () => {
       "def f(a = foo)\n foo /'/\nend\n# a\n",
       "foo { |a = bar| bar /'/ }\n# a\n",
       "-> (a = puts) { puts /'/ }\n# a\n",
+      "-> a do x; puts /'/ end\n# a\n",
+      "-> a do\n foo(1); bar /'/\nend\n# a\n",
+      "def a(b = ',puts')\n puts /'/\nend\n# a\n",
+      'case x\nin "puts"\n puts /\'/\nend\n# a\n',
+      "case x\nin {name: :puts}\n puts /'/\nend\n# a\n",
     ]) {
       const ripper = lex(source);
       expect(ripper.isError()).toBe(false);
       expect(ripper.comments.map(([, value]) => value)).toEqual(["# a"]);
+    }
+  });
+
+  it("steps over a comment in a parameter list", () => {
+    for (const source of ["def a(b, # x\n c)\n c /2\nend\n", "foo { |a,\n # d\n b| b /2 }\n"]) {
+      expect(lex(source).isError()).toBe(false);
     }
   });
 
