@@ -545,10 +545,7 @@ ${requireStatements.join("\n")}`;
     }
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @internal */
   protected async dockerfilePnpmVersion(): Promise<string | false | undefined> {
     try {
       return this.usingNode() && (await rbFBackquote("pnpm --version")).match(/\d+\.\d+\.\d+/)?.[0];
@@ -557,10 +554,7 @@ ${requireStatements.join("\n")}`;
     }
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @internal */
   protected async isPnpmThroughCorepack(): Promise<boolean> {
     const version = await this.dockerfilePnpmVersion();
     if (version === "latest") return true;
