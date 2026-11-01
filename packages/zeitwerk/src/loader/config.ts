@@ -116,7 +116,7 @@ export const Config = {
   },
 
   onLoad(this: Loader, cpath: string | LoadBlock = ":ANY", block?: LoadBlock): void {
-    if (typeof cpath === "function") [cpath, block] = [":ANY", cpath];
+    if (typeof cpath === "function" && block === undefined) [cpath, block] = [":ANY", cpath];
     if (typeof cpath !== "string") throw new TypeError("on_load only accepts strings");
 
     this.mutex.synchronize(() => {
@@ -125,7 +125,7 @@ export const Config = {
   },
 
   onUnload(this: Loader, cpath: string | LoadBlock = ":ANY", block?: LoadBlock): void {
-    if (typeof cpath === "function") [cpath, block] = [":ANY", cpath];
+    if (typeof cpath === "function" && block === undefined) [cpath, block] = [":ANY", cpath];
     if (typeof cpath !== "string") throw new TypeError("on_unload only accepts strings");
 
     this.mutex.synchronize(() => {

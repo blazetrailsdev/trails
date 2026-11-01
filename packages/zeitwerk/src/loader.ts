@@ -10,9 +10,11 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Cref } from "./cref.js";
 import { Map } from "./cref/map.js";
-import { Error as ZeitwerkError } from "./error.js";
+import { Error as ZeitwerkError, SetupRequired } from "./error.js";
 import { Inflector } from "./inflector.js";
+import { Callbacks } from "./loader/callbacks.js";
 import { Config } from "./loader/config.js";
+import { EagerLoad } from "./loader/eager-load.js";
 import { Helpers } from "./loader/helpers.js";
 import { RealModName } from "./real-mod-name.js";
 import { Registry } from "./registry.js";
@@ -23,7 +25,12 @@ export type Logger = ((message: string) => unknown) | { debug(message: string): 
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Loader
-  extends Included<typeof RealModName>, Included<typeof Helpers>, Included<typeof Config> {
+  extends
+    Included<typeof RealModName>,
+    Included<typeof Callbacks>,
+    Included<typeof Helpers>,
+    Included<typeof Config>,
+    Included<typeof EagerLoad> {
   tag: string;
 }
 
@@ -196,8 +203,28 @@ export class Loader {
     return this.shadowedFiles.has(file);
   }
 
+  static async eagerLoadAll(): Promise<void> {
+    for (const loader of Registry.loaders) {
+      try {
+        await loader.eagerLoad();
+      } catch (error) {
+        if (!(error instanceof SetupRequired)) throw error;
+      }
+    }
+  }
+
+  static async eagerLoadNamespace(mod: object): Promise<void> {
+    for (const loader of Registry.loaders) {
+      try {
+        await loader.eagerLoadNamespace(mod);
+      } catch (error) {
+        if (!(error instanceof SetupRequired)) throw error;
+      }
+    }
+  }
+
   /** @internal */
-  private async defineAutoloadsForDir(dir: string, parent: object): Promise<void> {
+  async defineAutoloadsForDir(dir: string, parent: object): Promise<void> {
     await this.ls(dir, async (basename, abspath, ftype) => {
       if (ftype === "file") {
         basename = basename.replace(/\.[jt]s$/, "");
@@ -229,7 +256,7 @@ export class Loader {
       if (this.logger != null) {
         this.log(`the namespace ${cref} already exists, descending into ${subdir}`);
       }
-      await this.defineAutoloadsForDir(subdir, cref.get() as object);
+      await this.defineAutoloadsForDir(subdir, (await cref.autoloadGet()) as object);
     }
   }
 
@@ -332,5 +359,7 @@ export class Loader {
 }
 
 include(Loader, RealModName);
+include(Loader, Callbacks);
 include(Loader, Helpers);
 include(Loader, Config);
+include(Loader, EagerLoad);
