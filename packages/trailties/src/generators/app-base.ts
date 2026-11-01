@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- `include AppName` (`railties/lib/rails/generators/app_base.rb:15`); the class/interface merge is how the mixin surfaces on the type side. */
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- `include AppName` (`railties/lib/rails/generators/app_base.rb:15`); the class/interface merge is how the mixin surfaces on the type side. */
 import {
   Dir,
   Errno,
@@ -41,13 +41,14 @@ export const BUN_VERSION = "1.0.1";
 export const JAVASCRIPT_OPTIONS = ["importmap", "bun", "webpack", "esbuild", "rollup"];
 export const CSS_OPTIONS = ["tailwind", "bootstrap", "bulma", "postcss", "sass"];
 
-export interface AppBase extends Included<typeof AppName> {}
+export interface AppBase extends Included<typeof AppName> {
+  shebang(): string;
+}
 
 export abstract class AppBase extends GeneratorBase {
   declare appPath: string;
   declare options: AppBaseOptions;
   declare railsTemplate?: string;
-  declare shebang: () => string;
   private _database?: Database;
   /** @internal */
   private _impliedOptions?: Record<string, string[]>;
