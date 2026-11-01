@@ -44,7 +44,6 @@ export class CorrectableNameError extends StandardError {
 prepend(CorrectableNameError, Correctable);
 
 export class UnrecognizedCommandError extends CorrectableNameError {
-  /** @missingRailsCall printing_commands — PERMANENT */
   constructor(name: string, commands: string[]) {
     super(`Unrecognized command ${rbInspect(name)}`, name, commands);
   }
