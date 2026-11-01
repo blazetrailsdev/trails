@@ -3,15 +3,17 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vite
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { destroyCommand } from "./destroy.js";
+import { DestroyCommand } from "./destroy.js";
 import { Generators } from "../generators.js";
 import { Application } from "../application.js";
+import { Trails } from "../rails.js";
 import "../trailties/active-record.js";
 
 class DestroyCommandApp extends Application {}
 
 beforeAll(async () => {
-  await DestroyCommandApp.instance().loadGenerators();
+  Trails.application = DestroyCommandApp.instance();
+  await Trails.application.loadGenerators();
 });
 
 let tmpDir: string;
@@ -57,9 +59,7 @@ describe("DestroyCommand", () => {
     expect(fs.readFileSync(path.join(tmpDir, "config", "routes.ts"), "utf-8")).not.toBe(routes);
 
     const destroyOutput = await capture(":stdout", () =>
-      destroyCommand()
-        .exitOverride()
-        .parseAsync(["scaffold", "Post", "title:string"], { from: "user" }),
+      DestroyCommand.perform("destroy", ["scaffold", "Post", "title:string"], {}),
     );
     log.mockRestore();
     expect(destroyOutput).toMatch(/invoke\s+resource_route/);

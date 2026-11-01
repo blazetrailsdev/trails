@@ -1,54 +1,32 @@
 import { Dir } from "@blazetrails/ruby-compat";
-import { Command } from "commander";
-import { MigrationGenerator } from "../generators/active-record/migration/migration-generator.js";
+import type { ThorClass } from "@blazetrails/thor";
+import { Base } from "../command/base.js";
 import { Generators } from "../generators.js";
-import { Actions } from "../command/actions.js";
-import { APP_PATH } from "../app-path.js";
 
-export function generateCommand(): Command {
-  const cmd = new Command("generate");
-  cmd.alias("g");
-  cmd.description("Generate models, controllers, migrations, and scaffolds");
+export class GenerateCommand extends Base {
+  static {
+    const klass = this as unknown as ThorClass;
+    klass.noCommands(() => klass.methodAdded("help"));
+    klass.methodAdded("perform");
+  }
 
-  cmd
-    .command("migration")
-    .description("Generate a database migration")
-    .argument("<name>", "Migration name (e.g. AddEmailToUsers)")
-    .argument("[columns...]", "Columns as name:type pairs")
-    .action(async (name: string, columns: string[]) => {
-      if (APP_PATH != null) {
-        await Actions.bootApplicationBang();
-        await Actions.loadGenerators();
-      }
-      await MigrationGenerator.start([name, ...columns], { destinationRoot: Dir.pwd() });
+  async help(): Promise<void> {
+    await this.bootApplicationBang();
+    await this.loadGenerators();
+
+    await Generators.help((this.constructor as typeof Base).commandName());
+  }
+
+  async perform(..._args: string[]): Promise<void> {
+    const generator = this.args.shift() as string | undefined;
+    if (generator == null) return this.help();
+
+    await this.bootApplicationBang();
+    await this.loadGenerators();
+
+    await Generators.invoke(generator, this.args as string[], {
+      behavior: "invoke",
+      destinationRoot: Dir.pwd(),
     });
-
-  const help = async (): Promise<void> => {
-    if (APP_PATH != null) {
-      await Actions.bootApplicationBang();
-      await Actions.loadGenerators();
-    }
-    await Generators.help("generate", console.log);
-  };
-
-  cmd
-    .argument("[generator]", "Generator name")
-    .argument("[args...]", "Generator arguments")
-    .allowUnknownOption()
-    .passThroughOptions()
-    .action(async (generator: string | undefined, args: string[]) => {
-      if (!generator) return help();
-
-      if (APP_PATH != null) {
-        await Actions.bootApplicationBang();
-        await Actions.loadGenerators();
-      }
-
-      await Generators.invoke(generator, args, {
-        destinationRoot: Dir.pwd(),
-        behavior: "invoke",
-      });
-    });
-
-  return cmd;
+  }
 }

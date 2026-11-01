@@ -1,17 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { createProgram } from "../cli.js";
-import { destroyCommand } from "./destroy.js";
+import { invoke as commandInvoke } from "../command.js";
+import { Generators } from "../generators.js";
+import { DestroyCommand } from "./destroy.js";
 import { lookupBang } from "../command/behavior.js";
 import { Application } from "../application.js";
+import { Trails } from "../rails.js";
 import "../trailties/active-record.js";
 
 class DestroyCommandTestApp extends Application {}
 
 await lookupBang();
-await DestroyCommandTestApp.instance().loadGenerators();
+Trails.application = DestroyCommandTestApp.instance();
+await Trails.application.loadGenerators();
 
 let tmpDir: string;
 let originalCwd: string;
@@ -27,15 +31,8 @@ afterEach(() => {
 });
 
 describe("DestroyCommand", () => {
-  it("is registered on the program", () => {
-    const program = createProgram();
-    expect(program.commands.some((c) => c.name() === "destroy")).toBe(true);
-  });
-
-  it("has alias d", () => {
-    const program = createProgram();
-    const cmd = program.commands.find((c) => c.name() === "destroy");
-    expect(cmd?.aliases()).toContain("d");
+  it("is not registered on the program", () => {
+    expect(createProgram().commands.some((c) => c.name() === "destroy")).toBe(false);
   });
 
   it("destroy migration anchors the filename match", async () => {
@@ -47,9 +44,23 @@ describe("DestroyCommand", () => {
     fs.writeFileSync(decoy, "");
 
     process.chdir(tmpDir);
-    await destroyCommand().parseAsync(["migration", "create_posts"], { from: "user" });
+    await DestroyCommand.perform("destroy", ["migration", "create_posts"], {});
 
     expect(fs.existsSync(target)).toBe(false);
     expect(fs.existsSync(decoy)).toBe(true);
+  });
+
+  it("resolves both spellings of a generator name", async () => {
+    const invoke = vi.spyOn(Generators, "invoke").mockResolvedValue();
+    onTestFinished(() => invoke.mockRestore());
+    await commandInvoke("destroy", ["scaffold_controller", "Post"]);
+    await commandInvoke("destroy", ["scaffold-controller", "Post"]);
+    expect(invoke.mock.calls.map((c) => c[0])).toEqual([
+      "scaffold_controller",
+      "scaffold-controller",
+    ]);
+    expect(await Generators.findByNamespace("scaffold_controller")).toBe(
+      await Generators.findByNamespace("scaffold-controller"),
+    );
   });
 });
