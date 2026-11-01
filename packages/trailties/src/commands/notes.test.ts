@@ -150,9 +150,20 @@ describe("Rails::Command::NotesTest", { timeout: 30_000 }, () => {
         "db/some_seeds.ts:\n  * [1] [TODO] default tags such as TODO are still present\n\n",
     );
   });
+  it.skip("does not pick up notes inside string literals", async () => {
+    appFile("app/models/profile.ts", '"// TODO: do something"');
+
+    expect(await runNotesCommand()).toBe("");
+  });
 });
 
 describe("NotesCommand", () => {
+  it("--help reaches Thor's help", async () => {
+    const output = await runNotesCommand(["--help"]);
+    expect(output).toContain("bin/rails notes");
+    expect(output).toContain("--annotations");
+  });
+
   it("has --annotations option", () => {
     const options = (NotesCommand as unknown as ThorClass).classOptions();
     expect(Object.values(options).map((o) => o.switchName)).toContain("--annotations");
