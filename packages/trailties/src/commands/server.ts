@@ -109,7 +109,7 @@ export class Server {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE server-start-after-stop-callback-and-trap */
+  /** @noRailsEquivalent CONVERGEABLE port-rackup-server-for-rails-server */
   server(): typeof Handler.Node {
     const { server } = this.options;
     if (server == null || server === "node") return Handler.Node;
