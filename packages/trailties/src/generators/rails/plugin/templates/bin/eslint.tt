@@ -7,4 +7,5 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const result = spawnSync(join(root, "node_modules", ".bin", "eslint"), ["--config", join(root, "eslint.config.js"), ...process.argv.slice(2)], {
   stdio: "inherit",
 });
+if (result.error) console.error(result.error);
 process.exit(result.status ?? 1);

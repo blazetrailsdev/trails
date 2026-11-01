@@ -3,6 +3,10 @@ import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { AppBase } from "../../app-base.js";
 import { PluginBuilder } from "./plugin-generator.js";
 
+interface ActionsHost {
+  directory(source: string, destination: string): Promise<unknown>;
+}
+
 const __dir__ = import.meta.dirname;
 
 class Host extends AppBase {
@@ -195,7 +199,7 @@ describe("PluginBuilder", () => {
     await FileUtils.mkdirP(`${root}/source`);
     await File.writeAsync(`${root}/source/plain.txt`, "x");
     await File.writeAsync(`${root}/source/plain.tt.js`, "x");
-    await g.directory(`${root}/source`, "out");
+    await (g as unknown as ActionsHost).directory(`${root}/source`, "out");
     expect(Dir.children(`${root}/out`)).toEqual(["plain.txt"]);
   });
 
