@@ -742,8 +742,8 @@ function fuOutputMessage(msg: string): void {
  * the interpreter, so no Rails file defines it and no port can remove the need
  * for it while Rails bodies send `FileUtils.mkdir_p` and friends.
  */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class FileUtils {
+  // eslint-disable-line @typescript-eslint/no-unsafe-declaration-merging
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
