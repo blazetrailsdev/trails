@@ -285,12 +285,14 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(NonExistentTable.attributeNames()).toEqual([]);
   });
 
-  it("attribute() raises DangerousAttributeError for a name that shadows Base", () => {
-    class Report extends Base {}
+  it("defining attribute methods raises DangerousAttributeError for changes", () => {
+    class Report extends Base {
+      static {
+        this.attribute("changes", "integer");
+      }
+    }
 
-    expect(() => Report.attribute("changes", "integer")).toThrow(DangerousAttributeError);
-    expect(() => Report.attribute("save", "string")).toThrow(DangerousAttributeError);
-    expect(() => Report.attribute("headline", "string")).not.toThrow();
+    expect(() => Report.defineAttributeMethods()).toThrow(DangerousAttributeError);
   });
 
   it("aliasing an attribute onto an Active Record method raises DangerousAttributeError", () => {

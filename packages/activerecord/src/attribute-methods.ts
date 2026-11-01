@@ -248,6 +248,7 @@ export function dangerousAttributeMethods(): Set<string> {
     "clone",
     "becomes",
     "createOrUpdate",
+    "changes",
     "isFrozen",
     "inspect",
     "toJSON",

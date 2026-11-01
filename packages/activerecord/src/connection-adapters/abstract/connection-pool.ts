@@ -305,13 +305,7 @@ export class ConnectionPool implements ReapablePool {
   }
 
   get migrationContext(): MigrationContext {
-    const context = new MigrationContext(
-      this.migrationsPaths,
-      this.schemaMigration,
-      this.internalMetadata,
-    );
-    context.pool = this;
-    return context;
+    return new MigrationContext(this.migrationsPaths, this.schemaMigration, this.internalMetadata);
   }
 
   get migrationsPaths(): string | string[] {

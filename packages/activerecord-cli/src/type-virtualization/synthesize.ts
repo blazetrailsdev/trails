@@ -1,5 +1,4 @@
 import * as ts from "typescript/unstable/ast";
-import { Base } from "@blazetrails/activerecord";
 import { camelize, pluralize, underscore } from "@blazetrails/activesupport";
 import { resolveAssociationTarget, stripQuotes } from "./resolve-target.js";
 import type {
@@ -241,7 +240,6 @@ function renderSchemaColumnDeclares(
     if (col === "id") continue;
     if (composedCols?.has(col)) continue;
     if (info.skipSchemaColumns.has(col)) continue;
-    if (col in Base.prototype) continue;
     const railsType = typeof value === "string" ? value : value.type;
     const keyLike = isForeignKeyColumn(col, value) || isDefaultTypedPrimaryKey(value);
     const tsType = keyLike
