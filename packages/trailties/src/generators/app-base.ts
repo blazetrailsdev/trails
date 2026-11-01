@@ -384,9 +384,6 @@ export abstract class AppBase extends GeneratorBase {
     if (!this.options.pretend) FileUtils.cd(this.destinationRoot);
   }
 
-  /** @internal */
-  protected abstract isValidConst(): void;
-
   private _requiredRailties?: Record<string, boolean>;
 
   /** @internal */

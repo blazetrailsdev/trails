@@ -6,7 +6,6 @@ import { env, setEnv } from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 
 class T extends AppBase {
-  protected isValidConst(): void {}
   static {
     this.addSharedOptionsFor("application");
   }

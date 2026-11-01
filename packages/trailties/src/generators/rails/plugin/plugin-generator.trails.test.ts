@@ -10,7 +10,6 @@ interface ActionsHost {
 const __dir__ = import.meta.dirname;
 
 class Host extends AppBase {
-  protected isValidConst(): void {}
   static {
     void this.sourceRoot(File.expandPath("templates", __dir__));
     this.addSharedOptionsFor("plugin");
