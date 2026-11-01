@@ -21,7 +21,7 @@ beforeAll(async () => {
 
 beforeEach(async (context) => {
   testCase = context.testCase as TestCase;
-  await testCase.prepareDestination();
+  testCase.prepareDestination();
   Trails.application = ChannelGeneratorApp.instance();
   File.write(path("tsconfig.json"), "{}");
   useWithJavascript();

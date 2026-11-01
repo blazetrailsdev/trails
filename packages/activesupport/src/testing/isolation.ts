@@ -9,6 +9,7 @@ import {
   env,
   excSetBacktrace,
   pack,
+  include,
   rbCallSuper,
   rbFCaller,
   rbInspect,
@@ -29,6 +30,7 @@ export function isForkingEnv(): boolean {
   return env["NO_FORK"] == null && rbObjRespondTo(Process, "fork");
 }
 
+/** @missingRailsCall parallelize_me! — PERMANENT */
 async function run(this: Test & typeof Subprocess): Promise<Test> {
   const [status, serialized] = await this.runInIsolation(() => rbCallSuper(this, run));
 
@@ -77,6 +79,7 @@ function load(test: Test, serialized: unknown): Test {
 
 export const Subprocess = {
   /**
+   * @missingRailsCall ORIG_ARGV — PERMANENT
    * @missingRailsCall exit! — PERMANENT
    * @missingRailsCall require — PERMANENT
    */
@@ -96,10 +99,10 @@ export const Subprocess = {
         };
 
         const description = this.name.slice("test_".length).split("_");
-        const testName = [className.replaceAll("::", " "), ...description]
+        const testName = [...className.split("::").filter(Boolean), ...description]
           .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
           .join("[\\s_]+");
-        const testOpts = `-t=${testName}$`;
+        const testOpts = `-t=^${testName}$`;
 
         const [file] = rbObjMethod(this, this.name).sourceLocation()!;
 
@@ -114,4 +117,7 @@ export const Subprocess = {
   },
 };
 
-export const Isolation = { SubprocessCrashed, run, ...Subprocess };
+export const Isolation = { SubprocessCrashed, Subprocess, run };
+Object.defineProperty(Isolation, "isForkingEnv", { value: isForkingEnv });
+
+include(Isolation, Subprocess);

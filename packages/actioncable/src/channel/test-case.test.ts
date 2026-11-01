@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, type TestContext } from "vitest";
+import { describe, expect, it, type TestContext } from "vitest";
 import { assertEqual } from "@blazetrails/activesupport";
 import { hashAref, registerConstant } from "@blazetrails/ruby-compat";
 import "../test-helpers/test-helper.js";
@@ -55,8 +55,6 @@ class SubscriptionsTestChannelTest extends TestCase {
 registerConstant("SubscriptionsTestChannelTest", SubscriptionsTestChannelTest);
 
 describe("SubscriptionsTestChannelTest", () => {
-  beforeEach(({ testCase: t }: ChannelContext) => (t as SubscriptionsTestChannelTest).setup());
-
   it("no subscribe", ({ testCase: t }: ChannelContext) => {
     expect(t.subscription).toBeNull();
   });
@@ -228,8 +226,6 @@ class PerformTestChannelTest extends TestCase {
 registerConstant("PerformTestChannelTest", PerformTestChannelTest);
 
 describe("PerformTestChannelTest", () => {
-  beforeEach(({ testCase: t }: ChannelContext) => (t as PerformTestChannelTest).setup());
-
   it("perform with params", async ({ testCase: t }: ChannelContext) => {
     await t.perform("echo", { text: "You are man!" });
 
@@ -280,8 +276,6 @@ class BroadcastsTestChannelTest extends TestCase {
 registerConstant("BroadcastsTestChannelTest", BroadcastsTestChannelTest);
 
 describe("BroadcastsTestChannelTest", () => {
-  beforeEach(({ testCase: t }: ChannelContext) => (t as BroadcastsTestChannelTest).setup());
-
   it("broadcast matchers included", async ({ testCase: t }: ChannelContext) => {
     await t.assertBroadcastOn("broadcast_5", { userId: 2017, text: "SOS" }, () =>
       t.perform("broadcast", { message: "SOS" }),

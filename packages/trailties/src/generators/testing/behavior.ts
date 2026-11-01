@@ -26,9 +26,23 @@ export interface BehaviorHost {
   _generator?: GeneratorBase;
 }
 
+export const ClassMethods = {
+  tests(this: { generatorClass?: unknown }, klass: unknown): void {
+    this.generatorClass = klass;
+  },
+
+  arguments(this: { defaultArguments?: string[] }, array: string[]): void {
+    this.defaultArguments = array;
+  },
+
+  destination(this: { destinationRoot?: string }, path: string): void {
+    this.destinationRoot = path;
+  },
+};
+
 export async function runGenerator(
   this: BehaviorHost,
-  args: string[] = this.defaultArguments ?? [],
+  args: string[] = this.defaultArguments!,
   config: GeneratorConfig = {},
 ): Promise<unknown> {
   if (!(args.includes("--no-skip-bundle") || args.includes("--dev")))
@@ -47,7 +61,7 @@ export async function runGenerator(
 
 export function generator(
   this: BehaviorHost,
-  args: unknown[] = this.defaultArguments ?? [],
+  args: unknown[] = this.defaultArguments!,
   options: unknown = {},
   config: GeneratorConfig = {},
 ): GeneratorBase {
@@ -67,7 +81,7 @@ export function createGeneratedAttribute(
 
 /** @internal */
 export function isDestinationRootIsSet(this: BehaviorHost): void {
-  if (!this.destinationRoot) {
+  if (this.destinationRoot == null) {
     throw new RuntimeError(
       "You need to configure your Rails::Generators::TestCase destination root.",
     );
@@ -79,9 +93,9 @@ export function ensureCurrentPath(this: BehaviorHost): void {
   FileUtils.cd(this.currentPath!);
 }
 
-export async function prepareDestination(this: BehaviorHost): Promise<void> {
-  await FileUtils.rmRfAsync(this.destinationRoot);
-  await FileUtils.mkdirPAsync(this.destinationRoot);
+export function prepareDestination(this: BehaviorHost): void {
+  FileUtils.rmRf(this.destinationRoot);
+  FileUtils.mkdirP(this.destinationRoot);
 }
 
 /** @internal */
@@ -95,20 +109,6 @@ export function migrationFileName(this: BehaviorHost, relative: string): string 
     new RegExp(`\\d+_${fileName}.ts$`).test(f),
   )[0];
 }
-
-export const ClassMethods = {
-  tests(this: { generatorClass?: unknown }, klass: unknown): void {
-    this.generatorClass = klass;
-  },
-
-  arguments(this: { defaultArguments?: string[] }, array: string[]): void {
-    this.defaultArguments = array;
-  },
-
-  destination(this: { destinationRoot?: string }, path: string): void {
-    this.destinationRoot = path;
-  },
-};
 
 export const Behavior = {
   [included](klass: object): void {

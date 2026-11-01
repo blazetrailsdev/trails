@@ -714,6 +714,16 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "`Testing::Isolation::Forking#run_in_isolation` is not ported: Ruby's `fork` has no Node " +
+      'counterpart (CLAUDE.md, "Runtime facts Node does not expose"), so only the Subprocess ' +
+      "arm's `runInIsolation` exists. PERMANENT.",
+    names: ["run_in_isolation"],
+    rubyFiles: ["isolation.rb"],
+    packages: ["activesupport"],
+    tsMirrorName: "runInIsolation",
+  },
+  {
+    reason:
       "tasks RFC 0204-actionmailer-and-mail-port, Transport edges: the socket is " +
       "nodemailer's `SMTPConnection`, so Net::SMTP's socket setup members are not ported. " +
       "PERMANENT.",

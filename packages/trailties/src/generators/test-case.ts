@@ -7,6 +7,7 @@ import { SetupAndTeardown } from "./testing/setup-and-teardown.js";
 
 noColorBang();
 
+/** @missingRailsCall include — PERMANENT */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TestCase extends ActiveSupportTestCase {
   declare static tests: Extended<typeof ClassMethods>["tests"];

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { Process, env, include } from "@blazetrails/ruby-compat";
+import { Marshal, Process, env, include } from "@blazetrails/ruby-compat";
 import { TestCase } from "../test-case.js";
 import { registerSpecType } from "./autorun.js";
-import { Isolation, SubprocessCrashed, isForkingEnv } from "./isolation.js";
-import { UnexpectedError } from "./assertions.js";
+import { Isolation, SubprocessCrashed } from "./isolation.js";
+import { Assertion, Skip, UnexpectedError } from "./assertions.js";
 
 class IsolatedStateTest extends TestCase {}
 include(IsolatedStateTest, Isolation);
@@ -28,7 +28,7 @@ describe("IsolationTest", () => {
   });
 
   it("does not fork on node", () => {
-    expect(isForkingEnv()).toBe(false);
+    expect((Isolation as unknown as { isForkingEnv(): boolean }).isForkingEnv()).toBe(false);
   });
 
   it("records a crashed subprocess as a failure", async () => {
@@ -41,5 +41,26 @@ describe("IsolationTest", () => {
     const result = await Isolation.run.call(test as never);
     expect(result.failures[0]).toBeInstanceOf(UnexpectedError);
     expect((result.failures[0] as UnexpectedError).error).toBeInstanceOf(SubprocessCrashed);
+  });
+
+  it("reads each failure kind back from the child", async () => {
+    class Finished extends TestCase {
+      async runInIsolation() {
+        const failures = [
+          ["assertion", "failed", []],
+          ["skip", "skipped", []],
+          ["error", "raised", []],
+        ];
+        return [
+          new Process.Status({ pid: 1, status: 0, signal: null }),
+          Marshal.dump([3, failures]),
+        ];
+      }
+    }
+    const result = await Isolation.run.call(new Finished("test_done") as never);
+    expect(result.assertions).toBe(3);
+    expect(result.failures[0]).toBeInstanceOf(Assertion);
+    expect(result.failures[1]).toBeInstanceOf(Skip);
+    expect((result.failures[2] as UnexpectedError).error.message).toBe("raised");
   });
 });
