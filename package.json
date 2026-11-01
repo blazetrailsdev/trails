@@ -4,7 +4,7 @@
   "license": "SEE LICENSE IN LICENSES.md",
   "packageManager": "pnpm@12.3.4",
   "scripts": {
-    "build": "tsc --build && pnpm -C packages/actionpack build:templates && pnpm -C packages/trailties build:templates && pnpm -C packages/solid-cable build:templates",
+    "build": "tsc --build && pnpm -C packages/actionpack build:templates && pnpm -C packages/trailties build:templates && pnpm -C packages/solid-cable build:templates && pnpm -C packages/solid-queue build:templates",
     "mail:parsers": "pnpm tsx scripts/mail-parsers/generate.ts",
     "tasks": "scripts/tasks/tasks.sh",
     "format": "prettier --write .",

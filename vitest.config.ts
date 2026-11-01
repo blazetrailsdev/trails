@@ -565,6 +565,7 @@ export default defineConfig({
             ...ADAPTER_SPECIFIC_EXCLUDE,
             ...SQLITE_DRIVER_TESTS,
             "packages/solid-cable/src/generators/**",
+            "packages/solid-queue/src/generators/**",
           ],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
@@ -691,12 +692,14 @@ export default defineConfig({
           include: [
             "packages/trailties/src/**/*.test.ts",
             "packages/solid-cable/src/generators/**/*.test.ts",
+            "packages/solid-queue/src/generators/**/*.test.ts",
           ],
           exclude: SHARED_EXCLUDE,
           globalSetup: [
             "./packages/trailties/src/test-helpers/build-templates.ts",
             "./packages/trailties/src/test-helpers/isolation/abstract-unit.ts",
             "./packages/solid-cable/src/test-helpers/build-templates.ts",
+            "./packages/solid-queue/src/test-helpers/build-templates.ts",
           ],
           setupFiles: otherSetupFiles,
         },
