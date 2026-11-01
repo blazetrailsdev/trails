@@ -11,13 +11,15 @@ import {
   Hash,
   include,
   LoadError,
+  NameError,
   setEnv,
   STDERR,
   STDOUT,
+  toI,
   type Included,
 } from "@blazetrails/ruby-compat";
 import { Handler, type RackEnv } from "@blazetrails/rack";
-import { demodulize, isPresent } from "@blazetrails/activesupport";
+import { demodulize, isPresent, underscore } from "@blazetrails/activesupport";
 import { DetailsKey } from "@blazetrails/actionview";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
@@ -73,23 +75,28 @@ export class Server {
   }
 
   async start(afterStopCallback: (() => void) | null = null): Promise<void> {
-    this.createTmpDirectories();
-    this.setupDevCaching();
-    const app = await Trails.initialize();
-    if (this.options.logStdout) this.logToStdout();
+    try {
+      this.createTmpDirectories();
+      this.setupDevCaching();
+      const app = await Trails.initialize();
+      if (this.options.logStdout) this.logToStdout();
 
-    await app.loadServer();
-    const root = Dir.pwd();
-    await watchViews(app, root);
-    const railsApp = (env: RackEnv) => app.call(env);
-    const { Port: port, Host: host } = this.options;
-    if (this.options.environment !== "development" || !(await hasViteConfig(root))) {
-      const server = await Handler.Node.run(railsApp, { Port: port, Host: host });
-      if (afterStopCallback != null) server.on("close", afterStopCallback);
-      return;
+      await app.loadServer();
+      const root = Dir.pwd();
+      await watchViews(app, root);
+      const railsApp = (env: RackEnv) => app.call(env);
+      const { Port: port, Host: host } = this.options;
+      if (this.options.environment !== "development" || !(await hasViteConfig(root))) {
+        const server = await Handler.Node.run(railsApp, { Port: port, Host: host });
+        if (afterStopCallback != null) server.on("close", afterStopCallback);
+        return;
+      }
+      const { DevServer } = await import("../server/dev-server.js");
+      await new DevServer({ port: port!, host: host!, cwd: root, app: railsApp }).start();
+    } catch (error) {
+      afterStopCallback?.();
+      throw error;
     }
-    const { DevServer } = await import("../server/dev-server.js");
-    await new DevServer({ port: port!, host: host!, cwd: root, app: railsApp }).start();
   }
 
   isServeable(): boolean {
@@ -97,12 +104,12 @@ export class Server {
       this.server();
       return true;
     } catch (error) {
-      if (error instanceof LoadError) return false;
+      if (error instanceof LoadError || error instanceof NameError) return false;
       throw error;
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE server-start-after-stop-callback-and-trap */
   server(): typeof Handler.Node {
     const { server } = this.options;
     if (server == null || server === "node") return Handler.Node;
@@ -150,7 +157,7 @@ export class Server {
 
   /** @internal */
   private isUsePuma(): boolean {
-    return String(this.options.server).endsWith("puma");
+    return this.server().name.endsWith("Handler::Puma");
   }
 }
 
@@ -244,12 +251,12 @@ export class ServerCommand extends Base {
       desc: "Whether to log to stdout. Enabled by default in development when not daemonized.",
     });
 
+    klass.desc("server", "Start the Rails server");
+    klass.methodAdded("perform");
     klass.noCommands(() => {
       klass.methodAdded("serverOptions");
       klass.methodAdded("environment");
     });
-    klass.desc("server", "Start the Rails server");
-    klass.methodAdded("perform");
   }
 
   /** @inlinedFrom Rails::Command::EnvironmentArgument#initialize rails/v8.0.2/railties/lib/rails/command/environment_argument.rb:16-26 */
@@ -323,7 +330,11 @@ export class ServerCommand extends Base {
       const userSuppliedOptions: string[] = [];
       const classOptions = (this.constructor as unknown as ThorClass).classOptions();
       for (const option of Object.values(classOptions)) {
-        if (option.aliases.some((name) => userFlag[name]) || userFlag[option.switchName]) {
+        if (
+          option.aliases.some((name) => userFlag[name]) ||
+          userFlag[option.switchName] ||
+          userFlag[`--${underscore(option.name)}`]
+        ) {
           let name = option.name;
           switch (name) {
             case "port":
@@ -351,7 +362,7 @@ export class ServerCommand extends Base {
 
   /** @internal */
   private port(): number {
-    return this.options.port ?? parseInt(getEnv("PORT", String(ServerCommand.DEFAULT_PORT)), 10);
+    return this.options.port ?? Number(toI(getEnv("PORT", String(ServerCommand.DEFAULT_PORT))));
   }
 
   /** @internal */
@@ -425,7 +436,7 @@ Run \`${this.executable()} --help\` for more options.
         server,
         ServerCommand.RACK_HANDLERS,
       );
-      return `${error.detailedMessage()}
+      return `${error.detailedMessage({ highlight: false })}
 Run \`${this.executable()} --help\` for more options.
 `;
     }
@@ -488,6 +499,7 @@ async function watchViews(
   return handle;
 }
 
+/** @noRailsEquivalent PERMANENT */
 async function hasViteConfig(root: string): Promise<boolean> {
   const fs = getFs();
   const p = getPath();

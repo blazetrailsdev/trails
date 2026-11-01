@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { DevServer } from "../server/dev-server.js";
 import { getEnv } from "@blazetrails/activesupport";
 import { setEnv } from "@blazetrails/ruby-compat";
@@ -30,6 +30,11 @@ describe("Rails::Command::ServerTest", () => {
     }
   }
 
+  const suggestion = (server: string): string =>
+    (
+      new ServerCommand([], []) as unknown as { rackServerSuggestion(s: string): string }
+    ).rackServerSuggestion(server);
+
   const noEnv = { TRAILS_ENV: undefined, NODE_ENV: undefined };
 
   it("test_environment_with_server_option", () => {
@@ -50,6 +55,14 @@ describe("Rails::Command::ServerTest", () => {
 
   it("test_explicit_using_option", () => {
     expect(parseArguments(["-u", "thin"]).server).toBe("thin");
+  });
+
+  it("test_gem_not_suggested_when_name_not_same_as_handler", () => {
+    for (const server of ["fastcgi", "lsws"]) {
+      const output = suggestion(server);
+      expect(output).toContain(`Could not find server '${server}'.`);
+      expect(output).not.toContain("Gemfile");
+    }
   });
 
   it("test_daemon_with_option", () => {
@@ -154,6 +167,7 @@ describe("Rails::Command::ServerTest", () => {
       "caching",
     ]);
     expect(parseArguments(["--port=3001"]).userSuppliedOptions).toEqual(["Port"]);
+    expect(parseArguments(["--dev_caching"]).userSuppliedOptions).toEqual(["caching"]);
     withEnv({ BINDING: "1.2.3.4" }, () =>
       expect(parseArguments().userSuppliedOptions).toEqual(["Host"]),
     );
@@ -185,17 +199,13 @@ describe("Rails::Command::ServerTest", () => {
 
   it("test_served_url_when_server_prints_it", () => {
     const server = new Server(parseArguments(["-u", "puma", "-b", "127.0.0.1", "-p", "4567"]));
+    vi.spyOn(server, "server").mockReturnValue({ name: "Rack::Handler::Puma" } as never);
     expect(server.servedUrl()).toBeUndefined();
   });
 
-  const suggestion = (server: string): string =>
-    (
-      new ServerCommand([], []) as unknown as { rackServerSuggestion(s: string): string }
-    ).rackServerSuggestion(server);
-
   it("test_using_server_mistype", () => {
     const output = suggestion("tin");
-    expect(output).toContain("Could not find server 'tin'");
+    expect(output).toMatch(/Could not find server 'tin'\. \(.*CorrectableNameError\)/);
     expect(output).toContain("Did you mean?  thin");
   });
 

@@ -24,16 +24,14 @@ export class CorrectableNameError extends StandardError {
     this._alternatives = alternatives;
   }
 
-  corrections(): string[] {
+  get corrections(): string[] {
     return (this._corrections ??= new SpellChecker({ dictionary: this._alternatives }).correct(
       this.name,
     ));
   }
-
-  detailedMessage(): string {
-    return this.message + formatter().messageFor(this.corrections());
-  }
 }
+
+prepend(CorrectableNameError, Correctable);
 
 let _hiddenCommands: (typeof Base)[] | undefined;
 
