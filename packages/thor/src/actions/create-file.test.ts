@@ -145,7 +145,7 @@ describe("Thor::Actions::CreateFile", () => {
           readline.mockReturnValueOnce("s");
 
           const content = await invokeBang();
-          expect(readline).toHaveBeenCalledWith(
+          expect(readline).toHaveBeenCalledExactlyOnceWith(
             `Overwrite ${file}? (enter "h" for help) [Ynaqdhm] `,
             expect.anything(),
           );
@@ -157,22 +157,22 @@ describe("Thor::Actions::CreateFile", () => {
           createFile("doc/config.rb");
           readline.mockReturnValueOnce("y");
           expect(await invokeBang()).toMatch(/force {2}doc\/config\.rb/);
-          expect(readline).toHaveBeenCalled();
+          expect(readline).toHaveBeenCalledTimes(1);
         });
 
         it("skips the file if the file collision menu returns false", async () => {
           createFile("doc/config.rb");
           readline.mockReturnValueOnce("n");
           expect(await invokeBang()).toMatch(/skip {2}doc\/config\.rb/);
-          expect(readline).toHaveBeenCalled();
+          expect(readline).toHaveBeenCalledTimes(1);
         });
 
         it("executes the block given to show file content", async () => {
           createFile("doc/config.rb");
           readline.mockReturnValueOnce("d").mockReturnValueOnce("n");
           await invokeBang();
-          expect(readline).toHaveBeenCalled();
-          expect(rbFSystem).toHaveBeenCalledWith(expect.stringMatching(/diff -u/));
+          expect(readline).toHaveBeenCalledTimes(2);
+          expect(rbFSystem).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/diff -u/));
         });
 
         it("executes the block given to run merge tool", async () => {
@@ -180,8 +180,8 @@ describe("Thor::Actions::CreateFile", () => {
           Object.assign(_base.shell, { mergeTool: async () => "meld" });
           readline.mockReturnValueOnce("m");
           await invokeBang();
-          expect(readline).toHaveBeenCalled();
-          expect(rbFSystem).toHaveBeenCalledWith(expect.stringMatching(/meld/));
+          expect(readline).toHaveBeenCalledTimes(1);
+          expect(rbFSystem).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/meld/));
         });
       });
     });
