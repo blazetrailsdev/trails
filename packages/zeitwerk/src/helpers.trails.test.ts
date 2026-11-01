@@ -52,3 +52,16 @@ describe("Zeitwerk::Loader::Helpers", () => {
     );
   });
 });
+
+describe("Zeitwerk::Loader::Config", () => {
+  afterEach(teardown);
+
+  it("tag reads and writes through the included accessor", () => {
+    const loader = newLoader();
+    const lines: string[] = [];
+    loader.tag = "main";
+    loader.logger = (message) => lines.push(message);
+    loader.log("hi");
+    expect(lines).toEqual(["Zeitwerk@main: hi"]);
+  });
+});
