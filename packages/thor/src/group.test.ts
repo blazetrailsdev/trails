@@ -76,7 +76,7 @@ describe("Thor::Group", () => {
     });
 
     it("invokes help message if any of the shortcuts are given", async () => {
-      const help = vi.spyOn(MyCounter, "help").mockImplementation(() => {});
+      const help = vi.spyOn(MyCounter, "help").mockResolvedValue();
       try {
         await MyCounter.start(["-h"]);
         expect(help).toHaveBeenCalled();

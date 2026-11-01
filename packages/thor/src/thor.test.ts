@@ -965,7 +965,7 @@ describe("Thor", () => {
       parent.desc("child", "child subcommand");
       parent.subcommand("child", child);
       parent.desc("dummy", "dummy");
-      const help = vi.spyOn(child, "help").mockImplementation(() => {});
+      const help = vi.spyOn(child, "help").mockResolvedValue();
       await parent.start(["child", "--help"]);
       expect(help).toHaveBeenCalledWith(expect.anything(), expect.anything());
     });
@@ -994,7 +994,7 @@ describe("Thor", () => {
             static {
               (this as unknown as ThorClass).methodAdded("help");
             }
-            help() {}
+            async help() {}
           }
         }),
       );

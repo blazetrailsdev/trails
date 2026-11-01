@@ -135,7 +135,6 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     return this._sourceRoot;
   }
 
-  /** @inventedArm readFile — PERMANENT */
   static async desc(description: string | null = null): Promise<string | null> {
     const klass = this as unknown as GroupClass;
     if (description != null) return (Group as unknown as GroupClass).desc.call(klass, description);

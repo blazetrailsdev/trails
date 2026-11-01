@@ -12,6 +12,12 @@ describe("RoutesCommand", () => {
     expect(subclasses()).toContain(RoutesCommand);
   });
 
+  it("does not register invokeCommand as a command", () => {
+    expect(Object.keys((RoutesCommand as unknown as ThorClass).allCommands())).not.toContain(
+      "invoke-command",
+    );
+  });
+
   it("has --grep option", () => {
     expect(classOptions().grep.switchName).toBe("--grep");
   });

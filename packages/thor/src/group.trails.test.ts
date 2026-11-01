@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError, toS } from "@blazetrails/ruby-compat";
-import type { BaseConfig } from "./base.js";
+import { capture } from "./test-helpers/helper.js";
+import { ArgumentError, rbModConstSet, toS } from "@blazetrails/ruby-compat";
+import { Base, type BaseConfig } from "./base.js";
 import { Command } from "./command.js";
 import { Group, type GroupClass } from "./group.js";
-import { Thor } from "./thor.js";
+import { Thor, type ThorClass } from "./thor.js";
 
 type Instance = {
   shell: { padding: number };
@@ -308,5 +309,20 @@ describe("Thor::Group.invoke_from_option", () => {
     klass.methodAdded("fooBar");
     expect(klass.isCommandExists("fooBar")).toBe(true);
     expect(klass.isCommandExists("foo_bar")).toBe(true);
+  });
+});
+
+describe("Thor.help with a nested Group", () => {
+  it("lists the Group's printable command", async () => {
+    class Host extends Thor {}
+    class Nested extends Group {}
+    (Nested as unknown as GroupClass).desc("nested things");
+    rbModConstSet(Host, "Nested", Nested);
+    (Base.subclasses() as unknown[]).push(Nested);
+    const output = await capture(":stdout", () =>
+      (Host as unknown as ThorClass).help(new Base.shell!()),
+    );
+    (Base.subclasses() as unknown[]).pop();
+    expect(output).toContain("# nested things");
   });
 });

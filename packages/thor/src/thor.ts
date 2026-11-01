@@ -266,11 +266,11 @@ export class Thor {
   }
   declare static taskHelp: typeof Thor.commandHelp;
 
-  static help(this: ThorClass, shell: Basic, subcommand: unknown = false): void {
+  static async help(this: ThorClass, shell: Basic, subcommand: unknown = false): Promise<void> {
     let list = this.printableCommands(true, subcommand);
-    (thorClassesIn(this) as ThorClass[]).forEach((klass) => {
-      list = list.concat(klass.printableCommands(false));
-    });
+    for (const klass of thorClassesIn(this) as ThorClass[]) {
+      list = list.concat(await klass.printableCommands(false));
+    }
     this.sortCommandsBang(list);
 
     if (Object.hasOwn(this, "_packageName") && rtest(this._packageName)) {
@@ -797,17 +797,17 @@ export class Thor {
       (this as unknown as Host).destinationRoot = config.destinationRoot as string;
   }
 
-  help(command: string | null = null, subcommand: unknown = false): void {
+  async help(command: string | null = null, subcommand: unknown = false): Promise<void> {
     const klass = this.constructor as ThorClass;
     const shell = (this as unknown as Instance).shell;
     if (rtest(command)) {
       if (klass.subcommands().includes(command)) {
-        klass.subcommandClasses()[command].help(shell, true);
+        await klass.subcommandClasses()[command].help(shell, true);
       } else {
         klass.commandHelp(shell, command);
       }
     } else {
-      klass.help(shell, subcommand);
+      await klass.help(shell, subcommand);
     }
   }
 }
