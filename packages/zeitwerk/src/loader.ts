@@ -1,3 +1,4 @@
+import { autoloadGet } from "./core-ext/kernel.js";
 import {
   File,
   Monitor,
@@ -256,7 +257,7 @@ export class Loader {
       if (this.logger != null) {
         this.log(`the namespace ${cref} already exists, descending into ${subdir}`);
       }
-      await this.defineAutoloadsForDir(subdir, (await cref.autoloadGet()) as object);
+      await this.defineAutoloadsForDir(subdir, (await autoloadGet(cref)) as object);
     }
   }
 

@@ -1,3 +1,4 @@
+import { autoloadGet } from "./core-ext/kernel.js";
 import { File, TopLevel, TypeError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
@@ -204,9 +205,9 @@ describe("TestOnLoad", () => {
     ];
     await withSetup(loader, files, {}, async () => {
       let loaded: unknown = false;
-      loader.onLoad("M", async () => (loaded = await new Cref(Object, "N").autoloadGet()));
+      loader.onLoad("M", async () => (loaded = await autoloadGet(new Cref(Object, "N"))));
 
-      await new Cref(Object, "M").autoloadGet();
+      await autoloadGet(new Cref(Object, "M"));
       expect(loaded).toBe(top.N);
     });
   });

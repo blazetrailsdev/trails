@@ -1,3 +1,4 @@
+import { autoloadGet } from "../core-ext/kernel.js";
 import { File, isModuleObject, rbInspect, type Pathname } from "@blazetrails/ruby-compat";
 import { Cref } from "../cref.js";
 import { Error as ZeitwerkError, SetupRequired } from "../error.js";
@@ -64,7 +65,7 @@ export const EagerLoad = {
     for (const cname of cnames.reverse()) {
       const cref = new Cref(namespace, cname);
       if (!cref.isDefined()) return;
-      namespace = (await cref.autoloadGet()) as object;
+      namespace = (await autoloadGet(cref)) as object;
     }
 
     await this.actualEagerLoadDir(abspath, namespace);
@@ -143,12 +144,12 @@ export const EagerLoad = {
 
     let namespace: object = rootNamespace;
     for (const cname of cnames.reverse()) {
-      namespace = (await new Cref(namespace, cname).autoloadGet()) as object;
+      namespace = (await autoloadGet(new Cref(namespace, cname))) as object;
     }
 
     if (this.isShadowedFile(abspath)) throw new ZeitwerkError(`${abspath} is shadowed`);
 
-    return new Cref(namespace, baseCname).autoloadGet();
+    return autoloadGet(new Cref(namespace, baseCname));
   },
 
   /** @internal */
@@ -174,14 +175,14 @@ export const EagerLoad = {
 
         if (ftype === "file") {
           const cref = this.autoloads[abspath];
-          if (cref != null) await cref.autoloadGet();
+          if (cref != null) await autoloadGet(cref);
         } else {
           if (this.isCollapse(abspath)) {
             queue.push([abspath, currentNamespace]);
           } else {
             const cname = this.inflector.camelize(basename, abspath);
             const cref = new Cref(currentNamespace, cname);
-            queue.push([abspath, (await cref.autoloadGet()) as object]);
+            queue.push([abspath, (await autoloadGet(cref)) as object]);
           }
         }
       });

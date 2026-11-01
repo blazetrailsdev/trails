@@ -7,7 +7,6 @@ import {
   rbModRemoveConst,
   type Included,
 } from "@blazetrails/ruby-compat";
-import { require } from "./core-ext/kernel.js";
 import { RealModName } from "./real-mod-name.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -63,13 +62,6 @@ export class Cref {
 
   get(): unknown {
     return rbConstGet(_seat(this.mod), this.cname, true, false);
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  async autoloadGet(): Promise<unknown> {
-    const autoloadPath = this.isAutoload();
-    if (autoloadPath != null) await require(autoloadPath);
-    return this.get();
   }
 
   /** @inventedArm if — PERMANENT */

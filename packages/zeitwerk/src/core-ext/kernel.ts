@@ -1,4 +1,5 @@
 import { LOADED_FEATURES, getPath } from "@blazetrails/ruby-compat";
+import type { Cref } from "../cref.js";
 import { Registry } from "../registry.js";
 
 export async function require(path: string): Promise<boolean> {
@@ -17,4 +18,11 @@ export async function require(path: string): Promise<boolean> {
     await loader.onDirAutoloaded(path);
     return true;
   }
+}
+
+/** @noRailsEquivalent PERMANENT */
+export async function autoloadGet(cref: Cref): Promise<unknown> {
+  const autoloadPath = cref.isAutoload();
+  if (autoloadPath != null) await require(autoloadPath);
+  return cref.get();
 }

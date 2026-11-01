@@ -1,3 +1,4 @@
+import { autoloadGet } from "./core-ext/kernel.js";
 import { FileUtils, TopLevel, isModuleObject } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
@@ -91,13 +92,13 @@ describe("TestAutovivification", () => {
 
   it("autovivification is synchronized", async () => {
     await withSetup(loader, [["admin/v2/user.ts", "export class User {}"]], {}, async () => {
-      const admin = (await new Cref(Object, "Admin").autoloadGet()) as object;
+      const admin = (await autoloadGet(new Cref(Object, "Admin"))) as object;
 
       let calls = 0;
       loader.onLoad("Admin::V2", () => (calls += 1));
 
       const cref = new Cref(admin, "V2");
-      const [a, b] = await Promise.all([cref.autoloadGet(), cref.autoloadGet()]);
+      const [a, b] = await Promise.all([autoloadGet(cref), autoloadGet(cref)]);
 
       expect(a).toBe(b);
       expect(calls).toEqual(1);
