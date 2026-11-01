@@ -33,8 +33,18 @@ describe("TestCref", () => {
     expect(Cref.prototype.toString).toBe(Cref.prototype.path);
   });
 
-  it.skip("#autoload?", () => {});
-  it.skip("#autoload", () => {});
+  it("#autoload?", () => {
+    newCref().autoload("/foo");
+    expect(newCref().isAutoload()).toEqual("/foo");
+    newCref().remove();
+  });
+
+  it("#autoload", () => {
+    const cref = newCref();
+    cref.autoload("/foo");
+    expect(newCref().isAutoload()).toEqual("/foo");
+    cref.remove();
+  });
 
   it("#defined? finds a constant defined in mod", () => {
     constSet(klass, "Foo", 1);
