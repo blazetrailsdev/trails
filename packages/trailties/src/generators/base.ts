@@ -23,7 +23,7 @@ import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
 import * as ThorActions from "@blazetrails/thor/actions";
 import type { BaseConfig } from "@blazetrails/thor/base";
-import { Group } from "@blazetrails/thor/group";
+import { Group, type GroupClass } from "@blazetrails/thor/group";
 import type { Invocation } from "@blazetrails/thor/invocation";
 import type { Command } from "@blazetrails/thor/command";
 import type { Argument, ArgumentOptions } from "@blazetrails/thor/parser/argument";
@@ -133,6 +133,20 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
       this._sourceRoot = await this.defaultSourceRoot();
     }
     return this._sourceRoot;
+  }
+
+  static async desc(description: string | null = null): Promise<string | null> {
+    const klass = this as unknown as GroupClass;
+    if (description != null) return (Group as unknown as GroupClass).desc.call(klass, description);
+
+    if (!Object.hasOwn(this, "_desc") || klass._desc == null) {
+      const usagePath = await this.usagePath();
+      klass._desc =
+        usagePath != null
+          ? await getFs().readFile(usagePath, "utf-8")
+          : `Description:\n    Create ${humanize(this.baseName()!).toLowerCase()} files for ${this.generatorName()} generator.`;
+    }
+    return klass._desc;
   }
 
   static async defaultSourceRoot(): Promise<string | undefined> {
@@ -301,6 +315,15 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   }
 
   /** @internal */
+  protected static banner(): string {
+    const namespace = this.namespace().replace(/^rails:/, "");
+    const usage = this.arguments()
+      .map((argument) => argument.usage())
+      .join(" ");
+    return `bin/trails generate ${namespace} ${usage} [options]`.replace(/\s+/g, " ");
+  }
+
+  /** @internal */
   protected static baseName(): string | undefined {
     const segments = this.name.split("::");
     while (segments.at(-1) === "") segments.pop();
@@ -350,6 +373,19 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
       return config["rails"][name];
     } else {
       return defaultValue;
+    }
+  }
+
+  /** @internal */
+  protected static async usagePath(): Promise<string | undefined> {
+    const sourceRoot = await this.sourceRoot();
+    const defaultGeneratorRoot = await this.defaultGeneratorRoot();
+    const paths = [
+      sourceRoot ? File.expandPath("../USAGE", sourceRoot) : null,
+      defaultGeneratorRoot ? File.join(defaultGeneratorRoot, "USAGE") : null,
+    ];
+    for (const path of paths) {
+      if (path != null && (await getFs().exists(path))) return path;
     }
   }
 

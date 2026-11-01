@@ -5,7 +5,7 @@ import type { Base } from "./command/base.js";
 import { Command as Program } from "commander";
 import { describe, it, expect, onTestFinished, vi } from "vitest";
 import { createProgram } from "./cli.js";
-import { findByNamespace, invoke } from "./command.js";
+import { findByNamespace, hiddenCommands, invoke } from "./command.js";
 import { lookupBang, subclasses } from "./command/behavior.js";
 
 const loaded = vi.hoisted(() => [] as string[]);
@@ -36,9 +36,7 @@ describe("Rails::Command.find_by_namespace", () => {
 
   it("hides unused_routes from the program, as printing_commands subtracts hidden_commands", async () => {
     await lookupBang();
-    const hidden = createProgram()
-      .commands.filter((c) => (c as unknown as { _hidden: boolean })._hidden)
-      .map((c) => c.name());
+    const hidden = hiddenCommands().map((klass) => klass.commandName());
     expect(hidden).toEqual(["unused-routes"]);
   }, 30_000);
 

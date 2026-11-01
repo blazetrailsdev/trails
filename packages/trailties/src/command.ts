@@ -1,5 +1,5 @@
 import { presence } from "@blazetrails/activesupport";
-import { File, Pathname, env } from "@blazetrails/ruby-compat";
+import { File, Pathname, env, rbArgv } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
@@ -51,19 +51,21 @@ export async function invoke(fullNamespace: string, args: string[] = []): Promis
   const command = await findByNamespace(namespace, commandName);
   const name = commandName.replaceAll("_", "-");
 
-  if (command && "perform" in command) {
-    if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
-      await command.perform(name, args, {});
+  await withArgv(args, async () => {
+    if (command && "perform" in command) {
+      if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
+        await command.perform(name, args, {});
+      } else {
+        await invokeRake(fullNamespace, args);
+      }
+    } else if (command && command.name() === name) {
+      await command.parent!.parseAsync([name, ...args], { from: "user" });
+    } else if (command && command.commands.some((c) => c.name() === name)) {
+      await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
     } else {
       await invokeRake(fullNamespace, args);
     }
-  } else if (command && command.name() === name) {
-    await command.parent!.parseAsync([name, ...args], { from: "user" });
-  } else if (command && command.commands.some((c) => c.name() === name)) {
-    await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
-  } else {
-    await invokeRake(fullNamespace, args);
-  }
+  });
 }
 
 /** @inventedArm replaceAll — PERMANENT */
@@ -95,6 +97,17 @@ function splitNamespace(namespace: string): [string, string] {
   if (HELP_MAPPINGS.has(namespace) || namespace === "help") return ["help", "help_extended"];
   if (VERSION_MAPPINGS.has(namespace)) return ["version", "version"];
   return [namespace, namespace];
+}
+
+/** @internal */
+async function withArgv(argv: string[], block: () => Promise<void>): Promise<void> {
+  const originalArgv = [...rbArgv()];
+  rbArgv().splice(0, rbArgv().length, ...argv);
+  try {
+    await block();
+  } finally {
+    rbArgv().splice(0, rbArgv().length, ...originalArgv);
+  }
 }
 
 /** @internal */

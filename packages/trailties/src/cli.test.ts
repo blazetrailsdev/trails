@@ -34,7 +34,6 @@ describe("CLI", () => {
     expect(names).toContain("new");
     expect(names).toContain("server");
     expect(names).toContain("db");
-    expect(names).toContain("routes");
   });
 
   it("server command has alias s", () => {

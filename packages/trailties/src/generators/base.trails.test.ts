@@ -517,3 +517,21 @@ describe("GeneratorBase.defaultSourceRoot", () => {
     expect(await WidgetGenerator.sourceRoot()).toBeUndefined();
   });
 });
+
+describe("GeneratorBase.help", () => {
+  it("--help prints the generator's banner, options and USAGE description", async () => {
+    const help = await capture("stdout", () =>
+      Generators.invoke("channel", ["--help"], { destinationRoot: "/tmp" }),
+    );
+    expect(help).toContain("bin/trails generate channel NAME [method method] [options]");
+    expect(help).toContain("Generates a new cable channel for the server");
+  });
+
+  it("--help falls back to the default description and a kebab-case banner", async () => {
+    const help = await capture("stdout", () =>
+      Generators.invoke("scaffold_controller", ["--help"], { destinationRoot: "/tmp" }),
+    );
+    expect(help).toContain("bin/trails generate scaffold-controller NAME");
+    expect(help).toContain("Description:\n    Create ");
+  });
+});

@@ -1,27 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { createProgram } from "../cli.js";
+import { hiddenCommands } from "../command.js";
 import type { ThorClass } from "@blazetrails/thor";
-import { lookupBang } from "../command/behavior.js";
+import { lookupBang, subclasses } from "../command/behavior.js";
+import { RoutesCommand } from "./routes.js";
 import { UnusedRoutesCommand } from "./unused-routes.js";
 
 await lookupBang();
 
 describe("UnusedRoutesCommand", () => {
   it("is registered on the program", () => {
-    const program = createProgram();
-    expect(program.commands.some((c) => c.name() === "unused-routes")).toBe(true);
+    expect(subclasses()).toContain(UnusedRoutesCommand);
   });
 
   it("is hidden, mirroring hide_command!", () => {
-    const program = createProgram();
-    const cmd = program.commands.find((c) => c.name() === "unused-routes");
-    expect(cmd?.helpInformation).toBeDefined();
-    expect(
-      program
-        .createHelp()
-        .visibleCommands(program)
-        .map((c) => c.name()),
-    ).not.toContain("unused-routes");
+    expect(hiddenCommands()).toContain(UnusedRoutesCommand);
   });
 
   it("has the class options UnusedRoutesCommand declares", () => {
@@ -32,9 +24,7 @@ describe("UnusedRoutesCommand", () => {
   });
 
   it("routes gains the -u/--unused class option", () => {
-    const program = createProgram();
-    const cmd = program.commands.find((c) => c.name() === "routes");
-    const unused = cmd?.options.find((o) => o.long === "--unused");
-    expect(unused?.short).toBe("-u");
+    const unused = (RoutesCommand as unknown as ThorClass).classOptions().unused;
+    expect(unused.aliases).toEqual(["-u"]);
   });
 });

@@ -10,8 +10,6 @@ import { getPath } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
-import { Command } from "commander";
-import { Actions } from "../command/actions.js";
 import { Base } from "../command/base.js";
 import { Trails } from "../rails.js";
 
@@ -104,8 +102,8 @@ export class UnusedRoutesCommand extends Base {
   /** @internal */
   private _routes: Journey.Route[] | null = null;
 
-  async perform(): Promise<void> {
-    await Actions.bootApplicationBang();
+  async perform(..._args: string[]): Promise<void> {
+    await this.bootApplicationBang();
     await Trails.application!.reloadRoutesUnlessLoaded();
 
     this.say((await this.inspector()).format(this.formatter(), this.routesFilter()));
@@ -139,19 +137,8 @@ export class UnusedRoutesCommand extends Base {
   private routesFilter(): RoutesFilter {
     const options = this.options as unknown as UnusedRoutesOptions;
     const filter: RoutesFilter = {};
-    if (options.controller !== undefined) filter.controller = options.controller;
-    if (options.grep !== undefined) filter.grep = options.grep;
+    if (this.options.hasKey("controller")) filter.controller = options.controller;
+    if (this.options.hasKey("grep")) filter.grep = options.grep;
     return filter;
   }
-}
-
-export function unusedRoutesCommand(): Command {
-  const klass = UnusedRoutesCommand;
-  const cmd = new Command(klass.commandName());
-  cmd.argument("[args...]").allowUnknownOption().helpOption(false);
-  cmd.action(async (_args: string[], _options: object, command: Command) => {
-    await klass.perform(klass.commandName(), command.args, {});
-  });
-
-  return cmd;
 }
