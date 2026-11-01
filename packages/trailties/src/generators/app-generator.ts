@@ -11,6 +11,11 @@ import { LOAD_DEFAULTS_VERSION } from "../application/configuration.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
+const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
+  skipActionMailer: true,
+  skipActiveStorage: true,
+};
+
 const META_OPTIONS = ["minimal"];
 
 const RESERVED_NAMES = ["application", "destroy", "plugin", "runner", "test"];
@@ -246,6 +251,13 @@ export class AppGenerator extends AppBase {
     if (this.options.database)
       this.options.database = DB_ALIAS[this.options.database] ?? this.options.database;
     this.implyOptions(AppGenerator.OPTION_IMPLICATIONS, { metaOptions: META_OPTIONS });
+    const options = { ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...this.options };
+    const skipDependents = options.skipActiveStorage ? true : undefined;
+    this.options = Object.freeze({
+      skipActionMailbox: skipDependents,
+      skipActionText: skipDependents,
+      ...options,
+    });
     this.packageManager = this.options.packageManager ?? "pnpm";
     this.sqliteDriver = this.options.sqliteDriver ?? "better-sqlite3";
     if (!VALID_PACKAGE_MANAGERS.includes(this.packageManager)) {

@@ -32,11 +32,6 @@ export type AppBaseOptions = GeneratorOptions & {
   [k: `skip${string}`]: boolean | undefined;
 };
 
-const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
-  skipActionMailer: true,
-  skipActiveStorage: true,
-};
-
 export const NODE_LTS_VERSION = "20.11.1";
 export const BUN_VERSION = "1.0.1";
 
@@ -333,16 +328,9 @@ export abstract class AppBase extends GeneratorBase {
     this._impliedOptionsConflicts = Object.keys(this._impliedOptions).filter(
       (name) => options[name] === false,
     );
-    const merged: Record<string, unknown> = {
-      ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS,
+    this.options = Object.freeze({
       ...options,
       ...Object.fromEntries(Object.keys(this._impliedOptions).map((name) => [name, true])),
-    };
-    const skipDependents = merged.skipActiveStorage ? true : undefined;
-    this.options = Object.freeze({
-      skipActionMailbox: skipDependents,
-      skipActionText: skipDependents,
-      ...merged,
     }) as unknown as AppBaseOptions;
   }
 
