@@ -1,13 +1,20 @@
 import { ArgumentError } from "./argument-error.js";
 import type { IO } from "./io.js";
 import { IOError } from "./io-error.js";
-import { isPlainHash, rbBuiltinClassName } from "./object.js";
+import { isPlainHash, rbBuiltinClassName, rbInspect } from "./object.js";
 import { env as processEnv, getProcessAdapter } from "./process-adapter.js";
 import type { WaitStatus } from "./child-process-adapter.js";
 
 interface SystemCallError extends Error {
   code?: string;
 }
+
+type ExecargOpthash = {
+  out?: string | IO;
+  err?: string | IO;
+  unsetenvOthers?: unknown;
+  exception?: boolean;
+};
 
 /**
  * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`): `rb_exec_getargs`
@@ -27,29 +34,27 @@ interface SystemCallError extends Error {
  */
 export function rbExecargNew(
   argv: readonly unknown[],
+  allowExcOpt = false,
 ): [
   prog: string,
   env: Record<string, string | undefined>,
   args: string[] | null,
-  opthash: { out?: string | IO; err?: string | IO; unsetenvOthers?: unknown; exception?: boolean },
+  opthash: ExecargOpthash,
 ] {
   const rest = [...argv];
-  let opthash: {
-    out?: string | IO;
-    err?: string | IO;
-    unsetenvOthers?: unknown;
-    exception?: boolean;
-  } = {};
+  let opthash: ExecargOpthash = {};
   if (rest.length > 0 && isPlainHash(rest[rest.length - 1])) {
-    opthash = rest.pop() as {
-      out?: string | IO;
-      err?: string | IO;
-      unsetenvOthers?: unknown;
-      exception?: boolean;
-    };
+    opthash = rest.pop() as ExecargOpthash;
     for (const key of Object.keys(opthash)) {
       if (EXEC_OPTIONS.has(key) || key.startsWith("rlimit_") || /^\d+$/.test(key)) continue;
       throw new ArgumentError(`wrong exec option symbol: ${key}`);
+    }
+    const { exception } = opthash;
+    if (exception != null && exception !== true && exception !== false) {
+      throw new ArgumentError(`expected true or false as exception: ${rbInspect(exception)}`);
+    }
+    if (!allowExcOpt && "exception" in opthash) {
+      throw new ArgumentError("exception option is not allowed");
     }
   }
   for (const redirect of [opthash.out, opthash.err]) {

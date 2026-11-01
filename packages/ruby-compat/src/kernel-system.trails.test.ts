@@ -14,7 +14,7 @@ import { rbFSystem } from "./kernel-system.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { Open3 } from "./open3.js";
 import { rbObjDup } from "./include.js";
-import { Process } from "./process.js";
+import { Process, rbExecargNew } from "./process.js";
 import { RuntimeError } from "./runtime-error.js";
 
 afterEach(() => {
@@ -42,11 +42,17 @@ describe("Kernel#system", () => {
       new RuntimeError("Command failed with exit 3: sh"),
     );
     await expect(rbFSystem("kill -9 $$", { exception: true })).rejects.toThrow(
-      new RuntimeError("Command failed with SIGKILL: kill -9 $$"),
+      new RuntimeError("Command failed with SIGKILL (signal 9): kill -9 $$"),
     );
-    await expect(
-      rbFSystem("trails-no-such-program", "--version", { exception: true }),
-    ).rejects.toBeInstanceOf(Errno.ENOENT);
+    const missing = rbFSystem("trails-no-such-program", "--version", { exception: true });
+    await expect(missing).rejects.toBeInstanceOf(Errno.ENOENT);
+    await expect(missing).rejects.toThrow("No such file or directory - trails-no-such-program");
+    await expect(rbFSystem("true", { exception: 1 as never })).rejects.toThrow(
+      "expected true or false as exception: 1",
+    );
+    expect(() => rbExecargNew(["true", { exception: true }])).toThrow(
+      "exception option is not allowed",
+    );
   });
 
   it("is nil when the command could not be executed", async () => {
