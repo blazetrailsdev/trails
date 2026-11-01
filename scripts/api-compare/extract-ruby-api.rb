@@ -1098,6 +1098,21 @@ class ApiExtractor
 
     return if node[0] == :command_call && record_boot_mixin(node[1], cmd_name, args)
 
+    # Zeitwerk's `internal def foo` (zeitwerk/internal.rb:6-11) is `private`
+    # plus a public `__foo` alias.
+    if cmd_name == "internal" && args.is_a?(Array) && args.flatten.include?(:def)
+      prev_vis = @visibility_stack[-1]
+      @visibility_stack[-1] = :private
+      walk(args)
+      @visibility_stack[-1] = prev_vis
+      return
+    end
+
+    if cmd_name == "internal"
+      apply_visibility_to_named(extract_symbol_args(args), :private)
+      return
+    end
+
     case cmd_name
     when "private", "protected", "public"
       # No-args form (`private`) flips the default visibility for the scope.

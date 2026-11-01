@@ -14,6 +14,7 @@ export {
   generatedClass,
   generatedClassPath,
   isClassPathPending,
+  isModuleObject,
   registerClassPaths,
 } from "./classpath.js";
 export { CGI } from "./cgi.js";
