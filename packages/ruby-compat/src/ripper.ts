@@ -23,11 +23,15 @@ const HEREDOC = new RegExp(
   `<<([~-]?)(?:"([^"\\n]+)"|'([^'\\n]+)'|\`([^\`\\n]+)\`|(${IDENT}))`,
   "y",
 );
-const BLOCK_PARAMS = /\s*\|([^|\n]*)\|/y;
+const BLOCK_PARAMS = /\s*\|([^|]*)\|/y;
 const LAMBDA_PARAMS = /->\s*\(?([^){\n]*)/y;
-const DEF_PARAMS = /[^(\n]*\(([^)\n]*)\)|[^\n]*/y;
+const DEF_PARAMS = /[^(\n]*\(([^)]*)\)|[^\n]*/y;
 const FOR_VARS = /([^\n]*?)\bin\b/y;
 const RESCUE_VAR = new RegExp(`[^\\n]*?=>\\s*(${IDENT})`, "y");
+const ASSIGNMENT = new RegExp(
+  `^(?:\\s*,\\s*\\*?${IDENT})*\\s*(?:\\|\\||&&|\\*\\*|<<|>>|[-+*/%|&^])?=(?![=~>])`,
+);
+const NAMED_CAPTURE = /\(\?<(\w+)>/g;
 const REGEXP_FLAGS = /[a-z]*/y;
 const CLOSERS: Record<string, string> = { "(": ")", "[": "]", "{": "}", "<": ">" };
 const VALUE_KEYWORDS = new Set(["end", "self", "true", "false", "nil", "__FILE__", "__LINE__"]);
@@ -38,7 +42,7 @@ const OPERATOR_KEYWORDS = new Set(
 );
 
 /**
- * `Ripper` (`vendor/ruby/v3.3.11/ext/ripper/lib/ripper/core.rb:15`), reduced to
+ * `Ripper` (`vendor/ruby/v3.3.11/ext/ripper/lib/ripper/core.rb:14`), reduced to
  * the lexer states of `parser_yylex` (`vendor/ruby/v3.3.11/parse.y:10420`) that
  * decide where a literal starts. Its comment event mirrors the Prism arm of
  * `ParserExtractor#annotations`: the value is `comment.location.slice`, so it
@@ -54,6 +58,7 @@ export class Ripper {
   private _error = false;
   private _state = EXPR_BEG;
   private _pending: Array<{ id: string; indent: boolean; raw: boolean }> = [];
+  /** @noRailsEquivalent CONVERGEABLE ripper-reports-syntax-errors-beyond-unterminated-literals */
   private _locals = new Set<string>();
 
   /**
@@ -174,6 +179,11 @@ export class Ripper {
       } else if (c === "/" && literal) {
         this._pos += 1;
         this._literal("/", null, true);
+        if (/^\s*=~/.test(src.slice(this._pos, this._pos + 40))) {
+          for (const [, name] of src.slice(pos, this._pos).matchAll(NAMED_CAPTURE)) {
+            this._locals.add(name);
+          }
+        }
         this._pos += this._match(REGEXP_FLAGS)![0].length;
         this._state = EXPR_END;
       } else if (c === "%" && literal && this._match(PERCENT)) {
@@ -233,7 +243,7 @@ export class Ripper {
       this._error = true;
       return;
     }
-    const end = start + m.index + m[0].length;
+    const end = Math.min(start + m.index + m[0].length + 1, this._src.length);
     this._comment(start, end);
   }
 
@@ -287,11 +297,16 @@ export class Ripper {
       if (name === "do") this._blockParams();
       const vars = name === "for" ? this._match(FOR_VARS) : null;
       if (vars) this._localVars(vars[1]);
+      const eol = src.indexOf("\n", this._pos);
+      if (name === "in") this._localVars(src.slice(this._pos, eol === -1 ? src.length : eol));
       const rescued = name === "rescue" ? this._match(RESCUE_VAR) : null;
       if (rescued) this._localVars(rescued[1]);
     } else {
-      if (/^\s*=(?![=~>])/.test(src.slice(this._pos, this._pos + 40))) this._locals.add(name);
-      this._state = this._locals.has(name) ? EXPR_END : EXPR_ARG;
+      const eol = src.indexOf("\n", this._pos);
+      if (ASSIGNMENT.test(src.slice(this._pos, eol === -1 ? src.length : eol))) {
+        this._locals.add(name);
+      }
+      this._state = this._locals.has(name) || /^_[1-9]$/.test(name) ? EXPR_END : EXPR_ARG;
     }
   }
 
@@ -366,6 +381,7 @@ export class Ripper {
         }
         if (this._error) return;
         this._pos += 1;
+        if (this._pending.length > 0) this._hereDocument();
       }
     }
   }

@@ -48,7 +48,7 @@ describe("Ripper", () => {
   it("reads an =begin block as one comment and stops at __END__", () => {
     const ripper = lex("=begin\ntext\n=end\n# yes\n__END__\n# no\n");
     expect(ripper.comments).toEqual([
-      [1, "=begin\ntext\n=end"],
+      [1, "=begin\ntext\n=end\n"],
       [4, "# yes"],
     ]);
   });
@@ -70,6 +70,14 @@ describe("Ripper", () => {
       "[1].map { |a| a /2 }\n# a\nb = 1 / 2\n",
       "x.each do |a|\n a /2\nend\n# a\n",
       "-> (a) { a /2 }\n# a\n",
+      "def foo(a,\n  b)\n  b /2\nend\n# a\n",
+      "foo do |a,\n  b|\n  b /2\nend\n# a\n",
+      "a ||= 1\na /2\n# a\n",
+      "a += 1\na /2\n# a\n",
+      "a, b = 1, 2\na /2\n# a\n",
+      "foo { _1 /2 }\n# a\n",
+      "case b\nin {a:} then a /2\nend\n# a\n",
+      "/(?<y>a)/ =~ b\ny /2\n# a\n",
     ]) {
       const ripper = lex(source);
       expect(ripper.isError()).toBe(false);
@@ -81,6 +89,12 @@ describe("Ripper", () => {
     const ripper = lex("foo(<<A, 'b\nbody\nA\nc')\n# a\n");
     expect(ripper.isError()).toBe(false);
     expect(ripper.comments).toEqual([[5, "# a"]]);
+  });
+
+  it("reads a heredoc opened inside a heredoc's interpolation", () => {
+    const ripper = lex("x = <<~A\n #{<<~B}\n 2\n B\nA\n# a\n");
+    expect(ripper.isError()).toBe(false);
+    expect(ripper.comments).toEqual([[6, "# a"]]);
   });
 
   it("answers error? for an unterminated literal", () => {
