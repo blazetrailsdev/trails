@@ -592,14 +592,14 @@ export class Configuration extends EngineConfiguration {
 
     if (!(await getFs().exists(keyFile))) {
       const randomKey = SecureRandom.hex(64);
-      await getFs().mkdir!(getPath().dirname(keyFile), { recursive: true });
+      await FileUtils.mkdirPAsync(getPath().dirname(keyFile));
       await getFs().writeFile!(keyFile, randomKey);
     }
 
     return (this._localSecret = await getFs().readFile(keyFile, "utf8"));
   }
 
-  /** @missingRailsCall mkdir_p — CONVERGEABLE call-gate-credits-file-utils-async */
+  /** @missingRailsCall mkdir_p — PERMANENT */
   private generateLocalSecret(): string {
     if (this._localSecret === undefined) {
       throw new RuntimeError(
