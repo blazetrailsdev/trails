@@ -26,10 +26,10 @@ const HEREDOC = new RegExp(
 const BLOCK_OPEN = /\s*\|/y;
 const LAMBDA_OPEN = /->\s*(\(?)/y;
 const DEF_HEAD = new RegExp(
-  `\\s*(?:${IDENT}\\.)?(?:${IDENT}[?!=]?|${OPERATOR})(\\(|[ \\t]+(?=[A-Za-z_*&]))?`,
+  `\\s*(?:${IDENT}\\.)?(?:${IDENT}[?!=]?|${OPERATOR})([ \\t]*\\(|[ \\t]+(?=[A-Za-z_*&]))?`,
   "y",
 );
-const PATTERN_END = /(?:then|if|unless)\b/y;
+const PATTERN_END = /(?:then|if|unless|and|or)\b/y;
 const PATTERN_VALUE = /:[ \t]*[^\s,})]/y;
 const LAMBDA_DO = /do\b/y;
 const FOR_VARS = /([^\n]*?)\bin\b/y;
@@ -53,6 +53,7 @@ interface Binder {
   depth: number;
   destructuring: number;
   expected: boolean;
+  outer: Binder | null;
 }
 
 /**
@@ -136,29 +137,41 @@ export class Ripper {
   }
 
   private _bind(close: string, pattern = false): void {
-    this._binder = { close, pattern, depth: 0, destructuring: 0, expected: true };
+    this._binder = {
+      close,
+      pattern,
+      depth: 0,
+      destructuring: 0,
+      expected: true,
+      outer: this._binder,
+    };
     this._state = EXPR_BEG;
+  }
+
+  private _release(binder: Binder, c: string): boolean {
+    this._binder = binder.outer;
+    return binder.outer ? this._scanBinder(binder.outer, c) : false;
   }
 
   private _scanBinder(binder: Binder, c: string): boolean {
     const atTop = binder.depth === 0;
     if (atTop && binder.destructuring === 0 && c === binder.close) {
-      this._binder = null;
       if (c === ")" || c === "|") {
+        this._binder = binder.outer;
         this._pos += 1;
         this._state = c === ")" ? EXPR_END : EXPR_BEG;
         return true;
       }
-      return false;
+      return this._release(binder, c);
+    }
+    if (atTop && binder.destructuring === 0 && (c === ")" || c === "]" || c === "}")) {
+      return this._release(binder, c);
     }
     if (atTop && (binder.close === "\n" || binder.close === "{")) {
       const stop = binder.pattern
         ? c === ";" || this._match(PATTERN_END) !== null
         : c === ";" || (binder.close === "{" && this._match(LAMBDA_DO) !== null);
-      if (stop) {
-        this._binder = null;
-        return false;
-      }
+      if (stop) return this._release(binder, c);
     }
     if (binder.pattern || (atTop && binder.expected)) {
       const word = this._match(WORD);
@@ -369,7 +382,7 @@ export class Ripper {
       const head = this._match(DEF_HEAD);
       if (head?.[1]) {
         this._pos += head[0].length;
-        this._bind(head[1] === "(" ? ")" : "\n");
+        this._bind(head[1].endsWith("(") ? ")" : "\n");
       }
     } else if (name === "class") {
       this._state = EXPR_CLASS;
