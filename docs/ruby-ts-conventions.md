@@ -206,6 +206,8 @@ parity:api skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
+- `Testing::Isolation::Forking#run_in_isolation` is not ported: Ruby's `fork` has no Node counterpart (CLAUDE.md, "Runtime facts Node does not expose"), so only the Subprocess arm's `runInIsolation` exists. PERMANENT.
+  - `run_in_isolation` (only in: `isolation.rb`; ported in TS as `runInIsolation`)
 - tasks RFC 0204-actionmailer-and-mail-port, Transport edges: the socket is nodemailer's `SMTPConnection`, so Net::SMTP's socket setup members are not ported. PERMANENT.
   - `tcp_socket`, `ssl_socket`, `new_internet_message_io` (only in: `smtp.rb`, `authenticator.rb`, `auth_plain.rb`, `auth_login.rb`, `auth_cram_md5.rb`, `auth_xoauth2.rb`)
 - Rake's `ThreadPool#__queue__` is a test-only reader, and cpu_counter.rb's `unless method_defined?(:count)` fallback is kept from loading by `Etc.nprocessors`. PERMANENT.

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { TestCase } from "@blazetrails/activejob/test-case";
+import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import type { Extended } from "@blazetrails/activesupport";
 import { StringIO } from "@blazetrails/ruby-compat";
@@ -105,7 +107,16 @@ describe("ActiveStorage::Attached::Many", () => {
 
   it("purgeLater empties the attachments", async () => {
     await user.photos.attach(hash());
-    await user.photos.purgeLater();
+    class PurgeLaterTest extends TestCase {
+      purgeLater(): void {}
+    }
+    const t = new PurgeLaterTest("purgeLater") as unknown as TestHelper;
+    await t.beforeSetup();
+    try {
+      await t.performEnqueuedJobs({}, () => user.photos.purgeLater());
+    } finally {
+      await t.afterTeardown();
+    }
     expect(user.attachmentChanges).toEqual({});
   });
 

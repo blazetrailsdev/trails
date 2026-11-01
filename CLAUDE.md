@@ -1493,6 +1493,13 @@ ratified here so no port re-derives them.
   is the usage error, the answer for a CLI user. Ruby-compat's own send frames
   are dropped by the same reader, as `vm_call_opt_send` pushes none.
 
+- **`Isolation::Subprocess#run_in_isolation`'s child.** Rails' child ends with
+  `exit!(0)` and answers `Minitest::Result.from(self)`
+  (`vendor/rails/v8.0.2/activesupport/lib/active_support/testing/isolation.rb:83-87`).
+  A Vitest child hands its result back and lets the runner finish, so
+  `isolation.ts` calls neither, and dumps the test itself. Both are `PERMANENT`
+  receipts. Ruled by the repo owner on 2026-11-01 (trails#9561).
+
 A test that depends on one of these ports the assertions that do not, and parks
 the rest as `it.skip` under a `PERMANENT-SKIP:` line citing this section.
 

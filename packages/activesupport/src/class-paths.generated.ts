@@ -92,14 +92,15 @@ import * as m89 from "./syntax-error-proxy.js";
 import * as m90 from "./tagged-logging.js";
 import * as m91 from "./testing/constant-lookup.js";
 import * as m92 from "./testing/error-reporter-assertions.js";
-import * as m93 from "./testing/method-call-assertions.js";
-import * as m94 from "./testing/setup-and-teardown.js";
-import * as m95 from "./testing/stream.js";
-import * as m96 from "./testing/tagged-logging.js";
-import * as m97 from "./testing/time-helpers.js";
-import * as m98 from "./time-with-zone.js";
-import * as m99 from "./values/time-zone.js";
-import * as m100 from "./xml-mini.js";
+import * as m93 from "./testing/isolation.js";
+import * as m94 from "./testing/method-call-assertions.js";
+import * as m95 from "./testing/setup-and-teardown.js";
+import * as m96 from "./testing/stream.js";
+import * as m97 from "./testing/tagged-logging.js";
+import * as m98 from "./testing/time-helpers.js";
+import * as m99 from "./time-with-zone.js";
+import * as m100 from "./values/time-zone.js";
+import * as m101 from "./xml-mini.js";
 
 registerClassPaths([
   [() => m0.ActionableError, "ActiveSupport::ActionableError"],
@@ -283,20 +284,22 @@ registerClassPaths([
   [() => m92.ErrorReporterAssertions, "ActiveSupport::Testing::ErrorReporterAssertions"],
   [() => m92.ErrorCollector, "ActiveSupport::Testing::ErrorReporterAssertions::ErrorCollector"],
   [() => m92.Report, "ActiveSupport::Testing::ErrorReporterAssertions::ErrorCollector::Report"],
-  [() => m93.MethodCallAssertions, "ActiveSupport::Testing::MethodCallAssertions"],
-  [() => m94.ClassMethods, "ActiveSupport::Testing::SetupAndTeardown::ClassMethods"],
-  [() => m97.SimpleStubs, "ActiveSupport::Testing::SimpleStubs"],
-  [() => m95.Stream, "ActiveSupport::Testing::Stream"],
-  [() => m96.TaggedLogging, "ActiveSupport::Testing::TaggedLogging"],
-  [() => m97.TimeHelpers, "ActiveSupport::Testing::TimeHelpers"],
-  [() => m98.TimeWithZone, "ActiveSupport::TimeWithZone"],
-  [() => m99.TimeZone, "ActiveSupport::TimeZone"],
+  [() => m93.Isolation, "ActiveSupport::Testing::Isolation"],
+  [() => m93.Subprocess, "ActiveSupport::Testing::Isolation::Subprocess"],
+  [() => m94.MethodCallAssertions, "ActiveSupport::Testing::MethodCallAssertions"],
+  [() => m95.ClassMethods, "ActiveSupport::Testing::SetupAndTeardown::ClassMethods"],
+  [() => m98.SimpleStubs, "ActiveSupport::Testing::SimpleStubs"],
+  [() => m96.Stream, "ActiveSupport::Testing::Stream"],
+  [() => m97.TaggedLogging, "ActiveSupport::Testing::TaggedLogging"],
+  [() => m98.TimeHelpers, "ActiveSupport::Testing::TimeHelpers"],
+  [() => m99.TimeWithZone, "ActiveSupport::TimeWithZone"],
+  [() => m100.TimeZone, "ActiveSupport::TimeZone"],
   [() => m23.ToJsonWithActiveSupportEncoder, "ActiveSupport::ToJsonWithActiveSupportEncoder"],
   [() => m24.Tryable, "ActiveSupport::Tryable"],
   [() => m48.VERSION, "ActiveSupport::VERSION"],
   [() => m22.XMLConverter, "ActiveSupport::XMLConverter"],
   [() => m22.DisallowedType, "ActiveSupport::XMLConverter::DisallowedType"],
-  [() => m100.FileLike, "ActiveSupport::XmlMini::FileLike"],
+  [() => m101.FileLike, "ActiveSupport::XmlMini::FileLike"],
   [() => m20, "DateAndTime::Calculations"],
   [() => m21.SoleItemExpectedError, "Enumerable::SoleItemExpectedError"],
   [() => m26.Util, "TSE::Util"],

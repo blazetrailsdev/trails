@@ -163,7 +163,9 @@ export class Test {
       await block();
     } catch (e) {
       if (Test.PASSTHROUGH_EXCEPTIONS.some((klass) => e instanceof klass)) throw e;
-      if (e instanceof Assertion) {
+      if ((e as { code?: unknown } | null)?.code === "VITEST_PENDING") {
+        this.failures.push(new Skip((e as Error).message));
+      } else if (e instanceof Assertion) {
         this.failures.push(e);
       } else {
         this.failures.push(new UnexpectedError(e as Error));
