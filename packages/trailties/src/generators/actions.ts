@@ -4,7 +4,6 @@ import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/repo
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
 import { createFile } from "@blazetrails/thor/actions/create-file";
 import { gsubFile } from "@blazetrails/thor/actions/file-manipulation";
-import { invoke } from "../command.js";
 
 export interface ActionsHost {
   options: { quiet?: boolean };
@@ -178,6 +177,7 @@ export async function railsCommand(
     log.call(this, "rails", command);
     let args: string[];
     [command, ...args] = Shellwords.shellwords(command);
+    const { invoke } = await import("../command.js");
     return await this.inRoot(() => silenceWarnings(() => invoke(command, args, { ...options })));
   } else {
     return await executeCommand.call(this, "rails", command, options);
