@@ -278,7 +278,7 @@ Trails.application.configure(function () {
   // Set host to be used by links generated in mailer templates.
   this.config.actionMailer.defaultUrlOptions = { host: "example.com" };
 
-  // Specify outgoing SMTP server. Remember to add smtp/* credentials via trails credentials edit.
+  // Specify outgoing SMTP server. Remember to add smtp/* credentials via trails credentials:edit.
   // this.config.actionMailer.smtpSettings = {
   //   userName: Trails.application.credentials.dig("smtp", "user_name"),
   //   password: Trails.application.credentials.dig("smtp", "password"),

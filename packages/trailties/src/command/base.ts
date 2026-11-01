@@ -19,8 +19,18 @@ export class Base extends Thor {
 
   declare static bin: string;
 
+  /** @internal */
+  private _currentSubcommand: string | null | undefined;
+
   static {
     classAttribute.call(this, "bin", { instanceAccessor: false, default: "bin/rails" });
+    const klass = this as unknown as ThorClass;
+    klass.noCommands(() => {
+      klass.methodAdded("executable");
+      klass.methodAdded("invokeCommand");
+    });
+    this.methodAdded("executable");
+    this.methodAdded("invokeCommand");
   }
 
   static isExitOnFailure(): boolean {
@@ -105,6 +115,27 @@ export class Base extends Thor {
       if (!Object.hasOwn(this, "_desc") || klass._desc == null) klass._desc = "";
 
       return (Thor as unknown as ThorClass).createCommand.call(klass, meth);
+    }
+  }
+
+  executable(commandName?: string): string {
+    return (this.constructor as typeof Base).executable(commandName);
+  }
+
+  get currentSubcommand(): string | null | undefined {
+    return this._currentSubcommand;
+  }
+
+  async invokeCommand(command: ThorCommand, ...args: unknown[]): Promise<unknown> {
+    this._currentSubcommand ??= null;
+    const originalSubcommand = this._currentSubcommand;
+    this._currentSubcommand = command.name;
+    try {
+      return await (
+        Thor.prototype as unknown as { invokeCommand: Base["invokeCommand"] }
+      ).invokeCommand.call(this, command, ...args);
+    } finally {
+      this._currentSubcommand = originalSubcommand;
     }
   }
 

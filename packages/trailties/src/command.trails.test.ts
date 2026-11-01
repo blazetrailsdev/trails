@@ -1,3 +1,4 @@
+import type { Base } from "./command/base.js";
 import { Command as Program } from "commander";
 import { describe, it, expect, onTestFinished, vi } from "vitest";
 import { createProgram } from "./cli.js";
@@ -25,7 +26,9 @@ describe("Rails::Command.find_by_namespace", () => {
     const { DevCommand } = await import("./commands/dev.js");
     expect(await findByNamespace("dev", "cache")).toBe(DevCommand);
     expect(programName(await findByNamespace("db", "migrate"))).toBe("db");
-    expect(programName(await findByNamespace("credentials", "edit"))).toBe("credentials");
+    expect(((await findByNamespace("credentials", "edit")) as typeof Base).namespace()).toBe(
+      "credentials",
+    );
   }, 30_000);
 
   it("hides unused_routes from the program, as printing_commands subtracts hidden_commands", async () => {

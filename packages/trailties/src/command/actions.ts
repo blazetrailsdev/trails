@@ -18,6 +18,13 @@ export async function bootApplicationBang(this: {
   if (APP_PATH != null) await Trails.application!.requireEnvironmentBang();
 }
 
+export async function loadEnvironmentConfigBang(this: {
+  requireApplicationBang(): Promise<void>;
+}): Promise<void> {
+  await this.requireApplicationBang();
+  if (APP_PATH != null) await Trails.application!.initialize("_");
+}
+
 /** @missingRailsCall find — CONVERGEABLE generators-configure-bang-api-only-no-color-fallbacks-templates */
 async function loadGenerators(): Promise<void> {
   await Trails.application!.loadGenerators();
@@ -26,5 +33,6 @@ async function loadGenerators(): Promise<void> {
 export const Actions = defineModule({
   requireApplicationBang,
   bootApplicationBang,
+  loadEnvironmentConfigBang,
   loadGenerators,
 });
