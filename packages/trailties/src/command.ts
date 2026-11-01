@@ -39,13 +39,6 @@ export function hiddenCommands(): (typeof Base)[] {
   return (_hiddenCommands ??= []);
 }
 
-export async function printingCommands(): Promise<[string, string | null][]> {
-  await lookupBang();
-  return subclasses()
-    .filter((klass) => !hiddenCommands().includes(klass))
-    .flatMap((klass) => klass.printingCommands());
-}
-
 export function environment(): string {
   return presence(env.TRAILS_ENV) ?? presence(env.NODE_ENV) ?? "development";
 }
@@ -117,6 +110,13 @@ export async function findByNamespace(
   const namespaces = new Map(createProgram().commands.map((c) => [c.name(), c]));
   const found = lookups.find((lookup) => namespaces.has(lookup));
   return found === undefined ? undefined : namespaces.get(found);
+}
+
+export async function printingCommands(): Promise<[string, string | null][]> {
+  await lookupBang();
+  return subclasses()
+    .filter((klass) => !hiddenCommands().includes(klass))
+    .flatMap((klass) => klass.printingCommands());
 }
 
 /** @internal */

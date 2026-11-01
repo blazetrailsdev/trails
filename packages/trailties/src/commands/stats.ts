@@ -1,4 +1,4 @@
-import { Dir, File, stdout } from "@blazetrails/ruby-compat";
+import { Dir, File, stdout, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { CodeStatistics, type DirectoryPair } from "../code-statistics.js";
 import { Base } from "../command/base.js";
@@ -25,3 +25,5 @@ export class StatsCommand extends Base {
     stdout.write(`${(await CodeStatistics.create(...statDirectories)).toString()}\n`);
   }
 }
+
+rbSetClassPathString(StatsCommand, { name: "Rails::Command" }, "StatsCommand");

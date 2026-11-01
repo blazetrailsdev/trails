@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport";
-import { File, getFs } from "@blazetrails/ruby-compat";
+import { Dir, File, getFs } from "@blazetrails/ruby-compat";
+import { buildTemplates } from "@blazetrails/trails-tsc";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "./base.js";
 import { printingCommands } from "../command.js";
+import { NotesCommand } from "../commands/notes.js";
 import { UnusedRoutesCommand } from "../commands/unused-routes.js";
 
 describe("Rails::Command::Base.perform", () => {
@@ -44,22 +46,18 @@ describe("Rails::Command::Base class surface", () => {
     expect(await NoUsageCommand.usagePath()).toBeNull();
   });
 
-  it("class_usage renders the precompiled USAGE with the class as its binding", async () => {
-    const dir = File.expandPath(`.usage-test-${Date.now()}`);
-    await getFs().mkdir!(dir, { recursive: true });
+  it("class_usage renders a multi-word command in kebab-case from its compiled USAGE", async () => {
+    const dir = Dir.mktmpdir();
     try {
       const usage = File.join(dir, "USAGE");
-      await getFs().writeFile!(usage, "<%= executable %> x\n");
-      await getFs().writeFile!(
-        `${usage}.js`,
-        "export default function () { return this.executable() + ' x'; }",
-      );
-      class RenderedCommand extends Base {
+      await getFs().writeFile!(usage, "<%= executable() %> x\n");
+      await buildTemplates([usage]);
+      class RenderedUsageCommand extends Base {
         static override async usagePath(): Promise<string | null> {
           return usage;
         }
       }
-      expect(await RenderedCommand.classUsage()).toBe("bin/rails rendered x");
+      expect(await RenderedUsageCommand.classUsage()).toBe("bin/rails rendered-usage x\n");
     } finally {
       await getFs().rm!(dir, { recursive: true, force: true });
     }
@@ -71,8 +69,7 @@ describe("Rails::Command::Base class surface", () => {
   });
 
   it("base_name is the first path segment, underscored", () => {
-    class BaseNameCommand extends Base {}
-    expect(BaseNameCommand.baseName()).toBe("base_name_command");
+    expect(NotesCommand.baseName()).toBe("rails");
   });
 
   it("Rails::Command.printing_commands skips hidden_commands", async () => {

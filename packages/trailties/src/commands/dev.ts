@@ -1,3 +1,4 @@
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { DevCaching } from "../dev-caching.js";
@@ -13,3 +14,5 @@ export class DevCommand extends Base {
     DevCaching.enableByFile();
   }
 }
+
+rbSetClassPathString(DevCommand, { name: "Rails::Command" }, "DevCommand");

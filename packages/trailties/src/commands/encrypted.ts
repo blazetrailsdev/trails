@@ -2,7 +2,7 @@ import { presence } from "@blazetrails/activesupport";
 import { InvalidContentError, type EncryptedConfiguration } from "@blazetrails/activesupport";
 import { MissingKeyError } from "@blazetrails/activesupport/encrypted-file";
 import { InvalidMessage } from "@blazetrails/activesupport/message-encryptor";
-import { include, type Included } from "@blazetrails/ruby-compat";
+import { include, type Included, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { Base } from "../command/base.js";
@@ -150,3 +150,5 @@ export class EncryptedCommand extends Base {
     }
   }
 }
+
+rbSetClassPathString(EncryptedCommand, { name: "Rails::Command" }, "EncryptedCommand");

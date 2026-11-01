@@ -1,4 +1,4 @@
-import { Dir } from "@blazetrails/ruby-compat";
+import { Dir, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { Generators } from "../generators.js";
@@ -31,3 +31,5 @@ export class DestroyCommand extends Base {
     });
   }
 }
+
+rbSetClassPathString(DestroyCommand, { name: "Rails::Command" }, "DestroyCommand");

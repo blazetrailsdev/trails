@@ -6,6 +6,7 @@ import {
   include,
   rbArgv,
   type Included,
+  rbSetClassPathString,
 } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
@@ -163,3 +164,5 @@ export class ConsoleCommand extends Base {
     await railsConsole.start();
   }
 }
+
+rbSetClassPathString(ConsoleCommand, { name: "Rails::Command" }, "ConsoleCommand");

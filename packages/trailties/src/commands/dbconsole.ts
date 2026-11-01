@@ -14,6 +14,7 @@ import {
   include,
   rbInspect,
   type Included,
+  rbSetClassPathString,
 } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
@@ -197,3 +198,5 @@ export function dbconsoleCommand(): Command {
 
   return cmd;
 }
+
+rbSetClassPathString(DbconsoleCommand, { name: "Rails::Command" }, "DbconsoleCommand");

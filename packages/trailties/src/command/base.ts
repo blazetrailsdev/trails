@@ -1,7 +1,6 @@
 import { classAttribute, underscore } from "@blazetrails/activesupport";
 import {
   File,
-  getFs,
   kebabCase,
   include,
   rbFBinding,
@@ -162,11 +161,12 @@ export class Base extends Thor {
     return this._commandName!;
   }
 
+  /** @inventedArm filename — PERMANENT */
   static async classUsage(): Promise<string | null> {
     const usagePath = await this.usagePath();
     if (usagePath != null) {
       if (!Object.hasOwn(this, "_classUsage") || this._classUsage == null) {
-        const erb = new TSE(await getFs().readFile(usagePath, "utf-8"), { trimMode: "-" });
+        const erb = new TSE(await File.readAsync(usagePath), { trimMode: "-" });
         erb.filename = usagePath;
         this._classUsage = await erb.result(rbFBinding(this));
       }
@@ -236,15 +236,14 @@ export class Base extends Thor {
 
   /** @internal */
   private static async resolvePath(path: string): Promise<string | null> {
+    const namespace = this.namespace();
     path = File.join(
       "../commands",
-      ...this.namespace()
-        .replace(/^rails:/, "")
-        .split(":"),
+      ...(namespace.startsWith("rails:") ? namespace.slice("rails:".length) : namespace).split(":"),
       path,
     );
     path = File.expandPath(path, __dir__);
-    return (await getFs().exists(path)) ? path : null;
+    return (await File.isExistAsync(path)) ? path : null;
   }
 }
 
