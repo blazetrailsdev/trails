@@ -3,7 +3,7 @@ import { Interrupt, type StringIO } from "@blazetrails/ruby-compat";
 import { ENGINE_ROOT } from "../app-path.js";
 import { Trails } from "../rails.js";
 
-type Io = Pick<StringIO, "print" | "puts"> & { isTty?(): boolean };
+type Io = Pick<StringIO, "print" | "puts" | "write"> & { isTty?(): boolean };
 
 interface Result {
   name: string;
