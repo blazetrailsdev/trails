@@ -372,15 +372,11 @@ export class Application extends Engine {
     return gen;
   }
 
-  /** @missingRailsArgs new — PERMANENT */
   messageVerifiers(): MessageVerifiers {
-    if (this._messageVerifiers) return this._messageVerifiers;
-    const secretGenerator = Object.assign(
+    return (this._messageVerifiers ??= new MessageVerifiers(
       (salt: string, { secretKeyBase = this.secretKeyBase() }: { secretKeyBase?: string } = {}) =>
         this.keyGenerator(secretKeyBase).generateKey(salt),
-      { parameters: ["secretKeyBase"] },
-    );
-    return (this._messageVerifiers = new MessageVerifiers(secretGenerator).rotateDefaults());
+    ).rotateDefaults());
   }
 
   messageVerifier(verifierName: string): MessageVerifier {
