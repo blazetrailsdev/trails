@@ -1,6 +1,6 @@
 import { autoloadGet } from "./core-ext/kernel.js";
 import { File, LOADED_FEATURES, TopLevel } from "@blazetrails/ruby-compat";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Cref } from "./cref.js";
 import { Error as ZeitwerkError, NameError } from "./error.js";
 import { Loader } from "./loader.js";
@@ -100,7 +100,13 @@ describe("Zeitwerk::Loader::Callbacks and EagerLoad", () => {
   it("a concurrent read of a built .js file loads it once", async () => {
     await withSetup(loader, [["x.js", "export const X = 1"]], {}, async () => {
       const cref = new Cref(Object, "X");
-      await Promise.all([autoloadGet(cref), autoloadGet(cref)]);
+      const first = autoloadGet(cref);
+      const isRuby = vi.spyOn(loader, "isRuby").mockImplementationOnce(async () => {
+        await first;
+        return true;
+      });
+      await Promise.all([first, autoloadGet(cref)]);
+      isRuby.mockRestore();
       expect(LOADED_FEATURES.filter((f) => f === File.expandPath("x.js")).length).toEqual(1);
     });
   });
