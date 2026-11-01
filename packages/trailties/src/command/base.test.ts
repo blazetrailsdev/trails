@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "./base.js";
 import { CredentialsCommand } from "../commands/credentials.js";
@@ -21,6 +22,15 @@ describe("Rails::Command::BaseTest", () => {
       "credentials:show",
       "credentials:diff",
     ]);
+    class ChangeCommand extends Base {
+      perform(): void {}
+
+      static {
+        rbSetClassPathString(this, { name: "Rails::Command::Db::System" }, "ChangeCommand");
+        (this as unknown as ThorClass).methodAdded("perform");
+      }
+    }
+    expect(ChangeCommand.printingCommands().map(([name]) => name)).toEqual(["db:system:change"]);
   });
 
   it("printing commands hides hidden commands", () => {
