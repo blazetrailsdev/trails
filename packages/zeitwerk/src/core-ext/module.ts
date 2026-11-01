@@ -3,7 +3,6 @@ import { Cref } from "../cref.js";
 import { Error as ZeitwerkError } from "../error.js";
 import { Registry } from "../registry.js";
 
-/** @noRailsEquivalent PERMANENT */
 export function _isModule(x: unknown): x is object {
   if (typeof x === "function") {
     return Object.getOwnPropertyDescriptor(x, "prototype")?.writable === false;
