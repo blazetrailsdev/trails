@@ -5,7 +5,9 @@ import * as nodePath from "node:path";
 import * as os from "node:os";
 import { Generators } from "./generators.js";
 import { DATABASES } from "./generators/database.js";
-import { createProgram } from "./cli.js";
+import { invoke } from "./command.js";
+import { Application } from "./application.js";
+import { Trails } from "./rails.js";
 import { AuthenticationGenerator } from "./generators/rails/authentication/authentication-generator.js";
 import { GeneratorGenerator } from "./generators/rails/generator/generator-generator.js";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
@@ -35,6 +37,9 @@ async function generatorDirectories(): Promise<string[]> {
   await walk(root, []);
   return out;
 }
+
+class GeneratorsCommandTestApp extends Application {}
+Trails.application = GeneratorsCommandTestApp.instance();
 
 describe("GeneratorsTest", () => {
   it("lookup finds a generator for every generator directory", async () => {
@@ -93,10 +98,8 @@ describe("GeneratorsTest", () => {
       return Promise.resolve([]);
     });
     try {
-      await createProgram().parseAsync(["generate", "authentication", "--api"], { from: "user" });
-      await createProgram().parseAsync(["generate", "generator", "foo", "--no-namespace"], {
-        from: "user",
-      });
+      await invoke("generate", ["authentication", "--api"]);
+      await invoke("generate", ["generator", "foo", "--no-namespace"]);
     } finally {
       auth.mockRestore();
       gen.mockRestore();

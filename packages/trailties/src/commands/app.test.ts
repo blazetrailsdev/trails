@@ -3,6 +3,11 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { appTemplateCommand } from "./app.js";
+import { Application } from "../application.js";
+import { Trails } from "../rails.js";
+
+class AppCommandTestApp extends Application {}
+Trails.application = AppCommandTestApp.instance();
 
 describe("AppCommandTest", () => {
   it("app:template drains pendingGenerators from a template that calls generate", async () => {

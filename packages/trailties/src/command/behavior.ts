@@ -6,16 +6,16 @@ import type { Base } from "./base.js";
 
 type CommandFactory = () => Program;
 
-const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory>>> = {
+const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory | null>>> = {
   new: async () => (await import("../commands/new.js")).newCommand,
-  generate: async () => (await import("../commands/generate.js")).generateCommand,
+  generate: async () => (await import("../commands/generate.js"), null),
   server: async () => (await import("../commands/server.js")).serverCommand,
   db: async () => (await import("../commands/db.js")).dbCommand,
   routes: async () => (await import("../commands/routes.js")).routesCommand,
   "unused-routes": async () => (await import("../commands/unused-routes.js")).unusedRoutesCommand,
   console: async () => (await import("../commands/console.js")).consoleCommand,
   dbconsole: async () => (await import("../commands/dbconsole.js")).dbconsoleCommand,
-  destroy: async () => (await import("../commands/destroy.js")).destroyCommand,
+  destroy: async () => (await import("../commands/destroy.js"), null),
   app: async () => (await import("../commands/app.js")).appTemplateCommand,
   notes: async () => (await import("../commands/notes.js")).notesCommand,
   stats: async () => (await import("../commands/stats.js")).statsCommand,
@@ -54,7 +54,7 @@ export async function lookup(namespaces: string[]): Promise<void> {
     try {
       if (!Object.hasOwn(LOAD_PATH, path)) throw new LoadError(`cannot load such file -- ${path}`);
       const factory = await LOAD_PATH[path]();
-      if (!commanderFactories().includes(factory)) commanderFactories().push(factory);
+      if (factory && !commanderFactories().includes(factory)) commanderFactories().push(factory);
       return;
     } catch (e) {
       if (e instanceof LoadError) {
@@ -77,7 +77,7 @@ export async function lookupBang(): Promise<void> {
   for (const load of Object.values(LOAD_PATH)) {
     try {
       const factory = await load();
-      if (!commanderFactories().includes(factory)) commanderFactories().push(factory);
+      if (factory && !commanderFactories().includes(factory)) commanderFactories().push(factory);
     } catch {
       continue;
     }
