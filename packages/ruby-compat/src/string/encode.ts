@@ -147,8 +147,10 @@ export function encode(
             );
           }
           if (
-            typeof rep === "string" &&
-            !Array.from(rep).every((r) => table.has(r.codePointAt(0)!) || r.codePointAt(0)! < 0x80)
+            !Array.from(rep).every((r) => {
+              const code = r.codePointAt(0)!;
+              return table.has(code) || (code < 0x80 && ![0x0e, 0x0f, 0x1b].includes(code));
+            })
           ) {
             throw new ArgumentError("too big fallback string");
           }

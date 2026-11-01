@@ -108,6 +108,9 @@ describe("encode to ISO-2022-JP", () => {
     expect(() => encode("é", "ISO-2022-JP", { fallback: (c) => c })).toThrow(
       "too big fallback string",
     );
+    expect(() => encode("é", "ISO-2022-JP", { fallback: () => "\x1b" })).toThrow(
+      "too big fallback string",
+    );
   });
 
   it("refuses a replacement the destination cannot hold", () => {

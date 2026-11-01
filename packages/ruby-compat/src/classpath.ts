@@ -66,7 +66,10 @@ export function generatedClassPath(klass: object): string | undefined {
   }
   const path = generatedClassPaths.get(klass);
   if (path !== undefined || pendingClassPaths.length === 0) return path;
-  for (const entry of pendingClassPaths.filter((entry) => isPendingFor(entry, klass))) {
+  const { name } = klass as { name?: unknown };
+  for (const entry of pendingClassPaths.filter(
+    ([, path]) => name === path.slice(path.lastIndexOf(":") + 1),
+  )) {
     let value: unknown;
     try {
       value = entry[0]();
@@ -85,11 +88,6 @@ export function generatedClassPath(klass: object): string | undefined {
   return generatedClassPaths.get(klass);
 }
 
-function isPendingFor(entry: [() => unknown, string], klass: object): boolean {
-  const { name } = klass as { name?: unknown };
-  return name === entry[1].slice(entry[1].lastIndexOf(":") + 1);
-}
-
 /**
  * Whether `rb_mod_name` (`vendor/ruby/v3.3.11/variable.c:122`) may yet miss
  * `klass`, a class whose generated path has not resolved.
@@ -97,7 +95,8 @@ function isPendingFor(entry: [() => unknown, string], klass: object): boolean {
  * @noRailsEquivalent PERMANENT
  */
 export function isClassPathPending(klass: object): boolean {
-  return pendingClassPaths.some((entry) => isPendingFor(entry, klass));
+  const { name } = klass as { name?: unknown };
+  return pendingClassPaths.some(([, path]) => name === path.slice(path.lastIndexOf(":") + 1));
 }
 
 /**

@@ -62,6 +62,7 @@ describe("SMTP (trails)", () => {
     expect(Array.isArray(connection._responseActions)).toBe(true);
     expect(connection._destroyed).toBe(false);
     expect("_socket" in connection).toBe(true);
+    expect(String(connection._remainingSetupTime)).toContain("_connectionDeadline");
   });
 
   it("raises ReadTimeout when the greeting never comes", async () => {
