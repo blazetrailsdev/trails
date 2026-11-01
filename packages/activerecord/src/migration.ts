@@ -1481,7 +1481,6 @@ export class MigrationContext<
   readonly migrationsPaths: string | string[];
   readonly schemaMigration: S;
   readonly internalMetadata: I;
-  /** Set by ConnectionPool#migrationContext: migrate here rather than on Base. */
   pool?: ConnectionPool;
 
   constructor(migrationsPaths: string | string[], ...seated: SeatedCollaborators<S, I>) {
@@ -1520,8 +1519,9 @@ export class MigrationContext<
       this.schemaMigration,
       this.internalMetadata,
       targetVersion,
-      this.pool,
-    ).migrate();
+    )
+      .seatedOn(this.pool)
+      .migrate();
   }
 
   async down(
@@ -1536,8 +1536,9 @@ export class MigrationContext<
       this.schemaMigration,
       this.internalMetadata,
       targetVersion,
-      this.pool,
-    ).migrate();
+    )
+      .seatedOn(this.pool)
+      .migrate();
   }
 
   async rollback(this: MigrationContext, steps: number = 1): Promise<MigrationProxy[]> {
@@ -1559,8 +1560,9 @@ export class MigrationContext<
       this.schemaMigration,
       this.internalMetadata,
       targetVersion,
-      this.pool,
-    ).run();
+    )
+      .seatedOn(this.pool)
+      .run();
   }
 
   open(this: MigrationContext): Migrator {
@@ -1569,9 +1571,7 @@ export class MigrationContext<
       this.migrations,
       this.schemaMigration,
       this.internalMetadata,
-      undefined,
-      this.pool,
-    );
+    ).seatedOn(this.pool);
   }
 
   async migrationsStatus(this: MigrationContext): Promise<Array<[string, string, string]>> {
@@ -1708,9 +1708,7 @@ export class MigrationContext<
       this.migrations,
       this.schemaMigration,
       this.internalMetadata,
-      undefined,
-      this.pool,
-    );
+    ).seatedOn(this.pool);
     if ((await this.currentVersion()) !== 0 && !(await migrator.currentMigration())) {
       throw new UnknownMigrationVersionError((await this.currentVersion())!);
     }
@@ -1730,6 +1728,7 @@ export class Migrator {
   static migrationsPaths: string[] = ["db/migrate"];
 
   private _migrations: MigrationProxy[];
+  private _pool?: ConnectionPool;
   private _schemaMigration: SchemaMigration;
   private _internalMetadata: InternalMetadata;
   private readonly _direction: "up" | "down";
@@ -1742,7 +1741,6 @@ export class Migrator {
     schemaMigration: SchemaMigration,
     internalMetadata: InternalMetadata,
     targetVersion?: number | string | null,
-    private readonly _pool?: ConnectionPool,
   ) {
     this._direction = direction;
     this._targetVersion = targetVersion == null ? null : toInteger(String(targetVersion));
@@ -1832,6 +1830,12 @@ export class Migrator {
       "environment",
       (await this.connection).pool.dbConfig.envName as string,
     );
+  }
+
+  /** @internal */
+  seatedOn(pool?: ConnectionPool): this {
+    this._pool = pool;
+    return this;
   }
 
   /** @internal */
