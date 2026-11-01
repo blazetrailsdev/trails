@@ -178,6 +178,14 @@ export class PluginBuilder {
       force: true,
     });
 
+    await this.insertIntoFile(
+      File.join(this.dummyPath(), "config/application.ts"),
+      'import "./boot.js";\n',
+      {
+        before: /^/,
+      },
+    );
+
     if (this.isMountable()) {
       await this.template("rails/routes.ts", File.join(this.dummyPath(), "config/routes.ts"), {
         force: true,

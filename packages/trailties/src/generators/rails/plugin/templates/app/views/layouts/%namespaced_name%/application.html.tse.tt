@@ -5,13 +5,13 @@
   <%%= csrfMetaTags() %>
   <%%= cspMetaTag() %>
 
-  <%%= yieldContent("head") %>
+  <%%= yield("head") %>
 
   <%= "<" + `%= stylesheetLinkTag("${this.namespacedName()}/application", { media: "all" }) %` + ">" %>
 </head>
 <body>
 
-<%%= yieldContent() %>
+<%%= yield %>
 
 </body>
 </html>

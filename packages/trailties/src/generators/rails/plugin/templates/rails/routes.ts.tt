@@ -1,5 +1,5 @@
 import { Trails } from "@blazetrails/trailties";
-import { <%= this.camelizedModules().split("::")[0] %> } from "../../../../lib/<%= this.namespacedName() %>/engine.js";
+import { <%= this.camelizedModules().split("::")[0] %> } from "../../../lib/<%= this.namespacedName() %>/engine.js";
 
 Trails.application.routes().draw(function () {
   this.mount(<%= this.camelizedModules().replaceAll("::", ".") %>.Engine, { at: "/<%= this.name() %>" });

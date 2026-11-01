@@ -9,10 +9,18 @@
   "license": "MIT",
 <% } -%>
   "files": ["app", "config", "db", "lib", "MIT-LICENSE", "Rakefile.ts", "README.md"],
-  "<%= this.railsPrerelease() ? "devDependencies" : "dependencies" %>": {
+  "dependencies": {
 <% const packages = ["activerecord", "activesupport", "actionpack", "activejob", "ruby-compat", "trailties"]; -%>
 <% packages.forEach((pkg, i) => { -%>
     "@blazetrails/<%= pkg %>": <%= JSON.stringify([this.railsVersionSpecifier()].flat().join(" ")) %><%= i < packages.length - 1 ? "," : "" %>
 <% }); -%>
+  },
+  "devDependencies": {
+<% if (!this.skipEslint()) { -%>
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.3",
+    "typescript-eslint": "^8.57.0",
+<% } -%>
+    "vitest": "^3.0.0"
   }
 }

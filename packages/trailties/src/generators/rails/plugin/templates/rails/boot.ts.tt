@@ -1,1 +1,1 @@
-import "../../../../lib/<%= this.namespacedName() %>.js";
+import "../../../lib/<%= this.namespacedName() %>.js";
