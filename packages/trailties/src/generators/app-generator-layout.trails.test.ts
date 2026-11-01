@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Base, Template, TseHandler } from "@blazetrails/actionview";
-import { AppGenerator } from "./app-generator.js";
+import { AppGenerator } from "./rails/app/app-generator.js";
 
 let tmpDir: string | undefined;
 

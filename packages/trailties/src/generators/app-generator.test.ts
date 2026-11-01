@@ -5,7 +5,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { assertNoMatch } from "@blazetrails/activesupport";
 import { execFile } from "node:child_process";
-import { AppGenerator, type AppDatabase } from "./app-generator.js";
+import { AppGenerator, type AppDatabase } from "./rails/app/app-generator.js";
 import * as Assertions from "./testing/assertions.js";
 
 let tmpDir: string;
