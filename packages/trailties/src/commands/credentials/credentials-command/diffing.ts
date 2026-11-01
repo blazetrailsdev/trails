@@ -1,3 +1,4 @@
+import { root } from "../../../command.js";
 import { Dir, File, Pathname, defineModule, rbFSystem } from "@blazetrails/ruby-compat";
 
 export const GITATTRIBUTES_ENTRY = `config/credentials/*.yml.enc diff=rails_credentials
@@ -31,7 +32,7 @@ export const Diffing = defineModule(
       }
     },
 
-    /** @missingRailsCall delete — PERMANENT */
+    /** @missingRailsCall delete — CONVERGEABLE pathname-answers-read-write-delete */
     async disenrollProjectFromCredentialsDiffing(this: DiffingHost): Promise<void> {
       if (await this.isEnrolledInCredentialsDiffing()) {
         const path = this.gitattributes().toString();
@@ -62,7 +63,7 @@ export const Diffing = defineModule(
     },
 
     async isDiffingDriverConfigured(): Promise<boolean | null> {
-      return rbFSystem("git config --get diff.rails_credentials.textconv", { out: "/dev/null" });
+      return rbFSystem("git config --get diff.rails_credentials.textconv", { out: File.NULL });
     },
 
     async configureDiffingDriver(this: DiffingHost): Promise<void> {
@@ -71,7 +72,7 @@ export const Diffing = defineModule(
     },
 
     gitattributes(this: DiffingHost): Pathname {
-      return (this._gitattributes ??= new Pathname(Dir.pwd()).join(".gitattributes"));
+      return (this._gitattributes ??= (root() ?? new Pathname(Dir.pwd())).join(".gitattributes"));
     },
   },
 );

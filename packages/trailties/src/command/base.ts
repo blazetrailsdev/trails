@@ -29,8 +29,6 @@ export class Base extends Thor {
       this.methodAdded("executable");
       this.methodAdded("invokeCommand");
     });
-    this.methodAdded("executable");
-    this.methodAdded("invokeCommand");
   }
 
   static isExitOnFailure(): boolean {
@@ -131,9 +129,7 @@ export class Base extends Thor {
     const originalSubcommand = this._currentSubcommand;
     this._currentSubcommand = command.name;
     try {
-      return await (
-        Thor.prototype as unknown as { invokeCommand: Base["invokeCommand"] }
-      ).invokeCommand.call(this, command, ...args);
+      return await super.invokeCommand(command, ...args);
     } finally {
       this._currentSubcommand = originalSubcommand;
     }

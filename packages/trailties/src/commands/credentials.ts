@@ -136,7 +136,10 @@ export class CredentialsCommand extends Base {
     return Trails.application!.config.credentials;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm credentialsDefaults — CONVERGEABLE credentials-config-is-inheritable-options
+   */
   private async contentPath(): Promise<string> {
     return (this._contentPath ??= this.relativePath(
       this.config().contentPath ??
@@ -144,7 +147,10 @@ export class CredentialsCommand extends Base {
     ));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm credentialsDefaults — CONVERGEABLE credentials-config-is-inheritable-options
+   */
   private async keyPath(): Promise<string> {
     return (this._keyPath ??= this.relativePath(
       this.config().keyPath ?? (await Trails.application!.config.credentialsDefaults()).keyPath,

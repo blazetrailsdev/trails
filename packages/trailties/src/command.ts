@@ -1,5 +1,6 @@
 import { presence } from "@blazetrails/activesupport";
-import { env } from "@blazetrails/ruby-compat";
+import { File, Pathname, env } from "@blazetrails/ruby-compat";
+import { APP_PATH } from "./app-path.js";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";
@@ -17,6 +18,17 @@ export function hiddenCommands(): (typeof Base)[] {
 
 export function environment(): string {
   return presence(env.TRAILS_ENV) ?? presence(env.NODE_ENV) ?? "development";
+}
+
+export function root(): Pathname | undefined {
+  return applicationRoot();
+}
+
+/** @inventedArm replace — PERMANENT */
+export function applicationRoot(): Pathname | undefined {
+  if (APP_PATH != null)
+    return new Pathname(File.expandPath("../..", APP_PATH).replace(/\/dist$/, ""));
+  return undefined;
 }
 
 /**

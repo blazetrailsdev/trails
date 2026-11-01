@@ -1,4 +1,11 @@
-import { Interrupt, Shellwords, defineModule, env, rbFSystem } from "@blazetrails/ruby-compat";
+import {
+  Interrupt,
+  Shellwords,
+  defineModule,
+  env,
+  onSignal,
+  rbFSystem,
+} from "@blazetrails/ruby-compat";
 
 interface EditorHost {
   currentSubcommand: string | null | undefined;
@@ -30,7 +37,17 @@ export const Editor = defineModule(
     },
 
     async systemEditor(this: EditorHost, filePath: string): Promise<boolean | null> {
-      return rbFSystem(...Shellwords.shellwords(this.editor()!), String(filePath));
+      let interrupted = false;
+      const untrap = onSignal("SIGINT", () => {
+        interrupted = true;
+      });
+      try {
+        const result = await rbFSystem(...Shellwords.shellwords(this.editor()!), String(filePath));
+        if (interrupted) throw new Interrupt();
+        return result;
+      } finally {
+        untrap();
+      }
     },
 
     async usingSystemEditor(this: EditorHost, block: () => Promise<void>): Promise<void> {
