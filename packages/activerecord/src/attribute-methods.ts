@@ -253,6 +253,8 @@ export function dangerousAttributeMethods(): Set<string> {
     "changedAttributes",
     "previousChanges",
     "changesToSave",
+    "savedChanges",
+    "changesApplied",
     "isFrozen",
     "inspect",
     "toJSON",

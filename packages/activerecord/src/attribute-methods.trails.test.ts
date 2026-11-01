@@ -285,13 +285,15 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(NonExistentTable.attributeNames()).toEqual([]);
   });
 
-  it("defining attribute methods raises DangerousAttributeError for the Dirty family", () => {
+  it("defining attribute methods raises DangerousAttributeError for Dirty methods", () => {
     for (const name of [
       "changes",
       "changed",
       "changedAttributes",
       "previousChanges",
       "changesToSave",
+      "savedChanges",
+      "changesApplied",
     ]) {
       class Report extends Base {
         static {
