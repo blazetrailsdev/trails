@@ -31,7 +31,7 @@ describe("Rails::Command.find_by_namespace", () => {
     expect(await findByNamespace("dev", "cache")).toBe(DevCommand);
     expect(programName(await findByNamespace("db", "migrate"))).toBe("db");
     expect(((await findByNamespace("credentials", "edit")) as typeof Base).namespace()).toBe(
-      "credentials",
+      "rails:credentials",
     );
   }, 30_000);
 
