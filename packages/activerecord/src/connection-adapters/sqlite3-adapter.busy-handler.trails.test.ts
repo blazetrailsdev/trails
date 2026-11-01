@@ -108,6 +108,51 @@ describe("SQLite3Adapter busy handler", () => {
     await waiter.execute("ROLLBACK");
   });
 
+  it("raises a deadlock in a batch at once", async () => {
+    await waiter.execute("BEGIN DEFERRED");
+    vi.spyOn(waiter, "isTransactionOpen").mockReturnValue(true);
+    await waiter.execute("SELECT * FROM t");
+    await writer.execute("BEGIN IMMEDIATE");
+    const started = Date.now();
+
+    await expect(
+      waiter.performQuery(waiter._rawConnection!, "INSERT INTO t VALUES (2);", [], [], {
+        prepare: false,
+        batch: true,
+      }),
+    ).rejects.toThrow(/locked/);
+
+    expect(Date.now() - started).toBeLessThan(500);
+    await writer.execute("ROLLBACK");
+    await waiter.execute("ROLLBACK");
+  });
+
+  it("waits out a lock while it sets the configured pragmas", async () => {
+    const database = join(dir, "pragma.sqlite3");
+    const holder = new BetterSQLite3Adapter({ database, pragmas: { journal_mode: "delete" } });
+    await holder.execute("CREATE TABLE p (id INTEGER)");
+    await holder.execute("BEGIN EXCLUSIVE");
+    setTimeout(() => void holder.execute("COMMIT"), 20);
+
+    const late = new BetterSQLite3Adapter({ database, timeout: 1000 });
+    try {
+      await late.execute("SELECT 1");
+    } finally {
+      await late.disconnectBang();
+      await holder.dropTable("p");
+      await holder.disconnectBang();
+    }
+  });
+
+  it("does not read a PRAGMA in a transaction as a held lock", async () => {
+    await waiter.execute("BEGIN DEFERRED");
+    vi.spyOn(waiter, "isTransactionOpen").mockReturnValue(true);
+    await waiter.execute("PRAGMA table_info(t)");
+
+    expect(waiter._sharedLockHeld).toBe(false);
+    await waiter.execute("ROLLBACK");
+  });
+
   it("retries a retries config that many times, then raises", async () => {
     const retrying = new BetterSQLite3Adapter({
       database: join(dir, "busy.sqlite3"),

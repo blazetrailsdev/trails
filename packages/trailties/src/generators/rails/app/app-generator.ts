@@ -353,6 +353,7 @@ export class AppGenerator extends AppBase {
               "@blazetrails/actionview",
               "@blazetrails/trailties",
               ...(this.options.skipActiveJob ? [] : ["@blazetrails/activejob"]),
+              ...(this.skipSolid() ? [] : ["@blazetrails/solid-queue"]),
               ...(this.skipActionCable() ? [] : ["@blazetrails/actioncable"]),
             ]),
             ...dbDep,

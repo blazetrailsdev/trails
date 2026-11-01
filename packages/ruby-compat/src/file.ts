@@ -1,3 +1,4 @@
+import { getProcessAdapter } from "./process-adapter.js";
 import { ArgumentError } from "./argument-error.js";
 import { Encoding } from "./encoding.js";
 import { getFs, getPath } from "./fs-adapter.js";
@@ -777,6 +778,10 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.chmod`
    * (`vendor/ruby/v3.3.11/file.c:2575`).
    */
+  static umask(): number {
+    return getProcessAdapter().umask!();
+  }
+
   static chmod(mode: number, ...files: string[]): number {
     for (const file of files) getFs().chmodSync?.(file, mode);
     return files.length;

@@ -198,7 +198,7 @@ export async function performQuery(
     retryBusy(rawConnection, step, this._sharedLockHeld && this.isWriteQuery(sql));
   let result: Result;
   if (batch) {
-    await execBatch(rawConnection, sql);
+    await execBatch(rawConnection, sql, this._sharedLockHeld && this.isWriteQuery(sql));
     result = Result.empty();
   } else if (prepare) {
     const stmt = await retry(() => this._cachedStatement(rawConnection, sql));
@@ -233,7 +233,7 @@ export async function performQuery(
     }
   }
   this._sharedLockHeld =
-    result.columns.length > 0 && !this.isWriteQuery(sql) && this.isTransactionOpen();
+    /^\s*(?:SELECT|WITH)\b/i.test(sql) && !this.isWriteQuery(sql) && this.isTransactionOpen();
   this._lastAffectedRows = await rawConnection.changes();
   this.verifiedBang();
   if (notificationPayload) notificationPayload.row_count = result.length;

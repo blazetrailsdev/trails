@@ -16,7 +16,7 @@ export class InstallGenerator extends GeneratorBase {
     await this.template("config/recurring.yml");
     await this.template("db/queue_schema.ts");
     await this.template("bin/jobs");
-    await chmod.call(this as never, "bin/jobs", 0o755, { verbose: false });
+    await chmod.call(this as never, "bin/jobs", 0o755 & ~File.umask(), { verbose: false });
   }
 
   async configureAdapterAndDatabase(): Promise<void> {

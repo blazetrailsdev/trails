@@ -10,7 +10,7 @@ import {
 import type { SqliteConnection, SqliteDriver, SqliteStatement } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
 import { Pragmas } from "../sqlite/pragmas.js";
-import { setBusyHandlerTimeout } from "../sqlite/busy-wait.js";
+import { retryBusy, setBusyHandlerTimeout } from "../sqlite/busy-wait.js";
 import { BusyException } from "../sqlite/errors.js";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
@@ -1050,9 +1050,9 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /**
    * @internal
    * @missingRailsCall busy_handler — PERMANENT
+   * @inventedArm setBusyTimeout — PERMANENT
    */
   override async configureConnection(): Promise<void> {
-    await Pragmas.setBusyTimeout.call(this._rawConnection!, 0);
     if (rtest(this._config["timeout"]) && rtest(this._config["retries"])) {
       throw new ArgumentError("Cannot specify both timeout and retries arguments");
     } else if (rtest(this._config["timeout"])) {
@@ -1068,6 +1068,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       const retries = SQLite3Adapter.typeCastConfigToInteger(this._config["retries"]) as number;
       this._rawConnection!.busyHandler = (count) => count <= retries;
     }
+    await Pragmas.setBusyTimeout.call(this._rawConnection!, 0);
     await super.configureConnection();
 
     const pragmas = fetch<Record<string, string | number | boolean>>(this._config, "pragmas", {});
@@ -1077,9 +1078,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     })) {
       const setter = `set${camelize(pragma)}`;
       if (Object.hasOwn(Pragmas, setter)) {
-        await (Pragmas[setter as keyof typeof Pragmas] as (value: unknown) => unknown).call(
-          this._rawConnection!,
-          value,
+        await retryBusy(this._rawConnection!, () =>
+          (Pragmas[setter as keyof typeof Pragmas] as (value: unknown) => unknown).call(
+            this._rawConnection!,
+            value,
+          ),
         );
       } else {
         console.warn(`Unknown SQLite pragma: ${pragma}`);

@@ -88,11 +88,19 @@ function splitStatements(sql: string): string[] {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export async function execBatch(rawConnection: SqliteConnection, sql: string): Promise<void> {
+export async function execBatch(
+  rawConnection: SqliteConnection,
+  sql: string,
+  sharedLockHeld = false,
+): Promise<void> {
   for (const statement of splitStatements(sql)) {
-    const stmt = await retryBusy(rawConnection, () => rawConnection.prepare(statement));
+    const stmt = await retryBusy(
+      rawConnection,
+      () => rawConnection.prepare(statement),
+      sharedLockHeld,
+    );
     try {
-      await retryBusy(rawConnection, () => stmt.step());
+      await retryBusy(rawConnection, () => stmt.step(), sharedLockHeld);
     } finally {
       await stmt.close();
     }

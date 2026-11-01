@@ -37,6 +37,7 @@ describe("AppGenerator (trails-only)", () => {
     expect(fs.existsSync(path.join(tmpDir, "my-app/app/channels"))).toBe(false);
     const pkg = JSON.parse(fs.readFileSync(path.join(tmpDir, "my-app/package.json"), "utf-8"));
     expect(pkg.dependencies["@blazetrails/actioncable"]).toBeDefined();
+    expect(pkg.dependencies["@blazetrails/solid-queue"]).toBeDefined();
   });
 
   it("writes config/boot.ts and imports it first from config/application.ts", async () => {
