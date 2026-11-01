@@ -29,7 +29,6 @@ import {
   unpack,
   unpack1,
   sortByBang,
-  each,
 } from "./array.js";
 import { Range } from "./range.js";
 import type { Enumerator } from "./enumerator.js";
