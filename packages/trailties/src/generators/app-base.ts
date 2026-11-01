@@ -30,7 +30,6 @@ export type AppBaseOptions = GeneratorOptions & {
   name?: string;
   database?: DatabaseName;
   template?: string;
-  packageManager?: string;
   api?: boolean;
   devcontainer?: boolean;
   dev?: boolean;
@@ -551,7 +550,8 @@ ${requireStatements.join("\n")}`;
   protected async dockerfilePackageManagerVersion(): Promise<string | false | undefined> {
     try {
       const packageManager =
-        this.options.packageManager ?? getPackageManager(this.destinationRoot).name;
+        (this.options as { packageManager?: string }).packageManager ??
+        getPackageManager(this.destinationRoot).name;
       return (
         this.usingNode() &&
         (await rbFBackquote(`${packageManager} --version`)).match(/\d+\.\d+\.\d+/)?.[0]

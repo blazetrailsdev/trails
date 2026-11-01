@@ -103,7 +103,10 @@ describe("AppBase", () => {
 
 describe("AppBase dockerfilePackageManagerVersion", () => {
   it("reads the packageManager option", async () => {
-    const generator = build({ javascript: "esbuild", packageManager: "not-a-package-manager" });
+    const generator = build({
+      javascript: "esbuild",
+      packageManager: "not-a-package-manager",
+    } as Partial<AppBaseOptions>);
     const version = (
       generator as unknown as { dockerfilePackageManagerVersion(): Promise<unknown> }
     ).dockerfilePackageManagerVersion();

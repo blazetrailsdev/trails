@@ -88,13 +88,9 @@ export class TestParser {
           ]);
         }
       }
-      const chained =
-        ts.isCallExpression(node) ||
-        ts.isPropertyAccessExpression(node) ||
-        ts.isTaggedTemplateExpression(node);
       const inner = ts.isTaggedTemplateExpression(node)
         ? node.tag
-        : chained
+        : ts.isCallExpression(node) || ts.isPropertyAccessExpression(node)
           ? node.expression
           : undefined;
       node.forEachChild((child) => {
