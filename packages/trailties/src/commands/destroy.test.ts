@@ -1,10 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { createProgram } from "../cli.js";
-import { invoke as commandInvoke } from "../command.js";
-import { Generators } from "../generators.js";
 import { DestroyCommand } from "./destroy.js";
 import { lookupBang } from "../command/behavior.js";
 import { Application } from "../application.js";
@@ -31,10 +28,6 @@ afterEach(() => {
 });
 
 describe("DestroyCommand", () => {
-  it("is not registered on the program", () => {
-    expect(createProgram().commands.some((c) => c.name() === "destroy")).toBe(false);
-  });
-
   it("destroy migration anchors the filename match", async () => {
     const migrationsDir = path.join(tmpDir, "db", "migrate");
     fs.mkdirSync(migrationsDir, { recursive: true });
@@ -48,19 +41,5 @@ describe("DestroyCommand", () => {
 
     expect(fs.existsSync(target)).toBe(false);
     expect(fs.existsSync(decoy)).toBe(true);
-  });
-
-  it("resolves both spellings of a generator name", async () => {
-    const invoke = vi.spyOn(Generators, "invoke").mockResolvedValue();
-    onTestFinished(() => invoke.mockRestore());
-    await commandInvoke("destroy", ["scaffold_controller", "Post"]);
-    await commandInvoke("destroy", ["scaffold-controller", "Post"]);
-    expect(invoke.mock.calls.map((c) => c[0])).toEqual([
-      "scaffold_controller",
-      "scaffold-controller",
-    ]);
-    expect(await Generators.findByNamespace("scaffold_controller")).toBe(
-      await Generators.findByNamespace("scaffold-controller"),
-    );
   });
 });

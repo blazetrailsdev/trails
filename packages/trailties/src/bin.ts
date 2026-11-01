@@ -4,6 +4,7 @@ import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Dir, argv } from "@blazetrails/ruby-compat";
 import { APP_PATH, setAppPath } from "./app-path.js";
 import { invoke } from "./command.js";
+import { aliases } from "./commands.js";
 import "./class-paths.generated.js";
 
 if (APP_PATH == null) {
@@ -20,8 +21,6 @@ if (APP_PATH == null) {
     }
   }
 }
-
-const aliases: Record<string, string> = { g: "generate", d: "destroy" };
 
 const [, , command = "", ...args] = argv;
 await invoke(Object.hasOwn(aliases, command) ? aliases[command] : command, args);

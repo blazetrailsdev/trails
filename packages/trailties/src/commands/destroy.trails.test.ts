@@ -1,9 +1,11 @@
 import { capture } from "@blazetrails/activesupport";
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, onTestFinished, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { DestroyCommand } from "./destroy.js";
+import { createProgram } from "../cli.js";
+import { invoke as commandInvoke } from "../command.js";
 import { Generators } from "../generators.js";
 import { Application } from "../application.js";
 import { Trails } from "../rails.js";
@@ -89,5 +91,23 @@ describe("DestroyCommand", () => {
     expect(output).toMatch(/^ +remove +app\/models\/post\.ts$/m);
     expect(listFiles(tmpDir)).toEqual(generated);
     expect(fs.readFileSync(path.join(tmpDir, "config", "routes.ts"), "utf-8")).toBe(routes);
+  });
+
+  it("is not registered on the program", () => {
+    expect(createProgram().commands.some((c) => c.name() === "destroy")).toBe(false);
+  });
+
+  it("resolves both spellings of a generator name", async () => {
+    const invoke = vi.spyOn(Generators, "invoke").mockResolvedValue();
+    onTestFinished(() => invoke.mockRestore());
+    await commandInvoke("destroy", ["scaffold_controller", "Post"]);
+    await commandInvoke("destroy", ["scaffold-controller", "Post"]);
+    expect(invoke.mock.calls.map((c) => c[0])).toEqual([
+      "scaffold_controller",
+      "scaffold-controller",
+    ]);
+    expect(await Generators.findByNamespace("scaffold_controller")).toBe(
+      await Generators.findByNamespace("scaffold-controller"),
+    );
   });
 });
