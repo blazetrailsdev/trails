@@ -1,4 +1,5 @@
 import { strftime } from "@blazetrails/date";
+import { rbObjAsString } from "@blazetrails/ruby-compat";
 import { ReceivedElement } from "../elements/received-element.js";
 import { Utilities } from "../utilities.js";
 import { NamedStructuredField } from "./named-structured-field.js";
@@ -36,7 +37,7 @@ export class ReceivedField extends NamedStructuredField {
     if (Utilities.isBlank(this.value)) {
       return `${this.name}: \r\n`;
     } else {
-      return `${this.name}: ${this.info()}; ${this.formattedDate()}\r\n`;
+      return `${this.name}: ${rbObjAsString(this.info())}; ${rbObjAsString(this.formattedDate())}\r\n`;
     }
   }
 
@@ -45,7 +46,7 @@ export class ReceivedField extends NamedStructuredField {
     if (Utilities.isBlank(this.value)) {
       return "";
     } else {
-      return `${this.info()}; ${this.formattedDate()}`;
+      return `${rbObjAsString(this.info())}; ${rbObjAsString(this.formattedDate())}`;
     }
   }
 }

@@ -1,3 +1,4 @@
+import { rbObjAsString } from "@blazetrails/ruby-compat";
 import { ContentLocationElement } from "../elements/content-location-element.js";
 import { NamedStructuredField } from "./named-structured-field.js";
 
@@ -19,7 +20,7 @@ export class ContentLocationField extends NamedStructuredField {
   }
 
   override encoded(): string {
-    return `${this.name}: ${this.location()}\r\n`;
+    return `${this.name}: ${rbObjAsString(this.location())}\r\n`;
   }
 
   override decoded(): string | null {
