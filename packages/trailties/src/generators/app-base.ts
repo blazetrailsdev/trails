@@ -23,6 +23,7 @@ import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "./ba
 import { DATABASES, Database, type DatabaseName } from "./database.js";
 import { GeneratorError } from "./generated-attribute.js";
 import { AppName } from "./app-name.js";
+import { getPackageManager } from "../package-manager.js";
 
 export type AppBaseOptions = GeneratorOptions & {
   appPath: string;
@@ -546,19 +547,17 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
-  protected async dockerfilePnpmVersion(): Promise<string | false | undefined> {
+  protected async dockerfilePackageManagerVersion(): Promise<string | false | undefined> {
     try {
-      return this.usingNode() && (await rbFBackquote("pnpm --version")).match(/\d+\.\d+\.\d+/)?.[0];
+      return (
+        this.usingNode() &&
+        (await rbFBackquote(`${getPackageManager(this.destinationRoot).name} --version`)).match(
+          /\d+\.\d+\.\d+/,
+        )?.[0]
+      );
     } catch {
       return "latest";
     }
-  }
-
-  /** @internal */
-  protected async isPnpmThroughCorepack(): Promise<boolean> {
-    const version = await this.dockerfilePnpmVersion();
-    if (version === "latest") return true;
-    return new Gem.Version(version as string).compare("2")! >= 0;
   }
 
   /** @internal */

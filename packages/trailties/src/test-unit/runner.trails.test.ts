@@ -1,6 +1,15 @@
 import { Formatter } from "@blazetrails/did-you-mean";
-import { Dir, File, LoadError, StringIO, env, getFs, setEnv } from "@blazetrails/ruby-compat";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  Dir,
+  File,
+  LoadError,
+  STDOUT,
+  StringIO,
+  env,
+  getFs,
+  setEnv,
+} from "@blazetrails/ruby-compat";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TestUnitReporter } from "./reporter.js";
 import { CompositeFilter, Filter, InvalidTestError, Runner } from "./runner.js";
 
@@ -99,7 +108,7 @@ describe("Runner", () => {
   it("a name filter unions with a line filter", async () => {
     await app();
     const tests = await Runner.loadTests(["test/models/user.test.ts:3"]);
-    expect(await internals.testLocations(tests, /^b$/)).toEqual([
+    expect(await internals.testLocations(tests, / b$/)).toEqual([
       "test/models/user.test.ts:2",
       "test/models/user.test.ts:6",
     ]);
@@ -122,6 +131,20 @@ describe("Runner", () => {
     expect(await internals.testLocations([file], /b$/)).toEqual([`${file}:1`, `${file}:3`]);
   });
 
+  it("testLocations matches an it.each title under its full name", async () => {
+    await app();
+    const file = "test/models/each.test.ts";
+    await getFs().writeFile!(
+      file,
+      'describe("Post", () => {\n  it.each([1])("saves", () => {});\n});\nit("other", () => {});\n',
+    );
+    await Runner.loadTests([`${file}:4`]);
+    expect(await internals.testLocations([file], /^Post saves$/)).toEqual([
+      `${file}:2`,
+      `${file}:4`,
+    ]);
+  });
+
   it("relativePathFor strips the application root", () => {
     TestUnitReporter.appRoot = "/app";
     try {
@@ -133,7 +156,11 @@ describe("Runner", () => {
   });
 
   it("run rejects an unknown option", async () => {
-    await expect(Runner.run(["-b"])).rejects.toThrow("invalid option: -b");
+    const puts = vi.spyOn(STDOUT, "puts").mockImplementation(() => null);
+    await expect(Runner.run(["-b"])).rejects.toThrow("process.exit");
+    expect(puts.mock.calls[1]).toEqual(["invalid option: -b"]);
+    expect(puts.mock.calls[3][0]).toContain("Usage:");
+    puts.mockRestore();
   });
 
   it("run does not start Vitest with no tests", async () => {
