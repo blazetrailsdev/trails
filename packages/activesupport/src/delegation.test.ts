@@ -167,6 +167,28 @@ describe("Delegation.generateMethodMissing", () => {
     expect(() => obj["nonexistentMethod"]()).toThrow(/undefined method 'nonexistentMethod'/);
   });
 
+  it("answers a getter target on an instance with no own fields", () => {
+    class H {
+      get delegate() {
+        return { greet: () => "hi" };
+      }
+    }
+    expect("greet" in Delegation.generateMethodMissing(new H(), "delegate")).toBe(true);
+  });
+
+  it("does not read the target off a prototype layer", () => {
+    const layer = Delegation.generateMethodMissing(
+      {
+        get delegate(): never {
+          throw new TypeError("no receiver");
+        },
+      },
+      "delegate",
+      { prototypeLayer: true },
+    );
+    expect("greet" in layer).toBe(false);
+  });
+
   it("does not answer marshal_dump or _dump but still forwards an explicit call", () => {
     const delegate = {
       marshal_dump() {

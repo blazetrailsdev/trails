@@ -59,7 +59,10 @@ export const AppName = {
           `name which does not match one of the reserved trails ` +
           `words: ${AppName.RESERVED_NAMES.join(", ")}`,
       );
-    } else if (rbModConstDefined(TopLevel, this.appConstBase())) {
+    } else if (
+      rbModConstDefined(TopLevel, this.appConstBase()) ||
+      this.appConstBase() in globalThis
+    ) {
       throw new GeneratorError(
         `Invalid application name ${this.originalAppName()}, constant ${this.appConstBase()} is already in use. Please choose another application name.`,
       );

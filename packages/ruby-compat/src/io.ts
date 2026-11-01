@@ -905,10 +905,7 @@ export class IO {
       offset += chunk.length;
     }
     if (dst instanceof IO) {
-      const fs = getFs();
-      if (fs.writeFile) await fs.writeFile(dst.pathv!, bytes, { flag: "a" });
-      else dst.write(bytes);
-      return bytes.length;
+      return await dst.writeAsync(bytes);
     }
     const fs = getFs();
     if (fs.writeFile) await fs.writeFile(dst, bytes);
@@ -1559,6 +1556,21 @@ export class IO {
     let n = 0;
     while (n < buffer.length) {
       n += getFs().writeSync(this.fd, buffer, n, buffer.length - n, this._pos + n);
+    }
+    this._pos += n;
+    return n;
+  }
+
+  /**
+   * {@link write} over the backend's async write.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#write`
+   * (`vendor/ruby/v3.3.11/io.c:2263`).
+   */
+  async writeAsync(buffer: Uint8Array): Promise<number> {
+    let n = 0;
+    while (n < buffer.length) {
+      n += await getFs().writeAsync(this.fd, buffer, n, buffer.length - n, this._pos + n);
     }
     this._pos += n;
     return n;
