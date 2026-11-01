@@ -35,6 +35,7 @@ export const VALID_SQLITE_DRIVERS: readonly SqliteDriver[] = [
 ];
 
 export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "appPath"> {
+  dummyApp?: boolean;
   appPath?: string;
   database?: AppDatabase;
   packageManager?: PackageManager;
@@ -125,173 +126,50 @@ export class ActionMethods {
 Trails.ActionMethods = ActionMethods;
 
 export class AppBuilder extends ActionMethods {
-  async cifiles(): Promise<void> {
-    await this.emptyDirectory(".github/workflows");
-    await this.template("github/ci.yml", ".github/workflows/ci.yml");
-    await this.template("github/dependabot.yml", ".github/dependabot.yml");
-  }
-}
+  /** @internal */
+  declare private readonly appPath: string;
+  /** @internal */
+  declare private readonly database: AppGenerator["database"];
+  /** @internal */
+  declare private readonly packageManager: PackageManager;
+  /** @internal */
+  declare private readonly sqliteDriver: SqliteDriver;
+  /** @internal */
+  declare private readonly appName: () => string;
+  /** @internal */
+  declare private readonly appConstBase: () => string;
+  /** @internal */
+  declare private readonly railsRequireStatement: () => string;
+  /** @internal */
+  declare private readonly railsGemfileEntry: (name: string, packageManager: string) => string;
+  /** @internal */
+  declare private readonly railsDevPackages: () => Record<string, string>;
+  /** @internal */
+  declare private readonly dependsOnSystemTest: () => boolean;
+  /** @internal */
+  declare private readonly skipActionCable: () => boolean | undefined;
+  /** @internal */
+  declare private readonly skipActionMailer: () => boolean | undefined;
+  /** @internal */
+  declare private readonly skipActiveRecord: () => boolean | undefined;
+  /** @internal */
+  declare private readonly skipActiveStorage: () => boolean | undefined;
+  /** @internal */
+  declare private readonly skipEslint: () => boolean | undefined;
+  /** @internal */
+  declare private readonly _configTargetVersion?: string;
 
-export class AppGenerator extends AppBase {
-  readonly packageManager: PackageManager;
-  private _configTargetVersion: string | null = null;
-  readonly sqliteDriver: SqliteDriver;
-
-  static override OPTION_IMPLICATIONS: Record<string, readonly string[]> = {
-    ...AppBase.OPTION_IMPLICATIONS,
-    skipGit: ["skipDecryptedDiffs"],
-    minimal: [
-      "skipActionCable",
-      "skipActionMailbox",
-      "skipActionMailer",
-      "skipActionText",
-      "skipActiveJob",
-      "skipActiveStorage",
-      "skipBootsnap",
-      "skipBrakeman",
-      "skipCi",
-      "skipDevGems",
-      "skipDocker",
-      "skipHotwire",
-      "skipJavascript",
-      "skipJbuilder",
-      "skipKamal",
-      "skipEslint",
-      "skipSolid",
-      "skipSystemTest",
-      "skipThruster",
-    ],
-    api: ["skipAssetPipeline", "skipJavascript"],
-  };
-
-  static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
-    this.addSharedOptionsFor("application");
-    this.classOption("version", {
-      type: "boolean",
-      aliases: "-v",
-      group: "rails",
-      desc: "Show Trails version number and quit",
-    });
-    this.classOption("api", {
-      type: "boolean",
-      desc: "Preconfigure smaller stack for API only apps",
-    });
-    this.classOption("minimal", { type: "boolean", desc: "Preconfigure a minimal trails app" });
-    this.classOption("javascript", {
-      type: "string",
-      aliases: ["-j", "--js"],
-      default: "importmap",
-      enum: JAVASCRIPT_OPTIONS,
-      desc: "Choose JavaScript approach",
-    });
-    this.classOption("css", {
-      type: "string",
-      aliases: "-c",
-      enum: CSS_OPTIONS,
-      desc: "Choose CSS processor. Check https://github.com/rails/cssbundling-rails for more options",
-    });
-    this.classOption("skipBundle", {
-      type: "boolean",
-      aliases: "-B",
-      default: null,
-      desc: "Don't run bundle install",
-    });
-    this.classOption("packageManager", {
-      type: "string",
-      enum: [...VALID_PACKAGE_MANAGERS],
-      default: "pnpm",
-      desc: "Package manager to use",
-    });
-    this.classOption("sqliteDriver", {
-      type: "string",
-      enum: [...VALID_SQLITE_DRIVERS],
-      desc: "SQLite driver",
-    });
-    this.classOption("skipDecryptedDiffs", {
-      type: "boolean",
-      default: null,
-      desc: "Don't configure git to show decrypted diffs of encrypted credentials",
-    });
-    this.publicCommand("reportImpliedOptions");
-    this.methodAdded("setDefaultAccessorsBang");
-    this.publicCommand("createRoot");
-    this.methodAdded("createRootFiles");
-    this.methodAdded("createAppFiles");
-    this.methodAdded("createBinFiles");
-    this.methodAdded("createDockerfiles");
-    this.methodAdded("createEslintFile");
-    this.methodAdded("createCifiles");
-    this.methodAdded("createConfigFiles");
-    this.methodAdded("createBootFile");
-    this.methodAdded("createDbFiles");
-    this.methodAdded("createLibFiles");
-    this.methodAdded("createLogFiles");
-    this.methodAdded("createPublicFiles");
-    this.methodAdded("createTmpFiles");
-    this.methodAdded("createVendorFiles");
-    this.methodAdded("createTestFiles");
-    this.methodAdded("createSystemTestFiles");
-    this.methodAdded("createStorageFiles");
-    this.methodAdded("applyRailsTemplate");
-    this.noCommands(() => this.methodAdded("eslint"));
-    this.noCommands(() => this.methodAdded("databaseYml"));
-  }
-
-  declare options: AppGeneratorOptions & AppBaseOptions;
-
-  static async applyRailsTemplate(template: string, destination: string): Promise<AppGenerator> {
-    const generator = new this(
-      [destination],
-      { template: template },
-      { destinationRoot: destination },
-    );
-    generator.setDefaultAccessorsBang();
-    await generator.applyRailsTemplate();
-    return generator;
-  }
-
-  static banner(): string {
-    return `trails new ${(this as unknown as ThorClass)
-      .arguments()
-      .map((a) => a.usage())
-      .join(" ")} [options]`;
-  }
-
-  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
-    super(args, localOptions, config);
-    if (this.options.database)
-      this.options.database = DB_ALIAS[this.options.database] ?? this.options.database;
-    this.implyOptions(AppGenerator.OPTION_IMPLICATIONS, { metaOptions: META_OPTIONS });
-    const options: AppBaseOptions = { ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...this.options };
-    const skipDependents = options.skipActiveStorage ? true : undefined;
-    this.options = Object.freeze({
-      skipActionMailbox: skipDependents,
-      skipActionText: skipDependents,
-      ...options,
-    });
-    this.packageManager = this.options.packageManager ?? "pnpm";
-    this.sqliteDriver = this.options.sqliteDriver ?? "better-sqlite3";
-    if (!VALID_PACKAGE_MANAGERS.includes(this.packageManager)) {
-      throw new GeneratorError(
-        `Unknown package manager '${this.packageManager}'. Valid options: ${VALID_PACKAGE_MANAGERS.join(", ")}`,
-      );
-    }
-    if (!VALID_SQLITE_DRIVERS.includes(this.sqliteDriver)) {
-      throw new GeneratorError(
-        `Unknown SQLite driver '${this.sqliteDriver}'. Valid options: ${VALID_SQLITE_DRIVERS.join(", ")}`,
-      );
-    }
-  }
-
+  /** @internal */
   private pmRun(): string {
     return this.packageManager === "npm" ? "npm run" : this.packageManager;
   }
 
+  /** @internal */
   private pmInstall(): string {
     return this.packageManager === "yarn" ? "yarn" : `${this.packageManager} install`;
   }
 
+  /** @internal */
   private pmLockFile(): string {
     return this.packageManager === "pnpm"
       ? "pnpm-lock.yaml"
@@ -300,13 +178,71 @@ export class AppGenerator extends AppBase {
         : "package-lock.json";
   }
 
+  /** @internal */
   private railsGemfileEntries(names: string[]): Record<string, string> {
     return Object.fromEntries(
       names.map((n) => [n, this.railsGemfileEntry(n, this.packageManager)]),
     );
   }
 
-  async createRootFiles(): Promise<void> {
+  /** @missingRailsCall copy_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async readme(): Promise<void> {
+    const name = File.basename(this.appPath);
+    await this.createFile(
+      "README.md",
+      `# ${name}
+
+This application was generated with [trails](https://github.com/blazetrailsdev/blazetrails).
+
+## Getting started
+
+    cd ${name}
+    ${this.pmInstall()}
+    ${this.pmRun()} db:setup
+    ${this.pmRun()} dev
+
+To reach a CLI command with no script of its own, use the \`bin/trails\` binstub:
+
+    bin/trails routes
+    bin/trails console
+
+## Commands
+
+| Command | Description |
+| --- | --- |
+| \`${this.pmRun()} dev\` | Start the development server |
+| \`bin/trails generate model NAME\` | Generate a new model |
+| \`bin/trails generate controller NAME\` | Generate a new controller |
+| \`bin/trails generate scaffold NAME\` | Generate a full CRUD resource |
+| \`${this.pmRun()} db:migrate\` | Run pending database migrations |
+| \`${this.pmRun()} db:seed\` | Seed the database |
+| \`${this.pmRun()} test\` | Run the test suite |
+
+## Configuration
+
+- Database: \`config/database.ts\`
+- Routes: \`config/routes.ts\`
+- Environment-specific: \`config/environments/\`
+
+## Views and deployment
+
+\`.tse\` views are precompiled into \`.trails/views/\`. In development,
+\`${this.pmRun()} dev\` watches \`app/views/\`, rebuilds a changed view and
+re-imports it on the next render. In production templates load once from the
+deploy-time build, so the deploy must run \`trails-tsc-views build --views
+app/views\` (the \`prepare\` script) before the server boots; a view with no
+built module raises \`LoadError\`.
+`,
+    );
+  }
+
+  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async nodeVersion(): Promise<void> {
+    await this.createFile(".node-version", "24.16.0\n");
+  }
+
+  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async gemfile(): Promise<void> {
     const name = File.basename(this.appPath);
     const dep = this.database.pkgDependency;
     const dbDep =
@@ -432,91 +368,10 @@ export class AppGenerator extends AppBase {
         2,
       ) + "\n",
     );
+  }
 
-    await this.createFile(
-      ".gitignore",
-      `/node_modules/
-/dist/
-/.trails/
-/.env*
-!/.env.example
-
-/log/*
-!/log/.gitkeep
-
-/tmp/*
-!/tmp/.gitkeep
-!/tmp/pids/
-/tmp/pids/*
-!/tmp/pids/.gitkeep
-
-/storage/*
-!/storage/.gitkeep
-
-/public/assets
-
-*.tsbuildinfo
-`,
-    );
-
-    await this.createFile(
-      ".gitattributes",
-      `# Mark the database schema as having been generated.
-db/schema.ts linguist-generated
-
-*.ts diff=typescript
-`,
-    );
-
-    await this.createFile(".node-version", "24.16.0\n");
-
-    await this.createFile(
-      "README.md",
-      `# ${name}
-
-This application was generated with [trails](https://github.com/blazetrailsdev/blazetrails).
-
-## Getting started
-
-    cd ${name}
-    ${this.pmInstall()}
-    ${this.pmRun()} db:setup
-    ${this.pmRun()} dev
-
-To reach a CLI command with no script of its own, use the \`bin/trails\` binstub:
-
-    bin/trails routes
-    bin/trails console
-
-## Commands
-
-| Command | Description |
-| --- | --- |
-| \`${this.pmRun()} dev\` | Start the development server |
-| \`bin/trails generate model NAME\` | Generate a new model |
-| \`bin/trails generate controller NAME\` | Generate a new controller |
-| \`bin/trails generate scaffold NAME\` | Generate a full CRUD resource |
-| \`${this.pmRun()} db:migrate\` | Run pending database migrations |
-| \`${this.pmRun()} db:seed\` | Seed the database |
-| \`${this.pmRun()} test\` | Run the test suite |
-
-## Configuration
-
-- Database: \`config/database.ts\`
-- Routes: \`config/routes.ts\`
-- Environment-specific: \`config/environments/\`
-
-## Views and deployment
-
-\`.tse\` views are precompiled into \`.trails/views/\`. In development,
-\`${this.pmRun()} dev\` watches \`app/views/\`, rebuilds a changed view and
-re-imports it on the next render. In production templates load once from the
-deploy-time build, so the deploy must run \`trails-tsc-views build --views
-app/views\` (the \`prepare\` script) before the server boots; a view with no
-built module raises \`LoadError\`.
-`,
-    );
-
+  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async configru(): Promise<void> {
     await this.createFile(
       "config.ts",
       `// This file is used by Rack-based servers to start the application.
@@ -587,7 +442,53 @@ ${
     );
   }
 
-  async createBinFiles(): Promise<void> {
+  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async gitignore(): Promise<void> {
+    await this.createFile(
+      ".gitignore",
+      `/node_modules/
+/dist/
+/.trails/
+/.env*
+!/.env.example
+
+/log/*
+!/log/.gitkeep
+
+/tmp/*
+!/tmp/.gitkeep
+!/tmp/pids/
+/tmp/pids/*
+!/tmp/pids/.gitkeep
+
+/storage/*
+!/storage/.gitkeep
+
+/public/assets
+
+*.tsbuildinfo
+`,
+    );
+  }
+
+  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async gitattributes(): Promise<void> {
+    await this.createFile(
+      ".gitattributes",
+      `# Mark the database schema as having been generated.
+db/schema.ts linguist-generated
+
+*.ts diff=typescript
+`,
+    );
+  }
+
+  /**
+   * @missingRailsCall chmod — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall shebang — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   */
+  async bin(): Promise<void> {
     const excludePattern = [this.skipEslint() ? /eslint/ : null].filter((p) => p != null);
 
     await this.createFile(
@@ -670,11 +571,17 @@ process.exit(status ?? 1);
     );
   }
 
-  private configTargetVersion(): string {
+  configTargetVersion(): string {
     return this._configTargetVersion ?? LOAD_DEFAULTS_VERSION;
   }
 
-  async createConfigFiles(): Promise<void> {
+  /**
+   * @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall empty_directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall inside — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   */
+  async config(): Promise<void> {
     const name = File.basename(this.appPath);
     await this.createFile(
       "config/application.ts",
@@ -739,8 +646,6 @@ Trails.application.routes().draw(function () {
 });
 `,
     );
-
-    await this.databaseYml();
 
     if (!this.skipActionCable()) {
       await this.createFile(
@@ -1144,12 +1049,12 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     );
   }
 
-  /** @missingRailsArgs template — PERMANENT */
-  async createBootFile(): Promise<void> {
-    await this.template("config/boot.ts", "config/boot.ts");
-  }
-
-  async createAppFiles(): Promise<void> {
+  /**
+   * @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   */
+  async app(): Promise<void> {
     const name = File.basename(this.appPath);
     await this.createFile(
       "app/controllers/application-controller.ts",
@@ -1282,7 +1187,8 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     await this.createFile("app/assets/images/.gitkeep", "");
   }
 
-  async createDbFiles(): Promise<void> {
+  /** @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async db(): Promise<void> {
     await this.createFile("db/migrate/.gitkeep", "");
 
     await this.createFile(
@@ -1295,29 +1201,18 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     );
   }
 
-  async createSystemTestFiles(): Promise<void> {
-    if (this.dependsOnSystemTest()) await this.systemTest();
+  /** @missingRailsArgs template — PERMANENT */
+  async systemTest(): Promise<void> {
+    await this.emptyDirectoryWithKeepFile("test/system");
+
+    await this.template("test/application-system-test-case.ts");
   }
 
-  /** @internal */
-  private async systemTest(): Promise<void> {
-    await this.createFile("test/system/.keep", "");
-
-    await this.createFile(
-      "test/application-system-test-case.ts",
-      `import "./test-helper.ts";
-import { SystemTestCase } from "@blazetrails/actionpack/system-testing";
-
-export class ApplicationSystemTestCase extends SystemTestCase {
-  static {
-    this.drivenBy("playwright", { screenSize: [1400, 1400] });
-  }
-}
-`,
-    );
-  }
-
-  async createTestFiles(): Promise<void> {
+  /**
+   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   */
+  async test(): Promise<void> {
     await this.createFile(
       "test/test-helper.ts",
       `import { TestCase } from "@blazetrails/activesupport/test-case";
@@ -1358,7 +1253,8 @@ export async function teardown(): Promise<void> {
     await this.createFile("test/fixtures/files/.gitkeep", "");
   }
 
-  async createPublicFiles(): Promise<void> {
+  /** @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async publicDirectory(): Promise<void> {
     await this.createFile(
       "public/404.html",
       `<!DOCTYPE html>
@@ -1475,29 +1371,40 @@ export async function teardown(): Promise<void> {
     await this.createFile("public/favicon.ico", "");
   }
 
-  async createLibFiles(): Promise<void> {
+  /**
+   * @missingRailsCall empty_directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   */
+  async lib(): Promise<void> {
     await this.createFile("lib/tasks/.gitkeep", "");
   }
 
-  async createLogFiles(): Promise<void> {
+  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async log(): Promise<void> {
     await this.createFile("log/.gitkeep", "");
   }
 
-  async createTmpFiles(): Promise<void> {
+  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async tmp(): Promise<void> {
     await this.createFile("tmp/.gitkeep", "");
     await this.createFile("tmp/pids/.gitkeep", "");
   }
 
-  async createVendorFiles(): Promise<void> {
+  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async vendor(): Promise<void> {
     await this.createFile("vendor/.gitkeep", "");
   }
 
-  async createStorageFiles(): Promise<void> {
-    if (!this.skipStorage()) await this.createFile("storage/.gitkeep", "");
+  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async storage(): Promise<void> {
+    await this.createFile("storage/.gitkeep", "");
   }
 
-  async createDockerfiles(): Promise<void> {
-    if (this.options.skipDocker) return;
+  /**
+   * @missingRailsCall chmod — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   */
+  async dockerfiles(): Promise<void> {
     await this.createFile(
       "Dockerfile",
       `# syntax=docker/dockerfile:1
@@ -1544,31 +1451,201 @@ dist
     );
   }
 
+  /** @missingRailsArgs template — PERMANENT */
   async eslint(): Promise<void> {
-    await this.createFile(
-      "eslint.config.mjs",
-      `// Recommended JavaScript and TypeScript styling for trails
-import js from "@eslint/js";
-import { defineConfig } from "eslint/config";
-import tseslint from "typescript-eslint";
+    await this.template("eslint.config.mjs");
+  }
 
-export default defineConfig([
-  { ignores: [".trails/", "dist/", "log/", "node_modules/", "public/assets/", "storage/", "tmp/"] },
-  js.configs.recommended,
-  tseslint.configs.recommended,
+  /** @missingRailsArgs template — PERMANENT */
+  async databaseYml(): Promise<void> {
+    await this.template(this.database.template, "config/database.ts");
+  }
 
-  // Overwrite or add rules to create your own house style
-  //
-  // // Allow \`let\` for bindings that are never reassigned
-  // { rules: { "prefer-const": "off" } },
-]);
-`,
+  async cifiles(): Promise<void> {
+    await this.emptyDirectory(".github/workflows");
+    await this.template("github/ci.yml", ".github/workflows/ci.yml");
+    await this.template("github/dependabot.yml", ".github/dependabot.yml");
+  }
+}
+
+export class AppGenerator extends AppBase {
+  readonly packageManager: PackageManager;
+  readonly sqliteDriver: SqliteDriver;
+
+  static override OPTION_IMPLICATIONS: Record<string, readonly string[]> = {
+    ...AppBase.OPTION_IMPLICATIONS,
+    skipGit: ["skipDecryptedDiffs"],
+    minimal: [
+      "skipActionCable",
+      "skipActionMailbox",
+      "skipActionMailer",
+      "skipActionText",
+      "skipActiveJob",
+      "skipActiveStorage",
+      "skipBootsnap",
+      "skipBrakeman",
+      "skipCi",
+      "skipDevGems",
+      "skipDocker",
+      "skipHotwire",
+      "skipJavascript",
+      "skipJbuilder",
+      "skipKamal",
+      "skipEslint",
+      "skipSolid",
+      "skipSystemTest",
+      "skipThruster",
+    ],
+    api: ["skipAssetPipeline", "skipJavascript"],
+  };
+
+  static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
+    this.addSharedOptionsFor("application");
+    this.classOption("version", {
+      type: "boolean",
+      aliases: "-v",
+      group: "rails",
+      desc: "Show Trails version number and quit",
+    });
+    this.classOption("api", {
+      type: "boolean",
+      desc: "Preconfigure smaller stack for API only apps",
+    });
+    this.classOption("minimal", { type: "boolean", desc: "Preconfigure a minimal trails app" });
+    this.classOption("javascript", {
+      type: "string",
+      aliases: ["-j", "--js"],
+      default: "importmap",
+      enum: JAVASCRIPT_OPTIONS,
+      desc: "Choose JavaScript approach",
+    });
+    this.classOption("css", {
+      type: "string",
+      aliases: "-c",
+      enum: CSS_OPTIONS,
+      desc: "Choose CSS processor. Check https://github.com/rails/cssbundling-rails for more options",
+    });
+    this.classOption("skipBundle", {
+      type: "boolean",
+      aliases: "-B",
+      default: null,
+      desc: "Don't run bundle install",
+    });
+    this.classOption("packageManager", {
+      type: "string",
+      enum: [...VALID_PACKAGE_MANAGERS],
+      desc: "Package manager to use",
+    });
+    this.classOption("sqliteDriver", {
+      type: "string",
+      enum: [...VALID_SQLITE_DRIVERS],
+      desc: "SQLite driver",
+    });
+    this.classOption("skipDecryptedDiffs", {
+      type: "boolean",
+      default: null,
+      desc: "Don't configure git to show decrypted diffs of encrypted credentials",
+    });
+    this.publicCommand("reportImpliedOptions");
+    this.methodAdded("setDefaultAccessorsBang");
+    this.publicCommand("createRoot");
+    this.methodAdded("createRootFiles");
+    this.methodAdded("createAppFiles");
+    this.methodAdded("createBinFiles");
+    this.methodAdded("createDockerfiles");
+    this.methodAdded("createEslintFile");
+    this.methodAdded("createCifiles");
+    this.methodAdded("createConfigFiles");
+    this.methodAdded("createBootFile");
+    this.methodAdded("createActiveRecordFiles");
+    this.methodAdded("createDbFiles");
+    this.methodAdded("createLibFiles");
+    this.methodAdded("createLogFiles");
+    this.methodAdded("createPublicFiles");
+    this.methodAdded("createTmpFiles");
+    this.methodAdded("createVendorFiles");
+    this.methodAdded("createTestFiles");
+    this.methodAdded("createSystemTestFiles");
+    this.methodAdded("createStorageFiles");
+    this.methodAdded("applyRailsTemplate");
+  }
+
+  declare options: AppGeneratorOptions & AppBaseOptions;
+
+  static async applyRailsTemplate(template: string, destination: string): Promise<AppGenerator> {
+    const generator = new this(
+      [destination],
+      { template: template },
+      { destinationRoot: destination },
     );
+    generator.setDefaultAccessorsBang();
+    await generator.applyRailsTemplate();
+    return generator;
+  }
+
+  static banner(): string {
+    return `trails new ${(this as unknown as ThorClass)
+      .arguments()
+      .map((a) => a.usage())
+      .join(" ")} [options]`;
+  }
+
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
+    if (this.options.database)
+      this.options.database = DB_ALIAS[this.options.database] ?? this.options.database;
+    this.implyOptions(AppGenerator.OPTION_IMPLICATIONS, { metaOptions: META_OPTIONS });
+    const options: AppBaseOptions = { ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...this.options };
+    const skipDependents = options.skipActiveStorage ? true : undefined;
+    this.options = Object.freeze({
+      skipActionMailbox: skipDependents,
+      skipActionText: skipDependents,
+      ...options,
+    });
+    this.packageManager = this.options.packageManager ?? "pnpm";
+    this.sqliteDriver = this.options.sqliteDriver ?? "better-sqlite3";
+    if (!VALID_PACKAGE_MANAGERS.includes(this.packageManager)) {
+      throw new GeneratorError(
+        `Unknown package manager '${this.packageManager}'. Valid options: ${VALID_PACKAGE_MANAGERS.join(", ")}`,
+      );
+    }
+    if (!VALID_SQLITE_DRIVERS.includes(this.sqliteDriver)) {
+      throw new GeneratorError(
+        `Unknown SQLite driver '${this.sqliteDriver}'. Valid options: ${VALID_SQLITE_DRIVERS.join(", ")}`,
+      );
+    }
+  }
+
+  async createRootFiles(): Promise<void> {
+    await this.build("readme");
+    await this.build("nodeVersion");
+    await this.build("configru");
+
+    if (!this.options.skipGit) {
+      await this.build("gitignore");
+      await this.build("gitattributes");
+    }
+
+    await this.build("gemfile");
+  }
+
+  async createAppFiles(): Promise<void> {
+    await this.build("app");
+  }
+
+  async createBinFiles(): Promise<void> {
+    await this.build("bin");
+  }
+
+  async createDockerfiles(): Promise<void> {
+    if (this.options.skipDocker || this.options.dummyApp) return;
+    await this.build("dockerfiles");
   }
 
   async createEslintFile(): Promise<void> {
     if (this.skipEslint()) return;
-    await this.eslint();
+    await this.build("eslint");
   }
 
   async createCifiles(): Promise<void> {
@@ -1576,8 +1653,55 @@ export default defineConfig([
     await this.build("cifiles");
   }
 
-  async databaseYml(): Promise<void> {
-    await this.template(this.database.template, "config/database.ts");
+  async createConfigFiles(): Promise<void> {
+    await this.build("config");
+  }
+
+  /** @missingRailsArgs template — PERMANENT */
+  async createBootFile(): Promise<void> {
+    await this.template("config/boot.ts", "config/boot.ts");
+  }
+
+  async createActiveRecordFiles(): Promise<void> {
+    if (this.options.skipActiveRecord) return;
+    await this.build("databaseYml");
+  }
+
+  async createDbFiles(): Promise<void> {
+    if (this.options.skipActiveRecord) return;
+    await this.build("db");
+  }
+
+  async createLibFiles(): Promise<void> {
+    await this.build("lib");
+  }
+
+  async createLogFiles(): Promise<void> {
+    await this.build("log");
+  }
+
+  async createPublicFiles(): Promise<void> {
+    await this.build("publicDirectory");
+  }
+
+  async createTmpFiles(): Promise<void> {
+    await this.build("tmp");
+  }
+
+  async createVendorFiles(): Promise<void> {
+    await this.build("vendor");
+  }
+
+  async createTestFiles(): Promise<void> {
+    if (!this.options.skipTest) await this.build("test");
+  }
+
+  async createSystemTestFiles(): Promise<void> {
+    if (this.dependsOnSystemTest()) await this.build("systemTest");
+  }
+
+  async createStorageFiles(): Promise<void> {
+    if (!this.skipStorage()) await this.build("storage");
   }
 
   /** @internal */
