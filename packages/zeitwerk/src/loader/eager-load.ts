@@ -1,5 +1,6 @@
 import { autoloadGet } from "../core-ext/kernel.js";
-import { File, isModuleObject, rbInspect, type Pathname } from "@blazetrails/ruby-compat";
+import { File, rbInspect, type Pathname } from "@blazetrails/ruby-compat";
+import { _isModule } from "../core-ext/module.js";
 import { Cref } from "../cref.js";
 import { Error as ZeitwerkError, SetupRequired } from "../error.js";
 import type { Loader } from "../loader.js";
@@ -74,7 +75,7 @@ export const EagerLoad = {
   async eagerLoadNamespace(this: Loader, mod: object): Promise<void> {
     if (!this._setup) throw new SetupRequired();
 
-    if (typeof mod !== "function" && !(typeof mod === "object" && isModuleObject(mod))) {
+    if (!_isModule(mod)) {
       throw new ZeitwerkError(`${rbInspect(mod)} is not a class or module object`);
     }
 
@@ -169,7 +170,6 @@ export const EagerLoad = {
     while ((next = queue.shift()) !== undefined) {
       const currentDir = next[0];
       namespace = next[1];
-      const currentNamespace = namespace;
       await this.ls(currentDir, async (basename, abspath, ftype) => {
         if (honourExclusions && this.eagerLoadExclusions.has(abspath)) return;
 
@@ -178,10 +178,10 @@ export const EagerLoad = {
           if (cref != null) await autoloadGet(cref);
         } else {
           if (this.isCollapse(abspath)) {
-            queue.push([abspath, currentNamespace]);
+            queue.push([abspath, namespace]);
           } else {
             const cname = this.inflector.camelize(basename, abspath);
-            const cref = new Cref(currentNamespace, cname);
+            const cref = new Cref(namespace, cname);
             queue.push([abspath, (await autoloadGet(cref)) as object]);
           }
         }

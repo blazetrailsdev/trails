@@ -1,3 +1,4 @@
+import { autoloadGet } from "./core-ext/kernel.js";
 import { File, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
@@ -63,5 +64,36 @@ describe("Zeitwerk::Loader::Callbacks and EagerLoad", () => {
       expect(await loader.loadFile("m/x.ts")).toEqual(7);
     });
     await expect(loader.loadFile("/nonexistent.ts")).rejects.toBeInstanceOf(ZeitwerkError);
+  });
+
+  it("eagerLoadNamespace raises for what is not a class or module", async () => {
+    await withSetup(loader, [["x.ts", "export const X = 1"]], {}, async () => {
+      await expect(loader.eagerLoadNamespace(null as never)).rejects.toThrow(
+        "nil is not a class or module object",
+      );
+      await expect(loader.eagerLoadNamespace((() => {}) as never)).rejects.toThrow(ZeitwerkError);
+    });
+  });
+
+  it("raises when an explicit namespace is an arrow function", async () => {
+    const files: [string, string][] = [
+      ["hotel.ts", "export const Hotel = () => 1"],
+      ["hotel/pricing.ts", "export class Pricing {}"],
+    ];
+    await withSetup(loader, files, {}, async () => {
+      await expect(loader.eagerLoad()).rejects.toThrow(ZeitwerkError);
+    });
+  });
+
+  it("a concurrent read waits for the namespace's children", async () => {
+    const files: [string, string][] = [
+      ["m.ts", "export class M {}"],
+      ["m/x.ts", "export const X = 1"],
+    ];
+    await withSetup(loader, files, {}, async () => {
+      const cref = new Cref(Object, "M");
+      await Promise.all([autoloadGet(cref), autoloadGet(cref)]);
+      expect(new Cref(top.M, "X").isAutoload()).toEqual(File.expandPath("m/x.ts"));
+    });
   });
 });

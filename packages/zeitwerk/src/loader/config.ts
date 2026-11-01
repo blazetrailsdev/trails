@@ -1,12 +1,5 @@
-import {
-  Dir,
-  File,
-  Pathname,
-  TypeError,
-  isModuleObject,
-  rbInspect,
-  stdout,
-} from "@blazetrails/ruby-compat";
+import { Dir, File, Pathname, TypeError, rbInspect, stdout } from "@blazetrails/ruby-compat";
+import { _isModule } from "../core-ext/module.js";
 import { Error as ZeitwerkError } from "../error.js";
 import type { Loader } from "../loader.js";
 
@@ -20,10 +13,7 @@ export const Config = {
     path: PathArg,
     { namespace = Object as unknown }: { namespace?: unknown } = {},
   ): Promise<object> {
-    if (
-      typeof namespace !== "function" &&
-      !(typeof namespace === "object" && namespace !== null && isModuleObject(namespace))
-    ) {
+    if (!_isModule(namespace)) {
       throw new ZeitwerkError(`${rbInspect(namespace)} is not a class or module object, should be`);
     }
 
