@@ -135,6 +135,7 @@
     "@blazetrails/parity": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
+    "@blazetrails/zeitwerk": "workspace:*",
     "@eslint/js": "^10.0.1",
     "@sinonjs/fake-timers": "^15.3.2",
     "@types/better-sqlite3": "^7.6.13",
