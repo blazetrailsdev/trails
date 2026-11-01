@@ -560,6 +560,7 @@ export class Configuration extends EngineConfiguration {
     return paths;
   }
 
+  /** @missingRailsCall mkdir_p — CONVERGEABLE call-gate-credits-file-utils-async */
   async defaultLogFile(): Promise<File> {
     const path = (await this.paths().get("log")!.first())!;
     if (!File.isExist(File.dirname(path))) {
@@ -585,19 +586,20 @@ export class Configuration extends EngineConfiguration {
     return { contentPath: contentPath, keyPath: keyPath };
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE generate-local-secret-converges-on-rails-body */
   async loadLocalSecret(): Promise<string> {
     const keyFile = getPath().join(this.root as string, "tmp/local_secret.txt");
 
     if (!(await getFs().exists(keyFile))) {
       const randomKey = SecureRandom.hex(64);
-      await getFs().mkdir!(getPath().dirname(keyFile), { recursive: true });
+      await FileUtils.mkdirPAsync(getPath().dirname(keyFile));
       await getFs().writeFile!(keyFile, randomKey);
     }
 
     return (this._localSecret = await getFs().readFile(keyFile, "utf8"));
   }
 
+  /** @missingRailsCall mkdir_p — CONVERGEABLE generate-local-secret-converges-on-rails-body */
   private generateLocalSecret(): string {
     if (this._localSecret === undefined) {
       throw new RuntimeError(
