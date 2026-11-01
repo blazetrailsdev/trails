@@ -1,3 +1,4 @@
+import "../class-paths.console.generated.js";
 import { isPresent } from "@blazetrails/activesupport";
 import {
   NotImplementedError,

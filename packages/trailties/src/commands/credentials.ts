@@ -1,3 +1,4 @@
+import "../class-paths.credentials.generated.js";
 import { isPresent, presence } from "@blazetrails/activesupport";
 import { InvalidContentError, type EncryptedConfiguration } from "@blazetrails/activesupport";
 import { MissingKeyError } from "@blazetrails/activesupport/encrypted-file";

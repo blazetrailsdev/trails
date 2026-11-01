@@ -1,3 +1,4 @@
+import "../class-paths.unused-routes.generated.js";
 import {
   ConsoleFormatter,
   RoutesInspector,

@@ -1,3 +1,4 @@
+import "../class-paths.generate.generated.js";
 import { Dir } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";

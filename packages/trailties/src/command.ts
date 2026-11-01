@@ -112,6 +112,13 @@ export async function findByNamespace(
   return found === undefined ? undefined : namespaces.get(found);
 }
 
+export async function printingCommands(): Promise<[string, string | null][]> {
+  await lookupBang();
+  return subclasses()
+    .filter((klass) => !hiddenCommands().includes(klass))
+    .flatMap((klass) => klass.printingCommands());
+}
+
 /** @internal */
 function splitNamespace(namespace: string): [string, string] {
   const m = /^(.+):(\w+)$/.exec(namespace);

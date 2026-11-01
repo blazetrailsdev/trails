@@ -1,3 +1,4 @@
+import "../class-paths.routes.generated.js";
 import {
   ConsoleFormatter,
   RoutesInspector,

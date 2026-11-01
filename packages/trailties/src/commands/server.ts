@@ -1,3 +1,4 @@
+import "../class-paths.server.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include EnvironmentArgument` (`server_command.rb:94`); the class/interface merge is how a mixin surfaces on the type side. */
 import { type BroadcastLogger, getEnv, isBlank, Logger } from "@blazetrails/activesupport";
 import {
