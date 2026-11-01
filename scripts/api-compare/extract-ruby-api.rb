@@ -3152,8 +3152,6 @@ class ApiExtractor
     [calls.uniq, weak_calls, receivers, receiver_names, string_evals]
   end
 
-  # The statements a method answers with: a `delete` here has its removed value
-  # read only by a caller, which a port declared `void` has none of.
   def method_tail_statements(body_node)
     Set.new.compare_by_identity.tap { |found| void_block_tail(body_node, found) }
   end

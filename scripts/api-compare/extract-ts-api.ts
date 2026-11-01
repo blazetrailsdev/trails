@@ -7459,7 +7459,6 @@ function isSuspensionTimer(
   );
 }
 
-/** Whether the function around `n` declares `void` or `Promise<void>`: nothing reads its answer. */
 function answersVoid(n: ts.Node): boolean {
   let fn: ts.Node | undefined = n;
   while (fn !== undefined && !ts.isFunctionLike(fn)) fn = fn.parent;

@@ -1206,7 +1206,7 @@ export class IO {
    * {@link read}'s length form over the backend's async read.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
-   * (`vendor/ruby/v3.3.11/io.c:3711`).
+   * (`vendor/ruby/v3.3.11/io.c:3774`).
    */
   async readAsync(length: number): Promise<Uint8Array | null> {
     const buffer = new Uint8Array(length);

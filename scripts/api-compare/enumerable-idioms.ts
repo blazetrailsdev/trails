@@ -56,7 +56,6 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   // leading `!` IS required (see NEGATED_ALIASES). (The convention
   // candidate for a method NAMED `exclude?` is `excludes`, so no overlap.)
   ["exclude?", ["includes", "has"]],
-  // ruby-compat's block-form `File.open` over async fs (`file.ts`).
   ["open", ["openAsync"]],
   ["key?", ["has"]],
   ["has_key?", ["has"]],
