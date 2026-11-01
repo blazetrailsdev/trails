@@ -62,12 +62,13 @@ export class Group {
     }
   }
 
-  static help(this: GroupClass, shell: Basic): void {
+  static async help(this: GroupClass, shell: Basic): Promise<void> {
     shell.say("Usage:");
     shell.say(`  ${this.banner()}\n`);
     shell.say();
     this.classOptionsHelp(shell);
-    if (rtest(this.desc())) shell.say(this.desc());
+    const desc = await this.desc();
+    if (rtest(desc)) shell.say(desc);
   }
 
   static invocations(this: GroupClass): Map<unknown, boolean> {
@@ -264,7 +265,7 @@ export class Group {
     block?: (instance: Instance) => void,
   ): Promise<unknown> {
     if (HELP_MAPPINGS.includes((givenArgs[0] ?? null) as string)) {
-      this.help(config.shell!);
+      await this.help(config.shell!);
       return;
     }
 

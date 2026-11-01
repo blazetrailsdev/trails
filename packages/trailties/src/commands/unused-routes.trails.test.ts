@@ -13,7 +13,7 @@ import {
   unregisterConstant,
 } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
-import { createProgram } from "../cli.js";
+import { invoke } from "../command.js";
 import { Trails, _resetTrailsEnv } from "../rails.js";
 import { RouteInfo } from "./unused-routes.js";
 import { lookupBang } from "../command/behavior.js";
@@ -173,9 +173,7 @@ describe("UnusedRoutesCommand", () => {
     );
     await Trails.initialize();
 
-    const output = await capture(":stdout", () =>
-      createProgram().parseAsync(["routes", "-u"], { from: "user" }),
-    );
+    const output = await capture(":stdout", () => invoke("routes", ["-u"]));
     expect(output).toMatch(/^Found 1 unused route:$/m);
     expect(output).toMatch(/legacy GET\s+\/legacy\(\.:format\)\s+legacy#index/);
     expect(exit).toHaveBeenCalledWith(1);
@@ -187,9 +185,7 @@ describe("unusedRoutesCommand", () => {
     const { UnusedRoutesCommand } = await import("./unused-routes.js");
     const perform = vi.spyOn(UnusedRoutesCommand, "perform").mockResolvedValue();
     onTestFinished(() => perform.mockRestore());
-    await createProgram().parseAsync(["unused-routes", "--controller", "Posts", "-g", "x"], {
-      from: "user",
-    });
+    await invoke("unused-routes", ["--controller", "Posts", "-g", "x"]);
     expect(perform).toHaveBeenCalledWith("unused-routes", ["--controller", "Posts", "-g", "x"], {});
   });
 });

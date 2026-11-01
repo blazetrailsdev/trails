@@ -9,6 +9,9 @@ import { lookup, lookupBang, subclasses } from "./command/behavior.js";
 export const HELP_MAPPINGS: ReadonlySet<string> = new Set(["-h", "-?", "--help"]);
 export const VERSION_MAPPINGS: ReadonlySet<string> = new Set(["-v", "--version"]);
 
+/** @noRailsEquivalent PERMANENT */
+export const ARGV: string[] = [];
+
 let _hiddenCommands: (typeof Base)[] | undefined;
 
 export function hiddenCommands(): (typeof Base)[] {
@@ -30,7 +33,7 @@ export async function invoke(fullNamespace: string, args: string[] = []): Promis
 
   if (command && "perform" in command) {
     if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
-      await command.perform(name, args, {});
+      await withArgv(args, () => command.perform(name, args, {}));
     } else {
       await invokeRake(fullNamespace, args);
     }
@@ -72,6 +75,17 @@ function splitNamespace(namespace: string): [string, string] {
   if (HELP_MAPPINGS.has(namespace) || namespace === "help") return ["help", "help_extended"];
   if (VERSION_MAPPINGS.has(namespace)) return ["version", "version"];
   return [namespace, namespace];
+}
+
+/** @internal */
+async function withArgv(argv: string[], block: () => Promise<void>): Promise<void> {
+  const originalArgv = [...ARGV];
+  ARGV.splice(0, ARGV.length, ...argv);
+  try {
+    await block();
+  } finally {
+    ARGV.splice(0, ARGV.length, ...originalArgv);
+  }
 }
 
 /** @internal */

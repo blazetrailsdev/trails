@@ -1,26 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { createProgram } from "../cli.js";
-import { lookupBang } from "../command/behavior.js";
+import type { ThorClass } from "@blazetrails/thor";
+import { lookupBang, subclasses } from "../command/behavior.js";
+import { RoutesCommand } from "./routes.js";
 
 await lookupBang();
 
+const classOptions = () => (RoutesCommand as unknown as ThorClass).classOptions();
+
 describe("RoutesCommand", () => {
   it("is registered on the program", () => {
-    const program = createProgram();
-    expect(program.commands.some((c) => c.name() === "routes")).toBe(true);
+    expect(subclasses()).toContain(RoutesCommand);
   });
 
   it("has --grep option", () => {
-    const program = createProgram();
-    const cmd = program.commands.find((c) => c.name() === "routes");
-    const grepOpt = cmd?.options.find((o) => o.long === "--grep");
-    expect(grepOpt).toBeDefined();
+    expect(classOptions().grep.switchName).toBe("--grep");
   });
 
   it("has the class options RoutesCommand declares", () => {
-    const program = createProgram();
-    const cmd = program.commands.find((c) => c.name() === "routes");
-    const longs = cmd?.options.map((o) => o.long);
-    expect(longs).toEqual(expect.arrayContaining(["--controller", "--grep", "--expanded"]));
+    expect(Object.values(classOptions()).map((o) => o.switchName)).toEqual(
+      expect.arrayContaining(["--controller", "--grep", "--expanded"]),
+    );
   });
 });
