@@ -42,11 +42,6 @@ export async function rbFSystem(
 
   const data = await adapter.system(prog, env, args, opthash);
   rbLastStatusSet(new Process.Status(data));
-  const klass = Errno[(data.error as { code?: string } | undefined)?.code as keyof typeof Errno];
-  const syserr =
-    klass !== undefined
-      ? new klass(prog)
-      : (data.error ?? new SystemCallError(`unknown error - ${prog}`));
 
   if (data.pid != null && data.pid > 0) {
     if (data.status === 0) {
@@ -55,7 +50,11 @@ export async function rbFSystem(
 
     if (data.error !== undefined) {
       if (opthash.exception) {
-        throw syserr;
+        const klass =
+          Errno[(data.error as { code?: string } | undefined)?.code as keyof typeof Errno];
+        throw klass !== undefined
+          ? new klass(prog)
+          : (data.error ?? new SystemCallError(`unknown error - ${prog}`));
       } else {
         return null;
       }
@@ -71,7 +70,10 @@ export async function rbFSystem(
   }
 
   if (opthash.exception) {
-    throw syserr;
+    const klass = Errno[(data.error as { code?: string } | undefined)?.code as keyof typeof Errno];
+    throw klass !== undefined
+      ? new klass(prog)
+      : (data.error ?? new SystemCallError(`unknown error - ${prog}`));
   } else {
     return null;
   }
