@@ -107,7 +107,10 @@ describe("ActiveStorage::Attached::Many", () => {
 
   it("purgeLater empties the attachments", async () => {
     await user.photos.attach(hash());
-    const t = new TestCase("purgeLater") as unknown as TestHelper;
+    class PurgeLaterTest extends TestCase {
+      purgeLater(): void {}
+    }
+    const t = new PurgeLaterTest("purgeLater") as unknown as TestHelper;
     await t.beforeSetup();
     try {
       await t.performEnqueuedJobs({}, () => user.photos.purgeLater());
