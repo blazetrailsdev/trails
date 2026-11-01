@@ -251,7 +251,7 @@ export class AppGenerator extends AppBase {
     if (this.options.database)
       this.options.database = DB_ALIAS[this.options.database] ?? this.options.database;
     this.implyOptions(AppGenerator.OPTION_IMPLICATIONS, { metaOptions: META_OPTIONS });
-    const options = { ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...this.options };
+    const options: AppBaseOptions = { ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...this.options };
     const skipDependents = options.skipActiveStorage ? true : undefined;
     this.options = Object.freeze({
       skipActionMailbox: skipDependents,
