@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { env } from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 
 class T extends AppBase {
@@ -94,5 +95,52 @@ describe("AppBase", () => {
     expect(g["ciPackages"]()).toContain("google-chrome-stable");
     expect(g["dockerfileChownDirectories"]()).toEqual(["db", "log", "storage", "tmp"]);
     expect(AppBase.strictArgsPosition()).toBe(false);
+  });
+});
+
+describe("AppBase run tasks", () => {
+  const commandsFor = async (options: Record<string, unknown>, method: string) => {
+    const generator = new T(["app"], options) as unknown as Record<string, any>;
+    const commands: string[] = [];
+    generator.railsCommand = async (command: string) => commands.push(command);
+    await generator[method]();
+    return commands;
+  };
+
+  it("run_javascript installs through the selected bundler", async () => {
+    expect(await commandsFor({ javascript: "esbuild" }, "runJavascript")).toEqual([
+      "javascript:install:esbuild",
+    ]);
+    expect(await commandsFor({ javascript: "importmap" }, "runJavascript")).toEqual([
+      "importmap:install",
+    ]);
+  });
+
+  it("run_css picks the standalone installer without a JS runtime", async () => {
+    expect(await commandsFor({ css: "tailwind" }, "runCss")).toEqual(["tailwindcss:install"]);
+    expect(await commandsFor({ css: "bulma" }, "runCss")).toEqual(["css:install:bulma"]);
+  });
+
+  it("run_solid leaves out solid_cable when Action Cable is skipped", async () => {
+    expect(await commandsFor({ skipActionCable: true }, "runSolid")).toEqual([
+      "solid_cache:install solid_queue:install",
+    ]);
+  });
+
+  it("run tasks do nothing without bundle_install?", async () => {
+    expect(await commandsFor({ skipBundle: true }, "runHotwire")).toEqual([]);
+    expect(await commandsFor({ pretend: true }, "runHotwire")).toEqual([]);
+  });
+
+  it("node_version prefers NODE_VERSION", async () => {
+    const generator = new T(["app"], { javascript: "esbuild" }) as unknown as Record<string, any>;
+    const before = env.NODE_VERSION;
+    env.NODE_VERSION = "1.2.3";
+    try {
+      expect(await generator.nodeVersion()).toBe("1.2.3");
+    } finally {
+      if (before === undefined) delete env.NODE_VERSION;
+      else env.NODE_VERSION = before;
+    }
   });
 });
