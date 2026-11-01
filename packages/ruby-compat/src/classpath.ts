@@ -22,8 +22,8 @@ const generatedClasses = new Map<string, () => unknown>();
  * `pnpm parity:class-paths` from `rails-api.json` (RFC 0205). Each class is
  * read through a thunk on the first lookup after a registration. A table is
  * imported last by its package entry, after every module it names has been
- * evaluated, so a thunk still in TDZ then is retried only on the next
- * registration, never on every lookup.
+ * evaluated, so a thunk still in TDZ then is retried on the next registration,
+ * or by a lookup of a class bearing the entry's last path segment.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -63,19 +63,38 @@ export function generatedClassPath(klass: object): string | undefined {
       }
     }
     pendingClassPaths.length = unresolved;
-    classPathsRegistered = unresolved > 0;
+  }
+  const path = generatedClassPaths.get(klass);
+  if (path !== undefined || pendingClassPaths.length === 0) return path;
+  for (const entry of pendingClassPaths.filter((entry) => isPendingFor(entry, klass))) {
+    let value: unknown;
+    try {
+      value = entry[0]();
+    } catch {
+      continue;
+    }
+    if (value === undefined) continue;
+    pendingClassPaths.splice(pendingClassPaths.indexOf(entry), 1);
+    if (typeof value === "function" || (typeof value === "object" && value !== null)) {
+      generatedClassPaths.set(value, entry[1]);
+    }
   }
   return generatedClassPaths.get(klass);
 }
 
+function isPendingFor(entry: [() => unknown, string], klass: object): boolean {
+  const { name } = klass as { name?: unknown };
+  return name === entry[1].slice(entry[1].lastIndexOf(":") + 1);
+}
+
 /**
- * Whether `rb_mod_name` (`vendor/ruby/v3.3.11/variable.c:122`) may yet miss a
- * class whose generated path has not resolved.
+ * Whether `rb_mod_name` (`vendor/ruby/v3.3.11/variable.c:122`) may yet miss
+ * `klass`, a class whose generated path has not resolved.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function isClassPathPending(): boolean {
-  return pendingClassPaths.length > 0;
+export function isClassPathPending(klass: object): boolean {
+  return pendingClassPaths.some((entry) => isPendingFor(entry, klass));
 }
 
 /**

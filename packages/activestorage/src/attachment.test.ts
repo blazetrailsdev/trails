@@ -41,7 +41,6 @@ describe("ActiveStorage::AttachmentTest", () => {
     expect(attachment.isPersisted()).toBe(true);
   });
 
-  // BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
   it("analyzing a directly-uploaded blob after attaching it", async () => {
     const blob = await directlyUploadFileBlob({ filename: "racecar.jpg" });
     expect(blob.isAnalyzed()).toBeFalsy();
@@ -64,6 +63,7 @@ describe("ActiveStorage::AttachmentTest", () => {
     await blob.reload();
     expect(blob.isAnalyzed()).toBeTruthy();
   });
+  // BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
   it.skip("attaching a blob doesn't touch the record", () => {});
   it.skip("attaching a record doesn't reset the previously_new_record flag", () => {});
   it.skip("mirroring a directly-uploaded blob after attaching it", () => {});

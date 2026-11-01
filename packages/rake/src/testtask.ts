@@ -151,7 +151,7 @@ export class TestTask extends TaskLib {
         return (
           `-e "import('${import.meta.url}').then(({ LOAD_PATH }) => { ` +
           `LOAD_PATH.unshift(${flatten(this.libs)
-            .map((lib) => `'${File.expandPath(String(lib))}'`)
+            .map((lib) => JSON.stringify(File.expandPath(String(lib))).replace(/[\\"$`]/g, "\\$&"))
             .join(", ")}); ` +
           `process.argv.slice(1).forEach((f) => require(require('path').resolve(f))); })"`
         );

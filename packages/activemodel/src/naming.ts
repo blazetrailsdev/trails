@@ -35,7 +35,7 @@ function modelName(this: NamingHost): ModelName {
       return relative != null && relative !== false;
     });
     const name = new ModelName(this as unknown as ModelLike, namespace ?? null);
-    if (isClassPathPending()) return name;
+    if (isClassPathPending(this)) return name;
     this._modelName = name;
   }
   return this._modelName;

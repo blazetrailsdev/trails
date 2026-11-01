@@ -597,9 +597,8 @@ function loadSchemaFromCacheSync(host: SchemaKlass): boolean {
 
 export function tableName(this: SchemaKlass): string | null {
   if (!Object.hasOwn(this, "_tableName")) {
-    const computed = resetTableName.call(this);
-    if (isClassPathPending()) delete (this as { _tableName?: string | null })._tableName;
-    return computed;
+    if (isClassPathPending(this)) return computeTableName.call(this);
+    resetTableName.call(this);
   }
   return this._tableName;
 }

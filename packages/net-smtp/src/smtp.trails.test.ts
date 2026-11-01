@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
 import { createServer } from "node:net";
 import { SMTPServer, type SMTPServerOptions } from "smtp-server";
+import { ReadTimeout } from "./protocol.js";
 import { SMTP, SMTPFatalError } from "./smtp.js";
 
 const servers: SMTPServer[] = [];
@@ -61,6 +62,15 @@ describe("SMTP (trails)", () => {
     expect(Array.isArray(connection._responseActions)).toBe(true);
     expect(connection._destroyed).toBe(false);
     expect("_socket" in connection).toBe(true);
+  });
+
+  it("raises ReadTimeout when the greeting never comes", async () => {
+    const server = createServer(() => {});
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const smtp = new SMTP("127.0.0.1", (server.address() as { port: number }).port);
+    smtp.readTimeout = 0.05;
+    await expect(smtp.start()).rejects.toThrow(ReadTimeout);
+    server.close();
   });
 
   it("open message stream writes through data's block", async () => {

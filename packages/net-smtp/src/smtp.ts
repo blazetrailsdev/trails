@@ -13,6 +13,7 @@ import { Authenticator } from "./authenticator.js";
 import {
   Net,
   OpenTimeout,
+  ReadTimeout,
   ProtoAuthError,
   ProtoFatalError,
   ProtocolError,
@@ -30,6 +31,7 @@ type Connection = SMTPConnection & {
   _actionGreeting(str: string): void;
   _clearPhase(): void;
   _onConnect(): void;
+  _connectionDeadline: number | null;
   _upgradeConnection(callback: (err: Error | null) => void): void;
 };
 
@@ -491,7 +493,7 @@ export class SMTP {
       name: heloDomain,
       secure: false,
       connectionTimeout: this.openTimeout * 1000,
-      greetingTimeout: this.openTimeout * 1000,
+      greetingTimeout: this._readTimeout * 1000,
       socketTimeout: this._readTimeout * 1000,
     }) as Connection;
     this._socket = s;
@@ -525,9 +527,13 @@ export class SMTP {
                 s._clearPhase();
                 resolve(Response.parse(`${str}\n`));
               };
+              s._connectionDeadline = null;
               onConnect.call(s);
             });
           } catch (err) {
+            if ((err as ConnectionError).code === "ETIMEDOUT") {
+              throw new ReadTimeout();
+            }
             if ((err as ConnectionError).code === "ECONNECTION") {
               throw new EOFError("end of file reached");
             }

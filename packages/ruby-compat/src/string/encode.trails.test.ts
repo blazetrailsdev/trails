@@ -97,6 +97,19 @@ describe("encode to ISO-2022-JP", () => {
     );
   });
 
+  it("refuses the bytes that would forge a charset shift", () => {
+    expect(() => encode("\x1b", "ISO-2022-JP")).toThrow(
+      '"\\e" to stateless-ISO-2022-JP in conversion from UTF-8 to EUC-JP to stateless-ISO-2022-JP to ISO-2022-JP',
+    );
+    expect(() => encode("\x0e", "ISO-2022-JP")).toThrow(UndefinedConversionError);
+  });
+
+  it("refuses a replacement the destination cannot hold", () => {
+    expect(() => encode("é", "ISO-2022-JP", { undef: ":replace", replace: "é" })).toThrow(
+      ConverterNotFoundError,
+    );
+  });
+
   it("replaces an undefined character in ASCII mode", () => {
     expect(ascii(encode("あéa", "ISO-2022-JP", { undef: ":replace" }))).toBe('\x1b$B$"\x1b(B?a');
   });

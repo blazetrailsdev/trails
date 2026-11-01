@@ -121,24 +121,29 @@ export function encode(
       if (kanji !== to) dest.push(...(to ? [0x1b, 0x24, 0x42] : [0x1b, 0x28, 0x42]));
       kanji = to;
     };
-    const put = (text: string): void => {
+    const put = (text: string, replacing = false): void => {
       for (const char of text) {
         const c = char.codePointAt(0)!;
         const cell = table.get(c);
-        if (c < 0x80) {
+        if (c < 0x80 && c !== 0x0e && c !== 0x0f && c !== 0x1b) {
           shift(false);
           dest.push(c);
         } else if (cell !== undefined) {
           shift(true);
           dest.push(cell >> 8, cell & 0xff);
+        } else if (replacing) {
+          throw new ConverterNotFoundError(`code converter not found (${senc} to ${denc})`);
         } else if (undefReplace) {
-          put(opts.replace ?? "?");
+          put(opts.replace ?? "?", true);
         } else {
           const rep = opts.fallback?.(char);
           if (rep == null) {
+            const chain = `in conversion from UTF-8 to EUC-JP to stateless-ISO-2022-JP to ${denc}`;
             const u = `U+${c.toString(16).toUpperCase().padStart(4, "0")}`;
             throw new UndefinedConversionError(
-              `${u} to EUC-JP in conversion from UTF-8 to EUC-JP to stateless-ISO-2022-JP to ${denc}`,
+              c < 0x80
+                ? `${c === 0x1b ? '"\\e"' : dump([c])} to stateless-ISO-2022-JP ${chain}`
+                : `${u} to EUC-JP ${chain}`,
             );
           }
           put(rep);
