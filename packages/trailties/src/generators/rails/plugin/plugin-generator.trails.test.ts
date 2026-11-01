@@ -190,6 +190,15 @@ describe("PluginBuilder", () => {
     });
   });
 
+  it("does not copy compiled template modules out of a directory", async () => {
+    const g = generator("plain");
+    await FileUtils.mkdirP(`${root}/source`);
+    await File.writeAsync(`${root}/source/plain.txt`, "x");
+    await File.writeAsync(`${root}/source/plain.tt.js`, "x");
+    await g.directory(`${root}/source`, "out");
+    expect(Dir.children(`${root}/out`)).toEqual(["plain.txt"]);
+  });
+
   it("copies the app directory for a mountable engine", async () => {
     const g = generator("mountable");
     await g["build"]("app");

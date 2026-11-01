@@ -60,6 +60,7 @@ export class Directory extends EmptyDirectory {
   /**
    * @internal
    * @missingRailsCall directory? — CONVERGEABLE call-gate-credits-is-directory-async
+   * @inventedArm if — PERMANENT
    */
   protected async executeBang(): Promise<unknown> {
     const source = await this.source;
@@ -72,6 +73,7 @@ export class Directory extends EmptyDirectory {
       if (await File.isDirectoryAsync(fileSource)) continue;
       const excludePattern = this.config["excludePattern"] as RegExp | null | undefined;
       if (rtest(excludePattern) && fileSource.match(excludePattern)) continue;
+      if (/\.tt\.(js|js\.map|d\.ts)$/.test(fileSource)) continue;
       let fileDestination = File.join(this.givenDestination, fileSource.replaceAll(source, "."));
       fileDestination = fileDestination.replaceAll("/./", "/");
 
