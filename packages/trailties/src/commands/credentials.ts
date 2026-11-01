@@ -85,7 +85,6 @@ export class CredentialsCommand extends Base {
     }
   }
 
-  /** @missingRailsCall overridden? — CONVERGEABLE credentials-config-is-inheritable-options */
   async edit(): Promise<void> {
     await this.loadEnvironmentConfigBang();
     await this.loadGenerators();

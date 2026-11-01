@@ -31,6 +31,7 @@ export const Diffing = defineModule(
       }
     },
 
+    /** @missingRailsCall delete — PERMANENT */
     async disenrollProjectFromCredentialsDiffing(this: DiffingHost): Promise<void> {
       if (await this.isEnrolledInCredentialsDiffing()) {
         const path = this.gitattributes().toString();
@@ -69,7 +70,6 @@ export const Diffing = defineModule(
       this.say("Configured Git diff driver for credentials.");
     },
 
-    /** @missingRailsCall root — CONVERGEABLE command-root-reads-the-application-root */
     gitattributes(this: DiffingHost): Pathname {
       return (this._gitattributes ??= new Pathname(Dir.pwd()).join(".gitattributes"));
     },
