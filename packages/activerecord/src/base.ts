@@ -8,7 +8,7 @@ import {
   rbModName,
 } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
-import { NotImplementedError } from "./errors.js";
+import { DangerousAttributeError, NotImplementedError } from "./errors.js";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";
 import { Transaction as _UserTransaction } from "./transaction.js";
@@ -2150,6 +2150,24 @@ extend(Base, {
   timestampAttributesForUpdate: Timestamp.timestampAttributesForUpdate,
 });
 extend(Base, { isDangerousAttributeMethod: _pkIsDangerousAttributeMethod });
+extend(Base, {
+  // Rails raises from define_attribute_methods; trails' accessors are defined
+  // lazily, so a shadowing name would otherwise pass silently. A schema column
+  // never comes through here, so `changes` stays a legal column name.
+  attribute(this: typeof Base, name: string, ...rest: unknown[]): void {
+    const shadowsBase = name !== "id" && name in Base.prototype;
+    if (shadowsBase || this.isDangerousAttributeMethod(name)) {
+      throw new DangerousAttributeError(
+        `${name} is defined by Active Record. Check to make sure that you don't have an attribute or method with the same name.`,
+      );
+    }
+    (AttributeRegistration.ClassMethods.attribute as (...args: unknown[]) => void).call(
+      this,
+      name,
+      ...rest,
+    );
+  },
+});
 extend(Base, { isInstanceMethodAlreadyImplemented: _pkIsInstanceMethodAlreadyImplemented });
 extend(Base, {
   defineMethodAttribute: _defineMethodAttribute,

@@ -88,6 +88,15 @@ describe("virtualize — deltas", () => {
     expect(naive.text).toMatch(/get created_at\(\): import\("@blazetrails\/date"\)\.Time;/);
   });
 
+  test("schemaColumnsByTable skips a column that shadows a Base member", () => {
+    const input = "export class Post extends Base {\n}\n";
+    const { text } = virtualize(input, "post.ts", {
+      schemaColumnsByTable: { posts: { changes: "integer", body: "text" } },
+    });
+    expect(text).toMatch(/get body\(\): string;/);
+    expect(text).not.toMatch(/\bchanges\b/);
+  });
+
   test("schemaColumnsByTable skips user-authored declares", () => {
     const src =
       "export class Post extends Base {\n" +

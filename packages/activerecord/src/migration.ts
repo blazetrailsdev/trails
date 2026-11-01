@@ -916,7 +916,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     if (!this.isReverting()) await this.executeBlock(block);
   }
 
-  async migrate(direction: "up" | "down"): Promise<void> {
+  async migrate(direction: "up" | "down", pool?: ConnectionPool): Promise<void> {
     if (!rbObjRespondTo(this, direction)) return;
 
     switch (direction) {
@@ -929,9 +929,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
 
     let timeElapsed: number | null = null;
-    const pool = (await ActiveRecord.Tasks.DatabaseTasks.migrationConnection())
-      .pool as ConnectionPool;
-    await pool.withConnection(async (conn) => {
+    this._poolOverride = pool ?? this._poolOverride;
+    const migrationPool =
+      this._poolOverride ??
+      ((await ActiveRecord.Tasks.DatabaseTasks.migrationConnection()).pool as ConnectionPool);
+    await migrationPool.withConnection(async (conn) => {
       timeElapsed = await Benchmark.realtime(() => this.execMigration(conn, direction));
     });
 
@@ -1418,8 +1420,8 @@ export class MigrationProxy {
     return File.basename(this.filename);
   }
 
-  async migrate(direction: "up" | "down"): Promise<void> {
-    return (await this.migration()).migrate(direction);
+  async migrate(direction: "up" | "down", pool?: ConnectionPool): Promise<void> {
+    return (await this.migration()).migrate(direction, pool);
   }
 
   async announce(message: string): Promise<void> {
@@ -1478,6 +1480,8 @@ export class MigrationContext<
   readonly migrationsPaths: string | string[];
   readonly schemaMigration: S;
   readonly internalMetadata: I;
+  /** Set by ConnectionPool#migrationContext: migrate here rather than on Base. */
+  pool?: ConnectionPool;
 
   constructor(migrationsPaths: string | string[], ...seated: SeatedCollaborators<S, I>) {
     const [schemaMigration, internalMetadata] = seated;
@@ -1515,6 +1519,7 @@ export class MigrationContext<
       this.schemaMigration,
       this.internalMetadata,
       targetVersion,
+      this.pool,
     ).migrate();
   }
 
@@ -1530,6 +1535,7 @@ export class MigrationContext<
       this.schemaMigration,
       this.internalMetadata,
       targetVersion,
+      this.pool,
     ).migrate();
   }
 
@@ -1552,11 +1558,19 @@ export class MigrationContext<
       this.schemaMigration,
       this.internalMetadata,
       targetVersion,
+      this.pool,
     ).run();
   }
 
   open(this: MigrationContext): Migrator {
-    return new Migrator("up", this.migrations, this.schemaMigration, this.internalMetadata);
+    return new Migrator(
+      "up",
+      this.migrations,
+      this.schemaMigration,
+      this.internalMetadata,
+      undefined,
+      this.pool,
+    );
   }
 
   async migrationsStatus(this: MigrationContext): Promise<Array<[string, string, string]>> {
@@ -1693,6 +1707,8 @@ export class MigrationContext<
       this.migrations,
       this.schemaMigration,
       this.internalMetadata,
+      undefined,
+      this.pool,
     );
     if ((await this.currentVersion()) !== 0 && !(await migrator.currentMigration())) {
       throw new UnknownMigrationVersionError((await this.currentVersion())!);
@@ -1725,6 +1741,7 @@ export class Migrator {
     schemaMigration: SchemaMigration,
     internalMetadata: InternalMetadata,
     targetVersion?: number | string | null,
+    private readonly _pool?: ConnectionPool,
   ) {
     this._direction = direction;
     this._targetVersion = targetVersion == null ? null : toInteger(String(targetVersion));
@@ -1818,7 +1835,8 @@ export class Migrator {
 
   /** @internal */
   private get connection(): Promise<DatabaseAdapter> {
-    return ActiveRecord.Tasks.DatabaseTasks.migrationConnection();
+    const pool = this._pool;
+    return pool ? pool.leaseConnection() : ActiveRecord.Tasks.DatabaseTasks.migrationConnection();
   }
 
   /** @internal */
@@ -1848,7 +1866,9 @@ export class Migrator {
         ActiveRecord.Base.logger.info(`Migrating to ${migration.name} (${migration.version})`);
 
       return await this.ddlTransaction(migration, async () => {
-        await migration.migrate(this._direction);
+        await (this._pool
+          ? migration.migrate(this._direction, this._pool)
+          : migration.migrate(this._direction));
         return this.recordVersionStateAfterMigrating(migration.version);
       });
     } catch (e) {

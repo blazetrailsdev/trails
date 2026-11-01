@@ -1,4 +1,5 @@
-import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { DatabaseTasks } from "./tasks/database-tasks.js";
 import {
   MigrationContext,
   Migrator,
@@ -242,5 +243,30 @@ describe("MigrationContext connected surface", () => {
     expect(discoveryOnly.migrations).toHaveLength(3);
     expect(discoveryOnly.schemaMigration).toBeInstanceOf(SchemaMigration);
     expect(discoveryOnly.internalMetadata).toBeInstanceOf(InternalMetadata);
+  });
+
+  it("a pool's context migrates on that pool, not Base", async () => {
+    class OtherRecord extends Base {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    const adapter = Base.connectionDbConfig() as never;
+    await OtherRecord.establishConnection(adapter);
+    const pool = OtherRecord.connectionPool();
+    const lease = vi
+      .spyOn(DatabaseTasks, "migrationConnection")
+      .mockRejectedValue(new Error("leased Base"));
+    try {
+      await expect(
+        pool.migrationContext.open().isUseTransaction({
+          disableDdlTransaction: false,
+        } as never),
+      ).resolves.toBeTypeOf("boolean");
+      expect(lease).not.toHaveBeenCalled();
+    } finally {
+      lease.mockRestore();
+      await OtherRecord.removeConnection();
+    }
   });
 });
