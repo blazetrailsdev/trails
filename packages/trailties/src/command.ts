@@ -1,3 +1,4 @@
+import { Trails } from "./rails.js";
 import { presence } from "@blazetrails/activesupport";
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import { File, Pathname, StandardError, env, prepend, rbArgv } from "@blazetrails/ruby-compat";
@@ -160,3 +161,5 @@ async function invokeRake(
   }
   await program.parseAsync(task === "" ? args : [task, ...args], { from: "user" });
 }
+
+Trails.Command = { invoke };

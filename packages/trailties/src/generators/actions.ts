@@ -1,6 +1,7 @@
 import { env as ENV, File, Gem, regexpEscape, Shellwords } from "@blazetrails/ruby-compat";
 import { chomp, indent, stripHeredoc } from "@blazetrails/activesupport";
 import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
+import { Trails } from "../rails.js";
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
 import { createFile } from "@blazetrails/thor/actions/create-file";
 import { gsubFile } from "@blazetrails/thor/actions/file-manipulation";
@@ -177,8 +178,9 @@ export async function railsCommand(
     log.call(this, "rails", command);
     let args: string[];
     [command, ...args] = Shellwords.shellwords(command);
-    const { invoke } = await import("../command.js");
-    return await this.inRoot(() => silenceWarnings(() => invoke(command, args, { ...options })));
+    return await this.inRoot(() =>
+      silenceWarnings(() => Trails.Command!.invoke(command, args, { ...options })),
+    );
   } else {
     return await executeCommand.call(this, "rails", command, options);
   }
