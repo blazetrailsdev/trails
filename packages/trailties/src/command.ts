@@ -1,5 +1,6 @@
 import { presence } from "@blazetrails/activesupport";
-import { env } from "@blazetrails/ruby-compat";
+import { File, Pathname, env } from "@blazetrails/ruby-compat";
+import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";
@@ -17,6 +18,28 @@ export function hiddenCommands(): (typeof Base)[] {
 
 export function environment(): string {
   return presence(env.TRAILS_ENV) ?? presence(env.NODE_ENV) ?? "development";
+}
+
+export function root(): Pathname | undefined {
+  if (ENGINE_ROOT != null) {
+    return new Pathname(ENGINE_ROOT);
+  } else {
+    return applicationRoot();
+  }
+}
+
+/**
+ * @inventedArm endsWith — CONVERGEABLE app-path-expands-to-the-application-root
+ * @inventedArm dirname — CONVERGEABLE app-path-expands-to-the-application-root
+ */
+export function applicationRoot(): Pathname | undefined {
+  if (APP_PATH != null) {
+    const path = File.expandPath("../..", APP_PATH);
+    return new Pathname(
+      APP_PATH.endsWith("/dist/config/application.js") ? File.dirname(path) : path,
+    );
+  }
+  return undefined;
 }
 
 /**

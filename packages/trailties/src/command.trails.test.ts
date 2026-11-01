@@ -1,3 +1,7 @@
+import { afterEach } from "vitest";
+import { setAppPath, setEngineRoot } from "./app-path.js";
+import { root } from "./command.js";
+import type { Base } from "./command/base.js";
 import { Command as Program } from "commander";
 import { describe, it, expect, onTestFinished, vi } from "vitest";
 import { createProgram } from "./cli.js";
@@ -25,7 +29,9 @@ describe("Rails::Command.find_by_namespace", () => {
     const { DevCommand } = await import("./commands/dev.js");
     expect(await findByNamespace("dev", "cache")).toBe(DevCommand);
     expect(programName(await findByNamespace("db", "migrate"))).toBe("db");
-    expect(programName(await findByNamespace("credentials", "edit"))).toBe("credentials");
+    expect(((await findByNamespace("credentials", "edit")) as typeof Base).namespace()).toBe(
+      "credentials",
+    );
   }, 30_000);
 
   it("hides unused_routes from the program, as printing_commands subtracts hidden_commands", async () => {
@@ -66,5 +72,27 @@ describe("Rails::Command.find_by_namespace", () => {
     await expect(findByNamespace("unused_routes")).resolves.toBeDefined();
     await expect(findByNamespace("unused-routes")).resolves.toBeDefined();
     await expect(findByNamespace("active_storage", "install")).resolves.toBeUndefined();
+  });
+});
+
+describe("Rails::Command.root", () => {
+  afterEach(() => {
+    setAppPath(undefined);
+    setEngineRoot(undefined);
+  });
+
+  it("expands the application root from APP_PATH, source or built", () => {
+    setAppPath("/app/config/application.ts");
+    expect(root()?.toString()).toBe("/app");
+    setAppPath("/app/dist/config/application.js");
+    expect(root()?.toString()).toBe("/app");
+    setAppPath("/srv/dist/config/application.ts");
+    expect(root()?.toString()).toBe("/srv/dist");
+  });
+
+  it("prefers ENGINE_ROOT", () => {
+    setAppPath("/app/config/application.ts");
+    setEngineRoot("/engine");
+    expect(root()?.toString()).toBe("/engine");
   });
 });
