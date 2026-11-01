@@ -40,8 +40,7 @@ describe("a hook whose complete answers a promise", () => {
         {
           run: () => null,
           complete: async () => {
-            await Promise.resolve();
-            await Promise.resolve();
+            await new Promise((resolve) => setTimeout(resolve, 5));
             completed = true;
           },
         },
