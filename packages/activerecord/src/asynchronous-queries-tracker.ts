@@ -55,6 +55,7 @@ export class AsynchronousQueriesTracker {
     return this.#stack;
   }
 
+  /** @inventedArm if — PERMANENT */
   finalizeSession(wait = false): this | Promise<this> {
     const session = this.#stack.pop();
     const finalized = session?.finalize(wait);
